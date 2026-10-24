@@ -43,6 +43,7 @@ The world should be believable but fantastic: classic countryside, forests and m
 | D22 | **Target: 60 fps on a mid-range desktop GPU.** Tablets are a later quality tier. | Was O12. |
 | D23 | **Sister repos:** release packages where they exist (Actors); other code is extracted into shared packages as needed, not copied. | Was O13. |
 | D24 | **Textures and assets: generated (AssetGenerator) and CC0 libraries.** Only CC0 or own work ships, with sources recorded. | Was O14. |
+| D25 | **Water is a hero feature, not a prop.** Seas, lakes, rivers and waterfalls look and behave well (waves, foam, depth colour, refraction, flow), the camera can go under the surface with a proper underwater view, and the player can swim. The door stays open for underwater content (sunken places, underwater dungeons and creatures). | Arnd, 2026-10-24. Base: Xenoworld's water. |
 
 ---
 
@@ -349,7 +350,8 @@ Rules for the contract:
 ## 13. Seas and oceans (later, prepared now)
 
 * Coasts and seas are part of the skeleton from day one, so the first town can already lie by a lake or estuary.
-* Rendering and water from Xenoworld: Gerstner-wave seas, shore foam, rivers, waterfalls.
+* Water is a hero feature (D25). Rendering and water from Xenoworld: Gerstner-wave seas, shore foam, depth colour, underwater view, rivers, waterfalls; swimming from the first water milestone.
+* Underwater content later: sunken ruins, underwater caves and dungeons, sea creatures. The VGM can promise them like anything else.
 * Later: boats and ships, harbour towns, sea travel as a journey promise, and **islands across the sea as promises** ("sailors talk of an island beyond the fog"). The ocean is the VGM's largest frontier.
 
 ---

@@ -12,6 +12,10 @@ export const params = {
   pos: q.get('pos')?.split(',').map(Number) ?? null,
   /** View direction `yaw,pitch` in degrees (yaw 0 looks north, 90 east). */
   look: q.get('look')?.split(',').map(Number) ?? null,
+  /** Time of day at the start, hours 0..24. */
+  hour: Number(q.get('hour') ?? 16),
+  /** Real minutes per game day; 0 stops the clock. */
+  dayMinutes: Number(q.get('day') ?? 0),
   /** Setting module id. */
   setting: q.get('setting') ?? 'classic',
 };

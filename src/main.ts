@@ -34,7 +34,7 @@ async function start(): Promise<void> {
     const home = findStart(terrain.skeleton, setting);
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: params.gl });
+    const view = await createView(canvas, { forceWebGL: params.gl, hour: params.hour, dayMinutes: params.dayMinutes });
     const fly = new FlyCamera(view.camera, canvas, (x, z) => terrain.height(x, z));
     const [px, py, pz] = params.pos ?? [home.x, 1.7, home.z];
     if (params.pos?.length === 2) fly.place(px, py, terrain.height(px, py) + 1.7);
@@ -47,6 +47,7 @@ async function start(): Promise<void> {
     useGroundTextures(await loadGroundTextures(texPool));
     texPool.dispose();
 
+    view.sky.update(0, view.camera);
     loading.set('Preparing shaders');
     await view.stage.warmUp();
     loading.set('Raising the land');
@@ -58,6 +59,7 @@ async function start(): Promise<void> {
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       fly.update(dt);
+      view.sky.update(dt, view.camera);
       ground.update(view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
