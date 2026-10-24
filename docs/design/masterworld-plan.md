@@ -1,6 +1,6 @@
 # MasterWorld: plan
 
-Living document. Status: **draft 2, open for discussion, no code yet.** Draft 2 adds Arnd's decisions of 2026-10-24 (D9–D16), including the region quadtree.
+Living document. Status: **draft 2, open for discussion, no code yet.** Draft 2 adds Arnd's decisions of 2026-10-24 (D9–D18), including the region quadtree and the hybrid terrain.
 Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld). The `MasterWorld` repo was empty.
 
 ---
@@ -27,7 +27,7 @@ The world should be believable but fantastic: classic countryside, forests and m
 | D6 | **Believable but fantastic overworld**: classic countryside, towns and cities on demand. **One small town at the start.** | |
 | D7 | **Think big.** Seas and oceans come later and must fit without a rewrite. | The world skeleton has coasts and seas from day one (section 5). |
 | D8 | **Skills and magic: start from Norgo's system**, to be discussed. | Section 10. |
-| D9 | **Height field overworld**, as long as dungeons can still be good. | They can: dungeons are their own full 3D spaces (section 8). |
+| D9 | **Hybrid terrain:** a height field for the big shapes, local voxel/SDF volumes where the drama is (overhangs, arches, cave mouths), hero rock meshes for dressing. | Revised after D18: a pure height field cannot do overhangs or natural caves. Section 5.6. Dungeons are their own full 3D spaces (section 8). |
 | D10 | **The VGM may add land or things wherever it makes sense, and may change things when the story calls for it.** | The village got burned or raided; goblins took the dungeon and drove the kobolds out. Section 4.5. |
 | D11 | **Ability unlocks from skills and from other sources** (trainers, tomes, quests, items, deeds). | Section 10. |
 | D12 | **Game modes like Dunfinity:** roguelike (permadeath) or classic save. | Section 11. |
@@ -35,6 +35,8 @@ The world should be believable but fantastic: classic countryside, forests and m
 | D14 | **The setting is a module.** Everything world-related sits behind one big, exchangeable contract. The default module is a classic small-town start. | Section 12. |
 | D15 | **Norgo's GM is inspiration only.** It served a different purpose; MasterWorld's VGM is designed fresh. | Section 4. |
 | D16 | **Regions are aligned squares in powers of two, from 250 m up.** A bigger region that would leave holes next to existing ones has the holes filled with smaller regions. | Arnd's proposal: no chess board, still predictable sizes. Section 5.5. |
+| D17 | **Hero-class graphics and assets from the start.** | Section 5.7. |
+| D18 | **The landscape is dramatic, not realistic.** | Believable in structure (rivers run downhill), exaggerated in form. Section 5.6. |
 
 ---
 
@@ -172,6 +174,23 @@ Refinements (proposals):
 * **The frontier** is the outer edge of all opened regions. When the player gets close, the VGM opens a region beyond it, sized for whatever the Director wants there.
 * **Addresses**: a region is `(level, x, z)` with `size = 250 m × 2^level`. Parent and children follow by halving and doubling, which makes lookup, saves and later multiplayer sharding simple.
 
+### 5.6 Hybrid terrain for a dramatic landscape (D9, D18)
+
+A pure height field stores one height per point, so overhangs, arches and natural cave mouths are impossible in it. A dramatic landscape needs them, so the terrain has three layers:
+
+1. **Height field: the big shapes.** Steep, exaggerated ranges, mesas, terraces, deep gorges, sea cliffs seen from afar. Cheap to draw to the horizon, simple LOD, good for seas and rivers. Drama here comes from shaping: ridged and terraced noise, vertical exaggeration, sharp erosion, and a setting module that may ask for more (D14).
+2. **Local volumes: where the drama is.** Small voxel or SDF pieces on top of the height field, meshed with surface nets (Norgo and Xenoworld already do this). They give overhangs, natural arches, karst towers, floating rocks if the setting wants them, and cave mouths that flow from the ground into a dungeon. A volume blends into the height field around its edge, so there is no visible seam. The VGM places them like any other feature ("a stone arch over the pass", "a cave mouth under the waterfall").
+3. **Hero rock meshes: dressing.** Boulders, cliff faces, spires and rubble from AssetGenerator, scattered by rules.
+
+The voxel cost is paid only where it is worth it. Geomancy (section 10) can edit volumes and spawn rock pieces; it does not dig through the height field.
+
+### 5.7 Hero-class graphics (D17)
+
+* Every asset and material aims for hero quality from the first milestone. Placeholders are allowed only behind a flag, never as the shipped default.
+* The shader policy ([docs/SHADERS.md](../SHADERS.md)) already assumes a **closed set of high-quality materials**: a few excellent material kinds (terrain blend, rock with triplanar mapping for volumes, foliage, water, skin from Actors, cloth, metal, stone, wood) beat many mediocre ones.
+* Lighting, sky, atmosphere and fog carry much of the drama: a strong time-of-day cycle, aerial perspective over long views, volumetric light where the budget allows.
+* Art style, rendering backend and target hardware are open questions (O10–O12) to settle before the first milestone.
+
 ---
 
 ## 6. The start
@@ -213,8 +232,8 @@ Classic and bounded: a beginning, a middle, an end, with a boss or a treasure or
 
 The purpose also tells the Director what to hint ("the dwarves sealed the lower galleries"), what lives there, and what the treasure is.
 
-* Dungeons are **their own spaces**, entered through doors, stairs or cave mouths. This keeps them bounded, lets the overworld stay a cheaper height field (D9), and gives clear loading points.
-* **A height field does not limit dungeons.** Inside, a dungeon is a full 3D mesh: overhangs, chasms, multi-level halls, bridges, flooded galleries, even local voxel or SDF geometry where a cave wants it. Only the overworld surface is a height field. Where the two meet, the entrance is a prop or a small hand-shaped piece of terrain (a cave mouth, a cellar hatch, a crypt door in a hillside), with a hole cut in the height field when needed.
+* Dungeons are **their own spaces**, entered through doors, stairs or cave mouths. This keeps them bounded and gives clear loading points. A cave mouth is a terrain volume (5.6), so the outside flows naturally into the inside.
+* **Inside, a dungeon is full 3D**: overhangs, chasms, multi-level halls, bridges, flooded galleries, voxel or SDF caves where natural rock is wanted, built pieces where people made it. Built entrances (a cellar hatch, a crypt door in a hillside) are props.
 * Dungeons change through story events too (D10): when goblins drive out the kobolds, the layout stays, the inhabitants, dressing and traps change.
 * From Dunfinity: styles, rock and brick materials, lighting, creatures. From AssetGenerator: props and dressing.
 * Once outlined, a dungeon is fixed. The player's changes are stored as diffs.
@@ -243,7 +262,7 @@ Decided: **a mix** (D11). Skill levels still unlock abilities, and other sources
 
 Still open:
 
-* **Which schools fit this world?** Gravitas was tied to Norgo's variable gravity. With a height field (D9), geomancy's walls and pillars become spawned rock pieces and small local raises; digging tunnels through the overworld is out, inside dungeons it is possible where the dungeon's geometry allows it.
+* **Which schools fit this world?** Gravitas was tied to Norgo's variable gravity. With hybrid terrain (D9), geomancy can shape the local volumes and spawn rock pieces (walls, pillars, bridges); digging through the height field itself is out, and inside dungeons it works where the geometry is a volume.
 * **Where does magic come from in the lore?** That shapes which NPCs teach it and what the VGM may hint.
 * **Keep the recipe format.** It is the part most worth porting as is.
 
@@ -331,7 +350,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 
 | # | Question | Notes |
 |---|---|---|
-| O1 | ~~Height field or voxel terrain?~~ | **Decided: height field** (D9). |
+| O1 | ~~Height field or voxel terrain?~~ | **Decided: hybrid** (D9, 5.6). |
 | O2 | Travel speed | Region sizes are decided (D16). Travel speed drives build-ahead time. |
 | O3 | ~~How far may the VGM go in soft land?~~ | **Decided** (D10): wherever it makes sense; known things change through story events. |
 | O4 | Skills and magic | Mix decided (D11). Open: which schools, the source of magic (section 10). |
@@ -339,13 +358,18 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | O6 | ~~Combat feel~~ | **Decided** (D13): real-time, tab targeting. |
 | O7 | Lore of the default module | Shapes everything the VGM hints (section 12). |
 | O8 | ~~Which Norgo code is ported?~~ | **Decided** (D15): the GM is inspiration only. Skills, abilities and the worker split are candidates to port. |
+| O10 | **Art style** for hero graphics | Stylised-painterly (ages well, fits dramatic land, cheaper to keep consistent) or realistic PBR. Proposal: stylised PBR, dramatic lighting. |
+| O11 | **Rendering backend and stack** | Proposal: like Dunfinity, three.js on WebGPU with WebGL 2 fallback, Vite, TypeScript strict, Rapier for physics, generation in workers. |
+| O12 | **Target hardware and frame rate** | Proposal: 60 fps on a mid-range desktop GPU; tablets are a later quality tier. Decides how far hero graphics can go. |
+| O13 | **How sister repos are shared** | Actors ships as a release package. Dunfinity's and Scale's generators are not packaged yet: copy and own, or extract shared packages (AssetGenerator's `packages/`)? Proposal: release packages where they exist, extract the rest into shared packages as we need them. |
+| O14 | **Textures and asset sources** | Hero quality needs good textures. Generated (AssetGenerator), CC0 libraries, or both? License rules for what may ship. |
 | O9 | Footprint rules | When a footprint reaches into a neighbouring region (5.5), and when a town grows into a forest: what wins? |
 
 ---
 
 ## 17. Milestones (proposal)
 
-1. **Walk the land**: the setting module contract (a first cut), skeleton, one open region, height field terrain, sky, water, the player walking.
+1. **Walk the land**: the setting module contract (a first cut), skeleton, one open region, hybrid terrain (height field plus a first volume: an arch or a cave mouth), sky, water, hero-quality materials and lighting, the player walking.
 2. **The town**: one medieval small town (Scale planner + medieval style), Actors townsfolk.
 3. **The first promise**: ledger, Conversations hint, one cellar dungeon built through the three stages.
 4. **The Director**: needs, tension curve, the first combat and rewards.
