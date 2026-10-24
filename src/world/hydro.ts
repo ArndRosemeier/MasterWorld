@@ -9,7 +9,7 @@
  * filled basins are lakes. Rivers become smooth polylines whose meanders depend on world position only, so
  * neighbouring tiles agree where they overlap.
  */
-import { MinHeap, Noise, clamp, deriveSeed, hash2f } from '@futuremagic/core';
+import { MinHeap, Noise, clamp, deriveSeed, hash2f, smoothstep } from '@futuremagic/core';
 import type { Skeleton } from './skeleton';
 
 export interface HydroOptions {
@@ -39,6 +39,17 @@ const LAKE_MIN_CELLS = 2;
 const LAKE_SHARE = 0.35;
 /** Spacing of river polyline points after resampling, metres. */
 const STEP = 80;
+/**
+ * Waterfalls: where a river drops at least FALL_MIN metres within FALL_RUN metres, the drop may gather into
+ * one fall (a seeded FALL_SHARE of such places, at least FALL_SPACING metres apart), and the reach below it
+ * lies flat at the lower level (the gorge a retreating fall leaves). Elsewhere rivers keep their even slope.
+ */
+const FALL_MIN = 12;
+const FALL_RUN = 800;
+const FALL_SPACING = 1500;
+const FALL_SHARE = 0.5;
+/** Horizontal width of the lip, metres: the drop happens within it. */
+export const FALL_LIP = 1.6;
 
 export interface River {
   /** World xz of the points, interleaved. */
@@ -47,6 +58,8 @@ export interface River {
   level: Float32Array;
   /** Half width at each point, metres. */
   half: Float32Array;
+  /** Height of the waterfall in each segment (at its middle), 0 where there is none. */
+  fall: Float32Array;
 }
 
 /** What the water does at one point (filled by `HydroTile.query`). */
@@ -64,9 +77,13 @@ export interface WaterHere {
   valley: number;
   /** Lake level here (the cell is a lake), else NaN. */
   lake: number;
+  /** Distance downstream from the nearest waterfall's lip (negative above it), Infinity when none is near; its height and the level at its foot. */
+  fallAt: number;
+  fallDrop: number;
+  fallBase: number;
 }
 
-export const emptyWater = (): WaterHere => ({ river: false, dist: Infinity, half: 0, level: 0, depth: 0, fx: 0, fz: 0, valley: 0, lake: NaN });
+export const emptyWater = (): WaterHere => ({ river: false, dist: Infinity, half: 0, level: 0, depth: 0, fx: 0, fz: 0, valley: 0, lake: NaN, fallAt: Infinity, fallDrop: 0, fallBase: 0 });
 
 /** Half width (m) of a river draining `areaKm2`. */
 export const riverHalf = (areaKm2: number): number => 0.6 * Math.sqrt(areaKm2);
@@ -261,7 +278,21 @@ export class HydroTile {
     xz.push(X[X.length - 1], Z[Z.length - 1]); lv.push(L[L.length - 1]); hw.push(H[H.length - 1]);
     // Never rise downstream.
     for (let k = 1; k < lv.length; k++) lv[k] = Math.min(lv[k], lv[k - 1]);
-    return { xz: Float64Array.from(xz), level: Float32Array.from(lv), half: Float32Array.from(hw) };
+    const fall = new Float32Array(lv.length - 1);
+    const seed = deriveSeed(this.skeleton.seed, 'falls');
+    for (let a = 0, last = -Infinity, k = 1; k < lv.length; k++) {
+      if (lv[a] - lv[k] >= FALL_MIN && k - a >= 2) {
+        // Which places fall is a property of the place, so neighbouring tiles agree.
+        const keep = (a - last) * STEP >= FALL_SPACING && hash2f(seed, Math.round(xz[a * 2] / 50), Math.round(xz[a * 2 + 1] / 50)) < FALL_SHARE;
+        if (keep) {
+          fall[a] = lv[a] - lv[k];
+          for (let j = a + 1; j < k; j++) lv[j] = lv[k];
+          last = a;
+        }
+        a = k;
+      } else if ((k - a) * STEP > FALL_RUN) a++;
+    }
+    return { xz: Float64Array.from(xz), level: Float32Array.from(lv), half: Float32Array.from(hw), fall };
   }
 
   private get meander(): Noise {
@@ -289,7 +320,7 @@ export class HydroTile {
 
   /** The water at (x, z): the nearest river whose valley reaches here, and the lake of this cell. */
   query(x: number, z: number, out: WaterHere = emptyWater()): WaterHere {
-    out.river = false; out.dist = Infinity; out.lake = NaN;
+    out.river = false; out.dist = Infinity; out.lake = NaN; out.fallAt = Infinity; out.fallDrop = 0;
     const list = this.buckets.get(this.key(Math.floor(x / this.bucket), Math.floor(z / this.bucket)));
     let best = Infinity;
     if (list) for (let q = 0; q < list.length; q += 2) {
@@ -310,6 +341,16 @@ export class HydroTile {
       out.level = r.level[k] + (r.level[k + 1] - r.level[k]) * t;
       out.depth = riverDepth(half);
       out.fx = dx / l; out.fz = dz / l;
+      out.fallAt = Infinity; out.fallDrop = 0;
+      if (r.fall[k] > 0) {
+        // The drop happens at the lip, mid-segment; the level is flat on both sides of it.
+        const along = t * l - l / 2;
+        out.level = r.level[k + 1] + r.fall[k] * (1 - smoothstep(-FALL_LIP / 2, FALL_LIP / 2, along));
+        out.fallAt = along; out.fallDrop = r.fall[k]; out.fallBase = r.level[k + 1];
+      } else if (k > 0 && r.fall[k - 1] > 0) {
+        const pl = Math.hypot(ax - r.xz[k * 2 - 2], az - r.xz[k * 2 - 1]);
+        out.fallAt = pl / 2 + t * l; out.fallDrop = r.fall[k - 1]; out.fallBase = r.level[k];
+      }
     }
     const i = Math.floor((x - this.x0) / this.o.cell), j = Math.floor((z - this.z0) / this.o.cell);
     if (i >= 0 && j >= 0 && i < this.n && j < this.n) out.lake = this.lake[j * this.n + i];

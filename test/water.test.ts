@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { Terrain } from '../src/world/terrain';
 import { Skeleton } from '../src/world/skeleton';
-import { HydroTile, type HydroOptions } from '../src/world/hydro';
+import { HydroTile, riverDepth, type HydroOptions } from '../src/world/hydro';
 import { classic } from '../src/setting/classic/index';
 import { DRY, SEA_LEVEL, waterMask } from '../src/world/water';
 
@@ -71,4 +71,40 @@ test('water mask: sea at level 0, rivers at their level with flow, land dry', ()
     if (depth <= DRY / 3) dry++;
   }
   assert.ok(sea > 20 && dry > 20, `sea ${sea}, dry ${dry}`);
+});
+
+test('hydro: waterfalls are rare, spaced out, and step the level down', () => {
+  let falls = 0, segs = 0;
+  for (const r of tile.rivers) {
+    let last = -Infinity;
+    segs += r.fall.length;
+    for (let k = 0; k < r.fall.length; k++) {
+      if (!(r.fall[k] > 0)) continue;
+      falls++;
+      assert.ok(k - last >= 1500 / 80, 'falls too close together');
+      last = k;
+      assert.ok(Math.abs(r.level[k] - r.level[k + 1] - r.fall[k]) < 1e-3, 'fall height is the step in level');
+    }
+  }
+  assert.ok(falls > 0, 'no waterfalls');
+  assert.ok(falls / segs < 0.02, `${falls} falls in ${segs} segments`);
+});
+
+test('terrain: a waterfall drops over a cliff into a pool', () => {
+  const t = terrain;
+  const tl = t.hydro.tileAt(-32000, 32000);
+  let checked = 0;
+  for (const r of tl.rivers) for (let k = 0; k < r.fall.length && checked < 5; k++) {
+    if (!(r.fall[k] > 0)) continue;
+    const ax = r.xz[k * 2], az = r.xz[k * 2 + 1], bx = r.xz[k * 2 + 2], bz = r.xz[k * 2 + 3];
+    const l = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / l, uz = (bz - az) / l;
+    const at = (s: number) => [ax + ux * (l / 2 + s), az + uz * (l / 2 + s)] as const;
+    const w = t.hydro.query(...at(-8));
+    if (!w.river || w.fallDrop !== r.fall[k]) continue; // another river wins here
+    const top = t.hydro.query(...at(-8)).level, foot = t.hydro.query(...at(8)).level;
+    assert.ok(Math.abs(top - foot - r.fall[k]) < 0.01, 'the level steps at the lip');
+    assert.ok(t.height(...at(8)) < foot - riverDepth(w.half), 'a pool below the fall');
+    checked++;
+  }
+  assert.ok(checked > 0, 'no waterfall checked');
 });
