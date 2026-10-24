@@ -12,7 +12,7 @@ import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import type { GroundTextures } from './terrain/groundTextures';
 import type { Surface } from '../setting/contract';
-import { WATER } from './materials/waterInputs';
+import { WATER, waterAt } from './materials/waterInputs';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 
@@ -127,7 +127,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   pert = mix(pert, vec3(tn(snow.n).x, 0, tn(snow.n).y), snowB);
 
   // At the water: wet, dark and glossy along the waterline; under it, caustics from the waves above.
-  const below = WATER.level.sub(p.y);
+  const below = waterAt(p.xz).x.sub(p.y);
   const wet = smoothstep(-1.2, -0.2, below).mul(float(1).sub(snowB));
   col = col.mul(mix(float(1), float(0.55), wet));
   rough = mix(rough, float(0.25), wet.mul(smoothstep(0.6, 0.95, up)));

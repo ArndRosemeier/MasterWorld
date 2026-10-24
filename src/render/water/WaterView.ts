@@ -1,14 +1,14 @@
 /**
- * The sea: one camera-centred radial mesh at sea level (Xenoworld's design: water quads per chunk never
- * line up across detail levels). Where water is and how deep comes from depth masks baked in a worker:
- * a near one for shores, a far one to the horizon.
+ * The water: one camera-centred radial mesh for sea, lakes and rivers (Xenoworld's design: water quads per chunk never
+ * line up across detail levels). Each vertex takes its height from water masks baked in a worker (surface
+ * level, depth and flow): a near one for shores and small rivers, a
+ * mid one for larger rivers and lakes, a far one to the horizon.
  */
 import { BufferGeometry, Float32BufferAttribute, Mesh, type Vector3 } from 'three/webgpu';
 import { deriveSeed, Rng } from '@futuremagic/core';
 import type { SkyLight } from '@futuremagic/sky';
-import { WATER, type DepthMask } from '../materials/waterInputs';
+import { WATER, type WaterMask } from '../materials/waterInputs';
 import { WATER_KIND } from '../materials/water';
-import { MASK_RES, decodeDepth } from '../../world/water';
 import type { WaterPool } from '../../workers/pool';
 
 function radialGrid(segments: number, rings: number, r0: number, growth: number): BufferGeometry {
@@ -33,7 +33,7 @@ function radialGrid(segments: number, rings: number, r0: number, growth: number)
   return g;
 }
 
-interface MaskState { mask: DepthMask; ready: boolean; pending: boolean; x0: number; z0: number }
+interface MaskState { mask: WaterMask; ready: boolean; pending: boolean; x0: number; z0: number }
 
 export class WaterView {
   readonly mesh: Mesh;
@@ -46,29 +46,29 @@ export class WaterView {
     this.mesh.name = 'sea';
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
-    this.masks = [WATER.near, WATER.far].map((mask) => ({ mask, ready: false, pending: false, x0: 1e9, z0: 1e9 }));
+    this.masks = [WATER.near, WATER.mid, WATER.far].map((mask) => ({ mask, ready: false, pending: false, x0: 1e9, z0: 1e9 }));
     const a = new Rng(deriveSeed(seed, 'wind')).float() * Math.PI * 2;
     WATER.wind.value.set(Math.cos(a), Math.sin(a));
   }
 
   get ready(): boolean { return this.masks.every((m) => m.ready); }
 
-  /** Sea depth at a point from the masks (metres; negative on land), or null where no mask has data. */
-  depthAt(x: number, z: number): number | null {
+  /** Water surface level and depth at a point (nearest mask sample), or null where no mask has data. */
+  waterAt(x: number, z: number): { level: number; depth: number } | null {
     for (const s of this.masks) {
       if (!s.ready) continue;
-      const u = (x - s.x0) / s.mask.side, v = (z - s.z0) / s.mask.side;
+      const res = s.mask.res, u = (x - s.x0) / s.mask.side, v = (z - s.z0) / s.mask.side;
       if (u < 0 || v < 0 || u >= 1 || v >= 1) continue;
-      const i = Math.floor(u * MASK_RES), j = Math.floor(v * MASK_RES);
-      return decodeDepth(s.mask.data[(j * MASK_RES + i) * 4]);
+      const p = (Math.floor(v * res) * res + Math.floor(u * res)) * 4;
+      return { level: s.mask.data[p], depth: s.mask.data[p + 1] };
     }
     return null;
   }
 
   /** True when `p` is under the water surface (calm level; waves are within a metre or two). */
   submerged(p: Vector3): boolean {
-    const d = this.depthAt(p.x, p.z);
-    return d !== null && p.y < WATER.level.value && d > WATER.level.value - p.y - 0.3;
+    const w = this.waterAt(p.x, p.z);
+    return w !== null && w.depth > 0 && p.y < w.level - 0.05;
   }
 
   private refresh(s: MaskState, cam: Vector3): void {
@@ -78,7 +78,7 @@ export class WaterView {
     const snap = side / 16;
     const x0 = Math.round(cam.x / snap) * snap - half, z0 = Math.round(cam.z / snap) * snap - half;
     s.pending = true;
-    void this.pool.run({ seed: this.seed, setting: this.setting, x0, z0, size: side, res: MASK_RES }).then((px) => {
+    void this.pool.run({ seed: this.seed, setting: this.setting, x0, z0, size: side, res: s.mask.res }).then((px) => {
       s.mask.data.set(px);
       s.mask.tex.needsUpdate = true;
       s.mask.origin.value.set(x0, z0);
@@ -100,7 +100,7 @@ export class WaterView {
     this.time += dt;
     WATER.time.value = this.time;
     const snap = 4;
-    WATER.center.value.set(Math.round(cam.x / snap) * snap, WATER.level.value, Math.round(cam.z / snap) * snap);
+    WATER.center.value.set(Math.round(cam.x / snap) * snap, 0, Math.round(cam.z / snap) * snap);
     this.mesh.position.copy(WATER.center.value);
     WATER.sunDir.value.set(...L.lightDir);
     const sun = L.lightIntensity * gain, sky = L.hemiIntensity * gain * 0.7;
