@@ -7,11 +7,12 @@
  * vertex attributes or uniforms, never into a new material.
  */
 import { DoubleSide, MeshStandardNodeMaterial, type Material, type Mesh } from 'three/webgpu';
-import { abs, attribute, cameraViewMatrix, dot, float, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
+import { Fn, If, vec2, abs, attribute, cameraViewMatrix, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import type { GroundTextures } from './terrain/groundTextures';
 import type { Surface } from '../setting/contract';
+import { WATER } from './materials/waterInputs';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 
@@ -124,6 +125,27 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const snowB = hblend(snowT, h.sub(snow.n.b), 1.5);
   col = mix(col, snow.a.rgb, snowB); rough = mix(rough, snow.a.a, snowB); ao = mix(ao, snow.n.a, snowB);
   pert = mix(pert, vec3(tn(snow.n).x, 0, tn(snow.n).y), snowB);
+
+  // At the water: wet, dark and glossy along the waterline; under it, caustics from the waves above.
+  const below = WATER.level.sub(p.y);
+  const wet = smoothstep(-1.2, -0.2, below).mul(float(1).sub(snowB));
+  col = col.mul(mix(float(1), float(0.55), wet));
+  rough = mix(rough, float(0.25), wet.mul(smoothstep(0.6, 0.95, up)));
+  // Caustics only where there is water above (a branch: the land above the sea pays nothing).
+  m.emissiveNode = Fn(() => {
+    const e = vec3(0).toVar();
+    If(below.greaterThan(0.05), () => {
+      const t = WATER.time;
+      // Warped, so the cells wobble like light through waves instead of tiling like paving stones.
+      const q = p.xz.add(vec2(mx_noise_float(vec3(p.xz.mul(0.35), t.mul(0.3))), mx_noise_float(vec3(p.xz.mul(0.35).add(9.1), t.mul(0.3)))).mul(0.9));
+      const a = mx_worley_noise_vec2(q.mul(1.3).add(vec2(t.mul(0.25), t.mul(0.16))));
+      const b = mx_worley_noise_vec2(q.mul(1.85).add(vec2(t.mul(-0.19), t.mul(0.27))).add(5.1));
+      const lines = float(1).sub(smoothstep(0.0, 0.16, a.y.sub(a.x))).mul(float(1).sub(smoothstep(0.0, 0.2, b.y.sub(b.x))).mul(0.6).add(0.4));
+      const k = lines.mul(smoothstep(0.05, 0.7, below)).mul(exp(below.mul(-0.12))).mul(clamp(WATER.sunDir.y.mul(3), 0, 1));
+      e.assign(col.mul(WATER.sunColor).mul(k).mul(0.15));
+    });
+    return e;
+  })();
 
   const nw = normalize(n.add(pert.mul(0.9)));
   // texgen albedos are physical (grass ~0.08 linear); the lift keeps the land readable under our light rig.

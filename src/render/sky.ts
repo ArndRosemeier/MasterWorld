@@ -4,7 +4,7 @@
  * (the environment map, shadows, fog type) is set up in the constructor, before the warm-up.
  */
 import { BoxGeometry, FogExp2, Mesh, PMREMGenerator, Scene, type DirectionalLight, type HemisphereLight, type OrthographicCamera, type PerspectiveCamera, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
-import { CLEAR, moonAt, skyLight, skyPath, type SkyWeather, type Vec3 } from '@futuremagic/sky';
+import { CLEAR, moonAt, skyLight, skyPath, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
 import { SKY, makeEnvSky, skyUniforms, type SkyUniforms } from './materials';
 
 /** Half the side of the sun's shadow box around the camera, metres. */
@@ -16,6 +16,8 @@ const SHADOW_MAP = 4096;
  */
 const EXPOSURE = 1.15;
 const LIGHT = 3.4;
+/** The environment (sky) light on the land and in the water's reflections. */
+export const ENV = 1.6;
 /** The world is large: fog thinner than Scale's city. */
 const FOG_SCALE = 0.35;
 
@@ -27,8 +29,15 @@ export class SkyView {
   dayMinutes: number;
   weather: SkyWeather = { ...CLEAR };
   readonly sunDir: Vec3 = [0, 1, 0];
+  /** The light of the last update (the water reads it). */
+  light!: SkyLight;
+  /** Multiplier on Scale's light rig (see LIGHT). */
+  readonly gain = LIGHT;
+  /** The camera is under water: fog turns to the water's own colour. */
+  underwater = false;
 
-  private readonly dome: Mesh;
+  /** The dome; it goes in with `stage.add` after the warm-up has compiled its kind (drawing it before would build it on the spot). */
+  readonly dome: Mesh;
   private readonly U: SkyUniforms;
   private readonly envScene = new Scene();
   private readonly envSky: Mesh;
@@ -55,18 +64,18 @@ export class SkyView {
     this.dome.renderOrder = -1000;
     this.dome.frustumCulled = false;
     this.U = skyUniforms(mat);
-    scene.add(this.dome);
     scene.background = null;
     this.fog = new FogExp2(0xbfd0e0, 0.00004);
     scene.fog = this.fog;
 
     this.envSky = makeEnvSky();
+    this.envSky.name = 'env sky';
     this.envSky.scale.setScalar(1000);
     this.envU = skyUniforms(this.envSky.material as never);
     this.envScene.add(this.envSky);
     this.pmrem = new PMREMGenerator(renderer);
-    // An environment map from the start: it is part of every lit shader's key. Later refreshes render into
-    // the same target, so no shader is built again.
+    // An environment map from the start: it is part of every lit shader's key. Later refreshes (the first in
+    // `update`, once the sky's uniforms are set) render into the same target, so no shader is built again.
     this.envRT = this.pmrem.fromScene(this.envScene, 0, 1, 2000);
     scene.environment = this.envRT.texture;
 
@@ -81,6 +90,9 @@ export class SkyView {
     this.update(0, null);
   }
 
+  /** The sky's environment map (reflections). */
+  get envTexture() { return this.envRT.texture; }
+
   /** Once per frame. `camera` null: only the light (the constructor). */
   update(dt: number, camera: PerspectiveCamera | null): void {
     if (this.dayMinutes > 0) {
@@ -91,6 +103,7 @@ export class SkyView {
     const sun = skyPath(this.hour, this.sunDir);
     const moon = moonAt(this.hour, this.day * 24 + this.hour, sun);
     const L = skyLight(sun, moon, this.weather);
+    this.light = L;
     const wx = this.weather;
     for (const U of [this.U, this.envU]) {
       U.sunPosition.value.set(sun[0], sun[1], sun[2]);
@@ -110,7 +123,15 @@ export class SkyView {
     this.hemi.intensity = L.hemiIntensity * LIGHT * 0.7;
     this.fog.color.setRGB(...L.fogColor);
     this.fog.density = L.fogDensity * FOG_SCALE;
-    this.scene.environmentIntensity = L.envIntensity * LIGHT;
+    this.dome.visible = !this.underwater;
+    this.scene.background = this.underwater ? this.fog.color : null;
+    if (this.underwater) {
+      // Light fades fast with depth of view under water; blue-green, dimmer at night.
+      const k = 0.15 + 0.85 * L.day;
+      this.fog.color.setRGB(0.03 * k, 0.17 * k, 0.19 * k);
+      this.fog.density = 0.022;
+    }
+    this.scene.environmentIntensity = L.envIntensity * ENV;
     this.renderer.toneMappingExposure = L.exposure * EXPOSURE;
 
     // The shadow box follows the camera, snapped to texels so edges do not shimmer.
@@ -127,7 +148,7 @@ export class SkyView {
     const l = this.lastEnvSun;
     if (Math.hypot(l[0] - sun[0], l[1] - sun[1], l[2] - sun[2]) > 0.02) {
       l[0] = sun[0]; l[1] = sun[1]; l[2] = sun[2];
-      if (camera) this.pmrem.fromScene(this.envScene, 0, 1, 2000, { renderTarget: this.envRT } as never);
+      this.pmrem.fromScene(this.envScene, 0, 1, 2000, { renderTarget: this.envRT } as never);
     }
   }
 }

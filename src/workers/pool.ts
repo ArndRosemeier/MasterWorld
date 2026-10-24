@@ -57,3 +57,10 @@ export type TexturePool = WorkerPool<import('./texture.worker').TextureJob, impo
 export function createTexturePool(size?: number): TexturePool {
   return new WorkerPool(() => new Worker(new URL('./texture.worker.ts', import.meta.url), { type: 'module' }), size);
 }
+
+export type WaterPool = WorkerPool<import('../world/water').DepthJob, Uint8Array>;
+
+/** Water depth masks around the camera (one worker: a mask now and then). */
+export function createWaterPool(): WaterPool {
+  return new WorkerPool(() => new Worker(new URL('./water.worker.ts', import.meta.url), { type: 'module' }), 1);
+}

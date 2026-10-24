@@ -5,7 +5,9 @@ import { params } from './app/params';
 import { FlyCamera } from './app/flyCamera';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
-import { createTerrainPool, createTexturePool } from './workers/pool';
+import { createTerrainPool, createTexturePool, createWaterPool } from './workers/pool';
+import { WaterView } from './render/water/WaterView';
+import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures } from './render/terrain/groundTextures';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
@@ -48,18 +50,27 @@ async function start(): Promise<void> {
     texPool.dispose();
 
     view.sky.update(0, view.camera);
+    loading.set('Filling the seas');
+    useWaterEnvironment(view.sky.envTexture);
+    const water = new WaterView(createWaterPool(), seed, setting.id);
+    await water.prime(view.camera.position);
+    water.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
     await view.stage.warmUp();
     loading.set('Raising the land');
     const ground = new TerrainView(view.stage, createTerrainPool(), seed, setting.id, (x, z) => terrain.height(x, z));
     await ground.ready(view.camera);
+    await view.stage.add(view.sky.dome);
+    await view.stage.add(water.mesh);
 
     const hud = document.getElementById('hud');
     let last = performance.now();
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       fly.update(dt);
+      view.sky.underwater = water.submerged(view.camera.position);
       view.sky.update(dt, view.camera);
+      water.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
