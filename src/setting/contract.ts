@@ -15,6 +15,8 @@ export interface BiomeDef {
   readonly temperature: readonly [number, number];
   /** Moisture range, 0 (desert) to 1 (rainforest). */
   readonly moisture: readonly [number, number];
+  /** Ground colour (sRGB hex) of open land in this biome; rock, snow and sand come from the terrain material. */
+  readonly ground: number;
   /** Optional elevation range in metres above the sea. */
   readonly elevation?: readonly [number, number];
 }
@@ -48,6 +50,8 @@ export interface StartSpec {
   readonly elevation: readonly [number, number];
   /** Steepest ground under the town, rise per metre. */
   readonly maxSlope: number;
+  /** Least height difference within 6 km of the start, metres: something to look at (D18). */
+  readonly vista: number;
 }
 
 export interface SettingModule {
@@ -83,5 +87,6 @@ export function validateSetting(m: SettingModule): string[] {
   for (const id of m.start.biomes) if (!ids.has(id)) out.push(`${where}: start biome "${id}" is not defined`);
   if (!(m.start.elevation[0] >= 0 && m.start.elevation[0] < m.start.elevation[1])) out.push(`${where}: start.elevation must be a rising range above the sea`);
   if (!(m.start.maxSlope > 0)) out.push(`${where}: start.maxSlope must be > 0`);
+  if (!(m.start.vista >= 0)) out.push(`${where}: start.vista must be >= 0`);
   return out;
 }

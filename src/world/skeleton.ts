@@ -77,17 +77,28 @@ export class Skeleton {
       return -lerp(2, w.seaDepth, d * d);
     }
     const coastRamp = smoothstep(0, 0.12, c);
-    // Lowlands: broad rolling ground and hills.
-    const plains = 25 + 140 * c + this.hillNoise.fbm2(x / 9000, z / 9000, 4) * 90;
-    const hills = Math.max(0, this.hillNoise.fbm2(x / 2600 + 13.1, z / 2600 - 7.7, 4)) * 160;
+    // Relief: some country is gentle, some rugged, changing over tens of kilometres.
+    const relief = smoothstep(-0.35, 0.55, this.hillNoise.fbm2(x / 40_000 + 5.3, z / 40_000 - 2.1, 3));
+    const amp = lerp(45, 560, relief) * (0.55 + 0.45 * w.drama);
+    // Lowlands: broad swells, ridged hills with real valleys between them, and rolling ground.
+    const plains = 20 + 120 * c + this.hillNoise.fbm2(x / 12_000, z / 12_000, 3) * 60;
+    const ridges = this.hillNoise.ridgedTerrain2(x / 5200 + 13.1, z / 5200 - 7.7, 5, 1.2 + w.drama * 0.6);
+    const rolling = this.hillNoise.fbm2(x / 1500 - 3.7, z / 1500 + 8.2, 3) * 0.15;
+    let land = plains + amp * (ridges + rolling);
+    // Drama: escarpments and mesas: terraces cut into rugged hill country.
+    if (w.drama > 0) {
+      const step = 70;
+      const terraced = Math.floor(land / step) * step + step * smoothstep(0.3, 0.7, (land % step) / step);
+      land = lerp(land, terraced, w.drama * 0.7 * smoothstep(0.45, 0.8, relief));
+    }
     // Mountains: ridged peaks inside the ranges, sharper with drama.
-    const peaks = this.peakNoise.ridgedTerrain2(x / 14000, z / 14000, 6, 1.4 + w.drama * 0.8);
-    let h = coastRamp * (plains + hills) + r * peaks * w.mountainHeight;
-    // Drama: lift the uplands and cut terraces into the high ground (mesas, steps).
-    if (w.drama > 0 && h > 300) {
-      const step = 140;
+    const peaks = this.peakNoise.ridgedTerrain2(x / 14_000, z / 14_000, 6, 1.4 + w.drama * 0.8);
+    let h = coastRamp * land + r * peaks * (w.mountainHeight - amp);
+    // High ground gets broad steps too (benches and cliffs below the peaks).
+    if (w.drama > 0 && h > 600) {
+      const step = 160;
       const terraced = Math.floor(h / step) * step + step * smoothstep(0.25, 0.75, (h % step) / step);
-      h = lerp(h, terraced, w.drama * 0.5 * smoothstep(300, 900, h));
+      h = lerp(h, terraced, w.drama * 0.45 * smoothstep(600, 1200, h));
     }
     return Math.max(1, h);
   }

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { Skeleton, emptySample, pickBiome } from '../src/world/skeleton';
-import { findStart, slopeAt } from '../src/world/start';
+import { findStart, slopeAt, vistaAt } from '../src/world/start';
 import { classic } from '../src/setting/classic/index';
 
 const make = (seed = 'masterworld') => new Skeleton(parseSeed(seed), classic.world);
@@ -59,5 +59,6 @@ test('start: on gentle land in a start biome, the same every time', () => {
     assert.ok(classic.start.biomes.includes(p.biome));
     assert.ok(p.elevation >= classic.start.elevation[0] && p.elevation <= classic.start.elevation[1]);
     assert.ok(slopeAt(sk, p.x, p.z) <= classic.start.maxSlope);
+    assert.ok(vistaAt(sk, p.x, p.z) >= classic.start.vista);
   }
 });
