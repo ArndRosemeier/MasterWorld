@@ -44,7 +44,7 @@ export class FloraView {
     const U = vegetationUniforms;
     const bark = createBarkMaterial(U), leaf = createLeafMaterial(U, false), needles = createLeafMaterial(U, true), hull = createFarTreeMaterial(U);
     // The hulls' baked colours read lighter than the leaf cards they stand in for.
-    hull.color.setScalar(0.62);
+    hull.color.setScalar(0.75);
     this.models = FLORA_KINDS.map((k) => (k.species === 'shrub' ? shrubModel(k.variant) : treeModel(k.species as TreeSpecies, k.variant)));
     this.full = this.models.map((m, k) => [this.part(m.wood, bark, 64, true), this.part(m.leaves, FLORA_KINDS[k].conifer ? needles : leaf, 64, true)]);
     this.hull = this.models.map((m) => (m.isShrub ? null : this.part(m.far, hull, 512, true)));
