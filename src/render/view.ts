@@ -1,7 +1,7 @@
 /**
  * The view: the one renderer, scene, camera and Stage. Everything visible enters through `view.stage.add`.
  */
-import { PerspectiveCamera, Scene, DirectionalLight, HemisphereLight, type WebGPURenderer } from 'three/webgpu';
+import { PerspectiveCamera, PCFSoftShadowMap, Scene, DirectionalLight, HemisphereLight, type WebGPURenderer } from 'three/webgpu';
 import { SkyView } from './sky';
 import { Stage, createRenderer } from '@futuremagic/stage';
 import { Float32BufferAttribute, type BufferGeometry } from 'three/webgpu';
@@ -20,6 +20,9 @@ export interface View {
 export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean; hour: number; dayMinutes: number }): Promise<View> {
   // Reversed depth: precision from a metre to the far horizon in one view.
   const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL: opts.forceWebGL, depth: 'reversed', exposure: 1.9 });
+  // Shadows are part of every lit shader's key: on before anything is built.
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFSoftShadowMap;
   const scene = new Scene();
   const camera = new PerspectiveCamera(55, 1, 0.2, 120000);
   camera.position.set(0, 2, 0);

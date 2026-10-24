@@ -1,0 +1,102 @@
+/**
+ * Where trees and shrubs grow (pure, runs in workers): seeded positions over a square of land, from the
+ * biome's flora (setting contract) thinned by a woods-cover field, kept off water, beaches and cliffs.
+ * Positions depend on world position only, so squares of any size agree where they overlap.
+ *
+ * Record (FLORA_STRIDE floats): x, y, z, scale, yaw, kind (index into FLORA_KINDS).
+ */
+import { Noise, deriveSeed, hash2f, smoothstep } from '@futuremagic/core';
+import { emptySample } from './skeleton';
+import { emptyWater } from './hydro';
+import { TREES, type TreeName } from '../setting/contract';
+import type { Terrain } from './terrain';
+
+export const FLORA_STRIDE = 6;
+
+/** The models trees are drawn with: species and variant (@futuremagic/vegetation). */
+export interface FloraKind { readonly species: TreeName | 'shrub'; readonly variant: number; readonly conifer: boolean }
+
+const VARIANTS = 2;
+export const FLORA_KINDS: readonly FloraKind[] = [
+  ...TREES.flatMap((species) => Array.from({ length: VARIANTS }, (_, variant) => ({ species, variant, conifer: species === 'pine' || species === 'cypress' }))),
+  { species: 'shrub', variant: 0, conifer: false },
+  { species: 'shrub', variant: 1, conifer: false },
+];
+const SHRUB = FLORA_KINDS.length - VARIANTS;
+
+export interface FloraJob {
+  seed: number;
+  setting: string;
+  /** The square's minimum corner and side, metres (multiples of `spacing`). */
+  x0: number;
+  z0: number;
+  size: number;
+  /** Candidate spacing, metres: 4 near (every tree), more far away (fewer, bigger: each stands for a few). */
+  spacing: number;
+}
+
+/** Spacing of the full-density candidate grid: at most 625 plants a hectare. */
+export const NEAR_SPACING = 4;
+/** Highest share of candidates with a plant (far candidates in thick woods). */
+const MAX_P = 0.9;
+
+export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
+  const { x0, z0, size, spacing } = job;
+  const biomes = t.setting.world.biomes;
+  const seed = deriveSeed(t.seed, 'flora');
+  const cover = new Noise(deriveSeed(t.seed, 'flora', 'cover'));
+  const s = emptySample(), w = emptyWater();
+  const out: number[] = [];
+  const thin = (spacing / NEAR_SPACING) ** 2; // candidates far away each stand for this many near ones
+  const n = Math.round(size / spacing);
+  const gi0 = Math.round(x0 / spacing), gj0 = Math.round(z0 / spacing);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const gi = gi0 + i, gj = gj0 + j;
+    const roll = hash2f(seed, gi * 7 + spacing, gj);
+    if (roll > MAX_P) continue; // a quick out before any sampling
+    const x = (gi + hash2f(seed + 1, gi, gj)) * spacing, z = (gj + hash2f(seed + 2, gi, gj)) * spacing;
+    t.skeleton.sample(x, z, s);
+    const flora = s.biome >= 0 ? biomes[s.biome].flora : undefined;
+    if (!flora) continue;
+    // Woods: a cover field at a few hundred metres, shifted by how wooded the biome is.
+    const c = cover.fbm2(x / 260, z / 260, 3) + flora.cover;
+    const woods = smoothstep(-0.15, 0.25, c);
+    const pTree = (flora.trees / 10000) * NEAR_SPACING ** 2 * (0.08 + 0.92 * woods);
+    const pShrub = (flora.shrubs / 10000) * NEAR_SPACING ** 2 * (0.4 + 0.6 * woods);
+    const near = spacing === NEAR_SPACING;
+    // Far away a candidate stands for `thin` near ones: a tree there as often as one would be among them
+    // (up to MAX_P), shrubs not at all.
+    const pT = near ? Math.min(0.5, pTree) : Math.min(MAX_P, pTree * thin * 0.6);
+    const p = near ? Math.min(0.5, pTree + pShrub) : pT;
+    if (roll >= p) continue;
+    const shrub = roll >= pT;
+    // Not in water, on beaches or on cliffs; trees keep a little off river banks.
+    const h = t.height(x, z);
+    if (h < 1.5) continue;
+    t.hydro.query(x, z, w);
+    if (w.river && w.dist < w.half + (shrub ? 1.5 : 4)) continue;
+    if (!Number.isNaN(w.lake) && h < w.lake + 0.5) continue;
+    const slope = Math.hypot(t.height(x + 1.5, z) - h, t.height(x, z + 1.5) - h) / 1.5;
+    if (slope > 0.75) continue;
+    const kind = shrub ? SHRUB + (hash2f(seed + 3, gi, gj) < 0.5 ? 0 : 1) : pickTree(flora.mix, hash2f(seed + 4, gi, gj), hash2f(seed + 5, gi, gj));
+    if (kind < 0) continue;
+    const size0 = 0.8 + 0.45 * hash2f(seed + 6, gi, gj);
+    // A far stand-in is bigger, to cover about the canopy its near trees would (up to half again as big).
+    const scale = near ? size0 : size0 * Math.min(1.5, Math.max(1, Math.sqrt((pTree * thin * 0.7) / pT)));
+    out.push(x, h - 0.15 * scale, z, scale, hash2f(seed + 7, gi, gj) * Math.PI * 2, kind);
+  }
+  return Float32Array.from(out);
+}
+
+/** A species by weight, then one of its variants: an index into FLORA_KINDS (-1: no species). */
+function pickTree(mix: Readonly<Partial<Record<TreeName, number>>>, r: number, rv: number): number {
+  let total = 0;
+  for (const k of TREES) total += mix[k] ?? 0;
+  if (total <= 0) return -1;
+  let acc = 0;
+  for (let i = 0; i < TREES.length; i++) {
+    acc += (mix[TREES[i]] ?? 0) / total;
+    if (r < acc) return i * VARIANTS + Math.min(VARIANTS - 1, Math.floor(rv * VARIANTS));
+  }
+  return (TREES.length - 1) * VARIANTS;
+}

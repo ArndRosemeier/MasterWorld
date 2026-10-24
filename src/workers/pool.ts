@@ -58,9 +58,13 @@ export function createTexturePool(size?: number): TexturePool {
   return new WorkerPool(() => new Worker(new URL('./texture.worker.ts', import.meta.url), { type: 'module' }), size);
 }
 
-export type WaterPool = WorkerPool<import('../world/water').MaskJob, Float32Array>;
+export type WorldPool = WorkerPool<import('./world.worker').WorldJob, Float32Array>;
 
-/** Water depth masks around the camera (one worker: a mask now and then). */
-export function createWaterPool(): WaterPool {
-  return new WorkerPool(() => new Worker(new URL('./water.worker.ts', import.meta.url), { type: 'module' }), 1);
+/** Water masks and plant positions around the camera (one worker: a job now and then). */
+export function createWorldPool(): WorldPool {
+  return new WorkerPool(() => new Worker(new URL('./world.worker.ts', import.meta.url), { type: 'module' }), 1);
+}
+/** Resolves once `test()` holds (checked every 20 ms): for loading steps that wait on worker results. */
+export async function until(test: () => boolean): Promise<void> {
+  while (!test()) await new Promise((r) => setTimeout(r, 20));
 }

@@ -12,9 +12,9 @@ test('setting: authoring errors are reported', () => {
     ...classic,
     id: 'Bad Id',
     version: 0,
-    world: { ...classic.world, landFraction: 2, biomes: [classic.world.biomes[0], { ...classic.world.biomes[0], surface: 'lava' as never }] },
+    world: { ...classic.world, landFraction: 2, biomes: [classic.world.biomes[0], { ...classic.world.biomes[0], surface: 'lava' as never, flora: { trees: 10, cover: 3, mix: { palm: 1 } as never, shrubs: 0 } }] },
     start: { ...classic.start, biomes: ['nowhere'] },
   };
   const errors = validateSetting(bad).join('\n');
-  for (const want of ['lowercase slug', 'version', 'landFraction', 'defined twice', 'surface "lava"', '"nowhere"']) assert.ok(errors.includes(want), `missing: ${want}\n${errors}`);
+  for (const want of ['lowercase slug', 'version', 'landFraction', 'defined twice', 'surface "lava"', 'cover must be', 'tree "palm"', '"nowhere"']) assert.ok(errors.includes(want), `missing: ${want}\n${errors}`);
 });
