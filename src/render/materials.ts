@@ -6,11 +6,15 @@
  * Every mesh of a kind shares the kind's one material, so a kind is one shader; variation goes into
  * vertex attributes or uniforms, never into a new material.
  */
-import { MeshStandardNodeMaterial, type Material } from 'three/webgpu';
-import { float, mix, mx_fractal_noise_float, mx_noise_float, normalWorld, positionWorld, smoothstep, vec3, vertexColor } from 'three/tsl';
+import { DoubleSide, MeshStandardNodeMaterial, type Material } from 'three/webgpu';
+import { abs, attribute, cameraViewMatrix, dot, float, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
+import type { Node } from 'three/webgpu';
+import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
+import type { GroundTextures } from './terrain/groundTextures';
+import type { Surface } from '../setting/contract';
 import type { StageKind } from '@futuremagic/stage';
 
-export type Attribute = 'position' | 'normal' | 'color' | 'uv';
+export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface';
 
 export interface MaterialKind extends StageKind {
   readonly attributes: readonly Attribute[];
@@ -39,26 +43,95 @@ export function allKinds(): readonly MaterialKind[] {
   return [...kinds.values()];
 }
 
+/** The ground's texture arrays; set once at load, before the warm-up builds the terrain material. */
+let ground: GroundTextures | null = null;
+export function useGroundTextures(t: GroundTextures): void { ground = t; }
+
+const LAYER = (name: string): number => {
+  const i = NATURAL_NAMES.indexOf(name);
+  if (i < 0) throw new Error(`texgen has no natural layer "${name}"`);
+  return i;
+};
+
 /**
- * The ground: one shader for every terrain chunk. Biome colour comes per vertex; rock on steep ground,
- * snow up high, sand at the shore, and noise breaks up every band so nothing reads as a straight line.
+ * The ground: one shader for every terrain chunk, built from texgen's natural layers. Open ground blends
+ * the biome surfaces (vertex attribute `surface`, SURFACES order) tinted by the biome colour; steep ground
+ * is rock, projected from three sides with strata on the faces; snow lies up high, sand at the shore.
+ * Height from the layers sharpens every transition so it follows stones and tufts, not straight lines.
  */
-export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color'], () => {
-  const m = new MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
-  const p = positionWorld;
-  const up = normalWorld.y;
+export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface'], () => {
+  if (!ground) throw new Error('terrain material built before the ground textures were loaded');
+  const { albedo: A, normal: N } = ground;
+  // Double-sided so chunk skirts close cracks seen from either side.
+  const m = new MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: DoubleSide });
+  const p = positionWorld, n = normalWorldGeometry, up = n.y;
+  const layer = (name: string, uv: Node<'vec2'>) => {
+    const i = LAYER(name), k = 1 / NATURAL_TILE_METERS[i];
+    const st = uv.mul(k);
+    return { a: texture(A).sample(st).depth(int(i)), n: texture(N).sample(st).depth(int(i)) };
+  };
+  // Tangent normal (0..1 encoded) to a world-space offset, for a projection whose u, v run along the axes.
+  const tn = (s: Node<'vec4'>) => s.xy.mul(2).sub(1);
+  // Height blend: inside a transition the higher material wins, so edges follow stones and tufts; outside
+  // it (t = 0 or 1) height has no say.
+  const hblend = (t: Node<'float'>, dh: Node<'float'>, k: number) => smoothstep(0.3, 0.7, t.add(dh.mul(k).mul(t).mul(float(1).sub(t)).mul(4)));
+
   const broad = mx_fractal_noise_float(p.xz.mul(0.004), 3, 2.0, 0.5);
   const fine = mx_noise_float(p.xz.mul(0.35));
-  const ground = vertexColor().mul(float(1).add(broad.mul(0.35)).add(fine.mul(0.06)));
-  const rock = mix(vec3(0.20, 0.19, 0.18), vec3(0.34, 0.31, 0.27), smoothstep(-0.4, 0.6, broad.add(fine.mul(0.3))));
+
+  // Open ground: the four biome surfaces, projected from above.
+  const w = attribute('surface', 'vec4');
+  const sl = [{ w: w.x, s: 'grass' }, { w: w.y, s: 'forest' }, { w: w.z, s: 'sand' }, { w: w.w, s: 'scree' }].map((e) => ({ w: e.w, l: layer(SURFACE_LAYER[e.s as Surface], p.xz) }));
+  let soilA: Node<'vec4'> = vec4(0), soilN: Node<'vec4'> = vec4(0);
+  for (const s of sl) { soilA = soilA.add(s.l.a.mul(s.w)); soilN = soilN.add(s.l.n.mul(s.w)); }
+  const vc = vertexColor().rgb;
+  const hue = vc.div(max(dot(vc, vec3(0.2126, 0.7152, 0.0722)), 0.02));
+  // Mid-scale variation (tens of metres) hides the tiling and breaks up big fields.
+  const mid = mx_fractal_noise_float(p.xz.mul(0.045), 3, 2.0, 0.5);
+  const tint = mix(vec3(1), hue, float(0.3).add(mid.mul(0.15))).mul(float(1).add(broad.mul(0.3)).add(mid.mul(0.22)));
+  let col: Node<'vec3'> = soilA.rgb.mul(tint), rough: Node<'float'> = soilA.a, ao: Node<'float'> = soilN.a, h: Node<'float'> = soilN.b;
+  let pert: Node<'vec3'> = vec3(tn(soilN).x, 0, tn(soilN).y);
+
+  // Shore sand.
+  const sand = layer('sand', p.xz);
+  const sandT = smoothstep(float(4).add(fine.mul(1.5)), float(1), p.y).mul(smoothstep(0.7, 0.9, up));
+  const sandB = hblend(sandT, sand.n.b.sub(h), 2);
+  col = mix(col, sand.a.rgb, sandB); rough = mix(rough, sand.a.a, sandB); ao = mix(ao, sand.n.a, sandB);
+  pert = mix(pert, vec3(tn(sand.n).x, 0, tn(sand.n).y), sandB); h = mix(h, sand.n.b, sandB);
+
+  // Rock: triplanar, strata on the side faces, weathered rock on top.
+  const bw0 = pow(abs(n), vec3(4));
+  const bw = bw0.div(bw0.x.add(bw0.y).add(bw0.z));
+  const rx = layer('cliffStrata', p.zy), rz = layer('cliffStrata', p.xy), ry = layer('rockFace', p.xz);
+  // The same strata, nine times larger, so cliffs keep their structure from far away.
+  const big = 1 / 9;
+  const mx = layer('cliffStrata', p.zy.mul(big)), mz = layer('cliffStrata', p.xy.mul(big));
+  const macro = mx.a.rgb.mul(bw.x).add(mz.a.rgb.mul(bw.z)).add(vec3(0.45).mul(bw.y)).div(0.45);
+  const rockA = rx.a.mul(bw.x).add(rz.a.mul(bw.z)).add(ry.a.mul(bw.y));
+  const rockN = rx.n.mul(bw.x).add(rz.n.mul(bw.z)).add(ry.n.mul(bw.y));
+  const rockP = vec3(0, tn(rx.n).y, tn(rx.n).x).mul(bw.x).add(vec3(tn(rz.n).x, tn(rz.n).y, 0).mul(bw.z)).add(vec3(tn(ry.n).x, 0, tn(ry.n).y).mul(bw.y));
   const rockT = smoothstep(0.82, 0.64, up.add(fine.mul(0.04)));
+  const rockB = hblend(rockT, rockN.b.sub(h), 2);
+  const rockTone = float(1).add(broad.mul(0.25));
+  col = mix(col, rockA.rgb.mul(rockTone).mul(macro), rockB); rough = mix(rough, rockA.a, rockB); ao = mix(ao, rockN.a, rockB);
+  pert = mix(pert, rockP, rockB); h = mix(h, rockN.b, rockB);
+
+  // Snow above a ragged line, only where it can lie.
+  const snow = layer('snow', p.xz);
   const snowLine = float(1900).add(broad.mul(350));
   const snowT = smoothstep(snowLine, snowLine.add(250), p.y).mul(smoothstep(0.5, 0.72, up));
-  const sandT = smoothstep(float(4).add(fine.mul(1.5)), float(1), p.y).mul(smoothstep(0.7, 0.9, up));
-  let c = mix(ground, vec3(0.62, 0.55, 0.40), sandT);
-  c = mix(c, rock, rockT);
-  c = mix(c, vec3(0.86, 0.88, 0.92), snowT);
-  m.colorNode = c;
-  m.roughnessNode = mix(float(0.95), float(0.6), snowT);
+  const snowB = hblend(snowT, h.sub(snow.n.b), 1.5);
+  col = mix(col, snow.a.rgb, snowB); rough = mix(rough, snow.a.a, snowB); ao = mix(ao, snow.n.a, snowB);
+  pert = mix(pert, vec3(tn(snow.n).x, 0, tn(snow.n).y), snowB);
+
+  const nw = normalize(n.add(pert.mul(0.9)));
+  // texgen albedos are physical (grass ~0.08 linear); the lift keeps the land readable under our light rig.
+  m.colorNode = col.mul(1.5);
+  m.roughnessNode = rough;
+  m.aoNode = ao;
+  m.normalNode = normalize(cameraViewMatrix.mul(vec4(nw, 0)).xyz);
   return m;
 });
+
+/** Which texgen layer draws each biome surface. */
+const SURFACE_LAYER: Record<Surface, string> = { grass: 'wildGrass', forest: 'forestFloor', sand: 'sand', scree: 'scree' };

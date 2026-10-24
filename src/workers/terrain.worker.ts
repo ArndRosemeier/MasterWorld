@@ -15,7 +15,7 @@ self.onmessage = (e: MessageEvent<{ id: number; job: TerrainJob }>) => {
   try {
     if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = new Terrain(job.seed, settingById(job.setting));
     const mesh: ChunkMesh = buildChunk(terrain, job);
-    (self as unknown as DedicatedWorkerGlobalScope).postMessage({ id, result: mesh }, [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer]);
+    (self as unknown as DedicatedWorkerGlobalScope).postMessage({ id, result: mesh }, [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer]);
   } catch (err) {
     (self as unknown as DedicatedWorkerGlobalScope).postMessage({ id, error: err instanceof Error ? err.message : String(err) });
   }

@@ -50,3 +50,10 @@ export type TerrainPool = WorkerPool<import('./terrain.worker').TerrainJob, impo
 export function createTerrainPool(size?: number): TerrainPool {
   return new WorkerPool(() => new Worker(new URL('./terrain.worker.ts', import.meta.url), { type: 'module' }), size);
 }
+
+export type TexturePool = WorkerPool<import('./texture.worker').TextureJob, import('@futuremagic/texgen').TexLayer>;
+
+/** Ground texture layers are generated off the main thread at load. */
+export function createTexturePool(size?: number): TexturePool {
+  return new WorkerPool(() => new Worker(new URL('./texture.worker.ts', import.meta.url), { type: 'module' }), size);
+}
