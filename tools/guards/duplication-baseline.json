@@ -6,5 +6,9 @@
   {
     "key": "clone: core/noise.ts#fbm2 + core/noise.ts#fbm3",
     "reason": "2D and 3D variants of the same noise in one file (shared package); merging them would cost the hot path a dimension branch."
+  },
+  {
+    "key": "same name: masterworld/app/flyCamera.ts#update + masterworld/render/terrain/TerrainView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (camera movement vs chunk selection); only the name matches."
   }
 ]

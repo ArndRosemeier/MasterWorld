@@ -22,6 +22,17 @@ export function slopeAt(sk: Skeleton, x: number, z: number, d = 25): number {
   return Math.hypot(dx, dz) / (2 * d);
 }
 
+/** Height difference between the highest and lowest of 24 points within 6 km. */
+export function vistaAt(sk: Skeleton, x: number, z: number): number {
+  let lo = Infinity, hi = -Infinity;
+  for (const r of [2000, 4000, 6000]) for (let a = 0; a < 8; a++) {
+    const e = sk.elevation(x + Math.cos((a * Math.PI) / 4) * r, z + Math.sin((a * Math.PI) / 4) * r);
+    lo = Math.min(lo, e);
+    hi = Math.max(hi, e);
+  }
+  return hi - lo;
+}
+
 export function findStart(sk: Skeleton, setting: SettingModule): StartPlace {
   const want = setting.start;
   const ids = sk.shape.biomes.map((b) => b.id);
@@ -35,6 +46,7 @@ export function findStart(sk: Skeleton, setting: SettingModule): StartPlace {
         if (s.biome < 0 || !want.biomes.includes(ids[s.biome])) continue;
         if (s.elevation < want.elevation[0] || s.elevation > want.elevation[1]) continue;
         if (slopeAt(sk, x, z) > want.maxSlope) continue;
+        if (vistaAt(sk, x, z) < want.vista) continue;
         return { x, z, elevation: s.elevation, biome: ids[s.biome] };
       }
     }
