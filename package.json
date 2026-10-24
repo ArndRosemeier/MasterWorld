@@ -1,0 +1,15 @@
+{
+  "name": "masterworld",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Classic fantasy RPG in the browser with a virtual game master that builds the world as play needs it.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test --test-timeout=5000 \"tools/**/*.test.mjs\"",
+    "dup": "node tools/duplicate-candidates/find-duplicate-candidates.mjs",
+    "repeated": "node tools/repeated-code/find-repeated-code.mjs"
+  }
+}
