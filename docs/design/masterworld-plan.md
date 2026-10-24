@@ -1,6 +1,6 @@
 # MasterWorld: plan
 
-Living document. Status: **draft 2, open for discussion, no code yet.** Draft 2 adds Arnd's decisions of 2026-10-24 (D9–D16).
+Living document. Status: **draft 2, open for discussion, no code yet.** Draft 2 adds Arnd's decisions of 2026-10-24 (D9–D16), including the region quadtree.
 Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld). The `MasterWorld` repo was empty.
 
 ---
@@ -34,7 +34,7 @@ The world should be believable but fantastic: classic countryside, forests and m
 | D13 | **Real-time combat with tab targeting.** Right mouse button held for mouse look; otherwise the cursor is visible to interact and to target by clicking. | Section 11. |
 | D14 | **The setting is a module.** Everything world-related sits behind one big, exchangeable contract. The default module is a classic small-town start. | Section 12. |
 | D15 | **Norgo's GM is inspiration only.** It served a different purpose; MasterWorld's VGM is designed fresh. | Section 4. |
-| D16 | Region size: **under discussion.** | Section 5.2. |
+| D16 | **Regions are aligned squares in powers of two, from 250 m up.** A bigger region that would leave holes next to existing ones has the holes filled with smaller regions. | Arnd's proposal: no chess board, still predictable sizes. Section 5.5. |
 
 ---
 
@@ -135,12 +135,12 @@ Rebuilding the world means replaying the decision log through the generators. Sa
 
 ### 5.2 A fixed coarse skeleton, detail on demand
 
-> The region size is under discussion (D16). This section describes the draft 1 proposal; 5.5 lists the alternatives.
+> Region sizes are decided in 5.5 (D16): aligned powers of two from 250 m.
 
 A believable world needs global structure: rivers run downhill to a coast, mountains form ranges, climate follows latitude and rain shadow. That is hard if land is invented piece by piece. So:
 
 * **Skeleton**: low-frequency fields (continents, seas, mountain ranges, climate, biomes) as global functions of world position. They are cheap, unbounded, and consistent everywhere.
-* **Regions** (about 8–16 km square, to be tuned): the unit the VGM opens. Opening a region solves its drainage and rivers on a coarse grid (with inflows from already-opened neighbours as boundary conditions), places roads, and fixes the sites the ledger puts there.
+* **Regions** (250 m to many km, see 5.5): the unit the VGM opens. Opening a region places roads and fixes the sites the ledger puts there. Rivers and drainage come from the skeleton (solved lazily on its coarse grid and cached), so they are continuous across region borders.
 * **Detail**: terrain mesh, vegetation, buildings, only near the player and streamed with LOD.
 
 The skeleton is unbounded and fixed. The VGM decides **what stands on it** and **when it is detailed**. "The world starts small" means few regions are open and few promises are made, not that the land is missing.
@@ -148,7 +148,7 @@ The skeleton is unbounded and fixed. The VGM decides **what stands on it** and *
 ### 5.3 Soft and hard land
 
 * **Hard**: anything the player has seen or been told about in detail. It changes only through story events (4.5).
-* **Soft**: everything else. Even inside an open area, unseen land stays soft, so the VGM can still put a ruin behind the next hill when a need calls for it.
+* **Soft**: everything else. Even inside an open region, unseen land stays soft, so the VGM can still put a ruin behind the next hill when a need calls for it.
 
 ### 5.4 Scale targets (proposal)
 
@@ -156,36 +156,28 @@ The skeleton is unbounded and fixed. The VGM decides **what stands on it** and *
 * View distance several km, with the far horizon drawn from the skeleton alone.
 * The skeleton is big enough for several continents and oceans between them.
 
-### 5.5 Region size: fixed or not? (D16, to discuss)
+### 5.5 Region sizes: aligned powers of two (D16)
 
-Two different things hide behind "region", and they want different answers:
+Arnd's proposal, decided: regions are squares whose side is **250 m × 2ⁿ** (250 m, 500 m, 1 km, 2 km, 4 km, 8 km, 16 km …), **aligned to their own grid** (a 2 km region starts at a multiple of 2 km). Together they form a quadtree.
 
-1. **The technical tile**: the unit for streaming, caching, LOD, saves and workers.
-2. **The design area**: the piece of land the VGM opens and fills (a valley with its town, a forest with its ruin).
+* **The VGM picks the size that fits the content**: a farmstead gets 250 m, a village 1 km, a city 4 or 8 km, a great forest 16 km.
+* **Holes are filled with smaller regions.** When a big region opens next to existing smaller ones, the parts of its square that are already taken stay as they are, and the rest is filled with the largest aligned squares that fit. That decomposition always exists and is unique, because every aligned square splits exactly into four aligned squares of half the size. So the world is covered without gaps or overlaps.
+* **Why it does not look like a chess board:** sizes vary with content, and region borders are invisible. Terrain, rivers, roads and vegetation come from continuous fields in world coordinates; a region only decides *what* is placed and *when* it is built, never the shape of the land.
 
-**Fixed size for both** (draft 1):
+Refinements (proposals):
 
-* Pro: simple addressing (`tile x,z`), simple streaming and save keys, predictable build cost per tile, easy to shard for multiplayer later.
-* Con: land does not come in squares. A city can be bigger than a region, a hamlet much smaller. Rivers, roads, ridges and forests all cross the borders and need boundary conditions. Grid artefacts show up in layouts ("why is there always something every 12 km?").
-
-**Free-shaped design areas, fixed technical tiles** (proposal):
-
-* The tiles are a fixed power-of-two grid (for example 256 m for detail, with coarser levels for LOD and the skeleton), invisible to design.
-* The VGM opens areas of any shape and size, sized to the content: the footprint of a city, a valley, a forest. An area is a polygon in the ledger.
-* Rivers and drainage are solved on the coarse skeleton, lazily and cached per coarse tile, so they are continuous everywhere and no area needs boundary conditions.
-* Pro: content decides the size, no seams in design, the tech stays simple.
-* Con: area overlap needs rules (what wins where a city grows into a forest); the build cost of an area varies, so the budget works in tiles, not in areas.
-
-**No areas at all, only sites** (another option): the VGM only places sites (town, ruin, dungeon entrance) with footprints, and everything between them is plain skeleton terrain with procedural dressing. The simplest, but the countryside between sites has no authored character (no "the Whispering Wood").
-
-Recommendation: **fixed technical tiles, free-shaped design areas.**
+* **Content is not square.** A city's footprint, a forest's edge or a lake is a free shape inside its region; the region is the container and the budget unit, not the outline. A footprint may reach into neighbouring regions that are still soft; opening those later must respect it.
+* **Fill regions are cheap.** Holes are filled at sketch stage (plain countryside with its biome) and get detail only when the player comes near, so opening a big region does not cause a build spike.
+* **The streaming tile is separate.** Rendering, LOD and saves use a fixed technical grid (250 m tiles and their coarser levels), so the build and memory cost per tile stays predictable whatever the region size.
+* **The frontier** is the outer edge of all opened regions. When the player gets close, the VGM opens a region beyond it, sized for whatever the Director wants there.
+* **Addresses**: a region is `(level, x, z)` with `size = 250 m × 2^level`. Parent and children follow by halving and doubling, which makes lookup, saves and later multiplayer sharding simple.
 
 ---
 
 ## 6. The start
 
 * One small town, ideally at a river crossing (that is where real towns grow), in a temperate region.
-* The town's area is open, the land around it is sketched.
+* The town's region is open (about 1 km), the land around it is sketched.
 * This start is the default **setting module** (D14, section 12). Another module can start somewhere else entirely.
 * Three or four promises are already planted in townsfolk: a cellar with a problem, a nearby ruin, a road with trouble, something farther away.
 * The rest of the world exists only as skeleton and horizon.
@@ -340,24 +332,24 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | # | Question | Notes |
 |---|---|---|
 | O1 | ~~Height field or voxel terrain?~~ | **Decided: height field** (D9). |
-| O2 | **Region size** and travel speed | Under discussion (D16, section 5.5). Travel speed drives build-ahead time. |
+| O2 | Travel speed | Region sizes are decided (D16). Travel speed drives build-ahead time. |
 | O3 | ~~How far may the VGM go in soft land?~~ | **Decided** (D10): wherever it makes sense; known things change through story events. |
 | O4 | Skills and magic | Mix decided (D11). Open: which schools, the source of magic (section 10). |
 | O5 | ~~Death and saving~~ | **Decided** (D12): roguelike or classic. |
 | O6 | ~~Combat feel~~ | **Decided** (D13): real-time, tab targeting. |
 | O7 | Lore of the default module | Shapes everything the VGM hints (section 12). |
 | O8 | ~~Which Norgo code is ported?~~ | **Decided** (D15): the GM is inspiration only. Skills, abilities and the worker split are candidates to port. |
-| O9 | Area overlap rules | If design areas are free-shaped (5.5): what wins where a town grows into a forest? |
+| O9 | Footprint rules | When a footprint reaches into a neighbouring region (5.5), and when a town grows into a forest: what wins? |
 
 ---
 
 ## 17. Milestones (proposal)
 
-1. **Walk the land**: the setting module contract (a first cut), skeleton, one open area, height field terrain, sky, water, the player walking.
+1. **Walk the land**: the setting module contract (a first cut), skeleton, one open region, height field terrain, sky, water, the player walking.
 2. **The town**: one medieval small town (Scale planner + medieval style), Actors townsfolk.
 3. **The first promise**: ledger, Conversations hint, one cellar dungeon built through the three stages.
 4. **The Director**: needs, tension curve, the first combat and rewards.
-5. **The frontier**: opening areas as the player walks, story events (raids, takeovers), more dungeon kinds, more settlement sizes.
+5. **The frontier**: opening regions as the player walks, story events (raids, takeovers), more dungeon kinds, more settlement sizes.
 6. **Skills and magic.**
 7. **Seas.**
 8. Later: the LLM hook, multiplayer.
