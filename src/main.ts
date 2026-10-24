@@ -5,7 +5,9 @@ import { params } from './app/params';
 import { FlyCamera } from './app/flyCamera';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
-import { createTerrainPool } from './workers/pool';
+import { createTerrainPool, createTexturePool } from './workers/pool';
+import { loadGroundTextures } from './render/terrain/groundTextures';
+import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { validateSetting } from './setting/contract';
 import { Terrain } from './world/terrain';
@@ -39,6 +41,11 @@ async function start(): Promise<void> {
     else if (params.pos) fly.place(px, pz, py, true);
     else fly.place(px, pz, terrain.height(px, pz) + py);
     if (params.look) fly.setLook(params.look[0], params.look[1] ?? 0);
+
+    loading.set('Painting the ground');
+    const texPool = createTexturePool();
+    useGroundTextures(await loadGroundTextures(texPool));
+    texPool.dispose();
 
     loading.set('Preparing shaders');
     await view.stage.warmUp();

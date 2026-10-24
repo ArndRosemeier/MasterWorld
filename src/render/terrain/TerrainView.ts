@@ -77,6 +77,7 @@ export class TerrainView {
     g.setAttribute('position', new BufferAttribute(m.position, 3));
     g.setAttribute('normal', new BufferAttribute(m.normal, 3));
     g.setAttribute('color', new BufferAttribute(m.color, 3));
+    g.setAttribute('surface', new BufferAttribute(m.surface, 4));
     g.setIndex(this.index);
     const size = chunkSize(k.level);
     g.boundingBox = null;

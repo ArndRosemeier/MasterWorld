@@ -39,3 +39,11 @@ test('lod: leaves tile the roots without overlap, fine near the camera, coarse f
   assert.ok(leaves.length < 300, `${leaves.length} chunks`);
   assert.ok(selectChunks(1000, -500, 3000).length < leaves.length, 'fewer chunks from high up');
 });
+
+test('chunk mesh: surface weights sum to 1 on every vertex', () => {
+  const m = buildChunk(new Terrain(7, classic), { x0: 1000, z0: -3000, size: 4096, segs: 16 });
+  for (let v = 0; v < m.surface.length / 4; v++) {
+    const s = m.surface[v * 4] + m.surface[v * 4 + 1] + m.surface[v * 4 + 2] + m.surface[v * 4 + 3];
+    assert.ok(Math.abs(s - 1) < 1e-5, `vertex ${v}: ${s}`);
+  }
+});

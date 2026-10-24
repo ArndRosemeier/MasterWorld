@@ -8,6 +8,13 @@
 
 export const CONTRACT_VERSION = 1;
 
+/**
+ * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
+ * ground, snow up high and sand at the shore are added by the terrain itself.
+ */
+export const SURFACES = ['grass', 'forest', 'sand', 'scree'] as const;
+export type Surface = (typeof SURFACES)[number];
+
 export interface BiomeDef {
   readonly id: string;
   readonly name: string;
@@ -17,6 +24,8 @@ export interface BiomeDef {
   readonly moisture: readonly [number, number];
   /** Ground colour (sRGB hex) of open land in this biome; rock, snow and sand come from the terrain material. */
   readonly ground: number;
+  /** What open ground in this biome is made of; `ground` tints it. */
+  readonly surface: Surface;
   /** Optional elevation range in metres above the sea. */
   readonly elevation?: readonly [number, number];
 }
@@ -81,6 +90,7 @@ export function validateSetting(m: SettingModule): string[] {
   for (const b of w.biomes) {
     if (ids.has(b.id)) out.push(`${where}: biome "${b.id}" defined twice`);
     ids.add(b.id);
+    if (!SURFACES.includes(b.surface)) out.push(`${where}: biome "${b.id}" surface "${b.surface}" is unknown`);
     if (!(b.temperature[0] <= b.temperature[1])) out.push(`${where}: biome "${b.id}" temperature range is reversed`);
     if (!(b.moisture[0] >= 0 && b.moisture[1] <= 1 && b.moisture[0] <= b.moisture[1])) out.push(`${where}: biome "${b.id}" moisture range must lie in 0..1`);
   }

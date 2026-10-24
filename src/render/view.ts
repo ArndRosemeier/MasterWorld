@@ -3,6 +3,7 @@
  */
 import { PerspectiveCamera, Scene, Color, Fog, DirectionalLight, HemisphereLight, type WebGPURenderer } from 'three/webgpu';
 import { Stage, createRenderer } from '@futuremagic/stage';
+import { Float32BufferAttribute, type BufferGeometry } from 'three/webgpu';
 import { allKinds } from './materials';
 
 export interface View {
@@ -16,7 +17,7 @@ export interface View {
 
 export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean }): Promise<View> {
   // Reversed depth: precision from a metre to the far horizon in one view.
-  const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL: opts.forceWebGL, depth: 'reversed', exposure: 1.3 });
+  const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL: opts.forceWebGL, depth: 'reversed', exposure: 1.9 });
   const scene = new Scene();
   scene.background = new Color(0x8fb4d8);
   scene.fog = new Fog(0x9fbfdc, 6000, 60000);
@@ -28,7 +29,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   sun.position.set(-0.6, 0.38, 0.7).multiplyScalar(1000);
   scene.add(sun, sun.target);
   scene.add(new HemisphereLight(0xbcd6f0, 0x5a5040, 1.4));
-  const stage = new Stage(renderer, scene, camera, { kinds: allKinds });
+  const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute });
   const fit = (): void => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);
@@ -38,4 +39,11 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   fit();
   window.addEventListener('resize', fit);
   return { renderer, backend, scene, camera, stage, sun };
+}
+
+/** Our own vertex attributes on the Stage's warm-up stand-ins (same size as on real meshes). */
+function standInAttribute(g: BufferGeometry, name: string): boolean {
+  if (name !== 'surface') return false;
+  g.setAttribute('surface', new Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4));
+  return true;
 }
