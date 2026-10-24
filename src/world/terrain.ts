@@ -2,17 +2,22 @@
  * The terrain surface: the skeleton's elevation plus local detail (the height field layer of 5.6). Pure,
  * deterministic, evaluated in workers for meshes and on the main thread for walking.
  */
-import { Noise, deriveSeed } from '@futuremagic/core';
+import { Noise, deriveSeed, lerp, smoothstep } from '@futuremagic/core';
 import { Skeleton } from './skeleton';
+import { HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
 
 export class Terrain {
   readonly skeleton: Skeleton;
   private readonly detail: Noise;
+  readonly hydro: Hydrology;
+  private readonly here: WaterHere = emptyWater();
 
-  constructor(readonly seed: number, readonly setting: SettingModule) {
+  /** `hydro`: tile sizes for drainage (tests use small tiles). */
+  constructor(readonly seed: number, readonly setting: SettingModule, hydro: HydroOptions = HYDRO) {
     this.skeleton = new Skeleton(seed, setting.world);
     this.detail = new Noise(deriveSeed(seed, 'terrain', 'detail'));
+    this.hydro = new Hydrology(this.skeleton, hydro);
   }
 
   /** Ground height above the sea surface, metres. */
@@ -22,6 +27,36 @@ export class Terrain {
     // Small undulations everywhere, rougher where the land is high.
     const rough = 1 + Math.min(4, e / 600);
     const d = this.detail.fbm2(x / 70, z / 70, 3) * 2.2 + this.detail.fbm2(x / 9 + 71.3, z / 9 - 12.9, 2) * 0.25;
-    return Math.max(0.5, e + d * rough);
+    return this.shapeByWater(x, z, Math.max(0.5, e + d * rough));
+  }
+
+  /**
+   * Rivers shape their valleys: inside the channel the ground drops to a rounded bed, along the banks it
+   * lies a little above the water and rises gently, and further out it blends back into the land (lowering
+   * hills into a valley, or lifting hollows into banks so the river stays in its bed). Gorges through rims
+   * come out as steep walls. Lakes need no shaping: their basins are already below the level.
+   */
+  private shapeByWater(x: number, z: number, h: number): number {
+    const w = this.hydro.query(x, z, this.here);
+    if (!w.river) return h;
+    const { dist, half, level, depth, valley } = w;
+    let shaped: number;
+    if (dist < half) {
+      const q = dist / half;
+      shaped = level - depth * (1 - q * q);
+    } else {
+      const bank = level + 0.4 + (dist - half) * 0.12;
+      if (h >= bank) {
+        // Higher ground slopes down to the bank over the valley, keeping a share of its own relief.
+        const keep = 0.2 * smoothstep(half, half + 25, dist);
+        shaped = lerp(bank, h, Math.max(keep, smoothstep(half, valley, dist)));
+      } else {
+        // Low ground: a low levee keeps the river in its bed, then the land is left as it is.
+        const levee = level + 0.4 + Math.min((dist - half) * 0.12, 1.2);
+        shaped = Math.max(h, lerp(levee, h, smoothstep(half + 30, (half + valley) / 2 + 30, dist)));
+      }
+    }
+    // At the mouth the sea takes over: only lower, never build banks out into the water.
+    return level < 1 ? Math.min(h, shaped) : shaped;
   }
 }

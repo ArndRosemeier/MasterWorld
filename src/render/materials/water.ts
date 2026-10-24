@@ -12,25 +12,13 @@ import {
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
-import { WATER, type DepthMask } from './waterInputs';
+import { WATER, waterAt } from './waterInputs';
 
 let envTex: Texture | null = null;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
 export function useWaterEnvironment(t: Texture): void { envTex = t; }
 
 const G = 9.81;
-
-/** Water depth at a world xz from the masks (far everywhere, near blended in towards its middle). */
-function maskDepth(p: Node<'vec2'>): Node<'float'> {
-  const read = (m: DepthMask) => texture(m.tex, p.sub(m.origin).div(m.size)).r.mul(127.5).sub(16);
-  const un = p.sub(WATER.near.origin).div(WATER.near.size);
-  const e = un.x.min(un.y).min(float(1).sub(un.x).min(float(1).sub(un.y)));
-  const uf = p.sub(WATER.far.origin).div(WATER.far.size);
-  const ef = uf.x.min(uf.y).min(float(1).sub(uf.x).min(float(1).sub(uf.y)));
-  // Outside both masks: open sea.
-  const far = mix(float(60), read(WATER.far), smoothstep(0.0, 0.02, ef));
-  return mix(far, read(WATER.near), smoothstep(0.0, 0.08, e));
-}
 
 export const WATER_KIND = defineKind('water', ['position'], () => {
   if (!envTex) throw new Error('water material built before the sky environment');
@@ -39,9 +27,13 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
 
   // --- Vertex: Gerstner waves, faded out in shallows and far away.
   const wp = positionLocal.add(W.center);
-  const depthV = maskDepth(wp.xz);
+  const here = waterAt(wp.xz);
+  const depthV = here.y;
   const dist = length(wp.xz.sub(cameraPosition.xz));
-  const k = W.amp.mul(smoothstep(0.3, 9.0, depthV)).mul(float(1).sub(smoothstep(250.0, 800.0, dist)));
+  // Waves on the sea; lakes get small ones, rivers none (their surface moves by its flow).
+  const sea = float(1).sub(smoothstep(0.5, 2.0, abs(here.x)));
+  const still = float(1).sub(smoothstep(0.05, 0.3, length(here.zw)));
+  const k = W.amp.mul(smoothstep(0.3, 9.0, depthV)).mul(float(1).sub(smoothstep(250.0, 800.0, dist))).mul(mix(float(0.12), float(1), sea)).mul(still);
   const wd = normalize(W.wind), wpp = vec2(wd.y.negate(), wd.x);
   let disp: Node<'vec3'> = vec3(0), tan: Node<'vec3'> = vec3(1, 0, 0), bin: Node<'vec3'> = vec3(0, 0, 1);
   const waves: [Node<'vec2'>, number, number][] = [
@@ -56,14 +48,16 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     bin = bin.add(vec3(d.x.mul(d.y).mul(steep).mul(s).negate(), d.y.mul(steep).mul(co), d.y.mul(d.y).mul(steep).mul(s).negate()));
     disp = disp.add(vec3(d.x.mul(a).mul(co), a.mul(s), d.y.mul(a).mul(co)));
   }
-  m.positionNode = positionLocal.add(disp);
+  m.positionNode = positionLocal.add(disp).add(vec3(0, here.x, 0));
   const vN = varying(normalize(cross(bin, tan)), 'vWaterN');
-  const vDepth = varying(depthV, 'vWaterDepth');
+  const vFlow = varying(here.zw, 'vWaterFlow');
   const vCrest = varying(disp.y.div(max(0.05, k.mul(2.2))), 'vWaterCrest');
 
   // --- Fragment.
   m.colorNode = Fn(() => {
     const p = positionWorld;
+    // Depth per fragment (the mesh is coarse far out, shores need the detail).
+    const vDepth = waterAt(p.xz).y;
     const V = normalize(cameraPosition.sub(p));
     const camDist = length(cameraPosition.sub(p));
     const fade = float(1).sub(smoothstep(40.0, 300.0, camDist));
@@ -73,7 +67,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const h = (q: Node<'vec2'>) => {
       let sum: Node<'float'> = float(0);
       oct.forEach(([sc, amp, sp], i) => {
-        const drift = W.wind.mul(t.mul(sp * 0.6));
+        const drift = W.wind.mul(t.mul(sp * 0.6)).add(vFlow.mul(t).mul(-1));
         sum = sum.add(mx_noise_float(vec3(q.add(drift).mul(sc).add(i * 13.7), t.mul(sp * 0.5))).mul(amp));
       });
       return sum;
@@ -109,12 +103,19 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
 
     // Foam: bands rolling onto the shore, a wet rim at the waterline, whitecaps on the crests.
     const n = mx_noise_float(vec3(p.xz.mul(0.45), t.mul(0.3))).mul(0.5).add(0.5);
-    const shore = float(1).sub(smoothstep(0.0, 2.8, depth));
+    // Surf rolls in only on still water; a river shows its wet rim and streaks drawn out by the current.
+    const still = float(1).sub(smoothstep(0.05, 0.3, length(vFlow)));
+    const shore = float(1).sub(smoothstep(0.0, 2.8, depth)).mul(still);
+    // Streaks: noise stretched along the flow and carried with it.
+    const fdir = vFlow.div(max(length(vFlow), 0.001));
+    const along = dot(p.xz, fdir), across = dot(p.xz, vec2(fdir.y.negate(), fdir.x));
+    const streak = mx_noise_float(vec3(along.sub(t.mul(length(vFlow))).mul(0.12), across.mul(1.1), t.mul(0.2))).mul(0.5).add(0.5);
     const bands = sin(depth.mul(4.2).sub(t.mul(1.7)).add(n.mul(5))).mul(0.5).add(0.5);
     const foam = clamp(
       shore.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
         .add(float(1).sub(smoothstep(0.0, 0.3, depth)).mul(0.6))
-        .add(smoothstep(0.55, 1.0, vCrest).mul(smoothstep(0.45, 0.75, n)).mul(0.7)),
+        .add(smoothstep(0.55, 1.0, vCrest).mul(smoothstep(0.45, 0.75, n)).mul(0.7))
+        .add(float(1).sub(still).mul(smoothstep(0.72, 0.9, streak)).mul(0.35)),
       0, 1);
     const foamCol = W.ambient.mul(1.1).add(W.sunColor.mul(0.5).mul(sunUp));
     col = mix(col, foamCol, foam.mul(0.85));
@@ -126,7 +127,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
   })();
   // Dry land under a wave's edge: nothing.
   m.alphaTestNode = null;
-  m.opacityNode = select(vDepth.lessThan(-0.4), float(0), float(1));
+  m.opacityNode = select(waterAt(positionWorld.xz).y.lessThan(-0.2), float(0), float(1));
   m.alphaTest = 0.5;
   return m;
 }, { cast: false, receive: false });
