@@ -6,13 +6,14 @@
  * Every mesh of a kind shares the kind's one material, so a kind is one shader; variation goes into
  * vertex attributes or uniforms, never into a new material.
  */
-import { DoubleSide, MeshStandardNodeMaterial, type Material } from 'three/webgpu';
+import { DoubleSide, MeshStandardNodeMaterial, type Material, type Mesh } from 'three/webgpu';
 import { abs, attribute, cameraViewMatrix, dot, float, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import type { GroundTextures } from './terrain/groundTextures';
 import type { Surface } from '../setting/contract';
 import type { StageKind } from '@futuremagic/stage';
+import { makeSkyNode } from '@futuremagic/sky/node';
 
 export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface';
 
@@ -135,3 +136,15 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
 
 /** Which texgen layer draws each biome surface. */
 const SURFACE_LAYER: Record<Surface, string> = { grass: 'wildGrass', forest: 'forestFloor', sand: 'sand', scree: 'scree' };
+
+/** The sky dome (a unit box on the camera, drawn at the far plane). Its uniforms: `skyUniforms`. */
+export const SKY = defineKind('sky', ['position', 'normal', 'uv'], () => makeSkyNode({ reversed: true }).material as Material, { cast: false, receive: false });
+
+/** The sky as the environment map sees it (rendered only into the PMREM, never into the view). */
+export function makeEnvSky(): Mesh {
+  return makeSkyNode({ reversed: false, env: true });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type SkyUniforms = Record<string, { value: any }>;
+export const skyUniforms = (m: Material): SkyUniforms => (m as unknown as { uniforms: SkyUniforms }).uniforms;
