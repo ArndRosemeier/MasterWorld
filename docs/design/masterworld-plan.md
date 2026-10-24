@@ -1,6 +1,6 @@
 # MasterWorld: plan
 
-Living document. Status: **draft 2, open for discussion, no code yet.** Draft 2 adds Arnd's decisions of 2026-10-24 (D9–D18), including the region quadtree and the hybrid terrain.
+Living document. Status: **draft 2, open for discussion, no code yet.** Draft 2 adds Arnd's decisions of 2026-10-24 (D9–D24), including the region quadtree, the hybrid terrain and believable NPC life.
 Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld). The `MasterWorld` repo was empty.
 
 ---
@@ -37,6 +37,12 @@ The world should be believable but fantastic: classic countryside, forests and m
 | D16 | **Regions are aligned squares in powers of two, from 250 m up.** A bigger region that would leave holes next to existing ones has the holes filled with smaller regions. | Arnd's proposal: no chess board, still predictable sizes. Section 5.5. |
 | D17 | **Hero-class graphics and assets from the start.** | Section 5.7. |
 | D18 | **The landscape is dramatic, not realistic.** | Believable in structure (rivers run downhill), exaggerated in form. Section 5.6. |
+| D19 | **Believable NPC behaviour is first class.** NPCs never just stand around. | The weak spot of most earlier projects. Section 9.2. |
+| D20 | **Art style: stylised PBR with dramatic lighting.** | Was O10. |
+| D21 | **Stack like Dunfinity:** three.js on WebGPU with WebGL 2 fallback, Vite, strict TypeScript, Rapier, generation in workers. | Was O11. |
+| D22 | **Target: 60 fps on a mid-range desktop GPU.** Tablets are a later quality tier. | Was O12. |
+| D23 | **Sister repos:** release packages where they exist (Actors); other code is extracted into shared packages as needed, not copied. | Was O13. |
+| D24 | **Textures and assets: generated (AssetGenerator) and CC0 libraries.** Only CC0 or own work ships, with sources recorded. | Was O14. |
 
 ---
 
@@ -240,12 +246,34 @@ The purpose also tells the Director what to hint ("the dwarves sealed the lower 
 
 ---
 
-## 9. NPCs and knowledge
+## 9. NPCs
+
+### 9.1 Knowledge and talk
 
 * People come from **Actors** (races, bodies, clothing, animation).
 * What they know comes from **Conversations**: the VGM plants a promise as a fact in one or a few NPCs' knowledge with `world.addFacts`. Rumours can spread between NPCs over time, with attribution and errors.
 * When the player learns the fact, Conversations knows it. That is the commitment signal for the promise.
 * Conversations' own review says open free-text conversation is still weak. **Topic-based dialogue** (pick a subject, ask about it) fits the hint channel well and avoids the problem. Free text can come later with the LLM hook.
+
+### 9.2 Believable life (D19)
+
+NPCs standing around is what broke the illusion in most earlier projects. Norgo already had needs, schedules, memories and goal planning, and its people still often stood still, because the visible layer was thin: few places that tell a person what to do there, and few animations to do it with. So in MasterWorld the visible layer comes first.
+
+**The rule: every NPC on screen is visibly doing something.** Standing still is allowed only as an activity of its own (waiting at a stall, keeping watch, listening to someone), with motion: weight shifts, looking around, gestures.
+
+How:
+
+* **Smart objects.** The world tells people what to do. Every anvil, well, bench, stall, field, woodpile, hearth, bar counter and doorway carries **affordances**: which activity it offers, for which jobs, where to stand, which animation and prop, how long, how many at once. Settlement and interior generators place them as a matter of course: a smithy is not finished until it has its forge, anvil, quench tub and woodpile with their affordances. Norgo's `SmartSpot` (13 kinds) is the seed of this; MasterWorld needs many more, and several per building.
+* **Activities, not poses.** An activity is a short sequence: walk there, put down the basket, draw water, lift the bucket, carry it home. Props move with the hands (IK onto the prop). Carrying things between places (sacks, buckets, firewood, tools) is the cheapest and most convincing life there is.
+* **Daily schedules by job, personality and weather.** Work, meals, the tavern in the evening, church on a holy day, shelter in the rain, sleep. Personality (from Scale's personality plan: Big Five traits) varies the timing and the choices: the lazy apprentice takes long breaks, the pious widow goes to the shrine.
+* **Social life.** People meet and talk in pairs and small groups with gestures and turn-taking, children play and chase each other, someone shouts across the market, a couple argues. Groups use Conversations underneath, so what they say can be real gossip (the VGM's rumours spreading, 9.1).
+* **Reactions.** To the player (glance, greet by name if they know them, step aside, stare at a drawn weapon), to events (fire: run with buckets; a raid: flee, bar the doors), to weather and time of day.
+* **Animals and traffic.** Dogs, chickens, cattle, a cart on the road: Actors' animals, with the same smart-object rules (a trough, a pasture, a kennel).
+* **Detail by distance.** Near the player: full locomotion, animation, IK and look-at. Further away: cheaper updates. Off screen: an abstract schedule in coarse time steps, caught up when the place is seen again (as Norgo did). What the player sees must always agree with the schedule (the baker is at the bakery at dawn).
+
+**Animation is the bottleneck.** Actors has about 90 clips from Quaternius and the CMU motion library on demand. A living town needs work clips most libraries lack: hammering, sweeping, chopping, digging, hoeing, carrying, drawing water, kneading, stirring, sitting and eating, drinking, talking gestures. Collecting, retargeting and blending these (Actors already retargets) is a work item of its own, early.
+
+**It is checked, not hoped for.** A headless test runs a town for an in-game day and measures how much of the time each visible NPC spends without an activity. The target is under 5 %, and the test fails above it. A second check counts distinct activities per town and per hour, so variety cannot quietly shrink.
 
 ---
 
@@ -358,11 +386,6 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | O6 | ~~Combat feel~~ | **Decided** (D13): real-time, tab targeting. |
 | O7 | Lore of the default module | Shapes everything the VGM hints (section 12). |
 | O8 | ~~Which Norgo code is ported?~~ | **Decided** (D15): the GM is inspiration only. Skills, abilities and the worker split are candidates to port. |
-| O10 | **Art style** for hero graphics | Stylised-painterly (ages well, fits dramatic land, cheaper to keep consistent) or realistic PBR. Proposal: stylised PBR, dramatic lighting. |
-| O11 | **Rendering backend and stack** | Proposal: like Dunfinity, three.js on WebGPU with WebGL 2 fallback, Vite, TypeScript strict, Rapier for physics, generation in workers. |
-| O12 | **Target hardware and frame rate** | Proposal: 60 fps on a mid-range desktop GPU; tablets are a later quality tier. Decides how far hero graphics can go. |
-| O13 | **How sister repos are shared** | Actors ships as a release package. Dunfinity's and Scale's generators are not packaged yet: copy and own, or extract shared packages (AssetGenerator's `packages/`)? Proposal: release packages where they exist, extract the rest into shared packages as we need them. |
-| O14 | **Textures and asset sources** | Hero quality needs good textures. Generated (AssetGenerator), CC0 libraries, or both? License rules for what may ship. |
 | O9 | Footprint rules | When a footprint reaches into a neighbouring region (5.5), and when a town grows into a forest: what wins? |
 
 ---
@@ -370,7 +393,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 ## 17. Milestones (proposal)
 
 1. **Walk the land**: the setting module contract (a first cut), skeleton, one open region, hybrid terrain (height field plus a first volume: an arch or a cave mouth), sky, water, hero-quality materials and lighting, the player walking.
-2. **The town**: one medieval small town (Scale planner + medieval style), Actors townsfolk.
+2. **The town**: one medieval small town (Scale planner + medieval style) with **living townsfolk**: smart objects, activities with props, schedules, social groups, and the "nobody stands around" test (9.2). The work-animation set starts here.
 3. **The first promise**: ledger, Conversations hint, one cellar dungeon built through the three stages.
 4. **The Director**: needs, tension curve, the first combat and rewards.
 5. **The frontier**: opening regions as the player walks, story events (raids, takeovers), more dungeon kinds, more settlement sizes.
