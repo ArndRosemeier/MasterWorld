@@ -4,7 +4,7 @@
  */
 import { Noise, deriveSeed, lerp, smoothstep } from '@futuremagic/core';
 import { Skeleton } from './skeleton';
-import { HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
+import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
 
 export class Terrain {
@@ -43,20 +43,45 @@ export class Terrain {
     let shaped: number;
     if (dist < half) {
       const q = dist / half;
-      shaped = level - depth * (1 - q * q);
+      shaped = rockLevel(w) - (depth + plunge(w)) * (1 - q * q);
     } else {
-      const bank = level + 0.4 + (dist - half) * 0.12;
+      const bank = bankLevel(w) + 0.4 + (dist - half) * 0.12;
       if (h >= bank) {
         // Higher ground slopes down to the bank over the valley, keeping a share of its own relief.
         const keep = 0.2 * smoothstep(half, half + 25, dist);
         shaped = lerp(bank, h, Math.max(keep, smoothstep(half, valley, dist)));
       } else {
         // Low ground: a low levee keeps the river in its bed, then the land is left as it is.
-        const levee = level + 0.4 + Math.min((dist - half) * 0.12, 1.2);
+        const levee = bankLevel(w) + 0.4 + Math.min((dist - half) * 0.12, 1.2);
         shaped = Math.max(h, lerp(levee, h, smoothstep(half + 30, (half + valley) / 2 + 30, dist)));
       }
     }
     // At the mouth the sea takes over: only lower, never build banks out into the water.
     return level < 1 ? Math.min(h, shaped) : shaped;
   }
+}
+
+/** Extra depth of the pool a waterfall digs below its lip, metres. */
+function plunge(w: WaterHere): number {
+  const reach = 3 * w.half + 12;
+  if (!(w.fallAt > FALL_LIP / 2) || w.fallAt > reach) return 0;
+  const f = 1 - w.fallAt / reach;
+  return Math.min(0.5 * w.fallDrop, 8) * f * f;
+}
+
+/**
+ * The level the banks follow: the river's, except that a waterfall's step spreads out away from the water,
+ * so the drop is a cliff at the river and a slope across the valley rather than a wall through the land.
+ */
+function bankLevel(w: WaterHere): number {
+  if (!(w.fallDrop > 0)) return w.level;
+  const wide = Math.min(FALL_LIP + (w.dist - w.half) * 1.5, 70);
+  return w.fallBase + w.fallDrop * (1 - smoothstep(-wide / 2, wide / 2, w.fallAt));
+}
+
+/** The water leaves the lip in an arc: the rock under it steps down a little upstream, behind the falling sheet. */
+const UNDERCUT = 2.5;
+function rockLevel(w: WaterHere): number {
+  if (!(w.fallDrop > 0) || Math.abs(w.fallAt + UNDERCUT) > 4) return w.level;
+  return w.fallBase + w.fallDrop * (1 - smoothstep(-FALL_LIP / 2, FALL_LIP / 2, w.fallAt + UNDERCUT));
 }

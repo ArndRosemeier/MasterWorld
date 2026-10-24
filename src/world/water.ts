@@ -43,7 +43,11 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
     t.hydro.query(x, z, w);
     // A river shows in a mask only where it is at least a pixel wide (finer masks draw the narrow ones), and only
     // where its surface is above the ground: a coarse pixel smeared over the banks would float a sheet of water.
-    if (w.river && w.dist < w.half + step / 2 && 2 * w.half >= step && h < w.level + 0.3) { level = w.level; fx = w.fx * RIVER_SPEED; fz = w.fz * RIVER_SPEED; }
+    if (w.river && w.dist < w.half + step / 2 && 2 * w.half >= step && h < w.level + 0.3) {
+      // Rivers rush over a fall's lip and away from its foot.
+      const v = RIVER_SPEED * (w.fallAt > -15 ? 1 + 3 * Math.exp(-Math.max(0, w.fallAt) / 25) : 1);
+      level = w.level; fx = w.fx * v; fz = w.fz * v;
+    }
     else if (!Number.isNaN(w.lake) && h < w.lake) level = w.lake;
     else if (h < SEA_LEVEL) level = SEA_LEVEL;
     if (!Number.isNaN(level)) {

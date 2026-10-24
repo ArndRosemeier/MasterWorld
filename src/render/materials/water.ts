@@ -49,7 +49,10 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     disp = disp.add(vec3(d.x.mul(a).mul(co), a.mul(s), d.y.mul(a).mul(co)));
   }
   m.positionNode = positionLocal.add(disp).add(vec3(0, here.x, 0));
-  const vN = varying(normalize(cross(bin, tan)), 'vWaterN');
+  // Slope of the surface itself (a river's fall): the level's gradient from the masks, a metre apart.
+  const slope = vec2(waterAt(wp.xz.add(vec2(1, 0))).x.sub(here.x), waterAt(wp.xz.add(vec2(0, 1))).x.sub(here.x)).mul(float(1).sub(still));
+  const vN = varying(normalize(cross(bin, tan).add(vec3(slope.x.negate(), 0, slope.y.negate()))), 'vWaterN');
+  const vFall = varying(smoothstep(0.6, 2.0, length(slope)), 'vWaterFall');
   const vFlow = varying(here.zw, 'vWaterFlow');
   const vCrest = varying(disp.y.div(max(0.05, k.mul(2.2))), 'vWaterCrest');
 
@@ -110,15 +113,22 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const fdir = vFlow.div(max(length(vFlow), 0.001));
     const along = dot(p.xz, fdir), across = dot(p.xz, vec2(fdir.y.negate(), fdir.x));
     const streak = mx_noise_float(vec3(along.sub(t.mul(length(vFlow))).mul(0.12), across.mul(1.1), t.mul(0.2))).mul(0.5).add(0.5);
+    // The falling sheet: streaks stretched down the fall, rushing.
+    const sheet = mx_noise_float(vec3(across.mul(1.4), p.y.mul(0.18).add(t.mul(3.0)), t.mul(0.4))).mul(0.35)
+      .add(mx_noise_float(vec3(across.mul(4.0), p.y.mul(0.5).add(t.mul(6.0)), 3.1)).mul(0.15)).add(0.5);
     const bands = sin(depth.mul(4.2).sub(t.mul(1.7)).add(n.mul(5))).mul(0.5).add(0.5);
     const foam = clamp(
       shore.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
         .add(float(1).sub(smoothstep(0.0, 0.3, depth)).mul(0.6))
         .add(smoothstep(0.55, 1.0, vCrest).mul(smoothstep(0.45, 0.75, n)).mul(0.7))
-        .add(float(1).sub(still).mul(smoothstep(0.72, 0.9, streak)).mul(0.35)),
+        .add(float(1).sub(still).mul(smoothstep(0.72, 0.9, streak)).mul(0.35))
+        // White water: below a fall the current churns, and the falling sheet itself is all foam.
+        .add(smoothstep(1.3, 3.2, length(vFlow)).mul(smoothstep(0.35, 0.8, n.mul(0.6).add(streak.mul(0.6)))).mul(0.8)),
       0, 1);
     const foamCol = W.ambient.mul(1.1).add(W.sunColor.mul(0.5).mul(sunUp));
     col = mix(col, foamCol, foam.mul(0.85));
+    // The falling sheet: torn white streaks over the dark water body behind them.
+    col = mix(col, foamCol.mul(0.8), vFall.mul(mix(float(0.3), float(0.95), smoothstep(0.3, 0.75, sheet))));
 
     // From below: a bright Snell window overhead, the dark of total internal reflection around it.
     const window = smoothstep(0.55, 0.75, ndv);
@@ -127,7 +137,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
   })();
   // Dry land under a wave's edge: nothing.
   m.alphaTestNode = null;
-  m.opacityNode = select(waterAt(positionWorld.xz).y.lessThan(-0.2), float(0), float(1));
+  // (A falling sheet stays whole: it hangs over its own lip.)
+  m.opacityNode = select(waterAt(positionWorld.xz).y.lessThan(-0.2).and(vFall.lessThan(0.3)), float(0), float(1));
   m.alphaTest = 0.5;
   return m;
 }, { cast: false, receive: false });
