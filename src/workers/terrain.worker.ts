@@ -2,6 +2,7 @@
 import { buildChunk, type ChunkSpec, type ChunkMesh } from '../world/chunkMesh';
 import { Terrain } from '../world/terrain';
 import { settingById } from '../setting/index';
+import { serve } from './serve';
 
 export interface TerrainJob extends ChunkSpec {
   seed: number;
@@ -10,13 +11,8 @@ export interface TerrainJob extends ChunkSpec {
 
 let terrain: Terrain | null = null;
 
-self.onmessage = (e: MessageEvent<{ id: number; job: TerrainJob }>) => {
-  const { id, job } = e.data;
-  try {
-    if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = new Terrain(job.seed, settingById(job.setting));
-    const mesh: ChunkMesh = buildChunk(terrain, job);
-    (self as unknown as DedicatedWorkerGlobalScope).postMessage({ id, result: mesh }, [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer]);
-  } catch (err) {
-    (self as unknown as DedicatedWorkerGlobalScope).postMessage({ id, error: err instanceof Error ? err.message : String(err) });
-  }
-};
+serve<TerrainJob, ChunkMesh>((job) => {
+  if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = new Terrain(job.seed, settingById(job.setting));
+  const mesh = buildChunk(terrain, job);
+  return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer] };
+});
