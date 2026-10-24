@@ -6,3 +6,7 @@
 4. **No duplicates:** search before writing a helper; run `npm run dup` and `npm run repeated` (toolbox finders in `tools/`). Every PR description has a `COPIES:` line.
 5. **No `Math.random`.** Every random number comes from a seed.
 6. **PRs are merged to `main` automatically** once `npm test` is green.
+7. **Shared code comes from packages** (D23): `@futuremagic/core` and `@futuremagic/stage` from the AssetGenerator submodule (`vendor/assetgenerator`, clone with `--recurse-submodules`). Do not copy their code.
+8. **Layers** are in `tools/guards/rules.json`: `src/world`, `src/setting` and `src/vgm` are pure (no three.js), so they run in workers and tests.
+
+Checks: `npm test` (unit tests and guards), `npm run build` (typecheck and bundle), `npm run shot -- "?gl&hud" shots/x.png` (headless screenshot after a build). In the cloud container set `CHROMIUM_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome` and use `?gl`.

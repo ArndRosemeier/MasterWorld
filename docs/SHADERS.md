@@ -12,17 +12,17 @@ Shader compiles are the worst kind of stutter: the frame waits for the driver. S
 
 In the worst case, shader work takes a third of the time and the game keeps two thirds of every second for itself. With 10 ms compiles, that is up to about 33 new shaders per second, enough to stream a new region in without anyone noticing.
 
-## How the code will keep them
+## How the code keeps them
 
-There is no rendering code yet. These are the pieces to build, taken from Dunfinity and Scale:
+The policy is implemented once, in the shared package **`@futuremagic/stage`** (AssetGenerator `packages/stage`, vendored at `vendor/assetgenerator`), which Dunfinity uses too:
 
-| Piece | What it does |
-|---|---|
-| Material registry | Every material is a *kind* from a closed list, and every mesh of a kind shares one material. So the set of shaders is known up front. Variation goes into vertex attributes or uniforms, never into a new material. |
-| Stage | `warmUp()` compiles every kind against the real scene (lights, fog, render target) behind the loading screen. After that, `stage.add(obj)` compiles first and only then puts the object into the scene. |
-| Cap | Hands out compile slots by the rules above: measures each compile and makes the next one wait `2t`. Off during warm-up. |
-| Monitor | Records every compile with its duration. `shaders.report()` in the browser console lists breaches (over 10 ms, or over the one-third budget). |
-| Guards | `npm test` fails on a material made outside the registry, on `onBeforeCompile`, and on `renderer.compile*` outside the Stage. |
+| Piece | Where | What it does |
+|---|---|---|
+| Material registry | `src/render/materials.ts` | Every material is a *kind* from a closed list, and every mesh of a kind shares one material. So the set of shaders is known up front. Variation goes into vertex attributes or uniforms, never into a new material. |
+| Stage | `@futuremagic/stage` `Stage`, made in `src/render/view.ts` | `warmUp()` compiles every kind against the real scene behind the loading screen. After that, `stage.add(obj)` compiles first and only then puts the object into the scene. |
+| Cap | `@futuremagic/stage` `ShaderCap` | `share = 1/3`: after a build that took `t` ms the next waits `2t`, one per frame. Off during warm-up. |
+| Monitor | `@futuremagic/stage` `ShaderMonitor` | Records every build with its duration. `shaders.report()` in the browser console; `?hud` shows a summary line. Its hard violation line is 100 ms; the 10 ms target is ours and is read from the same records. |
+| Guards | `tools/guards/rules.json` | `npm test` fails on a material made outside the registry, on `onBeforeCompile`, on `renderer.compile*` in our code, and on a second renderer. |
 
 ## Lessons this is built on
 

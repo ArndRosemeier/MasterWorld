@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>MasterWorld</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0d10; color: #d8d2c4; font: 13px/1.4 Georgia, serif; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+      #loading { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; background: #0b0d10; transition: opacity 0.6s; }
+      #loading.done { opacity: 0; pointer-events: none; }
+      #loading .name { font: 400 34px/1 Georgia, serif; letter-spacing: 0.24em; text-indent: 0.24em; color: #efe6d2; text-transform: uppercase; }
+      #loading .step { margin-top: 14px; min-height: 1.4em; color: #8a8070; letter-spacing: 0.06em; }
+      #hud { position: fixed; left: 12px; top: 10px; pointer-events: none; white-space: pre; font: 12px/1.4 ui-monospace, monospace; text-shadow: 0 1px 2px #000; }
+    </style>
+  </head>
+  <body>
+    <div id="loading"><div class="name">MasterWorld</div><div class="step">Loading</div></div>
+    <noscript><p style="position:fixed;inset:0;z-index:30;margin:0;padding:40vh 16px 0;text-align:center">MasterWorld needs JavaScript.</p></noscript>
+    <div id="hud"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
