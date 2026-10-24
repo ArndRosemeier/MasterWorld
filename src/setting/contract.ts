@@ -15,6 +15,22 @@ export const CONTRACT_VERSION = 1;
 export const SURFACES = ['grass', 'forest', 'sand', 'scree'] as const;
 export type Surface = (typeof SURFACES)[number];
 
+/** The tree species the engine can grow (procedural models from @futuremagic/vegetation). */
+export const TREES = ['oak', 'linden', 'maple', 'birch', 'chestnut', 'pine', 'cypress', 'plane'] as const;
+export type TreeName = (typeof TREES)[number];
+
+/** What grows wild in a biome. */
+export interface FloraDef {
+  /** Trees per hectare where the woods are thickest (a forest: 100-250; open country: a few). */
+  readonly trees: number;
+  /** How much of the land the woods cover, -1 (copses here and there) .. 1 (unbroken, a clearing now and then). */
+  readonly cover: number;
+  /** Relative share of each species. */
+  readonly mix: Readonly<Partial<Record<TreeName, number>>>;
+  /** Shrubs per hectare (under trees and in the open). */
+  readonly shrubs: number;
+}
+
 export interface BiomeDef {
   readonly id: string;
   readonly name: string;
@@ -28,6 +44,8 @@ export interface BiomeDef {
   readonly surface: Surface;
   /** Optional elevation range in metres above the sea. */
   readonly elevation?: readonly [number, number];
+  /** Wild trees and shrubs; none if absent. */
+  readonly flora?: FloraDef;
 }
 
 /** The shape of the land: the skeleton's parameters (section 5.2). All lengths in metres. */
@@ -91,6 +109,13 @@ export function validateSetting(m: SettingModule): string[] {
     if (ids.has(b.id)) out.push(`${where}: biome "${b.id}" defined twice`);
     ids.add(b.id);
     if (!SURFACES.includes(b.surface)) out.push(`${where}: biome "${b.id}" surface "${b.surface}" is unknown`);
+    if (b.flora) {
+      const f = b.flora;
+      if (!(f.trees >= 0 && f.trees <= 600) || !(f.shrubs >= 0 && f.shrubs <= 600)) out.push(`${where}: biome "${b.id}" flora densities must be 0..600 per hectare`);
+      if (!(f.cover >= -1 && f.cover <= 1)) out.push(`${where}: biome "${b.id}" flora cover must be -1..1`);
+      for (const k of Object.keys(f.mix)) if (!TREES.includes(k as TreeName)) out.push(`${where}: biome "${b.id}" tree "${k}" is unknown`);
+      if (f.trees > 0 && !Object.values(f.mix).some((w) => (w ?? 0) > 0)) out.push(`${where}: biome "${b.id}" has trees but no species`);
+    }
     if (!(b.temperature[0] <= b.temperature[1])) out.push(`${where}: biome "${b.id}" temperature range is reversed`);
     if (!(b.moisture[0] >= 0 && b.moisture[1] <= 1 && b.moisture[0] <= b.moisture[1])) out.push(`${where}: biome "${b.id}" moisture range must lie in 0..1`);
   }

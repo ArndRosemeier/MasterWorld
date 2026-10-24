@@ -9,7 +9,7 @@ import { deriveSeed, Rng } from '@futuremagic/core';
 import type { SkyLight } from '@futuremagic/sky';
 import { WATER, type WaterMask } from '../materials/waterInputs';
 import { WATER_KIND } from '../materials/water';
-import type { WaterPool } from '../../workers/pool';
+import { until, type WorldPool } from '../../workers/pool';
 
 function radialGrid(segments: number, rings: number, r0: number, growth: number): BufferGeometry {
   const pos: number[] = [0, 0, 0];
@@ -40,7 +40,7 @@ export class WaterView {
   private readonly masks: MaskState[];
   private time = 0;
 
-  constructor(private readonly pool: WaterPool, private readonly seed: number, private readonly setting: string) {
+  constructor(private readonly pool: WorldPool, private readonly seed: number, private readonly setting: string) {
     // Rings grow geometrically: ~0.4 m apart under the camera, out past the horizon (~150 km).
     this.mesh = new Mesh(radialGrid(192, 150, 0.4, 1.068), WATER_KIND.make());
     this.mesh.name = 'sea';
@@ -78,7 +78,7 @@ export class WaterView {
     const snap = side / 16;
     const x0 = Math.round(cam.x / snap) * snap - half, z0 = Math.round(cam.z / snap) * snap - half;
     s.pending = true;
-    void this.pool.run({ seed: this.seed, setting: this.setting, x0, z0, size: side, res: s.mask.res }).then((px) => {
+    void this.pool.run({ kind: 'mask', seed: this.seed, setting: this.setting, x0, z0, size: side, res: s.mask.res }).then((px) => {
       s.mask.data.set(px);
       s.mask.tex.needsUpdate = true;
       s.mask.origin.value.set(x0, z0);
@@ -91,7 +91,7 @@ export class WaterView {
   /** Masks for the start, before the first frame. */
   async prime(cam: Vector3): Promise<void> {
     for (const s of this.masks) this.refresh(s, cam);
-    while (!this.ready) await new Promise((r) => setTimeout(r, 20));
+    await until(() => this.ready);
   }
 
   /** `gain`: the multiplier the scene's lights carry on the sky's light rig (SkyView.gain). */
