@@ -1,6 +1,6 @@
 # MasterWorld: plan
 
-Living document. Status: **draft 1, open for discussion, no code yet.**
+Living document. Status: **draft 2, open for discussion, no code yet.** Draft 2 adds Arnd's decisions of 2026-10-24 (D9–D16).
 Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld). The `MasterWorld` repo was empty.
 
 ---
@@ -20,13 +20,21 @@ The world should be believable but fantastic: classic countryside, forests and m
 | # | Decision | Notes |
 |---|---|---|
 | D1 | **The VGM is procedural.** No language model is needed to play. | An LLM hook comes later (Norgo's Oracle already had one). Out of the box the game must cost nothing to run. |
-| D2 | **Single player.** Multiplayer is a later milestone. | Keep the door open: see section 12. |
+| D2 | **Single player.** Multiplayer is a later milestone. | Keep the door open: see section 14. |
 | D3 | **TypeScript, three.js, 3D**, like the other projects. | |
 | D4 | **The VGM's job is to make the game feel good for the player.** Difficulty and similar options are settings the VGM honours, not separate systems. | |
 | D5 | **Classic, bounded dungeons.** Nothing endless. | Dunfinity's endless levels are not the model, but its styles, materials and creatures are reusable. |
 | D6 | **Believable but fantastic overworld**: classic countryside, towns and cities on demand. **One small town at the start.** | |
 | D7 | **Think big.** Seas and oceans come later and must fit without a rewrite. | The world skeleton has coasts and seas from day one (section 5). |
 | D8 | **Skills and magic: start from Norgo's system**, to be discussed. | Section 10. |
+| D9 | **Height field overworld**, as long as dungeons can still be good. | They can: dungeons are their own full 3D spaces (section 8). |
+| D10 | **The VGM may add land or things wherever it makes sense, and may change things when the story calls for it.** | The village got burned or raided; goblins took the dungeon and drove the kobolds out. Section 4.5. |
+| D11 | **Ability unlocks from skills and from other sources** (trainers, tomes, quests, items, deeds). | Section 10. |
+| D12 | **Game modes like Dunfinity:** roguelike (permadeath) or classic save. | Section 11. |
+| D13 | **Real-time combat with tab targeting.** Right mouse button held for mouse look; otherwise the cursor is visible to interact and to target by clicking. | Section 11. |
+| D14 | **The setting is a module.** Everything world-related sits behind one big, exchangeable contract. The default module is a classic small-town start. | Section 12. |
+| D15 | **Norgo's GM is inspiration only.** It served a different purpose; MasterWorld's VGM is designed fresh. | Section 4. |
+| D16 | Region size: **under discussion.** | Section 5.2. |
 
 ---
 
@@ -34,7 +42,7 @@ The world should be believable but fantastic: classic countryside, forests and m
 
 | Repo | What it has | Use in MasterWorld |
 |---|---|---|
-| **Norgo** | Fantasy open world; **a VGM** (`src/gm`: Director, PlayerModel, Narrator, QuestForge, QuestBook, Scout, Oracle); use-based skills with 10 magic schools; data-driven ability recipes; server in a Web Worker behind a message protocol. | The VGM's *director* half is largely designed there. Skills, abilities and magic. The server/worker split for the multiplayer door. Outdated as a whole, so we port ideas and code selectively. |
+| **Norgo** | Fantasy open world; a GM (`src/gm`: Director, PlayerModel, Narrator, QuestForge, QuestBook, Scout, Oracle); use-based skills with 10 magic schools; data-driven ability recipes; server in a Web Worker behind a message protocol. | Skills, abilities and magic. The server/worker split for the multiplayer door. Its GM is **inspiration only** (D15): it ran pacing in a world that already existed. Outdated as a whole, so we port ideas and code selectively. |
 | **Dunfinity** | Procedural 3D dungeon, many styles, procedural creatures, item and lore design. | Dungeon styles, materials, lighting and creatures. The layout generator itself is new (D5). |
 | **Scale** | Seed-driven settlements from hamlet to metropolis: macro plan → cells → lots → buildings → elements; interiors; "a Settlement placed into a World". | The planning layers for towns and cities, and interiors for houses and cellars. Needs a medieval style family (section 7). |
 | **Actors** | Morphable rigged humans, ten fantasy races, animals, clips; `@actors/generator`. | All people and many animals. |
@@ -50,13 +58,13 @@ The VGM has two halves that share one view of the player.
 
 ### 4.1 Director: making it feel good
 
-This is Norgo's VGM, and most of its design carries over:
+Designed fresh (D15). Ideas worth taking from Norgo's GM:
 
-* **PlayerModel**: infers a playstyle (explorer, fighter, socializer, crafter, mage, sneak) from decayed evidence, plus a factual history.
-* **Director**: a tension curve (calm → build-up → peak → relief) with fairness rules (no spawns while hurt, talking or just respawned; attackers appear in front of the player, never on top of them).
-* **Narrator, QuestForge, QuestBook**: narration, GM-authored quests, the journal.
+* a **player model** that infers playstyle (explorer, fighter, socializer, crafter, mage, sneak) from decayed evidence, plus a factual history;
+* a **tension curve** (calm → build-up → peak → relief) with fairness rules: no spawns while hurt, talking or just respawned; attackers appear in front of the player, never on top of them;
+* a **pacing queue** for messages, so the GM never floods the screen.
 
-What changes: Norgo's Director could only *find* things in a world that already existed (its Scout searched for unexplored features). MasterWorld's Director can *order* things from the Builder.
+The big difference: Norgo's GM could only *find* things in a world that already existed (its Scout searched for unexplored features). MasterWorld's Director *orders* things from the Builder.
 
 The Director also keeps a small set of **needs**, each a score that rises over time and falls when it is met:
 
@@ -84,7 +92,7 @@ A promise moves through stages, and each stage costs more than the one before:
 |---|---|---|
 | **Sketch** | the promise is made | kind, purpose, rough place, theme, a secret or two, a difficulty band |
 | **Outline** | the player commits: learns the hint, asks the way, takes the quest, or heads that way | exact site on the land, entrance, layout graph, inhabitants, treasure |
-| **Built** | the player gets close (about one region away) | geometry, props, creatures, ready to stream |
+| **Built** | the player gets close (a few km away, tuned to travel speed) | geometry, props, creatures, ready to stream |
 
 Because the VGM made the hint, it always knows what the hint means. It never has to understand the player's words.
 
@@ -100,14 +108,16 @@ Because the VGM made the hint, it always knows what the hint means. It never has
 ### 4.4 Budget and latency
 
 * Generation runs in workers. The VGM has a fixed per-second build budget.
-* **Build ahead, hide the wait.** Travel time covers it: outline on commitment, build when about one region away. A walking player gives minutes of warning, so the budget is generous.
+* **Build ahead, hide the wait.** Travel time covers it: outline on commitment, build when a few km away. A walking player gives minutes of warning, so the budget is generous.
 * Fast travel (horse, ship, teleport) must not outrun the builder. A journey is a promise too: the VGM knows the destination when it starts.
 
 ### 4.5 Consistency
 
 * Every generated fact goes into the **canon** (the ledger plus the facts derived from it). New content must agree with it.
 * Promises carry **constraints** ("in the hills", "within two hours", "near water", "dwarven"). The Builder must place the content inside them or report failure. Then the Director makes a different promise, and the NPC never told a lie.
-* **Seen is frozen.** Anything the player has seen or been told in detail can no longer change.
+* **The VGM may place things wherever it makes sense** (D10), seen or not, as long as it fits the canon: a new farm by the road, a camp in the woods. What it may not do is quietly rewrite something the player knows.
+* **Known things change only through story.** A change to something the player has seen or been told about is an **event** in the ledger with a cause: bandits burned the village, goblins took the mine and drove out the kobolds. An event leaves **traces** the player can find: ruins and ash, kobold refugees on the road, rumours in the tavern, a survivor with a story. So a change never feels like the world contradicting itself; it feels like the world moving on.
+* Events are also the VGM's strongest tool for "feels good": a place the player liked being threatened is a hook, and the player's own deeds (clearing the bandits) can cause events too (the hamlet grows).
 
 ---
 
@@ -125,6 +135,8 @@ Rebuilding the world means replaying the decision log through the generators. Sa
 
 ### 5.2 A fixed coarse skeleton, detail on demand
 
+> The region size is under discussion (D16). This section describes the draft 1 proposal; 5.5 lists the alternatives.
+
 A believable world needs global structure: rivers run downhill to a coast, mountains form ranges, climate follows latitude and rain shadow. That is hard if land is invented piece by piece. So:
 
 * **Skeleton**: low-frequency fields (continents, seas, mountain ranges, climate, biomes) as global functions of world position. They are cheap, unbounded, and consistent everywhere.
@@ -135,8 +147,8 @@ The skeleton is unbounded and fixed. The VGM decides **what stands on it** and *
 
 ### 5.3 Soft and hard land
 
-* **Hard**: anything the player has seen or been told about in detail. It is frozen.
-* **Soft**: everything else. Even inside an open region, unseen land stays soft, so the VGM can still put a ruin behind the next hill when a need calls for it.
+* **Hard**: anything the player has seen or been told about in detail. It changes only through story events (4.5).
+* **Soft**: everything else. Even inside an open area, unseen land stays soft, so the VGM can still put a ruin behind the next hill when a need calls for it.
 
 ### 5.4 Scale targets (proposal)
 
@@ -144,12 +156,37 @@ The skeleton is unbounded and fixed. The VGM decides **what stands on it** and *
 * View distance several km, with the far horizon drawn from the skeleton alone.
 * The skeleton is big enough for several continents and oceans between them.
 
+### 5.5 Region size: fixed or not? (D16, to discuss)
+
+Two different things hide behind "region", and they want different answers:
+
+1. **The technical tile**: the unit for streaming, caching, LOD, saves and workers.
+2. **The design area**: the piece of land the VGM opens and fills (a valley with its town, a forest with its ruin).
+
+**Fixed size for both** (draft 1):
+
+* Pro: simple addressing (`tile x,z`), simple streaming and save keys, predictable build cost per tile, easy to shard for multiplayer later.
+* Con: land does not come in squares. A city can be bigger than a region, a hamlet much smaller. Rivers, roads, ridges and forests all cross the borders and need boundary conditions. Grid artefacts show up in layouts ("why is there always something every 12 km?").
+
+**Free-shaped design areas, fixed technical tiles** (proposal):
+
+* The tiles are a fixed power-of-two grid (for example 256 m for detail, with coarser levels for LOD and the skeleton), invisible to design.
+* The VGM opens areas of any shape and size, sized to the content: the footprint of a city, a valley, a forest. An area is a polygon in the ledger.
+* Rivers and drainage are solved on the coarse skeleton, lazily and cached per coarse tile, so they are continuous everywhere and no area needs boundary conditions.
+* Pro: content decides the size, no seams in design, the tech stays simple.
+* Con: area overlap needs rules (what wins where a city grows into a forest); the build cost of an area varies, so the budget works in tiles, not in areas.
+
+**No areas at all, only sites** (another option): the VGM only places sites (town, ruin, dungeon entrance) with footprints, and everything between them is plain skeleton terrain with procedural dressing. The simplest, but the countryside between sites has no authored character (no "the Whispering Wood").
+
+Recommendation: **fixed technical tiles, free-shaped design areas.**
+
 ---
 
 ## 6. The start
 
 * One small town, ideally at a river crossing (that is where real towns grow), in a temperate region.
-* The town's region is open, its neighbours are sketched.
+* The town's area is open, the land around it is sketched.
+* This start is the default **setting module** (D14, section 12). Another module can start somewhere else entirely.
 * Three or four promises are already planted in townsfolk: a cellar with a problem, a nearby ruin, a road with trouble, something farther away.
 * The rest of the world exists only as skeleton and horizon.
 
@@ -184,7 +221,9 @@ Classic and bounded: a beginning, a middle, an end, with a boss or a treasure or
 
 The purpose also tells the Director what to hint ("the dwarves sealed the lower galleries"), what lives there, and what the treasure is.
 
-* Dungeons are **their own spaces**, entered through doors, stairs or cave mouths. This keeps them bounded, lets the overworld stay a cheaper height field (open question O1), and gives clear loading points.
+* Dungeons are **their own spaces**, entered through doors, stairs or cave mouths. This keeps them bounded, lets the overworld stay a cheaper height field (D9), and gives clear loading points.
+* **A height field does not limit dungeons.** Inside, a dungeon is a full 3D mesh: overhangs, chasms, multi-level halls, bridges, flooded galleries, even local voxel or SDF geometry where a cave wants it. Only the overworld surface is a height field. Where the two meet, the entrance is a prop or a small hand-shaped piece of terrain (a cave mouth, a cellar hatch, a crypt door in a hillside), with a hole cut in the height field when needed.
+* Dungeons change through story events too (D10): when goblins drive out the kobolds, the layout stays, the inhabitants, dressing and traps change.
 * From Dunfinity: styles, rock and brick materials, lighting, creatures. From AssetGenerator: props and dressing.
 * Once outlined, a dungeon is fixed. The player's changes are stored as diffs.
 
@@ -208,16 +247,67 @@ Norgo's system, as it stands:
 * Skill thresholds unlock **abilities**. Abilities are data-driven recipes (`ops`: projectile, area, zone, terrain edit, effect …) with mana, stamina or HP cost, cooldown and cast time.
 * Race bonuses and an innate magic school per character.
 
-Questions for the discussion:
+Decided: **a mix** (D11). Skill levels still unlock abilities, and other sources do too: a trainer, a guild rank, a found tome or scroll, a quest reward, an item, a deed ("slew a dragon"). That gives the VGM another lever: it can hand out an unlock as a reward that fits the player's playstyle.
 
-* **Use-based only, or a mix?** Use-based fits a sandbox, but a classic RPG often has milestones too (a trainer, a guild, a found tome). The VGM could hand those out as rewards.
-* **Which schools fit this world?** Gravitas was tied to Norgo's variable gravity. Geomancy's digging and walls need terrain that can be edited (O1).
+Still open:
+
+* **Which schools fit this world?** Gravitas was tied to Norgo's variable gravity. With a height field (D9), geomancy's walls and pillars become spawned rock pieces and small local raises; digging tunnels through the overworld is out, inside dungeons it is possible where the dungeon's geometry allows it.
 * **Where does magic come from in the lore?** That shapes which NPCs teach it and what the VGM may hint.
 * **Keep the recipe format.** It is the part most worth porting as is.
 
 ---
 
-## 11. Seas and oceans (later, prepared now)
+## 11. Playing
+
+### 11.1 Game modes (D12)
+
+Like Dunfinity:
+
+* **Roguelike**: permadeath, one save that the game writes itself. Death ends the character; the world (the ledger) can stay for the next one, so a new character can find the old one's grave, gear or legend.
+* **Classic**: save and load freely.
+
+The mode is a setting the VGM honours (D4): in roguelike mode it is stricter with fairness, since a death costs more.
+
+### 11.2 Combat and controls (D13)
+
+* **Real-time combat with tab targeting.** Tab cycles through hostile targets in front of the player, nearest and most threatening first. Abilities fire at the current target.
+* **The cursor is visible by default.** Clicking a creature or NPC targets it; clicking an object or person interacts (talk, open, loot, pick up).
+* **Right mouse button held: mouse look.** The cursor hides, the mouse turns the camera and the character; releasing brings the cursor back where it was.
+* Movement with WASD, third-person camera with zoom to first person.
+* This also suits the cast-time and cooldown abilities from Norgo's recipe format (section 10).
+
+---
+
+## 12. The setting module (D14)
+
+Everything world-related lives behind **one big, exchangeable contract**: the *setting module*. The engine (rendering, streaming, the VGM's machinery, combat, the generators) knows nothing about any particular world. The default module is a **classic fantasy small-town start**.
+
+A setting module supplies, as data plus a few pure functions:
+
+| Part | Contents |
+|---|---|
+| Identity | id, version, title, save namespace |
+| World shape | skeleton parameters: continents, climate bands, biomes, sea level, how fantastic the land may get |
+| Peoples | races (Actors body presets), cultures, naming, languages, how they get along |
+| Places | settlement kinds and sizes, architecture style families per culture, dungeon kinds with their purposes (section 8) |
+| Creatures | rosters per biome and depth, factions (goblins, kobolds, bandits), who displaces whom |
+| Items | catalogues, treasure tables, unique items |
+| Skills and magic | skills, schools, abilities in the recipe format, unlock sources (D11) |
+| Lore | history, gods, the source of magic, the facts NPCs can know |
+| VGM content | promise templates, event templates (raid, plague, takeover, festival), hint wording, needs tuning |
+| Conversations | a Conversations setting package (its own `setting-package-contract`: domain, predicates, characters, language resources) |
+| Start | where and how a game starts: the start area, the first promises, the player's starting kit |
+
+Rules for the contract:
+
+* **Versioned.** A save records the module id and version; a module bumps its version when its saved meaning changes.
+* **Validated on load.** Like Conversations' `validateSetting`: authoring errors are reported before play starts.
+* **Pure data where possible**, pure seeded functions where not. No `Math.random`, no access to the engine's internals.
+* **One module per game.** Mixing modules is out of scope.
+
+---
+
+## 13. Seas and oceans (later, prepared now)
 
 * Coasts and seas are part of the skeleton from day one, so the first town can already lie by a lake or estuary.
 * Rendering and water from Xenoworld: Gerstner-wave seas, shore foam, rivers, waterfalls.
@@ -225,7 +315,7 @@ Questions for the discussion:
 
 ---
 
-## 12. The multiplayer door
+## 14. The multiplayer door
 
 * Server logic in a worker behind a message protocol, as Norgo did. The VGM and the ledger live on the server side.
 * The decision log is the shared truth. Clients only need the seed and the log to rebuild the world.
@@ -233,7 +323,7 @@ Questions for the discussion:
 
 ---
 
-## 13. The LLM hook
+## 15. The LLM hook
 
 Out of the box nothing calls a model. The hook is a narrow interface the procedural parts already use:
 
@@ -245,28 +335,29 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 
 ---
 
-## 14. Open questions
+## 16. Open questions
 
 | # | Question | Notes |
 |---|---|---|
-| O1 | **Height field or voxel terrain for the overworld?** | Height field: cheaper, longer views, ocean-friendly; caves and dungeons as their own spaces. Voxel (Norgo, Xenoworld): overhangs, digging, geomancy, at a much higher cost. Proposal: height field plus local edit layers. |
-| O2 | Region size and travel speed | Drives build-ahead time. |
-| O3 | How far may the VGM go in soft land? | Example: may it add a whole village behind a hill the player has not seen yet? |
-| O4 | Skills and magic | Section 10. |
-| O5 | Death and saving | Classic save/load, or something tougher? |
-| O6 | Combat feel | Real-time action like Norgo and Dunfinity? |
-| O7 | Lore | A setting, its history and its races shape everything the VGM hints. |
-| O8 | Which Norgo code is ported, which only re-read? | The GM modules are the first candidate. |
+| O1 | ~~Height field or voxel terrain?~~ | **Decided: height field** (D9). |
+| O2 | **Region size** and travel speed | Under discussion (D16, section 5.5). Travel speed drives build-ahead time. |
+| O3 | ~~How far may the VGM go in soft land?~~ | **Decided** (D10): wherever it makes sense; known things change through story events. |
+| O4 | Skills and magic | Mix decided (D11). Open: which schools, the source of magic (section 10). |
+| O5 | ~~Death and saving~~ | **Decided** (D12): roguelike or classic. |
+| O6 | ~~Combat feel~~ | **Decided** (D13): real-time, tab targeting. |
+| O7 | Lore of the default module | Shapes everything the VGM hints (section 12). |
+| O8 | ~~Which Norgo code is ported?~~ | **Decided** (D15): the GM is inspiration only. Skills, abilities and the worker split are candidates to port. |
+| O9 | Area overlap rules | If design areas are free-shaped (5.5): what wins where a town grows into a forest? |
 
 ---
 
-## 15. Milestones (proposal)
+## 17. Milestones (proposal)
 
-1. **Walk the land**: skeleton, one open region, height field terrain, sky, water, the player walking.
+1. **Walk the land**: the setting module contract (a first cut), skeleton, one open area, height field terrain, sky, water, the player walking.
 2. **The town**: one medieval small town (Scale planner + medieval style), Actors townsfolk.
 3. **The first promise**: ledger, Conversations hint, one cellar dungeon built through the three stages.
 4. **The Director**: needs, tension curve, the first combat and rewards.
-5. **The frontier**: opening regions as the player walks, more dungeon kinds, more settlement sizes.
+5. **The frontier**: opening areas as the player walks, story events (raids, takeovers), more dungeon kinds, more settlement sizes.
 6. **Skills and magic.**
 7. **Seas.**
 8. Later: the LLM hook, multiplayer.
