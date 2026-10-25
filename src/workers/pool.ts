@@ -64,6 +64,21 @@ export type WorldPool = WorkerPool<import('./world.worker').WorldJob, Float32Arr
 export function createWorldPool(): WorldPool {
   return new WorkerPool(() => new Worker(new URL('./world.worker.ts', import.meta.url), { type: 'module' }), 1);
 }
+/** The world worker's jobs for one world (seed and setting): masks and plant positions around the camera. */
+export class WorldJobs {
+  constructor(private readonly pool: WorldPool, readonly seed: number, readonly setting: string) {}
+
+  /** A water (`mask`) or grass mask over a square: `res` samples a side. */
+  mask(kind: 'mask' | 'grass', x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
+    return this.pool.run({ kind, seed: this.seed, setting: this.setting, x0, z0, size, res });
+  }
+
+  /** Trees and shrubs over a square, candidates `spacing` apart. */
+  flora(x0: number, z0: number, size: number, spacing: number): Promise<Float32Array> {
+    return this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing });
+  }
+}
+
 /** Resolves once `test()` holds (checked every 20 ms): for loading steps that wait on worker results. */
 export async function until(test: () => boolean): Promise<void> {
   while (!test()) await new Promise((r) => setTimeout(r, 20));

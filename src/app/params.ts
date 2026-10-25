@@ -16,6 +16,10 @@ export const params = {
   hour: Number(q.get('hour') ?? 16),
   /** Real minutes per game day; 0 stops the clock. */
   dayMinutes: Number(q.get('day') ?? 0),
+  /** Grow the trees (`trees=0` leaves them out, for quick screenshots). */
+  trees: q.get('trees') !== '0',
+  /** Draw the grass (`grass=0` leaves it out, for quick screenshots). */
+  grass: q.get('grass') !== '0',
   /** Setting module id. */
   setting: q.get('setting') ?? 'classic',
 };

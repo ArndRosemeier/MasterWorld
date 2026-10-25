@@ -9,7 +9,7 @@ import { shrubModel, treeModel, vegetationUniforms, type TreeModel, type TreeSpe
 import { batchCap, createBarkMaterial, createFarTreeMaterial, createLeafMaterial, instancedGeometry } from '@futuremagic/vegetation/node';
 import type { Stage } from '@futuremagic/stage';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING } from '../../world/flora';
-import { until, type WorldPool } from '../../workers/pool';
+import { until, type WorldJobs } from '../../workers/pool';
 
 /** Near cells: side (m) and how many around the camera's cell either way. */
 const NEAR_CELL = 64, NEAR_REACH = 6;
@@ -40,7 +40,7 @@ export class FloraView {
   private readonly s = new Vector3();
   private readonly up = new Vector3(0, 1, 0);
 
-  constructor(private readonly stage: Stage, private readonly pool: WorldPool, private readonly seed: number, private readonly setting: string) {
+  constructor(private readonly stage: Stage, private readonly jobs: WorldJobs) {
     const U = vegetationUniforms;
     const bark = createBarkMaterial(U), leaf = createLeafMaterial(U, false), needles = createLeafMaterial(U, true), hull = createFarTreeMaterial(U);
     // The hulls' baked colours read lighter than the leaf cards they stand in for.
@@ -88,7 +88,7 @@ export class FloraView {
       if (cells.has(key)) continue;
       const cell: Cell = { pending: true, data: null };
       cells.set(key, cell);
-      void this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0: i * side, z0: j * side, size: side, spacing }).then((d) => {
+      void this.jobs.flora(i * side, j * side, side, spacing).then((d) => {
         cell.data = d;
         cell.pending = false;
         this.dirty = true;

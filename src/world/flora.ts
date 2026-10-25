@@ -7,8 +7,7 @@
  */
 import { Noise, deriveSeed, hash2f, smoothstep } from '@futuremagic/core';
 import { emptySample } from './skeleton';
-import { emptyWater } from './hydro';
-import { TREES, type TreeName } from '../setting/contract';
+import { TREES, type FloraDef, type TreeName } from '../setting/contract';
 import type { Terrain } from './terrain';
 
 export const FLORA_STRIDE = 6;
@@ -42,10 +41,10 @@ const MAX_P = 0.9;
 
 export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
   const { x0, z0, size, spacing } = job;
-  const biomes = t.setting.world.biomes;
+  const biomes = t.biomes;
   const seed = deriveSeed(t.seed, 'flora');
-  const cover = new Noise(deriveSeed(t.seed, 'flora', 'cover'));
-  const s = emptySample(), w = emptyWater();
+  const cover = coverNoise(t.seed);
+  const s = emptySample(), w = { river: 0, lake: 0 };
   const out: number[] = [];
   const thin = (spacing / NEAR_SPACING) ** 2; // candidates far away each stand for this many near ones
   const n = Math.round(size / spacing);
@@ -58,9 +57,7 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     t.skeleton.sample(x, z, s);
     const flora = s.biome >= 0 ? biomes[s.biome].flora : undefined;
     if (!flora) continue;
-    // Woods: a cover field at a few hundred metres, shifted by how wooded the biome is.
-    const c = cover.fbm2(x / 260, z / 260, 3) + flora.cover;
-    const woods = smoothstep(-0.15, 0.25, c);
+    const woods = woodsAt(cover, flora, x, z);
     const pTree = (flora.trees / 10000) * NEAR_SPACING ** 2 * (0.08 + 0.92 * woods);
     const pShrub = (flora.shrubs / 10000) * NEAR_SPACING ** 2 * (0.4 + 0.6 * woods);
     const near = spacing === NEAR_SPACING;
@@ -73,9 +70,8 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     // Not in water, on beaches or on cliffs; trees keep a little off river banks.
     const h = t.height(x, z);
     if (h < 1.5) continue;
-    t.hydro.query(x, z, w);
-    if (w.river && w.dist < w.half + (shrub ? 1.5 : 4)) continue;
-    if (!Number.isNaN(w.lake) && h < w.lake + 0.5) continue;
+    t.clearOfWater(x, z, h, w);
+    if (w.river < (shrub ? 1.5 : 4) || w.lake < 0.5) continue;
     const slope = Math.hypot(t.height(x + 1.5, z) - h, t.height(x, z + 1.5) - h) / 1.5;
     if (slope > 0.75) continue;
     const kind = shrub ? SHRUB + (hash2f(seed + 3, gi, gj) < 0.5 ? 0 : 1) : pickTree(flora.mix, hash2f(seed + 4, gi, gj), hash2f(seed + 5, gi, gj));
@@ -86,6 +82,14 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     out.push(x, h - 0.15 * scale, z, scale, hash2f(seed + 7, gi, gj) * Math.PI * 2, kind);
   }
   return Float32Array.from(out);
+}
+
+/** The field that says where the woods stand (`woodsAt`). */
+export const coverNoise = (seed: number): Noise => new Noise(deriveSeed(seed, 'flora', 'cover'));
+
+/** How wooded the land is here, 0 (open) .. 1 (thick woods): a cover field at a few hundred metres, shifted by the biome. */
+export function woodsAt(cover: Noise, flora: FloraDef, x: number, z: number): number {
+  return smoothstep(-0.15, 0.25, cover.fbm2(x / 260, z / 260, 3) + flora.cover);
 }
 
 /** A species by weight, then one of its variants: an index into FLORA_KINDS (-1: no species). */

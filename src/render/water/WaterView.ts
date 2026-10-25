@@ -7,9 +7,10 @@
 import { BufferGeometry, Float32BufferAttribute, Mesh, type Vector3 } from 'three/webgpu';
 import { deriveSeed, Rng } from '@futuremagic/core';
 import type { SkyLight } from '@futuremagic/sky';
-import { WATER, type WaterMask } from '../materials/waterInputs';
+import { WATER } from '../materials/waterInputs';
 import { WATER_KIND } from '../materials/water';
-import { until, type WorldPool } from '../../workers/pool';
+import type { WorldJobs } from '../../workers/pool';
+import { FollowedMask } from '../followedMask';
 
 function radialGrid(segments: number, rings: number, r0: number, growth: number): BufferGeometry {
   const pos: number[] = [0, 0, 0];
@@ -33,21 +34,20 @@ function radialGrid(segments: number, rings: number, r0: number, growth: number)
   return g;
 }
 
-interface MaskState { mask: WaterMask; ready: boolean; pending: boolean; x0: number; z0: number }
-
 export class WaterView {
   readonly mesh: Mesh;
-  private readonly masks: MaskState[];
+  private readonly masks: FollowedMask[];
   private time = 0;
 
-  constructor(private readonly pool: WorldPool, private readonly seed: number, private readonly setting: string) {
+  constructor(jobs: WorldJobs) {
     // Rings grow geometrically: ~0.4 m apart under the camera, out past the horizon (~150 km).
     this.mesh = new Mesh(radialGrid(192, 150, 0.4, 1.068), WATER_KIND.make());
     this.mesh.name = 'sea';
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
-    this.masks = [WATER.near, WATER.mid, WATER.far].map((mask) => ({ mask, ready: false, pending: false, x0: 1e9, z0: 1e9 }));
-    const a = new Rng(deriveSeed(seed, 'wind')).float() * Math.PI * 2;
+    // Each rebaked once the camera is a fifth of its side from its centre.
+    this.masks = [WATER.near, WATER.mid, WATER.far].map((mask) => new FollowedMask(mask, (x0, z0) => jobs.mask('mask', x0, z0, mask.side, mask.res), mask.side / 5, mask.side / 16));
+    const a = new Rng(deriveSeed(jobs.seed, 'wind')).float() * Math.PI * 2;
     WATER.wind.value.set(Math.cos(a), Math.sin(a));
   }
 
@@ -71,32 +71,14 @@ export class WaterView {
     return w !== null && w.depth > 0 && p.y < w.level - 0.05;
   }
 
-  private refresh(s: MaskState, cam: Vector3): void {
-    if (s.pending) return;
-    const side = s.mask.side, half = side / 2;
-    if (s.ready && Math.abs(cam.x - (s.x0 + half)) < side / 5 && Math.abs(cam.z - (s.z0 + half)) < side / 5) return;
-    const snap = side / 16;
-    const x0 = Math.round(cam.x / snap) * snap - half, z0 = Math.round(cam.z / snap) * snap - half;
-    s.pending = true;
-    void this.pool.run({ kind: 'mask', seed: this.seed, setting: this.setting, x0, z0, size: side, res: s.mask.res }).then((px) => {
-      s.mask.data.set(px);
-      s.mask.tex.needsUpdate = true;
-      s.mask.origin.value.set(x0, z0);
-      s.x0 = x0; s.z0 = z0;
-      s.ready = true;
-      s.pending = false;
-    });
-  }
-
   /** Masks for the start, before the first frame. */
   async prime(cam: Vector3): Promise<void> {
-    for (const s of this.masks) this.refresh(s, cam);
-    await until(() => this.ready);
+    await Promise.all(this.masks.map((m) => m.start(cam)));
   }
 
   /** `gain`: the multiplier the scene's lights carry on the sky's light rig (SkyView.gain). */
   update(dt: number, cam: Vector3, L: SkyLight, gain: number): void {
-    for (const s of this.masks) this.refresh(s, cam);
+    for (const m of this.masks) m.follow(cam);
     this.time += dt;
     WATER.time.value = this.time;
     const snap = 4;
