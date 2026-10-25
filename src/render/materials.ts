@@ -71,9 +71,9 @@ export const WOODS = { band: uniform(new Vector2(800, 1000)) };
 /** The highest the canopy raises the ground (m; bounds of terrain meshes make room for it). */
 export const CANOPY_RISE = 22;
 /** The crowns' colour from afar (linear): broadleaf and conifer, matched to the near trees' hulls. */
-const CROWN_BROAD = vec3(0.032, 0.07, 0.016), CROWN_CONIFER = vec3(0.018, 0.042, 0.02);
+const CROWN_BROAD = vec3(0.02, 0.048, 0.012), CROWN_CONIFER = vec3(0.012, 0.03, 0.014);
 /** Past the sun's shadow box (sky.ts), the floor under the woods keeps this share of its light (the crowns' shade on average). */
-const UNDER_CROWNS = 0.25;
+const UNDER_CROWNS = 0.15;
 
 export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'canopy'], () => {
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');
