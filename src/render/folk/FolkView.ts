@@ -10,6 +10,7 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
+import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
 import { clipOf, coveringLooks, drawn, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
@@ -19,6 +20,17 @@ const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
 const RANGE = 70;
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
+
+/** Someone indoors, where the room has them (the app places them: render knows no rooms). */
+export interface Placed {
+  agent: Agent;
+  x: number;
+  y: number;
+  z: number;
+  /** Facing (radians, xz atan2, as the agents'). */
+  dir: number;
+  act: ActivityKind;
+}
 
 interface Slot {
   ch: Character;
@@ -110,16 +122,24 @@ export class FolkView {
   }
   private warm = false;
 
+  /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
+  indoors: readonly Placed[] | null = null;
+
   /** Each frame: who is drawn, where and doing what. */
   follow(dt: number, cam: Camera): void {
     if (!this.warm) return;
     const cx = cam.position.x, cz = cam.position.z;
-    // The nearest people out of doors.
+    // The nearest people out of doors (or those in the room).
     const near: [number, Agent][] = [];
-    for (const a of this.life.agents) {
-      if (a.hidden || !drawn(a.person)) continue;
-      const d = Math.hypot(a.x - cx, a.z - cz);
-      if (d < FAR) near.push([d, a]);
+    const placed = new Map<number, Placed>();
+    if (this.indoors) {
+      for (const p of this.indoors) if (drawn(p.agent.person)) { near.push([Math.hypot(p.x - cx, p.z - cz), p.agent]); placed.set(p.agent.person.id, p); }
+    } else {
+      for (const a of this.life.agents) {
+        if (a.hidden || !drawn(a.person)) continue;
+        const d = Math.hypot(a.x - cx, a.z - cz);
+        if (d < FAR) near.push([d, a]);
+      }
     }
     near.sort((x, y) => x[0] - y[0]);
     const want = new Set(near.slice(0, this.slots.length).filter(([d]) => d < RANGE).map(([, a]) => a.person.id));
@@ -141,12 +161,13 @@ export class FolkView {
     }
     for (const s of this.shown.values()) {
       if (!s.ready) continue;
-      const a = this.life.agents[s.agent];
+      const a = this.life.agents[s.agent], p = placed.get(a.person.id);
       const o = s.place;
-      o.position.set(a.x, this.height(a.x, a.z), a.z);
+      if (p) o.position.set(p.x, p.y, p.z);
+      else o.position.set(a.x, this.height(a.x, a.z), a.z);
       // Agents face `dir` (atan2 in x, z); a character faces +z.
-      o.rotation.y = Math.PI / 2 - a.dir;
-      const clip = clipOf(a.act, a.person.id);
+      o.rotation.y = Math.PI / 2 - (p ? p.dir : a.dir);
+      const clip = clipOf(p ? p.act : a.act, a.person.id);
       if (clip !== s.clip) {
         s.clip = clip;
         void s.ch.play(clip);
@@ -154,7 +175,8 @@ export class FolkView {
       s.ch.update(dt);
     }
     // The rest (and those whose character is still being dressed) as plain figures.
-    this.far.place(near.filter(([, a]) => !this.shown.get(a.person.id)?.ready).map(([, a]) => a), this.height);
+    if (this.indoors) this.far.place([], this.height);
+    else this.far.place(near.filter(([, a]) => !this.shown.get(a.person.id)?.ready).map(([, a]) => a), this.height);
   }
 
   private dress(s: Slot, a: Agent): void {
