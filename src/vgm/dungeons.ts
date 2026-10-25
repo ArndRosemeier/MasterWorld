@@ -13,8 +13,17 @@ import type { Town } from '../world/town';
 /** Houses that dig cellars: lived in, not the temple, the hall or the stable. */
 const CELLARED: readonly TownBuilding['kind'][] = ['house', 'cottage', 'inn', 'bakery', 'workshop', 'smithy'];
 
-/** A cellar promised under one of the town's houses; null if the town has none that fits. */
-export function promiseCellar(seed: number, town: Town, log: DecisionLog): DungeonDecision | null {
+/**
+ * The most danger a place may hold (D29): within reach of the start, what a fresh hero can take on
+ * (about 18 on the hero's power scale, a fresh hero being about 15); more with every kilometre beyond.
+ */
+export function dangerAt(at: { readonly decision: { readonly x: number; readonly z: number } }, home: { readonly x: number; readonly z: number }): number {
+  const km = Math.hypot(at.decision.x - home.x, at.decision.z - home.z) / 1000;
+  return Math.round(18 + Math.max(0, km - 1) * 6);
+}
+
+/** A cellar promised under one of the town's houses (`home`: where the game starts); null if the town has none that fits. */
+export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision): DungeonDecision | null {
   const dungeons = log.filter((d): d is DungeonDecision => d.kind === 'dungeon');
   const n = dungeons.length + 1;
   const s = deriveSeed(seed, 'vgm', 'cellar', n);
@@ -30,7 +39,7 @@ export function promiseCellar(seed: number, town: Town, log: DecisionLog): Dunge
   const fewest = Math.min(...SET_PIECES.map((p) => used(p.id)));
   const fresh = SET_PIECES.filter((p) => used(p.id) === fewest);
   const piece = fresh[Math.floor(hash2f(s, 3, 9) * fresh.length)];
-  return { kind: 'dungeon', id: `cellar-${n}`, template: 'cellar', town: town.decision.id, building: house.id, seed: s, setPiece: piece.id };
+  return { kind: 'dungeon', id: `cellar-${n}`, template: 'cellar', town: town.decision.id, building: house.id, seed: s, setPiece: piece.id, danger: dangerAt(town, home) };
 }
 
 /** The house a dungeon decision lies under. */

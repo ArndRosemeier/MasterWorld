@@ -5,6 +5,9 @@
 import { CONTRACT_VERSION, type SettingModule } from '../contract';
 import { cellar } from './cellar';
 import { names, talk } from './people';
+import { creatures } from './creatures';
+import { items } from './items';
+import { abilities, director, skills } from './skills';
 
 export const classic: SettingModule = {
   contractVersion: CONTRACT_VERSION,
@@ -44,4 +47,9 @@ export const classic: SettingModule = {
   dungeons: { cellar },
   names,
   talk,
+  skills,
+  creatures,
+  items,
+  abilities,
+  director,
 };
