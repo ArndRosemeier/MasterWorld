@@ -8,6 +8,7 @@ import { Group, Matrix4, Mesh, Quaternion, Vector3, type BufferGeometry, type In
 import { shrubModel, treeModel, vegetationUniforms, type TreeModel, type TreeSpecies } from '@futuremagic/vegetation';
 import { batchCap, createBarkMaterial, createFarTreeMaterial, createLeafMaterial, instancedGeometry } from '@futuremagic/vegetation/node';
 import type { Stage } from '@futuremagic/stage';
+import { hash2f, smoothstep } from '@futuremagic/core';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING } from '../../world/flora';
 import { until, type WorldJobs } from '../../workers/pool';
 import { WOODS } from '../materials';
@@ -18,8 +19,10 @@ const NEAR_CELL = 64, NEAR_REACH = 6;
 const FAR_CELL = 512, FAR_REACH = 2, FAR_SPACING = 16;
 /** Full models within this distance (m), hulls beyond. Shrubs end here too. */
 const FULL = 60;
-/** Hulls end here (m); the ground's canopy (materials.ts WOODS) rises over the last 200 m before. Within what the far cells always cover. */
+/** Hulls end here (m); the ground's canopy (materials.ts WOODS) rises over the last HULL_THIN m before. Within what the far cells always cover. */
 const HULL_END = FAR_REACH * FAR_CELL - 24;
+/** Over this last stretch (m) the hulls thin out at random as the canopy rises, so the woods have no edge where they hand over. */
+const HULL_THIN = 300;
 
 interface Cell { pending: boolean; data: Float32Array | null }
 /** One batch: a model part drawn once per instance (matrices in an instanced geometry attribute). */
@@ -44,7 +47,7 @@ export class FloraView {
   private readonly up = new Vector3(0, 1, 0);
 
   constructor(private readonly stage: Stage, private readonly jobs: WorldJobs) {
-    WOODS.band.value.set(HULL_END - 200, HULL_END);
+    WOODS.band.value.set(HULL_END - HULL_THIN, HULL_END);
     const U = vegetationUniforms;
     const bark = createBarkMaterial(U), leaf = createLeafMaterial(U, false), needles = createLeafMaterial(U, true), hull = createFarTreeMaterial(U);
     // The hulls' baked colours read lighter than the leaf cards they stand in for.
@@ -132,7 +135,11 @@ export class FloraView {
       if (!c.data) continue;
       // The near cells cover their square; far stand-ins only outside it, and only up to where the ground's
       // canopy has taken over (a circle, so the woods never end in a square).
-      this.place(c.data, (x, z, kind) => (Math.max(Math.abs(x - cx), Math.abs(z - cz)) < nearHalf || !this.hull[kind] || Math.hypot(x - cam.x, z - cam.z) > HULL_END ? [] : [this.hull[kind]!]));
+      this.place(c.data, (x, z, kind) => {
+        if (Math.max(Math.abs(x - cx), Math.abs(z - cz)) < nearHalf || !this.hull[kind]) return [];
+        const thin = smoothstep(HULL_END - HULL_THIN, HULL_END, Math.hypot(x - cam.x, z - cam.z));
+        return thin > 0 && hash2f(7, Math.round(x * 8), Math.round(z * 8)) < thin ? [] : [this.hull[kind]!];
+      });
     }
     for (const parts of this.full) for (const p of parts) this.finish(p);
     for (const p of this.hull) if (p) this.finish(p);
