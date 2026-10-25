@@ -359,6 +359,8 @@ export async function start(b: Boot): Promise<void> {
     // Talk and the journal (their Escape comes before the settings' too). The townsfolk know of the
     // promised cellar; what the player hears goes into the journal.
     const journal = new Journal(save?.journal);
+    // Declared before the sounds read it: a `?talk=` start opens a dialog right away.
+    let creator: Creator | null = null;
     sounds = new SoundDirector({
       engine: sound.engine, seed, camera: view.camera, walker: player.walker, terrain, town: town ?? null,
       water: (x, z) => sea.waterAt(x, z),
@@ -512,7 +514,6 @@ export async function start(b: Boot): Promise<void> {
     });
     saves.dock();
     // Character creation (plan 11.4): after New game's dive (or at once with `?create`), unless a save is loaded.
-    let creator: Creator | null = null;
     const create = async (race: string | null): Promise<void> => {
       const w = player.walker;
       creator = new Creator({
