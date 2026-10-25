@@ -367,6 +367,8 @@ export interface TalkDef {
   readonly lead: string;
   /** The note when a place is marked on the player's map (`{name}` who marks it, `{house}`). */
   readonly marked: string;
+  /** The line in the talk as the hero hands over the map to be marked (`{name}` who takes it). */
+  readonly handOver: string;
 }
 
 /**

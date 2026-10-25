@@ -459,6 +459,8 @@ The mode is a setting the VGM honours (D4): in roguelike mode it is stricter wit
 * NPCs mark places on it when they give a task (9.1).
 * The **orientation skill** sets how exactly the map shows where you are: a vague area at first, a sharp arrow at mastery. It rises by travelling and reading the map.
 
+**Built so far (2026-10-25)**: `src/game/orientation.ts` turns the skill into where the map shows the hero: a novice (10) sees a wash of blue ink about 90 m across with "you?" and no arrow; the area shrinks, an arrow for the facing appears from about 31 and steadies, and from 80 the arrow is exact. The guess drifts with seeded noise over the land (the hero is always inside it, and it holds still where they stand). Every 150 m travelled practises the skill (harder farther from town), and so does reading the map for 4 s, once per 90 s. When someone tells of a place, the talk says "You hold out your map" and a card of the real map rises to them, the mark is drawn in with a quill, and the card goes back (`src/app/handOver.ts`); the map then shows the mark as already inked.
+
 ---
 
 ## 12. The setting module (D14)

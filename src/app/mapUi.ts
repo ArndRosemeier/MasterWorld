@@ -1,10 +1,13 @@
 /**
  * The player's map (plan 11.7, D35, 17.1): a parchment of the land around the town, drawn from the height
- * field (hill shading and contours), the town's streets and houses, the hero's arrow, and the marks people
+ * field (hill shading and contours), the town's streets and houses, where the hero is, and the marks people
  * put on it when they tell of a place. The map key (M) unrolls it; the wheel zooms, dragging pans. A new
- * mark is drawn in with a quill stroke the first time the map shows it.
+ * mark is drawn in with a quill stroke the first time the map shows it (or while the teller marks it, the
+ * hand-over). Where the hero is follows their orientation skill: a vague area for a novice, an exact arrow
+ * at mastery (src/game/orientation.ts).
  */
 import { polyCentroid, type TownPlan } from '@futuremagic/settlement';
+import type { Bearing } from '../game/orientation';
 import type { Journal } from '../talk/journal';
 import { el } from './dom';
 import { KeyWindow, type WindowHost } from './window';
@@ -13,8 +16,8 @@ export interface MapHost extends WindowHost {
   /** Ground height and water depth (> 0: water) at a point. */
   height(x: number, z: number): number;
   water(x: number, z: number): number;
-  /** Where the hero is and faces (yaw as the walker's: 0 north). */
-  readonly hero: { x: number; z: number; yaw: number };
+  /** Where the hero believes they are and face (yaw as the walker's: 0 north), by their orientation. */
+  readonly hero: Bearing;
 }
 
 /** Metres across the whole parchment, and its raster (samples per side). */
@@ -103,12 +106,29 @@ export class MapUi extends KeyWindow {
   }
 
   private draw(): void {
-    const g = this.canvas.getContext('2d')!;
+    this.paintMap(this.canvas, this.cx, this.cz, this.zoom, (id) => (this.inked.has(id) ? 1 : this.stroke));
+  }
+
+  /**
+   * The hand-over: the map around a lead's mark, on a small canvas, with the mark drawn in to `t` (0..1).
+   * Drawn in fully, the mark counts as inked: opening the map later does not draw it again.
+   */
+  markIn(id: string, canvas: HTMLCanvasElement, t: number): void {
+    const lead = this.journal.open.find((l) => l.id === id);
+    if (!lead) return;
+    this.ground ??= this.paintGround();
+    this.paintMap(canvas, lead.mark.x, lead.mark.z, SPAN / 130, (l) => (l === id ? t : this.inked.has(l) ? 1 : 0));
+    if (t >= 1) this.inked.add(id);
+  }
+
+  private paintMap(canvas: HTMLCanvasElement, cx: number, cz: number, zoom: number, strokeOf: (id: string) => number): void {
+    const g = canvas.getContext('2d')!;
+    const size = canvas.width;
     const [mx, mz] = this.middle();
-    const s = (SIZE / SPAN) * this.zoom;
-    const X = (x: number) => SIZE / 2 + (x - this.cx) * s, Z = (z: number) => SIZE / 2 + (z - this.cz) * s;
+    const s = (size / SPAN) * zoom, u = size / SIZE;
+    const X = (x: number) => size / 2 + (x - cx) * s, Z = (z: number) => size / 2 + (z - cz) * s;
     g.fillStyle = '#d8c49a';
-    g.fillRect(0, 0, SIZE, SIZE);
+    g.fillRect(0, 0, size, size);
     if (this.ground) {
       g.imageSmoothingEnabled = true;
       g.drawImage(this.ground, X(mx - SPAN / 2), Z(mz - SPAN / 2), SPAN * s, SPAN * s);
@@ -132,28 +152,51 @@ export class MapUi extends KeyWindow {
     }
     // The marks: a ring of red ink and the place's name.
     for (const l of this.journal.open) {
-      const t = this.inked.has(l.id) ? 1 : this.stroke;
-      const x = X(l.mark.x), z = Z(l.mark.z), r = 12;
-      g.strokeStyle = '#a0281e'; g.lineWidth = 2.5;
+      const t = strokeOf(l.id);
+      if (t <= 0) continue;
+      const x = X(l.mark.x), z = Z(l.mark.z), r = 12 * Math.max(1, u);
+      g.strokeStyle = '#a0281e'; g.lineWidth = 2.5 * Math.max(1, u);
       g.beginPath(); g.arc(x, z, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * t); g.stroke();
       if (t >= 1) {
-        g.font = 'italic 15px Georgia, serif'; g.fillStyle = '#7a1e16'; g.textAlign = 'left';
+        g.font = `italic ${Math.round(15 * Math.max(1, u))}px Georgia, serif`; g.fillStyle = '#7a1e16'; g.textAlign = 'left';
         g.fillText(l.mark.label, x + r + 4, z + 5);
       }
     }
-    // The hero.
+    this.paintHero(g, X, Z, s);
+    // North.
+    g.fillStyle = ink; g.font = `600 ${Math.round(16 * u)}px Georgia, serif`; g.textAlign = 'center';
+    g.fillText('N', size - 28 * u, 30 * u);
+    g.beginPath(); g.moveTo(size - 28 * u, 36 * u); g.lineTo(size - 33 * u, 56 * u); g.lineTo(size - 23 * u, 56 * u); g.closePath(); g.fill();
+  }
+
+  /** The hero as their orientation knows it: a wash of blue ink where they may be, and the arrow once they can tell their facing. */
+  private paintHero(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number, s: number): void {
     const hero = this.map.hero;
-    const hx = X(hero.x), hz = Z(hero.z), fx = -Math.sin(hero.yaw), fz = -Math.cos(hero.yaw);
-    g.fillStyle = '#1e4a8a';
+    const hx = X(hero.x), hz = Z(hero.z);
+    const blue = '#1e4a8a';
+    if (hero.radius > 0) {
+      const r = Math.max(8, hero.radius * s);
+      const wash = g.createRadialGradient(hx, hz, 0, hx, hz, r);
+      wash.addColorStop(0, '#1e4a8a55'); wash.addColorStop(0.7, '#1e4a8a2a'); wash.addColorStop(1, '#1e4a8a00');
+      g.fillStyle = wash;
+      g.beginPath(); g.arc(hx, hz, r, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#1e4a8a99'; g.lineWidth = 1.5; g.setLineDash([5, 6]);
+      g.beginPath(); g.arc(hx, hz, r, 0, Math.PI * 2); g.stroke();
+      g.setLineDash([]);
+      if (hero.yaw === null) {
+        g.font = 'italic 15px Georgia, serif'; g.fillStyle = blue; g.textAlign = 'center';
+        g.fillText('you?', hx, hz + 5);
+        return;
+      }
+    }
+    if (hero.yaw === null) return;
+    const fx = -Math.sin(hero.yaw), fz = -Math.cos(hero.yaw);
+    g.fillStyle = hero.radius > 0 ? '#1e4a8acc' : blue;
     g.beginPath();
     g.moveTo(hx + fx * 10, hz + fz * 10);
     g.lineTo(hx - fx * 6 + fz * 6, hz - fz * 6 - fx * 6);
     g.lineTo(hx - fx * 6 - fz * 6, hz - fz * 6 + fx * 6);
     g.closePath(); g.fill();
-    // North.
-    g.fillStyle = ink; g.font = '600 16px Georgia, serif'; g.textAlign = 'center';
-    g.fillText('N', SIZE - 28, 30);
-    g.beginPath(); g.moveTo(SIZE - 28, 36); g.lineTo(SIZE - 33, 56); g.lineTo(SIZE - 23, 56); g.closePath(); g.fill();
   }
 }
 
