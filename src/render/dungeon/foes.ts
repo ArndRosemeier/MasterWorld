@@ -8,7 +8,7 @@ import { Rng, deriveSeed } from '@futuremagic/core';
 import type { CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
 import type { CreatureDef } from '../../setting/contract';
-import { garmentColors } from '../folk/looks';
+import { HAIR_COLORS, MEN_HAIR, WOMEN_HAIR, garmentColors } from '../folk/looks';
 
 /** Clips only the cellar's people play: the dead shamble and claw, the hurt reel, the meek kneel. */
 export const FOE_CLIPS = ['zombie idle', 'zombie walk', 'zombie scratch', 'hook', 'hit to head', 'repair (kneeling)', 'sword slash C'];
@@ -19,6 +19,21 @@ type Humanoid = Extract<CreatureDef['body'], { kind: 'humanoid' }>;
 const DRAB = ['#5a4a32', '#4e4434', '#62563e', '#3f382c', '#6a5c44'];
 const GRAVE = ['#5f5c52', '#4f4c44', '#6b665a'];
 const LEATHER = ['#3a2416', '#2a1d14', '#4a3020'];
+
+/** Grey, white and dead-straw hair of the dead that walk. */
+const GRAVE_HAIR = ['#8a8580', '#b0aca4', '#6e6a5e', '#a89a78'];
+
+/** Hair and beard: the living as townsfolk (rougher), goblins a few shaggy tufts, ghouls lank grey, bones none. */
+function hairOf(b: Humanoid, female: boolean, r: Rng): CharacterPatch {
+  if (b.bones) return { hair: null, beard: 'none', stubble: 0 };
+  if (b.gaunt) return { hair: r.chance(0.7) ? r.pick(['hair-long01', 'hair-shaggy']) : null, hairColor: r.pick(GRAVE_HAIR), beard: 'none', stubble: 0 };
+  if (b.race === 'goblin') return { hair: r.chance(0.5) ? r.pick(['hair-shaggy', 'hair-short-messy']) : null, hairColor: r.pick(['#1c1814', '#2a1d14', '#3b2417']), beard: 'none', stubble: 0 };
+  return {
+    hair: r.pick(female ? WOMEN_HAIR : MEN_HAIR), hairColor: r.pick(HAIR_COLORS),
+    beard: female ? 'none' : r.chance(0.5) ? r.pick(['short', 'full', 'mustache', 'goatee'] as const) : 'none',
+    stubble: female ? 0 : r.range(0.3, 0.8),
+  };
+}
 
 /** The look of creature `id` of kind `def` (seeded: the same cellar shows the same people). */
 export function foeLook(def: CreatureDef, seed: number, id: number): CharacterPatch {
@@ -39,6 +54,7 @@ export function foeLook(def: CreatureDef, seed: number, id: number): CharacterPa
     ...(b.skin && !b.bones ? { skinColor: b.skin } : {}),
     ...(b.bones ? { skeletal: true, skeletalLook: { bone: b.skin ?? '#d8ccb4', glow: '#4dc8ff', glowStrength: 0.6, dryness: 0.7 } } : {}),
     outfit, garmentColors: colors, anatomy: false, animation: 'idle', seed: r.float(),
+    ...hairOf(b, female, r),
   };
 }
 
