@@ -26,3 +26,6 @@ export function clock(h: number): string {
   const m = Math.round(h * 60) % (24 * 60);
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
+
+/** Markup (an SVG) as nodes to append. */
+export const svg = (markup: string): DocumentFragment => document.createRange().createContextualFragment(markup);

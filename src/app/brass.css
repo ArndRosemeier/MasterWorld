@@ -1,0 +1,10 @@
+/* Warded brass (plan 17.1): the colours and faces every window shares. */
+@font-face { font-family: 'Marcellus SC'; src: url('./fonts/marcellus-sc.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('./fonts/eb-garamond.woff2') format('woff2'); font-weight: 400 600; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('./fonts/eb-garamond-italic.woff2') format('woff2'); font-style: italic; font-display: swap; }
+
+:root {
+  --brass-hi: #fff0c0; --brass: #e2bd68; --brass-mid: #b08532; --brass-lo: #6e4f17; --brass-dark: #4a3510;
+  --leather: #1d1510; --leather-hi: #2a1c14; --ink: #efe3cc; --ink-dim: #cbb898; --ward: #8fe3ff; --ward-hot: #e8fbff;
+  --common: #c9c2b4; --uncommon: #6fdc7a; --rare: #5fa8ff; --legendary: #ffa940;
+}

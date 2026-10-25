@@ -6,9 +6,8 @@
  */
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { Walker, type WalkWorld } from '../game/walker';
-import type { ActionAnim } from '@futuremagic/humanoid/three';
 import { nearestSteed, type Steed } from '../game/horse';
-import type { HeroView } from '../render/hero/HeroView';
+import type { HeroAction, HeroView } from '../render/hero/HeroView';
 import type { HorseView } from '../render/horse/HorseView';
 import { FlyCamera } from './flyCamera';
 import { HeroCamera } from './heroCamera';
@@ -21,7 +20,7 @@ export class Player {
   /** Set once the hero's body is built. */
   hero: HeroView | null = null;
   /** In a fight: weapons drawn, and the blow (or drink, or flinch) playing; set by the fight each frame. */
-  stance: { combat: boolean; action?: ActionAnim } = { combat: false };
+  stance: { combat: boolean; action?: HeroAction } = { combat: false };
   /** The horses about, and how they are drawn (set once built; steeds[i] is drawn as horse i). */
   steeds: Steed[] = [];
   horses: HorseView | null = null;
@@ -198,9 +197,9 @@ export class Player {
     const ridden = riding && horses ? horses.saddle(this.steeds.indexOf(riding), this.seat) : null;
     if (riding && ridden) {
       // Seated on the saddle: pos is the point under it, the seat its height over the horse's ground.
-      hero.animateTo({ pos: { x: ridden.x, y: riding.pos.y, z: ridden.z }, vel: riding.walker.vel, yaw: riding.yaw, gait: 'ride', seat: ridden.y - riding.pos.y }, dt, () => riding.pos.y);
+      hero.animateTo({ pos: { x: ridden.x, y: riding.pos.y, z: ridden.z }, vel: riding.walker.vel, yaw: riding.yaw, gait: 'ride', seat: ridden.y - riding.pos.y }, dt);
     } else {
-      hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action }, dt, (x, y, z) => walker.support(x, z, y));
+      hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action }, dt);
     }
     hero.visible = this.flying || !this.heroCam.firstPerson;
   }

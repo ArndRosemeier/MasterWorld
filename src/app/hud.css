@@ -1,9 +1,6 @@
 /* The fight's HUD (src/app/fightHud.ts) in warded brass (plan 17.1): gauges, the belt, the target plate, item cards. */
-#fight, .panel.pack {
-  --brass-hi: #fff0c0; --brass: #e2bd68; --brass-mid: #b08532; --brass-lo: #6e4f17; --brass-dark: #4a3510;
-  --leather: #1d1510; --leather-hi: #2a1c14; --ink: #efe3cc; --ink-dim: #cbb898; --ward: #8fe3ff; --ward-hot: #e8fbff;
-  --common: #c9c2b4; --uncommon: #6fdc7a; --rare: #5fa8ff; --legendary: #ffa940;
-}
+@import './brass.css';
+
 #fight {
   position: fixed; inset: 0; z-index: 5; pointer-events: none; font-family: 'EB Garamond', Georgia, serif; color: var(--ink);
   transition: opacity .6s;

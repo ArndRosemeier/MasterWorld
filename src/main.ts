@@ -43,6 +43,8 @@ import { InteriorView } from './render/town/InteriorView';
 import { lookFromDegrees } from './app/look';
 import { Sound } from './app/sound';
 import { Title } from './app/title/title';
+import type { People } from './app/title/lines';
+import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
 import { Notes } from './app/notes';
 import { TalkUi } from './app/talkUi';
 import { JournalUi } from './app/journalUi';
@@ -141,6 +143,8 @@ export async function start(b: Boot): Promise<void> {
     // Dialogs (and the title) hold the game's keys and mouse while open.
     let open = 0;
     const paused = (on: boolean) => { open = Math.max(0, open + (on ? 1 : -1)); player.pause(open > 0); };
+    // What New game leads to once the dive lands (set once the hero exists: character creation).
+    let onBegin: ((people: People['id'] | null) => void) | null = null;
     if (title) {
       paused(true);
       // The fly-over circles the market, where the game starts.
@@ -155,10 +159,7 @@ export async function start(b: Boot): Promise<void> {
           hour: () => view.sky.hour,
         },
         heroView: () => player.heroView(),
-        begin: (people) => {
-          if (people) console.info(`[title] starting with the ${people} (character creation will take this)`);
-          paused(false);
-        },
+        begin: (people) => { if (onBegin) onBegin(people); else paused(false); },
       });
     }
 
@@ -186,9 +187,12 @@ export async function start(b: Boot): Promise<void> {
     player.resettle();
     title?.run(0);
     loading.set('Dressing the hero');
-    const hero = await HeroView.create(seed);
+    // In the look the player made (a save's), or a new hero of the setting drawn from the seed.
+    const hero = await HeroView.load(view.stage, view.renderer, setting.hero, save?.looks?.look ?? null, seed);
     player.walker.height = hero.height;
+    hero.onLook(() => { player.walker.height = hero.height; });
     player.hero = hero;
+    let heroName = save?.looks?.name ?? '';
     // The hero's sheet (skills, health, gear, purse) and what they hold.
     const character = new Character(setting, save?.character ?? undefined);
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
@@ -390,6 +394,7 @@ export async function start(b: Boot): Promise<void> {
           talk: townWords?.save() ?? null,
           journal: journal.entries(),
           character: character.save(),
+          looks: { name: heroName, look: hero.look },
           director: director.snapshot(),
         };
         return { data, where: visit?.inside ? `in ${visit.cellar.house}'s cellar` : 'in the town' };
@@ -458,6 +463,28 @@ export async function start(b: Boot): Promise<void> {
       set hour(h) { view.sky.hour = h; },
     });
     saves.dock();
+    // Character creation (plan 11.4): after New game's dive (or at once with `?create`), unless a save is loaded.
+    let creator: Creator | null = null;
+    const create = async (race: string | null): Promise<void> => {
+      const w = player.walker;
+      creator = new Creator({
+        camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
+        nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
+        click: () => sound.play('click'),
+      }, seed);
+      const made = await creator.open(race);
+      heroName = made.name;
+      creator = null;
+      // Behind the hero, looking the way they face.
+      player.teleport(w.pos.x, undefined, w.pos.z, w.yaw);
+      paused(false);
+      notes.say(`${made.name} steps out onto the market square.`, 5);
+    };
+    onBegin = (people) => {
+      if (save) paused(false);
+      else void create(people ? PEOPLE_RACE[people] : null);
+    };
+    if (!title && params.create && !save) { paused(true); void create(null); }
     // F flies, H gets on or off a horse (the keys are in the settings).
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
@@ -468,8 +495,9 @@ export async function start(b: Boot): Promise<void> {
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       title?.run(dt);
-      if (title?.holding) player.standBy(dt);
+      if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
+      creator?.orbit(dt);
       if (!rooms?.inside) visit?.update(dt);
       if (!visit?.inside) rooms?.update(dt);
       talk?.watch();

@@ -36,6 +36,8 @@ export const params = {
   horses: Number(q.get('horses') ?? 2),
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
+  /** Open character creation at once, without the title (`create`; with the title it follows New game). */
+  create: q.has('create'),
   /** Weather everywhere, all the time (a VGM order): clear, fair, overcast, rain, storm, fog, snow. */
   weather: q.get('weather'),
   /** Start in the town's cellar: `cellar` at the ladder, `cellar=3` in room 3. */

@@ -1,11 +1,11 @@
 /**
- * The clothes and arms of everyone drawn as a humanoid: the hero, and the cellars' goblins, smugglers and
- * dead. A plain wardrobe of shell garments (the humanoid package fits them to any body); a garment worn
+ * The clothes and arms of everyone drawn as a humanoid: the cellars' goblins, smugglers and dead (the hero is
+ * an Actors character, HeroView). A plain wardrobe of shell garments (the humanoid package fits them to any body); a garment worn
  * with a coloured visual takes that colour (white: its own). Held things come from ./arms.ts.
  */
 import type { Object3D } from 'three/webgpu';
 import type { Wardrobe } from '@futuremagic/humanoid/three';
-import type { BodyRegion, EquipmentVisuals, ItemVisual, ShellLayer, ShellMaterial, WearableSpec } from '@futuremagic/humanoid';
+import type { BodyRegion, ItemVisual, ShellLayer, ShellMaterial, WearableSpec } from '@futuremagic/humanoid';
 import { ARM_SHAPES, buildArm } from './arms';
 
 type RGB = [number, number, number];
@@ -74,10 +74,3 @@ export const TRAVELLER: Wardrobe = {
 /** A worn or held thing's visual, in `colour` (white: its own). */
 export const visual = (seed: number, colour: RGB = [1, 1, 1], shape = 'cloth'): ItemVisual => ({ shape, seed, primary: colour, secondary: [1, 1, 1], accent: [1, 1, 1], material: 'cloth', glow: 0 });
 
-/** What the traveller wears. */
-export const TRAVELLER_GARB: EquipmentVisuals = {
-  chest: { defId: 'shirt', visual: visual(11) },
-  legs: { defId: 'trousers', visual: visual(12) },
-  back: { defId: 'tunic', visual: visual(13) },
-  feet: { defId: 'boots', visual: visual(14) },
-};
