@@ -7,7 +7,7 @@ import type { Fixture, FixtureKind, TownPlan } from '@futuremagic/settlement';
 
 /** What a person is doing (the renderer picks an animation by it). */
 export type ActivityKind =
-  | 'sleep' | 'indoors' | 'walk' | 'wait'
+  | 'sleep' | 'indoors' | 'walk' | 'wait' | 'away'
   | 'smith' | 'stoke' | 'quench' | 'bake' | 'craft' | 'sell' | 'serve' | 'tend'
   | 'fetchWater' | 'fetchWood' | 'chop' | 'garden' | 'washing' | 'feedHens'
   | 'browse' | 'sit' | 'chat' | 'drink' | 'pray' | 'mourn' | 'play' | 'stroll' | 'gather';
@@ -65,6 +65,18 @@ export interface Spot {
   door: boolean;
   /** People using it or on their way. */
   users: number;
+  /** Who has each place at it (person id, -1 free; cap places, side by side across `dir`). */
+  seats?: number[];
+}
+
+/** Between two people side by side at one spot (m). */
+export const SEAT_GAP = 0.75;
+
+/** Where the place `seat` of a spot is: side by side, across the way its users face. */
+export function seatAt(s: Spot, seat: number): [number, number] {
+  if (s.cap <= 1 || s.door) return [s.x, s.z];
+  const off = (seat - (s.cap - 1) / 2) * SEAT_GAP;
+  return [s.x - Math.sin(s.dir) * off, s.z + Math.cos(s.dir) * off];
 }
 
 /** Every spot of a town: its fixtures, then one door per building. */

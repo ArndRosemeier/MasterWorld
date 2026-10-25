@@ -26,23 +26,28 @@ export const fill = (text: string, values: Readonly<Record<string, string>>): st
 export function nameFolk(people: readonly Person[], plan: TownPlan, names: Readonly<Record<string, NamesDef>>, talk: TalkDef, seed: number): Folk[] {
   const rng = new Rng(deriveSeed(seed, 'folk', 'names'));
   const families = new Map<string, string[]>();
-  const familyOf = new Map<number, string>();
+  const familyOf = new Map<string, string>();
+  /** The house's own family (the first named there): the house is called after them. */
+  const hosts = new Map<number, string>();
   const givenUsed = new Set<string>();
   return people.map((p) => {
     const n = names[p.race] ?? names.human;
-    let family = familyOf.get(p.home);
+    // A guest of another people (a traveller at the inn) keeps a family name of their own.
+    const key = `${p.home}/${p.race}`;
+    let family = familyOf.get(key);
     if (!family) {
       let left = families.get(p.race);
       if (!left?.length) families.set(p.race, (left = rng.shuffle([...n.family])));
       family = left.pop()!;
-      familyOf.set(p.home, family);
+      familyOf.set(key, family);
+      if (!hosts.has(p.home)) hosts.set(p.home, family);
     }
     const list = p.female ? n.female : n.male;
     // A given name not yet used in the household's family (two Maras in one house would confuse).
     let given = rng.pick(list);
     for (let k = 0; k < list.length && givenUsed.has(`${family}/${given}`); k++) given = list[(list.indexOf(given) + 1) % list.length];
     givenUsed.add(`${family}/${given}`);
-    const house = fill(talk.house, { house: houseName(plan.buildings[p.home]), family });
+    const house = fill(talk.house, { house: houseName(plan.buildings[p.home]), family: hosts.get(p.home)! });
     return { person: p, given, family, name: `${given} ${family}`, house };
   });
 }

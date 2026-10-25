@@ -106,3 +106,48 @@ test('town life: orders are timed in game hours since the start, so a curfew on 
   assert.ok(outDay1 > life.agents.length * 0.2, `${outDay1} out on day 1`);
   assert.ok(outDay2 < life.agents.length * 0.03, `${outDay2} out under the curfew`);
 });
+
+test('town life: the elf walks in along a road, stays the night at the inn, and leaves by a road', () => {
+  const life = new TownLife(plan, 7, 0);
+  const elf = life.agents.find((a) => a.person.role === 'traveller')!;
+  assert.ok(elf, 'a traveller');
+  const inn = plan.buildings[elf.person.home];
+  const fromCentre = () => Math.hypot(elf.x - plan.centre[0], elf.z - plan.centre[1]);
+  const seen = new Set<string>();
+  let farthest = 0, nearest = Infinity;
+  life.focus = { x: plan.centre[0], z: plan.centre[1] };
+  for (let s = 0; s < 72 * HOUR; s += 1) {
+    life.step(1, s / HOUR);
+    seen.add(elf.act);
+    if (elf.act === 'away') { assert.ok(elf.hidden); farthest = Math.max(farthest, fromCentre()); }
+    nearest = Math.min(nearest, Math.hypot(elf.x - inn.door[0], elf.z - inn.door[1]));
+  }
+  assert.ok(seen.has('away') && seen.has('walk') && seen.has('sleep'), [...seen].join(' '));
+  assert.ok(farthest > plan.radius, `away at ${farthest.toFixed(0)} m from the centre`);
+  assert.ok(nearest < 1, 'at the inn');
+});
+
+test('town life: two at one bench or table sit side by side, never in one place', () => {
+  const life = new TownLife(plan, 7, 17);
+  let shared = 0, pairs = 0;
+  for (let s = 0; s < 900; s++) {
+    life.step(1, 17 + s / HOUR);
+    if (s % 10) continue;
+    const at = life.agents.filter((a) => !a.hidden && a.act !== 'walk' && a.spot >= 0 && life.spots[a.spot].cap > 1);
+    for (let i = 0; i < at.length; i++) for (let j = i + 1; j < at.length; j++) {
+      if (at[i].spot !== at[j].spot) continue;
+      pairs++;
+      if (Math.hypot(at[i].x - at[j].x, at[i].z - at[j].z) < 0.5) shared++;
+    }
+  }
+  assert.ok(pairs > 0, 'some spots are shared');
+  assert.equal(shared, 0, `${shared} of ${pairs} pairs in one place`);
+});
+
+test('town life: the hero walks around townsfolk, and is never stuck in one who walks into them', () => {
+  const life = new TownLife(plan, 7, 12);
+  const a = life.agents.find((x) => !x.hidden)!;
+  assert.ok(life.touches(a.x + 0.4, a.z, 0.32, a.x + 3, a.z), 'blocked walking into them');
+  assert.ok(!life.touches(a.x + 0.4, a.z, 0.32, a.x + 0.3, a.z), 'free when already touching');
+  assert.ok(!life.touches(a.x + 2, a.z, 0.32, a.x + 3, a.z), 'free at a distance');
+});

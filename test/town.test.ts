@@ -7,6 +7,7 @@ import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
 import { TownGround } from '../src/world/town';
 import { floraPlacement, FLORA_STRIDE } from '../src/world/flora';
+import { Walker, type WalkWorld } from '../src/game/walker';
 
 const { terrain, log, home } = openWorld(parseSeed('masterworld'), classic);
 
@@ -54,4 +55,44 @@ test('town: the VGM promises a cellar under one of its houses, with a household 
   const s = sketchCellar(d, house, classic.dungeons.cellar);
   assert.ok(s.hints.length > 0);
   assert.equal(s.knownBy.building, house.id);
+});
+
+test('town: one walks up the steps and onto the temple porch, and not through its columns', () => {
+  const town = terrain.towns[0];
+  const at = (b: (typeof town.plan.buildings)[number], u: number, v: number): [number, number] =>
+    [b.cx + u * Math.cos(b.angle) + v * b.vx, b.cz + u * Math.sin(b.angle) + v * b.vz];
+  const temple = town.plan.buildings.find((b) => b.kind === 'temple');
+  if (temple) {
+    const [x, z] = at(temple, 0, -temple.hv - 1.2);
+    assert.ok(Math.abs(town.stand(x, z)! - (temple.floorY + 0.25)) < 1e-6, 'on the porch floor');
+    const w = Math.min(temple.hu - 0.4, 3.6);
+    const [cx, cz] = at(temple, -w + 0.3, -temple.hv - 2.2 + 0.35);
+    assert.ok(town.solid(cx, cz, 0.3), 'a column is in the way');
+  }
+  // Wherever steps lead to a door, each is a step up from the last (the walker climbs 0.45 m).
+  for (const b of town.plan.buildings) {
+    let prev = terrain.height(...at(b, 0, -b.hv - 4));
+    for (let v = -b.hv - 4; v < -b.hv - 0.1; v += 0.1) {
+      const [x, z] = at(b, 0, v);
+      const y = Math.max(terrain.height(x, z), town.stand(x, z) ?? -Infinity);
+      assert.ok(y - prev < 0.45, `${b.kind} ${b.id}: a rise of ${(y - prev).toFixed(2)} m at ${v.toFixed(1)}`);
+      prev = y;
+    }
+  }
+});
+
+test('town: the hero walks up the temple steps onto the porch', () => {
+  const town = terrain.towns[0];
+  const t = town.plan.buildings.find((b) => b.kind === 'temple');
+  if (!t) return;
+  const world: WalkWorld = {
+    height: (x, z) => terrain.height(x, z), floor: (x, z) => town.stand(x, z),
+    rockSurface: () => null, waterLevel: () => null, wall: (x, z, r) => town.solid(x, z, r),
+  };
+  // From 6 m out, straight at the door between the middle columns.
+  const dx = t.cx - t.door[0], dz = t.cz - t.door[1], l = Math.hypot(dx, dz);
+  const w = new Walker(world);
+  w.place(t.door[0] - (dx / l) * 6, t.door[1] - (dz / l) * 6);
+  for (let i = 0; i < 4 * 30; i++) w.step({ forward: 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: true, up: false, down: false }, 1 / 30);
+  assert.ok(w.pos.y > t.floorY + 0.2, `on the porch: ${(w.pos.y - t.floorY).toFixed(2)} m over the floor`);
 });

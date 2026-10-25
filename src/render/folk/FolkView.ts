@@ -11,6 +11,7 @@ import HumanWorker from '@actors/human/worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
 import type { ActivityKind } from '../../sim/spots';
+import { ChildFolk } from './ChildFolk';
 import { FAR, FarFolk } from './FarFolk';
 import { clipOf, coveringLooks, drawn, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
@@ -41,6 +42,12 @@ interface Slot {
   /** Dressed for that agent and compiled. */
   ready: boolean;
   clip: string;
+  /**
+   * A dressing still runs. A slot freed meanwhile is not dressed again until it ends: the old run would
+   * set the detail level and hide the character under the new run's compiles (hidden objects are not
+   * compiled), and that level then built its shaders on the render path.
+   */
+  busy: boolean;
 }
 
 export class FolkView {
@@ -49,6 +56,8 @@ export class FolkView {
   private readonly shown = new Map<number, Slot>();
   /** Everyone out of doors without a character, as plain figures. */
   private readonly far = new FarFolk();
+  /** The children, as simple figures. */
+  private readonly kids = new ChildFolk(this.far.mesh.material as Material);
 
   private constructor(private readonly reversed: boolean, private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
     for (const ch of [lead, ...others]) {
@@ -56,8 +65,30 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      this.slots.push({ ch, place, agent: -1, ready: false, clip: '' });
+      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false };
+      this.slots.push(slot);
+      ch.object.addEventListener('childadded', ({ child }) => this.late(slot, child));
     }
+  }
+
+  /** Materials compiled for the characters (a mesh made later with one of these needs nothing). */
+  private readonly compiled = new WeakSet<Material>();
+
+  /**
+   * Actors makes some meshes only once a detail level or a fitted shape first needs them, sometimes after
+   * the character is drawn: such a mesh with a material of its own would build its shader on the render
+   * path. Taken out of the scene at once (the mesh is added before it is drawn), compiled, and back.
+   */
+  private late(s: Slot, child: Object3D): void {
+    if (!s.ready) return;
+    let fresh = false;
+    child.traverse((m) => { for (const x of materialsOf(m)) if (!this.compiled.has(x)) fresh = true; });
+    if (!fresh) return;
+    s.ready = false;
+    s.place.removeFromParent();
+    this.dressing++;
+    s.busy = true;
+    void this.prepareSlot(s, s.agent).finally(() => { this.dressing--; s.busy = false; });
   }
 
   /**
@@ -93,7 +124,7 @@ export class FolkView {
     s.ch.setLod(0);
     this.adapt(s.place);
     s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
-    return [s.place, this.far.mesh];
+    return [s.place, this.far.mesh, ...this.kids.meshes];
   }
 
   /**
@@ -117,10 +148,12 @@ export class FolkView {
     }
     ch.setLod(0);
     this.slots[0].place.visible = false;
-    this.stage.scene.add(this.far.mesh);
+    this.stage.scene.add(this.far.mesh, ...this.kids.meshes);
     this.warm = true;
   }
   private warm = false;
+
+  private readonly children: Agent[] = [];
 
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
   indoors: readonly Placed[] | null = null;
@@ -155,7 +188,7 @@ export class FolkView {
     for (const [, a] of near) {
       if (this.dressing >= DRESSING || !want.size) break;
       if (!want.has(a.person.id) || this.shown.has(a.person.id)) continue;
-      const s = this.slots.find((x) => x.agent < 0);
+      const s = this.slots.find((x) => x.agent < 0 && !x.busy);
       if (!s) break;
       this.dress(s, a);
     }
@@ -177,6 +210,14 @@ export class FolkView {
     // The rest (and those whose character is still being dressed) as plain figures.
     if (this.indoors) this.far.place([], this.height);
     else this.far.place(near.filter(([, a]) => !this.shown.get(a.person.id)?.ready).map(([, a]) => a), this.height);
+    // Children (never indoors in a room: they play out of doors).
+    if (this.indoors) this.kids.place([], this.height, dt, cx, cz);
+    else {
+      this.children.length = 0;
+      for (const a of this.life.agents) if (!drawn(a.person) && !a.hidden) this.children.push(a);
+      this.children.sort((x, y) => Math.hypot(x.x - cx, x.z - cz) - Math.hypot(y.x - cx, y.z - cz));
+      this.kids.place(this.children, this.height, dt, cx, cz);
+    }
   }
 
   private dress(s: Slot, a: Agent): void {
@@ -185,29 +226,38 @@ export class FolkView {
     s.clip = clipOf(a.act, a.person.id);
     this.shown.set(a.person.id, s);
     this.dressing++;
+    s.busy = true;
     const id = a.person.id;
     s.ch.set({ ...lookOf(a.person), animation: s.clip })
-      .then(async () => {
-        // Its meshes are new: compile (a cache hit for kinds already seen) before it is drawn.
-        // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
-        // pass is warmed only for objects not yet in the scene).
-        s.place.removeFromParent();
-        s.place.visible = true;
-        // Every detail level in turn (each is its own meshes, shown only once chosen: left to 'auto' they
-        // built their shaders on the render path), and every caster: a character's shadow shaders are its
-        // own (its shape, its garments' fitting).
-        for (let k = 0; k < s.ch.lods.length && s.agent === id; k++) {
-          s.ch.setLod(k);
-          this.adapt(s.place);
-          await this.stage.prepare(s.place, { everyCaster: true });
-        }
-        s.ch.setLod('auto');
-        if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
-        this.stage.scene.add(s.place);
-        s.ready = true;
-      })
+      .then(() => this.prepareSlot(s, id))
       .catch((e: unknown) => console.error('[folk] dressing failed', e))
-      .finally(() => { this.dressing--; });
+      .finally(() => { this.dressing--; s.busy = false; });
+  }
+
+  /** Compiles a dressed character (a cache hit for kinds already seen) and puts it in the scene. */
+  private async prepareSlot(s: Slot, id: number): Promise<void> {
+    // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
+    // pass is warmed only for objects not yet in the scene).
+    s.place.removeFromParent();
+    s.place.visible = true;
+    // Every detail level in turn (each is its own meshes, shown only once chosen: left to 'auto' they
+    // built their shaders on the render path), and every caster: a character's shadow shaders are its
+    // own (its shape, its garments' fitting).
+    for (let k = 0; k < s.ch.lods.length && s.agent === id; k++) {
+      s.ch.setLod(k);
+      this.adapt(s.place);
+      // Hidden meshes too: Actors keeps some it may show later at this level (the body's own crowd
+      // mesh beside the merged one), and compileAsync skips hidden objects.
+      const hidden: Object3D[] = [];
+      s.place.traverse((m) => { if (!m.visible && (m as Mesh).isMesh) { hidden.push(m); m.visible = true; } });
+      await this.stage.prepare(s.place, { everyCaster: true });
+      for (const m of hidden) m.visible = false;
+      s.place.traverse((m) => { for (const x of materialsOf(m)) this.compiled.add(x); });
+    }
+    s.ch.setLod('auto');
+    if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
+    this.stage.scene.add(s.place);
+    s.ready = true;
   }
 
   /**
@@ -222,7 +272,7 @@ export class FolkView {
       if (!mesh.isMesh) return;
       if (mesh.name.startsWith('genitals')) mesh.castShadow = false; // always clothed: a shadow shader for nothing
       if (!this.reversed) return;
-      for (const x of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as Material[]) {
+      for (const x of materialsOf(mesh)) {
         if (!x.polygonOffset || x.userData.offsetReversed) continue;
         x.polygonOffsetFactor = -x.polygonOffsetFactor;
         x.polygonOffsetUnits = -x.polygonOffsetUnits;
@@ -239,4 +289,10 @@ export class FolkView {
     for (const s of this.shown.values()) if (s.ready) ready++;
     return `folk ${ready}/${this.slots.length}`;
   }
+}
+
+/** A mesh's materials (none for other objects). */
+function materialsOf(o: Object3D): Material[] {
+  const m = (o as Mesh).material;
+  return !(o as Mesh).isMesh || !m ? [] : Array.isArray(m) ? m : [m];
 }

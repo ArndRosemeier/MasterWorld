@@ -23,7 +23,8 @@ const NEIGHBOURS = 2;
 
 export function cellarHint(sketch: CellarSketch, people: readonly Person[], plan: TownPlan): CellarHint {
   const b = sketch.knownBy.building;
-  const grown = (p: Person) => p.role !== 'child';
+  // Grown locals: children and travellers passing through hear nothing of the house's troubles.
+  const grown = (p: Person) => p.role !== 'child' && p.role !== 'traveller';
   const household = people.filter((p) => p.home === b);
   const knowers = household.filter(grown).map((p) => p.id);
   // The talker of the house tells the others.

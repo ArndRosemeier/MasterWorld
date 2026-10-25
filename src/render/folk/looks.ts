@@ -33,8 +33,23 @@ const DYED = ['#7a3a2a', '#8a4a30', '#3d5a80', '#4a5a6a', '#5f6838', '#6b6a3a', 
 const LEATHER = ['#4a3020', '#3a2416', '#5a3a22', '#2a1d14'];
 const HAIR_COLORS = ['#2a1d14', '#3b2417', '#4a3020', '#6a4a2a', '#8a6a3a', '#b08a50', '#c8a868', '#1c1814', '#7a3a1e'];
 
-/** Who is drawn (Actors makes adults only: children are in the simulation, not yet in the picture). */
+/** Who is drawn as an Actors character (Actors makes adults only: children are simple figures, ChildFolk). */
 export const drawn = (p: Person): boolean => p.role !== 'child';
+
+/** How a child's simple figure looks (ChildFolk): colours of tunic, hose, skin and hair, and height (m). */
+export interface ChildLook { tunic: string; hose: string; skin: string; hair: string; tall: number }
+
+export function childLook(p: Person): ChildLook {
+  const r = new Rng(deriveSeed(p.seed, 'look'));
+  // Ages 4..15 stand about 1.0..1.6 m among humans and elves; dwarf and halfling children are smaller.
+  const small = p.race === 'dwarf' || p.race === 'halfling' ? 0.72 : 1;
+  const tone = r.range(0.05, 0.45);
+  const skin = `#${[[241, 141], [211, 90], [189, 59]].map(([a, b]) => Math.round(a + (b - a) * tone).toString(16).padStart(2, '0')).join('')}`;
+  return {
+    tunic: r.chance(0.35) ? r.pick(DYED) : r.pick(PLAIN), hose: r.pick(PLAIN), skin, hair: r.pick(HAIR_COLORS),
+    tall: small * (0.95 + (Math.min(15, Math.max(4, p.age)) - 4) * 0.055) * r.range(0.95, 1.05),
+  };
+}
 
 /** Everything about how `p` looks. */
 export function lookOf(p: Person): CharacterPatch {
@@ -55,6 +70,11 @@ export function lookOf(p: Person): CharacterPatch {
       // The temple's keeper: a long plain robe and a mantle (no faith's dress: the setting says that later).
       outfit = ['briefs', ...(f ? ['bra'] : []), wear('med-long-tunic', r.pick(['#d8d0bc', '#3a3a44', '#2f4a3a'])), wear('med-mantle', r.pick(['#5e1a2b', '#3d5a80', '#6b6a3a'])), wear('cloth-shoes', leather())];
       break;
+    case 'traveller':
+      // On the road: a long tunic, a mantle and a hood in the greens and greys of the woods.
+      outfit = ['briefs', ...(f ? ['bra'] : []), wear('med-long-tunic', r.pick(['#5d6b4a', '#6e7466', '#4a5a52'])), wear('med-belt', leather()),
+        wear('med-mantle', r.pick(['#3f5238', '#55604f', '#38463f'])), wear('hood-down', r.pick(['#3f5238', '#55604f'])), wear('leather-boots', leather())];
+      break;
     case 'trade':
     case 'hand':
       outfit = f
@@ -68,12 +88,12 @@ export function lookOf(p: Person): CharacterPatch {
         : ['briefs', wear('med-tunic', r.chance(0.4) ? dyed() : plain()), wear(r.chance(0.5) ? 'med-hose' : 'wool-pants', plain()), wear('med-belt', leather()), shoes];
   }
   if (r.chance(0.12)) outfit.push(wear('hood-down', dyed()));
-  const old = p.age > 55;
+  const old = p.race !== 'elf' && p.age > 55; // elves age slowly
   const dwarf = p.race === 'dwarf';
   return {
     race: p.race, race2: null, raceMix: 0, raceSize: r.range(0.3, 0.7),
     body: {
-      gender: f ? 0 : 1, ageYears: p.age, muscle: r.range(0.3, p.role === 'trade' ? 0.8 : 0.6), weight: r.range(0.3, 0.75),
+      gender: f ? 0 : 1, ageYears: p.race === 'elf' ? 20 + p.age / 12 : p.age, muscle: r.range(0.3, p.role === 'trade' ? 0.8 : 0.6), weight: r.range(0.3, 0.75),
       height: r.range(0.3, 0.7), proportions: r.range(0.3, 0.7),
       african: r.range(0, 0.15), asian: r.range(0, 0.15), caucasian: 1,
     },
@@ -87,9 +107,9 @@ export function lookOf(p: Person): CharacterPatch {
   };
 }
 
-/** The clip for each activity (looped); `walk` while on the way. Sleep and indoors are not drawn. */
+/** The clip for each activity (looped); `walk` while on the way. Sleep, indoors and away are not drawn. */
 const CLIP: Record<ActivityKind, string> = {
-  sleep: 'idle', indoors: 'idle', walk: 'walk', wait: 'idle', stroll: 'walk', gather: 'idle',
+  sleep: 'idle', indoors: 'idle', away: 'idle', walk: 'walk', wait: 'idle', stroll: 'walk', gather: 'idle',
   smith: 'chop wood', stoke: 'interact', quench: 'pick up', bake: 'interact', craft: 'repair (kneeling)',
   sell: 'talk', serve: 'talk', tend: 'water plants',
   fetchWater: 'pick up', fetchWood: 'pick up', chop: 'chop wood', garden: 'harvest', washing: 'interact', feedHens: 'plant seeds',
