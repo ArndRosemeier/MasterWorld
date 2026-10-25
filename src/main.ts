@@ -54,6 +54,8 @@ import { TalkUi } from './app/talkUi';
 import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
 import { MapUi } from './app/mapUi';
+import { HandOver } from './app/handOver';
+import { Orientation } from './game/orientation';
 import { townTalk } from './talk/townTalk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
@@ -383,7 +385,10 @@ export async function start(b: Boot): Promise<void> {
       paused,
       get bindings() { return settings.current.bindings; },
       get away() { return player.flying || !!visit?.inside; },
-      heard: (lead) => (sounds?.noted(), notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6)),
+      heard: (lead) => {
+        handOver?.give(lead.id);
+        notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
+      },
     }) : null;
     const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {
@@ -392,6 +397,8 @@ export async function start(b: Boot): Promise<void> {
       changed: armHero,
       drank: (n) => { if (n > 0) fightHud.healed(); },
     });
+    // How exactly the hero knows where they are (plan 11.7): the map shows it, travel and reading it train it.
+    const orientation = new Orientation(seed, character, home);
     const map = town ? new MapUi(town.plan, journal, {
       paused: pausedWith('ui/map'),
       get bindings() { return settings.current.bindings; },
@@ -400,9 +407,11 @@ export async function start(b: Boot): Promise<void> {
       get hero() {
         // Down in the cellar: at its house.
         const h = visit?.inside ? visit.houseDoor : null, w = player.walker;
-        return h ? { x: h[0], z: h[1], yaw: h[2] } : { x: w.pos.x, z: w.pos.z, yaw: w.yaw };
+        return h ? orientation.bearing(h[0], h[1], h[2]) : orientation.bearing(w.pos.x, w.pos.z, w.yaw);
       },
     }) : null;
+    // Telling of a place: the hero hands the map over and the teller marks it.
+    const handOver = map ? new HandOver((id, c, t) => map.markIn(id, c, t), () => sounds?.noted()) : null;
     if (talk && life && town && params.talk) {
       // Straight into a talk: in front of the innkeeper or of the cellar's household.
       const pick = params.talk === 'house'
@@ -554,6 +563,8 @@ export async function start(b: Boot): Promise<void> {
       if (!rooms?.inside) visit?.update(dt);
       if (!visit?.inside) rooms?.update(dt);
       talk?.watch();
+      const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.flying && !visit?.inside);
+      if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }
       fight?.play(dt);
       fight?.direct(dt, { inTown: !!town && !visit?.inside, talking: open > 0, leads: journal.open.length });
       notes.update(dt);
