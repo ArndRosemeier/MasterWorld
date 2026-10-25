@@ -40,13 +40,15 @@ export interface WeatherState {
   storm: number;
   /** Wet ground 0..1: rises with rain, dries over hours. */
   wet: number;
+  /** Snow lying on the ground 0..1: from recent snowfall, melting over hours. */
+  lying: number;
 }
 
 /** The kinds of weather the VGM can order (and a URL can ask for). */
 export const WEATHER_KINDS = ['clear', 'fair', 'overcast', 'rain', 'storm', 'fog', 'snow'] as const;
 export type WeatherKind = (typeof WEATHER_KINDS)[number];
 
-type Preset = Omit<WeatherState, 'windDir' | 'wet' | 'snow'> & { snow?: number };
+type Preset = Omit<WeatherState, 'windDir' | 'wet' | 'lying' | 'snow'> & { snow?: number };
 
 /** What each kind looks like at its height. Snow follows the temperature unless a kind sets it. */
 export const PRESETS: Readonly<Record<WeatherKind, Readonly<Preset>>> = {
@@ -113,14 +115,18 @@ export class Weather {
   state(x: number, z: number, hours: number, out: WeatherState = calm()): WeatherState {
     this.now(x, z, hours, out);
     // Wet ground: the strongest recent rain, fading as it dries (snow lies dry here).
-    let wet = out.rain * (1 - out.snow);
+    let wet = out.rain * (1 - out.snow), lying = out.rain * out.snow;
     const s = calm();
     for (let k = 1; k <= MEMORY / MEMORY_STEP; k++) {
       const ago = k * MEMORY_STEP;
       this.now(x, z, hours - ago, s);
-      wet = Math.max(wet, Math.min(1, s.rain * 1.6) * (1 - s.snow) * Math.exp(-ago / this.def.drying));
+      // Older than the memory counts for nothing; fade towards it so nothing snaps away.
+      const keep = smoothstep(MEMORY, MEMORY * 0.6, ago);
+      wet = Math.max(wet, Math.min(1, s.rain * 1.6) * (1 - s.snow) * Math.exp(-ago / this.def.drying) * keep);
+      lying = Math.max(lying, Math.min(1, s.rain * 2) * s.snow * Math.exp(-ago / (this.def.drying * 3)) * keep);
     }
     out.wet = clamp(wet, 0, 1);
+    out.lying = clamp(Math.max(lying, Math.min(1, out.rain * 2) * out.snow), 0, 1);
     return out;
   }
 
@@ -162,6 +168,7 @@ export class Weather {
     const daily = -Math.cos(((hour - 3) / 24) * Math.PI * 2) * 4;
     out.snow = smoothstep(1.5, -1, c.temperature + daily - out.rain * 2);
     out.wet = 0;
+    out.lying = 0;
   }
 
   private climate(x: number, z: number): Climate {
@@ -182,7 +189,7 @@ export function prevailingWind(seed: number): number {
   return new Rng(deriveSeed(seed, 'wind')).float() * Math.PI * 2;
 }
 
-const CALM: Readonly<WeatherState> = { cover: 0, density: 0, dark: 0, sun: 1, fog: 0, mist: 0, rain: 0, snow: 0, wind: 0, windDir: 0, storm: 0, wet: 0 };
+const CALM: Readonly<WeatherState> = { cover: 0, density: 0, dark: 0, sun: 1, fog: 0, mist: 0, rain: 0, snow: 0, wind: 0, windDir: 0, storm: 0, wet: 0, lying: 0 };
 
 /** A still, cloudless moment (a state to fill). */
 export const calm = (): WeatherState => ({ ...CALM });
@@ -207,16 +214,6 @@ export function blendTowards(s: WeatherState, p: Readonly<Preset>, w: number): v
   s.wind = lerp(s.wind, p.wind, w);
   s.storm = lerp(s.storm, p.storm, w);
   if (p.snow !== undefined) s.snow = lerp(s.snow, p.snow, w);
-}
-
-/** A whole weather state at a preset (for `?weather=`), the wind blowing `windDir`. */
-export function presetState(kind: WeatherKind, windDir: number, snow = 0): WeatherState {
-  const s = calm();
-  s.snow = snow;
-  blendTowards(s, PRESETS[kind], 1);
-  s.windDir = windDir;
-  s.wet = kind === 'rain' || kind === 'storm' ? 1 : 0;
-  return s;
 }
 
 /** A lightning flash: 0 dark .. 1 the brightest moment, and the bearing it lights from (radians). */

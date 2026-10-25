@@ -8,7 +8,7 @@ import { PRESETS, Weather, calm, type Climate, lightning, orderWeight, prevailin
 const seed = parseSeed('masterworld');
 const temperate = () => ({ temperature: 11, moisture: 0.5 });
 const weather = (climate: (x: number, z: number) => Climate = temperate) => new Weather(seed, classic.world.weather, climate);
-const KEYS = ['cover', 'density', 'dark', 'sun', 'fog', 'mist', 'rain', 'snow', 'wind', 'storm', 'wet'] as const;
+const KEYS = ['cover', 'density', 'dark', 'sun', 'fog', 'mist', 'rain', 'snow', 'wind', 'storm', 'wet', 'lying'] as const;
 
 test('weather: deterministic, and every value in range', () => {
   const a = weather(), b = weather();
@@ -60,6 +60,10 @@ test('weather: it snows where it is cold, and a dry climate rains less', () => {
     wetRain += wet.state(-32000, 32000, h).rain;
   }
   assert.ok(precip > 0 && snow === precip, `${snow} of ${precip} falls as snow`);
+  cold.order({ kind: 'snow', from: 3000, to: 3002 });
+  assert.ok(cold.state(-32000, 32000, 3001.5).lying > 0.9, 'snow lies');
+  assert.ok(cold.state(-32000, 32000, 3004).lying > 0.3, 'and stays a while');
+  assert.equal(dry.state(-32000, 32000, 50).lying, 0);
   assert.ok(dryRain < wetRain * 0.5, `dry ${dryRain}, wet ${wetRain}`);
 });
 

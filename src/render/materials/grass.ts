@@ -57,7 +57,8 @@ export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   const fade = float(1).sub(smoothstep(REACH * 0.7, REACH, d));
   // A blade grows if its rank is within what this distance keeps, and its roll within the density here.
   const live = step(blade.z, keep).mul(step(r2, g.y.sqrt())).mul(step(0.0, inside(GRASS.mask, xz)));
-  const height = g.z.mul(mix(0.55, 1.35, r3)).mul(smoothstep(0.0, 0.3, g.y).mul(0.5).add(0.5)).mul(fade).mul(live);
+  // Lying snow buries most of the grass (the tallest blades still poke through).
+  const height = g.z.mul(mix(0.55, 1.35, r3)).mul(WEATHER.lying.mul(mix(0.95, 0.5, r3)).oneMinus()).mul(smoothstep(0.0, 0.3, g.y).mul(0.5).add(0.5)).mul(fade).mul(live);
   const width = mix(0.011, 0.022, r4).mul(pow(keep, -0.5)).mul(d.div(40).add(1)).mul(live);
 
   // The blade's frame: it faces `f` and leans that way, its width runs along `tg`.

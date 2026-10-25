@@ -62,7 +62,7 @@ export class WeatherView {
     // The first frame shows the weather as it is; after that it eases (a teleport does not flip the sky).
     const k = this.first ? 1 : damp(1 / FOLLOW, dt);
     this.first = false;
-    for (const key of ['cover', 'density', 'dark', 'sun', 'fog', 'mist', 'rain', 'snow', 'wind', 'storm', 'wet'] as const) s[key] = lerp(s[key], t[key], k);
+    for (const key of ['cover', 'density', 'dark', 'sun', 'fog', 'mist', 'rain', 'snow', 'wind', 'storm', 'wet', 'lying'] as const) s[key] = lerp(s[key], t[key], k);
     s.windDir = lerpAngle(s.windDir, t.windDir, k);
 
     // Sky, light and fog.
@@ -92,6 +92,7 @@ export class WeatherView {
     W.rain.value = s.rain;
     W.snow.value = s.snow;
     W.wet.value = s.wet;
+    W.lying.value = s.lying;
     const L = sky.light, g = sky.gain;
     const amb = L.hemiIntensity * g * 0.7, sun = L.lightIntensity * g * 0.12 + this.flash.light * 2;
     W.light.value.setRGB(L.skyColor[0] * amb + L.lightColor[0] * sun, L.skyColor[1] * amb + L.lightColor[1] * sun, L.skyColor[2] * amb + L.lightColor[2] * sun);
@@ -117,6 +118,6 @@ export class WeatherView {
   /** One line for the HUD. */
   get summary(): string {
     const s = this.shown, f = (v: number) => v.toFixed(2);
-    return `weather cover ${f(s.cover)} rain ${f(s.rain)}${s.snow > 0.5 ? ' (snow)' : ''} storm ${f(s.storm)} mist ${f(s.mist)} wind ${f(s.wind)} wet ${f(s.wet)}`;
+    return `weather cover ${f(s.cover)} rain ${f(s.rain)}${s.snow > 0.5 ? ' (snow)' : ''} storm ${f(s.storm)} mist ${f(s.mist)} wind ${f(s.wind)} wet ${f(s.wet)}${s.lying > 0.01 ? ` snow ${f(s.lying)}` : ''}`;
   }
 }

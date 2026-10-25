@@ -4,7 +4,7 @@
  * fog (haze everywhere plus mist lying in the low ground), rings where raindrops hit still water, and the
  * falling rain and snow around the camera.
  */
-import { Color, MeshBasicNodeMaterial, Vector2, Vector3 } from 'three/webgpu';
+import { Color, DoubleSide, MeshBasicNodeMaterial, Vector2, Vector3 } from 'three/webgpu';
 import {
   Fn, attribute, cameraPosition, clamp, cross, dot, exp, float, fog, fract, length, max, mix, mod, normalize, positionGeometry,
   positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
@@ -16,8 +16,9 @@ export const WEATHER = {
   /** Precipitation 0..1, and the share of it that is snow. */
   rain: uniform(0),
   snow: uniform(0),
-  /** Wet ground 0..1. */
+  /** Wet ground 0..1, and snow lying on it 0..1. */
   wet: uniform(0),
+  lying: uniform(0),
   /** Wind strength 0..1 and the unit direction it blows to (xz). */
   wind: uniform(0),
   windDir: uniform(new Vector2(1, 0)),
@@ -75,7 +76,8 @@ export function rainRings(p) {
     const centre = id.add(h.mul(0.5).add(0.25));
     const d = q.sub(centre);
     const r = length(d);
-    const wave = sin(r.sub(phase.mul(0.45)).mul(55.0)).mul(exp(r.sub(phase.mul(0.45)).div(0.07).pow(2).negate()));
+    const front = r.sub(phase.mul(0.45)).div(0.07);
+    const wave = sin(front.mul(3.85)).mul(exp(front.mul(front).negate()));
     tilt = tilt.add(d.div(max(r, 1e-3)).mul(wave).mul(phase.oneMinus()).mul(falls));
   }
   return tilt.mul(0.3).mul(smoothstep(0.0, 0.08, WEATHER.rain)).mul(WEATHER.snow.oneMinus());
@@ -89,7 +91,7 @@ export const PRECIP_HALF = 18, PRECIP_HEIGHT = 22;
  * camera; it falls with the wind, drawn as a thin streak along its motion (rain) or a soft flake (snow).
  */
 export function createPrecipMaterial(): MeshBasicNodeMaterial {
-  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: true });
+  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: true, side: DoubleSide });
   const drop = attribute('pDrop', 'vec4'); // spot in the box 0..1 (xyz), a random number
   const across = positionGeometry.x, along = positionGeometry.y; // -1..1 across, 0..1 along
   const W = WEATHER, snow = W.snow, r = drop.w;
@@ -107,21 +109,24 @@ export function createPrecipMaterial(): MeshBasicNodeMaterial {
   const dist = length(toCam);
   const axis = normalize(mix(vel, vec3(0, -1, 0), snow));
   const side = normalize(cross(axis, toCam));
-  const up = normalize(cross(toCam, side));
+  // Flakes: the falling axis turned square to the view (it points down, like the streaks).
+  const down = normalize(cross(toCam, side));
   // Thin far away would alias: wider and fainter instead.
   const minW = dist.mul(0.0012);
   const rainW = max(float(0.006), minW), rainL = length(vel).mul(0.045);
-  const flake = mix(0.012, 0.03, r);
+  const flake = mix(0.035, 0.06, r);
   const halfW = mix(rainW, max(flake, minW), snow), len = mix(rainL, flake.mul(2), snow);
-  const dir = mix(axis, up.negate(), snow);
+  const dir = mix(axis, down, snow);
   m.positionNode = centre.add(side.mul(across.mul(halfW))).add(dir.mul(along.sub(0.5).mul(len)));
   // Fragment: faint streaks; flakes soft round dots. Nothing right at the lens or underground of the box.
   const thin = float(0.006).div(rainW);
   const streak = across.abs().oneMinus().mul(sin(along.mul(Math.PI))).mul(thin).mul(0.16);
-  const dot2 = across.mul(across).add(along.sub(0.5).mul(2).pow(2));
-  const flakeA = smoothstep(1.0, 0.2, dot2).mul(0.9).mul(flake.div(halfW).pow(2));
+  const v = along.sub(0.5).mul(2);
+  const dot2 = across.mul(across).add(v.mul(v));
+  const flakeA = smoothstep(0.2, 1.0, dot2).oneMinus().mul(0.9).mul(flake.div(halfW).pow(2));
   const a = mix(streak, flakeA, snow).mul(smoothstep(0.4, 1.6, dist)).mul(smoothstep(PRECIP_HALF * 0.75, PRECIP_HALF, dist).oneMinus());
-  m.colorNode = vec4(W.light.mul(mix(float(1.0), float(1.5), snow)), 1);
+  // Flakes in the air read grey against a bright sky and snow (as they do), drops a touch lighter.
+  m.colorNode = vec4(W.light.mul(mix(float(1.0), float(0.7), snow)), 1);
   m.opacityNode = a.min(1);
   return m;
 }

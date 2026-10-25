@@ -128,7 +128,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Snow above a ragged line, only where it can lie.
   const snow = layer('snow', p.xz);
   const snowLine = float(1900).add(broad.mul(350));
-  const snowT = smoothstep(snowLine, snowLine.add(250), p.y).mul(smoothstep(0.5, 0.72, up));
+  // Fresh snow (the weather's) lies on level ground at any height, patchy where it is thin.
+  const fresh = smoothstep(0.25, 0.6, WEATHER.lying.add(broad.mul(0.25)).add(fine.mul(0.08))).mul(WEATHER.lying.mul(4).min(1));
+  const snowT = smoothstep(snowLine, snowLine.add(250), p.y).max(fresh).mul(smoothstep(0.5, 0.72, up));
   const snowB = hblend(snowT, h.sub(snow.n.b), 1.5);
   col = mix(col, snow.a.rgb, snowB); rough = mix(rough, snow.a.a, snowB); ao = mix(ao, snow.n.a, snowB);
   pert = mix(pert, vec3(tn(snow.n).x, 0, tn(snow.n).y), snowB);
