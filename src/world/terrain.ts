@@ -71,7 +71,11 @@ export class Terrain {
 
   /** Ground height above the sea surface, metres. */
   height(x: number, z: number): number {
-    const e = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
+    const base = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
+    // The swash: low swells along the waterline (beach cusps), so the water's edge curves gently instead of
+    // running dead straight; they die out on dry sand and in deeper water.
+    const swash = Math.abs(base) < 2.5 ? (1 - smoothstep(0.6, 2.5, Math.abs(base))) * this.detail.fbm2(x / 22 - 40.1, z / 22 + 8.8, 2) * 0.15 : 0;
+    const e = base + swash;
     if (e <= 0) return e;
     // Small undulations everywhere, rougher where the land is high; none on the beach, so it runs smoothly
     // into the water instead of the waterline wandering over bumps.

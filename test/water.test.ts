@@ -108,3 +108,27 @@ test('terrain: a waterfall drops over a cliff into a pool', () => {
   }
   assert.ok(checked > 0, 'no waterfall checked');
 });
+
+test('water mask: the sea surface reaches the shoreline on a gentle beach (no ground showing under its edge)', () => {
+  const t = terrain;
+  // A beach south-west of the start, at the near mask's 2 m pixels.
+  const x0 = -33512, z0 = 29856, size = 64, res = 32, step = size / res;
+  const m = waterMask(t, { seed, setting: classic.id, x0, z0, size, res });
+  // The mask's depth, bilinear between pixel centres (as the shader samples it).
+  const depthAt = (x: number, z: number): number => {
+    const fx = (x - x0) / step - 0.5, fz = (z - z0) / step - 0.5;
+    const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+    const d = (a: number, b: number) => m[((j + b) * res + i + a) * 4 + 1];
+    return (d(0, 0) * (1 - u) + d(1, 0) * u) * (1 - v) + (d(0, 1) * (1 - u) + d(1, 1) * u) * v;
+  };
+  let checked = 0;
+  for (let z = z0 + 8; z < z0 + size - 8; z += 3) for (let x = x0 + 8; x < x0 + size - 9; x += 0.25) {
+    const a = t.height(x, z), b = t.height(x + 0.25, z);
+    if ((a > 0) === (b > 0)) continue;
+    // Just on the water's side of the line, the surface is drawn (the shader cuts it below -0.2).
+    const wx = a <= 0 ? x : x + 0.25;
+    assert.ok(depthAt(wx, z) > -0.2, `water cut short at ${wx}, ${z}: mask depth ${depthAt(wx, z)}`);
+    checked++;
+  }
+  assert.ok(checked > 3, `${checked} shore crossings`);
+});

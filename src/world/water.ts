@@ -72,7 +72,11 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
       }
       if (!cnt) continue;
       const level = sum / cnt;
-      out[p * 4] = level; out[p * 4 + 1] = Math.min(DRY / 3, level - ground[p]);
+      // The true (negative) depth where the ground stands above the carried level, so the surface runs out
+      // right at the waterline on a gentle beach instead of a pixel short of it; well dry where the ground
+      // lies below it (a river's coarse pixel beside its bed), so no sheet floats over the bank.
+      const d = level - ground[p];
+      out[p * 4] = level; out[p * 4 + 1] = d <= 0 ? d : DRY / 3;
       next[p] = 2;
     }
     wet.set(next);
