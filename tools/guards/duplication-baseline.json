@@ -50,5 +50,9 @@
   {
     "key": "same name: masterworld/game/dungeonWorld.ts#waterLevel + masterworld/game/interiorWorld.ts#waterLevel",
     "reason": "Both implement the WalkWorld interface (game/walker.ts): no water below ground or indoors."
+  },
+  {
+    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/setting/contract.ts",
+    "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   }
 ]

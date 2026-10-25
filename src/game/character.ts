@@ -3,7 +3,7 @@
  * and stamina that grow with the skills that use them, what is worn and carried, and the one "power"
  * number the VGM reads wherever it needs a level. Pure: saved as plain data.
  */
-import type { AbilityDef, DamageKind, ItemCatalog, SettingModule, Slot } from '../setting/contract';
+import type { AbilityDef, BackgroundDef, DamageKind, ItemCatalog, SettingModule, Slot } from '../setting/contract';
 import type { Blow, Guard } from '../sim/combat';
 import { defOf, plainItem, type Item } from './items';
 
@@ -14,6 +14,8 @@ export interface CharacterSave {
   readonly worn: Partial<Record<Slot | 'ring2', Item>>;
   readonly pack: readonly Item[];
   readonly coins: number;
+  /** The hero's past (a background id; absent in saves from before backgrounds). */
+  readonly background?: string;
 }
 
 /** A skill rose to a new whole point. */
@@ -41,6 +43,8 @@ export class Character {
   readonly worn: Partial<Record<Slot | 'ring2', Item>> = {};
   readonly pack: Item[] = [];
   coins = 0;
+  /** The hero's past (plan 11.4): a background id, '' before one is chosen. */
+  background = '';
   private readonly cat: ItemCatalog;
 
   constructor(private readonly setting: SettingModule, saved?: CharacterSave) {
@@ -50,17 +54,24 @@ export class Character {
       Object.assign(this.worn, saved.worn);
       this.pack.push(...saved.pack);
       this.coins = saved.coins;
-    } else {
-      // The starting kit (a background will choose it later, plan 11.4).
-      const p = (id: string) => plainItem(this.cat, id);
-      this.worn.main = p('short-sword');
-      this.worn.body = p('padded-jack');
-      this.worn.feet = p('boots');
-      this.pack.push(p('minor-potion'), p('minor-potion'), p('bread'), p('torch'));
-      this.coins = 24;
-    }
+      this.background = saved.background ?? '';
+    } else this.beginAs(setting.backgrounds[0]);
     this.health = Math.min(saved?.health ?? Infinity, this.maxHealth);
     this.stamina = Math.min(saved?.stamina ?? Infinity, this.maxStamina);
+  }
+
+  /** Starts a new hero's life with this past: its skills over the starts, its kit and coins, fully rested. */
+  beginAs(bg: BackgroundDef): void {
+    this.background = bg.id;
+    for (const s of this.setting.skills) this.skills.set(s.id, s.start + (bg.skills[s.id] ?? 0));
+    for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) delete this.worn[k];
+    this.pack.length = 0;
+    const p = (id: string) => plainItem(this.cat, id);
+    for (const [slot, id] of Object.entries(bg.kit.worn)) this.worn[slot as Slot] = p(id);
+    this.pack.push(...bg.kit.pack.map(p));
+    this.coins = bg.kit.coins;
+    this.health = this.maxHealth;
+    this.stamina = this.maxStamina;
   }
 
   /** A skill with what is worn added. */
@@ -184,6 +195,6 @@ export class Character {
   }
 
   save(): CharacterSave {
-    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins };
+    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background };
   }
 }
