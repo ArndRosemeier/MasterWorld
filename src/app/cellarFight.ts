@@ -141,7 +141,7 @@ export class CellarFight {
 
   /** A find: its cards, and what is better than what is worn is taken up at once. */
   private takeUp(loot: Loot): void {
-    this.hud.showFinds(loot, this.setting.items);
+    this.hud.showFinds(loot);
     this.onCue({ kind: 'found', loot });
     const took: string[] = [];
     for (const it of loot.items) if (this.better(it)) { this.hero.equip(it); took.push(it.name); }

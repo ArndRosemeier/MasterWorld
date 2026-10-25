@@ -97,6 +97,11 @@ test('fight: wearing a find raises its skills; a potion heals', () => {
   assert.ok(h.consume(pot) > 0 && h.health > 10);
   const saved = JSON.parse(JSON.stringify(h.save()));
   assert.equal(new Character(classic, saved).skill('blades'), h.skill('blades'));
+  // Taking it off: back into the pack, the bonus gone.
+  h.unequip('main');
+  assert.equal(h.worn.main, undefined);
+  assert.ok(h.pack.includes(blade));
+  assert.equal(h.skill('blades'), before);
 });
 
 test('fight: creatures can walk from the hatch to every room, along the walls, never through them', () => {

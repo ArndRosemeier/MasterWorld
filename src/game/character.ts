@@ -144,6 +144,15 @@ export class Character {
     this.health = Math.min(this.health, this.maxHealth);
   }
 
+  /** Take off what is worn in `slot`, into the pack. */
+  unequip(slot: Slot | 'ring2'): void {
+    const it = this.worn[slot];
+    if (!it) return;
+    delete this.worn[slot];
+    this.pack.push(it);
+    this.health = Math.min(this.health, this.maxHealth);
+  }
+
   /** Drink or eat something from the pack: the health it gave. */
   consume(item: Item): number {
     const d = defOf(this.cat, item.def);
