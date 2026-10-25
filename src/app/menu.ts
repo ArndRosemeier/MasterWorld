@@ -5,6 +5,7 @@
 import { ACTIONS, bind, keyLabel, RESERVED_KEYS, type Action } from '../input/controls';
 import { release, versionLabel } from './release';
 import { RANGES, type Settings, type SettingsStore } from './settings';
+import { onKeyDown } from '../input/keys';
 
 /** What the menu needs of the running game. */
 export interface MenuHost {
@@ -46,7 +47,7 @@ export class Menu {
     ));
     this.news = this.dialog("What's new", this.changes());
     document.body.append(corner, this.settings, this.news);
-    window.addEventListener('keydown', (e) => this.key(e), true);
+    onKeyDown((e) => this.key(e), true);
     // The keyboard's own letters, where the browser tells them.
     const kb = (navigator as Navigator & { keyboard?: { getLayoutMap?: () => Promise<ReadonlyMap<string, string>> } }).keyboard;
     void kb?.getLayoutMap?.().then((m) => { this.layout = m; this.render(); }).catch(() => undefined);

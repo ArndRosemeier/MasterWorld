@@ -44,6 +44,19 @@
       .panel .news ul { margin: 0; padding: 0; list-style: none; }
       .panel .news li { display: flex; flex-direction: column; padding: 6px 0; border-bottom: 1px solid #22201c; }
       .panel .news .when { color: #b09a6a; font: 11px ui-monospace, monospace; }
+      /* The debug menu (src/app/debugMenu.ts, Ctrl+Shift+F12). */
+      #debug { position: fixed; right: 16px; top: 16px; z-index: 15; width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 80px); display: none; flex-direction: column; background: #0e1218f0; border: 1px solid #2c3846; border-radius: 10px; box-shadow: 0 10px 34px #0008; color: #d8dee6; font: 12px/1.35 system-ui, sans-serif; }
+      #debug.open { display: flex; }
+      #debug .dbg-head { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 12px; border-bottom: 1px solid #2c3846; }
+      #debug .dbg-head span { color: #8fa3b5; font-size: 11px; }
+      #debug .dbg-body { overflow-y: auto; padding: 4px 12px 8px; }
+      #debug .dbg-sec h4 { margin: 8px 0 5px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #d8b56a; }
+      #debug .dbg-sec button { margin: 0 5px 5px 0; padding: 4px 9px; border: 1px solid #3a4756; border-radius: 5px; background: #222c37; color: #e8ecf0; font-size: 12px; cursor: pointer; }
+      #debug .dbg-sec button:hover { background: #2d3a48; border-color: #d8b56a; }
+      #debug .dbg-log { min-height: 48px; max-height: 140px; overflow-y: auto; margin: 0 12px; padding: 6px 8px; background: #0a0d11; border-radius: 6px; font: 11px/1.4 ui-monospace, monospace; color: #a8d8a0; white-space: pre-wrap; word-break: break-all; }
+      #debug .dbg-log .bad { color: #ff8a80; }
+      #debug .dbg-cmd { margin: 8px 12px 12px; padding: 7px 9px; border: 1px solid #3a4756; border-radius: 6px; background: #0a0d11; color: #e8ecf0; font: 12px ui-monospace, monospace; outline: none; }
+      #debug .dbg-cmd:focus { border-color: #d8b56a; }
     </style>
   </head>
   <body>

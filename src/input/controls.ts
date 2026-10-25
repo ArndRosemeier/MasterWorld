@@ -17,6 +17,7 @@ export const ACTIONS = [
   { id: 'walk', label: 'Walk (hold)' },
   { id: 'jump', label: 'Jump / swim up' },
   { id: 'dive', label: 'Dive' },
+  { id: 'fly', label: 'Fly (free camera)' },
 ] as const;
 
 export type Action = (typeof ACTIONS)[number]['id'];
@@ -35,6 +36,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   walk: ['ShiftLeft', 'ShiftRight'],
   jump: ['Space', ''],
   dive: ['KeyX', ''],
+  fly: ['KeyF', ''],
 };
 
 /** Keys that are never bound: Escape opens the settings. */

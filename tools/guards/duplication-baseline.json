@@ -10,5 +10,9 @@
   {
     "key": "same name: masterworld/app/flyCamera.ts#update + masterworld/render/terrain/TerrainView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (camera movement vs chunk selection); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/player.ts#update + masterworld/render/terrain/TerrainView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the player vs chunk selection); only the name matches."
   }
 ]
