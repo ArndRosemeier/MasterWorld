@@ -6,8 +6,8 @@
  * Every mesh of a kind shares the kind's one material, so a kind is one shader; variation goes into
  * vertex attributes or uniforms, never into a new material.
  */
-import { DoubleSide, MeshPhysicalNodeMaterial, type Material, type Mesh } from 'three/webgpu';
-import { Fn, If, vec2, abs, attribute, cameraViewMatrix, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
+import { DoubleSide, MeshPhysicalNodeMaterial, Vector2, type Material, type Mesh } from 'three/webgpu';
+import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import type { GroundTextures } from './terrain/groundTextures';
@@ -15,8 +15,9 @@ import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
+import { woodsFromAfar } from '@futuremagic/vegetation/node';
 
-export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level';
+export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy';
 
 export interface MaterialKind extends StageKind {
   readonly attributes: readonly Attribute[];
@@ -61,7 +62,20 @@ const LAYER = (name: string): number => {
  * is rock, projected from three sides with strata on the faces; snow lies up high, sand at the shore.
  * Height from the layers sharpens every transition so it follows stones and tufts, not straight lines.
  */
-export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level'], () => {
+/**
+ * The woods from afar (docs/far-view.md): past the trees drawn one by one (FloraView), the ground rises into the
+ * canopy (vertex attribute `canopy`: crown cover, tree height, spacing, conifer share; world/canopy.ts) and draws
+ * crowns, gaps and glades per pixel. `band`: from where to where (m from the eye) the canopy takes over.
+ */
+export const WOODS = { band: uniform(new Vector2(800, 1000)) };
+/** The highest the canopy raises the ground (m; bounds of terrain meshes make room for it). */
+export const CANOPY_RISE = 22;
+/** The crowns' colour from afar (linear): broadleaf and conifer, matched to the near trees' hulls. */
+const CROWN_BROAD = vec3(0.02, 0.048, 0.012), CROWN_CONIFER = vec3(0.012, 0.03, 0.014);
+/** Past the sun's shadow box (sky.ts), the floor under the woods keeps this share of its light (the crowns' shade on average). */
+const UNDER_CROWNS = 0.15;
+
+export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level', 'canopy'], () => {
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');
   const { albedo: A, normal: N } = ground;
   // Double-sided so chunk skirts close cracks seen from either side.
@@ -69,6 +83,11 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Not `vertexColors`: three would multiply the whole result by the biome colour (rock and snow too); the
   // biome colour tints only the open ground, below.
   const m = new MeshPhysicalNodeMaterial({ roughness: 0.95, metalness: 0, side: DoubleSide, specularIntensity: 0.25 });
+  // Far away, the woods raise the ground to their crowns: a closed wood by most of its trees' height.
+  const cn = attribute('canopy', 'vec4');
+  const placed = modelWorldMatrix.mul(vec4(positionLocal, 1)).xyz;
+  const far0 = smoothstep(WOODS.band.x, WOODS.band.y, length(placed.xz.sub(cameraPosition.xz)));
+  m.positionNode = positionLocal.add(vec3(0, cn.y.mul(smoothstep(0.05, 0.7, cn.x)).mul(0.8).mul(far0), 0));
   const p = positionWorld, n = normalWorldGeometry, up = n.y;
   // How level the ground is, smoothed over a few metres per vertex: what rock and sand follow, so their
   // edges run smoothly instead of along the triangles where a cliff's normal flips between vertices.
@@ -123,6 +142,20 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const rockTone = float(1).add(broad.mul(0.25));
   col = mix(col, rockA.rgb.mul(rockTone).mul(macro), rockB); rough = mix(rough, rockA.a, rockB); ao = mix(ao, rockN.a, rockB);
   pert = mix(pert, rockP, rockB); h = mix(h, rockN.b, rockB);
+
+  // The woods from afar: crowns and the shaded floor between them (@futuremagic/vegetation woodsFromAfar).
+  const far = varying(far0, 'vWoodsFar');
+  const cover = varying(cn.x, 'vWoodsCover'), crown = mix(CROWN_BROAD, CROWN_CONIFER, varying(cn.w, 'vWoodsConifer'));
+  const woods = far.mul(smoothstep(0.0, 0.05, cover)).mul(float(1).sub(rockB));
+  // Past the shadow box no tree shades the floor: the crowns' shade on average instead.
+  const unshaded = smoothstep(110, 150, length(p.sub(cameraPosition))).mul(cover).mul(float(1).sub(woods));
+  col = col.mul(mix(float(1), float(UNDER_CROWNS), unshaded));
+  const afar = woodsFromAfar(col, crown, cover, varying(cn.z, 'vWoodsSpacing'), p);
+  col = mix(col, afar.color, woods);
+  // Crowns are matt: no sheen of the sky on the woods from afar.
+  m.specularIntensityNode = mix(float(0.25), float(0.05), woods);
+  rough = mix(rough, float(0.9), woods);
+  pert = mix(pert, afar.bump.mul(0.9), woods);
 
   // Snow above a ragged line, only where it can lie.
   const snow = layer('snow', p.xz);
