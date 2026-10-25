@@ -1,7 +1,7 @@
 # MasterWorld: plan
 
 Living document. Status: **draft 3.** Draft 2 added Arnd's decisions of 2026-10-24 (D9–D24): the region quadtree, the hybrid terrain and believable NPC life. Draft 3 adds the decisions from the gap analysis of 2026-10-25 (D28–D47): the player's game (sandbox, character, items, factions, the map), the default world's lore, sound, the interface and the title animation.
-Milestone 1 (walk the land) is built; milestone 2 (the town) is under way. Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld).
+Status (2026-10-25, evening): milestones 1–4 are built as first cuts (the land, the town and its folk, the first promise with its cellar, the Director with combat, items and music), plus horses, character creation, sound, the title animation and the warded-brass UI. The core loop runs once so far; the frontier (milestone 5) is what makes it repeat. Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld).
 
 ---
 
@@ -458,6 +458,8 @@ The mode is a setting the VGM honours (D4): in roguelike mode it is stricter wit
 * The player carries a map that fills in with what they have seen, drawn like a hand-made map.
 * NPCs mark places on it when they give a task (9.1).
 * The **orientation skill** sets how exactly the map shows where you are: a vague area at first, a sharp arrow at mastery. It rises by travelling and reading the map.
+
+**Built so far (2026-10-25)**: `src/game/orientation.ts` turns the skill into where the map shows the hero: a novice (10) sees a wash of blue ink about 90 m across with "you?" and no arrow; the area shrinks, an arrow for the facing appears from about 31 and steadies, and from 80 the arrow is exact. The guess drifts with seeded noise over the land (the hero is always inside it, and it holds still where they stand). Every 150 m travelled practises the skill (harder farther from town), and so does reading the map for 4 s, once per 90 s. When someone tells of a place, the talk says "You hold out your map" and a card of the real map rises to them, the mark is drawn in with a quill, and the card goes back (`src/app/handOver.ts`); the map then shows the mark as already inked.
 
 ---
 

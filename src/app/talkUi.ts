@@ -28,7 +28,7 @@ export interface TalkHost {
   readonly away: boolean;
   /** The keys now. */
   readonly bindings: Bindings;
-  /** A lead was opened: say it, and the journal and map show it. */
+  /** A lead was opened: say it, and the journal and map show it (the hero hands the map over to be marked). */
   heard(lead: { id: string; title: string; note: string }): void;
 }
 
@@ -137,7 +137,10 @@ export class TalkUi {
       const b = this.plan.buildings[this.talk.houseOf(id)];
       const title = fill(this.words.lead, { cellar: this.talk.cellarCalled(id) });
       const lead = this.journal.hear(id, title, { text: r.text, from }, { x: b.door[0], z: b.door[1], label: this.talk.houseCalled(id) });
-      if (lead) this.host.heard({ id, title, note: fill(this.words.marked, { name: from, house: this.talk.houseCalled(id) }) });
+      if (!lead) continue;
+      this.lines.append(el('p', { className: 'act', textContent: fill(this.words.handOver, { name: from }) }));
+      this.lines.scrollTop = this.lines.scrollHeight;
+      this.host.heard({ id, title, note: fill(this.words.marked, { name: from, house: this.talk.houseCalled(id) }) });
     }
     if (r.done) { setTimeout(() => this.close(), 900); this.topicList.replaceChildren(); return; }
     this.offer();
