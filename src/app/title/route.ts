@@ -67,3 +67,29 @@ export function divePose(from: Pose, to: Pose, u: number): Pose {
   const look = v3lerp(from.look, to.look, smootherstep(0, 0.7, s));
   return { at, look };
 }
+
+/** The giant's walk (title, a rare guest): this far from the town's middle, this long, this fast (m, m/s). */
+const GIANT = { off: 330, length: 640, speed: 6 };
+
+/**
+ * Where the giant is `t` seconds in: pacing back and forth along a line past the town, out on the far
+ * land, on the ground. `yaw` is its facing (radians about +y; 0 walks towards −z).
+ */
+export function giantPose(o: Orbit, seed: number, t: number): { x: number; y: number; z: number; yaw: number } {
+  // Beyond the town as the camera sees it some 25 s into the flight (the camera circles on meanwhile).
+  const side = o.angle + o.turn * (Math.PI + 0.6) + ((seed % 7) - 3) * 0.08;
+  const [cx, , cz] = o.centre;
+  // The line's middle, out from the town, and its direction (across the view from the town).
+  const mx = cx + Math.sin(side) * GIANT.off, mz = cz + Math.cos(side) * GIANT.off;
+  const dx = Math.cos(side), dz = -Math.sin(side);
+  const lap = (2 * GIANT.length) / GIANT.speed;
+  const u = (((t / lap) % 1) + 1) % 1;
+  const out = u < 0.5;
+  const s = (out ? u * 2 : 2 - u * 2) * GIANT.length - GIANT.length / 2;
+  const x = mx + dx * s, z = mz + dz * s;
+  const sign = out ? 1 : -1;
+  return { x, y: o.ground(x, z), z, yaw: Math.atan2(-dx * sign, -dz * sign) };
+}
+
+/** The giant's walking speed (m/s): its clip is paced to match. */
+export const GIANT_SPEED = GIANT.speed;

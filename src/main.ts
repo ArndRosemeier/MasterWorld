@@ -10,6 +10,9 @@ import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
 import { HeroView } from './render/hero/HeroView';
+import { preparePeople } from './render/hero/play';
+import { GiantView } from './render/giant/GiantView';
+import { GIANT_SPEED, giantPose, type Orbit } from './app/title/route';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
 import { Steed, horseSpots } from './game/horse';
@@ -167,13 +170,15 @@ export async function start(b: Boot): Promise<void> {
     const pausedWith = (sound: string) => (on: boolean) => { opening = sound; paused(on); opening = 'ui/open'; };
     // What New game leads to once the dive lands (set once the hero exists: character creation).
     let onBegin: ((people: People['id'] | null) => void) | null = null;
+    let orbit: Orbit | null = null;
     if (title) {
       paused(true);
       // The fly-over circles the market, where the game starts.
       const middle = { x: home.x, z: home.z, r: town ? (Math.max(town.nx, town.nz) * TOWN_RASTER) / 2 : 0 };
+      orbit = { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) };
       await title.attach({
         camera: view.camera,
-        orbit: { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) },
+        orbit,
         toys: {
           height: (x, z) => terrain.height(x, z),
           water: (x, z) => water?.waterAt(x, z) ?? null,
@@ -214,6 +219,14 @@ export async function start(b: Boot): Promise<void> {
     player.walker.height = hero.height;
     hero.onLook(() => { player.walker.height = hero.height; });
     player.hero = hero;
+    // Now and then a giant walks the far hills while the title flies (compiled before it shows).
+    let giant: { view: GiantView; t: number } | null = null;
+    let giantReady: Promise<void> | null = null;
+    if ((title?.draw.giant || params.giant) && title && !title.calm && orbit) {
+      const g = { view: await GiantView.grow(view.renderer, GIANT_SPEED), t: 0 };
+      g.view.frame(0, giantPose(orbit, title.draw.seed, 0));
+      giantReady = preparePeople(view.stage, g.view.object).then(() => view.stage.add(g.view.object)).then(() => { giant = g; });
+    }
     let heroName = save?.looks?.name ?? '';
     // The hero's sheet (skills, health, gear, purse) and what they hold.
     const character = new Character(setting, save?.character ?? undefined);
@@ -340,7 +353,7 @@ export async function start(b: Boot): Promise<void> {
     const trees = (boot.trees ? flora.plant() : Promise.resolve()).then(took('trees'));
     let landed = false;
     void trees.then(() => { landed = true; if (folk) loading.set('Waking the townsfolk'); });
-    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk')), dwellers]).then(() => { planted = true; });
+    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk')), dwellers, giantReady]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -560,6 +573,10 @@ export async function start(b: Boot): Promise<void> {
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       title?.run(dt);
+      if (giant && orbit && title) {
+        if (title.holding) giant.view.frame(dt, giantPose(orbit, title.draw.seed, (giant.t += dt)));
+        else { giant.view.dispose(); giant = null; }
+      }
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
       creator?.orbit(dt);

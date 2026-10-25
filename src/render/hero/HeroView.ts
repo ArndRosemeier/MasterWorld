@@ -19,7 +19,7 @@ import type { Stage } from '@futuremagic/stage';
 import { buildArm } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE } from './clips';
 import { gripHeld } from './grips';
-import { FADE, playClip } from './play';
+import { FADE, castShadows, playClip, preparePeople } from './play';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -122,7 +122,7 @@ export class HeroView {
     if (!look) await front.set(newHero(front.catalog, looks, front.config, seed, race));
     const back = await Character.load({ ...opts, renderer, shareWith: front });
     for (const c of [front, back]) c.setLod(0); // always close to the camera
-    shadows(front.object);
+    castShadows(front.object);
     return new HeroView(front, back, stage);
   }
 
@@ -162,13 +162,9 @@ export class HeroView {
       this.wanted = null;
       const next = this.back;
       await next.set(want);
-      // Compiled out of the scene and shown (compileAsync skips hidden meshes; Actors keeps meshes it may
-      // show later hidden), with every shadow caster of its own.
-      const hidden: Object3D[] = [];
-      next.object.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
-      shadows(next.object);
-      await this.stage.prepare(next.object, { everyCaster: true });
-      for (const o of hidden) o.visible = false;
+      // Compiled out of the scene, with every shadow caster of its own.
+      castShadows(next.object);
+      await preparePeople(this.stage, next.object);
       // Swap: the new look takes over the old one's place, clip and held things.
       const old = this.front;
       this.front = next;
@@ -266,9 +262,4 @@ export class HeroView {
   private moveHeld(): void {
     gripHeld(this.held.main, this.held.off, !!this.held.drawn, this.front.actor, this.object);
   }
-}
-
-/** Every mesh of the hero casts a shadow. */
-function shadows(o: Object3D): void {
-  o.traverse((m) => { if ((m as { isMesh?: boolean }).isMesh && !m.name.startsWith('genitals')) m.castShadow = true; });
 }
