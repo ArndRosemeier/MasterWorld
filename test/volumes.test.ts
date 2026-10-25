@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
-import { Terrain } from '../src/world/terrain';
+import { openWorld } from '../src/vgm/builder';
 import { classic } from '../src/setting/classic/index';
 import { ArchField, archMesh } from '../src/world/volumes';
 
-const terrain = new Terrain(parseSeed('masterworld'), classic);
+const { terrain } = openWorld(parseSeed('masterworld'), classic);
 
 test('volumes: an arch stands near the start, rock at its feet and air under its crown', () => {
   const [f] = terrain.volumes;
