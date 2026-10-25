@@ -1,70 +1,55 @@
 /**
- * Music and sound effects (plan D40: made with OpenRouter, files in public/title/). Music streams through a
- * media element (never decoded whole); effects are short files played on fresh elements so they can
- * overlap. Browsers only allow sound after the player has pressed something: `unlock` is called on the
- * first click or key, and music asked for before plays then.
+ * Music and sounds (plan 16, D44: made with OpenRouter, listed in tools/sound/sounds.json, files in public/sound/),
+ * played by the shared engine (@futuremagic/audio). Browsers only allow sound after the player has pressed something:
+ * the engine opens on the first click or key, and music asked for before plays then.
+ *
+ * The title plays its effects and theme through here; in the game `SoundDirector` (soundDirector.ts) sets the beds,
+ * steps and music every frame on `engine`.
  */
+import { AudioEngine } from '@futuremagic/audio/web';
+
 export type Effect = 'bell' | 'birds' | 'click' | 'dive' | 'dragon' | 'gear' | 'splash' | 'thunder' | 'ward' | 'wind';
 
-/** Loudness of each effect against the others (the files are normalised alike). */
+/** Loudness of each title effect against the others (the files are levelled alike). */
 const MIX: Record<Effect, number> = { bell: 0.7, birds: 0.6, click: 0.35, dive: 0.6, dragon: 0.8, gear: 0.5, splash: 0.6, thunder: 0.8, ward: 0.5, wind: 0.45 };
 
-const url = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
+/** Loudness of the buses under the master volume. */
+const BUSES = { music: 0.55, world: 1, body: 0.8, ui: 0.7 } as const;
 
 export class Sound {
-  private music: HTMLAudioElement | null = null;
-  private wantMusic: string | null = null;
-  private unlocked = false;
-  private fade: { from: number; to: number; t: number; seconds: number; stop: boolean } | null = null;
-  private musicLevel = 1;
+  readonly engine: AudioEngine;
+  private master = 0.8;
+
+  constructor(seed = 0x6d77) {
+    this.engine = new AudioEngine({ base: `${import.meta.env.BASE_URL}sound/`, seed });
+    for (const [bus, v] of Object.entries(BUSES)) this.engine.setVolume(bus as keyof typeof BUSES, v);
+    this.engine.setVolume('master', this.master);
+  }
 
   /** Master volume, 0..1 (the setting). */
-  volume = 0.8;
-
-  unlock(): void {
-    if (this.unlocked) return;
-    this.unlocked = true;
-    if (this.wantMusic) this.playMusic(this.wantMusic);
+  get volume(): number { return this.master; }
+  set volume(v: number) {
+    this.master = v;
+    this.engine.setVolume('master', v);
   }
 
-  /** Starts a looping piece (now, or once sound is allowed). */
-  playMusic(path: string): void {
-    this.wantMusic = path;
-    if (!this.unlocked) return;
-    if (!this.music) {
-      this.music = new Audio(url(path));
-      this.music.loop = true;
-    }
-    this.musicLevel = 0;
-    this.fadeMusic(1, 2.5);
-    this.music.volume = 0;
-    void this.music.play().catch(() => undefined);
-  }
+  /** Sound is allowed now (from a press). */
+  allow(): void { this.engine.unlock(); }
+
+  /** Starts a piece of music (an id in public/sound, e.g. `music/title`), crossfading from what plays. */
+  playMusic(piece: string, fade = 2.5): void { this.engine.music(piece, fade); }
 
   /** Fades the music to `level` (0..1) over `seconds`; to 0 with `stop` it ends. */
   fadeMusic(level: number, seconds: number, stop = false): void {
-    if (stop) this.wantMusic = null;
-    this.fade = { from: this.musicLevel, to: level, t: 0, seconds, stop };
+    if (stop) this.engine.music(null, seconds);
+    else this.engine.duck(level, seconds);
   }
 
+  /** A title effect. */
   play(effect: Effect, level = 1): void {
-    if (!this.unlocked || this.volume <= 0) return;
-    const a = new Audio(url(`title/sfx/${effect}.mp3`));
-    a.volume = Math.min(1, this.volume * MIX[effect] * level);
-    void a.play().catch(() => undefined);
+    this.engine.play(`title/${effect}`, { gain: MIX[effect] * level, bus: 'ui' });
   }
 
-  /** Called every frame: runs the music's fades. */
-  tick(dt: number): void {
-    const f = this.fade;
-    if (f) {
-      f.t = Math.min(f.seconds, f.t + dt);
-      this.musicLevel = f.from + (f.to - f.from) * (f.seconds > 0 ? f.t / f.seconds : 1);
-      if (f.t >= f.seconds) {
-        this.fade = null;
-        if (f.stop) this.music?.pause();
-      }
-    }
-    if (this.music) this.music.volume = Math.min(1, this.volume * 0.6 * this.musicLevel);
-  }
+  /** Called every frame. */
+  tick(_dt: number): void { this.engine.update(); }
 }

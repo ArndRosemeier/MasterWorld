@@ -56,11 +56,11 @@ export class Title {
     this.draw = draw;
     console.info(`[title] ${draw.still}, ${draw.weather}, ${draw.hour.toFixed(1)} h`);
     this.screen = new TitleScreen(draw, { start: (p) => this.start(p), settings: () => menus.openSettings(), news: () => menus.whatsNew(), sound }, calm);
-    sound.playMusic('title/theme.mp3');
+    sound.playMusic('music/title');
     // Sound is allowed after the first press, which also opens the title; the pointer leans the view.
     const firstPress = () => {
       if (this.screen.begun) return;
-      sound.unlock();
+      sound.allow();
       this.screen.wake();
       this.goIfAsked();
     };
