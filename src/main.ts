@@ -8,10 +8,12 @@ import { placesFor } from './app/places';
 import { Player } from './app/player';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
+import { Trunks } from './world/trunks';
 import { HeroView } from './render/hero/HeroView';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
 import { Steed, horseSpots } from './game/horse';
+import { buildingOf } from './sim/people';
 import { TownLife, type TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
@@ -119,7 +121,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone });
     if (save) view.sky.day = save.clock.day;
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
     let water: WaterView | null = null;
@@ -131,6 +133,8 @@ export async function start(b: Boot): Promise<void> {
     // The town's people once they live (set below).
     let folkLife: TownLife | null = null;
     const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), town?.stand(x, z) ?? -Infinity);
+    // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
+    const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
     const below = () => (visit?.inside ? visit.world : rooms?.world ?? null);
     const world: WalkWorld = {
       // Out of doors also the steps and porches before the doors (as floors: climbed a step at a time).
@@ -139,8 +143,8 @@ export async function start(b: Boot): Promise<void> {
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
-      // Out of doors the buildings and the townsfolk (whom one walks around, not through).
-      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
+      // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
+      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || trunks.blocks(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
@@ -212,7 +216,7 @@ export async function start(b: Boot): Promise<void> {
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
     armHero();
     // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
-    const life = town ? new TownLife(town.plan, seed, hours()) : null;
+    const life = town ? new TownLife(town.plan, seed, hours(), setting.routines) : null;
     folkLife = life;
     // The VGM's orders to the town (logged; a save replays them).
     let log = opened.log;
@@ -437,7 +441,7 @@ export async function start(b: Boot): Promise<void> {
     // The fight down in the cellar, the HUD, and the Director watching over the pacing.
     const director = new Director(setting.director, save?.director ?? undefined);
     const fightHud = new FightHud(setting, () => settings.current.bindings);
-    const inn = town?.plan.buildings.find((b) => b.kind === 'inn');
+    const inn = town ? buildingOf(town.plan, 'inn') : undefined;
     const fight = visit && delve && creatures ? new CellarFight(visit, delve, creatures, fightHud, player, notes, director, setting, journal, view.camera, canvas, {
       get bindings() { return settings.current.bindings; },
       get blocked() { return open > 0; },
@@ -566,6 +570,7 @@ export async function start(b: Boot): Promise<void> {
       if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
       folk?.follow(dt, view.camera);
       if (boot.trees) flora.update(dt, view.camera);
+      trunks.around(player.walker.pos.x, player.walker.pos.z);
       grass?.tend(dt, view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);

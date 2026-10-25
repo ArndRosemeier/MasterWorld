@@ -22,8 +22,8 @@
     "variety": "node --import tsx tools/variety/cellars.ts"
   },
   "dependencies": {
-    "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.15.1/actors-animal-0.15.1.tgz",
-    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.15.1/actors-generator-0.15.1.tgz",
+    "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.15.2/actors-animal-0.15.2.tgz",
+    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.15.2/actors-generator-0.15.2.tgz",
     "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/creatures": "file:vendor/assetgenerator/packages/creatures",

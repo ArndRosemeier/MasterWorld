@@ -21,6 +21,8 @@ export const params = {
   title: q.get('title') === '0' ? false : q.has('title') ? true : !(q.has('pos') || q.has('fly')),
   /** Real minutes per game day; 0 stops the clock (null: from the settings). */
   dayMinutes: q.has('day') ? Number(q.get('day')) : null,
+  /** The tone curve (for comparing): `tone=aces` the old filmic one, `tone=agx` plain AgX; by default AgX with our look. */
+  tone: (['aces', 'agx'].includes(q.get('tone') ?? '') ? q.get('tone') : 'graded') as 'aces' | 'agx' | 'graded',
   /** Grow the trees (`trees=0` leaves them out, for quick screenshots). */
   trees: q.get('trees') !== '0',
   /** Tree checks (for measuring): `treeShadows=0` trees cast no shadows, `leafDepth=0` leaves without their depth pass. */

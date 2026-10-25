@@ -4,10 +4,11 @@
  * fog (haze everywhere plus mist lying in the low ground), rings where raindrops hit still water, and the
  * falling rain and snow around the camera.
  */
-import { Color, DoubleSide, MeshBasicNodeMaterial, Vector2, Vector3 } from 'three/webgpu';
+import { Color, DoubleSide, MeshBasicNodeMaterial, Vector2, Vector3, type Texture } from 'three/webgpu';
+import { skyToward } from '@futuremagic/sky/node';
 import {
   Fn, attribute, cameraPosition, clamp, cross, dot, exp, float, fog, fract, length, max, mix, mod, normalize, positionGeometry,
-  positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
+  log, positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 
 export const WEATHER = {
@@ -39,10 +40,25 @@ export const FOG = {
   mist: uniform(0),
   mistBase: uniform(0),
   mistFalloff: uniform(1 / 14),
+  /** 1: one colour everywhere (`color`: under water, below ground); 0: the sky's colour toward each view. */
+  flat: uniform(0),
 };
 
-/** The fog node for `scene.fogNode` (set before the warm-up: it is part of every shader's key). */
-export function fogNode() {
+/**
+ * The sky's light in the shade is its environment map; Preetham's clear sky is too saturated a blue for
+ * that, so the env copy is drawn with this much of its colour (sky.ts), and the fog puts it back.
+ */
+export const ENV_SATURATION = 0.6;
+
+/** A colour read from the sky's environment map with its full colour back (see ENV_SATURATION). */
+export const fullSky = (c) => mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, 1 / ENV_SATURATION).max(0);
+
+/**
+ * The fog node for `scene.fogNode` (set before the warm-up: it is part of every shader's key). `env` is the
+ * sky's environment map: distant land fades into the sky behind it (aerial perspective), warm toward the
+ * sun, blue away from it, grey in overcast (the sky turns grey itself).
+ */
+export function fogNode(env: Texture) {
   const factor = Fn(() => {
     const ray = positionWorld.sub(cameraPosition);
     const dist = length(ray);
@@ -55,7 +71,12 @@ export function fogNode() {
     const mist = start.mul(dist).mul(f);
     return exp(haze.mul(haze).add(mist).negate()).oneMinus();
   });
-  return fog(FOG.color, factor());
+  // The sky's colour toward the view, a shade darker than the sky itself so far hills stay hills.
+  const raw = fullSky(skyToward(env, positionWorld.sub(cameraPosition))).mul(0.75);
+  // The glow toward the sun runs far above 1 in the env map: the same soft knee the sky dome has on screen.
+  const peak = max(raw.x, max(raw.y, raw.z));
+  const toward = select(peak.greaterThan(1), raw.mul(log(peak).add(1).div(peak)), raw);
+  return fog(mix(toward, FOG.color, FOG.flat), factor());
 }
 
 const hash2 = (c) => fract(sin(vec2(dot(c, vec2(127.1, 311.7)), dot(c, vec2(269.5, 183.3)))).mul(43758.5453));
