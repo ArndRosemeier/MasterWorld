@@ -116,7 +116,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone });
     if (save) view.sky.day = save.clock.day;
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
     let water: WaterView | null = null;

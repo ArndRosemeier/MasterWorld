@@ -19,9 +19,9 @@ export interface View {
   readonly sky: SkyView;
 }
 
-export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean; hour: number; dayMinutes: number }): Promise<View> {
+export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean; hour: number; dayMinutes: number; tone?: 'aces' | 'agx' | 'graded' }): Promise<View> {
   // Reversed depth: precision from a metre to the far horizon in one view.
-  const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL: opts.forceWebGL, depth: 'reversed', exposure: 1.9 });
+  const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL: opts.forceWebGL, depth: 'reversed', exposure: 1.9, tone: opts.tone ?? 'graded' });
   // Shadows are part of every lit shader's key: on before anything is built.
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFSoftShadowMap;
@@ -36,7 +36,8 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   lantern.castShadow = false;
   scene.add(sun, sun.target, hemi, lantern);
   // Sky, fog, environment map and the sun's shadow (all part of shader keys) before the Stage warms up.
-  const sky = new SkyView(renderer, scene, sun, hemi, opts);
+  // AgX (with or without our look) needs more exposure than ACES for the same mid-grey (ACES divides by 0.6).
+  const sky = new SkyView(renderer, scene, sun, hemi, { ...opts, exposure: (opts.tone ?? 'graded') === 'aces' ? 1 : 1.5 });
   const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute });
   const fit = (): void => {
     const w = canvas.clientWidth, h = canvas.clientHeight;

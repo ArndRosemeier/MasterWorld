@@ -3,10 +3,12 @@
  * (@futuremagic/sky, from Scale; the weather itself comes from WeatherView). The sun casts one shadow map that follows the camera. Everything that changes any shader's key
  * (the environment map, shadows, fog type) is set up in the constructor, before the warm-up.
  */
-import { BoxGeometry, Mesh, PMREMGenerator, Scene, type DirectionalLight, type HemisphereLight, type OrthographicCamera, type PerspectiveCamera, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
+import { BoxGeometry, Color, Mesh, PMREMGenerator, Scene, Vector3, type DirectionalLight, type HemisphereLight, type OrthographicCamera, type PerspectiveCamera, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
+import { positionWorld, uniform } from 'three/tsl';
 import { CLEAR, moonAt, skyLight, skyPath, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
+import { cloudShadow } from '@futuremagic/sky/node';
 import { SKY, makeEnvSky, skyUniforms, type SkyUniforms } from './materials';
-import { FOG, fogNode } from './materials/weather';
+import { ENV_SATURATION, FOG, fogNode } from './materials/weather';
 
 /** Half the side of the sun's shadow box around the camera, metres. */
 const SHADOW_EXTENT = 160;
@@ -21,6 +23,9 @@ const LIGHT = 3.4;
 export const ENV = 1.6;
 /** The world is large: fog thinner than Scale's city. */
 const FOG_SCALE = 0.35;
+/** Metres up to the clouds: they pass overhead as you travel, and their shadows fall where they are. */
+const CLOUD_HEIGHT = 1500;
+
 
 export class SkyView {
   /** Hours 0..24, and whole days since the start. */
@@ -55,6 +60,11 @@ export class SkyView {
   private readonly envRT: RenderTarget;
   private readonly lastEnvSun: Vec3 = [0, -2, 0];
   private time = 0;
+  /** Exposure on top of the sky's own (the tone curve's gain times ours). */
+  private readonly exposure: number;
+  /** The sun's (or moon's) colour times its strength, and where it comes from: its colorNode reads them. */
+  private readonly sunLight = uniform(new Color());
+  private readonly lightDir = uniform(new Vector3(0, 1, 0));
   /** The weather the environment map was last rendered with. */
   private lastEnvWx = '';
 
@@ -63,8 +73,9 @@ export class SkyView {
     private readonly scene: Scene,
     private readonly sun: DirectionalLight,
     private readonly hemi: HemisphereLight,
-    opts: { hour: number; dayMinutes: number },
+    opts: { hour: number; dayMinutes: number; exposure?: number },
   ) {
+    this.exposure = EXPOSURE * (opts.exposure ?? 1);
     this.hour = opts.hour;
     this.dayMinutes = opts.dayMinutes;
     const mat = SKY.make();
@@ -74,21 +85,27 @@ export class SkyView {
     this.dome.renderOrder = -1000;
     this.dome.frustumCulled = false;
     this.U = skyUniforms(mat);
+    this.U.cloudHeight.value = CLOUD_HEIGHT;
     scene.background = null;
-    // Haze plus height mist (materials/weather.ts), part of every shader's key: set before the warm-up.
-    scene.fog = null;
-    (scene as unknown as { fogNode: unknown }).fogNode = fogNode();
 
     this.envSky = makeEnvSky();
     this.envSky.name = 'env sky';
     this.envSky.scale.setScalar(1000);
     this.envU = skyUniforms(this.envSky.material as never);
+    this.envU.envSaturation.value = ENV_SATURATION;
     this.envScene.add(this.envSky);
     this.pmrem = new PMREMGenerator(renderer);
     // An environment map from the start: it is part of every lit shader's key. Later refreshes (the first in
     // `update`, once the sky's uniforms are set) render into the same target, so no shader is built again.
+    // It is the only light from the sky: shade facing the bright horizon or the sun's side of the sky is lighter.
     this.envRT = this.pmrem.fromScene(this.envScene, 0, 1, 2000);
     scene.environment = this.envRT.texture;
+    // Haze plus height mist in the sky's own colour toward each view (materials/weather.ts), part of every
+    // shader's key: set before the warm-up.
+    scene.fog = null;
+    (scene as unknown as { fogNode: unknown }).fogNode = fogNode(this.envRT.texture);
+    // The clouds' shadows on everything the sun lights (three takes a light's colorNode in place of its colour).
+    (sun as unknown as { colorNode: unknown }).colorNode = this.sunLight.mul(cloudShadow(this.U, positionWorld, this.lightDir));
 
     sun.castShadow = true;
     sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
@@ -131,10 +148,12 @@ export class SkyView {
 
     this.sun.color.setRGB(...L.lightColor);
     this.sun.intensity = L.lightIntensity * LIGHT;
-    this.hemi.color.setRGB(...L.skyColor);
-    this.hemi.groundColor.setRGB(...L.groundColor);
-    // Lightning lights the land from the whole sky for a moment.
-    this.hemi.intensity = (L.hemiIntensity + this.flash * 1.2) * LIGHT * 0.7;
+    // The hemisphere light is only the light thrown back by the sunlit ground (from below); the sky's own
+    // light comes from the environment map. Lightning lights the land from the whole sky for a moment.
+    const f = this.flash * 0.84;
+    this.hemi.color.setRGB(0.75 * f, 0.8 * f, f);
+    this.hemi.groundColor.setRGB(...L.bounce);
+    this.hemi.intensity = LIGHT;
     const fog = FOG.color.value;
     fog.setRGB(...L.fogColor);
     // Thick fog closes in to a few hundred metres (the sky's own rig stops at haze).
@@ -142,6 +161,7 @@ export class SkyView {
     // Mist: up to ~60 m of sight where it lies thickest.
     FOG.mist.value = this.mist * this.mist * 0.05;
     FOG.mistBase.value = this.mistBase;
+    FOG.flat.value = 0;
     this.dome.visible = !this.underwater;
     this.scene.background = this.underwater ? fog : null;
     if (this.underwater) {
@@ -150,22 +170,27 @@ export class SkyView {
       fog.setRGB(0.03 * k, 0.17 * k, 0.19 * k);
       FOG.density.value = 0.022;
       FOG.mist.value = 0;
+      FOG.flat.value = 1;
     }
     this.scene.environmentIntensity = L.envIntensity * ENV;
-    this.renderer.toneMappingExposure = L.exposure * EXPOSURE;
+    this.renderer.toneMappingExposure = L.exposure * this.exposure;
     if (this.indoors) {
       this.sun.intensity = 0;
       this.hemi.color.setRGB(0.55, 0.42, 0.3);
       this.hemi.groundColor.setRGB(0.12, 0.09, 0.07);
       this.hemi.intensity = 0.05;
       this.scene.environmentIntensity = 0.01;
-      this.renderer.toneMappingExposure = 1.4;
+      this.renderer.toneMappingExposure = 1.4 * this.exposure / EXPOSURE;
       this.dome.visible = false;
       fog.setRGB(0.008, 0.006, 0.005);
       FOG.density.value = 0.06;
       FOG.mist.value = 0;
+      FOG.flat.value = 1;
       this.scene.background = fog;
     }
+
+    this.sunLight.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
+    this.lightDir.value.set(...L.lightDir);
 
     // The shadow box follows the camera, snapped to texels so edges do not shimmer.
     const focus = camera?.position ?? { x: 0, y: 0, z: 0 };
