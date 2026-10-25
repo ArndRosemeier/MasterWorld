@@ -13,6 +13,7 @@ import { HeroView } from './render/hero/HeroView';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
 import { Steed, horseSpots } from './game/horse';
+import { buildingOf } from './sim/people';
 import { TownLife, type TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
@@ -215,7 +216,7 @@ export async function start(b: Boot): Promise<void> {
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
     armHero();
     // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
-    const life = town ? new TownLife(town.plan, seed, hours()) : null;
+    const life = town ? new TownLife(town.plan, seed, hours(), setting.routines) : null;
     folkLife = life;
     // The VGM's orders to the town (logged; a save replays them).
     let log = opened.log;
@@ -440,7 +441,7 @@ export async function start(b: Boot): Promise<void> {
     // The fight down in the cellar, the HUD, and the Director watching over the pacing.
     const director = new Director(setting.director, save?.director ?? undefined);
     const fightHud = new FightHud(setting, () => settings.current.bindings);
-    const inn = town?.plan.buildings.find((b) => b.kind === 'inn');
+    const inn = town ? buildingOf(town.plan, 'inn') : undefined;
     const fight = visit && delve && creatures ? new CellarFight(visit, delve, creatures, fightHud, player, notes, director, setting, journal, view.camera, canvas, {
       get bindings() { return settings.current.bindings; },
       get blocked() { return open > 0; },

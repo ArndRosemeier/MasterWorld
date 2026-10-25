@@ -8,6 +8,7 @@ import { cellar } from './cellar';
 import { names, talk } from './people';
 import { creatures } from './creatures';
 import { hero } from './hero';
+import { routines } from './routines';
 import { items } from './items';
 import { abilities, director, skills } from './skills';
 
@@ -56,4 +57,5 @@ export const classic: SettingModule = {
   director,
   hero,
   backgrounds,
+  routines,
 };
