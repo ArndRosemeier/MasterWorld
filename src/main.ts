@@ -175,7 +175,7 @@ async function start(): Promise<void> {
       cam.invertMouse = s.invertMouse;
       if (view.camera.fov !== s.fov) { view.camera.fov = s.fov; view.camera.updateProjectionMatrix(); }
       if (scale !== s.renderScale) { scale = s.renderScale; view.renderer.setPixelRatio(pixels * scale); }
-      if (params.dayMinutes === null) view.sky.dayMinutes = s.dayMinutes;
+      if (params.dayMinutes === null) view.sky.dayMinutes = s.dayLength;
       showHud = params.hud || s.hud;
       if (hud) hud.style.display = showHud ? '' : 'none';
     });

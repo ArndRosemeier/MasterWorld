@@ -83,6 +83,7 @@ export class DebugMenu {
         { label: 'Clock stopped', run: () => { h.dayMinutes = 0; } },
         { label: 'Day in 2 min', run: () => { h.dayMinutes = 2; } },
         { label: 'Day in 24 min', run: () => { h.dayMinutes = 24; } },
+        { label: 'Day in 60 min (the game\'s)', run: () => { h.dayMinutes = 60; } },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },
