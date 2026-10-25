@@ -1,0 +1,833 @@
+{
+ "about": "MasterWorld's sounds and music. `node vendor/assetgenerator/packages/audio/tools/make.mjs --spec tools/sound/sounds.json --out public/sound --raw /mnt/project-files/masterworld/audio/raw` turns this into public/sound (see tools/sound/README.md). Seed Audio speaks a prompt unless it starts with 'The sound of'. `from` reuses takes of Arnd's other games, kept in the raw folder.",
+ "sounds": [
+  {
+   "id": "step/grass",
+   "kind": "steps",
+   "from": [
+    "from/solarpolis/step/grass-1.mp3",
+    "from/solarpolis/step/grass-2.mp3",
+    "from/solarpolis/step/grass-3.mp3",
+    "from/solarpolis/step/grass-4.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "step/litter",
+   "kind": "steps",
+   "from": [
+    "from/solarpolis/step/litter-1.mp3",
+    "from/solarpolis/step/litter-2.mp3",
+    "from/solarpolis/step/litter-3.mp3",
+    "from/solarpolis/step/litter-4.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "step/gravel",
+   "kind": "steps",
+   "from": [
+    "from/solarpolis/step/gravel-1.mp3",
+    "from/solarpolis/step/gravel-2.mp3",
+    "from/solarpolis/step/gravel-3.mp3",
+    "from/solarpolis/step/gravel-4.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "step/stone",
+   "kind": "steps",
+   "from": [
+    "from/solarpolis/step/stone-1.mp3",
+    "from/solarpolis/step/stone-2.mp3",
+    "from/solarpolis/step/stone-3.mp3",
+    "from/solarpolis/step/stone-4.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "step/snow",
+   "kind": "steps",
+   "from": [
+    "from/solarpolis/step/snow-1.mp3",
+    "from/solarpolis/step/snow-2.mp3",
+    "from/solarpolis/step/snow-3.mp3",
+    "from/solarpolis/step/snow-4.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "step/water",
+   "kind": "steps",
+   "from": [
+    "from/solarpolis/step/water-1.mp3",
+    "from/solarpolis/step/water-2.mp3",
+    "from/solarpolis/step/water-3.mp3",
+    "from/solarpolis/step/water-4.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "step/cobbles",
+   "kind": "steps",
+   "count": 5,
+   "prompt": "The sound of one person in leather boots walking slowly on the rounded cobblestones of an old town street, hard heels knocking on stone, dry, a faint short echo from house walls, about ten distinct footsteps with short pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "step/boards",
+   "kind": "steps",
+   "count": 5,
+   "prompt": "The sound of one person in leather boots walking slowly across old wooden floorboards indoors in a timber house, hollow knocks and a soft creak now and then, dry room, about ten distinct footsteps with short pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "step/sand",
+   "kind": "steps",
+   "count": 5,
+   "prompt": "The sound of one person in leather boots walking slowly on soft dry beach sand, muffled crunching sinking steps, quiet sea far away, about ten distinct footsteps with short pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "step/dirt",
+   "kind": "steps",
+   "count": 5,
+   "prompt": "The sound of one person in leather boots walking slowly on a hard packed dirt road in the countryside, dull earthy thuds with a little grit, about ten distinct footsteps with short pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "step/rock",
+   "kind": "steps",
+   "count": 5,
+   "prompt": "The sound of one person in leather boots walking slowly in a damp stone cellar, gritty scuffing steps on old flagstones with a short low echo, about ten distinct footsteps with short pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "swim/stroke",
+   "kind": "steps",
+   "count": 5,
+   "tail": 700,
+   "prompt": "The sound of one person swimming slowly breaststroke in a calm lake, about eight separate strokes, each a soft splash and swirl of water, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "swim/splash",
+   "kind": "call",
+   "most": 2.5,
+   "prompt": "The sound of a person jumping into deep water, one big splash and bubbling water closing over them, close-up, no voices, no talking, no music"
+  },
+  {
+   "id": "swim/out",
+   "kind": "call",
+   "most": 2.0,
+   "prompt": "The sound of a person climbing out of water onto a stony shore, water pouring and dripping off clothes, close-up, no voices, no talking, no music"
+  },
+  {
+   "id": "body/jump",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/body/jump.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "body/land",
+   "kind": "steps",
+   "count": 3,
+   "tail": 300,
+   "prompt": "The sound of a person in leather boots landing on the ground after a jump, about six separate heavy thuds on earth with a short scuff each time, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "body/land-hard",
+   "kind": "call",
+   "most": 1.0,
+   "from": [
+    "from/dunfinity/land_1.ogg"
+   ],
+   "source": "Dunfinity public/sounds (Seed Audio, MIT)"
+  },
+  {
+   "id": "hoof/walk",
+   "kind": "steps",
+   "count": 6,
+   "prompt": "The sound of a single horse walking slowly on a hard dirt road, heavy shod hooves, unhurried four-beat walk, about ten clear separate hoof beats, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "hoof/cobbles",
+   "kind": "steps",
+   "count": 6,
+   "prompt": "The sound of a single horse walking on the cobblestones of an old town street, iron horseshoes clopping on stone with a short echo, about ten clear separate hoof beats, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "hoof/grass",
+   "kind": "steps",
+   "count": 6,
+   "prompt": "The sound of a single horse walking on soft meadow grass, dull heavy thuds of big hooves on turf, about ten clear separate hoof beats, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "hoof/gallop",
+   "kind": "steps",
+   "count": 6,
+   "tail": 250,
+   "prompt": "The sound of a single horse galloping fast past on a dirt track, drumming heavy hooves, about ten clear separate hoof beats, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "horse/snort",
+   "kind": "call",
+   "most": 2.0,
+   "prompt": "The sound of a horse snorting and blowing air through its nostrils once, close-up, no voices, no talking, no music"
+  },
+  {
+   "id": "horse/whinny",
+   "kind": "call",
+   "most": 2.5,
+   "prompt": "The sound of a horse whinnying once, a short neigh in the open countryside, no voices, no talking, no music"
+  },
+  {
+   "id": "bed/wind-soft",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/wind-soft.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/wind-open",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/wind-open.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/wind-high",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/wind-high.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/leaves-broad",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/leaves-broad.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/leaves-conifer",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/leaves-conifer.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/grass",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/grass.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/river-riffle",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/river-riffle.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/river-slow",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/river-slow.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/lake",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/lake.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/falls",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/falls.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/birds-wood",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/birds-wood.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/birds-meadow",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/birds-meadow.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/birds-water",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/birds-water.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/bees",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/bees.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/crickets",
+   "kind": "bed",
+   "from": [
+    "from/solarpolis/bed/crickets.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "call/blackbird",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/call/blackbird.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "call/robin",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/call/robin.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "call/thrush",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/call/thrush.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "call/woodpecker",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/call/woodpecker.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "call/pigeon",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/call/pigeon.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "call/owl",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/call/owl.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "call/lark",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/call/lark.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "call/wren",
+   "kind": "call",
+   "from": [
+    "from/solarpolis/call/wren.mp3"
+   ],
+   "source": "Solarpolis public/sound (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/sea",
+   "kind": "bed",
+   "prompt": "The sound of waves rolling onto a long sandy beach, the slow rhythmic rush and hiss of surf breaking and drawing back, open sea air, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/surf-rocks",
+   "kind": "bed",
+   "prompt": "The sound of heavy sea waves crashing against rocky cliffs below, deep booming surges and spray, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "call/gull",
+   "kind": "call",
+   "most": 3,
+   "prompt": "The sound of a single seagull crying a few times as it flies over a beach, nothing else"
+  },
+  {
+   "id": "bed/night",
+   "kind": "bed",
+   "prompt": "The sound of a calm summer night in open countryside, soft crickets, a gentle breeze in the grass, very quiet and peaceful, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/rain",
+   "kind": "bed",
+   "prompt": "The sound of steady gentle rain falling on grass and leaves in the countryside, soft continuous patter, no thunder, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/rain-heavy",
+   "kind": "bed",
+   "prompt": "The sound of a heavy downpour in the open, dense pounding rain on the ground and trees, water running, gusty wind, no thunder, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/rain-roof",
+   "kind": "bed",
+   "prompt": "The sound of rain drumming on a wooden roof heard from inside a quiet timber house, soft steady patter overhead and a gutter dripping, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/storm-wind",
+   "kind": "bed",
+   "prompt": "The sound of a strong gusting storm wind howling over open hills, roaring gusts rising and falling, no rain, no thunder, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/snow",
+   "kind": "bed",
+   "prompt": "The sound of a cold quiet winter landscape while snow falls, a very soft muffled wind, almost silent, a faint hiss, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/underwater",
+   "kind": "bed",
+   "prompt": "The sound of being under water in a lake, a deep muffled low rumble with soft bubbles and faint gurgles, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "thunder/near",
+   "kind": "call",
+   "count": 2,
+   "most": 7,
+   "prompt": "The sound of a close lightning strike: a sharp loud crack followed by heavy rolling thunder, nothing else"
+  },
+  {
+   "id": "thunder/far",
+   "kind": "call",
+   "most": 8,
+   "prompt": "The sound of distant thunder rumbling long and low far away over hills, nothing else"
+  },
+  {
+   "id": "bed/town-day",
+   "kind": "bed",
+   "prompt": "The sound of a busy medieval market square by day: a murmuring crowd of townsfolk without clear words, a cart's wooden wheels, a distant blacksmith's hammer, chickens, a dog barking once, no cars, no engines, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/town-night",
+   "kind": "bed",
+   "from": [
+    "from/dunfinity/amb_town.ogg"
+   ],
+   "source": "Dunfinity public/sounds (Seed Audio, MIT)"
+  },
+  {
+   "id": "loop/smithy",
+   "kind": "loop",
+   "seconds": 10,
+   "prompt": "The sound of a blacksmith at work at an anvil, rhythmic ringing hammer blows on hot iron, bellows puffing, a hiss of quenching now and then, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "loop/mill",
+   "kind": "loop",
+   "seconds": 10,
+   "prompt": "The sound of a wooden water mill wheel turning slowly, water splashing off its paddles and the creak and knock of the wooden axle, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "call/bell",
+   "kind": "call",
+   "most": 9,
+   "prompt": "The sound of a bronze town bell in a tower ringing slowly four times across rooftops, with a long ringing tail, nothing else"
+  },
+  {
+   "id": "call/dog",
+   "kind": "call",
+   "most": 2,
+   "prompt": "The sound of a dog barking twice in the distance in a small town, nothing else"
+  },
+  {
+   "id": "call/rooster",
+   "kind": "call",
+   "most": 3.5,
+   "prompt": "The sound of a rooster crowing once in the morning on a farm, nothing else"
+  },
+  {
+   "id": "bed/inn",
+   "kind": "bed",
+   "prompt": "The sound of a warm busy tavern in a medieval inn: a low murmur of many people talking without clear words, laughter, wooden mugs knocking on tables, a crackling hearth fire, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/house",
+   "kind": "bed",
+   "from": [
+    "from/dunfinity/amb_cellar.ogg"
+   ],
+   "source": "Dunfinity public/sounds (Seed Audio, MIT)"
+  },
+  {
+   "id": "bed/hearth",
+   "kind": "bed",
+   "prompt": "The sound of a wood fire crackling and popping in a stone hearth inside a quiet room, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/temple",
+   "kind": "bed",
+   "prompt": "The sound of the inside of a large quiet stone hall with a high vault, a soft hushed room tone, faint echoing distant footsteps and a soft breath of air, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/cellar",
+   "kind": "bed",
+   "prompt": "The sound of a deep dark stone cellar underground, a low quiet room tone, a faint draught and now and then a distant drop of water echoing, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "call/drip",
+   "kind": "call",
+   "count": 4,
+   "from": [
+    "from/dunfinity/drip_1.ogg",
+    "from/dunfinity/drip_2.ogg",
+    "from/dunfinity/drip_3.ogg",
+    "from/dunfinity/drip_4.ogg"
+   ],
+   "source": "Dunfinity public/sounds (Seed Audio, MIT)"
+  },
+  {
+   "id": "door/open",
+   "kind": "call",
+   "from": [
+    "from/dunfinity/door_open_1.ogg"
+   ],
+   "source": "Dunfinity public/sounds (Seed Audio, MIT)"
+  },
+  {
+   "id": "door/close",
+   "kind": "call",
+   "from": [
+    "from/dunfinity/door_close_1.ogg"
+   ],
+   "source": "Dunfinity public/sounds (Seed Audio, MIT)"
+  },
+  {
+   "id": "door/heavy",
+   "kind": "call",
+   "most": 2.5,
+   "prompt": "The sound of a heavy old oak door with iron hinges creaking open slowly and an iron latch lifting, close-up, nothing else"
+  },
+  {
+   "id": "hatch/open",
+   "kind": "call",
+   "most": 2.5,
+   "prompt": "The sound of a heavy wooden trapdoor in a floor being pulled open by an iron ring, a creak of old hinges and the thick planks thudding back onto the floor, close-up, nothing else"
+  },
+  {
+   "id": "hatch/close",
+   "kind": "call",
+   "most": 2.0,
+   "prompt": "The sound of a heavy wooden trapdoor falling shut onto a floor, one deep wooden thud and a rattle of an iron ring, close-up, nothing else"
+  },
+  {
+   "id": "ladder/rung",
+   "kind": "call",
+   "count": 3,
+   "from": [
+    "from/dunfinity/ladder_1.ogg",
+    "from/dunfinity/ladder_2.ogg",
+    "from/dunfinity/ladder_3.ogg"
+   ],
+   "source": "Dunfinity public/sounds (Seed Audio, MIT)"
+  },
+  {
+   "id": "ui/open",
+   "kind": "call",
+   "most": 1.6,
+   "prompt": "The sound of an engraved brass instrument case unlatching and swinging open, a small clockwork whirr and a soft magical shimmer, nothing else"
+  },
+  {
+   "id": "ui/close",
+   "kind": "call",
+   "most": 1.2,
+   "prompt": "The sound of a small brass lid closing with a soft click and a fading low magical hum, nothing else"
+  },
+  {
+   "id": "ui/page",
+   "kind": "call",
+   "most": 1.0,
+   "prompt": "The sound of a single thick parchment page of an old book being turned, close-up, nothing else"
+  },
+  {
+   "id": "ui/map",
+   "kind": "call",
+   "most": 1.8,
+   "prompt": "The sound of a large old parchment map being unrolled and smoothed out on a wooden table, close-up, nothing else"
+  },
+  {
+   "id": "ui/quill",
+   "kind": "call",
+   "most": 1.6,
+   "prompt": "The sound of a quill pen scratching a few quick words onto parchment, then a soft bright chime, close-up, nothing else"
+  },
+  {
+   "id": "fight/swing",
+   "kind": "steps",
+   "count": 4,
+   "tail": 300,
+   "prompt": "The sound of a sword being swung fast through the air several times, separate sharp whooshes with pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "fight/hit",
+   "kind": "steps",
+   "count": 4,
+   "tail": 350,
+   "prompt": "The sound of heavy blows striking a body in a fight, several separate dull meaty thuds with pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "fight/block",
+   "kind": "steps",
+   "count": 3,
+   "tail": 450,
+   "prompt": "The sound of a sword blade clashing against a metal shield, several separate ringing clangs with pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "fight/bone",
+   "kind": "steps",
+   "count": 3,
+   "tail": 350,
+   "prompt": "The sound of a mace striking dry old bones, several separate cracking clattering hits with pauses between them, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "fight/hurt",
+   "kind": "call",
+   "count": 1,
+   "most": 1.0,
+   "prompt": "The sound of a man grunting in pain once when struck, a short hard exhale, no words"
+  },
+  {
+   "id": "fight/fall",
+   "kind": "call",
+   "most": 1.8,
+   "prompt": "The sound of a body falling to a stone floor, a heavy thud and a clatter of a dropped weapon, nothing else"
+  },
+  {
+   "id": "fight/coins",
+   "kind": "call",
+   "most": 1.5,
+   "prompt": "The sound of a handful of coins clinking into a leather purse, close-up, nothing else"
+  },
+  {
+   "id": "cry/rat",
+   "kind": "steps",
+   "count": 3,
+   "tail": 500,
+   "prompt": "The sound of a big angry rat squeaking and hissing several times, separate shrill squeals with pauses, close-up, nothing else"
+  },
+  {
+   "id": "cry/spider",
+   "kind": "call",
+   "most": 2,
+   "prompt": "The sound of a giant spider hissing and clicking its mandibles, a dry chittering rattle, close-up, nothing else"
+  },
+  {
+   "id": "cry/goblin",
+   "kind": "steps",
+   "count": 3,
+   "tail": 700,
+   "prompt": "The sound of a small goblin creature snarling and yelping angrily several times, short high raspy growls with pauses, no words"
+  },
+  {
+   "id": "cry/skeleton",
+   "kind": "call",
+   "most": 2,
+   "prompt": "The sound of dry bones rattling and clattering as a skeleton moves, hollow wooden clacks, nothing else"
+  },
+  {
+   "id": "cry/ghoul",
+   "kind": "call",
+   "most": 2.5,
+   "prompt": "The sound of a monstrous ghoul letting out a low wet gurgling growl, deep and menacing, no words"
+  },
+  {
+   "id": "title/bell",
+   "kind": "call",
+   "prompt": "The sound of a single large bronze bell in a town watchtower ringing three slow strokes across a valley, with long reverberating tail",
+   "most": 12
+  },
+  {
+   "id": "title/birds",
+   "kind": "call",
+   "prompt": "The sound of a flock of small birds suddenly taking off from trees, many wings flapping and a few startled chirps",
+   "most": 5
+  },
+  {
+   "id": "title/click",
+   "kind": "call",
+   "prompt": "The sound of a short bright brass click of a metal button being pressed",
+   "most": 0.5
+  },
+  {
+   "id": "title/dive",
+   "kind": "call",
+   "prompt": "The sound of a fast rushing wind whoosh as if diving down through clouds from the sky",
+   "most": 6
+  },
+  {
+   "id": "title/dragon",
+   "kind": "call",
+   "prompt": "The sound of a huge dragon roaring in the distance, then giant leathery wings beating as it flies past overhead",
+   "most": 9
+  },
+  {
+   "id": "title/gear",
+   "kind": "call",
+   "prompt": "The sound of a heavy brass gear mechanism turning and locking into place with a satisfying metallic clunk",
+   "most": 5
+  },
+  {
+   "id": "title/splash",
+   "kind": "call",
+   "prompt": "The sound of a whale breaching the sea surface with a huge splash and water pouring down",
+   "most": 5
+  },
+  {
+   "id": "title/thunder",
+   "kind": "call",
+   "prompt": "The sound of a close lightning strike: sharp crack followed by rolling thunder rumbling away over hills",
+   "most": 10
+  },
+  {
+   "id": "title/ward",
+   "kind": "call",
+   "prompt": "The sound of a soft magical shimmer: a glowing line of light igniting and running like a fuse, crystalline sparkle and low hum",
+   "most": 5
+  },
+  {
+   "id": "title/wind",
+   "kind": "call",
+   "prompt": "The sound of gentle mountain wind blowing over an empty valley before dawn, soft and airy, no other sounds",
+   "most": 16
+  }
+ ],
+ "music": [
+  {
+   "id": "music/title",
+   "kind": "music",
+   "out": "music/title",
+   "from": [
+    "from/title/theme.mp3"
+   ],
+   "source": "MasterWorld title (tools/assets/title.sh)"
+  },
+  {
+   "id": "music/day-1",
+   "kind": "music",
+   "out": "music/day-1",
+   "prompt": "Exploration music for wandering green valleys by day: gentle, wondrous and hopeful, light flowing strings with a pastoral flute melody, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/day-2",
+   "kind": "music",
+   "out": "music/day-2",
+   "prompt": "Exploration music for a long walk over sunny hills and through forests: open and adventurous, a lyrical horn theme over plucked strings and harp, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/day-3",
+   "kind": "music",
+   "out": "music/day-3",
+   "prompt": "Calm exploration music for a quiet afternoon by a river: soft and reflective, oboe and clarinet over warm sustained strings, a little playful, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/dawn",
+   "kind": "music",
+   "out": "music/dawn",
+   "prompt": "Music for sunrise over a misty valley: very slow and tender, a lone solo violin, then soft strings and harp as the light grows, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/night-1",
+   "kind": "music",
+   "out": "music/night-1",
+   "prompt": "Night exploration music under the stars: hushed and mysterious, low strings, celesta and harp, a distant solo horn, sparse and calm, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/night-2",
+   "kind": "music",
+   "out": "music/night-2",
+   "prompt": "Music for walking through a moonlit forest: quiet, dreamy and a little eerie, alto flute and soft choir pads over slow low strings, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/town-1",
+   "kind": "music",
+   "out": "music/town-1",
+   "prompt": "Music for a small medieval market town by day: cheerful and lively folk melody on recorder, lute and fiddle with light hand drum, warm and busy, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/town-2",
+   "kind": "music",
+   "out": "music/town-2",
+   "prompt": "Music for a peaceful small town in the evening: warm and homely, a lute and a soft flute over gentle strings, unhurried, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/inn-1",
+   "kind": "music",
+   "out": "music/inn-1",
+   "prompt": "Tavern music inside a cosy medieval inn: a jolly folk jig on fiddle, lute and tin whistle with a bodhran, merry but not loud, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/inn-2",
+   "kind": "music",
+   "out": "music/inn-2",
+   "prompt": "A slow warm tavern ballad by the fireplace of a medieval inn: lute, hurdy-gurdy and fiddle, gentle and a little wistful, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/cellar-1",
+   "kind": "music",
+   "out": "music/cellar-1",
+   "prompt": "Dungeon exploration music in a dark cellar under a house: tense and quiet, low drones, plucked cello, distant metallic sounds, slow and suspenseful, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/cellar-2",
+   "kind": "music",
+   "out": "music/cellar-2",
+   "prompt": "Music for creeping through ancient underground passages: dark and mysterious, low choir pads, deep brass swells and sparse timpani, uneasy, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/danger",
+   "kind": "music",
+   "out": "music/danger",
+   "prompt": "Tension music when something is near in the dark: low pulsing strings, nervous tremolo, soft taiko heartbeat, rising suspense without a melody, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/fight-1",
+   "kind": "music",
+   "out": "music/fight-1",
+   "prompt": "Battle music for a fierce close fight: driving fast strings, pounding drums and heroic brass stabs, urgent and dangerous, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/fight-2",
+   "kind": "music",
+   "out": "music/fight-2",
+   "prompt": "Combat music against monsters in a dungeon: dark and relentless, low brass, choir shouts without words, heavy percussion and racing strings, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  },
+  {
+   "id": "music/storm",
+   "kind": "music",
+   "out": "music/storm",
+   "prompt": "Music for walking through a storm over the hills: brooding and dramatic, surging low strings, rolling timpani and a sombre horn, then calmer, in the style of a warm classic high-fantasy role-playing game score with solo horn, harp, strings, woodwinds and wordless choir pads, instrumental, no vocals, about two and a half minutes, ends calmly so it can loop."
+  }
+ ]
+}

@@ -42,6 +42,7 @@ import { InteriorVisit } from './app/interiorVisit';
 import { InteriorView } from './render/town/InteriorView';
 import { lookFromDegrees } from './app/look';
 import { Sound } from './app/sound';
+import { SoundDirector } from './app/soundDirector';
 import { Title } from './app/title/title';
 import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
@@ -142,7 +143,17 @@ export async function start(b: Boot): Promise<void> {
     player.goTo(params.pos ?? [home.x, home.z], params.look);
     // Dialogs (and the title) hold the game's keys and mouse while open.
     let open = 0;
-    const paused = (on: boolean) => { open = Math.max(0, open + (on ? 1 : -1)); player.pause(open > 0); };
+    // The game's sound (set once the world stands): a dialog's sound, and the music steps back while it is open.
+    let sounds: SoundDirector | null = null;
+    let opening = 'ui/open';
+    const paused = (on: boolean) => {
+      const was = open;
+      open = Math.max(0, open + (on ? 1 : -1));
+      player.pause(open > 0);
+      if ((was > 0) !== (open > 0)) sounds?.dialogSound(open > 0, opening);
+    };
+    // A dialog with a sound of its own as it opens (the journal's page, the map unrolled).
+    const pausedWith = (sound: string) => (on: boolean) => { opening = sound; paused(on); opening = 'ui/open'; };
     // What New game leads to once the dive lands (set once the hero exists: character creation).
     let onBegin: ((people: People['id'] | null) => void) | null = null;
     if (title) {
@@ -339,15 +350,28 @@ export async function start(b: Boot): Promise<void> {
     // Talk and the journal (their Escape comes before the settings' too). The townsfolk know of the
     // promised cellar; what the player hears goes into the journal.
     const journal = new Journal(save?.journal);
-    const keys = { paused, get bindings() { return settings.current.bindings; } };
+    sounds = new SoundDirector({
+      engine: sound.engine, seed, camera: view.camera, walker: player.walker, terrain, town: town ?? null,
+      water: (x, z) => sea.waterAt(x, z),
+      waterLevel: (x, z) => world.waterLevel(x, z),
+      weather: () => wx.shown,
+      hour: () => view.sky.hour,
+      flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
+      where: () => (visit?.inside ? { place: 'cellar', room: null } : rooms?.inside && town ? { place: 'room', room: town.plan.buildings[rooms.building]?.kind ?? null } : { place: 'land', room: null }),
+      inFlight: () => player.flying,
+      horses: () => player.steeds,
+      riding: () => player.riding,
+      threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
+      titleHolds: () => !!title?.holding || !!creator?.showing,
+    });
     const townWords = town && life ? townTalk(seed, setting, town, life.agents.map((a) => a.person), opened.log, save?.talk ?? undefined).talk : null;
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
       get away() { return player.flying || !!visit?.inside; },
-      heard: (lead) => notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6),
+      heard: (lead) => (sounds?.noted(), notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6)),
     }) : null;
-    const journalUi = new JournalUi(journal, keys);
+    const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -355,7 +379,7 @@ export async function start(b: Boot): Promise<void> {
       drank: (n) => { if (n > 0) fightHud.healed(); },
     });
     const map = town ? new MapUi(town.plan, journal, {
-      paused,
+      paused: pausedWith('ui/map'),
       get bindings() { return settings.current.bindings; },
       height: (x, z) => terrain.height(x, z),
       water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
@@ -416,6 +440,7 @@ export async function start(b: Boot): Promise<void> {
       still: (on) => paused(on),
       armed: armHero,
     }, !!(promise && save?.cellars[promise.id]?.paid)) : null;
+    if (fight && sounds) { const s = sounds; fight.onCue = (c) => s.cue(c); }
     const saves = new SavesUi(savesHost);
     const autosave = () => void saveNow(savesHost, AUTOSAVE);
     if (visit) visit.onSwap = autosave;
@@ -455,7 +480,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound, life },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound, get sounds() { return sounds; }, life },
     });
     b.menus.menu = new Menu(settings, {
       paused,
@@ -498,6 +523,7 @@ export async function start(b: Boot): Promise<void> {
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
       creator?.orbit(dt);
+      sounds?.hearTick(dt);
       if (!rooms?.inside) visit?.update(dt);
       if (!visit?.inside) rooms?.update(dt);
       talk?.watch();
@@ -522,7 +548,7 @@ export async function start(b: Boot): Promise<void> {
       view.renderer.render(view.scene, view.camera);
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }
