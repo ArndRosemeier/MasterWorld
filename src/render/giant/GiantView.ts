@@ -1,6 +1,6 @@
 /**
  * The title's giant (plan D46, the rumour of a giant on the far hills): an Actors giantkin, grown to
- * TALL metres, walking slowly over the land beyond the town in some fly-overs. Built behind the title's
+ * TALL metres (over the treetops), walking slowly past the town in some fly-overs. Built behind the title's
  * still and compiled before it shows (preparePeople), so it costs no shader on the render path.
  */
 import { Group, type WebGPURenderer } from 'three/webgpu';
@@ -12,7 +12,7 @@ import { castShadows } from '../hero/play';
 
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
 /** How tall the giant stands (m). */
-export const TALL = 14;
+export const TALL = 30;
 
 /** A shaggy hill giant in undyed wool and a mossy mantle, barefoot. */
 const LOOK: CharacterPatch = {

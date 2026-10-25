@@ -20,7 +20,7 @@ export interface TitleDraw {
   readonly angle: number;
   /** The painted still mirrored (more variety from three pictures). */
   readonly mirror: boolean;
-  /** A giant strides over the far hills in this fly-over (now and then; the rumour is true). */
+  /** A giant strides past the town in this fly-over (now and then; the rumour is true). */
   readonly giant: boolean;
 }
 

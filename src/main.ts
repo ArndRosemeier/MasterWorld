@@ -219,7 +219,7 @@ export async function start(b: Boot): Promise<void> {
     player.walker.height = hero.height;
     hero.onLook(() => { player.walker.height = hero.height; });
     player.hero = hero;
-    // Now and then a giant walks the far hills while the title flies (compiled before it shows).
+    // Now and then a giant walks past the town while the title flies (compiled before it shows).
     let giant: { view: GiantView; t: number } | null = null;
     let giantReady: Promise<void> | null = null;
     if ((title?.draw.giant || params.giant) && title && !title.calm && orbit) {

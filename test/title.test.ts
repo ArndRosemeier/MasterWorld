@@ -66,7 +66,7 @@ test('title: the dive starts at the orbit and lands exactly behind the hero', ()
   assert.ok(DIVE_SECONDS > 2 && DIVE_SECONDS < 6);
 });
 
-test('title: the giant comes now and then, and paces the far land on the ground', () => {
+test('title: the giant comes now and then, and paces the land by the town on the ground', () => {
   const many = Array.from({ length: 200 }, (_, i) => drawTitle(titleSeed('2026-10-25', i)).giant);
   const share = many.filter(Boolean).length / many.length;
   assert.ok(share > 0.15 && share < 0.45, `giant in ${share} of the titles`);
@@ -75,7 +75,7 @@ test('title: the giant comes now and then, and paces the far land on the ground'
   for (let t = 0.5; t < 400; t += 0.5) {
     const p = giantPose(o, 9, t);
     const far = Math.hypot(p.x - 100, p.z + 50);
-    assert.ok(far > 200 && far < 500, `out on the far land (${far} m)`);
+    assert.ok(far > 100 && far < 300, `near the town (${far} m)`);
     assert.equal(p.y, o.ground(p.x, p.z));
     const step = Math.hypot(p.x - last.x, p.z - last.z);
     assert.ok(step <= GIANT_SPEED * 0.5 + 1e-6, `walks, does not jump (${step} m)`);
