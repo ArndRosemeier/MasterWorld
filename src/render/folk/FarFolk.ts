@@ -17,9 +17,9 @@ const MAX = 120;
 /** Standing height by people (m), as Actors draws them roughly. */
 const TALL: Record<Race, number> = { human: 1.72, elf: 1.8, dwarf: 1.3, halfling: 1.1 };
 
-/** A robed figure 1 m tall: hem, waist, shoulders, neck, head. */
+/** A robed figure 1 m tall and as slim as a person: hem, waist, chest, shoulders, neck, head. */
 function figure(): BufferGeometry {
-  const p = [[0, 0], [0.15, 0], [0.16, 0.05], [0.11, 0.55], [0.13, 0.78], [0.08, 0.84], [0.035, 0.86], [0.06, 0.9], [0.055, 0.97], [0, 1]];
+  const p = [[0, 0], [0.11, 0], [0.115, 0.04], [0.09, 0.45], [0.08, 0.55], [0.1, 0.7], [0.12, 0.8], [0.09, 0.83], [0.03, 0.85], [0.055, 0.89], [0.05, 0.96], [0, 1]];
   const g = new LatheGeometry(p.map(([r, y]) => new Vector2(r, y)), 7);
   g.deleteAttribute('uv'); // the kind's attributes: position and normal
   return g;
@@ -51,7 +51,7 @@ export class FarFolk {
     for (let i = 0; i < n; i++) {
       const a = who[i], p = a.person, s = TALL[p.race] * (0.94 + 0.12 * ((p.id * 0.618) % 1));
       this.q.setFromAxisAngle(this.up, Math.PI / 2 - a.dir);
-      this.m.compose(this.at.set(a.x, height(a.x, a.z), a.z), this.q, this.size.set(s * (p.race === 'dwarf' ? 1.25 : 1), s, s));
+      this.m.compose(this.at.set(a.x, height(a.x, a.z), a.z), this.q, this.size.set(s * (p.race === 'dwarf' ? 1.2 : 0.9), s, s * (p.race === 'dwarf' ? 1 : 0.75)));
       this.mesh.setMatrixAt(i, this.m);
       this.mesh.setColorAt(i, this.colorOf(a));
     }
