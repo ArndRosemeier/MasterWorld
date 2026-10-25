@@ -97,7 +97,7 @@ export class FolkView {
       for (let k = i > 0 ? 0 : 1; k < ch.lods.length; k++) {
         ch.setLod(k);
         this.adapt(place);
-        await this.stage.prepare(place);
+        await this.stage.prepare(place, { everyCaster: true });
       }
     }
     ch.setLod(0);
@@ -167,7 +167,8 @@ export class FolkView {
         // pass is warmed only for objects not yet in the scene).
         s.place.removeFromParent();
         s.place.visible = true;
-        await this.stage.prepare(s.place);
+        // Every caster: a character's shadow shaders are its own (its shape, its garments' fitting).
+        await this.stage.prepare(s.place, { everyCaster: true });
         if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
         this.stage.scene.add(s.place);
         s.ready = true;
@@ -177,20 +178,14 @@ export class FolkView {
   }
 
   /**
-   * Fits a character's meshes to the game (once per mesh and material; garments are made lazily):
-   * - Actors draws clothes over the skin, and each garment layer over the one below, by polygon offsets
-   *   toward the camera (negative). With reversed depth (view.ts) a negative offset pushes away: the
-   *   skin and underclothes showed through in patches. Flipped once per material.
-   * - Shadows come from the body alone (and the crowd level's one mesh): each garment and hairstyle
-   *   cast with a shadow shader of its own, built while playing (against the shader policy), and
-   *   the body's silhouette is nearly the same.
+   * Actors draws clothes over the skin, and each garment layer over the one below, by polygon offsets
+   * toward the camera (negative). With reversed depth (view.ts) a negative offset pushes away: the skin
+   * and underclothes showed through in patches. Flipped once per material (garments are made lazily).
    */
   private adapt(o: Object3D): void {
     o.traverse((m) => {
       const mesh = m as Mesh;
-      if (!mesh.isMesh) return;
-      if (!/^(body|crowd)/.test(mesh.name)) mesh.castShadow = false;
-      if (!this.reversed) return;
+      if (!mesh.isMesh || !this.reversed) return;
       for (const x of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as Material[]) {
         if (!x.polygonOffset || x.userData.offsetReversed) continue;
         x.polygonOffsetFactor = -x.polygonOffsetFactor;
