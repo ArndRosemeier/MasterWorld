@@ -265,7 +265,7 @@ async function start(): Promise<void> {
         // In a room: saved as standing at its door outside (rooms are built when entered).
         const w = rooms?.outside ?? player.walker.pos;
         const data: SaveData = {
-          version: SAVE_VERSION, game: release.version, setting: { id: setting.id, version: setting.version }, seed: seedText, log,
+          version: SAVE_VERSION, game: release.version, setting: { id: setting.id, version: setting.version }, seed: seedText, log: opened.log,
           clock: { day: view.sky.day, hour: view.sky.hour },
           hero: { x: w.x, y: w.y, z: w.z, yaw: rooms?.outside?.yaw ?? player.walker.yaw, below: !!visit?.inside },
           cellars: visit && promise ? { [promise.id]: visit.diff } : {},
