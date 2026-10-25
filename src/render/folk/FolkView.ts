@@ -95,14 +95,27 @@ export class FolkView {
     const place = this.slots[0].place;
     place.removeFromParent();
     const looks = coveringLooks(this.life.agents.map((a) => a.person));
+    // TEMP timing (title load investigation): what the townsfolk warm-up spends its time on.
+    const T = () => performance.now();
+    let meshes = 0;
     for (let i = 0; i < looks.length; i++) {
+      const t0 = T();
       if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
+      const t1 = T();
+      const lodMs: string[] = [];
       for (let k = i > 0 ? 0 : 1; k < ch.lods.length; k++) {
         ch.setLod(k);
         this.adapt(place);
+        let n = 0;
+        place.traverse((o) => { if ((o as { isMesh?: boolean }).isMesh && o.castShadow) n++; });
+        meshes += n;
+        const t2 = T();
         await this.stage.prepare(place, { everyCaster: true });
+        lodMs.push(`lod${k}:${n}c/${(T() - t2).toFixed(0)}ms`);
       }
+      console.info(`[folkwarm] look ${i + 1}/${looks.length}: dress ${(t1 - t0).toFixed(0)} ms, ${lodMs.join(' ')}`);
     }
+    console.info(`[folkwarm] ${looks.length} looks, ${ch.lods.length} lods, ${meshes} casters drawn`);
     ch.setLod(0);
     this.slots[0].place.visible = false;
     this.stage.scene.add(this.far.mesh);
