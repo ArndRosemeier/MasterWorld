@@ -34,6 +34,8 @@ export const params = {
   town: q.get('town') !== '0',
   /** How many townsfolk are drawn at most (`folk=0`: none). */
   folk: Number(q.get('folk') ?? 30),
+  /** How many of the farms' grazing animals are drawn at most, the nearest (`stock=0`: none). */
+  stock: Number(q.get('stock') ?? 6),
   /** How many saddled horses wait near the start (`horses=0`: none). */
   horses: Number(q.get('horses') ?? 2),
   /** Start in the saddle of the first horse (`ride`). */

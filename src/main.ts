@@ -12,6 +12,8 @@ import { Trunks } from './world/trunks';
 import { HeroView } from './render/hero/HeroView';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
+import { StockView } from './render/livestock/StockView';
+import { Herds } from './sim/livestock';
 import { Steed, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import { TownLife, type TownOrder } from './sim/townLife';
@@ -24,11 +26,11 @@ import { FloraView } from './render/flora/FloraView';
 import { GrassView } from './render/grass/GrassView';
 import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
-import { useTownGround, useTownTextures } from './render/materials/townGround';
+import { useFieldGround, useTownGround, useTownTextures } from './render/materials/townGround';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
-import { distSqPointSeg } from '@futuremagic/settlement';
+import { CROPS, distSqPointSeg } from '@futuremagic/settlement';
 import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { ordersOf, townOrder } from './vgm/orders';
@@ -36,7 +38,7 @@ import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
-import { TOWN_RASTER } from './world/town';
+import { TOWN_RASTER, TownGround } from './world/town';
 import { outlineCellar } from './world/dungeon/cellar';
 import { firstDungeon, houseOf } from './vgm/dungeons';
 import { CellarView } from './render/dungeon/CellarView';
@@ -188,6 +190,11 @@ export async function start(b: Boot): Promise<void> {
       // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
       useTownTextures(await loadTownTextures(texPool));
       useTownGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER));
+      useFieldGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => {
+        const x = town.x0 + (i + 0.5) * TOWN_RASTER, z = town.z0 + (j + 0.5) * TOWN_RASTER;
+        const f = town.fieldAt(x, z), path = town.groundAt(x, z) === TownGround.Path;
+        return f || path ? { path, crop: f ? CROPS.indexOf(f.crop) : -1, rows: f?.rows ?? 0 } : null;
+      });
     }
     texPool.dispose();
 
@@ -244,6 +251,13 @@ export async function start(b: Boot): Promise<void> {
       player.horses = horses;
       if (params.ride && player.steeds[0]) player.mount(player.steeds[0]);
     }
+    // The farms' animals in their paddocks (the setting says which; horses until Actors has cattle).
+    const herds = town && town.plan.paddocks.length ? new Herds(town.plan, seed) : null;
+    let stock: StockView | null = null;
+    if (herds && params.stock > 0) {
+      loading.set('Turning out the horses');
+      stock = await StockView.forHerds(view.renderer, setting.world.livestock, herds, params.stock, (x, z) => terrain.height(x, z));
+    }
     let folk: FolkView | null = null;
     if (life && params.folk > 0) {
       loading.set('Waking the town');
@@ -257,7 +271,7 @@ export async function start(b: Boot): Promise<void> {
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(folk ? await folk.warmObjects() : [])]);
+    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(folk ? await folk.warmObjects() : [])]);
     // While the loading screen (or the title's painted still) still covers the view, the land, trees and
     // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
     const capShare = view.stage.cap.share;
@@ -278,6 +292,7 @@ export async function start(b: Boot): Promise<void> {
     if (grass) await view.stage.add(grass.group);
     await view.stage.add(hero.object);
     await horses?.show(view.stage);
+    await stock?.enter(view.stage);
     await view.stage.add(wx.precip);
 
     const notes = new Notes();
@@ -567,6 +582,8 @@ export async function start(b: Boot): Promise<void> {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });
       }
+      herds?.step(dt);
+      stock?.herd(dt, view.camera.position);
       if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
       folk?.follow(dt, view.camera);
       if (boot.trees) flora.update(dt, view.camera);

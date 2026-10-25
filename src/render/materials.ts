@@ -7,11 +7,11 @@
  * vertex attributes or uniforms, never into a new material.
  */
 import { DoubleSide, Mesh, MeshPhysicalNodeMaterial, Vector2, type BufferGeometry, type Material } from 'three/webgpu';
-import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
+import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, sin, cos, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import { TOWN_GROUND_LAYER, TOWN_TILE_METERS, type GroundTextures } from './terrain/groundTextures';
-import { TOWN_GROUND, townTextures } from './materials/townGround';
+import { CROP_LOOK, CROP_STEP, FIELD_GROUND, TOWN_GROUND, townTextures } from './materials/townGround';
 import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
 import { WEATHER, rainRings } from './materials/weather';
@@ -160,6 +160,36 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
     col = mix(col, g.a.rgb.mul(float(tone).add(mid.mul(0.12))), b); rough = mix(rough, g.a.a, b); ao = mix(ao, g.n.a, b);
     pert = mix(pert, vec3(tn(g.n).x, 0, tn(g.n).y), b); h = mix(h, g.n.b, b);
   }
+
+  // The farmland (materials/townGround.ts FIELD_GROUND): earth tracks, then each field's crop from above,
+  // in rows along its run: corn closes over the soil, cabbages and beans stand in lines on ridges,
+  // ploughed land is all furrows. The rows fade out with distance (they would only shimmer).
+  const fg = texture(FIELD_GROUND.mask).sample(p.xz.sub(FIELD_GROUND.origin).div(FIELD_GROUND.size));
+  const earth = tl(TOWN_GROUND_LAYER.dirt, 1);
+  {
+    const tb = hblend(clamp(fg.r.add(ragged.mul(fg.r.mul(float(1).sub(fg.r)).mul(4))), 0, 1), earth.n.b.sub(h), 2).mul(0.9);
+    col = mix(col, earth.a.rgb.mul(float(0.95).add(mid.mul(0.12))), tb); rough = mix(rough, earth.a.a, tb); ao = mix(ao, earth.n.a, tb);
+    pert = mix(pert, vec3(tn(earth.n).x, 0, tn(earth.n).y), tb);
+  }
+  const cropU = fg.b.mul(255 / CROP_STEP).round().add(0.5).div(CROP_LOOK.count);
+  const look = texture(CROP_LOOK.texture).sample(vec2(cropU, 0.25)), shape = texture(CROP_LOOK.texture).sample(vec2(cropU, 0.75));
+  const ang = fg.a.mul(Math.PI), across = vec2(sin(ang).negate(), cos(ang));
+  const spacing = max(shape.r.mul(2), 0.1);
+  const cAcross = dot(p.xz, across).div(spacing), cAlong = dot(p.xz, vec2(cos(ang), sin(ang))).div(spacing);
+  const camD = length(cameraPosition.sub(p));
+  const rowsSeen = shape.a.mul(float(1).sub(smoothstep(25, 110, camD)));
+  const wave = sin(cAcross.mul(Math.PI * 2));
+  // Plants on the ridges: a line, or clumps along it.
+  const ridge = smoothstep(0.1, 0.8, wave);
+  const clump = mix(float(1), smoothstep(0.2, 0.7, sin(cAlong.mul(Math.PI * 2).add(fine.mul(1.5)))), shape.g);
+  const plants = mix(look.a, ridge.mul(clump).mul(look.a.mul(1.6).min(1)), rowsSeen).add(look.a.mul(float(1).sub(look.a)).mul(fine.mul(0.5))).clamp(0, 1);
+  const cropCol = pow(look.rgb, vec3(2.2)).mul(float(0.9).add(mid.mul(0.25)).add(fine.mul(0.08)));
+  const soilCol = earth.a.rgb.mul(mix(float(1), float(0.7).add(wave.mul(0.3)), shape.b.mul(rowsSeen.max(0.3)))).mul(0.8);
+  const fieldT = hblend(clamp(fg.g.add(ragged.mul(fg.g.mul(float(1).sub(fg.g)).mul(4))), 0, 1), earth.n.b.sub(h), 2);
+  col = mix(col, mix(soilCol, cropCol, plants), fieldT);
+  rough = mix(rough, float(0.95), fieldT);
+  // Furrows: the ground's normal tilts across the rows.
+  pert = mix(pert, vec3(across.x, 0, across.y).mul(cos(cAcross.mul(Math.PI * 2)).mul(shape.b).mul(rowsSeen).mul(0.5)).add(vec3(tn(earth.n).x, 0, tn(earth.n).y).mul(float(1).sub(plants))), fieldT);
 
   // Rock: triplanar, strata on the side faces, weathered rock on top.
   const bw0 = pow(abs(n), vec3(4));

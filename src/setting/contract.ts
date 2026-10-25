@@ -105,7 +105,12 @@ export interface WorldShape {
   readonly biomes: readonly BiomeDef[];
   /** The weather's climate. */
   readonly weather: WeatherDef;
+  /** What grazes the farms' paddocks (the game draws each kind its own way; only horses exist yet). */
+  readonly livestock: LivestockKind;
 }
+
+/** Farm animals the game can draw. Cattle, sheep and pigs join when Actors has them. */
+export type LivestockKind = 'horse';
 
 export interface StartSpec {
   /** Biome ids the start town may lie in, in order of preference. */

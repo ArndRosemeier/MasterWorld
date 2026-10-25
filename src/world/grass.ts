@@ -8,7 +8,18 @@ import { Noise, deriveSeed, lerp, smoothstep } from '@futuremagic/core';
 import { coverNoise, woodsAt } from './flora';
 import type { MaskJob } from './water';
 import type { Terrain } from './terrain';
+import type { CropKind } from '@futuremagic/settlement';
 import { TownGround } from './town';
+
+/** Town ground where no grass grows: streets, the market, under buildings, tracks. */
+const BARE = new Set<number>([TownGround.Street, TownGround.Market, TownGround.Building, TownGround.Path]);
+
+/** The blades of each crop: density, height (m), dryness. Zero density: the ground's own look shows (rows, furrows). */
+const CROP_GRASS: Readonly<Record<CropKind, [number, number, number]>> = {
+  wheat: [1, 0.95, 0.95], rye: [1, 1.15, 0.85], barley: [1, 0.75, 0.8], oats: [0.95, 0.85, 0.65],
+  flax: [0.9, 0.7, 0.12], beans: [0, 0, 0], cabbage: [0, 0, 0], ploughed: [0, 0, 0],
+  fallow: [0.75, 0.35, 0.45], meadow: [1, 0.6, 0.3], pasture: [0.95, 0.14, 0.25],
+};
 
 /** Biome grass is read on a world-aligned lattice this far apart (m) and blended between. */
 const LATTICE = 16;
@@ -60,6 +71,19 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
   for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
     const p = j * res + i, x = x0 + (i + 0.5) * step, z = z0 + (j + 0.5) * step, h = gh(i, j);
     out[p * 4] = h;
+    const built = t.townGround(x, z);
+    if (built === TownGround.Field) {
+      // A field grows its crop (tall corn, short pasture) or nothing the blades could show (rows, furrows).
+      const f = t.fieldAt(x, z), c = f ? CROP_GRASS[f.crop] : null;
+      if (c && c[0] > 0) {
+        const n = patch.fbm2(x / 5, z / 5, 2);
+        out[p * 4 + 1] = c[0] * smoothstep(-0.8, -0.2, n);
+        out[p * 4 + 2] = c[1] * (0.9 + 0.2 * n);
+        out[p * 4 + 3] = c[2];
+      }
+      continue;
+    }
+    if (BARE.has(built)) continue;
     let dens = at(x, z, 0);
     if (dens <= 0) continue;
     // Patches: meadows and bare spots a few metres across, and thicker and thinner stretches.
@@ -70,7 +94,7 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
     const slope = Math.hypot(hx, hz) / (2 * step);
     dens *= 1 - smoothstep(0.42, 0.68, slope);
     dens *= smoothstep(2.3, 4.2, h) * (1 - smoothstep(SNOW - 150, SNOW + 100, h));
-    if (dens <= 0.01 || t.rockAt(x, z, h) || t.townGround(x, z) >= TownGround.Street) continue;
+    if (dens <= 0.01 || t.rockAt(x, z, h)) continue;
     // Not in water; reeds-to-be along the banks keep their place.
     t.clearOfWater(x, z, h, w);
     dens *= smoothstep(0.3, 1.5, w.river) * smoothstep(0.1, 0.6, w.lake);

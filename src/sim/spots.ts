@@ -3,14 +3,16 @@
  * (an anvil, a well, a bench ...) and each building's door becomes a spot; a spot says what can be done
  * there, by whom, for how long and by how many at once. Pure.
  */
-import type { Fixture, FixtureKind, TownPlan } from '@futuremagic/settlement';
+import { pointInPoly, type CropKind, type Fixture, type FixtureKind, type TownPlan } from '@futuremagic/settlement';
 
 /** What a person is doing (the renderer picks an animation by it). */
 export type ActivityKind =
   | 'sleep' | 'indoors' | 'walk' | 'wait' | 'away'
   | 'smith' | 'stoke' | 'quench' | 'bake' | 'craft' | 'sell' | 'serve' | 'tend'
   | 'fetchWater' | 'fetchWood' | 'chop' | 'garden' | 'washing' | 'feedHens'
-  | 'browse' | 'sit' | 'chat' | 'drink' | 'pray' | 'mourn' | 'play' | 'stroll' | 'gather';
+  | 'browse' | 'sit' | 'chat' | 'drink' | 'pray' | 'mourn' | 'play' | 'stroll' | 'gather'
+  /** Farm work: in the fields by what grows there, with the animals in the paddock, hay and dung in the stable. */
+  | 'plough' | 'sow' | 'hoe' | 'reap' | 'tendHorses' | 'muckOut';
 
 /** Who may use a spot: its building's workers, its household, the market's traders, or anyone. */
 export type SpotUse = 'work' | 'home' | 'trade' | 'any';
@@ -46,6 +48,16 @@ export const SPOT_DEFS: Readonly<Record<FixtureKind, SpotDef>> = {
   chickens: { activity: 'feedHens', use: 'home', cap: 1, secs: [20, 45], outside: true },
   grave: { activity: 'mourn', use: 'any', cap: 1, secs: [30, 70], outside: true },
   offering: { activity: 'pray', use: 'any', cap: 3, secs: [25, 60], outside: true },
+  // A field's activity follows its crop (fieldWork); 'reap' is only the default.
+  field: { activity: 'reap', use: 'work', cap: 2, secs: [120, 300], outside: true },
+  paddock: { activity: 'tendHorses', use: 'work', cap: 1, secs: [40, 100], outside: true },
+  hayrack: { activity: 'muckOut', use: 'work', cap: 1, secs: [40, 110], outside: true },
+};
+
+/** The work a field asks for, by what grows there (the season is not modelled yet: a late summer's mix). */
+export const FIELD_WORK: Readonly<Record<CropKind, ActivityKind>> = {
+  wheat: 'reap', rye: 'reap', barley: 'reap', oats: 'reap', beans: 'hoe', flax: 'hoe', cabbage: 'hoe',
+  ploughed: 'sow', fallow: 'plough', meadow: 'reap', pasture: 'tendHorses',
 };
 
 export interface Spot {
@@ -83,7 +95,12 @@ export function seatAt(s: Spot, seat: number): [number, number] {
 export function townSpots(plan: TownPlan): Spot[] {
   const out: Spot[] = [];
   for (const f of plan.fixtures) {
-    out.push(fixtureSpot(out.length, f));
+    const s = fixtureSpot(out.length, f);
+    if (f.kind === 'field') {
+      const field = plan.fields.find((x) => x.paddock < 0 && pointInPoly(x.poly, f.x, f.z));
+      if (field) s.activity = FIELD_WORK[field.crop];
+    }
+    out.push(s);
     // A stall also has its seller, behind it, facing the market.
     if (f.kind === 'stall') out.push({ id: out.length, activity: 'sell', use: 'trade', cap: 1, secs: [90, 300], outside: true, x: f.x - Math.cos(f.yaw) * 0.9, z: f.z - Math.sin(f.yaw) * 0.9, dir: f.yaw, building: -1, door: false, users: 0 });
   }

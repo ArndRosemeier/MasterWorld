@@ -54,5 +54,13 @@
   {
     "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/setting/contract.ts",
     "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/world/volumes.ts",
+    "reason": "Stepping a point along a heading (x += cos(a) * d, z += sin(a) * d) in three unrelated places (title toys, grazing animals, the arch's feet); a two-line idiom, not a copied helper."
+  },
+  {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/livestock.ts#step",
+    "reason": "Each world-simulation behaviour advances by step(dt): dungeon creatures (sight, packs, fights) and grazing farm animals (wander in a paddock) share only the name."
   }
 ]
