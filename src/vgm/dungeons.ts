@@ -38,3 +38,9 @@ export function houseOf(d: DungeonDecision, towns: readonly Town[]): TownBuildin
   const town = towns.find((t) => t.decision.id === d.town);
   return town?.plan.buildings.find((b) => b.id === d.building) ?? null;
 }
+
+/** The first dungeon promised in the log, if any. */
+export function firstDungeon(log: DecisionLog): DungeonDecision | null {
+  for (const d of log) if (d.kind === 'dungeon') return d;
+  return null;
+}

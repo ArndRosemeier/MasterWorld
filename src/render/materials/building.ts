@@ -5,9 +5,10 @@
  * layer of the town texture array; `tint` (sRGB) colours it: lime washes, timber stains, glass. Texture
  * coordinates are in metres and scaled per layer. Rain darkens and wets the walls and roofs.
  */
-import { MeshPhysicalNodeMaterial } from 'three/webgpu';
+import { BufferAttribute, BufferGeometry, MeshPhysicalNodeMaterial, type Mesh } from 'three/webgpu';
+import type { BuildingMesh } from '@futuremagic/settlement';
 import { attribute, float, int, mix, normalMap, pow, round, texture, uniformArray, vec3 } from 'three/tsl';
-import { defineKind } from '../materials';
+import { defineKind, kindMesh } from '../materials';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 import { townTextures } from './townGround';
 import { WEATHER } from './weather';
@@ -30,3 +31,19 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   m.normalNode = normalMap(vec3(n.xy, z.mul(0.5).add(0.5)));
   return m;
 });
+
+/** A mesh in the building format (@futuremagic/settlement) as a three mesh with the building shader, at (x, y, z). */
+export function buildingMeshAt(m: BuildingMesh, x: number, y: number, z: number, name: string): Mesh {
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(m.position, 3));
+  g.setAttribute('normal', new BufferAttribute(m.normal, 3));
+  g.setAttribute('uv', new BufferAttribute(m.uv, 2));
+  // Floats: WebGPU has no 1- or 3-byte vertex formats.
+  g.setAttribute('mat', new BufferAttribute(Float32Array.from(m.mat), 1));
+  g.setAttribute('tint', new BufferAttribute(Float32Array.from(m.tint, (v) => v / 255), 3));
+  g.setIndex(new BufferAttribute(m.index, 1));
+  g.computeBoundingSphere();
+  const mesh = kindMesh(g, BUILDING, x, y, z);
+  mesh.name = name;
+  return mesh;
+}

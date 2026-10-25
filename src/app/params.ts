@@ -31,6 +31,9 @@ export const params = {
   folk: Number(q.get('folk') ?? 16),
   /** Weather everywhere, all the time (a VGM order): clear, fair, overcast, rain, storm, fog, snow. */
   weather: q.get('weather'),
+  /** Start in the town's cellar: `cellar` at the ladder, `cellar=3` in room 3. */
+  cellar: q.has('cellar'),
+  cellarRoom: q.get('cellar') ? Number(q.get('cellar')) : undefined,
   /** Setting module id. */
   setting: q.get('setting') ?? 'classic',
 };

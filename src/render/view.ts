@@ -1,7 +1,7 @@
 /**
  * The view: the one renderer, scene, camera and Stage. Everything visible enters through `view.stage.add`.
  */
-import { PerspectiveCamera, PCFSoftShadowMap, Scene, DirectionalLight, HemisphereLight, type WebGPURenderer } from 'three/webgpu';
+import { PerspectiveCamera, PCFSoftShadowMap, Scene, DirectionalLight, HemisphereLight, PointLight, type WebGPURenderer } from 'three/webgpu';
 import { SkyView } from './sky';
 import { Stage, createRenderer } from '@futuremagic/stage';
 import { Float32BufferAttribute, type BufferGeometry } from 'three/webgpu';
@@ -14,6 +14,8 @@ export interface View {
   readonly camera: PerspectiveCamera;
   readonly stage: Stage;
   readonly sun: DirectionalLight;
+  /** The hero's lantern: dark below ground (off, intensity 0, above it). */
+  readonly lantern: PointLight;
   readonly sky: SkyView;
 }
 
@@ -29,7 +31,10 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   // Lights are fixed before the warm-up: their number and order are part of every shader's key.
   const sun = new DirectionalLight(0xfff0d8, 4.2);
   const hemi = new HemisphereLight(0xbcd6f0, 0x5a5040, 1.4);
-  scene.add(sun, sun.target, hemi);
+  // The lantern is always in the scene (lights are part of every shader's key), dark until needed.
+  const lantern = new PointLight(0xffc27a, 0, 14, 1.6);
+  lantern.castShadow = false;
+  scene.add(sun, sun.target, hemi, lantern);
   // Sky, fog, environment map and the sun's shadow (all part of shader keys) before the Stage warms up.
   const sky = new SkyView(renderer, scene, sun, hemi, opts);
   const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute });
@@ -42,7 +47,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   fit();
   window.addEventListener('resize', fit);
   stage.shadowCamera = sun.shadow.camera;
-  return { renderer, backend, scene, camera, stage, sun, sky };
+  return { renderer, backend, scene, camera, stage, sun, lantern, sky };
 }
 
 /** Our own vertex attributes on the Stage's warm-up stand-ins (same size as on real meshes). */

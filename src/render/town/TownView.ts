@@ -3,12 +3,11 @@
  * far: the far one (no frames, shutters or sills) takes over past FAR metres. Drawn with the building
  * shader (materials/building.ts).
  */
-import { BufferAttribute, BufferGeometry, Group, type Mesh, type Vector3 } from 'three/webgpu';
+import { Group, type Mesh, type Vector3 } from 'three/webgpu';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import type { Stage } from '@futuremagic/stage';
 import type { TerrainJobs } from '../../workers/pool';
-import { BUILDING } from '../materials/building';
-import { kindMesh } from '../materials';
+import { buildingMeshAt } from '../materials/building';
 
 /** From this far (m, camera to the cell's middle) the far meshes draw. */
 const FAR = 200;
@@ -57,16 +56,5 @@ export class TownView {
 
 /** A cell's mesh: the attributes the building shader reads, at (x, 0, z). */
 function cellMesh(m: BuildingMesh, x: number, z: number): Mesh {
-  const g = new BufferGeometry();
-  g.setAttribute('position', new BufferAttribute(m.position, 3));
-  g.setAttribute('normal', new BufferAttribute(m.normal, 3));
-  g.setAttribute('uv', new BufferAttribute(m.uv, 2));
-  // Floats: WebGPU has no 1- or 3-byte vertex formats.
-  g.setAttribute('mat', new BufferAttribute(Float32Array.from(m.mat), 1));
-  g.setAttribute('tint', new BufferAttribute(Float32Array.from(m.tint, (v) => v / 255), 3));
-  g.setIndex(new BufferAttribute(m.index, 1));
-  g.computeBoundingSphere();
-  const mesh = kindMesh(g, BUILDING, x, 0, z);
-  mesh.name = 'buildings';
-  return mesh;
+  return buildingMeshAt(m, x, 0, z, 'buildings');
 }
