@@ -6,10 +6,11 @@ import { townMeshBuffers, townMeshes, type TownCellMesh } from '../world/townMes
 import type { Terrain } from '../world/terrain';
 import { openWorld } from '../vgm/builder';
 import { settingById } from '../setting/index';
+import { horizonMap, type HorizonSpec } from '../world/horizon';
 import { serve } from './serve';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; index: number });
-export type TerrainResult = ChunkMesh | VolumeMesh[] | TownCellMesh[];
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; index: number } | ({ kind: 'horizon' } & HorizonSpec));
+export type TerrainResult = ChunkMesh | VolumeMesh[] | TownCellMesh[] | Uint8Array;
 
 let terrain: Terrain | null = null;
 
@@ -24,6 +25,11 @@ serve<TerrainJob, TerrainResult>((job) => {
     const town = terrain.towns[job.index];
     const cells = town ? townMeshes(town) : [];
     return { result: cells, transfer: townMeshBuffers(cells) };
+  }
+  if (job.kind === 'horizon') {
+    const t = terrain;
+    const map = horizonMap((x, z) => t.height(x, z), job);
+    return { result: map, transfer: [map.buffer] };
   }
   const mesh = buildChunk(terrain, job);
   return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer, mesh.level.buffer, mesh.canopy.buffer] };

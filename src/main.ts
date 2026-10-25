@@ -559,6 +559,7 @@ export async function start(b: Boot): Promise<void> {
       view.sky.update(dt, view.camera);
       sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
+      view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
       houses?.update(view.camera.position);
       if (life) {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
