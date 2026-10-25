@@ -66,7 +66,7 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const vc = vertexCount(segs);
   const position = new Float32Array(vc * 3), normal = new Float32Array(vc * 3), color = new Float32Array(vc * 3);
   const surface = new Float32Array(vc * 4);
-  const biomes = t.setting.world.biomes;
+  const biomes = t.biomes;
   const lin = biomes.map((b) => [srgbToLinear(((b.ground >> 16) & 255) / 255), srgbToLinear(((b.ground >> 8) & 255) / 255), srgbToLinear((b.ground & 255) / 255)]);
   const surf = biomes.map((b) => SURFACES.indexOf(b.surface));
   const s = emptySample();

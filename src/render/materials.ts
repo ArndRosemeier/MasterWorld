@@ -6,7 +6,7 @@
  * Every mesh of a kind shares the kind's one material, so a kind is one shader; variation goes into
  * vertex attributes or uniforms, never into a new material.
  */
-import { DoubleSide, MeshStandardNodeMaterial, type Material, type Mesh } from 'three/webgpu';
+import { DoubleSide, MeshPhysicalNodeMaterial, type Material, type Mesh } from 'three/webgpu';
 import { Fn, If, vec2, abs, attribute, cameraViewMatrix, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
@@ -65,7 +65,8 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');
   const { albedo: A, normal: N } = ground;
   // Double-sided so chunk skirts close cracks seen from either side.
-  const m = new MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: DoubleSide });
+  // Physical, for its specular strength: soil and grass reflect little of the bright sky, even at a low angle.
+  const m = new MeshPhysicalNodeMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: DoubleSide, specularIntensity: 0.25 });
   const p = positionWorld, n = normalWorldGeometry, up = n.y;
   const layer = (name: string, uv: Node<'vec2'>) => {
     const i = LAYER(name), k = 1 / NATURAL_TILE_METERS[i];
@@ -125,6 +126,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const snowB = hblend(snowT, h.sub(snow.n.b), 1.5);
   col = mix(col, snow.a.rgb, snowB); rough = mix(rough, snow.a.a, snowB); ao = mix(ao, snow.n.a, snowB);
   pert = mix(pert, vec3(tn(snow.n).x, 0, tn(snow.n).y), snowB);
+
+  // Open ground is matt (the layers' glossier spots read as a frosty sheen against the sky at a low angle).
+  rough = max(rough, float(0.85).mul(float(1).sub(rockB)));
 
   // At the water: wet, dark and glossy along the waterline; under it, caustics from the waves above.
   const below = waterAt(p.xz).x.sub(p.y);

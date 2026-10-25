@@ -31,6 +31,16 @@ export interface FloraDef {
   readonly shrubs: number;
 }
 
+/** The grass on open ground (drawn blade by blade near the camera). */
+export interface GrassDef {
+  /** Share of open ground covered, 0..1 (patchy below 1). Fewer under thick woods. */
+  readonly cover: number;
+  /** Typical blade height, metres (0.05 .. 1.5). */
+  readonly height: number;
+  /** 0 lush green .. 1 dry straw. */
+  readonly dry: number;
+}
+
 export interface BiomeDef {
   readonly id: string;
   readonly name: string;
@@ -46,6 +56,8 @@ export interface BiomeDef {
   readonly elevation?: readonly [number, number];
   /** Wild trees and shrubs; none if absent. */
   readonly flora?: FloraDef;
+  /** Grass; none if absent. */
+  readonly grass?: GrassDef;
 }
 
 /** The shape of the land: the skeleton's parameters (section 5.2). All lengths in metres. */
@@ -115,6 +127,11 @@ export function validateSetting(m: SettingModule): string[] {
       if (!(f.cover >= -1 && f.cover <= 1)) out.push(`${where}: biome "${b.id}" flora cover must be -1..1`);
       for (const k of Object.keys(f.mix)) if (!TREES.includes(k as TreeName)) out.push(`${where}: biome "${b.id}" tree "${k}" is unknown`);
       if (f.trees > 0 && !Object.values(f.mix).some((w) => (w ?? 0) > 0)) out.push(`${where}: biome "${b.id}" has trees but no species`);
+    }
+    if (b.grass) {
+      const g = b.grass;
+      if (!(g.cover >= 0 && g.cover <= 1) || !(g.dry >= 0 && g.dry <= 1)) out.push(`${where}: biome "${b.id}" grass cover and dry must be 0..1`);
+      if (!(g.height >= 0.05 && g.height <= 1.5)) out.push(`${where}: biome "${b.id}" grass height must be 0.05..1.5 m`);
     }
     if (!(b.temperature[0] <= b.temperature[1])) out.push(`${where}: biome "${b.id}" temperature range is reversed`);
     if (!(b.moisture[0] >= 0 && b.moisture[1] <= 1 && b.moisture[0] <= b.moisture[1])) out.push(`${where}: biome "${b.id}" moisture range must lie in 0..1`);

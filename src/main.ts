@@ -5,9 +5,10 @@ import { params } from './app/params';
 import { FlyCamera } from './app/flyCamera';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
-import { createTerrainPool, createTexturePool, createWorldPool } from './workers/pool';
+import { WorldJobs, createTerrainPool, createTexturePool, createWorldPool } from './workers/pool';
 import { WaterView } from './render/water/WaterView';
 import { FloraView } from './render/flora/FloraView';
+import { GrassView } from './render/grass/GrassView';
 import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures } from './render/terrain/groundTextures';
 import { useGroundTextures } from './render/materials';
@@ -53,26 +54,29 @@ async function start(): Promise<void> {
     view.sky.update(0, view.camera);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
-    const worldPool = createWorldPool();
-    const water = new WaterView(worldPool, seed, setting.id);
+    const jobs = new WorldJobs(createWorldPool(), seed, setting.id);
+    const water = new WaterView(jobs);
     await water.prime(view.camera.position);
     loading.set('Growing the woods');
-    const flora = new FloraView(view.stage, worldPool, seed, setting.id);
-    await flora.placeStart(view.camera.position);
+    const flora = new FloraView(view.stage, jobs);
+    if (params.trees) await flora.placeStart(view.camera.position);
+    const grass = params.grass ? new GrassView(jobs) : null;
+    await grass?.sow(view.camera.position);
     water.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
-    await view.stage.warmUp();
+    await view.stage.warmUp(grass ? [grass.group] : []);
     loading.set('Raising the land');
     const ground = new TerrainView(view.stage, createTerrainPool(), seed, setting.id, (x, z) => terrain.height(x, z));
     await ground.ready(view.camera);
     await view.stage.add(view.sky.dome);
     await view.stage.add(water.mesh);
+    if (grass) await view.stage.add(grass.group);
 
     // The trees' shaders are built in the Stage's frame slots, so the loop must run meanwhile; loading ends
     // once they stand.
     loading.set('Planting the trees');
     let planted = false;
-    const planting = flora.show().then(() => { planted = true; });
+    const planting = (params.trees ? flora.show() : Promise.resolve()).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     let last = performance.now();
     view.renderer.setAnimationLoop(() => {
@@ -82,12 +86,13 @@ async function start(): Promise<void> {
       view.sky.update(dt, view.camera);
       water.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
-      flora.update(dt, view.camera.position);
+      if (params.trees) flora.update(dt, view.camera.position);
+      grass?.tend(dt, view.camera, 0.5);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
       if (hud && params.hud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})\n${view.stage.hudLine()}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}\n${view.stage.hudLine()}`;
       }
       last = now;
       if (planted && !window.__mwReady) {

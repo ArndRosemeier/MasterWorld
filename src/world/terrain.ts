@@ -11,6 +11,8 @@ export class Terrain {
   readonly skeleton: Skeleton;
   private readonly detail: Noise;
   readonly hydro: Hydrology;
+  /** The setting's biomes (skeleton samples index them). */
+  readonly biomes: SettingModule['world']['biomes'];
   private readonly here: WaterHere = emptyWater();
 
   /** `hydro`: tile sizes for drainage (tests use small tiles). */
@@ -18,6 +20,18 @@ export class Terrain {
     this.skeleton = new Skeleton(seed, setting.world);
     this.detail = new Noise(deriveSeed(seed, 'terrain', 'detail'));
     this.hydro = new Hydrology(this.skeleton, hydro);
+    this.biomes = setting.world.biomes;
+  }
+
+  /**
+   * How far a spot of ground `h` high is from open water: metres beyond the nearest river's edge, and
+   * metres above the lake it lies by (Infinity where there is none). For what grows near the water.
+   */
+  clearOfWater(x: number, z: number, h: number, out: { river: number; lake: number }): { river: number; lake: number } {
+    const w = this.hydro.query(x, z, this.here);
+    out.river = w.river ? w.dist - w.half : Infinity;
+    out.lake = Number.isNaN(w.lake) ? Infinity : h - w.lake;
+    return out;
   }
 
   /** Ground height above the sea surface, metres. */
