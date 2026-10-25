@@ -24,8 +24,8 @@ export interface Orbit {
 
 /** One full circle in this many seconds. */
 const LAP = 260;
-const FAR = { radius: 760, height: 190 };
-const NEAR = { radius: 330, height: 80 };
+const FAR = { radius: 520, height: 130 };
+const NEAR = { radius: 260, height: 60 };
 /** Ground checked this far around the camera, so no hill rises into the view. */
 const CLEAR = [0, 60, 140];
 

@@ -45,7 +45,7 @@ test('title: the orbit keeps above the land and comes closer when allowed', () =
   for (let t = 0; t < 300; t += 7) {
     for (const near of [0, 1]) {
       const { at } = orbitPose(hills, t, near);
-      assert.ok(at[1] > hills.ground(at[0], at[2]) + 60, `t=${t} near=${near}: ${at[1]}`);
+      assert.ok(at[1] > hills.ground(at[0], at[2]) + 45, `t=${t} near=${near}: ${at[1]}`);
     }
   }
   const far = orbitPose(hills, 10, 0).at, close = orbitPose(hills, 10, 1).at;

@@ -96,7 +96,7 @@ export class Toys {
     const right = new Vector3().crossVectors(fwd, c.up).normalize();
     const side = this.rng.sign();
     const ahead = (f: number, r: number, u: number) => c.position.clone().addScaledVector(fwd, f).addScaledVector(right, r * side).setY(c.position.y + u);
-    const a = ahead(1400, -900, 160), b = ahead(140, -30, 25), e = ahead(500, 1200, 90);
+    const a = ahead(900, -700, 90), b = ahead(70, -10, 8), e = ahead(400, 1000, 60);
     const dur = 7.5;
     const pos = new Vector3(), prev = new Vector3();
     const along = (u: number, out: Vector3) => out.copy(a).multiplyScalar((1 - u) * (1 - u)).addScaledVector(b, 2 * u * (1 - u)).addScaledVector(e, u * u);
@@ -110,7 +110,7 @@ export class Toys {
         along(Math.max(0, u - 0.01), prev);
         const s = this.screen(pos), q = this.screen(prev);
         if (!s || !q) return;
-        drawDragon(ctx, s[0], s[1], Math.atan2(s[1] - q[1], s[0] - q[0]), (30 * this.focal) / s[2], t);
+        drawDragon(ctx, s[0], s[1], Math.atan2(s[1] - q[1], s[0] - q[0]), (40 * this.focal) / s[2], t);
       },
     });
   }
@@ -200,7 +200,7 @@ export class Toys {
     for (const b of f.birds) {
       const s = this.screen(b.pos);
       if (!s) continue;
-      const span = Math.max(2.6, (BIRD_SPAN * this.focal) / s[2]) * 2.2;
+      const span = Math.max(4, (BIRD_SPAN * this.focal) / s[2]) * 3;
       const lift = Math.sin(b.flap) * span * 0.45;
       const width = Math.max(1.1, span * 0.16);
       ctx.beginPath();
@@ -229,10 +229,10 @@ export class Toys {
     window.setTimeout(() => this.hooks.sound.play('thunder'), 250);
     this.toastOf('bolt', 0.6);
     this.effects.push({
-      t: 0, dur: 0.75,
+      t: 0, dur: 1.1,
       draw: (ctx, t) => {
         // Flickers twice, then fades.
-        const a = t < 0.08 ? 1 : t < 0.16 ? 0.15 : t < 0.3 ? 1 : 1 - (t - 0.3) / 0.45;
+        const a = t < 0.1 ? 1 : t < 0.2 ? 0.15 : t < 0.45 ? 1 : 1 - (t - 0.45) / 0.65;
         ctx.save();
         ctx.shadowColor = '#bfe8ff';
         ctx.shadowBlur = 24;
@@ -284,9 +284,9 @@ export class Toys {
           const u = (t - i * 0.45) / 1.8;
           if (u <= 0 || u >= 1) continue;
           ctx.strokeStyle = `rgba(240,201,106,${(0.9 * (1 - u)).toFixed(3)})`;
-          ctx.lineWidth = 2.5;
+          ctx.lineWidth = 4;
           ctx.beginPath();
-          ctx.arc(s[0], s[1], 12 + u * 110, Math.PI * 1.1, Math.PI * 1.9);
+          ctx.arc(s[0], s[1], 16 + u * 150, Math.PI * 1.1, Math.PI * 1.9);
           ctx.stroke();
         }
       },

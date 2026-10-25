@@ -64,7 +64,7 @@ export class TitleCamera {
       return;
     }
     this.t += dt;
-    this.near += (this.nearWanted - this.near) * Math.min(1, dt / 40);
+    this.near += (this.nearWanted - this.near) * Math.min(1, dt / 20);
     const k = damp(2, dt);
     this.pointer.sx += (this.pointer.x - this.pointer.sx) * k;
     this.pointer.sy += (this.pointer.y - this.pointer.sy) * k;
