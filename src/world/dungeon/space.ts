@@ -72,8 +72,13 @@ export class DungeonSpace {
 
   /** Can one pass from cell (i, j, l) to its neighbour on side `dir`, at `lateral` metres from the edge's middle? */
   passable(i: number, j: number, l: number, dir: number, lateral: number): boolean {
+    return this.passLevel(i, j, l, dir, lateral) !== null;
+  }
+
+  /** The storey on which one passes from cell (i, j, l) to its neighbour on side `dir` (a stair spans two), or null. */
+  passLevel(i: number, j: number, l: number, dir: number, lateral: number): number | null {
     const a = this.grid.owner(i, j, l);
-    if (a === undefined) return false;
+    if (a === undefined) return null;
     const ni = i + DIRS[dir][0], nj = j + DIRS[dir][1];
     // A stair cell spans two storeys: its walls open on either.
     const st = this.grid.stairs.get(`${i},${j},${l}`);
@@ -81,11 +86,11 @@ export class DungeonSpace {
     for (const lv of levels) {
       const b = this.grid.owner(ni, nj, lv), here = this.grid.owner(i, j, lv);
       if (b === undefined || here === undefined) continue;
-      if (b === here) return true;
+      if (b === here) return lv;
       const o = this.opening(i, j, lv, dir);
-      if (o && Math.abs(lateral) < DOOR_W / 2 && this.lets(o, here)) return true;
+      if (o && Math.abs(lateral) < DOOR_W / 2 && this.lets(o, here)) return lv;
     }
-    return false;
+    return null;
   }
 
   /** Does the door let one through from the side owned by `from`? A passage's kind sits at its `b` end; its `a` end is an open arch. */

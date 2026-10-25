@@ -38,6 +38,11 @@ export interface DungeonDecision {
   readonly seed: number;
   /** The signature set piece (world/dungeon/setPieces.ts). */
   readonly setPiece: string;
+  /**
+   * The most danger the place may hold (D29): fixed when it is promised, from how far it lies from the
+   * start; who moves in is chosen to fit. None: anything.
+   */
+  readonly danger?: number;
 }
 
 /**

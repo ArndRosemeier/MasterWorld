@@ -399,6 +399,7 @@ export async function start(b: Boot): Promise<void> {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });
       }
+      if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
       folk?.follow(dt, view.camera);
       if (boot.trees) flora.update(dt, view.camera);
       grass?.tend(dt, view.camera);

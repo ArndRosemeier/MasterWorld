@@ -122,7 +122,8 @@ export function sketchCellar(d: DungeonDecision, house: TownBuilding, lore: Cell
   const older = piece.older || rng.chance(0.65) ? pickDef(rng, lore.older) : null;
   const trouble = pickDef(rng, lore.troubles, (t) => !piece.troubles || piece.troubles.includes(t.id));
   const ids = [builder.id, older?.id, trouble.id].filter(Boolean) as string[];
-  const dweller = pickDef(rng, lore.dwellers, (w) => !w.with || w.with.some((x) => ids.includes(x)));
+  // Who moves in fits the history and the place's danger (D29: fixed by where it lies, not by the hero).
+  const dweller = pickDef(rng, lore.dwellers, (w) => (!w.with || w.with.some((x) => ids.includes(x))) && w.danger <= (d.danger ?? Infinity));
   const line = (def: HistoryDef) => def.text.replaceAll('{house}', name);
   const history: HistoryEntry[] = [];
   if (older) history.push({ layer: 'older', def: older, text: line(older) });
@@ -279,14 +280,17 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     put(graph.entrance, 'ledger', 'built', clues.length - 1);
   }
 
-  // Who lives where: the lair holds most; rising tension brings more; the entrance and the safe spot are quiet.
+  // Who lives where (small and dense, plan 8.1): the lair holds most; the two tensest rooms on the way hold
+  // a group each, as many as the dwellers crowd into a room; the entrance and the safe spot are quiet.
   const spawns: Spawn[] = [];
   const [lead, ...rest] = now.creatures;
+  const other = () => (rest.length && rng.chance(0.6) ? rest[0] : lead);
   spawns.push({ creature: lead, room: graph.goal });
-  for (const r of rooms) {
-    if (r.id === graph.goal || r.id === p.safe || r.id === graph.entrance || r.tension < 0.35) continue;
-    const n = r.tension > 0.7 ? 2 : 1;
-    for (let i = 0; i < n; i++) spawns.push({ creature: rest.length && rng.chance(0.6) ? rest[0] : lead, room: r.id });
+  for (let i = 1; i < Math.min(now.crowd, 2); i++) spawns.push({ creature: other(), room: graph.goal });
+  const held = rooms.filter((r) => r.id !== graph.goal && r.id !== p.safe && r.id !== graph.entrance && r.tension >= 0.35).sort((a, b) => b.tension - a.tension).slice(0, 2);
+  for (const r of held) {
+    const n = r.tension > 0.7 ? now.crowd : Math.ceil(now.crowd / 2);
+    for (let i = 0; i < n; i++) spawns.push({ creature: other(), room: r.id });
   }
   if (now.surprise && rng.chance(0.5)) {
     const i = spawns.findIndex((s) => s.room !== graph.goal);
