@@ -22,6 +22,8 @@ export interface DebugHost {
   /** The weather kinds, and a kind ordered here and now (a VGM order); null: back to the natural weather. */
   readonly weatherKinds: readonly string[];
   weather(kind: string | null): string;
+  /** A VGM order to the town, here and now: everyone to the market, or everyone indoors. */
+  town(kind: 'gather' | 'stayIn'): string;
   /** The view as URL parameters (`pos=…&look=…`). */
   readonly viewParams: string;
   /** Places worth a look in this world. */
@@ -83,6 +85,11 @@ export class DebugMenu {
         { label: 'Clock stopped', run: () => { h.dayMinutes = 0; } },
         { label: 'Day in 2 min', run: () => { h.dayMinutes = 2; } },
         { label: 'Day in 24 min', run: () => { h.dayMinutes = 24; } },
+        { label: 'Day in 60 min (the game\'s)', run: () => { h.dayMinutes = 60; } },
+      ]],
+      ['Town', [
+        { label: 'Everyone to the market', run: () => h.town('gather') },
+        { label: 'Curfew', run: () => h.town('stayIn') },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },

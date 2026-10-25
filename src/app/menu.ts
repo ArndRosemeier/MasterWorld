@@ -131,7 +131,7 @@ export class Menu {
       hour.oninput = () => { this.host.hour = Number(hour.value); shown.textContent = clock(this.host.hour); };
       rows.push(
         el('label', { className: 'row' }, el('span', { textContent: 'Time of day' }), hour, shown),
-        this.slider('Length of a day', 'dayMinutes', 1, (v) => (v === 0 ? 'clock stopped' : `${v.toFixed(0)} min`)),
+        this.slider('Length of a day', 'dayLength', 1, (v) => (v === 0 ? 'clock stopped' : `${v.toFixed(0)} min`)),
         this.check('Frame time line (HUD)', 'hud'),
       );
     }

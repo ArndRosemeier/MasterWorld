@@ -95,3 +95,14 @@ test('town life: the start town (D41) costs well under its 2 ms a frame', () => 
   assert.ok(mean < 1, `mean ${mean.toFixed(3)} ms for ${life.agents.length} people`);
   assert.ok(p99 < 2, `99th percentile ${p99.toFixed(3)} ms`);
 });
+
+test('town life: orders are timed in game hours since the start, so a curfew on day 2 leaves day 1 alone', () => {
+  const life = new TownLife(plan, 7, 14);
+  life.order({ kind: 'stayIn', from: 24 + 14, to: 24 + 16 });
+  for (let s = 0; s < 400; s++) life.step(1, 14.5);
+  const outDay1 = life.agents.filter((a) => !a.hidden).length;
+  for (let s = 0; s < 400; s++) life.step(1, 24 + 14.5);
+  const outDay2 = life.agents.filter((a) => !a.hidden).length;
+  assert.ok(outDay1 > life.agents.length * 0.2, `${outDay1} out on day 1`);
+  assert.ok(outDay2 < life.agents.length * 0.03, `${outDay2} out under the curfew`);
+});

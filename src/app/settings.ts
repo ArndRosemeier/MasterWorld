@@ -24,7 +24,8 @@ export interface Settings {
   /** The frame time line in the corner. */
   hud: boolean;
   /** Real minutes per game day; 0 stops the clock. */
-  dayMinutes: number;
+  /** Real minutes a game day takes (D37: 60; 0 stops the clock). Was `dayMinutes`, stopped by default: renamed so old saves start with the game's day. */
+  dayLength: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -37,7 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   grass: true,
   webgl: false,
   hud: false,
-  dayMinutes: 0,
+  dayLength: 60,
 };
 
 /** The ranges the dialog offers (and stored values are held to). */
@@ -45,7 +46,7 @@ export const RANGES = {
   mouseSpeed: [0.25, 3],
   fov: [40, 90],
   renderScale: [0.5, 1],
-  dayMinutes: [0, 120],
+  dayLength: [0, 120],
 } as const satisfies Partial<Record<keyof Settings, readonly [number, number]>>;
 
 /** Settings read back from storage (or anything else): every field checked, the rest from the defaults. */
@@ -66,7 +67,7 @@ export function cleanSettings(raw: unknown): Settings {
     grass: flag('grass'),
     webgl: flag('webgl'),
     hud: flag('hud'),
-    dayMinutes: num('dayMinutes'),
+    dayLength: num('dayLength'),
   };
 }
 
@@ -99,7 +100,7 @@ export class SettingsStore {
       webgl: params.gl || this.value.webgl,
       trees: params.trees && this.value.trees,
       grass: params.grass && this.value.grass,
-      dayMinutes: params.dayMinutes ?? this.value.dayMinutes,
+      dayMinutes: params.dayMinutes ?? this.value.dayLength,
     };
   }
 }
