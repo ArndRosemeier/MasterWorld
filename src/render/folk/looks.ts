@@ -33,8 +33,23 @@ const DYED = ['#7a3a2a', '#8a4a30', '#3d5a80', '#4a5a6a', '#5f6838', '#6b6a3a', 
 const LEATHER = ['#4a3020', '#3a2416', '#5a3a22', '#2a1d14'];
 const HAIR_COLORS = ['#2a1d14', '#3b2417', '#4a3020', '#6a4a2a', '#8a6a3a', '#b08a50', '#c8a868', '#1c1814', '#7a3a1e'];
 
-/** Who is drawn (Actors makes adults only: children are in the simulation, not yet in the picture). */
+/** Who is drawn as an Actors character (Actors makes adults only: children are simple figures, ChildFolk). */
 export const drawn = (p: Person): boolean => p.role !== 'child';
+
+/** How a child's simple figure looks (ChildFolk): colours of tunic, hose, skin and hair, and height (m). */
+export interface ChildLook { tunic: string; hose: string; skin: string; hair: string; tall: number }
+
+export function childLook(p: Person): ChildLook {
+  const r = new Rng(deriveSeed(p.seed, 'look'));
+  // Ages 4..15 stand about 1.0..1.6 m among humans and elves; dwarf and halfling children are smaller.
+  const small = p.race === 'dwarf' || p.race === 'halfling' ? 0.72 : 1;
+  const tone = r.range(0.05, 0.45);
+  const skin = `#${[[241, 141], [211, 90], [189, 59]].map(([a, b]) => Math.round(a + (b - a) * tone).toString(16).padStart(2, '0')).join('')}`;
+  return {
+    tunic: r.chance(0.35) ? r.pick(DYED) : r.pick(PLAIN), hose: r.pick(PLAIN), skin, hair: r.pick(HAIR_COLORS),
+    tall: small * (0.95 + (Math.min(15, Math.max(4, p.age)) - 4) * 0.055) * r.range(0.95, 1.05),
+  };
+}
 
 /** Everything about how `p` looks. */
 export function lookOf(p: Person): CharacterPatch {

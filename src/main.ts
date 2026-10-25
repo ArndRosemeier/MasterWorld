@@ -113,9 +113,12 @@ export async function start(b: Boot): Promise<void> {
     let visit: CellarVisit | null = null;
     // Behind a door the walker walks the room.
     let rooms: InteriorVisit | null = null;
+    // The land, and the steps and porches before the doors.
+    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), town?.stand(x, z) ?? -Infinity);
     const below = () => (visit?.inside ? visit.world : rooms?.world ?? null);
     const world: WalkWorld = {
-      height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
+      // Out of doors also the steps and porches before the doors.
+      height: (x, z) => below()?.height(x, z) ?? outdoors(x, z),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
       waterLevel: (x, z) => { if (below()) return null; const w = water?.waterAt(x, z); return w && w.depth > 0 ? w.level : null; },
       wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r); },
@@ -187,7 +190,7 @@ export async function start(b: Boot): Promise<void> {
     let folk: FolkView | null = null;
     if (life && params.folk > 0) {
       loading.set('Waking the town');
-      folk = await FolkView.create(view.stage, view.renderer, life, (x, z) => terrain.height(x, z), params.folk);
+      folk = await FolkView.create(view.stage, view.renderer, life, outdoors, params.folk);
       folk.camera = view.camera;
     }
     loading.set('Growing the woods');
@@ -376,7 +379,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound, life },
     });
     b.menus.menu = new Menu(settings, {
       paused,

@@ -11,6 +11,7 @@ import HumanWorker from '@actors/human/worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
 import type { ActivityKind } from '../../sim/spots';
+import { ChildFolk } from './ChildFolk';
 import { FAR, FarFolk } from './FarFolk';
 import { clipOf, coveringLooks, drawn, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
@@ -55,6 +56,8 @@ export class FolkView {
   private readonly shown = new Map<number, Slot>();
   /** Everyone out of doors without a character, as plain figures. */
   private readonly far = new FarFolk();
+  /** The children, as simple figures. */
+  private readonly kids = new ChildFolk(this.far.mesh.material as Material);
 
   private constructor(private readonly reversed: boolean, private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
     for (const ch of [lead, ...others]) {
@@ -121,7 +124,7 @@ export class FolkView {
     s.ch.setLod(0);
     this.adapt(s.place);
     s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
-    return [s.place, this.far.mesh];
+    return [s.place, this.far.mesh, ...this.kids.meshes];
   }
 
   /**
@@ -145,10 +148,12 @@ export class FolkView {
     }
     ch.setLod(0);
     this.slots[0].place.visible = false;
-    this.stage.scene.add(this.far.mesh);
+    this.stage.scene.add(this.far.mesh, ...this.kids.meshes);
     this.warm = true;
   }
   private warm = false;
+
+  private readonly children: Agent[] = [];
 
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
   indoors: readonly Placed[] | null = null;
@@ -205,6 +210,14 @@ export class FolkView {
     // The rest (and those whose character is still being dressed) as plain figures.
     if (this.indoors) this.far.place([], this.height);
     else this.far.place(near.filter(([, a]) => !this.shown.get(a.person.id)?.ready).map(([, a]) => a), this.height);
+    // Children (never indoors in a room: they play out of doors).
+    if (this.indoors) this.kids.place([], this.height, dt, cx, cz);
+    else {
+      this.children.length = 0;
+      for (const a of this.life.agents) if (!drawn(a.person) && !a.hidden) this.children.push(a);
+      this.children.sort((x, y) => Math.hypot(x.x - cx, x.z - cz) - Math.hypot(y.x - cx, y.z - cz));
+      this.kids.place(this.children, this.height, dt, cx, cz);
+    }
   }
 
   private dress(s: Slot, a: Agent): void {
@@ -233,7 +246,12 @@ export class FolkView {
     for (let k = 0; k < s.ch.lods.length && s.agent === id; k++) {
       s.ch.setLod(k);
       this.adapt(s.place);
+      // Hidden meshes too: Actors keeps some it may show later at this level (the body's own crowd
+      // mesh beside the merged one), and compileAsync skips hidden objects.
+      const hidden: Object3D[] = [];
+      s.place.traverse((m) => { if (!m.visible && (m as Mesh).isMesh) { hidden.push(m); m.visible = true; } });
       await this.stage.prepare(s.place, { everyCaster: true });
+      for (const m of hidden) m.visible = false;
       s.place.traverse((m) => { for (const x of materialsOf(m)) this.compiled.add(x); });
     }
     s.ch.setLod('auto');

@@ -55,3 +55,27 @@ test('town: the VGM promises a cellar under one of its houses, with a household 
   assert.ok(s.hints.length > 0);
   assert.equal(s.knownBy.building, house.id);
 });
+
+test('town: one walks up the steps and onto the temple porch, and not through its columns', () => {
+  const town = terrain.towns[0];
+  const at = (b: (typeof town.plan.buildings)[number], u: number, v: number): [number, number] =>
+    [b.cx + u * Math.cos(b.angle) + v * b.vx, b.cz + u * Math.sin(b.angle) + v * b.vz];
+  const temple = town.plan.buildings.find((b) => b.kind === 'temple');
+  if (temple) {
+    const [x, z] = at(temple, 0, -temple.hv - 1.2);
+    assert.ok(Math.abs(town.stand(x, z)! - (temple.floorY + 0.25)) < 1e-6, 'on the porch floor');
+    const w = Math.min(temple.hu - 0.4, 3.6);
+    const [cx, cz] = at(temple, -w + 0.3, -temple.hv - 2.2 + 0.35);
+    assert.ok(town.solid(cx, cz, 0.3), 'a column is in the way');
+  }
+  // Wherever steps lead to a door, each is a step up from the last (the walker climbs 0.45 m).
+  for (const b of town.plan.buildings) {
+    let prev = terrain.height(...at(b, 0, -b.hv - 4));
+    for (let v = -b.hv - 4; v < -b.hv - 0.1; v += 0.1) {
+      const [x, z] = at(b, 0, v);
+      const y = Math.max(terrain.height(x, z), town.stand(x, z) ?? -Infinity);
+      assert.ok(y - prev < 0.45, `${b.kind} ${b.id}: a rise of ${(y - prev).toFixed(2)} m at ${v.toFixed(1)}`);
+      prev = y;
+    }
+  }
+});

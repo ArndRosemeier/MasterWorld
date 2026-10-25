@@ -3,7 +3,7 @@
  * (@futuremagic/settlement), and what the ground is at a point of it (street, building, yard) for
  * the terrain, the plants and later the ground's look. Pure, runs in workers.
  */
-import { distToPoly, planTown, pointInPoly, polyBounds, type TownPlan } from '@futuremagic/settlement';
+import { buildingEntrance, distToPoly, planTown, pointInPoly, polyBounds, type Entrance, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { TownDecision } from './decisions';
 import type { Terrain } from './terrain';
 
@@ -61,11 +61,46 @@ export class Town {
     for (const b of this.plan.buildings) {
       const s = b.sanctuary;
       if (s && Math.hypot(x - s.cx, z - s.cz) < s.r + r) return true;
-      const reach = Math.max(b.hu, b.hv) * 1.5 + r;
+      const reach = Math.max(b.hu, b.hv) * 1.5 + 3 + r; // the porch stands out before the door
       if (Math.abs(x - b.cx) > reach || Math.abs(z - b.cz) > reach) continue;
       if (pointInPoly(b.poly, x, z) || distToPoly(b.poly, x, z) < r) return true;
+      // The temple porch's columns.
+      const posts = this.entrance(b).posts;
+      if (posts.length) {
+        const [u, v] = Town.local(b, x, z);
+        for (const p of posts) if (Math.hypot(Math.max(p.u0 - u, 0, u - p.u1), Math.max(p.v0 - v, 0, v - p.v1)) < r) return true;
+      }
     }
     return false;
+  }
+
+  /** What stands before each building's door (steps, the temple's porch), by building. */
+  private entrances: Entrance[] | null = null;
+
+  /** Where (x, z) lies in a building's frame: u across, v from the front to the back. */
+  private static local(b: TownBuilding, x: number, z: number): [number, number] {
+    const dx = x - b.cx, dz = z - b.cz;
+    return [dx * Math.cos(b.angle) + dz * Math.sin(b.angle), dx * b.vx + dz * b.vz];
+  }
+
+  private entrance(b: TownBuilding): Entrance {
+    this.entrances ??= this.plan.buildings.map(buildingEntrance);
+    return this.entrances[b.id];
+  }
+
+  /** The highest step or porch floor at (x, z) (world y), or null where there is none. */
+  stand(x: number, z: number): number | null {
+    if (!this.near(x, z, 0)) return null;
+    let top: number | null = null;
+    for (const b of this.plan.buildings) {
+      const reach = Math.max(b.hu, b.hv) + 4;
+      if (Math.abs(x - b.cx) > reach || Math.abs(z - b.cz) > reach) continue;
+      const [u, v] = Town.local(b, x, z);
+      for (const f of this.entrance(b).floors) {
+        if (u >= f.u0 && u <= f.u1 && v >= f.v0 && v <= f.v1) top = Math.max(top ?? -Infinity, b.floorY + f.top);
+      }
+    }
+    return top;
   }
 
   /** Is the point within reach of the town (its raster bounds grown by `margin`)? */
