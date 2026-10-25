@@ -181,11 +181,14 @@ export class FolkView {
    * Actors draws clothes over the skin, and each garment layer over the one below, by polygon offsets
    * toward the camera (negative). With reversed depth (view.ts) a negative offset pushes away: the skin
    * and underclothes showed through in patches. Flipped once per material (garments are made lazily).
+   * Also what never shows casts no shadow.
    */
   private adapt(o: Object3D): void {
     o.traverse((m) => {
       const mesh = m as Mesh;
-      if (!mesh.isMesh || !this.reversed) return;
+      if (!mesh.isMesh) return;
+      if (mesh.name.startsWith('genitals')) mesh.castShadow = false; // always clothed: a shadow shader for nothing
+      if (!this.reversed) return;
       for (const x of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as Material[]) {
         if (!x.polygonOffset || x.userData.offsetReversed) continue;
         x.polygonOffsetFactor = -x.polygonOffsetFactor;
