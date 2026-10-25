@@ -68,7 +68,7 @@ export class Steed {
    * One step. Ridden, `intent` is the rider's (strafing turns the horse instead; it never jumps) and
    * `facing` where the rider wants to face: the horse turns toward it at its own rate. Otherwise it stands.
    */
-  move(dt: number, intent?: WalkIntent, facing?: number): void {
+  travel(dt: number, intent?: WalkIntent, facing?: number): void {
     const w = this.walker;
     if (!intent || !this.ridden) {
       w.step({ forward: 0, strafe: 0, heading: w.yaw, walk: true, up: false, down: false }, dt);

@@ -88,7 +88,7 @@ export class HorseView {
   /** Each frame: where horse `i` is and what it does. */
   pose(i: number, p: HorsePose, dt: number): void {
     const h = this.horses[i];
-    h.place.position.set(p.x, p.y, p.z);
+    h.place.position.copy(p);
     // The walker's yaw turns −z; Actors' horse faces +z.
     h.place.rotation.y = p.yaw + Math.PI;
     if (p.act !== h.act) {

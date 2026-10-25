@@ -154,7 +154,7 @@ export class Player {
     }
     if (riding) {
       const { intent, facing } = heroCam.intent(dt, riding.yaw);
-      riding.move(dt, intent, facing);
+      riding.travel(dt, intent, facing);
       // The hero's body goes where the horse goes (for the camera, the view's URL, the cellar's door).
       walker.pos.x = riding.pos.x; walker.pos.y = riding.pos.y; walker.pos.z = riding.pos.z;
       walker.yaw = riding.yaw;
@@ -163,7 +163,7 @@ export class Player {
       walker.yaw = facing;
       walker.step(intent, dt);
     }
-    this.pose(dt);
+    this.drawBodies(dt);
     heroCam.trail(this.toHead(), dt);
   }
 
@@ -171,7 +171,7 @@ export class Player {
   standBy(dt: number): void {
     const walker = this.walker;
     if (!this.riding) walker.step({ forward: 0, strafe: 0, heading: walker.yaw, walk: false, up: false, down: false }, dt);
-    this.pose(dt);
+    this.drawBodies(dt);
   }
 
   /** Where the camera will be behind the hero (the camera itself is left where it is). */
@@ -186,9 +186,9 @@ export class Player {
   }
 
   /** The horses (each its own step, the ridden one moved by the rider) and the hero, drawn where they are. */
-  private pose(dt: number): void {
+  private drawBodies(dt: number): void {
     const { walker, hero, riding, horses } = this;
-    for (const s of this.steeds) if (s !== riding) s.move(dt);
+    for (const s of this.steeds) if (s !== riding) s.travel(dt);
     if (horses) {
       this.steeds.forEach((s, i) => {
         if (i < horses.drawn) horses.pose(i, { x: s.pos.x, y: s.pos.y, z: s.pos.z, yaw: s.yaw, act: s.gait, speed: s.speed }, dt);

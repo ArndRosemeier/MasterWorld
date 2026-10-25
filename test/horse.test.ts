@@ -7,14 +7,14 @@ import type { WalkIntent, WalkWorld } from '../src/game/walker';
 const world: WalkWorld = { height: () => 2, rockSurface: () => null, waterLevel: () => null, wall: (x, _z, r) => x + r > 4 };
 const free = (x: number, z: number, r: number) => !world.wall!(x, z, r);
 const go = (o: Partial<WalkIntent> = {}): WalkIntent => ({ forward: 0, strafe: 0, heading: 0, walk: false, up: false, down: false, ...o });
-const ride = (s: Steed, i: WalkIntent, secs: number, facing?: number) => { for (let t = 0; t < secs; t += 1 / 60) s.move(1 / 60, i, facing); };
+const ride = (s: Steed, i: WalkIntent, secs: number, facing?: number) => { for (let t = 0; t < secs; t += 1 / 60) s.travel(1 / 60, i, facing); };
 
 test('horse: ridden forward it builds up through walk and trot to a 12 m/s gallop; let go it slows and stops', () => {
   const s = new Steed(world, 0, 1);
   s.walker.place(-200, 0);
   s.ridden = true;
   const seen = new Set<string>();
-  for (let t = 0; t < 4; t += 1 / 60) { s.move(1 / 60, go({ forward: 1 })); seen.add(s.gait); }
+  for (let t = 0; t < 4; t += 1 / 60) { s.travel(1 / 60, go({ forward: 1 })); seen.add(s.gait); }
   assert.ok(Math.abs(s.speed - HORSE.run) < 0.3, `gallops at ${s.speed.toFixed(1)} m/s`);
   assert.deepEqual([...seen].filter((g) => g !== 'idle'), ['walk', 'trot', 'gallop']);
   assert.ok(s.pos.z < -20, `went north (${s.pos.z.toFixed(1)})`);
