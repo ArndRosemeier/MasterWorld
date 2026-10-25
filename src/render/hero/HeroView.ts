@@ -21,6 +21,8 @@ export interface HeroPose {
   combat?: boolean;
   /** A blow, a drink, a flinch. */
   action?: ActionAnim;
+  /** Riding ('ride'): the saddle's height over `pos` (pos is the point under the saddle), on a horse. */
+  seat?: number;
 }
 
 export class HeroView {
@@ -56,8 +58,12 @@ export class HeroView {
   /** Shown or not (first person hides it). */
   set visible(v: boolean) { this.body.object.visible = v; }
 
+  /** The next pose at once, without blending (getting on or off a horse). */
+  snap(): void { this.body.animator.snapPose(); }
+
   animateTo(p: HeroPose, dt: number, ground: GroundFn): void {
     this.time += dt;
-    this.body.update({ pos: [p.pos.x, p.pos.y, p.pos.z], vel: [p.vel.x, p.vel.y, p.vel.z], yaw: p.yaw, anim: { move: p.gait, action: p.action, mood: p.combat ? 'focused' : undefined }, combat: p.combat }, dt, this.time, ground);
+    const ride = p.gait === 'ride' ? { seat: p.seat, mount: 'horse' as const } : {};
+    this.body.update({ pos: [p.pos.x, p.pos.y, p.pos.z], vel: [p.vel.x, p.vel.y, p.vel.z], yaw: p.yaw, anim: { move: p.gait, action: p.action, mood: p.combat ? 'focused' : undefined, ...ride }, combat: p.combat }, dt, this.time, ground);
   }
 }

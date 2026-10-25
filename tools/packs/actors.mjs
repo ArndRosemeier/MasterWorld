@@ -1,11 +1,12 @@
 /**
- * The people's asset pack (`npm run packs`): downloads the Actors release's packs once (cached in
- * node_modules/.cache) and copies what the town needs into public/packs/human: the body, its morph
- * targets and skins, the medieval wardrobe, a few hairstyles and the clips in src/render/folk/looks.ts.
+ * The people's and the horses' asset packs (`npm run packs`): downloads the Actors release's packs once
+ * (cached in node_modules/.cache) and copies what the town needs into public/packs/human: the body, its
+ * morph targets and skins, the medieval wardrobe, a few hairstyles and the clips in src/render/folk/looks.ts;
+ * and the horse pack (about 10 MB, with its tack and clips) whole into public/packs/horse.
  * The full pack is about 530 MB (the CMU motion library, 90 garments, 64 hairstyles); this is a tenth.
  * Runs again only when the Actors version or the selection changes. `--force` copies anew.
  */
-import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { cpSync, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Readable } from 'node:stream';
@@ -26,14 +27,15 @@ const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK
 const dest = join(root, 'public/packs/human');
 const stamp = join(dest, '.selection');
 const want = JSON.stringify({ version, keep: Object.fromEntries(Object.entries(keep).map(([k, v]) => [k, [...v].sort()])) });
-if (!process.argv.includes('--force') && existsSync(stamp) && readFileSync(stamp, 'utf8') === want) {
+const horses = join(root, 'public/packs/horse');
+if (!process.argv.includes('--force') && existsSync(stamp) && readFileSync(stamp, 'utf8') === want && existsSync(join(horses, 'manifest.json'))) {
   console.log(`public/packs/human already has the Actors ${version} selection`);
   process.exit(0);
 }
 
 const cache = join(root, 'node_modules/.cache/actors', version);
 const archive = join(cache, 'packs.tar.gz');
-if (!existsSync(join(cache, 'packs/human/manifest.json'))) {
+if (!existsSync(join(cache, 'packs/human/manifest.json')) || !existsSync(join(cache, 'packs/horse/manifest.json'))) {
   mkdirSync(cache, { recursive: true });
   const url = `https://github.com/ArndRosemeier/Actors/releases/download/v${version}/actors-packs-${version}.tar.gz`;
   console.log(`downloading ${url}`);
@@ -41,7 +43,7 @@ if (!existsSync(join(cache, 'packs/human/manifest.json'))) {
   if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
   await pipeline(Readable.fromWeb(res.body), createWriteStream(archive));
   // Without the CMU library (most of the archive).
-  execFileSync('tar', ['xzf', archive, '-C', cache, '--exclude=packs/human/clips/cmu'], { stdio: 'inherit' });
+  execFileSync('tar', ['xzf', archive, '-C', cache, '--exclude=packs/human/clips/cmu', 'packs/human', 'packs/horse'], { stdio: 'inherit' });
   rmSync(archive);
 }
 
@@ -76,3 +78,8 @@ for (const f of files) {
 writeFileSync(join(dest, 'manifest.json'), JSON.stringify({ ...manifest, clipLibraries: [] }));
 writeFileSync(stamp, want);
 console.log(`public/packs/human: ${files.size} files, ${(bytes / 1e6).toFixed(0)} MB (Actors ${version})`);
+
+// The horse: the whole pack (body, tack, morph targets, 13 clips).
+rmSync(horses, { recursive: true, force: true });
+cpSync(join(cache, 'packs/horse'), horses, { recursive: true });
+console.log(`public/packs/horse: the Actors ${version} horse`);

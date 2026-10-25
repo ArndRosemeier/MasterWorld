@@ -10,6 +10,8 @@ import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { HeroView } from './render/hero/HeroView';
 import { FolkView } from './render/folk/FolkView';
+import { HorseView } from './render/horse/HorseView';
+import { Steed, horseSpots } from './game/horse';
 import { TownLife, type TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
@@ -202,6 +204,23 @@ export async function start(b: Boot): Promise<void> {
       log = [...log, d];
       life.order(o);
     };
+    // Saddled horses waiting by the start (Actors' horse): the mount key gets on.
+    let horses: HorseView | null = null;
+    if (params.horses > 0) {
+      loading.set('Saddling the horses');
+      const free = (x: number, z: number, r: number) => !world.wall?.(x, z, r) && world.waterLevel(x, z) === null;
+      const start = player.walker.pos;
+      const spots = horseSpots(start.x, start.z, player.walker.yaw, params.horses, free);
+      horses = await HorseView.make(view.renderer, spots.length);
+      player.steeds = spots.map((p, i) => {
+        const s = new Steed(world, i, seed);
+        s.walker.place(p.x, p.z);
+        s.walker.yaw = p.yaw;
+        return s;
+      });
+      player.horses = horses;
+      if (params.ride && player.steeds[0]) player.mount(player.steeds[0]);
+    }
     let folk: FolkView | null = null;
     if (life && params.folk > 0) {
       loading.set('Waking the town');
@@ -215,7 +234,7 @@ export async function start(b: Boot): Promise<void> {
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(folk ? await folk.warmObjects() : [])]);
+    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(folk ? await folk.warmObjects() : [])]);
     // While the loading screen (or the title's painted still) still covers the view, the land, trees and
     // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
     const capShare = view.stage.cap.share;
@@ -235,6 +254,7 @@ export async function start(b: Boot): Promise<void> {
     await view.stage.add(sea.mesh);
     if (grass) await view.stage.add(grass.group);
     await view.stage.add(hero.object);
+    await horses?.show(view.stage);
     await view.stage.add(wx.precip);
 
     const notes = new Notes();
@@ -431,9 +451,11 @@ export async function start(b: Boot): Promise<void> {
       set hour(h) { view.sky.hour = h; },
     });
     saves.dock();
-    // F flies (the key is in the settings).
+    // F flies, H gets on or off a horse (the keys are in the settings).
     onKeyDown((e) => {
-      if (!e.repeat && open === 0 && settings.current.bindings.fly.includes(e.code)) player.flying = !player.flying;
+      if (e.repeat || open > 0) return;
+      if (settings.current.bindings.fly.includes(e.code)) player.flying = !player.flying;
+      else if (settings.current.bindings.mount.includes(e.code)) player.toggleMount();
     });
     let last = performance.now();
     view.renderer.setAnimationLoop(() => {

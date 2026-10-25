@@ -32,6 +32,10 @@ export const params = {
   town: q.get('town') !== '0',
   /** How many townsfolk are drawn at most (`folk=0`: none). */
   folk: Number(q.get('folk') ?? 30),
+  /** How many saddled horses wait near the start (`horses=0`: none). */
+  horses: Number(q.get('horses') ?? 2),
+  /** Start in the saddle of the first horse (`ride`). */
+  ride: q.has('ride'),
   /** Weather everywhere, all the time (a VGM order): clear, fair, overcast, rain, storm, fog, snow. */
   weather: q.get('weather'),
   /** Start in the town's cellar: `cellar` at the ladder, `cellar=3` in room 3. */

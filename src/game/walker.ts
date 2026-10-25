@@ -40,8 +40,16 @@ export interface WalkIntent {
 
 export type WalkMode = 'ground' | 'air' | 'swim';
 
-/** Speeds (m/s) and the body. */
-export const WALK = {
+/** Speeds (m/s) and the body of something that walks (the hero's, a horse's in game/horse.ts). */
+export interface WalkSpec {
+  run: number; walk: number; back: number; swim: number; swimSlow: number; jump: number; gravity: number;
+  height: number; radius: number; step: number; snap: number; maxSlope: number;
+  /** How quickly the speed answers the input on the ground (1/s). */
+  grip: number;
+}
+
+/** The hero's. */
+export const WALK: WalkSpec = {
   run: 5.2,
   walk: 1.7,
   /** Backwards is slower. */
@@ -58,6 +66,7 @@ export const WALK = {
   snap: 0.5,
   /** Ground steeper than this (rise over run) cannot be walked up. */
   maxSlope: 1.25,
+  grip: 12,
 };
 
 export class Walker {
@@ -67,9 +76,11 @@ export class Walker {
   yaw = 0;
   mode: WalkMode = 'ground';
   /** Body height, metres. */
-  height = WALK.height;
+  height: number;
 
-  constructor(private readonly world: WalkWorld) {}
+  constructor(private readonly world: WalkWorld, readonly spec: WalkSpec = WALK) {
+    this.height = spec.height;
+  }
 
   /** Stand at a point, on whatever ground is there (or float, in deep water). */
   place(x: number, z: number, y?: number): void {
@@ -86,7 +97,7 @@ export class Walker {
    */
   support(x: number, z: number, y: number): number {
     const h = Math.max(this.world.height(x, z), this.world.floor?.(x, z) ?? -Infinity);
-    let s = y + WALK.step;
+    let s = y + this.spec.step;
     if (s <= h) return h;
     for (let i = 0; i < 48; i++) {
       const d = this.world.rockSurface(x, s, z);
@@ -100,7 +111,7 @@ export class Walker {
 
   /** Whether the body would be in rock at (x, z) with its feet at y. */
   private blocked(x: number, y: number, z: number): boolean {
-    const r = WALK.radius;
+    const r = this.spec.radius;
     if (this.world.wall?.(x, z, r)) return true;
     for (const k of [0.75, 1.3, this.height - r]) {
       const d = this.world.rockSurface(x, y + k, z);
@@ -137,9 +148,9 @@ export class Walker {
     let fx = -sh * intent.forward + ch * intent.strafe, fz = -ch * intent.forward - sh * intent.strafe;
     const len = Math.hypot(fx, fz);
     if (len > 1) { fx /= len; fz /= len; }
-    const speed = (swim ? (intent.walk ? WALK.swimSlow : WALK.swim) : intent.walk ? WALK.walk : WALK.run) * (intent.forward < 0 ? WALK.back : 1);
+    const speed = (swim ? (intent.walk ? this.spec.swimSlow : this.spec.swim) : intent.walk ? this.spec.walk : this.spec.run) * (intent.forward < 0 ? this.spec.back : 1);
     // Quick to answer on the ground, slow to change course in the air, smooth in the water.
-    const a = damp(this.mode === 'ground' ? 12 : swim ? 3.5 : 1.2, dt);
+    const a = damp(this.mode === 'ground' ? this.spec.grip : swim ? 3.5 : 1.2, dt);
     v.x += (fx * speed - v.x) * a;
     v.z += (fz * speed - v.z) * a;
 
@@ -149,10 +160,10 @@ export class Walker {
       if (this.mode === 'ground') {
         const run = Math.hypot(nx - p.x, nz - p.z);
         const rise = this.support(nx, nz, p.y) - p.y;
-        if (run > 1e-6 && rise > WALK.step && rise / run > WALK.maxSlope) return false;
+        if (run > 1e-6 && rise > this.spec.step && rise / run > this.spec.maxSlope) return false;
         // The height field alone is too steep here (a step up of slope, not a ledge).
         const hf = this.world.height(nx, nz) - this.world.height(p.x, p.z);
-        if (run > 1e-6 && hf > 0 && hf / run > WALK.maxSlope && this.world.rockSurface(nx, p.y, nz) === null) return false;
+        if (run > 1e-6 && hf > 0 && hf / run > this.spec.maxSlope && this.world.rockSurface(nx, p.y, nz) === null) return false;
       }
       p.x = nx; p.z = nz;
       return true;
@@ -167,12 +178,12 @@ export class Walker {
     // Up and down.
     const ground = this.support(p.x, p.z, p.y);
     if (this.mode === 'ground') {
-      if (intent.up) { v.y = WALK.jump; this.mode = 'air'; }
-      else if (ground >= p.y - WALK.snap) { p.y = ground; v.y = 0; }
+      if (intent.up) { v.y = this.spec.jump; this.mode = 'air'; }
+      else if (ground >= p.y - this.spec.snap) { p.y = ground; v.y = 0; }
       else this.mode = 'air';
     }
     if (this.mode === 'air') {
-      v.y -= WALK.gravity * dt;
+      v.y -= this.spec.gravity * dt;
       const ny = p.y + v.y * dt;
       // The head stops at rock above.
       const above = this.world.rockSurface(p.x, ny + this.height, p.z);
