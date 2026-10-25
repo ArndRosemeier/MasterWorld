@@ -113,7 +113,7 @@ async function start(): Promise<void> {
     // once they stand.
     loading.set('Planting the trees');
     let planted = false;
-    const planting = (boot.trees ? flora.show() : Promise.resolve()).then(() => { planted = true; });
+    const planting = (boot.trees ? flora.plant() : Promise.resolve()).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;

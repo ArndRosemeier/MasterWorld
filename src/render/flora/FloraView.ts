@@ -5,7 +5,7 @@
  * canopy hull; past the near cells only the far cells' hulls remain. The levels, and on WebGPU the culling to the
  * view (and to shadows falling into it), are @futuremagic/instances'.
  */
-import { Matrix4, Mesh, Quaternion, Vector3, type BufferGeometry, type Camera, type DirectionalLight, type InstancedBufferGeometry, type Material } from 'three/webgpu';
+import { Matrix4, Quaternion, Vector3, type BufferGeometry, type Camera, type DirectionalLight, type Material } from 'three/webgpu';
 import { shrubModel, treeModel, vegetationUniforms, type TreeSpecies } from '@futuremagic/vegetation';
 import { createBarkMaterial, createFarTreeMaterial, createLeafMaterial } from '@futuremagic/vegetation/node';
 import { createInstanceDraws, DITHER, KIND, RECORD, type DrawKind, type DrawPart, type InstanceDraws } from '@futuremagic/instances';
@@ -149,15 +149,9 @@ export class FloraView {
     this.draws.set(this.records, n);
   }
 
-  /** Put the plants into the scene once their shaders are built. */
-  async show(): Promise<void> {
-    await this.draws.ready();
-    // Every batch is built now, also those of kinds not around yet (one instance each while it builds).
-    const meshes = this.group.children.filter((o): o is Mesh<InstancedBufferGeometry> => (o as Mesh).isMesh);
-    const counts = meshes.map((m) => m.geometry.instanceCount);
-    for (const m of meshes) m.geometry.instanceCount = Math.max(1, m.geometry.instanceCount);
-    await this.stage.prepare(this.group);
-    meshes.forEach((m, k) => { m.geometry.instanceCount = counts[k]; });
+  /** Put the plants into the scene once their shaders are built (every part, also of kinds not around yet). */
+  async plant(): Promise<void> {
+    await this.draws.prepare((g) => this.stage.prepare(g));
     await this.stage.add(this.group);
   }
 }
