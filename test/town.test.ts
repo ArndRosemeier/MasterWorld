@@ -7,6 +7,7 @@ import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
 import { TownGround } from '../src/world/town';
 import { floraPlacement, FLORA_STRIDE } from '../src/world/flora';
+import { Walker, type WalkWorld } from '../src/game/walker';
 
 const { terrain, log, home } = openWorld(parseSeed('masterworld'), classic);
 
@@ -78,4 +79,20 @@ test('town: one walks up the steps and onto the temple porch, and not through it
       prev = y;
     }
   }
+});
+
+test('town: the hero walks up the temple steps onto the porch', () => {
+  const town = terrain.towns[0];
+  const t = town.plan.buildings.find((b) => b.kind === 'temple');
+  if (!t) return;
+  const world: WalkWorld = {
+    height: (x, z) => terrain.height(x, z), floor: (x, z) => town.stand(x, z),
+    rockSurface: () => null, waterLevel: () => null, wall: (x, z, r) => town.solid(x, z, r),
+  };
+  // From 6 m out, straight at the door between the middle columns.
+  const dx = t.cx - t.door[0], dz = t.cz - t.door[1], l = Math.hypot(dx, dz);
+  const w = new Walker(world);
+  w.place(t.door[0] - (dx / l) * 6, t.door[1] - (dz / l) * 6);
+  for (let i = 0; i < 4 * 30; i++) w.step({ forward: 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: true, up: false, down: false }, 1 / 30);
+  assert.ok(w.pos.y > t.floorY + 0.2, `on the porch: ${(w.pos.y - t.floorY).toFixed(2)} m over the floor`);
 });

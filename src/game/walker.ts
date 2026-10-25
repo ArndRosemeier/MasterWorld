@@ -16,6 +16,8 @@ export interface WalkWorld {
   rockSurface(x: number, y: number, z: number): number | null;
   /** Calm water surface level here, or null where there is no water. */
   waterLevel(x: number, z: number): number | null;
+  /** Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. */
+  floor?(x: number, z: number): number | null;
   /** Walls (buildings): does a body of radius `r` at (x, z) touch one? */
   wall?(x: number, z: number, r: number): boolean;
 }
@@ -83,7 +85,7 @@ export class Walker {
    * `y` (so the walker can stand on an arch and walk under it).
    */
   support(x: number, z: number, y: number): number {
-    const h = this.world.height(x, z);
+    const h = Math.max(this.world.height(x, z), this.world.floor?.(x, z) ?? -Infinity);
     let s = y + WALK.step;
     if (s <= h) return h;
     for (let i = 0; i < 48; i++) {
