@@ -85,12 +85,12 @@ export class TitleScreen {
     this.root.querySelectorAll('svg').forEach((e) => e.pauseAnimations());
   }
 
-  /** True once the first press opened the title. */
-  get opened(): boolean { return !this.root.classList.contains('gated'); }
+  /** True once the first press woke the title. */
+  get begun(): boolean { return !this.root.classList.contains('gated'); }
 
   /** The first press: the opening starts (with its sounds; the caller has allowed sound by now). */
-  open(): void {
-    if (this.opened) return;
+  wake(): void {
+    if (this.begun) return;
     this.root.classList.remove('gated');
     this.root.querySelectorAll('svg').forEach((e) => e.unpauseAnimations());
     window.setTimeout(() => this.gate.remove(), 900);
