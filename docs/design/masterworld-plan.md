@@ -226,7 +226,7 @@ Weather is part of the world model (`src/world/weather.ts`), pure and determinis
 
 * Sizes: farmstead, hamlet, village, town, city. The VGM makes them on demand (People need, a quest, a road needing a waypoint).
 * **Growth**: a settlement can be upgraded by a later decision (a hamlet becomes a village after the player cleared the bandits). Growth adds to the plan and never moves what the player has already seen.
-* Scale's planning layers (macro plan → cells → lots → buildings) look reusable. Its look is modern, so MasterWorld needs a **medieval style family**: walls and gates, market square, church or temple, organic streets, timber-framed and stone houses, mills, docks, castles.
+* Scale's planning layers (macro plan → cells → lots → buildings) look reusable. Its look is modern, so MasterWorld needs a **medieval style family**: walls and gates, market square, temple, organic streets, timber-framed and stone houses, mills, docks, castles.
 * Race shapes architecture: a dwarven hold, an elven village and a human town should differ in plan as well as look.
 * Every building with an interior is a possible cellar or dungeon entrance.
 
@@ -278,7 +278,7 @@ How:
 
 * **Smart objects.** The world tells people what to do. Every anvil, well, bench, stall, field, woodpile, hearth, bar counter and doorway carries **affordances**: which activity it offers, for which jobs, where to stand, which animation and prop, how long, how many at once. Settlement and interior generators place them as a matter of course: a smithy is not finished until it has its forge, anvil, quench tub and woodpile with their affordances. Norgo's `SmartSpot` (13 kinds) is the seed of this; MasterWorld needs many more, and several per building.
 * **Activities, not poses.** An activity is a short sequence: walk there, put down the basket, draw water, lift the bucket, carry it home. Props move with the hands (IK onto the prop). Carrying things between places (sacks, buckets, firewood, tools) is the cheapest and most convincing life there is.
-* **Daily schedules by job, personality and weather.** Work, meals, the tavern in the evening, church on a holy day, shelter in the rain, sleep. Personality (from Scale's personality plan: Big Five traits) varies the timing and the choices: the lazy apprentice takes long breaks, the pious widow goes to the shrine.
+* **Daily schedules by job, personality and weather.** Work, meals, the tavern in the evening, the temple on a holy day, shelter in the rain, sleep. Personality (from Scale's personality plan: Big Five traits) varies the timing and the choices: the lazy apprentice takes long breaks, the pious widow goes to the shrine.
 * **Social life.** People meet and talk in pairs and small groups with gestures and turn-taking, children play and chase each other, someone shouts across the market, a couple argues. Groups use Conversations underneath, so what they say can be real gossip (the VGM's rumours spreading, 9.1).
 * **Reactions.** To the player (glance, greet by name if they know them, step aside, stare at a drawn weapon), to events (fire: run with buckets; a raid: flee, bar the doors), to weather and time of day.
 * **Animals and traffic.** Dogs, chickens, cattle, a cart on the road: Actors' animals, with the same smart-object rules (a trough, a pasture, a kennel).
