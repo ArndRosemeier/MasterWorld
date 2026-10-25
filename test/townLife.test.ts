@@ -21,7 +21,8 @@ test('town life: through a whole day nobody stands around, and everyone does sev
   const life = new TownLife(plan, 7, 6);
   const idle: ActivityKind[] = ['wait', 'stroll'];
   let idleS = 0, allS = 0, walkS = 0;
-  const did = life.agents.map(() => new Set<ActivityKind>());
+  // Indoors counts by the building: at work in the shop, at home, at the inn are different things.
+  const did = life.agents.map(() => new Set<string>());
   const t0 = performance.now();
   for (let s = 0; s < 16 * HOUR; s += 1) {
     life.step(1, 6 + s / HOUR);
@@ -29,7 +30,7 @@ test('town life: through a whole day nobody stands around, and everyone does sev
       allS++;
       if (idle.includes(a.act)) idleS++;
       if (a.act === 'walk') walkS++;
-      if (a.act !== 'walk') did[a.person.id].add(a.act);
+      if (a.act !== 'walk') did[a.person.id].add(a.act === 'indoors' ? `in ${life.spots[a.spot]?.building}` : a.act);
     }
   }
   const ms = performance.now() - t0;
