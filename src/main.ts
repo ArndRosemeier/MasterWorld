@@ -220,11 +220,14 @@ async function start(): Promise<void> {
     const notes = new Notes();
     let delve: Delve | null = null;
     let creatures: CreatureView | null = null;
+    let dwellers: Promise<void> | null = null;
     // The first promise: the cellar under a house of the town (outlined now; it is small).
     const promise = firstDungeon(opened.log);
     const house = promise ? houseOf(promise, terrain.towns) : null;
     if (promise && house) {
-      const cellar = outlineCellar(promise, house, setting.dungeons.cellar);
+      // `?dweller=` puts that dweller in (for looking at them); otherwise the cellar's own choice.
+      const lore = setting.dungeons.cellar, only = params.dweller ? lore.dwellers.filter((w) => w.id === params.dweller) : [];
+      const cellar = outlineCellar(params.dweller && only.length ? { ...promise, danger: undefined } : promise, house, only.length ? { ...lore, dwellers: only } : lore);
       // Its own space, deep under the house.
       const cellarView = new CellarView(cellar, { x: house.cx, y: -400, z: house.cz });
       await cellarView.add(view.stage);
@@ -233,7 +236,8 @@ async function start(): Promise<void> {
       loading.set('Waking the cellar');
       delve = new Delve(cellar, visit.space, setting, character, seed, save?.cellars[promise.id]?.delve);
       creatures = await CreatureView.build(delve.den, seed, cellarView.origin);
-      await view.stage.add(creatures.group);
+      // Its skinned shaders build in the Stage's frame slots once the loop runs; loading waits for them below.
+      dwellers = view.stage.add(creatures.group);
       if (params.cellar) {
         await visit.enter(true, params.cellarRoom);
         if (params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
@@ -253,7 +257,7 @@ async function start(): Promise<void> {
     // the loop must run meanwhile; loading ends once they stand.
     loading.set('Planting the trees');
     let planted = false;
-    const planting = Promise.all([boot.trees ? flora.plant() : null, folk?.warmLods()]).then(() => { planted = true; });
+    const planting = Promise.all([boot.trees ? flora.plant() : null, folk?.warmLods(), dwellers]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;

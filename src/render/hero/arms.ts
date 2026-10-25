@@ -1,6 +1,6 @@
 /**
  * What hands hold (plan 11.5): the setting's weapons, shields and the torch as small meshes in grip
- * space (+y along the blade from the fist, the hilt below), built from boxes in the building format and
+ * space (+y along the blade out of the thumb side of the fist, the edge along +z, the hilt below), built from boxes in the building format and
  * drawn with the town's building shader (no new shaders): steel on the smooth layer, hafts in oak, iron
  * in slate. The humanoid package grips, sheathes and swings them.
  */
@@ -22,12 +22,12 @@ export const ARM_SHAPES: Readonly<Record<string, string>> = {
 function blade(k: MeshKit, len: number, width: number, guard: number): void {
   k.box(0, -0.11, 0, 0.03, 0.12, 0.03, 0, M.Oak, LEATHER);
   k.box(0, -0.13, 0, 0.04, 0.025, 0.04, 0, M.Slate, BRASS);
-  k.box(0, 0.005, 0, guard, 0.02, 0.035, 0, M.Slate, guard > 0.08 ? BRASS : DARK);
+  k.box(0, 0.005, 0, 0.035, 0.02, guard, 0, M.Slate, guard > 0.08 ? BRASS : DARK);
   // Three steps narrower towards the point.
   const steps = 3;
   for (let s = 0; s < steps; s++) {
     const w = width * (1 - s / (steps + 0.5)), y0 = 0.02 + (len * s) / steps;
-    k.box(0, y0, 0, w, len / steps, 0.008, 0, M.Glass, STEEL);
+    k.box(0, y0, 0, 0.008, len / steps, w, 0, M.Glass, STEEL);
   }
 }
 
@@ -43,11 +43,11 @@ export function buildArm(defId: string): Object3D {
     case 'dagger': blade(k, 0.24, 0.035, 0.08); break;
     case 'sword.short': blade(k, 0.5, 0.045, 0.14); break;
     case 'sword.arming': blade(k, 0.72, 0.045, 0.2); break;
-    case 'axe.hand': haft(k, 0.5); k.box(0.05, 0.28, 0, 0.12, 0.08, 0.012, 0, M.Glass, STEEL); break;
-    case 'axe.bearded': haft(k, 0.66); k.box(0.06, 0.38, 0, 0.14, 0.13, 0.012, 0, M.Glass, STEEL); break;
+    case 'axe.hand': haft(k, 0.5); k.box(0, 0.28, 0.05, 0.012, 0.08, 0.12, 0, M.Glass, STEEL); break;
+    case 'axe.bearded': haft(k, 0.66); k.box(0, 0.38, 0.06, 0.012, 0.13, 0.14, 0, M.Glass, STEEL); break;
     case 'club': haft(k, 0.5); k.box(0, 0.24, 0, 0.07, 0.16, 0.07, 0, M.Oak, OAK); break;
-    case 'mace': haft(k, 0.52); k.box(0, 0.32, 0, 0.09, 0.1, 0.09, 0.4, M.Slate, DARK); k.box(0, 0.34, 0, 0.12, 0.05, 0.03, 0, M.Slate, DARK); break;
-    case 'spear': haft(k, 1.9, 0.6); k.box(0, 1.3, 0, 0.05, 0.22, 0.01, 0, M.Glass, STEEL); break;
+    case 'mace': haft(k, 0.52); k.box(0, 0.32, 0, 0.09, 0.1, 0.09, 0.4, M.Slate, DARK); k.box(0, 0.34, 0, 0.03, 0.05, 0.12, 0, M.Slate, DARK); break;
+    case 'spear': haft(k, 1.9, 0.6); k.box(0, 1.3, 0, 0.01, 0.22, 0.05, 0, M.Glass, STEEL); break;
     case 'shield.buckler': k.cylinder(0, -0.02, 0, 0.17, 0.03, 12, M.Slate, DARK); k.cylinder(0, 0.01, 0, 0.05, 0.03, 8, M.Slate, BRASS); break;
     case 'shield.round': k.cylinder(0, -0.02, 0, 0.32, 0.03, 16, M.Oak, OAK); k.cylinder(0, 0.01, 0, 0.07, 0.035, 10, M.Slate, DARK); break;
     case 'torch': haft(k, 0.45, 0.1); k.box(0, 0.33, 0, 0.06, 0.08, 0.06, 0, M.Thatch, [90, 70, 40]); break;

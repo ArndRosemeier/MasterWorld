@@ -1,21 +1,22 @@
 /**
- * A den's creatures drawn (plan 9.3, 12): rats and spiders are procedural animals (@futuremagic/creatures,
- * grown once per kind from the setting's seed: a rat a plain furred quadruped, a spider a chitin
- * eight-legger) on one flesh shader; goblins, smugglers, the dead and ghouls are humanoids
+ * A den's creatures drawn (plan 9.3, 12): rats are Dunfinity's modelled quarry rat (public/creatures, its
+ * clips: sniffing, scurrying, the run, rearing up, the bite, a flinch, dying), scaled to their kind;
+ * spiders are procedural animals (@futuremagic/creatures, grown once per kind from the setting's seed: a
+ * chitin eight-legger) on one flesh shader; goblins, smugglers, the dead and ghouls are humanoids
  * (@futuremagic/humanoid) in the cellar's outfits, holding their weapons, the skeleton only its bones.
  * Each is posed every frame from what the den says it is doing: walking, running, rummaging, the wind-up
  * and blow, a flinch when struck, begging, falling. Built behind the loading screen; placed at the
  * cellar's origin.
  */
-import { Group, type Object3D } from 'three/webgpu';
+import { Box3, Group, Vector3, type Object3D } from 'three/webgpu';
 import { Rng, deriveSeed, hexToRgb } from '@futuremagic/core';
 import { grow, type BodyPlan, type Integument } from '@futuremagic/creatures';
-import { CritterModel, type CritterFigure, type RigInput } from '@futuremagic/creatures/three';
+import { CritterModel, ModelledCreature, type ClipUse, type CritterFigure, type ModelledFigure, type RigInput } from '@futuremagic/creatures/three';
 import { randomAppearance, setHumanAssetBase, type EquipmentVisuals, type RaceId } from '@futuremagic/humanoid';
 import { Humanoid, type ActionAnim, type MoveState } from '@futuremagic/humanoid/three';
 import type { CreatureDef } from '../../setting/contract';
 import type { Creature, Den } from '../../sim/creatures';
-import { critterMaterials } from '../materials/creatures';
+import { critterMaterials, ratMaterial } from '../materials/creatures';
 import { TRAVELLER, visual } from '../hero/wardrobe';
 
 const ASSETS = `${import.meta.env.BASE_URL}humanoid/`;
@@ -23,9 +24,15 @@ const ASSETS = `${import.meta.env.BASE_URL}humanoid/`;
 const BLOW = 0.75;
 /** A flinch, seconds. */
 const FLINCH = 0.35;
+/** The rat's clips (AssetGenerator's quadruped rat_clips.py; strides at size 1). */
+const RAT_CLIPS: Record<string, ClipUse> = {
+  Sniff: { loop: true }, Scurry: { loop: true, stride: 0.22 }, Run: { loop: true, stride: 0.45 }, Rear: { loop: true },
+  Graze: { loop: true }, Bite: { loop: false }, Die: { loop: false },
+};
 
 type Body =
   | { readonly kind: 'critter'; readonly fig: CritterFigure; readonly scale: number }
+  | { readonly kind: 'modelled'; readonly fig: ModelledFigure; readonly scale: number }
   | { readonly kind: 'humanoid'; readonly body: Humanoid; readonly scale: number };
 
 interface Shown {
@@ -39,6 +46,8 @@ interface Shown {
   hurtAt: number;
   act: string;
   variant: number;
+  /** Metres walked (a modelled body's stride). */
+  walked: number;
 }
 
 const yawOf = (dir: number) => Math.atan2(-Math.cos(dir), -Math.sin(dir));
@@ -75,6 +84,9 @@ export class CreatureView {
   readonly group = new Group();
   private readonly shown: Shown[] = [];
   private time = 0;
+  /** The height (cellar frame) of the creature being posed: where its feet look for the floor. */
+  private near = 0;
+  private readonly eyeWorld: [number, number, number] = [0, 0, 0];
   private readonly input: { -readonly [K in keyof RigInput]: RigInput[K] } = { x: 0, y: 0, z: 0, yaw: 0, vx: 0, vz: 0, dead: false, action: '', actionT: 0, lookAt: null, running: false, pose: '', time: 0, scale: 1 };
 
   private constructor(readonly den: Den, origin: { x: number; y: number; z: number }) {
@@ -86,7 +98,10 @@ export class CreatureView {
     const v = new CreatureView(den, origin);
     setHumanAssetBase(ASSETS);
     const models = new Map<string, CritterModel>();
-    const ground = (_x: number, _z: number) => 0;
+    let rat: { model: ModelledCreature; length: number } | null = null;
+    // The rig plants feet in the world: the cellar's floor under them (near the storey the creature is on).
+    const O = v.group.position;
+    const ground = (x: number, z: number) => (den.space.floorAt(x - O.x, z - O.z, v.near + 0.8) ?? v.near) + O.y;
     for (const c of den.creatures) {
       const b = c.def.body;
       let body: Body;
@@ -102,17 +117,30 @@ export class CreatureView {
         body = { kind: 'humanoid', body: h, scale: b.height / h.height };
         h.object.scale.setScalar(body.scale);
         v.group.add(h.object);
+      } else if (b.kind === 'rat') {
+        if (!rat) {
+          const model = await ModelledCreature.load(`${import.meta.env.BASE_URL}creatures/quarry_rat.glb`, ratMaterial);
+          const f = model.figure(RAT_CLIPS);
+          const size = new Box3().setFromObject(f.root).getSize(new Vector3());
+          rat = { model, length: Math.max(size.x, size.z) };
+        }
+        const fig = rat.model.figure(RAT_CLIPS, 'Hurt');
+        // Its length without the tail, as the setting gives it (the tail is about two fifths of the model).
+        const scale = b.length / (rat.length * 0.6);
+        fig.root.name = c.def.name;
+        v.group.add(fig.root);
+        body = { kind: 'modelled', fig, scale };
       } else {
         let m = models.get(c.def.id);
         if (!m) { m = new CritterModel(speciesFor(c.def, seed), critterMaterials()); models.set(c.def.id, m); }
         const fig = m.figure(ground);
-        // Its length without the tail, as the setting gives it.
-        const scale = b.length / Math.max(0.05, m.species.totalLength * (b.kind === 'rat' ? 0.6 : 1));
+        // Its length, legs and all, as the setting gives it.
+        const scale = b.length / Math.max(0.05, m.species.totalLength);
         fig.root.name = c.def.name;
         v.group.add(fig.root);
         body = { kind: 'critter', fig, scale };
       }
-      v.shown.push({ c, body, px: c.x, pz: c.z, blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id });
+      v.shown.push({ c, body, px: c.x, pz: c.z, blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0 });
     }
     v.pose(0);
     return v;
@@ -137,14 +165,27 @@ export class CreatureView {
       const dead = c.state === 'dead';
       const yaw = yawOf(c.dir);
       const watching = !dead && (c.state === 'alert' || c.state === 'fight' || c.state === 'beg') && eye ? eye : null;
-      if (s.body.kind === 'critter') {
+      if (s.body.kind === 'modelled') {
+        const f = s.body.fig, k = s.body.scale, speed = Math.hypot(vx, vz) / k;
+        s.walked += Math.hypot(vx, vz) * dt;
+        f.root.position.set(c.x, c.y, c.z);
+        f.root.rotation.set(0, yaw + Math.PI, 0);
+        f.root.scale.setScalar(k);
+        const clip = dead ? 'Die' : blowT < 1 ? 'Bite' : c.state === 'alert' ? 'Rear' : speed > 2.2 ? 'Run' : speed > 0.2 ? 'Scurry' : c.act === 'gnaw' || c.act === 'rummage' ? 'Graze' : 'Sniff';
+        f.play(clip);
+        f.pace(s.walked / k);
+        if (hurtT < 1 && hurtT * FLINCH < dt + 1e-6 && !dead) f.hurt();
+        f.advance(dt);
+      } else if (s.body.kind === 'critter') {
         const i = this.input;
         i.x = c.x; i.y = c.y; i.z = c.z; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
         i.running = c.act === 'run' || c.state === 'fight' || c.state === 'flee';
         i.pose = c.act === 'gnaw' || c.act === 'sniff' || c.act === 'rummage' || c.act === 'spin' ? 'feed' : '';
-        i.lookAt = watching;
+        const O = this.group.position;
+        if (watching) { this.eyeWorld[0] = watching[0] + O.x; this.eyeWorld[1] = watching[1] + O.y; this.eyeWorld[2] = watching[2] + O.z; }
+        i.lookAt = watching ? this.eyeWorld : null;
+        this.near = c.y;
         if (blowT < 1 && !dead) { i.action = c.def.body.kind === 'spider' ? 'lunge' : 'bite'; i.actionT = blowT; }
-        else if (c.state === 'alert' && c.def.body.kind === 'rat') { i.action = 'rear'; i.actionT = 0.5; }
         else if (hurtT < 1 && !dead) { i.action = 'flinch'; i.actionT = hurtT; }
         else { i.action = ''; i.actionT = 0; }
         s.body.fig.animate(i, dt, hurtT < 1 ? 1 - hurtT : 0);
