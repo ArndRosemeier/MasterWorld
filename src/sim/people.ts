@@ -11,7 +11,7 @@ import { distToPoly, type TownPlan } from '@futuremagic/settlement';
 export type Race = 'human' | 'dwarf' | 'halfling' | 'elf';
 
 /** What a person does for a living. */
-export type Role = 'trade' | 'trader' | 'keeper' | 'hand' | 'homemaker' | 'child';
+export type Role = 'trade' | 'trader' | 'keeper' | 'hand' | 'homemaker' | 'child' | 'traveller';
 
 export interface Person {
   id: number;
@@ -37,7 +37,7 @@ export interface Person {
 }
 
 /** The parts of a day (each person's own hours). */
-export type Block = 'sleep' | 'morning' | 'work' | 'meal' | 'evening';
+export type Block = 'sleep' | 'morning' | 'work' | 'meal' | 'evening' | 'away';
 
 /** Everyone living in a town. */
 export function townsfolk(plan: TownPlan, seed: number): Person[] {
@@ -84,6 +84,13 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     if (b.kind === 'smithy' || b === miners) p.race = 'dwarf';
     else if (b.kind === 'inn') p.race = 'halfling';
   }
+  // The odd elf passing through, lodging at the inn while in town (away()).
+  const inn = plan.buildings.find((b) => b.kind === 'inn');
+  if (inn) {
+    const elf = houseOne(inn.id, -1, 'traveller', '');
+    elf.race = 'elf';
+    elf.age = Math.round(new Rng(deriveSeed(elf.seed, 'age')).range(90, 400));
+  }
   return people;
 }
 
@@ -92,6 +99,21 @@ const marketDist = (plan: TownPlan, home: number) => {
   return distToPoly(plan.market, b.door[0], b.door[1]);
 };
 const dist = (plan: TownPlan, home: number, x: number, z: number) => Math.hypot(plan.buildings[home].cx - x, plan.buildings[home].cz - z);
+
+/** A traveller's visits come round every this many game hours. */
+const VISIT = 72;
+
+/**
+ * Whether a traveller is out of town at `hours` game hours since the start (day × 24 + hour): each visit
+ * begins late in the morning, lasts the night at the inn and ends about the next noon. Others never are.
+ */
+export function away(p: Person, hours: number): boolean {
+  if (p.role !== 'traveller') return false;
+  const k = Math.floor(hours / VISIT), t = hours - k * VISIT;
+  const r = new Rng(deriveSeed(p.seed, 'visit', k));
+  const from = r.range(9, 15), to = 24 + r.range(10, 15);
+  return t < from || t >= to;
+}
 
 /** Which part of their day a person is in at `hour` (0..24). */
 export function blockAt(p: Person, hour: number): Block {

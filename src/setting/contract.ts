@@ -343,7 +343,7 @@ export interface NamesDef {
  * `{family}`, `{house}`, `{trade}` and `{sign}` are filled in by the engine.
  */
 export interface TalkDef {
-  /** Who someone is, by what they do (keys: trade, trader, keeper, hand, homemaker, child). */
+  /** Who someone is, by what they do (keys: trade, trader, keeper, hand, homemaker, child, traveller; {house} is where they live or lodge). */
   readonly identity: Readonly<Record<string, string>>;
   /** The topics the player can pick, by id (greet, self, news, more, source, bye, and `lead` for a lead's topic). */
   readonly topics: Readonly<Record<string, string>>;
@@ -444,7 +444,7 @@ export function validateSetting(m: SettingModule): string[] {
   }
   const t = m.talk;
   for (const k of ['greet', 'self', 'news', 'more', 'source', 'bye']) if (!t.topics[k]) out.push(`${where}: talk topic "${k}" has no wording`);
-  for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);
+  for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child', 'traveller']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);
   if (!t.nothing.length) out.push(`${where}: talk.nothing is empty`);
   if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
   out.push(...validateFight(m, where));

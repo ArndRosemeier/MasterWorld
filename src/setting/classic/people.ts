@@ -35,6 +35,7 @@ export const talk: TalkDef = {
     hand: "I'm {name}. I help the {trade}; home is {house}.",
     homemaker: "I'm {name}. I keep house in {house}.",
     child: "I'm {name}! I live in {house}.",
+    traveller: "I am {name}, only passing through. I lodge at {house} until the road calls again.",
   },
   topics: {
     greet: 'Greet',

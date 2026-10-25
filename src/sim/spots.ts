@@ -7,7 +7,7 @@ import type { Fixture, FixtureKind, TownPlan } from '@futuremagic/settlement';
 
 /** What a person is doing (the renderer picks an animation by it). */
 export type ActivityKind =
-  | 'sleep' | 'indoors' | 'walk' | 'wait'
+  | 'sleep' | 'indoors' | 'walk' | 'wait' | 'away'
   | 'smith' | 'stoke' | 'quench' | 'bake' | 'craft' | 'sell' | 'serve' | 'tend'
   | 'fetchWater' | 'fetchWood' | 'chop' | 'garden' | 'washing' | 'feedHens'
   | 'browse' | 'sit' | 'chat' | 'drink' | 'pray' | 'mourn' | 'play' | 'stroll' | 'gather';

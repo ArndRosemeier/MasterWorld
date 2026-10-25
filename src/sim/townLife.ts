@@ -9,7 +9,7 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { polyCentroid, type TownPlan } from '@futuremagic/settlement';
 import { NavGraph, aroundHouse } from './nav';
-import { blockAt, townsfolk, type Block, type Person } from './people';
+import { away, blockAt, townsfolk, type Block, type Person } from './people';
 import { townSpots, type ActivityKind, type Spot } from './spots';
 
 /** A VGM order for the town (plain data, logged with the decisions): times in game hours since the start (day × 24 + hour). */
@@ -31,7 +31,7 @@ export interface Agent {
   next: ActivityKind;
   /** The spot they are at or heading to (-1: a free point). */
   spot: number;
-  /** Indoors: not to be drawn. */
+  /** Indoors or out of town: not to be drawn. */
   hidden: boolean;
   /** When the turn ends (sim seconds). */
   until: number;
@@ -63,6 +63,8 @@ export class TownLife {
   focus = { x: 0, z: 0 };
   private readonly orders: TownOrder[] = [];
   private readonly market: [number, number];
+  /** Where each road out leaves the town (travellers come and go there). */
+  private readonly roadEnds: [number, number][] = [];
   private hour = 12;
   /** Game hours since the start (orders are timed in these). */
   private hours = 12;
@@ -73,6 +75,12 @@ export class TownLife {
     this.spots = townSpots(plan);
     this.market = polyCentroid(plan.market) as [number, number];
     this.focus = { x: this.market[0], z: this.market[1] };
+    for (const st of plan.streets) {
+      if (st.kind !== 'road') continue;
+      const [cx, cz] = plan.centre, n = st.pts.length;
+      const first = Math.hypot(st.pts[0] - cx, st.pts[1] - cz) > Math.hypot(st.pts[n - 2] - cx, st.pts[n - 1] - cz);
+      this.roadEnds.push(first ? [st.pts[0], st.pts[1]] : [st.pts[n - 2], st.pts[n - 1]]);
+    }
     this.hour = hour % 24;
     this.hours = hour;
     this.agents = townsfolk(plan, seed).map((p) => {
@@ -131,6 +139,7 @@ export class TownLife {
   }
 
   private blockOf(a: Agent): Block | 'order' {
+    if (away(a.person, this.hours)) return 'away';
     const b = blockAt(a.person, this.hour);
     return b !== 'sleep' && this.activeOrder() ? 'order' : b;
   }
@@ -160,7 +169,7 @@ export class TownLife {
   private arrive(a: Agent, x: number, z: number, dir: number): void {
     a.x = x; a.z = z; a.dir = dir;
     a.act = a.next;
-    a.hidden = a.act === 'sleep' || a.act === 'indoors';
+    a.hidden = a.act === 'sleep' || a.act === 'indoors' || a.act === 'away';
     a.path = [];
   }
 
@@ -207,6 +216,11 @@ export class TownLife {
     const free = (x: number, z: number, act: ActivityKind, secs: [number, number]) => ({ spot: -1, x, z, act, secs });
     const block = a.block;
     if (block === 'sleep') return at(home, 'sleep', [600, 1200]);
+    if (block === 'away') {
+      // On the road: gone where it leaves the town (or still there).
+      const [x, z] = this.roadEnds.length ? r.pick(this.roadEnds) : [this.spots[home].x, this.spots[home].z];
+      return a.act === 'away' ? free(a.x, a.z, 'away', [600, 1200]) : free(x, z, 'away', [600, 1200]);
+    }
     const order = this.activeOrder();
     if (block === 'order' && order) {
       if (order.kind === 'stayIn') return at(home, 'indoors', [120, 400]);
@@ -237,6 +251,20 @@ export class TownLife {
       // A break now and then.
       for (const s of town('fetchWater')) offer(s.id, 0.3 * (1 - p.diligent));
       for (const s of town('sit')) offer(s.id, 0.2 * (1 - p.diligent));
+    } else if (p.role === 'traveller') {
+      // Passing through: the market, a seat, a drink, a look at the temple; meals and nights at the inn.
+      offer(home, block === 'meal' ? 10 : block === 'evening' ? 2 : 0.6);
+      for (const s of town('browse')) offer(s.id, block === 'evening' ? 0.5 : 1.5);
+      for (const s of town('sit')) offer(s.id, 1);
+      for (const s of town('fetchWater')) offer(s.id, block === 'morning' ? 1 : 0.2);
+      for (const s of this.spots) {
+        if (s.activity === 'drink') offer(s.id, block === 'evening' ? 3 : 0.8);
+        else if (s.activity === 'pray') offer(s.id, 0.4);
+      }
+      if (r.chance(0.2)) {
+        const n = r.int(0, this.nav.xs.length - 1);
+        return free(this.nav.xs[n], this.nav.zs[n], 'stroll', [20, 60]);
+      }
     } else if (block === 'work' && p.role === 'child' || p.role === 'child' && block === 'evening') {
       // Children play by the house and on the market, and help a little.
       const [hx, hz] = [this.spots[home].x, this.spots[home].z];

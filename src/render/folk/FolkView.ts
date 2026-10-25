@@ -62,8 +62,30 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      this.slots.push({ ch, place, agent: -1, ready: false, clip: '', busy: false });
+      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false };
+      this.slots.push(slot);
+      ch.object.addEventListener('childadded', ({ child }) => this.late(slot, child));
     }
+  }
+
+  /** Materials compiled for the characters (a mesh made later with one of these needs nothing). */
+  private readonly compiled = new WeakSet<Material>();
+
+  /**
+   * Actors makes some meshes only once a detail level or a fitted shape first needs them, sometimes after
+   * the character is drawn: such a mesh with a material of its own would build its shader on the render
+   * path. Taken out of the scene at once (the mesh is added before it is drawn), compiled, and back.
+   */
+  private late(s: Slot, child: Object3D): void {
+    if (!s.ready) return;
+    let fresh = false;
+    child.traverse((m) => { for (const x of materialsOf(m)) if (!this.compiled.has(x)) fresh = true; });
+    if (!fresh) return;
+    s.ready = false;
+    s.place.removeFromParent();
+    this.dressing++;
+    s.busy = true;
+    void this.prepareSlot(s, s.agent).finally(() => { this.dressing--; s.busy = false; });
   }
 
   /**
@@ -194,27 +216,30 @@ export class FolkView {
     s.busy = true;
     const id = a.person.id;
     s.ch.set({ ...lookOf(a.person), animation: s.clip })
-      .then(async () => {
-        // Its meshes are new: compile (a cache hit for kinds already seen) before it is drawn.
-        // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
-        // pass is warmed only for objects not yet in the scene).
-        s.place.removeFromParent();
-        s.place.visible = true;
-        // Every detail level in turn (each is its own meshes, shown only once chosen: left to 'auto' they
-        // built their shaders on the render path), and every caster: a character's shadow shaders are its
-        // own (its shape, its garments' fitting).
-        for (let k = 0; k < s.ch.lods.length && s.agent === id; k++) {
-          s.ch.setLod(k);
-          this.adapt(s.place);
-          await this.stage.prepare(s.place, { everyCaster: true });
-        }
-        s.ch.setLod('auto');
-        if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
-        this.stage.scene.add(s.place);
-        s.ready = true;
-      })
+      .then(() => this.prepareSlot(s, id))
       .catch((e: unknown) => console.error('[folk] dressing failed', e))
       .finally(() => { this.dressing--; s.busy = false; });
+  }
+
+  /** Compiles a dressed character (a cache hit for kinds already seen) and puts it in the scene. */
+  private async prepareSlot(s: Slot, id: number): Promise<void> {
+    // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
+    // pass is warmed only for objects not yet in the scene).
+    s.place.removeFromParent();
+    s.place.visible = true;
+    // Every detail level in turn (each is its own meshes, shown only once chosen: left to 'auto' they
+    // built their shaders on the render path), and every caster: a character's shadow shaders are its
+    // own (its shape, its garments' fitting).
+    for (let k = 0; k < s.ch.lods.length && s.agent === id; k++) {
+      s.ch.setLod(k);
+      this.adapt(s.place);
+      await this.stage.prepare(s.place, { everyCaster: true });
+      s.place.traverse((m) => { for (const x of materialsOf(m)) this.compiled.add(x); });
+    }
+    s.ch.setLod('auto');
+    if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
+    this.stage.scene.add(s.place);
+    s.ready = true;
   }
 
   /**
@@ -229,7 +254,7 @@ export class FolkView {
       if (!mesh.isMesh) return;
       if (mesh.name.startsWith('genitals')) mesh.castShadow = false; // always clothed: a shadow shader for nothing
       if (!this.reversed) return;
-      for (const x of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as Material[]) {
+      for (const x of materialsOf(mesh)) {
         if (!x.polygonOffset || x.userData.offsetReversed) continue;
         x.polygonOffsetFactor = -x.polygonOffsetFactor;
         x.polygonOffsetUnits = -x.polygonOffsetUnits;
@@ -246,4 +271,10 @@ export class FolkView {
     for (const s of this.shown.values()) if (s.ready) ready++;
     return `folk ${ready}/${this.slots.length}`;
   }
+}
+
+/** A mesh's materials (none for other objects). */
+function materialsOf(o: Object3D): Material[] {
+  const m = (o as Mesh).material;
+  return !(o as Mesh).isMesh || !m ? [] : Array.isArray(m) ? m : [m];
 }

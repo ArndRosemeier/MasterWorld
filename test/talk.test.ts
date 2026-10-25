@@ -23,8 +23,13 @@ test('talk: every townsperson has a name, and households share their family name
   assert.equal(folk.length, people.length);
   for (const f of folk) assert.match(f.name, /^\S+ \S+$/);
   const byHome = new Map<number, Set<string>>();
-  for (const f of folk) (byHome.get(f.person.home) ?? byHome.set(f.person.home, new Set()).get(f.person.home)!).add(f.family);
+  for (const f of folk) if (f.person.role !== 'traveller') (byHome.get(f.person.home) ?? byHome.set(f.person.home, new Set()).get(f.person.home)!).add(f.family);
   for (const s of byHome.values()) assert.equal(s.size, 1, 'one family name per house');
+  // A guest keeps a name of their own, and calls the inn after its family.
+  const guest = folk.find((f) => f.person.role === 'traveller')!;
+  const host = folk.find((f) => f.person.home === guest.person.home && f !== guest)!;
+  assert.notEqual(guest.family, host.family);
+  assert.equal(guest.house, host.house);
 });
 
 test('talk: the household knows first-hand, the inn heard it from them, a stranger knows nothing', () => {
