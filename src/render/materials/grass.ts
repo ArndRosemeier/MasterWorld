@@ -13,6 +13,7 @@ import {
 } from 'three/tsl';
 import { FloatMask, inside, sampleMask } from './masks';
 import { WATER } from './waterInputs';
+import { WEATHER } from './weather';
 
 /** Side of a patch, metres, and blades in it (the near density: 48 a square metre). */
 export const PATCH = 4;
@@ -63,10 +64,10 @@ export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   const yaw = r1.mul(6.2832);
   const f = vec3(cos(yaw), 0, sin(yaw)), tg = vec3(sin(yaw).negate(), 0, cos(yaw));
   const lean = mix(0.15, 0.6, r4);
-  // Wind: gusts roll across the field downwind, blades flutter on top.
-  const wd = normalize(WATER.wind);
-  const gust = mx_noise_float(xz.mul(0.07).sub(wd.mul(GRASS.time.mul(0.9)))).mul(0.5).add(0.5);
-  const sway = GRASS.wind.mul(gust.mul(0.55).add(sin(GRASS.time.mul(2.6).add(r1.mul(6.28)).add(dot(xz, wd).mul(0.35))).mul(0.08)));
+  // Wind (the weather's): gusts roll across the field downwind, blades flutter on top.
+  const wd = WEATHER.windDir;
+  const gust = mx_noise_float(xz.sub(WEATHER.drift).mul(0.07)).mul(0.5).add(0.5);
+  const sway = GRASS.wind.mul(gust.mul(0.55).add(sin(GRASS.time.mul(2.6).add(r1.mul(6.28)).add(dot(xz, normalize(WATER.wind)).mul(0.35))).mul(0.08)));
   const push = vec3(wd.x, 0, wd.y).mul(sway).add(f.mul(lean));
   const t2 = t.mul(t);
   const base = vec3(xz.x, g.x.sub(0.04), xz.y);
@@ -90,8 +91,10 @@ export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   // Tips lighter and a touch yellower (older growth).
   const tip = mix(vec3(1), vec3(1.15, 1.12, 0.92), t.mul(t));
   const root = mix(float(0.35), float(1), smoothstep(0.0, 0.55, t));
-  const col = varying(mix(lush, straw, dry).mul(tip).mul(root), 'vGrassCol');
+  // Rain darkens the blades a little.
+  const col = varying(mix(lush, straw, dry).mul(tip).mul(root).mul(mix(float(1), float(0.72), WEATHER.wet)), 'vGrassCol');
   m.colorNode = vec4(col, 1);
+  m.roughnessNode = mix(float(0.9), float(0.6), WEATHER.wet);
   // Light through the blades when looking towards the sun.
   const back = pow(max(dot(normalize(cameraPosition.sub(pos)).negate(), WATER.sunDir), 0), 4);
   m.emissiveNode = col.mul(WATER.sunColor).mul(back.mul(0.35).mul(varying(t, 'vGrassT')));

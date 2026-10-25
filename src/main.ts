@@ -22,6 +22,8 @@ import { settingById } from './setting/index';
 import { validateSetting } from './setting/contract';
 import { Terrain } from './world/terrain';
 import { findStart } from './world/start';
+import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
+import { WeatherView } from './render/weather/WeatherView';
 
 declare global {
   interface Window {
@@ -42,6 +44,13 @@ async function start(): Promise<void> {
     const terrain = new Terrain(seed, setting);
     loading.set('Finding the start');
     const home = findStart(terrain.skeleton, setting);
+
+    const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
+    if (params.weather) {
+      if (!WEATHER_KINDS.includes(params.weather as WeatherKind)) throw new Error(`?weather=${params.weather}: one of ${WEATHER_KINDS.join(', ')}`);
+      // The same path the VGM takes: an order, here for all time.
+      weather.order({ kind: params.weather as WeatherKind, from: -1e6, to: 1e6 });
+    }
 
     loading.set('Starting the renderer');
     const view = await createView(canvas, { forceWebGL: params.gl, hour: params.hour, dayMinutes: params.dayMinutes });
@@ -76,6 +85,9 @@ async function start(): Promise<void> {
     useGroundTextures(await loadGroundTextures(texPool));
     texPool.dispose();
 
+    const wx = new WeatherView(weather, (x, z) => terrain.height(x, z));
+    const hours = () => view.sky.day * 24 + view.sky.hour;
+    wx.apply(0, view.camera.position, hours(), view.sky);
     view.sky.update(0, view.camera);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
@@ -95,7 +107,7 @@ async function start(): Promise<void> {
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), ...(hero ? [hero.object] : [])]);
+    await view.stage.warmUp([...(grass ? [grass.group] : []), ...(hero ? [hero.object] : []), wx.precip]);
     loading.set('Raising the land');
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
@@ -106,6 +118,7 @@ async function start(): Promise<void> {
     await view.stage.add(sea.mesh);
     if (grass) await view.stage.add(grass.group);
     if (hero) await view.stage.add(hero.object);
+    await view.stage.add(wx.precip);
     const heroGround = (x: number, y: number, z: number) => walker?.support(x, z, y) ?? terrain.height(x, z);
 
     // The trees' shaders are built in the Stage's frame slots, so the loop must run meanwhile; loading ends
@@ -127,16 +140,17 @@ async function start(): Promise<void> {
         heroCam.trail(toHead(walker), dt);
       }
       view.sky.underwater = sea.submerged(view.camera.position);
+      wx.apply(dt, view.camera.position, hours(), view.sky);
       view.sky.update(dt, view.camera);
       sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
       if (params.trees) flora.update(dt, view.camera.position);
-      grass?.tend(dt, view.camera, 0.5);
+      grass?.tend(dt, view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
       if (hud && params.hud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}\n${view.stage.hudLine()}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}\n${wx.summary}\n${view.stage.hudLine()}`;
       }
       last = now;
       if (planted && !window.__mwReady) {

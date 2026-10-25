@@ -7,12 +7,13 @@
  * vertex attributes or uniforms, never into a new material.
  */
 import { DoubleSide, MeshPhysicalNodeMaterial, type Material, type Mesh } from 'three/webgpu';
-import { Fn, If, vec2, abs, attribute, cameraViewMatrix, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
+import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import type { GroundTextures } from './terrain/groundTextures';
 import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
+import { WEATHER, rainRings } from './materials/weather';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 
@@ -140,6 +141,19 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const wet = smoothstep(-1.2, -0.2, below).mul(float(1).sub(snowB));
   col = col.mul(mix(float(1), float(0.55), wet));
   rough = mix(rough, float(0.25), wet.mul(smoothstep(0.6, 0.95, up)));
+
+  // Rain: the ground darkens and turns glossy; flat hollows hold puddles that mirror the sky, ringed by
+  // the drops while it rains. They dry from the edges in (the hollow's depth against the wetness).
+  const rain = WEATHER.wet.mul(snowB.oneMinus());
+  const hollow = mx_fractal_noise_float(p.xz.mul(0.11), 2, 2.0, 0.5).add(fine.mul(0.06)).add(mid.mul(0.15));
+  // Fewer in meadows (the grass stands in them), most on bare soil and the forest floor.
+  const puddle = smoothstep(0.02, 0.06, hollow.sub(float(0.62).sub(rain.mul(0.42)))).mul(w.x.mul(0.6).oneMinus())
+    .mul(smoothstep(0.95, 0.99, up)).mul(smoothstep(0.85, 0.95, level)).mul(rockB.oneMinus()).mul(sandB.oneMinus()).mul(smoothstep(0.3, 0.6, rain));
+  col = col.mul(mix(float(1), float(0.6), rain)).mul(mix(float(1), float(0.5), puddle));
+  rough = mix(mix(rough, float(0.42), rain.mul(0.85)), float(0.03), puddle);
+  const rings = rainRings(p.xz).mul(smoothstep(6.0, 25.0, length(cameraPosition.sub(p))).oneMinus());
+  pert = mix(pert, vec3(rings.x, 0, rings.y), puddle); ao = mix(ao, float(1), puddle);
+  m.specularIntensityNode = mix(mix(float(0.25), float(0.5), rain), float(1), puddle);
   // Caustics only where there is water above (a branch: the land above the sea pays nothing).
   m.emissiveNode = Fn(() => {
     const e = vec3(0).toVar();

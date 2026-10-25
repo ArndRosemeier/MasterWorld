@@ -89,13 +89,12 @@ export class GrassView {
     this.near.mesh.geometry.instanceCount = this.far.mesh.geometry.instanceCount = 1;
   }
 
-  /** Each frame: the mask follows, the wind blows, the patches in view are listed. */
-  tend(dt: number, camera: Camera, wind: number): void {
+  /** Each frame: the mask follows, the patches in view are listed (the wind is the weather's: WeatherView). */
+  tend(dt: number, camera: Camera): void {
     const cam = camera.position;
     this.mask.follow(cam);
     this.time += dt;
     GRASS.time.value = this.time;
-    GRASS.wind.value = wind;
     this.pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.pv);
     let nn = 0, nf = 0;

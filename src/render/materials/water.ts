@@ -13,6 +13,7 @@ import {
 import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
 import { WATER, waterAt } from './waterInputs';
+import { rainRings } from './weather';
 
 let envTex: Texture | null = null;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
@@ -76,7 +77,9 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       return sum;
     };
     const e = 0.04, h0 = h(p.xz), hx = h(p.xz.add(vec2(e, 0))), hz = h(p.xz.add(vec2(0, e)));
-    const ripple = vec3(h0.sub(hx), 0, h0.sub(hz)).div(e).mul(fade);
+    // Raindrops ring the surface near the camera.
+    const rings = rainRings(p.xz).mul(smoothstep(12.0, 50.0, camDist).oneMinus());
+    const ripple = vec3(h0.sub(hx), 0, h0.sub(hz)).div(e).mul(fade).add(vec3(rings.x, 0, rings.y));
     const up = frontFacing;
     const N0 = normalize(vN.add(ripple)).toVar();
     const N = select(up, N0, N0.negate());
