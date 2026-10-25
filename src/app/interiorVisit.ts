@@ -4,7 +4,7 @@
  * ceiling and furniture), the sky is off and one warm light hangs under the ceiling.
  */
 import type { PointLight } from 'three/webgpu';
-import { planInterior, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
+import { interiorBlocked, planInterior, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { interiorWorld, roomFrame, type RoomFrame } from '../game/interiorWorld';
 import type { WalkWorld } from '../game/walker';
 import { ROOM_DEPTH, type InteriorView } from '../render/town/InteriorView';
@@ -29,8 +29,8 @@ export class InteriorVisit {
 
   constructor(
     private readonly buildings: readonly TownBuilding[],
-    /** Doors that lead elsewhere (the cellar house). */
-    private readonly skip: ReadonlySet<number>,
+    /** Houses with a cellar: a hatch in the room, and the way down (`before` runs once the screen is dark). */
+    private readonly cellars: ReadonlyMap<number, (before: () => void) => Promise<void>>,
     private readonly view: InteriorView,
     private readonly player: Player,
     private readonly light: PointLight,
@@ -43,10 +43,10 @@ export class InteriorVisit {
   /** The building the player is in (-1: outside). */
   get building(): number { return this.room?.b.id ?? -1; }
 
-  /** Into `b` (now: at once, no fade). */
-  async enter(b: TownBuilding, now = false): Promise<void> {
+  /** Into `b` (now: at once, no fade); `up`: coming up through its hatch rather than in at the door. */
+  async enter(b: TownBuilding, now = false, up = false): Promise<void> {
     await this.fade.swap(now, async () => {
-      const plan = planInterior(b), y = b.floorY + ROOM_DEPTH, frame = roomFrame(b, { x: b.cx, z: b.cz });
+      const plan = planInterior(b, { hatch: this.cellars.has(b.id) }), y = b.floorY + ROOM_DEPTH, frame = roomFrame(b, { x: b.cx, z: b.cz });
       await this.view.show(plan, b, y);
       this.room = { b, plan, frame, world: interiorWorld(plan, frame, y), floor: y };
       this.sky.indoors = true;
@@ -57,10 +57,13 @@ export class InteriorVisit {
       const big = Math.min(3, Math.max(1, (plan.ha * plan.hb) / 12));
       this.light.intensity = 10 * big;
       this.light.distance = 14 * Math.sqrt(big);
-      // Just inside the door, facing in (the walker's forward is (-sin yaw, -cos yaw)).
-      const [x, z] = frame.toWorld(0, -plan.hb + 1.3);
+      // Just inside the door, facing in (the walker's forward is (-sin yaw, -cos yaw)); or beside the hatch.
+      const hatch = up ? plan.fixtures.find((f) => f.kind === 'hatch') : undefined;
+      const [a, bb] = hatch ? besideHatch(plan, hatch) : [0, -plan.hb + 1.3];
+      const [x, z] = frame.toWorld(a, bb);
       this.player.teleport(x, y, z, Math.atan2(-b.vx, -b.vz));
-      this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.`, 3);
+      if (up) this.cooldown = 1.5;
+      else this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.`, 3);
     });
   }
 
@@ -90,7 +93,7 @@ export class InteriorVisit {
     if (!this.room) {
       // Into a door: walking at it, facing in (along the building's v).
       for (const b of this.buildings) {
-        if (this.skip.has(b.id) || Math.abs(b.door[0] - w.pos.x) > 1 || Math.abs(b.door[1] - w.pos.z) > 1) continue;
+        if (Math.abs(b.door[0] - w.pos.x) > 1 || Math.abs(b.door[1] - w.pos.z) > 1) continue;
         if (Math.hypot(b.door[0] - w.pos.x, b.door[1] - w.pos.z) < 0.9 && fx * b.vx + fz * b.vz > 0.5) { void this.enter(b); return; }
       }
       return;
@@ -98,6 +101,12 @@ export class InteriorVisit {
     // Out of the door: at it, facing out.
     const { plan, frame, b } = this.room;
     const [a, bb] = frame.toRoom(w.pos.x, w.pos.z);
+    // Onto the hatch: down to the cellar.
+    const hatch = plan.fixtures.find((f) => f.kind === 'hatch'), down = this.cellars.get(b.id);
+    if (hatch && down && Math.abs(a - hatch.a) < hatch.w / 2 - 0.1 && Math.abs(bb - hatch.b) < hatch.d / 2 - 0.1) {
+      void down(() => { this.room = null; this.view.hide(); this.light.distance = 14; });
+      return;
+    }
     if (Math.abs(a) < plan.doorW && bb < -plan.hb + 0.5 && fx * b.vx + fz * b.vz < -0.5) void this.leave();
   }
 
@@ -121,4 +130,15 @@ export class InteriorVisit {
   get summary(): string {
     return this.room ? `in ${this.room.b.kind} #${this.room.b.id}` : '';
   }
+}
+
+/** A free place beside the hatch, facing nothing in particular (room coordinates). */
+function besideHatch(plan: InteriorPlan, h: InteriorFixture): [number, number] {
+  for (const d of [0.9, 1.2, 1.5]) {
+    for (const [da, db] of [[0, -1], [1, 0], [-1, 0], [0, 1]]) {
+      const a = h.a + da * d, b = h.b + db * d;
+      if (!interiorBlocked(plan, a, b, 0.35)) return [a, b];
+    }
+  }
+  return [0, -plan.hb + 1.3];
 }
