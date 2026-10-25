@@ -5,7 +5,7 @@
  * draw their "Crowd" level (one draw call plus the hair).
  */
 import { Group, type Camera, type Object3D, type WebGPURenderer } from 'three/webgpu';
-import { Character } from '@actors/generator';
+import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
 import type { Stage } from '@futuremagic/stage';
@@ -51,18 +51,22 @@ export class FolkView {
    */
   static async create(stage: Stage, renderer: WebGPURenderer, life: TownLife, height: (x: number, z: number) => number, count: number): Promise<FolkView> {
     const worker = new HumanWorker();
-    const lead = await Character.load({
-      pack: PACK, renderer, materials: nodeMaterials, worker, clipLibraries: false,
-      // Only what the town's pack has (tools/packs/actors.mjs).
-      catalog: (c) => ({
-        ...c,
-        garments: c.garments.filter((g) => PACK_GARMENTS.includes(g.id)),
-        hair: c.hair.filter((h) => PACK_HAIR.includes(h.id)),
-        animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id)),
-      }),
+    // Only what the town's pack has (tools/packs/actors.mjs).
+    const catalog = (c: CharacterCatalog): CharacterCatalog => ({
+      ...c,
+      garments: c.garments.filter((g) => PACK_GARMENTS.includes(g.id)),
+      hair: c.hair.filter((h) => PACK_HAIR.includes(h.id)),
+      animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id)),
     });
+    // A character knows only the garments and hairstyles the shared pack had loaded when it was made, and
+    // wearing one another character loaded first shows nothing (Actors 0.10). So a holder (never drawn)
+    // loads the whole wardrobe first, and every drawn character is made after.
+    const holder = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, worker, clipLibraries: false, catalog });
+    await holder.human.loadMeshes([...PACK_GARMENTS, ...PACK_HAIR]);
+    const share = () => Character.load({ pack: PACK, renderer, materials: nodeMaterials, shareWith: holder, catalog });
+    const lead = await share();
     const others: Character[] = [];
-    for (let i = 1; i < count; i++) others.push(await Character.load({ pack: PACK, renderer, materials: nodeMaterials, shareWith: lead }));
+    for (let i = 1; i < count; i++) others.push(await share());
     const view = new FolkView(stage, life, height, lead, others);
     return view;
   }
