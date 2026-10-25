@@ -1,17 +1,19 @@
 /* The fight's HUD (src/app/fightHud.ts) in warded brass (plan 17.1): gauges, the belt, the target plate, item cards. */
-#fight {
+#fight, .panel.pack {
   --brass-hi: #fff0c0; --brass: #e2bd68; --brass-mid: #b08532; --brass-lo: #6e4f17; --brass-dark: #4a3510;
   --leather: #1d1510; --leather-hi: #2a1c14; --ink: #efe3cc; --ink-dim: #cbb898; --ward: #8fe3ff; --ward-hot: #e8fbff;
   --common: #c9c2b4; --uncommon: #6fdc7a; --rare: #5fa8ff; --legendary: #ffa940;
+}
+#fight {
   position: fixed; inset: 0; z-index: 5; pointer-events: none; font-family: 'EB Garamond', Georgia, serif; color: var(--ink);
   transition: opacity .6s;
 }
 #fight.hidden { opacity: 0; }
-#fight .plate {
+#fight .plate, .pack .plate {
   background: linear-gradient(var(--leather-hi), var(--leather)); border: 2px solid var(--brass-mid); border-radius: 8px;
   box-shadow: inset 0 0 0 1px var(--brass-lo), inset 0 0 0 4px var(--leather), inset 0 0 0 5px var(--brass-lo), 0 8px 24px #000a;
 }
-#fight .name { font-family: 'Marcellus SC', Georgia, serif; letter-spacing: .04em; }
+#fight .name, .pack .card .name { font-family: 'Marcellus SC', Georgia, serif; letter-spacing: .04em; }
 
 /* Health and stamina: brass vials, liquid behind glass; it sloshes when hit, bubbles when healed, the ward glows as it runs low. */
 #fight .gauges { position: absolute; left: 22px; bottom: 22px; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
@@ -67,25 +69,25 @@
 #fight .prompt.shown { opacity: 1; }
 #fight .prompt b { font-family: 'Marcellus SC', serif; color: var(--brass-hi); }
 
-/* Finds: one card per item, the rarity setting the ward and the entrance. */
+/* Finds: one card per item (in the pack window too, there without the entrances), the rarity setting the ward and the entrance. */
 #fight .finds { position: absolute; right: 24px; bottom: 120px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
 #fight .card { position: relative; width: 250px; padding: 8px 12px 9px; overflow: hidden; animation: hud-drop .5s cubic-bezier(.3, 1.5, .5, 1) both; }
 #fight .card.uncommon { animation-name: hud-slide; }
 #fight .card.rare { animation-name: hud-flip; }
 #fight .card.legendary { animation-name: hud-iris; animation-duration: .9s; }
-#fight .card .name { font-size: 15px; }
-#fight .card.common .name { color: var(--common); }
-#fight .card.uncommon .name { color: var(--uncommon); }
-#fight .card.rare .name { color: var(--rare); }
-#fight .card.legendary .name { color: var(--legendary); }
+:is(#fight, .pack) .card .name { font-size: 15px; }
+:is(#fight, .pack) .card.common .name { color: var(--common); }
+:is(#fight, .pack) .card.uncommon .name { color: var(--uncommon); }
+:is(#fight, .pack) .card.rare .name { color: var(--rare); }
+:is(#fight, .pack) .card.legendary .name { color: var(--legendary); }
 #fight .card .line { font-size: 13px; color: var(--ink-dim); opacity: 0; animation: hud-line .4s ease-out forwards; }
-#fight .card .lore { font-style: italic; font-size: 12px; }
-#fight .card .ward { position: absolute; inset: 3px; border-radius: 6px; border: 1px solid transparent; pointer-events: none; }
-#fight .card.uncommon .ward { border-color: var(--uncommon); animation: hud-pulse 2.4s ease-in-out infinite; }
-#fight .card.rare .ward, #fight .card.legendary .ward { border-color: var(--rare); }
-#fight .card.legendary .ward { border-color: var(--legendary); box-shadow: 0 0 10px var(--legendary); }
-#fight .card.rare .spark, #fight .card.legendary .spark { position: absolute; top: 2px; width: 30px; height: 2px; border-radius: 1px; background: #fff; box-shadow: 0 0 6px #fff; animation: hud-run 3s linear infinite; }
-#fight .card.legendary .spark.b { top: auto; bottom: 2px; animation-delay: -1.5s; animation-direction: reverse; }
+:is(#fight, .pack) .card .lore { font-style: italic; font-size: 12px; }
+:is(#fight, .pack) .card .ward { position: absolute; inset: 3px; border-radius: 6px; border: 1px solid transparent; pointer-events: none; }
+:is(#fight, .pack) .card.uncommon .ward { border-color: var(--uncommon); animation: hud-pulse 2.4s ease-in-out infinite; }
+:is(#fight, .pack) .card.rare .ward, :is(#fight, .pack) .card.legendary .ward { border-color: var(--rare); }
+:is(#fight, .pack) .card.legendary .ward { border-color: var(--legendary); box-shadow: 0 0 10px var(--legendary); }
+:is(#fight, .pack) .card.rare .spark, :is(#fight, .pack) .card.legendary .spark { position: absolute; top: 2px; width: 30px; height: 2px; border-radius: 1px; background: #fff; box-shadow: 0 0 6px #fff; animation: hud-run 3s linear infinite; }
+:is(#fight, .pack) .card.legendary .spark.b { top: auto; bottom: 2px; animation-delay: -1.5s; animation-direction: reverse; }
 #fight .card.out { animation: hud-out .5s ease-in forwards; }
 @keyframes hud-drop { from { transform: translateY(-30px) scaleY(.2); opacity: 0; } }
 @keyframes hud-slide { from { transform: translateX(60px); opacity: 0; } }
@@ -102,3 +104,17 @@
 
 @media (prefers-reduced-motion: reduce) { #fight * { animation-duration: 1ms !important; } }
 @media (max-width: 640px) { #fight .vial { width: 140px; } #fight .socket { width: 40px; height: 40px; font-size: 18px; } #fight .finds { right: 12px; } #fight .card { width: 200px; } }
+
+/* The pack window (src/app/packUi.ts): worn slots, carried cards, skills. */
+.panel.pack { width: min(720px, 100%); }
+.pack .card { position: relative; padding: 6px 10px 7px; overflow: hidden; }
+.pack .card .line { font-size: 13px; color: var(--ink-dim); }
+.pack .worn { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pack .slot .label { font: 11px ui-monospace, monospace; color: #8a8070; margin-bottom: 3px; }
+.pack .slot .empty { height: 34px; border: 1px dashed #3a352c; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4a4438; }
+.pack .slot.full, .pack .card.use { cursor: pointer; }
+.pack .slot.full:hover .card, .pack .card.use:hover { border-color: var(--brass); box-shadow: 0 0 10px #e2bd6855; }
+.pack .carried { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.pack .skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 2px 18px; }
+.pack .skill { display: flex; justify-content: space-between; border-bottom: 1px solid #22201c; padding: 3px 0; color: var(--ink-dim); }
+.pack .foot { color: var(--ink-dim); font-size: 13px; }

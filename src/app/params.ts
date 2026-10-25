@@ -44,7 +44,7 @@ export const params = {
   /** Start in a talk (for screenshots): `talk=inn` with the innkeeper, `talk=house` with the cellar's household; `topics=news,source` asked first. */
   talk: q.get('talk'),
   topics: q.get('topics')?.split(',') ?? [],
-  /** Open the map (or `journal`) at the start, after any `talk`. */
+  /** Open the map (or `journal`, `saves`, `pack`) at the start, after any `talk`. */
   open: q.get('open'),
   /** Setting module id. */
   setting: q.get('setting') ?? 'classic',

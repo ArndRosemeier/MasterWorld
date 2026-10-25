@@ -44,6 +44,7 @@ import { Title } from './app/title/title';
 import { Notes } from './app/notes';
 import { TalkUi } from './app/talkUi';
 import { JournalUi } from './app/journalUi';
+import { PackUi } from './app/packUi';
 import { MapUi } from './app/mapUi';
 import { townTalk } from './talk/townTalk';
 import { Journal } from './talk/journal';
@@ -323,6 +324,12 @@ export async function start(b: Boot): Promise<void> {
       heard: (lead) => notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6),
     }) : null;
     const journalUi = new JournalUi(journal, keys);
+    const pack = new PackUi(character, setting, {
+      paused,
+      get bindings() { return settings.current.bindings; },
+      changed: armHero,
+      drank: (n) => { if (n > 0) fightHud.healed(); },
+    });
     const map = town ? new MapUi(town.plan, journal, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -397,7 +404,7 @@ export async function start(b: Boot): Promise<void> {
       player.teleport(h.x, h.below ? h.y : undefined, h.z, h.yaw);
       notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
     } else if (typeof loaded === 'string') notes.say(`Could not load the save: ${loaded}.`, 8);
-    if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else map?.setOpen(true); }
+    if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else map?.setOpen(true); }
     new DebugMenu({
       paused,
       get freeCamera() { return player.flying; },

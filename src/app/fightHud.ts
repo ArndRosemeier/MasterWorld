@@ -5,16 +5,17 @@
  * (a hit, a heal, a find) to animate them.
  */
 import './hud.css';
-import type { AbilityDef, Rarity, SettingModule } from '../setting/contract';
+import type { AbilityDef, SettingModule } from '../setting/contract';
 import type { Threat } from '../sim/combat';
 import type { Creature } from '../sim/creatures';
 import type { Character } from '../game/character';
 import type { Fight } from '../game/fight';
-import type { Item, Loot } from '../game/items';
+import type { Loot } from '../game/items';
 import { coinText } from '../game/items';
 import { keyLabel, type Bindings } from '../input/controls';
 import { cap } from '../talk/townTalk';
 import { el } from './dom';
+import { itemCard } from './itemCard';
 
 const THREAT: Record<Threat, string> = { trivial: '#9c9a94', easy: '#6fdc7a', even: '#f2d65c', hard: '#ff9a3c', deadly: '#ff4a3a' };
 const THREAT_WORD: Record<Threat, string> = { trivial: 'no match for you', easy: 'weaker than you', even: 'a fair fight', hard: 'stronger than you', deadly: 'far beyond you' };
@@ -124,8 +125,8 @@ export class FightHud {
   healed(): void { this.flash(this.vials.health.box, 'bubble'); }
 
   /** What a search turned up, a card for each item and one for the coin. */
-  showFinds(loot: Loot, items: SettingModule['items']): void {
-    const cards: HTMLElement[] = loot.items.map((i) => this.card(i, items));
+  showFinds(loot: Loot): void {
+    const cards: HTMLElement[] = loot.items.map((i) => itemCard(i, this.setting, true));
     if (loot.coins) cards.push(this.plain(coinText(loot.coins)));
     if (!cards.length) cards.push(this.plain('Nothing worth taking.'));
     cards.forEach((c, k) => {
@@ -139,19 +140,6 @@ export class FightHud {
   fallen(on: boolean, text = ''): void {
     this.root.classList.toggle('fallen', on);
     this.dark.textContent = text;
-  }
-
-  private card(i: Item, items: SettingModule['items']): HTMLElement {
-    const d = items.items.find((x) => x.id === i.def);
-    const lines = Object.entries(i.bonuses).map(([k, v]) => `+${v} ${this.setting.skills.find((s) => s.id === k)?.name ?? k}`);
-    if (d?.weapon) lines.unshift(`${d.weapon.damage[0]}–${d.weapon.damage[1]} damage`);
-    if (d?.armour) lines.unshift(`armour ${d.armour}`);
-    const c = el('div', { className: `card plate ${i.rarity as Rarity}` }, el('div', { className: 'ward' }), el('div', { className: 'name' }, i.name),
-      ...lines.map((l, k) => { const d = el('div', { className: 'line' }, l); d.style.animationDelay = `${0.3 + k * 0.12}s`; return d; }),
-      ...(i.lore ? [el('div', { className: 'line lore' }, i.lore)] : []));
-    if (i.rarity === 'rare' || i.rarity === 'legendary') c.append(el('div', { className: 'spark' }));
-    if (i.rarity === 'legendary') c.append(el('div', { className: 'spark b' }));
-    return c;
   }
 
   private plain(text: string): HTMLElement {
