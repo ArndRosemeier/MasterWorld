@@ -8,7 +8,9 @@ export const params = {
   gl: q.has('gl'),
   /** Show the HUD line (shader policy, frame time). */
   hud: q.has('hud'),
-  /** Camera position `x,y,z` (y is metres above the ground if given as `x,z`). */
+  /** The free camera instead of the hero (for looking at the land). */
+  fly: q.has('fly'),
+  /** Hero (or with `fly`, camera) position `x,y,z` (given as `x,z`: on the ground; the camera 1.7 m above it). */
   pos: q.get('pos')?.split(',').map(Number) ?? null,
   /** View direction `yaw,pitch` in degrees (yaw 0 looks north, 90 east). */
   look: q.get('look')?.split(',').map(Number) ?? null,

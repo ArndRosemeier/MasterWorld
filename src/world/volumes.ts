@@ -24,7 +24,8 @@ const SPINE = 28;
 /** Radius of the rock at the feet and at the crown; the fin is this much thicker across than along. */
 const R_FOOT = 6.2, R_CROWN = 3.1, FIN = 1.45;
 /** How far into the ground the feet go, and the blend radius into the ground. */
-const SINK = 4, BLEND = 3.5;
+const SINK = 4;
+export const BLEND = 3.5;
 /** Sample spacing of the volume grid, metres. */
 export const VOLUME_STEP = 0.7;
 
