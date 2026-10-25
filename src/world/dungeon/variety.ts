@@ -35,11 +35,17 @@ export function testDecision(i: number, base = 1): DungeonDecision {
 }
 
 /** Limits: the most common value of each aspect may make up at most this share. */
-const LIMITS: Record<string, number> = { layout: 0.03, mainPattern: 0.6, story: 0.12, goalRoom: 0.45, dressing: 0.05 };
+const LIMITS: Record<string, number> = { layout: 0.03, mainPattern: 0.2, story: 0.12, goalRoom: 0.45, dressing: 0.05, setPiece: 0.12 };
+
+/**
+ * Plan 8.1: a library of 15-20 cycle patterns and a growing one of set pieces. At least this many
+ * different ones must turn up (fewer in a small sample: one per `per` cellars).
+ */
+const MIN_DISTINCT: Record<string, { readonly n: number; readonly per: number }> = { mainPattern: { n: 14, per: 6 }, pattern: { n: 16, per: 4 }, setPiece: { n: 10, per: 6 } };
 
 export function checkVariety(lore: CellarLore, count: number, base = 1): VarietyReport {
   const problems: string[] = [];
-  const aspects: Record<string, string[]> = { layout: [], mainPattern: [], story: [], goalRoom: [], dressing: [], setPiece: [] };
+  const aspects: Record<string, string[]> = { layout: [], mainPattern: [], pattern: [], story: [], goalRoom: [], dressing: [], setPiece: [] };
   for (let i = 0; i < count; i++) {
     let c: Cellar;
     try { c = outlineCellar(testDecision(i, base), testHouse(i), lore); } catch (e) { problems.push(`cellar ${i}: ${(e as Error).message}`); continue; }
@@ -54,6 +60,7 @@ export function checkVariety(lore: CellarLore, count: number, base = 1): Variety
     if (!c.spawns.length) problems.push(`${where}: nobody lives there`);
     aspects.layout.push(c.signature);
     aspects.mainPattern.push(c.graph.patterns[0]);
+    aspects.pattern.push(...c.graph.patterns.filter((p) => p !== 'shortcut' && p !== 'refuge'));
     aspects.story.push(c.history.map((h) => h.def.id).join('/'));
     aspects.goalRoom.push(c.rooms[c.graph.goal].use.id);
     aspects.dressing.push(c.props.map((p) => p.kind).sort().join(','));
@@ -68,6 +75,8 @@ export function checkVariety(lore: CellarLore, count: number, base = 1): Variety
     distinct[k] = counts.size;
     // Small samples can't show small shares: allow two of a kind.
     if (LIMITS[k] !== undefined && n > Math.max(2, LIMITS[k] * vals.length)) problems.push(`${k} repeats: "${value.slice(0, 80)}" in ${n} of ${vals.length}`);
+    const min = MIN_DISTINCT[k];
+    if (min && counts.size < Math.min(min.n, Math.floor(count / min.per))) problems.push(`${k}: only ${counts.size} different ones (at least ${min.n} wanted)`);
   }
   return { count, problems, top, distinct };
 }

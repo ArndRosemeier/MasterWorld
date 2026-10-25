@@ -34,12 +34,16 @@ export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: 
   const [cx, cz] = town.plan.centre;
   const score = (b: TownBuilding) => hash2f(s, b.id, 7) - Math.min(1, Math.hypot(b.cx - cx, b.cz - cz) / (town.decision.radius * 1.2)) * 0.5;
   const house = houses.reduce((a, b) => (score(b) < score(a) ? b : a));
-  // The set piece used least so far in this world.
-  const used = (id: string) => dungeons.filter((d) => d.setPiece === id).length;
-  const fewest = Math.min(...SET_PIECES.map((p) => used(p.id)));
-  const fresh = SET_PIECES.filter((p) => used(p.id) === fewest);
-  const piece = fresh[Math.floor(hash2f(s, 3, 9) * fresh.length)];
-  return { kind: 'dungeon', id: `cellar-${n}`, template: 'cellar', town: town.decision.id, building: house.id, seed: s, setPiece: piece.id, danger: dangerAt(town, home) };
+  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s);
+  return { kind: 'dungeon', id: `cellar-${n}`, template: 'cellar', town: town.decision.id, building: house.id, seed: s, setPiece: piece, danger: dangerAt(town, home) };
+}
+
+/** The set piece for the next dungeon: one used least so far in this world (plan 8.1: none repeats until the library is used through). */
+export function nextSetPiece(used: readonly string[], seed: number): string {
+  const times = (id: string) => used.filter((u) => u === id).length;
+  const fewest = Math.min(...SET_PIECES.map((p) => times(p.id)));
+  const fresh = SET_PIECES.filter((p) => times(p.id) === fewest);
+  return fresh[Math.floor(hash2f(seed, 3, 9) * fresh.length)].id;
 }
 
 /** The house a dungeon decision lies under. */

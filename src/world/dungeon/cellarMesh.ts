@@ -170,7 +170,7 @@ export function cellarMeshes(c: Cellar): CellarMeshes {
     } else if (kind === 'locked' || kind === 'oneway' || kind === 'secret') {
       const kit = new MeshKit();
       if (kind === 'secret') {
-        const pale: Tint = c.setPiece.id === 'bricked-wall' && pl.link.id === c.pieceLink ? [200, 190, 170] : STONE;
+        const pale: Tint = c.setPiece.tint && pl.link.id === c.pieceLink ? [...c.setPiece.tint] as unknown as Tint : STONE;
         kit.box(mx, y, mz, DOOR_W + 0.02, DOOR_H + 0.02, 0.24, yaw, M.Rubble, pale);
       } else {
         kit.box(mx, y, mz, DOOR_W, DOOR_H, 0.08, yaw, M.Oak, OAK);
