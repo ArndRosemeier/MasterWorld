@@ -66,7 +66,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const { albedo: A, normal: N } = ground;
   // Double-sided so chunk skirts close cracks seen from either side.
   // Physical, for its specular strength: soil and grass reflect little of the bright sky, even at a low angle.
-  const m = new MeshPhysicalNodeMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: DoubleSide, specularIntensity: 0.25 });
+  // Not `vertexColors`: three would multiply the whole result by the biome colour (rock and snow too); the
+  // biome colour tints only the open ground, below.
+  const m = new MeshPhysicalNodeMaterial({ roughness: 0.95, metalness: 0, side: DoubleSide, specularIntensity: 0.25 });
   const p = positionWorld, n = normalWorldGeometry, up = n.y;
   const layer = (name: string, uv: Node<'vec2'>) => {
     const i = LAYER(name), k = 1 / NATURAL_TILE_METERS[i];
@@ -91,7 +93,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const hue = vc.div(max(dot(vc, vec3(0.2126, 0.7152, 0.0722)), 0.02));
   // Mid-scale variation (tens of metres) hides the tiling and breaks up big fields.
   const mid = mx_fractal_noise_float(p.xz.mul(0.045), 3, 2.0, 0.5);
-  const tint = mix(vec3(1), hue, float(0.3).add(mid.mul(0.15))).mul(float(1).add(broad.mul(0.3)).add(mid.mul(0.22)));
+  const tint = mix(vec3(1), hue, float(0.5).add(mid.mul(0.15))).mul(float(1).add(broad.mul(0.3)).add(mid.mul(0.22)));
   let col: Node<'vec3'> = soilA.rgb.mul(tint), rough: Node<'float'> = soilA.a, ao: Node<'float'> = soilN.a, h: Node<'float'> = soilN.b;
   let pert: Node<'vec3'> = vec3(tn(soilN).x, 0, tn(soilN).y);
 
@@ -152,8 +154,8 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   })();
 
   const nw = normalize(n.add(pert.mul(0.9)));
-  // texgen albedos are physical (grass ~0.08 linear); the lift keeps the land readable under our light rig.
-  m.colorNode = col.mul(1.5);
+  // texgen albedos are physical (grass ~0.08 linear); a slight trim keeps open land from glaring under our light rig.
+  m.colorNode = col.mul(0.85);
   m.roughnessNode = rough;
   m.aoNode = ao;
   m.normalNode = normalize(cameraViewMatrix.mul(vec4(nw, 0)).xyz);

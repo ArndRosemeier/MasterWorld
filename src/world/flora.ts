@@ -6,7 +6,6 @@
  * Record (FLORA_STRIDE floats): x, y, z, scale, yaw, kind (index into FLORA_KINDS).
  */
 import { Noise, deriveSeed, hash2f, smoothstep } from '@futuremagic/core';
-import { emptySample } from './skeleton';
 import { TREES, type FloraDef, type TreeName } from '../setting/contract';
 import type { Terrain } from './terrain';
 
@@ -44,7 +43,7 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
   const biomes = t.biomes;
   const seed = deriveSeed(t.seed, 'flora');
   const cover = coverNoise(t.seed);
-  const s = emptySample(), w = { river: 0, lake: 0 };
+  const w = { river: 0, lake: 0 };
   const out: number[] = [];
   const thin = (spacing / NEAR_SPACING) ** 2; // candidates far away each stand for this many near ones
   const n = Math.round(size / spacing);
@@ -54,8 +53,8 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     const roll = hash2f(seed, gi * 7 + spacing, gj);
     if (roll > MAX_P) continue; // a quick out before any sampling
     const x = (gi + hash2f(seed + 1, gi, gj)) * spacing, z = (gj + hash2f(seed + 2, gi, gj)) * spacing;
-    t.skeleton.sample(x, z, s);
-    const flora = s.biome >= 0 ? biomes[s.biome].flora : undefined;
+    const bi = t.biomeAt(x, z);
+    const flora = bi >= 0 ? biomes[bi].flora : undefined;
     if (!flora) continue;
     const woods = woodsAt(cover, flora, x, z);
     const pTree = (flora.trees / 10000) * NEAR_SPACING ** 2 * (0.08 + 0.92 * woods);
@@ -73,7 +72,7 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     t.clearOfWater(x, z, h, w);
     if (w.river < (shrub ? 1.5 : 4) || w.lake < 0.5) continue;
     const slope = Math.hypot(t.height(x + 1.5, z) - h, t.height(x, z + 1.5) - h) / 1.5;
-    if (slope > 0.75) continue;
+    if (slope > 0.75 || t.rockAt(x, z, h)) continue;
     const kind = shrub ? SHRUB + (hash2f(seed + 3, gi, gj) < 0.5 ? 0 : 1) : pickTree(flora.mix, hash2f(seed + 4, gi, gj), hash2f(seed + 5, gi, gj));
     if (kind < 0) continue;
     const size0 = 0.8 + 0.45 * hash2f(seed + 6, gi, gj);

@@ -3,9 +3,11 @@
  * deterministic, evaluated in workers for meshes and on the main thread for walking.
  */
 import { Noise, deriveSeed, lerp, smoothstep } from '@futuremagic/core';
-import { Skeleton } from './skeleton';
+import { Skeleton, emptySample } from './skeleton';
 import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
+import { ArchField, archNear } from './volumes';
+import { findStart } from './start';
 
 export class Terrain {
   readonly skeleton: Skeleton;
@@ -21,6 +23,30 @@ export class Terrain {
     this.detail = new Noise(deriveSeed(seed, 'terrain', 'detail'));
     this.hydro = new Hydrology(this.skeleton, hydro);
     this.biomes = setting.world.biomes;
+  }
+
+  private fields: ArchField[] | null = null;
+  private readonly probe = emptySample();
+
+  /** The biome at a point (an index into `biomes`; -1 under the sea). */
+  biomeAt(x: number, z: number): number {
+    return this.skeleton.sample(x, z, this.probe).biome;
+  }
+
+  /** The rock volumes standing on this land (milestone 1: the arch near the start). */
+  get volumes(): readonly ArchField[] {
+    if (!this.fields) {
+      this.fields = [];
+      const site = archNear(this, findStart(this.skeleton, this.setting));
+      if (site) this.fields.push(new ArchField(this, site));
+    }
+    return this.fields;
+  }
+
+  /** Whether rock of a volume stands on the ground here (`h` the ground height): nothing grows there. */
+  rockAt(x: number, z: number, h: number): boolean {
+    for (const f of this.volumes) if (f.inBounds(x, h + 0.3, z) && f.at(x, h + 0.3, z) < 0.8) return true;
+    return false;
   }
 
   /**

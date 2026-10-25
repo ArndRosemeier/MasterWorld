@@ -44,7 +44,7 @@ export class WorkerPool<Job, Result> {
   }
 }
 
-export type TerrainPool = WorkerPool<import('./terrain.worker').TerrainJob, import('../world/chunkMesh').ChunkMesh>;
+export type TerrainPool = WorkerPool<import('./terrain.worker').TerrainJob, import('./terrain.worker').TerrainResult>;
 
 /** Terrain chunks are built off the main thread. */
 export function createTerrainPool(size?: number): TerrainPool {
@@ -64,6 +64,19 @@ export type WorldPool = WorkerPool<import('./world.worker').WorldJob, Float32Arr
 export function createWorldPool(): WorldPool {
   return new WorkerPool(() => new Worker(new URL('./world.worker.ts', import.meta.url), { type: 'module' }), 1);
 }
+/** The terrain workers' jobs for one world: height field chunks and the rock volumes. */
+export class TerrainJobs {
+  constructor(private readonly pool: TerrainPool, readonly seed: number, readonly setting: string) {}
+
+  chunk(x0: number, z0: number, size: number, segs: number): Promise<import('../world/chunkMesh').ChunkMesh> {
+    return this.pool.run({ kind: 'chunk', seed: this.seed, setting: this.setting, x0, z0, size, segs }) as Promise<import('../world/chunkMesh').ChunkMesh>;
+  }
+
+  volumeMeshes(): Promise<import('../world/volumes').VolumeMesh[]> {
+    return this.pool.run({ kind: 'volumes', seed: this.seed, setting: this.setting }) as Promise<import('../world/volumes').VolumeMesh[]>;
+  }
+}
+
 /** The world worker's jobs for one world (seed and setting): masks and plant positions around the camera. */
 export class WorldJobs {
   constructor(private readonly pool: WorldPool, readonly seed: number, readonly setting: string) {}
