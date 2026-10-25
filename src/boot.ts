@@ -10,6 +10,9 @@ import { Sound } from './app/sound';
 import { Title } from './app/title/title';
 import type { Menu } from './app/menu';
 
+// A tool page (`?bake=…`), not the game.
+if (params.bake) await import('./app/bake').then((b) => b.bake(params.bake ?? ''));
+
 const settings = new SettingsStore();
 const sound = new Sound();
 sound.volume = settings.current.volume;

@@ -87,7 +87,7 @@ export function newHero(catalog: CharacterCatalog, looks: HeroLooks, base: Chara
 }
 
 /** Options for Actors' Character.load that give the hero's catalog. */
-const loadOptions = (looks: HeroLooks) => ({
+export const loadOptions = (looks: HeroLooks) => ({
   pack: PACK, materials: nodeMaterials, clipLibraries: false,
   themes: { themes: [...looks.themes], without: [...looks.without] },
   catalog: heroCatalog(looks),
