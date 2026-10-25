@@ -34,11 +34,11 @@ const LEATHER = ['#4a3020', '#3a2416', '#5a3a22', '#2a1d14'];
 export const HAIR_COLORS = ['#2a1d14', '#3b2417', '#4a3020', '#6a4a2a', '#8a6a3a', '#b08a50', '#c8a868', '#1c1814', '#7a3a1e'];
 
 /**
- * How young `p` looks (Actors' `youth`: 0 grown up, 1 a child of about five): ages 4..16 from 1 down
- * to 0. Children are the adult body with child proportions and never show anatomy.
+ * How young `p` looks (Actors' `youth`: 0 grown up, 1 a child of about five): 1 up to age 5, about a
+ * half at 11, a quarter at 15. Children are the adult body with child proportions and never show anatomy.
  */
 export function youthOf(p: Person): number {
-  return p.role === 'child' ? Math.min(1, Math.max(0, (16 - p.age) / 12)) : 0;
+  return p.role === 'child' ? Math.min(1, Math.max(0, (18 - p.age) / 13)) : 0;
 }
 
 /** Garment colours as an outfit is put together: `wear(id, colour)` notes the colour and gives back the id. */
