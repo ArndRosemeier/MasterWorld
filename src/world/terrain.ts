@@ -2,11 +2,11 @@
  * The terrain surface: the skeleton's elevation plus local detail (the height field layer of 5.6). Pure,
  * deterministic, evaluated in workers for meshes and on the main thread for walking.
  */
-import { Noise, deriveSeed, lerp, smoothstep } from '@futuremagic/core';
+import { Noise, deriveSeed, lerp, smin, smoothstep } from '@futuremagic/core';
 import { Skeleton, emptySample } from './skeleton';
 import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
-import { ArchField, archNear } from './volumes';
+import { ArchField, BLEND, archNear } from './volumes';
 import { findStart } from './start';
 
 export class Terrain {
@@ -41,6 +41,15 @@ export class Terrain {
       if (site) this.fields.push(new ArchField(this, site));
     }
     return this.fields;
+  }
+
+  /**
+   * The solid ground near a volume as a signed distance (positive in air): its rock blended into the
+   * height field, as it is meshed. Null away from every volume (the height field alone holds there).
+   */
+  rockSurface(x: number, y: number, z: number): number | null {
+    for (const f of this.volumes) if (f.inBounds(x, y, z)) return smin(y - this.height(x, z), f.at(x, y, z), BLEND);
+    return null;
   }
 
   /** Whether rock of a volume stands on the ground here (`h` the ground height): nothing grows there. */

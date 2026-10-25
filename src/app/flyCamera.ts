@@ -3,6 +3,7 @@
  * Space/C up and down, right mouse button held to look. Never goes below the ground.
  */
 import { Euler, Vector3, type PerspectiveCamera } from 'three/webgpu';
+import { lookFromDegrees } from './look';
 
 export class FlyCamera {
   private yaw = 0;
@@ -34,8 +35,7 @@ export class FlyCamera {
 
   /** Yaw 0 looks north (−z), 90 east; pitch up is positive. Degrees. */
   setLook(yawDeg: number, pitchDeg: number): void {
-    this.yaw = (-yawDeg * Math.PI) / 180;
-    this.pitch = (pitchDeg * Math.PI) / 180;
+    ({ yaw: this.yaw, pitch: this.pitch } = lookFromDegrees(yawDeg, pitchDeg));
     this.apply();
   }
 
