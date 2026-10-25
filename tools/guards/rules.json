@@ -11,6 +11,7 @@
   "layers": [
     { "from": "src/world", "deny": ["three", "src/render", "src/game", "src/app"], "why": "the world model is pure data: it runs in workers and headless tests" },
     { "from": "src/setting", "deny": ["three", "src/render", "src/game", "src/app"], "why": "a setting module is data and pure functions (docs/design/masterworld-plan.md section 12)" },
+    { "from": "src/sim", "deny": ["three", "src/render", "src/app"], "why": "the world simulation is pure: it runs in a worker and in headless tests (plan 9.3)" },
     { "from": "src/vgm", "deny": ["three", "src/render", "src/app"], "why": "the VGM decides; it does not draw" },
     { "from": "src/render", "deny": ["src/game", "src/app"], "why": "the renderer does not know about the game" },
     { "from": "src/input", "deny": ["three", "src/render", "src/game"], "why": "input is plain DOM" }

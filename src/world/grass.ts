@@ -8,6 +8,7 @@ import { Noise, deriveSeed, lerp, smoothstep } from '@futuremagic/core';
 import { coverNoise, woodsAt } from './flora';
 import type { MaskJob } from './water';
 import type { Terrain } from './terrain';
+import { TownGround } from './town';
 
 /** Biome grass is read on a world-aligned lattice this far apart (m) and blended between. */
 const LATTICE = 16;
@@ -69,7 +70,7 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
     const slope = Math.hypot(hx, hz) / (2 * step);
     dens *= 1 - smoothstep(0.42, 0.68, slope);
     dens *= smoothstep(2.3, 4.2, h) * (1 - smoothstep(SNOW - 150, SNOW + 100, h));
-    if (dens <= 0.01 || t.rockAt(x, z, h)) continue;
+    if (dens <= 0.01 || t.rockAt(x, z, h) || t.townGround(x, z) >= TownGround.Street) continue;
     // Not in water; reeds-to-be along the banks keep their place.
     t.clearOfWater(x, z, h, w);
     dens *= smoothstep(0.3, 1.5, w.river) * smoothstep(0.1, 0.6, w.lake);

@@ -8,6 +8,7 @@ import { smoothstep } from '@futuremagic/core';
 import { TREES, type FloraDef, type TreeName } from '../setting/contract';
 import { NEAR_SPACING, coverNoise, woodsAt } from './flora';
 import type { Terrain } from './terrain';
+import { TownGround } from './town';
 
 /**
  * Height and crown radius (m) of each species' models at scale 1 (@futuremagic/vegetation, mean of its
@@ -61,7 +62,7 @@ export function canopySampler(t: Terrain): (x: number, z: number, out: Canopy) =
     keep *= smoothstep(2, 6, w.river) * smoothstep(0.2, 1, w.lake);
     const slope = Math.hypot(t.height(x + 3, z) - h, t.height(x, z + 3) - h) / 3;
     keep *= 1 - smoothstep(0.6, 0.85, slope);
-    if (keep <= 0 || t.rockAt(x, z, h)) return out;
+    if (keep <= 0 || t.rockAt(x, z, h) || t.townGround(x, z) !== TownGround.None) return out;
     // Trees per square metre as world/flora.ts places them (at most one in two near candidates).
     const woods = woodsAt(cover, flora, x, z);
     const density = Math.min((flora.trees / 10000) * (0.08 + 0.92 * woods), 0.5 / NEAR_SPACING ** 2) * keep;

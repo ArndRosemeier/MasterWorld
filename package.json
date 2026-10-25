@@ -22,6 +22,7 @@
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/humanoid": "file:vendor/assetgenerator/packages/humanoid",
     "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",
+    "@futuremagic/settlement": "file:vendor/assetgenerator/packages/settlement",
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",
     "@futuremagic/stage": "file:vendor/assetgenerator/packages/stage",
     "@futuremagic/texgen": "file:vendor/assetgenerator/packages/texgen",

@@ -3,7 +3,7 @@
  * nets (@futuremagic/volume), blended into the ground around their edge. Pure, runs in workers.
  *
  * First kind: a natural arch, a fin of rock bent over from one foot to the other. Milestone 1 places one
- * near the start (`archNear`); later the VGM places them like any other feature.
+ * near the start (`archNear`), placed by the VGM's Builder as a decision (src/vgm/builder.ts).
  */
 import { Noise, deriveSeed, hash2f, lerp, smin, smoothstep } from '@futuremagic/core';
 import { PAD, surfaceNets, type Grid } from '@futuremagic/volume';
