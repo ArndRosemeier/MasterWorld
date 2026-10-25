@@ -60,7 +60,8 @@ export class Menu {
     return this.settings.classList.contains('open') || this.news.classList.contains('open');
   }
 
-  private show(which: 'settings' | 'news' | null): void {
+  /** Opens a dialog (or closes them with null). */
+  show(which: 'settings' | 'news' | null): void {
     this.rebinding = null;
     this.settings.classList.toggle('open', which === 'settings');
     this.news.classList.toggle('open', which === 'news');
@@ -125,6 +126,8 @@ export class Menu {
       rows.push(
         el('label', { className: 'row' }, el('span', { textContent: 'Time of day' }), hour, shown),
         this.slider('Length of a day', 'dayLength', 1, (v) => (v === 0 ? 'clock stopped' : `${v.toFixed(0)} min`)),
+        this.slider('Volume', 'volume', 0.05, (v) => `${Math.round(v * 100)}%`),
+        this.check('Calm motion (a still title, no window shows)', 'calm'),
         this.check('Frame time line (HUD)', 'hud'),
       );
     }

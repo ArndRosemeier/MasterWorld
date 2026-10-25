@@ -93,21 +93,42 @@ export class Player {
   }
 
   update(dt: number): void {
-    const { walker, heroCam, hero } = this;
+    const { walker, heroCam } = this;
     if (this.flying) {
       this.fly.update(dt);
-      // The hero stands and breathes where it was left.
-      walker.step({ forward: 0, strafe: 0, heading: walker.yaw, walk: false, up: false, down: false }, dt);
-    } else {
-      const { intent, facing } = heroCam.intent(dt, walker.yaw);
-      walker.yaw = facing;
-      walker.step(intent, dt);
+      this.standBy(dt);
+      return;
     }
-    if (hero) {
-      hero.update({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait }, dt, (x, y, z) => walker.support(x, z, y));
-      hero.visible = this.flying || !heroCam.firstPerson;
-    }
-    if (!this.flying) heroCam.trail(this.toHead(), dt);
+    const { intent, facing } = heroCam.intent(dt, walker.yaw);
+    walker.yaw = facing;
+    walker.step(intent, dt);
+    this.pose(dt);
+    heroCam.trail(this.toHead(), dt);
+  }
+
+  /** The hero stands and breathes where it was left, and the camera is someone else's (flying, the title). */
+  standBy(dt: number): void {
+    const walker = this.walker;
+    walker.step({ forward: 0, strafe: 0, heading: walker.yaw, walk: false, up: false, down: false }, dt);
+    this.pose(dt);
+  }
+
+  /** Where the camera will be behind the hero (the camera itself is left where it is). */
+  heroView(): { at: [number, number, number]; look: [number, number, number] } {
+    const c = this.camera, at = c.position.clone(), q = c.quaternion.clone();
+    this.heroCam.trail(this.toHead(), 0);
+    const d = c.getWorldDirection(this.head.clone());
+    const view = { at: [c.position.x, c.position.y, c.position.z] as [number, number, number], look: [c.position.x + d.x * 10, c.position.y + d.y * 10, c.position.z + d.z * 10] as [number, number, number] };
+    c.position.copy(at);
+    c.quaternion.copy(q);
+    return view;
+  }
+
+  private pose(dt: number): void {
+    const { walker, hero } = this;
+    if (!hero) return;
+    hero.update({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait }, dt, (x, y, z) => walker.support(x, z, y));
+    hero.visible = this.flying || !this.heroCam.firstPerson;
   }
 
   /** Where the view is, as URL parameters (`pos=x,y,z&look=yaw,pitch`, degrees), to come back to it. */

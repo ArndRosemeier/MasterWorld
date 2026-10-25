@@ -26,6 +26,10 @@ export interface Settings {
   /** Real minutes per game day; 0 stops the clock. */
   /** Real minutes a game day takes (D37: 60; 0 stops the clock). Was `dayMinutes`, stopped by default: renamed so old saves start with the game's day. */
   dayLength: number;
+  /** Music and sounds, 0..1. */
+  volume: number;
+  /** Calm motion: the title shows its still picture and windows open without their show (plan 17.1). */
+  calm: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,6 +43,8 @@ export const DEFAULT_SETTINGS: Settings = {
   webgl: false,
   hud: false,
   dayLength: 60,
+  volume: 0.8,
+  calm: false,
 };
 
 /** The ranges the dialog offers (and stored values are held to). */
@@ -47,6 +53,7 @@ export const RANGES = {
   fov: [40, 90],
   renderScale: [0.5, 1],
   dayLength: [0, 120],
+  volume: [0, 1],
 } as const satisfies Partial<Record<keyof Settings, readonly [number, number]>>;
 
 /** Settings read back from storage (or anything else): every field checked, the rest from the defaults. */
@@ -56,7 +63,7 @@ export function cleanSettings(raw: unknown): Settings {
     const v = s[k];
     return typeof v === 'number' && Number.isFinite(v) ? clamp(v, RANGES[k][0], RANGES[k][1]) : DEFAULT_SETTINGS[k];
   };
-  const flag = (k: 'invertMouse' | 'trees' | 'grass' | 'webgl' | 'hud'): boolean => (typeof s[k] === 'boolean' ? (s[k] as boolean) : DEFAULT_SETTINGS[k]);
+  const flag = (k: 'invertMouse' | 'trees' | 'grass' | 'webgl' | 'hud' | 'calm'): boolean => (typeof s[k] === 'boolean' ? (s[k] as boolean) : DEFAULT_SETTINGS[k]);
   return {
     mouseSpeed: num('mouseSpeed'),
     invertMouse: flag('invertMouse'),
@@ -68,6 +75,8 @@ export function cleanSettings(raw: unknown): Settings {
     webgl: flag('webgl'),
     hud: flag('hud'),
     dayLength: num('dayLength'),
+    volume: num('volume'),
+    calm: flag('calm'),
   };
 }
 

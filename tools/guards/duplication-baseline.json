@@ -8,6 +8,14 @@
     "reason": "2D and 3D variants of the same noise in one file (shared package); merging them would cost the hot path a dimension branch."
   },
   {
+    "key": "same name: masterworld/app/flyCamera.ts#update + masterworld/render/terrain/TerrainView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (camera movement vs chunk selection); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/render/flora/FloraView.ts#update + masterworld/render/hero/HeroView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (plant cells and their draws vs the hero's pose); only the name matches."
+  },
+  {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
     "reason": "TSL node arithmetic (x.add(y).mul(z)) in three shader kinds: it is how three.js nodes are written, not a copied helper. It crossed the info floor when the talk code grew the corpus."
   },
@@ -16,24 +24,28 @@
     "reason": "Per-frame update methods of unrelated systems (going in and out of the cellar vs chunk selection); only the name matches."
   },
   {
-    "key": "same name: masterworld/app/flyCamera.ts#update + masterworld/render/terrain/TerrainView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (camera movement vs chunk selection); only the name matches."
-  },
-  {
     "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/mapUi.ts#opened",
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the shared part already lives in the base class."
-  },
-  {
-    "key": "same name: masterworld/app/player.ts#update + masterworld/render/terrain/TerrainView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (the player vs chunk selection); only the name matches."
   },
   {
     "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",
     "reason": "The walker's world in main.ts delegates to the terrain's rockSurface (or the cellar's space below ground); an adapter, not a copy."
   },
   {
-    "key": "same name: masterworld/render/flora/FloraView.ts#update + masterworld/render/hero/HeroView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (plant cells and their draws vs the hero's pose); only the name matches."
+    "key": "same name: masterworld/app/loading.ts#fail + masterworld/app/title/TitleScreen.ts#fail",
+    "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
+  },
+  {
+    "key": "same name: masterworld/app/player.ts#update + masterworld/render/flora/FloraView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the player vs plant cells); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/player.ts#update + masterworld/render/hero/HeroView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the player's input and camera vs the hero's pose); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/player.ts#update + masterworld/render/town/TownView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the player vs town building streaming); only the name matches."
   },
   {
     "key": "same name: masterworld/app/cellarVisit.ts#enter + masterworld/app/interiorVisit.ts#enter",
@@ -46,10 +58,6 @@
   {
     "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/app/interiorVisit.ts#update",
     "reason": "Per-frame door checks of two different spaces (dungeon cells vs a room plan); shared parts in app/fade.ts. Folded when the cellar becomes a hatch in its house's room."
-  },
-  {
-    "key": "same name: masterworld/app/interiorVisit.ts#update + masterworld/app/player.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (going in and out of rooms vs the player); only the name matches."
   },
   {
     "key": "same name: masterworld/app/interiorVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",
