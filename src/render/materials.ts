@@ -152,7 +152,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Crowns are matt: no sheen of the sky on the woods from afar.
   m.specularIntensityNode = mix(float(0.25), float(0.05), woods);
   rough = mix(rough, float(0.9), woods);
-  pert = mix(pert, afar.bump.mul(1.6), woods);
+  pert = mix(pert, afar.bump.mul(0.9), woods);
 
   // Snow above a ragged line, only where it can lie.
   const snow = layer('snow', p.xz);
