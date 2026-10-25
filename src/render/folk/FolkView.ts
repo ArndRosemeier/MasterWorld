@@ -4,7 +4,7 @@
  * the shape worker) and shown once ready; until then the person is simply not drawn. Characters far off
  * draw their "Crowd" level (one draw call plus the hair).
  */
-import { Group, type Camera, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Group, type Camera, type Material, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
@@ -35,7 +35,7 @@ export class FolkView {
   private dressing = 0;
   private readonly shown = new Map<number, Slot>();
 
-  private constructor(private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
+  private constructor(private readonly reversed: boolean, private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
     for (const ch of [lead, ...others]) {
       const place = new Group();
       place.add(ch.object);
@@ -67,7 +67,7 @@ export class FolkView {
     const lead = await share();
     const others: Character[] = [];
     for (let i = 1; i < count; i++) others.push(await share());
-    const view = new FolkView(stage, life, height, lead, others);
+    const view = new FolkView(renderer.reversedDepthBuffer === true, stage, life, height, lead, others);
     return view;
   }
 
@@ -76,6 +76,7 @@ export class FolkView {
     const s = this.slots[0], p = this.life.agents.find((a) => drawn(a.person))?.person;
     if (p) await s.ch.set({ ...lookOf(p), animation: 'walk' });
     s.ch.setLod(0);
+    this.reverseOffsets(s.place);
     s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
     return [s.place];
   }
@@ -91,6 +92,7 @@ export class FolkView {
     place.removeFromParent();
     for (let k = 1; k < ch.lods.length; k++) {
       ch.setLod(k);
+      this.reverseOffsets(place);
       await this.stage.prepare(place);
     }
     ch.setLod(0);
@@ -154,6 +156,7 @@ export class FolkView {
     s.ch.set({ ...lookOf(a.person), animation: s.clip })
       .then(async () => {
         s.ch.setLod('auto');
+        this.reverseOffsets(s.place);
         // Its meshes are new: compile (a cache hit for kinds already seen) before it is drawn.
         // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
         // pass is warmed only for objects not yet in the scene).
@@ -166,6 +169,25 @@ export class FolkView {
       })
       .catch((e: unknown) => console.error('[folk] dressing failed', e))
       .finally(() => { this.dressing--; });
+  }
+
+  /**
+   * Actors draws clothes over the skin, and each garment layer over the one below, by polygon offsets
+   * toward the camera (negative). With reversed depth (view.ts) a negative offset pushes away: the skin
+   * and underclothes showed through in patches. Flipped once per material (garments are made lazily).
+   */
+  private reverseOffsets(o: Object3D): void {
+    if (!this.reversed) return;
+    o.traverse((m) => {
+      const mat = (m as Mesh).material;
+      if (!mat) return;
+      for (const x of (Array.isArray(mat) ? mat : [mat]) as Material[]) {
+        if (!x.polygonOffset || x.userData.offsetReversed) continue;
+        x.polygonOffsetFactor = -x.polygonOffsetFactor;
+        x.polygonOffsetUnits = -x.polygonOffsetUnits;
+        x.userData.offsetReversed = true;
+      }
+    });
   }
 
   /** The camera that picks each character's detail level. */
