@@ -56,8 +56,8 @@ export interface HeroLooks {
 /** Outfit presets a hero is never offered (real-world religious orders). */
 const LEFT_OUT_PRESETS = ['med-nun'];
 
-/** Swimming, the body lies in the water: the clip's hips stand this far (of the height) over the feet. */
-const SWIM_DROP = 0.3;
+/** Swimming or treading water, the body is this far (of the height) down in the water: head and shoulders above it. */
+const SWIM_DROP = 0.15;
 
 /** The hero's catalog: the setting's themes (filtered by Actors), its peoples, no robots or skeletons. */
 export function heroCatalog(looks: HeroLooks): (c: CharacterCatalog) => CharacterCatalog {
@@ -224,7 +224,7 @@ export class HeroView {
       o.position.set(p.pos.x, p.pos.y + (p.seat ?? 0), p.pos.z);
       if (seat) o.position.sub(seat.applyQuaternion(o.quaternion));
     } else {
-      o.position.set(p.pos.x, p.pos.y - (clip === 'swim' ? this.height * SWIM_DROP : 0), p.pos.z);
+      o.position.set(p.pos.x, p.pos.y - (clip === 'swim' || clip === 'tread water' ? this.height * SWIM_DROP : 0), p.pos.z);
     }
     if (this.held.drawn !== !!p.combat) { this.held.drawn = !!p.combat; this.moveHeld(); }
   }
@@ -258,7 +258,8 @@ export class HeroView {
   /** Where the rider's seat is in the hero's own space (Actors' Mount knows the hips). */
   private riderSeat(): Vector3 | null {
     const s = new Mount(this.front.actor, this.front.actor).riderSeat();
-    return s ? this.seatAt.copy(s) : null;
+    // Actors' seat is in the character's own space, which stands lifted inside the hero.
+    return s ? this.seatAt.copy(s).applyMatrix4(this.front.object.matrix) : null;
   }
 
   /** The held things onto the hands (in a fight) or the hip and back. */
