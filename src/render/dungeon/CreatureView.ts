@@ -2,24 +2,30 @@
  * A den's creatures drawn (plan 9.3, 12): rats are Dunfinity's modelled quarry rat (public/creatures, its
  * clips: sniffing, scurrying, the run, rearing up, the bite, a flinch, dying), scaled to their kind;
  * spiders are procedural animals (@futuremagic/creatures, grown once per kind from the setting's seed: a
- * chitin eight-legger) on one flesh shader; goblins, smugglers, the dead and ghouls are humanoids
- * (@futuremagic/humanoid) in the cellar's outfits, holding their weapons, the skeleton only its bones.
+ * chitin eight-legger) on one flesh shader; goblins, smugglers, the dead and ghouls are Actors people
+ * (./foes.ts: their looks and clips) in the cellar's rags, holding their weapons, the skeleton Actors' bones.
  * Each is posed every frame from what the den says it is doing: walking, running, rummaging, the wind-up
  * and blow, a flinch when struck, begging, falling. Built behind the loading screen; placed at the
  * cellar's origin.
  */
-import { Box3, Group, Vector3, type Object3D } from 'three/webgpu';
+import { Box3, Group, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed, hexToRgb } from '@futuremagic/core';
+import { Character } from '@actors/generator';
+import { nodeMaterials } from '@actors/three/webgpu';
+import HumanWorker from '@actors/human/worker?worker';
 import { grow, type BodyPlan, type Integument } from '@futuremagic/creatures';
 import { CritterModel, ModelledCreature, type ClipUse, type CritterFigure, type ModelledFigure, type RigInput } from '@futuremagic/creatures/three';
-import { randomAppearance, setHumanAssetBase, type EquipmentVisuals, type RaceId } from '@futuremagic/humanoid';
-import { Humanoid, type ActionAnim, type MoveState } from '@futuremagic/humanoid/three';
 import type { CreatureDef } from '../../setting/contract';
 import type { Creature, Den } from '../../sim/creatures';
 import { critterMaterials, ratMaterial } from '../materials/creatures';
-import { TRAVELLER, visual } from '../hero/wardrobe';
+import { buildArm } from '../hero/arms';
+import { gripHeld } from '../hero/grips';
+import { playClip } from '../hero/play';
+import { foeClip, foeLook, type FoeDoing } from './foes';
+import type { Stage } from '@futuremagic/stage';
 
-const ASSETS = `${import.meta.env.BASE_URL}humanoid/`;
+/** Where the build serves the people's pack (`npm run packs` fills public/packs). */
+const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
 /** A blow from the start of its wind-up to its follow-through, seconds. */
 const BLOW = 0.75;
 /** A flinch, seconds. */
@@ -33,7 +39,7 @@ const RAT_CLIPS: Record<string, ClipUse> = {
 type Body =
   | { readonly kind: 'critter'; readonly fig: CritterFigure; readonly scale: number }
   | { readonly kind: 'modelled'; readonly fig: ModelledFigure; readonly scale: number }
-  | { readonly kind: 'humanoid'; readonly body: Humanoid; readonly scale: number };
+  | { readonly kind: 'person'; readonly ch: Character; readonly place: Group; readonly held: Object3D | null; clip: string; drawn: boolean | null };
 
 interface Shown {
   readonly c: Creature;
@@ -63,23 +69,6 @@ function speciesFor(def: CreatureDef, seed: number) {
   return { ...sp, colors: { ...sp.colors, base: tone, secondary: tone.map((v) => v * 0.75) as typeof tone, belly: tone.map((v) => Math.min(1, v * 1.5)) as typeof tone } };
 }
 
-/** What a humanoid creature wears, by its outfit. */
-function outfitOf(def: CreatureDef, k: number, rng: Rng): EquipmentVisuals {
-  const b = def.body;
-  if (b.kind !== 'humanoid') return {};
-  const held = b.held ? { mainhand: { defId: b.held, visual: visual(k, [1, 1, 1], b.held) } } : {};
-  const dull = (r: number, g: number, bl: number): [number, number, number] => [r * rng.range(0.8, 1.2), g * rng.range(0.8, 1.2), bl * rng.range(0.8, 1.2)];
-  if (b.bones) return held;
-  if (b.outfit === 'rags') return { chest: { defId: 'rags', visual: visual(k, dull(0.34, 0.28, 0.19)) }, legs: { defId: 'trousers', visual: visual(k + 1, dull(0.2, 0.16, 0.11)) }, ...held };
-  if (b.outfit === 'bandit') {
-    return {
-      chest: { defId: 'shirt', visual: visual(k, dull(0.45, 0.4, 0.33)) }, legs: { defId: 'trousers', visual: visual(k + 1, dull(0.16, 0.14, 0.12)) },
-      back: { defId: 'jerkin', visual: visual(k + 2) }, feet: { defId: 'boots', visual: visual(k + 3) }, ...held,
-    };
-  }
-  return { chest: { defId: 'shroud', visual: visual(k, dull(0.38, 0.37, 0.32)) }, ...held };
-}
-
 export class CreatureView {
   readonly group = new Group();
   private readonly shown: Shown[] = [];
@@ -94,11 +83,17 @@ export class CreatureView {
     this.group.position.set(origin.x, origin.y, origin.z);
   }
 
-  static async build(den: Den, seed: number, origin: { x: number; y: number; z: number }): Promise<CreatureView> {
+  static async build(den: Den, seed: number, origin: { x: number; y: number; z: number }, renderer: WebGPURenderer): Promise<CreatureView> {
     const v = new CreatureView(den, origin);
-    setHumanAssetBase(ASSETS);
     const models = new Map<string, CritterModel>();
     let rat: { model: ModelledCreature; length: number } | null = null;
+    // The cellar's people: the first loads the pack (in its own worker), the others share it.
+    let lead: Character | null = null;
+    const person = async () => {
+      const ch = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, clipLibraries: false, ...(lead ? { shareWith: lead } : { worker: new HumanWorker() }) });
+      lead ??= ch;
+      return ch;
+    };
     // The rig plants feet in the world: the cellar's floor under them (near the storey the creature is on).
     const O = v.group.position;
     const ground = (x: number, z: number) => (den.space.floorAt(x - O.x, z - O.z, v.near + 0.8) ?? v.near) + O.y;
@@ -106,17 +101,17 @@ export class CreatureView {
       const b = c.def.body;
       let body: Body;
       if (b.kind === 'humanoid') {
-        const rng = new Rng(deriveSeed(seed, 'creature look', c.id));
-        const app = randomAppearance(b.race as RaceId, rng.int(0, 1e9), { gender: rng.chance(0.75) ? 1 : 0 });
-        const h = await Humanoid.create(app, {
-          wardrobe: TRAVELLER, castShadow: true,
-          ...(b.bones ? { bones: { tint: b.skin ? hexToRgb(parseInt(b.skin.slice(1), 16)) : undefined, eyes: [0.3, 0.8, 1] as [number, number, number] } } : {}),
-        });
-        h.dress(outfitOf(c.def, c.id * 7 + 101, rng));
-        h.object.name = c.def.name;
-        body = { kind: 'humanoid', body: h, scale: b.height / h.height };
-        h.object.scale.setScalar(body.scale);
-        v.group.add(h.object);
+        const ch = await person();
+        await ch.set(foeLook(c.def, seed, c.id));
+        ch.setLod(0); // a cellar is small: always close
+        // Never placed directly (Actors keeps its own offset): a group carries it, at the setting's height.
+        const place = new Group();
+        place.name = c.def.name;
+        place.add(ch.object);
+        place.scale.setScalar(b.height / (ch.height || 1.75));
+        ch.object.traverse((m) => { if ((m as { isMesh?: boolean }).isMesh) m.castShadow = !m.name.startsWith('genitals'); });
+        v.group.add(place);
+        body = { kind: 'person', ch, place, held: b.held ? buildArm(b.held) : null, clip: '', drawn: null };
       } else if (b.kind === 'rat') {
         if (!rat) {
           const model = await ModelledCreature.load(`${import.meta.env.BASE_URL}creatures/quarry_rat.glb`, ratMaterial);
@@ -190,22 +185,40 @@ export class CreatureView {
         else { i.action = ''; i.actionT = 0; }
         s.body.fig.animate(i, dt, hurtT < 1 ? 1 - hurtT : 0);
       } else {
-        const speed = Math.hypot(vx, vz);
-        const move: MoveState = dead ? 'dead' : speed > 2.6 ? 'run' : speed > 0.2 ? 'walk' : c.act === 'rummage' || c.act === 'gnaw' ? 'crouch' : 'idle';
-        let action: ActionAnim | undefined;
-        const held = c.def.body.kind === 'humanoid' ? c.def.body.held : undefined;
-        if (!dead && blowT < 1) action = { id: held === 'knife' ? 'stab' : held ? 'swing_1h' : 'slam', t0: s.blowAt, dur: BLOW };
-        else if (!dead && hurtT < 1) action = { id: 'flinch', t0: s.hurtAt, dur: FLINCH * 1.5 };
-        else if (c.act === 'beg') action = { id: 'cower', t0: t - 0.5, dur: 9 };
+        const p = s.body;
         const fighting = c.state === 'fight' || c.state === 'alert';
-        const mood = c.state === 'beg' || c.state === 'flee' || c.state === 'meek' ? 'afraid' : fighting ? 'angry' : 'neutral';
-        s.body.body.update({
-          pos: [c.x, c.y, c.z], vel: [vx, 0, vz], yaw, combat: fighting,
-          anim: { move, action, mood, lookAt: watching ? [watching[0], watching[1], watching[2]] : undefined },
-        }, dt, t, null);
-        s.body.body.object.scale.setScalar(s.body.scale);
+        const doing: FoeDoing = {
+          dead, speed: Math.hypot(vx, vz), fighting,
+          low: c.act === 'beg' ? 'beg' : c.act === 'rummage' || c.act === 'gnaw' ? 'rummage' : null,
+          action: dead ? null : blowT < 1 ? (c.def.body.kind === 'humanoid' && c.def.body.held === 'knife' ? 'stab' : c.def.body.kind === 'humanoid' && c.def.body.held ? 'swing_1h' : 'slam') : hurtT < 1 ? 'flinch' : null,
+          variant: s.variant,
+        };
+        const clip = foeClip(c.def, doing);
+        // A blow or flinch starts again when a new one comes, even of the same clip.
+        const fresh = (doing.action === 'flinch' && hurtT * FLINCH < dt + 1e-6) || (doing.action && doing.action !== 'flinch' && blowT * BLOW < dt + 1e-6);
+        if (clip !== p.clip || fresh) {
+          p.clip = clip;
+          const once = !!doing.action || dead;
+          playClip(p.ch, clip, once, () => p.clip === clip, doing.action === 'flinch' ? FLINCH * 1.5 : doing.action ? BLOW : undefined);
+        }
+        if (p.drawn !== fighting) { p.drawn = fighting; gripHeld(p.held, null, fighting, p.ch.actor.bones, p.place); }
+        p.ch.update(dt);
+        p.place.position.set(c.x, c.y, c.z);
+        // The den's yaw turns −z; Actors' people face +z.
+        p.place.rotation.y = yaw + Math.PI;
       }
     }
+  }
+
+  /**
+   * Compile every shader its people draw with, each one's shadow casters too (Actors people's shadow
+   * builds are their own), meshes Actors keeps hidden included (compileAsync skips hidden ones).
+   */
+  async warm(stage: Stage): Promise<void> {
+    const hidden: Object3D[] = [];
+    this.group.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    await stage.prepare(this.group, { everyCaster: true });
+    for (const o of hidden) o.visible = false;
   }
 
   /** The creature drawn nearest to a ray from the camera (a click), within `slack` metres of it. */
