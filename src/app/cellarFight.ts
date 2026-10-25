@@ -40,7 +40,23 @@ export interface FightHost {
 export const REWARD_PER_DANGER = 12;
 
 
+/**
+ * What happened in the cellar, for sound and music (each fight event, plus the moments around the fight):
+ * `who` carries the creature (its def, and x/y/z in the world) for placing a sound.
+ */
+export type FightCue =
+  | FightEvent
+  | { readonly kind: 'down' | 'up' }
+  | { readonly kind: 'battle'; readonly on: boolean }
+  | { readonly kind: 'quiet' }
+  | { readonly kind: 'found'; readonly loot: Loot }
+  | { readonly kind: 'woke' }
+  | { readonly kind: 'paid'; readonly coins: number };
+
 export class CellarFight {
+  /** Hears every cue (the game's sound sets it); nothing listens by default. */
+  onCue: (cue: FightCue) => void = () => {};
+  private wasInside = false;
   private readonly danger: number;
   private warned = false;
   private quietSaid = false;
@@ -126,6 +142,7 @@ export class CellarFight {
   /** A find: its cards, and what is better than what is worn is taken up at once. */
   private takeUp(loot: Loot): void {
     this.hud.showFinds(loot, this.setting.items);
+    this.onCue({ kind: 'found', loot });
     const took: string[] = [];
     for (const it of loot.items) if (this.better(it)) { this.hero.equip(it); took.push(it.name); }
     if (took.length) { this.notes.say(`You take up ${took.join(' and ')}.`, 4); this.host.armed(); }
@@ -144,6 +161,7 @@ export class CellarFight {
 
   play(dt: number): void {
     const inside = this.visit.inside;
+    if (inside !== this.wasInside) { this.wasInside = inside; this.onCue({ kind: inside ? 'down' : 'up' }); }
     this.hud.shown = inside || this.hero.health < this.hero.maxHealth;
     this.creatures.group.visible = inside;
     if (!inside) {
@@ -180,9 +198,11 @@ export class CellarFight {
     this.creatures.pose(dt, [pose.x, pose.y + head, pose.z]);
     const fighting = this.delve.den.fighting.length;
     if (this.wasFighting > 0 && fighting === 0) this.director.met('challenge');
+    if ((this.wasFighting > 0) !== (fighting > 0)) this.onCue({ kind: 'battle', on: fighting > 0 });
     this.wasFighting = fighting;
     if (!this.quietSaid && this.delve.beaten) {
       this.quietSaid = true;
+      this.onCue({ kind: 'quiet' });
       this.director.queue(`The cellar of ${this.visit.cellar.house} is quiet now. Its household will want to hear.`, 2);
     }
     this.near = this.delve.within(pose);
@@ -208,6 +228,7 @@ export class CellarFight {
   }
 
   private event(e: FightEvent): void {
+    this.onCue(e);
     const name = (c: Creature) => `the ${c.def.name}`;
     switch (e.kind) {
       case 'struck': {
@@ -251,6 +272,7 @@ export class CellarFight {
     this.hud.fallen(false);
     this.host.still(false);
     this.host.wake();
+    this.onCue({ kind: 'woke' });
     this.notes.say(`You wake in the inn, aching. Someone carried you up${lost ? `, and ${coinText(lost)} went with them` : ''}.`, 8);
   }
 
@@ -262,6 +284,7 @@ export class CellarFight {
     if (lead) lead.done = true;
     const pay = Math.round(this.danger * REWARD_PER_DANGER);
     this.hero.coins += pay;
+    this.onCue({ kind: 'paid', coins: pay });
     this.director.met('purpose');
     this.director.queue(`The household of ${this.visit.cellar.house} hears the cellar is safe and presses ${coinText(pay)} into your hand.`, 3);
   }
