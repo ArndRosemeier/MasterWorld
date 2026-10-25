@@ -97,7 +97,9 @@ export class FolkView {
       for (let k = i > 0 ? 0 : 1; k < ch.lods.length; k++) {
         ch.setLod(k);
         this.reverseOffsets(place);
-        await this.stage.prepare(place);
+        // Every caster: the Stage tells shadow-pass kinds apart by material type and attributes, which all
+        // garments share, but each one's shadow shader is its own.
+        await this.stage.prepare(place, { everyCaster: true });
       }
     }
     ch.setLod(0);
