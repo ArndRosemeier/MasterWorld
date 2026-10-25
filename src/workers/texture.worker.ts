@@ -1,14 +1,22 @@
 /// <reference lib="webworker" />
-import { generateNaturalLayer, type TexLayer } from '@futuremagic/texgen';
+import { generateFacadeLayer, generateGroundLayer, generateMedievalLayer, generateNaturalLayer, type TexLayer } from '@futuremagic/texgen';
 import { serve } from './serve';
 
+/** Which texgen set a layer comes from. */
+export type TextureSet = 'natural' | 'medieval' | 'facade' | 'ground';
+
 export interface TextureJob {
-  /** Natural layer index (NATURAL_NAMES). */
+  /** Layer index within its set (default: the natural layers, NATURAL_NAMES). */
   layer: number;
+  set?: TextureSet;
   size: number;
 }
 
+const GEN: Record<TextureSet, (index: number, size: number) => TexLayer> = {
+  natural: generateNaturalLayer, medieval: generateMedievalLayer, facade: generateFacadeLayer, ground: generateGroundLayer,
+};
+
 serve<TextureJob, TexLayer>((job) => {
-  const t = generateNaturalLayer(job.layer, job.size);
+  const t = GEN[job.set ?? 'natural'](job.layer, job.size);
   return { result: t, transfer: [t.albedo.buffer, t.normal.buffer] };
 });

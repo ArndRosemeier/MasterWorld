@@ -16,6 +16,8 @@ export interface WalkWorld {
   rockSurface(x: number, y: number, z: number): number | null;
   /** Calm water surface level here, or null where there is no water. */
   waterLevel(x: number, z: number): number | null;
+  /** Walls (buildings): does a body of radius `r` at (x, z) touch one? */
+  wall?(x: number, z: number, r: number): boolean;
 }
 
 /** What the player wants this frame. */
@@ -97,6 +99,7 @@ export class Walker {
   /** Whether the body would be in rock at (x, z) with its feet at y. */
   private blocked(x: number, y: number, z: number): boolean {
     const r = WALK.radius;
+    if (this.world.wall?.(x, z, r)) return true;
     for (const k of [0.75, 1.3, this.height - r]) {
       const d = this.world.rockSurface(x, y + k, z);
       if (d !== null && d < r) return true;

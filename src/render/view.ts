@@ -48,7 +48,8 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
 /** Our own vertex attributes on the Stage's warm-up stand-ins (same size as on real meshes). */
 function standInAttribute(g: BufferGeometry, name: string): boolean {
   if (name === 'surface' || name === 'canopy') g.setAttribute(name, new Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4));
-  else if (name === 'level') g.setAttribute('level', new Float32BufferAttribute([1, 1, 1], 1));
+  else if (name === 'level' || name === 'mat') g.setAttribute(name, new Float32BufferAttribute([1, 1, 1], 1));
+  else if (name === 'tint') g.setAttribute('tint', new Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1], 3));
   else return false;
   return true;
 }

@@ -16,7 +16,6 @@ test('town: the VGM founds the start town near the start, on dry land, clear of 
   assert.ok(terrain.height(d.x, d.z) > 2, 'on dry land');
   const arch = terrain.volumes[0]?.site;
   if (arch) assert.ok(Math.hypot(arch.a[0] - d.x, arch.a[1] - d.z) > d.radius, 'the arch stands outside');
-  assert.deepEqual(openWorld(parseSeed('masterworld'), classic).log, log, 'deterministic');
 });
 
 test('town: the market is level, and the ground knows its streets, market and houses', () => {

@@ -6,11 +6,12 @@
  * Every mesh of a kind shares the kind's one material, so a kind is one shader; variation goes into
  * vertex attributes or uniforms, never into a new material.
  */
-import { DoubleSide, MeshPhysicalNodeMaterial, Vector2, type Material, type Mesh } from 'three/webgpu';
+import { DoubleSide, Mesh, MeshPhysicalNodeMaterial, Vector2, type BufferGeometry, type Material } from 'three/webgpu';
 import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
-import type { GroundTextures } from './terrain/groundTextures';
+import { TOWN_GROUND_LAYER, TOWN_TILE_METERS, type GroundTextures } from './terrain/groundTextures';
+import { TOWN_GROUND, townTextures } from './materials/townGround';
 import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
 import { WEATHER, rainRings } from './materials/weather';
@@ -18,7 +19,7 @@ import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 import { woodsFromAfar } from '@futuremagic/vegetation/node';
 
-export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy';
+export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy' | 'mat' | 'tint';
 
 export interface MaterialKind extends StageKind {
   readonly attributes: readonly Attribute[];
@@ -40,6 +41,17 @@ export function defineKind(name: string, attributes: readonly Attribute[], build
   };
   kinds.set(name, kind);
   return kind;
+}
+
+/** A mesh drawn with a kind's material and its shadow flags, placed once (matrix not updated per frame). */
+export function kindMesh(g: BufferGeometry, kind: MaterialKind, x = 0, y = 0, z = 0): Mesh {
+  const mesh = new Mesh(g, kind.make());
+  mesh.castShadow = kind.shadow.cast;
+  mesh.receiveShadow = kind.shadow.receive;
+  mesh.position.set(x, y, z);
+  mesh.matrixAutoUpdate = false;
+  mesh.updateMatrix();
+  return mesh;
 }
 
 /** Every kind, for the warm-up. */
@@ -126,6 +138,28 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const sandB = hblend(sandT, sand.n.b.sub(h), 2);
   col = mix(col, sand.a.rgb, sandB); rough = mix(rough, sand.a.a, sandB); ao = mix(ao, sand.n.a, sandB);
   pert = mix(pert, vec3(tn(sand.n).x, 0, tn(sand.n).y), sandB); h = mix(h, sand.n.b, sandB);
+
+  // The town's ground (materials/townGround.ts): cobbled streets, a paved market, trodden yards.
+  const town = townTextures();
+  const tl = (k: number, scale: number) => {
+    const st = p.xz.mul(1 / (TOWN_TILE_METERS[k] * scale));
+    return { a: texture(town.albedo).sample(st).depth(int(k)), n: texture(town.normal).sample(st).depth(int(k)) };
+  };
+  const tg = texture(TOWN_GROUND.mask).sample(p.xz.sub(TOWN_GROUND.origin).div(TOWN_GROUND.size));
+  const ragged = fine.mul(0.18).add(mid.mul(0.1));
+  const paths = smoothstep(0.1, 0.45, mx_fractal_noise_float(p.xz.mul(0.18), 2, 2.0, 0.5).add(tg.a.mul(0.5)));
+  // Yards: trodden earth in patches; streets: cobbles; the market: bigger, worn setts, a shade darker.
+  const grounds: [Node<'float'>, number, number, number][] = [
+    [tg.b.max(tg.a).mul(paths).mul(0.85), TOWN_GROUND_LAYER.dirt, 1, 1],
+    [tg.r, TOWN_GROUND_LAYER.cobble, 1, 0.85],
+    [tg.g, TOWN_GROUND_LAYER.cobble, 1.5, 0.75],
+  ];
+  for (const [t, k, scale, tone] of grounds) {
+    const g = tl(k, scale);
+    const b = hblend(clamp(t.add(ragged.mul(t.mul(float(1).sub(t)).mul(4))), 0, 1), g.n.b.sub(h), 2);
+    col = mix(col, g.a.rgb.mul(float(tone).add(mid.mul(0.12))), b); rough = mix(rough, g.a.a, b); ao = mix(ao, g.n.a, b);
+    pert = mix(pert, vec3(tn(g.n).x, 0, tn(g.n).y), b); h = mix(h, g.n.b, b);
+  }
 
   // Rock: triplanar, strata on the side faces, weathered rock on top.
   const bw0 = pow(abs(n), vec3(4));

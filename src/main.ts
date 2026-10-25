@@ -17,7 +17,9 @@ import { WaterView } from './render/water/WaterView';
 import { FloraView } from './render/flora/FloraView';
 import { GrassView } from './render/grass/GrassView';
 import { useWaterEnvironment } from './render/materials/water';
-import { loadGroundTextures } from './render/terrain/groundTextures';
+import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
+import { useTownGround, useTownTextures } from './render/materials/townGround';
+import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { validateSetting } from './setting/contract';
@@ -26,6 +28,7 @@ import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
+import { TOWN_RASTER } from './world/town';
 
 declare global {
   interface Window {
@@ -67,6 +70,7 @@ async function start(): Promise<void> {
       height: (x, z) => terrain.height(x, z),
       rockSurface: (x, y, z) => terrain.rockSurface(x, y, z),
       waterLevel: (x, z) => { const w = water?.waterAt(x, z); return w && w.depth > 0 ? w.level : null; },
+      wall: (x, z, r) => !!town?.solid(x, z, r),
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
@@ -74,6 +78,11 @@ async function start(): Promise<void> {
     loading.set('Painting the ground');
     const texPool = createTexturePool();
     useGroundTextures(await loadGroundTextures(texPool));
+    if (town) {
+      // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
+      useTownTextures(await loadTownTextures(texPool));
+      useTownGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER));
+    }
     texPool.dispose();
 
     const wx = new WeatherView(weather, (x, z) => terrain.height(x, z));
@@ -104,8 +113,11 @@ async function start(): Promise<void> {
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
     const rock = new VolumeView(view.stage, terrainJobs).raise();
+    const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
+    const raised = houses?.build(0, view.camera.position);
     await ground.ready(view.camera);
     await rock;
+    await raised;
     await view.stage.add(view.sky.dome);
     await view.stage.add(sea.mesh);
     if (grass) await view.stage.add(grass.group);
@@ -175,6 +187,7 @@ async function start(): Promise<void> {
       view.sky.update(dt, view.camera);
       sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
+      houses?.update(view.camera.position);
       if (boot.trees) flora.update(dt, view.camera);
       grass?.tend(dt, view.camera);
       view.stage.frame();

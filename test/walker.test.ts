@@ -57,3 +57,12 @@ test('walker: wades into deep water and swims at the surface, then walks out', (
   run(w, go({ forward: -1, heading: w.yaw }), 12);
   assert.equal(w.mode, 'ground');
 });
+
+test('walker: a building wall stops it, and it slides along', () => {
+  // A house south of z = 5 (its north wall), the walker runs south-east at it.
+  const w = new Walker({ ...world, wall: (_x, z, r) => z + r > 5 });
+  w.place(0, 0);
+  run(w, go({ forward: 1, strafe: 1, heading: Math.PI }), 2);
+  assert.ok(w.pos.z <= 5 - WALK.radius + 1e-6 && w.pos.z > 4, `z ${w.pos.z}`);
+  assert.ok(w.pos.x < -1 || w.pos.x > 1, `slid along the wall: x ${w.pos.x}`);
+});

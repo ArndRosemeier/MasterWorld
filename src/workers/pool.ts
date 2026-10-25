@@ -64,16 +64,27 @@ export type WorldPool = WorkerPool<import('./world.worker').WorldJob, Float32Arr
 export function createWorldPool(): WorldPool {
   return new WorkerPool(() => new Worker(new URL('./world.worker.ts', import.meta.url), { type: 'module' }), 1);
 }
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
+
 /** The terrain workers' jobs for one world: height field chunks and the rock volumes. */
 export class TerrainJobs {
   constructor(private readonly pool: TerrainPool, readonly seed: number, readonly setting: string) {}
 
+  private job<T>(job: DistributiveOmit<import('./terrain.worker').TerrainJob, 'seed' | 'setting'>): Promise<T> {
+    return this.pool.run({ ...job, seed: this.seed, setting: this.setting } as import('./terrain.worker').TerrainJob) as Promise<T>;
+  }
+
   chunk(x0: number, z0: number, size: number, segs: number): Promise<import('../world/chunkMesh').ChunkMesh> {
-    return this.pool.run({ kind: 'chunk', seed: this.seed, setting: this.setting, x0, z0, size, segs }) as Promise<import('../world/chunkMesh').ChunkMesh>;
+    return this.job({ kind: 'chunk', x0, z0, size, segs });
   }
 
   volumeMeshes(): Promise<import('../world/volumes').VolumeMesh[]> {
-    return this.pool.run({ kind: 'volumes', seed: this.seed, setting: this.setting }) as Promise<import('../world/volumes').VolumeMesh[]>;
+    return this.job({ kind: 'volumes' });
+  }
+
+  /** The buildings of the `index`th town, merged per cell. */
+  townMeshes(index: number): Promise<import('../world/townMesh').TownCellMesh[]> {
+    return this.job({ kind: 'town', index });
   }
 }
 
