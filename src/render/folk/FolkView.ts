@@ -76,7 +76,7 @@ export class FolkView {
     const s = this.slots[0], look = coveringLooks(this.life.agents.map((a) => a.person))[0];
     if (look) await s.ch.set({ ...look, animation: 'walk' });
     s.ch.setLod(0);
-    this.reverseOffsets(s.place);
+    this.adapt(s.place);
     s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
     return [s.place];
   }
@@ -96,10 +96,8 @@ export class FolkView {
       if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
       for (let k = i > 0 ? 0 : 1; k < ch.lods.length; k++) {
         ch.setLod(k);
-        this.reverseOffsets(place);
-        // Every caster: the Stage tells shadow-pass kinds apart by material type and attributes, which all
-        // garments share, but each one's shadow shader is its own.
-        await this.stage.prepare(place, { everyCaster: true });
+        this.adapt(place);
+        await this.stage.prepare(place);
       }
     }
     ch.setLod(0);
@@ -163,7 +161,7 @@ export class FolkView {
     s.ch.set({ ...lookOf(a.person), animation: s.clip })
       .then(async () => {
         s.ch.setLod('auto');
-        this.reverseOffsets(s.place);
+        this.adapt(s.place);
         // Its meshes are new: compile (a cache hit for kinds already seen) before it is drawn.
         // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
         // pass is warmed only for objects not yet in the scene).
@@ -179,16 +177,21 @@ export class FolkView {
   }
 
   /**
-   * Actors draws clothes over the skin, and each garment layer over the one below, by polygon offsets
-   * toward the camera (negative). With reversed depth (view.ts) a negative offset pushes away: the skin
-   * and underclothes showed through in patches. Flipped once per material (garments are made lazily).
+   * Fits a character's meshes to the game (once per mesh and material; garments are made lazily):
+   * - Actors draws clothes over the skin, and each garment layer over the one below, by polygon offsets
+   *   toward the camera (negative). With reversed depth (view.ts) a negative offset pushes away: the
+   *   skin and underclothes showed through in patches. Flipped once per material.
+   * - Shadows come from the body alone (and the crowd level's one mesh): each garment and hairstyle
+   *   cast with a shadow shader of its own, built while playing (against the shader policy), and
+   *   the body's silhouette is nearly the same.
    */
-  private reverseOffsets(o: Object3D): void {
-    if (!this.reversed) return;
+  private adapt(o: Object3D): void {
     o.traverse((m) => {
-      const mat = (m as Mesh).material;
-      if (!mat) return;
-      for (const x of (Array.isArray(mat) ? mat : [mat]) as Material[]) {
+      const mesh = m as Mesh;
+      if (!mesh.isMesh) return;
+      if (!/^(body|crowd)/.test(mesh.name)) mesh.castShadow = false;
+      if (!this.reversed) return;
+      for (const x of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as Material[]) {
         if (!x.polygonOffset || x.userData.offsetReversed) continue;
         x.polygonOffsetFactor = -x.polygonOffsetFactor;
         x.polygonOffsetUnits = -x.polygonOffsetUnits;
