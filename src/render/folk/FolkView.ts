@@ -188,15 +188,20 @@ export class FolkView {
     const id = a.person.id;
     s.ch.set({ ...lookOf(a.person), animation: s.clip })
       .then(async () => {
-        s.ch.setLod('auto');
-        this.adapt(s.place);
         // Its meshes are new: compile (a cache hit for kinds already seen) before it is drawn.
         // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
         // pass is warmed only for objects not yet in the scene).
         s.place.removeFromParent();
         s.place.visible = true;
-        // Every caster: a character's shadow shaders are its own (its shape, its garments' fitting).
-        await this.stage.prepare(s.place, { everyCaster: true });
+        // Every detail level in turn (each is its own meshes, shown only once chosen: left to 'auto' they
+        // built their shaders on the render path), and every caster: a character's shadow shaders are its
+        // own (its shape, its garments' fitting).
+        for (let k = 0; k < s.ch.lods.length && s.agent === id; k++) {
+          s.ch.setLod(k);
+          this.adapt(s.place);
+          await this.stage.prepare(s.place, { everyCaster: true });
+        }
+        s.ch.setLod('auto');
         if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
         this.stage.scene.add(s.place);
         s.ready = true;
