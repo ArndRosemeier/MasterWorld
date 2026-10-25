@@ -57,8 +57,13 @@ export class Title {
     console.info(`[title] ${draw.still}, ${draw.weather}, ${draw.hour.toFixed(1)} h`);
     this.screen = new TitleScreen(draw, { start: (p) => this.start(p), settings: () => menus.openSettings(), news: () => menus.whatsNew(), sound }, calm);
     sound.playMusic('title/theme.mp3');
-    // Sound is allowed after the first press; the pointer leans the view.
-    const unlock = () => sound.unlock();
+    // Sound is allowed after the first press, which also opens the title; the pointer leans the view.
+    const unlock = () => {
+      if (this.screen.opened) return;
+      sound.unlock();
+      this.screen.open();
+      if (this.playable && this.wanted) this.go(this.wanted.people);
+    };
     this.screen.root.ownerDocument.addEventListener('pointerdown', unlock, { once: true });
     const code = new CodeWatch(SECRET);
     onKeyDown((e) => {
@@ -109,7 +114,7 @@ export class Title {
     this.landReady();
     this.playable = true;
     this.screen.done();
-    if (this.wanted) this.go(this.wanted.people);
+    if (this.wanted && this.screen.opened) this.go(this.wanted.people);
   }
 
   /** Each frame while active (before the game's own update). */
