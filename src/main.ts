@@ -23,6 +23,8 @@ import { settingById } from './setting/index';
 import { validateSetting } from './setting/contract';
 import { Terrain } from './world/terrain';
 import { findStart } from './world/start';
+import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
+import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 
 declare global {
@@ -47,6 +49,13 @@ async function start(): Promise<void> {
     loading.set('Finding the start');
     const home = findStart(terrain.skeleton, setting);
 
+    const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
+    if (params.weather) {
+      if (!WEATHER_KINDS.includes(params.weather as WeatherKind)) throw new Error(`?weather=${params.weather}: one of ${WEATHER_KINDS.join(', ')}`);
+      // The same path the VGM takes: an order, here for all time.
+      weather.order({ kind: params.weather as WeatherKind, from: -1e6, to: 1e6 });
+    }
+
     loading.set('Starting the renderer');
     const view = await createView(canvas, { forceWebGL: boot.webgl, hour: params.hour, dayMinutes: boot.dayMinutes });
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
@@ -64,6 +73,9 @@ async function start(): Promise<void> {
     useGroundTextures(await loadGroundTextures(texPool));
     texPool.dispose();
 
+    const wx = new WeatherView(weather, (x, z) => terrain.height(x, z));
+    const hours = () => view.sky.day * 24 + view.sky.hour;
+    wx.apply(0, view.camera.position, hours(), view.sky);
     view.sky.update(0, view.camera);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
@@ -84,7 +96,7 @@ async function start(): Promise<void> {
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object]);
+    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip]);
     loading.set('Raising the land');
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
@@ -95,6 +107,7 @@ async function start(): Promise<void> {
     await view.stage.add(sea.mesh);
     if (grass) await view.stage.add(grass.group);
     await view.stage.add(hero.object);
+    await view.stage.add(wx.precip);
 
     // The trees' shaders are built in the Stage's frame slots, so the loop must run meanwhile; loading ends
     // once they stand.
@@ -131,9 +144,15 @@ async function start(): Promise<void> {
       set dayMinutes(m) { view.sky.dayMinutes = m; },
       get hud() { return showHud; },
       set hud(on) { settings.set({ hud: on }); showHud = on; if (hud) hud.style.display = on ? '' : 'none'; },
+      weatherKinds: WEATHER_KINDS,
+      weather: (kind) => {
+        weather.cancel(hours());
+        if (kind) weather.order({ kind: kind as WeatherKind, from: hours(), to: hours() + 6, ramp: 0.05 });
+        return kind ? `${kind} for 6 game hours` : 'natural weather';
+      },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx },
     });
     new Menu(settings, {
       paused,
@@ -149,16 +168,17 @@ async function start(): Promise<void> {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       player.update(dt);
       view.sky.underwater = sea.submerged(view.camera.position);
+      wx.apply(dt, view.camera.position, hours(), view.sky);
       view.sky.update(dt, view.camera);
       sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
       if (boot.trees) flora.update(dt, view.camera.position);
-      grass?.tend(dt, view.camera, 0.5);
+      grass?.tend(dt, view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}\n${view.stage.hudLine()}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}\n${wx.summary}\n${view.stage.hudLine()}`;
       }
       last = now;
       if (planted && !window.__mwReady) {

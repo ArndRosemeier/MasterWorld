@@ -13,6 +13,7 @@ import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import type { GroundTextures } from './terrain/groundTextures';
 import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
+import { WEATHER, rainRings } from './materials/weather';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 import { woodsFromAfar } from '@futuremagic/vegetation/node';
@@ -160,7 +161,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Snow above a ragged line, only where it can lie.
   const snow = layer('snow', p.xz);
   const snowLine = float(1900).add(broad.mul(350));
-  const snowT = smoothstep(snowLine, snowLine.add(250), p.y).mul(smoothstep(0.5, 0.72, up));
+  // Fresh snow (the weather's) lies on level ground at any height, patchy where it is thin.
+  const fresh = smoothstep(0.25, 0.6, WEATHER.lying.add(broad.mul(0.25)).add(fine.mul(0.08))).mul(WEATHER.lying.mul(4).min(1));
+  const snowT = smoothstep(snowLine, snowLine.add(250), p.y).max(fresh).mul(smoothstep(0.5, 0.72, up));
   const snowB = hblend(snowT, h.sub(snow.n.b), 1.5);
   col = mix(col, snow.a.rgb, snowB); rough = mix(rough, snow.a.a, snowB); ao = mix(ao, snow.n.a, snowB);
   pert = mix(pert, vec3(tn(snow.n).x, 0, tn(snow.n).y), snowB);
@@ -173,6 +176,19 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const wet = smoothstep(-1.2, -0.2, below).mul(float(1).sub(snowB));
   col = col.mul(mix(float(1), float(0.55), wet));
   rough = mix(rough, float(0.25), wet.mul(smoothstep(0.6, 0.95, up)));
+
+  // Rain: the ground darkens and turns glossy; flat hollows hold puddles that mirror the sky, ringed by
+  // the drops while it rains. They dry from the edges in (the hollow's depth against the wetness).
+  const rain = WEATHER.wet.mul(snowB.oneMinus());
+  const hollow = mx_fractal_noise_float(p.xz.mul(0.11), 2, 2.0, 0.5).add(fine.mul(0.06)).add(mid.mul(0.15));
+  // Fewer in meadows (the grass stands in them), most on bare soil and the forest floor.
+  const puddle = smoothstep(0.02, 0.06, hollow.sub(float(0.62).sub(rain.mul(0.42)))).mul(w.x.mul(0.6).oneMinus())
+    .mul(smoothstep(0.95, 0.99, up)).mul(smoothstep(0.85, 0.95, level)).mul(rockB.oneMinus()).mul(sandB.oneMinus()).mul(smoothstep(0.3, 0.6, rain));
+  col = col.mul(mix(float(1), float(0.6), rain)).mul(mix(float(1), float(0.5), puddle));
+  rough = mix(mix(rough, float(0.42), rain.mul(0.85)), float(0.03), puddle);
+  const rings = rainRings(p.xz).mul(smoothstep(6.0, 25.0, length(cameraPosition.sub(p))).oneMinus());
+  pert = mix(pert, vec3(rings.x, 0, rings.y), puddle); ao = mix(ao, float(1), puddle);
+  m.specularIntensityNode = mix(mix(float(0.25), float(0.5), rain), float(1), puddle);
   // Caustics only where there is water above (a branch: the land above the sea pays nothing).
   m.emissiveNode = Fn(() => {
     const e = vec3(0).toVar();

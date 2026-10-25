@@ -6,7 +6,7 @@
  * lore, VGM templates and the Conversations package are added as the milestones need them.
  */
 
-export const CONTRACT_VERSION = 1;
+export const CONTRACT_VERSION = 2;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -60,6 +60,29 @@ export interface BiomeDef {
   readonly grass?: GrassDef;
 }
 
+/**
+ * The weather's climate (world/weather.ts): how big and fast its fronts are and how often it rains,
+ * storms and mists. Local moisture and temperature (the skeleton) shift it from place to place.
+ */
+export interface WeatherDef {
+  /** Typical size of a weather system (a rain area, a clear spell), metres. */
+  readonly frontSize: number;
+  /** How fast the weather drifts with the prevailing wind, metres per game hour. */
+  readonly frontSpeed: number;
+  /** Game hours over which a weather system grows or dies away as it drifts. */
+  readonly change: number;
+  /** 0 dry (rain is rare) .. 1 wet (rain is common); 0.5 is a temperate climate. */
+  readonly rainfall: number;
+  /** 0 .. 1: how often rain turns to thunderstorms. */
+  readonly storms: number;
+  /** 0 .. 1: how often calm mornings bring mist. */
+  readonly mist: number;
+  /** 0 .. 1: how windy it is in general. */
+  readonly windiness: number;
+  /** Game hours for wet ground to dry to a third. */
+  readonly drying: number;
+}
+
 /** The shape of the land: the skeleton's parameters (section 5.2). All lengths in metres. */
 export interface WorldShape {
   /** Typical distance between continents' centres. */
@@ -80,6 +103,8 @@ export interface WorldShape {
   readonly northCooling: number;
   /** Every biome. The skeleton takes the first whose ranges all hold, else the closest fit. */
   readonly biomes: readonly BiomeDef[];
+  /** The weather's climate. */
+  readonly weather: WeatherDef;
 }
 
 export interface StartSpec {
@@ -136,6 +161,9 @@ export function validateSetting(m: SettingModule): string[] {
     if (!(b.temperature[0] <= b.temperature[1])) out.push(`${where}: biome "${b.id}" temperature range is reversed`);
     if (!(b.moisture[0] >= 0 && b.moisture[1] <= 1 && b.moisture[0] <= b.moisture[1])) out.push(`${where}: biome "${b.id}" moisture range must lie in 0..1`);
   }
+  const wx = w.weather;
+  for (const k of ['frontSize', 'frontSpeed', 'change', 'drying'] as const) if (!(wx[k] > 0)) out.push(`${where}: world.weather.${k} must be > 0`);
+  for (const k of ['rainfall', 'storms', 'mist', 'windiness'] as const) if (!(wx[k] >= 0 && wx[k] <= 1)) out.push(`${where}: world.weather.${k} must be in 0..1`);
   for (const id of m.start.biomes) if (!ids.has(id)) out.push(`${where}: start biome "${id}" is not defined`);
   if (!(m.start.elevation[0] >= 0 && m.start.elevation[0] < m.start.elevation[1])) out.push(`${where}: start.elevation must be a rising range above the sea`);
   if (!(m.start.maxSlope > 0)) out.push(`${where}: start.maxSlope must be > 0`);

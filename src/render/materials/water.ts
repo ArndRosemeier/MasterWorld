@@ -13,6 +13,7 @@ import {
 import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
 import { WATER, waterAt } from './waterInputs';
+import { WEATHER, rainRings } from './weather';
 
 let envTex: Texture | null = null;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
@@ -76,7 +77,9 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       return sum;
     };
     const e = 0.04, h0 = h(p.xz), hx = h(p.xz.add(vec2(e, 0))), hz = h(p.xz.add(vec2(0, e)));
-    const ripple = vec3(h0.sub(hx), 0, h0.sub(hz)).div(e).mul(fade);
+    // Raindrops ring the surface near the camera.
+    const rings = rainRings(p.xz).mul(smoothstep(12.0, 50.0, camDist).oneMinus());
+    const ripple = vec3(h0.sub(hx), 0, h0.sub(hz)).div(e).mul(fade).add(vec3(rings.x, 0, rings.y));
     const up = frontFacing;
     const N0 = normalize(vN.add(ripple)).toVar();
     const N = select(up, N0, N0.negate());
@@ -90,7 +93,10 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const refrUV = screenUV.add(N.xz.mul(0.035).mul(fade).mul(smoothstep(0.0, 1.5, depth)));
     const below = viewportSharedTexture(refrUV).rgb;
     const trans = exp(W.absorb.mul(path).negate());
-    const body = mix(W.shallow, W.deep, smoothstep(0.0, 30.0, depth)).mul(W.ambient.add(W.sunColor.mul(0.3).mul(sunUp)));
+    // Wind and rain stir the water grey (silt, spray, no sun through it).
+    const stirred = WEATHER.wind.mul(WEATHER.rain).mul(0.75);
+    const tint = mix(W.shallow, W.deep, smoothstep(0.0, 30.0, depth));
+    const body = mix(tint, vec3(dot(tint, vec3(0.3, 0.5, 0.2))).mul(0.8), stirred).mul(W.ambient.add(W.sunColor.mul(0.3).mul(sunUp)));
     const water = below.mul(trans).add(body.mul(vec3(1).sub(trans)));
     // Light through the crests.
     const crestLit = W.shallow.mul(W.sunColor).mul(0.35).mul(max(vCrest, 0)).mul(sunUp);

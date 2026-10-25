@@ -19,6 +19,9 @@ export interface DebugHost {
   hour: number;
   dayMinutes: number;
   hud: boolean;
+  /** The weather kinds, and a kind ordered here and now (a VGM order); null: back to the natural weather. */
+  readonly weatherKinds: readonly string[];
+  weather(kind: string | null): string;
   /** The view as URL parameters (`pos=…&look=…`). */
   readonly viewParams: string;
   /** Places worth a look in this world. */
@@ -80,6 +83,10 @@ export class DebugMenu {
         { label: 'Clock stopped', run: () => { h.dayMinutes = 0; } },
         { label: 'Day in 2 min', run: () => { h.dayMinutes = 2; } },
         { label: 'Day in 24 min', run: () => { h.dayMinutes = 24; } },
+      ]],
+      ['Weather', [
+        { label: 'Natural', run: () => h.weather(null) },
+        ...h.weatherKinds.map((k) => ({ label: k[0].toUpperCase() + k.slice(1), run: () => h.weather(k) })),
       ]],
       ['Show', [
         { label: 'HUD on / off', run: () => { h.hud = !h.hud; } },

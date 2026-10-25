@@ -44,6 +44,7 @@ The world should be believable but fantastic: classic countryside, forests and m
 | D23 | **Sister repos:** release packages where they exist (Actors); other code is extracted into shared packages as needed, not copied. | Was O13. |
 | D24 | **Textures and assets: generated (AssetGenerator) and CC0 libraries.** Only CC0 or own work ships, with sources recorded. | Was O14. |
 | D25 | **Water is a hero feature, not a prop.** Seas, lakes, rivers and waterfalls look and behave well (waves, foam, depth colour, refraction, flow), the camera can go under the surface with a proper underwater view, and the player can swim. The door stays open for underwater content (sunken places, underwater dungeons and creatures). | Arnd, 2026-10-24. Base: Xenoworld's water. |
+| D26 | **Weather from the start.** Seeded, deterministic weather that drifts over the land: clouds, rain and snow, thunderstorms, mist in the low ground, wind on grass, trees and sea, wet ground and puddles. The VGM drives it with orders. | Arnd, 2026-10-25. Section 5.8. |
 
 ---
 
@@ -197,6 +198,16 @@ The voxel cost is paid only where it is worth it. Geomancy (section 10) can edit
 * The shader policy ([docs/SHADERS.md](../SHADERS.md)) already assumes a **closed set of high-quality materials**: a few excellent material kinds (terrain blend, rock with triplanar mapping for volumes, foliage, water, skin from Actors, cloth, metal, stone, wood) beat many mediocre ones.
 * Lighting, sky, atmosphere and fog carry much of the drama: a strong time-of-day cycle, aerial perspective over long views, volumetric light where the budget allows.
 * Art style, rendering backend and target hardware are open questions (O10–O12) to settle before the first milestone.
+
+### 5.8 Weather (D26)
+
+Weather is part of the world model (`src/world/weather.ts`), pure and deterministic like the land: the weather at a place and a moment follows from the seed, the setting's climate and the VGM's orders. NPCs (shelter in the rain, 9.2), the VGM and the renderer all read the same weather.
+
+* **Natural weather** is a slowly changing field of "wet air" that drifts with the world's prevailing wind (the sea's swell runs the same way), so fronts come in from one side, pass over and clear. Local moisture and temperature (the skeleton) shift it: wet coasts rain more, dry inland less, and cold places get snow. Unstable air turns rain into thunderstorms. Calm, damp mornings bring mist that pools in the low ground. Wet ground remembers the rain for hours.
+* **The setting tunes the climate** (`world.weather`: front size and speed, rainfall, storms, mist, wind, drying). Fantastic weather (ash fall, a blood-red storm) can be added as new kinds later.
+* **The VGM orders weather** like it orders land: `{ kind, from, to, at?, strength? }`, blended in and out over a ramp, so a summoned storm rolls in. Orders are plain data and go into the decision log. Uses: a storm for a dramatic arrival, fog that hides the bandits' camp, clear skies for a festival, rain that keeps people indoors (and the player in the tavern, hearing rumours).
+* **Drawn** by `render/weather/WeatherView.ts`: the sky's clouds, light and haze; height mist; rain streaks and snow flakes around the camera; lightning; wind strength on grass, trees and waves; wet, glossy ground with puddles and rain rings on water. `?weather=<kind>` forces a kind (it places an order for all time).
+* Later: thunder and rain sound, snow lying on the ground, distant rain curtains, cloud shadows, rainbows, seasons.
 
 ---
 

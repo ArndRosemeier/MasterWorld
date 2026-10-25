@@ -5,12 +5,12 @@
  * mid one for larger rivers and lakes, a far one to the horizon.
  */
 import { BufferGeometry, Float32BufferAttribute, Mesh, type Vector3 } from 'three/webgpu';
-import { deriveSeed, Rng } from '@futuremagic/core';
 import type { SkyLight } from '@futuremagic/sky';
 import { WATER } from '../materials/waterInputs';
 import { WATER_KIND } from '../materials/water';
 import type { WorldJobs } from '../../workers/pool';
 import { FollowedMask } from '../followedMask';
+import { prevailingWind } from '../../world/weather';
 
 function radialGrid(segments: number, rings: number, r0: number, growth: number): BufferGeometry {
   const pos: number[] = [0, 0, 0];
@@ -47,7 +47,8 @@ export class WaterView {
     this.mesh.renderOrder = 3;
     // Each rebaked once the camera is a fifth of its side from its centre.
     this.masks = [WATER.near, WATER.mid, WATER.far].map((mask) => new FollowedMask(mask, (x0, z0) => jobs.mask('mask', x0, z0, mask.side, mask.res), mask.side / 5, mask.side / 16));
-    const a = new Rng(deriveSeed(jobs.seed, 'wind')).float() * Math.PI * 2;
+    // The swell runs with the prevailing wind (the weather's gusts and turns only change its height).
+    const a = prevailingWind(jobs.seed);
     WATER.wind.value.set(Math.cos(a), Math.sin(a));
   }
 

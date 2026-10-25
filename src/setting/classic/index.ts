@@ -29,6 +29,9 @@ export const classic: SettingModule = {
       { id: 'desert', name: 'Desert', ground: 0xd2b47a, surface: 'sand', temperature: [16, 40], moisture: [0, 0.2] },
       { id: 'jungle', name: 'Jungle', ground: 0x2f6a2a, surface: 'forest', temperature: [20, 40], moisture: [0.6, 1], flora: { trees: 220, cover: 0.7, mix: { plane: 3, chestnut: 2, linden: 2, cypress: 1 }, shrubs: 120 }, grass: { cover: 0.7, height: 0.6, dry: 0 } },
     ],
+    // Temperate: fronts a few tens of km across pass over in half a day; showers, the odd thunderstorm,
+    // misty mornings in the valleys.
+    weather: { frontSize: 70_000, frontSpeed: 3_500, change: 14, rainfall: 0.5, storms: 0.45, mist: 0.55, windiness: 0.45, drying: 3 },
   },
   start: {
     biomes: ['meadow', 'forest'],
