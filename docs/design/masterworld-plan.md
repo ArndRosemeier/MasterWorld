@@ -67,7 +67,7 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 | D42 | **Tone: warm and full of wonder, with real danger.** Humour comes from people. A comic-relief character with some slapstick is allowed, as the exception. | Arnd, 2026-10-25. Section 12.1. |
 | D43 | **The default world: the Fading.** Magic drained out of the world 300 years ago and is now seeping back. Five Wardens are its gods. Creatures include truly giant versions of animals and monsters, and human giants. | 2026-10-25 (Arnd: giants). Section 12.1. |
 | D44 | **Sound is generated through OpenRouter** (the `openrouter` skill), with CC0 libraries as backup. Procedural sound only where a model cannot give a good result. | Arnd, 2026-10-25. Section 16. |
-| D45 | **The interface has a design language of its own,** something interesting like the salt creep in Dunfinity's UIs, definitely not plain and simple. It is still to be found. | Arnd, 2026-10-25. Section 17, O17. |
+| D45 | **The interface speaks "warded brass":** engraved brass instruments in dark leather with dwarven wards set into the metal, which light up as magic returns. Every window shares the language and has its own signature. Things are animated whenever they are shown and never sit quite still: playful and varied. | Arnd, 2026-10-25. Section 17.1. Mockups: [canvas](https://claude.ai/artifact/77cZmr4B2d3Y6yyieQCfU8). |
 | D46 | **The title animation is a hero feature.** Captivating and playful, like Starlord's, and the world is built behind it while it plays. | Arnd, 2026-10-25. Section 17, O18. |
 | D47 | **Free and open source, MIT licence.** | Arnd, 2026-10-25. |
 
@@ -519,13 +519,45 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 
 ## 17. Interface and first start (D45, D46)
 
-* **A design language of its own** (O17): something interesting, like the salt creep in Dunfinity's UIs, not plain and simple. It is found first, then every window follows it.
-* **Windows**: the map (11.7), the journal and the dialogue window (topics, the 3D speaker stays in view) in milestone 3; inventory with character sheet and trading in milestone 4. The HUD stays small: a compass, and health, stamina and mana only when they matter.
+* **Warded brass** is the design language (D45, 17.1).
+* **Windows**: the map (11.7), the journal and the dialogue window (topics, the 3D speaker stays in view) in milestone 3; inventory with character sheet and trading in milestone 4. The HUD stays small but is as animated and polished as the windows (17.1).
 * **The title animation** (O18) is a hero feature: captivating and playful, like Starlord's, and while it plays the world is built behind it. Then character creation and a short intro.
 * **First start targets**: the title animation shows within a few seconds; the game is playable when it ends.
 * **Saving**: IndexedDB in the browser, several slots, export and import as a file; autosave on entering or leaving a region or interior and every 5 minutes. A save holds the game version, the module id and version, the seed, the decision log, per-site diffs and the player. Each version bump brings a small migration.
 * **Language**: English first; all text goes through a string table from the start, so German can follow.
 * **Controls**: keys are rebindable already; gamepad after milestone 5.
+
+
+### 17.1 Warded brass (D45)
+
+**The shared language.** Every window follows it:
+
+* **Materials**: engraved brass (rims, rivets, gears, hinges) on dark leather and wood; slate inlays where wards sit. Text in a carved capital face for names (Marcellus SC in the mockups) and a book face for reading (EB Garamond).
+* **Wards**: thin lines of light set into the brass. They trace themselves in when a window opens and then rest with a slow pulse and a spark that runs along them. Their colour carries meaning: cyan is magic and the UI itself; rarity colours on items (grey, green, blue, orange).
+* **The story shows**: early in the game the wards are dim and few. As the long-term goals bring magic back, they grow brighter and more lines wake. The interface ages with the world.
+* **Always-on elements are polished too**: the HUD is animated like the windows (D45), but calm enough to sit on screen for hours: slow idle motion, quick reactions to what happens.
+* **Motion**: every window has an entrance (shutters, an iris, a flip, a drop, a slide, unrolling), lines arrive one after another with a small bounce, and at rest something always moves (a spark, a ticking gear, a glint, a settling needle). Motion is short (under about 1.5 s to readable), never blocks input, and a setting turns it down for those who want calm.
+* **Rarity is the strength of the ward**: common is plain brass, uncommon a breathing ward, rare a ward with a running spark, legendary two sparks, a gear and twinkling stars.
+
+**Each window has its own signature** (proposals, to be shown as mockups):
+
+| Window | Signature |
+|---|---|
+| Item card | Shutters part, the ward traces the rim, stats rise one by one; the rarity sets the entrance (drop, slide, flip, iris). |
+| Map | A brass map case: the lid swings up and the parchment unrolls. A compass whose needle wanders or points true by the orientation skill; marks drawn in with a quill when an NPC adds one. |
+| Journal | A brass-bound book. Pages turn, new leads write themselves in, a ward-lit bookmark sits at the newest lead. |
+| Dialogue | A brass speaking-ring around the topic list. Topics turn into place like a dial; topics with a new lead glow. |
+| Inventory and character | A field chest: the lid opens, compartments slide out. Character skills on brass gauges whose needles rise when a skill grows. |
+| Trade | A merchant's balance: coins and goods on two pans that tip as the deal changes. |
+| Compass (always on) | A brass ring at the top that turns with the camera. Its needle breathes and settles after each turn and wanders by the orientation skill; map marks slide in on the rim as small glowing studs. |
+| Health, stamina, mana (always on) | Three brass gauges with liquid behind glass: it sloshes when you are hit, bubbles when you heal, and the ward around each glows harder as it runs low. |
+| Quick slots and abilities (always on) | Brass sockets on a belt strap. Cooldowns run as a ward line around the socket; a ready ability gives a short glint. |
+| Target frame | A small brass plate that drops in on a hinge; the creature's threat colour shows in its ward. |
+| Clock and weather | A tiny orrery by the compass: sun and moon turn with the day, and a cloud, raindrop or snowflake rides along with the weather. |
+| Notifications | A small brass capsule that pops out of the frame edge, rings once and slides back. |
+| Settings and menus | A cartographer's tool roll that unrolls; switches are brass toggles that click. |
+| Death and waking | The wards go dark one by one; on waking they relight from the centre. |
+| Title screen | Part of the title animation (O18). |
 
 ---
 
@@ -544,7 +576,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | O9 | ~~Footprint rules~~ | **Decided** (section 7): hard land wins, then the older decision; settlements and roads beat vegetation. |
 | O15 | Free LLMs through `freeryder` | No cost, less reliable. What for, and how to stay safe when it fails? Its own discussion. |
 | O16 | Dungeons that don't feel formulaic | D39, 8.1. Needs its own design round before milestone 3's cellar grows into more kinds. |
-| O17 | The interface's design language | D45. To be found, e.g. from Dunfinity's salt creep. |
+| O17 | ~~The interface's design language~~ | **Decided** (D45, 17.1): warded brass. Each window's signature still to be mocked up. |
 | O18 | The title animation | D46. Concept to find, with Starlord as the bar. |
 
 ---
