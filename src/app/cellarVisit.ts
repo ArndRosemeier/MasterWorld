@@ -1,10 +1,9 @@
 /**
  * Going down into the cellar and back up (plan 7, D38: a space of its own behind a door, a short fade).
- * Walk into the cellar house's door to go down; walk to the ladder under the hatch to come up. Inside,
+ * Step onto the hatch in the cellar house's room to go down; walk to the ladder under it to come up. Inside,
  * the walker walks the cellar's space, the sky is off and the hero's lantern is lit; keys, bars, hidden
  * doors and the things worth reading speak through short notes.
  */
-import { angleDiff } from '@futuremagic/core';
 import type { PointLight } from 'three/webgpu';
 import type { TownBuilding } from '@futuremagic/settlement';
 import { dungeonWorld } from '../game/dungeonWorld';
@@ -27,6 +26,8 @@ export class CellarVisit {
   private readonly read = new Set<number>();
   /** Called after going down or coming up (the game autosaves then). */
   onSwap: (() => void) | null = null;
+  /** Up the ladder: into the house's room (set by the game; the hatch is in it). */
+  up: (() => Promise<void>) | null = null;
 
   constructor(
     readonly cellar: Cellar,
@@ -42,8 +43,9 @@ export class CellarVisit {
   }
 
   /** Go down (now: at once, no fade); `room` to stand in the middle of that room instead of at the ladder. */
-  async enter(now = false, room?: number): Promise<void> {
+  async enter(now = false, room?: number, before?: () => void): Promise<void> {
     await this.fade.swap(now, () => {
+      before?.();
       this.inside = true;
       this.view.group.visible = true;
       this.sky.indoors = true;
@@ -58,16 +60,17 @@ export class CellarVisit {
     if (!now) this.onSwap?.();
   }
 
-  /** Back up through the hatch, out of the house's door. */
+  /** Back up the ladder, into the house's room (`up`), else out of its door. */
   async leave(): Promise<void> {
-    await this.fade.swap(false, () => {
+    await this.fade.swap(false, async () => {
       this.inside = false;
       this.view.group.visible = false;
       this.sky.indoors = false;
       this.lantern.intensity = 0;
+      this.cooldown = 2;
+      if (this.up) { await this.up(); return; }
       const [x, z, yaw] = this.house.door;
       this.player.teleport(x - Math.sin(yaw) * 0.6, undefined, z - Math.cos(yaw) * 0.6, yaw);
-      this.cooldown = 2;
     });
     this.onSwap?.();
   }
@@ -76,13 +79,8 @@ export class CellarVisit {
     this.cooldown = Math.max(0, this.cooldown - dt);
     if (this.fade.busy || this.player.flying) return;
     const w = this.player.walker, O = this.view.origin;
-    if (!this.inside) {
-      // Into the house's door: down to the cellar.
-      const [x, z, yaw] = this.house.door;
-      const speed = w.groundSpeed;
-      if (this.cooldown === 0 && Math.hypot(w.pos.x - x, w.pos.z - z) < 0.9 && speed > 0.5 && Math.abs(angleDiff(w.yaw, yaw + Math.PI)) < 1.1) void this.enter();
-      return;
-    }
+    // The way down is the hatch in the house's room (InteriorVisit).
+    if (!this.inside) return;
     // The lantern, held up and a little ahead.
     this.lantern.intensity = 8;
     this.lantern.position.set(w.pos.x - Math.sin(w.yaw) * 0.4, w.pos.y + 1.9, w.pos.z - Math.cos(w.yaw) * 0.4);

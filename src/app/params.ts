@@ -39,7 +39,7 @@ export const params = {
   cellarRoom: q.get('cellar') ? Number(q.get('cellar')) : undefined,
   /** Who lives in the town's cellar (for looking at them): a cellar dweller's id, `dweller=goblins`. */
   dweller: q.get('dweller'),
-  /** Start inside a building of the town: `room=inn` (the first of that kind) or `room=12` (building 12). */
+  /** Start inside a building of the town: `room=inn` (the first of that kind), `room=12` (building 12) or `room=cellar` (the cellar's house, with its hatch). */
   room: q.get('room'),
   /** Start in a talk (for screenshots): `talk=inn` with the innkeeper, `talk=house` with the cellar's household; `topics=news,source` asked first. */
   talk: q.get('talk'),

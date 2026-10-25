@@ -47,8 +47,8 @@ import { JournalUi } from './app/journalUi';
 import { MapUi } from './app/mapUi';
 import { townTalk } from './talk/townTalk';
 import { Journal } from './talk/journal';
-import { AUTOSAVE, SavesUi, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
-import { SAVE_VERSION, type SaveData } from './app/saveGame';
+import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
+import { SAVE_VERSION, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
 import { Delve } from './game/delve';
@@ -64,16 +64,19 @@ declare global {
   }
 }
 
-async function start(): Promise<void> {
-  const settings = new SettingsStore();
+/** What the first, small script (boot.ts) made before the game's code arrived. */
+export interface Boot {
+  readonly settings: SettingsStore;
+  readonly sound: Sound;
+  readonly title: Title | null;
+  readonly loading: LoadingScreen | Title['screen'];
+  /** Filled in here once the menu exists (the title's Settings and What's new open it). */
+  readonly menus: { menu: Menu | null };
+}
+
+export async function start(b: Boot): Promise<void> {
+  const { settings, sound, title, loading } = b;
   const boot = settings.start;
-  const sound = new Sound();
-  sound.volume = settings.current.volume;
-  // The title shows at once and is the loading screen (plan D46); the menu it opens comes later.
-  let menu: Menu | null = null;
-  const calm = settings.current.calm || !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menu?.show('settings'), whatsNew: () => menu?.show('news') }, calm) : null;
-  const loading = title?.screen ?? new LoadingScreen();
   const canvas = document.createElement('canvas');
   document.body.prepend(canvas);
   try {
@@ -83,6 +86,9 @@ async function start(): Promise<void> {
     // A load asked for before this start: the world is built again from the save's seed.
     const loaded = await pendingLoad(setting);
     const save = typeof loaded === 'object' ? loaded : null;
+    // The title's Continue: straight on with a loaded save, or offered when one is kept.
+    if (title && save) title.continuing(saveLabel(save, 'where you left off'));
+    else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const seedText = save?.seed ?? params.seed;
     const seed = parseSeed(seedText);
     loading.set('Finding the start');
@@ -129,7 +135,7 @@ async function start(): Promise<void> {
       paused(true);
       // The fly-over circles the market, where the game starts.
       const middle = { x: home.x, z: home.z, r: town ? (Math.max(town.nx, town.nz) * TOWN_RASTER) / 2 : 0 };
-      title.attach({
+      await title.attach({
         camera: view.camera,
         orbit: { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) },
         toys: {
@@ -202,6 +208,12 @@ async function start(): Promise<void> {
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
     await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(folk ? await folk.warmObjects() : [])]);
+    // While the loading screen (or the title's painted still) still covers the view, the land, trees and
+    // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
+    const capShare = view.stage.cap.share;
+    view.stage.cap.share = 1;
+    view.stage.monitor.phase = 'warmup';
+    const shown = () => { view.stage.cap.share = capShare; view.stage.monitor.phase = 'run'; };
     loading.set('Raising the land');
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
@@ -245,11 +257,20 @@ async function start(): Promise<void> {
       }
     }
 
-    // Every other door of the town opens on its room.
-    if (town) rooms = new InteriorVisit(town.plan.buildings, new Set(house ? [house.id] : []), new InteriorView(view.stage), player, view.lantern, view.sky, notes);
+    // Every door of the town opens on its room; the cellar's house has the hatch down.
+    const down = new Map<number, (before: () => void) => Promise<void>>();
+    if (visit && house) {
+      const v = visit;
+      down.set(house.id, (before) => v.enter(false, undefined, before));
+    }
+    if (town) rooms = new InteriorVisit(town.plan.buildings, down, new InteriorView(view.stage), player, view.lantern, view.sky, notes);
+    if (visit && rooms && house) {
+      const r = rooms;
+      visit.up = () => r.enter(house, true, true);
+    }
     if (rooms && town && params.room !== null) {
-      const b = town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
-      if (b) await rooms.enter(b, true);
+      const b = params.room === 'cellar' ? house : town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
+      if (b) await rooms.enter(b, true, params.room === 'cellar'); // the cellar: beside its hatch
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
 
@@ -257,7 +278,13 @@ async function start(): Promise<void> {
     // the loop must run meanwhile; loading ends once they stand.
     loading.set('Planting the trees');
     let planted = false;
-    const planting = Promise.all([boot.trees ? flora.plant() : null, folk?.warmLods(), dwellers]).then(() => { planted = true; });
+    // The trees first: once they stand, the title's fly-over shows the live land while the townsfolk's
+    // many garments still warm up behind it (they are drawn only once warm).
+    const took = (what: string) => () => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: ${what} ready (${view.stage.hudLine().split('\n')[0]})`);
+    const trees = (boot.trees ? flora.plant() : Promise.resolve()).then(took('trees'));
+    let landed = false;
+    void trees.then(() => { landed = true; if (folk) loading.set('Waking the townsfolk'); });
+    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk')), dwellers]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -390,7 +417,7 @@ async function start(): Promise<void> {
       places: placesFor(params.seed, home),
       game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound },
     });
-    menu = new Menu(settings, {
+    b.menus.menu = new Menu(settings, {
       paused,
       get hour() { return view.sky.hour; },
       set hour(h) { view.sky.hour = h; },
@@ -422,6 +449,7 @@ async function start(): Promise<void> {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });
       }
+      if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
       folk?.follow(dt, view.camera);
       if (boot.trees) flora.update(dt, view.camera);
       grass?.tend(dt, view.camera);
@@ -432,8 +460,10 @@ async function start(): Promise<void> {
         hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}`;
       }
       last = now;
+      if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }
       if (planted && !window.__mwReady) {
         window.__mwReady = true;
+        shown();
         if (title) title.ready();
         else loading.done();
       }
@@ -446,4 +476,3 @@ async function start(): Promise<void> {
   }
 }
 
-void start();

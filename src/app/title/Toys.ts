@@ -27,7 +27,7 @@ export interface ToyHooks {
 
 interface Bird { phase: number; r: number; h: number; speed: number; flap: number; vel: Vector3 | null; pos: Vector3 }
 interface Flock { centre: Vector3; birds: Bird[]; scattered: number; home: boolean }
-interface Effect { t: number; readonly dur: number; draw(ctx: CanvasRenderingContext2D, t: number): void }
+interface Effect { t: number; readonly dur: number; paint(ctx: CanvasRenderingContext2D, t: number): void }
 
 const BIRD_SPAN = 0.9;
 const MAX_REACH = 9000;
@@ -83,7 +83,8 @@ export class Toys {
       this.bell([t.x, this.world.height(t.x, t.z) + 25, t.z]);
       return;
     }
-    // The land: birds start up from the trees there.
+    // The land: now and then a small cloud gathers and rains on the spot; else birds start up from the trees.
+    if (this.rng.chance(0.35)) { this.cloud(hit.at); return; }
     const f = this.flock(new Vector3(hx, hy + 6, hz), 6 + this.rng.int(0, 6), false);
     this.flocks.push(f);
     this.scatter(f, new Vector3(hx, hy - 10, hz));
@@ -104,7 +105,7 @@ export class Toys {
     this.toastOf('dragon');
     this.effects.push({
       t: 0, dur,
-      draw: (ctx, t) => {
+      paint: (ctx, t) => {
         const u = t / dur;
         along(u, pos);
         along(Math.max(0, u - 0.01), prev);
@@ -133,7 +134,7 @@ export class Toys {
     for (const f of this.flocks) this.circle(f, dt);
     for (let i = this.flocks.length - 1; i >= 0; i--) if (!this.flocks[i].home && this.flocks[i].scattered > 6) this.flocks.splice(i, 1);
     for (const f of this.flocks) this.drawFlock(ctx, f);
-    for (const e of this.effects) { e.t += dt; if (e.t < e.dur) e.draw(ctx, e.t); }
+    for (const e of this.effects) { e.t += dt; if (e.t < e.dur) e.paint(ctx, e.t); }
     this.effects = this.effects.filter((e) => e.t < e.dur);
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(230,240,255,${(this.flash * 0.45).toFixed(3)})`;
@@ -230,7 +231,7 @@ export class Toys {
     this.toastOf('bolt', 0.6);
     this.effects.push({
       t: 0, dur: 1.1,
-      draw: (ctx, t) => {
+      paint: (ctx, t) => {
         // Flickers twice, then fades.
         const a = t < 0.1 ? 1 : t < 0.2 ? 0.15 : t < 0.45 ? 1 : 1 - (t - 0.45) / 0.65;
         ctx.save();
@@ -254,7 +255,7 @@ export class Toys {
     this.toastOf('star', 0.5);
     this.effects.push({
       t: 0, dur: 1.1,
-      draw: (ctx, t) => {
+      paint: (ctx, t) => {
         const u = t / 1.1, len = 260 * u, hx = x + dx * 420 * u, hy = y + dy * 420 * u;
         const g = ctx.createLinearGradient(hx - dx * len, hy - dy * len, hx, hy);
         g.addColorStop(0, 'rgba(232,251,255,0)');
@@ -269,6 +270,52 @@ export class Toys {
     });
   }
 
+  /** A small grey cloud gathers over `at`, rains on it for a few seconds and drifts off thinning. */
+  private cloud(at: Vec3): void {
+    const ground = new Vector3(...at), top = new Vector3(at[0], at[1] + 70, at[2]);
+    const drift = new Vector3(this.rng.range(-1, 1), 0, this.rng.range(-1, 1)).normalize().multiplyScalar(4);
+    const puffs = Array.from({ length: 7 }, (_, i) => [((i - 3) / 3) * 0.5 + this.rng.range(-0.08, 0.08), this.rng.range(-0.12, 0.05), this.rng.range(0.22, 0.34)] as const);
+    const drops = Array.from({ length: 60 }, () => [this.rng.range(-0.42, 0.42), this.rng.float()] as const);
+    const dur = 8;
+    this.hooks.sound.play('wind', 0.8);
+    this.toastOf('cloud', 0.7);
+    const c = new Vector3(), g = new Vector3();
+    this.effects.push({
+      t: 0, dur,
+      paint: (ctx, t) => {
+        // Gathers in the first second, rains from 1 to 6 s, thins out by the end.
+        const grow = Math.min(1, t / 1.2), fade = t > 6 ? 1 - (t - 6) / (dur - 6) : 1;
+        c.copy(top).addScaledVector(drift, t);
+        g.copy(ground).addScaledVector(drift, t);
+        const s = this.screen(c), q = this.screen(g);
+        if (!s || !q) return;
+        const w = (50 * this.focal) / s[2];
+        // Rain: streaks from the cloud's belly to the ground, falling.
+        const rain = t > 1 && t < 6.6 ? Math.min(1, (t - 1) / 0.6) * Math.min(1, (6.6 - t) / 0.6) : 0;
+        if (rain > 0) {
+          ctx.strokeStyle = `rgba(200,215,230,${(0.55 * rain).toFixed(3)})`;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          const fall = q[1] - s[1], len = Math.max(6, fall * 0.12);
+          for (const [dx, phase] of drops) {
+            const y = s[1] + ((phase + t * 1.6) % 1) * fall, x = s[0] + dx * w * 1.6 + (q[0] - s[0]) * ((y - s[1]) / Math.max(1, fall));
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - len * 0.08, y + len);
+          }
+          ctx.stroke();
+        }
+        ctx.fillStyle = `rgba(92,100,112,${(0.85 * grow * fade).toFixed(3)})`;
+        ctx.beginPath();
+        for (const [px, py, r] of puffs) {
+          const rr = r * w * (0.5 + 0.5 * grow);
+          ctx.moveTo(s[0] + px * w * 2 + rr, s[1] + py * w);
+          ctx.arc(s[0] + px * w * 2, s[1] + py * w, rr, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      },
+    });
+  }
+
   // --- town and sea ------------------------------------------------------------------------------------
 
   private bell(at: Vec3): void {
@@ -277,7 +324,7 @@ export class Toys {
     const p = new Vector3(...at);
     this.effects.push({
       t: 0, dur: 3,
-      draw: (ctx, t) => {
+      paint: (ctx, t) => {
         const s = this.screen(p);
         if (!s) return;
         for (let i = 0; i < 3; i++) {
@@ -306,7 +353,7 @@ export class Toys {
     const body = new Vector3();
     this.effects.push({
       t: 0, dur: 3.2,
-      draw: (ctx, t) => {
+      paint: (ctx, t) => {
         // Out of the water, up in an arc, and back in with a crash.
         const u = Math.min(1, t / 2.4), rise = Math.sin(u * Math.PI) * 14;
         body.set(p.x + Math.cos(heading) * (u - 0.5) * 30, p.y + rise - 4, p.z + Math.sin(heading) * (u - 0.5) * 30);
@@ -337,7 +384,7 @@ export class Toys {
   private ripples(p: Vector3, size: number, dur: number, delay = 0): void {
     this.effects.push({
       t: -delay, dur,
-      draw: (ctx, t) => {
+      paint: (ctx, t) => {
         if (t < 0) return;
         const s = this.screen(p);
         if (!s) return;

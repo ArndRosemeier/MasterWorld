@@ -41,15 +41,15 @@
   },
   {
     "key": "same name: masterworld/app/cellarVisit.ts#enter + masterworld/app/interiorVisit.ts#enter",
-    "reason": "Two spaces behind a door (the cellar's dungeon space, a building's room) going in; the fade they share is app/fade.ts, the notes app/notes.ts. The cellar becomes a hatch in its house's room later, then one goes."
+    "reason": "Two spaces behind a way in (the cellar's dungeon space under its hatch, a building's room behind its door), each going in, out and checking its exits; the fade they share is app/fade.ts, the notes app/notes.ts. Different spaces, different checks."
   },
   {
     "key": "same name: masterworld/app/cellarVisit.ts#leave + masterworld/app/interiorVisit.ts#leave",
-    "reason": "Two spaces behind a door going out; shared parts in app/fade.ts. Folded when the cellar becomes a hatch in its house's room."
+    "reason": "Two spaces behind a way in (the cellar's dungeon space under its hatch, a building's room behind its door), each going in, out and checking its exits; the fade they share is app/fade.ts, the notes app/notes.ts. Different spaces, different checks."
   },
   {
     "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/app/interiorVisit.ts#update",
-    "reason": "Per-frame door checks of two different spaces (dungeon cells vs a room plan); shared parts in app/fade.ts. Folded when the cellar becomes a hatch in its house's room."
+    "reason": "Two spaces behind a way in (the cellar's dungeon space under its hatch, a building's room behind its door), each going in, out and checking its exits; the fade they share is app/fade.ts, the notes app/notes.ts. Different spaces, different checks."
   },
   {
     "key": "same name: masterworld/app/interiorVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",

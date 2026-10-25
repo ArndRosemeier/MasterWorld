@@ -25,7 +25,8 @@ export interface Orbit {
 /** One full circle in this many seconds. */
 const LAP = 260;
 const FAR = { radius: 520, height: 130 };
-const NEAR = { radius: 260, height: 60 };
+// Close enough that the town (about 200 m across) fills much of the frame, high enough to clear its roofs.
+const NEAR = { radius: 180, height: 55 };
 /** Ground checked this far around the camera, so no hill rises into the view. */
 const CLEAR = [0, 60, 140];
 
@@ -44,7 +45,8 @@ export function orbitPose(o: Orbit, t: number, near: number): Pose {
   }
   const y = ground + lerp(FAR.height, NEAR.height, n) * (1 + 0.15 * Math.sin(t * 0.07));
   // It looks at the town, wandering a little around it.
-  const look: Vec3 = [cx + Math.sin(t * 0.031) * 50, cy + 10, cz + Math.cos(t * 0.023) * 50];
+  const wander = lerp(50, 25, n);
+  const look: Vec3 = [cx + Math.sin(t * 0.031) * wander, cy + 6, cz + Math.cos(t * 0.023) * wander];
   return { at: [x, y, z], look };
 }
 
