@@ -93,7 +93,7 @@ async function start(): Promise<void> {
     player.walker.height = hero.height;
     player.hero = hero;
     loading.set('Growing the woods');
-    const flora = new FloraView(view.stage, jobs);
+    const flora = new FloraView(view.stage, jobs, view.sun);
     if (boot.trees) await flora.placeStart(view.camera.position);
     const grass = boot.grass ? new GrassView(jobs) : null;
     await grass?.sow(view.camera.position);
@@ -116,7 +116,7 @@ async function start(): Promise<void> {
     // once they stand.
     loading.set('Planting the trees');
     let planted = false;
-    const planting = (boot.trees ? flora.show() : Promise.resolve()).then(() => { planted = true; });
+    const planting = (boot.trees ? flora.plant() : Promise.resolve()).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -175,7 +175,7 @@ async function start(): Promise<void> {
       view.sky.update(dt, view.camera);
       sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
-      if (boot.trees) flora.update(dt, view.camera.position);
+      if (boot.trees) flora.update(dt, view.camera);
       grass?.tend(dt, view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
