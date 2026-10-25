@@ -197,7 +197,11 @@ export class TitleScreen {
       this.showPeople(true);
       this.restartCard();
     };
+    // The people's figure turns on top of the card (baked pictures: tools/assets/peoples.mjs).
+    const figure = el('div', { className: 'figure', ariaHidden: 'true' });
+    figure.style.backgroundImage = `url(${import.meta.env.BASE_URL}title/peoples/${p.id}.webp)`;
     const fill = () => this.card.replaceChildren(
+      figure,
       el('div', { className: 'head' }, svg(emblemSvg(p.id)), el('div', {}, el('div', { className: 'label', textContent: 'The peoples' }), el('h3', { textContent: p.name }))),
       el('p', { textContent: p.scene }),
       el('div', { className: 'nav' },

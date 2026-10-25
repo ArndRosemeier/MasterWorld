@@ -8,8 +8,7 @@
  * during the wait (KeyW: the hero runs). SHOT_LOG=1 prints all of the page's console, not only errors. SHOT_GPU=1 renders on the machine's own GPU instead (new headless
  * mode, no SwiftShader): for a desktop with a graphics card, where frames take milliseconds, not seconds.
  */
-import { chromium } from 'playwright';
-import { preview } from 'vite';
+import { launch } from './launch.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 300000);
 const args = process.argv.slice(2);
@@ -18,16 +17,7 @@ if (args.length < 2 || args.length % 2) {
   process.exit(2);
 }
 
-const server = await preview({ preview: { port: 5202, strictPort: false }, logLevel: 'silent' });
-const base = server.resolvedUrls.local[0];
-const gpu = !!process.env.SHOT_GPU;
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || undefined,
-  channel: gpu ? 'chromium' : undefined,
-  args: gpu
-    ? ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist']
-    : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist'],
-});
+const { server, base, browser } = await launch();
 let failed = false;
 for (let i = 0; i < args.length; i += 2) {
   const query = args[i], out = args[i + 1];
