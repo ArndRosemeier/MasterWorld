@@ -59,7 +59,7 @@ export class FolkView {
   /** The children, as simple figures. */
   private readonly kids = new ChildFolk(this.far.mesh.material as Material);
 
-  private constructor(private readonly reversed: boolean, private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
+  private constructor(private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
     for (const ch of [lead, ...others]) {
       const place = new Group();
       place.add(ch.object);
@@ -104,16 +104,13 @@ export class FolkView {
       hair: c.hair.filter((h) => PACK_HAIR.includes(h.id)),
       animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id)),
     });
-    // A character knows only the garments and hairstyles the shared pack had loaded when it was made, and
-    // wearing one another character loaded first shows nothing (Actors 0.10). So a holder (never drawn)
-    // loads the whole wardrobe first, and every drawn character is made after.
-    const holder = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, worker, clipLibraries: false, catalog });
-    await holder.human.loadMeshes([...PACK_GARMENTS, ...PACK_HAIR]);
-    const share = () => Character.load({ pack: PACK, renderer, materials: nodeMaterials, shareWith: holder, catalog });
-    const lead = await share();
+    // The first loads the pack; the others share it (and the garments any of them loads).
+    const first = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, worker, catalog });
+    const share = () => Character.load({ pack: PACK, renderer, materials: nodeMaterials, shareWith: first, catalog });
+    const lead = first;
     const others: Character[] = [];
     for (let i = 1; i < count; i++) others.push(await share());
-    const view = new FolkView(renderer.reversedDepthBuffer === true, stage, life, height, lead, others);
+    const view = new FolkView(stage, life, height, lead, others);
     return view;
   }
 
@@ -260,24 +257,10 @@ export class FolkView {
     s.ready = true;
   }
 
-  /**
-   * Actors draws clothes over the skin, and each garment layer over the one below, by polygon offsets
-   * toward the camera (negative). With reversed depth (view.ts) a negative offset pushes away: the skin
-   * and underclothes showed through in patches. Flipped once per material (garments are made lazily).
-   * Also what never shows casts no shadow.
-   */
+  /** What never shows casts no shadow (Actors flips its garments' polygon offsets for reversed depth itself). */
   private adapt(o: Object3D): void {
     o.traverse((m) => {
-      const mesh = m as Mesh;
-      if (!mesh.isMesh) return;
-      if (mesh.name.startsWith('genitals')) mesh.castShadow = false; // always clothed: a shadow shader for nothing
-      if (!this.reversed) return;
-      for (const x of materialsOf(mesh)) {
-        if (!x.polygonOffset || x.userData.offsetReversed) continue;
-        x.polygonOffsetFactor = -x.polygonOffsetFactor;
-        x.polygonOffsetUnits = -x.polygonOffsetUnits;
-        x.userData.offsetReversed = true;
-      }
+      if (m.name.startsWith('genitals')) m.castShadow = false; // always clothed: a shadow shader for nothing
     });
   }
 
