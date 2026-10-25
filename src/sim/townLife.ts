@@ -41,6 +41,8 @@ export interface Agent {
   /** The part of the day the current choice was made for. */
   block: Block | 'order';
   rng: Rng;
+  /** Stopped for a talk with the player: stands, faces them, and goes on with the day when let go. */
+  held?: boolean;
 }
 
 export interface TownWeather {
@@ -93,9 +95,24 @@ export class TownLife {
     this.hour = ((hours % 24) + 24) % 24;
     this.weather = weather;
     for (const a of this.agents) {
+      if (a.held) continue;
       if (a.act === 'walk') this.walk(a, dt);
       else if (this.time >= a.until || this.blockOf(a) !== a.block) this.choose(a, false);
     }
+  }
+
+  /** Stop someone for a talk: they stand where they are and turn to (x, z). */
+  hold(a: Agent, x: number, z: number): void {
+    a.held = true;
+    a.act = 'chat';
+    a.hidden = false;
+    a.dir = Math.atan2(z - a.z, x - a.x);
+  }
+
+  /** The talk is over: they pick up their day from here. */
+  letGo(a: Agent): void {
+    a.held = false;
+    this.choose(a, false);
   }
 
   /** How many are doing what (for the HUD and tests). */

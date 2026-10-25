@@ -103,7 +103,8 @@ export interface Cellar extends CellarSketch {
   readonly signature: string;
 }
 
-const houseName = (b: TownBuilding): string =>
+/** How people call a building ("the cottage", "the cooper's workshop"). */
+export const houseName = (b: TownBuilding): string =>
   b.kind === 'house' || b.kind === 'cottage' ? `the ${b.kind}` : b.kind === 'workshop' && b.trade ? `the ${b.trade}'s workshop` : `the ${b.kind}`;
 
 const pickDef = <T extends HistoryDef>(rng: Rng, list: readonly T[], ok: (d: T) => boolean = () => true): T => {

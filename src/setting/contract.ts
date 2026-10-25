@@ -6,7 +6,7 @@
  * lore, VGM templates and the Conversations package are added as the milestones need them.
  */
 
-export const CONTRACT_VERSION = 3;
+export const CONTRACT_VERSION = 4;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -176,6 +176,38 @@ export interface CellarLore {
   readonly dwellers: readonly DwellerDef[];
 }
 
+/** Names of one people (by Actors' race id): given names and the family names households share. */
+export interface NamesDef {
+  readonly female: readonly string[];
+  readonly male: readonly string[];
+  readonly family: readonly string[];
+}
+
+/**
+ * How townsfolk talk (plan 9.1: topic-based dialogue through Conversations), in English for now. `{name}`,
+ * `{family}`, `{house}`, `{trade}` and `{sign}` are filled in by the engine.
+ */
+export interface TalkDef {
+  /** Who someone is, by what they do (keys: trade, trader, keeper, hand, homemaker, child). */
+  readonly identity: Readonly<Record<string, string>>;
+  /** The topics the player can pick, by id (greet, self, news, more, source, bye, and `lead` for a lead's topic). */
+  readonly topics: Readonly<Record<string, string>>;
+  /** What is said when someone knows nothing of a topic. */
+  readonly nothing: readonly string[];
+  /** How a house is called: `{house}` the building ("the cottage"), `{family}` the household's name. */
+  readonly house: string;
+  /** How a promised cellar is called (`{house}` from above). */
+  readonly cellar: string;
+  /** The clause for "something is wrong down there" (`{subject}` the cellar). */
+  readonly troubled: string;
+  /** The household's own source, as in "I know it from our own house". */
+  readonly ownHouse: string;
+  /** How a lead reads in the journal (`{cellar}`). */
+  readonly lead: string;
+  /** The note when a place is marked on the player's map (`{name}` who marks it, `{house}`). */
+  readonly marked: string;
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -187,6 +219,9 @@ export interface SettingModule {
   readonly start: StartSpec;
   /** Material for dungeons, per kind (plan 8). */
   readonly dungeons: { readonly cellar: CellarLore };
+  /** Names of the peoples, by Actors' race id (human, dwarf, halfling, elf). */
+  readonly names: Readonly<Record<string, NamesDef>>;
+  readonly talk: TalkDef;
 }
 
 /** Authoring errors, one line each (empty: the module is valid). */
@@ -242,5 +277,15 @@ export function validateSetting(m: SettingModule): string[] {
     if (!uses.has(d.lair)) out.push(`${where}: cellar dweller "${d.id}" lair "${d.lair}" is unknown`);
     if (!d.signs.length) out.push(`${where}: cellar dweller "${d.id}" has no signs to hint with`);
   }
+  for (const race of ['human', 'dwarf', 'halfling', 'elf']) {
+    const n = m.names[race];
+    if (!n) { out.push(`${where}: names for "${race}" are missing`); continue; }
+    for (const k of ['female', 'male', 'family'] as const) if (n[k].length < 8) out.push(`${where}: names.${race}.${k} needs at least 8 names`);
+  }
+  const t = m.talk;
+  for (const k of ['greet', 'self', 'news', 'more', 'source', 'bye']) if (!t.topics[k]) out.push(`${where}: talk topic "${k}" has no wording`);
+  for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);
+  if (!t.nothing.length) out.push(`${where}: talk.nothing is empty`);
+  if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
   return out;
 }

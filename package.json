@@ -33,6 +33,7 @@
     "@futuremagic/texgen": "file:vendor/assetgenerator/packages/texgen",
     "@futuremagic/vegetation": "file:vendor/assetgenerator/packages/vegetation",
     "@futuremagic/volume": "file:vendor/assetgenerator/packages/volume",
+    "solarpolis-dialogue": "https://github.com/ArndRosemeier/Conversations/releases/download/v0.1.0/solarpolis-dialogue-0.1.0.tgz",
     "three": "^0.186.1"
   },
   "devDependencies": {

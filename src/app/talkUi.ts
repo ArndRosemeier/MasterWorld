@@ -1,0 +1,167 @@
+/**
+ * Talking in the game (plan 9.1, 17): walk up to a townsperson and press the talk key (T). They stop and
+ * turn to you; the dialogue window opens at the side so they stay in view. Pick a topic with the mouse or
+ * its number key; Escape, the talk key or walking off ends it. What they tell of a promised cellar goes
+ * into the journal, and the place onto the map.
+ */
+import { angleDiff } from '@futuremagic/core';
+import type { TownPlan } from '@futuremagic/settlement';
+import type { Bindings } from '../input/controls';
+import { onKeyDown, swallow } from '../input/keys';
+import type { TalkDef } from '../setting/contract';
+import type { Agent, TownLife } from '../sim/townLife';
+import type { Journal } from '../talk/journal';
+import type { TownTalk, Topic } from '../talk/townTalk';
+import { fill } from '../talk/folk';
+import { button, el, overlay } from './dom';
+import type { Player } from './player';
+
+/** How close (m) and how nearly in front someone must be to talk to them. */
+const REACH = 3;
+const FRONT = 1.0;
+/** Walking this far off ends the talk. */
+const LEAVE = 5;
+
+export interface TalkHost {
+  paused(open: boolean): void;
+  /** Talk is off (down in the cellar, flying). */
+  readonly away: boolean;
+  /** The keys now. */
+  readonly bindings: Bindings;
+  /** A lead was opened: say it, and the journal and map show it. */
+  heard(lead: { id: string; title: string; note: string }): void;
+}
+
+export class TalkUi {
+  private readonly prompt: HTMLElement;
+  private readonly box: HTMLDivElement;
+  private readonly who: HTMLDivElement;
+  private readonly lines: HTMLDivElement;
+  private readonly topicList: HTMLDivElement;
+  private near: Agent | null = null;
+  private with: Agent | null = null;
+  private shown: Topic[] = [];
+
+  constructor(
+    private readonly talk: TownTalk,
+    private readonly words: TalkDef,
+    private readonly journal: Journal,
+    private readonly life: TownLife,
+    private readonly plan: TownPlan,
+    private readonly player: Player,
+    private readonly host: TalkHost,
+  ) {
+    this.prompt = overlay('talk-prompt', '');
+    this.who = el('div', { className: 'who' });
+    this.lines = el('div', { className: 'lines' });
+    this.topicList = el('div', { className: 'topics' });
+    this.box = el('div', { className: 'talk', role: 'dialog' }, this.who, this.lines, this.topicList);
+    document.body.append(this.box);
+    // Before the menu's Escape (registered first), so Escape ends a talk instead of opening the settings.
+    onKeyDown((e) => this.onKey(e), true);
+  }
+
+  get open(): boolean { return this.with !== null; }
+
+  /** Each frame: who is near enough to talk to, or whether the talk partner was walked away from. */
+  watch(): void {
+    if (this.with) {
+      const w = this.player.walker.pos;
+      if (Math.hypot(this.with.x - w.x, this.with.z - w.z) > LEAVE || this.host.away) this.close();
+      return;
+    }
+    this.near = this.host.away ? null : this.inFront();
+    const on = this.near !== null;
+    this.prompt.classList.toggle('on', on);
+    if (on) {
+      const key = this.host.bindings.talk[0] || this.host.bindings.talk[1];
+      this.prompt.replaceChildren(el('kbd', { textContent: key.replace(/^Key/, '') }), `Talk to ${this.talk.nameOf(this.near!.person.id)}`);
+    }
+  }
+
+  /** The grown-up nearest in front of the hero, within reach. */
+  private inFront(): Agent | null {
+    const w = this.player.walker;
+    let best: Agent | null = null, bd = REACH;
+    for (const a of this.life.agents) {
+      if (a.hidden || a.person.role === 'child') continue;
+      const dx = a.x - w.pos.x, dz = a.z - w.pos.z, d = Math.hypot(dx, dz);
+      if (d >= bd) continue;
+      // The walker's yaw faces −z at 0 (walker.ts); the direction to them as the same kind of angle.
+      if (Math.abs(angleDiff(Math.atan2(-dx, -dz), w.yaw)) > FRONT) continue;
+      best = a; bd = d;
+    }
+    return best;
+  }
+
+  private onKey(e: KeyboardEvent): void {
+    if (e.repeat) return;
+    const talkKey = this.host.bindings.talk.includes(e.code);
+    if (this.with) {
+      if (e.code === 'Escape' || talkKey) { swallow(e); this.close(); return; }
+      const n = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
+      if (n) { swallow(e); const t = this.shown[Number(n[1]) - 1]; if (t) this.pick(t); }
+      return;
+    }
+    if (talkKey && this.near && !document.querySelector('.shade.open')) { e.preventDefault(); this.begin(this.near); }
+  }
+
+  /** Start talking with someone (the talk key, or `?talk`). */
+  begin(a: Agent): void {
+    this.with = a;
+    const w = this.player.walker.pos;
+    this.life.hold(a, w.x, w.z);
+    this.prompt.classList.remove('on');
+    this.who.textContent = this.talk.nameOf(a.person.id);
+    this.lines.replaceChildren();
+    this.box.classList.add('open');
+    this.host.paused(true);
+    this.say(this.talk.greet(a.person.id).text);
+    this.offer();
+  }
+
+  /** Pick a topic by id, if it is offered now. */
+  choose(id: string): void {
+    const t = this.shown.find((x) => x.id === id);
+    if (t) this.pick(t);
+  }
+
+  private pick(t: Topic): void {
+    const a = this.with;
+    if (!a) return;
+    this.lines.append(el('p', { className: 'you', textContent: t.label }));
+    const r = this.talk.ask(a.person.id, t.id);
+    this.say(r.text);
+    const from = this.talk.nameOf(a.person.id);
+    for (const id of r.heard) {
+      const b = this.plan.buildings[this.talk.houseOf(id)];
+      const title = fill(this.words.lead, { cellar: this.talk.cellarCalled(id) });
+      const lead = this.journal.hear(id, title, { text: r.text, from }, { x: b.door[0], z: b.door[1], label: this.talk.houseCalled(id) });
+      if (lead) this.host.heard({ id, title, note: fill(this.words.marked, { name: from, house: this.talk.houseCalled(id) }) });
+    }
+    if (r.done) { setTimeout(() => this.close(), 900); this.topicList.replaceChildren(); return; }
+    this.offer();
+  }
+
+  private say(text: string): void {
+    this.lines.append(el('p', { textContent: text }));
+    this.lines.scrollTop = this.lines.scrollHeight;
+  }
+
+  private offer(): void {
+    const a = this.with;
+    if (!a) return;
+    this.shown = this.talk.topics(a.person.id);
+    this.topicList.replaceChildren(...this.shown.map((t, i) =>
+      button(el('kbd', { textContent: String(i + 1) }), () => this.pick(t), { className: t.lead ? 'lead' : '' }, t.label)));
+  }
+
+  close(): void {
+    const a = this.with;
+    if (!a) return;
+    this.with = null;
+    this.life.letGo(a);
+    this.box.classList.remove('open');
+    this.host.paused(false);
+  }
+}

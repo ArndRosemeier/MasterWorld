@@ -336,6 +336,8 @@ Arnd's rules (2026-10-25):
 * Talk uses Arnd's **Conversations** package (D36). The default world ships its own Conversations setting package, written as data (drafted with an LLM offline and checked in, so play costs nothing, D1).
 * Conversations' own review says open free-text conversation is still weak. **Topic-based dialogue** (pick a subject, ask about it) fits the hint channel well and avoids the problem. Free text can come later with the LLM hook.
 
+**Built so far (2026-10-25)**: Conversations 0.1.0 (its GitHub release) runs the talk (`src/talk`): every townsperson is a character with a name from the setting (`names`, households share a family name) and their own evidence. The VGM's cellar hint (`src/vgm/hints.ts`) goes in as what the household above has seen themselves, and as hearsay the household told the innkeeper and two neighbours ("I heard it from Grundi Coalbeard"). Topics: who are you, anything strange lately, each lead, tell me more, how do you know, farewell (wording in the setting's `talk`). T talks to the person in front (they stop and face you, `TownLife.hold`), J opens the journal (one lead per promise, with what each person said), M the map (hill shading, contours, the town, the hero, red-ink marks drawn in when new). Hearing of a promise is the commitment signal.
+
 ### 9.2 Believable life (D19)
 
 NPCs standing around is what broke the illusion in most earlier projects. Norgo already had needs, schedules, memories and goal planning, and its people still often stood still, because the visible layer was thin: few places that tell a person what to do there, and few animations to do it with. So in MasterWorld the visible layer comes first.
