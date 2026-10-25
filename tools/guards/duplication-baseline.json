@@ -38,5 +38,9 @@
   {
     "key": "same name: masterworld/app/player.ts#update + masterworld/render/town/TownView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (the player vs town building streaming); only the name matches."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (a.add(b).mul(c)) is how shader kinds are written, not a copied helper. It crossed the idiom threshold when the title's new files changed the token statistics."
   }
 ]
