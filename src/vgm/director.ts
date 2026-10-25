@@ -61,7 +61,7 @@ export class Director {
     this.tension = saved?.tension ?? 0;
   }
 
-  tick(dt: number, s: Signals): void {
+  observe(dt: number, s: Signals): void {
     this.seconds += dt;
     this.signals = s;
     const minutes = dt / 60;

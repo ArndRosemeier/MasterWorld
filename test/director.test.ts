@@ -7,9 +7,9 @@ const calm: Signals = { fighting: 0, pressure: 0, health: 1, talking: false, und
 
 test('director: needs grow with time, play meets them, the most overdue comes first', () => {
   const d = new Director(classic.director);
-  for (let t = 0; t < 600; t++) d.tick(1, calm);
+  for (let t = 0; t < 600; t++) d.observe(1, calm);
   assert.equal(d.overdue, 'purpose');
-  d.tick(1, { ...calm, leads: 1 });
+  d.observe(1, { ...calm, leads: 1 });
   assert.equal(d.needs.purpose, 0, 'a lead is a purpose');
   assert.equal(d.overdue, 'discovery');
   d.met('discovery');
@@ -20,29 +20,29 @@ test('director: needs grow with time, play meets them, the most overdue comes fi
 
 test('director: a fight is the peak, relief after it, and the music follows', () => {
   const d = new Director(classic.director);
-  d.tick(1, { ...calm, inTown: true });
+  d.observe(1, { ...calm, inTown: true });
   assert.equal(d.mood, 'town');
-  for (let t = 0; t < 5; t++) d.tick(1, { ...calm, underground: true, fighting: 2, pressure: 1.2 });
+  for (let t = 0; t < 5; t++) d.observe(1, { ...calm, underground: true, fighting: 2, pressure: 1.2 });
   assert.equal(d.phase, 'peak');
   assert.equal(d.mood, 'fight');
   assert.ok(d.tension > 0.8);
   assert.equal(d.fair, false, 'no ambush in a fight');
-  d.tick(1, { ...calm, underground: true });
+  d.observe(1, { ...calm, underground: true });
   assert.equal(d.phase, 'relief');
-  for (let t = 0; t < 120; t++) d.tick(1, calm);
+  for (let t = 0; t < 120; t++) d.observe(1, calm);
   assert.equal(d.phase, 'calm');
   assert.ok(d.fair);
 });
 
 test('director: messages wait their turn, the important first, never twice', () => {
   const d = new Director(classic.director);
-  d.tick(0.1, calm);
+  d.observe(0.1, calm);
   d.queue('a', 1); d.queue('b', 5); d.queue('a', 1);
   assert.equal(d.next(), 'b');
   assert.equal(d.next(), null, 'a gap between messages');
-  d.tick(3, calm);
+  d.observe(3, calm);
   assert.equal(d.next(), 'a');
-  d.tick(3, calm);
+  d.observe(3, calm);
   assert.equal(d.next(), null);
 });
 
