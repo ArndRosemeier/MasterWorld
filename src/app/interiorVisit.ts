@@ -48,9 +48,12 @@ export class InteriorVisit {
       // A light under the ceiling, nearer the back.
       const [lx, lz] = frame.toWorld(0, plan.hb * 0.2);
       this.light.position.set(lx, y + plan.height - 0.35, lz);
-      this.light.intensity = 10;
+      // Brighter and farther-reaching in a big room (the temple's hall).
+      const big = Math.min(3, Math.max(1, (plan.ha * plan.hb) / 12));
+      this.light.intensity = 10 * big;
+      this.light.distance = 14 * Math.sqrt(big);
       // Just inside the door, facing in (the walker's forward is (-sin yaw, -cos yaw)).
-      const [x, z] = frame.toWorld(0, -plan.hb + 0.7);
+      const [x, z] = frame.toWorld(0, -plan.hb + 1.3);
       this.player.teleport(x, y, z, Math.atan2(-b.vx, -b.vz));
       this.note.say(`You step into ${NAMES[b.kind] ?? 'the house'}.`, 3);
     });
@@ -65,6 +68,7 @@ export class InteriorVisit {
       this.view.hide();
       this.sky.indoors = false;
       this.light.intensity = 0;
+      this.light.distance = 14; // the lantern's own
       const [x, z] = r.b.door;
       this.player.teleport(x, undefined, z, Math.atan2(r.b.vx, r.b.vz));
       this.cooldown = 1.5;
