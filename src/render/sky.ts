@@ -7,9 +7,11 @@ import { BoxGeometry, Color, Mesh, PMREMGenerator, Scene, Vector3, type Directio
 import { positionWorld, uniform } from 'three/tsl';
 import { CLEAR, moonAt, skyLight, skyPath, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
 import { cloudShadow } from '@futuremagic/sky/node';
+import { smoothstep } from '@futuremagic/core';
 import { GRADE, gradeAt, type GradeKey } from '@futuremagic/stage';
 import { SKY, makeEnvSky, skyUniforms, type SkyUniforms } from './materials';
 import { HorizonShadow } from './horizonShadow';
+import { WINDOWS } from './materials/building';
 import { ENV_SATURATION, FOG, fogNode } from './materials/weather';
 
 /** Half the side of the sun's shadow box around the camera, metres. */
@@ -206,6 +208,10 @@ export class SkyView {
       FOG.flat.value = 1;
     }
     this.scene.environmentIntensity = L.envIntensity * ENV * lowSunSky(sun[1]);
+    // Windows light up from dusk; most rooms in the evening, few after midnight, some before dawn.
+    WINDOWS.glow.value = 1 - smoothstep(-0.1, 0.06, sun[1]);
+    const hr = this.hour;
+    WINDOWS.share.value = hr >= 12 ? 0.7 - 0.25 * smoothstep(21.5, 24, hr) : 0.45 - 0.33 * smoothstep(0, 1.5, hr) + 0.2 * smoothstep(4.5, 6, hr);
     this.renderer.toneMappingExposure = L.exposure * this.exposure;
     if (this.look.length) {
       // Indoors the lamps set the colour: the day key (neutral).
@@ -215,6 +221,7 @@ export class SkyView {
     }
     if (this.indoors) {
       this.sun.intensity = 0;
+      WINDOWS.glow.value = 0;
       this.hemi.color.setRGB(0.55, 0.42, 0.3);
       this.hemi.groundColor.setRGB(0.12, 0.09, 0.07);
       this.hemi.intensity = 0.05;
