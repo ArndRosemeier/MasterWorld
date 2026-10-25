@@ -4,7 +4,7 @@
  * the shape worker) and shown once ready; until then the person is simply not drawn. Characters far off
  * draw their "Crowd" level (one draw call plus the hair).
  */
-import type { Camera, Object3D, WebGPURenderer } from 'three/webgpu';
+import { Group, type Camera, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
@@ -21,6 +21,8 @@ const DRESSING = 2;
 
 interface Slot {
   ch: Character;
+  /** Where the character stands: its own object keeps the height Actors gives it (feet on y = 0). */
+  place: Group;
   /** The agent shown (-1: free). */
   agent: number;
   /** Dressed for that agent and compiled. */
@@ -34,7 +36,13 @@ export class FolkView {
   private readonly shown = new Map<number, Slot>();
 
   private constructor(private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
-    for (const ch of [lead, ...others]) this.slots.push({ ch, agent: -1, ready: false, clip: '' });
+    for (const ch of [lead, ...others]) {
+      const place = new Group();
+      place.add(ch.object);
+      place.name = 'townsfolk';
+      place.visible = false;
+      this.slots.push({ ch, place, agent: -1, ready: false, clip: '' });
+    }
   }
 
   /**
@@ -56,10 +64,6 @@ export class FolkView {
     const others: Character[] = [];
     for (let i = 1; i < count; i++) others.push(await Character.load({ pack: PACK, renderer, materials: nodeMaterials, shareWith: lead }));
     const view = new FolkView(stage, life, height, lead, others);
-    for (const s of view.slots) {
-      s.ch.object.visible = false;
-      s.ch.object.name = 'townsfolk';
-    }
     return view;
   }
 
@@ -68,7 +72,8 @@ export class FolkView {
     const s = this.slots[0], p = this.life.agents.find((a) => drawn(a.person))?.person;
     if (p) await s.ch.set({ ...lookOf(p), animation: 'walk' });
     s.ch.setLod(0);
-    return [s.ch.object];
+    s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
+    return [s.place];
   }
 
   /**
@@ -78,11 +83,14 @@ export class FolkView {
    */
   async warmLods(): Promise<void> {
     const ch = this.slots[0].ch;
+    const place = this.slots[0].place;
+    place.removeFromParent();
     for (let k = 1; k < ch.lods.length; k++) {
       ch.setLod(k);
-      await this.stage.prepare(ch.object);
+      await this.stage.prepare(place);
     }
     ch.setLod(0);
+    this.slots[0].place.visible = false;
     this.warm = true;
   }
   private warm = false;
@@ -106,7 +114,7 @@ export class FolkView {
       this.shown.delete(id);
       s.agent = -1;
       s.ready = false;
-      s.ch.object.visible = false;
+      s.place.visible = false;
     }
     // Dress free characters for the nearest people without one.
     for (const [, a] of near) {
@@ -119,7 +127,7 @@ export class FolkView {
     for (const s of this.shown.values()) {
       if (!s.ready) continue;
       const a = this.life.agents[s.agent];
-      const o = s.ch.object;
+      const o = s.place;
       o.position.set(a.x, this.height(a.x, a.z), a.z);
       // Agents face `dir` (atan2 in x, z); a character faces +z.
       o.rotation.y = Math.PI / 2 - a.dir;
@@ -143,10 +151,13 @@ export class FolkView {
       .then(async () => {
         s.ch.setLod('auto');
         // Its meshes are new: compile (a cache hit for kinds already seen) before it is drawn.
-        await this.stage.prepare(s.ch.object);
-        if (s.agent !== id) return; // taken over meanwhile
-        if (!s.ch.object.parent) this.stage.scene.add(s.ch.object);
-        s.ch.object.visible = true;
+        // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
+        // pass is warmed only for objects not yet in the scene).
+        s.place.removeFromParent();
+        s.place.visible = true;
+        await this.stage.prepare(s.place);
+        if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
+        this.stage.scene.add(s.place);
         s.ready = true;
       })
       .catch((e: unknown) => console.error('[folk] dressing failed', e))
