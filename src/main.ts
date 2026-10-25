@@ -236,7 +236,7 @@ async function start(): Promise<void> {
       visit.up = () => r.enter(house, true, true);
     }
     if (rooms && town && params.room !== null) {
-      const b = town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
+      const b = params.room === 'cellar' ? house : town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
       if (b) await rooms.enter(b, true);
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
