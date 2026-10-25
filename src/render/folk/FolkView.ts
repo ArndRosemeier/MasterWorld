@@ -155,6 +155,9 @@ export class FolkView {
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
   indoors: readonly Placed[] | null = null;
 
+  /** Where nobody out of doors is drawn just now (the creator's view of the hero), or null. */
+  clear: ((x: number, z: number) => boolean) | null = null;
+
   /** Each frame: who is drawn, where and doing what. */
   follow(dt: number, cam: Camera): void {
     if (!this.warm) return;
@@ -166,7 +169,7 @@ export class FolkView {
       for (const p of this.indoors) if (drawn(p.agent.person)) { near.push([Math.hypot(p.x - cx, p.z - cz), p.agent]); placed.set(p.agent.person.id, p); }
     } else {
       for (const a of this.life.agents) {
-        if (a.hidden || !drawn(a.person)) continue;
+        if (a.hidden || !drawn(a.person) || this.clear?.(a.x, a.z)) continue;
         const d = Math.hypot(a.x - cx, a.z - cz);
         if (d < FAR) near.push([d, a]);
       }
@@ -211,7 +214,7 @@ export class FolkView {
     if (this.indoors) this.kids.place([], this.height, dt, cx, cz);
     else {
       this.children.length = 0;
-      for (const a of this.life.agents) if (!drawn(a.person) && !a.hidden) this.children.push(a);
+      for (const a of this.life.agents) if (!drawn(a.person) && !a.hidden && !this.clear?.(a.x, a.z)) this.children.push(a);
       this.children.sort((x, y) => Math.hypot(x.x - cx, x.z - cz) - Math.hypot(y.x - cx, y.z - cz));
       this.kids.place(this.children, this.height, dt, cx, cz);
     }

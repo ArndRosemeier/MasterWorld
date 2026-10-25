@@ -13,13 +13,12 @@ import {
 import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
 import { WATER, waterAt } from './waterInputs';
+import { WAVES, waveMotion } from '../../world/swell';
 import { WEATHER, rainRings } from './weather';
 
 let envTex: Texture | null = null;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
 export function useWaterEnvironment(t: Texture): void { envTex = t; }
-
-const G = 9.81;
 
 export const WATER_KIND = defineKind('water', ['position'], () => {
   if (!envTex) throw new Error('water material built before the sky environment');
@@ -37,12 +36,10 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
   const k = W.amp.mul(smoothstep(0.3, 9.0, depthV)).mul(float(1).sub(smoothstep(250.0, 800.0, dist))).mul(mix(float(0.12), float(1), sea)).mul(still);
   const wd = normalize(W.wind), wpp = vec2(wd.y.negate(), wd.x);
   let disp: Node<'vec3'> = vec3(0), tan: Node<'vec3'> = vec3(1, 0, 0), bin: Node<'vec3'> = vec3(0, 0, 1);
-  const waves: [Node<'vec2'>, number, number][] = [
-    [wd, 0.13, 58], [wd.add(wpp.mul(0.6)), 0.11, 31], [wd.sub(wpp.mul(0.7)), 0.09, 17], [wpp.add(wd.mul(0.3)), 0.07, 9], [wpp.negate().add(wd.mul(0.5)), 0.05, 5.3],
-  ];
-  for (const [dir, steep0, wl] of waves) {
-    const kk = (2 * Math.PI) / wl, c = Math.sqrt(G / kk);
-    const d = normalize(dir), steep = k.mul(steep0);
+  // The same waves the swimmers ride (world/swell.ts).
+  for (const [along, across, steep0, wl] of WAVES) {
+    const { k: kk, c } = waveMotion(wl);
+    const d = normalize(wd.mul(along).add(wpp.mul(across))), steep = k.mul(steep0);
     const f = dot(d, wp.xz).sub(W.time.mul(c)).mul(kk);
     const s = sin(f), co = f.cos(), a = steep.div(kk);
     tan = tan.add(vec3(d.x.mul(d.x).mul(steep).mul(s).negate(), d.x.mul(steep).mul(co), d.x.mul(d.y).mul(steep).mul(s).negate()));

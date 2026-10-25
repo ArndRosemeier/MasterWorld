@@ -26,6 +26,7 @@ import { useTownGround, useTownTextures } from './render/materials/townGround';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
+import { distSqPointSeg } from '@futuremagic/settlement';
 import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { ordersOf, townOrder } from './vgm/orders';
@@ -136,7 +137,8 @@ export async function start(b: Boot): Promise<void> {
       height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
       floor: (x, z) => (below() ? null : town?.stand(x, z) ?? null),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
-      waterLevel: (x, z) => { if (below()) return null; const w = water?.waterAt(x, z); return w && w.depth > 0 ? w.level : null; },
+      // The surface as drawn, waves and all: a swimmer rides the swell.
+      waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
       // Out of doors the buildings and the townsfolk (whom one walks around, not through).
       wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
     };
@@ -509,7 +511,11 @@ export async function start(b: Boot): Promise<void> {
         knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
         click: () => sound.play('click'),
       }, seed);
+      // Nobody walks between the camera and the hero while the glass is open.
+      const cam = view.camera.position;
+      if (folk) folk.clear = (x, z) => distSqPointSeg(x, z, cam.x, cam.z, w.pos.x, w.pos.z) < 1.5 * 1.5;
       const made = await creator.open(race);
+      if (folk) folk.clear = null;
       heroName = made.name;
       creator = null;
       // The past chosen: its skills, kit and the people in town who know the hero.
