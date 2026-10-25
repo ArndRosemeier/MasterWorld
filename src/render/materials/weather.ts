@@ -50,6 +50,9 @@ export const FOG = {
  */
 export const ENV_SATURATION = 0.6;
 
+/** A colour read from the sky's environment map with its full colour back (see ENV_SATURATION). */
+export const fullSky = (c) => mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, 1 / ENV_SATURATION).max(0);
+
 /**
  * The fog node for `scene.fogNode` (set before the warm-up: it is part of every shader's key). `env` is the
  * sky's environment map: distant land fades into the sky behind it (aerial perspective), warm toward the
@@ -68,11 +71,8 @@ export function fogNode(env: Texture) {
     const mist = start.mul(dist).mul(f);
     return exp(haze.mul(haze).add(mist).negate()).oneMinus();
   });
-  const sky = skyToward(env, positionWorld.sub(cameraPosition));
-  // The env copy of the sky is drawn with less colour (ENV_SATURATION): give it back.
-  const lum = dot(sky, vec3(0.2126, 0.7152, 0.0722));
-  // A shade darker than the sky itself, so far hills stay hills instead of melting into the horizon.
-  const toward = mix(vec3(lum), sky, 1 / ENV_SATURATION).max(0).mul(0.8);
+  // The sky's colour toward the view, a shade darker than the sky itself so far hills stay hills.
+  const toward = fullSky(skyToward(env, positionWorld.sub(cameraPosition))).mul(0.7);
   return fog(mix(toward, FOG.color, FOG.flat), factor());
 }
 

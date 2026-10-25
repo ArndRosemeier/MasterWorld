@@ -20,9 +20,9 @@ const SHADOW_MAP = 4096;
 const EXPOSURE = 1.15;
 const LIGHT = 3.4;
 /** The environment (sky) light on the land and in the water's reflections. */
-export const ENV = 1.6;
+export const ENV = 2.4;
 /** The world is large: fog thinner than Scale's city. */
-const FOG_SCALE = 0.35;
+const FOG_SCALE = 0.28;
 /** How much of the low sun's dimming by the air the eye adapts away (0 none, 1 all). */
 const SUN_ADAPT = 0.6;
 /** Metres up to the clouds: they pass overhead as you travel, and their shadows fall where they are. */

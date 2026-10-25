@@ -14,7 +14,7 @@ import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
 import { WATER, waterAt } from './waterInputs';
 import { WAVES, waveMotion } from '../../world/swell';
-import { WEATHER, rainRings } from './weather';
+import { WEATHER, fullSky, rainRings } from './weather';
 
 let envTex: Texture | null = null;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
@@ -101,7 +101,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     // The sky and the sun in it.
     const R = reflect(V.negate(), N);
     const Rup = vec3(R.x, abs(R.y), R.z);
-    const sky = pmremTexture(envTex!, Rup, float(0.04)).rgb.mul(W.env);
+    // The env copy of the sky is drawn with less colour (weather.ts ENV_SATURATION): the mirror gives it back.
+    const sky = fullSky(pmremTexture(envTex!, Rup, float(0.04)).rgb).mul(W.env);
     const rs = max(dot(R, W.sunDir), 0);
     const spec = pow(rs, 900).mul(30).add(pow(rs, 80).mul(0.6));
     const refl = sky.add(W.sunColor.mul(spec).mul(sunUp));
