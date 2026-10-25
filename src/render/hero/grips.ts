@@ -41,8 +41,16 @@ export function grip(thing: Object3D, bones: readonly Bone[], name: GripBone, ow
   return true;
 }
 
-/** Main and off hand things: drawn (hands) or carried (hip, back). */
-export function gripHeld(main: Object3D | null, off: Object3D | null, drawn: boolean, bones: readonly Bone[], owner: Object3D): void {
-  if (main) grip(main, bones, drawn ? 'hand_r' : 'pelvis', owner);
-  if (off) grip(off, bones, drawn ? 'hand_l' : 'spine_03', owner);
+/** An Actors person: its bones, and hands that close round what they hold. */
+export interface Holder {
+  readonly bones: readonly Bone[];
+  setGrip(side: 'l' | 'r', amount: number): void;
+}
+
+/** Main and off hand things: drawn (in closed hands) or carried (hip, back, hands open). */
+export function gripHeld(main: Object3D | null, off: Object3D | null, drawn: boolean, who: Holder, owner: Object3D): void {
+  if (main) grip(main, who.bones, drawn ? 'hand_r' : 'pelvis', owner);
+  if (off) grip(off, who.bones, drawn ? 'hand_l' : 'spine_03', owner);
+  who.setGrip('r', main && drawn ? 1 : 0);
+  who.setGrip('l', off && drawn ? 1 : 0);
 }
