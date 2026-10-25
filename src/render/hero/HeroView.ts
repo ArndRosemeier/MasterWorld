@@ -264,7 +264,7 @@ export class HeroView {
 
   /** The held things onto the hands (in a fight) or the hip and back. */
   private moveHeld(): void {
-    gripHeld(this.held.main, this.held.off, !!this.held.drawn, this.front.actor.bones, this.object);
+    gripHeld(this.held.main, this.held.off, !!this.held.drawn, this.front.actor, this.object);
   }
 }
 

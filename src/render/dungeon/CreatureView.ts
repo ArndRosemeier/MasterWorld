@@ -203,7 +203,7 @@ export class CreatureView {
           const once = !!doing.action || dead;
           playClip(p.ch, clip, once, () => p.clip === clip, doing.action === 'flinch' ? FLINCH * 1.5 : doing.action ? BLOW : undefined, fade);
         }
-        if (p.drawn !== fighting) { p.drawn = fighting; gripHeld(p.held, null, fighting, p.ch.actor.bones, p.place); }
+        if (p.drawn !== fighting) { p.drawn = fighting; gripHeld(p.held, null, fighting, p.ch.actor, p.place); }
         p.ch.update(dt);
         p.place.position.set(c.x, c.y, c.z);
         // The den's yaw turns −z; Actors' people face +z.
