@@ -71,7 +71,8 @@ export function fogNode(env: Texture) {
   const sky = skyToward(env, positionWorld.sub(cameraPosition));
   // The env copy of the sky is drawn with less colour (ENV_SATURATION): give it back.
   const lum = dot(sky, vec3(0.2126, 0.7152, 0.0722));
-  const toward = mix(vec3(lum), sky, 1 / ENV_SATURATION).max(0);
+  // A shade darker than the sky itself, so far hills stay hills instead of melting into the horizon.
+  const toward = mix(vec3(lum), sky, 1 / ENV_SATURATION).max(0).mul(0.8);
   return fog(mix(toward, FOG.color, FOG.flat), factor());
 }
 

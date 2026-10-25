@@ -23,6 +23,8 @@ const LIGHT = 3.4;
 export const ENV = 1.6;
 /** The world is large: fog thinner than Scale's city. */
 const FOG_SCALE = 0.35;
+/** How much of the low sun's dimming by the air the eye adapts away (0 none, 1 all). */
+const SUN_ADAPT = 0.6;
 /** Metres up to the clouds: they pass overhead as you travel, and their shadows fall where they are. */
 const CLOUD_HEIGHT = 1500;
 
@@ -147,7 +149,9 @@ export class SkyView {
     this.U.flashDir.value.set(Math.cos(this.flashBearing) * 0.8, 0.5, Math.sin(this.flashBearing) * 0.8);
 
     this.sun.color.setRGB(...L.lightColor);
-    this.sun.intensity = L.lightIntensity * LIGHT;
+    // The air dims the low sun a lot; the eye adapts, so only part of that dimming shows (the colour stays).
+    const c = L.lightColor, lum = Math.max(0.05, 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]);
+    this.sun.intensity = L.lightIntensity * LIGHT * Math.min(lum ** -SUN_ADAPT, 2.5);
     // The hemisphere light is only the light thrown back by the sunlit ground (from below); the sky's own
     // light comes from the environment map. Lightning lights the land from the whole sky for a moment.
     const f = this.flash * 0.84;
