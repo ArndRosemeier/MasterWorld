@@ -6,7 +6,7 @@
  * lore, VGM templates and the Conversations package are added as the milestones need them.
  */
 
-export const CONTRACT_VERSION = 5;
+export const CONTRACT_VERSION = 6;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -369,6 +369,21 @@ export interface TalkDef {
   readonly marked: string;
 }
 
+/**
+ * What the player's hero may look like (plan 11.4, D30): the shared Actors character creator offers only
+ * what fits the setting. Generous, but leaving out what clearly does not fit.
+ */
+export interface HeroLooksDef {
+  /** Actors theme tags the setting's clothes, hair and peoples fit (Actors' THEMES, e.g. "medieval"). */
+  readonly themes: readonly string[];
+  /** Actors flags left out whatever the themes (e.g. "real-faith": real-world religious symbols). */
+  readonly without: readonly string[];
+  /** The peoples a hero can be born to, by Actors' race id (each needs `names`). */
+  readonly races: readonly string[];
+  /** Actors outfit presets a new hero starts in, one drawn per hero (each must fit the themes). */
+  readonly outfits: readonly string[];
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -388,6 +403,7 @@ export interface SettingModule {
   readonly items: ItemCatalog;
   readonly abilities: readonly AbilityDef[];
   readonly director: DirectorDef;
+  readonly hero: HeroLooksDef;
 }
 
 /** Authoring errors, one line each (empty: the module is valid). */
@@ -448,6 +464,11 @@ export function validateSetting(m: SettingModule): string[] {
     if (!n) { out.push(`${where}: names for "${race}" are missing`); continue; }
     for (const k of ['female', 'male', 'family'] as const) if (n[k].length < 8) out.push(`${where}: names.${race}.${k} needs at least 8 names`);
   }
+  const h = m.hero;
+  if (!h.themes.length) out.push(`${where}: hero.themes is empty`);
+  if (!h.races.length) out.push(`${where}: hero.races is empty`);
+  for (const r of h.races) if (!m.names[r]) out.push(`${where}: hero race "${r}" has no names`);
+  if (!h.outfits.length) out.push(`${where}: hero.outfits is empty`);
   const t = m.talk;
   for (const k of ['greet', 'self', 'news', 'more', 'source', 'bye']) if (!t.topics[k]) out.push(`${where}: talk topic "${k}" has no wording`);
   for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child', 'traveller']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);

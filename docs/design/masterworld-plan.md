@@ -434,6 +434,7 @@ The mode is a setting the VGM honours (D4): in roguelike mode it is stricter wit
 ### 11.4 Character and growth (D29, D30)
 
 * **Creation**: the shared Actors character creator with a filter parameter for this setting (races, looks, clothing; generous, but leaving out what clearly does not fit), and a background (farmhand, smith's apprentice, acolyte, poacher, scribe …) that sets starting skills and kit and gives one or two people in town who already know you.
+  **Built (2026-10-25)**: Actors 0.13 tags its garments, hairstyles and races with themes (`modern`, `vintage`, `future`, `antique`, `medieval`, `nordic`, `eastern`, `fantasy`, and the flag `real-faith` for real-world religious symbols), and a game passes the themes it allows (`Character.load({ themes })`). The setting says what a hero may look like (`hero` in the module: the classic world allows medieval, Norse, antique and fantasy pieces, leaves out real-world faith symbols, and offers its four peoples). After New game the dive lands on the market square, the camera comes round to the hero's front and the creator opens beside them (`src/app/creatorUi.ts`: Actors' editor in a brass glass, tabs People, Body, Face & hair, Clothes, a name, Roll the dice, Begin; drag turns the hero, the wheel looks closer; the title's peoples card picks the people). The hero is drawn as that Actors character (`src/render/hero/HeroView.ts`: Actors' clips per gait and blow, its riding pose in the saddle, held weapons on the hands), and saves keep the name and look (version 3). `?create` opens the creator without the title. The background is still to come.
 * **Growth**: skills rise by use up to 100, more slowly the higher they are; trainers speed them up. Health, stamina and mana grow with the skills that use them. The VGM reads a "power" number (weighted skills plus gear) wherever it needs a level.
 * **Reasons to grow**: the world has places you cannot take on yet, and the game tells you so. Coming back later and winning is the reward.
 
@@ -577,6 +578,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | Quick slots and abilities (always on) | Brass sockets on a belt strap. Cooldowns run as a ward line around the socket; a ready ability gives a short glint. |
 | Target frame | A small brass plate that drops in on a hinge; the creature's threat colour shows in its ward. |
 | Clock and weather | A tiny orrery by the compass: sun and moon turn with the day, and a cloud, raindrop or snowflake rides along with the weather. |
+| Character creation | The tailor's glass: two leaves of a folding screen swing open, the ward traces the glass's rim and the tabs drop in one by one; the camera comes round to the hero's front. At rest a spark runs the rim and the turntable's gear ticks. |
 | Notifications | A small brass capsule that pops out of the frame edge, rings once and slides back. |
 | Settings and menus | A cartographer's tool roll that unrolls; switches are brass toggles that click. |
 | Death and waking | The wards go dark one by one; on waking they relight from the centre. |

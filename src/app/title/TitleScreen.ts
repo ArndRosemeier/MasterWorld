@@ -5,7 +5,7 @@
  * (TitleCamera, Toys); `live` hands the picture over to them. Plain DOM; styles in title.css.
  */
 import './title.css';
-import { el } from '../dom';
+import { el, svg } from '../dom';
 import { versionLabel } from '../release';
 import { shuffled, type TitleDraw } from './draw';
 import { HINT, PEOPLES, RUMOURS, type People } from './lines';
@@ -23,7 +23,6 @@ export interface TitleHost {
 /** Seconds per people on the card. */
 const CARD_SECONDS = 8;
 
-const svg = (markup: string): DocumentFragment => document.createRange().createContextualFragment(markup);
 
 export class TitleScreen {
   readonly root: HTMLDivElement;

@@ -17,16 +17,22 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const version = JSON.parse(readFileSync(join(root, 'node_modules/@actors/generator/package.json'), 'utf8')).version;
 // What the game wears and plays: read from the source, so the selection lives in one place.
 const looks = readFileSync(join(root, 'src/render/folk/looks.ts'), 'utf8');
-const list = (name) => {
-  const m = looks.match(new RegExp(`export const ${name}[^=]*=\\s*\\[([^\\]]*)\\]`));
-  if (!m) throw new Error(`looks.ts has no ${name} list`);
+// The hero's clips, and what the setting lets a hero wear (the creator offers every garment and
+// hairstyle that fits its themes: src/setting/classic/hero.ts).
+const heroClips = readFileSync(join(root, 'src/render/hero/clips.ts'), 'utf8');
+const heroLooks = readFileSync(join(root, 'src/setting/classic/hero.ts'), 'utf8');
+const list = (name, text = looks, pattern = `export const ${name}[^=]*=\\s*\\[([^\\]]*)\\]`) => {
+  const m = text.match(new RegExp(pattern));
+  if (!m) throw new Error(`no ${name} list`);
   return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
 };
-const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK_HAIR')), clips: new Set(list('PACK_CLIPS')) };
+const field = (name) => list(name, heroLooks, `\\b${name}:\\s*\\[([^\\]]*)\\]`);
+const themes = { themes: field('themes'), without: field('without') };
+const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK_HAIR')), clips: new Set([...list('PACK_CLIPS'), ...list('HERO_CLIPS', heroClips)]) };
 
 const dest = join(root, 'public/packs/human');
 const stamp = join(dest, '.selection');
-const want = JSON.stringify({ version, keep: Object.fromEntries(Object.entries(keep).map(([k, v]) => [k, [...v].sort()])) });
+const want = JSON.stringify({ version, themes, keep: Object.fromEntries(Object.entries(keep).map(([k, v]) => [k, [...v].sort()])) });
 const horses = join(root, 'public/packs/horse');
 if (!process.argv.includes('--force') && existsSync(stamp) && readFileSync(stamp, 'utf8') === want && existsSync(join(horses, 'manifest.json'))) {
   console.log(`public/packs/human already has the Actors ${version} selection`);
@@ -52,6 +58,12 @@ const manifest = JSON.parse(readFileSync(join(src, 'manifest.json'), 'utf8'));
 // Every file the manifest names, but for garments, hair and clips only the ones kept.
 const files = new Set(['base.bin']);
 const refs = (o) => JSON.stringify(o).match(/"[a-z]+\/[^"]+\.(?:bin|png|jpg)"/g)?.map((s) => s.slice(1, -1)) ?? [];
+// Every garment and hairstyle the hero's creator offers (the setting's themes, Actors' tags).
+const { fitsThemes, GARMENT_THEMES, HAIR_THEMES } = await import('@actors/generator');
+for (const m of manifest.meshes) {
+  if (m.role === 'garment' && !m.internal && fitsThemes(GARMENT_THEMES[m.name], themes)) keep.garment.add(m.name);
+  if (m.role === 'hair' && fitsThemes(HAIR_THEMES[m.name], themes)) keep.hair.add(m.name);
+}
 const role = new Map(manifest.meshes.map((m) => [m.name, m.role]));
 // A garment or hairstyle not kept (its mesh and its fitting proxy, which share the name).
 const dropped = (name) => {

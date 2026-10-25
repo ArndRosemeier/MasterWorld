@@ -6,6 +6,7 @@ const save: SaveData = {
   version: SAVE_VERSION, game: '0.001', setting: { id: 'classic', version: 1 }, seed: 'masterworld', log: [],
   clock: { day: 1, hour: 14.5 }, hero: { x: 1, y: 2, z: 3, yaw: 0, below: false }, cellars: { 'cellar-1': { open: [2], keys: [1], read: [0] } },
   talk: null, journal: [], character: null, director: null,
+  looks: { name: 'Wenna', look: { race: 'dwarf', body: { gender: 0.1, ageYears: 33 }, outfit: ['briefs', 'med-tunic'], garmentColors: { 'med-tunic': '#7a3a2a' } } },
 };
 
 test('saves: a save survives being written out as JSON and read back', () => {
@@ -19,6 +20,14 @@ test('saves: a first-version save loads with a fresh hero sheet', () => {
   assert.equal(back.version, SAVE_VERSION);
   assert.equal(back.character, null);
   assert.deepEqual(back.cellars, save.cellars);
+});
+
+test('saves: a second-version save loads with a hero drawn anew, and keeps the sheet', () => {
+  const { looks: _l, ...old } = save;
+  const back = checkSave({ ...old, version: 2 }, { id: 'classic', version: 1 }) as SaveData;
+  assert.equal(back.version, SAVE_VERSION);
+  assert.equal(back.looks, null);
+  assert.equal(back.character, save.character);
 });
 
 test('saves: other settings, newer games and junk are refused with a reason', () => {

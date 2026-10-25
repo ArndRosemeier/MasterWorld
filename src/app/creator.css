@@ -1,0 +1,83 @@
+/* Character creation (src/app/creatorUi.ts): the tailor's glass in warded brass (plan 17.1). */
+@import './brass.css';
+
+.creator { position: fixed; inset: 0; z-index: 12; pointer-events: none; font-family: 'EB Garamond', Georgia, serif; color: var(--ink); display: none; }
+.creator.open, .creator.closing { display: block; }
+.creator .cr-glass, .creator .cr-leaf {
+  position: absolute; right: max(16px, 4vw); top: 6vh; width: min(430px, calc(100vw - 32px)); height: 86vh; box-sizing: border-box;
+}
+/* The glass: brass rim on dark leather, the ward round it. */
+.creator .cr-glass {
+  display: flex; flex-direction: column; gap: 10px; padding: 20px 22px 18px; pointer-events: auto;
+  background: linear-gradient(#2a1c14f2, #1d1510f5); border: 3px solid var(--brass-mid); border-radius: 10px 10px 6px 6px;
+  box-shadow: inset 0 0 0 1px var(--brass-lo), inset 0 0 0 7px var(--leather), inset 0 0 0 8px var(--brass-lo), 0 16px 40px #000c;
+  opacity: 0; animation: cr-show .5s ease-out .35s forwards;
+}
+@keyframes cr-show { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+.creator .t-rim .ward { stroke-dasharray: 100; stroke-dashoffset: 100; animation: cr-trace 1.3s ease-out .6s forwards, cr-pulse 3.5s ease-in-out 2s infinite; }
+.creator .t-rim .run { stroke-dasharray: 4 96; stroke-dashoffset: 100; opacity: 0; animation: cr-run 7s linear 2s infinite; }
+.creator .t-rim { position: absolute; inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); pointer-events: none; overflow: visible; }
+@keyframes cr-trace { to { stroke-dashoffset: 0; } }
+@keyframes cr-pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes cr-run { 0% { stroke-dashoffset: 100; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 1; } }
+
+/* Its signature: two leaves of a folding screen swing open, then the glass behind them shows. */
+.creator .cr-leaf { width: calc(min(430px, calc(100vw - 32px)) / 2); background: linear-gradient(var(--leather-hi), var(--leather)); border: 3px solid var(--brass-mid); box-shadow: inset 0 0 0 1px var(--brass-lo), 0 12px 30px #000b; z-index: 1; }
+.creator .cr-leaf.l { right: calc(max(16px, 4vw) + min(430px, calc(100vw - 32px)) / 2); border-radius: 10px 0 0 6px; transform-origin: left center; animation: cr-leaf-l .8s cubic-bezier(.5, 0, .3, 1) .05s forwards; }
+.creator .cr-leaf.r { border-radius: 0 10px 6px 0; transform-origin: right center; animation: cr-leaf-r .8s cubic-bezier(.5, 0, .3, 1) .12s forwards; }
+@keyframes cr-leaf-l { 0% { transform: perspective(900px) rotateY(0); opacity: 1; } 100% { transform: perspective(900px) rotateY(-105deg); opacity: 0; } }
+@keyframes cr-leaf-r { 0% { transform: perspective(900px) rotateY(0); opacity: 1; } 100% { transform: perspective(900px) rotateY(105deg); opacity: 0; } }
+.creator.closing .cr-glass { animation: cr-hide .6s ease-in forwards; }
+@keyframes cr-hide { to { opacity: 0; transform: translateX(40px) scale(.97); } }
+
+.creator .cr-head { display: flex; flex-direction: column; gap: 8px; }
+.creator .label { font: 12px/1 'Marcellus SC', Georgia, serif; letter-spacing: .2em; color: var(--ward); text-transform: uppercase; animation: cr-rise .5s ease-out .5s both; }
+.creator .cr-name { display: flex; align-items: center; gap: 10px; animation: cr-rise .5s ease-out .6s both; }
+.creator .cr-name span { font: 14px/1 'Marcellus SC', Georgia, serif; letter-spacing: .12em; color: var(--ink-dim); }
+.creator .cr-name input { flex: 1; min-width: 0; padding: 6px 12px; font: 400 24px/1.1 'Marcellus SC', Georgia, serif; letter-spacing: .05em; color: #ffc46b; background: #120d09; border: 1px solid var(--brass-lo); border-radius: 18px; box-shadow: inset 0 2px 6px #000; outline: none; }
+.creator .cr-name input:focus { border-color: var(--ward); box-shadow: inset 0 2px 6px #000, 0 0 10px #8fe3ff55; }
+@keyframes cr-rise { 0% { opacity: 0; transform: translateY(10px); } 70% { opacity: 1; transform: translateY(-2px); } 100% { opacity: 1; transform: none; } }
+
+/* Tabs: brass plates that drop in one by one; the chosen one's ward glows. */
+.creator .cr-tabs { display: flex; gap: 6px; }
+.creator .cr-tab { flex: 1; padding: 7px 4px; font: 13px/1 'Marcellus SC', Georgia, serif; letter-spacing: .06em; color: var(--ink-dim); background: linear-gradient(#3a2a1a, #241910); border: 1px solid var(--brass-lo); border-radius: 6px 6px 3px 3px; cursor: pointer; animation: cr-drop .45s cubic-bezier(.3, 1.6, .5, 1) both; transition: color .2s, box-shadow .2s, transform .15s; }
+.creator .cr-tab:hover { color: var(--ink); transform: translateY(-1px); }
+.creator .cr-tab.on { color: #1e140a; background: linear-gradient(#e2bd68, #b08532); box-shadow: inset 0 1px 0 var(--brass-hi), 0 0 12px #8fe3ff66; }
+@keyframes cr-drop { from { opacity: 0; transform: translateY(-14px) rotate(-3deg); } to { opacity: 1; transform: none; } }
+
+/* Actors' editor inside the glass, restyled. One tab's section shows at a time. */
+.creator .cr-pane { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; animation: cr-rise .5s ease-out .8s both; scrollbar-color: var(--brass-lo) transparent; }
+.creator .actors-editor { --ae-panel: transparent; --ae-text: var(--ink); --ae-muted: var(--ink-dim); --ae-accent: var(--brass); --ae-border: var(--brass-lo); padding: 0; font: 15px/1.35 'EB Garamond', Georgia, serif; overflow: visible; }
+.creator .actors-editor > header { display: none; }
+.creator .actors-editor section { display: none; }
+.creator .cr-pane[data-tab="race"] section[data-section="race"], .creator .cr-pane[data-tab="body"] section[data-section="body"],
+.creator .cr-pane[data-tab="look"] section[data-section="look"], .creator .cr-pane[data-tab="outfit"] section[data-section="outfit"] { display: block; animation: cr-rise .35s ease-out both; }
+.creator .actors-editor h2 { font: 13px/1 'Marcellus SC', Georgia, serif; letter-spacing: .14em; color: var(--brass); }
+.creator .actors-editor .ae-row { grid-template-columns: 116px 1fr 36px; }
+.creator .actors-editor select, .creator .actors-editor button, .creator .actors-editor input[type="search"] { background: #120d09; color: var(--ink); border: 1px solid var(--brass-lo); border-radius: 5px; font: inherit; }
+.creator .actors-editor button:hover, .creator .actors-editor select:hover { border-color: var(--brass); }
+.creator .actors-editor input[type="range"] { accent-color: var(--brass); }
+.creator .actors-editor input[type="checkbox"] { accent-color: var(--brass); }
+.creator .actors-editor details { border-top-color: #4a3510; }
+.creator .actors-editor .ae-modes button[aria-pressed="true"] { background: linear-gradient(#e2bd68, #b08532); border-color: var(--brass-lo); color: #1e140a; }
+.creator .actors-editor .ae-swatch.ae-on { outline-color: var(--ward); }
+.creator .actors-editor .ae-note, .creator .actors-editor .ae-credit { color: #9c8a6c; }
+
+.creator .cr-foot { display: flex; gap: 10px; align-items: center; animation: cr-rise .5s ease-out .95s both; }
+.creator .cr-foot .t-btn { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 18px; font: 17px/1 'Marcellus SC', Georgia, serif; letter-spacing: .08em; border-radius: 22px; cursor: pointer; }
+.creator .cr-foot .t-btn.quiet { color: var(--ink-dim); background: transparent; border: 1px solid var(--brass-lo); }
+.creator .cr-foot .t-btn.quiet:hover { color: var(--ward); border-color: var(--ward); }
+.creator .cr-begin { margin-left: auto; font-size: 20px !important; color: #1e140a; background: linear-gradient(#e2bd68, #b08532); border: 1px solid var(--brass-lo); box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark); animation: cr-breathe 3s ease-in-out 2s infinite; transition: transform .15s; }
+.creator .cr-begin:hover { transform: translateY(-2px) rotate(-1deg); }
+.creator .cr-begin svg { width: 18px; height: 18px; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.creator .cr-begin:hover svg { transform: rotate(120deg); }
+@keyframes cr-breathe { 0%, 100% { box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark), 0 0 0 #8fe3ff00; } 50% { box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark), 0 0 18px #8fe3ffaa; } }
+
+/* The turntable under the hero: a ticking gear and how to turn them. */
+.creator .cr-turn { position: absolute; left: 50%; bottom: 7vh; transform: translateX(calc(-50% - min(215px, 50vw - 16px))); display: flex; align-items: center; gap: 10px; font-style: italic; font-size: 16px; color: var(--ink-dim); text-shadow: 0 1px 4px #000; animation: cr-rise .6s ease-out 1.2s both; white-space: nowrap; }
+.creator .cr-turn svg { width: 26px; height: 26px; animation: cr-tick 2.4s steps(1) infinite; }
+@keyframes cr-tick { 0%, 80% { transform: rotate(0); } 90%, 100% { transform: rotate(30deg); } }
+.creator.closing .cr-turn { opacity: 0; transition: opacity .3s; animation: none; }
+
+@media (prefers-reduced-motion: reduce) { .creator *, .creator *::before { animation-duration: .01s !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; } }
+@media (max-width: 760px) { .creator .cr-glass, .creator .cr-leaf { top: 30vh; height: 66vh; } .creator .cr-turn { display: none; } }
