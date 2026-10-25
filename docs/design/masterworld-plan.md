@@ -1,7 +1,7 @@
 # MasterWorld: plan
 
 Living document. Status: **draft 3.** Draft 2 added Arnd's decisions of 2026-10-24 (D9–D24): the region quadtree, the hybrid terrain and believable NPC life. Draft 3 adds the decisions from the gap analysis of 2026-10-25 (D28–D47): the player's game (sandbox, character, items, factions, the map), the default world's lore, sound, the interface and the title animation.
-Milestone 1 (walk the land) is built; milestone 2 (the town) is under way. Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld).
+Status (2026-10-25, evening): milestones 1–4 are built as first cuts (the land, the town and its folk, the first promise with its cellar, the Director with combat, items and music), plus horses, character creation, sound, the title animation and the warded-brass UI. The core loop runs once so far; the frontier (milestone 5) is what makes it repeat. Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld).
 
 ---
 
