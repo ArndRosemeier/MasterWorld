@@ -127,7 +127,7 @@ export class Creator {
     const yaw = this.camYaw + Math.PI * (1 - e);
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
     const startDist = Math.hypot(f.at.x - body.pos.x, f.at.z - body.pos.z), startUp = f.at.y - body.pos.y;
-    const dist = lerp(startDist, 0.7 + h * 1.55 * z, e), aim = h * (0.92 - 0.38 * z), side = h * 0.32 * z * e;
+    const dist = lerp(startDist, 0.5 + h * 1.25 * z, e), aim = h * (0.92 - 0.38 * z), side = h * 0.45 * z * e;
     camera.position.set(body.pos.x + fx * dist - rx * side, body.pos.y + lerp(startUp, aim + 0.08 * z, e), body.pos.z + fz * dist - rz * side);
     camera.lookAt(body.pos.x - rx * side, body.pos.y + aim, body.pos.z - rz * side);
   }
