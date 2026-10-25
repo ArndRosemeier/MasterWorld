@@ -211,7 +211,13 @@ export interface AttackDef {
 
 /** How a creature is drawn: an Actors person (race, look) or one of the engine's small bodies. */
 export type CreatureBody =
-  | { readonly kind: 'humanoid'; readonly race: string; readonly height: number; readonly skin?: string; readonly outfit: 'rags' | 'bandit' | 'grave'; readonly gaunt?: boolean }
+  | {
+    readonly kind: 'humanoid'; readonly race: string; readonly height: number; readonly skin?: string; readonly outfit: 'rags' | 'bandit' | 'grave'; readonly gaunt?: boolean;
+    /** What it holds (an item id). */
+    readonly held?: string;
+    /** Only its bones: the raised dead. */
+    readonly bones?: boolean;
+  }
   | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string };
 
 /**
@@ -480,6 +486,7 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (!(c.morale >= 0 && c.morale <= 1)) out.push(`${where}: creature "${c.id}" morale must be 0..1`);
     for (const a of c.attacks) if (!DAMAGE_KINDS.includes(a.kind) || !(a.time > 0)) out.push(`${where}: creature "${c.id}" attack "${a.name}" needs a known kind and time > 0`);
     if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
+    if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
   for (const d of m.dungeons.cellar.dwellers) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: cellar dweller "${d.id}" creature "${c}" is unknown`);
   if (!m.abilities.length) out.push(`${where}: no abilities`);

@@ -198,6 +198,9 @@ export class Walker {
   }
 
   /** The gait for the animator. */
+  /** Speed over the ground, m/s. */
+  get groundSpeed(): number { return Math.hypot(this.vel.x, this.vel.z); }
+
   get gait(): 'idle' | 'walk' | 'run' | 'swim' | 'jump' | 'fall' {
     if (this.mode === 'swim') return 'swim';
     if (this.mode === 'air') return this.vel.y > 0 ? 'jump' : 'fall';

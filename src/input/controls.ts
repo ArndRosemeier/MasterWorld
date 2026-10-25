@@ -21,6 +21,13 @@ export const ACTIONS = [
   { id: 'talk', label: 'Talk to someone' },
   { id: 'journal', label: 'Journal' },
   { id: 'map', label: 'Map' },
+  { id: 'target', label: 'Next target' },
+  { id: 'strike', label: 'Attack (on and off)' },
+  { id: 'heavy', label: 'Heavy blow' },
+  { id: 'shove', label: 'Shove' },
+  { id: 'breath', label: 'Second wind' },
+  { id: 'potion', label: 'Drink a potion' },
+  { id: 'search', label: 'Search, open, take' },
 ] as const;
 
 export type Action = (typeof ACTIONS)[number]['id'];
@@ -43,6 +50,13 @@ export const DEFAULT_BINDINGS: Bindings = {
   talk: ['KeyT', ''],
   journal: ['KeyJ', ''],
   map: ['KeyM', ''],
+  target: ['Tab', ''],
+  strike: ['Digit1', ''],
+  heavy: ['Digit2', ''],
+  shove: ['Digit3', ''],
+  breath: ['Digit4', ''],
+  potion: ['Digit5', ''],
+  search: ['KeyG', ''],
 };
 
 /** Keys that are never bound: Escape opens the settings. */

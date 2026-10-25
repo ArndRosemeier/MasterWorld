@@ -139,6 +139,13 @@ export class Fight {
 
   private readonly pending: FightEvent[] = [];
 
+  /** What a fallen creature carries (rolled from its own seed, so a loaded game finds the same), left on its body. */
+  restoreBody(c: Creature): Loot {
+    const loot = c.def.loot ? rollLoot(this.setting.items, c.def.loot, c.def.danger, new Rng(deriveSeed(this.rng.seed, 'body', c.id))) : { items: [], coins: 0 };
+    if (loot.items.length || loot.coins) this.bodies.set(c.id, loot);
+    return loot;
+  }
+
   /** Take what a fallen creature carried (null if nothing is left on it). */
   search(c: Creature): Loot | null {
     const l = this.bodies.get(c.id);
@@ -198,13 +205,7 @@ export class Fight {
       case 'flee': out.push({ kind: 'flee', who: e.who }); break;
       case 'plea': out.push({ kind: 'plea', who: e.who, text: e.text }); break;
       case 'spared': out.push({ kind: 'spared', who: e.who }); break;
-      case 'died': {
-        const c = e.who;
-        const loot = c.def.loot ? rollLoot(this.setting.items, c.def.loot, c.def.danger, new Rng(deriveSeed(this.rng.seed, 'body', c.id))) : { items: [], coins: 0 };
-        if (loot.items.length || loot.coins) this.bodies.set(c.id, loot);
-        out.push({ kind: 'killed', who: c, loot });
-        break;
-      }
+      case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who) }); break;
       default: break;
     }
   }

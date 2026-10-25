@@ -5,8 +5,8 @@
  */
 import type { Object3D } from 'three/webgpu';
 import { randomAppearance, setHumanAssetBase } from '@futuremagic/humanoid';
-import { Humanoid, type GroundFn, type MoveState } from '@futuremagic/humanoid/three';
-import { TRAVELLER, TRAVELLER_GARB } from './wardrobe';
+import { Humanoid, type ActionAnim, type GroundFn, type MoveState } from '@futuremagic/humanoid/three';
+import { TRAVELLER, TRAVELLER_GARB, visual } from './wardrobe';
 
 /** Where the build serves the humanoid package's assets (vite.config.ts). */
 const ASSETS = `${import.meta.env.BASE_URL}humanoid/`;
@@ -17,6 +17,10 @@ export interface HeroPose {
   vel: { x: number; y: number; z: number };
   yaw: number;
   gait: MoveState;
+  /** Weapons drawn (in a fight). */
+  combat?: boolean;
+  /** A blow, a drink, a flinch. */
+  action?: ActionAnim;
 }
 
 export class HeroView {
@@ -37,11 +41,23 @@ export class HeroView {
   /** Height of the body, metres. */
   get height(): number { return this.body.height; }
 
+  /** Hold these (item ids; null: empty-handed): drawn in a fight, sheathed otherwise. */
+  arm(main: string | null, off: string | null = null): void {
+    this.body.dress({
+      ...TRAVELLER_GARB,
+      ...(main ? { mainhand: { defId: main, visual: visual(21, [1, 1, 1], main) } } : {}),
+      ...(off ? { offhand: { defId: off, visual: visual(22, [1, 1, 1], off) } } : {}),
+    });
+  }
+
+  /** The body's clock (actions are timed by it). */
+  get clock(): number { return this.time; }
+
   /** Shown or not (first person hides it). */
   set visible(v: boolean) { this.body.object.visible = v; }
 
-  update(p: HeroPose, dt: number, ground: GroundFn): void {
+  animateTo(p: HeroPose, dt: number, ground: GroundFn): void {
     this.time += dt;
-    this.body.update({ pos: [p.pos.x, p.pos.y, p.pos.z], vel: [p.vel.x, p.vel.y, p.vel.z], yaw: p.yaw, anim: { move: p.gait } }, dt, this.time, ground);
+    this.body.update({ pos: [p.pos.x, p.pos.y, p.pos.z], vel: [p.vel.x, p.vel.y, p.vel.z], yaw: p.yaw, anim: { move: p.gait, action: p.action, mood: p.combat ? 'focused' : undefined }, combat: p.combat }, dt, this.time, ground);
   }
 }

@@ -4,19 +4,26 @@
  * hero went (per-site diffs: doors opened, keys taken, notes read), what the townsfolk learned and the
  * journal. Loading builds the world from the seed again and lays the save over it.
  */
+import type { CharacterSave } from '../game/character';
+import type { DelveSave } from '../game/delve';
+import type { DirectorSave } from '../vgm/director';
 import type { TownTalkSave } from '../talk/townTalk';
 import { clock } from './dom';
 import type { Lead } from '../talk/journal';
 import type { DecisionLog } from '../world/decisions';
 
 /** Bump when the shape below changes; `upgrade` brings older saves along. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface CellarDiff {
   readonly open: readonly number[];
   readonly keys: readonly number[];
   /** Clues read (indices into the cellar's clues). */
   readonly read: readonly number[];
+  /** Who fell, who was spared, what was searched (version 2). */
+  readonly delve?: DelveSave;
+  /** The household paid for it made safe. */
+  readonly paid?: boolean;
 }
 
 export interface SaveData {
@@ -32,6 +39,10 @@ export interface SaveData {
   readonly cellars: Readonly<Record<string, CellarDiff>>;
   readonly talk: TownTalkSave | null;
   readonly journal: readonly Lead[];
+  /** The hero's skills, health, gear and purse (version 2; none: a fresh hero). */
+  readonly character: CharacterSave | null;
+  /** The Director's needs and tension (version 2). */
+  readonly director: DirectorSave | null;
 }
 
 /** A save read back (from a slot or a file), checked; a reason if it cannot be loaded here. */
@@ -48,7 +59,8 @@ function upgrade(raw: unknown): SaveData | string {
   const s = raw as Partial<SaveData>;
   if (typeof s.version !== 'number' || typeof s.seed !== 'string' || !Array.isArray(s.log) || !s.hero || !s.clock || !s.setting) return 'not a MasterWorld save';
   if (s.version > SAVE_VERSION) return 'this save is from a newer version of the game';
-  // Version 1 is the first: nothing to bring along yet.
+  // Version 1 had no hero sheet and no Director: a fresh hero, fresh needs.
+  if (s.version < 2) return { ...(s as SaveData), version: 2, character: null, director: null };
   return s as SaveData;
 }
 

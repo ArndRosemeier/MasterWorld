@@ -12,10 +12,6 @@
     "reason": "Per-frame update methods of unrelated systems (camera movement vs chunk selection); only the name matches."
   },
   {
-    "key": "same name: masterworld/render/flora/FloraView.ts#update + masterworld/render/hero/HeroView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (plant cells and their draws vs the hero's pose); only the name matches."
-  },
-  {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
     "reason": "TSL node arithmetic (x.add(y).mul(z)) in three shader kinds: it is how three.js nodes are written, not a copied helper. It crossed the info floor when the talk code grew the corpus."
   },
@@ -38,10 +34,6 @@
   {
     "key": "same name: masterworld/app/player.ts#update + masterworld/render/flora/FloraView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (the player vs plant cells); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/app/player.ts#update + masterworld/render/hero/HeroView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (the player's input and camera vs the hero's pose); only the name matches."
   },
   {
     "key": "same name: masterworld/app/player.ts#update + masterworld/render/town/TownView.ts#update",

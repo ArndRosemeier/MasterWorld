@@ -4,13 +4,12 @@
  * wind) and goes on to the next, until the den is beaten or the hero falls. The checks use it to hold the
  * balance: what a fresh hero can take on, and that the dangerous places really are dangerous. Pure.
  */
-import { deriveSeed } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
-import { Den } from '../sim/creatures';
 import type { Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace } from '../world/dungeon/space';
 import { Character } from './character';
-import { Fight, type HeroPose } from './fight';
+import { Delve } from './delve';
+import type { HeroPose } from './fight';
 
 export interface BotResult {
   readonly won: boolean;
@@ -26,8 +25,7 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   const space = new DungeonSpace(cellar.layout);
   // A thorough player finds every key and door.
   for (const pl of cellar.layout.links) space.open.add(pl.link.id);
-  const den = new Den(space, cellar.spawns, setting.creatures, deriveSeed(seed, 'den'));
-  const fight = new Fight(hero, den, setting, seed);
+  const { den, fight } = new Delve(cellar, space, setting, hero, seed);
   const h = cellar.hatch;
   let x = h.x - Math.sin(h.yaw), y = h.y, z = h.z - Math.cos(h.yaw), yaw = h.yaw;
   let kills = 0, potions = 0, spared = 0, speed = 0;

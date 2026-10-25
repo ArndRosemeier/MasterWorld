@@ -50,6 +50,12 @@ import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
 import { SAVE_VERSION, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
+import { Character } from './game/character';
+import { Delve } from './game/delve';
+import { Director } from './vgm/director';
+import { CreatureView } from './render/dungeon/CreatureView';
+import { FightHud } from './app/fightHud';
+import { CellarFight } from './app/cellarFight';
 
 declare global {
   interface Window {
@@ -180,6 +186,10 @@ export async function start(b: Boot): Promise<void> {
     const hero = await HeroView.create(seed);
     player.walker.height = hero.height;
     player.hero = hero;
+    // The hero's sheet (skills, health, gear, purse) and what they hold.
+    const character = new Character(setting, save?.character ?? undefined);
+    const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
+    armHero();
     // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
     const life = town ? new TownLife(town.plan, seed, hours()) : null;
     folkLife = life;
@@ -228,15 +238,26 @@ export async function start(b: Boot): Promise<void> {
     await view.stage.add(wx.precip);
 
     const notes = new Notes();
+    let delve: Delve | null = null;
+    let creatures: CreatureView | null = null;
+    let dwellers: Promise<void> | null = null;
     // The first promise: the cellar under a house of the town (outlined now; it is small).
     const promise = firstDungeon(opened.log);
     const house = promise ? houseOf(promise, terrain.towns) : null;
     if (promise && house) {
-      const cellar = outlineCellar(promise, house, setting.dungeons.cellar);
+      // `?dweller=` puts that dweller in (for looking at them); otherwise the cellar's own choice.
+      const lore = setting.dungeons.cellar, only = params.dweller ? lore.dwellers.filter((w) => w.id === params.dweller) : [];
+      const cellar = outlineCellar(params.dweller && only.length ? { ...promise, danger: undefined } : promise, house, only.length ? { ...lore, dwellers: only } : lore);
       // Its own space, deep under the house.
       const cellarView = new CellarView(cellar, { x: house.cx, y: -400, z: house.cz });
       await cellarView.add(view.stage);
       visit = new CellarVisit(cellar, house, cellarView, player, view.lantern, view.sky, notes);
+      // Its dwellers: the den and the fight, and their bodies drawn.
+      loading.set('Waking the cellar');
+      delve = new Delve(cellar, visit.space, setting, character, seed, save?.cellars[promise.id]?.delve);
+      creatures = await CreatureView.build(delve.den, seed, cellarView.origin);
+      // Its skinned shaders build in the Stage's frame slots once the loop runs; loading waits for them below.
+      dwellers = view.stage.add(creatures.group);
       if (params.cellar) {
         await visit.enter(true, params.cellarRoom);
         if (params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
@@ -271,7 +292,7 @@ export async function start(b: Boot): Promise<void> {
     const trees = (boot.trees ? flora.plant() : Promise.resolve()).then(took('trees'));
     let landed = false;
     void trees.then(() => { landed = true; if (folk) loading.set('Waking the townsfolk'); });
-    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk'))]).then(() => { planted = true; });
+    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk')), dwellers]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -338,13 +359,31 @@ export async function start(b: Boot): Promise<void> {
           version: SAVE_VERSION, game: release.version, setting: { id: setting.id, version: setting.version }, seed: seedText, log: opened.log,
           clock: { day: view.sky.day, hour: view.sky.hour },
           hero: { x: w.x, y: w.y, z: w.z, yaw: rooms?.outside?.yaw ?? player.walker.yaw, below: !!visit?.inside },
-          cellars: visit && promise ? { [promise.id]: visit.diff } : {},
+          cellars: visit && promise ? { [promise.id]: { ...visit.diff, ...(fight ? { delve: fight.delve.tally(), paid: fight.paid } : {}) } } : {},
           talk: townWords?.save() ?? null,
           journal: journal.entries(),
+          character: character.save(),
+          director: director.snapshot(),
         };
         return { data, where: visit?.inside ? `in ${visit.cellar.house}'s cellar` : 'in the town' };
       },
     };
+    // The fight down in the cellar, the HUD, and the Director watching over the pacing.
+    const director = new Director(setting.director, save?.director ?? undefined);
+    const fightHud = new FightHud(setting, () => settings.current.bindings);
+    const inn = town?.plan.buildings.find((b) => b.kind === 'inn');
+    const fight = visit && delve && creatures ? new CellarFight(visit, delve, creatures, fightHud, player, notes, director, setting, journal, view.camera, canvas, {
+      get bindings() { return settings.current.bindings; },
+      get blocked() { return open > 0; },
+      wake: () => {
+        const v = visit;
+        const toInn = () => { if (inn) { const [x, z, yaw] = inn.door; player.teleport(x - Math.sin(yaw) * 1.2, undefined, z - Math.cos(yaw) * 1.2, yaw + Math.PI); } };
+        if (v?.inside) void v.leave().then(toInn);
+        else toInn();
+      },
+      still: (on) => paused(on),
+      armed: armHero,
+    }, !!(promise && save?.cellars[promise.id]?.paid)) : null;
     const saves = new SavesUi(savesHost);
     const autosave = () => void saveNow(savesHost, AUTOSAVE);
     if (visit) visit.onSwap = autosave;
@@ -405,6 +444,8 @@ export async function start(b: Boot): Promise<void> {
       if (!rooms?.inside) visit?.update(dt);
       if (!visit?.inside) rooms?.update(dt);
       talk?.watch();
+      fight?.play(dt);
+      fight?.direct(dt, { inTown: !!town && !visit?.inside, talking: open > 0, leads: journal.open.length });
       notes.update(dt);
       view.sky.underwater = sea.submerged(view.camera.position);
       wx.apply(dt, view.camera.position, hours(), view.sky);
