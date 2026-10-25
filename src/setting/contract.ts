@@ -6,7 +6,7 @@
  * lore, VGM templates and the Conversations package are added as the milestones need them.
  */
 
-export const CONTRACT_VERSION = 6;
+export const CONTRACT_VERSION = 7;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -384,6 +384,26 @@ export interface HeroLooksDef {
   readonly outfits: readonly string[];
 }
 
+/**
+ * A hero's past (plan 11.4): what they did before the story starts. It sets the starting skills and kit
+ * and gives one or two people in town who already know them.
+ */
+export interface BackgroundDef {
+  readonly id: string;
+  readonly name: string;
+  /** A line or two on who they were. */
+  readonly text: string;
+  /** Points over each skill's start. */
+  readonly skills: Readonly<Record<string, number>>;
+  /** What they wear (item ids by slot), carry and own (copper). */
+  readonly kit: { readonly worn: Partial<Readonly<Record<Slot, string>>>; readonly pack: readonly string[]; readonly coins: number };
+  /**
+   * Who in town knows them, by trade (the town's trades: 'smith', 'innkeeper', 'reeve', 'keeper' …; the
+   * first of these the town has, up to two). `line` greets the hero: {hero} is their name, {name} the speaker's.
+   */
+  readonly known: readonly { readonly trade: string; readonly line: string }[];
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -404,6 +424,8 @@ export interface SettingModule {
   readonly abilities: readonly AbilityDef[];
   readonly director: DirectorDef;
   readonly hero: HeroLooksDef;
+  /** The pasts a hero can choose (plan 11.4), the first the default. */
+  readonly backgrounds: readonly BackgroundDef[];
 }
 
 /** Authoring errors, one line each (empty: the module is valid). */
@@ -469,6 +491,7 @@ export function validateSetting(m: SettingModule): string[] {
   if (!h.races.length) out.push(`${where}: hero.races is empty`);
   for (const r of h.races) if (!m.names[r]) out.push(`${where}: hero race "${r}" has no names`);
   if (!h.outfits.length) out.push(`${where}: hero.outfits is empty`);
+  if (!m.backgrounds.length) out.push(`${where}: backgrounds is empty`);
   const t = m.talk;
   for (const k of ['greet', 'self', 'news', 'more', 'source', 'bye']) if (!t.topics[k]) out.push(`${where}: talk topic "${k}" has no wording`);
   for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child', 'traveller']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);
@@ -496,6 +519,13 @@ function validateFight(m: SettingModule, where: string): string[] {
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);
     for (const k of Object.keys(u.bonuses)) if (!skills.has(k)) out.push(`${where}: unique "${u.id}" raises unknown skill "${k}"`);
+  }
+  for (const b of m.backgrounds) {
+    for (const k of Object.keys(b.skills)) if (!skills.has(k)) out.push(`${where}: background "${b.id}" raises unknown skill "${k}"`);
+    for (const [slot, id] of Object.entries(b.kit.worn)) if (items.get(id)?.slot !== slot) out.push(`${where}: background "${b.id}" wears "${id}" in ${slot}, which does not go there`);
+    for (const id of b.kit.pack) if (!items.has(id)) out.push(`${where}: background "${b.id}" carries unknown item "${id}"`);
+    if (!b.known.length) out.push(`${where}: background "${b.id}" is known by no one in town`);
+    for (const k of b.known) if (!k.line.includes('{hero}')) out.push(`${where}: background "${b.id}": the ${k.trade}'s greeting must name {hero}`);
   }
   for (const t of m.items.treasure) for (const [id] of t.items) if (!items.has(id)) out.push(`${where}: treasure "${t.id}" holds unknown item "${id}"`);
   for (const k of Object.keys(m.items.affixes)) if (!skills.has(k)) out.push(`${where}: affix for unknown skill "${k}"`);

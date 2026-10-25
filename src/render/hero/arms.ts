@@ -54,7 +54,8 @@ export function buildArm(defId: string): Object3D {
     default: break;
   }
   const mesh = buildingMeshAt(k.mesh(), 0, 0, 0, `arm ${defId}`);
-  // Shields lie in their plate (the package turns the face out): the cylinders above stand up along +y.
-  if (ARM_SHAPES[defId]?.startsWith('shield')) { mesh.rotation.x = Math.PI / 2; mesh.updateMatrix(); }
+  // Shields lie in their plate, face to −z (out of the back of the fist in a hand's grip): the cylinders above
+  // stand up along +y. Turned in the geometry, as grip() sets the mesh's own turn.
+  if (ARM_SHAPES[defId]?.startsWith('shield')) mesh.geometry.rotateX(-Math.PI / 2);
   return mesh;
 }

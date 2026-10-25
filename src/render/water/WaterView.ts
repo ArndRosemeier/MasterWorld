@@ -11,6 +11,7 @@ import { WATER_KIND } from '../materials/water';
 import type { WorldJobs } from '../../workers/pool';
 import { FollowedMask } from '../followedMask';
 import { prevailingWind } from '../../world/weather';
+import { swellHeight, swellScale } from '../../world/swell';
 
 function radialGrid(segments: number, rings: number, r0: number, growth: number): BufferGeometry {
   const pos: number[] = [0, 0, 0];
@@ -56,14 +57,31 @@ export class WaterView {
 
   /** Water surface level and depth at a point (nearest mask sample), or null where no mask has data. */
   waterAt(x: number, z: number): { level: number; depth: number } | null {
+    const at = this.sample(x, z);
+    return at && { level: at.d[at.p], depth: at.d[at.p + 1] };
+  }
+
+  /** The finest mask that has data at a point: its data and the sample's index (nearest). */
+  private sample(x: number, z: number): { d: Float32Array; p: number } | null {
     for (const s of this.masks) {
       if (!s.ready) continue;
       const res = s.mask.res, u = (x - s.x0) / s.mask.side, v = (z - s.z0) / s.mask.side;
       if (u < 0 || v < 0 || u >= 1 || v >= 1) continue;
-      const p = (Math.floor(v * res) * res + Math.floor(u * res)) * 4;
-      return { level: s.mask.data[p], depth: s.mask.data[p + 1] };
+      return { d: s.mask.data, p: (Math.floor(v * res) * res + Math.floor(u * res)) * 4 };
     }
     return null;
+  }
+
+  /**
+   * The water's surface at a point as drawn, waves included (a swimmer floats on it), or null where there is
+   * no water. Near the camera, so the shader's distance fade is left out.
+   */
+  surfaceAt(x: number, z: number): number | null {
+    const at = this.sample(x, z);
+    if (!at || !(at.d[at.p + 1] > 0)) return null;
+    const { d, p } = at, w = WATER.wind.value;
+    const scale = swellScale(WATER.amp.value, d[p], d[p + 1], Math.hypot(d[p + 2], d[p + 3]));
+    return d[p] + swellHeight(x, z, this.time, w.x, w.y, scale);
   }
 
   /** True when `p` is under the water surface (calm level; waves are within a metre or two). */

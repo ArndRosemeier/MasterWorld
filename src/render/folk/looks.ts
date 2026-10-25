@@ -24,14 +24,14 @@ export const PACK_CLIPS = [
   'repair (kneeling)', 'harvest', 'plant seeds', 'water plants', 'chop wood', 'crouch',
 ];
 
-const MEN_HAIR = PACK_HAIR.slice(0, 8);
-const WOMEN_HAIR = PACK_HAIR.slice(8);
+export const MEN_HAIR = PACK_HAIR.slice(0, 8);
+export const WOMEN_HAIR = PACK_HAIR.slice(8);
 
 /** Natural dyes: undyed linen and wool, browns, madder, woad, weld, walnut. */
 const PLAIN = ['#b8a684', '#a89878', '#8a7a5c', '#6e5a40', '#5a4a3a', '#4a3a2a', '#7a6a4c'];
 const DYED = ['#7a3a2a', '#8a4a30', '#3d5a80', '#4a5a6a', '#5f6838', '#6b6a3a', '#5e1a2b', '#2f4a3a', '#7a6a2a'];
 const LEATHER = ['#4a3020', '#3a2416', '#5a3a22', '#2a1d14'];
-const HAIR_COLORS = ['#2a1d14', '#3b2417', '#4a3020', '#6a4a2a', '#8a6a3a', '#b08a50', '#c8a868', '#1c1814', '#7a3a1e'];
+export const HAIR_COLORS = ['#2a1d14', '#3b2417', '#4a3020', '#6a4a2a', '#8a6a3a', '#b08a50', '#c8a868', '#1c1814', '#7a3a1e'];
 
 /** Who is drawn as an Actors character (Actors makes adults only: children are simple figures, ChildFolk). */
 export const drawn = (p: Person): boolean => p.role !== 'child';
@@ -51,13 +51,18 @@ export function childLook(p: Person): ChildLook {
   };
 }
 
+/** Garment colours as an outfit is put together: `wear(id, colour)` notes the colour and gives back the id. */
+export function garmentColors(): { colors: Record<string, string>; wear: (id: string, c: string) => string } {
+  const colors: Record<string, string> = {};
+  return { colors, wear: (id, c) => { colors[id] = c; return id; } };
+}
+
 /** Everything about how `p` looks. */
 export function lookOf(p: Person): CharacterPatch {
   const r = new Rng(deriveSeed(p.seed, 'look'));
   const f = p.female;
   const plain = () => r.pick(PLAIN), dyed = () => r.pick(DYED), leather = () => r.pick(LEATHER);
-  const colors: Record<string, string> = {};
-  const wear = (id: string, c: string) => { colors[id] = c; return id; };
+  const { colors, wear } = garmentColors();
   let outfit: string[];
   const shoes = r.chance(0.5) ? wear('medieval-boots', leather()) : wear('leather-boots', leather());
   switch (p.role) {

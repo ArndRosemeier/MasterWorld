@@ -8,7 +8,7 @@
 import { CharacterEditor, randomConfig, type Character, type CharacterConfig } from '@actors/generator';
 import { Vector3, type PerspectiveCamera, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed, lerp } from '@futuremagic/core';
-import type { NamesDef } from '../setting/contract';
+import type { BackgroundDef, NamesDef } from '../setting/contract';
 import type { People } from './title/lines';
 import type { HeroLooks, HeroView } from '../render/hero/HeroView';
 import { button, el, svg } from './dom';
@@ -26,14 +26,22 @@ export interface CreatorHost {
   readonly body: { pos: { x: number; y: number; z: number }; yaw: number };
   /** A name for a hero of `race` (from the setting's names). */
   nameFor(race: string, female: boolean, n: number): string;
+  /** The pasts to choose from (the setting's backgrounds), the first chosen at first. */
+  readonly backgrounds: readonly BackgroundDef[];
+  /** A skill's and an item's name. */
+  skillName(id: string): string;
+  itemName(id: string): string;
+  /** Who in town would know a hero with this past ("Borin Ironfoot, the smith"). */
+  knownBy(bg: BackgroundDef): string[];
   /** A soft click for the brass (sound). */
   click?(): void;
 }
 
-/** The hero as made: a name and Actors' look. */
+/** The hero as made: a name, Actors' look and a past (a background id). */
 export interface MadeHero {
   readonly name: string;
   readonly look: CharacterConfig;
+  readonly background: string;
 }
 
 /** The title's peoples card, by Actors' race id. */
@@ -48,8 +56,10 @@ export function heroNameFor(names: NamesDef, female: boolean, n: number): string
 /** Seconds the camera takes to turn from behind the hero to their front. */
 const TURN = 1.4;
 
-/** The creator's tabs: Actors' editor sections. */
-const TABS = [['race', 'People'], ['body', 'Body'], ['look', 'Face & hair'], ['outfit', 'Clothes']] as const;
+/** The creator's tabs: Actors' editor sections, then the hero's past. */
+const TABS = [['race', 'People'], ['body', 'Body'], ['look', 'Face & hair'], ['outfit', 'Clothes'], ['past', 'Past']] as const;
+/** The tabs that are Actors' editor sections. */
+const SECTIONS = TABS.map(([id]) => id).filter((id) => id !== 'past');
 
 export class Creator {
   private readonly root: HTMLElement;
@@ -63,6 +73,7 @@ export class Creator {
   private zoom = 1;
   private zoomShown = 1;
   private named = false;
+  private past = '';
   private rolls = 0;
   private readonly drag = { on: false, x: 0 };
   /** The camera as the creator found it, and how far it has come round (0..1). */
@@ -116,7 +127,7 @@ export class Creator {
     const yaw = this.camYaw + Math.PI * (1 - e);
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
     const startDist = Math.hypot(f.at.x - body.pos.x, f.at.z - body.pos.z), startUp = f.at.y - body.pos.y;
-    const dist = lerp(startDist, 0.7 + h * 1.55 * z, e), aim = h * (0.92 - 0.38 * z), side = h * 0.32 * z * e;
+    const dist = lerp(startDist, 0.5 + h * 1.25 * z, e), aim = h * (0.92 - 0.38 * z), side = h * 0.45 * z * e;
     camera.position.set(body.pos.x + fx * dist - rx * side, body.pos.y + lerp(startUp, aim + 0.08 * z, e), body.pos.z + fz * dist - rz * side);
     camera.lookAt(body.pos.x - rx * side, body.pos.y + aim, body.pos.z - rz * side);
   }
@@ -136,9 +147,10 @@ export class Creator {
       tabs.append(b);
     });
     this.editor = new CharacterEditor(model, pane, {
-      title: 'Your hero', sections: TABS.map(([id]) => id), buttons: [], hide: ['anatomy'], mode: 'simple',
+      title: 'Your hero', sections: SECTIONS, buttons: [], hide: ['anatomy'], mode: 'simple',
       randomize: () => randomConfig(model.catalog, model.config, { random: this.random(), race: 'any' }),
     });
+    pane.append(this.pasts());
     tabTo('race');
     const begin = button('', () => this.begin(), { className: 't-btn primary cr-begin', type: 'button' }, svg(gearIcon), el('span', { textContent: 'Begin' }));
     const roll = button('Roll the dice', () => {
@@ -158,7 +170,7 @@ export class Creator {
 
   private begin(): void {
     if (!this.model || !this.done) return;
-    const made: MadeHero = { name: this.name.value.trim() || this.defaultName(this.model.config), look: this.model.config };
+    const made: MadeHero = { name: this.name.value.trim() || this.defaultName(this.model.config), look: this.model.config, background: this.past };
     const done = this.done;
     this.done = null;
     this.host.click?.();
@@ -174,6 +186,33 @@ export class Creator {
     this.root.classList.add('closing');
     window.setTimeout(() => this.root.remove(), 900);
     done(made);
+  }
+
+  /** The Past tab: one card per background, what it gives and who knows you; one is chosen. */
+  private pasts(): HTMLElement {
+    const { backgrounds, skillName, itemName, knownBy } = this.host;
+    this.past = backgrounds[0]?.id ?? '';
+    const list = el('section', { className: 'cr-past', role: 'radiogroup', ariaLabel: 'Your past' });
+    list.dataset.section = 'past';
+    for (const bg of backgrounds) {
+      const skills = Object.entries(bg.skills).map(([id, n]) => `${skillName(id)} +${n}`).join(' · ');
+      const kit = [...Object.values(bg.kit.worn), ...bg.kit.pack].map(itemName);
+      const kitLine = [...new Set(kit)].map((n) => (kit.filter((k) => k === n).length > 1 ? `${n} ×${kit.filter((k) => k === n).length}` : n)).join(', ');
+      const known = knownBy(bg);
+      const card = button('', () => {
+        this.past = bg.id;
+        for (const c of list.children) c.setAttribute('aria-checked', String(c === card));
+        this.host.click?.();
+      }, { className: 'cr-bg', type: 'button', role: 'radio' },
+      el('strong', { textContent: bg.name }),
+      el('span', { className: 'cr-bg-text', textContent: bg.text }),
+      el('span', { className: 'cr-bg-skills', textContent: skills }),
+      el('span', { className: 'cr-bg-kit', textContent: `${kitLine}; ${bg.kit.coins} copper` }),
+      ...(known.length ? [el('span', { className: 'cr-bg-known', textContent: `Knows you: ${known.join('; ')}` })] : []));
+      card.setAttribute('aria-checked', String(bg.id === this.past));
+      list.append(card);
+    }
+    return list;
   }
 
   private defaultName(c: CharacterConfig): string {

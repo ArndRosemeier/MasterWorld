@@ -218,3 +218,18 @@ test('fight: a delve saves who fell and what was taken, and a load finds the sam
   assert.ok(again.hasOpened(lair));
   assert.deepEqual(again.fight.bodies.get(victim.id) ?? { items: [], coins: 0 }, loot);
 });
+
+test('fight: every past gives its skills and kit, and a fresh hero of any past is a fair start (power 10-20)', () => {
+  for (const bg of classic.backgrounds) {
+    const h = new Character(classic);
+    h.beginAs(bg);
+    assert.equal(h.background, bg.id);
+    for (const s of classic.skills) assert.equal(h.skills.get(s.id), s.start + (bg.skills[s.id] ?? 0));
+    assert.equal(h.worn.main?.def, bg.kit.worn.main);
+    assert.equal(h.pack.length, bg.kit.pack.length);
+    assert.equal(h.coins, bg.kit.coins);
+    assert.equal(h.health, h.maxHealth);
+    assert.ok(h.power > 9 && h.power < 21, `${bg.id}: power ${h.power}`);
+    assert.equal(new Character(classic, JSON.parse(JSON.stringify(h.save()))).background, bg.id);
+  }
+});

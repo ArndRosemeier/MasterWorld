@@ -7,7 +7,7 @@
  * A new look never builds a shader on the render path: it is put on a second, hidden character, compiled
  * (each garment, hairstyle and shadow) and then swapped in, so the old look shows until the new one is ready.
  */
-import { Group, LoopOnce, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Group, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { Character, outfitGarments, randomConfig, type CharacterCatalog, type CharacterConfig, type CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
@@ -19,6 +19,7 @@ import type { Stage } from '@futuremagic/stage';
 import { buildArm } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE } from './clips';
 import { gripHeld } from './grips';
+import { FADE, playClip } from './play';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -55,8 +56,8 @@ export interface HeroLooks {
 /** Outfit presets a hero is never offered (real-world religious orders). */
 const LEFT_OUT_PRESETS = ['med-nun'];
 
-/** Swimming, the body lies in the water: the clip's hips stand this far (of the height) over the feet. */
-const SWIM_DROP = 0.3;
+/** Swimming or treading water, the body is this far (of the height) down in the water: head and shoulders above it. */
+const SWIM_DROP = 0.15;
 
 /** The hero's catalog: the setting's themes (filtered by Actors), its peoples, no robots or skeletons. */
 export function heroCatalog(looks: HeroLooks): (c: CharacterCatalog) => CharacterCatalog {
@@ -86,7 +87,7 @@ export function newHero(catalog: CharacterCatalog, looks: HeroLooks, base: Chara
 }
 
 /** Options for Actors' Character.load that give the hero's catalog. */
-const loadOptions = (looks: HeroLooks) => ({
+export const loadOptions = (looks: HeroLooks) => ({
   pack: PACK, materials: nodeMaterials, clipLibraries: false,
   themes: { themes: [...looks.themes], without: [...looks.without] },
   catalog: heroCatalog(looks),
@@ -97,6 +98,8 @@ export class HeroView {
   readonly object = new Group();
   private time = 0;
   private clip = '';
+  /** The next clip cuts in (snap). */
+  private cut = false;
   private actionShown: HeroAction | null = null;
   private held: { main: Object3D | null; off: Object3D | null; drawn: boolean | null } = { main: null, off: null, drawn: null };
   private wanted: CharacterPatch | null = null;
@@ -174,7 +177,7 @@ export class HeroView {
       this.object.add(next.object);
       const clip = this.clip;
       this.clip = '';
-      if (clip) this.play(clip);
+      if (clip) this.startClip(clip);
       this.moveHeld();
       for (const l of this.listeners) l(next.config);
     }
@@ -196,8 +199,8 @@ export class HeroView {
   /** Shown or not (first person hides it). */
   set visible(v: boolean) { this.object.visible = v; }
 
-  /** The next pose at once (getting on or off a horse): clips cut anyway, nothing to blend. */
-  snap(): void {}
+  /** The next pose at once, not blended (getting on or off a horse). */
+  snap(): void { this.cut = true; }
 
   animateTo(p: HeroPose, dt: number): void {
     this.time += dt;
@@ -209,7 +212,7 @@ export class HeroView {
     const clip = p.gait === 'ride' ? 'ride' : acting ? ACTION_CLIPS[acting.id] ?? 'sword slash A' : this.gaitClip(p, speed);
     if (clip !== this.clip || (acting && acting !== this.actionShown)) {
       this.actionShown = acting;
-      this.play(clip, acting?.dur);
+      this.startClip(clip, acting?.dur);
     }
     const action = this.front.actor.currentAction;
     const pace = PACE[clip];
@@ -221,7 +224,7 @@ export class HeroView {
       o.position.set(p.pos.x, p.pos.y + (p.seat ?? 0), p.pos.z);
       if (seat) o.position.sub(seat.applyQuaternion(o.quaternion));
     } else {
-      o.position.set(p.pos.x, p.pos.y - (clip === 'swim' ? this.height * SWIM_DROP : 0), p.pos.z);
+      o.position.set(p.pos.x, p.pos.y - (clip === 'swim' || clip === 'tread water' ? this.height * SWIM_DROP : 0), p.pos.z);
     }
     if (this.held.drawn !== !!p.combat) { this.held.drawn = !!p.combat; this.moveHeld(); }
   }
@@ -238,7 +241,7 @@ export class HeroView {
   }
 
   /** Plays `clip` on the hero now; a one-shot (an action, death) once from its start, held at its end. */
-  private play(clip: string, dur?: number): void {
+  private startClip(clip: string, dur?: number): void {
     this.clip = clip;
     const ch = this.front;
     if (clip === 'ride') {
@@ -247,25 +250,21 @@ export class HeroView {
       return;
     }
     const once = dur !== undefined || clip === 'death';
-    void ch.play(clip).then(() => {
-      const a = ch.actor.currentAction;
-      if (!a || this.clip !== clip || !once) return;
-      a.setLoop(LoopOnce, 1);
-      a.clampWhenFinished = true;
-      a.reset().play();
-      if (dur) a.timeScale = a.getClip().duration / dur;
-    });
+    const fade = this.cut ? 0 : once ? FADE.once : FADE.loop;
+    this.cut = false;
+    playClip(ch, clip, once, () => this.clip === clip, dur, fade);
   }
 
   /** Where the rider's seat is in the hero's own space (Actors' Mount knows the hips). */
   private riderSeat(): Vector3 | null {
     const s = new Mount(this.front.actor, this.front.actor).riderSeat();
-    return s ? this.seatAt.copy(s) : null;
+    // Actors' seat is in the character's own space, which stands lifted inside the hero.
+    return s ? this.seatAt.copy(s).applyMatrix4(this.front.object.matrix) : null;
   }
 
   /** The held things onto the hands (in a fight) or the hip and back. */
   private moveHeld(): void {
-    gripHeld(this.held.main, this.held.off, !!this.held.drawn, this.front.actor.bones, this.object);
+    gripHeld(this.held.main, this.held.off, !!this.held.drawn, this.front.actor, this.object);
   }
 }
 

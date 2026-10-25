@@ -63,6 +63,19 @@
 .creator .actors-editor .ae-swatch.ae-on { outline-color: var(--ward); }
 .creator .actors-editor .ae-note, .creator .actors-editor .ae-credit { color: #9c8a6c; }
 
+/* The Past tab: a card per background; the chosen one glows. */
+.creator .cr-past { display: none; flex-direction: column; gap: 8px; }
+.creator .cr-pane[data-tab="past"] .cr-past { display: flex; animation: cr-rise .35s ease-out both; }
+.creator .cr-pane[data-tab="past"] .actors-editor { display: none; }
+.creator .cr-bg { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; text-align: left; font: 15px/1.3 'EB Garamond', Georgia, serif; color: var(--ink-dim); background: #120d09; border: 1px solid var(--brass-lo); border-radius: 6px; cursor: pointer; transition: border-color .2s, box-shadow .2s, color .2s; }
+.creator .cr-bg strong { font: 16px/1.1 'Marcellus SC', Georgia, serif; letter-spacing: .06em; color: var(--brass); font-weight: 400; }
+.creator .cr-bg:hover { border-color: var(--brass); color: var(--ink); }
+.creator .cr-bg[aria-checked="true"] { color: var(--ink); border-color: var(--ward); box-shadow: inset 0 0 0 1px var(--brass-lo), 0 0 12px #8fe3ff44; }
+.creator .cr-bg[aria-checked="true"] strong { color: #ffc46b; }
+.creator .cr-bg-skills { color: var(--ward); font-size: 14px; }
+.creator .cr-bg-kit, .creator .cr-bg-known { font-size: 14px; color: #9c8a6c; }
+.creator .cr-bg-known { font-style: italic; }
+
 .creator .cr-foot { display: flex; gap: 10px; align-items: center; animation: cr-rise .5s ease-out .95s both; }
 .creator .cr-foot .t-btn { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 18px; font: 17px/1 'Marcellus SC', Georgia, serif; letter-spacing: .08em; border-radius: 22px; cursor: pointer; }
 .creator .cr-foot .t-btn.quiet { color: var(--ink-dim); background: transparent; border: 1px solid var(--brass-lo); }

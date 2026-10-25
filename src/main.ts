@@ -26,7 +26,8 @@ import { useTownGround, useTownTextures } from './render/materials/townGround';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
-import { validateSetting } from './setting/contract';
+import { distSqPointSeg } from '@futuremagic/settlement';
+import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { ordersOf, townOrder } from './vgm/orders';
 import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
@@ -42,6 +43,7 @@ import { InteriorVisit } from './app/interiorVisit';
 import { InteriorView } from './render/town/InteriorView';
 import { lookFromDegrees } from './app/look';
 import { Sound } from './app/sound';
+import { SoundDirector } from './app/soundDirector';
 import { Title } from './app/title/title';
 import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
@@ -56,6 +58,7 @@ import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, typ
 import { SAVE_VERSION, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
+import { acquaintances } from './game/background';
 import { Delve } from './game/delve';
 import { Director } from './vgm/director';
 import { CreatureView } from './render/dungeon/CreatureView';
@@ -134,7 +137,8 @@ export async function start(b: Boot): Promise<void> {
       height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
       floor: (x, z) => (below() ? null : town?.stand(x, z) ?? null),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
-      waterLevel: (x, z) => { if (below()) return null; const w = water?.waterAt(x, z); return w && w.depth > 0 ? w.level : null; },
+      // The surface as drawn, waves and all: a swimmer rides the swell.
+      waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
       // Out of doors the buildings and the townsfolk (whom one walks around, not through).
       wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
     };
@@ -142,7 +146,17 @@ export async function start(b: Boot): Promise<void> {
     player.goTo(params.pos ?? [home.x, home.z], params.look);
     // Dialogs (and the title) hold the game's keys and mouse while open.
     let open = 0;
-    const paused = (on: boolean) => { open = Math.max(0, open + (on ? 1 : -1)); player.pause(open > 0); };
+    // The game's sound (set once the world stands): a dialog's sound, and the music steps back while it is open.
+    let sounds: SoundDirector | null = null;
+    let opening = 'ui/open';
+    const paused = (on: boolean) => {
+      const was = open;
+      open = Math.max(0, open + (on ? 1 : -1));
+      player.pause(open > 0);
+      if ((was > 0) !== (open > 0)) sounds?.dialogSound(open > 0, opening);
+    };
+    // A dialog with a sound of its own as it opens (the journal's page, the map unrolled).
+    const pausedWith = (sound: string) => (on: boolean) => { opening = sound; paused(on); opening = 'ui/open'; };
     // What New game leads to once the dive lands (set once the hero exists: character creation).
     let onBegin: ((people: People['id'] | null) => void) | null = null;
     if (title) {
@@ -280,9 +294,9 @@ export async function start(b: Boot): Promise<void> {
       // Its dwellers: the den and the fight, and their bodies drawn.
       loading.set('Waking the cellar');
       delve = new Delve(cellar, visit.space, setting, character, seed, save?.cellars[promise.id]?.delve);
-      creatures = await CreatureView.build(delve.den, seed, cellarView.origin);
-      // Its skinned shaders build in the Stage's frame slots once the loop runs; loading waits for them below.
-      dwellers = view.stage.add(creatures.group);
+      const drawn = creatures = await CreatureView.build(delve.den, seed, cellarView.origin, view.renderer);
+      // Its people's shaders (each one's shadow casters too) build in the Stage's frame slots once the loop runs; loading waits for them below.
+      dwellers = drawn.warm(view.stage).then(() => view.stage.add(drawn.group));
       if (params.cellar) {
         await visit.enter(true, params.cellarRoom);
         if (params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
@@ -339,15 +353,35 @@ export async function start(b: Boot): Promise<void> {
     // Talk and the journal (their Escape comes before the settings' too). The townsfolk know of the
     // promised cellar; what the player hears goes into the journal.
     const journal = new Journal(save?.journal);
-    const keys = { paused, get bindings() { return settings.current.bindings; } };
+    sounds = new SoundDirector({
+      engine: sound.engine, seed, camera: view.camera, walker: player.walker, terrain, town: town ?? null,
+      water: (x, z) => sea.waterAt(x, z),
+      waterLevel: (x, z) => world.waterLevel(x, z),
+      weather: () => wx.shown,
+      hour: () => view.sky.hour,
+      flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
+      where: () => (visit?.inside ? { place: 'cellar', room: null } : rooms?.inside && town ? { place: 'room', room: town.plan.buildings[rooms.building]?.kind ?? null } : { place: 'land', room: null }),
+      inFlight: () => player.flying,
+      horses: () => player.steeds,
+      riding: () => player.riding,
+      threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
+      titleHolds: () => !!title?.holding || !!creator?.showing,
+    });
     const townWords = town && life ? townTalk(seed, setting, town, life.agents.map((a) => a.person), opened.log, save?.talk ?? undefined).talk : null;
+    // Who knows the hero from before (plan 11.4): their greeting names them.
+    const friendsOf = (bg: BackgroundDef | undefined) => (bg && life ? acquaintances(bg, life.agents.map((a) => a.person)) : []);
+    const meetOldFriends = () => {
+      const bg = setting.backgrounds.find((b) => b.id === character.background);
+      townWords?.acquaint(friendsOf(bg).map((a) => ({ person: a.person.id, line: a.line })), heroName || 'friend');
+    };
+    meetOldFriends();
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
       get away() { return player.flying || !!visit?.inside; },
-      heard: (lead) => notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6),
+      heard: (lead) => (sounds?.noted(), notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6)),
     }) : null;
-    const journalUi = new JournalUi(journal, keys);
+    const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -355,7 +389,7 @@ export async function start(b: Boot): Promise<void> {
       drank: (n) => { if (n > 0) fightHud.healed(); },
     });
     const map = town ? new MapUi(town.plan, journal, {
-      paused,
+      paused: pausedWith('ui/map'),
       get bindings() { return settings.current.bindings; },
       height: (x, z) => terrain.height(x, z),
       water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
@@ -416,6 +450,7 @@ export async function start(b: Boot): Promise<void> {
       still: (on) => paused(on),
       armed: armHero,
     }, !!(promise && save?.cellars[promise.id]?.paid)) : null;
+    if (fight && sounds) { const s = sounds; fight.onCue = (c) => s.cue(c); }
     const saves = new SavesUi(savesHost);
     const autosave = () => void saveNow(savesHost, AUTOSAVE);
     if (visit) visit.onSwap = autosave;
@@ -455,7 +490,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound, life },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound, get sounds() { return sounds; }, life },
     });
     b.menus.menu = new Menu(settings, {
       paused,
@@ -470,15 +505,28 @@ export async function start(b: Boot): Promise<void> {
       creator = new Creator({
         camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
         nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
+        backgrounds: setting.backgrounds,
+        skillName: (id) => setting.skills.find((k) => k.id === id)?.name ?? id,
+        itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
+        knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
         click: () => sound.play('click'),
       }, seed);
+      // Nobody walks between the camera and the hero while the glass is open.
+      const cam = view.camera.position;
+      if (folk) folk.clear = (x, z) => distSqPointSeg(x, z, cam.x, cam.z, w.pos.x, w.pos.z) < 1.5 * 1.5;
       const made = await creator.open(race);
+      if (folk) folk.clear = null;
       heroName = made.name;
       creator = null;
+      // The past chosen: its skills, kit and the people in town who know the hero.
+      const bg = setting.backgrounds.find((b) => b.id === made.background);
+      if (bg) { character.beginAs(bg); armHero(); }
+      meetOldFriends();
       // Behind the hero, looking the way they face.
       player.teleport(w.pos.x, undefined, w.pos.z, w.yaw);
       paused(false);
-      notes.say(`${made.name} steps out onto the market square.`, 5);
+      const friends = townWords ? friendsOf(bg).map((a) => townWords.nameOf(a.person.id)) : [];
+      notes.say(`${made.name} steps out onto the market square.${friends.length ? ` ${friends.join(' and ')} will know you.` : ''}`, 6);
     };
     onBegin = (people) => {
       if (save) paused(false);
@@ -498,6 +546,7 @@ export async function start(b: Boot): Promise<void> {
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
       creator?.orbit(dt);
+      sounds?.hearTick(dt);
       if (!rooms?.inside) visit?.update(dt);
       if (!visit?.inside) rooms?.update(dt);
       talk?.watch();
@@ -522,7 +571,7 @@ export async function start(b: Boot): Promise<void> {
       view.renderer.render(view.scene, view.camera);
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }

@@ -20,6 +20,8 @@ const looks = readFileSync(join(root, 'src/render/folk/looks.ts'), 'utf8');
 // The hero's clips, and what the setting lets a hero wear (the creator offers every garment and
 // hairstyle that fits its themes: src/setting/classic/hero.ts).
 const heroClips = readFileSync(join(root, 'src/render/hero/clips.ts'), 'utf8');
+// The cellar's people's own clips (the dead shamble, the meek kneel).
+const foeClips = readFileSync(join(root, 'src/render/dungeon/foes.ts'), 'utf8');
 const heroLooks = readFileSync(join(root, 'src/setting/classic/hero.ts'), 'utf8');
 const list = (name, text = looks, pattern = `export const ${name}[^=]*=\\s*\\[([^\\]]*)\\]`) => {
   const m = text.match(new RegExp(pattern));
@@ -28,7 +30,7 @@ const list = (name, text = looks, pattern = `export const ${name}[^=]*=\\s*\\[([
 };
 const field = (name) => list(name, heroLooks, `\\b${name}:\\s*\\[([^\\]]*)\\]`);
 const themes = { themes: field('themes'), without: field('without') };
-const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK_HAIR')), clips: new Set([...list('PACK_CLIPS'), ...list('HERO_CLIPS', heroClips)]) };
+const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK_HAIR')), clips: new Set([...list('PACK_CLIPS'), ...list('HERO_CLIPS', heroClips), ...list('FOE_CLIPS', foeClips)]) };
 
 const dest = join(root, 'public/packs/human');
 const stamp = join(dest, '.selection');
