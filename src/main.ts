@@ -36,6 +36,8 @@ import { outlineCellar } from './world/dungeon/cellar';
 import { firstDungeon, houseOf } from './vgm/dungeons';
 import { CellarView } from './render/dungeon/CellarView';
 import { CellarVisit } from './app/cellarVisit';
+import { InteriorVisit } from './app/interiorVisit';
+import { InteriorView } from './render/town/InteriorView';
 import { lookFromDegrees } from './app/look';
 
 declare global {
@@ -76,12 +78,14 @@ async function start(): Promise<void> {
     let water: WaterView | null = null;
     // Down in the cellar the walker walks the cellar's space instead of the land.
     let visit: CellarVisit | null = null;
-    const below = () => (visit?.inside ? visit.world : null);
+    // Behind a door the walker walks the room.
+    let rooms: InteriorVisit | null = null;
+    const below = () => (visit?.inside ? visit.world : rooms?.world ?? null);
     const world: WalkWorld = {
       height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
       waterLevel: (x, z) => { if (below()) return null; const w = water?.waterAt(x, z); return w && w.depth > 0 ? w.level : null; },
-      wall: (x, z, r) => !below() && !!town?.solid(x, z, r),
+      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r); },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
@@ -168,6 +172,14 @@ async function start(): Promise<void> {
       }
     }
 
+    // Every other door of the town opens on its room.
+    if (town) rooms = new InteriorVisit(town.plan.buildings, new Set(house ? [house.id] : []), new InteriorView(view.stage), player, view.lantern, view.sky);
+    if (rooms && town && params.room !== null) {
+      const b = town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
+      if (b) await rooms.enter(b, true);
+      if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
+    }
+
     // The trees' shaders (and the townsfolk's other detail levels) are built in the Stage's frame slots, so
     // the loop must run meanwhile; loading ends once they stand.
     loading.set('Planting the trees');
@@ -232,7 +244,8 @@ async function start(): Promise<void> {
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       player.update(dt);
-      visit?.update(dt);
+      if (!rooms?.inside) visit?.update(dt);
+      if (!visit?.inside) rooms?.update(dt);
       view.sky.underwater = sea.submerged(view.camera.position);
       wx.apply(dt, view.camera.position, hours(), view.sky);
       view.sky.update(dt, view.camera);
@@ -250,7 +263,7 @@ async function start(): Promise<void> {
       view.renderer.render(view.scene, view.camera);
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}`;
       }
       last = now;
       if (planted && !window.__mwReady) {

@@ -34,6 +34,8 @@ export const params = {
   /** Start in the town's cellar: `cellar` at the ladder, `cellar=3` in room 3. */
   cellar: q.has('cellar'),
   cellarRoom: q.get('cellar') ? Number(q.get('cellar')) : undefined,
+  /** Start inside a building of the town: `room=inn` (the first of that kind) or `room=12` (building 12). */
+  room: q.get('room'),
   /** Setting module id. */
   setting: q.get('setting') ?? 'classic',
 };
