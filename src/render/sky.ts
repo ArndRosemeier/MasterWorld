@@ -135,7 +135,8 @@ export class SkyView {
     this.hemi.intensity = (L.hemiIntensity + this.flash * 1.2) * LIGHT * 0.7;
     const fog = FOG.color.value;
     fog.setRGB(...L.fogColor);
-    FOG.density.value = L.fogDensity * FOG_SCALE;
+    // Thick fog closes in to a few hundred metres (the sky's own rig stops at haze).
+    FOG.density.value = L.fogDensity * FOG_SCALE + 0.012 * wx.fog ** 3;
     // Mist: up to ~60 m of sight where it lies thickest.
     FOG.mist.value = this.mist * this.mist * 0.05;
     FOG.mistBase.value = this.mistBase;

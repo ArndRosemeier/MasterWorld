@@ -55,7 +55,7 @@ export const PRESETS: Readonly<Record<WeatherKind, Readonly<Preset>>> = {
   overcast: { cover: 0.92, density: 0.8, dark: 0.25, sun: 0.25, fog: 0.12, mist: 0, rain: 0, wind: 0.4, storm: 0 },
   rain: { cover: 1, density: 0.9, dark: 0.45, sun: 0.1, fog: 0.25, mist: 0.15, rain: 0.65, wind: 0.5, storm: 0 },
   storm: { cover: 1, density: 1, dark: 0.85, sun: 0.04, fog: 0.3, mist: 0.1, rain: 1, wind: 0.9, storm: 1 },
-  fog: { cover: 0.7, density: 0.6, dark: 0.1, sun: 0.35, fog: 0.75, mist: 1, rain: 0, wind: 0.05, storm: 0 },
+  fog: { cover: 0.9, density: 0.6, dark: 0.1, sun: 0.3, fog: 0.75, mist: 1, rain: 0, wind: 0.05, storm: 0 },
   snow: { cover: 1, density: 0.85, dark: 0.3, sun: 0.15, fog: 0.35, mist: 0.1, rain: 0.6, wind: 0.35, storm: 0, snow: 1 },
 };
 
