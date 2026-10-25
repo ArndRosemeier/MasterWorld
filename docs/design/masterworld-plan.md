@@ -1,7 +1,7 @@
 # MasterWorld: plan
 
-Living document. Status: **draft 2, open for discussion, no code yet.** Draft 2 adds Arnd's decisions of 2026-10-24 (D9–D24), including the region quadtree, the hybrid terrain and believable NPC life.
-Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld). The `MasterWorld` repo was empty.
+Living document. Status: **draft 3.** Draft 2 added Arnd's decisions of 2026-10-24 (D9–D24): the region quadtree, the hybrid terrain and believable NPC life. Draft 3 adds the decisions from the gap analysis of 2026-10-25 (D28–D47): the player's game (sandbox, character, items, factions, the map), the default world's lore, sound, the interface and the title animation.
+Milestone 1 (walk the land) is built; milestone 2 (the town) is under way. Sources checked (main, 2026-10-24): `ArndRosemeier/Norgo`, `Dunfinity`, `Scale`, `Actors`, `AssetGenerator`, `Conversations`, `World` (Xenoworld).
 
 ---
 
@@ -12,6 +12,10 @@ A classic fantasy roleplaying game in the browser (TypeScript, three.js, 3D), si
 An NPC hints at a dungeon, so the VGM builds that dungeon. The player walks toward the edge of the known land, so the VGM extends the land before they get there. The world starts small, around one small town, and grows out of play.
 
 The world should be believable but fantastic: classic countryside, forests and mountains, towns and cities, cellars and classic dungeons, and later seas and oceans.
+
+**It is a sandbox.** There is no final goal and no ending. There are many long-term goals instead, and the player picks which to follow (D28).
+
+MasterWorld is free and open source under the MIT licence, like all of Arnd's projects (D47).
 
 ---
 
@@ -46,6 +50,26 @@ The world should be believable but fantastic: classic countryside, forests and m
 | D25 | **Water is a hero feature, not a prop.** Seas, lakes, rivers and waterfalls look and behave well (waves, foam, depth colour, refraction, flow), the camera can go under the surface with a proper underwater view, and the player can swim. The door stays open for underwater content (sunken places, underwater dungeons and creatures). | Arnd, 2026-10-24. Base: Xenoworld's water. |
 | D26 | **Weather from the start.** Seeded, deterministic weather that drifts over the land: clouds, rain and snow, thunderstorms, mist in the low ground, wind on grass, trees and sea, wet ground and puddles. The VGM drives it with orders. | Arnd, 2026-10-25. Section 5.8. |
 | D27 | **Two systems: the VGM and the world simulation.** One simulation moves everything that acts on its own (townsfolk first; later bandits on the road, animals, skeletons in a crypt). It works without the VGM: people always have something to do. The VGM nudges it only through plain-data orders that go into the decision log. | Arnd, 2026-10-25. Section 9.3. |
+| D28 | **A sandbox with no final goal.** There are several long-term goals at once, none of them the end of the game. | Arnd, 2026-10-25. Section 11.3. |
+| D29 | **Danger lives in places, not in the player's level.** The world is not scaled to the player's power. The land gets more dangerous with distance from the start and with depth underground, and the danger is fixed when a place is built. The game warns clearly ("don't take on that dragon when you're fresh"), and weak foes don't know the player has become a champion. The VGM makes sure there is always something at the player's level to find. | Arnd, 2026-10-25. Growing must feel like growing. Sections 4.1, 11.4. |
+| D30 | **Classless, use-based growth.** No classes, no XP, no levels. Skills rise by use (Norgo), and unlocks come from many sources (D11). Character creation is the shared Actors creator with a **filter parameter**: generous, but leaving out what clearly does not fit the setting. | Arnd, 2026-10-25. Section 11.4. |
+| D31 | **Items like players know them: common, uncommon, rare, legendary,** shown on WoW-style item cards. Items can raise one or more skills, and a few rare abilities can only be gained from items. | Arnd, 2026-10-25. Section 11.5. |
+| D32 | **No crafting in 1.0.** It can come later. | Arnd, 2026-10-25. |
+| D33 | **No intelligent companions.** If there are companions, they are animals, elementals or summoned things, never a talking person who follows you around. | Arnd, 2026-10-25. Hard to make feel good. |
+| D34 | **Race factions with reputation.** Each people is a faction, and they have their own areas: a human walking into the orc town is in trouble unless they have earned the orcs' trust. Other factions (guilds, the Temple, the watch) come later. | Arnd, 2026-10-25. Section 11.6. |
+| D35 | **The player's map is the hint channel.** When an NPC gives a task, the player shows them the map (animated), and the NPC marks the place on it. An **orientation skill** makes the player's own position on the map more and more exact. | Arnd, 2026-10-25. Sections 9.1, 11.7. |
+| D36 | **Talk uses Arnd's Conversations package.** Free LLM access through Arnd's `freeryder` project (no cost, but less reliable) is a separate discussion (O15). | Arnd, 2026-10-25. Sections 9.1, 15. |
+| D37 | **Game time: one game day takes 60 real minutes.** The player moves at real speed. | 2026-10-25. Section 5.4. |
+| D38 | **Interiors are their own small scenes behind a door,** with a short fade. | 2026-10-25. Section 7. |
+| D39 | **Dungeons must not feel formulaic.** This is the main risk of any generator and gets real design effort of its own. | Arnd, 2026-10-25. Section 8.1, O16. |
+| D40 | **Animations come from Actors' large library,** with no fixed list up front: we take what the town needs as we find it. Horses are being made in Actors. | Arnd, 2026-10-25. |
+| D41 | **Settlements from farmstead to capital.** The start town is small (about 80–120 people), but bigger towns and a capital must be possible; the detail-by-distance budget makes them affordable. | Arnd, 2026-10-25. Sections 7, 9.3. |
+| D42 | **Tone: warm and full of wonder, with real danger.** Humour comes from people. A comic-relief character with some slapstick is allowed, as the exception. | Arnd, 2026-10-25. Section 12.1. |
+| D43 | **The default world: the Fading.** Magic drained out of the world 300 years ago and is now seeping back. Five Wardens are its gods. Creatures include truly giant versions of animals and monsters, and human giants. | 2026-10-25 (Arnd: giants). Section 12.1. |
+| D44 | **Sound is generated through OpenRouter** (the `openrouter` skill), with CC0 libraries as backup. Procedural sound only where a model cannot give a good result. | Arnd, 2026-10-25. Section 16. |
+| D45 | **The interface speaks "warded brass":** engraved brass instruments in dark leather with dwarven wards set into the metal, which light up as magic returns. Every window shares the language and has its own signature. Things are animated whenever they are shown and never sit quite still: playful and varied. | Arnd, 2026-10-25. Section 17.1. Mockups: [canvas](https://claude.ai/artifact/77cZmr4B2d3Y6yyieQCfU8). |
+| D46 | **The title animation is a hero feature.** Captivating and playful, like Starlord's, and the world is built behind it while it plays. | Arnd, 2026-10-25. Section 17, O18. |
+| D47 | **Free and open source, MIT licence.** | Arnd, 2026-10-25. |
 
 ---
 
@@ -89,6 +113,10 @@ The Director also keeps a small set of **needs**, each a score that rises over t
 
 Each tick the Director looks at the most overdue need and picks the cheapest action that meets it, within the difficulty settings. That is the whole "feels good" loop. It stays explainable and tunable.
 
+**The Director does not scale the world to the player (D29).** Each place gets its danger when it is built, from its distance to the start, its depth and its purpose, and keeps it. What the Director chooses is *where* to put things: when the Challenge need is overdue, it places or hints at something that fits the player's power, but the dragon in the mountains stays a dragon. Dangerous places are signposted: NPCs warn, there are bones at the cave mouth, and a creature's name shows a threat colour against the player's power.
+
+**Measured, not hoped for.** A headless bot plays by script (follows leads, walks, fights) and a check logs the real time between notable things and how overdue each need gets. It fails when a gap is over 5 minutes. Starting density, tuned in the setting module: within 2 km of town something worth a look every 200–300 m off the road; farther out every 400–600 m, but bigger.
+
 ### 4.2 Builder: building what is needed
 
 The Builder turns the Director's orders into world. Its central idea is the **promise**.
@@ -108,6 +136,12 @@ A promise moves through stages, and each stage costs more than the one before:
 Because the VGM made the hint, it always knows what the hint means. It never has to understand the player's words.
 
 **The edge of the world is just another promise.** Land that the player can see but has not been detailed is a promise of land. Same stages, same budget.
+
+**A promise is plain data:** id, template, constraints (place, distance, theme), stage, state (open, kept, failed, withdrawn), danger, the facts it planted, and the long-term goal it belongs to, if any. Canon facts are triples (subject, predicate, object), the same shape as Conversations' predicates, so one fact feeds both. A promise the player ignores for a long time can be resolved by the world through an event ("the watch cleared the cellar"), so no NPC ever told a lie.
+
+**Promise templates** are data in the setting module: purpose, constraint slots, hint lines, inhabitants, goal state, reward. A first set: rats in a cellar, a smugglers' cellar, an heirloom lost in a ruin, a wolf pack, bandits on the road, a restless crypt, a missing person, a goblin-held mine. A promise is kept when its goal state is reached (the boss is dead, the item is found), which the simulation or the dungeon reports; the NPC who gave it pays the reward.
+
+**Events** (raid, takeover, plague, festival) are templates with preconditions (a raid needs a bandit camp within 3 km of a village and bandits left alone for two game days), a cooldown, and at most one big event per region per game week. They run as simulation orders.
 
 ### 4.3 Signals the VGM watches
 
@@ -161,9 +195,11 @@ The skeleton is unbounded and fixed. The VGM decides **what stands on it** and *
 * **Hard**: anything the player has seen or been told about in detail. It changes only through story events (4.5).
 * **Soft**: everything else. Even inside an open region, unseen land stays soft, so the VGM can still put a ruin behind the next hill when a need calls for it.
 
-### 5.4 Scale targets (proposal)
+### 5.4 Time and travel (D37)
 
-* Walking pace around 5 km/h in-game, so one region takes about two hours to cross on foot.
+* **One game day takes 60 real minutes** (the clock runs 24 times faster); night is about 12 minutes of it. The player moves at real speed: running is 5.2 m/s, so 1 km takes about 3 real minutes and a 4 km region about 13.
+* **Travel**: on foot first; horses (from Actors) in milestone 5 at about 12 m/s; fast travel as a paid cart between known towns, which is a journey promise (4.4). Magic waystones may come later.
+* **Seasons** (milestone 5): four seasons of 7 game days each. They change snow, fields, festivals and the date.
 * View distance several km, with the far horizon drawn from the skeleton alone.
 * The skeleton is big enough for several continents and oceans between them.
 
@@ -198,7 +234,7 @@ The voxel cost is paid only where it is worth it. Geomancy (section 10) can edit
 * Every asset and material aims for hero quality from the first milestone. Placeholders are allowed only behind a flag, never as the shipped default.
 * The shader policy ([docs/SHADERS.md](../SHADERS.md)) already assumes a **closed set of high-quality materials**: a few excellent material kinds (terrain blend, rock with triplanar mapping for volumes, foliage, water, skin from Actors, cloth, metal, stone, wood) beat many mediocre ones.
 * Lighting, sky, atmosphere and fog carry much of the drama: a strong time-of-day cycle, aerial perspective over long views, volumetric light where the budget allows.
-* Art style, rendering backend and target hardware are open questions (O10–O12) to settle before the first milestone.
+* Art style, rendering backend and target hardware are decided (D20–D22).
 
 ### 5.8 Weather (D26)
 
@@ -224,11 +260,15 @@ Weather is part of the world model (`src/world/weather.ts`), pure and determinis
 
 ## 7. Settlements
 
-* Sizes: farmstead, hamlet, village, town, city. The VGM makes them on demand (People need, a quest, a road needing a waypoint).
+* Sizes: farmstead, hamlet, village, town, city, and a capital (D41). The VGM makes them on demand (People need, a quest, a road needing a waypoint).
 * **Growth**: a settlement can be upgraded by a later decision (a hamlet becomes a village after the player cleared the bandits). Growth adds to the plan and never moves what the player has already seen.
 * Scale's planning layers (macro plan → cells → lots → buildings) look reusable. Its look is modern, so MasterWorld needs a **medieval style family**: walls and gates, market square, temple, organic streets, timber-framed and stone houses, mills, docks, castles.
 * Race shapes architecture: a dwarven hold, an elven village and a human town should differ in plan as well as look.
 * Every building with an interior is a possible cellar or dungeon entrance.
+* **Interiors (D38)** are small scenes of their own behind a door, entered with a short fade (half a second or less), each with its own lighting and budget. Open fronts (market stalls, a smithy's yard) stay outside. First interiors: the tavern, the smithy, the temple and the player's room.
+* **Roads**: when a region opens, roads link its settlements to the network along the cheapest path over the land (slope, water, fords and bridges). The kind follows what they link: a path, a cart track, a paved road near towns. Roads are decisions in the log; the routing is shared code in an AssetGenerator package.
+* **Footprints (was O9)**: hard land always wins; between soft things the older decision wins; settlements and roads beat vegetation, so a growing town clears the forest edge. A new footprint reserves its area in neighbouring soft regions.
+* **Peoples have their own areas (D34)**: a dwarven hold, an orc town. Who may walk in safely follows the player's standing with that people (11.6).
 
 ---
 
@@ -256,6 +296,30 @@ The purpose also tells the Director what to hint ("the dwarves sealed the lower 
 * Dungeons change through story events too (D10): when goblins drive out the kobolds, the layout stays, the inhabitants, dressing and traps change.
 * From Dunfinity: styles, rock and brick materials, lighting, creatures. From AssetGenerator: props and dressing.
 * Once outlined, a dungeon is fixed. The player's changes are stored as diffs.
+* **Graph first**: purpose → a graph of rooms and links (main path, loops, side branches, locks and keys, the goal) → laid out in 3D from built kit pieces, or carved as an SDF cave → dressed. Milestone 3 builds the cellar kit only.
+
+### 8.1 Against formula (D39)
+
+Dungeon generators turn formulaic easily: after the third crypt the player has seen them all. Eight layers work against it ([full write-up](https://claude.ai/artifact/AekqvbH369xW1pu8QrfgKN)):
+
+1. **History first.** The generator writes the place's past as layers of occupation (who built it and why, what went wrong, who moved in after, who is there now). Each layer leaves rooms and traces: original halls, collapse, rooms re-used (a chapel turned goblin kitchen), a barricade from a last stand. The same history feeds the VGM's hints in town.
+2. **Cycles, not trees.** Layouts are built from loops (as in *Unexplored*): a key on a loop around its door, the goal seen across a chasm long before you reach it, a hidden way back, a shortcut that opens once you've gone around. A library of 15–20 cycle patterns, two or three combined per dungeon.
+3. **Set pieces.** A growing library of hand-designed moments with their requirements (a flooded hall, a collapsing bridge, a sleeping giant, a ward wall that the right item breaks). At least one signature set piece per dungeon; none repeats until the library has been used through.
+4. **Space, not boxes.** Full 3D: galleries over halls, chasms, collapsed floors, rising water, SDF caves blended into built rooms. Each kind has its own space rules.
+5. **Living inhabitants.** The world simulation runs inside (D27): kitchens, sleeping quarters, guard shifts; they raise the alarm, flee for help, barricade doors.
+6. **Mechanics with tells.** Traps you can spot, levers and water, light and darkness, wards that only the right school or item opens (D31), secrets that reward looking.
+7. **Pacing.** A tension curve in every dungeon: a quiet entrance with foreshadowing, rising danger, one safe spot, a reveal, the climax, a shortcut back out.
+8. **Small and dense.** Most dungeons take 15–40 minutes; bigger ones are several connected parts with their own stories.
+
+Arnd's rules (2026-10-25):
+
+* **A world, not a game.** No gamey puzzles. A puzzle exists only with a very good in-world reason, and then it is a detective puzzle, never an infantile one: reading the clues the place's history left (whose grave is missing, why the water channel was blocked, which ledger entry is a lie).
+* **Repopulation.** A cleared or half-cleared dungeon can be moved into again, as a story event (D10): the goblins' cousins come back, something worse finds the empty halls.
+* **Breaking expectations, rarely.** Monsters mostly fight, but now and then one surprises: a goblin who speaks broken Common and begs for mercy, a kobold who wants to trade.
+
+**Checked, not hoped for**: a variety test generates many dungeons per kind and fails when layouts, set pieces, room shapes or dressing repeat too often, or a dungeon lacks a signature set piece, a safe spot, a shortcut out, or traces of its history. A small sample runs in `npm test`; the full sweep is a slow script.
+
+**Order of work**: milestone 3's cellar uses layers 1, 2, 7 and 8 and one set piece; the other layers grow with each new dungeon kind.
 
 ---
 
@@ -266,6 +330,8 @@ The purpose also tells the Director what to hint ("the dwarves sealed the lower 
 * People come from **Actors** (races, bodies, clothing, animation).
 * What they know comes from **Conversations**: the VGM plants a promise as a fact in one or a few NPCs' knowledge with `world.addFacts`. Rumours can spread between NPCs over time, with attribution and errors.
 * When the player learns the fact, Conversations knows it. That is the commitment signal for the promise.
+* **The map is where a hint lands (D35).** When an NPC gives a task, the player hands over their map (an animation, both looking at it), and the NPC marks the place. The journal lists the open leads, each linked to its mark.
+* Talk uses Arnd's **Conversations** package (D36). The default world ships its own Conversations setting package, written as data (drafted with an LLM offline and checked in, so play costs nothing, D1).
 * Conversations' own review says open free-text conversation is still weak. **Topic-based dialogue** (pick a subject, ask about it) fits the hint channel well and avoids the problem. Free text can come later with the LLM hook.
 
 ### 9.2 Believable life (D19)
@@ -284,7 +350,7 @@ How:
 * **Animals and traffic.** Dogs, chickens, cattle, a cart on the road: Actors' animals, with the same smart-object rules (a trough, a pasture, a kennel).
 * **Detail by distance.** Near the player: full locomotion, animation, IK and look-at. Further away: cheaper updates. Off screen: an abstract schedule in coarse time steps, caught up when the place is seen again (as Norgo did). What the player sees must always agree with the schedule (the baker is at the bakery at dawn).
 
-**Animation is the bottleneck.** Actors has about 90 clips from Quaternius and the CMU motion library on demand. A living town needs work clips most libraries lack: hammering, sweeping, chopping, digging, hoeing, carrying, drawing water, kneading, stirring, sitting and eating, drinking, talking gestures. Collecting, retargeting and blending these (Actors already retargets) is a work item of its own, early.
+**Animation** comes from Actors, which has a large library (D40). There is no fixed list up front: we take what the town needs as we find it (hammering, sweeping, chopping, carrying, drawing water, sitting and eating, talking gestures …) and ask Actors for what is missing. Procedural IK puts hands on props.
 
 **It is checked, not hoped for.** A headless test runs a town for an in-game day and measures how much of the time each visible NPC spends without an activity. The target is under 5 %, and the test fails above it. A second check counts distinct activities per town and per hour, so variety cannot quietly shrink.
 
@@ -299,6 +365,10 @@ Everything that moves by itself lives in **one simulation** (`src/sim`, pure, ru
 * **The simulation reports** what happens (who met whom, who saw the player), which the VGM reads and Conversations uses to spread rumours.
 
 Built so far (`src/sim`): `nav.ts` walks along the streets (a graph on their centre lines, the market as a hub, around a house to its back yard); `spots.ts` turns the plan's fixtures and doors into smart objects (what is done there, by whom, for how long, how many at once); `people.ts` fills the houses (trades, stall traders, the temple keeper, hands, homemakers, children; traits shift each one's day); `townLife.ts` runs them: every agent is always on the way or doing something, turns last real seconds while the game clock only picks the part of the day (so a stopped clock still gives a busy town), rain sends people in, far agents skip their walks, and the VGM's town orders are `gather` and `stayIn`. `test/townLife.test.ts` holds the town to it: through a whole day under 5 % of the time idle.
+
+* **Budget (D41)**: at most about 30 agents in full detail near the player, about 100 at a cheap middle level, the rest off screen; the simulation gets about 2 ms of main-thread CPU per frame, and a check measures it. That is what makes bigger towns and a capital possible.
+* **Saving**: the simulation is not saved in detail. It is rebuilt from the clock and the schedules; only lasting changes are saved (who died, moved items, relationships, merchants' stock).
+* **Creatures** use the same core: idle, alert, fight, flee; they notice by sight and sound, stay tied to their territory, and fight in groups with roles (leader, melee, ranged). Their power comes from where they live (D29), not from the player.
 
 Drawn (`src/render/folk`): the nearest people out of doors (16 by default, `?folk=N`) get an Actors character from a pool, dressed from their seed and role in Actors' medieval wardrobe (`looks.ts`: tunics, hose, chemises, skirts, a long tunic for traders, robe and mantle for the temple keeper) and playing a clip per activity. Far ones draw Actors' "Crowd" level. `npm run packs` copies the part of the Actors pack the town uses (about 90 of 530 MB) into `public/packs`; the Pages build runs it. Actors makes adults only, so children live in the simulation but are not drawn yet.
 
@@ -317,7 +387,9 @@ Norgo's system, as it stands:
 
 Decided: **a mix** (D11). Skill levels still unlock abilities, and other sources do too: a trainer, a guild rank, a found tome or scroll, a quest reward, an item, a deed ("slew a dragon"). That gives the VGM another lever: it can hand out an unlock as a reward that fits the player's playstyle.
 
-Still open:
+Decided for the default world (2026-10-25): magic is what returns after the Fading (12.1), so mages are rare and respected. **Six schools at the start**: pyromancy, cryomancy, geomancy, vitae, luminism, umbramancy. Kinesis, animism and runecraft can come back later as long-term goals. Gravitas is dropped. A hedge witch and a half-ruined tower near the town are the first teachers. Items can also grant rare abilities (D31).
+
+Notes:
 
 * **Which schools fit this world?** Gravitas was tied to Norgo's variable gravity. With hybrid terrain (D9), geomancy can shape the local volumes and spawn rock pieces (walls, pillars, bridges); digging through the height field itself is out, and inside dungeons it works where the geometry is a volume.
 * **Where does magic come from in the lore?** That shapes which NPCs teach it and what the VGM may hint.
@@ -343,6 +415,41 @@ The mode is a setting the VGM honours (D4): in roguelike mode it is stricter wit
 * **Right mouse button held: mouse look.** The cursor hides, the mouse turns the camera and the character; releasing brings the cursor back where it was.
 * Movement with WASD, third-person camera with zoom to first person.
 * This also suits the cast-time and cooldown abilities from Norgo's recipe format (section 10).
+* **Death in classic mode**: you wake at the nearest temple or inn and lose some coin; carried gear stays where you fell, so going back for it is a small quest. Loading a save is always allowed.
+
+### 11.3 The core loop (D28)
+
+* **Ten minutes**: walk, notice something (a view, a camp, a person), deal with it (talk, fight, sneak, loot), move on.
+* **An evening**: get a lead in town (a mark on the map), travel, clear the place, come back, sell and upgrade, get new leads.
+* **Why come back tomorrow**: open marks on the map, a town that changed because of you, the frontier you haven't seen, and the long-term goals.
+* **Long-term goals, many and none final**: the mystery of the Fading and what wakes with the magic, standing with each people, mastering skills, legendary items, the giants in the far mountains, a house of your own. The VGM ties some promises to them; the player follows whichever they like, and none of them ends the game.
+
+### 11.4 Character and growth (D29, D30)
+
+* **Creation**: the shared Actors character creator with a filter parameter for this setting (races, looks, clothing; generous, but leaving out what clearly does not fit), and a background (farmhand, smith's apprentice, acolyte, poacher, scribe …) that sets starting skills and kit and gives one or two people in town who already know you.
+* **Growth**: skills rise by use up to 100, more slowly the higher they are; trainers speed them up. Health, stamina and mana grow with the skills that use them. The VGM reads a "power" number (weighted skills plus gear) wherever it needs a level.
+* **Reasons to grow**: the world has places you cannot take on yet, and the game tells you so. Coming back later and winning is the reward.
+
+### 11.5 Items and money (D31)
+
+* **Rarity**: common, uncommon, rare, legendary, with WoW-style item cards (name in rarity colour, stats, bonuses, a line of lore). Legendary items are named and have a history in the canon.
+* **Bonuses**: items can raise one or more skills; a few rare abilities exist only on items.
+* **Slots**: head, body, hands, feet, cloak, main hand, off hand, two rings, amulet, plus four quick slots on the belt. The inventory is a sorted list limited by weight. Durability is light: gear wears, the smith repairs.
+* **Money**: copper, silver, gold. It buys gear, training, food and a room at the inn, repairs, later a house. Merchants have limited stock and coin; prices follow what the town has.
+* **Crafting**: not in 1.0 (D32).
+
+### 11.6 Peoples and reputation (D34)
+
+* Each people (race) is a faction with a reputation number the simulation reads: greetings, prices, who will talk to you, whether the guards let you in.
+* Peoples have their own areas. Walking into the orc town as a human is dangerous until you have earned the orcs' trust (a deed, a gift, a quest for them).
+* Other factions (the Temple, guilds, the watch, a thieves' ring) come later.
+* Companions, if any, are animals, elementals or summoned things (D33).
+
+### 11.7 The map and orientation (D35)
+
+* The player carries a map that fills in with what they have seen, drawn like a hand-made map.
+* NPCs mark places on it when they give a task (9.1).
+* The **orientation skill** sets how exactly the map shows where you are: a vague area at first, a sharp arrow at mastery. It rises by travelling and reading the map.
 
 ---
 
@@ -373,6 +480,16 @@ Rules for the contract:
 * **Pure data where possible**, pure seeded functions where not. No `Math.random`, no access to the engine's internals.
 * **One module per game.** Mixing modules is out of scope.
 
+### 12.1 The default world (D42, D43)
+
+* **Tone**: warm and full of wonder, with real danger. Townsfolk are human and sometimes funny; dark places are truly dark. Low to middle magic. A comic-relief character is allowed, as the exception.
+* **History: the Fading.** The start region is a river valley on the edge of an old realm where men and dwarves once ruled together. About 300 years ago magic drained out of the world: the realm's great works failed, the dwarves sealed their deep halls, cities shrank to towns. Now magic is seeping back, and old things wake with it: wards fail, crypts stir, children are born with the gift. This explains the ruins, the sealed mines and the rare mages.
+* **Faith: the five Wardens**: the Sun, the Harvest, the Hearth, the Road and the Threshold (death and passage). Symbols are simple shapes (a disc, a sheaf, a flame, a wheel, an open door); no real-world symbols. A town's temple serves all five; wayside shrines stand on the roads; the Threshold keeps the burial ground. Every seventh day is a rest day with a gathering at the temple.
+* **Peoples**: the start town is mostly human, with dwarves (a smith, a miner family), a halfling family running the inn and the odd elf passing through. Men and dwarves are old allies; elves remember the realm differently. Goblins, kobolds and orcs are peoples with their own reasons, mostly hostile at first.
+* **Creatures** for the start area: rat, giant rat, bat, wolf, boar, bear, giant spider, bandits (three roles), goblin, kobold, skeleton, ghoul, wraith, cave troll, will-o'-wisp (a sign of the returning magic), deer. Plus **truly giant versions** of animals and monsters, and human giants: cheap to make and fun.
+* **Items**: a first catalogue of about 60 (eight weapon kinds, shields, three armour weights, potions, food, torches, lockpicks, rope, valuables), with treasure tables by danger.
+* **Names**: humans Old English and Germanic in flavour (Eastmere, Aldric, Mara), dwarves Norse, elves invented and soft, halflings homely English (Tobold Underbank). A seeded generator per people.
+
 ---
 
 ## 13. Seas and oceans (later, prepared now)
@@ -400,33 +517,109 @@ Out of the box nothing calls a model. The hook is a narrow interface the procedu
 * `answer(question, knowledge) → text` for free-text talk (Norgo's Oracle),
 * `propose(need, canon) → promise` for more inventive promises, always validated by the Builder's constraints.
 
+Arnd's `freeryder` project offers real LLMs at no cost, but less reliably. Whether and how to use it is a discussion of its own (O15).
+
 An LLM can only *suggest*. The procedural layer stays the authority, so the game never breaks or contradicts itself because of a model.
 
 ---
 
-## 16. Open questions
+## 16. Sound (D44)
+
+* Sound comes from models through OpenRouter (the `openrouter` skill), with CC0 libraries as backup and sources recorded (D24). Procedural sound only where a model cannot give a good result.
+* A shared package in AssetGenerator for playback: Web Audio, positional sounds, mixing, ducking.
+* **Milestone 2: ambience**: wind, birds by time of day, rain and thunder, sea and rivers, town bustle, footsteps by surface.
+* **Milestone 4: music and combat**: music in layers (explore, tension, fight, town) that fade with the Director's tension curve; weapon and creature sounds.
+* No voices for now.
+
+---
+
+## 17. Interface and first start (D45, D46)
+
+* **Warded brass** is the design language (D45, 17.1).
+* **Windows**: the map (11.7), the journal and the dialogue window (topics, the 3D speaker stays in view) in milestone 3; inventory with character sheet and trading in milestone 4. The HUD stays small but is as animated and polished as the windows (17.1).
+* **The title animation** (17.2) is a hero feature: captivating and playful, like Starlord's, and while it plays the world is built behind it. Then character creation and a short intro.
+* **First start targets**: the title animation shows within a few seconds; the game is playable when it ends.
+* **Saving**: IndexedDB in the browser, several slots, export and import as a file; autosave on entering or leaving a region or interior and every 5 minutes. A save holds the game version, the module id and version, the seed, the decision log, per-site diffs and the player. Each version bump brings a small migration.
+* **Language**: English first; all text goes through a string table from the start, so German can follow.
+* **Controls**: keys are rebindable already; gamepad after milestone 5.
+
+
+### 17.1 Warded brass (D45)
+
+**The shared language.** Every window follows it:
+
+* **Materials**: engraved brass (rims, rivets, gears, hinges) on dark leather and wood; slate inlays where wards sit. Text in a carved capital face for names (Marcellus SC in the mockups) and a book face for reading (EB Garamond).
+* **Wards**: thin lines of light set into the brass. They trace themselves in when a window opens and then rest with a slow pulse and a spark that runs along them. Their colour carries meaning: cyan is magic and the UI itself; rarity colours on items (grey, green, blue, orange).
+* **The story shows**: early in the game the wards are dim and few. As the long-term goals bring magic back, they grow brighter and more lines wake. The interface ages with the world.
+* **Always-on elements are polished too**: the HUD is animated like the windows (D45), but calm enough to sit on screen for hours: slow idle motion, quick reactions to what happens.
+* **Motion**: every window has an entrance (shutters, an iris, a flip, a drop, a slide, unrolling), lines arrive one after another with a small bounce, and at rest something always moves (a spark, a ticking gear, a glint, a settling needle). Motion is short (under about 1.5 s to readable), never blocks input, and a setting turns it down for those who want calm.
+* **Rarity is the strength of the ward**: common is plain brass, uncommon a breathing ward, rare a ward with a running spark, legendary two sparks, a gear and twinkling stars.
+
+**Each window has its own signature** (proposals, to be shown as mockups):
+
+| Window | Signature |
+|---|---|
+| Item card | Shutters part, the ward traces the rim, stats rise one by one; the rarity sets the entrance (drop, slide, flip, iris). |
+| Map | A brass map case: the lid swings up and the parchment unrolls. A compass whose needle wanders or points true by the orientation skill; marks drawn in with a quill when an NPC adds one. |
+| Journal | A brass-bound book. Pages turn, new leads write themselves in, a ward-lit bookmark sits at the newest lead. |
+| Dialogue | A brass speaking-ring around the topic list. Topics turn into place like a dial; topics with a new lead glow. |
+| Inventory and character | A field chest: the lid opens, compartments slide out. Character skills on brass gauges whose needles rise when a skill grows. |
+| Trade | A merchant's balance: coins and goods on two pans that tip as the deal changes. |
+| Compass (always on) | A brass ring at the top that turns with the camera. Its needle breathes and settles after each turn and wanders by the orientation skill; map marks slide in on the rim as small glowing studs. |
+| Health, stamina, mana (always on) | Three brass gauges with liquid behind glass: it sloshes when you are hit, bubbles when you heal, and the ward around each glows harder as it runs low. |
+| Quick slots and abilities (always on) | Brass sockets on a belt strap. Cooldowns run as a ward line around the socket; a ready ability gives a short glint. |
+| Target frame | A small brass plate that drops in on a hinge; the creature's threat colour shows in its ward. |
+| Clock and weather | A tiny orrery by the compass: sun and moon turn with the day, and a cloud, raindrop or snowflake rides along with the weather. |
+| Notifications | A small brass capsule that pops out of the frame edge, rings once and slides back. |
+| Settings and menus | A cartographer's tool roll that unrolls; switches are brass toggles that click. |
+| Death and waking | The wards go dark one by one; on waking they relight from the centre. |
+| Title screen | Part of the title animation (O18). |
+
+
+### 17.2 The title animation (D46)
+
+StarLord's title is the bar: the game's own world, alive, playful, new every start, with toys and a jump into the game. MasterWorld's version ([full write-up](https://claude.ai/artifact/59Spcz1y7gNNX99LLriQwr)):
+
+1. **Opening** (about 8 s to the menu): dark and wind; one ward line runs over the land like a fuse, and dawn breaks along it.
+2. **Fly-over**: the camera rises over the real start region (river, town, sea, mountains). Weather, season, hour and route are drawn from a seed each start.
+3. **The logo** forges itself in warded brass (17.1): plates swing in, wards trace the letters, a gear clicks, a glint runs across. Music swells (generated through OpenRouter, D44).
+4. **The menu** is a brass instrument panel; around it a town-crier ticker of silly tavern rumours and a card per playable people (a live Actors model doing something in character).
+5. **Toys**: the world can be clicked. Birds scatter, the sky gives lightning or a shooting star, a cloud rains, the town bell rings, rarely a sea serpent breaches; a secret code brings a dragon or a giant.
+6. **The dive**: New game or Continue drops the camera through the clouds to the hero on the market square; the game starts where it lands.
+
+**It hides the build.** A still of the valley shows at once; the coarse land, sky and far terrain come first; the start town streams in while the menu sits, and shaders compile within [docs/SHADERS.md](../SHADERS.md). The route only comes close where the world is ready, and the dive waits for the last pieces. Weak GPUs fly higher; reduced motion gets the still and a fade.
+
+---
+
+## 18. Open questions
 
 | # | Question | Notes |
 |---|---|---|
 | O1 | ~~Height field or voxel terrain?~~ | **Decided: hybrid** (D9, 5.6). |
-| O2 | Travel speed | Region sizes are decided (D16). Travel speed drives build-ahead time. |
+| O2 | ~~Travel speed~~ | **Decided** (D37, 5.4). |
 | O3 | ~~How far may the VGM go in soft land?~~ | **Decided** (D10): wherever it makes sense; known things change through story events. |
-| O4 | Skills and magic | Mix decided (D11). Open: which schools, the source of magic (section 10). |
+| O4 | ~~Skills and magic~~ | **Decided** (D11, section 10): six schools at the start, magic returns after the Fading. |
 | O5 | ~~Death and saving~~ | **Decided** (D12): roguelike or classic. |
 | O6 | ~~Combat feel~~ | **Decided** (D13): real-time, tab targeting. |
-| O7 | Lore of the default module | Shapes everything the VGM hints (section 12). |
+| O7 | ~~Lore of the default module~~ | **Decided as a first sketch** (D43, 12.1): the Fading, the five Wardens. Details grow with play. |
 | O8 | ~~Which Norgo code is ported?~~ | **Decided** (D15): the GM is inspiration only. Skills, abilities and the worker split are candidates to port. |
-| O9 | Footprint rules | When a footprint reaches into a neighbouring region (5.5), and when a town grows into a forest: what wins? |
+| O9 | ~~Footprint rules~~ | **Decided** (section 7): hard land wins, then the older decision; settlements and roads beat vegetation. |
+| O15 | Free LLMs through `freeryder` | **Parked** (Arnd, 2026-10-25): not sure it belongs in MasterWorld at all. |
+| O16 | ~~Dungeons that don't feel formulaic~~ | **Decided** (D39, 8.1): eight layers, detective puzzles only, repopulation, rare surprises. |
+| O17 | ~~The interface's design language~~ | **Decided** (D45, 17.1): warded brass. Each window's signature still to be mocked up. |
+| O18 | ~~The title animation~~ | **Decided** (D46, 17.2). |
 
 ---
 
-## 17. Milestones (proposal)
+## 19. Milestones
 
 1. **Walk the land**: the setting module contract (a first cut), skeleton, one open region, hybrid terrain (height field plus a first volume: an arch or a cave mouth), sky, water, hero-quality materials and lighting, the player walking.
-2. **The town**: one medieval small town (Scale planner + medieval style) with **living townsfolk** in the world simulation (9.3): smart objects, activities with props, schedules, social groups, and the "nobody stands around" test (9.2). The work-animation set starts here.
-3. **The first promise**: ledger, Conversations hint, one cellar dungeon built through the three stages.
-4. **The Director**: needs, tension curve, the first combat and rewards.
+2. **The town**: one medieval small town (Scale planner + medieval style) with **living townsfolk** in the world simulation (9.3): smart objects, activities with props, schedules, social groups, and the "nobody stands around" test (9.2). Interiors (tavern, smithy, temple, the player's room), town ambience sound.
+3. **The first promise**: ledger, a Conversations hint marked on the player's map, the journal, one cellar dungeon built through the three stages, saving.
+4. **The Director**: needs, tension curve, the first combat, items and rewards, music.
 5. **The frontier**: opening regions as the player walks, story events (raids, takeovers), more dungeon kinds, more settlement sizes.
 6. **Skills and magic.**
 7. **Seas.**
-8. Later: the LLM hook, multiplayer.
+8. Later: the LLM hook, multiplayer, crafting.
+
+Alongside, from now on: the interface's design language (O17) and the title animation (O18), because both shape how the game feels from the first second.

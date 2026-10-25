@@ -2,6 +2,7 @@
   "name": "masterworld",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Classic fantasy RPG in the browser with a virtual game master that builds the world as play needs it.",
   "type": "module",
   "engines": {
