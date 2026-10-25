@@ -41,6 +41,12 @@ interface Slot {
   /** Dressed for that agent and compiled. */
   ready: boolean;
   clip: string;
+  /**
+   * A dressing still runs. A slot freed meanwhile is not dressed again until it ends: the old run would
+   * set the detail level and hide the character under the new run's compiles (hidden objects are not
+   * compiled), and that level then built its shaders on the render path.
+   */
+  busy: boolean;
 }
 
 export class FolkView {
@@ -56,7 +62,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      this.slots.push({ ch, place, agent: -1, ready: false, clip: '' });
+      this.slots.push({ ch, place, agent: -1, ready: false, clip: '', busy: false });
     }
   }
 
@@ -155,7 +161,7 @@ export class FolkView {
     for (const [, a] of near) {
       if (this.dressing >= DRESSING || !want.size) break;
       if (!want.has(a.person.id) || this.shown.has(a.person.id)) continue;
-      const s = this.slots.find((x) => x.agent < 0);
+      const s = this.slots.find((x) => x.agent < 0 && !x.busy);
       if (!s) break;
       this.dress(s, a);
     }
@@ -185,6 +191,7 @@ export class FolkView {
     s.clip = clipOf(a.act, a.person.id);
     this.shown.set(a.person.id, s);
     this.dressing++;
+    s.busy = true;
     const id = a.person.id;
     s.ch.set({ ...lookOf(a.person), animation: s.clip })
       .then(async () => {
@@ -207,7 +214,7 @@ export class FolkView {
         s.ready = true;
       })
       .catch((e: unknown) => console.error('[folk] dressing failed', e))
-      .finally(() => { this.dressing--; });
+      .finally(() => { this.dressing--; s.busy = false; });
   }
 
   /**
