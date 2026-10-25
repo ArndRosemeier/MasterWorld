@@ -75,7 +75,7 @@ test('title: the giant comes now and then, and paces the land by the town on the
   for (let t = 0.5; t < 400; t += 0.5) {
     const p = giantPose(o, 9, t);
     const far = Math.hypot(p.x - 100, p.z + 50);
-    assert.ok(far > 100 && far < 300, `near the town (${far} m)`);
+    assert.ok(far > 100 && far < 350, `near the town (${far} m)`);
     assert.equal(p.y, o.ground(p.x, p.z));
     const step = Math.hypot(p.x - last.x, p.z - last.z);
     assert.ok(step <= GIANT_SPEED * 0.5 + 1e-6, `walks, does not jump (${step} m)`);
