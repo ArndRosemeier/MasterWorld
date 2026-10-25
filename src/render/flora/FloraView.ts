@@ -7,7 +7,7 @@
  */
 import { Matrix4, Quaternion, Vector3, type BufferGeometry, type Camera, type DirectionalLight, type Material } from 'three/webgpu';
 import { shrubModel, treeModel, vegetationUniforms, type TreeSpecies } from '@futuremagic/vegetation';
-import { createBarkMaterial, createFarTreeMaterial, createLeafMaterial } from '@futuremagic/vegetation/node';
+import { createBarkMaterial, createFarTreeMaterial, createLeafMaterial, createLeafPasses } from '@futuremagic/vegetation/node';
 import { createInstanceDraws, DITHER, KIND, RECORD, type DrawKind, type DrawPart, type InstanceDraws } from '@futuremagic/instances';
 import type { Stage } from '@futuremagic/stage';
 import { hash2f } from '@futuremagic/core';
@@ -46,16 +46,23 @@ export class FloraView {
   private readonly s = new Vector3();
   private readonly up = new Vector3(0, 1, 0);
 
-  constructor(private readonly stage: Stage, private readonly jobs: WorldJobs, private readonly sun?: DirectionalLight) {
+  /** `leafDepth`: leaves with a depth pre-pass (each leaf pixel lit once); `shadows`: trees cast shadows. */
+  constructor(private readonly stage: Stage, private readonly jobs: WorldJobs, private readonly sun?: DirectionalLight, opts: { leafDepth?: boolean; shadows?: boolean } = {}) {
     WOODS.band.value.set(HULL_END - HULL_THIN, HULL_END);
     const U = vegetationUniforms;
-    const bark = createBarkMaterial(U), leaf = createLeafMaterial(U, false), needles = createLeafMaterial(U, true), hull = createFarTreeMaterial(U);
+    const shadows = opts.shadows ?? true, leafDepth = opts.leafDepth ?? true;
+    const bark = createBarkMaterial(U), hull = createFarTreeMaterial(U);
+    const reversed = !!(stage.renderer as unknown as { backend?: { parameters?: { reversedDepthBuffer?: boolean } } }).backend?.parameters?.reversedDepthBuffer;
+    const leafPass = (conifer: boolean) => (leafDepth ? createLeafPasses(U, conifer, reversed) : { depth: null, color: createLeafMaterial(U, conifer) });
+    const leaf = leafPass(false), needles = leafPass(true);
     // The hulls' baked colours read lighter than the leaf cards they stand in for.
     hull.color.setScalar(0.75);
-    const part = (geometry: BufferGeometry, material: Material): DrawPart => ({ geometry, material, castShadow: true, receiveShadow: true });
+    const part = (geometry: BufferGeometry, material: Material, renderOrder = 0, castShadow = shadows): DrawPart => ({ geometry, material, castShadow, receiveShadow: true, renderOrder });
+    const leaves = (geometry: BufferGeometry, p: typeof leaf): DrawPart[] =>
+      p.depth ? [part(geometry, p.depth, -1, false), part(geometry, p.color, 1)] : [part(geometry, p.color)];
     const kinds: DrawKind[] = FLORA_KINDS.map((k) => {
       const m = k.species === 'shrub' ? shrubModel(k.variant) : treeModel(k.species as TreeSpecies, k.variant);
-      const lods: DrawKind['lods'] = [{ far: FULL, parts: [part(m.wood, bark), part(m.leaves, k.conifer ? needles : leaf)] }];
+      const lods: DrawKind['lods'] = [{ far: FULL, parts: [part(m.wood, bark), ...leaves(m.leaves, k.conifer ? needles : leaf)] }];
       if (!m.isShrub) lods.push({ near: FULL, far: HULL_END, fade: [HULL_END - HULL_THIN, HULL_END], parts: [part(m.far, hull)] });
       return { lods };
     });

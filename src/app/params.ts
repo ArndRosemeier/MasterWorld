@@ -20,6 +20,9 @@ export const params = {
   dayMinutes: q.has('day') ? Number(q.get('day')) : null,
   /** Grow the trees (`trees=0` leaves them out, for quick screenshots). */
   trees: q.get('trees') !== '0',
+  /** Tree checks (for measuring): `treeShadows=0` trees cast no shadows, `leafDepth=0` leaves without their depth pass. */
+  treeShadows: q.get('treeShadows') !== '0',
+  leafDepth: q.get('leafDepth') !== '0',
   /** Draw the grass (`grass=0` leaves it out, for quick screenshots). */
   grass: q.get('grass') !== '0',
   /** Weather everywhere, all the time (a VGM order): clear, fair, overcast, rain, storm, fog, snow. */
