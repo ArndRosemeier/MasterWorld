@@ -5,7 +5,9 @@
 import { ACTIONS, bind, keyLabel, RESERVED_KEYS, type Action } from '../input/controls';
 import { release, versionLabel } from './release';
 import { RANGES, type Settings, type SettingsStore } from './settings';
-import { onKeyDown } from '../input/keys';
+import { onKeyDown, swallow } from '../input/keys';
+import { clock, el } from './dom';
+import { shadeAround } from './window';
 
 /** What the menu needs of the running game. */
 export interface MenuHost {
@@ -16,12 +18,6 @@ export interface MenuHost {
 }
 
 type Layout = ReadonlyMap<string, string> | undefined;
-
-const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] => {
-  const e = Object.assign(document.createElement(tag), props);
-  e.append(...kids);
-  return e;
-};
 
 export class Menu {
   private readonly settings: HTMLDivElement;
@@ -57,9 +53,7 @@ export class Menu {
     const box = el('div', { className: 'panel', role: 'dialog' },
       el('div', { className: 'head' }, el('h2', { textContent: title }), el('button', { className: 'close', textContent: '×', title: 'Close (Escape)', onclick: () => this.show(null) })),
       ...content);
-    const shade = el('div', { className: 'shade' }, box);
-    shade.addEventListener('mousedown', (e) => { if (e.target === shade) this.show(null); });
-    return shade;
+    return shadeAround(box, () => this.show(null));
   }
 
   private get open(): boolean {
@@ -77,8 +71,7 @@ export class Menu {
   private key(e: KeyboardEvent): void {
     if (this.rebinding) {
       // The next key goes on the slot: Escape keeps the old one, Backspace and Delete clear it.
-      e.preventDefault();
-      e.stopImmediatePropagation();
+      swallow(e);
       const { action, slot } = this.rebinding;
       this.rebinding = null;
       if (e.code === 'Backspace' || e.code === 'Delete') this.store.set({ bindings: bind(this.store.current.bindings, action, slot, '') });
@@ -163,8 +156,3 @@ export class Menu {
   }
 }
 
-/** Hours as a clock: 16.5 → "16:30". */
-function clock(h: number): string {
-  const m = Math.round(h * 60) % (24 * 60);
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-}

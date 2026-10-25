@@ -9,7 +9,8 @@ import { interiorWorld, roomFrame, type RoomFrame } from '../game/interiorWorld'
 import type { WalkWorld } from '../game/walker';
 import { ROOM_DEPTH, type InteriorView } from '../render/town/InteriorView';
 import type { SkyView } from '../render/sky';
-import { Fade, Note } from './fade';
+import { Fade } from './fade';
+import type { Notes } from './notes';
 import type { Player } from './player';
 
 /** What a room is called when one walks in. */
@@ -20,7 +21,6 @@ interface Room { b: TownBuilding; plan: InteriorPlan; frame: RoomFrame; world: W
 export class InteriorVisit {
   private room: Room | null = null;
   private readonly fade = new Fade();
-  private readonly note = new Note();
   private cooldown = 0;
 
   constructor(
@@ -31,6 +31,7 @@ export class InteriorVisit {
     private readonly player: Player,
     private readonly light: PointLight,
     private readonly sky: SkyView,
+    private readonly notes: Notes,
   ) {}
 
   get inside(): boolean { return this.room !== null; }
@@ -55,7 +56,7 @@ export class InteriorVisit {
       // Just inside the door, facing in (the walker's forward is (-sin yaw, -cos yaw)).
       const [x, z] = frame.toWorld(0, -plan.hb + 1.3);
       this.player.teleport(x, y, z, Math.atan2(-b.vx, -b.vz));
-      this.note.say(`You step into ${NAMES[b.kind] ?? 'the house'}.`, 3);
+      this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.`, 3);
     });
   }
 
@@ -77,7 +78,6 @@ export class InteriorVisit {
 
   update(dt: number): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
-    this.note.update(dt);
     if (this.fade.busy || this.player.flying || this.cooldown > 0) return;
     const w = this.player.walker;
     const speed = Math.hypot(w.vel.x, w.vel.z);
@@ -95,6 +95,12 @@ export class InteriorVisit {
     const { plan, frame, b } = this.room;
     const [a, bb] = frame.toRoom(w.pos.x, w.pos.z);
     if (Math.abs(a) < plan.doorW && bb < -plan.hb + 0.5 && fx * b.vx + fz * b.vz < -0.5) void this.leave();
+  }
+
+  /** Where one stands outside the room's door (null: not in a room). */
+  get outside(): { x: number; y: number; z: number; yaw: number } | null {
+    const b = this.room?.b;
+    return b ? { x: b.door[0], y: b.floorY, z: b.door[1], yaw: Math.atan2(b.vx, b.vz) } : null;
   }
 
   get summary(): string {
