@@ -12,9 +12,9 @@ import type { PerspectiveCamera } from 'three/webgpu';
 import { dayOf, drawTitle, titleSeed, type TitleDraw } from './draw';
 import { CodeWatch, SECRET, type People } from './lines';
 import type { Orbit, Pose } from './route';
-import { TitleCamera } from './TitleCamera';
+import type { TitleCamera } from './TitleCamera';
 import { TitleScreen } from './TitleScreen';
-import { Toys, type ToyWorld } from './Toys';
+import type { Toys, ToyWorld } from './Toys';
 
 /** What the title needs of the game once the view exists. */
 export interface TitleWorld {
@@ -41,6 +41,7 @@ export class Title {
   private toys: Toys | null = null;
   private world: TitleWorld | null = null;
   private built = false;
+  private playable = false;
   private wanted: { people: People['id'] | null } | null = null;
   private over = false;
 
@@ -68,23 +69,46 @@ export class Title {
     this.screen.toys.addEventListener('click', (e) => { if (this.built && !this.calm) this.toys?.click(e.clientX, e.clientY); });
   }
 
+  /** A saved game exists: the menu offers to continue it (`go` restarts the page with it loaded). */
+  offerContinue(label: string, go: () => void): void {
+    if (!this.wanted) this.screen.offerContinue(label, go);
+  }
+
+  /** This start loads a save: no menu choice is left, the title dives to it once the world is built. */
+  continuing(label: string): void {
+    this.wanted = { people: null };
+    this.screen.continuing(label);
+  }
+
   /** True while the title holds the camera. */
   get holding(): boolean { return !this.over; }
 
   /** The view exists: the fly-over takes the camera (placed at once, so the world loads around it). */
-  attach(world: TitleWorld): void {
+  async attach(world: TitleWorld): Promise<void> {
+    // The camera and the toys use three.js: loaded with the game, not with the title's first picture.
+    const [{ TitleCamera }, { Toys }] = await Promise.all([import('./TitleCamera'), import('./Toys')]);
     this.world = world;
     this.cam = new TitleCamera(world.camera, world.orbit);
     this.cam.fly(0);
     if (!this.calm) this.toys = new Toys(this.screen.toys, world.camera, world.toys, this.draw.seed, { toast: (t) => this.screen.toast(t), sound: this.sound });
   }
 
-  /** The world is built: the live fly-over replaces the still, and comes closer to the town over time. */
-  ready(): void {
+  /** True once the live land shows. */
+  get live(): boolean { return this.built; }
+
+  /** The land and its trees are built: the live fly-over replaces the still, and comes closer over time. */
+  landReady(): void {
+    if (this.built) return;
     this.built = true;
-    this.screen.done();
     this.screen.live();
     this.cam?.closer();
+  }
+
+  /** Everything is built (the townsfolk too): the game can start, and does if it was asked for. */
+  ready(): void {
+    this.landReady();
+    this.playable = true;
+    this.screen.done();
     if (this.wanted) this.go(this.wanted.people);
   }
 
@@ -100,7 +124,7 @@ export class Title {
   private start(people: People['id'] | null): void {
     if (this.screen.leaving || this.wanted) return;
     this.wanted = { people };
-    if (this.built) this.go(people);
+    if (this.playable) this.go(people);
     else this.screen.waiting();
   }
 

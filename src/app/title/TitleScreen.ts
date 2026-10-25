@@ -30,6 +30,8 @@ export class TitleScreen {
   /** Where the toys draw and the world's clicks land. */
   readonly toys: HTMLCanvasElement;
   private readonly build: HTMLDivElement;
+  private readonly continueButton: HTMLButtonElement;
+  private resume: (() => void) | null = null;
   private readonly startButton: HTMLButtonElement;
   private readonly card: HTMLDivElement;
   private people = 0;
@@ -49,7 +51,11 @@ export class TitleScreen {
       el('div', { className: 't-tagline', textContent: 'The land wakes as you walk it.' }));
 
     this.startButton = this.button('New game', () => this.startWith(null), 'primary');
+    // Shown only when there is a saved game (offerContinue).
+    this.continueButton = this.button('Continue', () => this.resume?.(), 'primary');
+    this.continueButton.hidden = true;
     const menu = el('div', { className: 't-menu' },
+      this.continueButton,
       this.startButton,
       this.button('Settings', () => host.settings()),
       this.button("What's new", () => host.news()),
@@ -98,6 +104,31 @@ export class TitleScreen {
   /** The live world takes over from the painted still (not with calm motion: the still stays). */
   live(): void {
     if (!this.calm) this.root.classList.add('live');
+  }
+
+  /**
+   * There is a saved game: Continue leads the menu (New game steps back), with where the save was made.
+   * `go` is called once, when it is pressed.
+   */
+  offerContinue(label: string, go: () => void): void {
+    this.resume = () => {
+      if (this.leavingNow) return;
+      this.resume = null;
+      this.host.sound.play('click');
+      this.continueButton.classList.add('waiting');
+      go();
+    };
+    this.continueButton.hidden = false;
+    this.continueButton.title = label;
+    this.continueButton.append(el('small', { textContent: label }));
+    this.startButton.classList.remove('primary');
+  }
+
+  /** A save was loaded for this start: the title goes straight on to it once the world is built. */
+  continuing(label: string): void {
+    this.startButton.lastChild!.textContent = 'Continue';
+    this.startButton.title = label;
+    this.waiting();
   }
 
   /** New game was pressed but the world is still being built: the button's gear turns meanwhile. */

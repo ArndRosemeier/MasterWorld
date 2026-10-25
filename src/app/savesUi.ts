@@ -33,6 +33,17 @@ export async function pendingLoad(setting: { id: string; version: number }): Pro
   }
 }
 
+/** Starts the game again from a slot: the next start loads it (see pendingLoad). */
+export function loadAtRestart(slot: string): void {
+  saveLocal(PENDING, slot);
+  location.reload();
+}
+
+/** The most recent save, if any (for the title's Continue). */
+export async function latestSave(): Promise<SlotInfo | null> {
+  return (await listSlots()).reduce<SlotInfo | null>((best, s) => (!best || s.at > best.at ? s : best), null);
+}
+
 /** Save into a slot now; false if the browser refused. */
 export async function saveNow(host: SavesHost, slot: string): Promise<boolean> {
   const { data, where } = host.capture();
@@ -83,10 +94,7 @@ export class SavesUi extends KeyWindow {
     await this.render();
   }
 
-  private load(slot: string): void {
-    saveLocal(PENDING, slot);
-    location.reload();
-  }
+  private load(slot: string): void { loadAtRestart(slot); }
 
   private async exportSlot(slot: string): Promise<void> {
     const data = await readSlot(slot);
