@@ -1,8 +1,8 @@
 /**
  * The townsfolk as drawn (plan 9.3): the nearest people the simulation has out of doors, each shown by
  * an Actors character from a small pool. A character taken over by another person is dressed anew (in
- * the shape worker) and shown once ready; until then the person is simply not drawn. Characters far off
- * draw their "Crowd" level (one draw call plus the hair).
+ * the shape worker) and shown once ready; until then, and everyone farther off, is a plain figure
+ * (FarFolk). Characters far off draw their "Crowd" level (one draw call plus the hair).
  */
 import { Group, type Camera, type Material, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterCatalog } from '@actors/generator';
@@ -10,11 +10,12 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
+import { FAR, FarFolk } from './FarFolk';
 import { clipOf, coveringLooks, drawn, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
-/** People farther than this are not drawn (m). */
+/** People farther than this get no character (m). */
 const RANGE = 70;
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
@@ -34,6 +35,8 @@ export class FolkView {
   private readonly slots: Slot[] = [];
   private dressing = 0;
   private readonly shown = new Map<number, Slot>();
+  /** Everyone out of doors without a character, as plain figures. */
+  private readonly far = new FarFolk();
 
   private constructor(private readonly reversed: boolean, private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
     for (const ch of [lead, ...others]) {
@@ -78,7 +81,7 @@ export class FolkView {
     s.ch.setLod(0);
     this.adapt(s.place);
     s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
-    return [s.place];
+    return [s.place, this.far.mesh];
   }
 
   /**
@@ -102,6 +105,7 @@ export class FolkView {
     }
     ch.setLod(0);
     this.slots[0].place.visible = false;
+    this.stage.scene.add(this.far.mesh);
     this.warm = true;
   }
   private warm = false;
@@ -115,10 +119,10 @@ export class FolkView {
     for (const a of this.life.agents) {
       if (a.hidden || !drawn(a.person)) continue;
       const d = Math.hypot(a.x - cx, a.z - cz);
-      if (d < RANGE) near.push([d, a]);
+      if (d < FAR) near.push([d, a]);
     }
     near.sort((x, y) => x[0] - y[0]);
-    const want = new Set(near.slice(0, this.slots.length).map(([, a]) => a.person.id));
+    const want = new Set(near.slice(0, this.slots.length).filter(([d]) => d < RANGE).map(([, a]) => a.person.id));
     // Free the characters of people no longer wanted.
     for (const [id, s] of this.shown) {
       if (want.has(id)) continue;
@@ -129,7 +133,7 @@ export class FolkView {
     }
     // Dress free characters for the nearest people without one.
     for (const [, a] of near) {
-      if (this.dressing >= DRESSING) break;
+      if (this.dressing >= DRESSING || !want.size) break;
       if (!want.has(a.person.id) || this.shown.has(a.person.id)) continue;
       const s = this.slots.find((x) => x.agent < 0);
       if (!s) break;
@@ -149,6 +153,8 @@ export class FolkView {
       }
       s.ch.update(dt);
     }
+    // The rest (and those whose character is still being dressed) as plain figures.
+    this.far.place(near.filter(([, a]) => !this.shown.get(a.person.id)?.ready).map(([, a]) => a), this.height);
   }
 
   private dress(s: Slot, a: Agent): void {

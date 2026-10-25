@@ -28,7 +28,7 @@ export const params = {
   /** Draw the town's buildings (`town=0` leaves them out, for comparisons). */
   town: q.get('town') !== '0',
   /** How many townsfolk are drawn at most (`folk=0`: none). */
-  folk: Number(q.get('folk') ?? 16),
+  folk: Number(q.get('folk') ?? 30),
   /** Weather everywhere, all the time (a VGM order): clear, fair, overcast, rain, storm, fog, snow. */
   weather: q.get('weather'),
   /** Start in the town's cellar: `cellar` at the ladder, `cellar=3` in room 3. */
