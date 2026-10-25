@@ -37,6 +37,7 @@ export const TOASTS = {
   bolt: ['A bolt from the blue!', 'The sky answers. Rudely.', 'Somewhere a weather mage is very pleased with themselves.'],
   star: ['A shooting star. Make a wish, it is free.', 'The stars are restless tonight.'],
   bell: ['The bell rings. The town looks up.', 'Ding. Someone in the market drops a cabbage.', 'The bell-ringer wants to know who did that.'],
+  cloud: ['A cloud of your very own. It rains on exactly one farmer.', 'The farmer below thanks you. The washing on the line does not.', 'Local weather, made to order.'],
   splash: ['Something large moves beneath the waves…', 'The sea keeps its secrets. For now.'],
   whale: ['A whale! It looks at you with mild disappointment.', 'A sea serpent breaches, waves, and is gone.'],
   dragon: ['Here be dragons.', 'A dragon! It did not notice you. Lucky.'],
