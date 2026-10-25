@@ -10,7 +10,7 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
-import { clipOf, drawn, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
+import { clipOf, coveringLooks, drawn, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -73,27 +73,32 @@ export class FolkView {
 
   /** Dresses the first character as somebody from town and returns what to compile in the warm-up. */
   async warmObjects(): Promise<Object3D[]> {
-    const s = this.slots[0], p = this.life.agents.find((a) => drawn(a.person))?.person;
-    if (p) await s.ch.set({ ...lookOf(p), animation: 'walk' });
+    const s = this.slots[0], look = coveringLooks(this.life.agents.map((a) => a.person))[0];
+    if (look) await s.ch.set({ ...look, animation: 'walk' });
     s.ch.setLod(0);
-    this.reverseOffsets(s.place);
+    this.adapt(s.place);
     s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
     return [s.place];
   }
 
   /**
-   * After the warm-up, while the loop runs (the Stage compiles in its frame slots): the other detail
-   * levels of the first character, whose meshes (and the crowd level's merged one) draw with
-   * materials of their own. Nobody is drawn before.
+   * After the warm-up, while the loop runs (the Stage compiles in its frame slots): every detail level
+   * of the first character, dressed in turn as a few townsfolk who between them wear everything in town
+   * (each garment, hairstyle and beard draws, and casts its shadow, with shaders of its own). Nobody is
+   * drawn before.
    */
   async warmLods(): Promise<void> {
     const ch = this.slots[0].ch;
     const place = this.slots[0].place;
     place.removeFromParent();
-    for (let k = 1; k < ch.lods.length; k++) {
-      ch.setLod(k);
-      this.reverseOffsets(place);
-      await this.stage.prepare(place);
+    const looks = coveringLooks(this.life.agents.map((a) => a.person));
+    for (let i = 0; i < looks.length; i++) {
+      if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
+      for (let k = i > 0 ? 0 : 1; k < ch.lods.length; k++) {
+        ch.setLod(k);
+        this.adapt(place);
+        await this.stage.prepare(place, { everyCaster: true });
+      }
     }
     ch.setLod(0);
     this.slots[0].place.visible = false;
@@ -156,13 +161,14 @@ export class FolkView {
     s.ch.set({ ...lookOf(a.person), animation: s.clip })
       .then(async () => {
         s.ch.setLod('auto');
-        this.reverseOffsets(s.place);
+        this.adapt(s.place);
         // Its meshes are new: compile (a cache hit for kinds already seen) before it is drawn.
         // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
         // pass is warmed only for objects not yet in the scene).
         s.place.removeFromParent();
         s.place.visible = true;
-        await this.stage.prepare(s.place);
+        // Every caster: a character's shadow shaders are its own (its shape, its garments' fitting).
+        await this.stage.prepare(s.place, { everyCaster: true });
         if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
         this.stage.scene.add(s.place);
         s.ready = true;
@@ -175,13 +181,15 @@ export class FolkView {
    * Actors draws clothes over the skin, and each garment layer over the one below, by polygon offsets
    * toward the camera (negative). With reversed depth (view.ts) a negative offset pushes away: the skin
    * and underclothes showed through in patches. Flipped once per material (garments are made lazily).
+   * Also what never shows casts no shadow.
    */
-  private reverseOffsets(o: Object3D): void {
-    if (!this.reversed) return;
+  private adapt(o: Object3D): void {
     o.traverse((m) => {
-      const mat = (m as Mesh).material;
-      if (!mat) return;
-      for (const x of (Array.isArray(mat) ? mat : [mat]) as Material[]) {
+      const mesh = m as Mesh;
+      if (!mesh.isMesh) return;
+      if (mesh.name.startsWith('genitals')) mesh.castShadow = false; // always clothed: a shadow shader for nothing
+      if (!this.reversed) return;
+      for (const x of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as Material[]) {
         if (!x.polygonOffset || x.userData.offsetReversed) continue;
         x.polygonOffsetFactor = -x.polygonOffsetFactor;
         x.polygonOffsetUnits = -x.polygonOffsetUnits;
