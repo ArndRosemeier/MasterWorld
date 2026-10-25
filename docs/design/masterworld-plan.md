@@ -575,7 +575,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | Notifications | A small brass capsule that pops out of the frame edge, rings once and slides back. |
 | Settings and menus | A cartographer's tool roll that unrolls; switches are brass toggles that click. |
 | Death and waking | The wards go dark one by one; on waking they relight from the centre. |
-| Title screen | Part of the title animation (O18). |
+| Title screen | Part of the title animation (O18): the logo's plates swing shut, brass pours into the letters, the ward traces them and a gear locks; the menu panel slides in with its rim ward; the peoples card flips; the town crier's bell swings. |
 
 
 ### 17.2 The title animation (D46)
@@ -588,6 +588,8 @@ StarLord's title is the bar: the game's own world, alive, playful, new every sta
 4. **The menu** is a brass instrument panel; around it a town-crier ticker of silly tavern rumours and a card per playable people (a live Actors model doing something in character).
 5. **Toys**: the world can be clicked. Birds scatter, the sky gives lightning or a shooting star, a cloud rains, the town bell rings, rarely a sea serpent breaches; a secret code brings a dragon or a giant.
 6. **The dive**: New game or Continue drops the camera through the clouds to the hero on the market square; the game starts where it lands.
+
+**First version** (`src/app/title/`): the opening, the seeded fly-over around the market, the forged logo, the brass menu, the crier and the peoples card (an engraved emblem for now; the live Actors model comes later), the toys (birds, lightning or a shooting star, the bell, splashes and a rare whale, the dragon on the code, drawn as 2D silhouettes over the 3D view until there are models) and the dive. Continue waits for saving.
 
 **It hides the build.** A still of the valley shows at once; the coarse land, sky and far terrain come first; the start town streams in while the menu sits, and shaders compile within [docs/SHADERS.md](../SHADERS.md). The route only comes close where the world is ready, and the dive waits for the last pieces. Weak GPUs fly higher; reduced motion gets the still and a fade.
 
@@ -609,7 +611,7 @@ StarLord's title is the bar: the game's own world, alive, playful, new every sta
 | O15 | Free LLMs through `freeryder` | **Parked** (Arnd, 2026-10-25): not sure it belongs in MasterWorld at all. |
 | O16 | ~~Dungeons that don't feel formulaic~~ | **Decided** (D39, 8.1): eight layers, detective puzzles only, repopulation, rare surprises. |
 | O17 | ~~The interface's design language~~ | **Decided** (D45, 17.1): warded brass. Each window's signature still to be mocked up. |
-| O18 | ~~The title animation~~ | **Decided** (D46, 17.2). |
+| O18 | ~~The title animation~~ | **Decided** (D46, 17.2). First version in `src/app/title/`. |
 
 ---
 

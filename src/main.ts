@@ -37,6 +37,8 @@ import { firstDungeon, houseOf } from './vgm/dungeons';
 import { CellarView } from './render/dungeon/CellarView';
 import { CellarVisit } from './app/cellarVisit';
 import { lookFromDegrees } from './app/look';
+import { Sound } from './app/sound';
+import { Title } from './app/title/title';
 
 declare global {
   interface Window {
@@ -46,11 +48,17 @@ declare global {
 }
 
 async function start(): Promise<void> {
-  const loading = new LoadingScreen();
-  const canvas = document.createElement('canvas');
-  document.body.prepend(canvas);
   const settings = new SettingsStore();
   const boot = settings.start;
+  const sound = new Sound();
+  sound.volume = settings.current.volume;
+  // The title shows at once and is the loading screen (plan D46); the menu it opens comes later.
+  let menu: Menu | null = null;
+  const calm = settings.current.calm || !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menu?.show('settings'), whatsNew: () => menu?.show('news') }, calm) : null;
+  const loading = title?.screen ?? new LoadingScreen();
+  const canvas = document.createElement('canvas');
+  document.body.prepend(canvas);
   try {
     const setting = settingById(params.setting);
     const errors = validateSetting(setting);
@@ -64,14 +72,18 @@ async function start(): Promise<void> {
     const home = town ? marketStart(town.plan) : opened.home;
 
     const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
+    const hour = title && !params.hourSet ? title.draw.hour : params.hour;
     if (params.weather) {
       if (!WEATHER_KINDS.includes(params.weather as WeatherKind)) throw new Error(`?weather=${params.weather}: one of ${WEATHER_KINDS.join(', ')}`);
       // The same path the VGM takes: an order, here for all time.
       weather.order({ kind: params.weather as WeatherKind, from: -1e6, to: 1e6 });
+    } else if (title) {
+      // The title's weather, into the first hour of play (it stays while the clock stands still).
+      weather.order({ kind: title.draw.weather, from: -1e6, to: hour + 1 });
     }
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: params.hour, dayMinutes: boot.dayMinutes });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour, dayMinutes: boot.dayMinutes });
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
     let water: WaterView | null = null;
     // Down in the cellar the walker walks the cellar's space instead of the land.
@@ -85,6 +97,29 @@ async function start(): Promise<void> {
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
+    // Dialogs (and the title) hold the game's keys and mouse while open.
+    let open = 0;
+    const paused = (on: boolean) => { open = Math.max(0, open + (on ? 1 : -1)); player.pause(open > 0); };
+    if (title) {
+      paused(true);
+      // The fly-over circles the market, where the game starts.
+      const middle = { x: home.x, z: home.z, r: town ? (Math.max(town.nx, town.nz) * TOWN_RASTER) / 2 : 0 };
+      title.attach({
+        camera: view.camera,
+        orbit: { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) },
+        toys: {
+          height: (x, z) => terrain.height(x, z),
+          water: (x, z) => water?.waterAt(x, z) ?? null,
+          town: town ? middle : null,
+          hour: () => view.sky.hour,
+        },
+        heroView: () => player.heroView(),
+        begin: (people) => {
+          if (people) console.info(`[title] starting with the ${people} (character creation will take this)`);
+          paused(false);
+        },
+      });
+    }
 
     loading.set('Painting the ground');
     const texPool = createTexturePool();
@@ -108,6 +143,7 @@ async function start(): Promise<void> {
     await sea.prime(view.camera.position);
     // In the water from the start (now that the water is known), and the hero's body built.
     player.resettle();
+    title?.run(0);
     loading.set('Dressing the hero');
     const hero = await HeroView.create(seed);
     player.walker.height = hero.height;
@@ -186,12 +222,11 @@ async function start(): Promise<void> {
       if (view.camera.fov !== s.fov) { view.camera.fov = s.fov; view.camera.updateProjectionMatrix(); }
       if (scale !== s.renderScale) { scale = s.renderScale; view.renderer.setPixelRatio(pixels * scale); }
       if (params.dayMinutes === null) view.sky.dayMinutes = s.dayLength;
+      sound.volume = s.volume;
       showHud = params.hud || s.hud;
       if (hud) hud.style.display = showHud ? '' : 'none';
     });
     // Dialogs: the debug menu first, so its keys come before the settings' Escape.
-    let open = 0;
-    const paused = (on: boolean) => { open = Math.max(0, open + (on ? 1 : -1)); player.pause(open > 0); };
     new DebugMenu({
       paused,
       get freeCamera() { return player.flying; },
@@ -217,9 +252,9 @@ async function start(): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; } },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound },
     });
-    new Menu(settings, {
+    menu = new Menu(settings, {
       paused,
       get hour() { return view.sky.hour; },
       set hour(h) { view.sky.hour = h; },
@@ -231,7 +266,9 @@ async function start(): Promise<void> {
     let last = performance.now();
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
-      player.update(dt);
+      title?.run(dt);
+      if (title?.holding) player.standBy(dt);
+      else player.update(dt);
       visit?.update(dt);
       view.sky.underwater = sea.submerged(view.camera.position);
       wx.apply(dt, view.camera.position, hours(), view.sky);
@@ -255,7 +292,8 @@ async function start(): Promise<void> {
       last = now;
       if (planted && !window.__mwReady) {
         window.__mwReady = true;
-        loading.done();
+        if (title) title.ready();
+        else loading.done();
       }
     });
     await planting;

@@ -1,0 +1,163 @@
+/* The title (src/app/title/TitleScreen.ts) in warded brass (plan 17.1): brass, dark leather, cyan wards. */
+@font-face { font-family: 'Marcellus SC'; src: url('../fonts/marcellus-sc.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('../fonts/eb-garamond.woff2') format('woff2'); font-weight: 400 600; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('../fonts/eb-garamond-italic.woff2') format('woff2'); font-style: italic; font-display: swap; }
+
+#title {
+  --brass-hi: #fff0c0; --brass: #e2bd68; --brass-mid: #b08532; --brass-lo: #6e4f17; --brass-dark: #4a3510;
+  --leather: #1d1510; --leather-hi: #2a1c14; --ink: #efe3cc; --ink-dim: #cbb898; --ward: #8fe3ff; --ward-hot: #e8fbff;
+  position: fixed; inset: 0; z-index: 20; overflow: hidden; pointer-events: none;
+  font-family: 'EB Garamond', Georgia, serif; color: var(--ink);
+}
+#title button { pointer-events: auto; }
+body.titled #corner, body.titled #hud { display: none; }
+
+/* The painted still: shown at once, slowly drifting, gone when the live world takes over. */
+.t-still { position: absolute; inset: -4%; background: #0b0d10 center / cover no-repeat; animation: t-drift 40s ease-in-out infinite alternate; transition: opacity 3s ease; }
+.t-still.mirror { transform: scaleX(-1); animation-name: t-drift-m; }
+#title.live .t-still { opacity: 0; }
+@keyframes t-drift { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.07) translate(-1.5%, 1%); } }
+@keyframes t-drift-m { from { transform: scaleX(-1) scale(1); } to { transform: scaleX(-1) scale(1.07) translate(-1.5%, 1%); } }
+.t-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, transparent 45%, #0006 80%, #000a), linear-gradient(#0000 65%, #0008); }
+
+/* The opening: dark, a ward line runs over the land like a fuse, dawn breaks along it. */
+.t-dawn { position: absolute; inset: 0; width: 100%; height: 100%; }
+.t-dawn .reveal { stroke-width: 0; animation: t-reveal 3.2s cubic-bezier(.5, 0, .3, 1) 1.5s forwards; }
+@keyframes t-reveal { to { stroke-width: 2600px; } }
+.t-dawn .glow { opacity: 0; animation: t-glow 4s ease-in-out 1.4s forwards; }
+@keyframes t-glow { 30% { opacity: .75; } 100% { opacity: 0; } }
+.t-dawn .fuse { stroke-dasharray: 100; stroke-dashoffset: 100; animation: t-trace 1.7s cubic-bezier(.4, 0, .6, 1) .4s forwards, t-fade 1.5s ease 3.4s forwards; }
+.t-dawn .spark { opacity: 0; offset-rotate: 0deg; animation: t-run 1.7s cubic-bezier(.4, 0, .6, 1) .4s forwards; }
+@keyframes t-trace { to { stroke-dashoffset: 0; } }
+@keyframes t-fade { to { opacity: 0; } }
+@keyframes t-run { 0% { offset-distance: 0%; opacity: 1; } 95% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+
+/* The toys draw here (birds, bolts, the dragon), and clicks on the world land here. */
+.t-toys { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: auto; cursor: pointer; }
+
+/* The logo forges itself: plates swing in, molten brass pours into the letters, the ward traces them, a gear locks. */
+.t-logo { position: absolute; left: 50%; top: 7vh; width: min(880px, 92vw); transform: translateX(-50%); perspective: 900px; transition: transform 1.2s cubic-bezier(.5, 0, .3, 1), opacity 1s; }
+.t-logo .plate { position: absolute; top: 14%; bottom: 14%; width: 50%; background: linear-gradient(var(--leather-hi), var(--leather)); border: 3px solid var(--brass-mid); box-shadow: inset 0 0 0 1px var(--brass-lo), inset 0 0 0 7px var(--leather), inset 0 0 0 8px var(--brass-lo), 0 14px 40px #000b; opacity: 0; }
+.t-logo .plate.l { left: 0; border-right: none; border-radius: 10px 0 0 10px; transform-origin: left center; animation: t-swing-l 1s cubic-bezier(.3, 1.4, .5, 1) 3s forwards; }
+.t-logo .plate.r { right: 0; border-left: none; border-radius: 0 10px 10px 0; transform-origin: right center; animation: t-swing-r 1s cubic-bezier(.3, 1.4, .5, 1) 3.1s forwards; }
+@keyframes t-swing-l { from { opacity: 1; transform: rotateY(-95deg); } to { opacity: 1; transform: none; } }
+@keyframes t-swing-r { from { opacity: 1; transform: rotateY(95deg); } to { opacity: 1; transform: none; } }
+.t-logo .clasp { position: absolute; left: 50%; width: 22px; height: 22px; margin-left: -11px; background: linear-gradient(135deg, var(--brass-hi), var(--brass-mid) 55%, var(--brass-lo)); transform: rotate(45deg) scale(0); border: 1px solid var(--brass-dark); box-shadow: 0 0 8px #8fe3ff66; animation: t-clasp .5s cubic-bezier(.3, 1.8, .5, 1) 4s forwards; }
+.t-logo .clasp.top { top: calc(14% - 11px); }
+.t-logo .clasp.bottom { bottom: calc(14% - 11px); }
+@keyframes t-clasp { to { transform: rotate(45deg) scale(1); } }
+.t-logo svg { position: relative; display: block; width: 100%; height: auto; overflow: visible; }
+.t-logo .pour { animation: t-pour 1.5s cubic-bezier(.5, 0, .4, 1) 3.7s both; }
+@keyframes t-pour { from { transform: translateX(-890px); } to { transform: none; } }
+.t-logo .melt { animation: t-melt 1.7s linear 3.7s both; }
+@keyframes t-melt { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+.t-logo .ward { stroke-dasharray: 700; stroke-dashoffset: 700; animation: t-trace 1.8s ease-out 4.6s forwards, t-pulse 3.2s ease-in-out 6.4s infinite; }
+.t-logo .run { stroke-dasharray: 26 674; stroke-dashoffset: 700; opacity: 0; animation: t-spark 5s linear 6.5s infinite; }
+@keyframes t-pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes t-spark { 0% { stroke-dashoffset: 700; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 1; } }
+.t-logo .gear { transform-box: fill-box; transform-origin: center; opacity: 0; animation: t-gear-in 1.2s cubic-bezier(.2, .8, .2, 1) 5.1s forwards, t-tick 2.4s steps(1) 6.6s infinite; }
+@keyframes t-gear-in { from { opacity: 1; transform: rotate(-540deg) scale(.4); } to { opacity: 1; transform: none; } }
+@keyframes t-tick { 0%, 80% { transform: rotate(0); opacity: 1; } 90%, 100% { transform: rotate(20deg); opacity: 1; } }
+.t-logo .glint { animation: t-glint 6s ease-in-out 6.2s infinite; transform: translateX(-200px) skewX(-20deg); }
+@keyframes t-glint { 0% { transform: translateX(-200px) skewX(-20deg); } 35%, 100% { transform: translateX(1000px) skewX(-20deg); } }
+.t-tagline { margin-top: -1.2em; text-align: center; font-style: italic; font-size: clamp(16px, 2.2vw, 22px); color: var(--ink); text-shadow: 0 2px 8px #000; letter-spacing: .04em; animation: t-rise .8s ease-out 5.6s both; }
+@keyframes t-rise { 0% { opacity: 0; transform: translateY(14px) scale(.97); } 70% { opacity: 1; transform: translateY(-3px); } 100% { opacity: 1; transform: none; } }
+
+/* The brass panel with the menu: slides in, its ward traces the rim, buttons rise one by one. */
+.t-panel { position: absolute; left: max(16px, 5vw); bottom: 76px; width: min(300px, calc(100vw - 32px)); padding: 26px 24px 20px; box-sizing: border-box; background: linear-gradient(#2a1c14ee, #1d1510f2); border: 3px solid var(--brass-mid); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--brass-lo), 0 16px 40px #000c; pointer-events: auto; animation: t-slide-l .9s cubic-bezier(.2, 1.2, .4, 1) 6s both; transition: transform .9s cubic-bezier(.6, 0, .4, 1), opacity .9s; }
+@keyframes t-slide-l { from { opacity: 0; transform: translateX(-120%); } to { opacity: 1; transform: none; } }
+.t-rim { position: absolute; inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); pointer-events: none; overflow: visible; }
+.t-rim .ward { stroke-dasharray: 100; stroke-dashoffset: 100; animation: t-trace 1.4s ease-out 6.6s forwards, t-pulse 3.5s ease-in-out 8s infinite; }
+.t-rim .run { stroke-dasharray: 4 96; stroke-dashoffset: 100; opacity: 0; animation: t-run-rim 6s linear 8s infinite; }
+@keyframes t-run-rim { 0% { stroke-dashoffset: 100; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 1; } }
+.t-menu { display: flex; flex-direction: column; gap: 10px; }
+.t-menu > * { animation: t-rise .5s ease-out both; }
+.t-btn { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 18px; font: 17px/1 'Marcellus SC', Georgia, serif; letter-spacing: .08em; color: #1e140a; background: linear-gradient(#e2bd68, #b08532); border: 1px solid var(--brass-lo); border-radius: 22px; cursor: pointer; box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark); transition: transform .15s, box-shadow .15s; text-align: left; }
+.t-btn:hover, .t-btn:focus-visible { transform: translateY(-2px) rotate(-1deg); box-shadow: inset 0 1px 0 var(--brass-hi), 0 4px 0 var(--brass-dark), 0 0 14px #8fe3ff88; outline: none; }
+.t-btn:active { transform: translateY(1px); box-shadow: inset 0 1px 0 var(--brass-hi), 0 1px 0 var(--brass-dark); }
+.t-btn svg { width: 18px; height: 18px; flex: none; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.t-btn:hover svg { transform: rotate(120deg); }
+.t-btn small { margin-left: auto; font: italic 14px 'EB Garamond', Georgia, serif; letter-spacing: 0; color: #3a2a12; }
+.t-btn.primary { font-size: 20px; min-height: 52px; animation: t-rise .5s ease-out both, t-breathe 3s ease-in-out 9s infinite; }
+@keyframes t-breathe { 0%, 100% { box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark), 0 0 0 #8fe3ff00; } 50% { box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark), 0 0 18px #8fe3ffaa; } }
+.t-btn.waiting svg { animation: t-spin 1.6s linear infinite; }
+@keyframes t-spin { to { transform: rotate(360deg); } }
+.t-btn.quiet { min-height: 36px; font-size: 14px; color: var(--ink-dim); background: transparent; border-color: var(--brass-lo); box-shadow: none; }
+.t-btn.quiet:hover { color: var(--ward); border-color: var(--ward); }
+.t-row { display: flex; gap: 8px; }
+.t-row .t-btn { flex: 1; justify-content: center; }
+.t-version { margin-top: 4px; text-align: right; font: italic 13px 'EB Garamond', Georgia, serif; color: var(--ink-dim); }
+
+/* The peoples card: flips to the next people every few seconds; each emblem does something in character. */
+.t-peoples { position: absolute; right: max(16px, 5vw); bottom: 76px; width: 310px; perspective: 900px; pointer-events: auto; animation: t-drop .9s cubic-bezier(.3, 1.5, .5, 1) 6.4s both; transition: transform .9s cubic-bezier(.6, 0, .4, 1), opacity .9s; }
+@keyframes t-drop { from { opacity: 0; transform: translateY(-60vh) rotate(6deg); } to { opacity: 1; transform: none; } }
+.t-card { position: relative; padding: 18px 20px 16px; box-sizing: border-box; min-height: 250px; display: flex; flex-direction: column; gap: 8px; background: linear-gradient(#2a1c14ee, #1d1510f2); border: 3px solid var(--brass-mid); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--brass-lo), 0 16px 40px #000c; }
+.t-card.flip { animation: t-flip .7s cubic-bezier(.4, 0, .3, 1); }
+@keyframes t-flip { 0% { transform: rotateY(0); } 49% { transform: rotateY(90deg); } 51% { transform: rotateY(-90deg); } 100% { transform: rotateY(0); } }
+.t-card .head { display: flex; align-items: center; gap: 12px; }
+.t-card .emblem { width: 54px; height: 54px; flex: none; }
+.t-card h3 { margin: 0; font: 400 24px/1 'Marcellus SC', Georgia, serif; color: #ffc46b; letter-spacing: .06em; }
+.t-card .label { font: 12px/1 'Marcellus SC', Georgia, serif; letter-spacing: .2em; color: var(--ward); }
+.t-card p { margin: 0; font-size: 16px; line-height: 1.4; color: var(--ink-dim); }
+.t-card .nav { display: flex; gap: 6px; margin-top: auto; }
+.t-card .nav .t-btn { font-size: 14px; letter-spacing: .04em; min-height: 40px; padding: 6px 12px; }
+.t-card .nav .arrow { flex: none; width: 36px; padding: 0; justify-content: center; font-size: 20px; }
+.emblem .hammer { transform-origin: 70% 80%; animation: t-strike 1.4s cubic-bezier(.6, 0, .4, 1) infinite; }
+@keyframes t-strike { 0%, 100% { transform: rotate(-35deg); } 55% { transform: rotate(-35deg); } 70% { transform: rotate(8deg); } 78% { transform: rotate(0); } }
+.emblem .sparks { animation: t-sparks 1.4s ease-out infinite; opacity: 0; }
+@keyframes t-sparks { 0%, 68% { opacity: 0; } 72% { opacity: 1; } 100% { opacity: 0; } }
+.emblem .steam { animation: t-steam 2.4s ease-out infinite; transform-box: fill-box; }
+.emblem .steam.b { animation-delay: 1.2s; }
+@keyframes t-steam { 0% { opacity: 0; transform: translateY(4px); } 30% { opacity: .9; } 100% { opacity: 0; transform: translateY(-10px); } }
+.emblem .leaf { transform-origin: 50% 90%; transform-box: fill-box; animation: t-sway 3s ease-in-out infinite; }
+@keyframes t-sway { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+.emblem .flag { transform-box: fill-box; transform-origin: left center; animation: t-wave 1.8s ease-in-out infinite; }
+@keyframes t-wave { 0%, 100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(8deg) scaleX(.9); } }
+
+/* The town crier: a ticker of what the tavern says. */
+.t-crier { position: absolute; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center; gap: 0; background: linear-gradient(#1d1510e6, #120d09f2); border-top: 2px solid var(--brass-mid); box-shadow: 0 -1px 0 var(--brass-lo); pointer-events: auto; animation: t-up .8s ease-out 6.8s both; transition: transform .8s, opacity .8s; }
+@keyframes t-up { from { transform: translateY(100%); } to { transform: none; } }
+.t-crier .plaque { flex: none; display: flex; align-items: center; gap: 8px; height: 100%; padding: 0 16px; font: 14px/1 'Marcellus SC', Georgia, serif; letter-spacing: .16em; color: #1e140a; background: linear-gradient(#e2bd68, #b08532); border-right: 2px solid var(--brass-lo); }
+.t-crier .plaque svg { width: 20px; height: 20px; transform-origin: 50% 10%; animation: t-ring 6s ease-in-out infinite; }
+@keyframes t-ring { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(18deg); } 92% { transform: rotate(-14deg); } 95% { transform: rotate(8deg); } 98% { transform: rotate(-3deg); } }
+.t-crier .window { position: relative; flex: 1; overflow: hidden; height: 100%; mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
+.t-crier .track { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; white-space: nowrap; animation: t-crawl linear infinite; }
+@keyframes t-crawl { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.t-crier .item { padding: 0 28px; font-size: 18px; color: var(--ink); }
+.t-crier .item::before { content: '✦'; margin-right: 28px; color: var(--brass-mid); }
+.t-crier .one { padding: 0 20px; line-height: 52px; font-size: 18px; animation: t-rise .6s ease-out both; }
+
+.t-hint { position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%); font-style: italic; font-size: 16px; color: var(--ink-dim); text-shadow: 0 1px 4px #000; animation: t-rise .8s ease-out 9.5s both; white-space: nowrap; }
+.t-toast { position: absolute; left: 50%; top: 42vh; transform: translateX(-50%); padding: 10px 22px; font-size: 19px; color: var(--ink); background: linear-gradient(#2a1c14ee, #1d1510f2); border: 2px solid var(--brass-mid); border-radius: 24px; box-shadow: 0 0 0 1px var(--brass-lo), 0 8px 24px #000a, 0 0 16px #8fe3ff44; animation: t-pop 3.4s ease both; max-width: calc(100vw - 32px); text-align: center; }
+@keyframes t-pop { 0% { opacity: 0; transform: translate(-50%, 12px) scale(.8); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1.04); } 16% { transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -8px); } }
+.t-build { position: absolute; right: 16px; top: 12px; display: flex; align-items: center; gap: 8px; font-style: italic; font-size: 14px; color: var(--ink-dim); text-shadow: 0 1px 3px #000; transition: opacity 1.5s; }
+.t-build::before { content: ''; width: 34px; height: 2px; background: linear-gradient(90deg, transparent, var(--ward), transparent); background-size: 200% 100%; animation: t-shimmer 1.4s linear infinite; box-shadow: 0 0 6px var(--ward); }
+@keyframes t-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+#title.awake .t-build { opacity: 0; }
+.t-fail { color: #ff9a80; }
+
+/* Into the game: everything makes way for the dive. */
+/* (Each part's entrance animation is dropped, or its end state would hold it in place.) */
+#title.leaving .t-panel { animation: none; transform: translateX(-130%); opacity: 0; }
+#title.leaving .t-peoples { animation: none; transform: translateX(130%); opacity: 0; }
+#title.leaving .t-crier { animation: none; transform: translateY(100%); opacity: 0; }
+#title.leaving .t-logo { transform: translate(-50%, -60vh); opacity: 0; }
+#title.leaving .t-hint, #title.leaving .t-toast, #title.leaving .t-build { animation: none; opacity: 0; transition: opacity .4s; }
+#title.leaving .t-toys { pointer-events: none; }
+#title .t-blackout { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 1.2s; pointer-events: none; }
+#title.gone { opacity: 0; transition: opacity 1.2s; }
+
+/* Calm motion (the setting or the system's reduced motion): the still picture, everything in place at once. */
+#title.calm *, #title.calm *::before { animation: none !important; }
+#title.calm .t-dawn { display: none; }
+#title.calm .t-logo .plate { opacity: 1; }
+#title.calm .t-logo .gear { opacity: 1; }
+#title.calm .t-logo .clasp { transform: rotate(45deg); }
+#title.calm .t-logo .melt, #title.calm .t-logo .glint, #title.calm .t-logo .run, #title.calm .t-rim .run { display: none; }
+#title.calm .t-logo .ward, #title.calm .t-rim .ward { stroke-dashoffset: 0; }
+
+@media (max-width: 760px) {
+  .t-peoples { display: none; }
+  .t-hint { display: none; }
+  .t-panel { bottom: 64px; }
+}

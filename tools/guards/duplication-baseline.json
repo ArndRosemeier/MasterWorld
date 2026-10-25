@@ -12,10 +12,6 @@
     "reason": "Per-frame update methods of unrelated systems (camera movement vs chunk selection); only the name matches."
   },
   {
-    "key": "same name: masterworld/app/player.ts#update + masterworld/render/terrain/TerrainView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (the player vs chunk selection); only the name matches."
-  },
-  {
     "key": "same name: masterworld/render/flora/FloraView.ts#update + masterworld/render/hero/HeroView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (plant cells and their draws vs the hero's pose); only the name matches."
   },
@@ -26,5 +22,21 @@
   {
     "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",
     "reason": "The walker's world in main.ts delegates to the terrain's rockSurface (or the cellar's space below ground); an adapter, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/loading.ts#fail + masterworld/app/title/TitleScreen.ts#fail",
+    "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
+  },
+  {
+    "key": "same name: masterworld/app/player.ts#update + masterworld/render/flora/FloraView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the player vs plant cells); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/player.ts#update + masterworld/render/hero/HeroView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the player's input and camera vs the hero's pose); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/player.ts#update + masterworld/render/town/TownView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the player vs town building streaming); only the name matches."
   }
 ]
