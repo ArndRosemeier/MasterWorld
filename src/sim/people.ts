@@ -7,6 +7,9 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { distToPoly, type TownPlan } from '@futuremagic/settlement';
 
+/** Their people (D34; the setting's peoples, by Actors' race ids). */
+export type Race = 'human' | 'dwarf' | 'halfling' | 'elf';
+
 /** What a person does for a living. */
 export type Role = 'trade' | 'trader' | 'keeper' | 'hand' | 'homemaker' | 'child';
 
@@ -27,6 +30,7 @@ export interface Person {
   /** Walking speed, m/s. */
   speed: number;
   female: boolean;
+  race: Race;
   /** Years. */
   age: number;
   seed: number;
@@ -43,7 +47,7 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     const id = people.length, s = deriveSeed(seed, 'person', id), pr = new Rng(s);
     const child = role === 'child';
     const traits = { social: pr.float(), diligent: pr.float(), pious: pr.float(), early: pr.float(), speed: child ? pr.range(1.4, 1.8) : pr.range(1.1, 1.45) };
-    people.push({ id, home, work, role, trade, ...traits, female: pr.chance(0.5), age: Math.round(child ? pr.range(4, 15) : pr.range(18, 68)), seed: s });
+    people.push({ id, home, work, role, trade, ...traits, female: pr.chance(0.5), race: 'human', age: Math.round(child ? pr.range(4, 15) : pr.range(18, 68)), seed: s });
     return people[id];
   };
   const trades = plan.buildings.filter((b) => b.trade && b.kind !== 'temple');
@@ -70,6 +74,15 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     const near = people.filter((p) => p.role === 'homemaker')
       .sort((a, b) => dist(plan, a.home, temple.cx, temple.cz) - dist(plan, b.home, temple.cx, temple.cz))[0];
     if (near) { near.role = 'keeper'; near.work = temple.id; near.trade = 'keeper'; }
+  }
+  // Peoples (plan 12.1): the start town is mostly human; dwarves keep the smithy and one more house (a
+  // miner family, the one farthest out), a halfling family runs the inn.
+  const houses = plan.buildings.filter((b) => b.kind === 'house' && b.household > 0);
+  const miners = houses.sort((a, b) => marketDist(plan, b.id) - marketDist(plan, a.id))[0];
+  for (const p of people) {
+    const b = plan.buildings[p.home];
+    if (b.kind === 'smithy' || b === miners) p.race = 'dwarf';
+    else if (b.kind === 'inn') p.race = 'halfling';
   }
   return people;
 }

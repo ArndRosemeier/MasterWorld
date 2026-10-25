@@ -69,7 +69,9 @@ export function lookOf(p: Person): CharacterPatch {
   }
   if (r.chance(0.12)) outfit.push(wear('hood-down', dyed()));
   const old = p.age > 55;
+  const dwarf = p.race === 'dwarf';
   return {
+    race: p.race, race2: null, raceMix: 0, raceSize: r.range(0.3, 0.7),
     body: {
       gender: f ? 0 : 1, ageYears: p.age, muscle: r.range(0.3, p.role === 'trade' ? 0.8 : 0.6), weight: r.range(0.3, 0.75),
       height: r.range(0.3, 0.7), proportions: r.range(0.3, 0.7),
@@ -77,7 +79,9 @@ export function lookOf(p: Person): CharacterPatch {
     },
     skin: 'procedural', skinTone: r.range(0.05, 0.45),
     hair: r.pick(f ? WOMEN_HAIR : MEN_HAIR), hairColor: old && r.chance(0.7) ? r.pick(['#8a8580', '#b0aca4', '#d0ccc4']) : r.pick(HAIR_COLORS),
-    beard: !f && r.chance(0.45) ? r.pick(['short', 'full', 'mustache', 'chinstrap', 'goatee'] as const) : 'none',
+    beard: f || p.race === 'halfling' || p.race === 'elf' ? 'none'
+      : dwarf ? r.pick(['long', 'braided', 'forked', 'full'] as const)
+        : r.chance(0.45) ? r.pick(['short', 'full', 'mustache', 'chinstrap', 'goatee'] as const) : 'none',
     stubble: f ? 0 : r.range(0, 0.6),
     outfit, garmentColors: colors,
   };

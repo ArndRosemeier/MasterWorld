@@ -1,3 +1,4 @@
+import { townsfolk } from '../src/sim/people';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
@@ -30,7 +31,9 @@ test('town: the market is level, and the ground knows its streets, market and ho
   const k = (road.pts.length >> 2) * 2;
   assert.equal(terrain.townGround(road.pts[k], road.pts[k + 1]), TownGround.Street);
   assert.equal(terrain.townGround(mx + 5000, mz), TownGround.None);
-  assert.ok(town.plan.buildings.length >= 50, `${town.plan.buildings.length} buildings`);
+  // A small town (D41): about 80-120 people.
+  const people = townsfolk(town.plan, terrain.seed).length;
+  assert.ok(people >= 70 && people <= 150, `${people} people in ${town.plan.buildings.length} buildings`);
 });
 
 test('town: no trees on its streets or in its houses', () => {
