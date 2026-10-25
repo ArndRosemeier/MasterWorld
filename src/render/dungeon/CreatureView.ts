@@ -20,7 +20,7 @@ import type { Creature, Den } from '../../sim/creatures';
 import { critterMaterials, ratMaterial } from '../materials/creatures';
 import { buildArm } from '../hero/arms';
 import { gripHeld } from '../hero/grips';
-import { playClip } from '../hero/play';
+import { FADE, playClip } from '../hero/play';
 import { foeClip, foeLook, type FoeDoing } from './foes';
 import type { Stage } from '@futuremagic/stage';
 
@@ -197,9 +197,11 @@ export class CreatureView {
         // A blow or flinch starts again when a new one comes, even of the same clip.
         const fresh = (doing.action === 'flinch' && hurtT * FLINCH < dt + 1e-6) || (doing.action && doing.action !== 'flinch' && blowT * BLOW < dt + 1e-6);
         if (clip !== p.clip || fresh) {
+          // Blended, but cut in when it first shows and when it falls dead.
+          const fade = !p.clip || dead ? 0 : doing.action ? FADE.once : FADE.loop;
           p.clip = clip;
           const once = !!doing.action || dead;
-          playClip(p.ch, clip, once, () => p.clip === clip, doing.action === 'flinch' ? FLINCH * 1.5 : doing.action ? BLOW : undefined);
+          playClip(p.ch, clip, once, () => p.clip === clip, doing.action === 'flinch' ? FLINCH * 1.5 : doing.action ? BLOW : undefined, fade);
         }
         if (p.drawn !== fighting) { p.drawn = fighting; gripHeld(p.held, null, fighting, p.ch.actor.bones, p.place); }
         p.ch.update(dt);

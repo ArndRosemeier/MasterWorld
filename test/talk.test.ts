@@ -8,6 +8,7 @@ import { TownLife } from '../src/sim/townLife';
 import { townTalk, TownTalk } from '../src/talk/townTalk';
 import { Journal } from '../src/talk/journal';
 import { firstDungeon } from '../src/vgm/dungeons';
+import { acquaintances } from '../src/game/background';
 
 const seed = parseSeed('masterworld');
 const { terrain, log } = openWorld(seed, classic);
@@ -101,4 +102,15 @@ test('talk: someone stopped for a talk stands and faces the player, and goes on 
   life.letGo(a);
   assert.ok(!a.held);
   assert.notEqual(a.act, 'chat');
+});
+
+test('talk: people who know the hero from before greet them by name, others as usual', () => {
+  const { talk } = townTalk(seed, classic, town, people, log);
+  const guard = classic.backgrounds.find((b) => b.id === 'sellsword')!;
+  const friends = acquaintances(guard, people);
+  assert.ok(friends.length >= 1 && friends.length <= 2);
+  assert.equal(friends[0].person, people.find((p) => p.trade === 'carter' && p.role === 'trade') ?? friends[0].person);
+  talk.acquaint(friends.map((f) => ({ person: f.person.id, line: f.line })), 'Wenna Hollin');
+  assert.match(talk.greet(friends[0].person.id).text, /Wenna Hollin/);
+  assert.doesNotMatch(talk.greet(stranger.id).text, /Wenna Hollin/);
 });

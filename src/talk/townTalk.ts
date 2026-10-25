@@ -55,6 +55,8 @@ export class TownTalk {
   private readonly turns = new Map<number, number>();
   /** What each person last told (so "How do you know?" asks about that alone). */
   private readonly told = new Map<number, Atom>();
+  /** People who know the hero from before (plan 11.4), and how they greet them. */
+  private readonly friends = new Map<number, string>();
 
   constructor(folk: readonly Folk[], private readonly talk: TalkDef, cellars: readonly TalkCellar[], saved?: TownTalkSave) {
     for (const f of folk) this.byId.set(f.person.id, f);
@@ -151,10 +153,18 @@ export class TownTalk {
     return out;
   }
 
-  /** Open a conversation: the greeting. */
+  /** Who knows the hero from before, and their greeting ({hero}: the hero's name); replaces any before. */
+  acquaint(friends: readonly { readonly person: number; readonly line: string }[], hero: string): void {
+    this.friends.clear();
+    for (const f of friends) this.friends.set(f.person, fill(f.line, { hero, name: this.nameOf(f.person) }));
+  }
+
+  /** Open a conversation: the greeting (an old friend greets the hero by name). */
   greet(person: number): Reply {
     this.told.delete(person);
-    return this.respond(person, { function: 'greet' });
+    const reply = this.respond(person, { function: 'greet' });
+    const friend = this.friends.get(person);
+    return friend ? { ...reply, text: friend } : reply;
   }
 
   /** Pick a topic. */

@@ -3,6 +3,7 @@
  * heartland, cold north, dry south.
  */
 import { CONTRACT_VERSION, type SettingModule } from '../contract';
+import { backgrounds } from './backgrounds';
 import { cellar } from './cellar';
 import { names, talk } from './people';
 import { creatures } from './creatures';
@@ -54,4 +55,5 @@ export const classic: SettingModule = {
   abilities,
   director,
   hero,
+  backgrounds,
 };

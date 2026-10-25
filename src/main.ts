@@ -26,7 +26,7 @@ import { useTownGround, useTownTextures } from './render/materials/townGround';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
-import { validateSetting } from './setting/contract';
+import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { ordersOf, townOrder } from './vgm/orders';
 import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
@@ -57,6 +57,7 @@ import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, typ
 import { SAVE_VERSION, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
+import { acquaintances } from './game/background';
 import { Delve } from './game/delve';
 import { Director } from './vgm/director';
 import { CreatureView } from './render/dungeon/CreatureView';
@@ -365,6 +366,13 @@ export async function start(b: Boot): Promise<void> {
       titleHolds: () => !!title?.holding || !!creator?.showing,
     });
     const townWords = town && life ? townTalk(seed, setting, town, life.agents.map((a) => a.person), opened.log, save?.talk ?? undefined).talk : null;
+    // Who knows the hero from before (plan 11.4): their greeting names them.
+    const friendsOf = (bg: BackgroundDef | undefined) => (bg && life ? acquaintances(bg, life.agents.map((a) => a.person)) : []);
+    const meetOldFriends = () => {
+      const bg = setting.backgrounds.find((b) => b.id === character.background);
+      townWords?.acquaint(friendsOf(bg).map((a) => ({ person: a.person.id, line: a.line })), heroName || 'friend');
+    };
+    meetOldFriends();
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -495,15 +503,24 @@ export async function start(b: Boot): Promise<void> {
       creator = new Creator({
         camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
         nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
+        backgrounds: setting.backgrounds,
+        skillName: (id) => setting.skills.find((k) => k.id === id)?.name ?? id,
+        itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
+        knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
         click: () => sound.play('click'),
       }, seed);
       const made = await creator.open(race);
       heroName = made.name;
       creator = null;
+      // The past chosen: its skills, kit and the people in town who know the hero.
+      const bg = setting.backgrounds.find((b) => b.id === made.background);
+      if (bg) { character.beginAs(bg); armHero(); }
+      meetOldFriends();
       // Behind the hero, looking the way they face.
       player.teleport(w.pos.x, undefined, w.pos.z, w.yaw);
       paused(false);
-      notes.say(`${made.name} steps out onto the market square.`, 5);
+      const friends = townWords ? friendsOf(bg).map((a) => townWords.nameOf(a.person.id)) : [];
+      notes.say(`${made.name} steps out onto the market square.${friends.length ? ` ${friends.join(' and ')} will know you.` : ''}`, 6);
     };
     onBegin = (people) => {
       if (save) paused(false);

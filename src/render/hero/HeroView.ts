@@ -19,7 +19,7 @@ import type { Stage } from '@futuremagic/stage';
 import { buildArm } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE } from './clips';
 import { gripHeld } from './grips';
-import { playClip } from './play';
+import { FADE, playClip } from './play';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -98,6 +98,8 @@ export class HeroView {
   readonly object = new Group();
   private time = 0;
   private clip = '';
+  /** The next clip cuts in (snap). */
+  private cut = false;
   private actionShown: HeroAction | null = null;
   private held: { main: Object3D | null; off: Object3D | null; drawn: boolean | null } = { main: null, off: null, drawn: null };
   private wanted: CharacterPatch | null = null;
@@ -197,8 +199,8 @@ export class HeroView {
   /** Shown or not (first person hides it). */
   set visible(v: boolean) { this.object.visible = v; }
 
-  /** The next pose at once (getting on or off a horse): clips cut anyway, nothing to blend. */
-  snap(): void {}
+  /** The next pose at once, not blended (getting on or off a horse). */
+  snap(): void { this.cut = true; }
 
   animateTo(p: HeroPose, dt: number): void {
     this.time += dt;
@@ -247,7 +249,10 @@ export class HeroView {
       void ch.play(null).then(() => { if (this.clip === 'ride' && this.front === ch) ch.actor.play(RIDE); });
       return;
     }
-    playClip(ch, clip, dur !== undefined || clip === 'death', () => this.clip === clip, dur);
+    const once = dur !== undefined || clip === 'death';
+    const fade = this.cut ? 0 : once ? FADE.once : FADE.loop;
+    this.cut = false;
+    playClip(ch, clip, once, () => this.clip === clip, dur, fade);
   }
 
   /** Where the rider's seat is in the hero's own space (Actors' Mount knows the hips). */
