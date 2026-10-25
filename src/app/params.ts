@@ -52,6 +52,8 @@ export const params = {
   topics: q.get('topics')?.split(',') ?? [],
   /** Open the map (or `journal`, `saves`, `pack`) at the start, after any `talk`. */
   open: q.get('open'),
+  /** The title's giant in this fly-over, whatever the draw says (for looking at it). */
+  giant: q.has('giant'),
   /** A tool page instead of the game: `bake=peoples` draws the title card's turning figures (tools/assets/peoples.mjs). */
   bake: q.get('bake'),
   /** Setting module id. */
