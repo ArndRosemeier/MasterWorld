@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readRelease } from './tools/release/release.ts';
 
 /** Package asset folders served under a path of their own (`/humanoid/…`): in dev from the package, in the build copied. */
 const PACKAGE_ASSETS: Record<string, string> = { humanoid: 'vendor/assetgenerator/packages/humanoid/assets' };
@@ -35,6 +36,8 @@ export default defineConfig({
   // GitHub Pages serves the game under /MasterWorld/ (set by .github/workflows/pages.yml); locally it is /.
   base: process.env.VITE_BASE ?? '/',
   plugins: [packageAssets()],
+  // The version and "What's new" (src/app/release.ts); the Pages build of main is the release.
+  define: { __RELEASE__: JSON.stringify(readRelease(process.cwd(), process.env.GITHUB_REF === 'refs/heads/main')) },
   // One three.js: the vendored packages must not bring a second copy (it would split TSL's state).
   resolve: { dedupe: ['three'] },
   server: { port: 5200, host: true, fs: { allow: ['.', 'vendor/assetgenerator/packages'] } },
