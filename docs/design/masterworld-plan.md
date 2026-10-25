@@ -520,7 +520,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 ## 17. Interface and first start (D45, D46)
 
 * **Warded brass** is the design language (D45, 17.1).
-* **Windows**: the map (11.7), the journal and the dialogue window (topics, the 3D speaker stays in view) in milestone 3; inventory with character sheet and trading in milestone 4. The HUD stays small: a compass, and health, stamina and mana only when they matter.
+* **Windows**: the map (11.7), the journal and the dialogue window (topics, the 3D speaker stays in view) in milestone 3; inventory with character sheet and trading in milestone 4. The HUD stays small but is as animated and polished as the windows (17.1).
 * **The title animation** (O18) is a hero feature: captivating and playful, like Starlord's, and while it plays the world is built behind it. Then character creation and a short intro.
 * **First start targets**: the title animation shows within a few seconds; the game is playable when it ends.
 * **Saving**: IndexedDB in the browser, several slots, export and import as a file; autosave on entering or leaving a region or interior and every 5 minutes. A save holds the game version, the module id and version, the seed, the decision log, per-site diffs and the player. Each version bump brings a small migration.
@@ -535,6 +535,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 * **Materials**: engraved brass (rims, rivets, gears, hinges) on dark leather and wood; slate inlays where wards sit. Text in a carved capital face for names (Marcellus SC in the mockups) and a book face for reading (EB Garamond).
 * **Wards**: thin lines of light set into the brass. They trace themselves in when a window opens and then rest with a slow pulse and a spark that runs along them. Their colour carries meaning: cyan is magic and the UI itself; rarity colours on items (grey, green, blue, orange).
 * **The story shows**: early in the game the wards are dim and few. As the long-term goals bring magic back, they grow brighter and more lines wake. The interface ages with the world.
+* **Always-on elements are polished too**: the HUD is animated like the windows (D45), but calm enough to sit on screen for hours: slow idle motion, quick reactions to what happens.
 * **Motion**: every window has an entrance (shutters, an iris, a flip, a drop, a slide, unrolling), lines arrive one after another with a small bounce, and at rest something always moves (a spark, a ticking gear, a glint, a settling needle). Motion is short (under about 1.5 s to readable), never blocks input, and a setting turns it down for those who want calm.
 * **Rarity is the strength of the ward**: common is plain brass, uncommon a breathing ward, rare a ward with a running spark, legendary two sparks, a gear and twinkling stars.
 
@@ -548,7 +549,11 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | Dialogue | A brass speaking-ring around the topic list. Topics turn into place like a dial; topics with a new lead glow. |
 | Inventory and character | A field chest: the lid opens, compartments slide out. Character skills on brass gauges whose needles rise when a skill grows. |
 | Trade | A merchant's balance: coins and goods on two pans that tip as the deal changes. |
-| HUD | A brass compass at the top; health, stamina and mana as small gauges that only rise into view in danger. |
+| Compass (always on) | A brass ring at the top that turns with the camera. Its needle breathes and settles after each turn and wanders by the orientation skill; map marks slide in on the rim as small glowing studs. |
+| Health, stamina, mana (always on) | Three brass gauges with liquid behind glass: it sloshes when you are hit, bubbles when you heal, and the ward around each glows harder as it runs low. |
+| Quick slots and abilities (always on) | Brass sockets on a belt strap. Cooldowns run as a ward line around the socket; a ready ability gives a short glint. |
+| Target frame | A small brass plate that drops in on a hinge; the creature's threat colour shows in its ward. |
+| Clock and weather | A tiny orrery by the compass: sun and moon turn with the day, and a cloud, raindrop or snowflake rides along with the weather. |
 | Notifications | A small brass capsule that pops out of the frame edge, rings once and slides back. |
 | Settings and menus | A cartographer's tool roll that unrolls; switches are brass toggles that click. |
 | Death and waking | The wards go dark one by one; on waking they relight from the centre. |
