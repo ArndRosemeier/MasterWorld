@@ -6,6 +6,10 @@ Design: [docs/design/masterworld-plan.md](docs/design/masterworld-plan.md)
 
 Rules for contributors (human or AI): [CLAUDE.md](CLAUDE.md).
 
+## Play it
+
+In the browser: https://arndrosemeier.github.io/MasterWorld/ (built from `main` on every push; a WebGPU or WebGL 2 browser on a desktop).
+
 ## Run it
 
 ```sh

@@ -32,6 +32,8 @@ function packageAssets(): Plugin {
 }
 
 export default defineConfig({
+  // GitHub Pages serves the game under /MasterWorld/ (set by .github/workflows/pages.yml); locally it is /.
+  base: process.env.VITE_BASE ?? '/',
   plugins: [packageAssets()],
   // One three.js: the vendored packages must not bring a second copy (it would split TSL's state).
   resolve: { dedupe: ['three'] },
