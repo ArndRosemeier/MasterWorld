@@ -10,7 +10,6 @@ import type { WalkWorld } from '../game/walker';
 import { ROOM_DEPTH, type InteriorView } from '../render/town/InteriorView';
 import type { SkyView } from '../render/sky';
 import type { Placed } from '../render/folk/FolkView';
-import { drawn } from '../render/folk/looks';
 import { roomCast } from '../sim/roomCast';
 import type { TownLife } from '../sim/townLife';
 import { Fade } from './fade';
@@ -115,7 +114,7 @@ export class InteriorVisit {
     const r = this.room;
     if (!r) return null;
     // Only those drawn (Actors makes adults): a child would hold a seat and show nobody.
-    return roomCast(life.agents.filter((a) => drawn(a.person)), life.spots, r.b.id, r.plan).map(({ agent, spot, act }) => {
+    return roomCast(life.agents, life.spots, r.b.id, r.plan).map(({ agent, spot, act }) => {
       const s = r.plan.spots[spot], [x, z] = r.frame.toWorld(s.a, s.b);
       return { agent, x, y: r.floor, z, dir: r.frame.dirOf(s.yaw), act };
     });
