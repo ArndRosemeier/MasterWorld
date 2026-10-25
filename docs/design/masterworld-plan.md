@@ -588,7 +588,7 @@ StarLord's title is the bar: the game's own world, alive, playful, new every sta
 | O7 | ~~Lore of the default module~~ | **Decided as a first sketch** (D43, 12.1): the Fading, the five Wardens. Details grow with play. |
 | O8 | ~~Which Norgo code is ported?~~ | **Decided** (D15): the GM is inspiration only. Skills, abilities and the worker split are candidates to port. |
 | O9 | ~~Footprint rules~~ | **Decided** (section 7): hard land wins, then the older decision; settlements and roads beat vegetation. |
-| O15 | Free LLMs through `freeryder` | No cost, less reliable. What for, and how to stay safe when it fails? Its own discussion. |
+| O15 | Free LLMs through `freeryder` | **Parked** (Arnd, 2026-10-25): not sure it belongs in MasterWorld at all. |
 | O16 | Dungeons that don't feel formulaic | D39, 8.1. Needs its own design round before milestone 3's cellar grows into more kinds. |
 | O17 | ~~The interface's design language~~ | **Decided** (D45, 17.1): warded brass. Each window's signature still to be mocked up. |
 | O18 | ~~The title animation~~ | **Decided** (D46, 17.2). |
