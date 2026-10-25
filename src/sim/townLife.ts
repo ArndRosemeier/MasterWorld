@@ -12,7 +12,7 @@ import { NavGraph, aroundHouse } from './nav';
 import { blockAt, townsfolk, type Block, type Person } from './people';
 import { townSpots, type ActivityKind, type Spot } from './spots';
 
-/** A VGM order for the town (plain data, logged with the decisions): times in game hours. */
+/** A VGM order for the town (plain data, logged with the decisions): times in game hours since the start (day × 24 + hour). */
 export type TownOrder =
   /** Everyone awake comes together around a place (a festival, a speech, a hanging). */
   | { kind: 'gather'; x: number; z: number; radius: number; from: number; to: number }
@@ -62,6 +62,8 @@ export class TownLife {
   private readonly orders: TownOrder[] = [];
   private readonly market: [number, number];
   private hour = 12;
+  /** Game hours since the start (orders are timed in these). */
+  private hours = 12;
   private weather: TownWeather = { rain: 0 };
 
   constructor(readonly plan: TownPlan, seed: number, hour: number) {
@@ -69,7 +71,8 @@ export class TownLife {
     this.spots = townSpots(plan);
     this.market = polyCentroid(plan.market) as [number, number];
     this.focus = { x: this.market[0], z: this.market[1] };
-    this.hour = hour;
+    this.hour = hour % 24;
+    this.hours = hour;
     this.agents = townsfolk(plan, seed).map((p) => {
       const d = plan.buildings[p.home].door;
       const a: Agent = { person: p, x: d[0], z: d[1], dir: d[2], act: 'wait', next: 'wait', spot: -1, hidden: false, until: 0, path: [], pi: 0, block: 'sleep', rng: new Rng(deriveSeed(seed, 'life', p.id)) };
@@ -83,10 +86,11 @@ export class TownLife {
   /** Give the town an order (the VGM's way in). */
   order(o: TownOrder): void { this.orders.push(o); }
 
-  /** Advance `dt` real seconds at game hour `hour`. */
-  step(dt: number, hour: number, weather: TownWeather = this.weather): void {
+  /** Advance `dt` real seconds at `hours` game hours since the start (day × 24 + hour). */
+  step(dt: number, hours: number, weather: TownWeather = this.weather): void {
     this.time += dt;
-    this.hour = hour;
+    this.hours = hours;
+    this.hour = ((hours % 24) + 24) % 24;
     this.weather = weather;
     for (const a of this.agents) {
       if (a.act === 'walk') this.walk(a, dt);
@@ -104,7 +108,7 @@ export class TownLife {
   private activeOrder(): TownOrder | null {
     for (let i = this.orders.length - 1; i >= 0; i--) {
       const o = this.orders[i];
-      if (this.hour >= o.from && this.hour < o.to) return o;
+      if (this.hours >= o.from && this.hours < o.to) return o;
     }
     return null;
   }

@@ -10,7 +10,7 @@ import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { HeroView } from './render/hero/HeroView';
 import { FolkView } from './render/folk/FolkView';
-import { TownLife } from './sim/townLife';
+import { TownLife, type TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
 import { VolumeView } from './render/terrain/VolumeView';
@@ -26,6 +26,7 @@ import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { validateSetting } from './setting/contract';
 import { openWorld } from './vgm/builder';
+import { ordersOf, townOrder } from './vgm/orders';
 import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
@@ -112,7 +113,16 @@ async function start(): Promise<void> {
     player.walker.height = hero.height;
     player.hero = hero;
     // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
-    const life = town ? new TownLife(town.plan, seed, view.sky.hour) : null;
+    const life = town ? new TownLife(town.plan, seed, hours()) : null;
+    // The VGM's orders to the town (logged; a save replays them).
+    let log = opened.log;
+    if (life && town) for (const o of ordersOf(log, town.decision.id)) life.order(o);
+    const orderTown = (o: TownOrder): void => {
+      if (!life || !town) return;
+      const d = townOrder(log, town.decision.id, o);
+      log = [...log, d];
+      life.order(o);
+    };
     let folk: FolkView | null = null;
     if (life && params.folk > 0) {
       loading.set('Waking the town');
@@ -199,6 +209,12 @@ async function start(): Promise<void> {
         if (kind) weather.order({ kind: kind as WeatherKind, from: hours(), to: hours() + 6, ramp: 0.05 });
         return kind ? `${kind} for 6 game hours` : 'natural weather';
       },
+      town: (kind) => {
+        if (!life || !town) return 'no town';
+        const [x, z] = town.plan.centre;
+        orderTown(kind === 'gather' ? { kind, x, z, radius: 14, from: hours(), to: hours() + 2 } : { kind, from: hours(), to: hours() + 2 });
+        return kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
+      },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
       game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; } },
@@ -225,7 +241,7 @@ async function start(): Promise<void> {
       houses?.update(view.camera.position);
       if (life) {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
-        life.step(dt, view.sky.hour, { rain: wx.shown.rain });
+        life.step(dt, hours(), { rain: wx.shown.rain });
       }
       folk?.follow(dt, view.camera);
       if (boot.trees) flora.update(dt, view.camera);

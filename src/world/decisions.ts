@@ -2,6 +2,7 @@
  * The decision log (plan 5.1): the world is the seed plus the VGM's decisions. A decision is plain data
  * (saved, replayed, later shared in multiplayer); the generators turn it into land, towns and people.
  */
+import type { TownOrder } from '../sim/townLife';
 import type { ArchSite } from './volumes';
 
 /** A town stands here (plan 7): its market's middle and its outline's typical radius. */
@@ -39,6 +40,18 @@ export interface DungeonDecision {
   readonly setPiece: string;
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision;
+/**
+ * The VGM steers a town's people (plan 9.3): a festival, a gathering, a curfew. They live their own
+ * lives otherwise; the order only says what everyone awake does for its while.
+ */
+export interface OrderDecision {
+  readonly kind: 'order';
+  readonly id: string;
+  /** The town's decision id. */
+  readonly town: string;
+  readonly order: TownOrder;
+}
+
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision;
 
 export type DecisionLog = readonly Decision[];
