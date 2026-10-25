@@ -300,6 +300,8 @@ Everything that moves by itself lives in **one simulation** (`src/sim`, pure, ru
 
 Built so far (`src/sim`): `nav.ts` walks along the streets (a graph on their centre lines, the market as a hub, around a house to its back yard); `spots.ts` turns the plan's fixtures and doors into smart objects (what is done there, by whom, for how long, how many at once); `people.ts` fills the houses (trades, stall traders, the temple keeper, hands, homemakers, children; traits shift each one's day); `townLife.ts` runs them: every agent is always on the way or doing something, turns last real seconds while the game clock only picks the part of the day (so a stopped clock still gives a busy town), rain sends people in, far agents skip their walks, and the VGM's town orders are `gather` and `stayIn`. `test/townLife.test.ts` holds the town to it: through a whole day under 5 % of the time idle.
 
+Drawn (`src/render/folk`): the nearest people out of doors (16 by default, `?folk=N`) get an Actors character from a pool, dressed from their seed and role in Actors' medieval wardrobe (`looks.ts`: tunics, hose, chemises, skirts, a long tunic for traders, robe and mantle for the temple keeper) and playing a clip per activity. Far ones draw Actors' "Crowd" level. `npm run packs` copies the part of the Actors pack the town uses (about 90 of 530 MB) into `public/packs`; the Pages build runs it. Actors makes adults only, so children live in the simulation but are not drawn yet.
+
 The VGM's own part in milestone 2 is small: the **decision log** (`src/world/decisions.ts`) and the **Builder** (`src/vgm/builder.ts`) founding the start town as its first decision. The town's plan comes from `@futuremagic/settlement` (`planTown`).
 
 ---

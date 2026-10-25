@@ -26,6 +26,9 @@ export interface Person {
   early: number;
   /** Walking speed, m/s. */
   speed: number;
+  female: boolean;
+  /** Years. */
+  age: number;
   seed: number;
 }
 
@@ -39,7 +42,8 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
   const add = (home: number, work: number, role: Role, trade: string) => {
     const id = people.length, s = deriveSeed(seed, 'person', id), pr = new Rng(s);
     const child = role === 'child';
-    people.push({ id, home, work, role, trade, social: pr.float(), diligent: pr.float(), pious: pr.float(), early: pr.float(), speed: child ? pr.range(1.4, 1.8) : pr.range(1.1, 1.45), seed: s });
+    const traits = { social: pr.float(), diligent: pr.float(), pious: pr.float(), early: pr.float(), speed: child ? pr.range(1.4, 1.8) : pr.range(1.1, 1.45) };
+    people.push({ id, home, work, role, trade, ...traits, female: pr.chance(0.5), age: Math.round(child ? pr.range(4, 15) : pr.range(18, 68)), seed: s });
     return people[id];
   };
   const trades = plan.buildings.filter((b) => b.trade && b.kind !== 'temple');

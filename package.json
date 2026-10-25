@@ -8,6 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "packs": "node tools/packs/actors.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
@@ -19,6 +20,7 @@
     "shot": "node tools/shot/shot.mjs"
   },
   "dependencies": {
+    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.10.0/actors-generator-0.10.0.tgz",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/humanoid": "file:vendor/assetgenerator/packages/humanoid",
     "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",

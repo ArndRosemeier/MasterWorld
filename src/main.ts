@@ -9,6 +9,8 @@ import { Player } from './app/player';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { HeroView } from './render/hero/HeroView';
+import { FolkView } from './render/folk/FolkView';
+import { TownLife } from './sim/townLife';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
 import { VolumeView } from './render/terrain/VolumeView';
@@ -101,6 +103,14 @@ async function start(): Promise<void> {
     const hero = await HeroView.create(seed);
     player.walker.height = hero.height;
     player.hero = hero;
+    // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
+    const life = town ? new TownLife(town.plan, seed, view.sky.hour) : null;
+    let folk: FolkView | null = null;
+    if (life && params.folk > 0) {
+      loading.set('Waking the town');
+      folk = await FolkView.create(view.stage, view.renderer, life, (x, z) => terrain.height(x, z), params.folk);
+      folk.camera = view.camera;
+    }
     loading.set('Growing the woods');
     const flora = new FloraView(view.stage, jobs, view.sun, { leafDepth: params.leafDepth, shadows: params.treeShadows });
     if (boot.trees) await flora.placeStart(view.camera.position);
@@ -108,7 +118,7 @@ async function start(): Promise<void> {
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip]);
+    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(folk ? await folk.warmObjects() : [])]);
     loading.set('Raising the land');
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
@@ -124,11 +134,11 @@ async function start(): Promise<void> {
     await view.stage.add(hero.object);
     await view.stage.add(wx.precip);
 
-    // The trees' shaders are built in the Stage's frame slots, so the loop must run meanwhile; loading ends
-    // once they stand.
+    // The trees' shaders (and the townsfolk's other detail levels) are built in the Stage's frame slots, so
+    // the loop must run meanwhile; loading ends once they stand.
     loading.set('Planting the trees');
     let planted = false;
-    const planting = (boot.trees ? flora.plant() : Promise.resolve()).then(() => { planted = true; });
+    const planting = Promise.all([boot.trees ? flora.plant() : null, folk?.warmLods()]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -188,13 +198,18 @@ async function start(): Promise<void> {
       sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
       houses?.update(view.camera.position);
+      if (life) {
+        life.focus = { x: view.camera.position.x, z: view.camera.position.z };
+        life.step(dt, view.sky.hour, { rain: wx.shown.rain });
+      }
+      folk?.update(dt, view.camera);
       if (boot.trees) flora.update(dt, view.camera);
       grass?.tend(dt, view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}\n${wx.summary}\n${view.stage.hudLine()}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.stats}` : ''}\n${wx.summary}\n${view.stage.hudLine()}`;
       }
       last = now;
       if (planted && !window.__mwReady) {
