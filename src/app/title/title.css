@@ -11,6 +11,8 @@
 }
 #title button { pointer-events: auto; }
 body.titled #corner, body.titled #hud { display: none; }
+/* The menu's windows (Settings, What's new) open over the title, not under its logo. */
+body.titled .shade { z-index: 25; }
 
 /* The painted still: shown at once, slowly drifting, gone when the live world takes over. */
 .t-still { position: absolute; inset: -4%; background: #0b0d10 center / cover no-repeat; animation: t-drift 40s ease-in-out infinite alternate; transition: opacity 3s ease; }
