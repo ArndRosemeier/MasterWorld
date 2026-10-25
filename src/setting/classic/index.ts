@@ -3,6 +3,7 @@
  * heartland, cold north, dry south.
  */
 import { CONTRACT_VERSION, type SettingModule } from '../contract';
+import { cellar } from './cellar';
 
 export const classic: SettingModule = {
   contractVersion: CONTRACT_VERSION,
@@ -39,4 +40,5 @@ export const classic: SettingModule = {
     maxSlope: 0.12,
     vista: 220,
   },
+  dungeons: { cellar },
 };

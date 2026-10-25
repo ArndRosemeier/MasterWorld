@@ -321,6 +321,8 @@ Arnd's rules (2026-10-25):
 
 **Order of work**: milestone 3's cellar uses layers 1, 2, 7 and 8 and one set piece; the other layers grow with each new dungeon kind.
 
+**Built so far (2026-10-25)**: `@futuremagic/dungeon` (AssetGenerator) holds the shape: 12 cycle patterns, `cyclicGraph`, the tension curve (`pace`) and a multi-level layout with stairs, ledges and tall halls. MasterWorld holds the meaning: the cellar lore in the setting module (`dungeons.cellar`: room uses, builders, older layers, troubles, dwellers with their hint lines), `src/world/dungeon/cellar.ts` (sketch and outline), two set pieces (`broken-floor`, `bricked-wall` with its ledger clue), and the VGM's `promiseCellar` (src/vgm/dungeons.ts), which puts the first cellar under a house of the start town. `npm run variety` sweeps 1000 cellars.
+
 ---
 
 ## 9. NPCs

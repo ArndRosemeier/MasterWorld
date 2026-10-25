@@ -22,6 +22,23 @@ export interface VolumeDecision {
   readonly site: ArchSite;
 }
 
-export type Decision = TownDecision | VolumeDecision;
+/**
+ * A dungeon promised under a building of a town (plan 4.2, 8): the seed and the set piece fix what it
+ * is; it is sketched, outlined and built from this as the player comes closer (world/dungeon).
+ */
+export interface DungeonDecision {
+  readonly kind: 'dungeon';
+  readonly id: string;
+  readonly template: 'cellar';
+  /** The town's decision id. */
+  readonly town: string;
+  /** Index into the town plan's buildings: the house above. */
+  readonly building: number;
+  readonly seed: number;
+  /** The signature set piece (world/dungeon/setPieces.ts). */
+  readonly setPiece: string;
+}
+
+export type Decision = TownDecision | VolumeDecision | DungeonDecision;
 
 export type DecisionLog = readonly Decision[];
