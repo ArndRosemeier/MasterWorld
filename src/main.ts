@@ -93,7 +93,7 @@ async function start(): Promise<void> {
     player.walker.height = hero.height;
     player.hero = hero;
     loading.set('Growing the woods');
-    const flora = new FloraView(view.stage, jobs, view.sun);
+    const flora = new FloraView(view.stage, jobs, view.sun, { leafDepth: params.leafDepth, shadows: params.treeShadows });
     if (boot.trees) await flora.placeStart(view.camera.position);
     const grass = boot.grass ? new GrassView(jobs) : null;
     await grass?.sow(view.camera.position);
