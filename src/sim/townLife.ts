@@ -10,7 +10,7 @@ import { Rng, deriveSeed } from '@futuremagic/core';
 import { polyCentroid, type TownPlan } from '@futuremagic/settlement';
 import { NavGraph, aroundHouse } from './nav';
 import { away, blockAt, townsfolk, type Block, type Person } from './people';
-import { townSpots, type ActivityKind, type Spot } from './spots';
+import { seatAt, townSpots, type ActivityKind, type Spot } from './spots';
 
 /** A VGM order for the town (plain data, logged with the decisions): times in game hours since the start (day × 24 + hour). */
 export type TownOrder =
@@ -29,8 +29,9 @@ export interface Agent {
   act: ActivityKind;
   /** What they will do on arrival. */
   next: ActivityKind;
-  /** The spot they are at or heading to (-1: a free point). */
+  /** The spot they are at or heading to (-1: a free point), and their place at it. */
   spot: number;
+  seat: number;
   /** Indoors or out of town: not to be drawn. */
   hidden: boolean;
   /** When the turn ends (sim seconds). */
@@ -49,6 +50,9 @@ export interface TownWeather {
   /** 0 dry .. 1 pouring. */
   rain: number;
 }
+
+/** A townsperson's radius as an obstacle (m). */
+const BODY = 0.28;
 
 /** Agents farther than this from the focus skip their walks (m). */
 const DETAIL = 260;
@@ -85,7 +89,7 @@ export class TownLife {
     this.hours = hour;
     this.agents = townsfolk(plan, seed).map((p) => {
       const d = plan.buildings[p.home].door;
-      const a: Agent = { person: p, x: d[0], z: d[1], dir: d[2], act: 'wait', next: 'wait', spot: -1, hidden: false, until: 0, path: [], pi: 0, block: 'sleep', rng: new Rng(deriveSeed(seed, 'life', p.id)) };
+      const a: Agent = { person: p, x: d[0], z: d[1], dir: d[2], act: 'wait', next: 'wait', spot: -1, seat: 0, hidden: false, until: 0, path: [], pi: 0, block: 'sleep', rng: new Rng(deriveSeed(seed, 'life', p.id)) };
       // Start in the middle of something, already there.
       this.choose(a, true);
       a.until = this.time + a.rng.range(0, 1) * (a.until - this.time);
@@ -123,6 +127,20 @@ export class TownLife {
     this.choose(a, false);
   }
 
+  /**
+   * Does a body of radius `r` at (x, z) touch someone out of doors (each about `BODY` wide)? People
+   * already touching (ax, az), where the asker stands now, are let through, so one walked into is
+   * never stuck.
+   */
+  touches(x: number, z: number, r: number, ax: number, az: number): boolean {
+    const d = r + BODY;
+    for (const a of this.agents) {
+      if (a.hidden || Math.abs(a.x - x) > d || Math.abs(a.z - z) > d) continue;
+      if ((a.x - x) ** 2 + (a.z - z) ** 2 < d * d && (a.x - ax) ** 2 + (a.z - az) ** 2 >= d * d) return true;
+    }
+    return false;
+  }
+
   /** How many are doing what (for the HUD and tests). */
   census(): Map<ActivityKind, number> {
     const m = new Map<ActivityKind, number>();
@@ -147,13 +165,22 @@ export class TownLife {
   /** Pick the next thing to do and set off (or, `here`, start there at once). */
   private choose(a: Agent, here: boolean): void {
     const was = a.spot >= 0 ? this.spots[a.spot] : null;
-    if (was) was.users--;
+    if (was) { was.users--; if (was.seats?.[a.seat] === a.person.id) was.seats[a.seat] = -1; }
     a.block = this.blockOf(a);
     const pick = this.pick(a);
     a.spot = pick.spot;
-    if (pick.spot >= 0) this.spots[pick.spot].users++;
     const s = pick.spot >= 0 ? this.spots[pick.spot] : null;
-    const tx = s ? s.x : pick.x, tz = s ? s.z : pick.z;
+    if (s) {
+      s.users++;
+      // A place of one's own at it (two on one bench sit side by side, not in each other's lap).
+      if (s.cap > 1 && !s.door) {
+        const seats = (s.seats ??= new Array<number>(s.cap).fill(-1));
+        const keep = s === was && seats[a.seat] === -1 ? a.seat : -1;
+        a.seat = keep >= 0 ? keep : Math.max(0, seats.indexOf(-1));
+        seats[a.seat] = a.person.id;
+      } else a.seat = 0;
+    }
+    const [tx, tz] = s ? seatAt(s, a.seat) : [pick.x, pick.z];
     a.next = pick.act;
     a.until = this.time + a.rng.range(pick.secs[0], pick.secs[1]) * (s?.outside && this.weather.rain > 0.5 ? 0.5 : 1);
     if (here || (s && s === was) || (Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > DETAIL && Math.hypot(tx - this.focus.x, tz - this.focus.z) > DETAIL)) {

@@ -126,3 +126,28 @@ test('town life: the elf walks in along a road, stays the night at the inn, and 
   assert.ok(farthest > plan.radius, `away at ${farthest.toFixed(0)} m from the centre`);
   assert.ok(nearest < 1, 'at the inn');
 });
+
+test('town life: two at one bench or table sit side by side, never in one place', () => {
+  const life = new TownLife(plan, 7, 17);
+  let shared = 0, pairs = 0;
+  for (let s = 0; s < 900; s++) {
+    life.step(1, 17 + s / HOUR);
+    if (s % 10) continue;
+    const at = life.agents.filter((a) => !a.hidden && a.act !== 'walk' && a.spot >= 0 && life.spots[a.spot].cap > 1);
+    for (let i = 0; i < at.length; i++) for (let j = i + 1; j < at.length; j++) {
+      if (at[i].spot !== at[j].spot) continue;
+      pairs++;
+      if (Math.hypot(at[i].x - at[j].x, at[i].z - at[j].z) < 0.5) shared++;
+    }
+  }
+  assert.ok(pairs > 0, 'some spots are shared');
+  assert.equal(shared, 0, `${shared} of ${pairs} pairs in one place`);
+});
+
+test('town life: the hero walks around townsfolk, and is never stuck in one who walks into them', () => {
+  const life = new TownLife(plan, 7, 12);
+  const a = life.agents.find((x) => !x.hidden)!;
+  assert.ok(life.touches(a.x + 0.4, a.z, 0.32, a.x + 3, a.z), 'blocked walking into them');
+  assert.ok(!life.touches(a.x + 0.4, a.z, 0.32, a.x + 0.3, a.z), 'free when already touching');
+  assert.ok(!life.touches(a.x + 2, a.z, 0.32, a.x + 3, a.z), 'free at a distance');
+});
