@@ -2,7 +2,9 @@
  * Who is where in a room (D38): the people the simulation has indoors in a building, each given one of
  * the room's spots (@futuremagic/settlement planInterior) by what they are there for. Those working
  * there take the work spots (the innkeeper the counter, the smith the anvil, the keeper the basin); the
- * rest sit, drink, pray or warm themselves. Sleepers are abed upstairs and not cast. Pure.
+ * rest sit, drink, pray or warm themselves. Those drinking at the inn's tables or praying at the temple's
+ * offering are drawn inside while the player is (the room is where one would look for them). Sleepers are
+ * abed upstairs and not cast. Pure.
  */
 import type { InteriorPlan, InteriorSpotKind } from '@futuremagic/settlement';
 import type { ActivityKind } from './spots';
@@ -26,7 +28,11 @@ const REST: readonly InteriorSpotKind[] = ['drink', 'sit', 'pray', 'warm'];
 
 /** The cast of `building`'s room, in a stable order (by person). */
 export function roomCast(agents: readonly Agent[], spots: readonly { building: number; door?: boolean }[], building: number, plan: InteriorPlan): Cast[] {
-  const inside = agents.filter((a) => a.hidden && a.act !== 'sleep' && a.spot >= 0 && spots[a.spot].building === building && spots[a.spot].door);
+  const inside = agents.filter((a) => {
+    const s = a.spot >= 0 ? spots[a.spot] : null;
+    if (!s || s.building !== building) return false;
+    return s.door ? a.hidden && a.act !== 'sleep' : (a.act === 'drink' || a.act === 'pray');
+  });
   const free = plan.spots.map((s, i) => ({ kind: s.kind, i })).filter((s) => s.kind !== 'sleep');
   const take = (ok: (k: InteriorSpotKind) => boolean, id: number): number => {
     const left = free.filter((s) => ok(s.kind));

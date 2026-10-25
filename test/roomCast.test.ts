@@ -13,7 +13,7 @@ test('room cast: in the evening the houses have their people at table and hearth
   for (const b of plan.buildings) {
     const room = planInterior(b), c = roomCast(life.agents, life.spots, b.id, room);
     assert.equal(new Set(c.map((x) => x.spot)).size, c.length, 'one each');
-    for (const x of c) assert.equal(x.agent.hidden, true);
+    for (const x of c) assert.ok(x.agent.hidden || x.agent.act === 'drink' || x.agent.act === 'pray');
     if (c.length) rooms++;
     cast += c.length;
     if (b.kind === 'inn') {
