@@ -43,7 +43,7 @@ export class Terrain {
     this.townList = null;
     for (const d of log) {
       if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
-      else this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
+      else if (d.kind === 'town') this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
     }
   }
 

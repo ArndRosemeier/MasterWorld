@@ -17,10 +17,12 @@
     "guards": "node tools/guards/guards.mjs",
     "dup": "node tools/duplicate-candidates/find-duplicate-candidates.mjs",
     "repeated": "node tools/repeated-code/find-repeated-code.mjs",
-    "shot": "node tools/shot/shot.mjs"
+    "shot": "node tools/shot/shot.mjs",
+    "variety": "node --import tsx tools/variety/cellars.ts"
   },
   "dependencies": {
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
+    "@futuremagic/dungeon": "file:vendor/assetgenerator/packages/dungeon",
     "@futuremagic/humanoid": "file:vendor/assetgenerator/packages/humanoid",
     "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",
     "@futuremagic/settlement": "file:vendor/assetgenerator/packages/settlement",

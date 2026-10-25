@@ -6,7 +6,7 @@
  * lore, VGM templates and the Conversations package are added as the milestones need them.
  */
 
-export const CONTRACT_VERSION = 2;
+export const CONTRACT_VERSION = 3;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -118,6 +118,64 @@ export interface StartSpec {
   readonly vista: number;
 }
 
+/** The props the engine can draw in a dungeon (simple kit pieces). */
+export const DUNGEON_PROPS = [
+  'barrel', 'cask', 'rack', 'crate', 'sack', 'shelf', 'table', 'stool', 'cot', 'straw', 'rubble', 'bones',
+  'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar',
+] as const;
+export type DungeonProp = (typeof DUNGEON_PROPS)[number];
+
+/** What a room is used for: its name and what stands in it. */
+export interface RoomUseDef {
+  readonly id: string;
+  /** As the player would call it ("the wine store"). */
+  readonly name: string;
+  /** Props that stand in it, most typical first. */
+  readonly props: readonly DungeonProp[];
+}
+
+/**
+ * One layer of a place's past (plan 8.1, history first): who built it, what lay there before, what went
+ * wrong, who lives there now. `text` is a line of history; `{house}` stands for the house above.
+ */
+export interface HistoryDef {
+  readonly id: string;
+  readonly text: string;
+  /** Room uses this layer leaves behind (ids of `RoomUseDef`). */
+  readonly uses: readonly string[];
+  /** Cycle patterns (@futuremagic/dungeon) that fit this layer's story. */
+  readonly patterns?: readonly string[];
+  /** Traces it leaves anywhere (soot, silt, bones). */
+  readonly traces?: readonly DungeonProp[];
+  readonly weight?: number;
+  /** Only together with one of these layers (ids from the other lists). */
+  readonly with?: readonly string[];
+}
+
+/** Who lives in a dungeon now: the problem the player solves. */
+export interface DwellerDef extends HistoryDef {
+  /** Creatures (the setting's names). */
+  readonly creatures: readonly string[];
+  /** Use of the goal room. */
+  readonly lair: string;
+  /** What the household above notices: the hint lines an NPC can say. */
+  readonly signs: readonly string[];
+  /** A rare surprise among them (plan 8.1: breaking expectations), if any. */
+  readonly surprise?: string;
+}
+
+/** The setting's material for cellar dungeons (plan 8, milestone 3). */
+export interface CellarLore {
+  readonly uses: readonly RoomUseDef[];
+  /** Who dug the cellar and why. */
+  readonly builders: readonly HistoryDef[];
+  /** What lay there before the house: the storey below. */
+  readonly older: readonly HistoryDef[];
+  /** What went wrong. */
+  readonly troubles: readonly HistoryDef[];
+  readonly dwellers: readonly DwellerDef[];
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -127,6 +185,8 @@ export interface SettingModule {
   readonly title: string;
   readonly world: WorldShape;
   readonly start: StartSpec;
+  /** Material for dungeons, per kind (plan 8). */
+  readonly dungeons: { readonly cellar: CellarLore };
 }
 
 /** Authoring errors, one line each (empty: the module is valid). */
@@ -168,5 +228,19 @@ export function validateSetting(m: SettingModule): string[] {
   if (!(m.start.elevation[0] >= 0 && m.start.elevation[0] < m.start.elevation[1])) out.push(`${where}: start.elevation must be a rising range above the sea`);
   if (!(m.start.maxSlope > 0)) out.push(`${where}: start.maxSlope must be > 0`);
   if (!(m.start.vista >= 0)) out.push(`${where}: start.vista must be >= 0`);
+  const c = m.dungeons.cellar;
+  const uses = new Set(c.uses.map((u) => u.id));
+  for (const u of c.uses) for (const p of u.props) if (!DUNGEON_PROPS.includes(p)) out.push(`${where}: cellar use "${u.id}" prop "${p}" is unknown`);
+  for (const [k, list] of [['builders', c.builders], ['older', c.older], ['troubles', c.troubles], ['dwellers', c.dwellers]] as const) {
+    if (!list.length) out.push(`${where}: dungeons.cellar.${k} is empty`);
+    for (const h of list as readonly HistoryDef[]) {
+      for (const u of h.uses) if (!uses.has(u)) out.push(`${where}: cellar ${k} "${h.id}" uses unknown room use "${u}"`);
+      for (const p of h.traces ?? []) if (!DUNGEON_PROPS.includes(p)) out.push(`${where}: cellar ${k} "${h.id}" trace "${p}" is unknown`);
+    }
+  }
+  for (const d of c.dwellers) {
+    if (!uses.has(d.lair)) out.push(`${where}: cellar dweller "${d.id}" lair "${d.lair}" is unknown`);
+    if (!d.signs.length) out.push(`${where}: cellar dweller "${d.id}" has no signs to hint with`);
+  }
   return out;
 }

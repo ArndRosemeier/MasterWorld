@@ -9,6 +9,7 @@ import type { Decision, DecisionLog, TownDecision } from '../world/decisions';
 import { findStart, type StartPlace } from '../world/start';
 import { Terrain } from '../world/terrain';
 import { archNear, type ArchSite } from '../world/volumes';
+import { promiseCellar } from './dungeons';
 
 /** A world ready to build on: the land, the log it was settled with, and where the start is. */
 export interface OpenWorld {
@@ -23,6 +24,10 @@ export function openWorld(seed: number, setting: SettingModule): OpenWorld {
   const home = findStart(terrain.skeleton, setting);
   const log = firstDecisions(terrain, home);
   terrain.settle(log);
+  // The first promise (milestone 3): a cellar under a house of the start town, for a hint in town.
+  const town = terrain.towns[0];
+  const cellar = town ? promiseCellar(seed, town, log) : null;
+  if (cellar) log.push(cellar);
   return { terrain, log, home };
 }
 

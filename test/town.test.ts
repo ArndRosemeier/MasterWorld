@@ -40,3 +40,15 @@ test('town: no trees on its streets or in its houses', () => {
   const f = floraPlacement(terrain, { seed: terrain.seed, setting: classic.id, x0, z0, size: 256, spacing: 4 });
   for (let i = 0; i < f.length; i += FLORA_STRIDE) assert.ok(terrain.townGround(f[i], f[i + 2]) <= TownGround.Yard, `a plant at ${f[i].toFixed(0)}, ${f[i + 2].toFixed(0)} on ${terrain.townGround(f[i], f[i + 2])}`);
 });
+
+test('town: the VGM promises a cellar under one of its houses, with a household who can hint at it', async () => {
+  const { sketchCellar } = await import('../src/world/dungeon/cellar');
+  const { houseOf } = await import('../src/vgm/dungeons');
+  const d = log.find((x) => x.kind === 'dungeon');
+  assert.ok(d && d.kind === 'dungeon', 'a dungeon decision');
+  const house = houseOf(d, terrain.towns);
+  assert.ok(house && house.household > 0, 'under a lived-in house');
+  const s = sketchCellar(d, house, classic.dungeons.cellar);
+  assert.ok(s.hints.length > 0);
+  assert.equal(s.knownBy.building, house.id);
+});
