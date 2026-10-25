@@ -32,14 +32,6 @@
     "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
   },
   {
-    "key": "same name: masterworld/app/player.ts#update + masterworld/render/flora/FloraView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (the player vs plant cells); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/app/player.ts#update + masterworld/render/town/TownView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (the player vs town building streaming); only the name matches."
-  },
-  {
     "key": "same name: masterworld/app/cellarVisit.ts#enter + masterworld/app/interiorVisit.ts#enter",
     "reason": "Two spaces behind a way in (the cellar's dungeon space under its hatch, a building's room behind its door), each going in, out and checking its exits; the fade they share is app/fade.ts, the notes app/notes.ts. Different spaces, different checks."
   },

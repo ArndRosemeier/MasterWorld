@@ -1,12 +1,15 @@
 /**
- * The player: the hero walking the land (Walker, HeroCamera, HeroView), or flying the free camera to look
- * around (F, `?fly`). The hero waits where it was left while the camera flies; landing puts it on the
- * ground under the camera.
+ * The player: the hero walking the land (Walker, HeroCamera, HeroView), riding a horse (Steed, HorseView),
+ * or flying the free camera to look around (F, `?fly`). The hero waits where it was left while the camera
+ * flies; landing puts it on the ground under the camera. The mount key gets on the nearest horse within
+ * reach, and off again on its left.
  */
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { Walker, type WalkWorld } from '../game/walker';
 import type { ActionAnim } from '@futuremagic/humanoid/three';
+import { nearestSteed, type Steed } from '../game/horse';
 import type { HeroView } from '../render/hero/HeroView';
+import type { HorseView } from '../render/horse/HorseView';
 import { FlyCamera } from './flyCamera';
 import { HeroCamera } from './heroCamera';
 import { lookFromDegrees } from './look';
@@ -19,7 +22,13 @@ export class Player {
   hero: HeroView | null = null;
   /** In a fight: weapons drawn, and the blow (or drink, or flinch) playing; set by the fight each frame. */
   stance: { combat: boolean; action?: ActionAnim } = { combat: false };
+  /** The horses about, and how they are drawn (set once built; steeds[i] is drawn as horse i). */
+  steeds: Steed[] = [];
+  horses: HorseView | null = null;
+  /** The horse the hero rides, or null on foot. */
+  riding: Steed | null = null;
   private paused = false;
+  private readonly seat = new Vector3();
   private flyingNow: boolean;
   private readonly head = new Vector3();
 
@@ -36,6 +45,7 @@ export class Player {
   set flying(on: boolean) {
     if (on === this.flying) return;
     if (on) {
+      this.dismount();
       this.fly.place(this.camera.position.x, this.camera.position.z, this.camera.position.y, true);
       this.fly.takeOver();
     } else {
@@ -74,14 +84,54 @@ export class Player {
       if (look) this.fly.setLook(look[0], look[1] ?? 0);
       return;
     }
+    this.dismount();
     this.walker.place(x, z, y);
     if (look) ({ yaw: this.heroCam.yaw, pitch: this.heroCam.pitch } = lookFromDegrees(look[0], look[1] ?? -10));
     this.walker.yaw = this.heroCam.yaw;
     this.heroCam.trail(this.toHead(), 0);
   }
 
+  /**
+   * The mount key: on the nearest horse within reach, or off the one ridden. Returns whether anything
+   * happened (no horse near, flying or swimming: nothing).
+   */
+  toggleMount(): boolean {
+    if (this.riding) return this.dismount();
+    if (this.flying || this.walker.mode !== 'ground') return false;
+    const s = nearestSteed(this.steeds, this.walker.pos.x, this.walker.pos.z);
+    if (!s) return false;
+    this.mount(s);
+    return true;
+  }
+
+  /** On horse `s` at once (wherever it is). */
+  mount(s: Steed): void {
+    this.dismount();
+    s.ridden = true;
+    this.riding = s;
+    this.walker.vel.x = this.walker.vel.y = this.walker.vel.z = 0;
+    // The horse keeps its heading; the camera swings round behind it.
+    this.heroCam.yaw = s.yaw;
+    this.hero?.snap();
+  }
+
+  /** Off the horse, onto free ground beside it (left first). */
+  dismount(): boolean {
+    const s = this.riding;
+    if (!s) return false;
+    const w = this.world;
+    const spot = s.dismountSpot((x, z, r) => !w.wall?.(x, z, r) && w.waterLevel(x, z) === null);
+    s.ridden = false;
+    this.riding = null;
+    this.walker.place(spot.x, spot.z);
+    this.walker.yaw = s.yaw;
+    this.hero?.snap();
+    return true;
+  }
+
   /** Stand somewhere at once, facing `yaw` (a door, a ladder): y undefined stands on the ground. */
   teleport(x: number, y: number | undefined, z: number, yaw: number): void {
+    this.dismount();
     this.walker.place(x, z, y);
     this.walker.yaw = this.heroCam.yaw = yaw;
     this.heroCam.trail(this.toHead(), 0);
@@ -96,24 +146,32 @@ export class Player {
   }
 
   update(dt: number): void {
-    const { walker, heroCam } = this;
+    const { walker, heroCam, riding } = this;
     if (this.flying) {
       this.fly.update(dt);
       this.standBy(dt);
       return;
     }
-    const { intent, facing } = heroCam.intent(dt, walker.yaw);
-    walker.yaw = facing;
-    walker.step(intent, dt);
-    this.pose(dt);
+    if (riding) {
+      const { intent, facing } = heroCam.intent(dt, riding.yaw);
+      riding.travel(dt, intent, facing);
+      // The hero's body goes where the horse goes (for the camera, the view's URL, the cellar's door).
+      walker.pos.x = riding.pos.x; walker.pos.y = riding.pos.y; walker.pos.z = riding.pos.z;
+      walker.yaw = riding.yaw;
+    } else {
+      const { intent, facing } = heroCam.intent(dt, walker.yaw);
+      walker.yaw = facing;
+      walker.step(intent, dt);
+    }
+    this.drawBodies(dt);
     heroCam.trail(this.toHead(), dt);
   }
 
   /** The hero stands and breathes where it was left, and the camera is someone else's (flying, the title). */
   standBy(dt: number): void {
     const walker = this.walker;
-    walker.step({ forward: 0, strafe: 0, heading: walker.yaw, walk: false, up: false, down: false }, dt);
-    this.pose(dt);
+    if (!this.riding) walker.step({ forward: 0, strafe: 0, heading: walker.yaw, walk: false, up: false, down: false }, dt);
+    this.drawBodies(dt);
   }
 
   /** Where the camera will be behind the hero (the camera itself is left where it is). */
@@ -127,10 +185,23 @@ export class Player {
     return view;
   }
 
-  private pose(dt: number): void {
-    const { walker, hero } = this;
+  /** The horses (each its own step, the ridden one moved by the rider) and the hero, drawn where they are. */
+  private drawBodies(dt: number): void {
+    const { walker, hero, riding, horses } = this;
+    for (const s of this.steeds) if (s !== riding) s.travel(dt);
+    if (horses) {
+      this.steeds.forEach((s, i) => {
+        if (i < horses.drawn) horses.pose(i, { x: s.pos.x, y: s.pos.y, z: s.pos.z, yaw: s.yaw, act: s.gait, speed: s.speed }, dt);
+      });
+    }
     if (!hero) return;
-    hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action }, dt, (x, y, z) => walker.support(x, z, y));
+    const ridden = riding && horses ? horses.saddle(this.steeds.indexOf(riding), this.seat) : null;
+    if (riding && ridden) {
+      // Seated on the saddle: pos is the point under it, the seat its height over the horse's ground.
+      hero.animateTo({ pos: { x: ridden.x, y: riding.pos.y, z: ridden.z }, vel: riding.walker.vel, yaw: riding.yaw, gait: 'ride', seat: ridden.y - riding.pos.y }, dt, () => riding.pos.y);
+    } else {
+      hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action }, dt, (x, y, z) => walker.support(x, z, y));
+    }
     hero.visible = this.flying || !this.heroCam.firstPerson;
   }
 
@@ -145,6 +216,11 @@ export class Player {
   }
 
   private toHead(): Vector3 {
+    // Riding: over the saddle, the rider's head about 0.85 m above the seat.
+    if (this.riding && this.horses) {
+      const seat = this.horses.saddle(this.steeds.indexOf(this.riding), this.seat);
+      if (seat) return this.head.set(seat.x, seat.y + this.walker.height * 0.48, seat.z);
+    }
     const w = this.walker;
     return this.head.set(w.pos.x, w.pos.y + w.height * 0.92, w.pos.z);
   }
