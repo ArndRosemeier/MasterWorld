@@ -147,11 +147,12 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Past the shadow box no tree shades the floor: the crowns' shade on average instead.
   const unshaded = smoothstep(110, 150, length(p.sub(cameraPosition))).mul(cover).mul(float(1).sub(woods));
   col = col.mul(mix(float(1), float(UNDER_CROWNS), unshaded));
-  col = mix(col, woodsFromAfar(col, crown, cover, varying(cn.z, 'vWoodsSpacing'), p, { top: 1.05, mean: 0.5 }), woods);
+  const afar = woodsFromAfar(col, crown, cover, varying(cn.z, 'vWoodsSpacing'), p);
+  col = mix(col, afar.color, woods);
   // Crowns are matt: no sheen of the sky on the woods from afar.
   m.specularIntensityNode = mix(float(0.25), float(0.05), woods);
   rough = mix(rough, float(0.9), woods);
-  pert = mix(pert, vec3(0), woods);
+  pert = mix(pert, afar.bump.mul(1.6), woods);
 
   // Snow above a ragged line, only where it can lie.
   const snow = layer('snow', p.xz);
