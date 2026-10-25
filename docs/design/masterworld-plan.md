@@ -521,7 +521,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 
 * **Warded brass** is the design language (D45, 17.1).
 * **Windows**: the map (11.7), the journal and the dialogue window (topics, the 3D speaker stays in view) in milestone 3; inventory with character sheet and trading in milestone 4. The HUD stays small but is as animated and polished as the windows (17.1).
-* **The title animation** (O18) is a hero feature: captivating and playful, like Starlord's, and while it plays the world is built behind it. Then character creation and a short intro.
+* **The title animation** (17.2) is a hero feature: captivating and playful, like Starlord's, and while it plays the world is built behind it. Then character creation and a short intro.
 * **First start targets**: the title animation shows within a few seconds; the game is playable when it ends.
 * **Saving**: IndexedDB in the browser, several slots, export and import as a file; autosave on entering or leaving a region or interior and every 5 minutes. A save holds the game version, the module id and version, the seed, the decision log, per-site diffs and the player. Each version bump brings a small migration.
 * **Language**: English first; all text goes through a string table from the start, so German can follow.
@@ -559,6 +559,20 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | Death and waking | The wards go dark one by one; on waking they relight from the centre. |
 | Title screen | Part of the title animation (O18). |
 
+
+### 17.2 The title animation (D46)
+
+StarLord's title is the bar: the game's own world, alive, playful, new every start, with toys and a jump into the game. MasterWorld's version ([full write-up](https://claude.ai/artifact/59Spcz1y7gNNX99LLriQwr)):
+
+1. **Opening** (about 8 s to the menu): dark and wind; one ward line runs over the land like a fuse, and dawn breaks along it.
+2. **Fly-over**: the camera rises over the real start region (river, town, sea, mountains). Weather, season, hour and route are drawn from a seed each start.
+3. **The logo** forges itself in warded brass (17.1): plates swing in, wards trace the letters, a gear clicks, a glint runs across. Music swells (generated through OpenRouter, D44).
+4. **The menu** is a brass instrument panel; around it a town-crier ticker of silly tavern rumours and a card per playable people (a live Actors model doing something in character).
+5. **Toys**: the world can be clicked. Birds scatter, the sky gives lightning or a shooting star, a cloud rains, the town bell rings, rarely a sea serpent breaches; a secret code brings a dragon or a giant.
+6. **The dive**: New game or Continue drops the camera through the clouds to the hero on the market square; the game starts where it lands.
+
+**It hides the build.** A still of the valley shows at once; the coarse land, sky and far terrain come first; the start town streams in while the menu sits, and shaders compile within [docs/SHADERS.md](../SHADERS.md). The route only comes close where the world is ready, and the dive waits for the last pieces. Weak GPUs fly higher; reduced motion gets the still and a fade.
+
 ---
 
 ## 18. Open questions
@@ -577,7 +591,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | O15 | Free LLMs through `freeryder` | No cost, less reliable. What for, and how to stay safe when it fails? Its own discussion. |
 | O16 | Dungeons that don't feel formulaic | D39, 8.1. Needs its own design round before milestone 3's cellar grows into more kinds. |
 | O17 | ~~The interface's design language~~ | **Decided** (D45, 17.1): warded brass. Each window's signature still to be mocked up. |
-| O18 | The title animation | D46. Concept to find, with Starlord as the bar. |
+| O18 | ~~The title animation~~ | **Decided** (D46, 17.2). |
 
 ---
 
