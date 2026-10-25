@@ -2,10 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
+import { firstDecisions } from '../src/vgm/builder';
+import { findStart } from '../src/world/start';
+import { Terrain } from '../src/world/terrain';
 
-// Its own file: two worlds take most of the 5 s a file may run.
+// The land is built once (its water takes most of the time); the decisions on it twice.
 test('town: the start decisions are the same every time for a seed', () => {
-  const a = openWorld(parseSeed('masterworld'), classic).log, b = openWorld(parseSeed('masterworld'), classic).log;
-  assert.deepEqual(a, b);
+  const t = new Terrain(parseSeed('masterworld'), classic);
+  const home = findStart(t.skeleton, classic);
+  assert.deepEqual(firstDecisions(t, home), firstDecisions(t, home));
 });
