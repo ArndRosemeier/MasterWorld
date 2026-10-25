@@ -8,6 +8,7 @@ import { placesFor } from './app/places';
 import { Player } from './app/player';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
+import { Trunks } from './world/trunks';
 import { HeroView } from './render/hero/HeroView';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
@@ -131,6 +132,8 @@ export async function start(b: Boot): Promise<void> {
     // The town's people once they live (set below).
     let folkLife: TownLife | null = null;
     const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), town?.stand(x, z) ?? -Infinity);
+    // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
+    const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
     const below = () => (visit?.inside ? visit.world : rooms?.world ?? null);
     const world: WalkWorld = {
       // Out of doors also the steps and porches before the doors (as floors: climbed a step at a time).
@@ -139,8 +142,8 @@ export async function start(b: Boot): Promise<void> {
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
-      // Out of doors the buildings and the townsfolk (whom one walks around, not through).
-      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
+      // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
+      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || trunks.blocks(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
@@ -566,6 +569,7 @@ export async function start(b: Boot): Promise<void> {
       if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
       folk?.follow(dt, view.camera);
       if (boot.trees) flora.update(dt, view.camera);
+      trunks.around(player.walker.pos.x, player.walker.pos.z);
       grass?.tend(dt, view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);

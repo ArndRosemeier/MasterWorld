@@ -13,13 +13,25 @@ import { TownGround } from './town';
 export const FLORA_STRIDE = 6;
 
 /** The models trees are drawn with: species and variant (@futuremagic/vegetation). */
-export interface FloraKind { readonly species: TreeName | 'shrub'; readonly variant: number; readonly conifer: boolean }
+export interface FloraKind {
+  readonly species: TreeName | 'shrub';
+  readonly variant: number;
+  readonly conifer: boolean;
+  /** Trunk radius at the foot (m, at scale 1) that bodies walk round (world/trunks.ts); 0: passable (shrubs). */
+  readonly trunk: number;
+}
+
+/**
+ * Trunk radius at the foot by species (m): the vegetation package's trunk radius with a little of its
+ * root flare. Kept here since the package's species settings come with its three.js geometry.
+ */
+const TRUNK: Readonly<Record<TreeName, number>> = { oak: 0.55, linden: 0.36, maple: 0.36, birch: 0.2, chestnut: 0.5, pine: 0.34, cypress: 0.28, plane: 0.42 };
 
 const VARIANTS = 2;
 export const FLORA_KINDS: readonly FloraKind[] = [
-  ...TREES.flatMap((species) => Array.from({ length: VARIANTS }, (_, variant) => ({ species, variant, conifer: species === 'pine' || species === 'cypress' }))),
-  { species: 'shrub', variant: 0, conifer: false },
-  { species: 'shrub', variant: 1, conifer: false },
+  ...TREES.flatMap((species) => Array.from({ length: VARIANTS }, (_, variant) => ({ species, variant, conifer: species === 'pine' || species === 'cypress', trunk: TRUNK[species] }))),
+  { species: 'shrub', variant: 0, conifer: false, trunk: 0 },
+  { species: 'shrub', variant: 1, conifer: false, trunk: 0 },
 ];
 const SHRUB = FLORA_KINDS.length - VARIANTS;
 
