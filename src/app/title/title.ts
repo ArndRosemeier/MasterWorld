@@ -12,9 +12,9 @@ import type { PerspectiveCamera } from 'three/webgpu';
 import { dayOf, drawTitle, titleSeed, type TitleDraw } from './draw';
 import { CodeWatch, SECRET, type People } from './lines';
 import type { Orbit, Pose } from './route';
-import { TitleCamera } from './TitleCamera';
+import type { TitleCamera } from './TitleCamera';
 import { TitleScreen } from './TitleScreen';
-import { Toys, type ToyWorld } from './Toys';
+import type { Toys, ToyWorld } from './Toys';
 
 /** What the title needs of the game once the view exists. */
 export interface TitleWorld {
@@ -84,7 +84,9 @@ export class Title {
   get holding(): boolean { return !this.over; }
 
   /** The view exists: the fly-over takes the camera (placed at once, so the world loads around it). */
-  attach(world: TitleWorld): void {
+  async attach(world: TitleWorld): Promise<void> {
+    // The camera and the toys use three.js: loaded with the game, not with the title's first picture.
+    const [{ TitleCamera }, { Toys }] = await Promise.all([import('./TitleCamera'), import('./Toys')]);
     this.world = world;
     this.cam = new TitleCamera(world.camera, world.orbit);
     this.cam.fly(0);

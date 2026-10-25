@@ -58,16 +58,19 @@ declare global {
   }
 }
 
-async function start(): Promise<void> {
-  const settings = new SettingsStore();
+/** What the first, small script (boot.ts) made before the game's code arrived. */
+export interface Boot {
+  readonly settings: SettingsStore;
+  readonly sound: Sound;
+  readonly title: Title | null;
+  readonly loading: LoadingScreen | Title['screen'];
+  /** Filled in here once the menu exists (the title's Settings and What's new open it). */
+  readonly menus: { menu: Menu | null };
+}
+
+export async function start(b: Boot): Promise<void> {
+  const { settings, sound, title, loading } = b;
   const boot = settings.start;
-  const sound = new Sound();
-  sound.volume = settings.current.volume;
-  // The title shows at once and is the loading screen (plan D46); the menu it opens comes later.
-  let menu: Menu | null = null;
-  const calm = settings.current.calm || !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menu?.show('settings'), whatsNew: () => menu?.show('news') }, calm) : null;
-  const loading = title?.screen ?? new LoadingScreen();
   const canvas = document.createElement('canvas');
   document.body.prepend(canvas);
   try {
@@ -126,7 +129,7 @@ async function start(): Promise<void> {
       paused(true);
       // The fly-over circles the market, where the game starts.
       const middle = { x: home.x, z: home.z, r: town ? (Math.max(town.nx, town.nz) * TOWN_RASTER) / 2 : 0 };
-      title.attach({
+      await title.attach({
         camera: view.camera,
         orbit: { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) },
         toys: {
@@ -366,7 +369,7 @@ async function start(): Promise<void> {
       places: placesFor(params.seed, home),
       game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; }, title, sound },
     });
-    menu = new Menu(settings, {
+    b.menus.menu = new Menu(settings, {
       paused,
       get hour() { return view.sky.hour; },
       set hour(h) { view.sky.hour = h; },
@@ -422,4 +425,3 @@ async function start(): Promise<void> {
   }
 }
 
-void start();
