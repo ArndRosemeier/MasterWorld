@@ -47,8 +47,8 @@ import { JournalUi } from './app/journalUi';
 import { MapUi } from './app/mapUi';
 import { townTalk } from './talk/townTalk';
 import { Journal } from './talk/journal';
-import { AUTOSAVE, SavesUi, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
-import { SAVE_VERSION, type SaveData } from './app/saveGame';
+import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
+import { SAVE_VERSION, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 
 declare global {
@@ -77,6 +77,9 @@ async function start(): Promise<void> {
     // A load asked for before this start: the world is built again from the save's seed.
     const loaded = await pendingLoad(setting);
     const save = typeof loaded === 'object' ? loaded : null;
+    // The title's Continue: straight on with a loaded save, or offered when one is kept.
+    if (title && save) title.continuing(saveLabel(save, 'where you left off'));
+    else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const seedText = save?.seed ?? params.seed;
     const seed = parseSeed(seedText);
     loading.set('Finding the start');
@@ -192,6 +195,12 @@ async function start(): Promise<void> {
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
     await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(folk ? await folk.warmObjects() : [])]);
+    // While the loading screen (or the title's painted still) still covers the view, the land, trees and
+    // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
+    const capShare = view.stage.cap.share;
+    view.stage.cap.share = 1;
+    view.stage.monitor.phase = 'warmup';
+    const shown = () => { view.stage.cap.share = capShare; view.stage.monitor.phase = 'run'; };
     loading.set('Raising the land');
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
@@ -236,7 +245,13 @@ async function start(): Promise<void> {
     // the loop must run meanwhile; loading ends once they stand.
     loading.set('Planting the trees');
     let planted = false;
-    const planting = Promise.all([boot.trees ? flora.plant() : null, folk?.warmLods()]).then(() => { planted = true; });
+    // The trees first: once they stand, the title's fly-over shows the live land while the townsfolk's
+    // many garments still warm up behind it (they are drawn only once warm).
+    const took = (what: string) => () => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: ${what} ready (${view.stage.hudLine().split('\n')[0]})`);
+    const trees = (boot.trees ? flora.plant() : Promise.resolve()).then(took('trees'));
+    let landed = false;
+    void trees.then(() => { landed = true; if (folk) loading.set('Waking the townsfolk'); });
+    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk'))]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -391,8 +406,10 @@ async function start(): Promise<void> {
         hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}`;
       }
       last = now;
+      if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }
       if (planted && !window.__mwReady) {
         window.__mwReady = true;
+        shown();
         if (title) title.ready();
         else loading.done();
       }

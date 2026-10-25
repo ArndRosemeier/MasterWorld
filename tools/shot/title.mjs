@@ -43,7 +43,7 @@ if (process.env.LIVE) {
     await page.screenshot({ path: `${prefix}-dragon.png`, timeout: 600000 });
   }
   if (process.env.DIVE) {
-    await page.evaluate(() => document.querySelector('.t-btn.primary').click());
+    await page.evaluate(() => document.querySelector('.t-btn.primary:not([hidden])').click());
     await page.waitForTimeout(Number(process.env.DIVE));
     await page.screenshot({ path: `${prefix}-dive.png`, timeout: 600000 });
     await page.waitForTimeout(15000);
