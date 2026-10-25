@@ -370,6 +370,8 @@ Built so far (`src/sim`): `nav.ts` walks along the streets (a graph on their cen
 * **Saving**: the simulation is not saved in detail. It is rebuilt from the clock and the schedules; only lasting changes are saved (who died, moved items, relationships, merchants' stock).
 * **Creatures** use the same core: idle, alert, fight, flee; they notice by sight and sound, stay tied to their territory, and fight in groups with roles (leader, melee, ranged). Their power comes from where they live (D29), not from the player.
 
+Drawn (`src/render/folk`): the nearest people out of doors (16 by default, `?folk=N`) get an Actors character from a pool, dressed from their seed and role in Actors' medieval wardrobe (`looks.ts`: tunics, hose, chemises, skirts, a long tunic for traders, robe and mantle for the temple keeper) and playing a clip per activity. Far ones draw Actors' "Crowd" level. `npm run packs` copies the part of the Actors pack the town uses (about 90 of 530 MB) into `public/packs`; the Pages build runs it. Actors makes adults only, so children live in the simulation but are not drawn yet.
+
 The VGM's own part in milestone 2 is small: the **decision log** (`src/world/decisions.ts`) and the **Builder** (`src/vgm/builder.ts`) founding the start town as its first decision. The town's plan comes from `@futuremagic/settlement` (`planTown`).
 
 ---

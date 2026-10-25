@@ -45,7 +45,8 @@ const STEP = 100;
  */
 export function startTown(t: Terrain, home: { x: number; z: number }, arch: ArchSite | null): TownDecision | null {
   const seed = deriveSeed(t.seed, 'vgm', 'start-town');
-  const R = 120 + 35 * hash2f(seed, 1, 1);
+  // A small town of about 80-120 people (D41): an outline of 68-76 m.
+  const R = 68 + 8 * hash2f(seed, 1, 1);
   const w = { river: 0, lake: 0 };
   let best: TownDecision | null = null, bestScore = Infinity;
   for (let gz = -SEARCH; gz <= SEARCH; gz += STEP) for (let gx = -SEARCH; gx <= SEARCH; gx += STEP) {

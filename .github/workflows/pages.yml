@@ -30,6 +30,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # The townsfolk's asset pack (Actors), cached by version.
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/actors
+          key: actors-packs-${{ hashFiles('package-lock.json') }}
+      - run: npm run packs
       - run: npm run build
         env:
           VITE_BASE: /MasterWorld/

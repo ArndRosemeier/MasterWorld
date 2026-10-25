@@ -5,7 +5,7 @@
  * own browser is not installed. Prints the HUD line, the shader report and the page's console errors.
  * SHOT_WAIT=<ms> waits that long after ready; SHOT_TIMEOUT=<ms> gives SwiftShader longer (default 5 min,
  * the slow-check limit in docs/CHECKS.md). SHOT_HOLD=<key codes, comma separated> holds those keys down
- * during the wait (KeyW: the hero runs). SHOT_GPU=1 renders on the machine's own GPU instead (new headless
+ * during the wait (KeyW: the hero runs). SHOT_LOG=1 prints all of the page's console, not only errors. SHOT_GPU=1 renders on the machine's own GPU instead (new headless
  * mode, no SwiftShader): for a desktop with a graphics card, where frames take milliseconds, not seconds.
  */
 import { chromium } from 'playwright';
@@ -32,7 +32,7 @@ let failed = false;
 for (let i = 0; i < args.length; i += 2) {
   const query = args[i], out = args[i + 1];
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  page.on('console', (m) => { if (m.type() === 'error') console.error(`[page] ${m.text()}`); });
+  page.on('console', (m) => { if (m.type() === 'error' || process.env.SHOT_LOG) console.error(`[page] ${m.text()}`); });
   page.on('pageerror', (e) => { failed = true; console.error(`[page error] ${e.message}`); });
   await page.goto(base + (query.startsWith('?') ? query : '?' + query));
   await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT }).catch(() => { failed = true; console.error('page did not report ready'); });
@@ -42,7 +42,7 @@ for (let i = 0; i < args.length; i += 2) {
   for (const k of hold) await page.keyboard.down(k);
   await page.waitForTimeout(Number(process.env.SHOT_WAIT ?? 0));
   await page.screenshot({ path: out, timeout: TIMEOUT });
-  const hud = (await page.textContent('#hud'))?.split('\n')[0] ?? '';
+  const hud = (await page.textContent('#hud', { timeout: TIMEOUT }))?.split('\n')[0] ?? '';
   const shaders = await page.evaluate(() => window.shaders?.report?.() ?? 'shaders: no monitor');
   console.log(`${out}: ${hud}\n${shaders}`);
   await page.close();
