@@ -21,11 +21,11 @@ import { loadGroundTextures } from './render/terrain/groundTextures';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { validateSetting } from './setting/contract';
-import { Terrain } from './world/terrain';
-import { findStart } from './world/start';
+import { openWorld } from './vgm/builder';
 import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
+import { marketStart } from './app/places';
 
 declare global {
   interface Window {
@@ -45,9 +45,12 @@ async function start(): Promise<void> {
     const errors = validateSetting(setting);
     if (errors.length) throw new Error(errors.join('; '));
     const seed = parseSeed(params.seed);
-    const terrain = new Terrain(seed, setting);
     loading.set('Finding the start');
-    const home = findStart(terrain.skeleton, setting);
+    // The VGM's first decisions: the start town (and the arch outside it) stand on the land.
+    const opened = openWorld(seed, setting);
+    const { terrain } = opened;
+    const town = terrain.towns[0];
+    const home = town ? marketStart(town.plan) : opened.home;
 
     const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
     if (params.weather) {

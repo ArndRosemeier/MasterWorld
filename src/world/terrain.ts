@@ -6,8 +6,9 @@ import { Noise, deriveSeed, lerp, smin, smoothstep } from '@futuremagic/core';
 import { SHORE, Skeleton, emptySample } from './skeleton';
 import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
-import { ArchField, BLEND, archNear } from './volumes';
-import { findStart } from './start';
+import { ArchField, BLEND } from './volumes';
+import type { DecisionLog, TownDecision } from './decisions';
+import { Town, TownGround } from './town';
 
 export class Terrain {
   readonly skeleton: Skeleton;
@@ -25,22 +26,60 @@ export class Terrain {
     this.biomes = setting.world.biomes;
   }
 
-  private fields: ArchField[] | null = null;
+  private fields: ArchField[] = [];
+  private townSpots: { d: TownDecision; level: number }[] = [];
+  private townList: Town[] | null = null;
   private readonly probe = emptySample();
+  private readonly wet = { river: 0, lake: 0 };
+
+  /**
+   * Build what the decision log says stands on the land (plan 5.1): rock volumes and towns. The land
+   * under a town calms down (less small relief, a level market), so call this before anything is built
+   * from the heights.
+   */
+  settle(log: DecisionLog): void {
+    this.fields = [];
+    this.townSpots = [];
+    this.townList = null;
+    for (const d of log) {
+      if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
+      else this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
+    }
+  }
 
   /** The biome at a point (an index into `biomes`; -1 under the sea). */
   biomeAt(x: number, z: number): number {
     return this.skeleton.sample(x, z, this.probe).biome;
   }
 
-  /** The rock volumes standing on this land (milestone 1: the arch near the start). */
+  /** The rock volumes standing on this land. */
   get volumes(): readonly ArchField[] {
-    if (!this.fields) {
-      this.fields = [];
-      const site = archNear(this, findStart(this.skeleton, this.setting));
-      if (site) this.fields.push(new ArchField(this, site));
-    }
     return this.fields;
+  }
+
+  /** The towns standing on this land (planned when first asked for). */
+  get towns(): readonly Town[] {
+    if (!this.townList) this.townList = this.townSpots.map(({ d }) => new Town(d, this));
+    return this.townList;
+  }
+
+  /** What a town has made of the ground here (TownGround.None outside every town). */
+  townGround(x: number, z: number): TownGround {
+    for (let i = 0; i < this.townSpots.length; i++) {
+      const s = this.townSpots[i].d;
+      if (Math.abs(x - s.x) > s.radius * 2.5 || Math.abs(z - s.z) > s.radius * 2.5) continue;
+      const g = this.towns[i].groundAt(x, z);
+      if (g !== TownGround.None) return g;
+    }
+    return TownGround.None;
+  }
+
+  /** Depth of open water at a point (> 0: sea, lake or river), roughly: for keeping things out of it. */
+  waterDepth(x: number, z: number): number {
+    const h = this.height(x, z);
+    if (h < 0.3) return 0.3 - h;
+    const w = this.clearOfWater(x, z, h, this.wet);
+    return Math.max(-w.river, 0.3 - w.lake, 0);
   }
 
   /**
@@ -79,11 +118,20 @@ export class Terrain {
     if (e <= 0) return e;
     // Small undulations everywhere, rougher where the land is high; none on the beach, so it runs smoothly
     // into the water instead of the waterline wandering over bumps.
-    const calm = Math.max(smoothstep(SHORE.berm + 0.6, SHORE.berm + 5, e), smoothstep(350, 700, shore));
-    if (calm <= 0) return this.shapeByWater(x, z, e);
+    let calm = Math.max(smoothstep(SHORE.berm + 0.6, SHORE.berm + 5, e), smoothstep(350, 700, shore));
+    let level = e;
+    for (const s of this.townSpots) {
+      // A town calms its ground: most of the small relief goes, and the market is level.
+      const d = Math.hypot(x - s.d.x, z - s.d.z), R = s.d.radius;
+      if (d > R * 1.8) continue;
+      const market = smoothstep(40, 22, d);
+      calm *= (1 - 0.75 * smoothstep(R * 1.8, R * 1.1, d)) * (1 - market);
+      level = lerp(level, s.level, market);
+    }
+    if (calm <= 0) return this.shapeByWater(x, z, level);
     const rough = 1 + Math.min(4, e / 600);
     const d = this.detail.fbm2(x / 70, z / 70, 3) * 2.2 + this.detail.fbm2(x / 9 + 71.3, z / 9 - 12.9, 2) * 0.25;
-    return this.shapeByWater(x, z, Math.max(Math.min(e, 0.5), e + d * rough * calm));
+    return this.shapeByWater(x, z, Math.max(Math.min(level, 0.5), level + d * rough * calm));
   }
 
   /**

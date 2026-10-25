@@ -3,7 +3,8 @@
  * Jobs over the land around the camera: water and grass masks, and where plants grow. One worker, so the hydrology
  * tiles both need are computed once.
  */
-import { Terrain } from '../world/terrain';
+import type { Terrain } from '../world/terrain';
+import { openWorld } from '../vgm/builder';
 import { waterMask, type MaskJob } from '../world/water';
 import { floraPlacement, type FloraJob } from '../world/flora';
 import { grassMask } from '../world/grass';
@@ -15,7 +16,7 @@ export type WorldJob = ({ kind: 'mask' } & MaskJob) | ({ kind: 'grass' } & MaskJ
 let terrain: Terrain | null = null;
 
 serve<WorldJob, Float32Array>((job) => {
-  if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = new Terrain(job.seed, settingById(job.setting));
+  if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = openWorld(job.seed, settingById(job.setting)).terrain;
   const out = job.kind === 'mask' ? waterMask(terrain, job) : job.kind === 'grass' ? grassMask(terrain, job) : floraPlacement(terrain, job);
   return { result: out, transfer: [out.buffer] };
 });

@@ -45,6 +45,7 @@ The world should be believable but fantastic: classic countryside, forests and m
 | D24 | **Textures and assets: generated (AssetGenerator) and CC0 libraries.** Only CC0 or own work ships, with sources recorded. | Was O14. |
 | D25 | **Water is a hero feature, not a prop.** Seas, lakes, rivers and waterfalls look and behave well (waves, foam, depth colour, refraction, flow), the camera can go under the surface with a proper underwater view, and the player can swim. The door stays open for underwater content (sunken places, underwater dungeons and creatures). | Arnd, 2026-10-24. Base: Xenoworld's water. |
 | D26 | **Weather from the start.** Seeded, deterministic weather that drifts over the land: clouds, rain and snow, thunderstorms, mist in the low ground, wind on grass, trees and sea, wet ground and puddles. The VGM drives it with orders. | Arnd, 2026-10-25. Section 5.8. |
+| D27 | **Two systems: the VGM and the world simulation.** One simulation moves everything that acts on its own (townsfolk first; later bandits on the road, animals, skeletons in a crypt). It works without the VGM: people always have something to do. The VGM nudges it only through plain-data orders that go into the decision log. | Arnd, 2026-10-25. Section 9.3. |
 
 ---
 
@@ -287,6 +288,18 @@ How:
 
 **It is checked, not hoped for.** A headless test runs a town for an in-game day and measures how much of the time each visible NPC spends without an activity. The target is under 5 %, and the test fails above it. A second check counts distinct activities per town and per hour, so variety cannot quietly shrink.
 
+### 9.3 The world simulation (D27)
+
+Everything that moves by itself lives in **one simulation** (`src/sim`, pure, runs in a worker and in tests), and the VGM is a separate system that steers it.
+
+* **The shared core**: agents (position, kind, home or territory, the activity they are in), navigation (streets and roads, open land, later dungeon graphs), smart objects (an anvil, a well, a bandit camp, a waterhole, a crypt door all offer activities), detail by distance with an abstract off-screen schedule that catches up, and one entry point for orders.
+* **Behaviours per kind** sit on top: citizens follow day schedules by job, personality and weather (9.2); bandits watch a road and ambush; deer graze and flee; skeletons guard and patrol. Milestone 2 builds the core and the citizens.
+* **Without the VGM** the simulation still runs: the town lives by its own schedules.
+* **The VGM steers through orders**, like weather orders: `{ kind, who or where, from, to, ... }`, such as a festival in the square, a curfew, rain keeping people in, or "Mara goes to the well and tells whoever is there about the cellar". Orders are data and go into the decision log, so a replay gives the same world.
+* **The simulation reports** what happens (who met whom, who saw the player), which the VGM reads and Conversations uses to spread rumours.
+
+The VGM's own part in milestone 2 is small: the **decision log** (`src/world/decisions.ts`) and the **Builder** (`src/vgm/builder.ts`) founding the start town as its first decision. The town's plan comes from `@futuremagic/settlement` (`planTown`).
+
 ---
 
 ## 10. Skills and magic (to discuss)
@@ -406,7 +419,7 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 ## 17. Milestones (proposal)
 
 1. **Walk the land**: the setting module contract (a first cut), skeleton, one open region, hybrid terrain (height field plus a first volume: an arch or a cave mouth), sky, water, hero-quality materials and lighting, the player walking.
-2. **The town**: one medieval small town (Scale planner + medieval style) with **living townsfolk**: smart objects, activities with props, schedules, social groups, and the "nobody stands around" test (9.2). The work-animation set starts here.
+2. **The town**: one medieval small town (Scale planner + medieval style) with **living townsfolk** in the world simulation (9.3): smart objects, activities with props, schedules, social groups, and the "nobody stands around" test (9.2). The work-animation set starts here.
 3. **The first promise**: ledger, Conversations hint, one cellar dungeon built through the three stages.
 4. **The Director**: needs, tension curve, the first combat and rewards.
 5. **The frontier**: opening regions as the player walks, story events (raids, takeovers), more dungeon kinds, more settlement sizes.

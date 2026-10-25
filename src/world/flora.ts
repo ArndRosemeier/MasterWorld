@@ -8,6 +8,7 @@
 import { Noise, deriveSeed, hash2f, smoothstep } from '@futuremagic/core';
 import { TREES, type FloraDef, type TreeName } from '../setting/contract';
 import type { Terrain } from './terrain';
+import { TownGround } from './town';
 
 export const FLORA_STRIDE = 6;
 
@@ -73,6 +74,9 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     if (w.river < (shrub ? 1.5 : 4) || w.lake < 0.5) continue;
     const slope = Math.hypot(t.height(x + 1.5, z) - h, t.height(x, z + 1.5) - h) / 1.5;
     if (slope > 0.75 || t.rockAt(x, z, h)) continue;
+    // Nothing on streets and under houses; in yards and gardens a fruit tree now and then, and bushes.
+    const built = t.townGround(x, z);
+    if (built >= TownGround.Street || (built === TownGround.Yard && !shrub && hash2f(seed + 8, gi, gj) < 0.85)) continue;
     const kind = shrub ? SHRUB + (hash2f(seed + 3, gi, gj) < 0.5 ? 0 : 1) : pickTree(flora.mix, hash2f(seed + 4, gi, gj), hash2f(seed + 5, gi, gj));
     if (kind < 0) continue;
     const size0 = 0.8 + 0.45 * hash2f(seed + 6, gi, gj);
