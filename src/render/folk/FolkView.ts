@@ -88,7 +88,7 @@ export class FolkView {
   private warm = false;
 
   /** Each frame: who is drawn, where and doing what. */
-  update(dt: number, cam: Camera): void {
+  follow(dt: number, cam: Camera): void {
     if (!this.warm) return;
     const cx = cam.position.x, cz = cam.position.z;
     // The nearest people out of doors.
@@ -156,7 +156,7 @@ export class FolkView {
   /** The camera that picks each character's detail level. */
   set camera(cam: Camera) { for (const s of this.slots) s.ch.lodCamera = cam; }
 
-  get stats(): string {
+  get hudText(): string {
     let ready = 0;
     for (const s of this.shown.values()) if (s.ready) ready++;
     return `folk ${ready}/${this.slots.length}`;

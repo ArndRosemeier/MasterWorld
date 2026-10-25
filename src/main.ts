@@ -202,14 +202,14 @@ async function start(): Promise<void> {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, view.sky.hour, { rain: wx.shown.rain });
       }
-      folk?.update(dt, view.camera);
+      folk?.follow(dt, view.camera);
       if (boot.trees) flora.update(dt, view.camera);
       grass?.tend(dt, view.camera);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.stats}` : ''}\n${wx.summary}\n${view.stage.hudLine()}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}`;
       }
       last = now;
       if (planted && !window.__mwReady) {

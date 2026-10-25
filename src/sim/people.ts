@@ -39,7 +39,7 @@ export type Block = 'sleep' | 'morning' | 'work' | 'meal' | 'evening';
 export function townsfolk(plan: TownPlan, seed: number): Person[] {
   const r = new Rng(deriveSeed(seed, 'townsfolk'));
   const people: Person[] = [];
-  const add = (home: number, work: number, role: Role, trade: string) => {
+  const houseOne = (home: number, work: number, role: Role, trade: string) => {
     const id = people.length, s = deriveSeed(seed, 'person', id), pr = new Rng(s);
     const child = role === 'child';
     const traits = { social: pr.float(), diligent: pr.float(), pious: pr.float(), early: pr.float(), speed: child ? pr.range(1.4, 1.8) : pr.range(1.1, 1.45) };
@@ -51,12 +51,12 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     if (b.household <= 0) continue;
     let adults = 0;
     for (let k = 0; k < b.household; k++) {
-      if (k === 0 && b.trade) { add(b.id, b.id, 'trade', b.trade); adults++; continue; }
+      if (k === 0 && b.trade) { houseOne(b.id, b.id, 'trade', b.trade); adults++; continue; }
       if (adults < 2 || r.chance(0.15)) {
         adults++;
         // Some lend a hand at a trade in town, most keep house.
-        if (trades.length && r.chance(0.3)) { const t = r.pick(trades); add(b.id, t.id, 'hand', t.trade); } else add(b.id, -1, 'homemaker', '');
-      } else add(b.id, -1, 'child', '');
+        if (trades.length && r.chance(0.3)) { const t = r.pick(trades); houseOne(b.id, t.id, 'hand', t.trade); } else houseOne(b.id, -1, 'homemaker', '');
+      } else houseOne(b.id, -1, 'child', '');
     }
   }
   // Traders for the stalls, from the houses nearest the market.
