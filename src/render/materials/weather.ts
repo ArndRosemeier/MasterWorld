@@ -8,7 +8,7 @@ import { Color, DoubleSide, MeshBasicNodeMaterial, Vector2, Vector3, type Textur
 import { skyToward } from '@futuremagic/sky/node';
 import {
   Fn, attribute, cameraPosition, clamp, cross, dot, exp, float, fog, fract, length, max, mix, mod, normalize, positionGeometry,
-  positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
+  log, positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 
 export const WEATHER = {
@@ -72,7 +72,10 @@ export function fogNode(env: Texture) {
     return exp(haze.mul(haze).add(mist).negate()).oneMinus();
   });
   // The sky's colour toward the view, a shade darker than the sky itself so far hills stay hills.
-  const toward = fullSky(skyToward(env, positionWorld.sub(cameraPosition))).mul(0.7);
+  const raw = fullSky(skyToward(env, positionWorld.sub(cameraPosition))).mul(0.75);
+  // The glow toward the sun runs far above 1 in the env map: the same soft knee the sky dome has on screen.
+  const peak = max(raw.x, max(raw.y, raw.z));
+  const toward = select(peak.greaterThan(1), raw.mul(log(peak).add(1).div(peak)), raw);
   return fog(mix(toward, FOG.color, FOG.flat), factor());
 }
 

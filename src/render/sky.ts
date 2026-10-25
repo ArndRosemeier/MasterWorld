@@ -29,6 +29,22 @@ const SUN_ADAPT = 0.6;
 const CLOUD_HEIGHT = 1500;
 
 
+/**
+ * The sky's light falls with the sun about as fast as the sun's own (Preetham), so a low sun would leave
+ * the shade nearly black; real skies keep more (the share of diffuse light rises as the sun sinks). The
+ * env map's strength is raised by the square root of how much its irradiance fell from midday, at most
+ * 3x. Irradiance of the sky (luminance, up-facing) by sun height, integrated from the sky shader offline.
+ */
+const SKY_E: [number, number][] = [[0, 0.079], [0.03, 0.221], [0.06, 0.428], [0.1, 0.78], [0.15, 1.287], [0.2, 1.797], [0.3, 2.643], [0.4, 3.239], [0.5, 3.757], [0.6, 4.374], [0.7, 5.175]];
+export function lowSunSky(sunUp: number): number {
+  const up = Math.min(Math.max(sunUp, 0), 0.7);
+  let i = 1;
+  while (i < SKY_E.length - 1 && SKY_E[i][0] < up) i++;
+  const [a, ea] = SKY_E[i - 1], [b, eb] = SKY_E[i];
+  const e = ea + ((eb - ea) * (up - a)) / (b - a);
+  return Math.min(3, Math.sqrt(SKY_E[SKY_E.length - 1][1] / e));
+}
+
 export class SkyView {
   /** Hours 0..24, and whole days since the start. */
   hour: number;
@@ -176,7 +192,7 @@ export class SkyView {
       FOG.mist.value = 0;
       FOG.flat.value = 1;
     }
-    this.scene.environmentIntensity = L.envIntensity * ENV;
+    this.scene.environmentIntensity = L.envIntensity * ENV * lowSunSky(sun[1]);
     this.renderer.toneMappingExposure = L.exposure * this.exposure;
     if (this.indoors) {
       this.sun.intensity = 0;
