@@ -6,7 +6,7 @@
  * lore, VGM templates and the Conversations package are added as the milestones need them.
  */
 
-export const CONTRACT_VERSION = 4;
+export const CONTRACT_VERSION = 5;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -158,6 +158,10 @@ export interface DwellerDef extends HistoryDef {
   readonly creatures: readonly string[];
   /** Use of the goal room. */
   readonly lair: string;
+  /** Most of them in one room (a few big ones, or a swarm of small). */
+  readonly crowd: number;
+  /** How dangerous a cellar of theirs is, on the hero's power scale (a fresh hero is about 15). */
+  readonly danger: number;
   /** What the household above notices: the hint lines an NPC can say. */
   readonly signs: readonly string[];
   /** A rare surprise among them (plan 8.1: breaking expectations), if any. */
@@ -174,6 +178,157 @@ export interface CellarLore {
   /** What went wrong. */
   readonly troubles: readonly HistoryDef[];
   readonly dwellers: readonly DwellerDef[];
+}
+
+/** The skills a character can grow by use (plan 10, 11.4, D30): no classes, no XP. */
+export interface SkillDef {
+  readonly id: string;
+  readonly name: string;
+  readonly group: 'combat' | 'magic' | 'utility' | 'survival' | 'social';
+  /** Where a fresh character starts (0..100). */
+  readonly start: number;
+  /** How fast use raises it (1 typical). */
+  readonly rate: number;
+}
+
+/** How a blow lands: the engine reads it for armour, sounds and the clip. */
+export const DAMAGE_KINDS = ['cut', 'pierce', 'blunt', 'bite', 'claw', 'cold'] as const;
+export type DamageKind = (typeof DAMAGE_KINDS)[number];
+
+/** One way to hit: a creature's bite, a weapon's swing. */
+export interface AttackDef {
+  readonly name: string;
+  /** Damage before armour, lo..hi. */
+  readonly damage: readonly [number, number];
+  readonly kind: DamageKind;
+  /** Reach, metres from the body's edge. */
+  readonly reach: number;
+  /** Seconds from one blow to the next. */
+  readonly time: number;
+  /** How well it is aimed (0..100, as a skill). */
+  readonly skill: number;
+}
+
+/** How a creature is drawn: an Actors person (race, look) or one of the engine's small bodies. */
+export type CreatureBody =
+  | { readonly kind: 'humanoid'; readonly race: string; readonly height: number; readonly skin?: string; readonly outfit: 'rags' | 'bandit' | 'grave'; readonly gaunt?: boolean }
+  | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string };
+
+/**
+ * A creature (plan 9.3, 12, D29): its body, senses, temper and power. Its danger is fixed by what it is,
+ * never scaled to the player; weak ones fight anyway, as they do not know the player is a champion.
+ */
+export interface CreatureDef {
+  /** As dwellers name it ("giant rat"). */
+  readonly id: string;
+  readonly name: string;
+  readonly plural: string;
+  readonly body: CreatureBody;
+  readonly health: number;
+  /** Damage taken off every blow. */
+  readonly armour: number;
+  /** Dodging and parrying (0..100, as a skill). */
+  readonly defence: number;
+  /** Running speed, m/s. */
+  readonly speed: number;
+  readonly attacks: readonly AttackDef[];
+  /** Sees this far in the dark (m) and much farther by the hero's light; hears a running hero this far. */
+  readonly senses: { readonly sight: number; readonly hearing: number };
+  /** skittish: keeps away unless cornered or many; hostile: attacks on sight. */
+  readonly temper: 'skittish' | 'hostile';
+  /** 0..1: how much of its health it loses before it runs (1 never runs). */
+  readonly morale: number;
+  /** Calls the others of its den when it sees the hero. */
+  readonly pack: boolean;
+  /** Its part in a group fight. */
+  readonly role: 'leader' | 'melee' | 'swarm';
+  /** Power, on the scale of the hero's (a fresh hero is about 10). */
+  readonly danger: number;
+  /** Treasure table id (items) for what it carries. */
+  readonly loot?: string;
+  /** What the player notices before the fight (a sound, a smell). */
+  readonly tell: string;
+  /** Lines when it breaks expectations (plan 8.1): a goblin begging in broken Common. */
+  readonly pleas?: readonly string[];
+}
+
+export const RARITIES = ['common', 'uncommon', 'rare', 'legendary'] as const;
+export type Rarity = (typeof RARITIES)[number];
+
+export const SLOTS = ['head', 'body', 'hands', 'feet', 'cloak', 'main', 'off', 'ring', 'amulet'] as const;
+export type Slot = (typeof SLOTS)[number];
+
+/** An item kind of the catalogue (plan 11.5, D31). Rarity and bonuses come when one is found. */
+export interface ItemDef {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: 'weapon' | 'shield' | 'armour' | 'potion' | 'food' | 'tool' | 'valuable';
+  readonly slot?: Slot;
+  /** Weapons: the skill it trains and how it hits. */
+  readonly weapon?: { readonly skill: string; readonly damage: readonly [number, number]; readonly kind: DamageKind; readonly time: number; readonly reach: number };
+  /** Armour and shields: damage taken off, and a shield's chance to block (0..1). */
+  readonly armour?: number;
+  readonly block?: number;
+  /** Potions and food: health restored. */
+  readonly heal?: number;
+  /** Copper pieces. */
+  readonly value: number;
+  readonly weight: number;
+  /** A line of lore on its card. */
+  readonly lore?: string;
+}
+
+/** A named legendary item with its place in the canon (plan 11.5). */
+export interface UniqueDef {
+  readonly id: string;
+  readonly base: string;
+  readonly name: string;
+  readonly bonuses: Readonly<Record<string, number>>;
+  readonly lore: string;
+  /** Least danger of a place that may hold it. */
+  readonly danger: number;
+}
+
+/** What a place or creature of some danger holds. */
+export interface TreasureDef {
+  readonly id: string;
+  /** Item ids with weights. */
+  readonly items: readonly (readonly [string, number])[];
+  /** How many items, lo..hi. */
+  readonly count: readonly [number, number];
+  /** Coins, copper, lo..hi. */
+  readonly coins: readonly [number, number];
+}
+
+/** Items: the catalogue, the legendary ones, treasure tables, and the words for rarer finds. */
+export interface ItemCatalog {
+  readonly items: readonly ItemDef[];
+  readonly uniques: readonly UniqueDef[];
+  readonly treasure: readonly TreasureDef[];
+  /** Name parts for uncommon and rare finds, by the skill they raise ("Keen" for blades). */
+  readonly affixes: Readonly<Record<string, { readonly prefix: string; readonly suffix: string }>>;
+}
+
+/** A weapon ability on the belt (plan 11.2; Norgo's recipe format comes with milestone 6). */
+export interface AbilityDef {
+  readonly id: string;
+  readonly name: string;
+  /** Stamina it costs. */
+  readonly stamina: number;
+  /** Seconds before it can be used again. */
+  readonly cooldown: number;
+  /** Damage as a share of a normal blow. */
+  readonly power: number;
+  /** Extra chance to hit (−1..1). */
+  readonly aim: number;
+  /** What else it does. */
+  readonly effect?: 'stagger' | 'heal';
+  readonly text: string;
+}
+
+/** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */
+export interface DirectorDef {
+  readonly needs: Readonly<Record<'discovery' | 'challenge' | 'reward' | 'people' | 'purpose', number>>;
 }
 
 /** Names of one people (by Actors' race id): given names and the family names households share. */
@@ -222,6 +377,11 @@ export interface SettingModule {
   /** Names of the peoples, by Actors' race id (human, dwarf, halfling, elf). */
   readonly names: Readonly<Record<string, NamesDef>>;
   readonly talk: TalkDef;
+  readonly skills: readonly SkillDef[];
+  readonly creatures: readonly CreatureDef[];
+  readonly items: ItemCatalog;
+  readonly abilities: readonly AbilityDef[];
+  readonly director: DirectorDef;
 }
 
 /** Authoring errors, one line each (empty: the module is valid). */
@@ -287,5 +447,41 @@ export function validateSetting(m: SettingModule): string[] {
   for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);
   if (!t.nothing.length) out.push(`${where}: talk.nothing is empty`);
   if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
+  out.push(...validateFight(m, where));
+  return out;
+}
+
+/** Skills, creatures, items and abilities: every name points at something that exists. */
+function validateFight(m: SettingModule, where: string): string[] {
+  const out: string[] = [];
+  const skills = new Set(m.skills.map((s) => s.id));
+  if (skills.size !== m.skills.length) out.push(`${where}: a skill is defined twice`);
+  for (const s of m.skills) if (!(s.start >= 0 && s.start <= 100) || !(s.rate > 0)) out.push(`${where}: skill "${s.id}" needs start 0..100 and rate > 0`);
+  for (const k of ['dodge', 'armour', 'shields', 'unarmed']) if (!skills.has(k)) out.push(`${where}: skill "${k}" is missing (the engine trains it)`);
+  const items = new Map(m.items.items.map((i) => [i.id, i]));
+  const tables = new Set(m.items.treasure.map((t) => t.id));
+  for (const i of m.items.items) {
+    if (i.weapon && !skills.has(i.weapon.skill)) out.push(`${where}: item "${i.id}" trains unknown skill "${i.weapon.skill}"`);
+    if (i.weapon && !(i.weapon.damage[0] > 0 && i.weapon.damage[0] <= i.weapon.damage[1])) out.push(`${where}: item "${i.id}" damage must be a rising range above 0`);
+    if (i.slot && !SLOTS.includes(i.slot)) out.push(`${where}: item "${i.id}" slot "${i.slot}" is unknown`);
+    if ((i.kind === 'weapon' || i.kind === 'shield' || i.kind === 'armour') && !i.slot) out.push(`${where}: item "${i.id}" is worn but has no slot`);
+  }
+  for (const u of m.items.uniques) {
+    if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);
+    for (const k of Object.keys(u.bonuses)) if (!skills.has(k)) out.push(`${where}: unique "${u.id}" raises unknown skill "${k}"`);
+  }
+  for (const t of m.items.treasure) for (const [id] of t.items) if (!items.has(id)) out.push(`${where}: treasure "${t.id}" holds unknown item "${id}"`);
+  for (const k of Object.keys(m.items.affixes)) if (!skills.has(k)) out.push(`${where}: affix for unknown skill "${k}"`);
+  const ids = new Set<string>();
+  for (const c of m.creatures) {
+    if (ids.has(c.id)) out.push(`${where}: creature "${c.id}" defined twice`);
+    ids.add(c.id);
+    if (!(c.health > 0) || !c.attacks.length || !(c.speed > 0)) out.push(`${where}: creature "${c.id}" needs health, speed and an attack`);
+    if (!(c.morale >= 0 && c.morale <= 1)) out.push(`${where}: creature "${c.id}" morale must be 0..1`);
+    for (const a of c.attacks) if (!DAMAGE_KINDS.includes(a.kind) || !(a.time > 0)) out.push(`${where}: creature "${c.id}" attack "${a.name}" needs a known kind and time > 0`);
+    if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
+  }
+  for (const d of m.dungeons.cellar.dwellers) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: cellar dweller "${d.id}" creature "${c}" is unknown`);
+  if (!m.abilities.length) out.push(`${where}: no abilities`);
   return out;
 }

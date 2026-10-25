@@ -1,0 +1,75 @@
+/**
+ * The classic setting's first items (plan 11.5, 12.1, D31): weapons of each kind, shields, three weights
+ * of armour, potions, food, tools and valuables; a few legendary pieces with their history; what places
+ * and creatures of some danger hold. Rarity and the skill bonuses are rolled when an item is found.
+ */
+import type { ItemCatalog } from '../contract';
+
+export const items: ItemCatalog = {
+  items: [
+    { id: 'knife', name: 'Knife', kind: 'weapon', slot: 'main', weapon: { skill: 'blades', damage: [2, 5], kind: 'cut', time: 1.4, reach: 0.7 }, value: 8, weight: 0.3 },
+    { id: 'dagger', name: 'Dagger', kind: 'weapon', slot: 'main', weapon: { skill: 'blades', damage: [3, 6], kind: 'pierce', time: 1.5, reach: 0.75 }, value: 30, weight: 0.4 },
+    { id: 'short-sword', name: 'Short sword', kind: 'weapon', slot: 'main', weapon: { skill: 'blades', damage: [4, 8], kind: 'cut', time: 1.9, reach: 0.95 }, value: 90, weight: 1.2 },
+    { id: 'arming-sword', name: 'Arming sword', kind: 'weapon', slot: 'main', weapon: { skill: 'blades', damage: [5, 11], kind: 'cut', time: 2.2, reach: 1.1 }, value: 260, weight: 1.4 },
+    { id: 'hatchet', name: 'Hatchet', kind: 'weapon', slot: 'main', weapon: { skill: 'axes', damage: [4, 8], kind: 'cut', time: 1.9, reach: 0.85 }, value: 40, weight: 1.1 },
+    { id: 'bearded-axe', name: 'Bearded axe', kind: 'weapon', slot: 'main', weapon: { skill: 'axes', damage: [6, 12], kind: 'cut', time: 2.5, reach: 1.0 }, value: 180, weight: 1.8 },
+    { id: 'club', name: 'Club', kind: 'weapon', slot: 'main', weapon: { skill: 'maces', damage: [3, 7], kind: 'blunt', time: 1.8, reach: 0.85 }, value: 4, weight: 1.3 },
+    { id: 'mace', name: 'Flanged mace', kind: 'weapon', slot: 'main', weapon: { skill: 'maces', damage: [5, 10], kind: 'blunt', time: 2.3, reach: 0.9 }, value: 200, weight: 2.0 },
+    { id: 'spear', name: 'Spear', kind: 'weapon', slot: 'main', weapon: { skill: 'spears', damage: [4, 9], kind: 'pierce', time: 2.1, reach: 1.6 }, value: 60, weight: 1.8 },
+    { id: 'buckler', name: 'Buckler', kind: 'shield', slot: 'off', armour: 0, block: 0.18, value: 40, weight: 1.5 },
+    { id: 'round-shield', name: 'Round shield', kind: 'shield', slot: 'off', armour: 1, block: 0.28, value: 70, weight: 3.5 },
+    { id: 'padded-jack', name: 'Padded jack', kind: 'armour', slot: 'body', armour: 1, value: 30, weight: 3 },
+    { id: 'leather-jerkin', name: 'Leather jerkin', kind: 'armour', slot: 'body', armour: 2, value: 80, weight: 4 },
+    { id: 'mail-shirt', name: 'Mail shirt', kind: 'armour', slot: 'body', armour: 4, value: 400, weight: 10 },
+    { id: 'leather-cap', name: 'Leather cap', kind: 'armour', slot: 'head', armour: 1, value: 20, weight: 0.5 },
+    { id: 'iron-cap', name: 'Iron cap', kind: 'armour', slot: 'head', armour: 2, value: 110, weight: 1.5 },
+    { id: 'gloves', name: 'Leather gloves', kind: 'armour', slot: 'hands', armour: 0, value: 15, weight: 0.3 },
+    { id: 'boots', name: 'Stout boots', kind: 'armour', slot: 'feet', armour: 1, value: 30, weight: 1.2 },
+    { id: 'cloak', name: 'Wool cloak', kind: 'armour', slot: 'cloak', armour: 0, value: 25, weight: 1.5 },
+    { id: 'ring', name: 'Copper ring', kind: 'armour', slot: 'ring', armour: 0, value: 12, weight: 0.02 },
+    { id: 'amulet', name: 'Pendant on a thong', kind: 'armour', slot: 'amulet', armour: 0, value: 20, weight: 0.05 },
+    { id: 'minor-potion', name: 'Small healing draught', kind: 'potion', heal: 25, value: 25, weight: 0.2, lore: 'Bitter and green; the hedge witch swears by it.' },
+    { id: 'potion', name: 'Healing draught', kind: 'potion', heal: 55, value: 70, weight: 0.3 },
+    { id: 'bread', name: 'Loaf of bread', kind: 'food', heal: 6, value: 2, weight: 0.4 },
+    { id: 'cheese', name: 'Wedge of cheese', kind: 'food', heal: 8, value: 4, weight: 0.3 },
+    { id: 'torch', name: 'Torch', kind: 'tool', value: 2, weight: 0.5 },
+    { id: 'rope', name: 'Coil of rope', kind: 'tool', value: 6, weight: 2 },
+    { id: 'lockpicks', name: 'Lockpicks', kind: 'tool', value: 40, weight: 0.1 },
+    { id: 'old-coin', name: 'Coin of the old realm', kind: 'valuable', value: 30, weight: 0.01, lore: 'A crowned hammer on one side, a tower on the other. Nobody mints these any more.' },
+    { id: 'candlestick', name: 'Silver candlestick', kind: 'valuable', value: 90, weight: 0.8 },
+    { id: 'garnet', name: 'Rough garnet', kind: 'valuable', value: 60, weight: 0.02 },
+    { id: 'trinket', name: 'Shiny trinket', kind: 'valuable', value: 3, weight: 0.05, lore: 'A button, a bent spoon and a bead on a string. Treasured by someone.' },
+    { id: 'silk', name: 'Bundle of spider silk', kind: 'valuable', value: 45, weight: 0.3, lore: 'Weavers in the city pay well for it, and ask no questions.' },
+  ],
+  uniques: [
+    { id: 'lantern-blade', base: 'short-sword', name: "Grundmar's Lantern-Blade", bonuses: { blades: 10, perception: 6 }, danger: 14, lore: 'A dwarf of the old realm forged it to light the deep halls. Since the Fading it has only glinted, until lately.' },
+    { id: 'threshold', base: 'round-shield', name: 'Threshold', bonuses: { shields: 10, armour: 5 }, danger: 18, lore: 'Its rim bears the open door of the Threshold. The temple keeper would give a great deal to see it.' },
+    { id: 'watch-mace', base: 'mace', name: 'Coldiron of the Watch', bonuses: { maces: 9, dodge: 4 }, danger: 18, lore: 'The valley watch carried it when the watch-house still stood. It is cold to the touch in any weather.' },
+  ],
+  treasure: [
+    { id: 'vermin', items: [['trinket', 3], ['old-coin', 1], ['ring', 1]], count: [0, 1], coins: [0, 4] },
+    { id: 'goblin', items: [['trinket', 4], ['knife', 2], ['bread', 2], ['old-coin', 1], ['amulet', 1]], count: [0, 1], coins: [1, 12] },
+    { id: 'bandit', items: [['dagger', 2], ['short-sword', 1], ['minor-potion', 2], ['leather-cap', 1], ['gloves', 1], ['cheese', 1]], count: [0, 1], coins: [8, 35] },
+    { id: 'web', items: [['silk', 4], ['old-coin', 2], ['dagger', 1], ['boots', 1], ['ring', 1]], count: [1, 2], coins: [0, 20] },
+    { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1]], count: [0, 1], coins: [0, 10] },
+    { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2]], count: [1, 2], coins: [3, 25] },
+    {
+      id: 'lair', count: [2, 3], coins: [20, 80],
+      items: [['minor-potion', 3], ['potion', 1], ['short-sword', 1], ['hatchet', 1], ['spear', 1], ['mace', 1], ['buckler', 1], ['round-shield', 1], ['leather-jerkin', 1], ['mail-shirt', 0.3], ['iron-cap', 0.6], ['boots', 1], ['ring', 1], ['amulet', 1], ['garnet', 1]],
+    },
+  ],
+  affixes: {
+    blades: { prefix: 'Keen', suffix: 'of the Edge' },
+    axes: { prefix: 'Hewing', suffix: 'of the Woodsman' },
+    maces: { prefix: 'Heavy', suffix: 'of the Smith' },
+    spears: { prefix: 'Long', suffix: 'of the Watch' },
+    unarmed: { prefix: "Brawler's", suffix: 'of the Fist' },
+    shields: { prefix: 'Steady', suffix: 'of the Wall' },
+    armour: { prefix: 'Stout', suffix: 'of the Ox' },
+    dodge: { prefix: 'Nimble', suffix: 'of the Cat' },
+    perception: { prefix: 'Watchful', suffix: 'of the Owl' },
+    stealth: { prefix: 'Quiet', suffix: 'of Shadows' },
+    orientation: { prefix: "Wayfinder's", suffix: 'of the Road' },
+    speech: { prefix: 'Silver', suffix: 'of the Market' },
+  },
+};
