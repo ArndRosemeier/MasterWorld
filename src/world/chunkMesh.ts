@@ -22,6 +22,12 @@ export interface ChunkMesh {
   color: Float32Array;
   /** Surface weights per vertex, 4 per vertex in SURFACES order (they sum to 1). */
   surface: Float32Array;
+  /**
+   * How level the ground is around each vertex: the up component of the normal smoothed over a few metres.
+   * It changes smoothly from vertex to vertex even across a cliff's edge (where the normal flips between
+   * neighbours), so rock, sand and grass meet along smooth lines instead of the mesh's triangles.
+   */
+  level: Float32Array;
   minY: number;
   maxY: number;
 }
@@ -73,26 +79,30 @@ export function groundLook(t: Terrain): (x: number, z: number, color: Float32Arr
 export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const { x0, z0, size, segs } = spec;
   const n = segs + 1, step = size / segs;
-  // Heights with one extra ring, so normals on the edge match the neighbour's.
-  const m = n + 2;
+  // Heights with two extra rings, so normals and levels on the edge match the neighbour's.
+  const m = n + 4;
   const h = new Float32Array(m * m);
-  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) h[j * m + i] = t.height(x0 + (i - 1) * step, z0 + (j - 1) * step);
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) h[j * m + i] = t.height(x0 + (i - 2) * step, z0 + (j - 2) * step);
+  const H = (i: number, j: number): number => h[(j + 2) * m + i + 2];
   const vc = vertexCount(segs);
   const position = new Float32Array(vc * 3), normal = new Float32Array(vc * 3), color = new Float32Array(vc * 3);
-  const surface = new Float32Array(vc * 4);
+  const surface = new Float32Array(vc * 4), level = new Float32Array(vc);
   const look = groundLook(t);
   let minY = Infinity, maxY = -Infinity;
   // Biome colour on a coarser grid (it varies over kilometres), blended per vertex.
   const cstep = Math.max(1, Math.round(segs / 8));
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const v = j * n + i, y = h[(j + 1) * m + i + 1];
+    const v = j * n + i, y = H(i, j);
     position[v * 3] = i * step;
     position[v * 3 + 1] = y;
     position[v * 3 + 2] = j * step;
     minY = Math.min(minY, y);
     maxY = Math.max(maxY, y);
-    const dx = h[(j + 1) * m + i + 2] - h[(j + 1) * m + i];
-    const dz = h[(j + 2) * m + i + 1] - h[j * m + i + 1];
+    const dx = H(i + 1, j) - H(i - 1, j);
+    const dz = H(i, j + 1) - H(i, j - 1);
+    // The level: the slope over two cells each way.
+    const sx = (H(i + 2, j) + dx - H(i - 2, j)) / (6 * step), sz = (H(i, j + 2) + dz - H(i, j - 2)) / (6 * step);
+    level[v] = 1 / Math.sqrt(1 + sx * sx + sz * sz);
     const nx = -dx, ny = 2 * step, nz = -dz, l = Math.hypot(nx, ny, nz);
     normal[v * 3] = nx / l;
     normal[v * 3 + 1] = ny / l;
@@ -124,6 +134,7 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     position[v * 3 + 2] = position[g * 3 + 2];
     for (let c = 0; c < 3; c++) { normal[v * 3 + c] = normal[g * 3 + c]; color[v * 3 + c] = color[g * 3 + c]; }
     for (let c = 0; c < 4; c++) surface[v * 4 + c] = surface[g * 4 + c];
+    level[v] = level[g];
   }
-  return { position, normal, color, surface, minY: minY - drop, maxY };
+  return { position, normal, color, surface, level, minY: minY - drop, maxY };
 }

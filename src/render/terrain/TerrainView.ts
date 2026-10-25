@@ -106,12 +106,13 @@ export class TerrainView {
  * A mesh with the terrain material (a height field chunk, or a rock volume): position, normal, ground colour
  * and surface weights, placed at (x, 0, z) and never moved.
  */
-export function groundMesh(m: Pick<ChunkMesh, 'position' | 'normal' | 'color' | 'surface'>, index: BufferAttribute, x = 0, z = 0): Mesh {
+export function groundMesh(m: Pick<ChunkMesh, 'position' | 'normal' | 'color' | 'surface' | 'level'>, index: BufferAttribute, x = 0, z = 0): Mesh {
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(m.position, 3));
   g.setAttribute('normal', new BufferAttribute(m.normal, 3));
   g.setAttribute('color', new BufferAttribute(m.color, 3));
   g.setAttribute('surface', new BufferAttribute(m.surface, 4));
+  g.setAttribute('level', new BufferAttribute(m.level, 1));
   g.setIndex(index);
   g.computeBoundingSphere();
   const mesh = new Mesh(g, TERRAIN.make());

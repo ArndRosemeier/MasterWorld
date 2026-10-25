@@ -174,12 +174,16 @@ export class Skeleton {
     const k = smoothstep(0.18, 0.28, n.fbm2(x / 5000 - 17.3, z / 5000 + 4.6, 2)) * smoothstep(8, 16, land) * Math.min(1, this.shape.drama * 1.5);
     if (k <= 0) return 0;
     // Height: set over kilometres, varied by headlands and dips over a few hundred metres.
-    const tall = lerp(14, 70, smoothstep(-0.3, 0.4, n.fbm2(x / 9000 + 2.2, z / 9000 + 9.9, 2)));
-    const top = Math.min(land, tall * (1 + 0.3 * n.fbm2(x / 300 - 6.1, z / 300 + 1.3, 2) + 0.1 * n.fbm2(x / 45 + 4.4, z / 45 - 2.6, 2))) * k;
+    const tall = lerp(12, 65, smoothstep(-0.45, 0.45, n.fbm2(x / 9000 + 2.2, z / 9000 + 9.9, 2)));
+    const top = Math.min(land, tall * (1 + 0.45 * n.fbm2(x / 300 - 6.1, z / 300 + 1.3, 2) + 0.12 * n.fbm2(x / 45 + 4.4, z / 45 - 2.6, 2))) * k;
     // The foot wanders (buttresses and coves), and some stretches lean back more than others.
     const foot = Math.max(3, 11 + n.fbm2(x / 70 + 0.7, z / 70 - 5.5, 2) * 5 + n.fbm2(x / 240 - 3.3, z / 240 + 2.9, 2) * 8 + n.fbm2(x / 24 - 9.1, z / 24 + 7.7, 2) * 1.8);
     const steep = lerp(1.7, 3, smoothstep(-0.4, 0.4, n.fbm2(x / 600 + 8.8, z / 600, 2)));
-    return cliffProfile(s - foot, top, steep);
+    // Gullies: narrow clefts every few dozen metres, cut deeper into the top of the face than at its foot.
+    const cleft = clamp(1 - Math.abs(n.fbm2(x / 38 + 1.9, z / 38 - 4.2, 2)) * 3.2, 0, 1) ** 2;
+    const depth = cleft * (4 + 0.25 * top);
+    const u = s - foot;
+    return cliffProfile(u - depth * (0.25 + 0.75 * smoothstep(0, 0.9 * top + 12, u)), top, steep);
   }
 
 
