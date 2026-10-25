@@ -41,7 +41,8 @@ const TEMPERAMENTS = ['warm', 'reserved', 'curious', 'dry', 'lively'] as const;
 const pid = (id: number) => `p${id}`;
 /** Lines arrive as sentences; the realizer adds its own capital and full stop (and quotes them mid-sentence). */
 const clause = (s: string) => s.charAt(0).toLowerCase() + s.slice(1).replace(/[.!]\s*$/, '');
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** The first letter upper case. */
+export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 export class TownTalk {
   private readonly session: SettingSession;

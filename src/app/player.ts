@@ -5,6 +5,7 @@
  */
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { Walker, type WalkWorld } from '../game/walker';
+import type { ActionAnim } from '@futuremagic/humanoid/three';
 import type { HeroView } from '../render/hero/HeroView';
 import { FlyCamera } from './flyCamera';
 import { HeroCamera } from './heroCamera';
@@ -16,6 +17,8 @@ export class Player {
   readonly fly: FlyCamera;
   /** Set once the hero's body is built. */
   hero: HeroView | null = null;
+  /** In a fight: weapons drawn, and the blow (or drink, or flinch) playing; set by the fight each frame. */
+  stance: { combat: boolean; action?: ActionAnim } = { combat: false };
   private paused = false;
   private flyingNow: boolean;
   private readonly head = new Vector3();
@@ -127,7 +130,7 @@ export class Player {
   private pose(dt: number): void {
     const { walker, hero } = this;
     if (!hero) return;
-    hero.update({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait }, dt, (x, y, z) => walker.support(x, z, y));
+    hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action }, dt, (x, y, z) => walker.support(x, z, y));
     hero.visible = this.flying || !this.heroCam.firstPerson;
   }
 

@@ -24,6 +24,7 @@
   "dependencies": {
     "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.10.0/actors-generator-0.10.0.tgz",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
+    "@futuremagic/creatures": "file:vendor/assetgenerator/packages/creatures",
     "@futuremagic/dungeon": "file:vendor/assetgenerator/packages/dungeon",
     "@futuremagic/humanoid": "file:vendor/assetgenerator/packages/humanoid",
     "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",

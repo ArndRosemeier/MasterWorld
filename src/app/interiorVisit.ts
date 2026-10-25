@@ -80,7 +80,7 @@ export class InteriorVisit {
     this.cooldown = Math.max(0, this.cooldown - dt);
     if (this.fade.busy || this.player.flying || this.cooldown > 0) return;
     const w = this.player.walker;
-    const speed = Math.hypot(w.vel.x, w.vel.z);
+    const speed = w.groundSpeed;
     if (speed < 0.5) return;
     const fx = -Math.sin(w.yaw), fz = -Math.cos(w.yaw);
     if (!this.room) {

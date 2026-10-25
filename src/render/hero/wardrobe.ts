@@ -1,10 +1,12 @@
 /**
- * The traveller's clothes for milestone 1: a plain wardrobe of shell garments (the humanoid package fits
- * them to any body). The setting's real garb comes later; this keeps the hero dressed until then.
+ * The clothes and arms of everyone drawn as a humanoid: the hero, and the cellars' goblins, smugglers and
+ * dead. A plain wardrobe of shell garments (the humanoid package fits them to any body); a garment worn
+ * with a coloured visual takes that colour (white: its own). Held things come from ./arms.ts.
  */
-import { Group } from 'three/webgpu';
+import type { Object3D } from 'three/webgpu';
 import type { Wardrobe } from '@futuremagic/humanoid/three';
 import type { BodyRegion, EquipmentVisuals, ItemVisual, ShellLayer, ShellMaterial, WearableSpec } from '@futuremagic/humanoid';
+import { ARM_SHAPES, buildArm } from './arms';
 
 type RGB = [number, number, number];
 
@@ -31,6 +33,21 @@ const GARMENTS: Record<string, ShellLayer[]> = {
     skirt: { length: 0.34, flare: 0.35, slits: 2 },
     trim: { width: 0.012, color: [0.45, 0.33, 0.14] },
   }],
+  rags: [{
+    kind: 'shell', layer: 3, offset: 0.012, material: cloth([0.34, 0.29, 0.2], 'plain', { wear: 0.9 }),
+    regions: [...whole('chest', 'belly', 'back', 'pelvis', 'buttocks'), { region: 'thigh.L', to: 0.5 }, { region: 'thigh.R', to: 0.5 }],
+    skirt: { length: 0.22, flare: 0.25, slits: 3 },
+  }],
+  jerkin: [{
+    kind: 'shell', layer: 3, offset: 0.014, material: cloth([0.18, 0.14, 0.11], 'leather', { roughness: 0.7, sheen: 0.1, wear: 0.6 }),
+    regions: [...whole('chest', 'belly', 'back', 'pelvis'), { region: 'upperarm.L', to: 0.4 }, { region: 'upperarm.R', to: 0.4 }],
+    trim: { width: 0.01, color: [0.1, 0.07, 0.05] },
+  }],
+  shroud: [{
+    kind: 'shell', layer: 3, offset: 0.016, material: cloth([0.42, 0.4, 0.34], 'plain', { wear: 1 }),
+    regions: [...whole('chest', 'belly', 'back', 'pelvis', 'buttocks', 'upperarm.L', 'upperarm.R'), { region: 'thigh.L', to: 0.6 }, { region: 'thigh.R', to: 0.6 }],
+    skirt: { length: 0.5, flare: 0.3, slits: 4 },
+  }],
   boots: [{
     kind: 'shell', layer: 4, offset: 0.01, material: cloth([0.2, 0.13, 0.08], 'leather', { roughness: 0.7, sheen: 0.1, wear: 0.5 }),
     regions: [{ region: 'shin.L', from: 0.4 }, { region: 'shin.R', from: 0.4 }, ...whole('foot.L', 'foot.R')],
@@ -38,17 +55,24 @@ const GARMENTS: Record<string, ShellLayer[]> = {
   }],
 };
 
+const white = (c: RGB) => c[0] === 1 && c[1] === 1 && c[2] === 1;
+
 export const TRAVELLER: Wardrobe = {
-  resolve(defId: string): WearableSpec | null {
+  resolve(defId: string, visual: ItemVisual): WearableSpec | null {
     const layers = GARMENTS[defId];
-    return layers ? { layers } : null;
+    if (!layers) return null;
+    if (white(visual.primary)) return { layers };
+    // Worn in the visual's colour.
+    const c = visual.primary;
+    return { layers: layers.map((l) => (l.kind === 'shell' ? { ...l, material: { ...l.material, color: c, color2: [c[0] * 0.7, c[1] * 0.7, c[2] * 0.7] } } : l)) };
   },
-  itemDef: () => undefined,
-  buildItem: () => new Group(),
-  disposeItem: () => {},
+  itemDef: (defId) => (ARM_SHAPES[defId] ? { visual: { shape: ARM_SHAPES[defId] }, twoHanded: false, category: defId === 'torch' ? 'light' : undefined } : undefined),
+  buildItem: (defId) => buildArm(defId),
+  disposeItem: (o: Object3D) => o.traverse((c) => (c as { geometry?: { dispose(): void } }).geometry?.dispose()),
 };
 
-const visual = (seed: number): ItemVisual => ({ shape: 'cloth', seed, primary: [1, 1, 1], secondary: [1, 1, 1], accent: [1, 1, 1], material: 'cloth', glow: 0 });
+/** A worn or held thing's visual, in `colour` (white: its own). */
+export const visual = (seed: number, colour: RGB = [1, 1, 1], shape = 'cloth'): ItemVisual => ({ shape, seed, primary: colour, secondary: [1, 1, 1], accent: [1, 1, 1], material: 'cloth', glow: 0 });
 
 /** What the traveller wears. */
 export const TRAVELLER_GARB: EquipmentVisuals = {

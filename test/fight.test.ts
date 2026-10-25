@@ -13,6 +13,7 @@ import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { DungeonNav, navKey } from '../src/sim/dungeonNav';
 import { Den, type Quarry } from '../src/sim/creatures';
+import { Delve } from '../src/game/delve';
 
 const cellars: Cellar[] = Array.from({ length: 24 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar));
 const openSpace = (c: Cellar) => { const s = new DungeonSpace(c.layout); for (const pl of c.layout.links) s.open.add(pl.link.id); return s; };
@@ -191,4 +192,24 @@ test('fight: a cellar has its danger and its treasure: chests and the hoard in t
     assert.equal(h.filter((x) => !x.prop).length, 1);
     assert.equal(h[h.length - 1].room, c.graph.goal);
   }
+});
+
+test('fight: a delve saves who fell and what was taken, and a load finds the same bodies and chests', () => {
+  const c = cellars.find((x) => x.dweller.id === 'rats')!;
+  const hero = new Character(classic);
+  const d = new Delve(c, openSpace(c), classic, hero, 4);
+  const victim = d.den.creatures[0];
+  d.den.wound(victim, { outcome: 'hit', damage: 500 }, victim);
+  const loot = d.fight.restoreBody(victim);
+  if (loot.items.length || loot.coins) assert.equal(d.within({ x: victim.x + 0.5, y: victim.y, z: victim.z })?.kind, 'body');
+  const lair = d.hoards[d.hoards.length - 1];
+  const coins = hero.coins;
+  const got = d.plunder({ kind: 'hoard', hoard: lair, x: lair.x, y: lair.y, z: lair.z, name: lair.name })!;
+  assert.ok(got && hero.coins === coins + got.coins);
+  assert.equal(d.plunder({ kind: 'hoard', hoard: lair, x: lair.x, y: lair.y, z: lair.z, name: lair.name }), null, 'a hoard is opened once');
+  const saved = JSON.parse(JSON.stringify(d.tally()));
+  const again = new Delve(c, openSpace(c), classic, new Character(classic), 4, saved);
+  assert.equal(again.den.creatures[0].state, 'dead');
+  assert.ok(again.hasOpened(lair));
+  assert.deepEqual(again.fight.bodies.get(victim.id) ?? { items: [], coins: 0 }, loot);
 });

@@ -79,7 +79,7 @@ export class CellarVisit {
     if (!this.inside) {
       // Into the house's door: down to the cellar.
       const [x, z, yaw] = this.house.door;
-      const speed = Math.hypot(w.vel.x, w.vel.z);
+      const speed = w.groundSpeed;
       if (this.cooldown === 0 && Math.hypot(w.pos.x - x, w.pos.z - z) < 0.9 && speed > 0.5 && Math.abs(angleDiff(w.yaw, yaw + Math.PI)) < 1.1) void this.enter();
       return;
     }
