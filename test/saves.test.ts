@@ -1,0 +1,26 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { SAVE_VERSION, checkSave, saveLabel, type SaveData } from '../src/app/saveGame';
+
+const save: SaveData = {
+  version: SAVE_VERSION, game: '0.001', setting: { id: 'classic', version: 1 }, seed: 'masterworld', log: [],
+  clock: { day: 1, hour: 14.5 }, hero: { x: 1, y: 2, z: 3, yaw: 0, below: false }, cellars: { 'cellar-1': { open: [2], keys: [1], read: [0] } },
+  talk: null, journal: [],
+};
+
+test('saves: a save survives being written out as JSON and read back', () => {
+  const back = checkSave(JSON.parse(JSON.stringify(save)), { id: 'classic', version: 1 });
+  assert.deepEqual(back, save);
+});
+
+test('saves: other settings, newer games and junk are refused with a reason', () => {
+  assert.match(checkSave({ ...save, setting: { id: 'other', version: 1 } }, { id: 'classic', version: 1 }) as string, /setting "other"/);
+  assert.match(checkSave({ ...save, version: SAVE_VERSION + 1 }, { id: 'classic', version: 1 }) as string, /newer version of the game/);
+  assert.match(checkSave({ ...save, setting: { id: 'classic', version: 2 } }, { id: 'classic', version: 1 }) as string, /newer version of the setting/);
+  assert.equal(checkSave(null, { id: 'classic', version: 1 }), 'not a MasterWorld save');
+  assert.equal(checkSave({ hello: 1 }, { id: 'classic', version: 1 }), 'not a MasterWorld save');
+});
+
+test('saves: the slot line says the day, the time and where', () => {
+  assert.equal(saveLabel(save, 'in the town'), 'Day 2, 14:30, in the town');
+});

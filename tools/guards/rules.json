@@ -13,6 +13,7 @@
     { "from": "src/setting", "deny": ["three", "src/render", "src/game", "src/app"], "why": "a setting module is data and pure functions (docs/design/masterworld-plan.md section 12)" },
     { "from": "src/sim", "deny": ["three", "src/render", "src/app"], "why": "the world simulation is pure: it runs in a worker and in headless tests (plan 9.3)" },
     { "from": "src/vgm", "deny": ["three", "src/render", "src/app"], "why": "the VGM decides; it does not draw" },
+    { "from": "src/talk", "deny": ["three", "src/render", "src/game", "src/app"], "why": "talk is knowledge and words: pure, so it runs in tests (plan 9.1)" },
     { "from": "src/render", "deny": ["src/game", "src/app"], "why": "the renderer does not know about the game" },
     { "from": "src/input", "deny": ["three", "src/render", "src/game"], "why": "input is plain DOM" }
   ],

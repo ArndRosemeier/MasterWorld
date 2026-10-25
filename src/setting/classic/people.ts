@@ -1,0 +1,54 @@
+/**
+ * The classic setting's townsfolk: their names by people, and how they talk (plan 9.1). Invented names
+ * with an old-country ring; dwarves short and hard, halflings homely, elves long.
+ */
+import type { NamesDef, TalkDef } from '../contract';
+
+export const names: Record<string, NamesDef> = {
+  human: {
+    female: ['Mara', 'Edda', 'Wenna', 'Alys', 'Brienne', 'Hild', 'Mirren', 'Tamsin', 'Elsa', 'Gwen', 'Isolde', 'Rowan', 'Saffi', 'Ysolt', 'Nell', 'Orla', 'Kestra', 'Lida'],
+    male: ['Tobin', 'Aldric', 'Bram', 'Cedric', 'Dunstan', 'Garrick', 'Hal', 'Jory', 'Osric', 'Piers', 'Roderic', 'Wat', 'Emeric', 'Fenn', 'Lorcan', 'Merrick', 'Oswin', 'Tam'],
+    family: ['Hollin', 'Ashby', 'Thorne', 'Wendle', 'Marsh', 'Crane', 'Fallow', 'Hearth', 'Mossop', 'Ravel', 'Stoneway', 'Tilley', 'Wick', 'Brook', 'Harrow', 'Lark', 'Pell', 'Vane'],
+  },
+  dwarf: {
+    female: ['Brunna', 'Dagny', 'Helga', 'Kalda', 'Ragna', 'Sigrun', 'Thora', 'Vigdis', 'Ylva', 'Gerd'],
+    male: ['Borin', 'Durgan', 'Fargrim', 'Grundi', 'Harbek', 'Kildrak', 'Morgran', 'Orsik', 'Thrain', 'Vondal'],
+    family: ['Ironfoot', 'Deepdelve', 'Coalbeard', 'Stonehelm', 'Anvilmar', 'Copperhand', 'Gravelbrow', 'Hammerfell'],
+  },
+  halfling: {
+    female: ['Rosie', 'Daisy', 'Marigold', 'Poppy', 'Tilly', 'Hazel', 'Primula', 'Bell', 'Lobelia', 'Myrtle'],
+    male: ['Pip', 'Milo', 'Tolly', 'Fosco', 'Hob', 'Ned', 'Perrin', 'Rufus', 'Sam', 'Wilco'],
+    family: ['Underbough', 'Goodbarrel', 'Greenhill', 'Tealeaf', 'Brushgather', 'Thistlewood', 'Applecart', 'Puddifoot'],
+  },
+  elf: {
+    female: ['Aelindra', 'Caerwyn', 'Elowen', 'Ilyana', 'Lirael', 'Naivara', 'Sariel', 'Thessaly', 'Vaelis', 'Yllana'],
+    male: ['Aerendil', 'Caelan', 'Elric', 'Faelar', 'Ithilan', 'Laeroth', 'Mirethil', 'Soveliss', 'Thalion', 'Varis'],
+    family: ['Moonwhisper', 'Silverfrond', 'Starbrook', 'Dawnmantle', 'Leafwind', 'Nightbloom', 'Amberglade', 'Mistvale'],
+  },
+};
+
+export const talk: TalkDef = {
+  identity: {
+    trade: "I'm {name}, the {trade}. Our home is {house}.",
+    trader: "I'm {name}. I sell at the market, and we live in {house}.",
+    keeper: "I'm {name}, keeper of the temple. I live in {house}.",
+    hand: "I'm {name}. I help the {trade}; home is {house}.",
+    homemaker: "I'm {name}. I keep house in {house}.",
+    child: "I'm {name}! I live in {house}.",
+  },
+  topics: {
+    greet: 'Greet',
+    self: 'Who are you?',
+    news: 'Anything strange lately?',
+    more: 'Tell me more.',
+    source: 'How do you know?',
+    bye: 'Farewell.',
+  },
+  nothing: ['Nothing out of the ordinary, that I know of.', 'Not that I have heard.', 'All quiet, as far as I know.', "Can't say I've noticed anything."],
+  house: '{house} of the {family} family',
+  cellar: 'the cellar under {house}',
+  troubled: 'something is wrong in {subject}',
+  ownHouse: 'our own house',
+  lead: 'Something is wrong in {cellar}.',
+  marked: '{name} marks {house} on your map.',
+};
