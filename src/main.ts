@@ -237,7 +237,7 @@ async function start(): Promise<void> {
     }
     if (rooms && town && params.room !== null) {
       const b = params.room === 'cellar' ? house : town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
-      if (b) await rooms.enter(b, true);
+      if (b) await rooms.enter(b, true, params.room === 'cellar'); // the cellar: beside its hatch
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
 
