@@ -13,20 +13,20 @@ import type { CellarView } from '../render/dungeon/CellarView';
 import type { SkyView } from '../render/sky';
 import { CELL, STOREY, type Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace, type SpaceEvent } from '../world/dungeon/space';
+import { Fade } from './fade';
+import type { Notes } from './notes';
+import type { CellarDiff } from './saveGame';
 import type { Player } from './player';
-
-const FADE_MS = 220;
 
 export class CellarVisit {
   inside = false;
   readonly space: DungeonSpace;
   readonly world: WalkWorld;
-  private readonly fade: HTMLElement;
-  private readonly note: HTMLElement;
-  private noteTimer = 0;
+  private readonly fade = new Fade();
   private cooldown = 0;
-  private busy = false;
   private readonly read = new Set<number>();
+  /** Called after going down or coming up (the game autosaves then). */
+  onSwap: (() => void) | null = null;
 
   constructor(
     readonly cellar: Cellar,
@@ -35,16 +35,15 @@ export class CellarVisit {
     private readonly player: Player,
     private readonly lantern: PointLight,
     private readonly sky: SkyView,
+    private readonly notes: Notes,
   ) {
     this.space = new DungeonSpace(cellar.layout);
     this.world = dungeonWorld(this.space, view.origin);
-    this.fade = overlay('cellar-fade', 'position:fixed;inset:0;z-index:8;background:#000;opacity:0;pointer-events:none;transition:opacity 0.2s');
-    this.note = overlay('cellar-note', 'position:fixed;left:50%;bottom:12%;transform:translateX(-50%);z-index:6;max-width:min(560px,90vw);padding:10px 16px;background:#0d0b09d9;border:1px solid #6a5a3a;border-radius:6px;color:#efe6d2;font:15px/1.45 Georgia,serif;text-align:center;opacity:0;transition:opacity 0.4s;pointer-events:none');
   }
 
   /** Go down (now: at once, no fade); `room` to stand in the middle of that room instead of at the ladder. */
   async enter(now = false, room?: number): Promise<void> {
-    await this.swap(now, () => {
+    await this.fade.swap(now, () => {
       this.inside = true;
       this.view.group.visible = true;
       this.sky.indoors = true;
@@ -54,13 +53,14 @@ export class CellarVisit {
         const r = this.cellar.layout.rooms[room];
         this.player.teleport(O.x + (r.x + r.w / 2) * CELL, O.y + r.level * STOREY, O.z + (r.z + r.d / 2) * CELL, h.yaw);
       } else this.player.teleport(O.x + h.x - fx * 1.0, O.y + h.y, O.z + h.z - fz * 1.0, h.yaw);
-      this.say(`You climb down into the cellar of ${this.cellar.house}.`);
+      this.notes.say(`You climb down into the cellar of ${this.cellar.house}.`);
     });
+    if (!now) this.onSwap?.();
   }
 
   /** Back up through the hatch, out of the house's door. */
   async leave(): Promise<void> {
-    await this.swap(false, () => {
+    await this.fade.swap(false, () => {
       this.inside = false;
       this.view.group.visible = false;
       this.sky.indoors = false;
@@ -69,12 +69,12 @@ export class CellarVisit {
       this.player.teleport(x - Math.sin(yaw) * 0.6, undefined, z - Math.cos(yaw) * 0.6, yaw);
       this.cooldown = 2;
     });
+    this.onSwap?.();
   }
 
   update(dt: number): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
-    if (this.noteTimer > 0 && (this.noteTimer -= dt) <= 0) this.note.style.opacity = '0';
-    if (this.busy || this.player.flying) return;
+    if (this.fade.busy || this.player.flying) return;
     const w = this.player.walker, O = this.view.origin;
     if (!this.inside) {
       // Into the house's door: down to the cellar.
@@ -92,11 +92,26 @@ export class CellarVisit {
     for (const p of this.cellar.props) {
       if (p.clue === undefined || this.read.has(p.clue) || Math.hypot(p.x - lx, p.z - lz) > 1.5 || Math.abs(p.y - ly) > 1.5) continue;
       this.read.add(p.clue);
-      this.say(this.cellar.clues[p.clue].text, 9);
+      this.notes.say(this.cellar.clues[p.clue].text, 9);
     }
     const h = this.cellar.hatch;
     if (this.cooldown === 0 && Math.hypot(h.x - lx, h.z - lz) < 0.75 && Math.abs(h.y - ly) < 1) void this.leave();
   }
+
+  /** What changed down here, for the save. */
+  get diff(): CellarDiff {
+    return { open: [...this.space.open], keys: [...this.space.keys], read: [...this.read] };
+  }
+
+  /** Lay a saved state over the fresh cellar. */
+  restore(d: CellarDiff): void {
+    for (const k of d.keys) this.space.keys.add(k);
+    for (const l of d.open) { this.space.open.add(l); this.view.opened(l); }
+    for (const r of d.read) this.read.add(r);
+  }
+
+  /** The house's door above (x, z, yaw). */
+  get houseDoor(): readonly [number, number, number] { return this.house.door; }
 
   /** Where the hero is, for the HUD. */
   get summary(): string {
@@ -111,28 +126,7 @@ export class CellarVisit {
     this.view.opened(e.link);
     const piece = e.link === this.cellar.pieceLink && this.cellar.setPiece.id === 'bricked-wall';
     const text = { key: 'You find a key on a nail by the door.', unlocked: 'The key turns, stiffly. The door gives.', unbarred: 'You lift the bar from its brackets. The way back is open.', found: piece ? 'The pale bricks give under your shoulder: a way through.' : 'A draught from the wall: a hidden door.' }[e.kind];
-    this.say(text);
-  }
-
-  private say(text: string, secs = 5): void {
-    this.note.textContent = text;
-    this.note.style.opacity = '1';
-    this.noteTimer = secs;
-  }
-
-  private async swap(now: boolean, act: () => void): Promise<void> {
-    if (now) { act(); return; }
-    this.busy = true;
-    this.fade.style.opacity = '1';
-    await new Promise((r) => setTimeout(r, FADE_MS));
-    act();
-    this.fade.style.opacity = '0';
-    this.busy = false;
+    this.notes.say(text);
   }
 }
 
-function overlay(id: string, css: string): HTMLElement {
-  const el = document.getElementById(id) ?? document.body.appendChild(Object.assign(document.createElement('div'), { id }));
-  el.style.cssText = css;
-  return el;
-}

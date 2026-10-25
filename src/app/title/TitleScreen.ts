@@ -48,7 +48,7 @@ export class TitleScreen {
     const logo = el('div', { className: 't-logo' }, el('div', { className: 'plate l' }), el('div', { className: 'plate r' }), el('div', { className: 'clasp top' }), el('div', { className: 'clasp bottom' }), svg(logoSvg()),
       el('div', { className: 't-tagline', textContent: 'The land wakes as you walk it.' }));
 
-    this.startButton = this.button('New game', () => this.choose(null), 'primary');
+    this.startButton = this.button('New game', () => this.startWith(null), 'primary');
     const menu = el('div', { className: 't-menu' },
       this.startButton,
       this.button('Settings', () => host.settings()),
@@ -127,7 +127,7 @@ export class TitleScreen {
     this.root.append(this.toastEl);
   }
 
-  private choose(people: People['id'] | null): void {
+  private startWith(people: People['id'] | null): void {
     if (this.leavingNow) return;
     this.host.sound.play('click');
     this.host.start(people);
@@ -155,7 +155,7 @@ export class TitleScreen {
       el('p', { textContent: p.scene }),
       el('div', { className: 'nav' },
         Object.assign(this.button('‹', () => step(-1), 'quiet arrow', false), { ariaLabel: 'The people before' }),
-        this.button(p.walk, () => this.choose(p.id)),
+        this.button(p.walk, () => this.startWith(p.id)),
         Object.assign(this.button('›', () => step(1), 'quiet arrow', false), { ariaLabel: 'The next people' })),
     );
     if (!flip || this.calm) { fill(); this.restartCard(); return; }

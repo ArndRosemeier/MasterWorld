@@ -18,6 +18,9 @@ export const ACTIONS = [
   { id: 'jump', label: 'Jump / swim up' },
   { id: 'dive', label: 'Dive' },
   { id: 'fly', label: 'Fly (free camera)' },
+  { id: 'talk', label: 'Talk to someone' },
+  { id: 'journal', label: 'Journal' },
+  { id: 'map', label: 'Map' },
 ] as const;
 
 export type Action = (typeof ACTIONS)[number]['id'];
@@ -37,6 +40,9 @@ export const DEFAULT_BINDINGS: Bindings = {
   jump: ['Space', ''],
   dive: ['KeyX', ''],
   fly: ['KeyF', ''],
+  talk: ['KeyT', ''],
+  journal: ['KeyJ', ''],
+  map: ['KeyM', ''],
 };
 
 /** Keys that are never bound: Escape opens the settings. */

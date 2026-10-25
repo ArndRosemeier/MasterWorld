@@ -60,7 +60,7 @@ export class Toys {
       if (f.scattered > 0) continue;
       if (f.birds.some((b) => { const s = this.screen(b.pos); return s && Math.hypot(s[0] - x, s[1] - y) < 28 + s[2] * 2; })) {
         this.scatter(f, f.centre);
-        this.say('birds', 0.5);
+        this.flutter('birds', 0.5);
         return;
       }
     }
@@ -373,7 +373,7 @@ export class Toys {
     this.hooks.toast(this.rng.pick(TOASTS[kind]));
   }
 
-  private say(kind: keyof typeof TOASTS, chance: number): void {
+  private flutter(kind: keyof typeof TOASTS, chance: number): void {
     this.hooks.sound.play('birds');
     this.toastOf(kind, chance);
   }

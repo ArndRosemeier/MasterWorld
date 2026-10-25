@@ -75,7 +75,8 @@ export class HeroCamera {
   }
 
   /** In first person (the hero's body is not drawn). */
-  get firstPerson(): boolean { return this.zoom < FIRST; }
+  /** Seen from the eyes: zoomed in, or pulled in that close by walls (a small room). */
+  get firstPerson(): boolean { return this.zoom < FIRST || this.dist < FIRST; }
 
 
   /**

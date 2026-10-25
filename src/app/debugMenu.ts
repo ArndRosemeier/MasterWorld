@@ -5,7 +5,7 @@
  * browser console. While open, the game gets no keyboard input. Styles in index.html.
  */
 import { loadLocal, saveLocal } from '../persist/local';
-import { onKeyDown } from '../input/keys';
+import { onKeyDown, swallow } from '../input/keys';
 
 /** What the debug menu reaches in the running game. */
 export interface DebugHost {
@@ -115,9 +115,9 @@ export class DebugMenu {
     }
     // Capture phase, registered before the settings menu: the game never sees these keys.
     onKeyDown((e) => {
-      if (e.code === 'F12' && e.ctrlKey && e.shiftKey) { e.preventDefault(); e.stopImmediatePropagation(); this.toggle(); return; }
+      if (e.code === 'F12' && e.ctrlKey && e.shiftKey) { swallow(e); this.toggle(); return; }
       if (!this.open) return;
-      if (e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); this.toggle(false); return; }
+      if (e.code === 'Escape') { swallow(e); this.toggle(false); return; }
       if (e.target !== this.input) return;
       e.stopImmediatePropagation();
       if (e.code === 'Enter') { e.preventDefault(); this.command(this.input.value); }

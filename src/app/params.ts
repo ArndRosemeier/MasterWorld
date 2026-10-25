@@ -37,6 +37,13 @@ export const params = {
   /** Start in the town's cellar: `cellar` at the ladder, `cellar=3` in room 3. */
   cellar: q.has('cellar'),
   cellarRoom: q.get('cellar') ? Number(q.get('cellar')) : undefined,
+  /** Start inside a building of the town: `room=inn` (the first of that kind) or `room=12` (building 12). */
+  room: q.get('room'),
+  /** Start in a talk (for screenshots): `talk=inn` with the innkeeper, `talk=house` with the cellar's household; `topics=news,source` asked first. */
+  talk: q.get('talk'),
+  topics: q.get('topics')?.split(',') ?? [],
+  /** Open the map (or `journal`) at the start, after any `talk`. */
+  open: q.get('open'),
   /** Setting module id. */
   setting: q.get('setting') ?? 'classic',
 };
