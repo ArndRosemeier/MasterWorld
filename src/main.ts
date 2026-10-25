@@ -291,9 +291,9 @@ export async function start(b: Boot): Promise<void> {
       // Its dwellers: the den and the fight, and their bodies drawn.
       loading.set('Waking the cellar');
       delve = new Delve(cellar, visit.space, setting, character, seed, save?.cellars[promise.id]?.delve);
-      creatures = await CreatureView.build(delve.den, seed, cellarView.origin);
-      // Its skinned shaders build in the Stage's frame slots once the loop runs; loading waits for them below.
-      dwellers = view.stage.add(creatures.group);
+      const drawn = creatures = await CreatureView.build(delve.den, seed, cellarView.origin, view.renderer);
+      // Its people's shaders (each one's shadow casters too) build in the Stage's frame slots once the loop runs; loading waits for them below.
+      dwellers = drawn.warm(view.stage).then(() => view.stage.add(drawn.group));
       if (params.cellar) {
         await visit.enter(true, params.cellarRoom);
         if (params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));

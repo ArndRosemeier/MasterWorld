@@ -51,13 +51,18 @@ export function childLook(p: Person): ChildLook {
   };
 }
 
+/** Garment colours as an outfit is put together: `wear(id, colour)` notes the colour and gives back the id. */
+export function garmentColors(): { colors: Record<string, string>; wear: (id: string, c: string) => string } {
+  const colors: Record<string, string> = {};
+  return { colors, wear: (id, c) => { colors[id] = c; return id; } };
+}
+
 /** Everything about how `p` looks. */
 export function lookOf(p: Person): CharacterPatch {
   const r = new Rng(deriveSeed(p.seed, 'look'));
   const f = p.female;
   const plain = () => r.pick(PLAIN), dyed = () => r.pick(DYED), leather = () => r.pick(LEATHER);
-  const colors: Record<string, string> = {};
-  const wear = (id: string, c: string) => { colors[id] = c; return id; };
+  const { colors, wear } = garmentColors();
   let outfit: string[];
   const shoes = r.chance(0.5) ? wear('medieval-boots', leather()) : wear('leather-boots', leather());
   switch (p.role) {

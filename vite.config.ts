@@ -1,41 +1,9 @@
-import { defineConfig, type Plugin } from 'vite';
-import fs from 'node:fs';
-import path from 'node:path';
+import { defineConfig } from 'vite';
 import { readRelease } from './tools/release/release.ts';
-
-/** Package asset folders served under a path of their own (`/humanoid/…`): in dev from the package, in the build copied. */
-const PACKAGE_ASSETS: Record<string, string> = { humanoid: 'vendor/assetgenerator/packages/humanoid/assets' };
-
-function packageAssets(): Plugin {
-  const files = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(path.join(dir, e.name)) : [path.join(dir, e.name)]));
-  return {
-    name: 'package-assets',
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const url = decodeURIComponent((req.url ?? '').split('?')[0]);
-        for (const [name, dir] of Object.entries(PACKAGE_ASSETS)) {
-          if (!url.startsWith(`/${name}/`)) continue;
-          const file = path.resolve(dir, url.slice(name.length + 2));
-          if (!file.startsWith(path.resolve(dir)) || !fs.existsSync(file)) break;
-          res.setHeader('Content-Type', file.endsWith('.json') ? 'application/json' : 'application/octet-stream');
-          fs.createReadStream(file).pipe(res);
-          return;
-        }
-        next();
-      });
-    },
-    generateBundle() {
-      for (const [name, dir] of Object.entries(PACKAGE_ASSETS)) {
-        for (const f of files(dir)) this.emitFile({ type: 'asset', fileName: `${name}/${path.relative(dir, f).split(path.sep).join('/')}`, source: fs.readFileSync(f) });
-      }
-    },
-  };
-}
 
 export default defineConfig({
   // GitHub Pages serves the game under /MasterWorld/ (set by .github/workflows/pages.yml); locally it is /.
   base: process.env.VITE_BASE ?? '/',
-  plugins: [packageAssets()],
   // The version and "What's new" (src/app/release.ts); the Pages build of main is the release.
   define: { __RELEASE__: JSON.stringify(readRelease(process.cwd(), process.env.GITHUB_REF === 'refs/heads/main')) },
   // One three.js: the vendored packages must not bring a second copy (it would split TSL's state).

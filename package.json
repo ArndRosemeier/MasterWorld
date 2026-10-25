@@ -28,7 +28,6 @@
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/creatures": "file:vendor/assetgenerator/packages/creatures",
     "@futuremagic/dungeon": "file:vendor/assetgenerator/packages/dungeon",
-    "@futuremagic/humanoid": "file:vendor/assetgenerator/packages/humanoid",
     "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",
     "@futuremagic/settlement": "file:vendor/assetgenerator/packages/settlement",
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",
