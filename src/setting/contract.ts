@@ -6,6 +6,8 @@
  * lore, VGM templates and the Conversations package are added as the milestones need them.
  */
 
+import type { GradeKey } from '@futuremagic/stage';
+
 export const CONTRACT_VERSION = 7;
 
 /**
@@ -426,6 +428,13 @@ export interface SettingModule {
   readonly hero: HeroLooksDef;
   /** The pasts a hero can choose (plan 11.4), the first the default. */
   readonly backgrounds: readonly BackgroundDef[];
+  /** The setting's colour key over the day; without it the engine's neutral grade. */
+  readonly look?: LookDef;
+}
+
+/** The picture's colour key: grade keys at sun heights, sorted by `at` (warm dusk, blue night, ...). */
+export interface LookDef {
+  readonly grade: readonly GradeKey[];
 }
 
 /** Authoring errors, one line each (empty: the module is valid). */
@@ -492,6 +501,10 @@ export function validateSetting(m: SettingModule): string[] {
   for (const r of h.races) if (!m.names[r]) out.push(`${where}: hero race "${r}" has no names`);
   if (!h.outfits.length) out.push(`${where}: hero.outfits is empty`);
   if (!m.backgrounds.length) out.push(`${where}: backgrounds is empty`);
+  m.look?.grade.forEach((k, i, all) => {
+    if (i > 0 && !(k.at > all[i - 1]!.at)) out.push(`${where}: look.grade keys must rise in sun height (key ${i})`);
+    if (!(k.at >= -1 && k.at <= 1) || !(k.saturation > 0) || !k.slope.every((v) => v > 0)) out.push(`${where}: look.grade key ${i} needs at in -1..1, saturation and slope > 0`);
+  });
   const t = m.talk;
   for (const k of ['greet', 'self', 'news', 'more', 'source', 'bye']) if (!t.topics[k]) out.push(`${where}: talk topic "${k}" has no wording`);
   for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child', 'traveller']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);

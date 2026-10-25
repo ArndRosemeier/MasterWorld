@@ -7,6 +7,7 @@ import { BoxGeometry, Color, Mesh, PMREMGenerator, Scene, Vector3, type Directio
 import { positionWorld, uniform } from 'three/tsl';
 import { CLEAR, moonAt, skyLight, skyPath, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
 import { cloudShadow } from '@futuremagic/sky/node';
+import { GRADE, gradeAt, type GradeKey } from '@futuremagic/stage';
 import { SKY, makeEnvSky, skyUniforms, type SkyUniforms } from './materials';
 import { ENV_SATURATION, FOG, fogNode } from './materials/weather';
 
@@ -139,6 +140,9 @@ export class SkyView {
   /** The sky's environment map (reflections). */
   get envTexture() { return this.envRT.texture; }
 
+  /** The setting's colour key over the day (empty: the grade stays as the view set it). */
+  look: readonly GradeKey[] = [];
+
   /** Once per frame. `camera` null: only the light (the constructor). */
   update(dt: number, camera: PerspectiveCamera | null): void {
     if (this.dayMinutes > 0) {
@@ -194,6 +198,12 @@ export class SkyView {
     }
     this.scene.environmentIntensity = L.envIntensity * ENV * lowSunSky(sun[1]);
     this.renderer.toneMappingExposure = L.exposure * this.exposure;
+    if (this.look.length) {
+      // Indoors the lamps set the colour: the day key (neutral).
+      const g = gradeAt(this.look, this.indoors ? 1 : sun[1]);
+      GRADE.slope.value.set(...g.slope);
+      GRADE.saturation.value = g.saturation;
+    }
     if (this.indoors) {
       this.sun.intensity = 0;
       this.hemi.color.setRGB(0.55, 0.42, 0.3);

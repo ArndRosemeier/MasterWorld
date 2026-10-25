@@ -56,4 +56,14 @@ export const classic: SettingModule = {
   director,
   hero,
   backgrounds,
+  // Golden late light, a cooler blue dusk, a blue night; neutral by day (the sun's own colour does the rest).
+  look: {
+    grade: [
+      { at: -0.3, slope: [0.9, 0.96, 1.12], saturation: 0.95 },
+      { at: -0.08, slope: [0.96, 0.97, 1.08], saturation: 1.15 },
+      { at: 0.04, slope: [1.06, 1.0, 0.94], saturation: 1.35 },
+      { at: 0.25, slope: [1.03, 1.0, 0.97], saturation: 1.32 },
+      { at: 0.6, slope: [1, 1, 1], saturation: 1.3 },
+    ],
+  },
 };
