@@ -5,7 +5,6 @@
  * position only, so masks agree where they overlap.
  */
 import { Noise, deriveSeed, lerp, smoothstep } from '@futuremagic/core';
-import { emptySample } from './skeleton';
 import { coverNoise, woodsAt } from './flora';
 import type { MaskJob } from './water';
 import type { Terrain } from './terrain';
@@ -26,7 +25,7 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
   const biomes = t.biomes;
   const cover = coverNoise(t.seed);
   const patch = new Noise(deriveSeed(t.seed, 'grass', 'patch'));
-  const s = emptySample(), w = { river: 0, lake: 0 };
+  const w = { river: 0, lake: 0 };
 
   // Biome grass (cover, height, dry) on the lattice around the mask, with woods shade folded into cover.
   const li0 = Math.floor(x0 / LATTICE), lj0 = Math.floor(z0 / LATTICE);
@@ -34,8 +33,8 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
   const lat = new Float32Array(ln * ln * 3);
   for (let j = 0; j < ln; j++) for (let i = 0; i < ln; i++) {
     const x = (li0 + i) * LATTICE, z = (lj0 + j) * LATTICE;
-    t.skeleton.sample(x, z, s);
-    const b = s.biome >= 0 ? biomes[s.biome] : undefined;
+    const bi = t.biomeAt(x, z);
+    const b = bi >= 0 ? biomes[bi] : undefined;
     const g = b?.grass;
     if (!g) continue;
     // Thick woods shade the floor: grass thins there (more so the denser the trees).
@@ -70,7 +69,7 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
     const slope = Math.hypot(hx, hz) / (2 * step);
     dens *= 1 - smoothstep(0.42, 0.68, slope);
     dens *= smoothstep(2.3, 4.2, h) * (1 - smoothstep(SNOW - 150, SNOW + 100, h));
-    if (dens <= 0.01) continue;
+    if (dens <= 0.01 || t.rockAt(x, z, h)) continue;
     // Not in water; reeds-to-be along the banks keep their place.
     t.clearOfWater(x, z, h, w);
     dens *= smoothstep(0.3, 1.5, w.river) * smoothstep(0.1, 0.6, w.lake);

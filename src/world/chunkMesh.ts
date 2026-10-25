@@ -4,7 +4,6 @@
  */
 import { srgbToLinear, clamp } from '@futuremagic/core';
 import { SURFACES } from '../setting/contract';
-import { emptySample } from './skeleton';
 import type { Terrain } from './terrain';
 
 export interface ChunkSpec {
@@ -56,6 +55,21 @@ function borderRing(segs: number): number[] {
   return ring;
 }
 
+/**
+ * The ground's look at a point, for any mesh drawn with the terrain material: writes the biome's linear
+ * ground colour and its surface weights (one-hot, SURFACES order) at vertex `v` of `color` and `surface`.
+ */
+export function groundLook(t: Terrain): (x: number, z: number, color: Float32Array, surface: Float32Array, v: number) => void {
+  const lin = t.biomes.map((b) => [srgbToLinear(((b.ground >> 16) & 255) / 255), srgbToLinear(((b.ground >> 8) & 255) / 255), srgbToLinear((b.ground & 255) / 255)]);
+  const surf = t.biomes.map((b) => SURFACES.indexOf(b.surface));
+  return (x, z, color, surface, v) => {
+    const b = clamp(t.biomeAt(x, z), 0, lin.length - 1), c = lin[b];
+    color[v * 3] = c[0]; color[v * 3 + 1] = c[1]; color[v * 3 + 2] = c[2];
+    surface.fill(0, v * 4, v * 4 + 4);
+    surface[v * 4 + surf[b]] = 1;
+  };
+}
+
 export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const { x0, z0, size, segs } = spec;
   const n = segs + 1, step = size / segs;
@@ -66,10 +80,7 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const vc = vertexCount(segs);
   const position = new Float32Array(vc * 3), normal = new Float32Array(vc * 3), color = new Float32Array(vc * 3);
   const surface = new Float32Array(vc * 4);
-  const biomes = t.biomes;
-  const lin = biomes.map((b) => [srgbToLinear(((b.ground >> 16) & 255) / 255), srgbToLinear(((b.ground >> 8) & 255) / 255), srgbToLinear((b.ground & 255) / 255)]);
-  const surf = biomes.map((b) => SURFACES.indexOf(b.surface));
-  const s = emptySample();
+  const look = groundLook(t);
   let minY = Infinity, maxY = -Infinity;
   // Biome colour on a coarser grid (it varies over kilometres), blended per vertex.
   const cstep = Math.max(1, Math.round(segs / 8));
@@ -87,10 +98,7 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     normal[v * 3 + 1] = ny / l;
     normal[v * 3 + 2] = nz / l;
     if (i % cstep === 0 && j % cstep === 0) {
-      t.skeleton.sample(x0 + i * step, z0 + j * step, s);
-      const c = lin[clamp(s.biome, 0, lin.length - 1)];
-      color[v * 3] = c[0]; color[v * 3 + 1] = c[1]; color[v * 3 + 2] = c[2];
-      surface[v * 4 + surf[clamp(s.biome, 0, surf.length - 1)]] = 1;
+      look(x0 + i * step, z0 + j * step, color, surface, v);
     }
   }
   // Fill colours and surfaces between the coarse samples bilinearly.

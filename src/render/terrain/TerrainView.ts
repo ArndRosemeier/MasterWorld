@@ -7,7 +7,7 @@ import { BufferAttribute, BufferGeometry, Mesh, type Camera } from 'three/webgpu
 import type { Stage } from '@futuremagic/stage';
 import { TERRAIN } from '../materials';
 import { chunkIndex, type ChunkMesh } from '../../world/chunkMesh';
-import type { TerrainPool } from '../../workers/pool';
+import type { TerrainJobs } from '../../workers/pool';
 import { SEGS, chunkId, chunkSize, selectChunks, type ChunkKey } from './lod';
 
 /** Built chunks kept around after they leave the view, for coming back. */
@@ -24,7 +24,7 @@ export class TerrainView {
   private last = { x: Infinity, z: Infinity, y: Infinity };
   private swapping = false;
 
-  constructor(private readonly stage: Stage, private readonly pool: TerrainPool, private readonly seed: number, private readonly setting: string, private readonly groundAt: (x: number, z: number) => number) {}
+  constructor(private readonly stage: Stage, private readonly jobs: TerrainJobs, private readonly groundAt: (x: number, z: number) => number) {}
 
   /** Chunks drawn now, and chunks being built. */
   get stats(): { shown: number; building: number; built: number } {
@@ -66,29 +66,16 @@ export class TerrainView {
   private request(k: ChunkKey): void {
     const id = chunkId(k), size = chunkSize(k.level);
     this.building.add(id);
-    void this.pool.run({ seed: this.seed, setting: this.setting, x0: k.x * size, z0: k.z * size, size, segs: SEGS }).then((m) => {
+    void this.jobs.chunk(k.x * size, k.z * size, size, SEGS).then((m) => {
       this.building.delete(id);
       this.built.set(id, this.mesh(k, m));
     });
   }
 
   private mesh(k: ChunkKey, m: ChunkMesh): Mesh {
-    const g = new BufferGeometry();
-    g.setAttribute('position', new BufferAttribute(m.position, 3));
-    g.setAttribute('normal', new BufferAttribute(m.normal, 3));
-    g.setAttribute('color', new BufferAttribute(m.color, 3));
-    g.setAttribute('surface', new BufferAttribute(m.surface, 4));
-    g.setIndex(this.index);
     const size = chunkSize(k.level);
-    g.boundingBox = null;
-    g.computeBoundingSphere();
-    const mesh = new Mesh(g, TERRAIN.make());
+    const mesh = groundMesh(m, this.index, k.x * size, k.z * size);
     mesh.name = `terrain ${chunkId(k)}`;
-    mesh.position.set(k.x * size, 0, k.z * size);
-    mesh.castShadow = TERRAIN.shadow.cast;
-    mesh.receiveShadow = TERRAIN.shadow.receive;
-    mesh.matrixAutoUpdate = false;
-    mesh.updateMatrix();
     return mesh;
   }
 
@@ -113,4 +100,25 @@ export class TerrainView {
       this.built.delete(id);
     }
   }
+}
+
+/**
+ * A mesh with the terrain material (a height field chunk, or a rock volume): position, normal, ground colour
+ * and surface weights, placed at (x, 0, z) and never moved.
+ */
+export function groundMesh(m: Pick<ChunkMesh, 'position' | 'normal' | 'color' | 'surface'>, index: BufferAttribute, x = 0, z = 0): Mesh {
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(m.position, 3));
+  g.setAttribute('normal', new BufferAttribute(m.normal, 3));
+  g.setAttribute('color', new BufferAttribute(m.color, 3));
+  g.setAttribute('surface', new BufferAttribute(m.surface, 4));
+  g.setIndex(index);
+  g.computeBoundingSphere();
+  const mesh = new Mesh(g, TERRAIN.make());
+  mesh.position.set(x, 0, z);
+  mesh.castShadow = TERRAIN.shadow.cast;
+  mesh.receiveShadow = TERRAIN.shadow.receive;
+  mesh.matrixAutoUpdate = false;
+  mesh.updateMatrix();
+  return mesh;
 }
