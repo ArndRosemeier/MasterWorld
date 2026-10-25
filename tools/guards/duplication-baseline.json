@@ -14,5 +14,9 @@
   {
     "key": "same name: masterworld/app/player.ts#update + masterworld/render/terrain/TerrainView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (the player vs chunk selection); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/render/flora/FloraView.ts#update + masterworld/render/hero/HeroView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (plant cells and their draws vs the hero's pose); only the name matches."
   }
 ]
