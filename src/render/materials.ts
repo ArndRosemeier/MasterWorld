@@ -16,7 +16,7 @@ import { WATER, waterAt } from './materials/waterInputs';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 
-export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface';
+export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level';
 
 export interface MaterialKind extends StageKind {
   readonly attributes: readonly Attribute[];
@@ -61,7 +61,7 @@ const LAYER = (name: string): number => {
  * is rock, projected from three sides with strata on the faces; snow lies up high, sand at the shore.
  * Height from the layers sharpens every transition so it follows stones and tufts, not straight lines.
  */
-export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface'], () => {
+export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level'], () => {
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');
   const { albedo: A, normal: N } = ground;
   // Double-sided so chunk skirts close cracks seen from either side.
@@ -70,6 +70,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // biome colour tints only the open ground, below.
   const m = new MeshPhysicalNodeMaterial({ roughness: 0.95, metalness: 0, side: DoubleSide, specularIntensity: 0.25 });
   const p = positionWorld, n = normalWorldGeometry, up = n.y;
+  // How level the ground is, smoothed over a few metres per vertex: what rock and sand follow, so their
+  // edges run smoothly instead of along the triangles where a cliff's normal flips between vertices.
+  const level = attribute('level', 'float');
   const layer = (name: string, uv: Node<'vec2'>) => {
     const i = LAYER(name), k = 1 / NATURAL_TILE_METERS[i];
     const st = uv.mul(k);
@@ -99,7 +102,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
 
   // Shore sand, up to where rock takes over (no strip of grass between a beach and its cliff).
   const sand = layer('sand', p.xz);
-  const sandT = smoothstep(float(4.5).add(fine.mul(1.5)), float(2.2), p.y).mul(smoothstep(0.6, 0.8, up));
+  const sandT = smoothstep(float(4.5).add(fine.mul(1.5)), float(2.2), p.y).mul(smoothstep(0.6, 0.8, level));
   const sandB = hblend(sandT, sand.n.b.sub(h), 2);
   col = mix(col, sand.a.rgb, sandB); rough = mix(rough, sand.a.a, sandB); ao = mix(ao, sand.n.a, sandB);
   pert = mix(pert, vec3(tn(sand.n).x, 0, tn(sand.n).y), sandB); h = mix(h, sand.n.b, sandB);
@@ -115,7 +118,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const rockA = rx.a.mul(bw.x).add(rz.a.mul(bw.z)).add(ry.a.mul(bw.y));
   const rockN = rx.n.mul(bw.x).add(rz.n.mul(bw.z)).add(ry.n.mul(bw.y));
   const rockP = vec3(0, tn(rx.n).y, tn(rx.n).x).mul(bw.x).add(vec3(tn(rz.n).x, tn(rz.n).y, 0).mul(bw.z)).add(vec3(tn(ry.n).x, 0, tn(ry.n).y).mul(bw.y));
-  const rockT = smoothstep(0.82, 0.64, up.add(fine.mul(0.04)).add(mid.mul(0.12)));
+  const rockT = smoothstep(0.82, 0.64, level.add(fine.mul(0.04)).add(mid.mul(0.12)));
   const rockB = hblend(rockT, rockN.b.sub(h), 2);
   const rockTone = float(1).add(broad.mul(0.25));
   col = mix(col, rockA.rgb.mul(rockTone).mul(macro), rockB); rough = mix(rough, rockA.a, rockB); ao = mix(ao, rockN.a, rockB);
