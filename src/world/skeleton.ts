@@ -5,7 +5,7 @@
  *
  * Units are metres. x runs east, z runs south (three.js), y is up; the sea surface is y = 0.
  */
-import { Noise, deriveSeed, clamp, smoothstep, lerp } from '@futuremagic/core';
+import { Noise, deriveSeed, clamp, smoothstep, lerp, smax } from '@futuremagic/core';
 import type { BiomeDef, WorldShape } from '../setting/contract';
 
 /** Everything the skeleton knows about one point. */
@@ -26,6 +26,21 @@ export interface SkeletonSample {
 
 const LAPSE = 0.0065; // °C per metre of height
 
+/**
+ * The shore: the ground runs through the waterline at one slope, levelling off to a berm on land and a
+ * shelf in the sea. Where hill country meets the sea, cliffs rise behind a narrow strip of beach.
+ */
+export const SHORE = {
+  /** Rise per metre at the waterline (both sides, so the beach runs smoothly into the sea floor). */
+  slope: 0.07,
+  /** Height the beach levels off at, metres. */
+  berm: 1.8,
+  /** Depth the shallows level off at before the deep sea, metres. */
+  shelf: 6,
+  /** Continent value inside which the shore is shaped (beyond it the land is as it was). */
+  band: 0.12,
+};
+
 export class Skeleton {
   private readonly continentNoise: Noise;
   private readonly warpNoise: Noise;
@@ -33,6 +48,7 @@ export class Skeleton {
   private readonly peakNoise: Noise;
   private readonly hillNoise: Noise;
   private readonly climateNoise: Noise;
+  private readonly shoreNoise: Noise;
   /** Continent value at which the coast lies, set so that `landFraction` of the surface is land. */
   private readonly coast: number;
 
@@ -43,6 +59,7 @@ export class Skeleton {
     this.peakNoise = new Noise(deriveSeed(seed, 'skeleton', 'peak'));
     this.hillNoise = new Noise(deriveSeed(seed, 'skeleton', 'hill'));
     this.climateNoise = new Noise(deriveSeed(seed, 'skeleton', 'climate'));
+    this.shoreNoise = new Noise(deriveSeed(seed, 'skeleton', 'shore'));
     // fbm of simplex noise is roughly normal around 0 with sd ≈ 0.25: the coast threshold follows from the land share.
     this.coast = (0.5 - shape.landFraction) * 0.5;
   }
@@ -69,17 +86,68 @@ export class Skeleton {
     return this.heightAt(x, z, c, this.range(x, z, c));
   }
 
+  /**
+   * Metres from the shoreline (positive inland) of the last `elevation` or `sample` call, ±Infinity away
+   * from the coast. The terrain reads it to keep beaches smooth.
+   */
+  lastShore = Infinity;
+
+  /**
+   * Distance to the shoreline, metres, positive inland: the continent value over its slope (the field is
+   * smooth over hundreds of metres), shifted a little so the shore has coves and points.
+   */
+  shoreDistance(x: number, z: number, c: number): number {
+    if (c > SHORE.band) return Infinity;
+    if (c < -SHORE.band) return -Infinity;
+    const D = 25;
+    const g = Math.hypot(this.continent(x + D, z) - c, this.continent(x, z + D) - c) / D;
+    const coves = this.shoreNoise.fbm2(x / 420 + 3.1, z / 420 - 8.4, 3) * 28;
+    return c / Math.max(g, 1e-7) + coves;
+  }
+
   private heightAt(x: number, z: number, c: number, r: number): number {
     const w = this.shape;
+    const s = (this.lastShore = this.shoreDistance(x, z, c));
+    // The shore profile: one slope through the waterline, a berm on land, a shelf in the sea.
+    let floor = s >= 0 ? SHORE.berm * (1 - Math.exp((-s * SHORE.slope) / SHORE.berm)) : -SHORE.shelf * (1 - Math.exp((s * SHORE.slope) / SHORE.shelf));
+    // Well inland the shore no longer has a say (it hands over to the land as it is beyond the band).
+    const inland = s > 0 ? Math.max(smoothstep(300, 600, s), smoothstep(SHORE.band * 0.65, SHORE.band, c)) : 0;
+    floor = lerp(floor, 1, inland);
     if (c <= 0) {
-      // Shelf, then the deep sea.
+      // Then the deep sea.
       const d = smoothstep(0, 0.35, -c);
-      return -lerp(2, w.seaDepth, d * d);
+      const sea = floor - lerp(0, w.seaDepth - SHORE.shelf, d * d);
+      return s > 0 ? Math.max(sea, this.cliff(x, z, s, this.landAt(x, z, c, this.relief(x, z)))) : sea;
     }
-    const coastRamp = smoothstep(0, 0.12, c);
-    // Relief: some country is gentle, some rugged, changing over tens of kilometres.
-    const relief = smoothstep(-0.35, 0.55, this.hillNoise.fbm2(x / 40_000 + 5.3, z / 40_000 - 2.1, 3));
-    const amp = lerp(45, 560, relief) * (0.55 + 0.45 * w.drama);
+    const relief = this.relief(x, z);
+    const amp = amplitude(relief, w.drama);
+    const land = this.landAt(x, z, c, relief);
+    // Mountains: ridged peaks inside the ranges, sharper with drama.
+    const peaks = r > 0 ? this.peakNoise.ridgedTerrain2(x / 14_000, z / 14_000, 6, 1.4 + w.drama * 0.8) : 0;
+    // The land comes down to the coast, flattening out into the beach right at the water.
+    let h = smoothstep(0, SHORE.band, c) * smoothstep(0, 60, s) * land + r * peaks * (w.mountainHeight - amp);
+    // High ground gets broad steps too (benches and cliffs below the peaks).
+    if (w.drama > 0 && h > 600) {
+      const step = 160;
+      const terraced = Math.floor(h / step) * step + step * smoothstep(0.25, 0.75, (h % step) / step);
+      h = lerp(h, terraced, w.drama * 0.45 * smoothstep(600, 1200, h));
+    }
+    if (s === Infinity) return Math.max(1, h);
+    // The land rises behind the beach (softly blended in, but not at the waterline itself).
+    const soft = 1.2 * smoothstep(0, 40, s) * (1 - inland);
+    h = soft > 1e-3 ? smax(floor, h, soft) : Math.max(floor, h);
+    return Math.max(h, this.cliff(x, z, s, land));
+  }
+
+  /** Relief amplitude: some country is gentle, some rugged, changing over tens of kilometres. */
+  private relief(x: number, z: number): number {
+    return smoothstep(-0.35, 0.55, this.hillNoise.fbm2(x / 40_000 + 5.3, z / 40_000 - 2.1, 3));
+  }
+
+  /** The land before it meets the coast and the mountains: lowlands, ridged hills, terraces. */
+  private landAt(x: number, z: number, c: number, relief: number): number {
+    const w = this.shape;
+    const amp = amplitude(relief, w.drama);
     // Lowlands: broad swells, ridged hills with real valleys between them, and rolling ground.
     const plains = 20 + 120 * c + this.hillNoise.fbm2(x / 12_000, z / 12_000, 3) * 60;
     const ridges = this.hillNoise.ridgedTerrain2(x / 5200 + 13.1, z / 5200 - 7.7, 5, 1.2 + w.drama * 0.6);
@@ -91,17 +159,29 @@ export class Skeleton {
       const terraced = Math.floor(land / step) * step + step * smoothstep(0.3, 0.7, (land % step) / step);
       land = lerp(land, terraced, w.drama * 0.7 * smoothstep(0.45, 0.8, relief));
     }
-    // Mountains: ridged peaks inside the ranges, sharper with drama.
-    const peaks = this.peakNoise.ridgedTerrain2(x / 14_000, z / 14_000, 6, 1.4 + w.drama * 0.8);
-    let h = coastRamp * land + r * peaks * (w.mountainHeight - amp);
-    // High ground gets broad steps too (benches and cliffs below the peaks).
-    if (w.drama > 0 && h > 600) {
-      const step = 160;
-      const terraced = Math.floor(h / step) * step + step * smoothstep(0.25, 0.75, (h % step) / step);
-      h = lerp(h, terraced, w.drama * 0.45 * smoothstep(600, 1200, h));
-    }
-    return Math.max(1, h);
+    return land;
   }
+
+  /**
+   * Sea cliffs: along some stretches of coast where the land behind is high, it rises steeply behind a
+   * narrow beach instead of sloping down to it. The foot wanders (buttresses, coves), the height tapers
+   * in and out along the coast. 0 where there is no cliff.
+   */
+  private cliff(x: number, z: number, s: number, land: number): number {
+    if (s < 0 || land < 8 || this.shape.drama <= 0) return 0;
+    const n = this.shoreNoise;
+    // Cliffs come and go along the coast within a few hundred metres, so few low half-cliffs stand on beaches.
+    const k = smoothstep(0.18, 0.28, n.fbm2(x / 5000 - 17.3, z / 5000 + 4.6, 2)) * smoothstep(8, 16, land) * Math.min(1, this.shape.drama * 1.5);
+    if (k <= 0) return 0;
+    // Height: set over kilometres, varied by headlands and dips over a few hundred metres.
+    const tall = lerp(14, 70, smoothstep(-0.3, 0.4, n.fbm2(x / 9000 + 2.2, z / 9000 + 9.9, 2)));
+    const top = Math.min(land, tall * (1 + 0.3 * n.fbm2(x / 300 - 6.1, z / 300 + 1.3, 2) + 0.1 * n.fbm2(x / 45 + 4.4, z / 45 - 2.6, 2))) * k;
+    // The foot wanders (buttresses and coves), and some stretches lean back more than others.
+    const foot = Math.max(3, 11 + n.fbm2(x / 70 + 0.7, z / 70 - 5.5, 2) * 5 + n.fbm2(x / 240 - 3.3, z / 240 + 2.9, 2) * 8 + n.fbm2(x / 24 - 9.1, z / 24 + 7.7, 2) * 1.8);
+    const steep = lerp(1.7, 3, smoothstep(-0.4, 0.4, n.fbm2(x / 600 + 8.8, z / 600, 2)));
+    return cliffProfile(s - foot, top, steep);
+  }
+
 
   temperature(x: number, z: number, elevation: number): number {
     const w = this.shape;
@@ -128,6 +208,25 @@ export class Skeleton {
     return out;
   }
 }
+
+/**
+ * A cliff's height `u` metres in from its foot: a concave apron of scree easing into the face, the face at
+ * `steep` (rise per metre), and a rounded crest. The slope changes over metres, not between two vertices,
+ * so rock, sand and grass meet along smooth lines on the mesh. Low cliffs come out as steep banks.
+ */
+export function cliffProfile(u: number, top: number, steep: number): number {
+  if (u <= 0 || top <= 0) return 0;
+  const L1 = Math.max(10, 0.4 * top), L2 = Math.max(7, 0.3 * top);
+  const S = Math.min(steep, top / ((L1 + L2) / 2));
+  const h1 = (S * L1) / 2, Lm = (top - h1 - (S * L2) / 2) / S;
+  if (u < L1) return (S * u * u) / (2 * L1);
+  if (u < L1 + Lm) return h1 + S * (u - L1);
+  const v = Math.max(0, L2 - (u - L1 - Lm));
+  return top - (S * v * v) / (2 * L2);
+}
+
+/** Height scale of the hills for a relief (0 gentle … 1 rugged). */
+const amplitude = (relief: number, drama: number): number => lerp(45, 560, relief) * (0.55 + 0.45 * drama);
 
 export function emptySample(): SkeletonSample {
   return { elevation: 0, continent: 0, range: 0, temperature: 0, moisture: 0, biome: -1 };

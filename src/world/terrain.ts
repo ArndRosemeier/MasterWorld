@@ -3,7 +3,7 @@
  * deterministic, evaluated in workers for meshes and on the main thread for walking.
  */
 import { Noise, deriveSeed, lerp, smin, smoothstep } from '@futuremagic/core';
-import { Skeleton, emptySample } from './skeleton';
+import { SHORE, Skeleton, emptySample } from './skeleton';
 import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND, archNear } from './volumes';
@@ -71,12 +71,15 @@ export class Terrain {
 
   /** Ground height above the sea surface, metres. */
   height(x: number, z: number): number {
-    const e = this.skeleton.elevation(x, z);
+    const e = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
     if (e <= 0) return e;
-    // Small undulations everywhere, rougher where the land is high.
+    // Small undulations everywhere, rougher where the land is high; none on the beach, so it runs smoothly
+    // into the water instead of the waterline wandering over bumps.
+    const calm = Math.max(smoothstep(SHORE.berm + 0.6, SHORE.berm + 5, e), smoothstep(350, 700, shore));
+    if (calm <= 0) return this.shapeByWater(x, z, e);
     const rough = 1 + Math.min(4, e / 600);
     const d = this.detail.fbm2(x / 70, z / 70, 3) * 2.2 + this.detail.fbm2(x / 9 + 71.3, z / 9 - 12.9, 2) * 0.25;
-    return this.shapeByWater(x, z, Math.max(0.5, e + d * rough));
+    return this.shapeByWater(x, z, Math.max(Math.min(e, 0.5), e + d * rough * calm));
   }
 
   /**

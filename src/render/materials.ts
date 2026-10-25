@@ -97,9 +97,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   let col: Node<'vec3'> = soilA.rgb.mul(tint), rough: Node<'float'> = soilA.a, ao: Node<'float'> = soilN.a, h: Node<'float'> = soilN.b;
   let pert: Node<'vec3'> = vec3(tn(soilN).x, 0, tn(soilN).y);
 
-  // Shore sand.
+  // Shore sand, up to where rock takes over (no strip of grass between a beach and its cliff).
   const sand = layer('sand', p.xz);
-  const sandT = smoothstep(float(4).add(fine.mul(1.5)), float(1), p.y).mul(smoothstep(0.7, 0.9, up));
+  const sandT = smoothstep(float(4.5).add(fine.mul(1.5)), float(2.2), p.y).mul(smoothstep(0.6, 0.8, up));
   const sandB = hblend(sandT, sand.n.b.sub(h), 2);
   col = mix(col, sand.a.rgb, sandB); rough = mix(rough, sand.a.a, sandB); ao = mix(ao, sand.n.a, sandB);
   pert = mix(pert, vec3(tn(sand.n).x, 0, tn(sand.n).y), sandB); h = mix(h, sand.n.b, sandB);
@@ -115,7 +115,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const rockA = rx.a.mul(bw.x).add(rz.a.mul(bw.z)).add(ry.a.mul(bw.y));
   const rockN = rx.n.mul(bw.x).add(rz.n.mul(bw.z)).add(ry.n.mul(bw.y));
   const rockP = vec3(0, tn(rx.n).y, tn(rx.n).x).mul(bw.x).add(vec3(tn(rz.n).x, tn(rz.n).y, 0).mul(bw.z)).add(vec3(tn(ry.n).x, 0, tn(ry.n).y).mul(bw.y));
-  const rockT = smoothstep(0.82, 0.64, up.add(fine.mul(0.04)));
+  const rockT = smoothstep(0.82, 0.64, up.add(fine.mul(0.04)).add(mid.mul(0.12)));
   const rockB = hblend(rockT, rockN.b.sub(h), 2);
   const rockTone = float(1).add(broad.mul(0.25));
   col = mix(col, rockA.rgb.mul(rockTone).mul(macro), rockB); rough = mix(rough, rockA.a, rockB); ao = mix(ao, rockN.a, rockB);
