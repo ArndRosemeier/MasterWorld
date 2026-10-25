@@ -57,12 +57,17 @@ export class Title {
     console.info(`[title] ${draw.still}, ${draw.weather}, ${draw.hour.toFixed(1)} h`);
     this.screen = new TitleScreen(draw, { start: (p) => this.start(p), settings: () => menus.openSettings(), news: () => menus.whatsNew(), sound }, calm);
     sound.playMusic('title/theme.mp3');
-    // Sound is allowed after the first press; the pointer leans the view.
-    const unlock = () => sound.unlock();
-    this.screen.root.ownerDocument.addEventListener('pointerdown', unlock, { once: true });
+    // Sound is allowed after the first press, which also opens the title; the pointer leans the view.
+    const firstPress = () => {
+      if (this.screen.begun) return;
+      sound.unlock();
+      this.screen.wake();
+      this.goIfAsked();
+    };
+    this.screen.root.ownerDocument.addEventListener('pointerdown', firstPress, { once: true });
     const code = new CodeWatch(SECRET);
     onKeyDown((e) => {
-      unlock();
+      firstPress();
       if (!this.over && code.heard(e.code)) this.toys?.dragon();
     });
     this.screen.toys.addEventListener('pointermove', (e) => this.cam?.point((e.clientX / innerWidth) * 2 - 1, (e.clientY / innerHeight) * 2 - 1));
@@ -105,11 +110,16 @@ export class Title {
   }
 
   /** Everything is built (the townsfolk too): the game can start, and does if it was asked for. */
-  ready(): void {
+  worldReady(): void {
     this.landReady();
     this.playable = true;
     this.screen.done();
-    if (this.wanted) this.go(this.wanted.people);
+    this.goIfAsked();
+  }
+
+  /** Into the game if it was asked for, the world is ready and the title has begun. */
+  private goIfAsked(): void {
+    if (this.playable && this.wanted && this.screen.begun) this.go(this.wanted.people);
   }
 
   /** Each frame while active (before the game's own update). */

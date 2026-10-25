@@ -501,7 +501,7 @@ export async function start(b: Boot): Promise<void> {
       if (planted && !window.__mwReady) {
         window.__mwReady = true;
         shown();
-        if (title) title.ready();
+        if (title) title.worldReady();
         else loading.done();
       }
     });

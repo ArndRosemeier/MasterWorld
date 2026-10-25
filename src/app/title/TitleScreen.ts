@@ -30,6 +30,7 @@ export class TitleScreen {
   /** Where the toys draw and the world's clicks land. */
   readonly toys: HTMLCanvasElement;
   private readonly build: HTMLDivElement;
+  private readonly gate: HTMLDivElement;
   private readonly continueButton: HTMLButtonElement;
   private resume: (() => void) | null = null;
   private readonly startButton: HTMLButtonElement;
@@ -72,16 +73,32 @@ export class TitleScreen {
     this.showPeople(false);
 
     this.build = el('div', { className: 't-build', textContent: 'Waking the world' });
-    this.root = el('div', { id: 'title', className: calm ? 'calm' : '' },
+    // Browsers allow sound only after a press: the opening waits for one, so the theme and the ward line
+    // begin together (the world keeps loading meanwhile).
+    this.gate = el('div', { className: 't-gate', role: 'button', ariaLabel: 'Press any key to begin' },
+      el('div', { className: 'name', textContent: 'MasterWorld' }), el('div', { className: 'press', textContent: 'Press any key' }));
+    this.root = el('div', { id: 'title', className: calm ? 'calm gated' : 'gated' },
       still, svg(dawnSvg(wardLine(draw.seed))), this.toys, el('div', { className: 't-vignette' }),
-      logo, panel, peoples, this.crier(), el('div', { className: 't-hint', textContent: HINT }), this.build);
+      logo, panel, peoples, this.crier(), el('div', { className: 't-hint', textContent: HINT }), this.build, this.gate);
     document.body.append(this.root);
-    if (!calm) host.sound.play('wind');
-    // The ward's sound as the fuse runs, the gear's as the logo locks (once sound is allowed, see main).
-    if (!calm) {
-      window.setTimeout(() => host.sound.play('ward'), 400);
-      window.setTimeout(() => host.sound.play('gear'), 5100);
-    }
+    // The SVG's own (SMIL) animations hold too until the press.
+    this.root.querySelectorAll('svg').forEach((e) => e.pauseAnimations());
+  }
+
+  /** True once the first press woke the title. */
+  get begun(): boolean { return !this.root.classList.contains('gated'); }
+
+  /** The first press: the opening starts (with its sounds; the caller has allowed sound by now). */
+  wake(): void {
+    if (this.begun) return;
+    this.root.classList.remove('gated');
+    this.root.querySelectorAll('svg').forEach((e) => e.unpauseAnimations());
+    window.setTimeout(() => this.gate.remove(), 900);
+    if (this.calm) return;
+    this.host.sound.play('wind');
+    // The ward's sound as the fuse runs, the gear's as the logo locks.
+    window.setTimeout(() => this.host.sound.play('ward'), 400);
+    window.setTimeout(() => this.host.sound.play('gear'), 5100);
   }
 
   // The loading screen's part (main.ts calls these while the world is built).

@@ -1,6 +1,6 @@
 /**
  * The title over time (a slow check, run after `npm run build`): `node tools/shot/title.mjs "?gl" shots/t`.
- * Screenshots at the page times in AT (ms, comma separated, default 1000,2600,4300,9000); with LIVE=1 also
+ * After a first key press (the title waits for one; GATE=1 shoots it first), screenshots at the page times in AT (ms, comma separated, default 1000,2600,4300,9000); with LIVE=1 also
  * once the world is built, then CLICK='[[x,y],...]' clicks the world (toys), DRAGON=<ms> types the secret
  * code and waits, DIVE=<ms> presses New game and shoots mid-dive and in the game. SwiftShader like shot.mjs, or SHOT_GPU=1 on a machine with a graphics card.
  */
@@ -23,6 +23,10 @@ page.on('console', (m) => { if (m.type() === 'error' || m.text().startsWith('[')
 page.on('pageerror', (e) => console.log(`[page error] ${e.message}`));
 const t0 = Date.now();
 await page.goto(base + query);
+// The title waits for a first press (sound needs one); GATE=1 shoots the gate first.
+if (process.env.GATE) { await page.waitForSelector('.t-gate'); await page.screenshot({ path: `${prefix}-gate.png`, timeout: 600000 }); }
+await page.waitForSelector('.t-gate');
+await page.keyboard.press('Space');
 for (const at of (process.env.AT ?? '1000,2600,4300,9000').split(',').map(Number)) {
   await page.waitForTimeout(Math.max(0, at - (Date.now() - t0)));
   await page.screenshot({ path: `${prefix}-${at}.png`, timeout: 600000 });
