@@ -6,6 +6,8 @@ import { params } from './app/params';
 import { FlyCamera } from './app/flyCamera';
 import { HeroCamera } from './app/heroCamera';
 import { lookFromDegrees } from './app/look';
+import { Menu } from './app/menu';
+import { SettingsStore } from './app/settings';
 import { Walker, type WalkWorld } from './game/walker';
 import { HeroView } from './render/hero/HeroView';
 import { createView } from './render/view';
@@ -34,6 +36,8 @@ async function start(): Promise<void> {
   const loading = new LoadingScreen();
   const canvas = document.createElement('canvas');
   document.body.prepend(canvas);
+  const settings = new SettingsStore();
+  const boot = settings.start;
   try {
     const setting = settingById(params.setting);
     const errors = validateSetting(setting);
@@ -44,7 +48,7 @@ async function start(): Promise<void> {
     const home = findStart(terrain.skeleton, setting);
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: params.gl, hour: params.hour, dayMinutes: params.dayMinutes });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: params.hour, dayMinutes: boot.dayMinutes });
     // The hero walks the land; `?fly` gives the free camera instead.
     let water: WaterView | null = null;
     const world: WalkWorld = {
@@ -90,8 +94,8 @@ async function start(): Promise<void> {
     if (hero && walker) walker.height = hero.height;
     loading.set('Growing the woods');
     const flora = new FloraView(view.stage, jobs);
-    if (params.trees) await flora.placeStart(view.camera.position);
-    const grass = params.grass ? new GrassView(jobs) : null;
+    if (boot.trees) await flora.placeStart(view.camera.position);
+    const grass = boot.grass ? new GrassView(jobs) : null;
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
@@ -112,8 +116,29 @@ async function start(): Promise<void> {
     // once they stand.
     loading.set('Planting the trees');
     let planted = false;
-    const planting = (params.trees ? flora.show() : Promise.resolve()).then(() => { planted = true; });
+    const planting = (boot.trees ? flora.show() : Promise.resolve()).then(() => { planted = true; });
     const hud = document.getElementById('hud');
+    // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
+    let showHud = params.hud;
+    const pixels = view.renderer.getPixelRatio();
+    let scale = 1;
+    settings.watch((s) => {
+      if (heroCam) {
+        heroCam.controls.bindings = s.bindings;
+        heroCam.mouseSpeed = s.mouseSpeed;
+        heroCam.invertMouse = s.invertMouse;
+      }
+      if (view.camera.fov !== s.fov) { view.camera.fov = s.fov; view.camera.updateProjectionMatrix(); }
+      if (scale !== s.renderScale) { scale = s.renderScale; view.renderer.setPixelRatio(pixels * scale); }
+      if (params.dayMinutes === null) view.sky.dayMinutes = s.dayMinutes;
+      showHud = params.hud || s.hud;
+      if (hud) hud.style.display = showHud ? '' : 'none';
+    });
+    new Menu(settings, {
+      paused: (open) => { if (heroCam) heroCam.enabled = !open; },
+      get hour() { return view.sky.hour; },
+      set hour(h) { view.sky.hour = h; },
+    });
     let last = performance.now();
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
@@ -130,11 +155,11 @@ async function start(): Promise<void> {
       view.sky.update(dt, view.camera);
       sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
-      if (params.trees) flora.update(dt, view.camera.position);
+      if (boot.trees) flora.update(dt, view.camera.position);
       grass?.tend(dt, view.camera, 0.5);
       view.stage.frame();
       view.renderer.render(view.scene, view.camera);
-      if (hud && params.hud) {
+      if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
         hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}\n${view.stage.hudLine()}`;
       }

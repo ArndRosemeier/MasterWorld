@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # The whole history: the version counts the commits on main (tools/release).
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
