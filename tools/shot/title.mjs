@@ -2,14 +2,22 @@
  * The title over time (a slow check, run after `npm run build`): `node tools/shot/title.mjs "?gl" shots/t`.
  * Screenshots at the page times in AT (ms, comma separated, default 1000,2600,4300,9000); with LIVE=1 also
  * once the world is built, then CLICK='[[x,y],...]' clicks the world (toys), DRAGON=<ms> types the secret
- * code and waits, DIVE=<ms> presses New game and shoots mid-dive and in the game. SwiftShader, like shot.mjs.
+ * code and waits, DIVE=<ms> presses New game and shoots mid-dive and in the game. SwiftShader like shot.mjs, or SHOT_GPU=1 on a machine with a graphics card.
  */
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 const [query, prefix] = process.argv.slice(2);
 const server = await preview({ root: process.cwd(), preview: { port: 5212, strictPort: false }, logLevel: 'silent' });
 const base = server.resolvedUrls.local[0];
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+// SHOT_GPU=1: the machine's own graphics card (as in shot.mjs), else SwiftShader.
+const gpu = !!process.env.SHOT_GPU;
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || undefined,
+  channel: gpu ? 'chromium' : undefined,
+  args: gpu
+    ? ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+});
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('console', (m) => { if (m.type() === 'error' || m.text().startsWith('[')) console.log(`[page ${m.type()}] ${m.text()}`); });
 page.on('pageerror', (e) => console.log(`[page error] ${e.message}`));
