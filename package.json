@@ -22,8 +22,8 @@
     "variety": "node --import tsx tools/variety/cellars.ts"
   },
   "dependencies": {
-    "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.11.1/actors-animal-0.11.1.tgz",
-    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.11.1/actors-generator-0.11.1.tgz",
+    "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.12.0/actors-animal-0.12.0.tgz",
+    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.12.0/actors-generator-0.12.0.tgz",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/creatures": "file:vendor/assetgenerator/packages/creatures",
     "@futuremagic/dungeon": "file:vendor/assetgenerator/packages/dungeon",

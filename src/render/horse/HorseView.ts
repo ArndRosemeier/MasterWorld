@@ -1,16 +1,16 @@
 /**
- * The horses as drawn: Actors' horse (0.11, a 1.6 m gelding on Mesh2Motion's rig and clips) saddled and
+ * The horses as drawn: Actors' horse (0.12, a 1.6 m gelding on Mesh2Motion's rig and clips) saddled and
  * bridled, one actor each, in the coat of its preset. Each frame the game says where each stands and what
  * it does; the view plays the clip for that gait at a speed that matches the ground speed, and tells the
  * game where the saddle is (the rider sits there, through every gait).
- *
- * Until Actors has node materials for fur (its fur shells are WebGL only), the coat is a plain colour.
+ * The coat is Actors' fur on node materials: the body in its coat colours and markings under a stack
+ * of fur shells (two shaders for every horse: each coat is an input of the shared graphs).
  */
-import { Group, Matrix4, Vector3, type Object3D, type WebGPURenderer, type Material, type Mesh } from 'three/webgpu';
+import { Group, Matrix4, Vector3, type Object3D, type WebGPURenderer, type Mesh } from 'three/webgpu';
 import { Animal } from '@actors/animal';
 import type { HorseCoat, HorseShape } from '@actors/animal';
-import { ThreeActor } from '@actors/three';
-import { nodeMaterials } from '@actors/three/webgpu';
+import { ThreeActor, createFurUniforms, setFurCoat } from '@actors/three';
+import { addNodeFurShells, animalNodeMaterials } from '@actors/three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 
 /** Where the build serves the horse pack (`npm run packs` fills public/packs). */
@@ -51,15 +51,14 @@ export class HorseView {
     for (let i = 0; i < count; i++) {
       const a = i === 0 ? lead : Animal.share(lead);
       a.setPreset(COATS[i % COATS.length]);
-      const actor = new ThreeActor(a.runtime, nodeMaterials, { reversedDepth });
+      const fur = createFurUniforms();
+      const actor = new ThreeActor(a.runtime, animalNodeMaterials(fur), { reversedDepth });
       // Tack first: the shape applies pending visibility, so its meshes exist before the warm-up compiles.
       for (const name of tack) actor.setVisible(name, true);
       actor.applyShape(await a.evaluate());
       actor.object.position.y = actor.groundOffset();
-      // The coat's own colour on the plain body (sRGB 0..1, as Actors' presets give it).
-      const body = actor.meshes.get('body');
-      const mat = body?.material as (Material & { color?: { setRGB(r: number, g: number, b: number, space: string): void } }) | undefined;
-      mat?.color?.setRGB(...a.coat.base, 'srgb');
+      setFurCoat(fur, a.coat as never, a.shape.size);
+      addNodeFurShells(actor, fur);
       const place = new Group();
       place.name = 'horse';
       place.add(actor.object);
@@ -68,7 +67,8 @@ export class HorseView {
       const index = f ? f.names.indexOf(seatBone) : -1;
       horses.push({ actor, place, act: '', seat: f && index >= 0 ? { index, head: new Vector3(...f.heads[index]) } : null });
     }
-    for (const o of horses) o.place.traverse((m) => { if ((m as Mesh).isMesh) (m as Mesh).castShadow = true; });
+    // (The fur shells cast no shadow: the body does.)
+    for (const o of horses) o.place.traverse((m) => { if ((m as Mesh).isMesh && !m.name.endsWith(':fur')) (m as Mesh).castShadow = true; });
     return new HorseView(lead, horses);
   }
 
