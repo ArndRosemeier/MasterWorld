@@ -9,6 +9,9 @@ import { interiorWorld, roomFrame, type RoomFrame } from '../game/interiorWorld'
 import type { WalkWorld } from '../game/walker';
 import { ROOM_DEPTH, type InteriorView } from '../render/town/InteriorView';
 import type { SkyView } from '../render/sky';
+import type { Placed } from '../render/folk/FolkView';
+import { roomCast } from '../sim/roomCast';
+import type { TownLife } from '../sim/townLife';
 import { Fade } from './fade';
 import type { Notes } from './notes';
 import type { Player } from './player';
@@ -16,7 +19,7 @@ import type { Player } from './player';
 /** What a room is called when one walks in. */
 const NAMES: Partial<Record<TownBuilding['kind'], string>> = { inn: 'the inn', smithy: 'the smithy', bakery: 'the bakery', temple: 'the temple', hall: 'the hall', mill: 'the mill', workshop: 'a workshop', stable: 'the stable' };
 
-interface Room { b: TownBuilding; plan: InteriorPlan; frame: RoomFrame; world: WalkWorld }
+interface Room { b: TownBuilding; plan: InteriorPlan; frame: RoomFrame; world: WalkWorld; floor: number }
 
 export class InteriorVisit {
   private room: Room | null = null;
@@ -44,7 +47,7 @@ export class InteriorVisit {
     await this.fade.swap(now, async () => {
       const plan = planInterior(b), y = b.floorY + ROOM_DEPTH, frame = roomFrame(b, { x: b.cx, z: b.cz });
       await this.view.show(plan, b, y);
-      this.room = { b, plan, frame, world: interiorWorld(plan, frame, y) };
+      this.room = { b, plan, frame, world: interiorWorld(plan, frame, y), floor: y };
       this.sky.indoors = true;
       // A light under the ceiling, nearer the back.
       const [lx, lz] = frame.toWorld(0, plan.hb * 0.2);
@@ -95,6 +98,16 @@ export class InteriorVisit {
     const { plan, frame, b } = this.room;
     const [a, bb] = frame.toRoom(w.pos.x, w.pos.z);
     if (Math.abs(a) < plan.doorW && bb < -plan.hb + 0.5 && fx * b.vx + fz * b.vz < -0.5) void this.leave();
+  }
+
+  /** The people the town has in this room now, placed on its spots (null: not in a room). */
+  people(life: TownLife): Placed[] | null {
+    const r = this.room;
+    if (!r) return null;
+    return roomCast(life.agents, life.spots, r.b.id, r.plan).map(({ agent, spot, act }) => {
+      const s = r.plan.spots[spot], [x, z] = r.frame.toWorld(s.a, s.b);
+      return { agent, x, y: r.floor, z, dir: r.frame.dirOf(s.yaw), act };
+    });
   }
 
   /** Where one stands outside the room's door (null: not in a room). */
