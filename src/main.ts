@@ -236,11 +236,20 @@ export async function start(b: Boot): Promise<void> {
       }
     }
 
-    // Every other door of the town opens on its room.
-    if (town) rooms = new InteriorVisit(town.plan.buildings, new Set(house ? [house.id] : []), new InteriorView(view.stage), player, view.lantern, view.sky, notes);
+    // Every door of the town opens on its room; the cellar's house has the hatch down.
+    const down = new Map<number, (before: () => void) => Promise<void>>();
+    if (visit && house) {
+      const v = visit;
+      down.set(house.id, (before) => v.enter(false, undefined, before));
+    }
+    if (town) rooms = new InteriorVisit(town.plan.buildings, down, new InteriorView(view.stage), player, view.lantern, view.sky, notes);
+    if (visit && rooms && house) {
+      const r = rooms;
+      visit.up = () => r.enter(house, true, true);
+    }
     if (rooms && town && params.room !== null) {
-      const b = town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
-      if (b) await rooms.enter(b, true);
+      const b = params.room === 'cellar' ? house : town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
+      if (b) await rooms.enter(b, true, params.room === 'cellar'); // the cellar: beside its hatch
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
 
