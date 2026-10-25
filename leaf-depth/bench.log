@@ -1,0 +1,22 @@
+start   webgpu  default   avg 3.66 p95 4.40 max 10.3 calls 282 tris 2.42M load 13.744s ready true errs 2
+start   webgpu  leafDepth=0 avg 7.60 p95 8.20 max 14.8 calls 264 tris 2.37M load 12.784s ready true errs 1
+start   webgpu  treeShadows=0 avg 3.13 p95 3.70 max 7.7 calls 230 tris 2.32M load 13.675s ready true errs 1
+start   webgpu  both=0    avg 7.02 p95 7.50 max 14.8 calls 212 tris 2.27M load 13.036s ready true errs 1
+start   webgpu  trees=0   avg 3.14 p95 3.50 max 9.0 calls 160 tris 2.18M load 10.306s ready true errs 1
+start   webgl2  default   avg 3.89 p95 6.40 max 14.7 calls 254 tris 6.99M load 19.005s ready true errs 1
+start   webgl2  leafDepth=0 avg 6.39 p95 12.10 max 24.7 calls 240 tris 6.53M load 11.912s ready true errs 1
+forest  webgpu  default   avg 7.84 p95 8.10 max 13.6 calls 281 tris 2.68M load 17.933s ready true errs 1
+forest  webgpu  leafDepth=0 avg 7.92 p95 8.60 max 16.1 calls 263 tris 2.63M load 16.089s ready true errs 1
+forest  webgpu  treeShadows=0 avg 7.78 p95 8.30 max 16.2 calls 229 tris 2.59M load 17.428s ready true errs 1
+forest  webgpu  both=0    avg 7.76 p95 8.20 max 16.1 calls 211 tris 2.53M load 15.779s ready true errs 1
+forest  webgpu  trees=0   avg 6.64 p95 7.00 max 13.3 calls 159 tris 2.44M load 10.243s ready true errs 1
+forest  webgl2  default   avg 6.66 p95 12.80 max 30.3 calls 253 tris 7.25M load 8.416s ready true errs 1
+forest  webgl2  leafDepth=0 avg 6.69 p95 7.50 max 33.6 calls 239 tris 6.79M load 8.425s ready true errs 1
+close   webgpu  default   avg 3.42 p95 4.00 max 9.5 calls 281 tris 2.73M load 13.32s ready true errs 1
+close   webgpu  leafDepth=0 avg 5.51 p95 6.10 max 11.7 calls 263 tris 2.68M load 12.292s ready true errs 1
+close   webgpu  treeShadows=0 avg 2.96 p95 3.60 max 8.3 calls 229 tris 2.64M load 13.314s ready true errs 1
+close   webgpu  both=0    avg 5.00 p95 5.40 max 10.8 calls 211 tris 2.58M load 11.966s ready true errs 1
+close   webgpu  trees=0   avg 2.68 p95 3.10 max 8.9 calls 159 tris 2.49M load 10.286s ready true errs 1
+close   webgl2  default   avg 3.78 p95 6.30 max 14.8 calls 253 tris 7.46M load 7.806s ready true errs 1
+close   webgl2  leafDepth=0 avg 5.02 p95 5.80 max 25.3 calls 239 tris 6.97M load 7.87s ready true errs 1
+{"ua":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36","webgpu":{"vendor":"nvidia","arch":"blackwell","device":"","desc":""},"webgl":"ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)","version":"155.0.8059.80"}
