@@ -3,9 +3,9 @@
  * swaps to a new set only once all of it is ready, so the ground never shows holes. Every chunk enters
  * the scene through the Stage and shares the TERRAIN kind's one shader.
  */
-import { BufferAttribute, BufferGeometry, Mesh, type Camera } from 'three/webgpu';
+import { BufferAttribute, BufferGeometry, type Camera, type Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import { CANOPY_RISE, TERRAIN } from '../materials';
+import { CANOPY_RISE, TERRAIN, kindMesh } from '../materials';
 import { chunkIndex, type ChunkMesh } from '../../world/chunkMesh';
 import type { TerrainJobs } from '../../workers/pool';
 import { SEGS, chunkId, chunkSize, selectChunks, type ChunkKey } from './lod';
@@ -119,11 +119,5 @@ export function groundMesh(m: Pick<ChunkMesh, 'position' | 'normal' | 'color' | 
   g.computeBoundingSphere();
   // The canopy rises over the ground far away (materials.ts): room for it in the bounds.
   g.boundingSphere!.radius += CANOPY_RISE;
-  const mesh = new Mesh(g, TERRAIN.make());
-  mesh.position.set(x, 0, z);
-  mesh.castShadow = TERRAIN.shadow.cast;
-  mesh.receiveShadow = TERRAIN.shadow.receive;
-  mesh.matrixAutoUpdate = false;
-  mesh.updateMatrix();
-  return mesh;
+  return kindMesh(g, TERRAIN, x, 0, z);
 }

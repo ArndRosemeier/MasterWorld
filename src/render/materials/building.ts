@@ -1,0 +1,32 @@
+// @ts-nocheck -- TSL node math; checked by rendering it (npm run shot).
+/**
+ * The town's buildings: one shader for every building mesh (TownView). Each vertex names its material
+ * (`mat`, @futuremagic/settlement's BuildingMat: plaster, rubble, oak, thatch, tile ...), which picks the
+ * layer of the town texture array; `tint` (sRGB) colours it: lime washes, timber stains, glass. Texture
+ * coordinates are in metres and scaled per layer. Rain darkens and wets the walls and roofs.
+ */
+import { MeshPhysicalNodeMaterial } from 'three/webgpu';
+import { attribute, float, int, mix, normalMap, pow, round, texture, uniformArray, vec3 } from 'three/tsl';
+import { defineKind } from '../materials';
+import { TOWN_TILE_METERS } from '../terrain/groundTextures';
+import { townTextures } from './townGround';
+import { WEATHER } from './weather';
+
+export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat', 'tint'], () => {
+  const { albedo: A, normal: N } = townTextures();
+  const m = new MeshPhysicalNodeMaterial({ roughness: 0.9, metalness: 0, specularIntensity: 0.35 });
+  const layer = int(round(attribute('mat', 'float')));
+  const scale = uniformArray(TOWN_TILE_METERS.map((w) => 1 / w), 'float');
+  const st = attribute('uv', 'vec2').mul(scale.element(layer));
+  const a = texture(A).sample(st).depth(layer), n = texture(N).sample(st).depth(layer);
+  // Tint is sRGB (0..1 after normalising); the texture is already linear.
+  const tint = pow(attribute('tint', 'vec3'), vec3(2.2));
+  const wet = WEATHER.wet;
+  m.colorNode = a.rgb.mul(tint).mul(mix(float(1), float(0.65), wet)).mul(n.a.mul(0.6).add(0.4));
+  m.roughnessNode = mix(a.a, a.a.mul(0.45), wet);
+  m.aoNode = n.a;
+  const xy = n.xy.mul(2).sub(1);
+  const z = float(1).sub(xy.dot(xy)).max(0).sqrt();
+  m.normalNode = normalMap(vec3(n.xy, z.mul(0.5).add(0.5)));
+  return m;
+});

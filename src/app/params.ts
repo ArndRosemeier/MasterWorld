@@ -22,6 +22,8 @@ export const params = {
   trees: q.get('trees') !== '0',
   /** Draw the grass (`grass=0` leaves it out, for quick screenshots). */
   grass: q.get('grass') !== '0',
+  /** Draw the town's buildings (`town=0` leaves them out, for comparisons). */
+  town: q.get('town') !== '0',
   /** Weather everywhere, all the time (a VGM order): clear, fair, overcast, rain, storm, fog, snow. */
   weather: q.get('weather'),
   /** Setting module id. */

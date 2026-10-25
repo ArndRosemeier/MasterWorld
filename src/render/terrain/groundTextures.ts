@@ -3,8 +3,9 @@
  * texture arrays (albedo + roughness, normal + height + AO), one layer per natural surface.
  */
 import { DataArrayTexture, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RGBAFormat, RepeatWrapping, SRGBColorSpace, UnsignedByteType } from 'three/webgpu';
-import { NATURAL_LAYER_COUNT } from '@futuremagic/texgen';
+import { FACADE_TILE_METERS, GROUND_TILE_METERS, MEDIEVAL_NAMES, MEDIEVAL_TILE_METERS, NATURAL_LAYER_COUNT } from '@futuremagic/texgen';
 import type { TexturePool } from '../../workers/pool';
+import type { TextureSet } from '../../workers/texture.worker';
 
 export interface GroundTextures {
   /** RGB = albedo (sRGB), A = roughness. */
@@ -27,10 +28,45 @@ function arrayTexture(data: Uint8Array, size: number, layers: number, srgb: bool
   return t;
 }
 
-export async function loadGroundTextures(pool: TexturePool, size = 512): Promise<GroundTextures> {
-  const layers = await Promise.all(Array.from({ length: NATURAL_LAYER_COUNT }, (_, layer) => pool.run({ layer, size })));
+/** Generate layers in the texture workers and pack them into the two arrays. */
+async function loadLayers(pool: TexturePool, jobs: readonly { set: TextureSet; layer: number }[], size: number): Promise<GroundTextures> {
+  const layers = await Promise.all(jobs.map((j) => pool.run({ ...j, size })));
   const px = size * size * 4;
   const albedo = new Uint8Array(px * layers.length), normal = new Uint8Array(px * layers.length);
   layers.forEach((l, i) => { albedo.set(l.albedo, i * px); normal.set(l.normal, i * px); });
   return { albedo: arrayTexture(albedo, size, layers.length, true), normal: arrayTexture(normal, size, layers.length, false) };
+}
+
+export function loadGroundTextures(pool: TexturePool, size = 512): Promise<GroundTextures> {
+  return loadLayers(pool, Array.from({ length: NATURAL_LAYER_COUNT }, (_, layer) => ({ set: 'natural' as const, layer })), size);
+}
+
+const MED = (name: string): { set: TextureSet; layer: number } => {
+  const layer = MEDIEVAL_NAMES.indexOf(name);
+  if (layer < 0) throw new Error(`texgen has no medieval layer "${name}"`);
+  return { set: 'medieval', layer };
+};
+/** texgen facade layers used in towns (FACADE_WALLS then ROOFS order). */
+const FACADE = { limestone: 4, plaster: 6, clayTile: 17, slate: 18 };
+/** texgen ground layers used in towns (GROUNDS order). */
+const GROUND = { cobble: 5, dirt: 11 };
+
+/**
+ * The town's layers: first one per BuildingMat (@futuremagic/settlement, in its order), then the town's
+ * ground (TOWN_GROUND_LAYER).
+ */
+export const TOWN_LAYERS: readonly { set: TextureSet; layer: number }[] = [
+  { set: 'facade', layer: FACADE.plaster }, MED('rubble'), { set: 'facade', layer: FACADE.limestone }, MED('oak'), MED('thatch'),
+  { set: 'facade', layer: FACADE.clayTile }, { set: 'facade', layer: FACADE.slate }, MED('shingle'), MED('leaded'),
+  { set: 'ground', layer: GROUND.cobble }, { set: 'ground', layer: GROUND.dirt },
+];
+/** Where the town's ground layers sit in TOWN_LAYERS: cobbles (streets and market) and trodden earth (yards). */
+export const TOWN_GROUND_LAYER = { cobble: 9, dirt: 10 };
+
+const TILE: Record<TextureSet, readonly number[]> = { facade: FACADE_TILE_METERS, ground: GROUND_TILE_METERS, medieval: MEDIEVAL_TILE_METERS, natural: [] };
+/** Metres one tile of each TOWN_LAYERS layer covers. */
+export const TOWN_TILE_METERS: readonly number[] = TOWN_LAYERS.map((l) => TILE[l.set][l.layer]);
+
+export function loadTownTextures(pool: TexturePool, size = 512): Promise<GroundTextures> {
+  return loadLayers(pool, TOWN_LAYERS, size);
 }
