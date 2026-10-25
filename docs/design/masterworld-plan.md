@@ -300,12 +300,26 @@ The purpose also tells the Director what to hint ("the dwarves sealed the lower 
 
 ### 8.1 Against formula (D39)
 
-Dungeon generators turn formulaic easily: after the third crypt the player has seen them all. This needs real effort, and is its own design topic (O16). Starting points:
+Dungeon generators turn formulaic easily: after the third crypt the player has seen them all. Eight layers work against it ([full write-up](https://claude.ai/artifact/AekqvbH369xW1pu8QrfgKN)):
 
-* **Story in the place**: every dungeon has a history from its purpose and the canon (who built it, what went wrong, who lives there now), told by its rooms: the dwarves' last stand at the barricade, the smugglers' ledger.
-* **Set pieces**: a growing library of hand-designed memorable rooms and moments (a flooded hall, a collapsing bridge, a sleeping giant) that the generator places where they fit. A dungeon should have at least one.
-* **Many grammars, not one**: each kind has its own layout rules, and inside a kind several variants.
-* **A variety check**, like the "nobody stands around" test: generate many dungeons of one kind and measure how alike they are (layout graphs, set pieces, dressing). It fails when they drift together.
+1. **History first.** The generator writes the place's past as layers of occupation (who built it and why, what went wrong, who moved in after, who is there now). Each layer leaves rooms and traces: original halls, collapse, rooms re-used (a chapel turned goblin kitchen), a barricade from a last stand. The same history feeds the VGM's hints in town.
+2. **Cycles, not trees.** Layouts are built from loops (as in *Unexplored*): a key on a loop around its door, the goal seen across a chasm long before you reach it, a hidden way back, a shortcut that opens once you've gone around. A library of 15–20 cycle patterns, two or three combined per dungeon.
+3. **Set pieces.** A growing library of hand-designed moments with their requirements (a flooded hall, a collapsing bridge, a sleeping giant, a ward wall that the right item breaks). At least one signature set piece per dungeon; none repeats until the library has been used through.
+4. **Space, not boxes.** Full 3D: galleries over halls, chasms, collapsed floors, rising water, SDF caves blended into built rooms. Each kind has its own space rules.
+5. **Living inhabitants.** The world simulation runs inside (D27): kitchens, sleeping quarters, guard shifts; they raise the alarm, flee for help, barricade doors.
+6. **Mechanics with tells.** Traps you can spot, levers and water, light and darkness, wards that only the right school or item opens (D31), secrets that reward looking.
+7. **Pacing.** A tension curve in every dungeon: a quiet entrance with foreshadowing, rising danger, one safe spot, a reveal, the climax, a shortcut back out.
+8. **Small and dense.** Most dungeons take 15–40 minutes; bigger ones are several connected parts with their own stories.
+
+Arnd's rules (2026-10-25):
+
+* **A world, not a game.** No gamey puzzles. A puzzle exists only with a very good in-world reason, and then it is a detective puzzle, never an infantile one: reading the clues the place's history left (whose grave is missing, why the water channel was blocked, which ledger entry is a lie).
+* **Repopulation.** A cleared or half-cleared dungeon can be moved into again, as a story event (D10): the goblins' cousins come back, something worse finds the empty halls.
+* **Breaking expectations, rarely.** Monsters mostly fight, but now and then one surprises: a goblin who speaks broken Common and begs for mercy, a kobold who wants to trade.
+
+**Checked, not hoped for**: a variety test generates many dungeons per kind and fails when layouts, set pieces, room shapes or dressing repeat too often, or a dungeon lacks a signature set piece, a safe spot, a shortcut out, or traces of its history. A small sample runs in `npm test`; the full sweep is a slow script.
+
+**Order of work**: milestone 3's cellar uses layers 1, 2, 7 and 8 and one set piece; the other layers grow with each new dungeon kind.
 
 ---
 
@@ -589,7 +603,7 @@ StarLord's title is the bar: the game's own world, alive, playful, new every sta
 | O8 | ~~Which Norgo code is ported?~~ | **Decided** (D15): the GM is inspiration only. Skills, abilities and the worker split are candidates to port. |
 | O9 | ~~Footprint rules~~ | **Decided** (section 7): hard land wins, then the older decision; settlements and roads beat vegetation. |
 | O15 | Free LLMs through `freeryder` | **Parked** (Arnd, 2026-10-25): not sure it belongs in MasterWorld at all. |
-| O16 | Dungeons that don't feel formulaic | D39, 8.1. Needs its own design round before milestone 3's cellar grows into more kinds. |
+| O16 | ~~Dungeons that don't feel formulaic~~ | **Decided** (D39, 8.1): eight layers, detective puzzles only, repopulation, rare surprises. |
 | O17 | ~~The interface's design language~~ | **Decided** (D45, 17.1): warded brass. Each window's signature still to be mocked up. |
 | O18 | ~~The title animation~~ | **Decided** (D46, 17.2). |
 
