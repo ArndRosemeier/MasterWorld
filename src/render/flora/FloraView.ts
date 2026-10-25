@@ -2,13 +2,15 @@
  * Trees and shrubs around the camera (@futuremagic/vegetation models, drawn instanced). Placements come
  * from the world worker (world/flora.ts) in square cells: near cells hold every plant, far cells a thinned
  * set of bigger stand-ins. Up close a tree is its full model (wood and leaf cards); further out its far
- * canopy hull; past the near cells only the far cells' hulls remain.
+ * canopy hull; past the near cells only the far cells' hulls remain. The levels, and on WebGPU the culling to the
+ * view (and to shadows falling into it), are @futuremagic/instances'.
  */
-import { Group, Matrix4, Mesh, Quaternion, Vector3, type BufferGeometry, type InstancedBufferGeometry, type InstancedInterleavedBuffer, type Material } from 'three/webgpu';
-import { shrubModel, treeModel, vegetationUniforms, type TreeModel, type TreeSpecies } from '@futuremagic/vegetation';
-import { batchCap, createBarkMaterial, createFarTreeMaterial, createLeafMaterial, instancedGeometry } from '@futuremagic/vegetation/node';
+import { Matrix4, Mesh, Quaternion, Vector3, type BufferGeometry, type Camera, type DirectionalLight, type InstancedBufferGeometry, type Material } from 'three/webgpu';
+import { shrubModel, treeModel, vegetationUniforms, type TreeSpecies } from '@futuremagic/vegetation';
+import { createBarkMaterial, createFarTreeMaterial, createLeafMaterial } from '@futuremagic/vegetation/node';
+import { createInstanceDraws, DITHER, KIND, RECORD, type DrawKind, type DrawPart, type InstanceDraws } from '@futuremagic/instances';
 import type { Stage } from '@futuremagic/stage';
-import { hash2f, smoothstep } from '@futuremagic/core';
+import { hash2f } from '@futuremagic/core';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING } from '../../world/flora';
 import { until, type WorldJobs } from '../../workers/pool';
 import { WOODS } from '../materials';
@@ -23,56 +25,52 @@ const FULL = 60;
 const HULL_END = FAR_REACH * FAR_CELL - 24;
 /** Over this last stretch (m) the hulls thin out at random as the canopy rises, so the woods have no edge where they hand over. */
 const HULL_THIN = 300;
+/** How far a tree's shadow reaches (m): trees just out of view whose shadows fall into it stay drawn. */
+const SHADOW_REACH = 80;
 
 interface Cell { pending: boolean; data: Float32Array | null }
-/** One batch: a model part drawn once per instance (matrices in an instanced geometry attribute). */
-interface Part { geo: BufferGeometry; mat: Material; mesh: Mesh<InstancedBufferGeometry>; matrices: Float32Array; buffer: InstancedInterleavedBuffer; cap: number; n: number }
 
 export class FloraView {
-  readonly group = new Group();
   private readonly near = new Map<string, Cell>();
   private readonly far = new Map<string, Cell>();
-  private readonly models: TreeModel[];
-  /** Per kind: full model parts (wood, leaves) and the hull (null for shrubs). */
-  private readonly full: Part[][];
-  private readonly hull: (Part | null)[];
+  /** Every plant as an instance; levels (full model, hull) and, on WebGPU, view culling done there. */
+  readonly draws: InstanceDraws;
+  private readonly hasHull: boolean[];
   private center = { i: NaN, j: NaN };
-  /** Where the camera was at the last rebuild (full models follow it). */
-  private readonly at = new Vector3(Infinity, 0, 0);
   private dirty = true;
+  private records = new Float32Array(0);
+  private readonly sunDir = new Vector3(0, -1, 0);
   private readonly m = new Matrix4();
   private readonly q = new Quaternion();
   private readonly v = new Vector3();
   private readonly s = new Vector3();
   private readonly up = new Vector3(0, 1, 0);
 
-  constructor(private readonly stage: Stage, private readonly jobs: WorldJobs) {
+  constructor(private readonly stage: Stage, private readonly jobs: WorldJobs, private readonly sun?: DirectionalLight) {
     WOODS.band.value.set(HULL_END - HULL_THIN, HULL_END);
     const U = vegetationUniforms;
     const bark = createBarkMaterial(U), leaf = createLeafMaterial(U, false), needles = createLeafMaterial(U, true), hull = createFarTreeMaterial(U);
     // The hulls' baked colours read lighter than the leaf cards they stand in for.
     hull.color.setScalar(0.75);
-    this.models = FLORA_KINDS.map((k) => (k.species === 'shrub' ? shrubModel(k.variant) : treeModel(k.species as TreeSpecies, k.variant)));
-    this.full = this.models.map((m, k) => [this.part(m.wood, bark, 64, true), this.part(m.leaves, FLORA_KINDS[k].conifer ? needles : leaf, 64, true)]);
-    this.hull = this.models.map((m) => (m.isShrub ? null : this.part(m.far, hull, 512, true)));
-    this.group.name = 'flora';
+    const part = (geometry: BufferGeometry, material: Material): DrawPart => ({ geometry, material, castShadow: true, receiveShadow: true });
+    const kinds: DrawKind[] = FLORA_KINDS.map((k) => {
+      const m = k.species === 'shrub' ? shrubModel(k.variant) : treeModel(k.species as TreeSpecies, k.variant);
+      const lods: DrawKind['lods'] = [{ far: FULL, parts: [part(m.wood, bark), part(m.leaves, k.conifer ? needles : leaf)] }];
+      if (!m.isShrub) lods.push({ near: FULL, far: HULL_END, fade: [HULL_END - HULL_THIN, HULL_END], parts: [part(m.far, hull)] });
+      return { lods };
+    });
+    this.hasHull = kinds.map((k) => k.lods.length > 1);
+    this.draws = createInstanceDraws(stage.renderer, kinds, { horizontal: true, shadow: { dir: this.sunDir, reach: SHADOW_REACH }, capacity: 16384 });
+    this.draws.group.name = 'flora';
   }
 
-  private part(geo: BufferGeometry, mat: Material, cap: number, shadow: boolean): Part {
-    const { geometry, matrices, buffer } = instancedGeometry(geo, cap);
-    const mesh = new Mesh(geometry, mat);
-    mesh.frustumCulled = false;
-    mesh.castShadow = shadow;
-    mesh.receiveShadow = true;
-    this.group.add(mesh);
-    return { geo, mat, mesh, matrices, buffer, cap, n: 0 };
-  }
+  get group() { return this.draws.group; }
 
   /** Placements for the start, before the first frame. */
   async placeStart(cam: Vector3): Promise<void> {
     this.follow(cam);
     await until(() => [...this.near.values(), ...this.far.values()].every((c) => c.data));
-    this.rebuild(cam);
+    this.rebuild();
   }
 
   /** Cells around the camera: asks for the missing ones. */
@@ -108,80 +106,58 @@ export class FloraView {
     }
   }
 
-  update(dt: number, cam: Vector3): void {
+  update(dt: number, camera: Camera): void {
     vegetationUniforms.uTime.value += dt;
-    this.follow(cam);
-    if (this.dirty || Math.hypot(cam.x - this.at.x, cam.z - this.at.z) > 8) this.rebuild(cam);
+    this.follow(camera.position);
+    if (this.dirty) this.rebuild();
+    if (this.sun) this.sunDir.subVectors(this.sun.target.position, this.sun.position).normalize();
+    this.draws.update(camera);
   }
 
-  /** Every instance anew, around the camera's current cell. */
-  private rebuild(cam: Vector3): void {
+  /** Every plant anew, around the camera's current cell (the draws pick each one's level). */
+  private rebuild(): void {
     this.dirty = false;
-    this.at.copy(cam);
-    for (const parts of this.full) for (const p of parts) p.n = 0;
-    for (const p of this.hull) if (p) p.n = 0;
+    let n = 0;
     const cx = (this.center.i + 0.5) * NEAR_CELL, cz = (this.center.j + 0.5) * NEAR_CELL;
     const nearHalf = (NEAR_REACH + 0.5) * NEAR_CELL;
+    const add = (d: Float32Array, keep: (x: number, z: number, kind: number) => boolean) => {
+      if (this.records.length < (n + d.length / FLORA_STRIDE) * RECORD) {
+        const grown = new Float32Array(Math.ceil((n + d.length / FLORA_STRIDE) * 1.5) * RECORD);
+        grown.set(this.records.subarray(0, n * RECORD));
+        this.records = grown;
+      }
+      for (let r = 0; r < d.length; r += FLORA_STRIDE) {
+        const x = d[r], y = d[r + 1], z = d[r + 2], scale = d[r + 3], yaw = d[r + 4], kind = d[r + 5];
+        if (!keep(x, z, kind)) continue;
+        this.m.compose(this.v.set(x, y, z), this.q.setFromAxisAngle(this.up, yaw), this.s.setScalar(scale));
+        const o = n++ * RECORD;
+        this.m.toArray(this.records, o);
+        this.records[o + KIND] = kind;
+        this.records[o + DITHER] = hash2f(7, Math.round(x * 8), Math.round(z * 8));
+      }
+    };
     for (const [key, c] of this.near) {
       if (!c.data) continue;
       const [i, j] = key.split(',').map(Number);
       if (Math.max(Math.abs(i - this.center.i), Math.abs(j - this.center.j)) > NEAR_REACH) continue;
-      this.place(c.data, (x, z, kind) => {
-        const full = Math.hypot(x - cam.x, z - cam.z) < FULL;
-        return full ? this.full[kind] : this.hull[kind] ? [this.hull[kind]!] : [];
-      });
+      add(c.data, () => true);
     }
+    // The near cells cover their square; far stand-ins (trees, drawn as hulls) only outside it.
     for (const c of this.far.values()) {
-      if (!c.data) continue;
-      // The near cells cover their square; far stand-ins only outside it, and only up to where the ground's
-      // canopy has taken over (a circle, so the woods never end in a square).
-      this.place(c.data, (x, z, kind) => {
-        if (Math.max(Math.abs(x - cx), Math.abs(z - cz)) < nearHalf || !this.hull[kind]) return [];
-        const thin = smoothstep(HULL_END - HULL_THIN, HULL_END, Math.hypot(x - cam.x, z - cam.z));
-        return thin > 0 && hash2f(7, Math.round(x * 8), Math.round(z * 8)) < thin ? [] : [this.hull[kind]!];
-      });
+      if (c.data) add(c.data, (x, z, kind) => this.hasHull[kind] && Math.max(Math.abs(x - cx), Math.abs(z - cz)) >= nearHalf);
     }
-    for (const parts of this.full) for (const p of parts) this.finish(p);
-    for (const p of this.hull) if (p) this.finish(p);
-  }
-
-  private place(d: Float32Array, parts: (x: number, z: number, kind: number) => Part[]): void {
-    for (let r = 0; r < d.length; r += FLORA_STRIDE) {
-      const x = d[r], y = d[r + 1], z = d[r + 2], scale = d[r + 3], yaw = d[r + 4], kind = d[r + 5];
-      const ps = parts(x, z, kind);
-      if (!ps.length) continue;
-      this.m.compose(this.v.set(x, y, z), this.q.setFromAxisAngle(this.up, yaw), this.s.setScalar(scale));
-      for (const p of ps) {
-        if (p.n >= p.cap) this.grow(p);
-        this.m.toArray(p.matrices, p.n++ * 16);
-      }
-    }
-  }
-
-  /** A full batch: a bigger mesh of the same geometry and material (same shaders, nothing to build). */
-  private grow(p: Part): void {
-    const old = p.mesh;
-    const cap = batchCap(p.cap + 1);
-    const { geometry, matrices, buffer } = instancedGeometry(p.geo, cap);
-    matrices.set(p.matrices);
-    old.geometry.dispose();
-    old.geometry = geometry;
-    Object.assign(p, { matrices, buffer, cap });
-  }
-
-  private finish(p: Part): void {
-    p.mesh.geometry.instanceCount = p.n;
-    p.buffer.needsUpdate = true;
+    this.draws.set(this.records, n);
   }
 
   /** Put the plants into the scene once their shaders are built. */
   async show(): Promise<void> {
+    await this.draws.ready();
     // Every batch is built now, also those of kinds not around yet (one instance each while it builds).
-    const parts = [...this.full.flat(), ...this.hull.filter((p): p is Part => !!p)];
-    const counts = parts.map((p) => p.mesh.geometry.instanceCount);
-    for (const p of parts) p.mesh.geometry.instanceCount = Math.max(1, p.mesh.geometry.instanceCount);
+    const meshes = this.group.children.filter((o): o is Mesh<InstancedBufferGeometry> => (o as Mesh).isMesh);
+    const counts = meshes.map((m) => m.geometry.instanceCount);
+    for (const m of meshes) m.geometry.instanceCount = Math.max(1, m.geometry.instanceCount);
     await this.stage.prepare(this.group);
-    parts.forEach((p, k) => { p.mesh.geometry.instanceCount = counts[k]; });
+    meshes.forEach((m, k) => { m.geometry.instanceCount = counts[k]; });
     await this.stage.add(this.group);
   }
 }
