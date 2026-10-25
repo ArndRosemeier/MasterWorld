@@ -52,8 +52,9 @@ export class HorseView {
       const a = i === 0 ? lead : Animal.share(lead);
       a.setPreset(COATS[i % COATS.length]);
       const actor = new ThreeActor(a.runtime, nodeMaterials, { reversedDepth });
-      actor.applyShape(await a.evaluate());
+      // Tack first: the shape applies pending visibility, so its meshes exist before the warm-up compiles.
       for (const name of tack) actor.setVisible(name, true);
+      actor.applyShape(await a.evaluate());
       actor.object.position.y = actor.groundOffset();
       // The coat's own colour on the plain body (sRGB 0..1, as Actors' presets give it).
       const body = actor.meshes.get('body');
@@ -73,8 +74,11 @@ export class HorseView {
 
   get drawn(): number { return this.horses.length; }
 
-  /** What the warm-up compiles (every horse is made of the same kinds: the first is enough). */
-  warmObjects(): Object3D[] { return this.horses.slice(0, 1).map((h) => h.place); }
+  /**
+   * What the warm-up compiles: every horse. Their materials are cache hits after the first, but each
+   * skinned mesh gets shadow-pass shaders of its own, which would otherwise build in play.
+   */
+  warmObjects(): Object3D[] { return this.horses.map((h) => h.place); }
 
   /** Into the scene, after the warm-up (each compiled on the way, cache hits after the first). */
   async show(stage: Stage): Promise<void> {
