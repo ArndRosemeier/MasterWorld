@@ -34,5 +34,29 @@
   {
     "key": "same name: masterworld/render/flora/FloraView.ts#update + masterworld/render/hero/HeroView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (plant cells and their draws vs the hero's pose); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#enter + masterworld/app/interiorVisit.ts#enter",
+    "reason": "Two spaces behind a door (the cellar's dungeon space, a building's room) going in; the fade they share is app/fade.ts, the notes app/notes.ts. The cellar becomes a hatch in its house's room later, then one goes."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#leave + masterworld/app/interiorVisit.ts#leave",
+    "reason": "Two spaces behind a door going out; shared parts in app/fade.ts. Folded when the cellar becomes a hatch in its house's room."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/app/interiorVisit.ts#update",
+    "reason": "Per-frame door checks of two different spaces (dungeon cells vs a room plan); shared parts in app/fade.ts. Folded when the cellar becomes a hatch in its house's room."
+  },
+  {
+    "key": "same name: masterworld/app/interiorVisit.ts#update + masterworld/app/player.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (going in and out of rooms vs the player); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/interiorVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (going in and out of rooms vs chunk selection); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/dungeonWorld.ts#waterLevel + masterworld/game/interiorWorld.ts#waterLevel",
+    "reason": "Both implement the WalkWorld interface (game/walker.ts): no water below ground or indoors."
   }
 ]
