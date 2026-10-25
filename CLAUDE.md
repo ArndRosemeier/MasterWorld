@@ -5,7 +5,7 @@
 3. **Tests follow [docs/CHECKS.md](docs/CHECKS.md):** at most 5 s per test, 60 s for all of `npm test`. Browser and other slow checks are separate scripts, at most 5 min each.
 4. **No duplicates:** search before writing a helper; run `npm run dup` and `npm run repeated` (toolbox finders in `tools/`). Every PR description has a `COPIES:` line.
 5. **No `Math.random`.** Every random number comes from a seed.
-6. **PRs are merged to `main` automatically** once `npm test` is green.
+6. **PRs are merged to `main` automatically** once CI (`.github/workflows/ci.yml`: `npm test` and `npm run build`) is green.
 7. **Shared code comes from packages** (D23): `@futuremagic/core` and `@futuremagic/stage` from the AssetGenerator submodule (`vendor/assetgenerator`, clone with `--recurse-submodules`). Do not copy their code.
 8. **Layers** are in `tools/guards/rules.json`: `src/world`, `src/setting` and `src/vgm` are pure (no three.js), so they run in workers and tests.
 
