@@ -19,5 +19,5 @@ serve<TerrainJob, TerrainResult>((job) => {
     return { result: meshes, transfer: meshes.flatMap((m) => [m.position.buffer, m.normal.buffer, m.color.buffer, m.surface.buffer, m.index.buffer]) };
   }
   const mesh = buildChunk(terrain, job);
-  return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer] };
+  return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer, mesh.canopy.buffer] };
 });

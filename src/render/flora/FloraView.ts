@@ -10,6 +10,7 @@ import { batchCap, createBarkMaterial, createFarTreeMaterial, createLeafMaterial
 import type { Stage } from '@futuremagic/stage';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING } from '../../world/flora';
 import { until, type WorldJobs } from '../../workers/pool';
+import { WOODS } from '../materials';
 
 /** Near cells: side (m) and how many around the camera's cell either way. */
 const NEAR_CELL = 64, NEAR_REACH = 6;
@@ -17,6 +18,8 @@ const NEAR_CELL = 64, NEAR_REACH = 6;
 const FAR_CELL = 512, FAR_REACH = 2, FAR_SPACING = 16;
 /** Full models within this distance (m), hulls beyond. Shrubs end here too. */
 const FULL = 60;
+/** Hulls end here (m); the ground's canopy (materials.ts WOODS) rises over the last 200 m before. Within what the far cells always cover. */
+const HULL_END = FAR_REACH * FAR_CELL - 24;
 
 interface Cell { pending: boolean; data: Float32Array | null }
 /** One batch: a model part drawn once per instance (matrices in an instanced geometry attribute). */
@@ -41,6 +44,7 @@ export class FloraView {
   private readonly up = new Vector3(0, 1, 0);
 
   constructor(private readonly stage: Stage, private readonly jobs: WorldJobs) {
+    WOODS.band.value.set(HULL_END - 200, HULL_END);
     const U = vegetationUniforms;
     const bark = createBarkMaterial(U), leaf = createLeafMaterial(U, false), needles = createLeafMaterial(U, true), hull = createFarTreeMaterial(U);
     // The hulls' baked colours read lighter than the leaf cards they stand in for.
@@ -126,8 +130,9 @@ export class FloraView {
     }
     for (const c of this.far.values()) {
       if (!c.data) continue;
-      // The near cells cover their square; far stand-ins only outside it.
-      this.place(c.data, (x, z, kind) => (Math.max(Math.abs(x - cx), Math.abs(z - cz)) < nearHalf || !this.hull[kind] ? [] : [this.hull[kind]!]));
+      // The near cells cover their square; far stand-ins only outside it, and only up to where the ground's
+      // canopy has taken over (a circle, so the woods never end in a square).
+      this.place(c.data, (x, z, kind) => (Math.max(Math.abs(x - cx), Math.abs(z - cz)) < nearHalf || !this.hull[kind] || Math.hypot(x - cam.x, z - cam.z) > HULL_END ? [] : [this.hull[kind]!]));
     }
     for (const parts of this.full) for (const p of parts) this.finish(p);
     for (const p of this.hull) if (p) this.finish(p);
