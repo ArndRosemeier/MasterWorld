@@ -6,7 +6,7 @@ export const params = {
   seed: q.get('seed') ?? 'masterworld',
   /** Draw with WebGL 2 even where WebGPU exists. */
   gl: q.has('gl'),
-  /** Show the HUD line (shader policy, frame time). */
+  /** Show the HUD line (shader policy, frame time), whatever the settings say. */
   hud: q.has('hud'),
   /** The free camera instead of the hero (for looking at the land). */
   fly: q.has('fly'),
@@ -16,8 +16,8 @@ export const params = {
   look: q.get('look')?.split(',').map(Number) ?? null,
   /** Time of day at the start, hours 0..24. */
   hour: Number(q.get('hour') ?? 16),
-  /** Real minutes per game day; 0 stops the clock. */
-  dayMinutes: Number(q.get('day') ?? 0),
+  /** Real minutes per game day; 0 stops the clock (null: from the settings). */
+  dayMinutes: q.has('day') ? Number(q.get('day')) : null,
   /** Grow the trees (`trees=0` leaves them out, for quick screenshots). */
   trees: q.get('trees') !== '0',
   /** Draw the grass (`grass=0` leaves it out, for quick screenshots). */

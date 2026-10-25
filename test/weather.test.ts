@@ -90,6 +90,8 @@ test('weather: the VGM orders a storm here; it rolls in, holds and clears, and e
   assert.ok(here(33.5).storm < 0.5, 'and clears');
   assert.equal(orderWeight({ kind: 'fog', from: 0, to: 1, strength: 0.5 }, 0, 0, 0.5), 0.5);
   assert.throws(() => w.order({ kind: 'storm', from: 2, to: 1 }));
+  w.cancel(31);
+  assert.equal(here(31).storm, plain.state(at.x, at.z, 31).storm, 'a withdrawn order is gone');
 });
 
 test('weather: presets say what they are', () => {

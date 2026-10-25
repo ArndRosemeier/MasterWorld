@@ -1,30 +1,52 @@
 /**
- * A free camera for looking at the land until the player walks (milestone 1): WASD to move, Shift fast,
- * Space/C up and down, right mouse button held to look. Never goes below the ground.
+ * A free camera for looking at the land (F in game, `?fly` from the start): WASD to move, Shift fast,
+ * Space/C up and down, the wheel sets the speed, right mouse button held to look. Never goes below the
+ * ground. Takes input only while `active`.
  */
 import { Euler, Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { lookFromDegrees } from './look';
 
 export class FlyCamera {
-  private yaw = 0;
-  private pitch = 0;
+  /** Direction (rad), as the hero camera's. */
+  yaw = 0;
+  pitch = 0;
+  private on = false;
   private readonly keys = new Set<string>();
   private looking = false;
   speed = 30;
 
   constructor(private readonly camera: PerspectiveCamera, el: HTMLElement, private readonly groundAt: (x: number, z: number) => number) {
-    window.addEventListener('keydown', (e) => this.keys.add(e.code));
+    window.addEventListener('keydown', (e) => { if (this.on) this.keys.add(e.code); });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     el.addEventListener('contextmenu', (e) => e.preventDefault());
-    el.addEventListener('mousedown', (e) => { if (e.button === 2) { this.looking = true; void el.requestPointerLock?.(); } });
-    window.addEventListener('mouseup', (e) => { if (e.button === 2) { this.looking = false; document.exitPointerLock?.(); } });
+    el.addEventListener('mousedown', (e) => { if (this.on && e.button === 2) { this.looking = true; void el.requestPointerLock?.(); } });
+    window.addEventListener('mouseup', (e) => { if (this.looking && e.button === 2) { this.looking = false; document.exitPointerLock?.(); } });
     window.addEventListener('mousemove', (e) => {
       if (!this.looking) return;
       this.yaw -= e.movementX * 0.0025;
       this.pitch = Math.max(-1.5, Math.min(1.5, this.pitch - e.movementY * 0.0025));
       this.apply();
     });
-    window.addEventListener('wheel', (e) => { this.speed = Math.max(2, Math.min(3000, this.speed * (e.deltaY < 0 ? 1.25 : 0.8))); });
+    window.addEventListener('blur', () => { this.active = this.on; }); // lets go of the keys
+    window.addEventListener('wheel', (e) => { if (this.on) this.speed = Math.max(2, Math.min(3000, this.speed * (e.deltaY < 0 ? 1.25 : 0.8))); });
+  }
+
+  get active(): boolean { return this.on; }
+
+  /** Taking input (flying); off lets go of the keys and the mouse. */
+  set active(on: boolean) {
+    this.on = on;
+    this.keys.clear();
+    if (this.looking) document.exitPointerLock?.();
+    this.looking = false;
+  }
+
+  /** Look the way the camera looks now (on taking over from the hero camera). */
+  takeOver(): void {
+    const e = new Euler().setFromQuaternion(this.camera.quaternion, 'YXZ');
+    this.yaw = e.y;
+    this.pitch = e.x;
+    this.apply();
   }
 
   /** Put the camera at a point; `absolute` takes y as it is, otherwise y is clamped above the ground. */

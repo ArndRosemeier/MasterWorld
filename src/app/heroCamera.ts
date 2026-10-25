@@ -1,6 +1,7 @@
 /**
  * Playing the hero (D13): WASD to move, A and D turn (and strafe while the right mouse button is held),
- * Q and E strafe, Shift walks, Space jumps (rises when swimming), X dives. Right mouse button held:
+ * Q and E strafe, R autoruns, Shift walks, Space jumps (rises when swimming), X dives (all rebindable,
+ * src/input/controls.ts). Right mouse button held:
  * mouse look, the hero turns with the camera; left button held: the camera alone orbits the hero; both
  * buttons: run forward. The wheel zooms, all the way into first person. The camera stays out of the
  * ground and the rock.
@@ -8,6 +9,7 @@
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { clamp, damp } from '@futuremagic/core';
 import type { WalkIntent, WalkWorld } from '../game/walker';
+import { Controls } from '../input/controls';
 
 /** Turn rate of the A and D keys, rad/s. */
 const TURN = 2.6;
@@ -23,17 +25,22 @@ export class HeroCamera {
   /** Wanted distance from the head, and the one the camera is at (pulled in by ground and rock). */
   zoom = 5;
   private dist = 5;
-  private readonly keys = new Set<string>();
+  readonly controls = new Controls();
+  /** Mouse look speed (times the default) and up-down inverted (from the settings). */
+  mouseSpeed = 1;
+  invertMouse = false;
+  private on = true;
   private lmb = false;
   private rmb = false;
   private readonly eye = new Vector3();
 
   constructor(private readonly camera: PerspectiveCamera, el: HTMLElement, private readonly world: WalkWorld) {
-    window.addEventListener('keydown', (e) => this.keys.add(e.code));
-    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    window.addEventListener('blur', () => { this.keys.clear(); this.lmb = this.rmb = false; });
+    window.addEventListener('keydown', (e) => { if (this.on && !e.repeat) this.controls.press(e.code); });
+    window.addEventListener('keyup', (e) => this.controls.release(e.code));
+    window.addEventListener('blur', () => this.letGo());
     el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('mousedown', (e) => {
+      if (!this.on) return;
       if (e.button === 0) this.lmb = true;
       if (e.button === 2) { this.rmb = true; void el.requestPointerLock?.(); }
     });
@@ -43,14 +50,28 @@ export class HeroCamera {
     });
     window.addEventListener('mousemove', (e) => {
       if (!this.lmb && !this.rmb) return;
-      this.yaw -= e.movementX * LOOK;
-      this.pitch = clamp(this.pitch - e.movementY * LOOK, -1.45, 1.4);
+      const look = LOOK * this.mouseSpeed;
+      this.yaw -= e.movementX * look;
+      this.pitch = clamp(this.pitch - e.movementY * look * (this.invertMouse ? -1 : 1), -1.45, 1.4);
     });
     el.addEventListener('wheel', (e) => {
       e.preventDefault();
+      if (!this.on) return;
       this.zoom = this.zoom < FIRST && e.deltaY > 0 ? FIRST + 0.9 : clamp(this.zoom * (e.deltaY < 0 ? 0.85 : 1.18), NEAR, FAR);
       if (this.zoom < FIRST + 0.05 && e.deltaY < 0) this.zoom = 0;
     }, { passive: false });
+  }
+
+  /** Off while a dialog is open: keys and buttons are let go (autorun keeps going). */
+  set enabled(on: boolean) {
+    this.on = on;
+    if (!on) this.letGo();
+  }
+
+  private letGo(): void {
+    this.controls.clear();
+    if (this.rmb) document.exitPointerLock?.();
+    this.lmb = this.rmb = false;
   }
 
   /** In first person (the hero's body is not drawn). */
@@ -62,11 +83,11 @@ export class HeroCamera {
    * one). While the right button is held the hero faces where the camera looks.
    */
   intent(dt: number, facing: number): { intent: WalkIntent; facing: number } {
-    const k = this.keys, has = (c: string) => k.has(c);
-    let forward = (has('KeyW') || has('ArrowUp') ? 1 : 0) - (has('KeyS') || has('ArrowDown') ? 1 : 0);
-    if (this.lmb && this.rmb) forward = 1;
-    let strafe = (has('KeyE') ? 1 : 0) - (has('KeyQ') ? 1 : 0);
-    const turnKeys = (has('KeyD') || has('ArrowRight') ? 1 : 0) - (has('KeyA') || has('ArrowLeft') ? 1 : 0);
+    const c = this.controls;
+    let forward = c.axis('back', 'forward');
+    if ((this.lmb && this.rmb) || c.autorun) forward = 1;
+    let strafe = c.axis('strafeLeft', 'strafeRight');
+    const turnKeys = c.axis('turnLeft', 'turnRight');
     if (this.rmb) {
       strafe = clamp(strafe + turnKeys, -1, 1);
       facing = this.yaw;
@@ -76,7 +97,7 @@ export class HeroCamera {
       this.yaw -= turnKeys * TURN * dt;
     }
     return {
-      intent: { forward, strafe, heading: facing, walk: has('ShiftLeft') || has('ShiftRight'), up: has('Space'), down: has('KeyX') },
+      intent: { forward, strafe, heading: facing, walk: c.held('walk'), up: c.held('jump'), down: c.held('dive') },
       facing,
     };
   }

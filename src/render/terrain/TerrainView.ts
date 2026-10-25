@@ -5,7 +5,7 @@
  */
 import { BufferAttribute, BufferGeometry, Mesh, type Camera } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import { TERRAIN } from '../materials';
+import { CANOPY_RISE, TERRAIN } from '../materials';
 import { chunkIndex, type ChunkMesh } from '../../world/chunkMesh';
 import type { TerrainJobs } from '../../workers/pool';
 import { SEGS, chunkId, chunkSize, selectChunks, type ChunkKey } from './lod';
@@ -106,15 +106,19 @@ export class TerrainView {
  * A mesh with the terrain material (a height field chunk, or a rock volume): position, normal, ground colour
  * and surface weights, placed at (x, 0, z) and never moved.
  */
-export function groundMesh(m: Pick<ChunkMesh, 'position' | 'normal' | 'color' | 'surface' | 'level'>, index: BufferAttribute, x = 0, z = 0): Mesh {
+export function groundMesh(m: Pick<ChunkMesh, 'position' | 'normal' | 'color' | 'surface' | 'level'> & Partial<Pick<ChunkMesh, 'canopy'>>, index: BufferAttribute, x = 0, z = 0): Mesh {
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(m.position, 3));
   g.setAttribute('normal', new BufferAttribute(m.normal, 3));
   g.setAttribute('color', new BufferAttribute(m.color, 3));
   g.setAttribute('surface', new BufferAttribute(m.surface, 4));
   g.setAttribute('level', new BufferAttribute(m.level, 1));
+  // No woods on meshes without a canopy (the rock volumes).
+  g.setAttribute('canopy', new BufferAttribute(m.canopy ?? new Float32Array((m.position.length / 3) * 4), 4));
   g.setIndex(index);
   g.computeBoundingSphere();
+  // The canopy rises over the ground far away (materials.ts): room for it in the bounds.
+  g.boundingSphere!.radius += CANOPY_RISE;
   const mesh = new Mesh(g, TERRAIN.make());
   mesh.position.set(x, 0, z);
   mesh.castShadow = TERRAIN.shadow.cast;

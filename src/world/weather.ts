@@ -106,6 +106,14 @@ export class Weather {
     this.orders.push(o);
   }
 
+  /** Withdraws every order still holding at `hours`: the natural weather is back at once (the ground stays wet). */
+  cancel(hours: number): void {
+    for (let i = 0; i < this.orders.length; i++) {
+      const o = this.orders[i], ramp = o.ramp ?? 0.75;
+      if (o.to + ramp > hours) this.orders[i] = { ...o, to: hours - ramp };
+    }
+  }
+
   /** Forgets orders that ended before `hours` (they no longer change anything, the ground has dried). */
   forget(hours: number): void {
     for (let i = this.orders.length - 1; i >= 0; i--) if (this.orders[i].to + (this.orders[i].ramp ?? 0.75) + MEMORY < hours) this.orders.splice(i, 1);
