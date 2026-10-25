@@ -148,11 +148,11 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const tg = texture(TOWN_GROUND.mask).sample(p.xz.sub(TOWN_GROUND.origin).div(TOWN_GROUND.size));
   const ragged = fine.mul(0.18).add(mid.mul(0.1));
   const paths = smoothstep(0.1, 0.45, mx_fractal_noise_float(p.xz.mul(0.18), 2, 2.0, 0.5).add(tg.a.mul(0.5)));
-  // Yards: trodden earth in patches; streets: cobbles; the market: bigger, worn setts, a shade darker.
+  // Yards: trodden earth in patches; streets: small cobbles; the market: the same stones a little larger, a shade darker.
   const grounds: [Node<'float'>, number, number, number][] = [
     [tg.b.max(tg.a).mul(paths).mul(0.85), TOWN_GROUND_LAYER.dirt, 1, 1],
-    [tg.r, TOWN_GROUND_LAYER.cobble, 1, 0.85],
-    [tg.g, TOWN_GROUND_LAYER.cobble, 1.5, 0.75],
+    [tg.r, TOWN_GROUND_LAYER.cobble, 0.75, 0.85],
+    [tg.g, TOWN_GROUND_LAYER.cobble, 0.95, 0.75],
   ];
   for (const [t, k, scale, tone] of grounds) {
     const g = tl(k, scale);

@@ -5,7 +5,8 @@
  * own browser is not installed. Prints the HUD line, the shader report and the page's console errors.
  * SHOT_WAIT=<ms> waits that long after ready; SHOT_TIMEOUT=<ms> gives SwiftShader longer (default 5 min,
  * the slow-check limit in docs/CHECKS.md). SHOT_HOLD=<key codes, comma separated> holds those keys down
- * during the wait (KeyW: the hero runs).
+ * during the wait (KeyW: the hero runs). SHOT_GPU=1 renders on the machine's own GPU instead (new headless
+ * mode, no SwiftShader): for a desktop with a graphics card, where frames take milliseconds, not seconds.
  */
 import { chromium } from 'playwright';
 import { preview } from 'vite';
@@ -19,9 +20,13 @@ if (args.length < 2 || args.length % 2) {
 
 const server = await preview({ preview: { port: 5202, strictPort: false }, logLevel: 'silent' });
 const base = server.resolvedUrls.local[0];
+const gpu = !!process.env.SHOT_GPU;
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || undefined,
-  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist'],
+  channel: gpu ? 'chromium' : undefined,
+  args: gpu
+    ? ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist']
+    : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist'],
 });
 let failed = false;
 for (let i = 0; i < args.length; i += 2) {
@@ -31,6 +36,8 @@ for (let i = 0; i < args.length; i += 2) {
   page.on('pageerror', (e) => { failed = true; console.error(`[page error] ${e.message}`); });
   await page.goto(base + (query.startsWith('?') ? query : '?' + query));
   await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT }).catch(() => { failed = true; console.error('page did not report ready'); });
+  // The loading overlay can linger while it fades out: keep it out of the picture.
+  await page.addStyleTag({ content: '#loading{display:none!important}' });
   const hold = process.env.SHOT_HOLD ? process.env.SHOT_HOLD.split(',') : [];
   for (const k of hold) await page.keyboard.down(k);
   await page.waitForTimeout(Number(process.env.SHOT_WAIT ?? 0));

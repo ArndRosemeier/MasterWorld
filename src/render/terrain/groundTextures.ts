@@ -49,7 +49,7 @@ const MED = (name: string): { set: TextureSet; layer: number } => {
 /** texgen facade layers used in towns (FACADE_WALLS then ROOFS order). */
 const FACADE = { limestone: 4, plaster: 6, clayTile: 17, slate: 18 };
 /** texgen ground layers used in towns (GROUNDS order). */
-const GROUND = { cobble: 5, dirt: 11 };
+const GROUND = { dirt: 11 };
 
 /**
  * The town's layers: first one per BuildingMat (@futuremagic/settlement, in its order), then the town's
@@ -58,7 +58,7 @@ const GROUND = { cobble: 5, dirt: 11 };
 export const TOWN_LAYERS: readonly { set: TextureSet; layer: number }[] = [
   { set: 'facade', layer: FACADE.plaster }, MED('rubble'), { set: 'facade', layer: FACADE.limestone }, MED('oak'), MED('thatch'),
   { set: 'facade', layer: FACADE.clayTile }, { set: 'facade', layer: FACADE.slate }, MED('shingle'), MED('leaded'),
-  { set: 'ground', layer: GROUND.cobble }, { set: 'ground', layer: GROUND.dirt },
+  MED('cobbles'), { set: 'ground', layer: GROUND.dirt },
 ];
 /** Where the town's ground layers sit in TOWN_LAYERS: cobbles (streets and market) and trodden earth (yards). */
 export const TOWN_GROUND_LAYER = { cobble: 9, dirt: 10 };
