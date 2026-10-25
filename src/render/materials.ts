@@ -17,7 +17,7 @@ import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 import { woodsFromAfar } from '@futuremagic/vegetation/node';
 
-export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'canopy';
+export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy';
 
 export interface MaterialKind extends StageKind {
   readonly attributes: readonly Attribute[];
@@ -75,7 +75,7 @@ const CROWN_BROAD = vec3(0.02, 0.048, 0.012), CROWN_CONIFER = vec3(0.012, 0.03, 
 /** Past the sun's shadow box (sky.ts), the floor under the woods keeps this share of its light (the crowns' shade on average). */
 const UNDER_CROWNS = 0.15;
 
-export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'canopy'], () => {
+export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level', 'canopy'], () => {
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');
   const { albedo: A, normal: N } = ground;
   // Double-sided so chunk skirts close cracks seen from either side.
@@ -89,6 +89,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const far0 = smoothstep(WOODS.band.x, WOODS.band.y, length(placed.xz.sub(cameraPosition.xz)));
   m.positionNode = positionLocal.add(vec3(0, cn.y.mul(smoothstep(0.05, 0.7, cn.x)).mul(0.8).mul(far0), 0));
   const p = positionWorld, n = normalWorldGeometry, up = n.y;
+  // How level the ground is, smoothed over a few metres per vertex: what rock and sand follow, so their
+  // edges run smoothly instead of along the triangles where a cliff's normal flips between vertices.
+  const level = attribute('level', 'float');
   const layer = (name: string, uv: Node<'vec2'>) => {
     const i = LAYER(name), k = 1 / NATURAL_TILE_METERS[i];
     const st = uv.mul(k);
@@ -116,9 +119,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   let col: Node<'vec3'> = soilA.rgb.mul(tint), rough: Node<'float'> = soilA.a, ao: Node<'float'> = soilN.a, h: Node<'float'> = soilN.b;
   let pert: Node<'vec3'> = vec3(tn(soilN).x, 0, tn(soilN).y);
 
-  // Shore sand.
+  // Shore sand, up to where rock takes over (no strip of grass between a beach and its cliff).
   const sand = layer('sand', p.xz);
-  const sandT = smoothstep(float(4).add(fine.mul(1.5)), float(1), p.y).mul(smoothstep(0.7, 0.9, up));
+  const sandT = smoothstep(float(4.5).add(fine.mul(1.5)), float(2.2), p.y).mul(smoothstep(0.6, 0.8, level));
   const sandB = hblend(sandT, sand.n.b.sub(h), 2);
   col = mix(col, sand.a.rgb, sandB); rough = mix(rough, sand.a.a, sandB); ao = mix(ao, sand.n.a, sandB);
   pert = mix(pert, vec3(tn(sand.n).x, 0, tn(sand.n).y), sandB); h = mix(h, sand.n.b, sandB);
@@ -134,7 +137,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const rockA = rx.a.mul(bw.x).add(rz.a.mul(bw.z)).add(ry.a.mul(bw.y));
   const rockN = rx.n.mul(bw.x).add(rz.n.mul(bw.z)).add(ry.n.mul(bw.y));
   const rockP = vec3(0, tn(rx.n).y, tn(rx.n).x).mul(bw.x).add(vec3(tn(rz.n).x, tn(rz.n).y, 0).mul(bw.z)).add(vec3(tn(ry.n).x, 0, tn(ry.n).y).mul(bw.y));
-  const rockT = smoothstep(0.82, 0.64, up.add(fine.mul(0.04)));
+  const rockT = smoothstep(0.82, 0.64, level.add(fine.mul(0.04)).add(mid.mul(0.12)));
   const rockB = hblend(rockT, rockN.b.sub(h), 2);
   const rockTone = float(1).add(broad.mul(0.25));
   col = mix(col, rockA.rgb.mul(rockTone).mul(macro), rockB); rough = mix(rough, rockA.a, rockB); ao = mix(ao, rockN.a, rockB);

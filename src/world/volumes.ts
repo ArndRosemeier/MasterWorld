@@ -96,6 +96,8 @@ export interface VolumeMesh {
   normal: Float32Array;
   color: Float32Array;
   surface: Float32Array;
+  /** How level the ground is (see ChunkMesh): here the normal's up component. */
+  level: Float32Array;
   index: Uint32Array;
 }
 
@@ -146,7 +148,9 @@ export function archMesh(t: Terrain, site: ArchSite): VolumeMesh | null {
   const color = new Float32Array(count * 3), surface = new Float32Array(count * 4);
   const look = groundLook(t);
   for (let v = 0; v < count; v++) look(m.positions[v * 3], m.positions[v * 3 + 2], color, surface, v);
-  return { position: m.positions, normal: m.normals, color, surface, index: new Uint32Array(keep) };
+  const level = new Float32Array(count);
+  for (let v = 0; v < count; v++) level[v] = m.normals[v * 3 + 1];
+  return { position: m.positions, normal: m.normals, color, surface, level, index: new Uint32Array(keep) };
 }
 
 /**
