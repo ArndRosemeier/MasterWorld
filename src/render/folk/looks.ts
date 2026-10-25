@@ -103,3 +103,24 @@ export function clipOf(act: ActivityKind, id: number): string {
   if (act === 'drink' && id % 2) return 'sit and talk';
   return CLIP[act];
 }
+
+/**
+ * A few of `people` whose looks between them wear every garment, hairstyle and beard any of them has:
+ * dressed in turn behind the loading screen, they compile every kind of mesh the town will show.
+ */
+export function coveringLooks(people: Person[]): CharacterPatch[] {
+  const partsOf = (l: CharacterPatch) => [...(l.outfit ?? []), `hair:${l.hair}`, `beard:${l.beard}`, `race:${l.race}`];
+  const looks = people.filter(drawn).map(lookOf);
+  const left = new Set(looks.flatMap(partsOf));
+  const out: CharacterPatch[] = [];
+  while (left.size) {
+    let best = looks[0], gain = 0;
+    for (const l of looks) {
+      const g = partsOf(l).filter((x) => left.has(x)).length;
+      if (g > gain) { best = l; gain = g; }
+    }
+    for (const x of partsOf(best)) left.delete(x);
+    out.push(best);
+  }
+  return out;
+}

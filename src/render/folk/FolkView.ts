@@ -10,7 +10,7 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
-import { clipOf, drawn, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
+import { clipOf, coveringLooks, drawn, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -73,8 +73,8 @@ export class FolkView {
 
   /** Dresses the first character as somebody from town and returns what to compile in the warm-up. */
   async warmObjects(): Promise<Object3D[]> {
-    const s = this.slots[0], p = this.life.agents.find((a) => drawn(a.person))?.person;
-    if (p) await s.ch.set({ ...lookOf(p), animation: 'walk' });
+    const s = this.slots[0], look = coveringLooks(this.life.agents.map((a) => a.person))[0];
+    if (look) await s.ch.set({ ...look, animation: 'walk' });
     s.ch.setLod(0);
     this.reverseOffsets(s.place);
     s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
@@ -82,18 +82,23 @@ export class FolkView {
   }
 
   /**
-   * After the warm-up, while the loop runs (the Stage compiles in its frame slots): the other detail
-   * levels of the first character, whose meshes (and the crowd level's merged one) draw with
-   * materials of their own. Nobody is drawn before.
+   * After the warm-up, while the loop runs (the Stage compiles in its frame slots): every detail level
+   * of the first character, dressed in turn as a few townsfolk who between them wear everything in town
+   * (each garment, hairstyle and beard draws, and casts its shadow, with shaders of its own). Nobody is
+   * drawn before.
    */
   async warmLods(): Promise<void> {
     const ch = this.slots[0].ch;
     const place = this.slots[0].place;
     place.removeFromParent();
-    for (let k = 1; k < ch.lods.length; k++) {
-      ch.setLod(k);
-      this.reverseOffsets(place);
-      await this.stage.prepare(place);
+    const looks = coveringLooks(this.life.agents.map((a) => a.person));
+    for (let i = 0; i < looks.length; i++) {
+      if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
+      for (let k = i > 0 ? 0 : 1; k < ch.lods.length; k++) {
+        ch.setLod(k);
+        this.reverseOffsets(place);
+        await this.stage.prepare(place);
+      }
     }
     ch.setLod(0);
     this.slots[0].place.visible = false;
