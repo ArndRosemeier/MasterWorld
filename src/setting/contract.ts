@@ -121,7 +121,7 @@ export interface StartSpec {
 /** The props the engine can draw in a dungeon (simple kit pieces). */
 export const DUNGEON_PROPS = [
   'barrel', 'cask', 'rack', 'crate', 'sack', 'shelf', 'table', 'stool', 'cot', 'straw', 'rubble', 'bones',
-  'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar',
+  'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar', 'ladder',
 ] as const;
 export type DungeonProp = (typeof DUNGEON_PROPS)[number];
 

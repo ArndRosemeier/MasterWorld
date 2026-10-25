@@ -97,6 +97,8 @@ export interface Cellar extends CellarSketch {
   readonly spawns: Spawn[];
   /** The link the set piece hangs on. */
   readonly pieceLink: number;
+  /** The way up to the house: the ladder under the hatch (a prop in the entrance room). */
+  readonly hatch: Prop;
   /** For variety checks: what makes this cellar's shape. */
   readonly signature: string;
 }
@@ -241,6 +243,9 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     const yaw = Math.atan2(DIRS[s.dir][0], DIRS[s.dir][1]);
     props.push({ kind, x, z, y: R.level * STOREY, yaw, room, ...(trace ? { trace } : {}), ...(clue !== undefined ? { clue } : {}) });
   };
+  // The ladder up to the hatch first, so nothing stands in front of it.
+  put(graph.entrance, 'ladder');
+  const hatch = props[0];
   for (const r of rooms) {
     const R = placed[r.id], n = Math.max(2, Math.min(7, Math.round(R.w * R.d * 0.45)));
     for (let i = 0; i < n; i++) put(r.id, r.use.props[i % r.use.props.length]);
@@ -289,5 +294,5 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
 
   const shape = layout.rooms.map((r) => `${r.w}x${r.d}x${r.height}@${r.level}`).sort().join(',');
   const signature = `${graph.patterns.join('+')}|${graph.rooms.length}r${graph.links.length}l|${shape}`;
-  return { ...sketch, graph, pace: p, layout, rooms, props, clues, spawns, pieceLink, signature };
+  return { ...sketch, graph, pace: p, layout, rooms, props, clues, spawns, pieceLink, hatch, signature };
 }

@@ -77,6 +77,13 @@ export class Player {
     this.heroCam.trail(this.toHead(), 0);
   }
 
+  /** Stand somewhere at once, facing `yaw` (a door, a ladder): y undefined stands on the ground. */
+  teleport(x: number, y: number | undefined, z: number, yaw: number): void {
+    this.walker.place(x, z, y);
+    this.walker.yaw = this.heroCam.yaw = yaw;
+    this.heroCam.trail(this.toHead(), 0);
+  }
+
   /** Settle again where it stands (once the water is known). */
   resettle(): void {
     if (this.flying) return;

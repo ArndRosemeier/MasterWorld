@@ -31,6 +31,11 @@ import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
 import { TOWN_RASTER } from './world/town';
+import { outlineCellar } from './world/dungeon/cellar';
+import { firstDungeon, houseOf } from './vgm/dungeons';
+import { CellarView } from './render/dungeon/CellarView';
+import { CellarVisit } from './app/cellarVisit';
+import { lookFromDegrees } from './app/look';
 
 declare global {
   interface Window {
@@ -68,11 +73,14 @@ async function start(): Promise<void> {
     const view = await createView(canvas, { forceWebGL: boot.webgl, hour: params.hour, dayMinutes: boot.dayMinutes });
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
     let water: WaterView | null = null;
+    // Down in the cellar the walker walks the cellar's space instead of the land.
+    let visit: CellarVisit | null = null;
+    const below = () => (visit?.inside ? visit.world : null);
     const world: WalkWorld = {
-      height: (x, z) => terrain.height(x, z),
-      rockSurface: (x, y, z) => terrain.rockSurface(x, y, z),
-      waterLevel: (x, z) => { const w = water?.waterAt(x, z); return w && w.depth > 0 ? w.level : null; },
-      wall: (x, z, r) => !!town?.solid(x, z, r),
+      height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
+      rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
+      waterLevel: (x, z) => { if (below()) return null; const w = water?.waterAt(x, z); return w && w.depth > 0 ? w.level : null; },
+      wall: (x, z, r) => !below() && !!town?.solid(x, z, r),
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
@@ -134,6 +142,22 @@ async function start(): Promise<void> {
     await view.stage.add(hero.object);
     await view.stage.add(wx.precip);
 
+    // The first promise: the cellar under a house of the town (outlined now; it is small).
+    const promise = firstDungeon(opened.log);
+    const house = promise ? houseOf(promise, terrain.towns) : null;
+    if (promise && house) {
+      const cellar = outlineCellar(promise, house, setting.dungeons.cellar);
+      // Its own space, deep under the house.
+      const cellarView = new CellarView(cellar, { x: house.cx, y: -400, z: house.cz });
+      await cellarView.add(view.stage);
+      visit = new CellarVisit(cellar, house, cellarView, player, view.lantern, view.sky);
+      if (params.cellar) {
+        await visit.enter(true, params.cellarRoom);
+        if (params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
+        player.walker.yaw = player.heroCam.yaw;
+      }
+    }
+
     // The trees' shaders (and the townsfolk's other detail levels) are built in the Stage's frame slots, so
     // the loop must run meanwhile; loading ends once they stand.
     loading.set('Planting the trees');
@@ -177,7 +201,7 @@ async function start(): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit; } },
     });
     new Menu(settings, {
       paused,
@@ -192,6 +216,7 @@ async function start(): Promise<void> {
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       player.update(dt);
+      visit?.update(dt);
       view.sky.underwater = sea.submerged(view.camera.position);
       wx.apply(dt, view.camera.position, hours(), view.sky);
       view.sky.update(dt, view.camera);
@@ -209,7 +234,7 @@ async function start(): Promise<void> {
       view.renderer.render(view.scene, view.camera);
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}`;
       }
       last = now;
       if (planted && !window.__mwReady) {

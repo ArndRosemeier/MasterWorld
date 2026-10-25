@@ -36,6 +36,8 @@ export class SkyView {
   readonly gain = LIGHT;
   /** The camera is under water: fog turns to the water's own colour. */
   underwater = false;
+  /** Below ground (a cellar, a dungeon): no sun or sky, a faint warm fill, darkness closing in. */
+  indoors = false;
   /** Mist in the low ground 0..1, and the height it lies at (the weather sets both). */
   mist = 0;
   mistBase = 0;
@@ -151,6 +153,19 @@ export class SkyView {
     }
     this.scene.environmentIntensity = L.envIntensity * ENV;
     this.renderer.toneMappingExposure = L.exposure * EXPOSURE;
+    if (this.indoors) {
+      this.sun.intensity = 0;
+      this.hemi.color.setRGB(0.55, 0.42, 0.3);
+      this.hemi.groundColor.setRGB(0.12, 0.09, 0.07);
+      this.hemi.intensity = 0.05;
+      this.scene.environmentIntensity = 0.01;
+      this.renderer.toneMappingExposure = 1.4;
+      this.dome.visible = false;
+      fog.setRGB(0.008, 0.006, 0.005);
+      FOG.density.value = 0.06;
+      FOG.mist.value = 0;
+      this.scene.background = fog;
+    }
 
     // The shadow box follows the camera, snapped to texels so edges do not shimmer.
     const focus = camera?.position ?? { x: 0, y: 0, z: 0 };

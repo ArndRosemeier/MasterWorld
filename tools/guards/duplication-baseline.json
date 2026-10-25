@@ -18,5 +18,13 @@
   {
     "key": "same name: masterworld/render/flora/FloraView.ts#update + masterworld/render/hero/HeroView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (plant cells and their draws vs the hero's pose); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (going in and out of the cellar vs chunk selection); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",
+    "reason": "The walker's world in main.ts delegates to the terrain's rockSurface (or the cellar's space below ground); an adapter, not a copy."
   }
 ]
