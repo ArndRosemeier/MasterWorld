@@ -95,8 +95,8 @@ export class Toys {
     const c = this.camera, fwd = c.getWorldDirection(new Vector3()).setY(0).normalize();
     const right = new Vector3().crossVectors(fwd, c.up).normalize();
     const side = this.rng.sign();
-    const p = (f: number, r: number, u: number) => c.position.clone().addScaledVector(fwd, f).addScaledVector(right, r * side).setY(c.position.y + u);
-    const a = p(1400, -900, 160), b = p(140, -30, 25), e = p(500, 1200, 90);
+    const ahead = (f: number, r: number, u: number) => c.position.clone().addScaledVector(fwd, f).addScaledVector(right, r * side).setY(c.position.y + u);
+    const a = ahead(1400, -900, 160), b = ahead(140, -30, 25), e = ahead(500, 1200, 90);
     const dur = 7.5;
     const pos = new Vector3(), prev = new Vector3();
     const along = (u: number, out: Vector3) => out.copy(a).multiplyScalar((1 - u) * (1 - u)).addScaledVector(b, 2 * u * (1 - u)).addScaledVector(e, u * u);

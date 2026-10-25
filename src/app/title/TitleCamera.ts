@@ -51,7 +51,7 @@ export class TitleCamera {
     if (d) {
       d.u = Math.min(1, d.u + dt / DIVE_SECONDS);
       const p = divePose(d.from, d.to, d.u);
-      this.place(p.at, p.look, 0);
+      this.aim(p.at, p.look, 0);
       // The view widens in the fall and settles on landing.
       c.fov = this.fov + 14 * Math.sin(Math.PI * d.u);
       c.updateProjectionMatrix();
@@ -69,11 +69,11 @@ export class TitleCamera {
     this.pointer.sx += (this.pointer.x - this.pointer.sx) * k;
     this.pointer.sy += (this.pointer.y - this.pointer.sy) * k;
     const p = orbitPose(this.orbit, this.t, this.near);
-    this.place(p.at, p.look, 1);
+    this.aim(p.at, p.look, 1);
   }
 
   /** Puts the camera at `at` looking at `look`, leaning with the pointer by `sway`. */
-  private place(at: Vec3, look: Vec3, sway: number): void {
+  private aim(at: Vec3, look: Vec3, sway: number): void {
     const c = this.camera;
     c.position.set(at[0], at[1], at[2]);
     this.look.set(look[0], look[1], look[2]);
