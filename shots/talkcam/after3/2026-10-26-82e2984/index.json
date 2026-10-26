@@ -1,0 +1,40 @@
+{
+  "commit": "82e298479fb8bd432094ab122a489f4936066f00",
+  "dirty": false,
+  "date": "2026-10-26",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": false,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 22.326,
+  "shots": [
+    {
+      "name": "talk",
+      "file": "01-talk.jpg",
+      "query": "title=0&day=0&hour=20&talk=inn&topics=news",
+      "loadS": 17.987,
+      "drawnS": 0.032,
+      "settledS": 1.525399999976158,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 144,
+      "p50": 12.700000000000728,
+      "p95": 29,
+      "mean": 13.998611110779974,
+      "shaders": {
+        "warmup": 81,
+        "run": 0,
+        "late": 0,
+        "worstMs": 12.800000071525574,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    }
+  ]
+}
