@@ -13,6 +13,7 @@ import { Trunks } from './world/trunks';
 import { HeroView } from './render/hero/HeroView';
 import { preparePeople } from './render/hero/play';
 import { GiantView } from './render/giant/GiantView';
+import { routePackImages } from './render/packImages';
 import { GIANT_SPEED, giantPose, type Orbit } from './app/title/route';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
@@ -106,6 +107,8 @@ export interface Boot {
 export async function start(b: Boot): Promise<void> {
   const { settings, sound, title, loading } = b;
   const boot = settings.start;
+  // The people's textures come from the pack bundles and the browser's cache too, not from an <img> of their own.
+  routePackImages();
   const canvas = document.createElement('canvas');
   document.body.prepend(canvas);
   try {
@@ -215,19 +218,23 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Painting the ground');
-    const texPool = createTexturePool();
-    useGroundTextures(await loadGroundTextures(texPool));
-    if (town) {
-      // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
-      useTownTextures(await loadTownTextures(texPool));
-      useTownGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER));
-      useFieldGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => {
-        const x = town.x0 + (i + 0.5) * TOWN_RASTER, z = town.z0 + (j + 0.5) * TOWN_RASTER;
-        const f = town.fieldAt(x, z), path = town.groundAt(x, z) === TownGround.Path;
-        return f || path ? { path, crop: f ? CROPS.indexOf(f.crop) : -1, rows: f?.rows ?? 0 } : null;
-      });
-    }
-    texPool.dispose();
+    // The ground's textures are made in workers while the seas, the hero and the town load; the land's
+    // shaders need them, so the warm-up waits for them (plan A7: the start's steps overlap).
+    const painted = (async () => {
+      const texPool = createTexturePool();
+      useGroundTextures(await loadGroundTextures(texPool));
+      if (town) {
+        // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
+        useTownTextures(await loadTownTextures(texPool));
+        useTownGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER));
+        useFieldGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => {
+          const x = town.x0 + (i + 0.5) * TOWN_RASTER, z = town.z0 + (j + 0.5) * TOWN_RASTER;
+          const f = town.fieldAt(x, z), path = town.groundAt(x, z) === TownGround.Path;
+          return f || path ? { path, crop: f ? CROPS.indexOf(f.crop) : -1, rows: f?.rows ?? 0 } : null;
+        });
+      }
+      texPool.dispose();
+    })();
 
     const wx = new WeatherView(weather, (x, z) => terrain.height(x, z));
     const hours = () => view.sky.day * 24 + view.sky.hour;
@@ -337,6 +344,15 @@ export async function start(b: Boot): Promise<void> {
     // The first townsman's clothes come over the network: their own step, so 'Preparing shaders' times only the compiles.
     if (folk) loading.set('Dressing the townsfolk');
     const folkWarm = folk ? await folk.warmObjects() : [];
+    await painted;
+    // The land, its rock and the town's houses are built in workers meanwhile; their shaders compile with the rest.
+    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
+    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
+    const rock = new VolumeView(view.stage, terrainJobs).raise();
+    const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
+    if (houses && town) view.warm.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
+    const raised = houses?.build(0, view.camera.position);
+    const landReady = ground.ready(view.camera);
     loading.set('Preparing shaders');
     await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...folkWarm]);
     // While the loading screen (or the title's painted still) still covers the view, the land, trees and
@@ -349,13 +365,7 @@ export async function start(b: Boot): Promise<void> {
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
     if (chosen) hurry();
     loading.set('Raising the land');
-    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
-    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
-    const rock = new VolumeView(view.stage, terrainJobs).raise();
-    const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
-    if (houses && town) view.warm.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
-    const raised = houses?.build(0, view.camera.position);
-    await ground.ready(view.camera);
+    await landReady;
     await rock;
     await raised;
     await view.stage.add(view.sky.dome);
@@ -491,7 +501,13 @@ export async function start(b: Boot): Promise<void> {
     void trees.then(() => { landed = true; if (folk) loading.set('Waking the townsfolk'); });
     // One part failing (a file that would not load) must not hold the start: it is logged and play begins.
     const survive = (what: string, p: Promise<unknown> | null | undefined) => p?.catch((e: unknown) => console.error(`[load] ${what} failed`, e));
-    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folk?.warmLods().then(took('townsfolk'))), survive('cellar', dwellers), survive('giant', giantReady)]).then(() => { planted = true; });
+    // The townsfolk show once one look stands in every detail level; their other looks, the cellar's people (unless
+    // the start is down there) and the title's giant finish behind play (plan A7).
+    const folkLooks = folk?.warmLods();
+    void survive('townsfolk', folkLooks?.done.then(took('townsfolk, every look')));
+    void survive('cellar', dwellers?.then(took('cellar')));
+    void survive('giant', giantReady);
+    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folkLooks?.shown.then(took('townsfolk'))), params.cellar ? survive('cellar', dwellers) : null]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;

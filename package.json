@@ -9,7 +9,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "packs": "node tools/packs/actors.mjs",
+    "packs": "node tools/packs/actors.mjs && node tools/packs/bundle.mjs",
     "props": "node tools/props/pack.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

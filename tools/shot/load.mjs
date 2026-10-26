@@ -1,20 +1,30 @@
 /**
- * Load-time probe (F4, a slow check run after `npm run build`): `node tools/shot/load.mjs ["?query"]`.
+ * Load-time probe (F4, A7; a slow check run after `npm run build`): `node tools/shot/load.mjs ["?query"] [--record]`.
  * Opens the game as a player does (presses a key at the title's gate, so sound may start), and reports when the title
  * shows, when the world is playable (`__mwReady`), and what was downloaded until then, by folder. It fails when the
  * start downloads music other than the title's own theme (music streams: a piece loads when it first plays), or when
  * LIMIT_TITLE / LIMIT_READY (seconds, default 1 and 20, the F4 marks on the reference machine; SwiftShader in the cloud
  * container is far slower, so set them there or pass LIMITS=0 to only report).
  */
+import { existsSync, renameSync, writeFileSync } from 'node:fs';
 import { launch } from './launch.mjs';
 
-const [query = '?gl'] = process.argv.slice(2);
+// `--record`: the pack files this start fetched become tools/packs/start.json, the start bundle's list
+// (tools/packs/bundle.mjs); the run fetches them one by one, so the bundle is set aside meanwhile.
+const record = process.argv.includes('--record');
+// The game's own default backend on a real GPU (WebGPU where the browser has it: what a player gets); WebGL in the
+// cloud's SwiftShader. Pass "?gl" to time the WebGL fallback on a GPU.
+const [query = process.env.SHOT_GPU ? '?' : '?gl'] = process.argv.slice(2).filter((a) => a !== '--record');
+const bundles = 'dist/packs/bundles.json';
+if (record && existsSync(bundles)) renameSync(bundles, `${bundles}.off`);
 const limits = process.env.LIMITS !== '0';
 const LIMIT_TITLE = Number(process.env.LIMIT_TITLE ?? 1), LIMIT_READY = Number(process.env.LIMIT_READY ?? 20);
 
 const { server, base, browser } = await launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.error(`[page error] ${e.message}`));
+// The game's own loading steps (and pack retries), so a slow start shows where its time goes.
+page.on('console', (m) => { const t = m.text(); if (/^\[(load|packs|title|diag)\]/.test(t)) console.log(`  ${t}`); });
 
 /** Every finished download: its path under the site and its body bytes; `ready` marks those after the world was playable. */
 const got = [];
@@ -28,9 +38,16 @@ page.on('requestfinished', async (r) => {
 const t0 = Date.now();
 await page.goto(base + (query.startsWith('?') ? query : '?' + query));
 console.log('page loaded', ((Date.now() - t0) / 1000).toFixed(1));
-const gate = await page.waitForSelector('.t-gate', { timeout: 60000 }).then(() => (Date.now() - t0) / 1000).catch(() => null);
+const seen = await page.waitForSelector('.t-gate', { timeout: 60000 }).then(() => (Date.now() - t0) / 1000).catch(() => null);
+// When the title was first painted: the browser's element timing of the gate's name (`elementtiming="title"`). The
+// probe's own look (`seen`) can come seconds later, as the game's start keeps the page's thread busy meanwhile.
+const painted = seen === null ? null : await page.evaluate(() => new Promise((done) => {
+  setTimeout(() => done(null), 5000);
+  new PerformanceObserver((l) => { const e = l.getEntries().find((x) => x.identifier === 'title'); if (e) done(e.renderTime || e.loadTime); }).observe({ type: 'element', buffered: true });
+}));
+const gate = seen === null ? null : painted !== null ? painted / 1000 : seen;
 if (gate !== null) await page.keyboard.press('Space');
-if (gate !== null) console.log('title', gate.toFixed(2));
+if (gate !== null) console.log(`title ${gate.toFixed(2)} (first paint; the probe saw it at ${seen.toFixed(2)})`);
 const came = await page.waitForFunction(() => window.__mwReady === true, null, { timeout: Number(process.env.LOAD_WAIT ?? 300) * 1000 }).then(() => true, () => false);
 const playable = came ? (Date.now() - t0) / 1000 : Infinity;
 console.log('playable', playable.toFixed(1));
@@ -40,6 +57,13 @@ await page.waitForTimeout(Number(process.env.LOAD_AFTER ?? 3000));
 await browser.close();
 server.httpServer.closeAllConnections?.();
 await server.close();
+
+if (record && existsSync(`${bundles}.off`)) renameSync(`${bundles}.off`, bundles);
+if (record) {
+  const files = [...new Set(got.filter((g) => !g.ready && g.path.startsWith('packs/') && !g.path.endsWith('bundles.json')).map((g) => decodeURIComponent(g.path.slice('packs/'.length))))].sort();
+  writeFileSync('tools/packs/start.json', `${JSON.stringify({ note: 'The pack files a start fetches (npm run load -- --record); tools/packs/bundle.mjs joins them.', files }, null, 1)}\n`);
+  console.log(`tools/packs/start.json: ${files.length} files`);
+}
 
 const MB = 1024 * 1024;
 const byFolder = new Map();
