@@ -1,0 +1,420 @@
+{
+  "commit": "992b2008fe8ad26b3bbf1aa9f8193c74acb22f18",
+  "dirty": false,
+  "date": "2026-10-26",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": true,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 223.685,
+  "shots": [
+    {
+      "name": "title",
+      "file": "01-title.jpg",
+      "query": "title&day=0&gl",
+      "loadS": 29.538,
+      "drawnS": 15.125,
+      "settledS": 1.5077000000476837,
+      "missing": [
+        "1 wild groups"
+      ],
+      "backend": "webgl2",
+      "frames": 42,
+      "p50": 11.599999999998545,
+      "p95": 58.89999999999418,
+      "mean": 48.19047618877327,
+      "shaders": {
+        "warmup": 88,
+        "run": 23,
+        "worstMs": 23.899999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "still waiting to be drawn: 1 wild groups"
+      ]
+    },
+    {
+      "name": "creator",
+      "file": "02-creator.jpg",
+      "query": "title&day=0&gl",
+      "loadS": 29.538,
+      "drawnS": 0.205,
+      "settledS": 2.705299999952316,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 41,
+      "p50": 50.599999999998545,
+      "p95": 80.19999999999709,
+      "mean": 51.26341463472778,
+      "shaders": {
+        "warmup": 88,
+        "run": 53,
+        "worstMs": 23.899999976158142,
+        "violations": 3,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh body-crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 58 ms after a build of 65 ms ended (minimum 130 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "3 shader violations"
+      ]
+    },
+    {
+      "name": "town-noon",
+      "file": "03-town-noon.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 16.016,
+      "drawnS": 10.414,
+      "settledS": 2.198,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 28,
+      "p50": 62.79999999999927,
+      "p95": 183.60000000000218,
+      "mean": 71.84642857228002,
+      "shaders": {
+        "warmup": 84,
+        "run": 21,
+        "worstMs": 12.700000047683716,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 2 ms ended (minimum 3 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "1 shader violations"
+      ]
+    },
+    {
+      "name": "pack",
+      "file": "04-pack.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 16.016,
+      "drawnS": 0.037,
+      "settledS": 1.5506999999284745,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 63,
+      "p50": 16.19999999999709,
+      "p95": 69.19999999999709,
+      "mean": 32.093650793650816,
+      "shaders": {
+        "warmup": 84,
+        "run": 21,
+        "worstMs": 12.700000047683716,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 2 ms ended (minimum 3 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim",
+        "1 shader violations"
+      ]
+    },
+    {
+      "name": "map",
+      "file": "05-map.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 16.016,
+      "drawnS": 0.046,
+      "settledS": 1.5107000000476838,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 135,
+      "p50": 14.200000000004366,
+      "p95": 51.900000000001455,
+      "mean": 15.020000000176596,
+      "shaders": {
+        "warmup": 84,
+        "run": 21,
+        "worstMs": 12.700000047683716,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 2 ms ended (minimum 3 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim",
+        "1 shader violations"
+      ]
+    },
+    {
+      "name": "town-dusk",
+      "file": "06-town-dusk.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 16.016,
+      "drawnS": 0.252,
+      "settledS": 1.5372999999523163,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 53,
+      "p50": 30.60000000000582,
+      "p95": 80.30000000000291,
+      "mean": 37.84150943396224,
+      "shaders": {
+        "warmup": 84,
+        "run": 21,
+        "worstMs": 12.700000047683716,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 2 ms ended (minimum 3 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "1 shader violations"
+      ]
+    },
+    {
+      "name": "town-night",
+      "file": "07-town-night.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 16.016,
+      "drawnS": 0.131,
+      "settledS": 1.5408999999761581,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 47,
+      "p50": 36.5,
+      "p95": 92.79999999999563,
+      "mean": 42.73404255268419,
+      "shaders": {
+        "warmup": 84,
+        "run": 21,
+        "worstMs": 12.700000047683716,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 2 ms ended (minimum 3 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "1 shader violations"
+      ]
+    },
+    {
+      "name": "town-rain",
+      "file": "08-town-rain.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 16.016,
+      "drawnS": 1.006,
+      "settledS": 1.5212999999523162,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 52,
+      "p50": 38.89999999999418,
+      "p95": 62.89999999999418,
+      "mean": 39.142307692766245,
+      "shaders": {
+        "warmup": 84,
+        "run": 23,
+        "worstMs": 12.700000047683716,
+        "violations": 2,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 2 ms ended (minimum 3 ms)",
+          "run: \"MeshBasicNodeMaterial\" started 0 ms after a build of 4 ms ended (minimum 9 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "2 shader violations"
+      ]
+    },
+    {
+      "name": "trade",
+      "file": "09-trade.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 16.016,
+      "drawnS": 0.024,
+      "settledS": 1.5043999999761581,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 143,
+      "p50": 15,
+      "p95": 35.80000000000291,
+      "mean": 14.17622377605707,
+      "shaders": {
+        "warmup": 84,
+        "run": 23,
+        "worstMs": 12.700000047683716,
+        "violations": 2,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 2 ms ended (minimum 3 ms)",
+          "run: \"MeshBasicNodeMaterial\" started 0 ms after a build of 4 ms ended (minimum 9 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim",
+        "2 shader violations"
+      ]
+    },
+    {
+      "name": "cellar",
+      "file": "10-cellar.jpg",
+      "query": "title=0&day=0&gl&hour=12&cellar=2",
+      "loadS": 15.832,
+      "drawnS": 0.022,
+      "settledS": 4.015699999928475,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 149,
+      "p50": 8.099999999998545,
+      "p95": 43.599999999998545,
+      "mean": 13.50872483221476,
+      "shaders": {
+        "warmup": 91,
+        "run": 18,
+        "worstMs": 8.699999928474426,
+        "violations": 2,
+        "repeats": 1,
+        "lines": [
+          "run: \"ShadowMaterial of Mesh flora<Point Light Shadow [ torch shadow light ] - Face 1\" started 0 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial (instanced) of Mesh far folk<Point Light Shadow [ torch shadow light ] - Face 1\" started 0 ms after a build of 1 ms ended (minimum 2 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "2 shader violations"
+      ]
+    },
+    {
+      "name": "barrow",
+      "file": "11-barrow.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 18.43,
+      "drawnS": 0.048,
+      "settledS": 4.016799999952316,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 117,
+      "p50": 12.099999999998545,
+      "p95": 54.5,
+      "mean": 17.14957264936886,
+      "shaders": {
+        "warmup": 84,
+        "run": 14,
+        "worstMs": 10.100000023841858,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "wild",
+      "file": "12-wild.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 18.43,
+      "drawnS": 0.703,
+      "settledS": 1.5046999999284745,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 182,
+      "p50": 10.599999999998545,
+      "p95": 15.599999999998545,
+      "mean": 11.003296703427702,
+      "shaders": {
+        "warmup": 84,
+        "run": 31,
+        "worstMs": 10.100000023841858,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh body<deer<creatures\" started 1 ms after a build of 1 ms ended (minimum 2 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "1 shader violations"
+      ]
+    },
+    {
+      "name": "fight",
+      "file": "13-fight.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 18.43,
+      "drawnS": 0.029,
+      "settledS": 1.5092999999523162,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 145,
+      "p50": 13.89999999999418,
+      "p95": 16.69999999999709,
+      "mean": 13.873103448440288,
+      "shaders": {
+        "warmup": 84,
+        "run": 36,
+        "worstMs": 10.100000023841858,
+        "violations": 2,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh body<deer<creatures\" started 1 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh body<wolf<creatures\" started 0 ms after a build of 1 ms ended (minimum 2 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim",
+        "2 shader violations"
+      ]
+    },
+    {
+      "name": "talk",
+      "file": "14-talk.jpg",
+      "query": "title=0&day=0&gl&hour=20&talk=inn&topics=news",
+      "loadS": 14.007,
+      "drawnS": 1.909,
+      "settledS": 2.6018999999761583,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 126,
+      "p50": 14.599999999998545,
+      "p95": 27.5,
+      "mean": 15.986507937075599,
+      "shaders": {
+        "warmup": 84,
+        "run": 20,
+        "worstMs": 10.800000071525574,
+        "violations": 2,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh body-crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]\" started 0 ms after a build of 9 ms ended (minimum 17 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim",
+        "2 shader violations"
+      ]
+    }
+  ]
+}
