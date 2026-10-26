@@ -88,12 +88,8 @@ export class Creator {
 
   /** Opens the glass and resolves with the hero once Begin is pressed. `race` comes from the title's peoples card. */
   async open(race: string | null): Promise<MadeHero> {
-    const { hero, renderer, looks } = this.host;
-    const model = (this.model = await hero.model(renderer, looks));
-    if (race && race !== model.config.race && model.catalog.races.some((r) => r.id === race)) {
-      await model.set(randomConfig(model.catalog, model.config, { random: this.random(), race: race as never, outfit: false }));
-      void hero.dress(model.config);
-    }
+    const { hero } = this.host;
+    const model = (this.model = await this.ready(race));
     this.stop = model.onChange((c) => {
       void hero.dress(c);
       if (!this.named) this.name.value = this.defaultName(c);
@@ -107,6 +103,27 @@ export class Creator {
     this.listen(true);
     return new Promise((resolve) => { this.done = resolve; });
   }
+
+  /**
+   * Loads the editor's character in the people's race (its files come over the network), so the glass opens
+   * at once after the dive: called as soon as the title's choice is made. `open` waits for it.
+   */
+  ready(race: string | null): Promise<Character> {
+    this.readying ??= (async () => {
+      const { hero, renderer, looks } = this.host;
+      const model = await hero.model(renderer, looks);
+      if (race && race !== model.config.race && model.catalog.races.some((r) => r.id === race)) {
+        await model.set(randomConfig(model.catalog, model.config, { random: this.random(), race: race as never, outfit: false }));
+        // The hero the dive lands on is already of that people.
+        void hero.dress(model.config);
+      }
+      return model;
+    })();
+    // A failed load (its files would not come) is tried afresh by the next call.
+    this.readying.catch(() => { this.readying = null; });
+    return this.readying;
+  }
+  private readying: Promise<Character> | null = null;
 
   get showing(): boolean { return this.root.classList.contains('open'); }
 
