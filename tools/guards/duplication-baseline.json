@@ -240,10 +240,6 @@
     "reason": "Rock beds as a sine warped by fbm noise: one line of shaping in each rock field, with its own scales and amplitudes."
   },
   {
-    "key": "same name: masterworld/world/dungeon/caveMouth.ts#mat + masterworld/world/dungeon/caveRock.ts#mat",
-    "reason": "Both implement RockLook.mat (world/dungeon/rockMesh.ts): each rock says which material its faces are; the shared meshing already lives in meshField."
-  },
-  {
     "key": "same name: masterworld/world/dungeon/caveMouth.ts#tint + masterworld/world/dungeon/caveRock.ts#tint",
     "reason": "Both implement RockLook.tint (world/dungeon/rockMesh.ts): each rock colours its own faces; the shared meshing already lives in meshField."
   },

@@ -29,19 +29,24 @@ export interface KindShape {
   readonly carved: boolean;
   /** Wall torches by its doors (a natural cave has none: the lantern is all the light there is). */
   readonly torches: boolean;
+  /**
+   * The hero comes in standing in the middle of the entrance room (a tower's door, a cave's rock step: the
+   * camera behind them would sit in the door or the ladder), else by the way out (a cellar's ladder).
+   */
+  readonly arriveMid: boolean;
 }
 
 const footprint = (p: { readonly hu: number; readonly hv: number }): [number, number] => [Math.max(2, Math.min(5, Math.floor(p.hu))), Math.max(2, Math.min(5, Math.floor(p.hv)))];
 
-const CELLAR: KindShape = { radius: 16, maxRooms: 11, depth: (older) => (older ? -1 : 0), rise: 0, way: 'ladder', inset: 0.55, entrance: footprint, carved: false, torches: true };
+const CELLAR: KindShape = { radius: 16, maxRooms: 11, depth: (older) => (older ? -1 : 0), rise: 0, way: 'ladder', inset: 0.55, entrance: footprint, carved: false, torches: true, arriveMid: false };
 
 export const KIND_SHAPES: Readonly<Record<DungeonTemplate, KindShape>> = {
   cellar: CELLAR,
   barrow: CELLAR,
   // Water and rock: a storey below always (the water went down), the way up to the mouth a rock step with a ladder.
-  cave: { ...CELLAR, maxRooms: 12, depth: () => -1, inset: 0.95, entrance: () => [3, 3], carved: true, torches: false },
+  cave: { ...CELLAR, maxRooms: 12, depth: () => -1, inset: 0.95, entrance: () => [3, 3], carved: true, torches: false, arriveMid: true },
   // A small foot and storeys going up, a cellar under its foot (an older layer's vault, if it has one).
-  tower: { ...CELLAR, radius: 7, maxRooms: 10, depth: () => -1, rise: 2, way: 'door', entrance: () => [3, 3] },
+  tower: { ...CELLAR, radius: 7, maxRooms: 10, depth: () => -1, rise: 2, way: 'door', entrance: () => [3, 3], arriveMid: true },
 };
 
 export const shapeOf = (kind: DungeonTemplate): KindShape => KIND_SHAPES[kind];
