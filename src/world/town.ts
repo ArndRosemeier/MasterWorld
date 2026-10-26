@@ -159,7 +159,10 @@ export class Town {
 
   private rasterise(): void {
     const p = this.plan;
-    // The farmland first: open ground, the fields on it, the farmsteads' grounds and yards.
+    // The farmland first: open ground, the fields on it, the farmsteads' grounds and yards. Round a hamlet
+    // or village all of it is cleared, not only the furlongs (its few fields would stand in the wood).
+    const small = this.decision.size === 'hamlet' || this.decision.size === 'village';
+    if (small) this.fill(p.farmEdge, TownGround.Farmland);
     for (const f of p.furlongs) this.fill(f, TownGround.Farmland);
     for (const fm of p.farms) {
       const ids = [fm.house, fm.barn, fm.stable].filter((i) => i >= 0);
@@ -167,7 +170,7 @@ export class Town {
     }
     for (const f of p.fields) this.fill(f.poly, TownGround.Field, f.id + 1);
     for (const fm of p.farms) this.fill(fm.yard, TownGround.Yard);
-    if (this.decision.size === 'hamlet' || this.decision.size === 'village') {
+    if (small) {
       // A hamlet's or village's blocks are wide: inside the outline it is open ground (kept grass, no
       // wood), the plots round the houses its yards and gardens.
       this.fill(p.outline, TownGround.Farmland);

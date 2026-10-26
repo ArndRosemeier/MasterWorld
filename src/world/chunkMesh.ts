@@ -6,6 +6,7 @@ import { srgbToLinear, clamp } from '@futuremagic/core';
 import { SURFACES } from '../setting/contract';
 import type { Terrain } from './terrain';
 import { canopySampler, type Canopy } from './canopy';
+import { TownGround } from './town';
 
 export interface ChunkSpec {
   /** World position of the chunk's minimum corner. */
@@ -64,6 +65,9 @@ function borderRing(segs: number): number[] {
   return ring;
 }
 
+/** The surfaces a settlement's ground swaps (the wood's floor for kept grass). */
+const FOREST = SURFACES.indexOf('forest'), GRASS = SURFACES.indexOf('grass');
+
 /**
  * The ground's look at a point, for any mesh drawn with the terrain material: writes the biome's linear
  * ground colour and its surface weights (one-hot, SURFACES order) at vertex `v` of `color` and `surface`.
@@ -75,7 +79,9 @@ export function groundLook(t: Terrain): (x: number, z: number, color: Float32Arr
     const b = clamp(t.biomeAt(x, z), 0, lin.length - 1), c = lin[b];
     color[v * 3] = c[0]; color[v * 3 + 1] = c[1]; color[v * 3 + 2] = c[2];
     surface.fill(0, v * 4, v * 4 + 4);
-    surface[v * 4 + surf[b]] = 1;
+    // A settlement's ground is kept: grass, not the wood's floor, even where it was cleared from forest.
+    const kept = surf[b] === FOREST && t.townGround(x, z) !== TownGround.None;
+    surface[v * 4 + (kept ? GRASS : surf[b])] = 1;
   };
 }
 
