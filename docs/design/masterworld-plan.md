@@ -192,6 +192,8 @@ A believable world needs global structure: rivers run downhill to a coast, mount
 
 The skeleton is unbounded and fixed. The VGM decides **what stands on it** and **when it is detailed**. "The world starts small" means few regions are open and few promises are made, not that the land is missing.
 
+**Built (2026-10-26, B0): a floating origin** (MW #152, AG #100). The land is unbounded, and float32 is not: the start town already sits 32 km from zero. So the GPU sees the world relative to an origin near the camera (`FloatingOrigin` in `@futuremagic/stage`, `ORIGIN` in `src/render/origin.ts`). The origin moves in steps of 1280 m (ten chunks, a whole number of sun-shadow texels) once the camera is that far from it. Game code, the simulation and the game camera keep world coordinates. The scene root stands at minus the origin, and the renderer draws an origin-relative copy of the camera. Shaders read patterns at `WORLD`, and GPU-placed geometry is pinned (docs/SHADERS.md). A step changes one uniform and builds no shader. `npm run shot:origin` shows a shore 300 km out without shimmer, where `?origin=0` crumples the grass and roughens the hero.
+
 ### 5.3 Soft and hard land
 
 * **Hard**: anything the player has seen or been told about in detail. It changes only through story events (4.5).
