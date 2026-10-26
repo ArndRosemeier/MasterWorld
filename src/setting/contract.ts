@@ -261,6 +261,40 @@ export interface WildDef {
 }
 
 /**
+ * Small life (plan 9.3): birds and squirrels about the land, in the world simulation, never fought and
+ * never steered by the VGM. They forage, flee into the trees or take wing when someone comes near, and
+ * keep to their roosts by night.
+ */
+export interface SmallLifeDef {
+  readonly birds: readonly BirdKindDef[];
+  /** The squirrel's looks (Actors' squirrel presets: grey, red, fox, black), picked by seed; empty: none. */
+  readonly squirrels: readonly string[];
+  /** Chance of a squirrel in a 32 m square of closed wood (less where the wood is thinner). */
+  readonly squirrelChance: number;
+}
+
+/** A kind of bird (plan 9.3). */
+export interface BirdKindDef {
+  readonly id: string;
+  /** Length, metres (a sparrow 0.15, a crow 0.45). */
+  readonly size: number;
+  /** Colours of the back (sRGB 0xRRGGBB), one picked per bird; the belly is paler. */
+  readonly colours: readonly number[];
+  /**
+   * wood: a few forage on the woodland floor and flee up into the crowns; open: the same on meadows and
+   * at wood edges, fleeing to the nearest trees or farther over the grass; flock: many wheel over open
+   * land and fields, settle to feed, and rise together.
+   */
+  readonly habitat: 'wood' | 'open' | 'flock';
+  /** How many together, at least and at most. */
+  readonly count: readonly [number, number];
+  /** Chance of a group in a square where they live (32 m; flocks 128 m). */
+  readonly chance: number;
+  /** Wing beats per second. */
+  readonly beat: number;
+}
+
+/**
  * A creature (plan 9.3, 12, D29): its body, senses, temper and power. Its danger is fixed by what it is,
  * never scaled to the player; weak ones fight anyway, as they do not know the player is a champion.
  */
@@ -622,6 +656,8 @@ export interface SettingModule {
   readonly routines: RoutinesDef;
   /** What lives on the land around a town. */
   readonly wild: readonly WildDef[];
+  /** Birds and squirrels about the land; without it the land has none. */
+  readonly smallLife?: SmallLifeDef;
   /** The setting's colour key over the day; without it the engine's neutral grade. */
   readonly look?: LookDef;
 }
@@ -763,6 +799,9 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
   for (const [kind, lore] of Object.entries(m.dungeons)) for (const d of lore?.dwellers ?? []) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: ${kind} dweller "${d.id}" creature "${c}" is unknown`);
+  for (const b of m.smallLife?.birds ?? []) {
+    if (b.size <= 0 || !b.colours.length || b.count[0] < 1 || b.count[1] < b.count[0] || b.beat <= 0) out.push(`${where}: bird "${b.id}" needs a size, colours, a count and a beat`);
+  }
   for (const w of m.wild) {
     for (const c of w.creatures) if (!ids.has(c)) out.push(`${where}: wild "${w.id}" creature "${c}" is unknown`);
     if (!w.creatures.length || w.count[0] < 1 || w.count[1] < w.count[0] || w.ring[1] < w.ring[0] || w.range <= 0) out.push(`${where}: wild "${w.id}" needs creatures, a count, a ring and a range`);

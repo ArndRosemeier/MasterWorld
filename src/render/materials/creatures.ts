@@ -7,7 +7,7 @@
  */
 import { MeshStandardNodeMaterial, NoColorSpace, SRGBColorSpace, Texture, type Material } from 'three/webgpu';
 import { normalMap, texture, vec3, vertexColor } from 'three/tsl';
-import { critterEye, critterFlesh } from '@futuremagic/creatures/node';
+import { birdMaterial, critterEye, critterFlesh } from '@futuremagic/creatures/node';
 import type { CritterMaterials } from '@futuremagic/creatures/three';
 import { defineKind } from '../materials';
 
@@ -56,4 +56,12 @@ export function ratMaterial(name: string, loaded: Material): Material | null {
     return RAT_COAT.make();
   }
   return name === 'eye' ? ANIMAL_EYE.make() : name === 'teeth' ? TEETH.make() : null;
+}
+
+/**
+ * The small birds (sim/smallLife.ts), all in one draw (@futuremagic/creatures BirdBatch): not a kind, since
+ * its instance attributes are no stand-in's; the batch's mesh is warmed with the warm-up's extras, like the grass.
+ */
+export function createBirdMaterial(): Material {
+  return birdMaterial();
 }

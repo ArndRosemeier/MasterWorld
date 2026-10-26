@@ -13,15 +13,15 @@ import { hash2f } from '@futuremagic/core';
 import { furActor, gaitPace } from '../furAnimal';
 
 /** What a wild animal does this frame (from its den state). */
-export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 'hurt' | 'dead';
+export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 'hurt' | 'dead' | 'flick';
 
 interface Kind {
   readonly pack: string;
   readonly preset: string;
   /** Breeds to pick from by seed (over `preset`): a herd of mixed cattle. */
   readonly presets?: readonly string[];
-  /** The pack's clip for each thing it does (null: the idle). */
-  readonly clips: Record<AnimalDoing, string | null>;
+  /** The pack's clip for each thing it does (null or none: the clip playing goes on). */
+  readonly clips: Partial<Record<AnimalDoing, string | null>>;
   /** The ground speed (m/s) its walk and run show at their own pace. */
   readonly pace: { readonly walk: number; readonly run: number };
   /** Over the preset: shape values and coat. */
@@ -62,6 +62,12 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     clips: { idle: 'idle', alert: 'idle', feed: 'eat', walk: 'walk', run: 'trot', blow: 'headbutt', hurt: null, dead: 'death' },
     pace: { walk: 1, run: 2.5 },
   },
+  // The woods' squirrels (sim/smallLife.ts): a hop to forage, a run up the trunk, a flick of the tail.
+  squirrel: {
+    pack: 'squirrel', preset: 'red',
+    clips: { idle: 'idle', alert: 'alert', feed: 'eat', walk: 'hop', run: 'run', flick: 'flick', dead: 'death' },
+    pace: { walk: 1.3, run: 4.5 },
+  },
   deer: {
     pack: 'deer', preset: 'red',
     clips: { idle: 'idle', alert: 'idle2', feed: 'eat', walk: 'walk', run: 'gallop', blow: 'kick', hurt: 'hit', dead: 'death' },
@@ -97,13 +103,13 @@ function lead(pack: string): Promise<Animal<object, object>> {
   return p;
 }
 
-/** One animal of a species (`wolf`, `deer`); a little bigger or smaller by `seed`. */
-export async function animalBody(species: string, seed: number, renderer: WebGPURenderer): Promise<AnimalBody | null> {
+/** One animal of a species (`wolf`, `deer`); a little bigger or smaller by `seed`; `preset` over the kind's own. */
+export async function animalBody(species: string, seed: number, renderer: WebGPURenderer, preset?: string): Promise<AnimalBody | null> {
   const def = ANIMAL_KINDS[species];
   if (!def) return null;
   const first = await lead(def.pack);
   const animal = Animal.share(first);
-  animal.setPreset(def.presets ? def.presets[Math.floor(hash2f(seed, 2, 9) * def.presets.length) % def.presets.length] : def.preset);
+  animal.setPreset(preset ?? (def.presets ? def.presets[Math.floor(hash2f(seed, 2, 9) * def.presets.length) % def.presets.length] : def.preset));
   if (def.shape || def.coat) animal.params = { shape: { ...animal.shape, ...def.shape }, coat: { ...animal.coat, ...def.coat } };
   const shape = animal.shape as { size?: number };
   if (typeof shape.size === 'number') shape.size *= 0.92 + hash2f(seed, 1, 7) * 0.16;
