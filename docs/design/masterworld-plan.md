@@ -557,6 +557,8 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 * **Milestone 4: music and combat**: music in layers (explore, tension, fight, town) that fade with the Director's tension curve; weapon and creature sounds.
 * No voices for now.
 
+**Built (2026-10-26): music streams (F4, plan step A5).** Music is 34 of the 42 MB in `public/sound`, and none of it is in the start download: `@futuremagic/audio` plays a piece through a media element (fetched and buffered as it plays, never decoded whole), and only when it first plays. The title's theme starts with the first press at the gate; the game is silent, and asks for no music, beds or steps, until the world is playable (`titleHolds` in `src/main.ts` waits for `__mwReady`), and its music begins 8 s after the title lets go. `node tools/shot/load.mjs` (a slow check, after `npm run build`) presses the gate like a player, reports the title time, the playable time and the start download by folder, and fails when game music is part of it or the F4 marks (1 s, 20 s) are missed.
+
 ---
 
 ## 17. Interface and first start (D45, D46)
