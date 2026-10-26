@@ -13,7 +13,7 @@ import { Rng, deriveSeed, hexToRgb } from '@futuremagic/core';
 import { Character } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
-import { grow, type BodyPlan, type CritterRole, type Integument } from '@futuremagic/creatures';
+import { grow, settle, type BodyPlan, type CritterRole, type Integument, type Species } from '@futuremagic/creatures';
 import { CritterModel, ModelledCreature, type ClipUse, type CritterFigure, type ModelledFigure, type RigInput } from '@futuremagic/creatures/three';
 import type { CreatureDef } from '../../setting/contract';
 import type { Creature, Den } from '../../sim/creatures';
@@ -23,6 +23,7 @@ import { gripHeld } from '../hero/grips';
 import { FADE, castShadows, playClip, preparePeople } from '../hero/play';
 import { foeClip, foeLook, type FoeDoing } from './foes';
 import type { Stage } from '@futuremagic/stage';
+import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from './animals';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -39,6 +40,7 @@ const RAT_CLIPS: Record<string, ClipUse> = {
 type Body =
   | { readonly kind: 'critter'; readonly fig: CritterFigure; readonly scale: number }
   | { readonly kind: 'modelled'; readonly fig: ModelledFigure; readonly scale: number }
+  | AnimalBody
   | { readonly kind: 'person'; readonly ch: Character; readonly place: Group; readonly held: Object3D | null; clip: string; drawn: boolean | null };
 
 interface Shown {
@@ -73,7 +75,27 @@ function speciesFor(def: CreatureDef, seed: number) {
   const sp = grow(new Rng(deriveSeed(seed, 'creature', def.id)), spider ? 'hunter' : beast?.role ?? 'scuttler', 0, def.id, force);
   const tone = hexToRgb(parseInt((b.kind === 'humanoid' ? '#000000' : b.color).slice(1), 16));
   // The setting's colour over the grown coat, its pattern kept.
-  return { ...sp, colors: { ...sp.colors, base: tone, secondary: tone.map((v) => v * 0.75) as typeof tone, belly: tone.map((v) => Math.min(1, v * 1.5)) as typeof tone } };
+  const coat = { ...sp, colors: { ...sp.colors, base: tone, secondary: tone.map((v) => v * 0.75) as typeof tone, belly: tone.map((v) => Math.min(1, v * 1.5)) as typeof tone } };
+  return b.kind === 'beast' && b.species === 'boar' ? boarOf(coat) : coat;
+}
+
+/**
+ * A boar out of the brute it grew as: a deep, heavy body high at the shoulder on short legs, a long
+ * blunt snout with tusks, small eyes and ears, a bristle ridge down the back, a thin short tail, and
+ * all of it dark (no pale face).
+ */
+function boarOf(sp: Species): Species {
+  const c = sp.colors;
+  return settle({
+    ...sp, plan: 'quadruped', integument: 'hide', oddities: [],
+    girth: 0.3, bodyWidth: 0.9, bodyHeight: 1.3, chest: 1.35, belly: 0.1, spineArch: 0.2, chunky: 0.1,
+    neckLen: 0.12, neckRaise: 0.05,
+    head: { ...sp.head, size: 0.25, snout: 1.4, snoutTip: 0.9, mandibles: 0, horns: 0, crest: 0, frill: 0, eyes: 2, eyeSize: 0.7, stalks: 0, pupil: 'round', ears: 0.55, earPoint: 0.8, tusks: 0.7, antennae: 0, whiskers: false, lure: 0 },
+    limbs: { ...sp.limbs, pairs: 2, length: 0.45, thickness: 0.3, hindRatio: 1, digitigrade: false, splay: 0, foot: 'hoof', footSize: 0.9, arms: false, armLength: 0, claws: 0, bigClaw: 0 },
+    tail: { ...sp.tail, length: 0.22, thickness: 0.25, curl: 0.1, tip: 'tuft' },
+    dorsal: { ...sp.dorsal, spikes: 8, spikeLen: 0.08, plates: false, shell: 0, sacs: 0 },
+    colors: { ...c, belly: c.base.map((v) => v * 0.85) as typeof c.base, secondary: c.base.map((v) => v * 0.6) as typeof c.base, pattern: 'none', countershade: 0.15, glowAmount: 0, sheen: 0, translucent: 0 },
+  });
 }
 
 export class CreatureView {
@@ -107,6 +129,8 @@ export class CreatureView {
     for (const c of den.creatures) {
       const b = c.def.body;
       let body: Body;
+      // Wolves and deer are Actors' animals; other beasts are grown critters.
+      const animal = b.kind === 'beast' ? await animalBody(b.species, deriveSeed(seed, 'animal', c.id), renderer) : null;
       if (b.kind === 'humanoid') {
         const ch = await person();
         await ch.set(foeLook(c.def, seed, c.id));
@@ -132,6 +156,9 @@ export class CreatureView {
         fig.root.name = c.def.name;
         v.group.add(fig.root);
         body = { kind: 'modelled', fig, scale };
+      } else if (animal) {
+        body = animal;
+        v.group.add(animal.place);
       } else {
         let m = models.get(c.def.id);
         if (!m) { m = new CritterModel(speciesFor(c.def, seed), critterMaterials()); models.set(c.def.id, m); }
@@ -178,6 +205,11 @@ export class CreatureView {
         f.pace(s.walked / k);
         if (hurtT < 1 && hurtT * FLINCH < dt + 1e-6 && !dead) f.hurt();
         f.advance(dt);
+      } else if (s.body.kind === 'animal') {
+        const speed = Math.hypot(vx, vz);
+        const doing: AnimalDoing = dead ? 'dead' : blowT < 1 ? 'blow' : hurtT < 1 ? 'hurt' : speed > 2.2 ? 'run' : speed > 0.2 ? 'walk'
+          : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
+        poseAnimal(s.body, c.x, c.y, c.z, yaw, doing, speed, dt);
       } else if (s.body.kind === 'critter') {
         const i = this.input;
         i.x = c.x; i.y = c.y; i.z = c.z; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
@@ -230,7 +262,7 @@ export class CreatureView {
     const O = this.group.position;
     for (const s of this.shown) {
       const c = s.c;
-      const h = c.def.body.kind === 'humanoid' ? c.def.body.height * 0.6 : 0.2;
+      const h = c.def.body.kind === 'humanoid' ? c.def.body.height * 0.6 : s.body.kind === 'animal' ? 0.55 : 0.2;
       const px = c.x + O.x - from.x, py = c.y + h + O.y - from.y, pz = c.z + O.z - from.z;
       const along = px * dir.x + py * dir.y + pz * dir.z;
       if (along < 0) continue;
