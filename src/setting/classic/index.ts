@@ -42,8 +42,8 @@ export const classic: SettingModule = {
     // Temperate: fronts a few tens of km across pass over in half a day; showers, the odd thunderstorm,
     // misty mornings in the valleys.
     weather: { frontSize: 70_000, frontSpeed: 3_500, change: 14, rainfall: 0.5, storms: 0.45, mist: 0.55, windiness: 0.45, drying: 3 },
-    // Horses stand in for cattle until Actors has cattle.
-    livestock: 'horse',
+    // Cattle graze the paddocks.
+    livestock: 'cow',
   },
   start: {
     biomes: ['meadow', 'forest'],
