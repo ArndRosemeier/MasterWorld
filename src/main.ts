@@ -61,6 +61,7 @@ import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
 import { Notes } from './app/notes';
 import { TalkUi } from './app/talkUi';
+import { standingPlace } from './game/standingPlace';
 import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
 import { TradeUi } from './app/tradeUi';
@@ -659,7 +660,9 @@ export async function start(b: Boot): Promise<void> {
         const p = rooms.people(life)?.find((x) => x.agent === a);
         if (p) { player.teleport(p.x + Math.cos(p.dir) * 1.3, p.y, p.z + Math.sin(p.dir) * 1.3, Math.atan2(Math.cos(p.dir), Math.sin(p.dir))); return; }
       }
-      player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
+      // Clear of walls: a building's corner beside the hero filled the talk's shot.
+      const at = standingPlace(a.x, a.z, a.dir, (x, z, r) => !!town?.solid(x, z, r));
+      player.teleport(at.x, undefined, at.z, Math.atan2(at.x - a.x, at.z - a.z));
     };
     if (talk && life && town && params.talk) {
       // Straight into a talk: in front of the innkeeper or of the cellar's household.
