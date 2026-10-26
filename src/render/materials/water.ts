@@ -81,7 +81,10 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const N0 = normalize(vN.add(ripple)).toVar();
     const N = select(up, N0, N0.negate());
     const ndv = clamp(dot(N, V), 0, 1);
-    const fres = float(0.02).add(pow(float(1).sub(ndv), 5).mul(0.98));
+    // A wind-roughened sea is no mirror: at grazing angles its facets tilt toward the viewer, so the
+    // reflection never reaches full strength and comes from higher, bluer sky than the pale horizon.
+    const rough = smoothstep(20.0, 400.0, camDist);
+    const fres = float(0.02).add(pow(float(1).sub(ndv), 5).mul(0.98)).min(mix(float(0.7), float(0.5), rough));
     const depth = max(vDepth, 0);
     const sunUp = clamp(W.sunDir.y.mul(3).add(0.2), 0, 1);
 
@@ -100,9 +103,9 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
 
     // The sky and the sun in it.
     const R = reflect(V.negate(), N);
-    const Rup = vec3(R.x, abs(R.y), R.z);
+    const Rup = normalize(vec3(R.x, max(abs(R.y), mix(float(0.12), float(0.25), rough)), R.z));
     // The env copy of the sky is drawn with less colour (weather.ts ENV_SATURATION): the mirror gives it back.
-    const sky = fullSky(pmremTexture(envTex!, Rup, float(0.04)).rgb).mul(W.env);
+    const sky = fullSky(pmremTexture(envTex!, Rup, mix(float(0.06), float(0.2), rough)).rgb).mul(W.env);
     const rs = max(dot(R, W.sunDir), 0);
     const spec = pow(rs, 900).mul(30).add(pow(rs, 80).mul(0.6));
     const refl = sky.add(W.sunColor.mul(spec).mul(sunUp));
