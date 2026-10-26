@@ -65,6 +65,9 @@ export const params = {
   site: q.get('site'),
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
+  /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
+  cave: q.has('cave'),
+  tower: q.has('tower'),
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
   /** Open character creation at once, without the title (`create`; with the title it follows New game). */

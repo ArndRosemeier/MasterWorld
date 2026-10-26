@@ -128,7 +128,7 @@ export interface StartSpec {
 /** The props the engine can draw in a dungeon (simple kit pieces). */
 export const DUNGEON_PROPS = [
   'barrel', 'cask', 'rack', 'crate', 'sack', 'shelf', 'table', 'stool', 'cot', 'straw', 'rubble', 'bones',
-  'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar', 'ladder',
+  'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar', 'ladder', 'door',
 ] as const;
 export type DungeonProp = (typeof DUNGEON_PROPS)[number];
 
@@ -674,7 +674,7 @@ export interface SettingModule {
   readonly world: WorldShape;
   readonly start: StartSpec;
   /** Material for dungeons, per kind (plan 8). */
-  readonly dungeons: { readonly cellar: CellarLore; readonly barrow?: CellarLore };
+  readonly dungeons: { readonly cellar: CellarLore; readonly barrow?: CellarLore; readonly cave?: CellarLore; readonly tower?: CellarLore };
   /** Names of the peoples, by Actors' race id (human, dwarf, halfling, elf). */
   readonly names: Readonly<Record<string, NamesDef>>;
   readonly talk: TalkDef;

@@ -24,6 +24,17 @@ The policy is implemented once, in the shared package **`@futuremagic/stage`** (
 | Monitor | `@futuremagic/stage` `ShaderMonitor` | Records every build with its duration. `shaders.report()` in the browser console; `?hud` shows a summary line. Its hard violation line is 100 ms; the 10 ms target is ours and is read from the same records. |
 | Guards | `tools/guards/rules.json` | `npm test` fails on a material made outside the registry, on `onBeforeCompile`, on `renderer.compile*` in our code, and on a second renderer. |
 
+## The floating origin (plan B0)
+
+The scene is drawn relative to a point near the camera (`ORIGIN` in `src/render/origin.ts`, `FloatingOrigin` in `@futuremagic/stage`), so float32 stays exact however far out the hero walks. The origin moves in 1280 m steps. A step changes one uniform and the scene root's position, and builds no shader. So in every shader:
+
+- `positionWorld`, `modelWorldMatrix` and `cameraPosition` are **relative to the origin**. Their differences (a view ray, a distance to the camera) are right as they are.
+- A **pattern, noise or mask** read at a world point uses `WORLD` (the fragment's world position), and one that follows the camera uses `EYE`. Both come from `src/render/origin.ts`. Raw `positionWorld` there makes the pattern jump at every step, and breaks it far out.
+- **Geometry placed on the GPU** (instances, grass, far folk, precipitation) has no matrix of its own. Its group is `ORIGIN.pin`ned so its matrixWorld is the identity, and it writes positions minus `ORIGIN.at`. On the CPU an object's matrixWorld is relative too: add `ORIGIN.at` (`ORIGIN.toWorld`). Meshes with big vertex coordinates are placed at their middle with local vertices (`recentre` in `src/world/chunkMesh.ts`).
+- A shadow map that is snapped in world space is redrawn when `ORIGIN.steps` changes (`src/render/sky.ts`, `src/render/warmLights.ts`).
+
+A guard in `tools/guards/rules.json` lets `positionWorld` and `modelWorldMatrix` appear only in the files that use the relative value on purpose. `npm run shot:origin` checks the town at 32 km and a shore at 300 km, with the origin on and with `?origin=0`, and checks that an origin step does not show.
+
 ## Lessons this is built on
 
 - Warm-up must compile against the *real* scene and render target. A shader's cache key includes lights, fog, render context and geometry layout, so a warm-up against a different setup warms nothing.

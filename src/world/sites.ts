@@ -9,6 +9,7 @@ import { buildingMesh, distToPoly, ensureCCW, makeBuilding, pointInPoly, rect, t
 import type { RegionFillDef } from '../setting/contract';
 import type { RegionDecision } from './decisions';
 import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
+import { onLand } from './dungeon/site';
 import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type Tint } from './dungeon/meshKit';
 
 /** What the walker cannot go through: a circle or a polygon (x, z pairs). */
@@ -192,9 +193,8 @@ const MOSS: Tint = [150, 156, 120];
  */
 function ruin(at: At, k: MeshKit, solids: Solid[]): void {
   const r = at.rng, W = r.range(9, 13) / 2, D = r.range(7, 10) / 2, thick = 0.8;
-  const c = Math.cos(at.yaw), s = Math.sin(at.yaw);
   // A point of the hall's own frame (u across, v along) in world metres.
-  const inHall = (u: number, v: number): [number, number] => [at.x + u * c + v * s, at.z - u * s + v * c];
+  const inHall = (u: number, v: number): [number, number] => onLand(at, u, v);
   const sides: [number, number, number, number][] = [[-W, -D, W, -D], [W, -D, W, D], [W, D, -W, D], [-W, D, -W, -D]];
   // The wall's height round the hall: a slow wave of decay, the doorway in the front side's middle.
   const phase = r.range(0, 6);

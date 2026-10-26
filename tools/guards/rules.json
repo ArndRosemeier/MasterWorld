@@ -6,6 +6,7 @@
     { "id": "new Material", "pattern": "\\bnew\\s+\\w*Material\\s*\\(", "only": ["src/render/materials.ts", "src/render/materials/"], "why": "every material is a kind in the registry, so warm-up knows every shader (docs/SHADERS.md)" },
     { "id": "onBeforeCompile", "pattern": "\\bonBeforeCompile\\b", "only": [], "why": "shader variants come from the registry's TSL kinds, not from patched source (docs/SHADERS.md)" },
     { "id": "renderer.compile", "pattern": "\\.compile(Async)?\\s*\\(", "only": [], "why": "compiling is the Stage's job (@futuremagic/stage): warmUp() and add() (docs/SHADERS.md)" },
+    { "id": "positionWorld", "pattern": "\\b(positionWorld|modelWorldMatrix)\\b", "only": ["src/render/origin.ts", "src/render/materials.ts", "src/render/materials/water.ts", "src/render/materials/weather.ts"], "why": "positionWorld and modelWorldMatrix are relative to the floating origin: patterns, noise and masks read WORLD (src/render/origin.ts); a file that needs the relative value for a distance or a ray is added here (docs/SHADERS.md)" },
     { "id": "localStorage", "pattern": "\\blocalStorage\\b", "only": ["src/persist/"], "why": "persistence goes through src/persist" }
   ],
   "layers": [

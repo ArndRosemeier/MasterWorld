@@ -14,6 +14,7 @@ import type { WarmLights } from '../render/warmLights';
 import { torchSpots } from '../world/dungeon/torches';
 import { CELL, STOREY, type Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace, type SpaceEvent } from '../world/dungeon/space';
+import { shapeOf } from '../world/dungeon/kinds';
 import { Fade } from './fade';
 import type { Notes } from './notes';
 import type { CellarDiff } from './saveGame';
@@ -45,8 +46,10 @@ export class CellarVisit {
     private readonly warm: WarmLights,
     private readonly sky: SkyView,
     private readonly notes: Notes,
+    /** Its space, if not the layout's own (a cave's carved rock). */
+    space?: DungeonSpace,
   ) {
-    this.space = new DungeonSpace(cellar.layout);
+    this.space = space ?? new DungeonSpace(cellar.layout);
     this.world = dungeonWorld(this.space, view.origin);
     this.entering = `You climb down into the cellar of ${cellar.house}.`;
   }
@@ -63,6 +66,8 @@ export class CellarVisit {
       this.warm.lightTorches(torchSpots(this.cellar).map((t) => ({ x: O0.x + t.x, y: O0.y + t.y, z: O0.z + t.z })));
       const O = this.view.origin, h = this.cellar.hatch;
       const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
+      // Some kinds bring the hero in the middle of the entrance room (world/dungeon/kinds.ts).
+      if (room === undefined && shapeOf(this.cellar.decision.template).arriveMid) room = this.cellar.graph.entrance;
       if (room !== undefined && this.cellar.layout.rooms[room]) {
         const r = this.cellar.layout.rooms[room];
         this.player.teleport(O.x + (r.x + r.w / 2) * CELL, O.y + r.level * STOREY, O.z + (r.z + r.d / 2) * CELL, h.yaw);
