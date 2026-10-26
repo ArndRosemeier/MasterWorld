@@ -43,7 +43,7 @@ These hold in every phase. A PR that breaks one is fixed before new work goes on
 
 | # | Floor | Check |
 |---|---|---|
-| F1 | **Standard shots.** One script takes the same set on a GPU: title, the creator, town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map, talk. They are saved with the commit hash. | `npm run shot:set` (`tools/shot/set.mjs`, built in A1). Run at every phase gate and after visual PRs. |
+| F1 | **Standard shots.** One script takes the same set on a GPU: title, the creator, town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map, the trade window, talk. They are saved with the commit hash. | `npm run shot:set` (`tools/shot/set.mjs`, built in A1). Run at every phase gate and after visual PRs. |
 | F2 | **Frame time** on the reference GPU (Arnd's RTX 5070, webgl2, 1080p): at most 16.7 ms in every standard shot, aiming for 12 ms. No shot may be twice as slow as the town at noon. | The `&hud` frame time in F1 shots, written into the set's index. |
 | F3 | **Shaders** per [SHADERS.md](../SHADERS.md): 0 violations in every shot. | HUD line "policy ok". |
 | F4 | **Load time**: title in under 1 s and playable in under 20 s on the reference machine; music streams and is not part of the start download. | `tools/shot/perf.mjs`. Sound today is 42 MB in `public/sound`. |
@@ -65,7 +65,7 @@ Goal: an evening of play works end to end. You get a lead, travel, clear the pla
 | Step | Delivers | Done when | Design |
 |---|---|---|---|
 | A1 | **The standard shot set** (F1, F2): one script, one folder per commit, an index with frame times | The set runs in one go on the reference GPU and the shots of today's main are judged | 3 |
-| A2 | **Trade**: merchants in the town's shops (smith, general store, the inn's keeper) with limited stock and coin; prices follow what the town has; sell finds, buy gear; copper, silver and gold; a trade window in warded brass with item cards | A seeded test sells a find and buys an upgrade; the trade window is in the F1 set | 11.5 |
+| A2 ✓ | **Trade**: merchants in the town's shops (smith, general store, the inn's keeper) with limited stock and coin; prices follow what the town has; sell finds, buy gear; copper, silver and gold; a trade window in warded brass with item cards | A seeded test sells a find and buys an upgrade; the trade window is in the F1 set | 11.5 |
 | A3 ✓ | **Upkeep**: gear wears and the smith repairs it; a room at the inn restores you and sets where you wake | Test: wear, repair cost, waking at the inn | 11.5, 11.2 |
 | A4 ✓ | **Death as designed**: in classic mode carried gear stays where you fell, as a mark on the map to go back for; **roguelike mode** (one save the game writes, death ends the hero, the world stays for the next one) | Tests for both modes; the New game screen offers the mode | 11.1, D12 |
 | A5 | **Music streams** (F4): the start loads no music; tracks load when first needed | F4 load time passes | 16 |

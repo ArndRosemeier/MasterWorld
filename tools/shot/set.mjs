@@ -2,7 +2,7 @@
  * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack,
- * the map, talk) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
+ * the map, the trade window, talk) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
  * writes `index.md` and `index.json` there: each shot's frame time (median and 95th percentile over a few
  * seconds, no frame cap), its shader summary (F3) and the page's errors. The index marks a shot over 16.7 ms,
  * or more than twice as slow as the town at noon (F2). A slow check (docs/CHECKS.md): one run must stay
@@ -63,6 +63,8 @@ const SESSIONS = [
     { name: 'town-dusk', act: async (p) => { await close(p); await turn(18.3, 'fair')(p); } },
     { name: 'town-night', act: turn(23, 'clear') },
     { name: 'town-rain', act: turn(14, 'rain') },
+    // Last, as it moves the hero to the smith's counter.
+    { name: 'trade', act: async (p) => { await p.evaluate(() => window.game.tradeAt('smith')); await p.waitForTimeout(1800); } },
   ] },
   { id: 'cellar', query: `${still}&hour=12&cellar=2`, shots: [{ name: 'cellar' }] },
   // Out on the land: the barrow, then the hero is moved to the deer and the wolves (a load is the dearest part).
