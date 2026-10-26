@@ -22,14 +22,34 @@ interface Kind {
   readonly clips: Record<AnimalDoing, string | null>;
   /** The ground speed (m/s) its walk and run show at their own pace. */
   readonly pace: { readonly walk: number; readonly run: number };
+  /** Over the preset: shape values and coat. */
+  readonly shape?: Readonly<Record<string, number>>;
+  readonly coat?: Readonly<Record<string, number | readonly number[]>>;
 }
 
-/** The setting's beasts Actors has a body for (the boar has none: a grown critter draws it). */
+/** The setting's beasts, on Actors' bodies (the boar on the dog's rig: Actors has no pig). */
 export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
   wolf: {
     pack: 'dog', preset: 'wolf',
     clips: { idle: 'idle', alert: 'alert', feed: 'idle', walk: 'walk', run: 'run', blow: 'bite', hurt: null, dead: 'death' },
     pace: { walk: 1.5, run: 7 },
+    // Greyer and less white than Actors' grey wolf (which reads as a husky in the game's light).
+    coat: { white: [0.7, 0.66, 0.6], bib: 0.35, belly: 0.6 },
+  },
+  boar: {
+    pack: 'dog', preset: 'wolf',
+    clips: { idle: 'idle', alert: 'alert', feed: 'idle', walk: 'walk', run: 'run', blow: 'bite', hurt: null, dead: 'death' },
+    pace: { walk: 1.2, run: 6 },
+    // A boar's build: short legs under a deep heavy barrel, a big wedge of a head (a long, deep snout
+    // with no stop), small pricked ears, a short straight tail; a dark coarse coat with no pale marks.
+    shape: {
+      size: 1.4, legs: 0.6, body: 1.2, neck: 0.7, head: 1.3, bulk: 1.45, bone: 1.4, tail: 0.3, ears: 0.7, earDrop: 0, earFold: 0.3,
+      muzzle: 1, muzzleBroad: 0.6, muzzleDeep: 0.9, stop: 0, skullDome: 0, chestDeep: 1, bellyTuck: 0, tailCurl: 0, tailPlume: 0, cheeks: 0.3,
+    },
+    coat: {
+      base: [0.29, 0.24, 0.19], second: [0.12, 0.1, 0.09], tan: [0.29, 0.24, 0.19], white: [0.33, 0.28, 0.23],
+      saddle: 0.6, mask: 0, points: 0, belly: 0, bib: 0, socks: 0, blaze: 0, tailTip: 0, spots: 0, shade: 0.3, paleMask: 0, agouti: 0.4, tanLegs: 0, length: 0.045, fluff: 0.15,
+    },
   },
   deer: {
     pack: 'deer', preset: 'red',
@@ -73,6 +93,7 @@ export async function animalBody(species: string, seed: number, renderer: WebGPU
   const first = await lead(def.pack);
   const animal = Animal.share(first);
   animal.setPreset(def.preset);
+  if (def.shape || def.coat) animal.params = { shape: { ...animal.shape, ...def.shape }, coat: { ...animal.coat, ...def.coat } };
   const shape = animal.shape as { size?: number };
   if (typeof shape.size === 'number') shape.size *= 0.92 + hash2f(seed, 1, 7) * 0.16;
   const { actor, place } = await furActor(animal, renderer, species);

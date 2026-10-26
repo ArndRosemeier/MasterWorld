@@ -13,7 +13,7 @@ import { Rng, deriveSeed, hexToRgb } from '@futuremagic/core';
 import { Character } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
-import { grow, settle, type BodyPlan, type CritterRole, type Integument, type Species } from '@futuremagic/creatures';
+import { grow, type BodyPlan, type CritterRole, type Integument } from '@futuremagic/creatures';
 import { CritterModel, ModelledCreature, type ClipUse, type CritterFigure, type ModelledFigure, type RigInput } from '@futuremagic/creatures/three';
 import type { CreatureDef } from '../../setting/contract';
 import type { Creature, Den } from '../../sim/creatures';
@@ -75,27 +75,7 @@ function speciesFor(def: CreatureDef, seed: number) {
   const sp = grow(new Rng(deriveSeed(seed, 'creature', def.id)), spider ? 'hunter' : beast?.role ?? 'scuttler', 0, def.id, force);
   const tone = hexToRgb(parseInt((b.kind === 'humanoid' ? '#000000' : b.color).slice(1), 16));
   // The setting's colour over the grown coat, its pattern kept.
-  const coat = { ...sp, colors: { ...sp.colors, base: tone, secondary: tone.map((v) => v * 0.75) as typeof tone, belly: tone.map((v) => Math.min(1, v * 1.5)) as typeof tone } };
-  return b.kind === 'beast' && b.species === 'boar' ? boarOf(coat) : coat;
-}
-
-/**
- * A boar out of the brute it grew as: a deep, heavy body high at the shoulder on short legs, a long
- * blunt snout with tusks, small eyes and ears, a bristle ridge down the back, a thin short tail, and
- * all of it dark (no pale face).
- */
-function boarOf(sp: Species): Species {
-  const c = sp.colors;
-  return settle({
-    ...sp, plan: 'quadruped', integument: 'hide', oddities: [],
-    girth: 0.3, bodyWidth: 0.9, bodyHeight: 1.3, chest: 1.35, belly: 0.1, spineArch: 0.2, chunky: 0.1,
-    neckLen: 0.12, neckRaise: 0.05,
-    head: { ...sp.head, size: 0.25, snout: 1.4, snoutTip: 0.9, mandibles: 0, horns: 0, crest: 0, frill: 0, eyes: 2, eyeSize: 0.7, stalks: 0, pupil: 'round', ears: 0.55, earPoint: 0.8, tusks: 0.7, antennae: 0, whiskers: false, lure: 0 },
-    limbs: { ...sp.limbs, pairs: 2, length: 0.45, thickness: 0.3, hindRatio: 1, digitigrade: false, splay: 0, foot: 'hoof', footSize: 0.9, arms: false, armLength: 0, claws: 0, bigClaw: 0 },
-    tail: { ...sp.tail, length: 0.22, thickness: 0.25, curl: 0.1, tip: 'tuft' },
-    dorsal: { ...sp.dorsal, spikes: 8, spikeLen: 0.08, plates: false, shell: 0, sacs: 0 },
-    colors: { ...c, belly: c.base.map((v) => v * 0.85) as typeof c.base, secondary: c.base.map((v) => v * 0.6) as typeof c.base, pattern: 'none', countershade: 0.15, glowAmount: 0, sheen: 0, translucent: 0 },
-  });
+  return { ...sp, colors: { ...sp.colors, base: tone, secondary: tone.map((v) => v * 0.75) as typeof tone, belly: tone.map((v) => Math.min(1, v * 1.5)) as typeof tone } };
 }
 
 export class CreatureView {
@@ -129,7 +109,7 @@ export class CreatureView {
     for (const c of den.creatures) {
       const b = c.def.body;
       let body: Body;
-      // Wolves and deer are Actors' animals; other beasts are grown critters.
+      // The wild's beasts are Actors' animals (render/dungeon/animals.ts).
       const animal = b.kind === 'beast' ? await animalBody(b.species, deriveSeed(seed, 'animal', c.id), renderer) : null;
       if (b.kind === 'humanoid') {
         const ch = await person();
