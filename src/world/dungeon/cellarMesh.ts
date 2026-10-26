@@ -259,7 +259,11 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
       } else if (kind === 'oneway' && carved) {
         // A boulder rolled into the gap from beyond and wedged there with smaller stones: levered out from the far side.
         const rng = new Rng(deriveSeed(c.decision.seed, 'wedged', pl.link.id));
-        kit.stone(mx + out[0] * 0.15, y - 0.15, mz + out[1] * 0.15, DOOR_W + 0.5, DOOR_H + 0.25, 1.1, yaw + rng.range(-0.1, 0.1), WildMat.Rock, varyTint(rng, CAVE_ROCK, 0.06), rng, 0.08, 0.6);
+        // Round and knocked about (no slab): a great boulder bulging into the way, a smaller one jammed beside its shoulder.
+        const rock = (k: number) => scaleTint(CAVE_ROCK, rng.range(0.82, 1) * k);
+        kit.stone(mx + out[0] * 0.35, y - 0.3, mz + out[1] * 0.35, DOOR_W + 0.8, DOOR_H + 0.2, 1.9, yaw + rng.range(-0.5, 0.5), WildMat.Rock, rock(1), rng, 0.2, 0.88);
+        const side = rng.chance(0.5) ? 1 : -1;
+        kit.stone(mx + ux * side * 0.75 + out[0] * 0.2, y + DOOR_H * 0.45, mz + uz * side * 0.75 + out[1] * 0.2, 0.9, 0.8, 0.9, rng.range(0, 3), WildMat.Rock, rock(0.92), rng, 0.12, 0.8);
         for (let n = 0; n < 4; n++) {
           const s = rng.range(-1, 1);
           kit.stone(mx + ux * s * 0.7 + out[0] * rng.range(0.7, 1.1), y - 0.05, mz + uz * s * 0.7 + out[1] * rng.range(0.7, 1.1), rng.range(0.3, 0.5), rng.range(0.25, 0.45), rng.range(0.3, 0.5), rng.range(0, 3), WildMat.Rock, varyTint(rng, CAVE_ROCK, 0.1), rng, 0.06, 0.4);
