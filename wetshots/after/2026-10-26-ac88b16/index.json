@@ -1,0 +1,40 @@
+{
+  "commit": "ac88b16d9e8e6ec4483b51f2bef9ca6b9b21103a",
+  "dirty": false,
+  "date": "2026-10-26",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": false,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 27.783,
+  "shots": [
+    {
+      "name": "town-wet-sun",
+      "file": "01-town-wet-sun.jpg",
+      "query": "title=0&day=0&hour=15&look=270,-4",
+      "loadS": 22.081,
+      "drawnS": 0.04,
+      "settledS": 2.906600000023842,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 158,
+      "p50": 12.5,
+      "p95": 19.200000000000728,
+      "mean": 12.7018987346299,
+      "shaders": {
+        "warmup": 83,
+        "run": 1,
+        "late": 0,
+        "worstMs": 11.300000071525574,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    }
+  ]
+}
