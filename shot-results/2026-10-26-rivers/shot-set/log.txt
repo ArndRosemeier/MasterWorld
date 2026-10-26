@@ -1,0 +1,29 @@
+
+> masterworld@0.0.0 shot:set
+> node tools/shot/set.mjs
+
+title: ready in 20.5 s
+01-title.jpg: drawn 0.0 s · settled 1.5 s · p50 12.6 ms · p95 16.3 ms · 0 shader violations
+02-creator.jpg: drawn 0.0 s · settled 1.5 s · p50 13.1 ms · p95 16.3 ms · 0 shader violations
+town: ready in 17.3 s
+03-town-noon.jpg: drawn 0.0 s · settled 1.5 s · p50 10.8 ms · p95 14.3 ms · 0 shader violations
+04-pack.jpg: drawn 0.0 s · settled 1.5 s · p50 5.2 ms · p95 19.6 ms · 0 shader violations
+05-map.jpg: drawn 0.0 s · settled 1.5 s · p50 3.6 ms · p95 13.5 ms · 0 shader violations
+06-town-dusk.jpg: drawn 0.1 s · settled 1.5 s · p50 13.3 ms · p95 20.6 ms · 0 shader violations
+07-town-night.jpg: drawn 0.0 s · settled 1.5 s · p50 13.7 ms · p95 17.6 ms · 0 shader violations
+08-town-rain.jpg: drawn 0.0 s · settled 1.5 s · p50 14.3 ms · p95 32.8 ms · 0 shader violations
+09-paddock.jpg: drawn 0.1 s · settled 1.5 s · p50 8.1 ms · p95 10.2 ms · 0 shader violations
+10-trade.jpg: drawn 0.0 s · settled 1.5 s · p50 10.9 ms · p95 16.3 ms · 0 shader violations
+cellar: ready in 14.6 s
+11-cellar.jpg: drawn 0.0 s · settled 4.0 s · p50 4.2 ms · p95 11.6 ms · 0 shader violations
+land: ready in 15.0 s
+12-barrow.jpg: drawn 0.4 s · settled 4.0 s · p50 6.8 ms · p95 9.3 ms · 0 shader violations
+13-wild.jpg: drawn 0.1 s · settled 1.8 s · p50 8.0 ms · p95 11.4 ms · 0 shader violations
+14-fight.jpg: drawn 0.0 s · settled 1.5 s · p50 6.3 ms · p95 8.0 ms · 0 shader violations
+inn: ready in 16.2 s
+15-inn.jpg: drawn 0.0 s · settled 1.5 s · p50 8.9 ms · p95 11.3 ms · 0 shader violations
+talk: ready in 16.2 s
+16-talk.jpg: drawn 0.0 s · settled 1.5 s · p50 9.8 ms · p95 12.0 ms · 0 shader violations
+hold: ready in 14.5 s
+17-hold.jpg: drawn 0.9 s · settled 4.0 s · p50 7.0 ms · p95 9.5 ms · 0 shader violations
+17 shots in shots\set\2026-10-26-6019ba7 (200 s)
