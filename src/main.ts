@@ -469,7 +469,8 @@ export async function start(b: Boot): Promise<void> {
       horses: () => player.steeds,
       riding: () => player.riding,
       threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
-      titleHolds: () => !!title?.holding || !!creator?.showing,
+      // Silent until the world is playable: no beds, steps or music (it streams, D44/F4) compete with the start's downloads.
+      titleHolds: () => !!title?.holding || !!creator?.showing || !window.__mwReady,
     });
     const townWords = town && life ? townTalk(seed, setting, town, life.agents.map((a) => a.person), log, save?.talk ?? undefined).talk : null;
     // Who knows the hero from before (plan 11.4): their greeting names them.
