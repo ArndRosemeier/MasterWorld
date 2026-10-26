@@ -107,15 +107,22 @@ export class HeroCamera {
     };
   }
 
+  /** The cosine of half the frame's width, as an angle seen from the camera (a little beyond its edge). */
+  private get frameCos(): number {
+    const half = Math.atan(Math.tan((this.camera.fov * Math.PI) / 360) * this.camera.aspect);
+    return Math.cos(Math.min(1.5, half + 0.1));
+  }
+
   /** In a talk: the camera holds the talk's view (`frameTalk`) instead of trailing. */
   private talking = false;
 
   /**
    * A talk's view (`on`): close over the hero's right shoulder and above the heads, looking at `at` (the
    * one talked to, about chest high), so that neither people behind the hero (a room's drinkers), nor a
-   * counter in front, nor the posts of an open front hide them. Off: trailing again as before.
+   * counter in front, nor the posts of an open front hide them, and as few of `others` (the people about)
+   * as can be stand between. Off: trailing again as before.
    */
-  frameTalk(on: boolean, head: Vector3, at?: Vector3): void {
+  frameTalk(on: boolean, head: Vector3, at?: Vector3, others: readonly { x: number; z: number }[] = []): void {
     this.talking = on && !!at;
     if (!this.talking || !at) { this.trail(head, 0); return; }
     const dx = at.x - head.x, dz = at.z - head.z, len = Math.hypot(dx, dz) || 1;
@@ -127,6 +134,12 @@ export class HeroCamera {
       const wallHit = (px: number, pz: number, r: number) => (this.world.wall?.(px, pz, r) ? 1 : 0);
       let n = wallHit(x, z, 0.3) * 3;
       for (let t = 0.1; t < 0.75; t += 0.1) n += wallHit(x + (head.x - x) * t, z + (head.z - z) * t, 0.08) + wallHit(x + (at.x - x) * t * 0.6, z + (at.z - z) * t * 0.6, 0.08);
+      // Others between the camera and the one talked to, in the frame (some way in from its edge).
+      const ax = at.x - x, az = at.z - z, far = Math.hypot(ax, az);
+      for (const o of others) {
+        const ox = o.x - x, oz = o.z - z, d = Math.hypot(ox, oz);
+        if (d > 0.3 && d < far && (ax * ox + az * oz) / (far * d) > this.frameCos) n += 10;
+      }
       return n;
     };
     let back = 0, side = 0, least = Infinity;
