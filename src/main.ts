@@ -562,6 +562,7 @@ export async function start(b: Boot): Promise<void> {
         notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
       },
       serve: (id, a) => services.get(id)?.(a),
+      get roomPeople() { return rooms?.inside && life ? rooms.people(life) : null; },
     }) : null;
     // A room at the inn and the smith's mending (plan 11.5): two more services.
     const upkeep = town && life && townWords ? new UpkeepUi(character, setting, {
@@ -610,6 +611,21 @@ export async function start(b: Boot): Promise<void> {
     };
     // Telling of a place: the hero hands the map over and the teller marks it.
     const handOver = map ? new HandOver((id, c, t) => map.markIn(id, c, t), () => sounds?.noted()) : null;
+    /**
+     * The hero in front of `a` (for `?talk`, `?trade` and the shot set): in their room when they are
+     * indoors (out in the town an indoor person stands inside the building's walls, seen from within),
+     * else where they are.
+     */
+    const standBefore = async (a: Agent): Promise<void> => {
+      const s = a.spot >= 0 ? life?.spots[a.spot] : undefined;
+      const b = a.hidden && s && s.building >= 0 ? town?.plan.buildings[s.building] : undefined;
+      if (b && rooms && life) {
+        if (rooms.building !== b.id) await rooms.enter(b, true);
+        const p = rooms.people(life)?.find((x) => x.agent === a);
+        if (p) { player.teleport(p.x + Math.cos(p.dir) * 1.3, p.y, p.z + Math.sin(p.dir) * 1.3, Math.atan2(Math.cos(p.dir), Math.sin(p.dir))); return; }
+      }
+      player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
+    };
     if (talk && life && town && params.talk) {
       // Straight into a talk: in front of the innkeeper or of the cellar's household.
       const pick = params.talk === 'house'
@@ -618,8 +634,7 @@ export async function start(b: Boot): Promise<void> {
         ? life.agents.find((a) => a.person.trade === 'smith' && a.person.role === 'trade')
         : life.agents.find((a) => town.plan.buildings[a.person.home].kind === 'inn' && a.person.role === 'trade');
       if (pick) {
-        const yaw = pick.dir;
-        player.teleport(pick.x + Math.cos(yaw) * 1.6, undefined, pick.z + Math.sin(yaw) * 1.6, Math.atan2(Math.cos(yaw), Math.sin(yaw)));
+        await standBefore(pick);
         talk.begin(pick);
         for (const t of params.topics) talk.choose(t);
       }
@@ -700,16 +715,16 @@ export async function start(b: Boot): Promise<void> {
       if (!save.heir) notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
     } else if (typeof loaded === 'string') notes.say(`Could not load the save: ${loaded}.`, 8);
     // Straight to a merchant's counter (`?trade=smith`, or `game.tradeAt('smith')` in the console and the shot set): in front of them, their wares out.
-    const tradeAt = (keeper: string): boolean => {
+    const tradeAt = async (keeper: string): Promise<boolean> => {
       const m = market?.merchants.find((x) => x.shop.keeper === keeper);
       const a = m && life?.agents.find((x) => x.person.id === m.person);
       if (!m || !a || !trade || !townWords) return false;
       talk?.close();
-      player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
+      await standBefore(a);
       trade.show(m, townWords.nameOf(a.person.id));
       return true;
     };
-    if (params.trade) tradeAt(params.trade);
+    if (params.trade) await tradeAt(params.trade);
     if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else if (params.open === 'tale') showTale(); else map?.setOpen(true); }
     new DebugMenu({
       paused,
