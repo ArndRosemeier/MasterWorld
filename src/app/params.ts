@@ -59,6 +59,10 @@ export const params = {
   /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about). */
   small: q.get('small') !== '0',
   smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
+  /** Regions open as the hero walks (`regions=0`: only the start's land). */
+  regions: q.get('regions') !== '0',
+  /** Start beside a place the VGM opens out on the land: `site=hamlet`, `camp`, `ruin` or `barrows` (the first a walk finds). */
+  site: q.get('site'),
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
   /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
@@ -77,8 +81,6 @@ export const params = {
   dweller: q.get('dweller'),
   /** The first cellar was cleared long ago and others have moved in (`moved`, with `cellar` to look at them). */
   moved: q.has('moved'),
-  /** A stand-in hamlet 1.6-2.6 km out with a cart track from the town to it (`hamlet`), until the regions (plan B1) found real ones. */
-  hamlet: q.has('hamlet'),
   /** Start inside a building of the town: `room=inn` (the first of that kind), `room=12` (building 12) or `room=cellar` (the cellar's house, with its hatch). */
   room: q.get('room'),
   /** Start in a talk (for screenshots): `talk=inn` with the innkeeper, `talk=smith` with the smith, `talk=house` with the cellar's household; `topics=news,source` asked first (`topics=repair` opens the smith's bench). */

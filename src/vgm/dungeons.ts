@@ -8,7 +8,7 @@
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, SettingModule } from '../setting/contract';
-import type { DecisionLog, DungeonDecision, DungeonTemplate } from '../world/decisions';
+import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import type { DungeonPlace } from '../world/dungeon/cellar';
 import { setPiecesFor } from '../world/dungeon/setPieces';
@@ -116,7 +116,7 @@ export function promisePlace(kind: LandKind, seed: number, terrain: Terrain, tow
   const n = dungeons.filter((d) => d.template === kind).length + 1;
   const s = deriveSeed(seed, 'vgm', kind, n);
   const { x: tx, z: tz } = town.decision;
-  const away = [...avoid, ...dungeons.flatMap((d) => (d.site ? [{ x: d.site.x, z: d.site.z, r: 150 }] : []))];
+  const away = [...avoid, ...sitesIn(log, 150)];
   const rule = LAND[kind], [r0, r1] = rule.ring, fit = rule.fit(terrain, s);
   let best: { x: number; z: number; score: number; yaw?: number } | null = null;
   for (let k = 0; k < 64; k++) {

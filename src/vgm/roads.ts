@@ -3,7 +3,7 @@
  * way over the land (@futuremagic/settlement routeRoad: grades, fords, round the houses). The road is a
  * decision with its route and profile in it, so it is routed once and never moves.
  */
-import { deriveSeed, hash2f } from '@futuremagic/core';
+import { deriveSeed } from '@futuremagic/core';
 import { roadProfile, routeRoad } from '@futuremagic/settlement';
 import type { DecisionLog, RoadDecision, RoadWay } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
@@ -62,28 +62,3 @@ export function linkRoad(t: Terrain, log: DecisionLog, place: Place, way: RoadWa
 }
 
 const round = (v: number): number => Math.round(v * 100) / 100;
-
-/**
- * A stand-in for a hamlet (`?hamlet`) until the regions (plan B1) found real ones: dry, gentle ground
- * 1.6 to 2.6 km from `home`, in a direction chosen by the seed. Nothing is built there; the road leads to it.
- */
-export function standInHamlet(t: Terrain, home: { x: number; z: number }): Place | null {
-  const seed = deriveSeed(t.seed, 'vgm', 'stand-in-hamlet');
-  const turn = hash2f(seed, 0, 0) * Math.PI * 2;
-  let best: Place | null = null, bestScore = Infinity;
-  for (let a = 0; a < 24; a++) for (const r of [1600, 2000, 2300, 2600]) {
-    const ang = turn + (a / 24) * Math.PI * 2;
-    const x = home.x + Math.cos(ang) * r, z = home.z + Math.sin(ang) * r, h = t.height(x, z);
-    if (h < 4 || t.waterDepth(x, z) > 0) continue;
-    let steep = 0;
-    for (let i = 0; i < 8; i++) {
-      const q = (i / 8) * Math.PI * 2;
-      const px = x + Math.cos(q) * 35, pz = z + Math.sin(q) * 35;
-      if (t.waterDepth(px, pz) > 0) steep += 1;
-      steep = Math.max(steep, Math.abs(t.height(px, pz) - h) / 35);
-    }
-    const score = steep + r / 20000 + hash2f(seed, a, r) * 0.01;
-    if (steep < 0.15 && score < bestScore) { bestScore = score; best = { id: 'hamlet-standin', x, z, r: 30 }; }
-  }
-  return best;
-}

@@ -12,6 +12,7 @@ import { creatures } from './creatures';
 import { hero } from './hero';
 import { routines } from './routines';
 import { wild } from './wild';
+import { regions } from './regions';
 import { smallLife } from './smallLife';
 import { tower } from './tower';
 import { items, upkeep } from './items';
@@ -81,4 +82,5 @@ export const classic: SettingModule = {
   },
   wild,
   smallLife,
+  regions,
 };

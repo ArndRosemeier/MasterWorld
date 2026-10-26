@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
-import { linkRoad, standInHamlet } from '../src/vgm/roads';
+import { linkRoad } from '../src/vgm/roads';
+import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
 import { grassMask } from '../src/world/grass';
 import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
@@ -11,9 +12,13 @@ import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
 const seed = parseSeed('masterworld');
 const { terrain, log } = openWorld(seed, classic);
 const town = terrain.towns[0];
-const hamlet = standInHamlet(terrain, town.decision)!;
+// The first hamlet the VGM founds on a walk east from the start (plan B1).
+const regions = classic.regions!;
+const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, 0, 5, (d) => d.fill === 'hamlet' && !!d.site);
+const hamlet = settlementsOf(walked, regions)[0];
 const road = linkRoad(terrain, log, hamlet, 'track')!;
-const again = linkRoad(terrain, log, hamlet, 'track');
+// Again, as the world worker routes it (WorldJobs.linkRoad: from the roads alone).
+const again = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'track');
 const pt = (k: number) => ({ x: road.pts[k * 3], y: road.pts[k * 3 + 1], z: road.pts[k * 3 + 2] });
 const n = road.pts.length / 3;
 // Points well inside the road (not at its ends, not in water), and the bare land's height beside them.
@@ -21,10 +26,10 @@ const inner = Array.from({ length: n }, (_, k) => k).filter((k) => k > 6 && k < 
 const bare = inner.map((k) => terrain.height(pt(k).x, pt(k).z));
 terrain.addRoad(road);
 
-test('roads: a stand-in hamlet out on the land gets a cart track to a road out of the town', () => {
+test('roads: a hamlet out on the land gets a cart track to a road out of the town', () => {
   assert.ok(road, 'a road');
   const d = Math.hypot(hamlet.x - town.decision.x, hamlet.z - town.decision.z);
-  assert.ok(d > 1500 && d < 2700, `hamlet ${d.toFixed(0)} m out`);
+  assert.ok(d > 1500 && d < 5000, `hamlet ${d.toFixed(0)} m out`);
   assert.equal(road.way, 'track');
   assert.equal(road.to, town.decision.id);
   assert.equal(road.from, hamlet.id);
@@ -33,7 +38,7 @@ test('roads: a stand-in hamlet out on the land gets a cart track to a road out o
   const ends = town.plan.streets.filter((s) => s.kind === 'road').map((s) => [s.pts[s.pts.length - 2], s.pts[s.pts.length - 1]]);
   assert.ok(ends.some(([x, z]) => Math.hypot(x - end.x, z - end.z) < 0.5), 'joins a town road');
   for (let k = 1; k < n; k++) assert.ok(Math.hypot(pt(k).x - pt(k - 1).x, pt(k).z - pt(k - 1).z) < 7, 'points about 6 m apart');
-  // Decided once: the same land, log and place give the same road.
+  // Decided once: the same land, roads and place give the same road (in the worker too).
   assert.deepEqual(again, road);
 });
 
@@ -51,8 +56,11 @@ test('roads: the ground is levelled to the road, flat across it, and eases back 
   });
   assert.ok(moved > 0.05, 'the land was cut or filled somewhere');
   // Far beside the road the land is its own.
-  const p = pt(inner[3]), side = WAY_WIDTH.track / 2 + ROAD_REACH + 20;
-  assert.equal(terrain.roads.nearest(p.x + side, p.z + side, emptyRoad()), null);
+  const p = pt(inner[3]), q = pt(inner[3] + 1), side = WAY_WIDTH.track / 2 + ROAD_REACH + 20;
+  const L = Math.hypot(q.x - p.x, q.z - p.z), ax = -(q.z - p.z) / L, az = (q.x - p.x) / L;
+  // Straight out to either side (a winding road may come back round on one of them).
+  const off = [1, -1].map((s) => terrain.roads.nearest(p.x + ax * side * s, p.z + az * side * s, emptyRoad()));
+  assert.ok(off.includes(null), 'land beside the road is its own');
 });
 
 test('roads: no tree stands on the track or by its edge, and grass grows only between its ruts', () => {
