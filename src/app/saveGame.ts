@@ -8,6 +8,7 @@ import type { CharacterPatch } from '@actors/generator';
 import type { CharacterSave } from '../game/character';
 import { remainsLead, type GameMode, type Remains } from '../game/death';
 import type { DelveSave } from '../game/delve';
+import type { StandingSave } from '../game/standing';
 import type { MarketSave } from '../game/trade';
 import type { DirectorSave } from '../vgm/director';
 import type { TownTalkSave } from '../talk/townTalk';
@@ -60,6 +61,10 @@ export interface SaveData {
   readonly mode: GameMode;
   /** What fallen heroes left where they fell: packs, and roguelike graves (version 4). */
   readonly remains: readonly Remains[];
+  /** The hero's standing with each people (plan 11.6; none in older saves: as a stranger, kin a little better). */
+  readonly standing?: StandingSave;
+  /** A people's hold: who of its wardens fell, was searched (none: all at their posts). */
+  readonly hold?: DelveSave;
   /** A roguelike hero fell: the world goes on and the next start makes a new hero in it. */
   readonly heir?: boolean;
 }

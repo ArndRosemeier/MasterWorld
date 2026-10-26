@@ -12,7 +12,7 @@ import type { SettingModule, TalkDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import { loreOf, placeOf } from '../vgm/dungeons';
 import { cellarHint, type CellarHint } from '../vgm/hints';
-import type { Decision, DecisionLog, DungeonDecision } from '../world/decisions';
+import { dungeonOf, type Decision, type DecisionLog } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
 import { fill, nameFolk, type Folk } from './folk';
@@ -52,6 +52,17 @@ export interface Reply {
   readonly done: boolean;
 }
 
+/**
+ * How a townsperson's people stand with the hero (plan 11.6), as the game reads it: how they greet them
+ * (null: the talk's own greeting), whether they will not talk at all, and what they say instead of their
+ * news when they do not care to share it (null: they share).
+ */
+export interface Manner {
+  readonly greet: string | null;
+  readonly refuse: boolean;
+  readonly curt: string | null;
+}
+
 const TEMPERAMENTS = ['warm', 'reserved', 'curious', 'dry', 'lively'] as const;
 const pid = (id: number) => `p${id}`;
 /** Lines arrive as sentences; the realizer adds its own capital and full stop (and quotes them mid-sentence). */
@@ -77,6 +88,13 @@ export class TownTalk {
   private readonly beckoned = new Set<number>();
   /** What each person offers besides talk (set by the game: trade, repairs, a room). */
   services: (person: number) => readonly Service[] = () => [];
+  /** How each person's people stand with the hero (set by the game; none: as with any stranger). */
+  manner: (person: Person) => Manner | null = () => null;
+
+  private mannerOf(person: number): Manner | null {
+    const f = this.byId.get(person);
+    return f ? this.manner(f.person) : null;
+  }
 
   constructor(private readonly folk: readonly Folk[], private readonly talk: TalkDef, cellars: readonly TalkCellar[], saved?: TownTalkSave) {
     for (const f of folk) this.byId.set(f.person.id, f);
@@ -210,6 +228,7 @@ export class TownTalk {
   /** The topics the player can pick with this person now. */
   topics(person: number): Topic[] {
     const t = this.talk.topics;
+    if (this.mannerOf(person)?.refuse) return [{ id: 'bye', label: t.bye }];
     const out: Topic[] = [{ id: 'self', label: t.self }, { id: 'news', label: t.news, ...(this.beckoned.has(person) ? { lead: true } : {}) }];
     // A cellar moved into again: only its newest story is a topic.
     this.leads.forEach((l, i) => {
@@ -234,15 +253,23 @@ export class TownTalk {
   greet(person: number): Reply {
     this.told.delete(person);
     const reply = this.respond(person, { function: 'greet' });
+    const manner = this.mannerOf(person);
+    // Hated: no word for the hero but to go away, old friend or not.
+    if (manner?.refuse) return { ...reply, text: manner.greet ?? reply.text };
     const friend = this.friends.get(person);
     if (friend) return { ...reply, text: friend };
     // Come over to the hero: they open with why (one of the setting's hails, the same for a person each time).
     const hail = this.talk.beckon;
-    return this.beckoned.has(person) && hail.length ? { ...reply, text: hail[person % hail.length] } : reply;
+    if (this.beckoned.has(person) && hail.length) return { ...reply, text: hail[person % hail.length] };
+    // As their people stand with the hero (plan 11.6).
+    return manner?.greet ? { ...reply, text: manner.greet } : reply;
   }
 
   /** Pick a topic. */
   ask(person: number, topic: string): Reply {
+    // Unwelcome: they keep what they know to themselves.
+    const curt = this.mannerOf(person)?.curt;
+    if (curt && (topic === 'news' || topic === 'more' || topic === 'source' || topic.startsWith('lead:'))) return { text: curt, heard: [], done: false };
     if (topic === 'self') return this.respond(person, { function: 'social', topic: 'identity' });
     if (topic === 'news') this.beckoned.delete(person);
     if (topic === 'news') return this.respond(person, { function: 'ask', query: { predicate: 'troubled' } });
@@ -321,7 +348,7 @@ export function townTalk(seed: number, setting: SettingModule, town: Town, peopl
 
 /** A promise as the townsfolk know it (a cellar under one of this town's houses, or new dwellers in one); null for any other decision. */
 export function talkCellar(d: Decision, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog): TalkCellar | null {
-  const dungeon = d.kind === 'dungeon' ? d : d.kind === 'move-in' ? log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === d.dungeon) : undefined;
+  const dungeon = dungeonOf(log, d);
   if (!dungeon || dungeon.town !== town.decision.id) return null;
   const house = placeOf(dungeon, [town]);
   if (!house) return null;

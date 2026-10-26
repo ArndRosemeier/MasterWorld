@@ -259,7 +259,8 @@ export class Encounter {
   /** What the Director watches (plan 4.3): who fights the hero, and how much danger knows of them. */
   get pressure(): { readonly fighting: number; readonly pressure: number } {
     const den = this.delve.den;
-    if (!this.arena.inside || this.retired) return { fighting: 0, pressure: 0 };
+    // At peace (a hold's wardens watching the hero go by) it is no danger.
+    if (!this.arena.inside || this.retired || den.peace) return { fighting: 0, pressure: 0 };
     return { fighting: den.fighting.length, pressure: den.alive.filter((c) => c.aware > 0.3).reduce((a, c) => a + c.def.danger, 0) / Math.max(1, this.hero.power) };
   }
 

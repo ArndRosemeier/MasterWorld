@@ -7,7 +7,8 @@ import { SHORE, Skeleton, emptySample } from './skeleton';
 import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
-import type { Decision, DecisionLog, RoadDecision, TownDecision } from './decisions';
+import type { Decision, DecisionLog, HoldDecision, RoadDecision, TownDecision } from './decisions';
+import { holdBare, holdGround } from './hold';
 import { clearingOf, type Clearing } from './dungeon/site';
 import { RoadNet } from './roads';
 import type { Field } from '@futuremagic/settlement';
@@ -32,6 +33,7 @@ export class Terrain {
   private fields: ArchField[] = [];
   private townSpots: { d: TownDecision; level: number }[] = [];
   private townList: Town[] | null = null;
+  private holdList: HoldDecision[] = [];
   private readonly probe = emptySample();
   private readonly wet = { river: 0, lake: 0 };
   private roadNet = new RoadNet();
@@ -47,10 +49,12 @@ export class Terrain {
     this.townSpots = [];
     this.townList = null;
     this.roadNet = new RoadNet();
+    this.holdList = [];
     for (const d of log) {
       if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
       else if (d.kind === 'town') this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
       else if (d.kind === 'road') this.roadNet.insert(d);
+      else if (d.kind === 'hold') this.holdList.push(d);
     }
     this.clearingMap.clear();
     this.settleMore(log.filter((d) => d.kind === 'dungeon'));
@@ -111,6 +115,11 @@ export class Terrain {
     return this.fields;
   }
 
+  /** The peoples' holds on this land (plan 11.6): their gates and courts. */
+  get holds(): readonly HoldDecision[] {
+    return this.holdList;
+  }
+
   /** The towns standing on this land (planned when first asked for). */
   get towns(): readonly Town[] {
     if (!this.townList) this.townList = this.townSpots.map(({ d }) => new Town(d, this));
@@ -151,9 +160,10 @@ export class Terrain {
     return null;
   }
 
-  /** Whether rock of a volume stands on the ground here (`h` the ground height): nothing grows there. */
+  /** Whether rock of a volume, or a hold's gate and court, stands on the ground here (`h` the ground height): nothing grows there. */
   rockAt(x: number, z: number, h: number): boolean {
     for (const f of this.volumes) if (f.inBounds(x, h + 0.3, z) && f.at(x, h + 0.3, z) < 0.8) return true;
+    for (const d of this.holdList) if (holdBare(d, x, z)) return true;
     return false;
   }
 
@@ -168,8 +178,14 @@ export class Terrain {
     return out;
   }
 
-  /** Ground height above the sea surface, metres. */
+  /** Ground height above the sea surface, metres: the land's own, as the holds shape it. */
   height(x: number, z: number): number {
+    let h = this.landHeight(x, z);
+    for (let i = 0; i < this.holdList.length; i++) h = holdGround(this.holdList[i], x, z, h);
+    return h;
+  }
+
+  private landHeight(x: number, z: number): number {
     const base = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
     // The swash: low swells along the waterline (beach cusps), so the water's edge curves gently instead of
     // running dead straight; they die out on dry sand and in deeper water.

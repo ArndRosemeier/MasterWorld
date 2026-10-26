@@ -4,7 +4,8 @@
  * for their trade. Stock is limited and seeded; what the hero sells stays on the shelf to be bought back;
  * over the days stock and coin come back towards what the shop likes to hold. Prices follow what the
  * town has: what a shop here makes is cheaper, and the more of a thing the town's merchants already hold,
- * the less they pay for it and the less they ask. The hero's speech skill narrows the gap. Pure: saved
+ * the less they pay for it and the less they ask. The hero's speech skill narrows the gap, and their
+ * standing with the merchant's people (plan 11.6) moves it. Pure: saved
  * as plain data.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
@@ -12,6 +13,7 @@ import type { ItemCatalog, Rarity, SettingModule, ShopDef } from '../setting/con
 import type { Person } from '../sim/people';
 import { Character } from './character';
 import { defOf, itemAs, plainItem, type Item } from './items';
+import type { Standing } from './standing';
 import { condition } from './upkeep';
 
 /** How much more a rarer thing is worth than a plain one of its kind. */
@@ -31,8 +33,9 @@ export function itemWorth(cat: ItemCatalog, item: Item): number {
 export function haggle(speech: number): number { return Math.min(0.2, Math.max(0, speech) / 300); }
 
 export interface Merchant {
-  /** The townsperson who keeps it. */
+  /** The townsperson who keeps it, and their people (their standing with the hero moves the prices). */
   readonly person: number;
+  readonly race: string;
   readonly shop: ShopDef;
   readonly stock: Item[];
   coins: number;
@@ -58,6 +61,8 @@ export class Market {
   private readonly cat: ItemCatalog;
   /** Item ids some shop in town makes. */
   private readonly made = new Set<string>();
+  /** The hero's standing with each people (plan 11.6): a merchant asks more and pays less of someone their people dislikes. */
+  standing: Standing | null = null;
 
   /** The town's merchants: each keeper of a shop's trade (or a market trader) gets that shop. */
   constructor(private readonly setting: SettingModule, people: readonly Person[], private readonly seed: number, day: number, saved?: MarketSave) {
@@ -70,8 +75,8 @@ export class Market {
       for (const [id] of shop.goods) this.made.add(id);
       const was = saved?.find((m) => m.person === p.id && m.keeper === shop.keeper);
       const m: Merchant = was
-        ? { person: p.id, shop, stock: [...was.stock], coins: was.coins, day: was.day }
-        : { person: p.id, shop, stock: this.fresh(shop, p.id), coins: shop.purse, day };
+        ? { person: p.id, race: p.race, shop, stock: [...was.stock], coins: was.coins, day: was.day }
+        : { person: p.id, race: p.race, shop, stock: this.fresh(shop, p.id), coins: shop.purse, day };
       this.merchants.push(m);
       this.byPerson.set(p.id, m);
     }
@@ -143,13 +148,13 @@ export class Market {
 
   /** What the merchant asks for one of their things, given the hero's speech. */
   asks(m: Merchant, item: Item, speech: number): number {
-    return Math.max(1, Math.round(this.worthHere(item) * m.shop.asks * (1 - haggle(speech) / 2)));
+    return Math.max(1, Math.round(this.worthHere(item) * m.shop.asks * (1 - haggle(speech) / 2) * (this.standing?.prices(m.race).asks ?? 1)));
   }
 
   /** What the merchant pays for one of the hero's things (0: they do not buy that kind). */
   pays(m: Merchant, item: Item, speech: number): number {
     if (!m.shop.buys.includes(defOf(this.cat, item.def).kind)) return 0;
-    return Math.max(1, Math.round(this.worthHere(item) * m.shop.pays * (1 + haggle(speech))));
+    return Math.max(1, Math.round(this.worthHere(item) * m.shop.pays * (1 + haggle(speech)) * (this.standing?.prices(m.race).pays ?? 1)));
   }
 
   /** The hero buys one of the merchant's things into the pack. */

@@ -84,10 +84,6 @@
     "reason": "Each system's line on the debug HUD; only the name matches."
   },
   {
-    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/wild.ts#step",
-    "reason": "Wilds.step steps each awake band's Den.step: the outer loop over dens, by design."
-  },
-  {
     "key": "same name: masterworld/sim/dungeonNav.ts#away + masterworld/sim/people.ts#away",
     "reason": "Unrelated: a den's way off from a threat vs a townsperson being away from home; only the name matches."
   },
@@ -184,10 +180,6 @@
     "reason": "A heading from one point to another (Math.atan2 of the z and x differences): every moving thing faces where it goes; one line, not a helper."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/world/volumes.ts",
-    "reason": "A point along a heading (x + cos a * d, z + sin a * d): plain trigonometry each mover does in its own terms."
-  },
-  {
     "key": "idiom: [.count .int] in masterworld/game/items.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
     "reason": "A seeded count from a [min, max] pair in setting data (rng.int(count[0], count[1])): one call, the data shape is the seam."
   },
@@ -212,12 +204,76 @@
     "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
   },
   {
+    "key": "clone: masterworld/world/dungeon/barrowMesh.ts#barrowMesh + masterworld/world/holdMesh.ts#holdMesh",
+    "reason": "Both are the MeshKit's usual opening (a kit and a seeded Rng, a few part builders, k.mesh()); the parts they build share nothing."
+  },
+  {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (a.mul(b).add(c)) is how every shader is written, not a copied helper; it crossed the info floor when the cave code changed the corpus weights."
+    "reason": "TSL node arithmetic (a.mul(b).add(c)) is how every material is written; these files are unchanged, the finder only regrouped them as the source grew."
   },
   {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (a.mul(b).add(c)) is how every shader is written, not a copied helper; it crossed the info floor when the cave code changed the corpus weights."
+    "reason": "TSL node arithmetic (a.mul(b).add(c)) is how every material is written; these files are unchanged, the finder only regrouped them as the source grew."
+  },
+  {
+    "key": "idiom: [.camera .canvas .director .fight .hud .journal .notes .player .setting] in masterworld/app/cellars.ts + masterworld/app/holdGate.ts + masterworld/app/wildLand.ts",
+    "reason": "Each builds an Encounter (app/encounter.ts) from its host, whose constructor takes these parts; HoldHost already extends WildHost, so only the call remains."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
+    "reason": "A point along a heading (x + cos a * d, z + sin a * d): plain trigonometry each mover does in its own terms. The hold's site search samples a ring around the town the same way."
+  },
+  {
+    "key": "idiom: [.host Promise] in masterworld/app/cellars.ts + masterworld/app/holdGate.ts + masterworld/app/wildLand.ts",
+    "reason": "Things built once the hero comes near keep their build's promise (built ??= build()); each builds different bodies and places."
+  },
+  {
+    "key": "same name: masterworld/app/cellars.ts#shown + masterworld/app/holdGate.ts#shown",
+    "reason": "Both implement Arena.shown (app/encounter.ts) for their place: the interface's member, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/holdGate.ts#shown + masterworld/app/wildLand.ts#shown",
+    "reason": "Both implement Arena.shown (app/encounter.ts) for their place: the interface's member, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/holdGate.ts#inside + masterworld/app/wildLand.ts#inside",
+    "reason": "Both implement Arena.inside (app/encounter.ts) for their place: the interface's member, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/holdGate.ts#thanks + masterworld/app/wildLand.ts#thanks",
+    "reason": "Both implement Arena.thanks (app/encounter.ts); neither place keeps a promise, so both say the same plain line."
+  },
+  {
+    "key": "same name: masterworld/app/cellars.ts#solid + masterworld/app/holdGate.ts#solid",
+    "reason": "Each says whether a body stands in its own stones (a barrow's mound, a hold's gate) for the walker's wall test in main.ts; the shapes are their own (inBarrowShape, inHoldShape)."
+  },
+  {
+    "key": "same name: masterworld/app/holdGate.ts#build + masterworld/app/wildLand.ts#build",
+    "reason": "Each builds its own bodies once the hero comes near (a wild band's den, the hold's wardens on their posts)."
+  },
+  {
+    "key": "same name: masterworld/app/holdGate.ts#tend + masterworld/render/grass/GrassView.ts#tend",
+    "reason": "Per-frame methods of unrelated systems (the hold's wardens vs grass patches); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/peoples.ts#services + masterworld/app/upkeepUi.ts#services",
+    "reason": "Both supply TownTalk.services (talk/townTalk.ts) with their own topics: a people's hold and gifts, rooms and mending."
+  },
+  {
+    "key": "same name: masterworld/app/savesUi.ts#save + masterworld/game/standing.ts#save",
+    "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
+  },
+  {
+    "key": "same name: masterworld/game/standing.ts#save + masterworld/game/trade.ts#save",
+    "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
+  },
+  {
+    "key": "same name: masterworld/game/standing.ts#save + masterworld/talk/townTalk.ts#save",
+    "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
+  },
+  {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "Each simulation steps its own agents (a den's creatures, the townsfolk) by dt; the finder paired them anew as files changed."
   },
   {
     "key": "idiom: [.doors .flatMap .links] in masterworld/world/dungeon/caveRock.ts + masterworld/world/dungeon/cellarMesh.ts + masterworld/world/dungeon/torches.ts",
@@ -246,5 +302,9 @@
   {
     "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/terrain/TerrainView.ts#refresh",
     "reason": "The same seam on purpose: app/roads.ts asks every view built from the land to build again over the squares a new road passes; each view rebuilds its own cells."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/cellar.ts#settle + masterworld/world/terrain.ts#settle",
+    "reason": "Different verbs that share a word: a cellar's dwellers settle into it; the terrain settles the decision log's things onto the land. The finder paired them anew when the terrain learned of holds."
   }
 ]

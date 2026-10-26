@@ -7,6 +7,7 @@ import { OpenGround, Wilds, placeWild, groupDanger, type Land } from '../src/sim
 import { Den, type Quarry } from '../src/sim/creatures';
 import { Delve, type DelveSave } from '../src/game/delve';
 import { Character } from '../src/game/character';
+import { onLand } from '../src/world/dungeon/site';
 
 const seed = parseSeed('masterworld');
 const { terrain } = openWorld(seed, classic);
@@ -84,4 +85,19 @@ test('wild: a band is fought like a cellar (no hoards); its dead stay dead', () 
   c.state = 'dead';
   const again = make(d.tally());
   assert.equal(again.den.creatures[0].state, 'dead');
+});
+
+test('wild: the dwarves\' hold stands on the land (plan 11.6): in its ring from the town, its court level and bare, no band in it', () => {
+  const hold = terrain.holds[0];
+  assert.ok(hold && hold.people === 'dwarf', 'a hold is opened with the world');
+  const ring = classic.peoples.find((p) => p.id === 'dwarf')!.hold!.ring;
+  const d = Math.hypot(hold.x - town.decision.x, hold.z - town.decision.z);
+  assert.ok(d >= ring[0] - 1 && d <= ring[1] + 1, `${d.toFixed(0)} m out`);
+  for (const [u, v] of [[0, 2], [-10, 12], [10, 20]]) {
+    const [x, z] = onLand(hold, u, v);
+    assert.ok(Math.abs(terrain.height(x, z) - hold.level) < 1e-6, 'the court is level');
+    assert.ok(terrain.rockAt(x, z, hold.level), 'and nothing grows there');
+    assert.equal(terrain.waterDepth(x, z), 0);
+  }
+  for (const t of places) assert.ok(Math.hypot(t.x - hold.x, t.z - hold.z) > t.r + 60, `${t.id} keeps off the hold`);
 });

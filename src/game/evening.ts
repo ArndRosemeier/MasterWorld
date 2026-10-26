@@ -17,7 +17,7 @@ import { openWorld } from '../vgm/builder';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
 import { hailer } from '../vgm/guide';
-import type { Decision, DungeonDecision } from '../world/decisions';
+import { dungeonOf, type Decision, type DungeonDecision } from '../world/decisions';
 import { moveIn, outlineCellar, type Cellar } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
 import { Character } from './character';
@@ -184,7 +184,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       let paid = 0;
       const lead = e === 0 ? hailed() : hearLead(heard);
       heard.add(lead.id);
-      const dungeon = lead.kind === 'dungeon' ? lead : (log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.id === lead.dungeon) ?? null);
+      const dungeon = dungeonOf(log, lead);
       if (!dungeon) throw new Broke(`no dungeon for ${lead.id}`);
       const place = placeOf(dungeon, terrain.towns), house = houseOf(dungeon, terrain.towns);
       if (!place || !house) throw new Broke(`${dungeon.id} has no place`);
