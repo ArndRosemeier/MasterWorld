@@ -43,6 +43,37 @@ export interface DungeonDecision {
    * start; who moves in is chosen to fit. None: anything.
    */
   readonly danger?: number;
+  /** When it was promised, game hours since the world began (none: when the world was opened). */
+  readonly at?: number;
+}
+
+/**
+ * A promise kept (plan 4.2): its goal was reached (the dwellers are gone and the household paid). The
+ * promise is a dungeon decision's id or a move-in's.
+ */
+export interface KeptDecision {
+  readonly kind: 'kept';
+  readonly id: string;
+  readonly promise: string;
+  /** Game hours since the world began. */
+  readonly at: number;
+}
+
+/**
+ * A story event (plan 8.1, D10: repopulation): new dwellers move into a dungeon that was cleared. The
+ * layout stays; who lives there, what they left and what the household above has noticed change. It is a
+ * promise of its own (the household wants it cleared again).
+ */
+export interface MoveInDecision {
+  readonly kind: 'move-in';
+  readonly id: string;
+  /** The dungeon decision's id. */
+  readonly dungeon: string;
+  /** The dweller (id in the setting's lore) who moves in. */
+  readonly dweller: string;
+  readonly seed: number;
+  /** Game hours since the world began. */
+  readonly at: number;
 }
 
 /**
@@ -57,6 +88,6 @@ export interface OrderDecision {
   readonly order: TownOrder;
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision;
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision;
 
 export type DecisionLog = readonly Decision[];

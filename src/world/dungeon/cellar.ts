@@ -14,7 +14,7 @@ import { Rng, deriveSeed } from '@futuremagic/core';
 import { cyclicGraph, layoutDungeon, pace, PATTERNS, DIRS, type DungeonGraph, type DungeonLayout, type Pace, type Room } from '@futuremagic/dungeon';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonProp, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
-import type { DungeonDecision } from '../decisions';
+import type { DungeonDecision, MoveInDecision } from '../decisions';
 import { setPieceById, type SetPieceDef } from './setPieces';
 
 /** Metres per layout cell, per storey, and stairs per storey (cells). */
@@ -47,6 +47,8 @@ export interface CellarSketch {
   readonly knownBy: { readonly town: string; readonly building: number };
   /** The house above, as people call it ("the inn"). */
   readonly house: string;
+  /** Who lives there now, if they moved in after it was cleared (plan 8.1: repopulation): the move-in's id and seed. */
+  readonly occupation?: { readonly id: string; readonly seed: number };
 }
 
 export interface CellarRoom {
@@ -80,6 +82,7 @@ export interface Clue {
   readonly link?: number;
 }
 
+/** Who lives where: a creature (id in the setting) in a home of its den (a room here; a territory out on the land, sim/wild.ts). */
 export interface Spawn {
   readonly creature: string;
   readonly room: number;
@@ -112,8 +115,11 @@ const pickDef = <T extends HistoryDef>(rng: Rng, list: readonly T[], ok: (d: T) 
   return rng.weighted(c.length ? c : list, (d) => d.weight ?? 1);
 };
 
-/** The sketch: history, hints and facts (no layout). */
-export function sketchCellar(d: DungeonDecision, house: TownBuilding, lore: CellarLore): CellarSketch {
+/**
+ * The sketch: history, hints and facts (no layout). With `moved`, the dwellers who moved in after it was
+ * cleared (plan 8.1); its history and hints are theirs, its id the move-in's.
+ */
+export function sketchCellar(d: DungeonDecision, house: TownBuilding, lore: CellarLore, moved?: MoveInDecision): CellarSketch {
   const rng = new Rng(deriveSeed(d.seed, 'cellar', 'history'));
   const piece = setPieceById(d.setPiece);
   const name = houseName(house);
@@ -123,12 +129,15 @@ export function sketchCellar(d: DungeonDecision, house: TownBuilding, lore: Cell
   const trouble = pickDef(rng, lore.troubles, (t) => !piece.troubles || piece.troubles.includes(t.id));
   const ids = [builder.id, older?.id, trouble.id].filter(Boolean) as string[];
   // Who moves in fits the history and the place's danger (D29: fixed by where it lies, not by the hero).
-  const dweller = pickDef(rng, lore.dwellers, (w) => (!w.with || w.with.some((x) => ids.includes(x))) && w.danger <= (d.danger ?? Infinity));
+  const first = pickDef(rng, lore.dwellers, (w) => (!w.with || w.with.some((x) => ids.includes(x))) && w.danger <= (d.danger ?? Infinity));
+  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || first;
   const line = (def: HistoryDef) => def.text.replaceAll('{house}', name);
   const history: HistoryEntry[] = [];
   if (older) history.push({ layer: 'older', def: older, text: line(older) });
   history.push({ layer: 'built', def: builder, text: line(builder) }, { layer: 'trouble', def: trouble, text: line(trouble) }, { layer: 'now', def: dweller, text: line(dweller) });
-  const hints = [...dweller.signs, `They say ${line(trouble).charAt(0).toLowerCase()}${line(trouble).slice(1)}`];
+  const hints = moved
+    ? [...dweller.signs, `It was cleared, and for a while it was quiet down there. Now something else has moved in.`]
+    : [...dweller.signs, `They say ${line(trouble).charAt(0).toLowerCase()}${line(trouble).slice(1)}`];
   const facts: Fact[] = [
     [d.id, 'is under', `${d.town}/building/${d.building}`],
     [d.id, 'was dug by', builder.id],
@@ -136,7 +145,8 @@ export function sketchCellar(d: DungeonDecision, house: TownBuilding, lore: Cell
     [d.id, 'is home to', dweller.id],
   ];
   if (older) facts.push([d.id, 'lies over', older.id]);
-  return { decision: d, history, dweller, setPiece: piece, hints, facts, knownBy: { town: d.town, building: d.building }, house: name };
+  if (moved) facts.push([moved.id, 'moved into', d.id], [moved.id, 'is', dweller.id]);
+  return { decision: d, history, dweller, setPiece: piece, hints, facts, knownBy: { town: d.town, building: d.building }, house: name, ...(moved ? { occupation: { id: moved.id, seed: moved.seed } } : {}) };
 }
 
 /** A sketch's history layer of a kind, if it has one. */
@@ -271,8 +281,18 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     put(graph.entrance, 'ledger', 'built', clues.length - 1);
   }
 
-  // Who lives where (small and dense, plan 8.1): the lair holds most; the two tensest rooms on the way hold
-  // a group each, as many as the dwellers crowd into a room; the entrance and the safe spot are quiet.
+  const spawns = settle(graph, p, rooms, now, rng);
+
+  const shape = layout.rooms.map((r) => `${r.w}x${r.d}x${r.height}@${r.level}`).sort().join(',');
+  const signature = `${graph.patterns.join('+')}|${graph.rooms.length}r${graph.links.length}l|${shape}`;
+  return { ...sketch, graph, pace: p, layout, rooms, props, clues, spawns, pieceLink, hatch, signature };
+}
+
+/**
+ * Who lives where (small and dense, plan 8.1): the lair holds most; the two tensest rooms on the way hold
+ * a group each, as many as the dwellers crowd into a room; the entrance and the safe spot are quiet.
+ */
+function settle(graph: DungeonGraph, p: Pace, rooms: readonly CellarRoom[], now: DwellerDef, rng: Rng): Spawn[] {
   const spawns: Spawn[] = [];
   const [lead, ...rest] = now.creatures;
   const other = () => (rest.length && rng.chance(0.6) ? rest[0] : lead);
@@ -287,8 +307,19 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     const i = spawns.findIndex((s) => s.room !== graph.goal);
     if (i >= 0) spawns[i] = { ...spawns[i], surprise: now.surprise };
   }
-
-  const shape = layout.rooms.map((r) => `${r.w}x${r.d}x${r.height}@${r.level}`).sort().join(',');
-  const signature = `${graph.patterns.join('+')}|${graph.rooms.length}r${graph.links.length}l|${shape}`;
-  return { ...sketch, graph, pace: p, layout, rooms, props, clues, spawns, pieceLink, hatch, signature };
+  return spawns;
 }
+
+/**
+ * New dwellers in a cleared cellar (plan 8.1, D10: repopulation as a story event): the layout, the rooms
+ * and what stands in them stay (the old dwellers' leavings too); who lives there and the story of it are
+ * the move-in's.
+ */
+export function moveIn(c: Cellar, moved: MoveInDecision, house: TownBuilding, lore: CellarLore): Cellar {
+  const sketch = sketchCellar(c.decision, house, lore, moved);
+  const spawns = settle(c.graph, c.pace, c.rooms, sketch.dweller, new Rng(deriveSeed(moved.seed, 'move-in')));
+  return { ...c, ...sketch, spawns };
+}
+
+/** The id the cellar's dwellers go by in the journal, the talk and the save: the move-in's, else the dungeon's. */
+export const occupantId = (c: CellarSketch): string => c.occupation?.id ?? c.decision.id;

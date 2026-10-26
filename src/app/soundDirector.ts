@@ -19,7 +19,7 @@ import { TOWN_RASTER, TownGround, type Town } from '../world/town';
 import { canopySampler, type Canopy } from '../world/canopy';
 import { emptyWater } from '../world/hydro';
 import type { WeatherState } from '../world/weather';
-import type { FightCue } from './cellarFight';
+import type { FightCue } from './encounter';
 
 export interface SoundHost {
   readonly engine: AudioEngine;
@@ -145,7 +145,7 @@ export class SoundDirector {
     this.wildlife();
   }
 
-  /** A fight's cue (CellarFight.onCue): blows, cries and falls from where they happen. */
+  /** A fight's cue (Encounter.onCue): blows, cries and falls from where they happen. */
   cue(c: FightCue): void {
     const e = this.host.engine, spotOf = (w: { x: number; y: number; z: number }): [number, number, number] => [w.x, w.y + 1, w.z];
     switch (c.kind) {

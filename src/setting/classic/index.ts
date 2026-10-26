@@ -9,6 +9,7 @@ import { names, talk } from './people';
 import { creatures } from './creatures';
 import { hero } from './hero';
 import { routines } from './routines';
+import { wild } from './wild';
 import { items } from './items';
 import { abilities, director, skills } from './skills';
 
@@ -68,4 +69,5 @@ export const classic: SettingModule = {
       { at: 0.6, slope: [1, 1, 1], saturation: 1.3 },
     ],
   },
+  wild,
 };

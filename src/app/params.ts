@@ -38,6 +38,9 @@ export const params = {
   folk: Number(q.get('folk') ?? 30),
   /** How many saddled horses wait near the start (`horses=0`: none). */
   horses: Number(q.get('horses') ?? 2),
+  /** The wild around the town (`wild=0` leaves it out; `wild=wolves` starts beside the first group of that kind). */
+  wild: q.get('wild') !== '0',
+  wildAt: ['0', '1', '', null].includes(q.get('wild')) ? null : q.get('wild'),
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
   /** Open character creation at once, without the title (`create`; with the title it follows New game). */

@@ -5,13 +5,13 @@
  * picks a topic, the person answers from what they know, and hearing of a promised cellar is the
  * commitment signal (plan 4.2) the journal and the map pick up. Pure: no DOM, no three.js.
  */
-import { characterFromProfile, createSettingSession, hearResponse, type Act, type Atom, type Fact, type Plan, type Profile, type SettingSession, type SettingSnapshot } from 'solarpolis-dialogue';
+import { AgentCore, characterFromProfile, createSettingSession, hearResponse, type Act, type Atom, type Domain, type Fact, type Plan, type Profile, type SettingSession, type SettingSnapshot } from 'solarpolis-dialogue';
 import { createEnglishResources, englishModule, type EnglishResources } from 'solarpolis-dialogue/english';
 import { hash2f } from '@futuremagic/core';
 import type { SettingModule, TalkDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import { cellarHint, type CellarHint } from '../vgm/hints';
-import type { DecisionLog } from '../world/decisions';
+import type { Decision, DecisionLog, DungeonDecision } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
 import { fill, nameFolk, type Folk } from './folk';
@@ -45,7 +45,8 @@ const clause = (s: string) => s.charAt(0).toLowerCase() + s.slice(1).replace(/[.
 export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 export class TownTalk {
-  private readonly session: SettingSession;
+  private session!: SettingSession;
+  private readonly cellars: TalkCellar[];
   private readonly byId = new Map<number, Folk>();
   /** Lead topics the player can ask about (cellar ids), in the order heard. */
   private readonly leads: string[] = [];
@@ -58,8 +59,39 @@ export class TownTalk {
   /** People who know the hero from before (plan 11.4), and how they greet them. */
   private readonly friends = new Map<number, string>();
 
-  constructor(folk: readonly Folk[], private readonly talk: TalkDef, cellars: readonly TalkCellar[], saved?: TownTalkSave) {
+  constructor(private readonly folk: readonly Folk[], private readonly talk: TalkDef, cellars: readonly TalkCellar[], saved?: TownTalkSave) {
     for (const f of folk) this.byId.set(f.person.id, f);
+    this.cellars = [...cellars];
+    this.open(saved?.session);
+    if (saved) this.leads.push(...saved.leads.filter((l) => this.cellarName.has(l)));
+    else this.spread(this.cellars);
+  }
+
+  /**
+   * A cellar promised while playing (the Builder's next lead, plan 4.2): the townsfolk learn of it as if
+   * it had been there from the start, and the household tells it around.
+   */
+  add(cellar: TalkCellar): void {
+    if (this.cellarName.has(cellar.hint.cellar)) return;
+    this.cellars.push(cellar);
+    this.open(this.session.snapshot());
+    this.spread([cellar]);
+  }
+
+  /** The household has told some of it around: the inn and a neighbour or two heard that something is wrong. */
+  private spread(cellars: readonly TalkCellar[]): void {
+    for (const { hint } of cellars) for (const t of hint.told) {
+      const plan = this.session.core.respond(pid(t.from), { function: 'ask', query: { predicate: 'troubled', args: { subject: hint.cellar } }, speaker: pid(t.to) });
+      hearResponse(this.session.core, pid(t.from), pid(t.to), plan);
+    }
+  }
+
+  /**
+   * The talk's session from the folk and the cellars; a saved state carries over. Each cellar added is a
+   * new version of the domain, so an older state takes in the new cellars' facts (Conversations' migration).
+   */
+  private open(saved?: SettingSnapshot): void {
+    const { folk, talk, cellars } = this;
     const entities: Record<string, { type: string }> = {};
     const names: Record<string, string> = {};
     const social: Record<string, Record<string, unknown>> = {};
@@ -106,11 +138,10 @@ export class TownTalk {
       social,
       sources: { 'source.house': talk.ownHouse },
     };
-    this.session = createSettingSession({
-      contractVersion: 1,
-      id: 'masterworld-town',
-      domain: {
-        version: 1,
+    const version = Math.max(1, cellars.length);
+    const domain: Domain = {
+        version,
+        migrateFrom: Array.from({ length: version - 1 }, (_, i) => i + 1),
         entities,
         predicates: {
           troubled: { roles: { subject: 'entity' }, keyRoles: ['subject'] },
@@ -119,17 +150,10 @@ export class TownTalk {
         },
         characters,
         facts,
-      },
-      languages: { en: resources },
-    }, { languageModule: englishModule, saved: saved?.session });
-    if (saved) this.leads.push(...saved.leads.filter((l) => this.cellarName.has(l)));
-    else {
-      // The household has told some of it around: the inn and a neighbour or two heard that something is wrong.
-      for (const { hint } of cellars) for (const t of hint.told) {
-        const plan = this.session.core.respond(pid(t.from), { function: 'ask', query: { predicate: 'troubled', args: { subject: hint.cellar } }, speaker: pid(t.to) });
-        hearResponse(this.session.core, pid(t.from), pid(t.to), plan);
-      }
-    }
+      };
+    // A state from before the latest cellars: its people take in the new facts (Conversations' own migration).
+    const state = saved && saved.domainVersion !== version ? { ...saved, domainVersion: version, core: new AgentCore(domain, saved.core).snapshot() } : saved;
+    this.session = createSettingSession({ contractVersion: 1, id: 'masterworld-town', domain, languages: { en: resources } }, { languageModule: englishModule, saved: state });
   }
 
   /** The person's name. */
@@ -146,7 +170,11 @@ export class TownTalk {
   topics(person: number): Topic[] {
     const t = this.talk.topics;
     const out: Topic[] = [{ id: 'self', label: t.self }, { id: 'news', label: t.news }];
-    for (const l of this.leads) out.push({ id: `lead:${l}`, label: cap(this.cellarCalled(l)), lead: true });
+    // A cellar moved into again: only its newest story is a topic.
+    this.leads.forEach((l, i) => {
+      if (this.leads.slice(i + 1).some((m) => this.houseOf(m) === this.houseOf(l))) return;
+      out.push({ id: `lead:${l}`, label: cap(this.cellarCalled(l)), lead: true });
+    });
     if (this.session.core.context(pid(person)).pendingOffer) out.push({ id: 'more', label: t.more });
     if (this.told.has(person)) out.push({ id: 'source', label: t.source });
     out.push({ id: 'bye', label: t.bye });
@@ -224,11 +252,18 @@ export function townTalk(seed: number, setting: SettingModule, town: Town, peopl
   const folk = nameFolk(people, town.plan, setting.names, setting.talk, seed);
   const cellars: TalkCellar[] = [];
   for (const d of log) {
-    if (d.kind !== 'dungeon' || d.town !== town.decision.id) continue;
-    const house = town.plan.buildings.find((b) => b.id === d.building);
-    if (!house) continue;
-    const sketch = sketchCellar(d, house, setting.dungeons.cellar);
-    cellars.push({ sketch, hint: cellarHint(sketch, people, town.plan) });
+    const c = talkCellar(d, setting, town, people, log);
+    if (c) cellars.push(c);
   }
   return { talk: new TownTalk(folk, setting.talk, cellars, saved), folk };
+}
+
+/** A promise as the townsfolk know it (a cellar under one of this town's houses, or new dwellers in one); null for any other decision. */
+export function talkCellar(d: Decision, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog): TalkCellar | null {
+  const dungeon = d.kind === 'dungeon' ? d : d.kind === 'move-in' ? log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === d.dungeon) : undefined;
+  if (!dungeon || dungeon.town !== town.decision.id) return null;
+  const house = town.plan.buildings.find((b) => b.id === dungeon.building);
+  if (!house) return null;
+  const sketch = sketchCellar(dungeon, house, setting.dungeons.cellar, d.kind === 'move-in' ? d : undefined);
+  return { sketch, hint: cellarHint(sketch, people, town.plan) };
 }

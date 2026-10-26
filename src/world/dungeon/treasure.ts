@@ -43,7 +43,8 @@ export function hoardsOf(c: Cellar, defs: readonly CreatureDef[]): Hoard[] {
   const r = c.layout.rooms[c.graph.goal];
   out.push({
     id: out.length, x: (r.x + r.w / 2) * CELL, y: r.level * STOREY, z: (r.z + r.d / 2) * CELL, room: r.id, table: 'lair', danger,
-    seed: deriveSeed(c.decision.seed, 'hoard', out.length), name: `the ${c.dweller.id === 'rats' ? 'nest' : 'hoard'}`, prop: false,
+    // New dwellers gather a hoard of their own.
+    seed: deriveSeed(c.occupation?.seed ?? c.decision.seed, 'hoard', out.length), name: `the ${c.dweller.id === 'rats' ? 'nest' : 'hoard'}`, prop: false,
   });
   return out;
 }

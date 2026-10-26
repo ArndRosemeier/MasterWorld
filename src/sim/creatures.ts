@@ -10,15 +10,14 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { CreatureDef } from '../setting/contract';
 import type { Spawn } from '../world/dungeon/cellar';
-import { CELL } from '../world/dungeon/cellar';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { strike, type Guard, type Strike } from './combat';
-import { DungeonNav, type NavCell } from './dungeonNav';
+import { DungeonGround, type DenGround, type DungeonNav } from './dungeonNav';
 
 export type CreatureState = 'idle' | 'alert' | 'fight' | 'flee' | 'beg' | 'meek' | 'dead';
 
 /** What the body shows (the renderer picks a clip or a pose for it). */
-export type CreatureAct = 'stand' | 'walk' | 'run' | 'sniff' | 'gnaw' | 'watch' | 'rummage' | 'spin' | 'swing' | 'hurt' | 'beg' | 'die' | 'dead';
+export type CreatureAct = 'stand' | 'walk' | 'run' | 'sniff' | 'gnaw' | 'graze' | 'watch' | 'rummage' | 'spin' | 'swing' | 'hurt' | 'beg' | 'die' | 'dead';
 
 export interface Creature {
   /** Index in the den (stable: saves name the dead by it). */
@@ -98,18 +97,19 @@ const WINDUP = 0.4;
 const GIVE_UP = 9;
 
 export class Den {
-  readonly nav: DungeonNav;
+  readonly ground: DenGround;
   readonly creatures: Creature[] = [];
   /** Sim seconds. */
   time = 0;
 
-  constructor(readonly space: DungeonSpace, spawns: readonly Spawn[], defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []) {
-    this.nav = new DungeonNav(space);
+  /** A dungeon's space (its rooms are the homes), or any other ground (open land: sim/wild.ts). */
+  constructor(ground: DungeonSpace | DenGround, spawns: readonly Spawn[], defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []) {
+    this.ground = 'layout' in ground ? new DungeonGround(ground) : ground;
     spawns.forEach((s, id) => {
       const def = defs.find((d) => d.id === s.creature);
       if (!def) throw new Error(`no creature "${s.creature}"`);
       const rng = new Rng(deriveSeed(seed, 'den', id));
-      const p = this.spotIn(s.room, rng);
+      const p = this.ground.spot(s.room, rng);
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
         aware: 0, leader: id === 0 && def.pack, stagger: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
@@ -131,12 +131,11 @@ export class Den {
   /** Ids of the dead (for the save). */
   get dead(): number[] { return this.creatures.filter((c) => c.state === 'dead').map((c) => c.id); }
 
-  /** A free point on the floor of a room. */
-  private spotIn(room: number, rng: Rng): { x: number; y: number; z: number } {
-    const r = this.space.layout.rooms[room];
-    const x = (r.x + rng.range(0.25, r.w - 0.25)) * CELL, z = (r.z + rng.range(0.25, r.d - 0.25)) * CELL;
-    return { x, y: this.space.floorAt(x, z, r.level * 2.8 + 1) ?? r.level * 2.8, z };
-  }
+  /** A dungeon den's walking graph (the fight bot walks it too). */
+  get nav(): DungeonNav { return (this.ground as DungeonGround).nav; }
+
+  /** A dungeon den's space. */
+  get space(): DungeonSpace { return (this.ground as DungeonGround).space; }
 
   step(dt: number, q: Quarry): DenEvent[] {
     this.time += dt;
@@ -168,7 +167,7 @@ export class Den {
     let gain = 0;
     const facing = Math.cos(Math.atan2(dz, dx) - c.dir) > -0.2 ? 1 : 0.45;
     const sightRange = (s.sight + q.light * 1.4) * facing;
-    const clear = d < Math.max(sightRange, s.hearing) && this.nav.sees(c.x, c.y, c.z, q.x, q.y, q.z, 0.8);
+    const clear = d < Math.max(sightRange, s.hearing) && this.ground.sees(c.x, c.y, c.z, q.x, q.y, q.z, 0.8);
     if (clear && d < sightRange) gain += 2.2 * (1 - (d / sightRange) * 0.6);
     const hearRange = s.hearing * q.noise * (clear ? 1 : 0.45);
     if (d < hearRange) gain += 1.2 * (1 - d / hearRange);
@@ -206,7 +205,7 @@ export class Den {
       if (o === c || !o.def.pack || o.state === 'dead' || o.state === 'fight' || o.state === 'flee' || o.state === 'meek' || o.state === 'beg') continue;
       const d = Math.hypot(o.x - c.x, o.z - c.z, o.y - c.y);
       // A shout carries as far as one can see (a room, an open door), and only a little through walls.
-      const range = this.nav.sees(c.x, c.y, c.z, o.x, o.y, o.z, 0.6) ? o.def.senses.hearing : 2.5;
+      const range = this.ground.sees(c.x, c.y, c.z, o.x, o.y, o.z, 0.6) ? o.def.senses.hearing : 2.5;
       if (d > range) continue;
       o.aware = 1;
       o.seen = c.seen;
@@ -226,13 +225,18 @@ export class Den {
     if (c.until > 0) return;
     const r = c.rng;
     if (r.chance(0.55)) {
-      const p = this.spotIn(c.home, r);
+      const p = this.ground.spot(c.home, r);
       c.path = [p];
       c.pi = 0;
       c.act = 'walk';
       c.until = 0;
     } else {
-      c.act = c.def.body.kind === 'rat' ? (r.chance(0.5) ? 'gnaw' : 'sniff') : c.def.body.kind === 'spider' ? (r.chance(0.6) ? 'watch' : 'spin') : r.chance(0.5) ? 'watch' : 'rummage';
+      const b = c.def.body;
+      c.act = b.kind === 'rat' ? (r.chance(0.5) ? 'gnaw' : 'sniff')
+        : b.kind === 'spider' ? (r.chance(0.6) ? 'watch' : 'spin')
+        // Deer and boar graze and root, a wolf noses about and keeps watch.
+        : b.kind === 'beast' ? (b.species === 'wolf' ? (r.chance(0.5) ? 'sniff' : 'watch') : r.chance(0.7) ? 'graze' : 'watch')
+        : r.chance(0.5) ? 'watch' : 'rummage';
       c.until = r.range(2, 6);
     }
   }
@@ -377,33 +381,19 @@ export class Den {
     c.state = 'idle';
     c.aware = 0.2;
     c.seen = null;
-    this.headTo(c, this.spotIn(c.home, c.rng));
+    this.headTo(c, this.ground.spot(c.home, c.rng));
     out.push({ kind: 'home', who: c });
   }
 
-  private cellOf(c: { x: number; y: number; z: number }): NavCell | null {
-    return this.nav.at(c.x, c.y + 0.3, c.z);
-  }
-
   private headTo(c: Creature, p: { x: number; y: number; z: number }): void {
-    const a = this.cellOf(c), b = this.cellOf(p);
     c.pi = 0;
-    if (!a || !b) { c.path = []; return; }
-    const way = this.nav.way(a, b, 60);
-    // In the same room (or the last step): straight to the point itself.
-    c.path = way.length ? [...way.slice(0, -1), p] : this.nav.roomOf(a) === this.nav.roomOf(b) && this.nav.roomOf(a) >= 0 ? [p] : [];
+    c.path = this.ground.way(c, p);
   }
 
-  /** The reachable cell that is farthest from the hero, within a few rooms. */
+  /** Off as far from the hero as it can get. */
   private runFrom(c: Creature, q: Quarry): void {
-    const a = this.cellOf(c);
-    if (!a) return;
-    let best: NavCell | null = null, score = -Infinity;
-    for (const { cell, d } of this.nav.distances(a, 24).values()) {
-      const p = this.nav.centre(cell), far = Math.hypot(p.x - q.x, p.z - q.z) - d * 0.3;
-      if (far > score) { score = far; best = cell; }
-    }
-    if (best) { c.path = this.nav.way(a, best, 24); c.pi = 0; }
+    const way = this.ground.away(c, q);
+    if (way.length) { c.path = way; c.pi = 0; }
   }
 
   /** Walk the path at a share of its speed; false when there is nowhere to go. */
@@ -417,16 +407,16 @@ export class Den {
       const k = Math.min(1, left / d);
       left -= d * k;
       // Along the walls, never through them; stuck, it looks for another way.
-      const to = this.nav.slide(c.x, c.y, c.z, dx * k, dz * k, r);
+      const to = this.ground.slide(c.x, c.y, c.z, dx * k, dz * k, r);
       if (!to) { c.pi = c.path.length; c.repath = 0; return false; }
       c.dir = Math.atan2(dz, dx);
       const reached = k === 1 && to.x === c.x + dx && to.z === c.z + dz;
       c.x = to.x; c.z = to.z;
       // The feet follow the floor (stairs), never jump to a point's storey.
-      c.y = this.space.floorAt(c.x, c.z, c.y + 0.6) ?? c.y;
+      c.y = this.ground.floorAt(c.x, c.z, c.y + 0.6) ?? c.y;
       if (reached) c.pi++; else if (k === 1) break;
     }
-    const floor = this.space.floorAt(c.x, c.z, c.y + 0.6);
+    const floor = this.ground.floorAt(c.x, c.z, c.y + 0.6);
     if (floor !== null) c.y = floor;
     c.act = pace > 0.5 ? 'run' : 'walk';
     return true;
@@ -447,6 +437,6 @@ export class Den {
 
   private nudge(c: Creature, dx: number, dz: number): void {
     const x = c.x + dx, z = c.z + dz;
-    if (this.space.sdf(x, c.y + 0.5, z) > radiusOf(c.def) * 0.5) { c.x = x; c.z = z; }
+    if (this.ground.clearance(x, c.y, z) > radiusOf(c.def) * 0.5) { c.x = x; c.z = z; }
   }
 }

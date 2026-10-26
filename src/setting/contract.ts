@@ -220,7 +220,29 @@ export type CreatureBody =
     /** Only its bones: the raised dead. */
     readonly bones?: boolean;
   }
-  | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string };
+  | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string }
+  /** An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures. `length` nose to rump. */
+  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar'; readonly length: number; readonly color: string };
+
+/**
+ * Who lives on the land around a town (plan 9.3, the world simulation): a kind of group, where its
+ * territories lie and how many there are. The simulation places them from the seed; the VGM does not.
+ */
+export interface WildDef {
+  readonly id: string;
+  /** Who lives together (creature ids): the first leads, the others follow at random. */
+  readonly creatures: readonly string[];
+  /** How many in a group, at least and at most. */
+  readonly count: readonly [number, number];
+  /** wood: under thick trees; open: meadows and heath; road: by a road out of town. */
+  readonly habitat: 'wood' | 'open' | 'road';
+  /** Metres from the town's market where their territories lie. */
+  readonly ring: readonly [number, number];
+  /** Territory radius, metres. */
+  readonly range: number;
+  /** Territories of this kind around a town. */
+  readonly groups: number;
+}
 
 /**
  * A creature (plan 9.3, 12, D29): its body, senses, temper and power. Its danger is fixed by what it is,
@@ -483,6 +505,8 @@ export interface SettingModule {
   readonly backgrounds: readonly BackgroundDef[];
   /** How the townsfolk spend their days. */
   readonly routines: RoutinesDef;
+  /** What lives on the land around a town. */
+  readonly wild: readonly WildDef[];
   /** The setting's colour key over the day; without it the engine's neutral grade. */
   readonly look?: LookDef;
 }
@@ -609,6 +633,10 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
   for (const d of m.dungeons.cellar.dwellers) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: cellar dweller "${d.id}" creature "${c}" is unknown`);
+  for (const w of m.wild) {
+    for (const c of w.creatures) if (!ids.has(c)) out.push(`${where}: wild "${w.id}" creature "${c}" is unknown`);
+    if (!w.creatures.length || w.count[0] < 1 || w.count[1] < w.count[0] || w.ring[1] < w.ring[0] || w.range <= 0) out.push(`${where}: wild "${w.id}" needs creatures, a count, a ring and a range`);
+  }
   if (!m.abilities.length) out.push(`${where}: no abilities`);
   return out;
 }
