@@ -2,7 +2,7 @@ import { townsfolk } from '../src/sim/people';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
-import { polyCentroid } from '@futuremagic/settlement';
+import { pointInPoly, polyCentroid } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
 import { TownGround } from '../src/world/town';
@@ -28,9 +28,14 @@ test('town: the market is level, and the ground knows its streets, market and ho
   assert.equal(terrain.townGround(mx, mz), TownGround.Market);
   const b = town.plan.buildings[0];
   assert.equal(terrain.townGround(b.cx, b.cz), TownGround.Building);
+  // Roads are cobbled in town and earth out in the fields.
   const road = town.plan.streets.find((s) => s.kind === 'road')!;
-  const k = (road.pts.length >> 2) * 2;
+  const inTown = (k: number) => pointInPoly(town.plan.outline, road.pts[k], road.pts[k + 1]) && !pointInPoly(town.plan.market, road.pts[k], road.pts[k + 1]);
+  let k = 0;
+  while (!inTown(k)) k += 2;
   assert.equal(terrain.townGround(road.pts[k], road.pts[k + 1]), TownGround.Street);
+  const n = road.pts.length - 4;
+  assert.equal(terrain.townGround(road.pts[n], road.pts[n + 1]), TownGround.Path);
   assert.equal(terrain.townGround(mx + 5000, mz), TownGround.None);
   // A small town (D41): about 80-120 people.
   const people = townsfolk(town.plan, terrain.seed).length;

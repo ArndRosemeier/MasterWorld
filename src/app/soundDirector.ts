@@ -309,7 +309,7 @@ export class SoundDirector {
     const { terrain } = this.host, p = wk.pos, where = this.host.where();
     const level = this.host.waterLevel(p.x, p.z);
     const g = terrain.townGround(p.x, p.z);
-    const town = g === TownGround.Street || g === TownGround.Building ? 'street' : g === TownGround.Market ? 'market' : g === TownGround.Yard ? 'yard' : null;
+    const town = g === TownGround.Street || g === TownGround.Building ? 'street' : g === TownGround.Market ? 'market' : g === TownGround.Yard || g === TownGround.Path ? 'yard' : null;
     const bi = terrain.biomeAt(p.x, p.z);
     const h = terrain.height(p.x, p.z), d = 1.5;
     const slope = Math.hypot(terrain.height(p.x + d, p.z) - terrain.height(p.x - d, p.z), terrain.height(p.x, p.z + d) - terrain.height(p.x, p.z - d)) / (2 * d);

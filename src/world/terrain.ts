@@ -8,6 +8,7 @@ import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHe
 import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
 import type { DecisionLog, TownDecision } from './decisions';
+import type { Field } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
 
 export class Terrain {
@@ -66,12 +67,18 @@ export class Terrain {
   /** What a town has made of the ground here (TownGround.None outside every town). */
   townGround(x: number, z: number): TownGround {
     for (let i = 0; i < this.townSpots.length; i++) {
-      const s = this.townSpots[i].d;
-      if (Math.abs(x - s.x) > s.radius * 2.5 || Math.abs(z - s.z) > s.radius * 2.5) continue;
-      const g = this.towns[i].groundAt(x, z);
+      const town = this.towns[i];
+      if (!town.near(x, z, 0)) continue;
+      const g = town.groundAt(x, z);
       if (g !== TownGround.None) return g;
     }
     return TownGround.None;
+  }
+
+  /** The field at a point (its crop and rows), or null. */
+  fieldAt(x: number, z: number): Field | null {
+    for (const town of this.towns) if (town.near(x, z, 0)) { const f = town.fieldAt(x, z); if (f) return f; }
+    return null;
   }
 
   /** Depth of open water at a point (> 0: sea, lake or river), roughly: for keeping things out of it. */

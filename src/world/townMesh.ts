@@ -1,8 +1,9 @@
 /**
  * A town's buildings as meshes (pure, runs in the terrain worker): @futuremagic/settlement builds each
- * building, and the buildings of one square cell are merged into one mesh near and one far (fewer draws).
+ * building (and each fence and haystack of its farmland), and those of one square cell are merged into
+ * one mesh near and one far (fewer draws).
  */
-import { buildingMesh, type BuildingMesh, type TownBuilding } from '@futuremagic/settlement';
+import { buildingMesh, propMesh, type BuildingMesh, type TownBuilding, type TownProp } from '@futuremagic/settlement';
 import type { Town } from './town';
 
 /** Side of a merge cell, metres. */
@@ -18,16 +19,19 @@ export interface TownCellMesh {
 
 /** Every cell of a town that has buildings in it. */
 export function townMeshes(town: Town): TownCellMesh[] {
-  const cells = new Map<string, { i: number; j: number; list: TownBuilding[] }>();
-  for (const b of town.plan.buildings) {
-    const i = Math.floor(b.cx / TOWN_CELL), j = Math.floor(b.cz / TOWN_CELL), key = `${i},${j}`;
+  const cells = new Map<string, { i: number; j: number; list: TownBuilding[]; props: TownProp[] }>();
+  const cellAt = (x: number, z: number) => {
+    const i = Math.floor(x / TOWN_CELL), j = Math.floor(z / TOWN_CELL), key = `${i},${j}`;
     let c = cells.get(key);
-    if (!c) cells.set(key, (c = { i, j, list: [] }));
-    c.list.push(b);
-  }
-  return [...cells.values()].map(({ i, j, list }) => {
+    if (!c) cells.set(key, (c = { i, j, list: [], props: [] }));
+    return c;
+  };
+  for (const b of town.plan.buildings) cellAt(b.cx, b.cz).list.push(b);
+  for (const p of town.plan.props) (p.kind === 'fence' ? cellAt(p.posts[0], p.posts[2]) : cellAt(p.x, p.z)).props.push(p);
+  return [...cells.values()].map(({ i, j, list, props }) => {
     const x = (i + 0.5) * TOWN_CELL, z = (j + 0.5) * TOWN_CELL;
-    return { x, z, near: mergeMeshes(list.map((b) => buildingMesh(b, [x, 0, z], true))), far: mergeMeshes(list.map((b) => buildingMesh(b, [x, 0, z], false))) };
+    const meshes = (detail: boolean) => mergeMeshes([...list.map((b) => buildingMesh(b, [x, 0, z], detail)), ...props.map((p) => propMesh(p, [x, 0, z], detail))]);
+    return { x, z, near: meshes(true), far: meshes(false) };
   });
 }
 

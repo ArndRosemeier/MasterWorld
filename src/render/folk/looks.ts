@@ -33,22 +33,12 @@ const DYED = ['#7a3a2a', '#8a4a30', '#3d5a80', '#4a5a6a', '#5f6838', '#6b6a3a', 
 const LEATHER = ['#4a3020', '#3a2416', '#5a3a22', '#2a1d14'];
 export const HAIR_COLORS = ['#2a1d14', '#3b2417', '#4a3020', '#6a4a2a', '#8a6a3a', '#b08a50', '#c8a868', '#1c1814', '#7a3a1e'];
 
-/** Who is drawn as an Actors character (Actors makes adults only: children are simple figures, ChildFolk). */
-export const drawn = (p: Person): boolean => p.role !== 'child';
-
-/** How a child's simple figure looks (ChildFolk): colours of tunic, hose, skin and hair, and height (m). */
-export interface ChildLook { tunic: string; hose: string; skin: string; hair: string; tall: number }
-
-export function childLook(p: Person): ChildLook {
-  const r = new Rng(deriveSeed(p.seed, 'look'));
-  // Ages 4..15 stand about 1.0..1.6 m among humans and elves; dwarf and halfling children are smaller.
-  const small = p.race === 'dwarf' || p.race === 'halfling' ? 0.72 : 1;
-  const tone = r.range(0.05, 0.45);
-  const skin = `#${[[241, 141], [211, 90], [189, 59]].map(([a, b]) => Math.round(a + (b - a) * tone).toString(16).padStart(2, '0')).join('')}`;
-  return {
-    tunic: r.chance(0.35) ? r.pick(DYED) : r.pick(PLAIN), hose: r.pick(PLAIN), skin, hair: r.pick(HAIR_COLORS),
-    tall: small * (0.95 + (Math.min(15, Math.max(4, p.age)) - 4) * 0.055) * r.range(0.95, 1.05),
-  };
+/**
+ * How young `p` looks (Actors' `youth`: 0 grown up, 1 a child of about five): 1 up to age 5, about a
+ * half at 11, a quarter at 15. Children are the adult body with child proportions and never show anatomy.
+ */
+export function youthOf(p: Person): number {
+  return p.role === 'child' ? Math.min(1, Math.max(0, (18 - p.age) / 13)) : 0;
 }
 
 /** Garment colours as an outfit is put together: `wear(id, colour)` notes the colour and gives back the id. */
@@ -80,6 +70,12 @@ export function lookOf(p: Person): CharacterPatch {
       outfit = ['briefs', ...(f ? ['bra'] : []), wear('med-long-tunic', r.pick(['#5d6b4a', '#6e7466', '#4a5a52'])), wear('med-belt', leather()),
         wear('med-mantle', r.pick(['#3f5238', '#55604f', '#38463f'])), wear('hood-down', r.pick(['#3f5238', '#55604f'])), wear('leather-boots', leather())];
       break;
+    case 'child':
+      // Children in undyed linen and wool, now and then a dyed tunic or skirt.
+      outfit = f
+        ? ['briefs', wear('laced-chemise', plain()), wear('gored-skirt', r.chance(0.3) ? dyed() : plain()), wear('med-belt', leather()), wear('cloth-shoes', leather())]
+        : ['briefs', wear('med-tunic', r.chance(0.3) ? dyed() : plain()), wear(r.chance(0.5) ? 'med-hose' : 'wool-pants', plain()), wear('med-belt', leather()), wear('cloth-shoes', leather())];
+      break;
     case 'trade':
     case 'hand':
       outfit = f
@@ -92,22 +88,25 @@ export function lookOf(p: Person): CharacterPatch {
         ? ['briefs', wear('laced-chemise', plain()), wear('gored-skirt', r.chance(0.4) ? dyed() : plain()), wear('med-belt', leather()), shoes]
         : ['briefs', wear('med-tunic', r.chance(0.4) ? dyed() : plain()), wear(r.chance(0.5) ? 'med-hose' : 'wool-pants', plain()), wear('med-belt', leather()), shoes];
   }
-  if (r.chance(0.12)) outfit.push(wear('hood-down', dyed()));
+  if (p.role !== 'child' && r.chance(0.12)) outfit.push(wear('hood-down', dyed()));
   const old = p.race !== 'elf' && p.age > 55; // elves age slowly
   const dwarf = p.race === 'dwarf';
+  const youth = youthOf(p);
+  // Actors keeps a child's body at its youngest adult age and gives it child proportions from `youth`.
+  const ageYears = youth > 0 ? 18 : p.race === 'elf' ? 20 + p.age / 12 : p.age;
   return {
-    race: p.race, race2: null, raceMix: 0, raceSize: r.range(0.3, 0.7),
+    race: p.race, race2: null, raceMix: 0, raceSize: r.range(0.3, 0.7), youth,
     body: {
-      gender: f ? 0 : 1, ageYears: p.race === 'elf' ? 20 + p.age / 12 : p.age, muscle: r.range(0.3, p.role === 'trade' ? 0.8 : 0.6), weight: r.range(0.3, 0.75),
+      gender: f ? 0 : 1, ageYears, muscle: r.range(0.3, p.role === 'trade' ? 0.8 : 0.6), weight: r.range(0.3, 0.75),
       height: r.range(0.3, 0.7), proportions: r.range(0.3, 0.7),
       african: r.range(0, 0.15), asian: r.range(0, 0.15), caucasian: 1,
     },
     skin: 'procedural', skinTone: r.range(0.05, 0.45),
     hair: r.pick(f ? WOMEN_HAIR : MEN_HAIR), hairColor: old && r.chance(0.7) ? r.pick(['#8a8580', '#b0aca4', '#d0ccc4']) : r.pick(HAIR_COLORS),
-    beard: f || p.race === 'halfling' || p.race === 'elf' ? 'none'
+    beard: f || youth > 0 || p.race === 'halfling' || p.race === 'elf' ? 'none'
       : dwarf ? r.pick(['long', 'braided', 'forked', 'full'] as const)
         : r.chance(0.45) ? r.pick(['short', 'full', 'mustache', 'chinstrap', 'goatee'] as const) : 'none',
-    stubble: f ? 0 : r.range(0, 0.6),
+    stubble: f || youth > 0 ? 0 : r.range(0, 0.6),
     outfit, garmentColors: colors,
   };
 }
@@ -119,6 +118,7 @@ const CLIP: Record<ActivityKind, string> = {
   sell: 'talk', serve: 'talk', tend: 'water plants',
   fetchWater: 'pick up', fetchWood: 'pick up', chop: 'chop wood', garden: 'harvest', washing: 'interact', feedHens: 'plant seeds',
   browse: 'arms folded', sit: 'sit', chat: 'talk', drink: 'eat or drink', pray: 'crouch', mourn: 'arms folded', play: 'idle',
+  plough: 'harvest', sow: 'plant seeds', hoe: 'harvest', reap: 'harvest', tendHorses: 'interact', muckOut: 'pick up',
 };
 
 /** The clip that shows `act` (`id` varies a few between people). */
@@ -135,7 +135,7 @@ export function clipOf(act: ActivityKind, id: number): string {
  */
 export function coveringLooks(people: Person[]): CharacterPatch[] {
   const partsOf = (l: CharacterPatch) => [...(l.outfit ?? []), `hair:${l.hair}`, `beard:${l.beard}`, `race:${l.race}`];
-  const looks = people.filter(drawn).map(lookOf);
+  const looks = people.map(lookOf);
   const left = new Set(looks.flatMap(partsOf));
   const out: CharacterPatch[] = [];
   while (left.size) {
