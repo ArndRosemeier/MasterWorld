@@ -15,6 +15,8 @@ const LIMIT_TITLE = Number(process.env.LIMIT_TITLE ?? 1), LIMIT_READY = Number(p
 const { server, base, browser } = await launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.error(`[page error] ${e.message}`));
+// The game's own loading steps (and pack retries), so a slow start shows where its time goes.
+page.on('console', (m) => { const t = m.text(); if (/^\[(load|packs|title)\]/.test(t)) console.log(`  ${t}`); });
 
 /** Every finished download: its path under the site and its body bytes; `ready` marks those after the world was playable. */
 const got = [];
