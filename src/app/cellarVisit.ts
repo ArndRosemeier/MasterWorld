@@ -26,6 +26,8 @@ export class CellarVisit {
   private readonly read = new Set<number>();
   /** Called after going down or coming up (the game autosaves then). */
   onSwap: (() => void) | null = null;
+  /** Down (true) or up again (false), as the view swaps: the game leaves the land above out of the frame meanwhile. */
+  onDepth: ((below: boolean) => void) | null = null;
   /** Up the ladder: into the house's room (set by the game; the hatch is in it). */
   up: (() => Promise<void>) | null = null;
 
@@ -49,6 +51,7 @@ export class CellarVisit {
       this.inside = true;
       this.view.group.visible = true;
       this.sky.indoors = true;
+      this.onDepth?.(true);
       const O = this.view.origin, h = this.cellar.hatch;
       const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
       if (room !== undefined && this.cellar.layout.rooms[room]) {
@@ -66,6 +69,7 @@ export class CellarVisit {
       this.inside = false;
       this.view.group.visible = false;
       this.sky.indoors = false;
+      this.onDepth?.(false);
       this.lantern.intensity = 0;
       this.cooldown = 2;
       if (this.up) { await this.up(); return; }
