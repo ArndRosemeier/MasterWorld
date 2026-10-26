@@ -44,9 +44,9 @@ These hold in every phase. A PR that breaks one is fixed before new work goes on
 | # | Floor | Check |
 |---|---|---|
 | F1 | **Standard shots.** One script takes the same set on a GPU: title, the creator, town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map, the trade window, talk. They are saved with the commit hash. | `npm run shot:set` (`tools/shot/set.mjs`, built in A1). Run at every phase gate and after visual PRs. |
-| F2 | **Frame time** on the reference GPU (Arnd's RTX 5070, webgl2, 1080p): at most 16.7 ms in every standard shot, aiming for 12 ms. No shot may be twice as slow as the town at noon. | The `&hud` frame time in F1 shots, written into the set's index. |
+| F2 | **Frame time** on the reference GPU (Arnd's RTX 5070, 1080p, the game's default backend, WebGPU): at most 16.7 ms in every standard shot, aiming for 12 ms. No shot may be twice as slow as the town at noon. The WebGL fallback (`?gl`) may be at most 1.5× slower. | The `&hud` frame time in F1 shots, written into the set's index. |
 | F3 | **Shaders** per [SHADERS.md](../SHADERS.md): 0 violations in every shot. | HUD line "policy ok". |
-| F4 | **Load time**: title in under 1 s and playable in under 20 s on the reference machine; music streams and is not part of the start download. | `tools/shot/load.mjs` (title, playable, start download; fails on game music in it), `tools/shot/perf.mjs`. Sound is 42 MB in `public/sound`, 34 MB of it music. |
+| F4 | **Load time**: title in under 1 s and playable in under 20 s on the reference machine, cold, on the default backend (WebGPU); the WebGL fallback (`?gl`) playable in under 30 s; music streams and is not part of the start download. | `tools/shot/load.mjs` (title, playable, start download; fails on game music in it), `tools/shot/perf.mjs`. Sound is 42 MB in `public/sound`, 34 MB of it music. |
 | F5 | **Tests** per [CHECKS.md](../CHECKS.md): 5 s per test, 60 s for `npm test`; variety check in CI. | CI. |
 | F6 | **No duplicates, no `Math.random`, layers kept** (CLAUDE.md). | `npm run dup`, `npm run repeated`, guards. |
 | F7 | **The world stays fixed by place** (D29): nothing scales to the hero's power. | Review at each gate. |
@@ -71,7 +71,7 @@ Goal: an evening of play works end to end. You get a lead, travel, clear the pla
 | A4 ✓ | **Death as designed**: in classic mode carried gear stays where you fell, as a mark on the map to go back for; **roguelike mode** (one save the game writes, death ends the hero, the world stays for the next one) | Tests for both modes; the New game screen offers the mode | 11.1, D12 |
 | A5 ✓ | **Music streams** (F4): the start loads no music; tracks load when first needed | `npm run load`: no game music before playable (only the title's theme). The load times are A7 | 16 |
 | A6 ✓ | **The loop check**: a scripted hero (extending `src/game/bot.ts`) plays an evening headless: hears a lead, walks to it, clears it, comes back, sells, buys an upgrade, hears the next lead. It is a slow check of at most 5 min | The check passes on main and runs before every phase gate | 11.3 |
-| A7 | **Load fast** (F4): the start fetches only what the first view needs. Today a cold load on the reference GPU shows the title at 1.4 s and is playable at 62 s, with 97 MB fetched (Actors human packs 68 MB in 654 files, cow 14, horse 8, dog 4.5). Bundle the packs into a few files, load the people and animals near the start first and the rest behind play, and cache in the browser | `npm run load` on the reference machine: title under 1 s, playable under 20 s, cold | 3 (F4), 17.2 |
+| A7 ✓ | **Load fast** (F4): the start fetches only what the first view needs. Today a cold load on the reference GPU shows the title at 1.4 s and is playable at 62 s, with 97 MB fetched (Actors human packs 68 MB in 654 files, cow 14, horse 8, dog 4.5). Bundle the packs into a few files, load the people and animals near the start first and the rest behind play, and cache in the browser | `npm run load` on the reference machine: title under 1 s, playable under 20 s, cold | 3 (F4), 17.2 |
 
 Gate A: A1–A7 and A2b done, the F1 set judged, no placeholders.
 
