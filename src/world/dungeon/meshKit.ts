@@ -110,6 +110,31 @@ export class MeshKit {
     }
   }
 
+  /**
+   * A filled sack standing at (x, y0, z): a heavy, lumpy body slumped at the foot, gathered and tied at the
+   * neck. `lump(a, t)` (-1..1, around a in radians and up t in 0..1) dents and bulges it.
+   */
+  sack(x: number, y0: number, z: number, r: number, h: number, mat: number, tint: Tint, lump: (a: number, t: number) => number): void {
+    const seg = 12, rings = 8;
+    // Radius up the sack: wide and settled at the foot, full in the body, drawn in at the neck, a small flare above the tie.
+    const prof = (t: number) => t < 0.08 ? 0.75 + 3 * t : t < 0.62 ? 1 - 0.25 * ((t - 0.35) / 0.27) ** 2 : t < 0.86 ? 0.95 - 3.3 * (t - 0.62) : 0.16 + 0.6 * (t - 0.86);
+    const P = (a: number, t: number) => {
+      const rr = r * prof(t) * (1 + 0.12 * lump(a, t)), yy = y0 + h * t * (1 - 0.08 * Math.max(0, lump(a + 1.7, 0.5)) * t);
+      return [x + Math.cos(a) * rr, yy, z + Math.sin(a) * rr];
+    };
+    for (let k = 0; k < seg; k++) {
+      const a0 = (k / seg) * Math.PI * 2, a1 = ((k + 1) / seg) * Math.PI * 2;
+      for (let q = 0; q < rings; q++) {
+        const t0 = q / rings, t1 = (q + 1) / rings;
+        const u0 = a0 * r, u1 = a1 * r;
+        this.quad(P(a0, t0), P(a0, t1), P(a1, t1), P(a1, t0), [[u0, t0 * h], [u0, t1 * h], [u1, t1 * h], [u1, t0 * h]], mat, tint);
+      }
+      this.tri([x, y0 + h, z], P(a1, 1), P(a0, 1), mat, tint);
+    }
+    // The cord round the neck.
+    this.cylinder(x, y0 + h * 0.84, z, r * 0.24, h * 0.05, 8, mat, [tint[0] * 0.55, tint[1] * 0.5, tint[2] * 0.45]);
+  }
+
   mesh(): BuildingMesh {
     return {
       position: Float32Array.from(this.p), normal: Float32Array.from(this.n), uv: Float32Array.from(this.uv),

@@ -37,7 +37,7 @@ export interface CellarMeshes {
 const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], EARTH: Tint = [120, 96, 72];
 const OAK: Tint = [120, 90, 62], DARK_OAK: Tint = [84, 62, 44], IRON: Tint = [60, 60, 64];
 /** Tints on the cellar's own textures (they carry their colour; these only age them). */
-const WASH: Tint = [236, 228, 210], FLAGS: Tint = [214, 206, 192], OLD_FLAGS: Tint = [188, 186, 180], BRICK: Tint = [214, 200, 188];
+const WASH: Tint = [236, 228, 210], FLAGS: Tint = [204, 200, 194], OLD_FLAGS: Tint = [188, 186, 180], BRICK: Tint = [214, 200, 188];
 const RAFTERS: Tint = [168, 146, 124], DIRT: Tint = [176, 160, 140];
 
 /** A wall's look: its layer, tint, and how damp its foot is (0 dry .. 1 wet). */
@@ -261,6 +261,7 @@ function modelProp(k: MeshKit, p: Prop, models: PropModels): boolean {
   const rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), p.kind));
   const fwd = [Math.sin(yaw), Math.cos(yaw)];
   const spot = (u: number, w: number) => [x + Math.cos(yaw) * u + fwd[0] * w, z - Math.sin(yaw) * u + fwd[1] * w];
+  const t = (base: Tint, v = 0.12): Tint => base.map((ch) => Math.max(0, Math.min(255, Math.round(ch * (1 + rng.range(-v, v)))))) as unknown as Tint;
   const stampAs = (name: string, s: Partial<Stamp> & { x: number; z: number }): boolean => {
     const m = models.get(name);
     if (!m) return false;
@@ -285,12 +286,15 @@ function modelProp(k: MeshKit, p: Prop, models: PropModels): boolean {
     case 'shelf': case 'rack': {
       stampAs('furn_cellar_shelf', { x, z, scale: [p.kind === 'shelf' ? 0.9 : 1, 0.95, 1] });
       // Bottles, jars and candles on the boards.
-      const boards = [0.06, 0.66, 1.26];
-      for (let s = 0; s < 6; s++) {
-        const [a, b] = spot(-0.6 + s * 0.24, 0);
-        const yy = y + boards[s % 3] + 0.05;
-        if (p.kind === 'rack') k.cylinder(a, yy, b, 0.045, 0.3, 6, M.Glass, [40, 60, 40]);
-        else if (!stampAs('sculpt_clay_urn', { x: a, y: yy, z: b, yaw: rng.range(0, 6.28), round: true, scale: [0.28, 0.32, 0.28] })) return true;
+      // The model's board tops (furn_cellar_shelf), times its height scale.
+      const boards = [0.42, 1.02, 1.62].map((h) => h * 0.95);
+      for (let s = 0; s < 9; s++) {
+        if (rng.chance(0.3)) continue;
+        const [a, b] = spot(-0.6 + (s % 3) * 0.6 + rng.range(-0.1, 0.1), rng.range(-0.05, 0.05));
+        const yy = y + boards[Math.floor(s / 3)];
+        if (p.kind === 'rack') for (let n = 0; n < 4; n++) { const [c2, d] = spot(-0.75 + (s % 3) * 0.6 + n * 0.1, 0); k.cylinder(c2, yy, d, 0.04, 0.3, 6, M.Plaster, t([34, 52, 34], 0.25)); }
+        else if (rng.chance(0.75)) stampAs('sculpt_clay_urn', { x: a, y: yy, z: b, yaw: rng.range(0, 6.28), round: true, scale: [0.3, 0.34, 0.3] });
+        else stampAs('prop_candles', { x: a, y: yy, z: b, round: true });
       }
       return true;
     }
@@ -364,9 +368,13 @@ function prop(k: MeshKit, p: Prop): void {
     case 'barrel': k.cylinder(x, y, z, 0.32, 0.85, 10, M.Oak, t(OAK), 0.12); break;
     case 'cask': { const [a, b] = spot(-0.4, 0), [c2, d] = spot(0.4, 0); k.box(x, y, z, 1.4, 0.18, 0.5, yaw, M.Oak, t(DARK_OAK)); k.cylinder(a, y + 0.18, b, 0.4, 0.8, 10, M.Oak, t(OAK), 0.1); k.cylinder(c2, y + 0.18, d, 0.4, 0.8, 10, M.Oak, t(OAK), 0.1); break; }
     case 'vat': k.cylinder(x, y, z, 0.7, 1.3, 14, M.Oak, t(OAK), 0.05); break;
-    case 'rack': for (let s = 0; s < 3; s++) k.box(x, y + 0.05 + s * 0.6, z, 1.6, 0.06, 0.45, yaw, M.Oak, t(DARK_OAK)); for (const u of [-0.78, 0.78]) { const [a, b] = spot(u, 0); k.box(a, y, b, 0.08, 1.8, 0.45, yaw, M.Oak, t(DARK_OAK)); } for (let s = 0; s < 6; s++) { const [a, b] = spot(-0.6 + s * 0.24, 0); k.box(a, y + 0.12 + (s % 3) * 0.6, b, 0.1, 0.1, 0.4, yaw, M.Glass, [40, 60, 40]); } break;
+    case 'rack': for (let s = 0; s < 3; s++) k.box(x, y + 0.05 + s * 0.6, z, 1.6, 0.06, 0.45, yaw, M.Oak, t(DARK_OAK)); for (const u of [-0.78, 0.78]) { const [a, b] = spot(u, 0); k.box(a, y, b, 0.08, 1.8, 0.45, yaw, M.Oak, t(DARK_OAK)); } for (let s = 0; s < 6; s++) { const [a, b] = spot(-0.6 + s * 0.24, 0); k.box(a, y + 0.12 + (s % 3) * 0.6, b, 0.1, 0.1, 0.4, yaw, M.Plaster, [34, 52, 34]); } break;
     case 'crate': k.box(x, y, z, 0.7, 0.6, 0.7, yaw + rng.range(-0.3, 0.3), M.Oak, t([150, 118, 80])); if (rng.chance(0.5)) k.box(x, y + 0.6, z, 0.55, 0.45, 0.55, yaw + rng.range(-0.5, 0.5), M.Oak, t([150, 118, 80])); break;
-    case 'sack': k.box(x, y, z, 0.55, 0.5, 0.4, yaw + rng.range(-0.6, 0.6), M.Plaster, t([170, 150, 112])); break;
+    case 'sack': {
+      const a0 = rng.range(0, 6.28), b0 = rng.range(0, 6.28), lean = rng.range(0.8, 1.15);
+      k.sack(x, y, z, 0.27 * lean, 0.72 / lean, M.Plaster, t([150, 124, 88]), (a, tt) => Math.sin(2 * a + a0) * 0.6 * Math.sin(Math.PI * tt) + Math.sin(3 * a + b0 + tt * 4) * 0.4);
+      break;
+    }
     case 'shelf': k.box(x, y, z, 1.4, 1.7, 0.08, yaw, M.Oak, t(DARK_OAK)); for (let s = 0; s < 3; s++) k.box(x, y + 0.4 + s * 0.5, z, 1.4, 0.04, 0.35, yaw, M.Oak, t(OAK)); break;
     case 'table': { const [a, b] = spot(0, -0.3); k.box(a, y + 0.72, b, 1.2, 0.06, 0.7, yaw, M.Oak, t(OAK)); for (const [u, w] of [[-0.5, -0.25], [0.5, -0.25], [-0.5, 0.25], [0.5, 0.25]]) { const [px, pz] = spot(u, w - 0.3); k.box(px, y, pz, 0.07, 0.72, 0.07, yaw, M.Oak, t(DARK_OAK)); } break; }
     case 'stool': k.cylinder(x, y, z, 0.18, 0.45, 8, M.Oak, t(OAK)); break;
@@ -379,10 +387,18 @@ function prop(k: MeshKit, p: Prop): void {
     case 'lantern': k.box(x, y, z, 0.2, 0.32, 0.2, yaw, M.Slate, IRON); k.box(x, y + 0.04, z, 0.14, 0.22, 0.14, yaw, M.Glass, [255, 200, 120]); break;
     case 'ledger': { const [a, b] = spot(0, -0.3); k.box(a, y, b, 0.5, 0.7, 0.4, yaw, M.Oak, t(DARK_OAK)); k.box(a, y + 0.7, b, 0.34, 0.06, 0.26, yaw + 0.2, M.Plaster, [150, 60, 40]); break; }
     case 'chest': k.box(x, y, z, 0.9, 0.5, 0.55, yaw, M.Oak, t(OAK)); k.box(x, y + 0.5, z, 0.92, 0.12, 0.57, yaw, M.Oak, t(DARK_OAK)); k.box(x, y + 0.3, z, 0.94, 0.06, 0.59, yaw, M.Slate, IRON); break;
-    case 'web': { const [a, b] = spot(0, -0.4); k.box(a, y + 1.6, b, 1.6, 0.9, 0.02, yaw + 0.3, M.Plaster, [235, 235, 230]); break; }
+    case 'web': {
+      // Threads spun across the corner of wall and ceiling: spokes from a hub, a few turns of spiral.
+      const [hx, hz] = spot(0, -0.35), hy = y + 2.0, spokes = 8, silk: Tint = [205, 205, 198];
+      const end = (i: number, f: number): number[] => { const a = (i / spokes) * Math.PI * 2 + 0.3; const [px, pz] = spot(Math.cos(a) * 0.8 * f, -0.35 - Math.max(0, Math.sin(a)) * 0.3 * f); return [px, hy + Math.sin(a) * 0.55 * f, pz]; };
+      const thread = (p0: number[], p1: number[]) => { const dx = p1[0] - p0[0], dy = p1[1] - p0[1], dz = p1[2] - p0[2], len = Math.hypot(dx, dy, dz); const w = 0.006; const nx = -dz / (Math.hypot(dx, dz) || 1) * w, nz = dx / (Math.hypot(dx, dz) || 1) * w; k.quad([p0[0] - nx, p0[1], p0[2] - nz], [p1[0] - nx, p1[1], p1[2] - nz], [p1[0] + nx, p1[1] + w * 2, p1[2] + nz], [p0[0] + nx, p0[1] + w * 2, p0[2] + nz], [[0, 0], [len, 0], [len, 0.01], [0, 0.01]], M.Plaster, silk); };
+      for (let i = 0; i < spokes; i++) thread([hx, hy, hz], end(i, 1));
+      for (const f of [0.3, 0.55, 0.8]) for (let i = 0; i < spokes; i++) thread(end(i, f), end(i + 1, f));
+      break;
+    }
     case 'bricks': for (let s = 0; s < 3; s++) k.box(x, y + s * 0.12, z, 0.7, 0.12, 0.4, yaw + s * 0.2, M.Ashlar, t([190, 120, 90])); break;
-    case 'beam': k.box(x, y, z, 2.4, 0.22, 0.24, yaw + rng.range(-0.4, 0.4), M.Oak, t([60, 48, 40], 0.2)); break;
-    case 'puddle': k.flat(x - 0.7, z - 0.5, x + 0.7, z + 0.5, y + 0.01, true, M.Glass, [30, 36, 40]); break;
+    case 'beam': k.box(x, y, z, 2.4, 0.22, 0.24, yaw + rng.range(-0.4, 0.4), M.Oak, t([150, 116, 84], 0.2)); break;
+    case 'puddle': k.flat(x - 0.7, z - 0.5, x + 0.7, z + 0.5, y + 0.01, true, M.Plaster, [44, 48, 50]); break;
     case 'bin': k.box(x, y, z, 1.0, 0.8, 0.6, yaw, M.Oak, t(OAK)); break;
     case 'jar': k.cylinder(x, y, z, 0.16, 0.42, 8, M.Tile, t([170, 110, 70]), 0.3); break;
     case 'ladder': { const [a, b] = spot(0, -0.15); for (const u of [-0.3, 0.3]) { const [px, pz] = spot(u, -0.15); k.box(px, y, pz, 0.08, STOREY, 0.08, yaw, M.Oak, t(OAK)); } for (let s = 0; s < 8; s++) k.box(a, y + 0.3 + s * 0.32, b, 0.6, 0.05, 0.06, yaw, M.Oak, t(OAK)); break; }
