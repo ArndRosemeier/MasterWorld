@@ -7,7 +7,8 @@
  * after warm-up (and what they were), and the same for `PROBE_TURNS` (e.g. `23:clear,14:rain`: hour and weather).
  * Each row is measured between two runs with everything drawn (the frame time drifts), and a CPU profile of the main
  * thread follows (self time by script and function; PROBE_PROFILE=0 skips it; build with `npx vite build --minify
- * false` for readable names). PROBE_MEASURE=<ms> per measurement (default 2000).
+ * false` for readable names). PROBE_MEASURE=<ms> per measurement (default 2000). Then the slow frames of PROBE_SLOW_MS
+ * (default 10000): what each spent its time on, against the other frames.
  */
 import { launch } from './launch.mjs';
 
@@ -66,6 +67,53 @@ await page.evaluate(() => {
   };
 });
 const churn = () => page.evaluate(() => { const C = window.__churn; const out = JSON.parse(JSON.stringify(C)); C.skin = 0; C.skinMs = 0; C.from = {}; C.dress = 0; C.freed = { hidden: 0, ranked: 0, far: 0 }; return out; });
+
+// Slow frames: time spent per frame in the parts that can spike (Actors' rebuilds, the townsfolk, the town's life,
+// compiles started, the main render), to name what a slow frame did.
+await page.evaluate(() => {
+  const g = window.game, S = (window.__span = {});
+  const span = (o, name, label) => {
+    const fn = o?.[name];
+    if (typeof fn !== 'function') return;
+    o[name] = function (...a) { const t = performance.now(); try { return fn.apply(this, a); } finally { S[label] = (S[label] ?? 0) + performance.now() - t; } };
+  };
+  if (g.folk) {
+    const proto = Object.getPrototypeOf(g.folk.slots[0].ch.actor);
+    span(proto, 'updateHiddenSkin', 'actors skin');
+    span(proto, 'buildCrowd', 'actors crowd merge');
+    span(proto, 'writePositions', 'actors shape write');
+    span(proto, 'update', 'actors update');
+    span(g.folk, 'follow', 'folk follow');
+  }
+  span(g.life, 'step', 'town life');
+  span(g.view.stage, 'prepare', 'stage prepare (sync part)');
+  span(g.view.renderer, 'render', 'render');
+});
+const slowFrames = () => page.evaluate((ms) => new Promise((done) => {
+  const S = window.__span, sky = window.game.view.sky, frames = [];
+  let last = performance.now(), n0 = window.shaders.events.length;
+  const t0 = last;
+  for (const k in S) S[k] = 0;
+  const step = (now) => {
+    const ev = window.shaders.events.slice(n0); n0 = window.shaders.events.length;
+    frames.push({ dt: now - last, spans: { ...S }, shadow: sky.shadowFrame === 0, builds: ev.map((e) => `${e.kind} ${e.ms.toFixed(1)} ${e.what}`) });
+    for (const k in S) S[k] = 0;
+    last = now;
+    if (now - t0 < ms) requestAnimationFrame(step); else done(frames);
+  };
+  requestAnimationFrame(step);
+}), Number(process.env.PROBE_SLOW_MS ?? 10000));
+
+function reportSlow(frames) {
+  const sorted = frames.map((f) => f.dt).sort((a, b) => a - b), p50 = sorted[sorted.length >> 1], p95 = sorted[Math.floor(sorted.length * 0.95)];
+  const slow = frames.filter((f) => f.dt > Math.max(25, p50 * 2));
+  const mean = (list, k) => list.reduce((n, f) => n + (f.spans[k] ?? 0), 0) / Math.max(1, list.length);
+  const keys = [...new Set(frames.flatMap((f) => Object.keys(f.spans)))];
+  const fast = frames.filter((f) => !slow.includes(f));
+  console.log(`\nslow frames over ${(frames.reduce((n, f) => n + f.dt, 0) / 1000).toFixed(0)} s: ${slow.length} of ${frames.length} over ${Math.max(25, p50 * 2).toFixed(0)} ms (p50 ${p50.toFixed(1)}, p95 ${p95.toFixed(1)}); in them / in the rest: sun shadow redrawn ${slow.filter((f) => f.shadow).length} / ${fast.filter((f) => f.shadow).length}, with a build ${slow.filter((f) => f.builds.length).length} / ${fast.filter((f) => f.builds.length).length}`);
+  console.log('\n| mean ms in | slow frames | the rest |\n|---|---|---|\n' + keys.map((k) => `| ${k} | ${mean(slow, k).toFixed(1)} | ${mean(fast, k).toFixed(1)} |`).join('\n'));
+  console.log('\nslowest frames:\n```\n' + [...slow].sort((a, b) => b.dt - a.dt).slice(0, 12).map((f) => `${f.dt.toFixed(1)} ms${f.shadow ? ' (sun shadow)' : ''}: ${Object.entries(f.spans).filter(([, v]) => v >= 0.5).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')}${f.builds.length ? ' | ' + f.builds.join('; ') : ''}`).join('\n') + '\n```');
+}
 
 const quiet = () => page.evaluate(() => new Promise((done) => {
   const built = () => { const s = window.shaders?.summary(); return s ? s.warmup + s.run : 0; };
@@ -164,6 +212,7 @@ async function probe(title) {
   await page.waitForTimeout(5000);
   const c = await churn();
   console.log(`\ntownsfolk over 5 s: ${c.dress} dressings, freed ${JSON.stringify(c.freed)}; updateHiddenSkin ${c.skin}× ${c.skinMs.toFixed(0)} ms: ${Object.entries(c.from).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n}× ${k}`).join(', ')}`);
+  reportSlow(await slowFrames());
   if (process.env.PROBE_PROFILE !== '0') await profile();
   console.log('\nshaders:\n```\n' + await page.evaluate(() => window.shaders.report()) + '\n```');
   const after = await page.evaluate(() => {
