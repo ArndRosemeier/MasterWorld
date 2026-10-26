@@ -57,7 +57,7 @@ import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
-import { Settlements } from './app/settlements';
+import { Settlements, type SettlementFolk } from './app/settlements';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
@@ -72,7 +72,7 @@ import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
 import { Notes } from './app/notes';
 import { BrookPrefetch } from './app/brooks';
-import { TalkUi } from './app/talkUi';
+import { TalkUi, type TalkPlace } from './app/talkUi';
 import { standingPlace } from './game/standingPlace';
 import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
@@ -223,7 +223,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return !!town?.solid(x, z, r, h?.building.id) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!settlements?.solid(x, z, r) || !!hold?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return !!town?.solid(x, z, r, h?.building.id) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!settlements?.solid(x, z, r) || !!hold?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z) || !!settlements?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
@@ -303,7 +303,11 @@ export async function start(b: Boot): Promise<void> {
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
     // The hamlets and villages founded out on the land (plan B3): towns of their size, planned in a worker.
-    settlements = new Settlements({ stage: view.stage, terrain, land: terrainJobs, roads: roadWork, home: town?.decision.id ?? null, masks: !!town && params.town });
+    settlements = new Settlements({ stage: view.stage, terrain, land: terrainJobs, roads: roadWork, home: town?.decision.id ?? null, masks: !!town && params.town,
+      setting, seed, hours, log: () => log, saved: save?.talks,
+      // Their people take the hero as their kin stand with them (plan 11.6), as the start town's do.
+      talked: (words) => { words.manner = (p) => standing.manner(p.race, p.seed); },
+    });
     const sea = new WaterView(jobs);
     water = sea;
     await sea.prime(view.camera.position);
@@ -697,20 +701,23 @@ export async function start(b: Boot): Promise<void> {
       // Silent until the world is playable: no beds, steps or music (it streams, D44/F4) compete with the start's downloads.
       titleHolds: () => !!title?.holding || !!creator?.showing || !window.__mwReady,
     });
-    const townWords = town && life ? townTalk(seed, setting, town, life.agents.map((a) => a.person), log, save?.talk ?? undefined).talk : null;
+    const townWords = town && life ? townTalk(seed, setting, town, life.persons, log, save?.talk ?? undefined).talk : null;
     // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
     for (const id of keptOf(log)) townWords?.hush(id);
     // A place gone quiet: the journal says whom to tell, and the map marks their door.
+    // (A place promised from a hamlet or village: its own people are the ones to tell, plan B3.)
     if (townWords && town && life) quietPlace = (id) => {
-      if (!townWords.clear(id)) return true;
-      const to = townWords.reportTo(id)[0], p = life.agents.find((a) => a.person.id === to)?.person;
+      const f = settlements?.wordsFor(id);
+      const words = f ? settlements!.wordsOf(f) : townWords, people = f ? f.life : life, plan = f ? f.town.plan : town.plan;
+      if (!words.clear(id)) return true;
+      const to = words.reportTo(id)[0], p = people.agents.find((a) => a.person.id === to)?.person;
       if (p === undefined) return true;
-      const name = townWords.nameOf(p.id), house = townWords.homeCalled(p.id), door = town.plan.buildings[p.home].door;
+      const name = words.nameOf(p.id), house = words.homeCalled(p.id), door = plan.buildings[p.home].door;
       journal.quiet(id, { text: fill(setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
       return true;
     };
     // Who knows the hero from before (plan 11.4): their greeting names them.
-    const friendsOf = (bg: BackgroundDef | undefined) => (bg && life ? acquaintances(bg, life.agents.map((a) => a.person)) : []);
+    const friendsOf = (bg: BackgroundDef | undefined) => (bg && life ? acquaintances(bg, life.persons) : []);
     const meetOldFriends = () => {
       const bg = setting.backgrounds.find((b) => b.id === character.background);
       townWords?.acquaint(friendsOf(bg).map((a) => ({ person: a.person.id, line: a.line })), heroName || 'friend');
@@ -719,7 +726,7 @@ export async function start(b: Boot): Promise<void> {
     // What townsfolk do besides talk (trade, repairs, a room): a talk topic each, which opens its window.
     const services = new Map<string, (a: Agent) => void>();
     // The town's merchants (plan 11.5): the smith, the inn's keeper and the market's stalls.
-    const market = life ? new Market(setting, life.agents.map((a) => a.person), seed, view.sky.day, save?.market) : null;
+    const market = life ? new Market(setting, life.persons, seed, view.sky.day, save?.market) : null;
     // Merchants ask more of someone their people dislike, and less of a friend (plan 11.6).
     if (market) market.standing = standing;
     const trade = market ? new TradeUi(character, setting, market, {
@@ -737,7 +744,17 @@ export async function start(b: Boot): Promise<void> {
       };
     }
     const keyName = (k: 'journal' | 'map' | 'talk') => (settings.current.bindings[k][0] || settings.current.bindings[k][1]).replace(/^Key/, '');
-    const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
+    // Where the hero talks: in the start town, or in the hamlet or village they are in (plan B3).
+    const homePlace: TalkPlace | null = town && life && townWords ? { talk: townWords, life, plan: town.plan } : null;
+    const settledPlaces = new WeakMap<SettlementFolk, TalkPlace>();
+    const placeHere = (): TalkPlace | null => {
+      const w = player.walker.pos, f = settlements?.folkAt(w.x, w.z);
+      if (!f) return homePlace;
+      let p = settledPlaces.get(f);
+      if (!p) settledPlaces.set(f, (p = { talk: settlements!.wordsOf(f), life: f.life, plan: f.town.plan }));
+      return p;
+    };
+    const talk: TalkUi | null = homePlace ? new TalkUi(homePlace, setting.talk, journal, player, {
       paused,
       get bindings() { return settings.current.bindings; },
       // Flying, below in a cellar, or still at the title (its fly-over is no place to talk).
@@ -760,11 +777,12 @@ export async function start(b: Boot): Promise<void> {
         journal.fulfil(id);
         director.met('purpose');
         // The household's people think better of the hero (and the others hear of it).
-        const who = householdOf(log, id, life.agents.map((p) => p.person));
+        const here = talk!.place;
+        const who = householdOf(log, id, here.life.persons);
         const own = who ? standing.keptFor(who.race).find((c) => c.people.id === who.race) : undefined;
         if (own) notes.say(changeLine(own), 5);
         promiseDue();
-        return townWords.toldSafe(a.person.id, id, due ? due.thanks(coinText(coins)) : '');
+        return here.talk.toldSafe(a.person.id, id, due ? due.thanks(coinText(coins)) : '');
       },
       get roomPeople() { return rooms?.inside && life ? rooms.people(life) : null; },
     }) : null;
@@ -893,6 +911,7 @@ export async function start(b: Boot): Promise<void> {
           cellars: cellars?.diffs() ?? {},
           wild: wild?.diffs() ?? save?.wild ?? {},
           talk: townWords?.save() ?? null,
+          ...(settlements ? { talks: settlements.talksSaved() } : {}),
           journal: journal.entries(),
           character: character.save(),
           ...(market ? { market: market.save() } : {}),
@@ -1093,13 +1112,14 @@ export async function start(b: Boot): Promise<void> {
     /** The Builder's next promise, if one is due now: into the log, and told to the town. */
     const promiseDue = (): void => {
       if (!town || !life) return;
-      const d = nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id), dungeons: setting.dungeons, terrain, avoid: wild?.territories ?? [] });
+      const d = nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id), dungeons: setting.dungeons, terrain, avoid: wild?.territories ?? [], near: settlements?.folkAt(player.walker.pos.x, player.walker.pos.z)?.town ?? null });
       if (!d) return;
       console.info(`[vgm] ${d.kind} ${d.id}${d.kind === 'move-in' ? ` into ${d.dungeon}` : ''} at ${hours().toFixed(1)} h`);
       log = [...log, d];
       cellars?.sync(log);
-      const c = townWords ? talkCellar(d, setting, town, life.agents.map((a) => a.person), log) : null;
+      const c = townWords ? talkCellar(d, setting, town, life.persons, log) : null;
       if (c) townWords?.add(c);
+      settlements?.promised(d);
     };
     let last = performance.now(), frame = 0;
     view.renderer.setAnimationLoop(() => {
@@ -1134,6 +1154,7 @@ export async function start(b: Boot): Promise<void> {
       }
       if (!visit()) rooms?.update(dt);
       if (rooms?.inside) cellars.near(rooms.building);
+      if (talk) { const p = placeHere(); if (p) talk.place = p; }
       talk?.watch();
       const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.flying && !visit());
       if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }
@@ -1165,6 +1186,9 @@ export async function start(b: Boot): Promise<void> {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });
       }
+      // The people of the hamlets and villages near the hero (plan B3), drawn besides the start town's.
+      const settled = settlements?.live(dt, { x: view.camera.position.x, z: view.camera.position.z }, { rain: wx.shown.rain }) ?? [];
+      if (folk) folk.others = settled;
       herds?.step(dt);
       stock?.herd(dt, view.camera.position);
       if (small && smallView) {

@@ -65,8 +65,8 @@ interface Slot {
   ch: Character;
   /** Where the character stands: its own object keeps the height Actors gives it (feet on y = 0). */
   place: Group;
-  /** The agent shown (-1: free). */
-  agent: number;
+  /** The agent shown (null: free). */
+  agent: Agent | null;
   /** Dressed for that agent and compiled. */
   ready: boolean;
   clip: string;
@@ -89,7 +89,9 @@ export class FolkView {
   private dressing = 0;
   /** Seconds until the next dressing may begin (DRESS_GAP). */
   private dressWait = 0;
-  private readonly shown = new Map<number, Slot>();
+  private readonly shown = new Map<Agent, Slot>();
+  /** The people of the settlements near the hero (plan B3), drawn besides the start town's. */
+  others: readonly TownLife[] = [];
   /** Everyone out of doors without a character, as plain figures. */
   private readonly far = new FarFolk();
 
@@ -100,7 +102,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false };
+      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false };
       this.slots.push(slot);
     }
   }
@@ -130,7 +132,7 @@ export class FolkView {
 
   /** Dresses the first character as somebody from town and returns what to compile in the warm-up. */
   async warmObjects(): Promise<Object3D[]> {
-    const s = this.slots[0], look = coveringLooks(this.life.agents.map((a) => a.person))[0];
+    const s = this.slots[0], look = coveringLooks(this.life.persons)[0];
     // Undressed if the look's files would not load: the warm-up still compiles the body.
     if (look) await s.ch.set({ ...look, animation: 'walk' }).catch((e: unknown) => console.error('[folk] dressing the first failed', e));
     s.ch.setLod(0);
@@ -164,7 +166,7 @@ export class FolkView {
     place.removeFromParent();
     slot.busy = true; // not dressed for anybody while it tries the looks on
     this.trying = true;
-    const looks = coveringLooks(this.life.agents.map((a) => a.person));
+    const looks = coveringLooks(this.life.persons);
     for (let i = 0; i < looks.length; i++) {
       if (i === 1) first();
       // Before the game begins the people round the hero come first: their dressing compiles what they wear, and
@@ -215,21 +217,23 @@ export class FolkView {
     const cx = this.focus?.x ?? cam.position.x, cz = this.focus?.z ?? cam.position.z;
     // The nearest people out of doors (or those in the room).
     const near: [number, Agent][] = [];
-    const placed = new Map<number, Placed>();
-    for (const p of this.indoors ?? []) { near.push([Math.hypot(p.x - cx, p.z - cz), p.agent]); placed.set(p.agent.person.id, p); }
-    for (const a of this.life.agents) {
-      if (a.hidden || placed.has(a.person.id) || this.clear?.(a.x, a.z)) continue;
-      const d = Math.hypot(a.x - cx, a.z - cz);
-      if (d < FAR) near.push([d, a]);
+    const placed = new Map<Agent, Placed>();
+    for (const p of this.indoors ?? []) { near.push([Math.hypot(p.x - cx, p.z - cz), p.agent]); placed.set(p.agent, p); }
+    for (const life of [this.life, ...this.others]) {
+      for (const a of life.agents) {
+        if (a.hidden || placed.has(a) || this.clear?.(a.x, a.z)) continue;
+        const d = Math.hypot(a.x - cx, a.z - cz);
+        if (d < FAR) near.push([d, a]);
+      }
     }
     near.sort((x, y) => x[0] - y[0]);
     // (Not counting the first character while it tries the looks on: nobody waits for it.)
-    const want = new Set(near.slice(0, this.slots.length - (this.trying ? 1 : 0)).filter(([d]) => d < RANGE).map(([, a]) => a.person.id));
+    const want = new Set(near.slice(0, this.slots.length - (this.trying ? 1 : 0)).filter(([d]) => d < RANGE).map(([, a]) => a));
     // Free the characters of people no longer wanted.
-    for (const [id, s] of this.shown) {
-      if (want.has(id)) continue;
-      this.shown.delete(id);
-      s.agent = -1;
+    for (const [a, s] of this.shown) {
+      if (want.has(a)) continue;
+      this.shown.delete(a);
+      s.agent = null;
       s.ready = false;
       s.place.visible = false;
     }
@@ -237,8 +241,8 @@ export class FolkView {
     this.dressWait = Math.max(0, this.dressWait - dt);
     for (const [, a] of near) {
       if (this.dressing >= DRESSING || !want.size || this.dressWait > 0) break;
-      if (!want.has(a.person.id) || this.shown.has(a.person.id)) continue;
-      const s = this.slots.find((x) => x.agent < 0 && !x.busy);
+      if (!want.has(a) || this.shown.has(a)) continue;
+      const s = this.slots.find((x) => !x.agent && !x.busy);
       if (!s) break;
       // The first fill of the pool goes at full speed; taking over a character waits its turn.
       if (s.used) this.dressWait = DRESS_GAP;
@@ -256,7 +260,7 @@ export class FolkView {
     for (const [d, s] of ranked) this.detail(s, keep.has(s), s.shadow ? d < SHADOW_RANGE + STICK : d < SHADOW_RANGE);
     for (const s of this.shown.values()) {
       if (!s.ready) continue;
-      const a = this.life.agents[s.agent], p = placed.get(a.person.id);
+      const a = s.agent!, p = placed.get(a);
       const o = s.place;
       if (p) o.position.set(p.x, p.y, p.z);
       else o.position.set(a.x, this.height(a.x, a.z), a.z);
@@ -270,16 +274,16 @@ export class FolkView {
       s.ch.update(dt);
     }
     // The rest (and those whose character is still being dressed) as plain figures.
-    const pending = near.filter(([, a]) => !this.shown.get(a.person.id)?.ready);
+    const pending = near.filter(([, a]) => !this.shown.get(a)?.ready);
     // (Those in the open building wait for a character: a plain figure stands on the ground, not on its floor.)
-    this.far.place(pending.filter(([, a]) => !placed.has(a.person.id)).map(([, a]) => a), this.height);
+    this.far.place(pending.filter(([, a]) => !placed.has(a)).map(([, a]) => a), this.height);
     // How many of those (or of the room's people), close in view, wait for a character (beyond the characters' count they stay plain).
     VIEW.setFromProjectionMatrix(SCRATCH.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     let waiting = 0;
     // In a room too (nobody there is a plain figure: the undressed are not drawn at all).
     for (const [d, a] of pending) {
-      const p = placed.get(a.person.id);
-      if (d < CLOSE && want.has(a.person.id) && (this.focus || VIEW.containsPoint(p ? AT.set(p.x, p.y + 1, p.z) : AT.set(a.x, this.height(a.x, a.z) + 1, a.z)))) waiting++;
+      const p = placed.get(a);
+      if (d < CLOSE && want.has(a) && (this.focus || VIEW.containsPoint(p ? AT.set(p.x, p.y + 1, p.z) : AT.set(a.x, this.height(a.x, a.z) + 1, a.z)))) waiting++;
     }
     this.waiting = waiting;
   }
@@ -305,15 +309,14 @@ export class FolkView {
   }
 
   private dress(s: Slot, a: Agent): void {
-    s.agent = a.person.id;
+    s.agent = a;
     s.ready = false;
     s.clip = clipOf(a.act, a.person.id);
-    this.shown.set(a.person.id, s);
+    this.shown.set(a, s);
     this.dressing++;
     s.busy = true;
-    const id = a.person.id;
     s.ch.set({ ...lookOf(a.person), animation: s.clip })
-      .then(() => this.prepareSlot(s, id))
+      .then(() => this.prepareSlot(s, a))
       .catch((e: unknown) => console.error('[folk] dressing failed', e))
       .finally(() => { this.dressing--; s.busy = false; });
   }
@@ -322,7 +325,7 @@ export class FolkView {
    * Compiles a dressed character (a cache hit for kinds already seen) and puts it in the scene. A mesh Actors makes
    * later (a detail level's merged crowd mesh) is left to the Stage: drawn once its shader is built in a cap slot.
    */
-  private async prepareSlot(s: Slot, id: number): Promise<void> {
+  private async prepareSlot(s: Slot, id: Agent): Promise<void> {
     // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
     // pass is warmed only for objects not yet in the scene).
     s.place.removeFromParent();

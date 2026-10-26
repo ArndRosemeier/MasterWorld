@@ -125,6 +125,9 @@ export class TownLife {
     });
   }
 
+  /** Everyone living here (the agents' persons, in their order). */
+  get persons(): Person[] { return this.agents.map((a) => a.person); }
+
   /** Give the town an order (the VGM's way in). */
   order(o: TownOrder): void { this.orders.push(o); }
 
