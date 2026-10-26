@@ -20,7 +20,7 @@ import { StockView } from './render/livestock/StockView';
 import { Herds } from './sim/livestock';
 import { Steed, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
-import { TownLife, type TownOrder } from './sim/townLife';
+import { TownLife, type Agent, type TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
 import { VolumeView } from './render/terrain/VolumeView';
@@ -479,6 +479,8 @@ export async function start(b: Boot): Promise<void> {
       townWords?.acquaint(friendsOf(bg).map((a) => ({ person: a.person.id, line: a.line })), heroName || 'friend');
     };
     meetOldFriends();
+    // What townsfolk do besides talk (trade, repairs, a room): a talk topic each, which opens its window.
+    const services = new Map<string, (a: Agent) => void>();
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -488,6 +490,7 @@ export async function start(b: Boot): Promise<void> {
         handOver?.give(lead.id);
         notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
       },
+      serve: (id, a) => services.get(id)?.(a),
     }) : null;
     const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {
