@@ -1,0 +1,167 @@
+===== wolves.png  query: ?wild=wolves&hud&title=0  env: SHOT_GPU=1 SHOT_LOG=1 SHOT_WAIT=10000
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?wild=wolves&hud&title=0 shots/wolves.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 0.7 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 0.8 s: Painting the ground
+[page] [load] 1.9 s: Filling the seas
+[page] [load] 3.3 s: Dressing the hero
+[page] [load] 4.2 s: Saddling the horses
+[page] [load] 4.3 s: Turning out the horses
+[page] [load] 4.3 s: Waking the town
+[page] [load] 5.0 s: Growing the woods
+[page] [load] 5.8 s: Preparing shaders
+[page] [load] 13.8 s: Raising the land
+[page] [load] 16.4 s: Waking the cellar
+[page] [load] 16.8 s: Planting the trees
+[page] [load] 18.6 s: trees ready (shaders 123 warm-up + 0 later · worst 18 ms · policy ok)
+[page] [load] 18.6 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 21.8 s: townsfolk ready (shaders 189 warm-up + 0 later · worst 18 ms · policy ok)
+shots/wolves.png: webgpu · 18.1 ms · -32925, 133, 30841 · chunks 282 (+0) · grass 100+323 · 0.26 dense 0.17 m · folk 0/30
+shaders: 189 built in warm-up, 0 after, worst block 18 ms, 0 violations, 0 built again alike
+exit code: 0
+
+===== deer.png  query: ?wild=deer&hud&title=0  env: SHOT_GPU=1 SHOT_LOG=1 SHOT_WAIT=10000
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?wild=deer&hud&title=0 shots/deer.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 0.7 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 0.8 s: Painting the ground
+[page] [load] 1.9 s: Filling the seas
+[page] [load] 3.3 s: Dressing the hero
+[page] [load] 4.2 s: Saddling the horses
+[page] [load] 4.3 s: Turning out the horses
+[page] [load] 4.3 s: Waking the town
+[page] [load] 5.0 s: Growing the woods
+[page] [load] 5.8 s: Preparing shaders
+[page] [load] 13.9 s: Raising the land
+[page] [load] 16.7 s: Waking the cellar
+[page] [load] 17.1 s: Planting the trees
+[page] [load] 19.0 s: trees ready (shaders 122 warm-up + 0 later · worst 27 ms · policy ok)
+[page] [load] 19.0 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 24.5 s: townsfolk ready (shaders 217 warm-up + 0 later · worst 27 ms · policy ok)
+shots/deer.png: webgpu · 17.9 ms · -31317, 78, 32128 · chunks 264 (+0) · grass 98+323 · 0.00 dense 0.00 m · folk 0/30
+shaders: 217 built in warm-up, 0 after, worst block 27 ms, 0 violations, 0 built again alike
+exit code: 0
+
+===== bandits.png  query: ?wild=bandits&hud&title=0  env: SHOT_GPU=1 SHOT_LOG=1 SHOT_WAIT=10000
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?wild=bandits&hud&title=0 shots/bandits.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 0.7 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 0.9 s: Painting the ground
+[page] [load] 1.9 s: Filling the seas
+[page] [load] 3.4 s: Dressing the hero
+[page] [load] 4.5 s: Saddling the horses
+[page] [load] 4.6 s: Turning out the horses
+[page] [load] 4.6 s: Waking the town
+[page] [load] 5.3 s: Growing the woods
+[page] [load] 6.2 s: Preparing shaders
+[page] [load] 14.3 s: Raising the land
+[page] [load] 17.0 s: Waking the cellar
+[page] [load] 17.4 s: Planting the trees
+[page] [load] 19.7 s: trees ready (shaders 156 warm-up + 0 later · worst 14 ms · policy ok)
+[page] [load] 19.7 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 22.7 s: townsfolk ready (shaders 217 warm-up + 0 later · worst 14 ms · policy ok)
+shots/bandits.png: webgpu · 17.2 ms · -31007, 26, 31980 · chunks 279 (+0) · grass 99+324 · 0.58 dense 0.23 m · folk 0/30
+shaders: 217 built in warm-up, 0 after, worst block 14 ms, 0 violations, 0 built again alike
+exit code: 0
+
+===== boar.png  query: ?wild=boar&hud&title=0  env: SHOT_GPU=1 SHOT_LOG=1 SHOT_WAIT=10000
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?wild=boar&hud&title=0 shots/boar.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 0.7 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 0.8 s: Painting the ground
+[page] [load] 1.9 s: Filling the seas
+[page] [load] 3.3 s: Dressing the hero
+[page] [load] 4.2 s: Saddling the horses
+[page] [load] 4.3 s: Turning out the horses
+[page] [load] 4.3 s: Waking the town
+[page] [load] 5.0 s: Growing the woods
+[page] [load] 5.8 s: Preparing shaders
+[page] [load] 13.8 s: Raising the land
+[page] [load] 16.4 s: Waking the cellar
+[page] [load] 16.8 s: Planting the trees
+[page] [load] 18.5 s: trees ready (shaders 123 warm-up + 0 later · worst 12 ms · policy ok)
+[page] [load] 18.5 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 21.7 s: townsfolk ready (shaders 189 warm-up + 0 later · worst 12 ms · policy ok)
+shots/boar.png: webgpu · 18.1 ms · -32187, 85, 32232 · chunks 285 (+0) · grass 97+322 · 0.05 dense 0.17 m · folk 0/30
+shaders: 189 built in warm-up, 0 after, worst block 12 ms, 0 violations, 0 built again alike
+exit code: 0
+
+===== moved.png  query: ?cellar&moved&hud&title=0  env: SHOT_GPU=1 SHOT_LOG=1 SHOT_WAIT=10000
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?cellar&moved&hud&title=0 shots/moved.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 0.7 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 0.8 s: Painting the ground
+[page] [load] 1.9 s: Filling the seas
+[page] [load] 3.3 s: Dressing the hero
+[page] [load] 4.2 s: Saddling the horses
+[page] [load] 4.2 s: Turning out the horses
+[page] [load] 4.3 s: Waking the town
+[page] [load] 4.9 s: Growing the woods
+[page] [load] 5.7 s: Preparing shaders
+[page] [load] 13.7 s: Raising the land
+[page] [load] 16.3 s: Waking the cellar
+[page] [load] 16.9 s: Planting the trees
+[page] [load] 18.3 s: trees ready (shaders 128 warm-up + 0 later · worst 11 ms · policy ok)
+[page] [load] 18.3 s: Waking the townsfolk
+[page] [load] 21.3 s: townsfolk ready (shaders 194 warm-up + 0 later · worst 11 ms · policy ok)
+shots/moved.png: webgpu · 18.4 ms · -31923, -399, 31828 · chunks 270 (+0) · grass 1+1 · 0.00 dense 0.00 m · folk 0/30
+shaders: 194 built in warm-up, 0 after, worst block 11 ms, 0 violations, 0 built again alike
+exit code: 0
+
+===== cellar.png  query: ?cellar&hud&title=0  env: SHOT_GPU=1 SHOT_LOG=1 SHOT_WAIT=10000
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?cellar&hud&title=0 shots/cellar.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 0.7 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 0.8 s: Painting the ground
+[page] [load] 1.9 s: Filling the seas
+[page] [load] 3.4 s: Dressing the hero
+[page] [load] 4.5 s: Saddling the horses
+[page] [load] 4.6 s: Turning out the horses
+[page] [load] 4.6 s: Waking the town
+[page] [load] 5.3 s: Growing the woods
+[page] [load] 6.2 s: Preparing shaders
+[page] [load] 14.4 s: Raising the land
+[page] [load] 17.0 s: Waking the cellar
+[page] [load] 17.4 s: Planting the trees
+[page] [load] 19.3 s: trees ready (shaders 120 warm-up + 0 later · worst 19 ms · policy ok)
+[page] [load] 19.2 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 22.8 s: townsfolk ready (shaders 187 warm-up + 0 later · worst 19 ms · policy ok)
+shots/cellar.png: webgpu · 17.2 ms · -31923, -399, 31828 · chunks 270 (+0) · grass 1+1 · 0.00 dense 0.00 m · folk 0/30
+shaders: 187 built in warm-up, 0 after, worst block 19 ms, 0 violations, 0 built again alike
+exit code: 0
+
