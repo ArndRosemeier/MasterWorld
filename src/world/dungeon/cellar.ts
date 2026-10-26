@@ -398,7 +398,8 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     if (put(graph.entrance, 'ledger', 'built', clues.length)) clues.push({ text: `An old note in the ledger: "${lower.text}"`, room: graph.entrance });
   }
 
-  const spawns = settle(graph, p, rooms, now, rng);
+  // Who lives where draws from its own stream, so how the rooms are dressed never changes it.
+  const spawns = settle(graph, p, rooms, now, new Rng(deriveSeed(sketch.decision.seed, 'settle')));
 
   const form = layout.rooms.map((r) => `${r.w}x${r.d}x${r.height}@${r.level}`).sort().join(',');
   const signature = `${graph.patterns.join('+')}|${graph.rooms.length}r${graph.links.length}l|${form}`;
