@@ -1,0 +1,30 @@
+=== a squirrel ===
+shots/wild3/squirrel.png: webgpu · 26.9 ms · -31840, 90, 31949 · chunks 276 (+0) · grass 99+401 · 0.33 dense 0.28 m · folk 15/30
+weather cover 0.95 rain 0.07 storm 0.00 mist 0.01 wind 0.14 wet 0.07
+shaders 90 warm-up + 9 later · worst 12 ms · policy ok · wild - (0/7 built) · small life 1 squirrels, 157/157 birds (44 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 90 built in warm-up, 9 after, worst block 12 ms, 0 violations, 0 built again alike
+=== b birds ===
+shots/wild3/birds.png: webgpu · 18.1 ms · -31926, 82, 31757 · chunks 291 (+0) · grass 102+400 · 0.08 dense 0.28 m · folk 5/30
+weather cover 0.95 rain 0.09 storm 0.00 mist 0.01 wind 0.14 wet 0.09
+shaders 93 warm-up + 3 later · worst 14 ms · policy ok · wild - (0/7 built) · small life 1 squirrels, 167/167 birds (66 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 93 built in warm-up, 3 after, worst block 14 ms, 0 violations, 0 built again alike
+=== c flock ===
+shots/wild3/flock.png: webgpu · 27.9 ms · -32032, 102, 31813 · chunks 291 (+0) · grass 98+333 · 0.69 dense 0.29 m · folk 0/30
+weather cover 0.95 rain 0.07 storm 0.00 mist 0.01 wind 0.14 wet 0.07
+shaders 89 warm-up + 22 later · worst 14 ms · policy ok · wild - (0/7 built) · small life 1 squirrels, 144/144 birds (75 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 89 built in warm-up, 22 after, worst block 14 ms, 0 violations, 0 built again alike
+=== a2 squirrel retry (SHOT_WAIT doubled) ===
+shots/wild3/squirrel-2.png: webgpu · 24.8 ms · -31840, 90, 31949 · chunks 276 (+0) · grass 99+401 · 0.33 dense 0.28 m · folk 14/30
+weather cover 0.96 rain 0.13 storm 0.00 mist 0.02 wind 0.17 wet 0.13
+shaders 90 warm-up + 8 later · worst 11 ms · policy ok · wild - (0/7 built) · small life 1 squirrels, 157/157 birds (54 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 90 built in warm-up, 8 after, worst block 11 ms, 0 violations, 0 built again alike
+=== c2 flock retry (SHOT_WAIT doubled) ===
+shots/wild3/flock-2.png: webgpu · 16.6 ms · -32032, 102, 31813 · chunks 291 (+0) · grass 98+334 · 0.69 dense 0.29 m · folk 0/30
+weather cover 0.96 rain 0.12 storm 0.00 mist 0.01 wind 0.16 wet 0.12
+shaders 89 warm-up + 22 later · worst 10 ms · policy ok · wild - (0/7 built) · small life 1 squirrels, 144/144 birds (83 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 89 built in warm-up, 22 after, worst block 10 ms, 0 violations, 0 built again alike
