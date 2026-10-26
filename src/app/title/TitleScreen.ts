@@ -50,7 +50,7 @@ export class TitleScreen {
     this.toys = el('canvas', { className: 't-toys' });
 
     const logo = el('div', { className: 't-logo' }, el('div', { className: 'plate l' }), el('div', { className: 'plate r' }), el('div', { className: 'clasp top' }), el('div', { className: 'clasp bottom' }), svg(logoSvg()),
-      el('div', { className: 't-tagline', textContent: 'The land wakes as you walk it.' }));
+      el('div', { className: 't-tagline', textContent: 'The land wakes as you walk it.' }), this.alpha());
 
     this.startButton = this.button('New game', () => this.startWith(null), 'primary');
     // Shown only when there is a saved game (offerContinue).
@@ -80,7 +80,7 @@ export class TitleScreen {
     const name = el('div', { className: 'name', textContent: 'MasterWorld' });
     name.setAttribute('elementtiming', 'title');
     this.gate = el('div', { className: 't-gate', role: 'button', ariaLabel: 'Press any key to begin' },
-      name, el('div', { className: 'press', textContent: 'Press any key' }));
+      name, this.alpha(), el('div', { className: 'press', textContent: 'Press any key' }));
     this.root = el('div', { id: 'title', className: calm ? 'calm gated' : 'gated' },
       still, svg(dawnSvg(wardLine(draw.seed))), this.toys, el('div', { className: 't-vignette' }),
       logo, panel, peoples, this.crier(), el('div', { className: 't-hint', textContent: HINT }), this.build, this.gate);
@@ -194,6 +194,11 @@ export class TitleScreen {
     if (this.leavingNow) return;
     this.host.sound.play('click');
     this.host.start(people);
+  }
+
+  /** The stamped plate that says the game is still in alpha (on the gate and on the logo). Plain DOM, no shaders. */
+  private alpha(): HTMLDivElement {
+    return el('div', { className: 't-alpha', textContent: 'Alpha', title: 'MasterWorld is in alpha: unfinished, and it changes every day.' });
   }
 
   private soundLabel(): string {

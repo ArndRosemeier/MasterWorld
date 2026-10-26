@@ -4,7 +4,7 @@
  * shader (materials/building.ts).
  */
 import { Group, type BufferAttribute, type Mesh, type Vector3 } from 'three/webgpu';
-import type { BuildingMesh } from '@futuremagic/settlement';
+import type { BuildingMesh, TownPlan } from '@futuremagic/settlement';
 import type { Stage } from '@futuremagic/stage';
 import type { TerrainJobs } from '../../workers/pool';
 import type { MeshRange } from '../../world/townMesh';
@@ -27,9 +27,9 @@ export class TownView {
     this.group.name = 'town';
   }
 
-  /** Mesh the `index`th town's buildings and put them in. */
-  async build(index: number, cam: Vector3): Promise<void> {
-    const cells = await this.jobs.townMeshes(index);
+  /** Mesh the buildings of the town of this id and put them in; its plan, if `plan` (planned in the worker). */
+  async build(id: string, cam: Vector3, plan = false): Promise<TownPlan | null> {
+    const { cells, plan: planned } = await this.jobs.townMeshes(id, plan);
     for (const c of cells) {
       const near = cellMesh(c.near, c.x, c.z), far = cellMesh(c.far, c.x, c.z);
       this.group.add(near, far);
@@ -37,6 +37,7 @@ export class TownView {
     }
     this.update(cam, true);
     await this.stage.add(this.group);
+    return planned;
   }
 
   /** Near or far meshes, by distance. */

@@ -1,15 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
-import { firstDecisions } from '../src/vgm/builder';
+import { firstDecisions, startPlace } from '../src/vgm/builder';
 import { classic } from '../src/setting/classic/index';
-import { findStart } from '../src/world/start';
 import { Terrain } from '../src/world/terrain';
 import { ArchField, archMesh } from '../src/world/volumes';
 
 // The start's decisions without the town planned (nothing here needs it, and planning it costs time).
 const terrain = new Terrain(parseSeed('masterworld'), classic);
-terrain.settle(firstDecisions(terrain, findStart(terrain.skeleton, classic)));
+terrain.settle(firstDecisions(terrain, startPlace(terrain)));
 
 test('volumes: an arch stands near the start, rock at its feet and air under its crown', () => {
   const [f] = terrain.volumes;

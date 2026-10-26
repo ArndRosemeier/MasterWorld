@@ -2,6 +2,8 @@
  * The decision log (plan 5.1): the world is the seed plus the VGM's decisions. A decision is plain data
  * (saved, replayed, later shared in multiplayer); the generators turn it into land, towns and people.
  */
+import type { SettlementSize } from '@futuremagic/settlement';
+import type { RegionFillDef } from '../setting/contract';
 import type { TownOrder } from '../sim/townLife';
 import type { ArchSite } from './volumes';
 
@@ -14,6 +16,10 @@ export interface TownDecision {
   readonly z: number;
   /** Typical outline radius, metres. */
   readonly radius: number;
+  /** How big (default: a small town, as the start's). */
+  readonly size?: SettlementSize;
+  /** Its own seed (default: the world's, as the start town's). */
+  readonly seed?: number;
 }
 
 /** A rock volume stands here (plan 5.6): milestone 1's arch. */
@@ -149,6 +155,16 @@ export interface RoadDecision {
   readonly pts: readonly number[];
   /** When it was decided, game hours since the world began (none: when the world was opened). */
   readonly at?: number;
+}
+
+/**
+ * The settlement a region's place is (plan B3: hamlets and villages are planned like towns, by the one
+ * planner), or null for other places. `fills`: the setting's region fills.
+ */
+export function settlementOf(d: RegionDecision, fills: readonly RegionFillDef[]): TownDecision | null {
+  const f = d.site ? fills.find((x) => x.id === d.fill) : undefined;
+  if (!f || !d.site || (f.place !== 'hamlet' && f.place !== 'village')) return null;
+  return { kind: 'town', id: d.id, x: d.site.x, z: d.site.z, radius: d.site.r, size: f.place, seed: d.seed };
 }
 
 export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision;

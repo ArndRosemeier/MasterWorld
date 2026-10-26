@@ -7,6 +7,8 @@ import { ClampToEdgeWrapping, DataArrayTexture, DataTexture, LinearFilter, RGBAF
 import { uniform, uniformArray } from 'three/tsl';
 import type { GroundTextures } from '../terrain/groundTextures';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
+import { TOWN_RASTER, type Town } from '../../world/town';
+import { townMaskData } from '../../world/townMask';
 
 let town: GroundTextures | null = null;
 /** The town's texture arrays; set at load, before the warm-up builds the terrain and building shaders. */
@@ -45,52 +47,37 @@ export const TOWN_MASKS = {
   half: uniform(new Vector2(0.5, 0.5)),
 };
 
-/** The crop index's step in the farmland mask's blue channel. */
-export const CROP_STEP = 20;
-
-/** The farmland at a cell: whether it is a track, and the field there (crop index, rows), if any. */
-export type FieldCell = { path: boolean; crop: number; rows: number } | null;
+export { CROP_STEP } from '../../world/townMask';
 
 /**
- * The town's masks: `ground(i, j)` gives TownGround per cell (1 yard, 2 street, 3 market, 4 building),
- * `field(i, j)` the farmland. Set before the warm-up builds the terrain shader, which samples them.
+ * The town's masks (world/townMask.ts): set before the warm-up builds the terrain shader, which samples them.
+ * Their texture keeps the start town's size.
  */
-export function useTownMasks(x0: number, z0: number, nx: number, nz: number, cell: number, ground: (i: number, j: number) => number, field: (i: number, j: number) => FieldCell): void {
-  const w = nx * 2, data = new Uint8Array(w * nz * 4);
-  const has = new Uint8Array(nx * nz);
-  const texel = (i: number, j: number, half: number) => (i + half * nx + j * w) * 4;
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    const g = ground(i, j), o = texel(i, j, 0);
-    if (g === 2) data[o] = 255; else if (g === 3) data[o + 1] = 255; else if (g === 1) data[o + 2] = 255; else if (g === 4) data[o + 3] = 255;
-    const f = field(i, j), q = texel(i, j, 1);
-    if (!f) continue;
-    if (f.path) data[q] = 255;
-    if (f.crop >= 0) {
-      data[q + 1] = 255;
-      data[q + 2] = f.crop * CROP_STEP;
-      data[q + 3] = Math.round((((f.rows % Math.PI) + Math.PI) % Math.PI) / Math.PI * 255);
-      has[i + j * nx] = 1;
-    }
-  }
-  // Spread crop and rows two cells out from every field.
-  for (let pass = 0; pass < 2; pass++) {
-    const was = has.slice();
-    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-      if (was[i + j * nx]) continue;
-      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const a = i + di, b = j + dj;
-        if (a < 0 || b < 0 || a >= nx || b >= nz || !was[a + b * nx]) continue;
-        const o = texel(i, j, 1), q = texel(a, b, 1);
-        data[o + 2] = data[q + 2]; data[o + 3] = data[q + 3];
-        has[i + j * nx] = 1;
-        break;
-      }
-    }
-  }
-  TOWN_MASKS.mask = maskTexture(data, w, nz);
+export function useTownMasks(town: Town): void {
+  const { x0, z0, nx, nz } = town, cell = TOWN_RASTER;
+  const data = townMaskData(town, nx, nz);
+  TOWN_MASKS.mask = maskTexture(data, nx * 2, nz);
   TOWN_MASKS.origin.value.set(x0, z0);
   TOWN_MASKS.size.value.set(nx * cell, nz * cell);
   TOWN_MASKS.half.value.set(0.5 / nx, 0.5 / nz);
+}
+
+/**
+ * The masks move to another settlement (the one the hero is nearest): its masks (townMaskData, baked in a
+ * worker at townMaskSize) go into the same texture, so the shader keeps reading it and nothing compiles.
+ */
+export function moveTownMasks(x0: number, z0: number, data: Uint8Array): void {
+  const img = TOWN_MASKS.mask.image as { data: Uint8Array; width: number; height: number };
+  img.data.set(data);
+  TOWN_MASKS.mask.needsUpdate = true;
+  TOWN_MASKS.origin.value.set(x0, z0);
+  TOWN_MASKS.size.value.set((img.width / 2) * TOWN_RASTER, img.height * TOWN_RASTER);
+}
+
+/** The masks' texels a side (one mask): a settlement's masks are baked at this size to move in. */
+export function townMaskSize(): [number, number] {
+  const img = TOWN_MASKS.mask.image as { width: number; height: number };
+  return [img.width / 2, img.height];
 }
 
 /**

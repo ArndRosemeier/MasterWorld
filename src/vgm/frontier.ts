@@ -7,8 +7,9 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { RegionFillDef, RegionsDef } from '../setting/contract';
-import { sitesIn, type DecisionLog, type RegionDecision } from '../world/decisions';
+import { settlementOf, sitesIn, type DecisionLog, type RegionDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
+import { bankSpots, freshWaterEdge, WATER_REACH } from '../world/freshWater';
 import { RegionMap, boundsOf, keyAt, keyId, sizeOf, type RegionKey } from '../world/regions';
 import type { Terrain } from '../world/terrain';
 import { compass } from './dungeons';
@@ -102,20 +103,22 @@ function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; 
   const base = { kind: 'region' as const, id: `region-${n}`, seed: s, at: c.hours };
   if (pick.place !== 'none') {
     // The place needs a square of its own: its size if that is free, else the largest free one round the
-    // point. Open ground first: the point's square, then the free squares beside it; woodland only when
-    // none of them has open ground.
+    // point. The point's square first, then the free squares beside it: a settlement by fresh water before
+    // one without (D49), open ground before woodland.
     for (let level = pick.level; level >= 0; level--) {
       const k = keyAt(level, p.x, p.z);
       if (!wholeFree(map, k)) continue;
-      let wooded: { k: RegionKey; site: Spot } | null = null;
+      let best: { k: RegionKey; site: Spot; rank: number } | null = null;
       for (const [dx, dz] of AROUND) {
         const q = { level, x: k.x + dx, z: k.z + dz };
         if (!wholeFree(map, q)) continue;
         const site = findSite(c, pick, q, s);
-        if (site?.open) return { ...base, ...q, fill: pick.id, site: site.at };
-        if (site && !wooded) wooded = { k: q, site };
+        if (!site) continue;
+        const rank = (SETTLES[pick.place] && !site.wet ? 2 : 0) + (site.open ? 0 : 1);
+        if (!best || rank < best.rank) best = { k: q, site, rank };
+        if (rank === 0) break;
       }
-      if (wooded) return { ...base, ...wooded.k, fill: pick.id, site: wooded.site.at };
+      if (best) return { ...base, ...best.k, fill: pick.id, site: best.site.at };
       break;
     }
   }
@@ -131,31 +134,36 @@ function wholeFree(map: RegionMap<RegionData>, k: RegionKey): boolean {
   return free.length === 1 && keyId(free[0]) === keyId(k);
 }
 
-/** A place's spot, and whether it lies on open ground. */
-interface Spot { readonly at: NonNullable<RegionDecision['site']>; readonly open: boolean }
+/** A place's spot, and whether it lies on open ground and (a settlement) by fresh water. */
+interface Spot { readonly at: NonNullable<RegionDecision['site']>; readonly open: boolean; readonly wet: boolean }
 
 /** Whether a fill may lie round this point: its biomes, its ring round the start, and apart from others of its kind. */
 function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number }, done: readonly RegionDecision[]): boolean {
   const t = c.terrain;
   if (t.height(p.x, p.z) < 2) return false;
-  if (f.biomes) {
-    const b = t.biomeAt(p.x, p.z);
-    if (b < 0 || !f.biomes.includes(t.biomes[b].id)) return false;
-  }
+  if (f.biomes && !f.biomes.includes(t.biomeIdAt(p.x, p.z) ?? '')) return false;
   const d = Math.hypot(p.x - c.home.x, p.z - c.home.z);
   if (f.ring && (d < f.ring[0] || (f.ring[1] !== undefined && d > f.ring[1]))) return false;
   const apart = f.apart ?? 0;
   return !done.some((o) => o.fill === f.id && o.site && Math.hypot(o.site.x - p.x, o.site.z - p.z) < apart);
 }
 
+/**
+ * The places people live in stand by fresh water (D49) where any is in reach: their squares' river banks
+ * are tried too, and a spot without water ranks DRY worse (more than thick woods do).
+ */
+const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, hamlet: true, village: true, camp: false, ruin: false, barrows: false };
+
+const DRY = 20;
+
 const woods = new WeakMap<Terrain, (x: number, z: number) => number>();
 
 /** How steep the ground may be round a place of each kind (rise per metre over its radius). */
-const STEEP: Record<RegionFillDef['place'], number> = { none: 1, hamlet: 0.12, camp: 0.16, ruin: 0.25, barrows: 0.16 };
+const STEEP: Record<RegionFillDef['place'], number> = { none: 1, hamlet: 0.12, village: 0.1, camp: 0.16, ruin: 0.25, barrows: 0.16 };
 /** Ground this wooded or less (woodsOf, 0..1) round a place counts as open. */
 export const OPEN_GROUND = 0.3;
 /** How much a place of each kind keeps out of thick woods (ruins do not mind: the wood grew round them). */
-const OPEN: Record<RegionFillDef['place'], number> = { none: 0, hamlet: 1.2, camp: 0.3, ruin: 0, barrows: 0.8 };
+const OPEN: Record<RegionFillDef['place'], number> = { none: 0, hamlet: 1.2, village: 1.2, camp: 0.3, ruin: 0, barrows: 0.8 };
 
 /**
  * Where in the square a place stands: dry, gentle ground with room for its footprint, away from towns and
@@ -171,18 +179,23 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
   ];
   const wood = woods.get(t) ?? woods.set(t, woodsOf(t)).get(t)!;
   // The best spot so far (lowest score).
-  let bx = NaN, bz = NaN, low = Infinity, open = false;
-  const N = 7;
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const x = x0 + margin + (size - 2 * margin) * ((i + hash2f(s, i, j + 40)) / N);
-    const z = z0 + margin + (size - 2 * margin) * ((j + hash2f(s, i + 40, j)) / N);
+  let bx = NaN, bz = NaN, low = Infinity, open = false, wet = false;
+  // A grid of spots through the square; a settlement also tries the river banks in it.
+  const N = 7, settles = SETTLES[f.place];
+  const spots: [number, number][] = [];
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) spots.push([
+    x0 + margin + (size - 2 * margin) * ((i + hash2f(s, i, j + 40)) / N),
+    z0 + margin + (size - 2 * margin) * ((j + hash2f(s, i + 40, j)) / N),
+  ]);
+  if (settles) for (const b of bankSpots(t, x0 + size / 2, z0 + size / 2, size * 0.75, r)) {
+    if (b.x > x0 + margin && b.x < x0 + size - margin && b.z > z0 + margin && b.z < z0 + size - margin) spots.push([b.x, b.z]);
+  }
+  for (let q = 0; q < spots.length; q++) {
+    const [x, z] = spots[q], i = q % N, j = Math.floor(q / N);
     const h = t.height(x, z);
     if (h < 3 || t.waterDepth(x, z) > 0) continue;
     if (away.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 30)) continue;
-    if (f.biomes) {
-      const b = t.biomeAt(x, z);
-      if (b < 0 || !f.biomes.includes(t.biomes[b].id)) continue;
-    }
+    if (f.biomes && !f.biomes.includes(t.biomeIdAt(x, z) ?? '')) continue;
     let steep = 0, ok = true;
     for (const rr of [r * 0.5, r]) for (let a = 0; a < 8 && ok; a++) {
       const px = x + Math.cos((a * Math.PI) / 4) * rr, pz = z + Math.sin((a * Math.PI) / 4) * rr;
@@ -191,25 +204,24 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
       steep = Math.max(steep, Math.abs(ph - h) / rr);
     }
     if (!ok || steep > STEEP[f.place]) continue;
+    const water = settles ? freshWaterEdge(t, x, z, r + WATER_REACH) : 0;
     // Open ground first (the place is seen from afar); woodland only when the square has none.
     // How wooded the place's footprint is, on the whole (its clearing opens the rest round it).
     let woods = wood(x, z);
     for (let a = 0; a < 8; a++) woods += wood(x + Math.cos((a * Math.PI) / 4) * r * 0.7, z + Math.sin((a * Math.PI) / 4) * r * 0.7);
     woods /= 9;
-    const rank = (woods > OPEN_GROUND ? 10 + woods : 0) + steep / STEEP[f.place] + woods * OPEN[f.place] + hash2f(s, i, j) * 0.4;
-    if (rank < low) { low = rank; bx = x; bz = z; open = woods <= OPEN_GROUND; }
+    const rank = (woods > OPEN_GROUND ? 10 + woods : 0) + steep / STEEP[f.place] + woods * OPEN[f.place] + (water === Infinity ? DRY : (Math.max(0, water - r - 30) / WATER_REACH) * 0.4) + hash2f(s, i, j) * 0.4;
+    if (rank < low) { low = rank; bx = x; bz = z; open = woods <= OPEN_GROUND; wet = settles && water !== Infinity; }
   }
   if (low === Infinity) return null;
-  return { at: { x: bx, z: bz, yaw: Math.atan2(-(c.home.x - bx), -(c.home.z - bz)), r }, open };
+  return { at: { x: bx, z: bz, yaw: Math.atan2(-(c.home.x - bx), -(c.home.z - bz)), r }, open, wet };
 }
 
-/** The settlements in the log (the towns and the hamlets): for roads and for whatever links places. */
+/** The settlements in the log (the towns, and the hamlets and villages of regions): for roads and for whatever links places. */
 export function settlementsOf(log: DecisionLog, regions?: RegionsDef): { id: string; x: number; z: number; r: number }[] {
-  const hamlets = new Set(regions?.fills.filter((f) => f.place === 'hamlet').map((f) => f.id) ?? []);
   return log.flatMap((d) => {
-    if (d.kind === 'town') return [{ id: d.id, x: d.x, z: d.z, r: d.radius }];
-    if (d.kind === 'region' && d.site && hamlets.has(d.fill)) return [{ id: d.id, x: d.site.x, z: d.site.z, r: d.site.r }];
-    return [];
+    const t = d.kind === 'town' ? d : d.kind === 'region' && regions ? settlementOf(d, regions.fills) : null;
+    return t ? [{ id: t.id, x: t.x, z: t.z, r: t.radius }] : [];
   });
 }
 

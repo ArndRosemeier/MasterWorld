@@ -61,7 +61,7 @@ export const params = {
   smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
   /** Regions open as the hero walks (`regions=0`: only the start's land). */
   regions: q.get('regions') !== '0',
-  /** Start beside a place the VGM opens out on the land: `site=hamlet`, `camp`, `ruin` or `barrows` (the first a walk finds). */
+  /** Start beside a place the VGM opens out on the land: `site=hamlet`, `village`, `camp`, `ruin` or `barrows` (the first a walk finds). */
   site: q.get('site'),
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),

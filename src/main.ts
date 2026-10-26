@@ -39,7 +39,7 @@ import { WINDOWS } from './render/materials/building';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
-import { CROPS, distSqPointSeg } from '@futuremagic/settlement';
+import { distSqPointSeg } from '@futuremagic/settlement';
 import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
@@ -57,6 +57,7 @@ import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
+import { Settlements } from './app/settlements';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
@@ -83,7 +84,7 @@ import { Compass, type SkyGlyph } from './app/compass';
 import { talkCellar, townTalk } from './talk/townTalk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
-import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, type SaveData } from './app/saveGame';
+import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
 import { Market, itemWorth } from './game/trade';
@@ -137,15 +138,19 @@ export async function start(b: Boot): Promise<void> {
     if (errors.length) throw new Error(errors.join('; '));
     // A load asked for before this start: the world is built again from the save's seed.
     const loaded = await pendingLoad(setting);
-    const save = typeof loaded === 'object' ? loaded : null;
-    // The title's Continue: straight on with a loaded save, or offered when one is kept.
-    if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
-    else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
-    const seedText = save?.seed ?? params.seed;
+    const asked = typeof loaded === 'object' ? loaded : null;
+    const seedText = asked?.seed ?? params.seed;
     const seed = parseSeed(seedText);
     loading.set('Finding the start');
     // The VGM's first decisions: the start town (and the arch outside it) stand on the land.
     const opened = openWorld(seed, setting);
+    // A save whose start town stood elsewhere (before D49 moved it to its river) belongs to a world that is
+    // gone: a new game begins in this one.
+    const lost = asked !== null && startMoved(asked.log, opened.log);
+    const save = lost ? null : asked;
+    // The title's Continue: straight on with a loaded save, or offered when one is kept.
+    if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
+    else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const { terrain } = opened;
     const town = terrain.towns[0];
     const home = town ? marketStart(town.plan) : opened.home;
@@ -183,6 +188,7 @@ export async function start(b: Boot): Promise<void> {
     let rooms: InteriorVisit | null = null;
     // The regions the VGM opens as the hero walks, and the places in them (set once the log stands).
     let regionSites: RegionSites | null = null;
+    let settlements: Settlements | null = null;
     // The land, and the steps and porches before the doors (where the townsfolk stand).
     // The town's people once they live (set below).
     let folkLife: TownLife | null = null;
@@ -215,7 +221,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return !!town?.solid(x, z, r, h?.building.id) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return !!town?.solid(x, z, r, h?.building.id) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!settlements?.solid(x, z, r) || !!hold?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
@@ -276,11 +282,7 @@ export async function start(b: Boot): Promise<void> {
       if (town) {
         // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
         useTownTextures(await loadTownTextures(texPool));
-        useTownMasks(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER), (i, j) => {
-          const x = town.x0 + (i + 0.5) * TOWN_RASTER, z = town.z0 + (j + 0.5) * TOWN_RASTER;
-          const f = town.fieldAt(x, z), path = town.groundAt(x, z) === TownGround.Path;
-          return f || path ? { path, crop: f ? CROPS.indexOf(f.crop) : -1, rows: f?.rows ?? 0 } : null;
-        });
+        useTownMasks(town);
       }
       texPool.dispose();
     })();
@@ -296,6 +298,8 @@ export async function start(b: Boot): Promise<void> {
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
+    // The hamlets and villages founded out on the land (plan B3): towns of their size, planned in a worker.
+    settlements = new Settlements({ stage: view.stage, terrain, land: terrainJobs, roads: roadWork, home: town?.decision.id ?? null, masks: !!town && params.town });
     const sea = new WaterView(jobs);
     water = sea;
     await sea.prime(view.camera.position);
@@ -360,8 +364,9 @@ export async function start(b: Boot): Promise<void> {
       if (d) { log = [...log, d]; await roadWork.lay(d); }
       return d;
     };
-    // A region the VGM opened goes into the log; a hamlet founded in it gets its cart track to the network (plan 7).
-    // The track is routed in the world worker (it takes a few hundred ms), one road at a time so each sees the last.
+    // A region the VGM opened goes into the log; a hamlet or village founded in it is planned in a worker
+    // (plan B3), then gets its cart track to the network (plan 7). The track is routed in the world worker
+    // (it takes a few hundred ms), one road at a time so each sees the last.
     let roading: Promise<void> = Promise.resolve();
     const regionOpened = (d: RegionDecision): void => {
       log = [...log, d];
@@ -370,9 +375,10 @@ export async function start(b: Boot): Promise<void> {
       const place = setting.regions ? settlementsOf([d], setting.regions)[0] : undefined;
       if (!place) return;
       roading = roading.then(async () => {
+        await settlements?.found(d, view.camera.position);
         const road = await jobs.linkRoad(log.filter((x): x is RoadDecision => x.kind === 'road'), place, 'track', d.at);
         if (road && !log.some((x) => x.id === road.id)) { log = [...log, road]; await roadWork.lay(road); }
-      }).catch((e: unknown) => console.warn('road to a hamlet:', e));
+      }).catch((e: unknown) => console.warn('founding a settlement:', e));
     };
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {
@@ -454,7 +460,8 @@ export async function start(b: Boot): Promise<void> {
     const rock = new VolumeView(view.stage, terrainJobs).raise();
     const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
     if (houses && town) view.warm.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
-    const raised = houses?.build(0, view.camera.position);
+    const raised = houses?.build(town!.decision.id, view.camera.position);
+    void settlements.standing(view.camera.position);
     const landReady = ground.ready(view.camera);
     loading.set('Preparing shaders');
     await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm]);
@@ -481,6 +488,7 @@ export async function start(b: Boot): Promise<void> {
     await view.stage.add(wx.precip);
 
     const notes = new Notes();
+    if (lost) notes.say('That save was made before the town moved to its river: its world is gone, so a new game begins.', 10);
     // The Director watching over the pacing, the fight's HUD and the journal (the cellars report to them).
     const director = new Director(setting.director, save?.director ?? undefined);
     // One life (roguelike): the Director is stricter with fairness (plan 11.1).
@@ -955,7 +963,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, get settlements() { return settlements; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1116,6 +1124,7 @@ export async function start(b: Boot): Promise<void> {
         roadWork.follow(view.camera.position);
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         houses?.update(view.camera.position);
+        settlements?.tick(dt, view.camera.position);
       }
       // Doorways at night above, torches below, a soft fill on the hero in a room.
       view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
@@ -1167,7 +1176,7 @@ export async function start(b: Boot): Promise<void> {
       }
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${settlements?.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }
