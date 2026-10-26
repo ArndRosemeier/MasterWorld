@@ -1,0 +1,56 @@
+===== boar.png  query: ?wild=boar&hud&title=0  env: SHOT_GPU=1 SHOT_LOG=1 SHOT_WAIT=10000
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?wild=boar&hud&title=0 shots/boar.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 0.7 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 0.8 s: Painting the ground
+[page] [load] 2.2 s: Filling the seas
+[page] [load] 3.6 s: Dressing the hero
+[page] [load] 4.5 s: Saddling the horses
+[page] [load] 4.6 s: Turning out the horses
+[page] [load] 4.6 s: Waking the town
+[page] [load] 5.3 s: Growing the woods
+[page] [load] 6.1 s: Preparing shaders
+[page] [load] 14.0 s: Raising the land
+[page] [load] 16.6 s: Waking the cellar
+[page] [load] 17.2 s: Planting the trees
+[page] [load] 18.7 s: trees ready (shaders 127 warm-up + 0 later · worst 11 ms · policy ok)
+[page] [load] 18.7 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 21.7 s: townsfolk ready (shaders 194 warm-up + 0 later · worst 11 ms · policy ok)
+shots/boar.png: webgpu · 17.5 ms · -32187, 85, 32232 · chunks 285 (+0) · grass 97+322 · 0.05 dense 0.17 m · folk 0/30
+shaders: 194 built in warm-up, 0 after, worst block 11 ms, 0 violations, 0 built again alike
+exit code: 0
+
+===== wolves.png  query: ?wild=wolves&hud&title=0  env: SHOT_GPU=1 SHOT_LOG=1 SHOT_WAIT=10000
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?wild=wolves&hud&title=0 shots/wolves.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 0.7 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 0.8 s: Painting the ground
+[page] [load] 2.2 s: Filling the seas
+[page] [load] 3.7 s: Dressing the hero
+[page] [load] 4.5 s: Saddling the horses
+[page] [load] 4.6 s: Turning out the horses
+[page] [load] 4.6 s: Waking the town
+[page] [load] 5.3 s: Growing the woods
+[page] [load] 6.1 s: Preparing shaders
+[page] [load] 14.1 s: Raising the land
+[page] [load] 16.6 s: Waking the cellar
+[page] [load] 17.2 s: Planting the trees
+[page] [load] 18.8 s: trees ready (shaders 123 warm-up + 0 later · worst 15 ms · policy ok)
+[page] [load] 18.8 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 22.1 s: townsfolk ready (shaders 198 warm-up + 0 later · worst 15 ms · policy ok)
+shots/wolves.png: webgpu · 18.4 ms · -32925, 133, 30841 · chunks 282 (+0) · grass 100+323 · 0.26 dense 0.17 m · folk 0/30
+shaders: 198 built in warm-up, 0 after, worst block 15 ms, 0 violations, 0 built again alike
+exit code: 0
+
