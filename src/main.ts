@@ -152,7 +152,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post, postSamples: params.postSamples, postFloatDepth: params.postFloatDepth, ao: params.ao, bloom: params.bloom });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post, postSamples: params.postSamples, postFloatDepth: params.postFloatDepth, ao: params.ao, bloom: params.bloom, envGround: params.envGround });
     if (save) view.sky.day = save.clock.day;
     view.sky.look = setting.look?.grade ?? [];
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
