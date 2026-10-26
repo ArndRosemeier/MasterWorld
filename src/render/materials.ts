@@ -154,7 +154,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const patchy = mx_fractal_noise_float(p.xz.mul(0.09), 2, 2.0, 0.5);
   const laid = (t: Node<'float'>) => smoothstep(0.3, 0.7, t.add(patchy.mul(0.45)).sub(float(1).sub(t).mul(0.25)));
   const lane = float(1).sub(smoothstep(0.02, 0.07, abs(mx_noise_float(p.xz.mul(0.035)).add(mid.mul(0.2)))));
-  const mud = smoothstep(0.25, 0.55, mx_fractal_noise_float(p.xz.mul(0.06).add(17.3), 2, 2.0, 0.5)).mul(0.8);
+  const mud = smoothstep(0.08, 0.3, mx_fractal_noise_float(p.xz.mul(0.07).add(17.3), 2, 2.0, 0.5)).mul(0.85);
   const stones = tg.r.max(tg.g);
   // Yards: trodden earth in patches; streets and the market: small cobbles (fist-sized), the market's a
   // shade darker; on top, the earth of the worn lanes and mud patches among the stones.
@@ -162,12 +162,13 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
     [tg.b.max(tg.a).mul(paths).mul(0.85), TOWN_GROUND_LAYER.dirt, 1, 1],
     [laid(tg.r), TOWN_GROUND_LAYER.cobble, 0.4, 0.85],
     [laid(tg.g), TOWN_GROUND_LAYER.cobble, 0.45, 0.75],
-    [stones.mul(lane.mul(0.75).max(mud)), TOWN_GROUND_LAYER.dirt, 0.8, 0.8],
+    [stones.mul(lane.mul(0.75)), TOWN_GROUND_LAYER.dirt, 0.8, 0.85],
+    [stones.mul(mud), TOWN_GROUND_LAYER.dirt, 0.7, 0.6],
   ];
   for (const [t, k, scale, tone] of grounds) {
     const g = tl(k, scale);
     const b = hblend(clamp(t.add(ragged.mul(t.mul(float(1).sub(t)).mul(4))), 0, 1), g.n.b.sub(h), 2);
-    col = mix(col, g.a.rgb.mul(float(tone).add(mid.mul(0.12))), b); rough = mix(rough, g.a.a, b); ao = mix(ao, g.n.a, b);
+    col = mix(col, g.a.rgb.mul(float(tone).add(mid.mul(0.12)).add(patchy.mul(0.15))), b); rough = mix(rough, g.a.a, b); ao = mix(ao, g.n.a, b);
     pert = mix(pert, vec3(tn(g.n).x, 0, tn(g.n).y), b); h = mix(h, g.n.b, b);
   }
 
