@@ -98,7 +98,7 @@ export class MeshKit {
     const foot: Tint = [Math.round(tint[0] * 0.62), Math.round(tint[1] * 0.66), Math.round(tint[2] * 0.6)];
     // One knock per point of the cube, so faces that share an edge share its points.
     const knocks = new Map<string, number[]>();
-    const place = (p: number[]): { at: number[]; t: Tint } => {
+    const knocked = (p: number[]): { at: number[]; t: Tint } => {
       const key = p.join(',');
       let k = knocks.get(key);
       if (!k) knocks.set(key, (k = [rng.range(-rough, rough), rng.range(-rough, rough), rng.range(-rough, rough)]));
@@ -116,7 +116,7 @@ export class MeshKit {
       const pt = (i: number, j: number) => {
         const p = [0, 0, 0];
         p[ax] = side; p[u] = -1 + (2 * i) / n; p[v] = -1 + (2 * j) / n;
-        return { ...place(p), uv: [o + p[u] * half[u], o + p[v] * half[v]] };
+        return { ...knocked(p), uv: [o + p[u] * half[u], o + p[v] * half[v]] };
       };
       for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
         const a = pt(i, j), b = pt(i + 1, j), cc = pt(i + 1, j + 1), d = pt(i, j + 1);
