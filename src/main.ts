@@ -301,8 +301,11 @@ export async function start(b: Boot): Promise<void> {
     const grass = boot.grass ? new GrassView(jobs) : null;
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
+    // The first townsman's clothes come over the network: their own step, so 'Preparing shaders' times only the compiles.
+    if (folk) loading.set('Dressing the townsfolk');
+    const folkWarm = folk ? await folk.warmObjects() : [];
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(folk ? await folk.warmObjects() : [])]);
+    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...folkWarm]);
     // While the loading screen (or the title's painted still) still covers the view, the land, trees and
     // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
     const capShare = view.stage.cap.share;
@@ -429,7 +432,9 @@ export async function start(b: Boot): Promise<void> {
     const trees = (boot.trees ? flora.plant() : Promise.resolve()).then(took('trees'));
     let landed = false;
     void trees.then(() => { landed = true; if (folk) loading.set('Waking the townsfolk'); });
-    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk')), dwellers, giantReady]).then(() => { planted = true; });
+    // One part failing (a file that would not load) must not hold the start: it is logged and play begins.
+    const survive = (what: string, p: Promise<unknown> | null | undefined) => p?.catch((e: unknown) => console.error(`[load] ${what} failed`, e));
+    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folk?.warmLods().then(took('townsfolk'))), survive('cellar', dwellers), survive('giant', giantReady)]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;

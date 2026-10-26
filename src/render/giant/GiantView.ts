@@ -6,7 +6,7 @@
 import { Group, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterPatch } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
-import HumanWorker from '@actors/human/worker?worker';
+import HumanWorker from '../../workers/human.worker?worker';
 import { PACE } from '../hero/clips';
 import { castShadows } from '../hero/play';
 

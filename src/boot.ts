@@ -9,6 +9,11 @@ import { SettingsStore } from './app/settings';
 import { Sound } from './app/sound';
 import { Title } from './app/title/title';
 import type { Menu } from './app/menu';
+import { installPackFetch } from './workers/packFetch';
+
+// The people's and animals' packs come as hundreds of small files: queued and retried (a static host
+// answers a burst with 503s).
+installPackFetch();
 
 // A tool page (`?bake=…`), not the game.
 if (params.bake) await import('./app/bake').then((b) => b.bake(params.bake ?? ''));

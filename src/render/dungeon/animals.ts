@@ -7,7 +7,7 @@
  */
 import { LoopOnce, type Group, type WebGPURenderer } from 'three/webgpu';
 import { Animal } from '@actors/animal';
-import AnimalWorker from '@actors/animal/worker?worker';
+import AnimalWorker from '../../workers/animal.worker?worker';
 import type { ThreeActor } from '@actors/three';
 import { hash2f } from '@futuremagic/core';
 import { furActor, gaitPace } from '../furAnimal';
