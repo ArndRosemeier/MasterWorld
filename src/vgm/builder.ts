@@ -1,6 +1,6 @@
 /**
  * The Builder (plan 4.2), first cut: the decisions a new world starts with. The start (plan 6) is a small
- * town by the river nearest the setting's start place (D49), on gentle dry ground, with the stone arch
+ * town by the river nearest the setting's start place (D50), on gentle dry ground, with the stone arch
  * of milestone 1 a short walk outside it, and the hold of a people (plan 11.6) in the hills a walk away. Deterministic per seed; the result goes into the decision log.
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
@@ -33,7 +33,7 @@ export function openWorld(seed: number, setting: SettingModule): OpenWorld {
   return { terrain, log, home };
 }
 
-/** Where a new game starts: the setting's start place, moved to the river nearest it (D49). */
+/** Where a new game starts: the setting's start place, moved to the river nearest it (D50). */
 export function startPlace(t: Terrain): StartPlace {
   return waterside(t, findStart(t.skeleton, t.setting));
 }
@@ -60,15 +60,15 @@ const BANK_SEARCH = [6000, 12000, 24000, 48000];
 const START_R = 75;
 
 /**
- * The start moved to the river nearest the setting's start place (D49: a town needs fresh water): the
+ * The start moved to the river nearest the setting's start place (D50: a town needs fresh water): the
  * nearest gentle, dry bank spot, preferring level ground. The start place itself when no river is near.
  */
 export function waterside(t: Terrain, start: StartPlace): StartPlace {
-  if (byFreshWater(t, start.x, start.z, START_R)) return start;
+  if (byFreshWater(t, start.x, start.z, START_R, false)) return start;
   const want = t.setting.start;
   for (const within of BANK_SEARCH) {
     let best: StartPlace | null = null, bestScore = Infinity;
-    for (const s of bankSpots(t, start.x, start.z, within, START_R, 2)) {
+    for (const s of bankSpots(t, start.x, start.z, within, START_R, 2, false)) {
       const h = t.height(s.x, s.z);
       if (h < Math.max(4, want.elevation[0] * 0.5) || h > want.elevation[1] || t.waterDepth(s.x, s.z) > 0) continue;
       let steep = 0;
@@ -90,7 +90,7 @@ export function waterside(t: Terrain, start: StartPlace): StartPlace {
 
 /**
  * The start town: the best spot within SEARCH metres of `home` by flatness, dry ground, fresh water within
- * reach (D49: a hard rule, when any is near) and nearness; clear of the arch.
+ * reach (D50: a river or lake, not a brook; a hard rule when any is near) and nearness; clear of the arch.
  */
 export function startTown(t: Terrain, home: { x: number; z: number }, arch: ArchSite | null): TownDecision | null {
   const seed = deriveSeed(t.seed, 'vgm', 'start-town');
@@ -98,7 +98,7 @@ export function startTown(t: Terrain, home: { x: number; z: number }, arch: Arch
   const R = 68 + 8 * hash2f(seed, 1, 1);
   const w = { river: 0, lake: 0 };
   // Only where the start has water near (else, on a dry seed, the old rule: the best spot without it).
-  const needWater = freshWaterEdge(t, home.x, home.z, SEARCH) < SEARCH;
+  const needWater = freshWaterEdge(t, home.x, home.z, SEARCH, false) < SEARCH;
   let best: TownDecision | null = null, bestScore = Infinity;
   for (let gz = -SEARCH; gz <= SEARCH; gz += STEP) for (let gx = -SEARCH; gx <= SEARCH; gx += STEP) {
     const near = Math.hypot(gx, gz);
@@ -107,7 +107,7 @@ export function startTown(t: Terrain, home: { x: number; z: number }, arch: Arch
     if (arch && Math.hypot(x - (arch.a[0] + arch.b[0]) / 2, z - (arch.a[1] + arch.b[1]) / 2) < R + 90) continue;
     const h0 = t.height(x, z);
     if (h0 < 4) continue;
-    const water = needWater ? freshWaterEdge(t, x, z, R + WATER_REACH) : Infinity;
+    const water = needWater ? freshWaterEdge(t, x, z, R + WATER_REACH, false) : Infinity;
     if (needWater && water > R + WATER_REACH) continue;
     // Dry and gentle within the inner town, mostly so out to its edge.
     let steep = 0, wet = 0, ok = true;

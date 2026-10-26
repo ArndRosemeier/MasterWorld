@@ -10,7 +10,9 @@ import { DRY, SEA_LEVEL, waterMask } from '../src/world/water';
 const seed = parseSeed('masterworld');
 const SMALL: HydroOptions = { cell: 2000, core: 96, margin: 32, minArea: 120 };
 const tile = new HydroTile(new Skeleton(seed, classic.world), -1, 0, SMALL);
-const terrain = new Terrain(seed, classic, SMALL);
+// Rivers alone: these tests look at rivers all over the tile, and a brook tile for each would take seconds
+// (brooks have their own tests, test/brooks.test.ts).
+const terrain = new Terrain(seed, classic, SMALL, null);
 
 test('hydro: rivers exist and never flow uphill', () => {
   assert.ok(tile.rivers.length > 10, `${tile.rivers.length} rivers`);

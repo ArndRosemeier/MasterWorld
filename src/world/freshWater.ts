@@ -1,6 +1,6 @@
 /**
- * Fresh water for settlements (D49): every town, village and hamlet stands by a river or a lake, so its
- * people have water. One rule for all of them: the start town (vgm/builder.ts) and the places the VGM opens
+ * Fresh water for settlements (D50): every town, village and hamlet stands by a brook, river or lake, so its
+ * people have water (the start town by a river). One rule for all of them: the start town (vgm/builder.ts) and the places the VGM opens
  * on the frontier (vgm/frontier.ts) both ask here. The sea does not count: it is salt. Pure.
  */
 import type { Terrain } from './terrain';
@@ -17,9 +17,12 @@ type Land = Pick<Terrain, 'hydro' | 'height' | 'clearOfWater'>;
 
 const wet = { river: 0, lake: 0 };
 
-/** Metres from (x, z) to the nearest fresh water (a river's edge, or a lake's surface), if any lies within `within`; else Infinity. */
-export function freshWaterEdge(t: Land, x: number, z: number, within: number): number {
-  let best = t.hydro.riverEdge(x, z, within);
+/**
+ * Metres from (x, z) to the nearest fresh water (a brook's or river's edge, or a lake's surface), if any lies
+ * within `within`; else Infinity. `brooks` false: rivers and lakes only.
+ */
+export function freshWaterEdge(t: Land, x: number, z: number, within: number, brooks = true): number {
+  let best = t.hydro.riverEdge(x, z, within, brooks);
   // Lakes: the nearest ring with ground under a lake's level.
   for (let d = 0; d <= Math.min(within, best); d += LAKE_RING) {
     const dirs = d === 0 ? 1 : LAKE_DIRS;
@@ -32,8 +35,8 @@ export function freshWaterEdge(t: Land, x: number, z: number, within: number): n
 }
 
 /** Does a settlement of radius `r` round (x, z) have fresh water within reach of its edge? */
-export function byFreshWater(t: Land, x: number, z: number, r: number): boolean {
-  return freshWaterEdge(t, x, z, r + WATER_REACH) <= r + WATER_REACH;
+export function byFreshWater(t: Land, x: number, z: number, r: number, brooks = true): boolean {
+  return freshWaterEdge(t, x, z, r + WATER_REACH, brooks) <= r + WATER_REACH;
 }
 
 /** A spot beside a river: where a settlement's middle could go, and the river's edge distance from it. */
@@ -45,11 +48,11 @@ export interface BankSpot {
 }
 
 /**
- * Spots for a settlement of radius `r` along the rivers within `within` metres of (x, z): on both banks,
- * its edge a little back from the water. Every `every`-th river point (they lie 80 m apart). Lakes offer
+ * Spots for a settlement of radius `r` along the brooks and rivers (`brooks` false: rivers only) within `within` metres of (x, z): on both banks,
+ * its edge a little back from the water. Every `every`-th point (80 m apart on rivers, 40 m on brooks). Lakes offer
  * none: the caller's own grid finds their shores.
  */
-export function bankSpots(t: Land, x: number, z: number, within: number, r: number, every = 1): BankSpot[] {
+export function bankSpots(t: Land, x: number, z: number, within: number, r: number, every = 1, brooks = true): BankSpot[] {
   const out: BankSpot[] = [];
   t.hydro.riverPoints(x, z, within, (rv, k) => {
     if (k % every) return;
@@ -61,6 +64,6 @@ export function bankSpots(t: Land, x: number, z: number, within: number, r: numb
       const off = half + gap + r;
       out.push({ x: rv.xz[k * 2] + nx * off * side, z: rv.xz[k * 2 + 1] + nz * off * side, edge: gap + r });
     }
-  });
+  }, brooks);
   return out;
 }

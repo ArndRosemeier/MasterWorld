@@ -145,6 +145,11 @@ export class WorldJobs {
     return this.pool.run({ kind: 'roads', seed: this.seed, setting: this.setting, x0, z0, size, res }) as Promise<Float32Array>;
   }
 
+  /** A brook tile's brooks, traced in the world worker (world/hydro.ts packRivers). */
+  brooks(tx: number, tz: number): Promise<Float64Array> {
+    return this.pool.run({ kind: 'brooks', seed: this.seed, setting: this.setting, tx, tz }) as Promise<Float64Array>;
+  }
+
   /** Trees and shrubs over a square, candidates `spacing` apart. */
   flora(x0: number, z0: number, size: number, spacing: number): Promise<Float32Array> {
     return this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing }) as Promise<Float32Array>;

@@ -71,6 +71,7 @@ import { Title } from './app/title/title';
 import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
 import { Notes } from './app/notes';
+import { BrookPrefetch } from './app/brooks';
 import { TalkUi } from './app/talkUi';
 import { standingPlace } from './game/standingPlace';
 import { JournalUi } from './app/journalUi';
@@ -145,7 +146,7 @@ export async function start(b: Boot): Promise<void> {
     loading.set('Finding the start');
     // The VGM's first decisions: the start town (and the arch outside it) stand on the land.
     const opened = openWorld(seed, setting);
-    // A save whose start town stood elsewhere (before D49 moved it to its river) belongs to a world that is
+    // A save whose start town stood elsewhere (before D50 moved it to its river) belongs to a world that is
     // gone: a new game begins in this one.
     const lost = asked !== null && startMoved(asked.log, opened.log);
     const save = lost ? null : asked;
@@ -295,6 +296,8 @@ export async function start(b: Boot): Promise<void> {
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
     const jobs = new WorldJobs(createWorldPool(), seed, setting.id);
+    // Brook tiles ahead of the hero come from the world worker (D50).
+    const brooks = new BrookPrefetch(terrain.hydro, jobs);
     // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
@@ -1119,6 +1122,7 @@ export async function start(b: Boot): Promise<void> {
           standBeside(seen, 12);
         }
         if (!visit() && !player.flying) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
+        brooks.near(player.walker.pos.x, player.walker.pos.z);
         // The VGM opens the land ahead (plan 5.5): a region at a time into the log, its place drawn as the hero nears.
         if (regionSites && !visit()) {
           const asking = !title?.holding && !creator?.showing && !!window.__mwReady;
