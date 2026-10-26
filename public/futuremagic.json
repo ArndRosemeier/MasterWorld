@@ -1,0 +1,24 @@
+{
+  "title": "MasterWorld",
+  "tagline": "A classic fantasy roleplaying game in the browser, with a virtual game master that builds the world as you play.",
+  "tags": [
+    "roleplay",
+    "fantasy",
+    "3d",
+    "AI"
+  ],
+  "screenshot": "/shots/masterworld.png",
+  "description": "MasterWorld is a classic fantasy roleplaying game that runs in the browser on three.js. There is no pre-authored campaign: a virtual game master watches what you do and builds the world as it is needed, so the places you visit exist because you went looking for them.\n\nWalk a living world of towns, hamlets and wild country, talk to the people you meet, and play a session that shapes itself around your choices. A desktop browser with WebGL 2 or WebGPU is all it needs.",
+  "highlights": [
+    "A virtual game master builds the world as play demands it",
+    "Towns, hamlets and villages planned at the scale of their population",
+    "Runs entirely in the browser on three.js — no install"
+  ],
+  "links": [
+    {
+      "label": "Source",
+      "url": "https://github.com/ArndRosemeier/MasterWorld"
+    }
+  ],
+  "cta": "Enter the world"
+}
