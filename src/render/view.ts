@@ -28,9 +28,11 @@ export interface View {
 }
 
 /** What glows: brighter than this on screen (after exposure, before the tone curve). */
-const BLOOM_AT = 1.6;
+const BLOOM_AT = 4;
+/** How strong and how wide the glow is (wide and strong veils the whole sunlit frame). */
+const BLOOM_STRENGTH = 0.16, BLOOM_RADIUS = 0.3;
 
-export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean; hour: number; dayMinutes: number; tone?: 'aces' | 'agx' | 'graded'; post?: boolean; postSamples?: number; postFloatDepth?: boolean; ao?: { radius: number; strength: number } | null }): Promise<View> {
+export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean; hour: number; dayMinutes: number; tone?: 'aces' | 'agx' | 'graded'; post?: boolean; postSamples?: number; postFloatDepth?: boolean; ao?: { radius: number; strength: number } | null; bloom?: number[] }): Promise<View> {
   // Reversed depth: precision from a metre to the far horizon in one view.
   const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL: opts.forceWebGL, depth: 'reversed', exposure: 1.9, tone: opts.tone ?? 'graded' });
   // Our look on AgX: close to its Punchy look (AgX alone reads washed out on the greens).
@@ -55,10 +57,10 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const sky = new SkyView(renderer, scene, sun, hemi, { ...opts, exposure: (opts.tone ?? 'graded') === 'aces' ? 1 : (opts.tone ?? 'graded') === 'agx' ? 1.5 : 1.6 });
   // Bloom: a soft glow round the sun, lit windows and fire. Its threshold follows the exposure (frame()).
   // Ambient occlusion: contact shade in corners, under eaves, round feet and stones.
-  const post = opts.post === false ? null : createPost(renderer, scene, camera, { bloom: { strength: 0.22, radius: 0.45, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth });
+  const post = opts.post === false ? null : createPost(renderer, scene, camera, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth });
   const draw = (): void => {
     if (!post) { renderer.render(scene, camera); return; }
-    post.bloom!.threshold.value = BLOOM_AT / Math.max(1e-3, renderer.toneMappingExposure);
+    post.bloom!.threshold.value = (opts.bloom?.[0] ?? BLOOM_AT) / Math.max(1e-3, renderer.toneMappingExposure);
     post.draw();
   };
   const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute, target: post ? post.target : undefined, draw });
