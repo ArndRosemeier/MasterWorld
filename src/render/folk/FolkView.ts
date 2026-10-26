@@ -41,6 +41,12 @@ const SHADOW_RANGE = 35;
 /** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
 const CLOSE = 40;
 const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3();
+/**
+ * Seconds between two dressings begun. In rain the square empties and fills as people run for shelter, and each
+ * dressing runs through every detail level, each of which costs Actors a rebuild of what the clothes hide: begun as
+ * fast as slots came free, that took half of the main thread. Until dressed, people are plain figures.
+ */
+const DRESS_GAP = 0.3;
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
 
@@ -74,11 +80,15 @@ interface Slot {
   look: string;
   detailed: boolean;
   shadow: boolean;
+  /** Dressed for somebody before (a new dressing takes it over: DRESS_GAP). */
+  used: boolean;
 }
 
 export class FolkView {
   private readonly slots: Slot[] = [];
   private dressing = 0;
+  /** Seconds until the next dressing may begin (DRESS_GAP). */
+  private dressWait = 0;
   private readonly shown = new Map<number, Slot>();
   /** Everyone out of doors without a character, as plain figures. */
   private readonly far = new FarFolk();
@@ -90,7 +100,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false };
+      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false };
       this.slots.push(slot);
       ch.object.addEventListener('childadded', ({ child }) => this.late(slot, child));
     }
@@ -233,11 +243,15 @@ export class FolkView {
       s.place.visible = false;
     }
     // Dress free characters for the nearest people without one.
+    this.dressWait = Math.max(0, this.dressWait - dt);
     for (const [, a] of near) {
-      if (this.dressing >= DRESSING || !want.size) break;
+      if (this.dressing >= DRESSING || !want.size || this.dressWait > 0) break;
       if (!want.has(a.person.id) || this.shown.has(a.person.id)) continue;
       const s = this.slots.find((x) => x.agent < 0 && !x.busy);
       if (!s) break;
+      // The first fill of the pool goes at full speed; taking over a character waits its turn.
+      if (s.used) this.dressWait = DRESS_GAP;
+      s.used = true;
       this.dress(s, a);
     }
     const ranked: [number, Slot][] = [];
