@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line).
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Current phase: B.**
 
 ---
 
@@ -44,7 +44,7 @@ These hold in every phase. A PR that breaks one is fixed before new work goes on
 | # | Floor | Check |
 |---|---|---|
 | F1 | **Standard shots.** One script takes the same set on a GPU: title, the creator, town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map, the trade window, talk. They are saved with the commit hash. | `npm run shot:set` (`tools/shot/set.mjs`, built in A1). Run at every phase gate and after visual PRs. |
-| F2 | **Frame time** on the reference GPU (Arnd's RTX 5070, 1080p, the game's default backend, WebGPU): at most 16.7 ms in every standard shot, aiming for 12 ms. No shot may be twice as slow as the town at noon. The WebGL fallback (`?gl`) may be at most 1.5× slower. | The `&hud` frame time in F1 shots, written into the set's index. |
+| F2 | **Frame time** on the reference GPU (Arnd's RTX 5070, 1080p, the game's default backend, WebGPU): at most 16.7 ms in every standard shot, aiming for 12 ms. No shot may be twice as slow as the town at noon. The WebGL fallback (`?gl`) may be at most 1.5× slower. From gate B on, p95 is at most 25 ms too (vsync on): at gate A dusk and night had 5–9 % of frames at 30–46 ms, GPU or present side. | The `&hud` frame time in F1 shots, written into the set's index. |
 | F3 | **Shaders** per [SHADERS.md](../SHADERS.md): 0 violations in every shot. | HUD line "policy ok". |
 | F4 | **Load time**: title in under 1 s and playable in under 20 s on the reference machine, cold, on the default backend (WebGPU); the WebGL fallback (`?gl`) playable in under 30 s; music streams and is not part of the start download. | `tools/shot/load.mjs` (title, playable, start download; fails on game music in it), `tools/shot/perf.mjs`. Sound is 42 MB in `public/sound`, 34 MB of it music. |
 | F5 | **Tests** per [CHECKS.md](../CHECKS.md): 5 s per test, 60 s for `npm test`; variety check in CI. | CI. |
@@ -73,7 +73,7 @@ Goal: an evening of play works end to end. You get a lead, travel, clear the pla
 | A6 ✓ | **The loop check**: a scripted hero (extending `src/game/bot.ts`) plays an evening headless: hears a lead, walks to it, clears it, comes back, sells, buys an upgrade, hears the next lead. It is a slow check of at most 5 min | The check passes on main and runs before every phase gate | 11.3 |
 | A7 ✓ | **Load fast** (F4): the start fetches only what the first view needs. Today a cold load on the reference GPU shows the title at 1.4 s and is playable at 62 s, with 97 MB fetched (Actors human packs 68 MB in 654 files, cow 14, horse 8, dog 4.5). Bundle the packs into a few files, load the people and animals near the start first and the rest behind play, and cache in the browser | `npm run load` on the reference machine: title under 1 s, playable under 20 s, cold | 3 (F4), 17.2 |
 
-Gate A: A1–A7 and A2b done, the F1 set judged, no placeholders.
+Gate A: A1–A7 and A2b done, the F1 set judged, no placeholders. **Passed 2026-10-26** (set 8ca069c, then #144, #146–#149 for the inn talk, barrow portal, sea and animals).
 
 ### Phase B: The frontier (milestone 5)
 
@@ -141,3 +141,6 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | freeryder / free LLMs (O15) | Parked by Arnd |
 | The capital | Prepared in B3, placed once a road network exists |
 | Companions (animals, elementals, summons) | After magic (C), since summons need it |
+| A hedge witch who teaches | She doesn't exist in town yet; teachers of magic are C3 |
+| Interiors rework (ceiling joists cross the wall tops, dim rooms) | Seen at gate A; looks, not function. Before gate B's shots |
+| Barrow nits: straight slab edges close up, a crease where bank meets mound, a yellowish patch at the foot | Seen at gate A after #149 |

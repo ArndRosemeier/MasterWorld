@@ -180,14 +180,6 @@
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   },
   {
-    "key": "idiom: [.PI .range Math] in masterworld/sim/creatures.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts",
-    "reason": "A seeded angle round a point (rng.range(0, Math.PI * 2)): each sim picks its own spots (small life folds its own into aboutPoint); one line of arithmetic, not a copied helper."
-  },
-  {
-    "key": "idiom: [.PI .range Math] in masterworld/sim/smallLife.ts + masterworld/sim/townLife.ts + masterworld/sim/wild.ts",
-    "reason": "A seeded angle round a point (rng.range(0, Math.PI * 2)): each sim picks its own spots (small life folds its own into aboutPoint); one line of arithmetic, not a copied helper."
-  },
-  {
     "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
     "reason": "A heading from one point to another (Math.atan2 of the z and x differences): every moving thing faces where it goes; one line, not a helper."
   },
