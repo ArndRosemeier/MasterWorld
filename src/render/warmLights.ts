@@ -14,7 +14,7 @@ export const WARM_LIGHTS = 3;
 const HAND_OVER = 6;
 /** Candela: a lit doorway, a torch. */
 const DOOR = 6;
-const TORCH = 5;
+const TORCH = 9;
 /** The shadow torch's cube map side (texels) and reach (m). */
 const SHADOW_MAP = 512;
 const REACH = 12;
@@ -28,6 +28,7 @@ export class WarmLights {
   private doors: Spot[] = [];
   private torches: Spot[] | null = null;
   private time = 0;
+  private frames = 0;
 
   constructor(scene: Scene) {
     for (let i = 0; i < WARM_LIGHTS; i++) {
@@ -61,7 +62,7 @@ export class WarmLights {
   /** Underground: the torches (world positions), or null on the way up again. */
   lightTorches(spots: readonly { x: number; y: number; z: number }[] | null): void {
     this.torches = spots ? spots.map((s, i) => ({ ...s, roll: hashToFloat(hash32(i * 104729 + 3)) })) : null;
-    if (!spots) { this.shadowed.intensity = 0; this.shadowed.shadow.autoUpdate = false; }
+    if (!spots) this.shadowed.intensity = 0;
   }
 
   /** Once per frame: `glow` 0 by day .. 1 at night, `share` of the houses with a light on (ignored underground). */
@@ -78,10 +79,13 @@ export class WarmLights {
     const first = near[0];
     const s = this.shadowed;
     if (first) {
+      // The cube map (six views) is redrawn when the torch changes and every third frame after:
+      // walls stand still, only people and creatures move.
+      const moved = s.position.x !== first.s.x || s.position.y !== first.s.y || s.position.z !== first.s.z;
       s.position.set(first.s.x, first.s.y, first.s.z);
       s.intensity = TORCH * this.flicker(first.s);
-      s.shadow.autoUpdate = true;
-    } else { s.intensity = 0; s.shadow.autoUpdate = false; }
+      if (moved || ++this.frames % 3 === 0) s.shadow.needsUpdate = true;
+    } else s.intensity = 0;
     this.setLights(this.lights, near.slice(1), TORCH, true);
   }
 
