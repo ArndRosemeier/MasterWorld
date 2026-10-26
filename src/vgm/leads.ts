@@ -96,7 +96,7 @@ export function nextPromise(c: LeadsContext): Decision | null {
 }
 
 /** New dwellers for a dungeon kept long enough ago, if any fits. */
-function moveInto(c: LeadsContext, s: number): MoveInDecision | null {
+export function moveInto(c: LeadsContext, s: number): MoveInDecision | null {
   const kept = c.log.filter((d): d is KeptDecision => d.kind === 'kept');
   const open = new Set(openPromises(c.log).map((p) => (p.kind === 'move-in' ? p.dungeon : p.id)));
   const ready: { d: DungeonDecision; was: string }[] = [];

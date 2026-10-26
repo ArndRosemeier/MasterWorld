@@ -131,7 +131,7 @@ export class CellarVisit {
     const w = this.player.walker, O = this.view.origin;
     const owner = this.space.grid.owner(Math.floor((w.pos.x - O.x) / CELL), Math.floor((w.pos.z - O.z) / CELL), this.space.levelAt(w.pos.y - O.y));
     const r = owner !== undefined && owner >= 0 ? this.cellar.rooms[owner] : null;
-    return r ? `cellar: ${r.use.name} (room ${r.id}, ${r.beat}, tension ${r.tension.toFixed(2)})` : 'cellar: a passage';
+    return r ? `below: ${r.use.name} (room ${r.id}, ${r.beat}, tension ${r.tension.toFixed(2)})` : 'below: a passage';
   }
 
   private event(e: SpaceEvent): void {
