@@ -12,7 +12,7 @@ import type { Market, Merchant, Refusal } from '../game/trade';
 import { el } from './dom';
 import { itemCard } from './itemCard';
 import { replay } from './ward';
-import { KeyWindow, type WindowHost } from './window';
+import { BodyWindow, type WindowHost } from './window';
 
 export interface TradeHost extends WindowHost {
   /** The game's day now (merchants restock with the days). */
@@ -30,9 +30,7 @@ function coins(copper: number): HTMLElement {
   return el('span', { className: 'coins', title: coinText(copper) }, ...pips.map(([n, k]) => el('span', { className: `coin ${k}` }, String(n))));
 }
 
-export class TradeUi extends KeyWindow {
-  private readonly body: HTMLDivElement;
-  private readonly foot: HTMLDivElement;
+export class TradeUi extends BodyWindow {
   private readonly scales: HTMLDivElement;
   private readonly line: HTMLParagraphElement;
   private with: Merchant | null = null;
@@ -41,10 +39,7 @@ export class TradeUi extends KeyWindow {
   private moved: Item | null = null;
 
   constructor(private readonly hero: Character, private readonly setting: SettingModule, private readonly market: Market, private readonly tradeHost: TradeHost) {
-    const body = el('div', { className: 'body' }), foot = el('div', { className: 'foot' });
-    super('Trade', 'trade', null, tradeHost, body, foot);
-    this.body = body;
-    this.foot = foot;
+    super('Trade', 'trade', null, tradeHost);
     this.line = el('p', { className: 'says' });
     const pan = (side: string) => el('div', { className: `pan ${side}` }, el('i', { className: 'cord l' }), el('i', { className: 'cord r' }), el('div', { className: 'dish' }));
     this.scales = el('div', { className: 'scales', ariaHidden: 'true' },
@@ -89,15 +84,15 @@ export class TradeUi extends KeyWindow {
       cell.addEventListener('click', () => this.deal(() => this.market.sell(h, m, it), it, 'theirs'));
       return cell;
     });
-    this.body.replaceChildren(
+    this.fill([
       el('div', { className: 'counter' }, this.scales, this.line),
       el('div', { className: 'sides' },
         el('section', {}, el('h3', { textContent: `${this.who}’s wares` }), wares.length ? el('div', { className: 'wares' }, ...wares) : el('p', { className: 'hint', textContent: 'The shelves are bare. Come back another day.' })),
         el('section', {}, el('h3', { textContent: 'Your pack' }), pack.length ? el('div', { className: 'wares' }, ...pack) : el('p', { className: 'hint', textContent: 'Nothing to sell but lint.' }))),
-      el('p', { className: 'hint', textContent: 'Click a ware to buy it, or something of yours to sell it. What you wear stays on you: take it off in the pack (I) to sell it.' }));
-    this.foot.replaceChildren(
+      el('p', { className: 'hint', textContent: 'Click a ware to buy it, or something of yours to sell it. What you wear stays on you: take it off in the pack (I) to sell it.' })],
+    [
       el('span', { className: 'purse' }, 'Your purse ', coins(h.coins)),
-      el('span', { className: 'purse' }, `${this.who}’s purse `, coins(m.coins)));
+      el('span', { className: 'purse' }, `${this.who}’s purse `, coins(m.coins))]);
   }
 
   /** A trade: on success the balance tips towards the pan that was paid into and the thing arrives on its side. */

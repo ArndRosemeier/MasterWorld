@@ -12,6 +12,7 @@ import type { ItemCatalog, Rarity, SettingModule, ShopDef } from '../setting/con
 import type { Person } from '../sim/people';
 import { Character } from './character';
 import { defOf, plainItem, rollItem, type Item } from './items';
+import { condition } from './upkeep';
 
 /** How much more a rarer thing is worth than a plain one of its kind. */
 const RARITY_WORTH: Record<Rarity, number> = { common: 1, uncommon: 2.5, rare: 6, legendary: 20 };
@@ -126,15 +127,18 @@ export class Market {
     return (this.made.has(id) ? 0.9 : 1.13) * scarce;
   }
 
+  /** What a thing is worth across the counter: as new, less its wear, as the town has it. */
+  private worthHere(item: Item): number { return itemWorth(this.cat, item) * condition(item) * this.townFactor(item.def); }
+
   /** What the merchant asks for one of their things, given the hero's speech. */
   asks(m: Merchant, item: Item, speech: number): number {
-    return Math.max(1, Math.round(itemWorth(this.cat, item) * m.shop.asks * this.townFactor(item.def) * (1 - haggle(speech) / 2)));
+    return Math.max(1, Math.round(this.worthHere(item) * m.shop.asks * (1 - haggle(speech) / 2)));
   }
 
   /** What the merchant pays for one of the hero's things (0: they do not buy that kind). */
   pays(m: Merchant, item: Item, speech: number): number {
     if (!m.shop.buys.includes(defOf(this.cat, item.def).kind)) return 0;
-    return Math.max(1, Math.round(itemWorth(this.cat, item) * m.shop.pays * this.townFactor(item.def) * (1 + haggle(speech))));
+    return Math.max(1, Math.round(this.worthHere(item) * m.shop.pays * (1 + haggle(speech))));
   }
 
   /** The hero buys one of the merchant's things into the pack. */

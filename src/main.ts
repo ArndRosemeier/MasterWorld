@@ -73,12 +73,11 @@ import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, typ
 import { SAVE_VERSION, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
-import { Market } from './game/trade';
+import { Market, itemWorth } from './game/trade';
 import { acquaintances } from './game/background';
 import { Director } from './vgm/director';
 import { FightHud } from './app/fightHud';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
-import { defOf } from './game/items';
 
 declare global {
   interface Window {
@@ -539,7 +538,7 @@ export async function start(b: Boot): Promise<void> {
       setClock: (h) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; },
       enter: (b) => rooms?.enter(b, true) ?? Promise.resolve(),
       say: (text, secs) => notes.say(text, secs),
-      worth: (it) => defOf(setting.items, it.def).value,
+      worth: (it) => itemWorth(setting.items, it),
       rang: () => sounds?.rang(),
     }) : null;
     if (upkeep && townWords && life) {

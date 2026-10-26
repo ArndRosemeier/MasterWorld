@@ -63,6 +63,10 @@ test('trade: they ask more than they pay, speech narrows it, and rarer is dearer
   assert.ok(m.asks(s, sword, 60) < m.asks(s, sword, 10));
   const keen: Item = { ...sword, rarity: 'rare', name: 'Keen short sword of the Edge', bonuses: { blades: 7, dodge: 3 } };
   assert.ok(itemWorth(classic.items, keen) > itemWorth(classic.items, sword) * 5);
+  // Worn gear fetches less; its worth as new (what the smith's mending reads) stays.
+  const battered: Item = { ...sword, wear: 0.6 };
+  assert.ok(m.pays(s, battered, 10) < m.pays(s, sword, 10) * 0.5);
+  assert.equal(itemWorth(classic.items, battered), itemWorth(classic.items, sword));
 });
 
 test('trade: prices follow what the town has; a glut pays less, and they keep their kind', () => {

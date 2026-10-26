@@ -8,7 +8,7 @@
 
 import type { GradeKey } from '@futuremagic/stage';
 
-export const CONTRACT_VERSION = 8;
+export const CONTRACT_VERSION = 9;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep

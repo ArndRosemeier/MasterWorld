@@ -96,4 +96,10 @@ export abstract class BodyWindow extends KeyWindow {
     this.body = body;
     this.foot = foot;
   }
+
+  /** Draw the window's body and its foot line anew. */
+  protected fill(body: readonly Node[], foot: readonly Node[]): void {
+    this.body.replaceChildren(...body);
+    this.foot.replaceChildren(...foot);
+  }
 }
