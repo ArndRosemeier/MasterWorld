@@ -1,0 +1,34 @@
+diff --git a/packages/stage/src/stage.ts b/packages/stage/src/stage.ts
+index ecea16a..cad8103 100644
+--- a/packages/stage/src/stage.ts
++++ b/packages/stage/src/stage.ts
+@@ -115,7 +115,9 @@ export class Stage {
+   async warmUp(extra: readonly Object3D[] = []): Promise<void> {
+     // One real frame first: it settles the render context (frame buffer target) that compiled
+     // shaders are keyed by, and builds the renderer's own output pass.
++    const T = () => performance.now(); let t0 = T();
+     this.drawFrame();
++    console.info(`[diag] first frame ${(T() - t0).toFixed(0)} ms`); t0 = T();
+     const standIns = this.opts.kinds().map((k) => standIn(k, this.opts.attribute));
+     for (const m of standIns) {
+       m.position.set(this.camera.position.x, this.camera.position.y, this.camera.position.z - 2);
+@@ -124,9 +126,18 @@ export class Stage {
+     const group = new Group();
+     for (const m of standIns) group.add(m);
+     await this.onTarget(() => this.renderer.compileAsync(group, this.camera, this.scene));
+-    for (const o of extra) await this.prepare(o);
++    console.info(`[diag] ${standIns.length} kinds compiled ${(T() - t0).toFixed(0)} ms`); t0 = T();
++    if (location.search.includes('warmpar')) {
++      await Promise.all(extra.map((o) => this.prepare(o)));
++      console.info(`[diag] ${extra.length} extras in parallel ${(T() - t0).toFixed(0)} ms`); t0 = T();
++    } else for (const o of extra) {
++      let n = 0; o.traverse((c) => { if ((c as Mesh).isMesh) n++; });
++      await this.prepare(o);
++      console.info(`[diag] extra ${extra.indexOf(o)} ${o.name || o.type} (${n} meshes) ${(T() - t0).toFixed(0)} ms`); t0 = T();
++    }
+     // Then draw them, for the shadow pass's own (small) shaders, which compileAsync does not build.
+     await this.warmShadows(group, extra);
++    console.info(`[diag] shadows ${(T() - t0).toFixed(0)} ms`);
+     for (const m of standIns) m.geometry.dispose();
+     this.monitor.phase = 'run';
+     this.cap.active = true;

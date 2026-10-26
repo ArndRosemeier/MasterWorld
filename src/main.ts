@@ -336,6 +336,7 @@ export async function start(b: Boot): Promise<void> {
     if (folk) loading.set('Dressing the townsfolk');
     const folkWarm = folk ? await folk.warmObjects() : [];
     loading.set('Preparing shaders');
+    console.info(`[diag] extras: ${["grass", "hero", "precip", ...(horses ? horses.warmObjects().map(() => "horse") : []), ...(stock ? stock.toWarm().map(() => "stock") : []), ...folkWarm.map(() => "folk")].filter((x, i) => x !== "grass" || grass).map((x, i) => `${i}=${x}`).join(" ")}`);
     await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...folkWarm]);
     // While the loading screen (or the title's painted still) still covers the view, the land, trees and
     // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
