@@ -91,7 +91,7 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     if (slope > 0.75 || t.rockAt(x, z, h)) continue;
     // Nothing on streets and under houses; in yards and gardens a fruit tree now and then, and bushes.
     const built = t.townGround(x, z);
-    if (built >= TownGround.Street || (built === TownGround.Yard && !shrub && hash2f(seed + 8, gi, gj) < 0.85)) continue;
+    if (built >= TownGround.Street || (built === TownGround.Yard && !shrub && (hash2f(seed + 8, gi, gj) < 0.85 || besideWalls(t, x, z)))) continue;
     // Roads keep a lane clear: no trunk within crown's reach of the edge, no bush on it.
     if (!t.roads.empty && t.roads.fromEdge(x, z) < (shrub ? 0.8 : 3)) continue;
     // Places out on the land stand in the open: no trunk in their clearing and fewer towards its edge, bushes only round its rim.
@@ -138,4 +138,13 @@ function pickTree(mix: Readonly<Partial<Record<TreeName, number>>>, r: number, r
     if (r < acc) return i * VARIANTS + Math.min(VARIANTS - 1, Math.floor(rv * VARIANTS));
   }
   return (TREES.length - 1) * VARIANTS;
+}
+
+/** Does a house wall or a street lie within a crown's reach (5 m) of a yard's spot? A tree there would lean on it. */
+function besideWalls(t: Terrain, x: number, z: number): boolean {
+  for (const [dx, dz] of [[5, 0], [-5, 0], [0, 5], [0, -5], [3.5, 3.5], [-3.5, 3.5], [3.5, -3.5], [-3.5, -3.5]]) {
+    const g = t.townGround(x + dx, z + dz);
+    if (g === TownGround.Building || g === TownGround.Street || g === TownGround.Market) return true;
+  }
+  return false;
 }

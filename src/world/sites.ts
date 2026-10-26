@@ -1,11 +1,11 @@
 /**
- * The places the VGM puts in the regions it opens (plan 5.5, B1), as they stand on the land: a hamlet of a
- * few farms round a green, a camp of tents round a fire, the broken walls of the old realm, a field of
- * sealed barrows. Each is laid out from its region decision alone (seeded), in the building mesh format so
+ * The places the VGM puts in the regions it opens (plan 5.5, B1), as they stand on the land: a camp of tents
+ * round a fire, the broken walls of the old realm, a field of sealed barrows (hamlets and villages are
+ * towns of their size). Each is laid out from its region decision alone (seeded), in the building mesh format so
  * it draws with the town's one building shader, with the shapes the walker cannot go through. Pure.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { buildingMesh, distToPoly, ensureCCW, makeBuilding, pointInPoly, rect, type BuildingMesh, type Poly, type TownBuilding } from '@futuremagic/settlement';
+import { distToPoly, ensureCCW, pointInPoly, rect, type BuildingMesh, type Poly } from '@futuremagic/settlement';
 import type { RegionFillDef } from '../setting/contract';
 import type { RegionDecision } from './decisions';
 import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
@@ -20,24 +20,24 @@ export interface SiteLayout {
   readonly origin: readonly [number, number, number];
   readonly mesh: BuildingMesh;
   readonly solids: readonly Solid[];
-  /** A hamlet's houses (as a town's: for doors and, later, people). */
-  readonly buildings: readonly TownBuilding[];
 }
 
 export type Place = RegionFillDef['place'];
 
-/** A place laid out on the land (`height`: the ground), or null for a region with nothing on it. */
+/**
+ * A place laid out on the land (`height`: the ground), or null for a region with nothing on it, and for a
+ * hamlet or village: those are planned as towns (world/town.ts, Terrain.addTown).
+ */
 export function layOutSite(d: RegionDecision, place: Place, height: (x: number, z: number) => number): SiteLayout | null {
   const s = d.site;
-  if (!s || place === 'none') return null;
+  if (!s || place === 'none' || place === 'hamlet' || place === 'village') return null;
   const origin: [number, number, number] = [s.x, height(s.x, s.z), s.z];
   const at: At = { x: s.x, z: s.z, yaw: s.yaw, r: s.r, y0: origin[1], height, rng: new Rng(deriveSeed(d.seed, 'site')), seed: d.seed };
   const k = new MeshKit(), solids: Solid[] = [];
-  const buildings = place === 'hamlet' ? hamlet(at, k, solids) : [];
   if (place === 'camp') camp(at, k, solids);
   else if (place === 'ruin') ruin(at, k, solids);
   else if (place === 'barrows') barrows(at, k, solids);
-  return { origin, mesh: k.mesh(), solids, buildings };
+  return { origin, mesh: k.mesh(), solids };
 }
 
 /** Is a body of radius `r` at (x, z) inside one of the solids? */
@@ -81,42 +81,6 @@ function appendAt(k: MeshKit, m: BuildingMesh, x: number, y: number, z: number, 
  * A hamlet (D41: a few households): a farmhouse, a barn and two or three cottages round a small green,
  * their doors to it, one storey under thatch or shingles as on a town's edge.
  */
-function hamlet(at: At, k: MeshKit, solids: Solid[]): TownBuilding[] {
-  const r = at.rng, n = r.int(3, 5);
-  const site = { seed: deriveSeed(at.seed, 'hamlet'), x: at.x, z: at.z, height: at.height };
-  const out: TownBuilding[] = [];
-  const turn = r.range(0, Math.PI * 2);
-  for (let i = 0; i < n; i++) {
-    const kind = i === 0 ? 'farmhouse' : i === 2 && n > 3 ? 'barn' : 'cottage';
-    const hu = kind === 'barn' ? r.range(5, 6.2) : kind === 'farmhouse' ? r.range(4.2, 5) : r.range(3, 4);
-    const hv = kind === 'barn' ? r.range(3.4, 4) : r.range(2.6, 3.3);
-    const a = turn + (i / n) * Math.PI * 2 + r.range(-0.2, 0.2);
-    const reach = Math.hypot(hu, hv);
-    let dist = 9 + hv + r.range(0, 4);
-    // Out from the green until it stands clear of the houses already there.
-    while (dist < at.r - reach * 0.5 && out.some((b) => Math.hypot(b.cx - (at.x + Math.cos(a) * dist), b.cz - (at.z + Math.sin(a) * dist)) < Math.hypot(b.hu, b.hv) + reach + 1.5)) dist += 1;
-    const [cx, cz] = round(at, a, dist);
-    if (out.some((b) => Math.hypot(b.cx - cx, b.cz - cz) < Math.hypot(b.hu, b.hv) + reach + 1.5)) continue;
-    // v away from the green (the door faces it), u along its edge.
-    const vx = Math.cos(a), vz = Math.sin(a);
-    const b = makeBuilding(out.length, kind, cx, cz, -vz, vx, vx, vz, hu, hv, false, false, true, i, site, r);
-    out.push(b);
-    solids.push({ poly: b.poly });
-    appendAt(k, buildingMesh(b, [at.x, at.y0, at.z]), 0, 0, 0);
-  }
-  // A woodpile by the farmhouse and a trough on the green.
-  const f = out[0];
-  if (f) {
-    const [wx, wz] = [f.cx + f.vx * (f.hv + 1.2) - f.vz * (f.hu - 1), f.cz + f.vz * (f.hv + 1.2) + f.vx * (f.hu - 1)];
-    stack(at, k, wx, wz, Math.atan2(f.vx, f.vz));
-    solids.push({ x: wx, z: wz, r: 0.9 });
-  }
-  const ty = at.height(at.x, at.z) - at.y0;
-  k.box(0, ty - 0.1, 0, 2.2, 0.75, 0.8, at.yaw, BuildingMat.Oak, [120, 96, 74]);
-  solids.push({ x: at.x, z: at.z, r: 1.1 });
-  return out;
-}
-
 /** Split logs stacked against a wall: a few rows of rounds, ends out. */
 function stack(at: At, k: MeshKit, x: number, z: number, yaw: number): void {
   const y = at.height(x, z) - at.y0, lx = x - at.x, lz = z - at.z;

@@ -7,7 +7,7 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { RegionFillDef, RegionsDef } from '../setting/contract';
-import { sitesIn, type DecisionLog, type RegionDecision } from '../world/decisions';
+import { settlementOf, sitesIn, type DecisionLog, type RegionDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import { RegionMap, boundsOf, keyAt, keyId, sizeOf, type RegionKey } from '../world/regions';
 import type { Terrain } from '../world/terrain';
@@ -151,11 +151,11 @@ function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number 
 const woods = new WeakMap<Terrain, (x: number, z: number) => number>();
 
 /** How steep the ground may be round a place of each kind (rise per metre over its radius). */
-const STEEP: Record<RegionFillDef['place'], number> = { none: 1, hamlet: 0.12, camp: 0.16, ruin: 0.25, barrows: 0.16 };
+const STEEP: Record<RegionFillDef['place'], number> = { none: 1, hamlet: 0.12, village: 0.1, camp: 0.16, ruin: 0.25, barrows: 0.16 };
 /** Ground this wooded or less (woodsOf, 0..1) round a place counts as open. */
 export const OPEN_GROUND = 0.3;
 /** How much a place of each kind keeps out of thick woods (ruins do not mind: the wood grew round them). */
-const OPEN: Record<RegionFillDef['place'], number> = { none: 0, hamlet: 1.2, camp: 0.3, ruin: 0, barrows: 0.8 };
+const OPEN: Record<RegionFillDef['place'], number> = { none: 0, hamlet: 1.2, village: 1.2, camp: 0.3, ruin: 0, barrows: 0.8 };
 
 /**
  * Where in the square a place stands: dry, gentle ground with room for its footprint, away from towns and
@@ -203,13 +203,11 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
   return { at: { x: bx, z: bz, yaw: Math.atan2(-(c.home.x - bx), -(c.home.z - bz)), r }, open };
 }
 
-/** The settlements in the log (the towns and the hamlets): for roads and for whatever links places. */
+/** The settlements in the log (the towns, and the hamlets and villages of regions): for roads and for whatever links places. */
 export function settlementsOf(log: DecisionLog, regions?: RegionsDef): { id: string; x: number; z: number; r: number }[] {
-  const hamlets = new Set(regions?.fills.filter((f) => f.place === 'hamlet').map((f) => f.id) ?? []);
   return log.flatMap((d) => {
-    if (d.kind === 'town') return [{ id: d.id, x: d.x, z: d.z, r: d.radius }];
-    if (d.kind === 'region' && d.site && hamlets.has(d.fill)) return [{ id: d.id, x: d.site.x, z: d.site.z, r: d.site.r }];
-    return [];
+    const t = d.kind === 'town' ? d : d.kind === 'region' && regions ? settlementOf(d, regions.fills) : null;
+    return t ? [{ id: t.id, x: t.x, z: t.z, r: t.radius }] : [];
   });
 }
 

@@ -42,9 +42,12 @@ export class Town {
   readonly nx: number;
   readonly nz: number;
 
-  /** `t`: the land, already settled (its heights calmed for this town). */
-  constructor(readonly decision: TownDecision, t: Terrain) {
-    this.plan = planTown({ seed: t.seed, x: decision.x, z: decision.z, radius: decision.radius, height: t.height.bind(t), water: t.waterDepth.bind(t) });
+  /**
+   * `t`: the land, already settled (its heights calmed for this town). `plan`: the town's plan if it was
+   * planned elsewhere (a worker plans a settlement founded while playing: it takes too long for a frame).
+   */
+  constructor(readonly decision: TownDecision, t: Terrain, plan?: TownPlan) {
+    this.plan = plan ?? townPlanOf(decision, t);
     let [x0, z0, x1, z1] = polyBounds(this.plan.farmEdge);
     for (const s of this.plan.streets) {
       const b = polyBounds(s.pts);
@@ -156,7 +159,10 @@ export class Town {
 
   private rasterise(): void {
     const p = this.plan;
-    // The farmland first: open ground, the fields on it, the farmsteads' grounds and yards.
+    // The farmland first: open ground, the fields on it, the farmsteads' grounds and yards. Round a hamlet
+    // or village all of it is cleared, not only the furlongs (its few fields would stand in the wood).
+    const small = this.decision.size === 'hamlet' || this.decision.size === 'village';
+    if (small) this.fill(p.farmEdge, TownGround.Farmland);
     for (const f of p.furlongs) this.fill(f, TownGround.Farmland);
     for (const fm of p.farms) {
       const ids = [fm.house, fm.barn, fm.stable].filter((i) => i >= 0);
@@ -164,7 +170,12 @@ export class Town {
     }
     for (const f of p.fields) this.fill(f.poly, TownGround.Field, f.id + 1);
     for (const fm of p.farms) this.fill(fm.yard, TownGround.Yard);
-    this.fill(p.outline, TownGround.Yard);
+    if (small) {
+      // A hamlet's or village's blocks are wide: inside the outline it is open ground (kept grass, no
+      // wood), the plots round the houses its yards and gardens.
+      this.fill(p.outline, TownGround.Farmland);
+      for (const l of p.lots) this.fill(l.poly, TownGround.Yard);
+    } else this.fill(p.outline, TownGround.Yard);
     // Roads are cobbled in town; out in the fields they are earth, like the farm tracks.
     for (const s of p.streets) {
       const pts = s.closed ? [...s.pts, s.pts[0], s.pts[1]] : s.pts;
@@ -230,4 +241,9 @@ function hull(pts: number[], grow: number): number[] {
   const h = [...lo.slice(0, -1), ...hi.slice(0, -1)];
   const cx = h.reduce((s, q) => s + q[0], 0) / h.length, cz = h.reduce((s, q) => s + q[1], 0) / h.length;
   return h.flatMap(([x, z]) => { const d = Math.hypot(x - cx, z - cz) || 1; return [x + ((x - cx) / d) * grow, z + ((z - cz) / d) * grow]; });
+}
+
+/** A town's plan (AG settlement planTown, the one planner for every size), on the land as settled. */
+export function townPlanOf(d: TownDecision, t: Terrain): TownPlan {
+  return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t) });
 }

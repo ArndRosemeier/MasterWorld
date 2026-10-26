@@ -298,9 +298,5 @@
   {
     "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/terrain/TerrainView.ts#refresh",
     "reason": "The same seam on purpose: app/roads.ts asks every view built from the land to build again over the squares a new road passes; each view rebuilds its own cells."
-  },
-  {
-    "key": "same name: masterworld/world/dungeon/cellar.ts#settle + masterworld/world/terrain.ts#settle",
-    "reason": "Different verbs that share a word: a cellar's dwellers settle into it; the terrain settles the decision log's things onto the land. The finder paired them anew when the terrain learned of holds."
   }
 ]

@@ -115,9 +115,14 @@ export class TerrainJobs {
     return this.job({ kind: 'caveMouth', site, cave });
   }
 
-  /** The buildings of the `index`th town, merged per cell. */
-  townMeshes(index: number): Promise<import('../world/townMesh').TownCellMesh[]> {
-    return this.job({ kind: 'town', index });
+  /** The ground masks of the town of this id (world/townMask.ts), `w` × `h` texels each. */
+  townMask(id: string, w: number, h: number): Promise<Uint8Array> {
+    return this.job({ kind: 'townMask', id, w, h });
+  }
+
+  /** The buildings of the town of this id, merged per cell, and its plan if `plan` (the worker plans a settlement founded while playing). */
+  townMeshes(id: string, plan = false): Promise<import('./terrain.worker').TownMeshes> {
+    return this.job({ kind: 'town', id, plan });
   }
 }
 

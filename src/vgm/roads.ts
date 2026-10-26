@@ -44,9 +44,15 @@ export function linkRoad(t: Terrain, log: DecisionLog, place: Place, way: RoadWa
   const targets = joins(t, log, place.id);
   if (!targets.length) return null;
   const to = targets.reduce((a, b) => (Math.hypot(b.x - place.x, b.z - place.z) < Math.hypot(a.x - place.x, a.z - place.z) ? b : a));
-  // From the edge of the place's houses, towards the network.
+  // From the end of the place's own road out nearest the network (a settlement planned as a town), else
+  // from the edge of its houses, towards the network.
   const dx = to.x - place.x, dz = to.z - place.z, L = Math.hypot(dx, dz) || 1;
-  const from: [number, number] = [place.x + (dx / L) * Math.min(place.r, L / 2), place.z + (dz / L) * Math.min(place.r, L / 2)];
+  let from: [number, number] = [place.x + (dx / L) * Math.min(place.r, L / 2), place.z + (dz / L) * Math.min(place.r, L / 2)];
+  for (const s of t.town(place.id)?.plan.streets ?? []) {
+    if (s.kind !== 'road' || s.pts.length < 4) continue;
+    const e: [number, number] = [s.pts[s.pts.length - 2], s.pts[s.pts.length - 1]];
+    if (Math.hypot(e[0] - to.x, e[1] - to.z) < Math.hypot(from[0] - to.x, from[1] - to.z)) from = e;
+  }
   const id = `road-${log.filter((d) => d.kind === 'road').length + 1}`;
   const route = routeRoad({
     seed: deriveSeed(t.seed, 'road', id),
