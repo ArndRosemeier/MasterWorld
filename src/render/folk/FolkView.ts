@@ -30,6 +30,12 @@ const LOD_BIAS = 0.7;
  * hair) wherever they stand. A crowded square no longer costs a dozen draws a head.
  */
 const DETAILED = 6;
+/**
+ * Someone among them keeps the detail until this much farther (m) than the nearest without, and shadows go off past
+ * SHADOW_RANGE + this: every switch of level costs Actors a rebuild of what the clothes hide, so two people at about
+ * the same distance must not trade places every frame.
+ */
+const STICK = 4;
 /** People farther than this (m) cast no shadow (in the Crowd level only the body casts one). */
 const SHADOW_RANGE = 35;
 /** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
@@ -66,6 +72,8 @@ interface Slot {
   busy: boolean;
   /** The detail and shadows set last (`detail`), so they change only when they must. */
   look: string;
+  detailed: boolean;
+  shadow: boolean;
 }
 
 export class FolkView {
@@ -82,7 +90,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false, look: '' };
+      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false };
       this.slots.push(slot);
       ch.object.addEventListener('childadded', ({ child }) => this.late(slot, child));
     }
@@ -235,7 +243,12 @@ export class FolkView {
     const ranked: [number, Slot][] = [];
     for (const s of this.shown.values()) if (s.ready) ranked.push([Math.hypot(s.place.position.x - cx, s.place.position.z - cz), s]);
     ranked.sort((x, y) => x[0] - y[0]);
-    ranked.forEach(([d, s], i) => this.detail(s, i < DETAILED, d < SHADOW_RANGE));
+    // Who keeps the detail: those who had it, until they are STICK farther than the DETAILED-th nearest; then the
+    // nearest fill it up.
+    const edge = (ranked[DETAILED - 1]?.[0] ?? Infinity) + STICK, keep = new Set<Slot>();
+    for (const [d, s] of ranked) if (s.detailed && d <= edge && keep.size < DETAILED) keep.add(s);
+    for (const [, s] of ranked) if (keep.size < DETAILED) keep.add(s);
+    for (const [d, s] of ranked) this.detail(s, keep.has(s), s.shadow ? d < SHADOW_RANGE + STICK : d < SHADOW_RANGE);
     for (const s of this.shown.values()) {
       if (!s.ready) continue;
       const a = this.life.agents[s.agent], p = placed.get(a.person.id);
@@ -270,6 +283,8 @@ export class FolkView {
     const look = `${detailed}${shadow}`;
     if (look === s.look) return;
     s.look = look;
+    s.detailed = detailed;
+    s.shadow = shadow;
     const crowd = s.ch.lods.length - 1;
     s.ch.setLod(detailed ? 'auto' : crowd);
     castShadows(s.place);
@@ -315,6 +330,7 @@ export class FolkView {
     }
     s.ch.setLod('auto');
     s.look = ''; // `detail` sets it again on the next frame
+    s.detailed = s.shadow = false;
     if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
     this.stage.scene.add(s.place);
     s.ready = true;
