@@ -44,12 +44,12 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     // A boar's build: short legs under a deep heavy barrel, a big wedge of a head (a long, deep snout
     // with no stop), small pricked ears, a short straight tail; a dark coarse coat with no pale marks.
     shape: {
-      size: 1.3, legs: 0.48, body: 1.15, neck: 0.7, head: 1.3, bulk: 1.45, bone: 1.4, tail: 0.3, ears: 0.7, earDrop: 0, earFold: 0.3,
-      muzzle: 0.5, muzzleBroad: 1, muzzleDeep: 1, stop: 0, skullDome: 0, chestDeep: 1, bellyTuck: 0, tailCurl: 0, tailPlume: 0, cheeks: 0.5,
+      size: 1.3, legs: 0.48, body: 1.15, neck: 0.7, head: 1.3, bulk: 1.45, bone: 1.4, tail: 0.3, ears: 0.75, earDrop: 0, earFold: 0,
+      muzzle: 0.8, muzzleBroad: 0.8, muzzleDeep: 1, stop: 0, skullDome: 0, chestDeep: 1, bellyTuck: 0, tailCurl: 0, tailPlume: 0, cheeks: 0.5,
     },
     coat: {
-      // One dark brown-black all over (every marking colour the same), long and bristly.
-      base: [0.17, 0.14, 0.11], second: [0.17, 0.14, 0.11], tan: [0.17, 0.14, 0.11], white: [0.17, 0.14, 0.11],
+      // One dark brown all over (every marking colour the same), long and bristly.
+      base: [0.24, 0.19, 0.14], second: [0.24, 0.19, 0.14], tan: [0.24, 0.19, 0.14], white: [0.24, 0.19, 0.14],
       saddle: 0, mask: 0, points: 0, belly: 0, bib: 0, socks: 0, blaze: 0, tailTip: 0, spots: 0, shade: 0.15, paleMask: 0, agouti: 0.3, tanLegs: 0, length: 0.06, fluff: 0.05,
     },
   },
