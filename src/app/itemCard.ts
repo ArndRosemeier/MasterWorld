@@ -20,7 +20,7 @@ export function itemLines(i: Item, setting: SettingModule): string[] {
   if (d?.block) lines.unshift(`blocks ${Math.round(d.block * 100)}%`);
   if (d?.heal) lines.unshift(`restores ${d.heal} health`);
   // Worn gear says how worn (game/upkeep.ts): it strikes and guards less well until a smith mends it.
-  if (i.wear) lines.push(`${wearState(i)}: ${Math.round(condition(i) * 100)}% sound`);
+  if (i.wear) { const s = wearState(i), pct = `${Math.round(condition(i) * 100)}% sound`; lines.push(s === 'new' ? pct : `${s}: ${pct}`); }
   return lines;
 }
 

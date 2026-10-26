@@ -31,7 +31,8 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
   const inside = agents.filter((a) => {
     const s = a.spot >= 0 ? spots[a.spot] : null;
     if (!s || s.building !== building) return false;
-    return s.door ? a.hidden && a.act !== 'sleep' : (a.act === 'drink' || a.act === 'pray');
+    // Someone held for a talk in the room stays in it (holding shows them, as out of doors).
+    return s.door ? (a.hidden || !!a.held) && a.act !== 'sleep' : (a.act === 'drink' || a.act === 'pray' || !!a.held);
   });
   const free = plan.spots.map((s, i) => ({ kind: s.kind, i })).filter((s) => s.kind !== 'sleep');
   const take = (ok: (k: InteriorSpotKind) => boolean, id: number): number => {

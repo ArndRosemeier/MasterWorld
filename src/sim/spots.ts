@@ -12,7 +12,7 @@ export type ActivityKind =
   | 'fetchWater' | 'fetchWood' | 'chop' | 'garden' | 'washing' | 'feedHens'
   | 'browse' | 'sit' | 'chat' | 'drink' | 'pray' | 'mourn' | 'play' | 'stroll' | 'gather'
   /** Farm work: in the fields by what grows there, with the animals in the paddock, hay and dung in the stable. */
-  | 'plough' | 'sow' | 'hoe' | 'reap' | 'tendHorses' | 'muckOut';
+  | 'plough' | 'sow' | 'hoe' | 'reap' | 'tendStock' | 'muckOut';
 
 /** Who may use a spot: its building's workers, its household, the market's traders, or anyone. */
 export type SpotUse = 'work' | 'home' | 'trade' | 'any';
@@ -50,14 +50,14 @@ export const SPOT_DEFS: Readonly<Record<FixtureKind, SpotDef>> = {
   offering: { activity: 'pray', use: 'any', cap: 3, secs: [25, 60], outside: true },
   // A field's activity follows its crop (fieldWork); 'reap' is only the default.
   field: { activity: 'reap', use: 'work', cap: 2, secs: [120, 300], outside: true },
-  paddock: { activity: 'tendHorses', use: 'work', cap: 1, secs: [40, 100], outside: true },
+  paddock: { activity: 'tendStock', use: 'work', cap: 1, secs: [40, 100], outside: true },
   hayrack: { activity: 'muckOut', use: 'work', cap: 1, secs: [40, 110], outside: true },
 };
 
 /** The work a field asks for, by what grows there (the season is not modelled yet: a late summer's mix). */
 export const FIELD_WORK: Readonly<Record<CropKind, ActivityKind>> = {
   wheat: 'reap', rye: 'reap', barley: 'reap', oats: 'reap', beans: 'hoe', flax: 'hoe', cabbage: 'hoe',
-  ploughed: 'sow', fallow: 'plough', meadow: 'reap', pasture: 'tendHorses',
+  ploughed: 'sow', fallow: 'plough', meadow: 'reap', pasture: 'tendStock',
 };
 
 export interface Spot {

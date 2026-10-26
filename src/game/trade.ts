@@ -190,6 +190,17 @@ export class Market {
   }
 }
 
+/** Items that are alike (same kind, rarity, name, bonuses and wear) in stacks, in the order first met. */
+export function stackAlike(items: readonly Item[]): Item[][] {
+  const by = new Map<string, Item[]>();
+  for (const it of items) {
+    const k = JSON.stringify([it.def, it.rarity, it.name, Object.entries(it.bonuses).sort(), it.wear ?? 0]);
+    const s = by.get(k);
+    if (s) s.push(it); else by.set(k, [it]);
+  }
+  return [...by.values()];
+}
+
 /** The shop a townsperson keeps, if any: their own trade's, or the market's for a trader. */
 export function shopOf(setting: SettingModule, p: Person): ShopDef | null {
   const keeper = p.role === 'trader' ? 'trader' : p.role === 'trade' ? p.trade : '';

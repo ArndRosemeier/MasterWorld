@@ -27,3 +27,15 @@ test('room cast: in the evening the houses have their people at table and hearth
   const inn = plan.buildings.find((b) => b.kind === 'inn')!;
   assert.deepEqual(roomCast(life.agents, life.spots, inn.id, planInterior(inn)).map((x) => [x.agent.person.id, x.spot]), roomCast(life.agents, life.spots, inn.id, planInterior(inn)).map((x) => [x.agent.person.id, x.spot]));
 });
+
+test('room cast: the innkeeper held for a talk stays at the counter (holding shows them, which would drop them from the room)', () => {
+  const life = new TownLife(plan, 7, 19);
+  for (let s = 0; s < 300; s++) life.step(1, 19);
+  const inn = plan.buildings.find((b) => b.kind === 'inn')!, room = planInterior(inn);
+  const keeper = roomCast(life.agents, life.spots, inn.id, room).find((x) => x.agent.person.work === inn.id);
+  assert.ok(keeper, 'the keeper is in');
+  life.hold(keeper.agent, inn.cx, inn.cz);
+  assert.equal(keeper.agent.hidden, false);
+  const after = roomCast(life.agents, life.spots, inn.id, room).find((x) => x.agent === keeper.agent);
+  assert.equal(after?.spot, keeper.spot);
+});

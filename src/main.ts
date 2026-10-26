@@ -140,7 +140,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post, postSamples: params.postSamples, postFloatDepth: params.postFloatDepth, ao: params.ao });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post, postSamples: params.postSamples, postFloatDepth: params.postFloatDepth, ao: params.ao, bloom: params.bloom });
     if (save) view.sky.day = save.clock.day;
     view.sky.look = setting.look?.grade ?? [];
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
@@ -313,11 +313,11 @@ export async function start(b: Boot): Promise<void> {
       player.horses = horses;
       if (params.ride && player.steeds[0]) player.mount(player.steeds[0]);
     }
-    // The farms' animals in their paddocks (the setting says which; horses until Actors has cattle).
+    // The farms' animals in their paddocks (the setting says which).
     const herds = town && town.plan.paddocks.length ? new Herds(town.plan, seed) : null;
     let stock: StockView | null = null;
     if (herds && params.stock > 0) {
-      loading.set('Turning out the horses');
+      loading.set('Turning out the herds');
       stock = await StockView.forHerds(view.renderer, setting.world.livestock, herds, params.stock, (x, z) => terrain.height(x, z));
     }
     let folk: FolkView | null = null;
@@ -524,7 +524,8 @@ export async function start(b: Boot): Promise<void> {
       horses: () => player.steeds,
       riding: () => player.riding,
       threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
-      titleHolds: () => !!title?.holding || !!creator?.showing,
+      // Silent until the world is playable: no beds, steps or music (it streams, D44/F4) compete with the start's downloads.
+      titleHolds: () => !!title?.holding || !!creator?.showing || !window.__mwReady,
     });
     const townWords = town && life ? townTalk(seed, setting, town, life.agents.map((a) => a.person), log, save?.talk ?? undefined).talk : null;
     // Who knows the hero from before (plan 11.4): their greeting names them.
@@ -562,6 +563,7 @@ export async function start(b: Boot): Promise<void> {
         notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
       },
       serve: (id, a) => services.get(id)?.(a),
+      get roomPeople() { return rooms?.inside && life ? rooms.people(life) : null; },
     }) : null;
     // A room at the inn and the smith's mending (plan 11.5): two more services.
     const upkeep = town && life && townWords ? new UpkeepUi(character, setting, {
@@ -610,6 +612,21 @@ export async function start(b: Boot): Promise<void> {
     };
     // Telling of a place: the hero hands the map over and the teller marks it.
     const handOver = map ? new HandOver((id, c, t) => map.markIn(id, c, t), () => sounds?.noted()) : null;
+    /**
+     * The hero in front of `a` (for `?talk`, `?trade` and the shot set): in their room when they are
+     * indoors (out in the town an indoor person stands inside the building's walls, seen from within),
+     * else where they are.
+     */
+    const standBefore = async (a: Agent): Promise<void> => {
+      const s = a.spot >= 0 ? life?.spots[a.spot] : undefined;
+      const b = a.hidden && s && s.building >= 0 ? town?.plan.buildings[s.building] : undefined;
+      if (b && rooms && life) {
+        if (rooms.building !== b.id) await rooms.enter(b, true);
+        const p = rooms.people(life)?.find((x) => x.agent === a);
+        if (p) { player.teleport(p.x + Math.cos(p.dir) * 1.3, p.y, p.z + Math.sin(p.dir) * 1.3, Math.atan2(Math.cos(p.dir), Math.sin(p.dir))); return; }
+      }
+      player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
+    };
     if (talk && life && town && params.talk) {
       // Straight into a talk: in front of the innkeeper or of the cellar's household.
       const pick = params.talk === 'house'
@@ -618,8 +635,7 @@ export async function start(b: Boot): Promise<void> {
         ? life.agents.find((a) => a.person.trade === 'smith' && a.person.role === 'trade')
         : life.agents.find((a) => town.plan.buildings[a.person.home].kind === 'inn' && a.person.role === 'trade');
       if (pick) {
-        const yaw = pick.dir;
-        player.teleport(pick.x + Math.cos(yaw) * 1.6, undefined, pick.z + Math.sin(yaw) * 1.6, Math.atan2(Math.cos(yaw), Math.sin(yaw)));
+        await standBefore(pick);
         talk.begin(pick);
         for (const t of params.topics) talk.choose(t);
       }
@@ -700,16 +716,16 @@ export async function start(b: Boot): Promise<void> {
       if (!save.heir) notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
     } else if (typeof loaded === 'string') notes.say(`Could not load the save: ${loaded}.`, 8);
     // Straight to a merchant's counter (`?trade=smith`, or `game.tradeAt('smith')` in the console and the shot set): in front of them, their wares out.
-    const tradeAt = (keeper: string): boolean => {
+    const tradeAt = async (keeper: string): Promise<boolean> => {
       const m = market?.merchants.find((x) => x.shop.keeper === keeper);
       const a = m && life?.agents.find((x) => x.person.id === m.person);
       if (!m || !a || !trade || !townWords) return false;
       talk?.close();
-      player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
+      await standBefore(a);
       trade.show(m, townWords.nameOf(a.person.id));
       return true;
     };
-    if (params.trade) tradeAt(params.trade);
+    if (params.trade) await tradeAt(params.trade);
     if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else if (params.open === 'tale') showTale(); else map?.setOpen(true); }
     new DebugMenu({
       paused,
@@ -736,7 +752,15 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, market, trade, tradeAt, fightHud, compass },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, market, trade, tradeAt, fightHud, compass,
+        /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
+        get undrawn() {
+          const out: string[] = [];
+          if (folk && folk.undressed) out.push(`${folk.undressed} townsfolk`);
+          if (wild?.warming) out.push(`${wild.warming} wild groups`);
+          if (!cellars.dwellersWarm) out.push('cellar dwellers');
+          return out;
+        } },
     });
     b.menus.menu = new Menu(settings, {
       paused,
@@ -865,8 +889,8 @@ export async function start(b: Boot): Promise<void> {
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         houses?.update(view.camera.position);
       }
-      // Doorways at night above, torches below.
-      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt);
+      // Doorways at night above, torches below, a soft fill on the hero in a room.
+      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
       if (life) {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });
