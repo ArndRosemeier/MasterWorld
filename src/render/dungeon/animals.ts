@@ -1,21 +1,29 @@
 /**
- * The wild's wolves and deer as drawn: Actors' animals (the dog pack's grey wolf, the deer pack's red
- * deer) in their fur, like the town's horses (render/horse/HorseView.ts). Each creature is one actor;
- * the first of a kind loads its pack (shapes evaluated in a worker), the others share it. Each frame
- * the den says what the creature does; the body plays the clip for it, a blow, a flinch or the fall
- * once, the gaits looping at a pace that matches the ground speed.
+ * The wild's wolves, boars and deer and the farms' cattle as drawn: the library animals (WildMesh3D's
+ * modelled and animated wolf, wild boar, red deer and cow, loaded through Actors' `loadLibraryAnimal`)
+ * where the build has them, else Actors' generated animals in their fur (the dog pack's grey wolf, the
+ * deer pack's red deer, the cow pack), like the town's horses (render/horse/HorseView.ts). The library
+ * files are licensed for Arnd's games only: they live in the private PrivateAssets repository and
+ * `npm run packs` copies the ones used here into public/wildmesh3d when it can reach them
+ * (tools/packs/library.mjs); a build without them draws Actors' animals.
+ *
+ * Each creature is one body; the first of a kind loads its file or pack (an Actors shape is evaluated in
+ * a worker), the others share it. Each frame the den says what the creature does; the body plays the
+ * clip for it, a blow, a flinch or the fall once, the gaits looping at a pace that matches the ground speed.
  */
-import { LoopOnce, type Group, type WebGPURenderer } from 'three/webgpu';
+import { Group, LoopOnce, type WebGPURenderer } from 'three/webgpu';
 import { Animal } from '@actors/animal';
 import AnimalWorker from '../../workers/animal.worker?worker';
-import type { ThreeActor } from '@actors/three';
+import { loadLibraryAnimal, type LibraryAnimal, type ThreeActor } from '@actors/three';
+import { LIBRARY_KINDS, libraryClip, type AnimalDoing, type LibraryKind } from '../libraryAnimals';
 import { hash2f } from '@futuremagic/core';
 import { furActor, gaitPace } from '../furAnimal';
 
-/** What a wild animal does this frame (from its den state). */
-export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 'hurt' | 'dead' | 'flick';
+export type { AnimalDoing };
 
 interface Kind {
+  /** Drawn as library animals where the build has their files (else as the Actors pack below). */
+  readonly library?: LibraryKind;
   readonly pack: string;
   readonly preset: string;
   /** Breeds to pick from by seed (over `preset`): a herd of mixed cattle. */
@@ -38,6 +46,7 @@ interface Kind {
 /** The setting's beasts and the farms' cattle, on Actors' bodies (the boar on the dog's rig: Actors has no pig). */
 export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
   wolf: {
+    library: LIBRARY_KINDS.wolf,
     pack: 'dog', preset: 'wolf',
     clips: { idle: 'idle', alert: 'alert', feed: 'idle', walk: 'walk', run: 'run', blow: 'bite', hurt: null, dead: 'death' },
     pace: { walk: 1.5, run: 7 },
@@ -46,6 +55,7 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     coat: { base: [0.4, 0.33, 0.24], second: [0.18, 0.15, 0.12], tan: [0.56, 0.42, 0.27], white: [0.58, 0.54, 0.47], saddle: 0.6, mask: 0.2, points: 0, socks: 0, blaze: 0, belly: 0.5, bib: 0.3, paleMask: 0.3, tanLegs: 0.3, agouti: 0.5 },
   },
   boar: {
+    library: LIBRARY_KINDS.boar,
     pack: 'dog', preset: 'wolf',
     clips: { idle: 'idle', alert: 'alert', feed: 'idle', walk: 'walk', run: 'run', blow: 'bite', hurt: null, dead: 'death' },
     pace: { walk: 1.2, run: 6 },
@@ -64,6 +74,7 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
   // The farms' cattle (render/livestock/StockView.ts): old brown, red-pied and shaggy breeds, no modern
   // Holsteins. A cow does not run; its gallop is a startled trot.
   cow: {
+    library: LIBRARY_KINDS.cow,
     pack: 'cow', preset: 'braunvieh', presets: ['braunvieh', 'braunvieh', 'fleckvieh', 'jersey', 'highland'],
     clips: { idle: 'idle', alert: 'idle', feed: 'eat', walk: 'walk', run: 'trot', blow: 'headbutt', hurt: null, dead: 'death' },
     pace: { walk: 1, run: 2.5 },
@@ -78,6 +89,7 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     shape: { tailPlume: 1 },
   },
   deer: {
+    library: LIBRARY_KINDS.deer,
     pack: 'deer', preset: 'red',
     clips: { idle: 'idle', alert: 'idle2', feed: 'eat', walk: 'walk', run: 'gallop', blow: 'kick', hurt: 'hit', dead: 'death' },
     pace: { walk: 1.5, run: 10 },
@@ -90,8 +102,11 @@ const ONCE: readonly AnimalDoing[] = ['blow', 'hurt', 'dead'];
 export interface AnimalBody {
   readonly kind: 'animal';
   readonly place: Group;
-  readonly actor: ThreeActor;
-  readonly animal: Animal<object, object>;
+  /** The Actors animal (null: a library animal). */
+  readonly actor: ThreeActor | null;
+  readonly animal: Animal<object, object> | null;
+  /** The library animal (null: an Actors animal). */
+  readonly lib: LibraryAnimal | null;
   readonly def: Kind;
   doing: AnimalDoing | '';
 }
@@ -114,19 +129,46 @@ function lead(pack: string): Promise<Animal<object, object>> {
   return p;
 }
 
+/** Where the build serves the library animals (tools/packs/library.mjs). */
+const LIBRARY = `${import.meta.env.BASE_URL}wildmesh3d/`;
+let shelf: Promise<ReadonlySet<string>> | null = null;
+
+/** The library animals this build has (its index; none when the build was made without PrivateAssets). */
+export function libraryShelf(): Promise<ReadonlySet<string>> {
+  shelf ??= fetch(`${LIBRARY}index.json`)
+    .then((r) => (r.ok ? r.json() : { ids: [] }))
+    .then((j: { ids?: unknown }) => new Set(Array.isArray(j.ids) ? j.ids.filter((x): x is string => typeof x === 'string') : []))
+    // Not there (a dev server answers with the page): Actors' animals.
+    .catch(() => new Set<string>());
+  return shelf;
+}
+
 /** One animal of a species (`wolf`, `deer`); a little bigger or smaller by `seed`; `preset` over the kind's own. */
 export async function animalBody(species: string, seed: number, renderer: WebGPURenderer, preset?: string): Promise<AnimalBody | null> {
   const def = ANIMAL_KINDS[species];
   if (!def) return null;
+  const size = 0.92 + hash2f(seed, 1, 7) * 0.16;
+  if (def.library && !preset) {
+    const ids = def.library.ids;
+    const id = ids[Math.floor(hash2f(seed, 2, 9) * ids.length) % ids.length];
+    if ((await libraryShelf()).has(id)) {
+      const lib = await loadLibraryAnimal(id, { baseUrl: LIBRARY });
+      const place = new Group();
+      place.name = species;
+      place.add(lib.object);
+      lib.object.scale.setScalar((def.library.scale ?? 1) * size);
+      return { kind: 'animal', place, actor: null, animal: null, lib, def, doing: '' };
+    }
+  }
   const first = await lead(def.pack);
   const animal = Animal.share(first);
   animal.setPreset(preset ?? (def.presets ? def.presets[Math.floor(hash2f(seed, 2, 9) * def.presets.length) % def.presets.length] : def.preset));
   if (def.shape || def.coat) animal.params = { shape: { ...animal.shape, ...def.shape }, coat: { ...animal.coat, ...def.coat } };
   if (def.shade) animal.params = { shape: animal.shape, coat: shaded(animal.coat as Record<string, unknown>, ...def.shade) };
   const shape = animal.shape as { size?: number };
-  if (typeof shape.size === 'number') shape.size *= 0.92 + hash2f(seed, 1, 7) * 0.16;
+  if (typeof shape.size === 'number') shape.size *= size;
   const { actor, place } = await furActor(animal, renderer, species);
-  return { kind: 'animal', place, actor, animal, def, doing: '' };
+  return { kind: 'animal', place, actor, animal, lib: null, def, doing: '' };
 }
 
 /** `coat` with its base, second and tan colours times `k`, and up to `hue` times as far from their grey (sRGB, kept in 0..1; the white and the nose stay). */
@@ -146,19 +188,36 @@ export function shaded(coat: Record<string, unknown>, k: number, hue = 1): Recor
 /** A frame of an animal: where it stands, facing `yaw` (−z turned), what it does, how fast it goes. */
 export function poseAnimal(b: AnimalBody, x: number, y: number, z: number, yaw: number, doing: AnimalDoing, speed: number, dt: number): void {
   b.place.position.set(x, y, z);
-  // The den's yaw turns −z; Actors' animals face +z.
+  // The den's yaw turns −z; the animals face +z.
   b.place.rotation.y = yaw + Math.PI;
+  if (b.lib) { poseLibrary(b, b.lib, doing, speed, dt); return; }
+  const actor = b.actor!;
   // (A doing without a clip of its own, a wolf's flinch, keeps the clip playing.)
   const name = b.def.clips[doing];
   if (doing !== b.doing && name) {
     b.doing = doing;
-    void b.animal.runtime.loadClip(name).then((clip) => {
+    void b.animal!.runtime.loadClip(name).then((clip) => {
       if (b.doing !== doing) return;
-      b.actor.play(clip, { fade: doing === 'dead' ? 0.1 : 0.25 });
-      const a = b.actor.currentAction;
+      actor.play(clip, { fade: doing === 'dead' ? 0.1 : 0.25 });
+      const a = actor.currentAction;
       if (a && ONCE.includes(doing)) { a.time = 0; a.setLoop(LoopOnce, 1); a.clampWhenFinished = true; }
     });
   }
-  gaitPace(b.actor, speed, doing === 'walk' ? b.def.pace.walk : doing === 'run' ? b.def.pace.run : undefined);
-  b.actor.update(dt);
+  gaitPace(actor, speed, doing === 'walk' ? b.def.pace.walk : doing === 'run' ? b.def.pace.run : undefined);
+  actor.update(dt);
+}
+
+function poseLibrary(b: AnimalBody, lib: LibraryAnimal, doing: AnimalDoing, speed: number, dt: number): void {
+  const name = doing !== b.doing ? libraryClip(lib, b.def.library!, doing) : undefined;
+  if (name) {
+    b.doing = doing;
+    lib.play(name, { fade: !lib.currentAction ? 0 : doing === 'dead' ? 0.1 : 0.25, loop: !ONCE.includes(doing) });
+  }
+  // The gait at its own pace when the ground speed is the clip's (its scale counted), within half to 1.6 times.
+  const a = lib.currentAction;
+  if (a) {
+    const own = (doing === 'walk' || doing === 'run') && b.doing === doing ? lib.speedOf(a.getClip().name) * lib.object.scale.x : 0;
+    a.timeScale = own > 0 ? Math.min(1.6, Math.max(0.5, speed / own)) : 1;
+  }
+  lib.update(dt);
 }
