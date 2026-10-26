@@ -72,6 +72,7 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 | D47 | **Free and open source, MIT licence.** | Arnd, 2026-10-25. |
 | D48 | **Buildings open in place:** as one comes to a door, that one building is swapped for a hollow version where it stands (every storey, stairs, windows one looks out of, the hearth under the chimney), read from the same house shape as its outside; no fade; it shuts again once one walks away. | Arnd, 2026-10-26 (windows and a second storey seen outside but not inside). Section 7. |
 | D49 | **Skills are learned at guild houses.** Every skill set has a house with trainers, in town or a short way out and already on the map. A trainer opens a new skill (its rank 0) and later ranks and abilities, but only once the hero has earned them by use; some ranks ask for a trainer's task first. Lessons stay a paid speed-up. Tomes, items and deeds stay rare extra ways to an ability. Each guild is a faction with standing. Magic stays rare: its houses are small and a little out of the way (the hedge witch's cottage, the warden of the half-ruined tower), not a grand hall. Skills not for the public eye (magic, stealth, lockpicking) may have hidden houses, often underground (under the town, a cellar, a cave), not on the map. A teller at the inn (a bard) answers "where can I learn …?" from the first evening and marks the way on the map, the hidden houses too, so a hero can start in any direction without first earning a hint with another skill. | Arnd, 2026-10-26 (how does a hero start pyromancy?). Sections 10, 11.6. |
+| D50 | **Every settlement stands by fresh water.** The start town sits on the bank of the river nearest the setting's start place; villages, hamlets and later cities stand by a river or lake too. The sea does not count. One rule for all (`src/world/freshWater.ts`): fresh water within 120 m of the settlement's edge. | Arnd, 2026-10-26 (towns need a water source). Sections 6, 7. |
 
 ---
 
@@ -260,7 +261,7 @@ Weather is part of the world model (`src/world/weather.ts`), pure and determinis
 
 ## 6. The start
 
-* One small town, ideally at a river crossing (that is where real towns grow), in a temperate region.
+* One small town on a river bank (D50; a crossing is best, that is where real towns grow), in a temperate region. The setting names the kind of place to start; the start moves from there to the bank of the nearest river (seed `masterworld`: 2.8 km north-east, by the waterfall), and the arch, the hold and the first places are sited round it.
 * The town's region is open (about 1 km), the land around it is sketched.
 * This start is the default **setting module** (D14, section 12). Another module can start somewhere else entirely.
 * Three or four promises are already planted in townsfolk: a cellar with a problem, a nearby ruin, a road with trouble, something farther away.
@@ -271,6 +272,7 @@ Weather is part of the world model (`src/world/weather.ts`), pure and determinis
 ## 7. Settlements
 
 * Sizes: farmstead, hamlet, village, town, city, and a capital (D41). The VGM makes them on demand (People need, a quest, a road needing a waypoint).
+* **Water (D50)**: every settlement stands by a river or lake (`world/freshWater.ts`: `byFreshWater`, `bankSpots`). The frontier tries the river banks of a region's squares and takes a spot by the water before one without. Rivers are still far apart (the drainage is computed on a 2 km grid, so only about 4 % of the land lies within 600 m of one); until the land has brooks, a hamlet or village with no water in reach still stands where it would have.
 * **Growth**: a settlement can be upgraded by a later decision (a hamlet becomes a village after the player cleared the bandits). Growth adds to the plan and never moves what the player has already seen.
 * Scale's planning layers (macro plan → cells → lots → buildings) look reusable. Its look is modern, so MasterWorld needs a **medieval style family**: walls and gates, market square, temple, organic streets, timber-framed and stone houses, mills, docks, castles.
 * Race shapes architecture: a dwarven hold, an elven village and a human town should differ in plan as well as look.

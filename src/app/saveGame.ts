@@ -69,6 +69,16 @@ export interface SaveData {
   readonly heir?: boolean;
 }
 
+/**
+ * Whether a save's start town stands somewhere else than the one the seed opens with now (it moved to its
+ * river, D49): such a save belongs to a world that is gone.
+ */
+export function startMoved(saved: DecisionLog, now: DecisionLog): boolean {
+  const town = (log: DecisionLog) => log.find((d) => d.kind === 'town' && d.id === 'town-1') as { x: number; z: number } | undefined;
+  const a = town(saved), b = town(now);
+  return !!a && !!b && (a.x !== b.x || a.z !== b.z);
+}
+
 /** A save read back (from a slot or a file), checked; a reason if it cannot be loaded here. */
 export function checkSave(raw: unknown, setting: { id: string; version: number }): SaveData | string {
   const s = upgrade(raw);

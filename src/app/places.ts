@@ -4,7 +4,7 @@ import { polyCentroid } from '@futuremagic/settlement';
 import type { Place } from './debugMenu';
 
 const MASTERWORLD: Place[] = [
-  { label: 'Stone arch', pos: [-32115, 31935], look: [280, 8], hour: 15, fly: false },
+  { label: 'Stone arch', pos: [-30633, 34120], look: [294, 8], hour: 15, fly: false },
   { label: 'Waterfall', pos: [-30637, 53, 34634], look: [215, -4], hour: 10, fly: true },
   { label: 'Beach', pos: [-33540, 4, 29800], look: [150, -4], hour: 15, fly: true },
   { label: 'Sea cliff', pos: [-31888, 8, 30715], look: [185, 2], fly: true },

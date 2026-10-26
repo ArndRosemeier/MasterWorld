@@ -2,9 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { firstDecisions } from '../src/vgm/builder';
+import { firstDecisions, startPlace } from '../src/vgm/builder';
 import { Terrain } from '../src/world/terrain';
-import { findStart } from '../src/world/start';
 import type { HydroOptions } from '../src/world/hydro';
 import { linkRoad } from '../src/vgm/roads';
 import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
@@ -16,7 +15,7 @@ const seed = parseSeed('masterworld');
 // The start's land with small drainage tiles (as the flora and water tests): the same town, a quarter of the time.
 const SMALL: HydroOptions = { cell: 2000, core: 96, margin: 32, minArea: 120 };
 const terrain = new Terrain(seed, classic, SMALL);
-const log = firstDecisions(terrain, findStart(terrain.skeleton, classic));
+const log = firstDecisions(terrain, startPlace(terrain));
 terrain.settle(log);
 const town = terrain.towns[0];
 // The first hamlet the VGM founds on a walk east from the start (plan B1).
