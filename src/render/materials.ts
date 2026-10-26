@@ -154,7 +154,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const patchy = mx_fractal_noise_float(p.xz.mul(0.09), 2, 2.0, 0.5);
   const laid = (t: Node<'float'>) => smoothstep(0.3, 0.7, t.add(patchy.mul(0.45)).sub(float(1).sub(t).mul(0.25)));
   const lane = float(1).sub(smoothstep(0.02, 0.07, abs(mx_noise_float(p.xz.mul(0.035)).add(mid.mul(0.2)))));
-  const mud = smoothstep(0.08, 0.3, mx_fractal_noise_float(p.xz.mul(0.07).add(17.3), 2, 2.0, 0.5)).mul(0.85);
+  const mud = smoothstep(0.16, 0.36, mx_fractal_noise_float(p.xz.mul(0.07).add(17.3), 2, 2.0, 0.5)).mul(0.75);
   const stones = tg.r.max(tg.g);
   // Yards: trodden earth in patches; streets and the market: small cobbles (fist-sized), the market's a
   // shade darker; on top, the earth of the worn lanes and mud patches among the stones.
