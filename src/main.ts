@@ -402,7 +402,8 @@ export async function start(b: Boot): Promise<void> {
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
-      get away() { return player.flying || !!visit?.inside; },
+      // Flying, below in the cellar, or still at the title (its fly-over is no place to talk).
+      get away() { return player.flying || !!visit?.inside || !!title?.holding; },
       heard: (lead) => {
         handOver?.give(lead.id);
         notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
