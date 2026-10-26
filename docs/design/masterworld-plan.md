@@ -238,6 +238,8 @@ The voxel cost is paid only where it is worth it. Geomancy (section 10) can edit
 * Lighting, sky, atmosphere and fog carry much of the drama: a strong time-of-day cycle, aerial perspective over long views, volumetric light where the budget allows.
 * Art style, rendering backend and target hardware are decided (D20–D22).
 
+**Built (2026-10-26): the standard shot set** (implementation plan A1, F1, F2). `npm run shot:set` (`tools/shot/set.mjs`, after `npm run build`, with `SHOT_GPU=1` on the reference machine) takes the same thirteen pictures every time at 1920×1080 on WebGL 2: the title, the creator, the town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map and talk. The clock stands still and the weather is set, so two runs show the same scene; dusk, night and rain are the noon town turned to that hour and weather, the wild and the fight are the barrow's load with the hero moved to the deer and the wolves, and every shot waits until no shader has been built for 1.5 s, so its frame time is the warm scene. Each run goes into its own folder, `shots/set/<date>-<commit>/`, with `index.md` and `index.json`: per shot the frame time (median and 95th percentile, no frame cap), the shader summary and the page's errors. The index marks a shot over 16.7 ms or more than twice as slow as the town at noon (F2), and any shader violation (F3).
+
 ### 5.8 Weather (D26)
 
 Weather is part of the world model (`src/world/weather.ts`), pure and deterministic like the land: the weather at a place and a moment follows from the seed, the setting's climate and the VGM's orders. NPCs (shelter in the rain, 9.2), the VGM and the renderer all read the same weather.
