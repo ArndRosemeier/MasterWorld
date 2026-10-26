@@ -6,7 +6,7 @@ import { classic } from '../src/setting/classic';
 import { townsfolk } from '../src/sim/people';
 import { Character } from '../src/game/character';
 import { plainItem, rollLoot, type Item } from '../src/game/items';
-import { Market, itemWorth, type Merchant } from '../src/game/trade';
+import { Market, itemWorth, stackAlike, type Merchant } from '../src/game/trade';
 
 const plan = planTown({ seed: 3, x: 0, z: 0, radius: 72, height: () => 10 });
 const folk = townsfolk(plan, 3);
@@ -109,4 +109,12 @@ test('trade: no coin, no sale; their purse and shelves come back over the days; 
   const s2 = keeper(again, 'smith');
   assert.ok(s2.coins > s.shop.purse * 0.8, `${s2.coins} copper after three days`);
   assert.ok(s2.stock.length > n - 6, 'the smith made some again');
+});
+
+test('trade: alike things stack (kind, rarity, name, bonuses and wear), others stay apart', () => {
+  const knife = () => plainItem(classic.items, 'knife');
+  const worn: Item = { ...knife(), wear: 0.3 };
+  const keen: Item = { ...knife(), rarity: 'uncommon', name: 'Keen knife', bonuses: { blades: 3 } };
+  const st = stackAlike([knife(), keen, knife(), worn, { ...keen }]);
+  assert.deepEqual(st.map((s) => s.length), [2, 2, 1]);
 });

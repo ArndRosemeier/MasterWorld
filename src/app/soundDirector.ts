@@ -45,7 +45,7 @@ export interface SoundHost {
   riding(): Steed | null;
   /** The Director's mood: danger or a fight (music). */
   threat(): Threat;
-  /** The title still holds the screen: the game is silent. */
+  /** The title, the hero's making or the loading still holds the screen: the game is silent (and its music not fetched). */
   titleHolds(): boolean;
 }
 
