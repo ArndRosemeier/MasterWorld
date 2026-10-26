@@ -79,6 +79,29 @@ export interface River {
   reach?: Float32Array;
 }
 
+/** Metres either way along a river its slope is taken over (its levels come in steps, flat between). */
+const SLOPE_REACH = 200;
+const slopeCache = new WeakMap<River, Float32Array>();
+/** A river's slope at each point (`WaterHere.slope`), computed once. */
+function slopesOf(r: River): Float32Array {
+  let out = slopeCache.get(r);
+  if (out) return out;
+  const n = r.level.length, run = new Float64Array(n), fell = new Float64Array(n);
+  for (let k = 1; k < n; k++) {
+    run[k] = run[k - 1] + Math.hypot(r.xz[k * 2] - r.xz[k * 2 - 2], r.xz[k * 2 + 1] - r.xz[k * 2 - 1]);
+    fell[k] = fell[k - 1] + r.fall[k - 1];
+  }
+  out = new Float32Array(n);
+  for (let k = 0, a = 0, b = 0; k < n; k++) {
+    while (run[k] - run[a] > SLOPE_REACH) a++;
+    while (b < n - 1 && run[b] - run[k] < SLOPE_REACH) b++;
+    const d = run[b] - run[a];
+    out[k] = d > 0 ? Math.max(0, r.level[a] - r.level[b] - (fell[b] - fell[a])) / d : 0;
+  }
+  slopeCache.set(r, out);
+  return out;
+}
+
 /** What the water does at one point (filled by `HydroTile.query`). */
 export interface WaterHere {
   /** Nearest river within its valley: distance to its centre line, its half width, level and depth there. */
@@ -103,9 +126,11 @@ export interface WaterHere {
   fallAt: number;
   fallDrop: number;
   fallBase: number;
+  /** How steeply the water runs here: its fall per metre over a stretch of ~400 m, waterfalls left out (for its speed). */
+  slope: number;
 }
 
-export const emptyWater = (): WaterHere => ({ river: false, brook: false, dist: Infinity, half: 0, level: 0, depth: 0, fx: 0, fz: 0, cx: 0, cz: 0, valley: 0, lake: NaN, fallAt: Infinity, fallDrop: 0, fallBase: 0 });
+export const emptyWater = (): WaterHere => ({ river: false, brook: false, dist: Infinity, half: 0, level: 0, depth: 0, fx: 0, fz: 0, cx: 0, cz: 0, valley: 0, lake: NaN, fallAt: Infinity, fallDrop: 0, fallBase: 0, slope: 0 });
 
 /** Half width (m) of a river draining `areaKm2`. */
 export const riverHalf = (areaKm2: number): number => 0.6 * Math.sqrt(areaKm2);
@@ -502,6 +527,8 @@ export class HydroTile {
       out.depth = this.o.brook ? brookDepth(half) : riverDepth(half);
       out.fx = dx / l; out.fz = dz / l;
       out.cx = ax + dx * t; out.cz = az + dz * t;
+      const sl = slopesOf(r);
+      out.slope = sl[k] + (sl[k + 1] - sl[k]) * t;
       out.fallAt = Infinity; out.fallDrop = 0;
       if (r.fall[k] > 0) {
         // The drop happens at the lip, mid-segment; the level is flat on both sides of it.
@@ -631,7 +658,7 @@ export class Hydrology {
     if (f.river && (!out.river || f.dist / f.valley < out.dist / out.valley)) {
       out.river = true; out.brook = true; out.dist = f.dist; out.half = f.half; out.level = f.level; out.depth = f.depth;
       out.fx = f.fx; out.fz = f.fz; out.cx = f.cx; out.cz = f.cz; out.valley = f.valley;
-      out.fallAt = Infinity; out.fallDrop = 0; out.fallBase = 0;
+      out.fallAt = Infinity; out.fallDrop = 0; out.fallBase = 0; out.slope = f.slope;
     }
     return out;
   }

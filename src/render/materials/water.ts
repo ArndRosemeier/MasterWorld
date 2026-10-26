@@ -7,8 +7,8 @@
  */
 import { DoubleSide, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
-  Fn, abs, cameraPosition, clamp, cross, dot, exp, float, frontFacing, length, max, mix, mx_noise_float, normalize, pmremTexture,
-  positionLocal, positionWorld, pow, reflect, screenUV, select, sin, smoothstep, texture, varying, vec2, vec3, vec4, viewportSharedTexture,
+  Fn, If, abs, cameraPosition, clamp, cross, dot, exp, float, frontFacing, length, max, mix, mx_noise_float, normalize, pmremTexture,
+  positionLocal, positionWorld, pow, fract, reflect, screenUV, select, sin, smoothstep, texture, varying, vec2, vec3, vec4, viewportSharedTexture,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
@@ -18,6 +18,8 @@ import { WEATHER, fullSky, rainRings } from './weather';
 import { EYE, WORLD } from '../origin';
 
 let envTex: Texture | null = null;
+/** Seconds a running water's pattern is carried before it fades back (flow map cycle). */
+const FLOW_CYCLE = 1.6;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
 export function useWaterEnvironment(t: Texture): void { envTex = t; }
 
@@ -66,21 +68,52 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const V = normalize(cameraPosition.sub(positionWorld));
     const camDist = length(cameraPosition.sub(positionWorld));
     const fade = float(1).sub(smoothstep(40.0, 300.0, camDist));
-    // Ripples: the slope of three drifting octaves of small waves (metres of height), finer ones faster.
     const t = W.time;
+    // Running water (rivers, brooks) and its way downstream; still water (sea, lakes) has none.
+    const speed = length(vFlow);
+    const running = smoothstep(0.05, 0.3, speed);
+    const fdir = vFlow.div(max(speed, 0.001));
+    const across = vec2(fdir.y.negate(), fdir.x);
+    // The current carries its pattern downstream in two layers half a cycle apart, each pulled back when it fades
+    // out (a flow map): drift that grew without end would tear the pattern apart where the speed changes.
+    const phaseA = fract(t.div(FLOW_CYCLE)), phaseB = fract(t.div(FLOW_CYCLE).add(0.5));
+    const layerB = abs(phaseA.mul(2).sub(1));
+    const carried = (ph: Node<'float'>) => speed.mul(ph.sub(0.5)).mul(FLOW_CYCLE);
+    const e = 0.04;
+    // Ripples: the slope of small waves (metres of height), finer ones faster. Still water: three octaves drifting
+    // with the wind. Running water: two, drawn out along the current (it streams in lines) and carried by it.
     const oct: [number, number, number][] = [[0.6, 0.035, 0.35], [1.9, 0.012, 0.7], [5.2, 0.004, 1.3]];
-    const h = (q: Node<'vec2'>) => {
+    const hStill = (q: Node<'vec2'>) => {
       let sum: Node<'float'> = float(0);
       oct.forEach(([sc, amp, sp], i) => {
-        const drift = W.wind.mul(t.mul(sp * 0.6)).add(vFlow.mul(t).mul(-1));
-        sum = sum.add(mx_noise_float(vec3(q.add(drift).mul(sc).add(i * 13.7), t.mul(sp * 0.5))).mul(amp));
+        sum = sum.add(mx_noise_float(vec3(q.add(W.wind.mul(t.mul(sp * 0.6))).mul(sc).add(i * 13.7), t.mul(sp * 0.5))).mul(amp));
       });
       return sum;
     };
-    const e = 0.04, h0 = h(p.xz), hx = h(p.xz.add(vec2(e, 0))), hz = h(p.xz.add(vec2(0, e)));
+    const hRun = (q: Node<'vec2'>, ph: Node<'float'>, seed: number) => {
+      const f = vec2(dot(q, fdir).sub(carried(ph)).mul(0.4), dot(q, across));
+      let sum: Node<'float'> = float(0);
+      oct.slice(0, 2).forEach(([sc, amp, sp], i) => {
+        sum = sum.add(mx_noise_float(vec3(f.mul(sc * 1.5).add(i * 13.7 + seed), t.mul(sp * 0.8))).mul(amp));
+      });
+      return sum;
+    };
+    const slopeOf = (h: (q: Node<'vec2'>) => Node<'float'>) => {
+      const h0 = h(p.xz);
+      return vec2(h0.sub(h(p.xz.add(vec2(e, 0)))), h0.sub(h(p.xz.add(vec2(0, e))))).div(e);
+    };
+    const rippled = vec2(0).toVar();
+    If(running.greaterThan(0.5), () => {
+      // Faster water is rougher.
+      const rough = mix(float(1), float(1.8), smoothstep(1.0, 3.0, speed));
+      rippled.assign(mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(rough));
+    }).Else(() => {
+      rippled.assign(slopeOf(hStill));
+    });
     // Raindrops ring the surface near the camera.
     const rings = rainRings(p.xz).mul(smoothstep(12.0, 50.0, camDist).oneMinus());
-    const ripple = vec3(h0.sub(hx), 0, h0.sub(hz)).div(e).mul(fade).add(vec3(rings.x, 0, rings.y));
+    const faded = rippled.mul(fade).add(rings);
+    const ripple = vec3(faded.x, 0, faded.y);
     const up = frontFacing;
     const N0 = normalize(vN.add(ripple)).toVar();
     const N = select(up, N0, N0.negate());
@@ -118,15 +151,16 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     // Foam: bands rolling onto the shore, a wet rim at the waterline, whitecaps on the crests.
     const n = mx_noise_float(vec3(p.xz.mul(0.45), t.mul(0.3))).mul(0.5).add(0.5);
     // Surf rolls in only on still water; a river shows its wet rim and streaks drawn out by the current.
-    const still = float(1).sub(smoothstep(0.05, 0.3, length(vFlow)));
+    const still = running.oneMinus();
     const shore = float(1).sub(smoothstep(0.0, 2.8, depth)).mul(still);
-    // Streaks: noise stretched along the flow and carried with it.
-    const fdir = vFlow.div(max(length(vFlow), 0.001));
-    const along = dot(p.xz, fdir), across = dot(p.xz, vec2(fdir.y.negate(), fdir.x));
-    const streak = mx_noise_float(vec3(along.sub(t.mul(length(vFlow))).mul(0.12), across.mul(1.1), t.mul(0.2))).mul(0.5).add(0.5);
+    // Streaks: noise stretched along the flow and carried with it (in the same two layers as the ripples).
+    const along = dot(p.xz, fdir), sideways = dot(p.xz, across);
+    const streakAt = (ph: Node<'float'>, seed: number) =>
+      mx_noise_float(vec3(along.sub(carried(ph)).mul(0.12).add(seed), sideways.mul(1.1), t.mul(0.2)));
+    const streak = mix(streakAt(phaseA, 0), streakAt(phaseB, 7.1), layerB).mul(0.5).add(0.5);
     // The falling sheet: streaks stretched down the fall, rushing.
-    const sheet = mx_noise_float(vec3(across.mul(1.4), p.y.mul(0.18).add(t.mul(3.0)), t.mul(0.4))).mul(0.35)
-      .add(mx_noise_float(vec3(across.mul(4.0), p.y.mul(0.5).add(t.mul(6.0)), 3.1)).mul(0.15)).add(0.5);
+    const sheet = mx_noise_float(vec3(sideways.mul(1.4), p.y.mul(0.18).add(t.mul(3.0)), t.mul(0.4))).mul(0.35)
+      .add(mx_noise_float(vec3(sideways.mul(4.0), p.y.mul(0.5).add(t.mul(6.0)), 3.1)).mul(0.15)).add(0.5);
     const bands = sin(depth.mul(4.2).sub(t.mul(1.7)).add(n.mul(5))).mul(0.5).add(0.5);
     const foam = clamp(
       shore.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
@@ -136,7 +170,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
         .add(smoothstep(0.55, 1.0, vCrest).mul(smoothstep(0.45, 0.75, n)).mul(0.7))
         .add(float(1).sub(still).mul(smoothstep(0.72, 0.9, streak)).mul(0.35))
         // White water: below a fall the current churns, and the falling sheet itself is all foam.
-        .add(smoothstep(1.3, 3.2, length(vFlow)).mul(smoothstep(0.35, 0.8, n.mul(0.6).add(streak.mul(0.6)))).mul(0.8)),
+        .add(smoothstep(1.3, 3.2, speed).mul(smoothstep(0.35, 0.8, n.mul(0.6).add(streak.mul(0.6)))).mul(0.8)),
       0, 1);
     const foamCol = W.ambient.mul(1.1).add(W.sunColor.mul(0.5).mul(sunUp));
     col = mix(col, foamCol, foam.mul(0.85));
