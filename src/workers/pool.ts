@@ -2,6 +2,8 @@
  * The worker pool: the one place workers are created (guarded). Jobs go to the least busy worker; results
  * come back as promises. Each worker script handles `{ id, job }` and answers `{ id, result }` or `{ id, error }`.
  */
+import { FLORA_STRIDE } from '../world/flora';
+
 export class WorkerPool<Job, Result> {
   private readonly workers: Worker[] = [];
   private readonly busy: number[] = [];
@@ -102,10 +104,20 @@ export class WorldJobs {
     return this.pool.run({ kind, seed: this.seed, setting: this.setting, x0, z0, size, res });
   }
 
+  /** Ground no plant grows on that the worker does not know of (the places the VGM opened since the start). */
+  keepOut: ((x: number, z: number) => boolean) | null = null;
+
   /** Trees and shrubs over a square, candidates `spacing` apart. */
   flora(x0: number, z0: number, size: number, spacing: number): Promise<Float32Array> {
-    return this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing });
+    return this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing }).then((d) => (this.keepOut ? withoutPlantsIn(d, this.keepOut) : d));
   }
+}
+
+/** Plant placements (FLORA_STRIDE floats each: x, y, z first) without those standing where `out` says. */
+export function withoutPlantsIn(d: Float32Array, out: (x: number, z: number) => boolean): Float32Array {
+  const keep: number[] = [];
+  for (let i = 0; i < d.length; i += FLORA_STRIDE) if (!out(d[i], d[i + 2])) for (let k = 0; k < FLORA_STRIDE; k++) keep.push(d[i + k]);
+  return keep.length === d.length ? d : Float32Array.from(keep);
 }
 
 /** Resolves once `test()` holds (checked every 20 ms): for loading steps that wait on worker results. */

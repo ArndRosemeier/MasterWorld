@@ -222,5 +222,21 @@
   {
     "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/smallLife.ts#step",
     "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (x.mul(a).add(b)) is three.js's shading language itself, not a copied helper; it crossed the idiom finder's floor when B1's site code grew the corpus."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (x.mul(a).add(b)) is three.js's shading language itself, not a copied helper; it crossed the idiom finder's floor when B1's site code grew the corpus."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/townLife.ts + masterworld/world/sites.ts",
+    "reason": "A point at an angle and distance round a centre (x + cos\u00b7d, z + sin\u00b7d): plain trigonometry for three different things (rain's low ground, where townsfolk gather, a place's houses and tents)."
+  },
+  {
+    "key": "idiom: [.cos .sin .yaw Math] in masterworld/app/cellars.ts + masterworld/world/dungeon/propModels.ts + masterworld/world/sites.ts",
+    "reason": "Turning a local frame by a yaw (cos, sin of the yaw): plain trigonometry in three frames (a barrow's mound, a prop, a ruin's hall)."
   }
 ]

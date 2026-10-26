@@ -93,6 +93,39 @@ export interface OrderDecision {
   readonly order: TownOrder;
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision;
+/**
+ * A region opened (plan 5.2, 5.5, D16): the VGM opened the aligned square `(level, x, z)` of side
+ * 250 m × 2^level ahead of the hero and filled it from the setting (`fill`: a fill id of the setting's
+ * regions, such as a hamlet, a camp, ruins or a barrow field). Where smaller regions inside the square were
+ * open already, the free rest opens as plain country (RegionMap.open); replaying the log rebuilds it so.
+ */
+export interface RegionDecision {
+  readonly kind: 'region';
+  readonly id: string;
+  readonly level: number;
+  readonly x: number;
+  readonly z: number;
+  readonly fill: string;
+  readonly seed: number;
+  /** What the fill placed: its middle (world metres), the way it faces (yaw) and its footprint's radius (m). */
+  readonly site?: { readonly x: number; readonly z: number; readonly yaw: number; readonly r: number };
+  /** Game hours since the world began. */
+  readonly at: number;
+}
+
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RegionDecision;
 
 export type DecisionLog = readonly Decision[];
+
+/**
+ * Ground the log has put something on out on the land: barrows (`dungeonR` metres round each) and the places
+ * in opened regions (their own footprint). New places keep away from it.
+ */
+export function sitesIn(log: DecisionLog, dungeonR: number): { x: number; z: number; r: number }[] {
+  const out: { x: number; z: number; r: number }[] = [];
+  for (const d of log) {
+    if (d.kind === 'dungeon' && d.site) out.push({ x: d.site.x, z: d.site.z, r: dungeonR });
+    else if (d.kind === 'region' && d.site) out.push({ x: d.site.x, z: d.site.z, r: d.site.r });
+  }
+  return out;
+}
