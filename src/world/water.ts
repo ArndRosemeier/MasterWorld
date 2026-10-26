@@ -11,6 +11,11 @@ export const SEA_LEVEL = 0;
 const RIVER_SPEED = 0.9;
 /** Pixels a water level is carried onto dry land, so the surface mesh interpolates cleanly to the shore. */
 const DILATE = 3;
+/**
+ * Further pixels it is carried where the ground stands above it (the surface stays hidden there): the water mesh's
+ * vertices lie ~10-20 m apart a few hundred metres out, and a brook a pixel wide must not fall between them.
+ */
+const HIDDEN_DILATE = 6;
 /** Depth written where no water is near (the surface hides below the ground). */
 export const DRY = -3;
 
@@ -58,7 +63,7 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
     }
   }
   // Carry levels a few pixels onto the land (depth stays negative there).
-  for (let pass = 0; pass < DILATE; pass++) {
+  for (let pass = 0; pass < DILATE + HIDDEN_DILATE; pass++) {
     const next = wet.slice();
     for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
       const p = j * res + i;
@@ -76,6 +81,7 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
       // right at the waterline on a gentle beach instead of a pixel short of it; well dry where the ground
       // lies below it (a river's coarse pixel beside its bed), so no sheet floats over the bank.
       const d = level - ground[p];
+      if (pass >= DILATE && d > 0) continue;
       out[p * 4] = level; out[p * 4 + 1] = d <= 0 ? d : DRY / 3;
       next[p] = 2;
     }

@@ -4,7 +4,7 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
 import { BROOKS, brookDepth, packRivers } from '../src/world/hydro';
-import { waterMask } from '../src/world/water';
+import { DRY, waterMask } from '../src/world/water';
 
 const seed = parseSeed('masterworld');
 // Small river tiles (as the frontier and roads tests), brooks as in the game.
@@ -85,4 +85,22 @@ test('brooks: a tile traced in a worker and handed over answers as one traced he
     assert.deepEqual(other.hydro.query(x, z), terrain.hydro.query(x, z));
     assert.equal(other.height(x, z), terrain.height(x, z));
   }
+});
+
+test('brooks: the mask carries a brook\'s level well onto its banks, under the ground, so far water vertices find it', () => {
+  let carried = 0, tried = 0;
+  for (const r of own.slice(0, 40)) {
+    const k = Math.floor(r.level.length / 2), x = r.xz[k * 2], z = r.xz[k * 2 + 1];
+    const w = terrain.hydro.query(x, z);
+    if (!w.brook || w.dist > 0.5) continue;
+    // 12 m beside the brook (six 2 m pixels out): the brook's level, below that bank's ground.
+    const nx = -w.fz, nz = w.fx, bx = x + nx * (w.half + 12), bz = z + nz * (w.half + 12);
+    const big = waterMask(terrain, { seed, setting: classic.id, x0: x - 32, z0: z - 32, size: 64, res: 32 });
+    const i = Math.floor((bx - (x - 32)) / 2), j = Math.floor((bz - (z - 32)) / 2), p = (j * 32 + i) * 4;
+    const ground = terrain.height(bx, bz);
+    tried++;
+    if (big[p + 1] !== DRY && Math.abs(big[p] - w.level) < 0.5) { carried++; assert.ok(big[p] <= ground + 0.01, 'never above the bank'); }
+    if (tried >= 8) break;
+  }
+  assert.ok(carried >= tried * 0.6, `${carried} of ${tried} banks carry the level`);
 });

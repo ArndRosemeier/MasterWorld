@@ -42,6 +42,11 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
   const patch = new Noise(deriveSeed(t.seed, 'grass', 'patch'));
   const w = { river: 0, lake: 0 };
   const road = emptyRoad(), roads = !t.roads.empty ? t.roads : null;
+  // Nothing grows in water (a brook runs through fields too); reeds-to-be along the banks keep their place.
+  const dry = (x: number, z: number, h: number): number => {
+    t.clearOfWater(x, z, h, w);
+    return smoothstep(0.3, 1.5, w.river) * smoothstep(0.1, 0.6, w.lake);
+  };
 
   // Biome grass (cover, height, dry) on the lattice around the mask, with woods shade folded into cover.
   const li0 = Math.floor(x0 / LATTICE), lj0 = Math.floor(z0 / LATTICE);
@@ -81,7 +86,7 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
       const f = t.fieldAt(x, z), c = f ? CROP_GRASS[f.crop] : null;
       if (c && c[0] > 0) {
         const n = patch.fbm2(x / 5, z / 5, 2);
-        out[p * 4 + 1] = c[0] * smoothstep(-0.8, -0.2, n);
+        out[p * 4 + 1] = c[0] * smoothstep(-0.8, -0.2, n) * dry(x, z, h);
         out[p * 4 + 2] = c[1] * (0.9 + 0.2 * n);
         out[p * 4 + 3] = c[2];
       }
@@ -110,9 +115,7 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
     dens *= 1 - smoothstep(0.42, 0.68, slope);
     dens *= smoothstep(2.3, 4.2, h) * (1 - smoothstep(SNOW - 150, SNOW + 100, h));
     if (dens <= 0.01 || t.rockAt(x, z, h)) continue;
-    // Not in water; reeds-to-be along the banks keep their place.
-    t.clearOfWater(x, z, h, w);
-    dens *= smoothstep(0.3, 1.5, w.river) * smoothstep(0.1, 0.6, w.lake);
+    dens *= dry(x, z, h);
     out[p * 4 + 1] = dens;
     out[p * 4 + 2] = short * at(x, z, 1) * (0.75 + 0.5 * smoothstep(-0.5, 0.6, patch.fbm2(x / 37 + 13.7, z / 37 - 5.1, 2)));
     out[p * 4 + 3] = at(x, z, 2);
