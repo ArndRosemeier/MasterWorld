@@ -45,8 +45,10 @@ export class CellarVisit {
     private readonly warm: WarmLights,
     private readonly sky: SkyView,
     private readonly notes: Notes,
+    /** Its space, if not the layout's own (a cave's carved rock). */
+    space?: DungeonSpace,
   ) {
-    this.space = new DungeonSpace(cellar.layout);
+    this.space = space ?? new DungeonSpace(cellar.layout);
     this.world = dungeonWorld(this.space, view.origin);
     this.entering = `You climb down into the cellar of ${cellar.house}.`;
   }

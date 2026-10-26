@@ -1,7 +1,7 @@
 /**
- * Every cellar the VGM has promised under the town's houses (plan 4.2, 8), and every barrow out on the
- * land (a cellar's making with its own lore; the mound and its passage stand on the land, and walking
- * into the passage goes down), played one at a time. A cellar
+ * Every cellar the VGM has promised under the town's houses (plan 4.2, 8), and every barrow, cave and
+ * ruined tower out on the land (a cellar's making with its own lore and shape; its piece stands on the
+ * land, a mound, a crag with a mouth, a keep, and walking into its doorway goes in), played one at a time. A cellar
  * is outlined from its decision when it is promised (cheap), and built (its meshes, its dwellers' den and
  * bodies, its fight) once the hero steps into the house above, so it stands ready by the time they reach
  * the hatch; the first one is built while the game loads. When new dwellers move into a cleared cellar
@@ -26,6 +26,13 @@ import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { occupationOf } from '../vgm/leads';
 import type { DecisionLog, DungeonDecision, MoveInDecision } from '../world/decisions';
 import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh';
+import { CaveSpace, caveField, caveShell } from '../world/dungeon/caveRock';
+import { inMouthShape, MOUTH_WAY_DOWN, mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
+import { onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
+import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
+import { CELL } from '../world/dungeon/cellar';
+import type { DungeonLayout } from '@futuremagic/dungeon';
+import type { BuildingMesh } from '@futuremagic/settlement';
 import { moveIn, occupantId, outlineCellar, type Cellar, type DungeonPlace } from '../world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
 import { fill } from '../talk/folk';
@@ -63,24 +70,35 @@ export interface CellarsHost {
   cue(c: FightCue): void;
   /** `?dweller=`: who lives in every cellar (for looking at them). */
   readonly dweller: string | null;
-  /** The land's height (a barrow stands on it). */
+  /** The land's height (a barrow, a cave's crag, a tower stand on it). */
   ground(x: number, z: number): number;
+  /** The terrain workers, for a cave's rock and mouth (none: built here, a moment's stall). */
+  readonly jobs?: {
+    caveRock(layout: DungeonLayout, cave: number): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
+    caveMouth(site: LandSite, cave: number): Promise<CaveMouth>;
+  };
   /** Down (true) or up again: the land above leaves the frame meanwhile, all but `keep` (the cellar and its dwellers). */
   depth(below: boolean, keep: readonly Object3D[]): void;
 }
 
-/** A barrow's mound on the land: where it stands and its mesh. */
-interface Mound {
-  readonly x: number;
-  readonly z: number;
-  readonly yaw: number;
-  readonly mesh: Mesh;
-  /** Seconds before walking into the passage goes down again (after coming up). */
+/** A place's piece on the land (a barrow's mound, a cave's crag, a tower): where it stands, its mesh, its way in. */
+interface Mound extends LandSite {
+  /** Its mesh, once made (a cave's crag is made by a worker). */
+  mesh: Mesh | null;
+  /** Is a body of radius `r` at (x, z) of its own frame in its way? */
+  inShape: (x: number, z: number, r: number) => boolean;
+  /** Where in its doorway the way goes in (its frame). */
+  readonly way: { readonly x: number; readonly z: number };
+  /** Where the hero comes back out (its frame), facing away from it. */
+  readonly out: number;
+  /** Seconds before walking into the doorway goes in again (after coming out). */
   cool: number;
 }
 
-/** A barrow is built (rooms, dwellers) once the hero is this near, metres. */
+/** A place on the land is built (rooms, dwellers) once the hero is this near, metres. */
 const BARROW_NEAR = 250;
+/** How far a place's piece reaches from its site, metres (for quick tests). */
+const MOUND_REACH = 24;
 
 /** One cellar: its promise and house; its parts once built. */
 interface Site {
@@ -88,7 +106,7 @@ interface Site {
   /** A cellar's house above; a barrow's household who knows of it. */
   readonly house: TownBuilding;
   readonly place: DungeonPlace;
-  /** A barrow's mound on the land (none: a cellar, reached through its house). */
+  /** A place's piece on the land (none: a cellar, reached through its house). */
   readonly mound: Mound | null;
   /** As outlined for its first dwellers (the rooms never change). */
   readonly first: Cellar;
@@ -158,7 +176,7 @@ export class Cellars {
       m.cool = Math.max(0, m.cool - dt);
       if (Math.hypot(x - m.x, z - m.z) > BARROW_NEAR) continue;
       if (!s.built) void this.ensure(s);
-      const [wx, wz] = turn(m, WAY_DOWN.x, WAY_DOWN.z);
+      const [wx, wz] = onLand(m, m.way.x, m.way.z);
       if (s.ready && !s.ready.visit.inside && m.cool === 0 && Math.hypot(x - wx, z - wz) < 0.9) {
         m.cool = 3;
         void s.ready.visit.enter();
@@ -166,14 +184,13 @@ export class Cellars {
     }
   }
 
-  /** Is a body of radius `r` at (x, z) on the land inside a barrow's mound or its slabs? */
+  /** Is a body of radius `r` at (x, z) on the land inside a place's piece (a barrow's mound, a crag, a tower's walls)? */
   solid(x: number, z: number, r: number): boolean {
     for (const s of this.sites.values()) {
       const m = s.mound;
-      if (!m || Math.abs(x - m.x) > 20 || Math.abs(z - m.z) > 20) continue;
-      // Into the mound's own frame (the inverse of `turn`).
-      const dx = x - m.x, dz = z - m.z, c = Math.cos(m.yaw), sn = Math.sin(m.yaw);
-      if (inBarrowShape(dx * c - dz * sn, dx * sn + dz * c, r)) return true;
+      if (!m || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
+      const [fx, fz] = inFrame(m, x, z);
+      if (m.inShape(fx, fz, r)) return true;
     }
     return false;
   }
@@ -221,7 +238,7 @@ export class Cellars {
     const only = this.host.dweller ? lore.dwellers.filter((w) => w.id === this.host.dweller) : [];
     const first = only.length ? outlineCellar({ ...d, danger: undefined }, place, { ...lore, dwellers: only }) : outlineCellar(d, place, lore);
     const m = occupationOf(this.log, d.id);
-    const mound = d.site ? this.heap(d.site, d.seed) : null;
+    const mound = d.site ? this.heap(d, d.site, first.layout) : null;
     const s: Site = { decision: d, house, place, mound, first, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;
@@ -231,18 +248,38 @@ export class Cellars {
     });
   }
 
-  /** A barrow's mound and passage, on the land at its site (the town's building shader: nothing new to build). */
-  private heap(site: { readonly x: number; readonly z: number; readonly yaw: number }, seed: number): Mound {
-    const mesh = buildingMeshAt(barrowMesh(deriveSeed(seed, 'barrow')), site.x, this.host.ground(site.x, site.z) - 0.05, site.z, 'barrow');
-    mesh.rotation.y = site.yaw;
-    void this.host.stage.add(mesh);
-    return { ...site, mesh, cool: 0 };
+  /**
+   * A place's piece on the land at its site (the town's building shader: nothing new to build): a barrow's
+   * mound and passage, a cave's crag and mouth (made by a worker), a tower's keep sized to its rooms.
+   */
+  private heap(d: DungeonDecision, site: LandSite, layout: DungeonLayout): Mound {
+    const h = this.host, y = h.ground(site.x, site.z);
+    const put = (mesh: BuildingMesh, sink: number): Mesh => {
+      const m = buildingMeshAt(mesh, site.x, y - sink, site.z, d.template);
+      m.rotation.y = site.yaw;
+      void h.stage.add(m);
+      return m;
+    };
+    if (d.template === 'cave') {
+      const seed = deriveSeed(d.seed, 'cave');
+      const mound: Mound = { ...site, mesh: null, inShape: () => false, way: MOUTH_WAY_DOWN, out: 3, cool: 0 };
+      void (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
+        mound.mesh = put(mouth.mesh, 0);
+        mound.inShape = (x, z) => inMouthShape(mouth, x, z);
+      });
+      return mound;
+    }
+    if (d.template === 'tower') {
+      const size = towerOf(layout);
+      return { ...site, mesh: put(towerMesh(size, deriveSeed(d.seed, 'tower')), 0.02), inShape: (x, z, r) => inTowerShape(size, x, z, r), way: TOWER_WAY_IN, out: 2.4, cool: 0 };
+    }
+    return { ...site, mesh: put(barrowMesh(deriveSeed(d.seed, 'barrow')), 0.05), inShape: inBarrowShape, way: WAY_DOWN, out: 2.2, cool: 0 };
   }
 
   private moved(m: MoveInDecision): void {
     const s = this.sites.get(m.dungeon);
     if (!s || occupantId(s.cellar) === m.id || occupationOf(this.log, m.dungeon)?.id !== m.id) return;
-    s.cellar = moveIn(s.first, m, s.house, this.host.setting.dungeons.cellar);
+    s.cellar = moveIn(s.first, m, s.place, loreOf(this.host.setting, s.decision.template));
     const b = s.ready;
     if (b) void this.populate(s, b);
   }
@@ -257,10 +294,18 @@ export class Cellars {
     // Its own space, deep under the house.
     const m = s.mound, at = m ?? { x: s.house.cx, z: s.house.cz };
     const view = new CellarView(s.first, { x: at.x, y: -400, z: at.z });
+    // A cave: its rock carved round its rooms (a worker's few hundred milliseconds), walked as it is seen.
+    let carved: CaveSpace | undefined;
+    if (s.decision.template === 'cave') {
+      const layout = s.first.layout, seed = deriveSeed(s.decision.seed, 'cave', 'rock');
+      const rock = await (h.jobs ? h.jobs.caveRock(layout, seed) : Promise.resolve((() => { const field = caveField(layout, seed); return { field, shell: caveShell(field, layout, seed) }; })()));
+      view.rock = rock.shell;
+      carved = new CaveSpace(layout, rock.field);
+    }
     await view.add(h.stage);
-    // A barrow: back out into its forecourt, facing away from the mound.
-    const out = m ? { door: [...turn(m, 0, 2.2), m.yaw + Math.PI] as const } : s.house;
-    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes);
+    // A place on the land: back out in front of its doorway, facing away from it.
+    const out = m ? { door: [...onLand(m, 0, m.out), m.yaw + Math.PI] as const } : s.house;
+    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, carved);
     const words = loreOf(h.setting, s.decision.template).words;
     if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
     if (!m) visit.up = () => h.up(s.house);
@@ -294,7 +339,7 @@ export class Cellars {
     const arena: Arena = {
       get inside() { return visit.inside; },
       get shown() { return visit.inside; },
-      enclosed: true, place: s.mound ? 'this barrow' : 'this cellar', danger, promise: own,
+      enclosed: true, place: `this ${s.decision.template === 'tower' ? 'tower' : s.decision.template}`, danger, promise: own,
       quietLine: fill(words.quiet, { place }),
       thanks: (coins) => fill(words.thanks, { place, coins }),
     };
@@ -315,10 +360,12 @@ const CELLAR_WORDS = {
   thanks: 'The household of {place} hears the cellar is safe and presses {coins} into your hand.',
 };
 
-/** A point of a barrow's own frame (x, z) on the land: turned by its yaw, at its site. */
-function turn(m: { readonly x: number; readonly z: number; readonly yaw: number }, x: number, z: number): [number, number] {
-  const c = Math.cos(m.yaw), s = Math.sin(m.yaw);
-  return [m.x + x * c + z * s, m.z - x * s + z * c];
+/** A tower's keep for its rooms: as wide and deep as the rooms above the ground, as many storeys as they climb. */
+function towerOf(layout: DungeonLayout): ReturnType<typeof towerSize> {
+  const up = layout.rooms.filter((r) => r.level >= 0);
+  const x0 = Math.min(...up.map((r) => r.x)), x1 = Math.max(...up.map((r) => r.x + r.w));
+  const z0 = Math.min(...up.map((r) => r.z)), z1 = Math.max(...up.map((r) => r.z + r.d));
+  return towerSize((x1 - x0) * CELL, (z1 - z0) * CELL, layout.levels[1] + 1);
 }
 
 /** The chests a cellar's earlier dwellers' visit opened (not the lair's hoard). */

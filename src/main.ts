@@ -48,7 +48,7 @@ import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
 import { TOWN_RASTER, TownGround } from './world/town';
-import { firstDungeon, houseOf, promiseBarrow } from './vgm/dungeons';
+import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
 import { LEADS, keepPromise, keptOf, moveInto, nextPromise, openPromises } from './vgm/leads';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
@@ -457,6 +457,7 @@ export async function start(b: Boot): Promise<void> {
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
+      jobs: terrainJobs,
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       depth: (down, keep) => {
@@ -479,14 +480,15 @@ export async function start(b: Boot): Promise<void> {
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!town.solid(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
     }, save?.wild ?? {}) : null;
-    // `barrow`: before a barrow's forecourt, looking at it (one is promised now if there is none).
-    if (params.barrow && town) {
-      let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === 'barrow') ?? null;
+    // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
+    const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
+    if (lookAt && town) {
+      let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === lookAt) ?? null;
       if (!b) {
-        b = promiseBarrow(seed, terrain, town, log, home, wild?.territories ?? []);
+        b = promisePlace(lookAt, seed, terrain, town, log, home, wild?.territories ?? []);
         if (b) { log = [...log, { ...b, at: hours() }]; cellars.sync(log); }
       }
-      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * 9, undefined, b.site.z + Math.cos(b.site.yaw) * 9, b.site.yaw);
+      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * 14, undefined, b.site.z + Math.cos(b.site.yaw) * 14, b.site.yaw);
     }
     // `wild=<kind>`: beside its first group (for looking at them).
     const by = params.wildAt ? wild?.territories.find((t) => t.def.id === params.wildAt) : undefined;

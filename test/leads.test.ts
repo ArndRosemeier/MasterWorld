@@ -77,21 +77,30 @@ test('leads: the townsfolk learn of a promise made while playing, and keep what 
   assert.deepEqual(again.ask(knower, 'news').heard, [d.id]);
 });
 
-test('leads: now and then the new place is a barrow out on the land, with its own lore, named and marked in town', () => {
+test('leads: now and then the new place is out on the land (a barrow, a cave, a tower), with its own lore, named and marked in town', () => {
   const log = play(48, (l, h) => (Math.round(h * 10) % 20 === 0 ? openPromises(l)[0]?.id ?? null : null));
-  const barrows = log.filter((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === 'barrow');
-  assert.ok(barrows.length >= 2, `${barrows.length} barrows`);
+  const land = log.filter((d): d is DungeonDecision => d.kind === 'dungeon' && d.template !== 'cellar');
+  const kinds = new Set(land.map((d) => d.template));
+  assert.ok(kinds.has('barrow') && kinds.has('cave') && kinds.has('tower'), [...kinds].join(', '));
   const people = townsfolk(town.plan, seed);
-  for (const b of barrows) {
+  const NAMES = { barrow: 'the barrow', cave: 'the cave', tower: 'the old tower' } as const;
+  for (const b of land) {
+    const kind = b.template as keyof typeof NAMES;
     const far = Math.hypot(b.site!.x - town.decision.x, b.site!.z - town.decision.z);
-    assert.ok(far > 500 && far < 1400, `${b.id} at ${far.toFixed(0)} m`);
+    assert.ok(far > 500 && far < 1700, `${b.id} at ${far.toFixed(0)} m`);
     assert.equal(terrain.waterDepth(b.site!.x, b.site!.z), 0);
-    const c = outlineCellar(b, placeOf(b, terrain.towns)!, loreOf(classic, 'barrow'));
-    assert.ok(classic.dungeons.barrow!.dwellers.some((w) => w.id === c.dweller.id), 'a barrow dweller');
-    assert.ok(!c.setPiece.kinds || c.setPiece.kinds.includes('barrow'), `${c.setPiece.id} fits a barrow`);
-    assert.match(c.house, /^the barrow (north|south|east|west)/);
+    const c = outlineCellar(b, placeOf(b, terrain.towns)!, loreOf(classic, kind));
+    assert.ok(classic.dungeons[kind]!.dwellers.some((w) => w.id === c.dweller.id), `a ${kind} dweller`);
+    assert.ok(!c.setPiece.kinds || c.setPiece.kinds.includes(kind), `${c.setPiece.id} fits a ${kind}`);
+    assert.match(c.house, new RegExp(`^${NAMES[kind]} (north|south|east|west)`));
     const t = talkCellar(b, classic, town, people, log)!;
     assert.equal(t.sketch.called, c.house);
     assert.ok(t.hint.knowers.length > 0, 'someone in town knows');
+  }
+  // A cave's mouth goes into its hill; a tower stands on level ground.
+  for (const b of land) {
+    const { x, z, yaw } = b.site!, fx = -Math.sin(yaw), fz = -Math.cos(yaw), h = terrain.height(x, z);
+    if (b.template === 'cave') assert.ok(terrain.height(x + fx * 14, z + fz * 14) - h > 2, `${b.id} goes into its hill`);
+    if (b.template === 'tower') for (const [a, c] of [[-9, 0], [9, 0], [0, -18]]) assert.ok(Math.abs(terrain.height(x + a, z + c) - h) <= 1.8, `${b.id} on level ground`);
   }
 });

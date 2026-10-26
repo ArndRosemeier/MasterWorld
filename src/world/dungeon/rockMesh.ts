@@ -1,0 +1,100 @@
+/**
+ * Carved rock as a mesh (pure): a grid of signed distances (positive in air) meshed with surface nets
+ * (@futuremagic/volume) in cubes, then put into the building format so it draws with the town's one
+ * building shader. Each triangle takes one material and texture coordinates projected along the axis it
+ * faces most; a vertex is split where its triangles differ in either, so no triangle blends two layers or
+ * two projections. A cave's rock (caveRock.ts) and its mouth on the land (caveMouth.ts) are made this way.
+ */
+import { lerp } from '@futuremagic/core';
+import type { BuildingMesh } from '@futuremagic/settlement';
+import { PAD, surfaceNets, type Grid } from '@futuremagic/volume';
+import type { Tint } from './meshKit';
+
+/** Signed distances on a grid (positive in air). */
+export interface Field {
+  /** The first sample's position. */
+  readonly ox: number;
+  readonly oy: number;
+  readonly oz: number;
+  readonly step: number;
+  /** Samples per axis. */
+  readonly nx: number;
+  readonly ny: number;
+  readonly nz: number;
+  /** x fastest, then y, then z. */
+  readonly d: Float32Array;
+}
+
+/** What the rock looks like where: a triangle's material (null: leave it out) by its middle and how much it faces up; a vertex's tint. */
+export interface RockLook {
+  mat(x: number, y: number, z: number, up: number): number | null;
+  tint(x: number, y: number, z: number, mat: number): Tint;
+}
+
+/** Cells per side of the cubes the field is meshed in. */
+const CHUNK = 32;
+
+export function meshField(f: Field, look: RockLook): BuildingMesh {
+  const n = CHUNK + 2 * PAD + 1;
+  const sample = new Float32Array(n * n * n);
+  const pos: number[] = [], nor: number[] = [], uv: number[] = [], mat: number[] = [], tint: number[] = [], idx: number[] = [];
+  for (let cz = 0; cz < f.nz - 1; cz += CHUNK) for (let cy = 0; cy < f.ny - 1; cy += CHUNK) for (let cx = 0; cx < f.nx - 1; cx += CHUNK) {
+    let air = false, rock = false;
+    for (let k = 0; k < n; k++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const gi = cx + i - PAD, gj = cy + j - PAD, gk = cz + k - PAD;
+      const v = gi < 0 || gj < 0 || gk < 0 || gi >= f.nx || gj >= f.ny || gk >= f.nz ? -1 : f.d[gi + f.nx * (gj + f.ny * gk)];
+      sample[i + n * (j + n * k)] = v;
+      if (v > 0) air = true; else rock = true;
+    }
+    if (!air || !rock) continue;
+    const grid: Grid = { n, d: sample };
+    const m = surfaceNets(grid, f.ox + cx * f.step, f.oy + cy * f.step, f.oz + cz * f.step, f.step);
+    if (m) add(m.positions, m.normals, m.indices);
+  }
+  return { position: Float32Array.from(pos), normal: Float32Array.from(nor), uv: Float32Array.from(uv), mat: Uint8Array.from(mat), tint: Uint8Array.from(tint), index: Uint32Array.from(idx) };
+
+  /** One cube's triangles. */
+  function add(P: Float32Array, N: Float32Array, I: Uint32Array): void {
+    const made = new Map<string, number>();
+    const vertex = (v: number, axis: number, m: number): number => {
+      const key = `${v},${axis},${m}`;
+      let out = made.get(key);
+      if (out !== undefined) return out;
+      out = pos.length / 3;
+      const x = P[3 * v], y = P[3 * v + 1], z = P[3 * v + 2];
+      pos.push(x, y, z);
+      nor.push(N[3 * v], N[3 * v + 1], N[3 * v + 2]);
+      uv.push(...(axis === 0 ? [z, y] : axis === 1 ? [x, z] : [x, y]));
+      mat.push(m);
+      tint.push(...look.tint(x, y, z, m));
+      made.set(key, out);
+      return out;
+    };
+    for (let t = 0; t < I.length; t += 3) {
+      const a = I[t], b = I[t + 1], c = I[t + 2];
+      const e1 = [P[3 * b] - P[3 * a], P[3 * b + 1] - P[3 * a + 1], P[3 * b + 2] - P[3 * a + 2]];
+      const e2 = [P[3 * c] - P[3 * a], P[3 * c + 1] - P[3 * a + 1], P[3 * c + 2] - P[3 * a + 2]];
+      const fx = e1[1] * e2[2] - e1[2] * e2[1], fy = e1[2] * e2[0] - e1[0] * e2[2], fz = e1[0] * e2[1] - e1[1] * e2[0];
+      const ax = Math.abs(fx), ay = Math.abs(fy), az = Math.abs(fz);
+      const axis = ay >= ax && ay >= az ? 1 : ax >= az ? 0 : 2;
+      const up = fy / (Math.hypot(fx, fy, fz) || 1);
+      const m = look.mat((P[3 * a] + P[3 * b] + P[3 * c]) / 3, (P[3 * a + 1] + P[3 * b + 1] + P[3 * c + 1]) / 3, (P[3 * a + 2] + P[3 * b + 2] + P[3 * c + 2]) / 3, up);
+      if (m === null) continue;
+      idx.push(vertex(a, axis, m), vertex(b, axis, m), vertex(c, axis, m));
+    }
+  }
+}
+
+/** The field at a point (trilinear); `outside` beyond it. */
+export function fieldAt(f: Field, x: number, y: number, z: number, outside = -1): number {
+  const u = (x - f.ox) / f.step, v = (y - f.oy) / f.step, w = (z - f.oz) / f.step;
+  const i = Math.floor(u), j = Math.floor(v), k = Math.floor(w);
+  if (i < 0 || j < 0 || k < 0 || i >= f.nx - 1 || j >= f.ny - 1 || k >= f.nz - 1) return outside;
+  const a = u - i, b = v - j, c = w - k, { nx, ny, d } = f;
+  const at = (p: number, q: number, r: number) => d[p + nx * (q + ny * r)];
+  return lerp(
+    lerp(lerp(at(i, j, k), at(i + 1, j, k), a), lerp(at(i, j + 1, k), at(i + 1, j + 1, k), a), b),
+    lerp(lerp(at(i, j, k + 1), at(i + 1, j, k + 1), a), lerp(at(i, j + 1, k + 1), at(i + 1, j + 1, k + 1), a), b),
+    c,
+  );
+}

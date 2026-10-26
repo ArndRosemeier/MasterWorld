@@ -26,7 +26,7 @@ The coordinator enforces these rules. A thread that wants to break one asks Arnd
 |---|---|---|
 | The land, sky, water, weather, trees, grass, light | Built, hero-class on GPU; dusk and night fixed (PR #82), bloom and AO (#94, #96) | 5, D17 |
 | The town and its folk | One town, day plans, interiors, farms, horses | 7, 9.2 |
-| Promises and dungeons | Leads keep coming (#88), cellars and barrows, twelve set pieces, variety check in CI | 4.2, 8 |
+| Promises and dungeons | Leads keep coming (#88), cellars, barrows, caves and ruined towers (B5), set pieces per kind, variety check in CI | 4.2, 8 |
 | Fights, items, the Director | Tab combat, rarity cards, needs and tension, music | 11.2, 11.5 |
 | Map, talk, journal, saves | Orientation skill, map hand-over, Conversations, saves v3 | 9.1, 11.7 |
 | Title, creator, sound, UI | Title fly-over with giant, Actors creator, warded-brass windows and compass (#87) | 16, 17 |
