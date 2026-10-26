@@ -72,6 +72,14 @@ const SESSIONS = [
     { name: 'town-dusk', act: async (p) => { await close(p); await turn(18.3, 'fair')(p); } },
     { name: 'town-night', act: turn(23, 'clear') },
     { name: 'town-rain', act: turn(14, 'rain') },
+    // The hero 15 m from a cow in its paddock, facing it, at noon again.
+    { name: 'paddock', act: async (p) => {
+      await turn(12, 'clear')(p);
+      await p.evaluate(() => {
+        const g = window.game, a = g.herds.animals[0], x = a.x + 15, z = a.z;
+        g.player.teleport(x, undefined, z, Math.atan2(x - a.x, z - a.z));
+      });
+    } },
     // Last, as it moves the hero to the smith's counter.
     { name: 'trade', act: async (p) => { await p.evaluate(() => window.game.tradeAt('smith')); await p.waitForTimeout(1800); } },
   ] },
@@ -82,6 +90,7 @@ const SESSIONS = [
     { name: 'wild', act: meet('deer', 25) },
     { name: 'fight', act: async (p) => { await meet('wolves', 12)(p); await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
   ] },
+  { id: 'inn', query: `${still}&hour=20&room=inn`, shots: [{ name: 'inn' }] },
   { id: 'talk', query: `${still}&hour=20&talk=inn&topics=news`, shots: [{ name: 'talk' }] },
 ];
 
