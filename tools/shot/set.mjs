@@ -1,0 +1,149 @@
+/**
+ * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root]` after `npm run build`,
+ * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
+ * title, the creator, the town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack,
+ * the map, talk) into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
+ * writes `index.md` and `index.json` there: each shot's frame time (median and 95th percentile over a few
+ * seconds, no frame cap), its shader summary (F3) and the page's errors. The index marks a shot over 16.7 ms,
+ * or more than twice as slow as the town at noon (F2). A slow check (docs/CHECKS.md): one run must stay
+ * under 5 min.
+ * SET_ONLY=town,fight takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2;
+ * SET_MEASURE=<ms> how long frame times are taken (default 3000); SET_SETTLE=<ms> how long the scene
+ * settles first (default 3000). Exits 1 when a page failed or a shot breaks F2 or F3.
+ */
+import { execSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { launch } from './launch.mjs';
+
+const TIMEOUT = 120000;
+const SETTLE = Number(process.env.SET_SETTLE ?? 3000);
+const MEASURE = Number(process.env.SET_MEASURE ?? 3000);
+const BUDGET = 16.7, AIM = 12;
+const gl = process.env.SET_GL !== '0';
+// The clock stands still and the hud is off the picture (frame times are taken here, not read off it).
+const still = `title=0&day=0${gl ? '&gl' : ''}`;
+
+/**
+ * The sessions: one page load each, then its shots in order. A shot's `act` runs before it settles
+ * (key presses on the page); `first` runs once the page is loaded instead of waiting for it to be ready.
+ */
+const SESSIONS = [
+  { id: 'title', query: `title${gl ? '&gl' : ''}`, first: async (page) => {
+    await page.waitForSelector('.t-gate', { timeout: TIMEOUT });
+    await page.keyboard.press('Space'); // the title waits for a first press (sound needs one)
+  }, shots: [{ name: 'title' }] },
+  { id: 'creator', query: `${still}&create&hour=11`, shots: [{ name: 'creator' }] },
+  { id: 'town', query: `${still}&hour=12&weather=clear`, shots: [
+    { name: 'town-noon' },
+    { name: 'pack', act: (p) => p.keyboard.press('KeyI') },
+    { name: 'map', act: async (p) => { await p.keyboard.press('Escape'); await p.waitForTimeout(600); await p.keyboard.press('KeyM'); } },
+  ] },
+  { id: 'dusk', query: `${still}&hour=19.6&weather=fair`, shots: [{ name: 'town-dusk' }] },
+  { id: 'night', query: `${still}&hour=23&weather=clear`, shots: [{ name: 'town-night' }] },
+  { id: 'rain', query: `${still}&hour=14&weather=rain`, shots: [{ name: 'town-rain' }] },
+  { id: 'cellar', query: `${still}&hour=12&cellar=2`, shots: [{ name: 'cellar' }] },
+  { id: 'barrow', query: `${still}&hour=15&weather=fair&barrow`, shots: [{ name: 'barrow' }] },
+  { id: 'wild', query: `${still}&hour=9&weather=fair&wild=deer`, shots: [{ name: 'wild' }] },
+  { id: 'fight', query: `${still}&hour=10&weather=clear&wild=wolves`, shots: [
+    { name: 'fight', act: async (p) => { await p.waitForTimeout(2000); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
+  ] },
+  { id: 'talk', query: `${still}&hour=20&talk=inn&topics=news`, shots: [{ name: 'talk' }] },
+];
+
+const only = process.env.SET_ONLY?.split(',');
+const sessions = only ? SESSIONS.filter((s) => only.includes(s.id)) : SESSIONS;
+const git = (cmd) => { try { return execSync(`git ${cmd}`, { encoding: 'utf8' }).trim(); } catch { return ''; } };
+const commit = git('rev-parse --short HEAD') || 'nocommit';
+const dirty = git('status --porcelain --untracked-files=no') ? '-dirty' : '';
+const date = new Date().toISOString().slice(0, 10);
+const dir = join(process.argv[2] ?? 'shots/set', `${date}-${commit}${dirty}`);
+mkdirSync(dir, { recursive: true });
+
+// No frame cap: with vsync a GPU frame shows as the screen's 16.7 ms however little it costs.
+const { server, base, browser } = await launch({ args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+const t0 = Date.now();
+const rows = [];
+let failed = false, gpuName = '';
+
+/** Frame intervals over `ms` (requestAnimationFrame), sorted: median, 95th percentile, mean. */
+const measure = (page) => page.evaluate((ms) => new Promise((done) => {
+  const dts = [];
+  let last = performance.now();
+  const t0 = last;
+  const step = (now) => {
+    dts.push(now - last); last = now;
+    if (now - t0 < ms) return requestAnimationFrame(step);
+    dts.sort((a, b) => a - b);
+    const n = dts.length;
+    done({ frames: n, p50: dts[n >> 1], p95: dts[Math.floor(n * 0.95)], mean: dts.reduce((a, b) => a + b, 0) / n });
+  };
+  requestAnimationFrame(step);
+}), MEASURE);
+
+for (const s of sessions) {
+  const errors = [];
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => { failed = true; errors.push(`page error: ${e.message}`); });
+  const started = Date.now();
+  await page.goto(`${base}?${s.query}`);
+  if (s.first) await s.first(page);
+  const ready = await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT }).then(() => true, () => false);
+  if (!ready) { failed = true; errors.push('the page did not report ready'); }
+  const loadS = (Date.now() - started) / 1000;
+  await page.addStyleTag({ content: '#loading{display:none!important}#hud{visibility:hidden!important}' });
+  if (!gpuName) gpuName = await page.evaluate(() => {
+    const c = document.createElement('canvas').getContext('webgl2');
+    const ext = c?.getExtension('WEBGL_debug_renderer_info');
+    return (ext && c.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || '';
+  });
+  for (const shot of s.shots) {
+    if (shot.act) await shot.act(page);
+    await page.waitForTimeout(SETTLE);
+    const ft = await measure(page);
+    const file = `${String(rows.length + 1).padStart(2, '0')}-${shot.name}.png`;
+    await page.screenshot({ path: join(dir, file), timeout: TIMEOUT });
+    const sh = await page.evaluate(() => {
+      const m = window.shaders;
+      return m ? { ...m.summary(), lines: m.violations() } : null;
+    });
+    const backend = (await page.evaluate(() => window.game?.view?.backend ?? '')) || '';
+    rows.push({ name: shot.name, file, query: s.query, loadS, backend, ...ft, shaders: sh, errors: [...errors] });
+    console.log(`${file}: p50 ${ft.p50.toFixed(1)} ms · p95 ${ft.p95.toFixed(1)} ms · ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}${errors.length ? ` · ${errors.length} errors` : ''}`);
+    errors.length = 0;
+  }
+  await page.close();
+}
+await browser.close();
+await server.close();
+
+// F2: under 16.7 ms everywhere (aim 12), none more than twice the town at noon; F3: no shader violations.
+const noon = rows.find((r) => r.name === 'town-noon')?.p50;
+for (const r of rows) {
+  r.marks = [];
+  if (r.p50 > BUDGET) r.marks.push(`over ${BUDGET} ms`);
+  else if (r.p50 > AIM) r.marks.push(`over the ${AIM} ms aim`);
+  if (noon && r.p50 > 2 * noon) r.marks.push('over twice the town at noon');
+  if (!r.shaders) r.marks.push('no shader monitor');
+  else if (r.shaders.violations) r.marks.push(`${r.shaders.violations} shader violations`);
+  if (r.errors.length) r.marks.push(`${r.errors.length} page errors`);
+  if (r.marks.some((m) => !m.startsWith('over the'))) failed = true;
+}
+const seconds = (Date.now() - t0) / 1000;
+const meta = { commit: git('rev-parse HEAD'), dirty: !!dirty, date, gpu: gpuName, gl, viewport: '1920x1080', settleMs: SETTLE, measureMs: MEASURE, seconds };
+writeFileSync(join(dir, 'index.json'), JSON.stringify({ ...meta, shots: rows }, null, 2));
+const md = [
+  `# Standard shots ${date} · ${commit}${dirty}`,
+  '',
+  `${gpuName || 'unknown GPU'} · ${gl ? 'WebGL 2' : 'WebGPU'} · 1920×1080 · frame times over ${MEASURE / 1000} s after ${SETTLE / 1000} s settling, no frame cap · run took ${seconds.toFixed(0)} s`,
+  '',
+  '| Shot | p50 ms | p95 ms | Shaders (warm-up + later, worst) | Notes |',
+  '|---|---|---|---|---|',
+  ...rows.map((r) => `| [${r.name}](${r.file}) | ${r.p50.toFixed(1)} | ${r.p95.toFixed(1)} | ${r.shaders ? `${r.shaders.warmup} + ${r.shaders.run}, ${r.shaders.worstMs.toFixed(0)} ms` : '–'} | ${r.marks.join('; ') || 'ok'} |`),
+  '',
+  ...rows.filter((r) => r.errors.length || r.shaders?.lines.length).flatMap((r) => [`## ${r.name}`, '', ...[...(r.shaders?.lines ?? []), ...r.errors].map((l) => `- ${l}`), '']),
+].join('\n');
+writeFileSync(join(dir, 'index.md'), md);
+console.log(`${rows.length} shots in ${dir} (${seconds.toFixed(0)} s)${seconds > 300 ? ' · over the 5 min slow-check limit' : ''}`);
+process.exit(failed ? 1 : 0);
