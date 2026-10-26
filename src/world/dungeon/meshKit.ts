@@ -1,6 +1,6 @@
 /**
  * A small mesh kit for built spaces (pure): quads, boxes and cylinders into the building mesh format of
- * @futuremagic/settlement (positions, normals, uv in metres, a BuildingMat and a tint per vertex), so
+ * @futuremagic/settlement (positions, normals, uv in metres, a material layer and a tint per vertex), so
  * dungeons draw with the town's one building shader.
  */
 import { BuildingMat, type BuildingMesh } from '@futuremagic/settlement';
@@ -17,25 +17,30 @@ export class MeshKit {
 
   get empty(): boolean { return this.idx.length === 0; }
 
-  /** A quad a, b, c, d (counter-clockwise seen from the front), uv from each corner's (u, v) in metres. */
-  quad(a: number[], b: number[], c: number[], d: number[], uv: number[][], mat: BuildingMat, tint: Tint): void {
+  /**
+   * A quad a, b, c, d (counter-clockwise seen from the front), uv from each corner's (u, v) in metres; one
+   * tint, or one per corner (grime that fades up a wall).
+   */
+  quad(a: number[], b: number[], c: number[], d: number[], uv: number[][], mat: number, tint: Tint | readonly Tint[]): void {
     const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
     let nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0];
     const l = Math.hypot(nx, ny, nz) || 1;
     nx /= l; ny /= l; nz /= l;
     const base = this.p.length / 3;
+    const corner = (i: number): Tint => (typeof tint[0] === 'number' ? tint as Tint : (tint as readonly Tint[])[i]);
     [a, b, c, d].forEach((q, i) => {
+      const t = corner(i);
       this.p.push(q[0], q[1], q[2]);
       this.n.push(nx, ny, nz);
       this.uv.push(uv[i][0], uv[i][1]);
       this.mat.push(mat);
-      this.tint.push(tint[0], tint[1], tint[2]);
+      this.tint.push(t[0], t[1], t[2]);
     });
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
   /** A triangle (counter-clockwise seen from the front), uv from x and z. */
-  tri(a: number[], b: number[], c: number[], mat: BuildingMat, tint: Tint): void {
+  tri(a: number[], b: number[], c: number[], mat: number, tint: Tint): void {
     const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
     let nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0];
     const l = Math.hypot(nx, ny, nz) || 1;
@@ -48,21 +53,33 @@ export class MeshKit {
     this.idx.push(base, base + 1, base + 2);
   }
 
-  /** A vertical wall face from (x0, z0) to (x1, z1), y0 .. y1, facing left of the direction of travel. */
-  wall(x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, mat: BuildingMat, tint: Tint, u0 = 0): void {
+  /**
+   * A vertical wall face from (x0, z0) to (x1, z1), y0 .. y1, facing left of the direction of travel; `lo`
+   * and `hi` tint its foot and its top (else `tint` all over).
+   */
+  wall(x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, mat: number, tint: Tint, u0 = 0, lo: Tint = tint, hi: Tint = tint): void {
     if (y1 - y0 < 0.005) return;
     const len = Math.hypot(x1 - x0, z1 - z0);
-    this.quad([x0, y0, z0], [x0, y1, z0], [x1, y1, z1], [x1, y0, z1], [[u0, y0], [u0, y1], [u0 + len, y1], [u0 + len, y0]], mat, tint);
+    this.quad([x0, y0, z0], [x0, y1, z0], [x1, y1, z1], [x1, y0, z1], [[u0, y0], [u0, y1], [u0 + len, y1], [u0 + len, y0]], mat, [lo, hi, hi, lo]);
+  }
+
+  /** Triangles as they are: positions, normals, uv (metres), a material and a tint per vertex. */
+  append(position: ArrayLike<number>, normal: ArrayLike<number>, uv: ArrayLike<number>, mat: ArrayLike<number>, tint: ArrayLike<number>, index: ArrayLike<number>): void {
+    const base = this.p.length / 3;
+    for (let i = 0; i < position.length; i++) { this.p.push(position[i]); this.n.push(normal[i]); this.tint.push(tint[i]); }
+    for (let i = 0; i < uv.length; i++) this.uv.push(uv[i]);
+    for (let i = 0; i < mat.length; i++) this.mat.push(mat[i]);
+    for (let i = 0; i < index.length; i++) this.idx.push(base + index[i]);
   }
 
   /** A horizontal rectangle at height y, facing up (or down). */
-  flat(x0: number, z0: number, x1: number, z1: number, y: number, up: boolean, mat: BuildingMat, tint: Tint): void {
+  flat(x0: number, z0: number, x1: number, z1: number, y: number, up: boolean, mat: number, tint: Tint): void {
     if (up) this.quad([x0, y, z0], [x0, y, z1], [x1, y, z1], [x1, y, z0], [[x0, z0], [x0, z1], [x1, z1], [x1, z0]], mat, tint);
     else this.quad([x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1], [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], mat, tint);
   }
 
   /** A box centred at (x, y0 + sy/2, z), turned by yaw about +y. */
-  box(x: number, y0: number, z: number, sx: number, sy: number, sz: number, yaw: number, mat: BuildingMat, tint: Tint): void {
+  box(x: number, y0: number, z: number, sx: number, sy: number, sz: number, yaw: number, mat: number, tint: Tint): void {
     const c = Math.cos(yaw), s = Math.sin(yaw);
     const P = (u: number, v: number, w: number) => [x + u * c + w * s, y0 + v, z - u * s + w * c];
     const hx = sx / 2, hz = sz / 2;
@@ -77,7 +94,7 @@ export class MeshKit {
   }
 
   /** An upright cylinder (a barrel, a vat, a candle), `bulge` widens its middle. */
-  cylinder(x: number, y0: number, z: number, r: number, h: number, seg: number, mat: BuildingMat, tint: Tint, bulge = 0): void {
+  cylinder(x: number, y0: number, z: number, r: number, h: number, seg: number, mat: number, tint: Tint, bulge = 0): void {
     const rings = bulge ? [0, 0.5, 1] : [0, 1];
     const rad = (t: number) => r * (1 + bulge * Math.sin(Math.PI * t));
     for (let k = 0; k < seg; k++) {
@@ -93,6 +110,31 @@ export class MeshKit {
     }
   }
 
+  /**
+   * A filled sack standing at (x, y0, z): a heavy, lumpy body slumped at the foot, gathered and tied at the
+   * neck. `lump(a, t)` (-1..1, around a in radians and up t in 0..1) dents and bulges it.
+   */
+  sack(x: number, y0: number, z: number, r: number, h: number, mat: number, tint: Tint, lump: (a: number, t: number) => number): void {
+    const seg = 12, rings = 8;
+    // Radius up the sack: wide and settled at the foot, full in the body, drawn in at the neck, a small flare above the tie.
+    const prof = (t: number) => t < 0.08 ? 0.75 + 3 * t : t < 0.62 ? 1 - 0.25 * ((t - 0.35) / 0.27) ** 2 : t < 0.86 ? 0.95 - 3.3 * (t - 0.62) : 0.16 + 0.6 * (t - 0.86);
+    const P = (a: number, t: number) => {
+      const rr = r * prof(t) * (1 + 0.12 * lump(a, t)), yy = y0 + h * t * (1 - 0.08 * Math.max(0, lump(a + 1.7, 0.5)) * t);
+      return [x + Math.cos(a) * rr, yy, z + Math.sin(a) * rr];
+    };
+    for (let k = 0; k < seg; k++) {
+      const a0 = (k / seg) * Math.PI * 2, a1 = ((k + 1) / seg) * Math.PI * 2;
+      for (let q = 0; q < rings; q++) {
+        const t0 = q / rings, t1 = (q + 1) / rings;
+        const u0 = a0 * r, u1 = a1 * r;
+        this.quad(P(a0, t0), P(a0, t1), P(a1, t1), P(a1, t0), [[u0, t0 * h], [u0, t1 * h], [u1, t1 * h], [u1, t0 * h]], mat, tint);
+      }
+      this.tri([x, y0 + h, z], P(a1, 1), P(a0, 1), mat, tint);
+    }
+    // The cord round the neck.
+    this.cylinder(x, y0 + h * 0.84, z, r * 0.24, h * 0.05, 8, mat, [tint[0] * 0.55, tint[1] * 0.5, tint[2] * 0.45]);
+  }
+
   mesh(): BuildingMesh {
     return {
       position: Float32Array.from(this.p), normal: Float32Array.from(this.n), uv: Float32Array.from(this.uv),
@@ -102,3 +144,9 @@ export class MeshKit {
 }
 
 export { BuildingMat };
+
+/**
+ * The cellar's own surfaces, after the town's layers in the building texture array (render/terrain/
+ * groundTextures.ts TOWN_LAYERS: the BuildingMats, cobbles 9, trodden earth 10, then these).
+ */
+export const CellarMat = { Earth: 10, Flagstone: 11, Brick: 12, Boards: 13, Limewash: 14 } as const;

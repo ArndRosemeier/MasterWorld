@@ -1,0 +1,8 @@
+{
+  "why": "The AssetGenerator props the cellars are dressed with (vendor/assetgenerator/assets/specs), packed with their material slots into public/props/cellar.fmpk by `npm run props`.",
+  "specs": [
+    "prop_barrel", "prop_crate", "prop_bucket", "prop_skull", "prop_bone_pile", "prop_niche_bones", "prop_candles",
+    "prop_rope_coil", "prop_chain", "prop_crypt_lantern", "furn_cellar_shelf", "furn_kitchen_table", "furn_bench",
+    "furn_chair", "furn_bed", "furn_chest", "sculpt_clay_urn", "rock_cobble_worn", "rock_chunk_angular", "door_plank", "door_sturdy"
+  ]
+}

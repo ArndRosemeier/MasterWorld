@@ -53,12 +53,14 @@ const GROUND = { dirt: 11 };
 
 /**
  * The town's layers: first one per BuildingMat (@futuremagic/settlement, in its order), then the town's
- * ground (TOWN_GROUND_LAYER).
+ * ground (TOWN_GROUND_LAYER), then the cellars' surfaces (CellarMat).
  */
 export const TOWN_LAYERS: readonly { set: TextureSet; layer: number }[] = [
   { set: 'facade', layer: FACADE.plaster }, MED('rubble'), { set: 'facade', layer: FACADE.limestone }, MED('oak'), MED('thatch'),
   { set: 'facade', layer: FACADE.clayTile }, { set: 'facade', layer: FACADE.slate }, MED('shingle'), MED('leaded'),
   MED('cobbles'), { set: 'ground', layer: GROUND.dirt },
+  // The cellars' (world/dungeon/meshKit.ts CellarMat).
+  MED('flagstone'), MED('brick'), MED('boards'), MED('limewash'),
 ];
 /** Where the town's ground layers sit in TOWN_LAYERS: cobbles (streets and market) and trodden earth (yards). */
 export const TOWN_GROUND_LAYER = { cobble: 9, dirt: 10 };
