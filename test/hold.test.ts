@@ -26,7 +26,8 @@ test('hold: the gate stands on a hillside in its ring, facing down the slope, it
   assert.ok(oz - site.z > 9 && Math.abs(ox - site.x) < 1, 'faces down the slope');
   const ground = (u: number, v: number) => { const [x, z] = siteToWorld(site, u, v); return holdGround(site, x, z, hill.height(x, z)); };
   for (const [u, v] of [[0, 1], [-COURT.half + 1, 5], [COURT.half - 1, COURT.depth - 1]]) assert.ok(Math.abs(ground(u, v) - site.level) < 1e-6, `court level at ${u}, ${v}`);
-  assert.ok(ground(0, -FACE.run - 1) >= site.level + FACE.h * 0.8, 'a rock face behind the gate');
+  assert.ok(Math.abs(ground(0, -2.5) - site.level) < 0.05, 'the doorway\'s recess level too');
+  assert.ok(ground(0, -FACE.foot - FACE.run - 1) >= site.level + FACE.h * 0.8, 'a rock face behind the gate');
   const [fx, fz] = siteToWorld(site, 0, 200);
   assert.equal(holdGround(site, fx, fz, 3), 3, 'far off the land is its own');
   const [cx, cz] = siteToWorld(site, 3, 8);

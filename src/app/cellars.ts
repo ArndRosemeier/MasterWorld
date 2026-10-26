@@ -234,8 +234,7 @@ export class Cellars {
 
   /** A barrow's mound and passage, on the land at its site (the town's building shader: nothing new to build). */
   private heap(site: { readonly x: number; readonly z: number; readonly yaw: number }, seed: number): Mound {
-    const mesh = buildingMeshAt(barrowMesh(deriveSeed(seed, 'barrow')), site.x, this.host.ground(site.x, site.z) - 0.05, site.z, 'barrow');
-    mesh.rotation.y = site.yaw;
+    const mesh = buildingMeshAt(barrowMesh(deriveSeed(seed, 'barrow')), site.x, this.host.ground(site.x, site.z) - 0.05, site.z, 'barrow', site.yaw);
     void this.host.stage.add(mesh);
     return { ...site, mesh, cool: 0 };
   }

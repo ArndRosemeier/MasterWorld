@@ -15,10 +15,11 @@ export const COURT = { half: 13, depth: 24 } as const;
 /** How far the levelled ground blends back into the land around the court (m). */
 const COURT_BLEND = 12;
 /**
- * The rock face behind the gate: how high it rises above the court, over how much ground (m behind the
- * face line), how far across it reaches at full height and how far back before it fades into the land.
+ * The rock face behind the gate: how high it rises above the court, how far behind the face line it
+ * starts (the doorway's recess stays level), over how much ground, how far across it reaches at full
+ * height and how far back before it fades into the land (m).
  */
-export const FACE = { h: 17, run: 6, half: 26, back: 40 } as const;
+export const FACE = { h: 17, foot: 3, run: 12, half: 26, back: 40 } as const;
 
 /** The gate's front (m): its half width and height, and the doorway's half width, height and recess. */
 export const GATE = { half: 11, h: 13.5, door: 2.6, doorH: 6.6, recess: 2.2 } as const;
@@ -30,7 +31,7 @@ export const POSTS: readonly (readonly [number, number])[] = [[-3.6, 2.4], [3.6,
 
 /** How far (m) a point of the gate's frame is outside the court (0 inside). */
 function outsideCourt(u: number, v: number): number {
-  const du = Math.max(0, Math.abs(u) - COURT.half), dv = Math.max(0, v - COURT.depth, -v - 1);
+  const du = Math.max(0, Math.abs(u) - COURT.half), dv = Math.max(0, v - COURT.depth, -v - FACE.foot);
   return Math.hypot(du, dv);
 }
 
@@ -50,7 +51,7 @@ export function holdGround(d: HoldDecision, x: number, z: number, h: number): nu
     const across = 1 - smoothstep(FACE.half, FACE.half + 18, Math.abs(u));
     const deep = 1 - smoothstep(FACE.back, FACE.back + 30, -v);
     // Not a ruled wall: its height wanders a little (84 .. 100 % of FACE.h) across and back.
-    const face = d.level + FACE.h * smoothstep(0, FACE.run, -v) * (0.92 + 0.08 * Math.cos(u * 0.7 + v * 0.4));
+    const face = d.level + FACE.h * smoothstep(FACE.foot, FACE.foot + FACE.run, -v) * (0.92 + 0.08 * Math.cos(u * 0.7 + v * 0.4));
     if (face > g) g = lerp(g, face, across * deep);
   }
   return g;
@@ -60,7 +61,7 @@ export function holdGround(d: HoldDecision, x: number, z: number, h: number): nu
 export function holdBare(d: HoldDecision, x: number, z: number): boolean {
   if (Math.abs(x - d.x) > HOLD_REACH || Math.abs(z - d.z) > HOLD_REACH) return false;
   const [u, v] = worldToSite(d, x, z);
-  return outsideCourt(u, v) < 4 || (v < 0 && v > -FACE.run - 2 && Math.abs(u) < FACE.half);
+  return outsideCourt(u, v) < 4 || (v < 0 && v > -FACE.foot - FACE.run - 2 && Math.abs(u) < FACE.half);
 }
 
 /** Is a body of radius `r` at (u, v) of the gate's frame in the gate's stone or the court's walls? */

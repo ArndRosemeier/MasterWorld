@@ -40,8 +40,7 @@ export class HoldGate {
   private delve: Delve | null = null;
 
   constructor(private readonly host: HoldHost, readonly site: HoldDecision, readonly people: PeopleDef, private readonly land: Land, private readonly saved?: DelveSave) {
-    this.mesh = buildingMeshAt(holdMesh(deriveSeed(host.seed, 'hold', site.id)), site.x, site.level, site.z, 'hold');
-    this.mesh.rotation.y = site.yaw;
+    this.mesh = buildingMeshAt(holdMesh(deriveSeed(host.seed, 'hold', site.id)), site.x, site.level, site.z, 'hold', site.yaw);
     void host.stage.add(this.mesh);
   }
 

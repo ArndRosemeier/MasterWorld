@@ -47,7 +47,7 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
 });
 
 /** A mesh in the building format (@futuremagic/settlement) as a three mesh with the building shader, at (x, y, z). */
-export function buildingMeshAt(m: BuildingMesh, x: number, y: number, z: number, name: string): Mesh {
+export function buildingMeshAt(m: BuildingMesh, x: number, y: number, z: number, name: string, yaw = 0): Mesh {
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(m.position, 3));
   g.setAttribute('normal', new BufferAttribute(m.normal, 3));
@@ -58,6 +58,9 @@ export function buildingMeshAt(m: BuildingMesh, x: number, y: number, z: number,
   g.setIndex(new BufferAttribute(m.index, 1));
   g.computeBoundingSphere();
   const mesh = kindMesh(g, BUILDING, x, y, z);
+  // Turned about +y (a barrow, a hold's gate); its matrix is fixed, so it is set here, once.
+  mesh.rotation.y = yaw;
+  mesh.updateMatrix();
   mesh.name = name;
   return mesh;
 }
