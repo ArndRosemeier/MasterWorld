@@ -103,22 +103,20 @@ function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; 
   const base = { kind: 'region' as const, id: `region-${n}`, seed: s, at: c.hours };
   if (pick.place !== 'none') {
     // The place needs a square of its own: its size if that is free, else the largest free one round the
-    // point. The point's square first, then the free squares beside it: a settlement by fresh water before
-    // one without (D49), open ground before woodland.
+    // point. Open ground first: the point's square, then the free squares beside it; woodland only when
+    // none of them has open ground.
     for (let level = pick.level; level >= 0; level--) {
       const k = keyAt(level, p.x, p.z);
       if (!wholeFree(map, k)) continue;
-      let best: { k: RegionKey; site: Spot; rank: number } | null = null;
+      let wooded: { k: RegionKey; site: Spot } | null = null;
       for (const [dx, dz] of AROUND) {
         const q = { level, x: k.x + dx, z: k.z + dz };
         if (!wholeFree(map, q)) continue;
         const site = findSite(c, pick, q, s);
-        if (!site) continue;
-        const rank = (SETTLES[pick.place] && !site.wet ? 2 : 0) + (site.open ? 0 : 1);
-        if (!best || rank < best.rank) best = { k: q, site, rank };
-        if (rank === 0) break;
+        if (site?.open) return { ...base, ...q, fill: pick.id, site: site.at };
+        if (site && !wooded) wooded = { k: q, site };
       }
-      if (best) return { ...base, ...best.k, fill: pick.id, site: best.site.at };
+      if (wooded) return { ...base, ...wooded.k, fill: pick.id, site: wooded.site.at };
       break;
     }
   }
@@ -134,8 +132,8 @@ function wholeFree(map: RegionMap<RegionData>, k: RegionKey): boolean {
   return free.length === 1 && keyId(free[0]) === keyId(k);
 }
 
-/** A place's spot, and whether it lies on open ground and (a settlement) by fresh water. */
-interface Spot { readonly at: NonNullable<RegionDecision['site']>; readonly open: boolean; readonly wet: boolean }
+/** A place's spot, and whether it lies on open ground. */
+interface Spot { readonly at: NonNullable<RegionDecision['site']>; readonly open: boolean }
 
 /** Whether a fill may lie round this point: its biomes, its ring round the start, and apart from others of its kind. */
 function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number }, done: readonly RegionDecision[]): boolean {
@@ -145,16 +143,14 @@ function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number 
   const d = Math.hypot(p.x - c.home.x, p.z - c.home.z);
   if (f.ring && (d < f.ring[0] || (f.ring[1] !== undefined && d > f.ring[1]))) return false;
   const apart = f.apart ?? 0;
-  return !done.some((o) => o.fill === f.id && o.site && Math.hypot(o.site.x - p.x, o.site.z - p.z) < apart);
+  if (done.some((o) => o.fill === f.id && o.site && Math.hypot(o.site.x - p.x, o.site.z - p.z) < apart)) return false;
+  // A settlement needs fresh water (D50): a brook, river or lake somewhere in the squares it may take.
+  return !SETTLES[f.place] || freshWaterEdge(t, p.x, p.z, sizeOf(f.level) * 1.5) < Infinity;
 }
 
-/**
- * The places people live in stand by fresh water (D49) where any is in reach: their squares' river banks
- * are tried too, and a spot without water ranks DRY worse (more than thick woods do).
- */
+/** The places people live in, which stand by fresh water (D50): their squares' banks are tried too. */
 const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, hamlet: true, village: true, camp: false, ruin: false, barrows: false };
 
-const DRY = 20;
 
 const woods = new WeakMap<Terrain, (x: number, z: number) => number>();
 
@@ -179,8 +175,8 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
   ];
   const wood = woods.get(t) ?? woods.set(t, woodsOf(t)).get(t)!;
   // The best spot so far (lowest score).
-  let bx = NaN, bz = NaN, low = Infinity, open = false, wet = false;
-  // A grid of spots through the square; a settlement also tries the river banks in it.
+  let bx = NaN, bz = NaN, low = Infinity, open = false;
+  // A grid of spots through the square; a settlement also tries the banks in it, and needs water.
   const N = 7, settles = SETTLES[f.place];
   const spots: [number, number][] = [];
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) spots.push([
@@ -205,16 +201,17 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
     }
     if (!ok || steep > STEEP[f.place]) continue;
     const water = settles ? freshWaterEdge(t, x, z, r + WATER_REACH) : 0;
+    if (water === Infinity) continue;
     // Open ground first (the place is seen from afar); woodland only when the square has none.
     // How wooded the place's footprint is, on the whole (its clearing opens the rest round it).
     let woods = wood(x, z);
     for (let a = 0; a < 8; a++) woods += wood(x + Math.cos((a * Math.PI) / 4) * r * 0.7, z + Math.sin((a * Math.PI) / 4) * r * 0.7);
     woods /= 9;
-    const rank = (woods > OPEN_GROUND ? 10 + woods : 0) + steep / STEEP[f.place] + woods * OPEN[f.place] + (water === Infinity ? DRY : (Math.max(0, water - r - 30) / WATER_REACH) * 0.4) + hash2f(s, i, j) * 0.4;
-    if (rank < low) { low = rank; bx = x; bz = z; open = woods <= OPEN_GROUND; wet = settles && water !== Infinity; }
+    const rank = (woods > OPEN_GROUND ? 10 + woods : 0) + steep / STEEP[f.place] + woods * OPEN[f.place] + (Math.max(0, water - r - 30) / WATER_REACH) * 0.4 + hash2f(s, i, j) * 0.4;
+    if (rank < low) { low = rank; bx = x; bz = z; open = woods <= OPEN_GROUND; }
   }
   if (low === Infinity) return null;
-  return { at: { x: bx, z: bz, yaw: Math.atan2(-(c.home.x - bx), -(c.home.z - bz)), r }, open, wet };
+  return { at: { x: bx, z: bz, yaw: Math.atan2(-(c.home.x - bx), -(c.home.z - bz)), r }, open };
 }
 
 /** The settlements in the log (the towns, and the hamlets and villages of regions): for roads and for whatever links places. */

@@ -3,7 +3,7 @@
  * camera that the water and terrain shaders read. One surface for everything: the sea at level 0, lakes at
  * their spill level, rivers at their sloping level (hydro.ts).
  */
-import { emptyWater } from './hydro';
+import { emptyWater, inChannel } from './hydro';
 import type { Terrain } from './terrain';
 
 export const SEA_LEVEL = 0;
@@ -43,7 +43,7 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
     t.hydro.query(x, z, w);
     // A river shows in a mask only where it is at least a pixel wide (finer masks draw the narrow ones), and only
     // where its surface is above the ground: a coarse pixel smeared over the banks would float a sheet of water.
-    if (w.river && w.dist < w.half + step / 2 && 2 * w.half >= step && h < w.level + 0.3) {
+    if (inChannel(w, step / 2) && 2 * w.half >= step && h < w.level + 0.3) {
       // Rivers rush over a fall's lip and away from its foot.
       const v = RIVER_SPEED * (w.fallAt > -15 ? 1 + 3 * Math.exp(-Math.max(0, w.fallAt) / 25) : 1);
       level = w.level; fx = w.fx * v; fz = w.fz * v;

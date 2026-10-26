@@ -4,7 +4,7 @@
  */
 import { Noise, deriveSeed, lerp, smin, smoothstep } from '@futuremagic/core';
 import { SHORE, Skeleton, emptySample } from './skeleton';
-import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
+import { BROOKS, HYDRO, Hydrology, emptyWater, inChannel, shapeByWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
 import { settlementOf, type Decision, type DecisionLog, type HoldDecision, type RoadDecision, type TownDecision } from './decisions';
@@ -21,12 +21,13 @@ export class Terrain {
   /** The setting's biomes (skeleton samples index them). */
   readonly biomes: SettingModule['world']['biomes'];
   private readonly here: WaterHere = emptyWater();
+  private readonly brook: WaterHere = emptyWater();
 
-  /** `hydro`: tile sizes for drainage (tests use small tiles). */
-  constructor(readonly seed: number, readonly setting: SettingModule, hydro: HydroOptions = HYDRO) {
+  /** `hydro`, `brooks`: tile sizes for drainage (tests use small tiles; null: no brooks). */
+  constructor(readonly seed: number, readonly setting: SettingModule, hydro: HydroOptions = HYDRO, brooks: HydroOptions | null = BROOKS) {
     this.skeleton = new Skeleton(seed, setting.world);
     this.detail = new Noise(deriveSeed(seed, 'terrain', 'detail'));
-    this.hydro = new Hydrology(this.skeleton, hydro);
+    this.hydro = new Hydrology(this.skeleton, hydro, brooks);
     this.biomes = setting.world.biomes;
   }
 
@@ -236,63 +237,15 @@ export class Terrain {
       const d = this.detail.fbm2(x / 70, z / 70, 3) * 2.2 + this.detail.fbm2(x / 9 + 71.3, z / 9 - 12.9, 2) * 0.25;
       level = Math.max(Math.min(level, 0.5), level + d * rough * calm);
     }
-    // A road levels its bed and shoulders (the river still cuts its ford through it).
-    if (!this.roadNet.empty) level = this.roadNet.level(x, z, level);
-    return this.shapeByWater(x, z, level);
-  }
-
-  /**
-   * Rivers shape their valleys: inside the channel the ground drops to a rounded bed, along the banks it
-   * lies a little above the water and rises gently, and further out it blends back into the land (lowering
-   * hills into a valley, or lifting hollows into banks so the river stays in its bed). Gorges through rims
-   * come out as steep walls. Lakes need no shaping: their basins are already below the level.
-   */
-  private shapeByWater(x: number, z: number, h: number): number {
-    const w = this.hydro.query(x, z, this.here);
-    if (!w.river) return h;
-    const { dist, half, level, depth, valley } = w;
-    let shaped: number;
-    if (dist < half) {
-      const q = dist / half;
-      shaped = rockLevel(w) - (depth + plunge(w)) * (1 - q * q);
-    } else {
-      const bank = bankLevel(w) + 0.4 + (dist - half) * 0.12;
-      if (h >= bank) {
-        // Higher ground slopes down to the bank over the valley, keeping a share of its own relief.
-        const keep = 0.2 * smoothstep(half, half + 25, dist);
-        shaped = lerp(bank, h, Math.max(keep, smoothstep(half, valley, dist)));
-      } else {
-        // Low ground: a low levee keeps the river in its bed, then the land is left as it is.
-        const levee = bankLevel(w) + 0.4 + Math.min((dist - half) * 0.12, 1.2);
-        shaped = Math.max(h, lerp(levee, h, smoothstep(half + 30, (half + valley) / 2 + 30, dist)));
-      }
+    // Rivers shape their valleys, then brooks theirs in the land the rivers left (their levels come from it, D50),
+    // each blending out to the edge of its own valley, so where two meet the land stays whole.
+    const r = this.hydro.riverAt(x, z, this.here);
+    level = shapeByWater(this.hydro.brookAt(x, z, this.brook), shapeByWater(r, level));
+    // A road levels its bed and shoulders, over a brook (it runs under the road); a river still cuts its ford.
+    if (!this.roadNet.empty) {
+      level = this.roadNet.level(x, z, level);
+      if (inChannel(r)) level = Math.min(level, shapeByWater(r, level));
     }
-    // At the mouth the sea takes over: only lower, never build banks out into the water.
-    return level < 1 ? Math.min(h, shaped) : shaped;
+    return level;
   }
-}
-
-/** Extra depth of the pool a waterfall digs below its lip, metres. */
-function plunge(w: WaterHere): number {
-  const reach = 3 * w.half + 12;
-  if (!(w.fallAt > FALL_LIP / 2) || w.fallAt > reach) return 0;
-  const f = 1 - w.fallAt / reach;
-  return Math.min(0.5 * w.fallDrop, 8) * f * f;
-}
-
-/**
- * The level the banks follow: the river's, except that a waterfall's step spreads out away from the water,
- * so the drop is a cliff at the river and a slope across the valley rather than a wall through the land.
- */
-function bankLevel(w: WaterHere): number {
-  if (!(w.fallDrop > 0)) return w.level;
-  const wide = Math.min(FALL_LIP + (w.dist - w.half) * 1.5, 70);
-  return w.fallBase + w.fallDrop * (1 - smoothstep(-wide / 2, wide / 2, w.fallAt));
-}
-
-/** The water leaves the lip in an arc: the rock under it steps down a little upstream, behind the falling sheet. */
-const UNDERCUT = 2.5;
-function rockLevel(w: WaterHere): number {
-  if (!(w.fallDrop > 0) || Math.abs(w.fallAt + UNDERCUT) > 4) return w.level;
-  return w.fallBase + w.fallDrop * (1 - smoothstep(-FALL_LIP / 2, FALL_LIP / 2, w.fallAt + UNDERCUT));
 }

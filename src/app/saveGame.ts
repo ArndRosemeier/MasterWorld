@@ -71,7 +71,7 @@ export interface SaveData {
 
 /**
  * Whether a save's start town stands somewhere else than the one the seed opens with now (it moved to its
- * river, D49): such a save belongs to a world that is gone.
+ * river, D50): such a save belongs to a world that is gone.
  */
 export function startMoved(saved: DecisionLog, now: DecisionLog): boolean {
   const town = (log: DecisionLog) => log.find((d) => d.kind === 'town' && d.id === 'town-1') as { x: number; z: number } | undefined;
