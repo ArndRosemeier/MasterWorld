@@ -52,7 +52,9 @@ if (!existsSync(join(cache, 'packs/human/manifest.json')) || ANIMALS.some((k) =>
   if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
   await pipeline(Readable.fromWeb(res.body), createWriteStream(archive));
   // Without the CMU library (most of the archive).
-  execFileSync('tar', ['xzf', archive, '-C', cache, '--exclude=packs/human/clips/cmu', 'packs/human', ...ANIMALS.map((k) => `packs/${k}`)], { stdio: 'inherit' });
+  // Run inside the cache with a relative archive name: GNU tar reads `C:\...` as a remote host, and Windows' own
+  // tar (bsdtar) has no --force-local, so no absolute path is handed to tar at all.
+  execFileSync('tar', ['xzf', 'packs.tar.gz', '--exclude=packs/human/clips/cmu', 'packs/human', ...ANIMALS.map((k) => `packs/${k}`)], { stdio: 'inherit', cwd: cache });
   rmSync(archive);
 }
 
