@@ -64,6 +64,12 @@ export const talk: TalkDef = {
     'A stranger on the road, just when we could use one. Something has been going on here, you know.',
     'Forgive me for stopping you. You are not from here, are you? Then you will not have heard what people are saying.',
   ],
+  cleared: {
+    topic: '{place} is safe again.',
+    yours: 'your cellar',
+    note: 'It is quiet there now. {name} of {house} will want to hear it, and pay what the trouble was worth.',
+    rumour: 'And since you are so good at this:',
+  },
   arrival: {
     title: 'Find work in town',
     text: 'A light purse and a long road behind me. Innkeepers hear every rumour: ask at {inn} whether anything strange has happened lately, or ask the townsfolk.',

@@ -12,7 +12,7 @@ import { onKeyDown, swallow } from '../input/keys';
 import type { TalkDef } from '../setting/contract';
 import type { Agent, TownLife } from '../sim/townLife';
 import type { Journal } from '../talk/journal';
-import type { TownTalk, Topic } from '../talk/townTalk';
+import type { Reply, TownTalk, Topic } from '../talk/townTalk';
 import { fill } from '../talk/folk';
 import './windows.css';
 import { button, el, overlay } from './dom';
@@ -37,6 +37,8 @@ export interface TalkHost {
   heard(lead: { id: string; title: string; note: string }): void;
   /** A service was asked for (trade, a repair, a room): the talk has ended, open its window. */
   serve(service: string, agent: Agent): void;
+  /** The hero tells `agent` the place of promise `id` is safe again: the game pays and keeps it; their answer. */
+  report(id: string, agent: Agent): Reply;
   /** In a room: who is in it and where they stand there (their own x, z are out in the town); null outside. */
   readonly roomPeople: readonly { agent: Agent; x: number; z: number }[] | null;
 }
@@ -164,7 +166,7 @@ export class TalkUi {
     const a = this.with;
     if (!a) return;
     this.lines.append(el('p', { className: 'you', textContent: t.label }));
-    const r = this.talk.ask(a.person.id, t.id);
+    const r = t.id.startsWith('report:') ? this.host.report(t.id.slice(7), a) : this.talk.ask(a.person.id, t.id);
     this.speak(r.text);
     const from = this.talk.nameOf(a.person.id);
     for (const id of r.heard) {

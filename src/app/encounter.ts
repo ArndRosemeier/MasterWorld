@@ -4,8 +4,9 @@
  * become notes, the HUD's moments and the hero's blows; Tab, a click and the belt's keys pick a target
  * and use abilities; G searches the fallen and opens chests. The Director (vgm/director.ts) watches it
  * all, warns at the door of a place too hard, and its messages come one at a time. Falling ends as the
- * game's mode says (game/death.ts): waking at the inn without the pack, or the hero's end. A place gone quiet that was promised keeps the promise once the
- * hero leaves it: the journal marks it done and the household pays. Only one encounter plays at a time
+ * game's mode says (game/death.ts): waking at the inn without the pack, or the hero's end. A place gone
+ * quiet that was promised is reported to the game once the hero leaves it: its household waits to be told
+ * (the talk's report topic), and pays then. Only one encounter plays at a time
  * (`stepEncounters`); the others rest.
  */
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
@@ -19,7 +20,6 @@ import type { Bindings } from '../input/controls';
 import { onKeyDown } from '../input/keys';
 import type { CreatureView } from '../render/dungeon/CreatureView';
 import { warning, type Director } from '../vgm/director';
-import type { Journal } from '../talk/journal';
 import { cap } from '../talk/townTalk';
 import { fill } from '../talk/folk';
 import type { FightHud } from './fightHud';
@@ -39,8 +39,11 @@ export interface FightHost {
   still(on: boolean): void;
   /** What the hero holds changed. */
   armed(): void;
-  /** The promise was kept (its id: the dungeon's, or the move-in's). */
-  kept(id: string): void;
+  /**
+   * The place of a promise is quiet and the hero has left it (its id: the dungeon's, or the move-in's):
+   * its household can be told. True once the game has taken it in (it is not said again).
+   */
+  quiet(id: string): boolean;
 }
 
 /** Where an encounter is: a cellar, a band's ground. */
@@ -55,16 +58,11 @@ export interface Arena {
   readonly place: string;
   /** Its danger (D29: from who lives there). */
   readonly danger: number;
-  /** The promise kept once it is quiet and the hero has left (null: none). */
+  /** The promise whose household waits to hear once it is quiet and the hero has left (null: none). */
   readonly promise: string | null;
   /** The Director's line when it goes quiet (null: none). */
   readonly quietLine: string | null;
-  /** The thanks when the promise is kept and paid. */
-  thanks(coins: string): string;
 }
-
-/** What the household pays for a cellar made safe, copper per point of its danger. */
-export const REWARD_PER_DANGER = 12;
 
 
 /**
@@ -86,8 +84,10 @@ export class Encounter {
   private wasInside = false;
   private warned = false;
   private quietSaid = false;
-  /** The promise was kept and paid. */
+  /** The promise was kept and paid (its household was told). */
   paid: boolean;
+  /** The game took in that it is quiet. */
+  private reported = false;
   /** Its dwellers were replaced by new ones (a move-in): it no longer plays. */
   retired = false;
   private down = 0;
@@ -105,7 +105,6 @@ export class Encounter {
     private readonly notes: Notes,
     private readonly director: Director,
     private readonly setting: SettingModule,
-    private readonly journal: Journal,
     private readonly camera: PerspectiveCamera,
     canvas: HTMLElement,
     private readonly host: FightHost,
@@ -189,13 +188,13 @@ export class Encounter {
     return rank.indexOf(it.rarity) > rank.indexOf(now.rarity);
   }
 
-  /** Not the one playing: its creatures shown or not, and a quiet place's promise kept once the hero is away. */
+  /** Not the one playing: its creatures shown or not, and a quiet place made known once the hero is away. */
   rest(): void {
     this.active = false;
     if (this.retired) return;
     this.cueInside();
     this.creatures.group.visible = this.arena.shown;
-    if (!this.arena.inside && !this.paid && this.arena.promise && this.delve.beaten) this.honour(this.arena.promise);
+    if (!this.arena.inside && !this.paid && !this.reported && this.arena.promise && this.delve.beaten) this.reported = this.host.quiet(this.arena.promise);
   }
 
   private cueInside(): void {
@@ -320,18 +319,6 @@ export class Encounter {
     this.host.still(false);
     this.onCue({ kind: 'woke' });
     this.notes.say(woke, 8);
-  }
-
-  /** Away from a quiet place that was promised: the promise is kept and the household pays. */
-  private honour(id: string): void {
-    this.paid = true;
-    this.journal.fulfil(id);
-    this.host.kept(id);
-    const pay = Math.round(this.arena.danger * REWARD_PER_DANGER);
-    this.hero.coins += pay;
-    this.onCue({ kind: 'paid', coins: pay });
-    this.director.met('purpose');
-    this.director.queue(this.arena.thanks(coinText(pay)), 3);
   }
 }
 

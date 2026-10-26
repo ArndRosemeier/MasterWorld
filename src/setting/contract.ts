@@ -181,7 +181,7 @@ export interface DungeonWords {
   readonly enter: string;
   /** The Director's line when it has gone quiet. */
   readonly quiet: string;
-  /** The thanks when the promise is kept; `{coins}` the reward. */
+  /** What the household says when told it is quiet (the promise kept); `{coins}` the reward, `{place}` the place. */
   readonly thanks: string;
 }
 
@@ -576,6 +576,12 @@ export interface TalkDef {
   readonly comes: readonly string[];
   /** How they open the talk then: why they came over, leading to the news. */
   readonly beckon: readonly string[];
+  /**
+   * Telling a household their place is safe again (plan 4.2): the topic (`{place}` as they call it),
+   * how the household's own cellar is named to them ("your cellar"), the journal's note once it is quiet
+   * (`{name}` who to tell, `{house}` where they live), and the words before a rumour of the next lead.
+   */
+  readonly cleared: { readonly topic: string; readonly yours: string; readonly note: string; readonly rumour: string };
   /** The hero's own first journal page in a new game (`{inn}`: the inn as it is called): where to ask. */
   readonly arrival: { readonly title: string; readonly text: string; readonly from: string };
 }

@@ -14,8 +14,8 @@ export interface Lead {
   readonly id: string;
   readonly title: string;
   readonly notes: LeadNote[];
-  /** Where it points, world metres, and what is there. */
-  readonly mark: { readonly x: number; readonly z: number; readonly label: string };
+  /** Where it points, world metres, and what is there (once the place is quiet: whom to tell). */
+  mark: { readonly x: number; readonly z: number; readonly label: string };
   /** Kept (the promise's goal reached) or still open. */
   done: boolean;
 }
@@ -42,6 +42,17 @@ export class Journal {
   /** A lead the hero gave themselves (where they fell, plan 11.1). */
   remember(lead: Lead): void {
     if (!this.leads.some((l) => l.id === lead.id)) this.leads.push({ ...lead, notes: [...lead.notes] });
+  }
+
+  /**
+   * The place is quiet (plan 4.2): a note on what is left to do, and the mark moves to whom to tell.
+   * Nothing for a lead the hero never heard of.
+   */
+  quiet(id: string, note: LeadNote, mark: Lead['mark']): void {
+    const l = this.leads.find((x) => x.id === id);
+    if (!l || l.done) return;
+    if (!l.notes.some((n) => n.text === note.text)) l.notes.push(note);
+    l.mark = mark;
   }
 
   /** A lead's goal reached. */
