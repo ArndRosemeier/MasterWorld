@@ -20,6 +20,8 @@ export interface TitleDraw {
   readonly angle: number;
   /** The painted still mirrored (more variety from three pictures). */
   readonly mirror: boolean;
+  /** A giant strides past the town in this fly-over (now and then; the rumour is true). */
+  readonly giant: boolean;
 }
 
 interface Mood {
@@ -35,6 +37,9 @@ const MOODS: readonly Mood[] = [
   { weight: 0.3, hours: [16.8, 18], weathers: ['clear', 'fair'], still: 'evening' },
   { weight: 0.2, hours: [12.5, 16], weathers: ['storm', 'rain'], still: 'storm' },
 ];
+
+/** How often a fly-over has the giant. */
+export const GIANT_CHANCE = 0.3;
 
 /** The seed of a start: the day plus how many times the title has been shown before. */
 export function titleSeed(day: string, counter: number): number {
@@ -52,6 +57,8 @@ export function drawTitle(seed: number): TitleDraw {
     turn: rng.chance(0.5) ? 1 : -1,
     angle: rng.range(0, Math.PI * 2),
     mirror: rng.chance(0.5),
+    // Its own stream, so the rest of a start's draw stays as it was.
+    giant: new Rng(deriveSeed(seed, 'giant')).chance(GIANT_CHANCE),
   };
 }
 
