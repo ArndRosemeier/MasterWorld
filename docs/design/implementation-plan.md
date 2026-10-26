@@ -43,7 +43,7 @@ These hold in every phase. A PR that breaks one is fixed before new work goes on
 
 | # | Floor | Check |
 |---|---|---|
-| F1 | **Standard shots.** One script takes the same set on a GPU: title, the creator, town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map, talk. They are saved with the commit hash. | `tools/shot/set.mjs` (to build, F1 is the first step of phase A). Run at every phase gate and after visual PRs. |
+| F1 | **Standard shots.** One script takes the same set on a GPU: title, the creator, town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map, talk. They are saved with the commit hash. | `npm run shot:set` (`tools/shot/set.mjs`, built in A1). Run at every phase gate and after visual PRs. |
 | F2 | **Frame time** on the reference GPU (Arnd's RTX 5070, webgl2, 1080p): at most 16.7 ms in every standard shot, aiming for 12 ms. No shot may be twice as slow as the town at noon. | The `&hud` frame time in F1 shots, written into the set's index. |
 | F3 | **Shaders** per [SHADERS.md](../SHADERS.md): 0 violations in every shot. | HUD line "policy ok". |
 | F4 | **Load time**: title in under 1 s and playable in under 20 s on the reference machine; music streams and is not part of the start download. | `tools/shot/perf.mjs`. Sound today is 42 MB in `public/sound`. |
