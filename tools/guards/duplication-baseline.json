@@ -200,14 +200,6 @@
     "reason": "A seeded angle round a point (rng.range(0, Math.PI * 2)): each sim picks its own spots (small life folds its own into aboutPoint); one line of arithmetic, not a copied helper."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
-  },
-  {
     "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
     "reason": "A heading from one point to another (Math.atan2 of the z and x differences): every moving thing faces where it goes; one line, not a helper."
   },
