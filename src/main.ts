@@ -959,7 +959,7 @@ export async function start(b: Boot): Promise<void> {
       if (small && smallView) {
         // Out of doors only: below or inside, the land's small life waits.
         const out = above && !rooms?.inside, w = player.walker;
-        const near = lookSmall ? small.sight(lookSmall) : null;
+        const near = lookSmall ? small.firstSeen(lookSmall) : null;
         if (near) {
           standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
           // With `fly`: the free camera close by, looking at it (the hero stays off where it does not alarm them).
