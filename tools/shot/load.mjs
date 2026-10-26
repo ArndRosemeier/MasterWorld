@@ -30,8 +30,9 @@ await page.goto(base + (query.startsWith('?') ? query : '?' + query));
 console.log('page loaded', ((Date.now() - t0) / 1000).toFixed(1));
 const gate = await page.waitForSelector('.t-gate', { timeout: 60000 }).then(() => (Date.now() - t0) / 1000).catch(() => null);
 if (gate !== null) await page.keyboard.press('Space');
-await page.waitForFunction(() => window.__mwReady === true, null, { timeout: 600000 });
-const playable = (Date.now() - t0) / 1000;
+if (gate !== null) console.log('title', gate.toFixed(2));
+const came = await page.waitForFunction(() => window.__mwReady === true, null, { timeout: Number(process.env.LOAD_WAIT ?? 300) * 1000 }).then(() => true, () => false);
+const playable = came ? (Date.now() - t0) / 1000 : Infinity;
 console.log('playable', playable.toFixed(1));
 ready = true;
 // A moment in the world: music asked for now is "when first needed", and is listed apart.
@@ -56,9 +57,10 @@ const early = music(false).filter((g) => !g.path.startsWith('sound/music/title')
 console.log(`music at the start: ${music(false).map((g) => g.path).join(', ') || 'none'} · in the world: ${music(true).map((g) => g.path).join(', ') || 'none yet'}`);
 
 const fails = [];
+if (!came) fails.push('the world never became playable');
 if (early.length) fails.push(`the start loaded game music: ${early.map((g) => g.path).join(', ')}`);
 if (limits && gate !== null && gate > LIMIT_TITLE) fails.push(`title after ${gate.toFixed(2)} s (limit ${LIMIT_TITLE} s)`);
-if (limits && playable > LIMIT_READY) fails.push(`playable after ${playable.toFixed(1)} s (limit ${LIMIT_READY} s)`);
+if (limits && came && playable > LIMIT_READY) fails.push(`playable after ${playable.toFixed(1)} s (limit ${LIMIT_READY} s)`);
 for (const f of fails) console.error(`FAIL ${f}`);
 console.log(fails.length ? 'load: FAIL' : 'load: ok');
 process.exit(fails.length ? 1 : 0);
