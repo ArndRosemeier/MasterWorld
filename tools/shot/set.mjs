@@ -52,11 +52,19 @@ const close = async (page) => { await page.keyboard.press('Escape'); await page.
  * `act` runs before it settles; `first` runs once the page is loaded, before waiting for it to be ready.
  */
 const SESSIONS = [
-  { id: 'title', query: `title${gl ? '&gl' : ''}`, first: async (page) => {
+  // The title, then New game: the dive lands by the hero and the creator opens (one load for both).
+  { id: 'title', query: `title&day=0${gl ? '&gl' : ''}`, first: async (page) => {
     await page.waitForSelector('.t-gate', { timeout: TIMEOUT });
     await page.keyboard.press('Space'); // the title waits for a first press (sound needs one)
-  }, shots: [{ name: 'title' }] },
-  { id: 'creator', query: `${still}&create&hour=11&weather=clear`, shots: [{ name: 'creator' }] },
+  }, shots: [
+    { name: 'title' },
+    { name: 'creator', act: async (p) => {
+      await p.evaluate(() => document.querySelector('.t-btn.primary:not([hidden])').click());
+      await p.waitForSelector('.creator.open', { timeout: TIMEOUT });
+      await turn(11, 'clear')(p);
+      await p.waitForTimeout(1500); // the camera comes round to the hero's front
+    } },
+  ] },
   { id: 'town', query: `${still}&hour=12&weather=clear`, shots: [
     { name: 'town-noon' },
     { name: 'pack', act: (p) => p.keyboard.press('KeyI') },
