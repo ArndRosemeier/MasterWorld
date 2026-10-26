@@ -1,0 +1,86 @@
+[
+ {
+  "name": "c7-motion-river-top",
+  "q": "?fly&pos=-30398,70,34242&look=0,-89&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 20.4 ms · -30398, 70, 34242 · chunks 276 (+0) · grass 101+396 · 0.00 dense 0.27 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 76 warm-up + 22 later · worst 10 ms · policy ok · wild - (0/7 built) · regions 7 (0 places drawn) · settlements 0 (0 folk) · small life 8 squirrels, 53/53 birds (41 drawn, 0/0 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 76 built in warm-up, 22 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike",
+  "times": [
+   21390,
+   21625,
+   21921,
+   22157,
+   22376,
+   22598,
+   22823,
+   23046,
+   23266,
+   23497,
+   23711,
+   23943
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 7.2 s: Preparing shaders",
+   "[info] [load] 17.4 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 18.1 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 18.3 s: trees ready (shaders 72 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 22.1 s: townsfolk, every look ready (shaders 76 warm-up + 22 later · worst 10 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c7-motion-river-20m",
+  "q": "?fly&pos=-30450,58,34320&look=35,-20&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 18.2 ms · -30450, 58, 34320 · chunks 279 (+0) · grass 98+403 · 0.23 dense 0.17 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 75 warm-up + 26 later · worst 11 ms · policy ok · wild - (0/7 built) · regions 7 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 56/56 birds (38 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 75 built in warm-up, 26 after (0 drawn late), worst block 11 ms, 0 violations, 0 built again alike",
+  "times": [
+   22005,
+   22325,
+   22617,
+   22900,
+   23159,
+   23418,
+   23689,
+   23971,
+   24254,
+   24528,
+   24808,
+   25089
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 7.3 s: Preparing shaders",
+   "[info] [load] 17.7 s: cellar ready (shaders 65 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 18.6 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 18.9 s: trees ready (shaders 71 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 23.0 s: townsfolk, every look ready (shaders 75 warm-up + 26 later · worst 11 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c7-motion-steep-top",
+  "q": "?fly&pos=-30667,62,34656&look=0,-89&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 16.7 ms · -30667, 62, 34656 · chunks 279 (+0) · grass 96+403 · 0.00 dense 0.28 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 75 warm-up + 26 later · worst 13 ms · policy ok · wild - (0/7 built) · regions 6 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 35/35 birds (20 drawn, 2/2 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 75 built in warm-up, 26 after (0 drawn late), worst block 13 ms, 0 violations, 0 built again alike",
+  "times": [
+   21042,
+   21308,
+   21605,
+   21869,
+   22130,
+   22379,
+   22611,
+   22844,
+   23093,
+   23322,
+   23555,
+   23825
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 7.1 s: Preparing shaders",
+   "[info] [load] 16.7 s: cellar ready (shaders 65 warm-up + 0 later · worst 13 ms · policy ok)",
+   "[info] [load] 17.6 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 13 ms · policy ok)",
+   "[info] [load] 17.9 s: trees ready (shaders 71 warm-up + 0 later · worst 13 ms · policy ok)",
+   "[info] [load] 22.4 s: townsfolk, every look ready (shaders 75 warm-up + 26 later · worst 13 ms · policy ok)"
+  ]
+ }
+]

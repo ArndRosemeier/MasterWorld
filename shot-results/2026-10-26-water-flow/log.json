@@ -1,0 +1,203 @@
+[
+ {
+  "name": "c1-river-20m-ne",
+  "q": "?fly&pos=-30450,58,34320&look=35,-20&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 15.6 ms · -30450, 58, 34320 · chunks 279 (+0) · grass 98+403 · 0.23 dense 0.17 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 76 warm-up + 20 later · worst 17 ms · policy ok · wild - (0/7 built) · regions 7 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 56/56 birds (38 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 76 built in warm-up, 20 after (0 drawn late), worst block 17 ms, 0 violations, 0 built again alike",
+  "times": [
+   21521
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 7.3 s: Preparing shaders",
+   "[info] [load] 17.4 s: cellar ready (shaders 65 warm-up + 0 later · worst 17 ms · policy ok)",
+   "[info] [load] 18.2 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 17 ms · policy ok)",
+   "[info] [load] 18.4 s: trees ready (shaders 72 warm-up + 0 later · worst 17 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c1-river-20m-sw",
+  "q": "?fly&pos=-30350,58,34160&look=215,-20&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 77.2 ms · -30350, 58, 34160 · chunks 255 (+0) · grass 98+403 · 0.63 dense 0.39 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 76 warm-up + 17 later · worst 11 ms · policy ok · wild - (0/7 built) · regions 6 (1 places drawn) · settlements 0 (0 folk) · small life 6 squirrels, 73/73 birds (27 drawn, 0/0 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 76 built in warm-up, 17 after (0 drawn late), worst block 11 ms, 0 violations, 0 built again alike",
+  "times": [
+   21705
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 7.4 s: Preparing shaders",
+   "[info] [load] 17.5 s: cellar ready (shaders 65 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 18.3 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 18.7 s: trees ready (shaders 72 warm-up + 0 later · worst 11 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c2-river-bank-hero",
+  "q": "?pos=-30410,34231&look=55,-15&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 42.1 ms · -30414, 51, 34234 · chunks 282 (+0) · grass 101+401 · 0.19 dense 0.17 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 79 warm-up + 24 later · worst 10 ms · policy ok · wild - (1/7 built) · regions 7 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 62/62 birds (48 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 79 built in warm-up, 24 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike",
+  "times": [
+   20209
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 7.7 s: Preparing shaders",
+   "[info] [load] 16.4 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 16.9 s: townsfolk ready (shaders 72 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 17.2 s: trees ready (shaders 75 warm-up + 0 later · worst 10 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c2-river-bank-hero-across",
+  "q": "?pos=-30410,34231&look=110,-15&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 19.9 ms · -30415, 51, 34229 · chunks 279 (+0) · grass 102+400 · 0.19 dense 0.17 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 79 warm-up + 24 later · worst 9 ms · policy ok · wild - (1/7 built) · regions 7 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 62/62 birds (48 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 79 built in warm-up, 24 after (0 drawn late), worst block 9 ms, 0 violations, 0 built again alike",
+  "times": [
+   18579
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 6.3 s: Preparing shaders",
+   "[info] [load] 14.6 s: cellar ready (shaders 65 warm-up + 0 later · worst 9 ms · policy ok)",
+   "[info] [load] 15.2 s: townsfolk ready (shaders 72 warm-up + 0 later · worst 9 ms · policy ok)",
+   "[info] [load] 15.5 s: trees ready (shaders 75 warm-up + 0 later · worst 9 ms · policy ok)",
+   "[info] [load] 18.7 s: townsfolk, every look ready (shaders 79 warm-up + 24 later · worst 9 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c3-brookB-ground",
+  "q": "?pos=-29643,33865&look=180,-25&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 12.2 ms · -29643, 33, 33860 · chunks 288 (+0) · grass 99+404 · 0.00 dense 0.00 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 78 warm-up + 24 later · worst 11 ms · policy ok · wild - (1/7 built) · regions 6 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 60/60 birds (41 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 78 built in warm-up, 24 after (0 drawn late), worst block 11 ms, 0 violations, 0 built again alike",
+  "times": [
+   19037
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 6.7 s: Preparing shaders",
+   "[info] [load] 15.2 s: cellar ready (shaders 65 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 15.8 s: townsfolk ready (shaders 73 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 16.0 s: trees ready (shaders 74 warm-up + 0 later · worst 11 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c3-steep-brook-6m",
+  "q": "?pos=-30663,34657&look=320,-25&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 17.6 ms · -30660, 53, 34660 · chunks 279 (+0) · grass 98+398 · 0.23 dense 0.21 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 81 warm-up + 22 later · worst 10 ms · policy ok · wild deer-2 (1/7 built) · regions 6 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 35/35 birds (26 drawn, 2/2 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 81 built in warm-up, 23 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike",
+  "times": [
+   18716
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 6.3 s: Preparing shaders",
+   "[info] [load] 14.7 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 15.4 s: townsfolk ready (shaders 74 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 15.7 s: trees ready (shaders 77 warm-up + 0 later · worst 10 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c3-steep-brook-2-6m",
+  "q": "?pos=-30714,34759&look=250,-25&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 7.8 ms · -30710, 60, 34757 · chunks 288 (+0) · grass 100+403 · 0.00 dense 0.00 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 79 warm-up + 24 later · worst 10 ms · policy ok · wild deer-2 (1/7 built) · regions 6 (0 places drawn) · settlements 0 (0 folk) · small life 10 squirrels, 37/37 birds (26 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 79 built in warm-up, 24 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike",
+  "times": [
+   18522
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 6.3 s: Preparing shaders",
+   "[info] [load] 14.6 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 15.2 s: townsfolk ready (shaders 72 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 15.5 s: trees ready (shaders 75 warm-up + 0 later · worst 10 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c5-river-mouth",
+  "q": "?fly&pos=-27235,22,31185&look=53,-20&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 16.9 ms · -27235, 22, 31185 · chunks 159 (+0) · grass 100+400 · 0.00 dense 0.00 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 76 warm-up + 22 later · worst 10 ms · policy ok · wild - (0/7 built) · regions 7 (0 places drawn) · settlements 0 (0 folk) · small life 0 squirrels, 0/0 birds (0 drawn, 0/0 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 76 built in warm-up, 22 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike",
+  "times": [
+   17236
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 5.2 s: Preparing shaders",
+   "[warning] Calling [ComputePassEncoder \"computeGroup_undefined\"].DispatchWorkgroups with a workgroup count of 0 is unusual.",
+   "[info] [load] 13.4 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 14.0 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 14.2 s: trees ready (shaders 72 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 17.4 s: townsfolk, every look ready (shaders 76 warm-up + 22 later · worst 10 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c5-river-mouth-top",
+  "q": "?fly&pos=-27080,120,31060&look=53,-89&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 16.7 ms · -27080, 120, 31060 · chunks 156 (+0) · grass 88+400 · 0.00 dense 0.00 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 76 warm-up + 22 later · worst 11 ms · policy ok · wild - (0/7 built) · regions 5 (0 places drawn) · settlements 0 (0 folk) · small life 0 squirrels, 0/0 birds (0 drawn, 0/0 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 76 built in warm-up, 22 after (0 drawn late), worst block 11 ms, 0 violations, 0 built again alike",
+  "times": [
+   16971
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 5.1 s: Preparing shaders",
+   "[warning] Calling [ComputePassEncoder \"computeGroup_undefined\"].DispatchWorkgroups with a workgroup count of 0 is unusual.",
+   "[info] [load] 13.1 s: cellar ready (shaders 65 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 13.7 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 13.9 s: trees ready (shaders 72 warm-up + 0 later · worst 11 ms · policy ok)",
+   "[info] [load] 17.1 s: townsfolk, every look ready (shaders 76 warm-up + 22 later · worst 11 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c6-motion-bank",
+  "q": "?pos=-30410,34231&look=55,-15&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 16.8 ms · -30414, 51, 34234 · chunks 282 (+0) · grass 101+401 · 0.19 dense 0.17 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 79 warm-up + 24 later · worst 10 ms · policy ok · wild - (1/7 built) · regions 7 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 62/62 birds (48 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 79 built in warm-up, 24 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike",
+  "times": [
+   18461,
+   18826,
+   19184,
+   19542,
+   19918,
+   20276,
+   20642,
+   21008,
+   21385,
+   21754
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 6.1 s: Preparing shaders",
+   "[info] [load] 14.5 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 15.1 s: townsfolk ready (shaders 72 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 15.4 s: trees ready (shaders 75 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 18.7 s: townsfolk, every look ready (shaders 79 warm-up + 24 later · worst 10 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "c6-motion-steep",
+  "q": "?pos=-30663,34657&look=320,-25&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 16.7 ms · -30660, 53, 34660 · chunks 279 (+0) · grass 98+398 · 0.23 dense 0.21 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 81 warm-up + 24 later · worst 10 ms · policy ok · wild deer-2 (1/7 built) · regions 6 (0 places drawn) · settlements 0 (0 folk) · small life 9 squirrels, 35/35 birds (24 drawn, 2/2 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 81 built in warm-up, 24 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike",
+  "times": [
+   18581,
+   18969,
+   19322,
+   19682,
+   20050,
+   20414,
+   20773,
+   21121,
+   21468,
+   21834
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 6.3 s: Preparing shaders",
+   "[info] [load] 14.6 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 15.3 s: townsfolk ready (shaders 74 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 15.5 s: trees ready (shaders 77 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 18.8 s: townsfolk, every look ready (shaders 81 warm-up + 24 later · worst 10 ms · policy ok)"
+  ]
+ }
+]

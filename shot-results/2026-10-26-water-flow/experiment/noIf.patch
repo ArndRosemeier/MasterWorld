@@ -1,0 +1,21 @@
+diff --git a/src/render/materials/water.ts b/src/render/materials/water.ts
+index e893d76..40bf384 100644
+--- a/src/render/materials/water.ts
++++ b/src/render/materials/water.ts
+@@ -102,14 +102,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
+       const h0 = h(p.xz);
+       return vec2(h0.sub(h(p.xz.add(vec2(e, 0)))), h0.sub(h(p.xz.add(vec2(0, e))))).div(e);
+     };
+-    const rippled = vec2(0).toVar();
+-    If(running.greaterThan(0.5), () => {
+-      // Faster water is rougher.
+-      const rough = mix(float(1), float(1.8), smoothstep(1.0, 3.0, speed));
+-      rippled.assign(mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(rough));
+-    }).Else(() => {
+-      rippled.assign(slopeOf(hStill));
+-    });
++    const runS = mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(mix(float(1), float(1.8), smoothstep(1.0, 3.0, speed)));
++    const rippled = mix(slopeOf(hStill), runS, running);
+     // Raindrops ring the surface near the camera.
+     const rings = rainRings(p.xz).mul(smoothstep(12.0, 50.0, camDist).oneMinus());
+     const faded = rippled.mul(fade).add(rings);
