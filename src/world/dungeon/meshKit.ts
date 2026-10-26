@@ -115,7 +115,7 @@ export class MeshKit {
    * neck. `lump(a, t)` (-1..1, around a in radians and up t in 0..1) dents and bulges it.
    */
   sack(x: number, y0: number, z: number, r: number, h: number, mat: number, tint: Tint, lump: (a: number, t: number) => number): void {
-    const seg = 12, rings = 8;
+    const seg = 16, rings = 10, start = this.p.length / 3;
     // Radius up the sack: wide and settled at the foot, full in the body, drawn in at the neck, a small flare above the tie.
     const prof = (t: number) => t < 0.08 ? 0.75 + 3 * t : t < 0.62 ? 1 - 0.25 * ((t - 0.35) / 0.27) ** 2 : t < 0.86 ? 0.95 - 3.3 * (t - 0.62) : 0.16 + 0.6 * (t - 0.86);
     const P = (a: number, t: number) => {
@@ -131,8 +131,25 @@ export class MeshKit {
       }
       this.tri([x, y0 + h, z], P(a1, 1), P(a0, 1), mat, tint);
     }
+    this.smoothFrom(start);
     // The cord round the neck.
     this.cylinder(x, y0 + h * 0.84, z, r * 0.24, h * 0.05, 8, mat, [tint[0] * 0.55, tint[1] * 0.5, tint[2] * 0.45]);
+  }
+
+  /** Smooth the normals of the vertices from index `start` on: where corners meet, they share one normal. */
+  smoothFrom(start: number): void {
+    const sum = new Map<string, number[]>();
+    const spotOf = (i: number) => `${Math.round(this.p[3 * i] * 1e4)},${Math.round(this.p[3 * i + 1] * 1e4)},${Math.round(this.p[3 * i + 2] * 1e4)}`;
+    const n = this.p.length / 3;
+    for (let i = start; i < n; i++) {
+      const k = spotOf(i), s = sum.get(k) ?? [0, 0, 0];
+      s[0] += this.n[3 * i]; s[1] += this.n[3 * i + 1]; s[2] += this.n[3 * i + 2];
+      sum.set(k, s);
+    }
+    for (let i = start; i < n; i++) {
+      const s = sum.get(spotOf(i))!, l = Math.hypot(s[0], s[1], s[2]) || 1;
+      this.n[3 * i] = s[0] / l; this.n[3 * i + 1] = s[1] / l; this.n[3 * i + 2] = s[2] / l;
+    }
   }
 
   mesh(): BuildingMesh {
