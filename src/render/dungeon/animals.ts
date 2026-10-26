@@ -33,8 +33,9 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     pack: 'dog', preset: 'wolf',
     clips: { idle: 'idle', alert: 'alert', feed: 'idle', walk: 'walk', run: 'run', blow: 'bite', hurt: null, dead: 'death' },
     pace: { walk: 1.5, run: 7 },
-    // Greyer and less white than Actors' grey wolf (which reads as a husky in the game's light).
-    coat: { white: [0.7, 0.66, 0.6], bib: 0.35, belly: 0.6 },
+    // Grey-brown all over with a paler belly and muzzle: Actors' grey wolf reads as a husky in the
+    // game's light (white face and legs, a black back).
+    coat: { base: [0.46, 0.42, 0.37], second: [0.3, 0.27, 0.24], tan: [0.52, 0.47, 0.4], white: [0.6, 0.56, 0.5], saddle: 0.45, mask: 0.2, points: 0, socks: 0, blaze: 0, belly: 0.5, bib: 0.3, paleMask: 0.3, tanLegs: 0.3 },
   },
   boar: {
     pack: 'dog', preset: 'wolf',
@@ -43,12 +44,13 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     // A boar's build: short legs under a deep heavy barrel, a big wedge of a head (a long, deep snout
     // with no stop), small pricked ears, a short straight tail; a dark coarse coat with no pale marks.
     shape: {
-      size: 1.4, legs: 0.6, body: 1.2, neck: 0.7, head: 1.3, bulk: 1.45, bone: 1.4, tail: 0.3, ears: 0.7, earDrop: 0, earFold: 0.3,
-      muzzle: 1, muzzleBroad: 0.6, muzzleDeep: 0.9, stop: 0, skullDome: 0, chestDeep: 1, bellyTuck: 0, tailCurl: 0, tailPlume: 0, cheeks: 0.3,
+      size: 1.3, legs: 0.48, body: 1.15, neck: 0.7, head: 1.3, bulk: 1.45, bone: 1.4, tail: 0.3, ears: 0.7, earDrop: 0, earFold: 0.3,
+      muzzle: 0.5, muzzleBroad: 1, muzzleDeep: 1, stop: 0, skullDome: 0, chestDeep: 1, bellyTuck: 0, tailCurl: 0, tailPlume: 0, cheeks: 0.5,
     },
     coat: {
-      base: [0.29, 0.24, 0.19], second: [0.12, 0.1, 0.09], tan: [0.29, 0.24, 0.19], white: [0.33, 0.28, 0.23],
-      saddle: 0.6, mask: 0, points: 0, belly: 0, bib: 0, socks: 0, blaze: 0, tailTip: 0, spots: 0, shade: 0.3, paleMask: 0, agouti: 0.4, tanLegs: 0, length: 0.045, fluff: 0.15,
+      // One dark brown-black all over (every marking colour the same), long and bristly.
+      base: [0.17, 0.14, 0.11], second: [0.17, 0.14, 0.11], tan: [0.17, 0.14, 0.11], white: [0.17, 0.14, 0.11],
+      saddle: 0, mask: 0, points: 0, belly: 0, bib: 0, socks: 0, blaze: 0, tailTip: 0, spots: 0, shade: 0.15, paleMask: 0, agouti: 0.3, tanLegs: 0, length: 0.06, fluff: 0.05,
     },
   },
   deer: {
