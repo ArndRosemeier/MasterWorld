@@ -148,11 +148,21 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const tg = texture(TOWN_GROUND.mask).sample(p.xz.sub(TOWN_GROUND.origin).div(TOWN_GROUND.size));
   const ragged = fine.mul(0.18).add(mid.mul(0.1));
   const paths = smoothstep(0.1, 0.45, mx_fractal_noise_float(p.xz.mul(0.18), 2, 2.0, 0.5).add(tg.a.mul(0.5)));
-  // Yards: trodden earth in patches; streets: small cobbles; the market: the same stones a little larger, a shade darker.
+  // A village's stones are laid where the traffic is, not wall to wall: toward their edges the street and
+  // the market break up into earth and grass, mud stands in patches, and worn lanes run across the
+  // square (where the noise crosses zero), trodden into earth between the stones.
+  const patchy = mx_fractal_noise_float(p.xz.mul(0.09), 2, 2.0, 0.5);
+  const laid = (t: Node<'float'>) => smoothstep(0.3, 0.7, t.add(patchy.mul(0.45)).sub(float(1).sub(t).mul(0.25)));
+  const lane = float(1).sub(smoothstep(0.02, 0.07, abs(mx_noise_float(p.xz.mul(0.035)).add(mid.mul(0.2)))));
+  const mud = smoothstep(0.25, 0.55, mx_fractal_noise_float(p.xz.mul(0.06).add(17.3), 2, 2.0, 0.5)).mul(0.8);
+  const stones = tg.r.max(tg.g);
+  // Yards: trodden earth in patches; streets and the market: small cobbles (fist-sized), the market's a
+  // shade darker; on top, the earth of the worn lanes and mud patches among the stones.
   const grounds: [Node<'float'>, number, number, number][] = [
     [tg.b.max(tg.a).mul(paths).mul(0.85), TOWN_GROUND_LAYER.dirt, 1, 1],
-    [tg.r, TOWN_GROUND_LAYER.cobble, 0.75, 0.85],
-    [tg.g, TOWN_GROUND_LAYER.cobble, 0.95, 0.75],
+    [laid(tg.r), TOWN_GROUND_LAYER.cobble, 0.4, 0.85],
+    [laid(tg.g), TOWN_GROUND_LAYER.cobble, 0.45, 0.75],
+    [stones.mul(lane.mul(0.75).max(mud)), TOWN_GROUND_LAYER.dirt, 0.8, 0.8],
   ];
   for (const [t, k, scale, tone] of grounds) {
     const g = tl(k, scale);
