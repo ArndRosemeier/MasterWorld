@@ -181,9 +181,14 @@ export class Fight {
     return out;
   }
 
+  /** How far from a creature's middle the hero's weapon still lands, metres. */
+  reach(t: Creature): number {
+    return this.hero.weapon.reach + radiusOf(t.def) + HERO_R + 0.15;
+  }
+
   private blow(t: Creature, p: HeroPose, out: FightEvent[]): void {
     const w = this.hero.weapon;
-    const d = Math.hypot(t.x - p.x, t.z - p.z), reach = w.reach + radiusOf(t.def) + HERO_R + 0.15;
+    const d = Math.hypot(t.x - p.x, t.z - p.z), reach = this.reach(t);
     if (d > reach || Math.abs(t.y - p.y) > 1.3) return;
     if (Math.abs(angleDiff(Math.atan2(t.z - p.z, t.x - p.x), yawToDir(p.yaw))) > FACING) return;
     const a = this.queued ?? this.setting.abilities.find((x) => x.id === 'strike')!;

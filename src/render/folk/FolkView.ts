@@ -4,7 +4,7 @@
  * the shape worker) and shown once ready; until then, and everyone farther off, is a plain figure
  * (FarFolk). Characters far off draw their "Crowd" level (one draw call plus the hair).
  */
-import { Group, type Camera, type Material, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Frustum, Group, Matrix4, Vector3, type Camera, type Material, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
@@ -18,6 +18,9 @@ import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } f
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
 /** People farther than this get no character (m). */
 const RANGE = 70;
+/** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
+const CLOSE = 40;
+const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3();
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
 
@@ -152,6 +155,10 @@ export class FolkView {
     this.warm = true;
   }
   private warm = false;
+  private waiting = 0;
+
+  /** How many people within CLOSE in the camera's view are plain figures while their character is dressed (before the warm-up ends at least 1). */
+  get undressed(): number { return this.warm ? this.waiting : Math.max(1, this.waiting); }
 
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
   indoors: readonly Placed[] | null = null;
@@ -209,8 +216,13 @@ export class FolkView {
       s.ch.update(dt);
     }
     // The rest (and those whose character is still being dressed) as plain figures.
-    if (this.indoors) this.far.place([], this.height);
-    else this.far.place(near.filter(([, a]) => !this.shown.get(a.person.id)?.ready).map(([, a]) => a), this.height);
+    const plain = this.indoors ? [] : near.filter(([, a]) => !this.shown.get(a.person.id)?.ready);
+    this.far.place(plain.map(([, a]) => a), this.height);
+    // How many of those, close in view, wait for a character (beyond the characters' count they stay plain).
+    VIEW.setFromProjectionMatrix(SCRATCH.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    let waiting = 0;
+    for (const [d, a] of plain) if (d < CLOSE && want.has(a.person.id) && VIEW.containsPoint(AT.set(a.x, this.height(a.x, a.z) + 1, a.z))) waiting++;
+    this.waiting = waiting;
   }
 
   private dress(s: Slot, a: Agent): void {

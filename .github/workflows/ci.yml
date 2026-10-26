@@ -24,5 +24,7 @@ jobs:
         run: npm test
       - name: Dungeon variety
         run: npm run variety
+      - name: The evening loop
+        run: npm run loop
       - name: Typecheck and build
         run: npm run build

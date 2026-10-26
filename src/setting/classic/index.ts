@@ -12,7 +12,7 @@ import { hero } from './hero';
 import { routines } from './routines';
 import { wild } from './wild';
 import { items, upkeep } from './items';
-import { shops } from './shops';
+import { shops, trainers } from './shops';
 import { abilities, director, skills } from './skills';
 
 export const classic: SettingModule = {
@@ -60,6 +60,7 @@ export const classic: SettingModule = {
   items,
   upkeep,
   shops,
+  trainers,
   abilities,
   director,
   hero,

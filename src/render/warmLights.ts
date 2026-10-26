@@ -15,6 +15,9 @@ const HAND_OVER = 6;
 /** Candela: a lit doorway, a torch. */
 const DOOR = 6;
 const TORCH = 9;
+/** Candela of the soft fill in a room, and how far it reaches (m). */
+const FILL = 3;
+const FILL_REACH = 7;
 /** The shadow torch's cube map side (texels) and reach (m). */
 const SHADOW_MAP = 512;
 const REACH = 12;
@@ -65,10 +68,23 @@ export class WarmLights {
     if (!spots) this.shadowed.intensity = 0;
   }
 
-  /** Once per frame: `glow` 0 by day .. 1 at night, `share` of the houses with a light on (ignored underground). */
-  shine(cam: Vector3, glow: number, share: number, dt: number): void {
+  /**
+   * Once per frame: `glow` 0 by day .. 1 at night, `share` of the houses with a light on (ignored underground).
+   * `hero`: in a room, where the hero stands (null outside). The room's one lamp hangs at the back, so the
+   * hero, seen from behind, faced it and showed only a dark back: one light becomes a soft fill from the
+   * viewer's side, like the glow of the hearth and the other lamps of the room.
+   */
+  shine(cam: Vector3, glow: number, share: number, dt: number, hero: { x: number; y: number; z: number } | null = null): void {
     this.time += dt;
     if (this.torches) { this.burn(cam); return; }
+    if (hero) {
+      // A third of the way from the camera to the hero's chest, a little above.
+      const f = { x: cam.x + (hero.x - cam.x) / 3, y: cam.y + (hero.y + 1.3 - cam.y) / 3 + 0.5, z: cam.z + (hero.z - cam.z) / 3, roll: 0 };
+      this.setLights(this.lights, [{ s: f, dist: 0 }], FILL, false);
+      this.lights[0]!.distance = FILL_REACH;
+      return;
+    }
+    this.lights[0]!.distance = 11;
     const near = glow > 0 ? closest(this.doors.filter((d) => d.roll < share), cam, WARM_LIGHTS + 1) : [];
     this.setLights(this.lights, near, DOOR * glow, false);
   }

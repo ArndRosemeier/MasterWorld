@@ -286,7 +286,8 @@ export class Cellars {
     b.creatures = await CreatureView.build(b.delve.den, h.seed, b.view.origin, h.renderer);
     // Its people's shaders build in the Stage's frame slots; they show once warm.
     const drawn = b.creatures;
-    this.warming = drawn.warm(h.stage).then(() => h.stage.add(drawn.group));
+    this.dwellersWarm = false;
+    this.warming = drawn.warm(h.stage).then(() => { h.stage.add(drawn.group); this.dwellersWarm = true; });
     const visit = b.visit, danger = cellarDanger(cellar, h.setting.creatures), place = cellar.house;
     const words = loreOf(h.setting, s.decision.template).words ?? CELLAR_WORDS;
     const arena: Arena = {
@@ -302,6 +303,8 @@ export class Cellars {
 
   /** The newest dwellers' warm-up (loading waits for the first cellar's; later ones warm while the hero walks to the hatch). */
   warming: Promise<void> = Promise.resolve();
+  /** Whether the newest dwellers are drawn (false while they warm up). */
+  dwellersWarm = true;
 }
 
 /** How a cellar is spoken of when the setting gives no words of its own. */

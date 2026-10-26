@@ -63,6 +63,7 @@ import { TalkUi } from './app/talkUi';
 import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
 import { TradeUi } from './app/tradeUi';
+import { LessonsUi } from './app/lessonsUi';
 import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
 import { Orientation, mastery } from './game/orientation';
@@ -74,6 +75,7 @@ import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, type SaveD
 import { release } from './app/release';
 import { Character } from './game/character';
 import { Market, itemWorth } from './game/trade';
+import { teacherOf } from './game/lessons';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -524,7 +526,8 @@ export async function start(b: Boot): Promise<void> {
       horses: () => player.steeds,
       riding: () => player.riding,
       threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
-      titleHolds: () => !!title?.holding || !!creator?.showing,
+      // Silent until the world is playable: no beds, steps or music (it streams, D44/F4) compete with the start's downloads.
+      titleHolds: () => !!title?.holding || !!creator?.showing || !window.__mwReady,
     });
     const townWords = town && life ? townTalk(seed, setting, town, life.agents.map((a) => a.person), log, save?.talk ?? undefined).talk : null;
     // Who knows the hero from before (plan 11.4): their greeting names them.
@@ -581,6 +584,22 @@ export async function start(b: Boot): Promise<void> {
       const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
       townWords.services = (id) => { const p = person(id); return [...others(id), ...(p ? upkeep.services(p) : [])]; };
       for (const id of UPKEEP_SERVICES) services.set(id, (a) => upkeep.answer(id, a.person, townWords.nameOf(a.person.id)));
+    }
+    // Lessons (plan 11.4): the smith, the old caravan guard and the innkeeper teach for coin; one more service.
+    const lessons = life && townWords ? new LessonsUi(character, setting, {
+      paused,
+      get bindings() { return settings.current.bindings; },
+      taught: (h) => { const t = hours() + h; view.sky.day = Math.floor(t / 24); view.sky.hour = t - view.sky.day * 24; sounds?.coins(); },
+      changed: armHero,
+    }) : null;
+    if (lessons && townWords && life) {
+      const others = townWords.services.bind(townWords);
+      const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
+      townWords.services = (id) => {
+        const p = person(id), t = p ? teacherOf(setting, p) : null;
+        return [...others(id), ...(t ? [{ id: 'lessons', label: t.topic, line: t.line }] : [])];
+      };
+      services.set('lessons', (a) => { const t = teacherOf(setting, a.person); if (t) lessons.teach(t, townWords.nameOf(a.person.id)); });
     }
     const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {
@@ -751,7 +770,15 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, market, trade, tradeAt, fightHud, compass },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, market, trade, tradeAt, fightHud, compass,
+        /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
+        get undrawn() {
+          const out: string[] = [];
+          if (folk && folk.undressed) out.push(`${folk.undressed} townsfolk`);
+          if (wild?.warming) out.push(`${wild.warming} wild groups`);
+          if (!cellars.dwellersWarm) out.push('cellar dwellers');
+          return out;
+        } },
     });
     b.menus.menu = new Menu(settings, {
       paused,
@@ -880,8 +907,8 @@ export async function start(b: Boot): Promise<void> {
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         houses?.update(view.camera.position);
       }
-      // Doorways at night above, torches below.
-      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt);
+      // Doorways at night above, torches below, a soft fill on the hero in a room.
+      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
       if (life) {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });

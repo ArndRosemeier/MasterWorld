@@ -118,3 +118,42 @@ test('trade: alike things stack (kind, rarity, name, bonuses and wear), others s
   const st = stackAlike([knife(), keen, knife(), worn, { ...keen }]);
   assert.deepEqual(st.map((s) => s.length), [2, 2, 1]);
 });
+
+test('trade: each forge and stall keeps fine work above its plain goods, the rare piece worth several evenings', () => {
+  const m = market();
+  for (const k of ['smith', 'trader']) {
+    const s = keeper(m, k), f = s.shop.fine!;
+    assert.equal(s.stock.filter((i) => i.rarity === 'uncommon').length, f.uncommon, `${k}: uncommon pieces`);
+    assert.equal(s.stock.filter((i) => i.rarity === 'rare').length, f.rare, `${k}: rare pieces`);
+  }
+  const smith = keeper(m, 'smith');
+  const rare = smith.stock.find((i) => i.rarity === 'rare')!;
+  const plainMost = Math.max(...smith.stock.filter((i) => i.rarity === 'common').map((i) => m.asks(smith, i, 12)));
+  assert.ok(m.asks(smith, rare, 12) > plainMost * 3, `${rare.name}: ${m.asks(smith, rare, 12)} copper`);
+  assert.ok(m.asks(smith, rare, 12) >= 1000, 'ten silver or more: several evenings of finds');
+});
+
+test('trade: shelves are filled again only on the shop\'s restock day, each shop on its own, seeded', () => {
+  const m = market(), s = keeper(m, 'smith');
+  const hero = new Character(classic);
+  hero.coins = 1_000_000;
+  const rare = s.stock.find((i) => i.rarity === 'rare')!;
+  assert.equal(m.buy(hero, s, rare), null);
+  const plain = s.stock.filter((i) => i.rarity === 'common').slice(0, 4);
+  for (const it of plain) assert.equal(m.buy(hero, s, it), null);
+  const left = s.stock.length;
+  // Days pass; the shelf stays as it is until the restock day comes round (every `restock` days).
+  let day = 0;
+  while ((day + 1 + s.person) % s.shop.restock) { day++; m.restock(day); assert.equal(s.stock.length, left, `day ${day}: nothing new yet`); }
+  m.restock(day + 1);
+  assert.ok(s.stock.length >= left + plain.length, 'the plain goods are made again');
+  assert.equal(s.stock.filter((i) => i.rarity === 'rare').length, 1, 'and a new rare piece');
+  assert.notDeepEqual(s.stock.find((i) => i.rarity === 'rare'), rare);
+  // The same seed, the same restock.
+  const again = market();
+  const s2 = keeper(again, 'smith');
+  assert.equal(again.buy(hero, s2, s2.stock.find((i) => i.rarity === 'rare')!), null);
+  for (const it of s2.stock.filter((i) => i.rarity === 'common').slice(0, 4)) again.buy(hero, s2, it);
+  again.restock(day + 1);
+  assert.deepEqual(s2.stock, s.stock);
+});

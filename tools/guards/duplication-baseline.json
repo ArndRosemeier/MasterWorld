@@ -172,11 +172,39 @@
     "reason": "Each pure game object writes its own plain save data (the hero's sheet, the town's merchants); only the name matches."
   },
   {
+    "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/hydro.ts",
+    "reason": "The MinHeap's pop loop (@futuremagic/core) in three different searches: A* over the town's street graph, the priority flood of a tile's water, and A* over 1 m walk cells in the loop check. The heap is shared; the searches are not the same."
+  },
+  {
+    "key": "same name: masterworld/game/evening.ts#floor + masterworld/world/dungeon/space.ts#floor",
+    "reason": "WalkWorld.floor (game/walker.ts) for the loop check's land walk vs the dungeon space's own floor lookup: an interface member, only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/evening.ts#height + masterworld/main.ts#height",
+    "reason": "Both implement WalkWorld (game/walker.ts): the game's walk world (with cellars, rooms, trunks and folk) and the loop check's bare land and town. Interface members share names by design."
+  },
+  {
+    "key": "same name: masterworld/game/evening.ts#inside + masterworld/main.ts#inside",
+    "reason": "Both fill LeadsContext.inside (vgm/leads.ts) for nextPromise: the game asks its cellars, the loop check is never below while the VGM thinks."
+  },
+  {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
     "reason": "TSL node arithmetic (x.add(y).mul(z)) in three shader kinds: it is how three.js nodes are written, not a copied helper. It crossed the info floor when the talk code grew the corpus."
   },
   {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
     "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
+  },
+  {
+    "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/lessonsUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/mapUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   }
 ]
