@@ -158,5 +158,13 @@
   {
     "key": "same name: masterworld/app/mapUi.ts#opened + masterworld/app/repairUi.ts#opened",
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/packUi.ts#opened + masterworld/app/tradeUi.ts#opened",
+    "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the card entrances are shared in KeyWindow.entrances."
+  },
+  {
+    "key": "same name: masterworld/game/character.ts#save + masterworld/game/trade.ts#save",
+    "reason": "Each pure game object writes its own plain save data (the hero's sheet, the town's merchants); only the name matches."
   }
 ]

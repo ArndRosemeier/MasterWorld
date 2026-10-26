@@ -201,6 +201,9 @@ export class SoundDirector {
     e.play('fight/coins', { bus: 'ui', gain: 0.7, delay: 0.7 });
   }
 
+  /** Coins changed hands (a trade). */
+  coins(): void { this.host.engine.play('fight/coins', { bus: 'ui', gain: 0.8 }); }
+
   /** Something written into the journal. */
   noted(): void { this.host.engine.play('ui/quill', { bus: 'ui', gain: 0.7 }); }
 

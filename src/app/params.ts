@@ -72,6 +72,8 @@ export const params = {
   topics: q.get('topics')?.split(',') ?? [],
   /** The hero's gear starts this worn (for looking at the smith's bench): `wear=0.6`, the main hand most, the rest less. */
   wear: Math.min(1, Math.max(0, Number(q.get('wear') ?? 0))),
+  /** Start at a merchant's counter (for screenshots): `trade=smith`, `trade=innkeeper` or `trade=trader` (a market stall). */
+  trade: q.get('trade'),
   /** Lay remains in front of the start (for screenshots): `remains=pack` or `remains=grave`. */
   remains: q.get('remains'),
   /** Open the map (or `journal`, `saves`, `pack`, `tale`: a roguelike end) at the start, after any `talk`. */

@@ -47,13 +47,13 @@ export class RepairUi extends BodyWindow {
     const rows = list.map((m) => this.row(m));
     const total = list.reduce((a, m) => a + m.cost, 0);
     const line = this.said || (list.length ? `${this.smith} turns your gear over in scarred hands.` : w.nothingToMend);
-    this.body.replaceChildren(
-      el('p', { className: 'smith-says', textContent: line }),
-      ...(rows.length ? [el('div', { className: 'bench' }, ...rows)] : []),
-      el('p', { className: 'hint', textContent: rows.length ? 'Click a piece to mend it. Worn gear strikes and guards less well.' : 'Gear wears as you fight: blades as they strike, armour as it is struck.' }));
     const all = button(`Mend all · ${coinText(total)}`, () => this.clickAll(), { className: 'mend-all' });
     all.disabled = !list.length || !list.some((m) => m.cost <= h.coins);
-    this.foot.replaceChildren(el('span', { textContent: `Your purse: ${coinText(h.coins)}` }), all);
+    this.fill([
+      el('p', { className: 'smith-says', textContent: line }),
+      ...(rows.length ? [el('div', { className: 'bench' }, ...rows)] : []),
+      el('p', { className: 'hint', textContent: rows.length ? 'Click a piece to mend it. Worn gear strikes and guards less well.' : 'Gear wears as you fight: blades as they strike, armour as it is struck.' })],
+    [el('span', { textContent: `Your purse: ${coinText(h.coins)}` }), all]);
   }
 
   private row(m: Mend): HTMLElement {

@@ -62,6 +62,7 @@ import { Notes } from './app/notes';
 import { TalkUi } from './app/talkUi';
 import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
+import { TradeUi } from './app/tradeUi';
 import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
 import { Orientation, mastery } from './game/orientation';
@@ -72,6 +73,7 @@ import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, typ
 import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
+import { Market, itemWorth } from './game/trade';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -81,7 +83,6 @@ import { acquaintances } from './game/background';
 import { Director } from './vgm/director';
 import { FightHud } from './app/fightHud';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
-import { defOf } from './game/items';
 
 declare global {
   interface Window {
@@ -533,6 +534,22 @@ export async function start(b: Boot): Promise<void> {
     meetOldFriends();
     // What townsfolk do besides talk (trade, repairs, a room): a talk topic each, which opens its window.
     const services = new Map<string, (a: Agent) => void>();
+    // The town's merchants (plan 11.5): the smith, the inn's keeper and the market's stalls.
+    const market = life ? new Market(setting, life.agents.map((a) => a.person), seed, view.sky.day, save?.market) : null;
+    const trade = market ? new TradeUi(character, setting, market, {
+      paused,
+      get bindings() { return settings.current.bindings; },
+      get day() { return view.sky.day; },
+      traded: () => sounds?.coins(),
+      say: (text) => notes.say(text),
+    }) : null;
+    if (market && trade && townWords) {
+      services.set('trade', (a) => { const m = market.of(a.person.id); if (m) trade.show(m, townWords.nameOf(a.person.id)); });
+      townWords.services = (person) => {
+        const shop = market.of(person)?.shop;
+        return shop ? [{ id: 'trade', label: shop.topic, line: shop.line }] : [];
+      };
+    }
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -553,7 +570,7 @@ export async function start(b: Boot): Promise<void> {
       setClock: (h) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; },
       enter: (b) => rooms?.enter(b, true) ?? Promise.resolve(),
       say: (text, secs) => notes.say(text, secs),
-      worth: (it) => defOf(setting.items, it.def).value,
+      worth: (it) => itemWorth(setting.items, it),
       rang: () => sounds?.rang(),
     }) : null;
     if (upkeep && townWords && life) {
@@ -624,6 +641,7 @@ export async function start(b: Boot): Promise<void> {
           talk: townWords?.save() ?? null,
           journal: journal.entries(),
           character: character.save(),
+          ...(market ? { market: market.save() } : {}),
           looks: { name: heroName, look: hero.look },
           director: director.snapshot(),
           mode,
@@ -679,6 +697,17 @@ export async function start(b: Boot): Promise<void> {
       player.teleport(h.x, h.below ? h.y : undefined, h.z, h.yaw);
       if (!save.heir) notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
     } else if (typeof loaded === 'string') notes.say(`Could not load the save: ${loaded}.`, 8);
+    // Straight to a merchant's counter (`?trade=smith`, or `game.tradeAt('smith')` in the console and the shot set): in front of them, their wares out.
+    const tradeAt = (keeper: string): boolean => {
+      const m = market?.merchants.find((x) => x.shop.keeper === keeper);
+      const a = m && life?.agents.find((x) => x.person.id === m.person);
+      if (!m || !a || !trade || !townWords) return false;
+      talk?.close();
+      player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
+      trade.show(m, townWords.nameOf(a.person.id));
+      return true;
+    };
+    if (params.trade) tradeAt(params.trade);
     if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else if (params.open === 'tale') showTale(); else map?.setOpen(true); }
     new DebugMenu({
       paused,
@@ -705,7 +734,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, fightHud, compass },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, market, trade, tradeAt, fightHud, compass },
     });
     b.menus.menu = new Menu(settings, {
       paused,

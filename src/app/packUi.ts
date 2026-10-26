@@ -39,8 +39,7 @@ export class PackUi extends BodyWindow {
   protected opened(): void {
     const h = this.hero;
     // Opening, the cards make their entrance one after another; re-drawn after a click, they are just there.
-    let k = 0;
-    const enter = () => (this.fresh ? 0.35 + 0.05 * k++ : null);
+    const enter = this.entrances(0.35, 0.05);
     const worn = WORN.map((s) => {
       const it = h.worn[s];
       const cell = el('div', { className: `slot${it ? ' full' : ''}` }, el('div', { className: 'label', textContent: SLOT_NAME[s] }), it ? itemCard(it, this.setting, enter()) : el('div', { className: 'empty', textContent: '—' }));
@@ -73,14 +72,14 @@ export class PackUi extends BodyWindow {
       return el('div', { className: `gauge${rose ? ' up' : ''}`, title: plus ? `${s.name}: ${base}, +${plus} from what you wear` : `${s.name}: ${base}` },
         dial, el('div', { className: 'name', textContent: s.name }), el('div', { className: 'value' }, String(base), ...(plus ? [' ', el('b', { textContent: `+${plus}` })] : [])));
     });
-    this.body.replaceChildren(
+    this.fill([
       el('h3', { textContent: 'Worn' }), el('div', { className: 'worn' }, ...worn),
       el('h3', { textContent: 'Carried' }),
       carried.length ? el('div', { className: 'carried' }, ...carried) : el('p', { className: 'hint', textContent: 'Nothing but lint.' }),
       el('p', { className: 'hint', textContent: 'Click something carried to put it on, drink or eat it; click something worn to take it off.' }),
-      el('h3', { textContent: 'Skills' }), el('div', { className: 'skills' }, ...skills));
-    this.foot.replaceChildren(
+      el('h3', { textContent: 'Skills' }), el('div', { className: 'skills' }, ...skills)],
+    [
       el('span', { textContent: `Health ${Math.ceil(h.health)} / ${h.maxHealth} · Stamina ${Math.ceil(h.stamina)} / ${h.maxStamina}` }),
-      el('span', { textContent: `${coinText(h.coins)} · ${h.carried.toFixed(1)} kg` }));
+      el('span', { textContent: `${coinText(h.coins)} · ${h.carried.toFixed(1)} kg` })]);
   }
 }
