@@ -129,14 +129,29 @@ export class FolkView {
    * After the warm-up, while the loop runs (the Stage compiles in its frame slots): every detail level
    * of the first character, dressed in turn as a few townsfolk who between them wear everything in town
    * (each garment, hairstyle and beard draws, and casts its shadow, with shaders of its own). Nobody is
-   * drawn before.
+   * drawn before the first look stands in every detail level: then `shown` resolves and the town fills (each
+   * character still compiles what it wears before it shows, `prepareSlot`), while the other looks warm on,
+   * behind play (plan A7: load what the first view needs, the rest after).
    */
-  async warmLods(): Promise<void> {
-    const ch = this.slots[0].ch;
-    const place = this.slots[0].place;
+  warmLods(): { shown: Promise<void>; done: Promise<void> } {
+    let show = (): void => {};
+    const shown = new Promise<void>((r) => { show = r; });
+    const done = this.warmAll(() => {
+      this.stage.scene.add(this.far.mesh);
+      this.warm = true;
+      show();
+    }).finally(show);
+    return { shown, done };
+  }
+
+  private async warmAll(first: () => void): Promise<void> {
+    const slot = this.slots[0], ch = slot.ch;
+    const place = slot.place;
     place.removeFromParent();
+    slot.busy = true; // not dressed for anybody while it tries the looks on
     const looks = coveringLooks(this.life.agents.map((a) => a.person));
     for (let i = 0; i < looks.length; i++) {
+      if (i === 1) first();
       // A look whose files would not load is skipped: its garments then compile when first worn.
       try {
         if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
@@ -149,10 +164,10 @@ export class FolkView {
         console.error('[folk] warming a look failed', e);
       }
     }
+    if (!this.warm) first();
     ch.setLod(0);
-    this.slots[0].place.visible = false;
-    this.stage.scene.add(this.far.mesh);
-    this.warm = true;
+    place.visible = false;
+    slot.busy = false;
   }
   private warm = false;
   private waiting = 0;

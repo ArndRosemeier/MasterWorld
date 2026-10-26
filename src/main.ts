@@ -489,7 +489,13 @@ export async function start(b: Boot): Promise<void> {
     void trees.then(() => { landed = true; if (folk) loading.set('Waking the townsfolk'); });
     // One part failing (a file that would not load) must not hold the start: it is logged and play begins.
     const survive = (what: string, p: Promise<unknown> | null | undefined) => p?.catch((e: unknown) => console.error(`[load] ${what} failed`, e));
-    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folk?.warmLods().then(took('townsfolk'))), survive('cellar', dwellers), survive('giant', giantReady)]).then(() => { planted = true; });
+    // The townsfolk show once one look stands in every detail level; their other looks, the cellar's people (unless
+    // the start is down there) and the title's giant finish behind play (plan A7).
+    const folkLooks = folk?.warmLods();
+    void survive('townsfolk', folkLooks?.done.then(took('townsfolk, every look')));
+    void survive('cellar', dwellers?.then(took('cellar')));
+    void survive('giant', giantReady);
+    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folkLooks?.shown.then(took('townsfolk'))), params.cellar ? survive('cellar', dwellers) : null]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
