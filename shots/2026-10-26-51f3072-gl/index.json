@@ -1,0 +1,328 @@
+{
+  "commit": "51f3072b98003a470cc534d55ddea5abb55a128d",
+  "dirty": false,
+  "date": "2026-10-26",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": true,
+  "viewport": "1920x1080",
+  "settleMs": 6000,
+  "measureMs": 2000,
+  "seconds": 251.934,
+  "shots": [
+    {
+      "name": "title",
+      "file": "01-title.jpg",
+      "query": "title&gl",
+      "loadS": 42.863,
+      "settledS": 1.5008000000715256,
+      "backend": "webgl2",
+      "frames": 241,
+      "p50": 6.200000000004366,
+      "p95": 10.400000000001455,
+      "mean": 8.312033194822895,
+      "shaders": {
+        "warmup": 74,
+        "run": 23,
+        "worstMs": 11.200000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "creator",
+      "file": "02-creator.jpg",
+      "query": "title=0&day=0&gl&create&hour=11&weather=clear",
+      "loadS": 17.246,
+      "settledS": 4.126299999952316,
+      "backend": "webgl2",
+      "frames": 185,
+      "p50": 11.200000000000728,
+      "p95": 14.599999999998545,
+      "mean": 10.827027027027027,
+      "shaders": {
+        "warmup": 97,
+        "run": 9,
+        "worstMs": 8.100000023841858,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "town-noon",
+      "file": "03-town-noon.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 15.299,
+      "settledS": 2.469799999952316,
+      "backend": "webgl2",
+      "frames": 57,
+      "p50": 36.10000000000218,
+      "p95": 49.80000000000291,
+      "mean": 35.4526315802022,
+      "shaders": {
+        "warmup": 97,
+        "run": 7,
+        "worstMs": 8.200000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "pack",
+      "file": "04-pack.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 15.299,
+      "settledS": 1.5363999999761582,
+      "backend": "webgl2",
+      "frames": 54,
+      "p50": 38.79999999999927,
+      "p95": 65.39999999999782,
+      "mean": 37.65555555599706,
+      "shaders": {
+        "warmup": 97,
+        "run": 7,
+        "worstMs": 8.200000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "map",
+      "file": "05-map.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 15.299,
+      "settledS": 1.5324000000953675,
+      "backend": "webgl2",
+      "frames": 62,
+      "p50": 37.400000000001455,
+      "p95": 44.599999999998545,
+      "mean": 32.32258064554586,
+      "shaders": {
+        "warmup": 97,
+        "run": 7,
+        "worstMs": 8.200000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-dusk",
+      "file": "06-town-dusk.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 15.299,
+      "settledS": 1.56,
+      "backend": "webgl2",
+      "frames": 46,
+      "p50": 40.400000000001455,
+      "p95": 71.90000000000146,
+      "mean": 44.05000000207324,
+      "shaders": {
+        "warmup": 97,
+        "run": 7,
+        "worstMs": 8.200000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-night",
+      "file": "07-town-night.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 15.299,
+      "settledS": 1.5377000000476837,
+      "backend": "webgl2",
+      "frames": 44,
+      "p50": 45,
+      "p95": 92.29999999999563,
+      "mean": 45.68181818398559,
+      "shaders": {
+        "warmup": 97,
+        "run": 7,
+        "worstMs": 8.200000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-rain",
+      "file": "08-town-rain.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 15.299,
+      "settledS": 1.7133999999761582,
+      "backend": "webgl2",
+      "frames": 29,
+      "p50": 73.59999999999854,
+      "p95": 96.5,
+      "mean": 72.25862069294365,
+      "shaders": {
+        "warmup": 97,
+        "run": 9,
+        "worstMs": 8.200000047683716,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"MeshBasicNodeMaterial\" started 0 ms after a build of 4 ms ended (minimum 8 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "over twice the town at noon",
+        "1 shader violations"
+      ]
+    },
+    {
+      "name": "cellar",
+      "file": "09-cellar.jpg",
+      "query": "title=0&day=0&gl&hour=12&cellar=2",
+      "loadS": 24.698,
+      "settledS": 1.5019000000953675,
+      "backend": "webgl2",
+      "frames": 401,
+      "p50": 3.599999999998545,
+      "p95": 9.900000000001455,
+      "mean": 4.992269326564376,
+      "shaders": {
+        "warmup": 99,
+        "run": 1,
+        "worstMs": 7.899999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "barrow",
+      "file": "10-barrow.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 24.898,
+      "settledS": 1.5101000000238418,
+      "backend": "webgl2",
+      "frames": 177,
+      "p50": 8.600000000002183,
+      "p95": 25.299999999999272,
+      "mean": 11.323163842212017,
+      "shaders": {
+        "warmup": 96,
+        "run": 0,
+        "worstMs": 13.399999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "wild",
+      "file": "11-wild.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 24.898,
+      "settledS": 1.533,
+      "backend": "webgl2",
+      "frames": 40,
+      "p50": 48.099999999998545,
+      "p95": 81.19999999999709,
+      "mean": 50.6475000017881,
+      "shaders": {
+        "warmup": 96,
+        "run": 7,
+        "worstMs": 13.399999976158142,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh body<deer<creatures\" started 0 ms after a build of 1 ms ended (minimum 3 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "1 shader violations"
+      ]
+    },
+    {
+      "name": "fight",
+      "file": "12-fight.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 24.898,
+      "settledS": 1.5760999999046326,
+      "backend": "webgl2",
+      "frames": 40,
+      "p50": 55.599999999998545,
+      "p95": 64.69999999999709,
+      "mean": 51.06250000238415,
+      "shaders": {
+        "warmup": 96,
+        "run": 12,
+        "worstMs": 13.399999976158142,
+        "violations": 2,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh body<deer<creatures\" started 0 ms after a build of 1 ms ended (minimum 3 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh body<wolf<creatures\" started 0 ms after a build of 1 ms ended (minimum 2 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "2 shader violations"
+      ]
+    },
+    {
+      "name": "talk",
+      "file": "13-talk.jpg",
+      "query": "title=0&day=0&gl&hour=20&talk=inn&topics=news",
+      "loadS": 35.165,
+      "settledS": 5.334,
+      "backend": "webgl2",
+      "frames": 97,
+      "p50": 19,
+      "p95": 44.30000000000291,
+      "mean": 20.65154639224416,
+      "shaders": {
+        "warmup": 94,
+        "run": 8,
+        "worstMs": 14.900000095367432,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    }
+  ]
+}
