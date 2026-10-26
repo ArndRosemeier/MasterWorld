@@ -26,6 +26,8 @@ const SERVE_STEP = 0.3;
 /** A building opens as one comes this near its door (m), and shuts once one is this far from it, outside. */
 const OPEN_AT = 7;
 const SHUT_AT = 14;
+/** Pushing this long (s) on a stair without getting anywhere: put off it (a body wedged under a low edge). */
+const STUCK_FOR = 2;
 
 interface Open { b: TownBuilding; plan: InteriorPlan; walk: HouseWalk }
 
@@ -114,12 +116,29 @@ export class InteriorVisit {
     // The lamp on the storey one is on.
     const k = o.walk.storey(w.pos.y);
     if (k !== this.lampOn) this.lamp(k);
-    // Onto the hatch: down to the cellar.
     const [a, bb] = o.walk.frame.toRoom(x, z);
+    // Wedged on a stair for a while, pushing: off it, at the end one was heading for.
+    if (w.stuckFor > STUCK_FOR) this.offStair(o, a, bb, k);
+    // Onto the hatch: down to the cellar.
     const hatch = o.plan.fixtures.find((f) => f.kind === 'hatch'), down = this.cellars.get(o.b.id);
     if (!this.going && k === 0 && hatch && down && Math.abs(a - hatch.a) < hatch.w / 2 - 0.1 && Math.abs(bb - hatch.b) < hatch.d / 2 - 0.1) {
       this.going = true;
       void down(() => this.shut()).finally(() => { this.going = false; });
+    }
+  }
+
+  /** Off the flight under (a, b) of storey `k`, if one stands on it: to its top or its foot, whichever one faces. */
+  private offStair(o: Open, a: number, b: number, k: number): void {
+    const w = this.player.walker, h = w.pos.y - o.b.floorY;
+    if (Math.abs(h - o.plan.storeys[k].y) < 0.05) return;
+    for (const s of o.plan.stairs) {
+      const run = s.steps * s.tread, along = (a - s.a) * s.da + (b - s.b) * s.db, across = (a - s.a) * s.db - (b - s.b) * s.da;
+      if (s.storey !== k || along < -0.3 || along > run + 0.3 || Math.abs(across) > s.w / 2 + 0.3) continue;
+      const [fx, fz] = o.walk.frame.toWorld(s.a + s.da, s.b + s.db), [x0, z0] = o.walk.frame.toWorld(s.a, s.b);
+      const up = -Math.sin(w.yaw) * (fx - x0) - Math.cos(w.yaw) * (fz - z0) > 0;
+      const t = up ? run + 0.6 : -0.6, p = o.walk.floorAt(s.a + s.da * t, s.b + s.db * t, up ? k + 1 : k);
+      this.player.teleport(p.x, p.y, p.z, w.yaw);
+      return;
     }
   }
 
