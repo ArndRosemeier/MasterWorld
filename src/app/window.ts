@@ -75,3 +75,16 @@ export abstract class KeyWindow {
   protected abstract opened(): void;
   protected closed(): void {}
 }
+
+/** A key window with a scrolling body and a foot line (the pack, the smith's bench). */
+export abstract class BodyWindow extends KeyWindow {
+  protected readonly body: HTMLDivElement;
+  protected readonly foot: HTMLDivElement;
+
+  constructor(title: string, className: string, action: Action | null, host: WindowHost) {
+    const body = el('div', { className: 'body' }), foot = el('div', { className: 'foot' });
+    super(title, className, action, host, body, foot);
+    this.body = body;
+    this.foot = foot;
+  }
+}

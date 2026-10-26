@@ -193,6 +193,14 @@ export class SoundDirector {
     this.host.engine.duck(open ? 0.45 : 1, 0.8);
   }
 
+  /** The smith's hammer on a mended piece, and the coins for it. */
+  rang(): void {
+    const e = this.host.engine;
+    e.play('fight/block', { bus: 'ui', gain: 0.8, pitch: 1.25 });
+    e.play('fight/block', { bus: 'ui', gain: 0.5, pitch: 1.4, delay: 0.32 });
+    e.play('fight/coins', { bus: 'ui', gain: 0.7, delay: 0.7 });
+  }
+
   /** Something written into the journal. */
   noted(): void { this.host.engine.play('ui/quill', { bus: 'ui', gain: 0.7 }); }
 

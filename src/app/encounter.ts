@@ -21,6 +21,7 @@ import type { CreatureView } from '../render/dungeon/CreatureView';
 import { warning, type Director } from '../vgm/director';
 import type { Journal } from '../talk/journal';
 import { cap } from '../talk/townTalk';
+import { fill } from '../talk/folk';
 import type { FightHud } from './fightHud';
 import type { Notes } from './notes';
 import type { Player } from './player';
@@ -29,8 +30,8 @@ export interface FightHost {
   readonly bindings: Bindings;
   /** A dialog is open (keys are the dialog's). */
   readonly blocked: boolean;
-  /** Fallen: carry the hero to the inn. */
-  wake(): void;
+  /** Fallen: carry the hero to where they wake (game/upkeep.ts wakePlace); returns that place as said ("the temple"). */
+  wake(): string;
   /** Hold the hero still (fallen) or let go. */
   still(on: boolean): void;
   /** What the hero holds changed. */
@@ -294,6 +295,7 @@ export class Encounter {
       case 'killed': if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
       case 'skill': this.director.queue(`Your ${e.up.name} rises to ${e.up.level}.`, 1); break;
       case 'refused': this.notes.say(e.text, 2.5); break;
+      case 'worn': if (e.state !== 'new') this.director.queue(fill(this.setting.upkeep.words[e.state], { item: e.item.name.toLowerCase() }), 1); break;
       case 'fallen':
         this.fallenFor = 0;
         this.down = 0;
@@ -304,7 +306,7 @@ export class Encounter {
     }
   }
 
-  /** Waking at the inn (classic mode): half the purse gone, sore but alive. */
+  /** Waking where the hero lodges (classic mode): half the purse gone, sore but alive. */
   private wakeUp(): void {
     this.fallenFor = -1;
     const lost = Math.floor(this.hero.coins / 2);
@@ -314,9 +316,9 @@ export class Encounter {
     this.fight.pick(null);
     this.hud.fallen(false);
     this.host.still(false);
-    this.host.wake();
+    const place = this.host.wake();
     this.onCue({ kind: 'woke' });
-    this.notes.say(`You wake in the inn, aching. Someone carried you up${lost ? `, and ${coinText(lost)} went with them` : ''}.`, 8);
+    this.notes.say(`You wake in ${place}, aching. Someone carried you there${lost ? `, and ${coinText(lost)} went with them` : ''}.`, 8);
   }
 
   /** Away from a quiet place that was promised: the promise is kept and the household pays. */
