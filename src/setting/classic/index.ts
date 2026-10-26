@@ -4,11 +4,13 @@
  */
 import { CONTRACT_VERSION, type SettingModule } from '../contract';
 import { backgrounds } from './backgrounds';
+import { barrow } from './barrow';
 import { cellar } from './cellar';
 import { names, talk } from './people';
 import { creatures } from './creatures';
 import { hero } from './hero';
 import { routines } from './routines';
+import { wild } from './wild';
 import { items } from './items';
 import { abilities, director, skills } from './skills';
 
@@ -49,7 +51,7 @@ export const classic: SettingModule = {
     maxSlope: 0.12,
     vista: 220,
   },
-  dungeons: { cellar },
+  dungeons: { cellar, barrow },
   names,
   talk,
   skills,
@@ -70,4 +72,5 @@ export const classic: SettingModule = {
       { at: 0.6, slope: [1, 1, 1], saturation: 1.3 },
     ],
   },
+  wild,
 };

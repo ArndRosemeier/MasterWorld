@@ -62,7 +62,8 @@ export class Fight {
   /** Seconds the hero has stood still. */
   private still = 0;
 
-  constructor(readonly hero: Character, readonly den: Den, private readonly setting: SettingModule, seed: number, private readonly light = 9) {
+  /** `light`: how far off the hero is seen, metres (the lantern below; daylight out on the land). */
+  constructor(readonly hero: Character, readonly den: Den, private readonly setting: SettingModule, seed: number, public light = 9) {
     this.rng = new Rng(deriveSeed(seed, 'fight'));
   }
 
@@ -91,7 +92,7 @@ export class Fight {
     const face = yawToDir(p.yaw);
     const live = this.den.alive.filter((c) => {
       const d = Math.hypot(c.x - p.x, c.z - p.z);
-      return d < TAB_RANGE && Math.abs(c.y - p.y) < 3 && Math.abs(angleDiff(Math.atan2(c.z - p.z, c.x - p.x), face)) < 1.4 && this.den.nav.sees(p.x, p.y, p.z, c.x, c.y, c.z, 1.1);
+      return d < TAB_RANGE && Math.abs(c.y - p.y) < 3 && Math.abs(angleDiff(Math.atan2(c.z - p.z, c.x - p.x), face)) < 1.4 && this.den.ground.sees(p.x, p.y, p.z, c.x, c.y, c.z, 1.1);
     });
     const score = (c: Creature) => Math.hypot(c.x - p.x, c.z - p.z) - (c.state === 'fight' ? 6 : 0) - c.def.danger * 0.1 + (c.state === 'meek' || c.state === 'beg' ? 30 : 0);
     live.sort((a, b) => score(a) - score(b));
@@ -154,7 +155,8 @@ export class Fight {
     return l;
   }
 
-  advance(dt: number, p: HeroPose): FightEvent[] {
+  /** `breathe`: the hero recovers here (false for a second fight at once: one recovery a frame). */
+  advance(dt: number, p: HeroPose, breathe = true): FightEvent[] {
     const out: FightEvent[] = this.pending.splice(0);
     const hero = this.hero;
     this.quiet += dt;
@@ -165,7 +167,7 @@ export class Fight {
     if (t && t.state === 'dead') { this.target = null; this.attacking = false; }
     if (hero.alive && this.attacking && this.target && this.swing === 0) this.blow(this.target, p, out);
     this.still = p.speed < 0.3 ? this.still + dt : 0;
-    hero.recover(dt, this.den.fighting.length > 0 || this.quiet < 6, this.still);
+    if (breathe) hero.recover(dt, this.den.fighting.length > 0 || this.quiet < 6, this.still);
     return out;
   }
 

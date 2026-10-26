@@ -1,13 +1,14 @@
 /**
  * The in-game menu: the version and two buttons in the corner, the settings dialog (Escape, or the
- * button) and "What's new". Plain DOM over the canvas; styles in index.html.
+ * button) and "What's new". Plain DOM over the canvas in warded brass (windows.css): the settings unroll
+ * like a cartographer's tool roll, What's new opens behind two brass shutters.
  */
 import { ACTIONS, bind, keyLabel, RESERVED_KEYS, type Action } from '../input/controls';
 import { release, versionLabel } from './release';
 import { RANGES, type Settings, type SettingsStore } from './settings';
 import { onKeyDown, swallow } from '../input/keys';
 import { clock, el } from './dom';
-import { shadeAround } from './window';
+import { entering, shadeAround } from './window';
 
 /** What the menu needs of the running game. */
 export interface MenuHost {
@@ -31,17 +32,17 @@ export class Menu {
   constructor(private readonly store: SettingsStore, private readonly host: MenuHost) {
     const corner = el('div', { id: 'corner' },
       el('span', { className: 'version', textContent: `v${versionLabel}` }),
-      el('button', { textContent: "What's new", onclick: () => this.show('news') }),
-      el('button', { textContent: 'Settings', title: 'Escape', onclick: () => this.show('settings') }),
+      el('button', { textContent: "What's new", onclick: () => this.showDialog('news') }),
+      el('button', { textContent: 'Settings', title: 'Escape', onclick: () => this.showDialog('settings') }),
     );
     this.body = el('div', { className: 'body' });
     const tabs = el('div', { className: 'tabs' }, ...(['controls', 'graphics', 'game'] as const).map((t) =>
-      el('button', { textContent: t[0].toUpperCase() + t.slice(1), onclick: () => { this.tab = t; this.render(); } })));
-    this.settings = this.dialog('Settings', tabs, this.body, el('div', { className: 'foot' },
+      el('button', { className: 'tab', textContent: t[0].toUpperCase() + t.slice(1), onclick: () => { this.tab = t; this.render(); } })));
+    this.settings = this.dialog('Settings', 'settings', tabs, this.body, el('div', { className: 'foot' },
       el('button', { textContent: 'Defaults', onclick: () => { this.store.reset(); this.render(); } }),
-      el('button', { textContent: 'Done', onclick: () => this.show(null) }),
+      el('button', { textContent: 'Done', onclick: () => this.showDialog(null) }),
     ));
-    this.news = this.dialog("What's new", this.changes());
+    this.news = this.dialog("What's new", 'news', this.changes());
     document.body.append(corner, this.settings, this.news);
     onKeyDown((e) => this.key(e), true);
     // The keyboard's own letters, where the browser tells them.
@@ -49,11 +50,11 @@ export class Menu {
     void kb?.getLayoutMap?.().then((m) => { this.layout = m; this.render(); }).catch(() => undefined);
   }
 
-  private dialog(title: string, ...content: Node[]): HTMLDivElement {
-    const box = el('div', { className: 'panel', role: 'dialog' },
-      el('div', { className: 'head' }, el('h2', { textContent: title }), el('button', { className: 'close', textContent: '×', title: 'Close (Escape)', onclick: () => this.show(null) })),
+  private dialog(title: string, kind: 'settings' | 'news', ...content: Node[]): HTMLDivElement {
+    const box = el('div', { className: `panel ${kind}`, role: 'dialog' },
+      el('div', { className: 'head' }, el('h2', { textContent: title }), el('button', { className: 'close', textContent: '×', title: 'Close (Escape)', onclick: () => this.showDialog(null) })),
       ...content);
-    return shadeAround(box, () => this.show(null));
+    return shadeAround(box, () => this.showDialog(null), kind === 'news');
   }
 
   private get open(): boolean {
@@ -61,11 +62,13 @@ export class Menu {
   }
 
   /** Opens a dialog (or closes them with null). */
-  show(which: 'settings' | 'news' | null): void {
+  showDialog(which: 'settings' | 'news' | null): void {
     this.rebinding = null;
+    const was = { settings: this.settings.classList.contains('open'), news: this.news.classList.contains('open') };
     this.settings.classList.toggle('open', which === 'settings');
     this.news.classList.toggle('open', which === 'news');
     if (which === 'settings') this.render();
+    if (which && !was[which]) entering((which === 'settings' ? this.settings : this.news).firstElementChild!);
     this.host.paused(which !== null);
   }
 
@@ -82,7 +85,7 @@ export class Menu {
     }
     if (e.code === 'Escape' && !e.repeat) {
       e.preventDefault();
-      this.show(this.open ? null : 'settings');
+      this.showDialog(this.open ? null : 'settings');
     }
   }
 

@@ -175,8 +175,19 @@ export interface DwellerDef extends HistoryDef {
   readonly surprise?: string;
 }
 
-/** The setting's material for cellar dungeons (plan 8, milestone 3). */
+/** How a kind of dungeon is spoken of as the hero goes in and out; `{place}` is what it is called. */
+export interface DungeonWords {
+  /** Going down ("You climb down into the cellar of {place}."). */
+  readonly enter: string;
+  /** The Director's line when it has gone quiet. */
+  readonly quiet: string;
+  /** The thanks when the promise is kept; `{coins}` the reward. */
+  readonly thanks: string;
+}
+
+/** The setting's material for a kind of dungeon (plan 8: cellars in milestone 3, barrows after). */
 export interface CellarLore {
+  readonly words?: DungeonWords;
   readonly uses: readonly RoomUseDef[];
   /** Who dug the cellar and why. */
   readonly builders: readonly HistoryDef[];
@@ -225,7 +236,29 @@ export type CreatureBody =
     /** Only its bones: the raised dead. */
     readonly bones?: boolean;
   }
-  | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string };
+  | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string }
+  /** An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures. `length` nose to rump. */
+  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar'; readonly length: number; readonly color: string };
+
+/**
+ * Who lives on the land around a town (plan 9.3, the world simulation): a kind of group, where its
+ * territories lie and how many there are. The simulation places them from the seed; the VGM does not.
+ */
+export interface WildDef {
+  readonly id: string;
+  /** Who lives together (creature ids): the first leads, the others follow at random. */
+  readonly creatures: readonly string[];
+  /** How many in a group, at least and at most. */
+  readonly count: readonly [number, number];
+  /** wood: under thick trees; open: meadows and heath; road: by a road out of town. */
+  readonly habitat: 'wood' | 'open' | 'road';
+  /** Metres from the town's market where their territories lie. */
+  readonly ring: readonly [number, number];
+  /** Territory radius, metres. */
+  readonly range: number;
+  /** Territories of this kind around a town. */
+  readonly groups: number;
+}
 
 /**
  * A creature (plan 9.3, 12, D29): its body, senses, temper and power. Its danger is fixed by what it is,
@@ -474,7 +507,7 @@ export interface SettingModule {
   readonly world: WorldShape;
   readonly start: StartSpec;
   /** Material for dungeons, per kind (plan 8). */
-  readonly dungeons: { readonly cellar: CellarLore };
+  readonly dungeons: { readonly cellar: CellarLore; readonly barrow?: CellarLore };
   /** Names of the peoples, by Actors' race id (human, dwarf, halfling, elf). */
   readonly names: Readonly<Record<string, NamesDef>>;
   readonly talk: TalkDef;
@@ -488,6 +521,8 @@ export interface SettingModule {
   readonly backgrounds: readonly BackgroundDef[];
   /** How the townsfolk spend their days. */
   readonly routines: RoutinesDef;
+  /** What lives on the land around a town. */
+  readonly wild: readonly WildDef[];
   /** The setting's colour key over the day; without it the engine's neutral grade. */
   readonly look?: LookDef;
 }
@@ -536,19 +571,23 @@ export function validateSetting(m: SettingModule): string[] {
   if (!(m.start.elevation[0] >= 0 && m.start.elevation[0] < m.start.elevation[1])) out.push(`${where}: start.elevation must be a rising range above the sea`);
   if (!(m.start.maxSlope > 0)) out.push(`${where}: start.maxSlope must be > 0`);
   if (!(m.start.vista >= 0)) out.push(`${where}: start.vista must be >= 0`);
-  const c = m.dungeons.cellar;
-  const uses = new Set(c.uses.map((u) => u.id));
-  for (const u of c.uses) for (const p of u.props) if (!DUNGEON_PROPS.includes(p)) out.push(`${where}: cellar use "${u.id}" prop "${p}" is unknown`);
-  for (const [k, list] of [['builders', c.builders], ['older', c.older], ['troubles', c.troubles], ['dwellers', c.dwellers]] as const) {
-    if (!list.length) out.push(`${where}: dungeons.cellar.${k} is empty`);
-    for (const h of list as readonly HistoryDef[]) {
-      for (const u of h.uses) if (!uses.has(u)) out.push(`${where}: cellar ${k} "${h.id}" uses unknown room use "${u}"`);
-      for (const p of h.traces ?? []) if (!DUNGEON_PROPS.includes(p)) out.push(`${where}: cellar ${k} "${h.id}" trace "${p}" is unknown`);
+  for (const [kind, c] of Object.entries(m.dungeons) as [string, CellarLore | undefined][]) {
+    if (!c) continue;
+    const uses = new Set(c.uses.map((u) => u.id));
+    for (const u of c.uses) for (const p of u.props) if (!DUNGEON_PROPS.includes(p)) out.push(`${where}: ${kind} use "${u.id}" prop "${p}" is unknown`);
+    // The engine's own rooms (the safe spot, a dug burrow) must exist in every kind.
+    for (const u of ['refuge', 'burrow']) if (!uses.has(u)) out.push(`${where}: dungeons.${kind} needs the room use "${u}"`);
+    for (const [k, list] of [['builders', c.builders], ['older', c.older], ['troubles', c.troubles], ['dwellers', c.dwellers]] as const) {
+      if (!list.length) out.push(`${where}: dungeons.${kind}.${k} is empty`);
+      for (const h of list as readonly HistoryDef[]) {
+        for (const u of h.uses) if (!uses.has(u)) out.push(`${where}: ${kind} ${k} "${h.id}" uses unknown room use "${u}"`);
+        for (const p of h.traces ?? []) if (!DUNGEON_PROPS.includes(p)) out.push(`${where}: ${kind} ${k} "${h.id}" trace "${p}" is unknown`);
+      }
     }
-  }
-  for (const d of c.dwellers) {
-    if (!uses.has(d.lair)) out.push(`${where}: cellar dweller "${d.id}" lair "${d.lair}" is unknown`);
-    if (!d.signs.length) out.push(`${where}: cellar dweller "${d.id}" has no signs to hint with`);
+    for (const d of c.dwellers) {
+      if (!uses.has(d.lair)) out.push(`${where}: ${kind} dweller "${d.id}" lair "${d.lair}" is unknown`);
+      if (!d.signs.length) out.push(`${where}: ${kind} dweller "${d.id}" has no signs to hint with`);
+    }
   }
   for (const race of ['human', 'dwarf', 'halfling', 'elf']) {
     const n = m.names[race];
@@ -613,7 +652,11 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
-  for (const d of m.dungeons.cellar.dwellers) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: cellar dweller "${d.id}" creature "${c}" is unknown`);
+  for (const [kind, lore] of Object.entries(m.dungeons)) for (const d of lore?.dwellers ?? []) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: ${kind} dweller "${d.id}" creature "${c}" is unknown`);
+  for (const w of m.wild) {
+    for (const c of w.creatures) if (!ids.has(c)) out.push(`${where}: wild "${w.id}" creature "${c}" is unknown`);
+    if (!w.creatures.length || w.count[0] < 1 || w.count[1] < w.count[0] || w.ring[1] < w.ring[0] || w.range <= 0) out.push(`${where}: wild "${w.id}" needs creatures, a count, a ring and a range`);
+  }
   if (!m.abilities.length) out.push(`${where}: no abilities`);
   return out;
 }

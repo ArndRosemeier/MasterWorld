@@ -13,7 +13,7 @@ import { Rng, deriveSeed, hexToRgb } from '@futuremagic/core';
 import { Character } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
-import { grow, type BodyPlan, type Integument } from '@futuremagic/creatures';
+import { grow, type BodyPlan, type CritterRole, type Integument } from '@futuremagic/creatures';
 import { CritterModel, ModelledCreature, type ClipUse, type CritterFigure, type ModelledFigure, type RigInput } from '@futuremagic/creatures/three';
 import type { CreatureDef } from '../../setting/contract';
 import type { Creature, Den } from '../../sim/creatures';
@@ -58,12 +58,19 @@ interface Shown {
 
 const yawOf = (dir: number) => Math.atan2(-Math.cos(dir), -Math.sin(dir));
 
-/** The animal a rat or spider is (one species per creature kind, from the seed). */
+/** How each beast of the land is grown: a hunter's lean build, a grazer's long legs and neck, a rooting brute. */
+const BEAST: Record<'wolf' | 'deer' | 'boar', { role: CritterRole; integument: Integument }> = {
+  wolf: { role: 'hunter', integument: 'fur' },
+  deer: { role: 'grazer', integument: 'fur' },
+  boar: { role: 'brute', integument: 'hide' },
+};
+
+/** The animal a rat, spider or beast is (one species per creature kind, from the seed). */
 function speciesFor(def: CreatureDef, seed: number) {
   const b = def.body;
-  const spider = b.kind === 'spider';
-  const force: { plan: BodyPlan; integument: Integument } = spider ? { plan: 'octopod', integument: 'chitin' } : { plan: 'quadruped', integument: 'fur' };
-  const sp = grow(new Rng(deriveSeed(seed, 'creature', def.id)), spider ? 'hunter' : 'scuttler', 0, def.id, force);
+  const spider = b.kind === 'spider', beast = b.kind === 'beast' ? BEAST[b.species] : null;
+  const force: { plan: BodyPlan; integument: Integument } = spider ? { plan: 'octopod', integument: 'chitin' } : { plan: 'quadruped', integument: beast?.integument ?? 'fur' };
+  const sp = grow(new Rng(deriveSeed(seed, 'creature', def.id)), spider ? 'hunter' : beast?.role ?? 'scuttler', 0, def.id, force);
   const tone = hexToRgb(parseInt((b.kind === 'humanoid' ? '#000000' : b.color).slice(1), 16));
   // The setting's colour over the grown coat, its pattern kept.
   return { ...sp, colors: { ...sp.colors, base: tone, secondary: tone.map((v) => v * 0.75) as typeof tone, belly: tone.map((v) => Math.min(1, v * 1.5)) as typeof tone } };
@@ -96,7 +103,7 @@ export class CreatureView {
     };
     // The rig plants feet in the world: the cellar's floor under them (near the storey the creature is on).
     const O = v.group.position;
-    const ground = (x: number, z: number) => (den.space.floorAt(x - O.x, z - O.z, v.near + 0.8) ?? v.near) + O.y;
+    const ground = (x: number, z: number) => (den.ground.floorAt(x - O.x, z - O.z, v.near + 0.8) ?? v.near) + O.y;
     for (const c of den.creatures) {
       const b = c.def.body;
       let body: Body;

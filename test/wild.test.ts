@@ -1,0 +1,87 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { deriveSeed, parseSeed } from '@futuremagic/core';
+import { classic } from '../src/setting/classic/index';
+import { openWorld } from '../src/vgm/builder';
+import { OpenGround, Wilds, placeWild, groupDanger, type Land } from '../src/sim/wild';
+import { Den, type Quarry } from '../src/sim/creatures';
+import { Delve, type DelveSave } from '../src/game/delve';
+import { Character } from '../src/game/character';
+
+const seed = parseSeed('masterworld');
+const { terrain } = openWorld(seed, classic);
+const town = terrain.towns[0];
+const land: Land = { height: (x, z) => terrain.height(x, z), waterDepth: (x, z) => terrain.waterDepth(x, z), blocked: (x, z, r) => town.solid(x, z, r) };
+const places = placeWild(seed, terrain, town, classic.wild);
+const guard = { defence: 20, armour: 1, open: false };
+const hero = (x: number, z: number, noise = 0.4): Quarry => ({ x, y: terrain.height(x, z), z, noise, light: 0, alive: true, guard });
+
+test('wild: deer, boar, a wolf pack and bandits live around the town, apart, on dry land, none too strong near it', () => {
+  const kinds = new Set(places.map((t) => t.def.id));
+  for (const k of ['deer', 'boar', 'wolves', 'bandits']) assert.ok(kinds.has(k), `${k} live here (${[...kinds].join(', ')})`);
+  for (const t of places) {
+    const d = Math.hypot(t.x - town.decision.x, t.z - town.decision.z);
+    assert.ok(d >= t.def.ring[0] - 1 && d <= t.def.ring[1] + 1, `${t.id} at ${d.toFixed(0)} m`);
+    assert.equal(terrain.waterDepth(t.x, t.z), 0, `${t.id} on dry land`);
+    assert.ok(groupDanger(t.members, classic.creatures) <= 18, `${t.id} fits a fresh hero`);
+    for (const o of places) if (o !== t) assert.ok(Math.hypot(o.x - t.x, o.z - t.z) > o.r + t.r, `${t.id} and ${o.id} apart`);
+  }
+  assert.deepEqual(placeWild(seed, terrain, town, classic.wild), places, 'the same every time');
+});
+
+test('wild: far groups rest; near ones are always busy; deer bolt from a hero, wolves come for them', () => {
+  const wilds = new Wilds(places, land, classic.creatures);
+  // The hero in town: nobody out there is awake.
+  wilds.step(0.1, hero(town.decision.x, town.decision.z));
+  assert.ok(wilds.bands.every((b) => !b.awake));
+  const deer = wilds.bands.find((b) => b.territory.def.id === 'deer')!;
+  const t = deer.territory;
+  // Watching from a distance: they graze and wander, every one of them doing something.
+  const far = hero(t.x + t.r + 120, t.z);
+  let busy = 0, steps = 0;
+  for (let i = 0; i < 300; i++) {
+    wilds.step(0.1, far);
+    for (const c of deer.den.creatures) { steps++; if (c.act !== 'stand') busy++; }
+  }
+  assert.ok(deer.awake);
+  assert.ok(busy / steps > 0.9, `busy ${(busy / steps * 100).toFixed(0)} %`);
+  // Running up to them: they bolt.
+  const start = deer.den.creatures.map((c) => Math.hypot(c.x - t.x, c.z - t.z));
+  let fled = 0;
+  for (let i = 0; i < 200; i++) {
+    const c0 = deer.den.creatures[0];
+    for (const e of wilds.step(0.1, hero(c0.x + 12, c0.z, 1))) if (e.event.kind === 'flee') fled++;
+  }
+  assert.ok(fled > 0, 'the deer fled');
+  assert.ok(start.length > 0);
+  // Wolves: the pack comes for a hero who walks into their woods.
+  const wolves = wilds.bands.find((b) => b.territory.def.id === 'wolves')!;
+  const w = wolves.territory;
+  let fighting = 0;
+  for (let i = 0; i < 300 && !fighting; i++) {
+    wilds.step(0.1, hero(w.x + 10, w.z, 0.6));
+    fighting = wolves.den.fighting.length;
+  }
+  assert.ok(fighting >= 2, `${fighting} wolves on the hunt`);
+});
+
+test('wild: a band is fought like a cellar (no hoards); its dead stay dead', () => {
+  const bandits = places.find((t) => t.def.id === 'bandits')!;
+  const make = (saved?: DelveSave) => {
+    const den = new Den(new OpenGround(land, [bandits]), bandits.members.map((creature) => ({ creature, room: 0 })), classic.creatures, deriveSeed(bandits.seed, 'den'), saved?.dead ?? []);
+    return new Delve(null, den, classic, new Character(classic), 7, saved);
+  };
+  const d = make();
+  assert.equal(d.hoards.length, 0);
+  // A hero walking into their camp gets set upon.
+  let hurt = 0;
+  const c0 = d.den.creatures[0], at = { x: c0.x + 3, y: terrain.height(c0.x + 3, c0.z), z: c0.z, yaw: 0, speed: 1 };
+  for (let i = 0; i < 300 && !hurt; i++) for (const e of d.step(0.1, at)) if (e.kind === 'hurt') hurt++;
+  assert.ok(hurt > 0, 'the highwaymen strike');
+  // One of them dies: after loading, still dead.
+  const c = d.den.creatures[0];
+  c.health = 0;
+  c.state = 'dead';
+  const again = make(d.tally());
+  assert.equal(again.den.creatures[0].state, 'dead');
+});

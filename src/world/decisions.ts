@@ -27,14 +27,19 @@ export interface VolumeDecision {
  * A dungeon promised under a building of a town (plan 4.2, 8): the seed and the set piece fix what it
  * is; it is sketched, outlined and built from this as the player comes closer (world/dungeon).
  */
+export type DungeonTemplate = 'cellar' | 'barrow';
+
 export interface DungeonDecision {
   readonly kind: 'dungeon';
   readonly id: string;
-  readonly template: 'cellar';
+  /** A cellar under a house of the town; a barrow out on the land near it (plan 8: dungeon kinds). */
+  readonly template: DungeonTemplate;
   /** The town's decision id. */
   readonly town: string;
-  /** Index into the town plan's buildings: the house above. */
+  /** Index into the town plan's buildings: the house above (a cellar), the household who knows of it (a barrow). */
   readonly building: number;
+  /** A barrow's doorway on the land: world metres, and the way it faces (yaw: 0 faces −z, as the walker). */
+  readonly site?: { readonly x: number; readonly z: number; readonly yaw: number };
   readonly seed: number;
   /** The signature set piece (world/dungeon/setPieces.ts). */
   readonly setPiece: string;
@@ -43,6 +48,37 @@ export interface DungeonDecision {
    * start; who moves in is chosen to fit. None: anything.
    */
   readonly danger?: number;
+  /** When it was promised, game hours since the world began (none: when the world was opened). */
+  readonly at?: number;
+}
+
+/**
+ * A promise kept (plan 4.2): its goal was reached (the dwellers are gone and the household paid). The
+ * promise is a dungeon decision's id or a move-in's.
+ */
+export interface KeptDecision {
+  readonly kind: 'kept';
+  readonly id: string;
+  readonly promise: string;
+  /** Game hours since the world began. */
+  readonly at: number;
+}
+
+/**
+ * A story event (plan 8.1, D10: repopulation): new dwellers move into a dungeon that was cleared. The
+ * layout stays; who lives there, what they left and what the household above has noticed change. It is a
+ * promise of its own (the household wants it cleared again).
+ */
+export interface MoveInDecision {
+  readonly kind: 'move-in';
+  readonly id: string;
+  /** The dungeon decision's id. */
+  readonly dungeon: string;
+  /** The dweller (id in the setting's lore) who moves in. */
+  readonly dweller: string;
+  readonly seed: number;
+  /** Game hours since the world began. */
+  readonly at: number;
 }
 
 /**
@@ -57,6 +93,6 @@ export interface OrderDecision {
   readonly order: TownOrder;
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision;
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision;
 
 export type DecisionLog = readonly Decision[];

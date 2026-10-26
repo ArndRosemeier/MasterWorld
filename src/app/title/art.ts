@@ -49,7 +49,7 @@ export function dawnSvg(line: string): string {
 </svg>`;
 }
 
-const GEAR = 'M21 2h6l1 6 4 2 5-4 4 4-4 5 2 4 6 1v6l-6 1-2 4 4 5-4 4-5-4-4 2-1 6h-6l-1-6-4-2-5 4-4-4 4-5-2-4-6-1v-6l6-1 2-4-4-5 4-4 5 4 4-2z';
+export const GEAR = 'M21 2h6l1 6 4 2 5-4 4 4-4 5 2 4 6 1v6l-6 1-2 4 4 5-4 4-5-4-4 2-1 6h-6l-1-6-4-2-5 4-4-4 4-5-2-4-6-1v-6l6-1 2-4-4-5 4-4 5 4 4-2z';
 
 /** A small gear (buttons). */
 export const gearIcon = `<svg viewBox="0 0 48 48" aria-hidden="true"><path d="${GEAR}" fill="#6e4f17"/><circle cx="24" cy="24" r="7" fill="#e2bd68"/></svg>`;

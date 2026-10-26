@@ -9,6 +9,7 @@
 import type { Rng } from '@futuremagic/core';
 import type { DungeonGraph, Link } from '@futuremagic/dungeon';
 import type { DungeonProp, DwellerDef, HistoryDef } from '../../setting/contract';
+import type { DungeonTemplate } from '../decisions';
 import type { CellarRoom, HistoryLayer } from './cellar';
 
 /** What a set piece may do while its dungeon is furnished. */
@@ -29,6 +30,8 @@ export interface SetPieceDef {
   readonly id: string;
   /** What the player meets, in a line. */
   readonly about: string;
+  /** The kinds of dungeon it belongs in (none: every kind). */
+  readonly kinds?: readonly DungeonTemplate[];
   /** Layers of history it needs, by kind: forces these choices (ids from the setting's cellar lore). */
   readonly troubles?: readonly string[];
   /** Needs a storey below (an older layer). */
@@ -55,6 +58,7 @@ const tagged = (g: DungeonGraph, room: number, tag: string) => g.rooms[room].tag
 export const SET_PIECES: readonly SetPieceDef[] = [
   {
     id: 'broken-floor',
+    kinds: ['cellar'],
     about: 'The floor of a cellar room has fallen into an older hall below; from the broken edge the goal is in sight, far down, and the way to it leads around.',
     troubles: ['collapse'],
     older: true,
@@ -69,6 +73,7 @@ export const SET_PIECES: readonly SetPieceDef[] = [
   },
   {
     id: 'bricked-wall',
+    kinds: ['cellar'],
     about: 'A wall bricked up later than the others. The mortar is paler, a ledger pays a mason for work the house never shows, and the wall rings hollow; behind it, the hidden way.',
     troubles: ['sealed', 'debt'],
     prefer: ['hidden-shortcut', 'secret-key', 'side-loop'],
@@ -86,6 +91,7 @@ export const SET_PIECES: readonly SetPieceDef[] = [
   },
   {
     id: 'false-cask',
+    kinds: ['cellar'],
     about: 'A great cask against a wall that never empties and never fills: its tap is dry, it rings hollow, and the floor before it is worn in an arc. It swings out on hinges.',
     prefer: ['hidden-shortcut', 'side-loop', 'secret-key'],
     find: (g) => g.links.find((l) => l.kind === 'secret' && l.b !== g.entrance) ?? g.links.find((l) => l.kind === 'secret') ?? null,
@@ -118,7 +124,7 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     use: { id: 'stand', room: (_g, l) => l.a },
     found: 'You heave the beams aside and lift the bar. Whoever held this door is long gone.',
     dress({ link, trouble, put, clue }) {
-      const why = trouble.id === 'sealed' ? 'they bricked us in with the sick' : trouble.id === 'flood' ? 'the water rose behind us' : 'they came up from below';
+      const why = trouble.id === 'robbed' ? 'the dead came out of the walls' : trouble.id === 'sealed' ? 'they bricked us in with the sick' : trouble.id === 'flood' ? 'the water rose behind us' : 'they came up from below';
       const k = clue(`Scratched into the beam: "Held the door three nights. No more water. ${why.charAt(0).toUpperCase()}${why.slice(1)}." The bar is still down on this side.`, link.a, link.id);
       put(link.a, 'beam', 'trouble', k); put(link.a, 'barrel', 'trouble'); put(link.a, 'bones', 'trouble');
     },
@@ -139,6 +145,7 @@ export const SET_PIECES: readonly SetPieceDef[] = [
   },
   {
     id: 'stewards-key',
+    kinds: ['cellar'],
     about: "The far door is locked. The steward's ledger says where the key was left, if one reads it right.",
     prefer: ['lock-key', 'secret-key', 'seen-key'],
     find: (g) => g.links.find((l) => l.kind === 'locked' && l.key !== undefined) ?? null,
@@ -208,7 +215,38 @@ export const SET_PIECES: readonly SetPieceDef[] = [
       put(link.a, 'lantern', 'now', k); put(link.a, 'rubble', 'trouble');
     },
   },
+  {
+    id: 'empty-bier',
+    kinds: ['barrow'],
+    about: 'Before the tomb, a great bier of grey stone, the grave-cloth thrown back and nobody on it; the dust tells which way its sleeper went.',
+    prefer: ['seen-goal', 'lock-key', 'gallery'],
+    find: (g) => g.links.find((l) => l.b === g.goal && l.a !== g.entrance) ?? g.links.find((l) => l.a === g.goal && l.b !== g.entrance) ?? null,
+    use: { id: 'bier-hall', era: 'trouble', room: (g, l) => other(l, g.goal) },
+    dress({ link, graph, put, clue }) {
+      const hall = other(link, graph.goal);
+      const k = clue('A bier of grey stone, the grave-cloth thrown back. The dust on it keeps the shape of a long body, and the drag of its feet leads on, deeper in.', hall, link.id);
+      put(hall, 'candle', 'trouble', k); put(hall, 'bones', 'trouble');
+    },
+  },
+  {
+    id: 'robbers-hole',
+    kinds: ['barrow'],
+    about: "Grave-robbers dug a hole of their own past the sealed rooms; their tally on the wall says how many went in, and how many came back.",
+    prefer: ['bolt-hole', 'collapsed-way', 'hidden-shortcut'],
+    troubles: ['robbed'],
+    find: (g) => g.links.find((l) => l.tags.includes('dug')) ?? g.links.find((l) => l.kind === 'secret') ?? null,
+    found: "You crawl through the robbers' hole and come out where they meant to.",
+    dress({ link, put, clue }) {
+      const k = clue('A pick-head rusted through, and a tally scratched in the wall: seven strokes for those who went in, two for those who came out.', link.a, link.id);
+      put(link.a, 'lantern', 'trouble', k); put(link.a, 'rubble', 'trouble');
+    },
+  },
 ];
+
+/** The set pieces of a kind of dungeon. */
+export function setPiecesFor(kind: DungeonTemplate): readonly SetPieceDef[] {
+  return SET_PIECES.filter((p) => !p.kinds || p.kinds.includes(kind));
+}
 
 export function setPieceById(id: string): SetPieceDef {
   const s = SET_PIECES.find((p) => p.id === id);
