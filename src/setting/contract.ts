@@ -8,7 +8,7 @@
 
 import type { GradeKey } from '@futuremagic/stage';
 
-export const CONTRACT_VERSION = 9;
+export const CONTRACT_VERSION = 10;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -417,8 +417,35 @@ export interface ShopDef {
   readonly asks: number;
   /** At most this many keep the shop in a town (the market's first stalls; absent: every keeper). */
   readonly most?: number;
-  /** Fine work: their goods roll rarity as finds at this danger (absent: all plain). */
-  readonly quality?: number;
+  /** Days between restocks (each shop on its own day): the shelves are filled again and coin comes back. */
+  readonly restock: number;
+  /**
+   * Fine work, the price ladder above the plain goods (plan 11.5): this many uncommon pieces and rare
+   * ones made of the shop's wearable goods (the rare of the dearest), their bonuses as found at
+   * `danger`. Fixed by the shop, never by the hero (D29).
+   */
+  readonly fine?: { readonly uncommon: number; readonly rare: number; readonly danger: number };
+}
+
+/**
+ * A teacher (plan 11.4, 11.5): a townsperson of this trade sells lessons in a few skills. A lesson is one
+ * point of the skill and some hours; it costs more the higher the skill, and above `upTo` they have
+ * nothing more to teach (from there only use and harder masters).
+ */
+export interface TrainerDef {
+  /** The teacher's trade ('smith', 'carter', 'innkeeper'), or 'trader' / 'keeper' by role. */
+  readonly keeper: string;
+  /** Who they are as a teacher ("Borin, the smith"), shown on the window: `{name}`. */
+  readonly title: string;
+  /** The talk topic that opens the lessons, and their line as it opens. */
+  readonly topic: string;
+  readonly line: string;
+  readonly skills: readonly string[];
+  readonly upTo: number;
+  /** Copper for a lesson at skill 0; it grows with the square of (1 + skill / 10). */
+  readonly price: number;
+  /** Game hours one lesson takes. */
+  readonly hours: number;
 }
 
 /** A weapon ability on the belt (plan 11.2; Norgo's recipe format comes with milestone 6). */
@@ -584,6 +611,8 @@ export interface SettingModule {
   readonly upkeep: UpkeepDef;
   /** The town's shops (plan 11.5), by who keeps them. */
   readonly shops: readonly ShopDef[];
+  /** Who teaches what in town (plan 11.4). */
+  readonly trainers: readonly TrainerDef[];
   readonly abilities: readonly AbilityDef[];
   readonly director: DirectorDef;
   readonly hero: HeroLooksDef;
@@ -702,6 +731,12 @@ function validateFight(m: SettingModule, where: string): string[] {
   for (const sh of m.shops) {
     for (const [id, n] of sh.goods) if (!items.has(id) || !(n > 0)) out.push(`${where}: shop "${sh.keeper}" keeps unknown item "${id}" or none of it`);
     if (!(sh.pays > 0 && sh.pays < sh.asks) || !(sh.purse > 0)) out.push(`${where}: shop "${sh.keeper}" must pay less than it asks, and hold some coin`);
+    if (!(sh.restock >= 1)) out.push(`${where}: shop "${sh.keeper}" must restock every day or more`);
+    if (sh.fine && !sh.goods.some(([id]) => items.get(id)?.slot)) out.push(`${where}: shop "${sh.keeper}" has fine work but no wearable goods`);
+  }
+  for (const t of m.trainers) {
+    for (const k of t.skills) if (!skills.has(k)) out.push(`${where}: trainer "${t.keeper}" teaches unknown skill "${k}"`);
+    if (!(t.price > 0 && t.hours > 0 && t.upTo > 0 && t.upTo <= 100)) out.push(`${where}: trainer "${t.keeper}" needs a price, hours and upTo 1..100`);
   }
   if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);
   for (const u of m.items.uniques) {

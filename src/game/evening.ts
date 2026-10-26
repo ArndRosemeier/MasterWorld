@@ -26,6 +26,7 @@ import { fightBot } from './bot';
 import { defOf, type Item } from './items';
 import { Market, itemWorth, type Merchant } from './trade';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
+import { lessonPrice, takeLesson, teacherOf } from './lessons';
 import { WALK, Walker, type WalkWorld } from './walker';
 import type { Terrain } from '../world/terrain';
 
@@ -47,6 +48,12 @@ export interface EveningResult {
   /** Copper the finds fetched, and what was bought. */
   readonly earned: number;
   readonly bought: readonly string[];
+  /** Lessons taken ("blades 13"). */
+  readonly lessons: readonly string[];
+  /** Per evening: copper spent on gear and lessons (the coin sink, plan A2b). */
+  readonly spent: readonly number[];
+  /** The purse at the end. */
+  readonly purse: number;
   /** The hero's power at the start and at the end. */
   readonly power: readonly [number, number];
   /** Simulated seconds walking and fighting. */
@@ -73,6 +80,13 @@ const WALK_LIMIT = 900;
 /** How long one visit below may take, seconds. */
 const DELVE_LIMIT = 1200;
 
+/** Copper kept back from lessons (with the room): a mending or two. */
+const LESSON_RESERVE = 40;
+/** Lessons in one skill an evening, at most. */
+const LESSONS_A_DAY = 2;
+/** A purse above this at the end means coin piles up with nothing to buy (plan A2b). */
+const SENSIBLE_PURSE = 400;
+
 /** A failure of the evening: thrown inside, returned as `failed`. */
 class Broke extends Error {}
 
@@ -91,7 +105,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const land = new LandWalk(terrain, town);
   land.walker.place(home.x, home.z);
   const power0 = hero.power;
-  const cleared: string[] = [], bought: string[] = [];
+  const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
   let falls = 0, earned = 0, seconds = 0;
   const pass = (s: number) => { seconds += s; hours += s * HOURS_PER_SECOND; };
 
@@ -113,13 +127,14 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     if (!s.arrived) throw new Broke(`stuck on the way to ${what}: ${s.left.toFixed(0)} m short at (${land.walker.pos.x.toFixed(0)}, ${land.walker.pos.z.toFixed(0)})`);
     say(`walked to ${what} (${s.metres.toFixed(0)} m, ${s.seconds.toFixed(0)} s)`);
   };
-  const workplace = (m: Merchant): { at: [number, number]; name: string } => {
-    const p = people[m.person];
+  const workplace = (m: Merchant): { at: [number, number]; name: string } => workOf(people[m.person], m.shop.keeper);
+  const workOf = (p: Person, keeper: string): { at: [number, number]; name: string } => {
     const b = p.work >= 0 ? town.plan.buildings[p.work] : null;
-    if (b) return { at: front(b), name: `the ${m.shop.keeper}'s` };
+    if (b) return { at: front(b), name: `the ${keeper}'s` };
     const [x, z] = polyCentroid(town.plan.market);
-    return { at: [x, z], name: `the ${m.shop.keeper} at the market` };
+    return { at: [x, z], name: `the ${keeper} at the market` };
   };
+  const teachers = people.flatMap((p) => { const t = teacherOf(setting, p); return t ? [{ p, t }] : []; });
   const merchant = (keeper: string) => market.merchants.find((m) => m.shop.keeper === keeper) ?? null;
 
   /** Ask around for news, the innkeeper first; the first lead heard that is still open. */
@@ -146,6 +161,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     const evenings = opts.evenings ?? 1;
     for (let e = 0; e < evenings; e++) {
       say(`evening ${e + 1}: power ${hero.power}, ${hero.coins} copper, ${hero.pack.length} in the pack`);
+      let paid = 0;
       const lead = hearLead(heard);
       heard.add(lead.id);
       const dungeon = lead.kind === 'dungeon' ? lead : (log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.id === lead.dungeon) ?? null);
@@ -236,12 +252,33 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         const w = workplace(m);
         walkTo(w.name, ...w.at);
         const was = hero.power;
+        const before = hero.coins;
         if (market.buy(hero, m, up.item)) continue;
+        paid += before - hero.coins;
         hero.equip(up.item);
         bought.push(up.item.name);
         say(`bought ${up.item.name} from the ${m.shop.keeper}: power ${was} -> ${hero.power}`);
         break;
       }
+      // Lessons with what is left above a night's room and a mending (the weapon's skill first, then guarding).
+      const reserve = setting.upkeep.room + LESSON_RESERVE;
+      for (const skill of [hero.weapon.skill, 'armour', 'dodge', 'shields']) {
+        const by = teachers.find(({ t }) => t.skills.includes(skill));
+        if (!by) continue;
+        let walked = false;
+        for (let n = 0; n < LESSONS_A_DAY; n++) {
+          if (hero.coins - lessonPrice(by.t, hero.skills.get(skill) ?? 0) < reserve) break;
+          if (!walked) { const w = workOf(by.p, by.t.keeper); walkTo(w.name, ...w.at); walked = true; }
+          const before = hero.coins;
+          if (takeLesson(hero, by.t, skill)) break;
+          paid += before - hero.coins;
+          hours += by.t.hours;
+          taught.push(`${skill} ${Math.floor(hero.skills.get(skill) ?? 0)}`);
+          say(`a lesson in ${skill} from the ${by.t.keeper} for ${before - hero.coins} copper: ${Math.floor(hero.skills.get(skill) ?? 0)}`);
+        }
+      }
+      spent.push(paid);
+      if (e > 0 && !paid && !spent[e - 1]) throw new Broke(`two evenings with nothing bought and no lesson (${hero.coins} copper)`);
       // A room for the night, and the next morning's news.
       const innB = buildingOf(town.plan, 'inn');
       if (!innB) throw new Broke('no inn in town');
@@ -254,15 +291,16 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     }
     if (opts.reckless && !falls) throw new Broke('went down reckless and did not fall');
     if (!bought.length) throw new Broke(`bought no upgrade in ${evenings} evenings (${hero.coins} copper left)`);
+    if (hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
     // The next lead: someone has news of a place not yet visited.
     const next = hearLead(heard);
     say(`the next lead is ${next.id}`);
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, power: [power0, hero.power], seconds };
+    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], seconds };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, power: [power0, hero.power], seconds };
+  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], seconds };
 }
 
 /** A point just outside a building's door. */
