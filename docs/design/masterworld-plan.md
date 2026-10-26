@@ -56,7 +56,7 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 | D31 | **Items like players know them: common, uncommon, rare, legendary,** shown on WoW-style item cards. Items can raise one or more skills, and a few rare abilities can only be gained from items. | Arnd, 2026-10-25. Section 11.5. |
 | D32 | **No crafting in 1.0.** It can come later. | Arnd, 2026-10-25. |
 | D33 | **No intelligent companions.** If there are companions, they are animals, elementals or summoned things, never a talking person who follows you around. | Arnd, 2026-10-25. Hard to make feel good. |
-| D34 | **Race factions with reputation.** Each people is a faction, and they have their own areas: a human walking into the orc town is in trouble unless they have earned the orcs' trust. Other factions (guilds, the Temple, the watch) come later. | Arnd, 2026-10-25. Section 11.6. |
+| D34 | **Race factions with reputation.** Each people is a faction, and they have their own areas: a human walking into the orc town is in trouble unless they have earned the orcs' trust. Other factions (the Temple, the watch) come later; guilds come with D49. | Arnd, 2026-10-25. Section 11.6. |
 | D35 | **The player's map is the hint channel.** When an NPC gives a task, the player shows them the map (animated), and the NPC marks the place on it. An **orientation skill** makes the player's own position on the map more and more exact. | Arnd, 2026-10-25. Sections 9.1, 11.7. |
 | D36 | **Talk uses Arnd's Conversations package.** Free LLM access through Arnd's `freeryder` project (no cost, but less reliable) is a separate discussion (O15). | Arnd, 2026-10-25. Sections 9.1, 15. |
 | D37 | **Game time: one game day takes 60 real minutes.** The player moves at real speed. | 2026-10-25. Section 5.4. |
@@ -71,6 +71,7 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 | D46 | **The title animation is a hero feature.** Captivating and playful, like Starlord's, and the world is built behind it while it plays. | Arnd, 2026-10-25. Section 17, O18. |
 | D47 | **Free and open source, MIT licence.** | Arnd, 2026-10-25. |
 | D48 | **Buildings open in place:** as one comes to a door, that one building is swapped for a hollow version where it stands (every storey, stairs, windows one looks out of, the hearth under the chimney), read from the same house shape as its outside; no fade; it shuts again once one walks away. | Arnd, 2026-10-26 (windows and a second storey seen outside but not inside). Section 7. |
+| D49 | **Skills are learned at guild houses.** Every skill set has a house with trainers, in town or a short way out and already on the map. A trainer opens a new skill (its rank 0) and later ranks and abilities, but only once the hero has earned them by use; some ranks ask for a trainer's task first. Lessons stay a paid speed-up. Tomes, items and deeds stay rare extra ways to an ability. Each guild is a faction with standing. Magic stays rare: its houses are small and a little out of the way (the hedge witch's cottage, the warden of the half-ruined tower), not a grand hall. Skills not for the public eye (magic, stealth, lockpicking) may have hidden houses, often underground (under the town, a cellar, a cave), not on the map. A teller at the inn (a bard) answers "where can I learn …?" from the first evening and marks the way on the map, the hidden houses too, so a hero can start in any direction without first earning a hint with another skill. | Arnd, 2026-10-26 (how does a hero start pyromancy?). Sections 10, 11.6. |
 
 ---
 
@@ -412,6 +413,8 @@ Norgo's system, as it stands:
 
 Decided: **a mix** (D11). Skill levels still unlock abilities, and other sources do too: a trainer, a guild rank, a found tome or scroll, a quest reward, an item, a deed ("slew a dragon"). That gives the VGM another lever: it can hand out an unlock as a reward that fits the player's playstyle.
 
+**How a skill starts (D49, 2026-10-26).** Skills rise by use, but a hero cannot use a skill they never got. So skills are learned at **guild houses**: one per skill set, in town or a short way out, and on the map from the start. A trainer there opens the skill at rank 0. After that, use raises it, and the trainer opens the next rank or ability once the hero has earned it by use; some ranks ask for a trainer's task first (a quest, the VGM's lever). Lessons (A2b) stay a paid speed-up within a rank. Tomes, scrolls, items and deeds stay rare extra ways to an ability, so an item-only ability (D31) still feels special. Each guild is a faction with standing (11.6). Magic stays rare after the Fading: its "houses" are small and a little out of the way, one teacher for a school or two (the hedge witch's cottage, the warden of the half-ruined tower), never a grand mages' hall. **Hidden houses:** skills not for the public eye (magic, stealth, lockpicking, poisons) may be taught underground (a vault under the town, a cellar behind the inn, a cave) and are not on the map; the way in is a lead the VGM may promise like any other place. **Nobody has to earn their way to their first skill with another:** a bard at the inn (a teller who knows every house) answers "where can I learn …?" from the first evening and marks the place on the hero's map (D35); for a hidden house he gives the way in (a word, a contact, a door). A background may already know one house. The fighting and craft houses come first; the magic teachers come with the schools.
+
 Decided for the default world (2026-10-25): magic is what returns after the Fading (12.1), so mages are rare and respected. **Six schools at the start**: pyromancy, cryomancy, geomancy, vitae, luminism, umbramancy. Kinesis, animism and runecraft can come back later as long-term goals. Gravitas is dropped. A hedge witch and a half-ruined tower near the town are the first teachers. Items can also grant rare abilities (D31).
 
 Notes:
@@ -478,7 +481,8 @@ The mode is a setting the VGM honours (D4): in roguelike mode it is stricter wit
 
 * Each people (race) is a faction with a reputation number the simulation reads: greetings, prices, who will talk to you, whether the guards let you in.
 * Peoples have their own areas. Walking into the orc town as a human is dangerous until you have earned the orcs' trust (a deed, a gift, a quest for them).
-* Other factions (the Temple, guilds, the watch, a thieves' ring) come later.
+* **Guilds (D49)** are factions too: standing with a guild rises through its trainer's tasks and opens its higher ranks.
+* Other factions (the Temple, the watch, a thieves' ring) come later.
 * Companions, if any, are animals, elementals or summoned things (D33).
 
 ### 11.7 The map and orientation (D35)
