@@ -20,7 +20,7 @@ const NEAR = 0, FAR = 18, FIRST = 0.6;
 /** A talk's view (m): this far above the aim (about eye height, under a room's wall tops), and at least this far above the hero's head. */
 const TALK_UP = 0.3, TALK_OVER_HEAD = 0.1;
 /** The top of a hood or helmet above the head point (m), and how far a talk's view may rise to leave it out of the shot. */
-const TALK_HEAD_TOP = 0.15, TALK_RISE = 0.8;
+const TALK_HEAD_TOP = 0.15, TALK_RISE = 1.2;
 /**
  * The shots tried for a talk, best first: back and to the right (m). Never straight behind: there the hero's
  * head (a hood, a helmet) fills the bottom middle of the frame.
