@@ -79,6 +79,8 @@ export class Walker {
   mode: WalkMode = 'ground';
   /** Body height, metres. */
   height: number;
+  /** How long (s) the body has been asked to walk on the ground and has not got anywhere. */
+  stuckFor = 0;
 
   constructor(private readonly world: WalkWorld, readonly spec: WalkSpec = WALK) {
     this.height = spec.height;
@@ -89,6 +91,7 @@ export class Walker {
     const g = this.support(x, z, y ?? 1e5);
     this.pos.x = x; this.pos.z = z; this.pos.y = y ?? g;
     this.vel.x = this.vel.y = this.vel.z = 0;
+    this.stuckFor = 0;
     this.mode = this.pos.y > g + 0.05 ? 'air' : 'ground';
     this.settleInWater();
   }
@@ -160,7 +163,17 @@ export class Walker {
     // already in something (placed against a tree) may move, so it can walk out.
     const stuck = this.blocked(p.x, p.y, p.z);
     const tryMove = (nx: number, nz: number): boolean => {
-      if (!stuck && this.blocked(nx, p.y, nz)) return false;
+      // Going down a step the body sinks as it moves on, so the head is tested at the lower floor too
+      // (else a tall body under a low edge climbs a stair it can never come down again).
+      if (!stuck && this.blocked(nx, p.y, nz)) {
+        // The floor a body's width ahead: the step down it is about to take.
+        const run = Math.hypot(nx - p.x, nz - p.z), k = run > 1e-6 ? this.spec.radius / run : 0;
+        const ahead = this.mode === 'ground' ? this.support(nx + (nx - p.x) * k, nz + (nz - p.z) * k, p.y) : p.y;
+        if (ahead >= p.y - 1e-3) return false;
+        // Sinking up to a step (not into the step ahead's own block, nor deeper than the floor ahead).
+        const low = Math.max(ahead, p.y - this.spec.step);
+        if ([this.support(nx, nz, p.y), (p.y + low) / 2, low].every((y) => y >= p.y - 1e-3 || this.blocked(nx, y, nz))) return false;
+      }
       if (this.mode === 'ground') {
         const run = Math.hypot(nx - p.x, nz - p.z);
         const rise = this.support(nx, nz, p.y) - p.y;
@@ -172,12 +185,14 @@ export class Walker {
       p.x = nx; p.z = nz;
       return true;
     };
-    const nx = p.x + v.x * dt, nz = p.z + v.z * dt;
+    const nx = p.x + v.x * dt, nz = p.z + v.z * dt, x0 = p.x, z0 = p.z;
     if (!tryMove(nx, nz)) {
       if (tryMove(nx, p.z)) v.z = 0;
       else if (tryMove(p.x, nz)) v.x = 0;
       else { v.x = 0; v.z = 0; }
     }
+    const asked = this.mode === 'ground' && len > 0.3;
+    this.stuckFor = asked && Math.hypot(p.x - x0, p.z - z0) < speed * len * dt * 0.1 ? this.stuckFor + dt : 0;
 
     // Up and down.
     const ground = this.support(p.x, p.z, p.y);
