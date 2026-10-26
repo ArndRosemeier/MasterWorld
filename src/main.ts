@@ -69,9 +69,13 @@ import { Compass, type SkyGlyph } from './app/compass';
 import { talkCellar, townTalk } from './talk/townTalk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
-import { SAVE_VERSION, saveLabel, type SaveData } from './app/saveGame';
+import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
+import { coinText } from './game/items';
+import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
+import { TalesEnd } from './app/talesEnd';
+import { writeSlot } from './persist/saves';
 import { acquaintances } from './game/background';
 import { Director } from './vgm/director';
 import { FightHud } from './app/fightHud';
@@ -106,7 +110,7 @@ export async function start(b: Boot): Promise<void> {
     const loaded = await pendingLoad(setting);
     const save = typeof loaded === 'object' ? loaded : null;
     // The title's Continue: straight on with a loaded save, or offered when one is kept.
-    if (title && save) title.continuing(saveLabel(save, 'where you left off'));
+    if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
     else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const seedText = save?.seed ?? params.seed;
     const seed = parseSeed(seedText);
@@ -245,6 +249,11 @@ export async function start(b: Boot): Promise<void> {
     const character = new Character(setting, save?.character ?? undefined);
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
     armHero();
+    // Classic or roguelike (plan 11.1): chosen in the creator, kept in the save. What fallen heroes left lies where they fell.
+    let mode: GameMode = save?.mode ?? 'classic';
+    const remains: Remains[] = [...(save?.remains ?? [])];
+    // A roguelike hero fell: the heir's save is written and nothing saves over it.
+    let ended = false;
     // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
     const life = town ? new TownLife(town.plan, seed, hours(), setting.routines) : null;
     folkLife = life;
@@ -344,10 +353,24 @@ export async function start(b: Boot): Promise<void> {
       get bindings() { return settings.current.bindings; },
       get blocked() { return open > 0; },
       wake: () => {
-        const v = visit();
-        const toInn = () => { if (inn) { const [x, z, yaw] = inn.door; player.teleport(x - Math.sin(yaw) * 1.2, undefined, z - Math.cos(yaw) * 1.2, yaw + Math.PI); } };
-        if (v) void v.leave().then(toInn);
-        else toInn();
+        const v = visit(), w = player.walker.pos;
+        const at: FallPlace = {
+          x: w.x, y: w.y, z: w.z, below: v ? v.cellar.decision.id : null,
+          mark: v ? { x: v.houseDoor[0], z: v.houseDoor[1] } : { x: w.x, z: w.z },
+          label: v ? `in ${v.cellar.house}'s cellar` : 'out on the land',
+        };
+        const id = remainsId(hours());
+        if (mode === 'roguelike') { endTale(at, id); return null; }
+        // Classic: carried off to wake somewhere safe, the pack left where the hero fell.
+        const fell = fallClassic(character, at, id, view.sky.day);
+        if (fell.remains) leaveRemains(fell.remains);
+        // Where the hero wakes: the inn's door.
+        const carry = (): string | void => { if (inn) { const [x, z, yaw] = inn.door; player.teleport(x - Math.sin(yaw) * 1.2, undefined, z - Math.cos(yaw) * 1.2, yaw + Math.PI); } };
+        let place = 'the inn';
+        if (v) void v.leave().then(carry);
+        else place = carry() || place;
+        return `You wake in ${place}, aching. Someone carried you there${fell.lost ? `, and ${coinText(fell.lost)} went with them` : ''}.`
+          + (fell.remains ? ' Your pack stayed where you fell; your map marks the place.' : '');
       },
       still: (on) => paused(on),
       armed: armHero,
@@ -536,6 +559,7 @@ export async function start(b: Boot): Promise<void> {
       get bindings() { return settings.current.bindings; },
       setting: { id: setting.id, version: setting.version },
       say: (text) => notes.say(text),
+      get mode() { return mode; },
       capture: () => {
         // In a room: saved as standing at its door outside (rooms are built when entered).
         const w = rooms?.outside ?? player.walker.pos;
@@ -550,23 +574,58 @@ export async function start(b: Boot): Promise<void> {
           character: character.save(),
           looks: { name: heroName, look: hero.look },
           director: director.snapshot(),
+          mode,
+          remains: [...remains],
         };
         const v = visit();
         return { data, where: v ? `in ${v.cellar.house}'s cellar` : 'in the town' };
       },
     };
     const saves = new SavesUi(savesHost);
-    const autosave = () => void saveNow(savesHost, AUTOSAVE);
-    setInterval(autosave, 5 * 60 * 1000);
+    // A classic game autosaves every 5 minutes; a roguelike one keeps its one save every minute and as the page goes.
+    const autosave = () => { if (!ended) void saveNow(savesHost, mode === 'roguelike' ? ROGUE_SLOT : AUTOSAVE); };
+    let minutes = 0;
+    setInterval(() => { if (mode === 'roguelike' || ++minutes % 5 === 0) autosave(); }, 60 * 1000);
+    addEventListener('pagehide', () => { if (mode === 'roguelike' && heroName) autosave(); });
+    // Remains left where a hero fell: on the map until taken up again. The ones just left wait until the hero has been away.
+    let justLeft: Remains | null = null;
+    const leaveRemains = (r: Remains) => {
+      remains.push(r);
+      journal.remember(remainsEntry(r));
+      justLeft = r;
+    };
+    const gatherNear = () => {
+      if (!remains.length || !character.alive) return;
+      const v = visit(), w = player.walker.pos, below = v ? v.cellar.decision.id : null;
+      if (justLeft && (justLeft.at.below !== below || Math.hypot(justLeft.at.x - w.x, justLeft.at.z - w.z) > 8)) justLeft = null;
+      const r = remainsNear(remains, below, w.x, w.y, w.z);
+      if (!r || r === justLeft) return;
+      gather(character, r);
+      remains.splice(remains.indexOf(r), 1);
+      journal.fulfil(r.id);
+      notes.say(gatheredLine(r), 6);
+      sounds?.cue({ kind: 'found', loot: { items: [...r.items], coins: r.coins } });
+    };
+    // `?open=tale`: the end of a roguelike tale as it shows (for the standard shots), without ending anything.
+    const showTale = () => { paused(true); new TalesEnd().show(heroName || 'Wenna Stonehelm', epitaph(heroName || 'Wenna Stonehelm', view.sky.day, { x: 0, y: 0, z: 0, below: null, mark: { x: 0, z: 0 }, label: 'out on the land' }), () => location.reload()); };
+    // Roguelike (plan 11.1): the hero's tale ends where they fell. The world goes on; the next start makes a new hero in it.
+    const endTale = (at: FallPlace, id: string) => {
+      ended = true;
+      const name = heroName || 'a nameless wanderer', day = view.sky.day;
+      const grave = fallRoguelike(character, name, at, id, day);
+      const heir = heirSave(savesHost.capture().data, grave, { x: home.x, y: 0, z: home.z, yaw: 0, below: false });
+      const written = writeSlot(ROGUE_SLOT, saveLabel(heir, `after ${name} fell`), heir).catch(() => notes.say('The browser would not keep the tale.', 8));
+      new TalesEnd().show(name, epitaph(name, day, at), () => void written.then(() => loadAtRestart(ROGUE_SLOT)));
+    };
     if (save) {
       // Lay the save over the fresh world (each cellar takes its changes as it is built), then the hero where they were.
       const h = save.hero;
       const down = h.below ? await cellars.build(h.cellar ?? firstPromise?.id ?? '') : null;
       if (down) await down.enter(true);
       player.teleport(h.x, h.below ? h.y : undefined, h.z, h.yaw);
-      notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
+      if (!save.heir) notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
     } else if (typeof loaded === 'string') notes.say(`Could not load the save: ${loaded}.`, 8);
-    if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else map?.setOpen(true); }
+    if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else if (params.open === 'tale') showTale(); else map?.setOpen(true); }
     new DebugMenu({
       paused,
       get freeCamera() { return player.flying; },
@@ -611,6 +670,7 @@ export async function start(b: Boot): Promise<void> {
         itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
         knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
         click: () => sound.play('click'),
+        mode: save?.heir ? 'roguelike' : null,
       }, seed);
       // Nobody walks between the camera and the hero while the glass is open.
       const cam = view.camera.position;
@@ -622,6 +682,9 @@ export async function start(b: Boot): Promise<void> {
       // The past chosen: its skills, kit and the people in town who know the hero.
       const bg = setting.backgrounds.find((b) => b.id === made.background);
       if (bg) { character.beginAs(bg); armHero(); }
+      // A roguelike tale has its one save from the first step.
+      mode = made.mode;
+      if (mode === 'roguelike') autosave();
       meetOldFriends();
       // Behind the hero, looking the way they face.
       player.teleport(w.pos.x, undefined, w.pos.z, w.yaw);
@@ -630,10 +693,10 @@ export async function start(b: Boot): Promise<void> {
       notes.say(`${made.name} steps out onto the market square.${friends.length ? ` ${friends.join(' and ')} will know you.` : ''}`, 6);
     };
     onBegin = (people) => {
-      if (save) paused(false);
+      if (save && !save.heir) paused(false);
       else void create(people ? PEOPLE_RACE[people] : null);
     };
-    if (!title && params.create && !save) { paused(true); void create(null); }
+    if (!title && ((params.create && !save) || save?.heir)) { paused(true); void create(null); }
     // F flies, H gets on or off a horse (the keys are in the settings).
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
@@ -650,6 +713,7 @@ export async function start(b: Boot): Promise<void> {
       director.observe(dt, { fighting, pressure, health: character.health / character.maxHealth, talking: open > 0, underground: below, inTown: !!town && !below, leads: journal.open.length });
       const m = director.next();
       if (m) notes.say(m, 6);
+      if (!title?.holding && !creator?.showing) gatherNear();
       builderClock += dt;
       if (builderClock < 3 || !town || !life || title?.holding || creator?.showing) return;
       builderClock = 0;
