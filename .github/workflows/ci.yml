@@ -30,3 +30,7 @@ jobs:
         run: npm run loop
       - name: Typecheck and build
         run: npm run build
+      - name: Chromium for the WebGL 2 check
+        run: npx playwright install --with-deps chromium
+      - name: Texture units on WebGL 2 (every material at most 16)
+        run: npm run check:units

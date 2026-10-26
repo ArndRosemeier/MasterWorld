@@ -24,7 +24,8 @@
     "shot:set": "node tools/shot/set.mjs",
     "shot:origin": "node tools/shot/origin.mjs",
     "variety": "node --import tsx tools/variety/cellars.ts",
-    "loop": "node --import tsx tools/loop/evening.ts"
+    "loop": "node --import tsx tools/loop/evening.ts",
+    "check:units": "node tools/units/check.mjs"
   },
   "dependencies": {
     "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.0/actors-animal-0.19.0.tgz",

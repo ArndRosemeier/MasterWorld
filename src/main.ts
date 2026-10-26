@@ -34,7 +34,7 @@ import { FloraView } from './render/flora/FloraView';
 import { GrassView } from './render/grass/GrassView';
 import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
-import { useFieldGround, useTownGround, useTownTextures } from './render/materials/townGround';
+import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
@@ -266,8 +266,7 @@ export async function start(b: Boot): Promise<void> {
       if (town) {
         // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
         useTownTextures(await loadTownTextures(texPool));
-        useTownGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER));
-        useFieldGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => {
+        useTownMasks(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER), (i, j) => {
           const x = town.x0 + (i + 0.5) * TOWN_RASTER, z = town.z0 + (j + 0.5) * TOWN_RASTER;
           const f = town.fieldAt(x, z), path = town.groundAt(x, z) === TownGround.Path;
           return f || path ? { path, crop: f ? CROPS.indexOf(f.crop) : -1, rows: f?.rows ?? 0 } : null;

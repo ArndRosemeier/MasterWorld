@@ -3,8 +3,8 @@
  * materials and the streets') and a mask of its ground for the terrain (R street, G market, B yard,
  * A under a building; world/town.ts), one texel a square metre, filtered so edges blend over a metre.
  */
-import { ClampToEdgeWrapping, DataArrayTexture, DataTexture, LinearFilter, RGBAFormat, UnsignedByteType, Vector2 } from 'three/webgpu';
-import { uniform } from 'three/tsl';
+import { ClampToEdgeWrapping, DataArrayTexture, DataTexture, LinearFilter, RGBAFormat, UnsignedByteType, Vector2, Vector4 } from 'three/webgpu';
+import { uniform, uniformArray } from 'three/tsl';
 import type { GroundTextures } from '../terrain/groundTextures';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 
@@ -29,52 +29,46 @@ function maskTexture(data: Uint8Array, w: number, h: number): DataTexture {
   return t;
 }
 
-export const TOWN_GROUND = {
-  mask: maskTexture(new Uint8Array(4), 1, 1) as DataTexture,
-  /** World xz of the mask's corner, and its size in metres. */
-  origin: uniform(new Vector2(0, 0)),
-  size: uniform(new Vector2(1, 1)),
-};
-
-/** The ground mask of a town: `at(i, j)` gives TownGround per cell (1 yard, 2 street, 3 market, 4 building). */
-export function useTownGround(x0: number, z0: number, nx: number, nz: number, cell: number, at: (i: number, j: number) => number): void {
-  const data = new Uint8Array(nx * nz * 4);
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    const g = at(i, j), o = (i + j * nx) * 4;
-    if (g === 2) data[o] = 255; else if (g === 3) data[o + 1] = 255; else if (g === 1) data[o + 2] = 255; else if (g === 4) data[o + 3] = 255;
-  }
-  // A new texture (set before the warm-up builds the terrain shader, which samples it).
-  TOWN_GROUND.mask = maskTexture(data, nx, nz);
-  TOWN_GROUND.origin.value.set(x0, z0);
-  TOWN_GROUND.size.value.set(nx * cell, nz * cell);
-}
-
 /**
- * The town's farmland for the terrain shader: one texel a square metre, R a track (trodden earth),
- * G a field, B its crop (index into CROPS, times CROP_STEP / 255), A the way its rows run (0..π as
- * 0..1). Crop and rows reach two metres past each field, so filtering at its edge mixes nothing in.
+ * The town's two ground masks in one texture, side by side (one texture unit: the land's shader is near
+ * WebGL 2's 16). Left half, the ground (R street, G market, B yard, A under a building); right half,
+ * the farmland (R a track, i.e. trodden earth; G a field; B its crop, an index into CROPS times
+ * CROP_STEP / 255; A the way its rows run, 0..π as 0..1). Crop and rows reach two metres past each
+ * field, so filtering at its edge mixes nothing in.
  */
-export const FIELD_GROUND = {
-  mask: maskTexture(new Uint8Array(4), 1, 1) as DataTexture,
+export const TOWN_MASKS = {
+  mask: maskTexture(new Uint8Array(8), 2, 1) as DataTexture,
+  /** World xz of the masks' corner, and their size in metres. */
   origin: uniform(new Vector2(0, 0)),
   size: uniform(new Vector2(1, 1)),
+  /** Half a texel of one mask, as a share of it (reads are kept inside their own half). */
+  half: uniform(new Vector2(0.5, 0.5)),
 };
 
-/** The crop index's step in the mask's blue channel. */
+/** The crop index's step in the farmland mask's blue channel. */
 export const CROP_STEP = 20;
 
-/** `at(i, j)`: per cell, whether it is a track, and the field there (crop index, rows), if any. */
-export function useFieldGround(x0: number, z0: number, nx: number, nz: number, cell: number, at: (i: number, j: number) => { path: boolean; crop: number; rows: number } | null): void {
-  const data = new Uint8Array(nx * nz * 4);
+/** The farmland at a cell: whether it is a track, and the field there (crop index, rows), if any. */
+export type FieldCell = { path: boolean; crop: number; rows: number } | null;
+
+/**
+ * The town's masks: `ground(i, j)` gives TownGround per cell (1 yard, 2 street, 3 market, 4 building),
+ * `field(i, j)` the farmland. Set before the warm-up builds the terrain shader, which samples them.
+ */
+export function useTownMasks(x0: number, z0: number, nx: number, nz: number, cell: number, ground: (i: number, j: number) => number, field: (i: number, j: number) => FieldCell): void {
+  const w = nx * 2, data = new Uint8Array(w * nz * 4);
   const has = new Uint8Array(nx * nz);
+  const texel = (i: number, j: number, half: number) => (i + half * nx + j * w) * 4;
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    const g = at(i, j), o = (i + j * nx) * 4;
-    if (!g) continue;
-    if (g.path) data[o] = 255;
-    if (g.crop >= 0) {
-      data[o + 1] = 255;
-      data[o + 2] = g.crop * CROP_STEP;
-      data[o + 3] = Math.round((((g.rows % Math.PI) + Math.PI) % Math.PI) / Math.PI * 255);
+    const g = ground(i, j), o = texel(i, j, 0);
+    if (g === 2) data[o] = 255; else if (g === 3) data[o + 1] = 255; else if (g === 1) data[o + 2] = 255; else if (g === 4) data[o + 3] = 255;
+    const f = field(i, j), q = texel(i, j, 1);
+    if (!f) continue;
+    if (f.path) data[q] = 255;
+    if (f.crop >= 0) {
+      data[q + 1] = 255;
+      data[q + 2] = f.crop * CROP_STEP;
+      data[q + 3] = Math.round((((f.rows % Math.PI) + Math.PI) % Math.PI) / Math.PI * 255);
       has[i + j * nx] = 1;
     }
   }
@@ -86,16 +80,17 @@ export function useFieldGround(x0: number, z0: number, nx: number, nz: number, c
       for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const a = i + di, b = j + dj;
         if (a < 0 || b < 0 || a >= nx || b >= nz || !was[a + b * nx]) continue;
-        const o = (i + j * nx) * 4, q = (a + b * nx) * 4;
+        const o = texel(i, j, 1), q = texel(a, b, 1);
         data[o + 2] = data[q + 2]; data[o + 3] = data[q + 3];
         has[i + j * nx] = 1;
         break;
       }
     }
   }
-  FIELD_GROUND.mask = maskTexture(data, nx, nz);
-  FIELD_GROUND.origin.value.set(x0, z0);
-  FIELD_GROUND.size.value.set(nx * cell, nz * cell);
+  TOWN_MASKS.mask = maskTexture(data, w, nz);
+  TOWN_MASKS.origin.value.set(x0, z0);
+  TOWN_MASKS.size.value.set(nx * cell, nz * cell);
+  TOWN_MASKS.half.value.set(0.5 / nx, 0.5 / nz);
 }
 
 /**
@@ -119,12 +114,9 @@ const CROP_LOOKS: readonly [number, number, number, number, number, number, numb
 ];
 
 export const CROP_LOOK = (() => {
-  const n = CROP_LOOKS.length, data = new Uint8Array(n * 2 * 4);
-  CROP_LOOKS.forEach(([r, g, b, cover, spacing, clumps, furrows, rows], i) => {
-    data.set([r, g, b, cover * 255], i * 4);
-    data.set([(spacing / 2) * 255, clumps * 255, furrows * 255, rows * 255], (n + i) * 4);
-  });
-  const t = new DataTexture(data, n, 2, RGBAFormat, UnsignedByteType);
-  t.needsUpdate = true;
-  return { texture: t, count: n };
+  const n = CROP_LOOKS.length;
+  const looks = CROP_LOOKS.map(([r, g, b, cover]) => new Vector4(r / 255, g / 255, b / 255, cover));
+  const shapes = CROP_LOOKS.map(([, , , , spacing, clumps, furrows, rows]) => new Vector4(spacing / 2, clumps, furrows, rows));
+  // A uniform array, not a texture: the land's shader has no texture unit to spare.
+  return { table: uniformArray([...looks, ...shapes], 'vec4'), count: n };
 })();
