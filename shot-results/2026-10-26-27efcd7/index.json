@@ -1,0 +1,298 @@
+{
+  "commit": "27efcd7f8c23152218c8ae1360990b9ce7903eab",
+  "dirty": false,
+  "date": "2026-10-26",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": true,
+  "viewport": "1920x1080",
+  "settleMs": 3000,
+  "measureMs": 3000,
+  "seconds": 403.269,
+  "shots": [
+    {
+      "name": "title",
+      "file": "01-title.jpg",
+      "query": "title&gl",
+      "loadS": 52.833,
+      "backend": "webgl2",
+      "frames": 296,
+      "p50": 9.299999999995634,
+      "p95": 12.700000000004366,
+      "mean": 10.135135135135135,
+      "shaders": {
+        "warmup": 135,
+        "run": 71,
+        "worstMs": 13,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "creator",
+      "file": "02-creator.jpg",
+      "query": "title=0&day=0&gl&create&hour=11",
+      "loadS": 33.134,
+      "backend": "webgl2",
+      "frames": 97,
+      "p50": 20.89999999999418,
+      "p95": 64,
+      "mean": 30.96804123686761,
+      "shaders": {
+        "warmup": 207,
+        "run": 70,
+        "worstMs": 12.600000023841858,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-noon",
+      "file": "03-town-noon.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.927,
+      "backend": "webgl2",
+      "frames": 103,
+      "p50": 22.400000000001455,
+      "p95": 62.60000000000218,
+      "mean": 29.7233009706423,
+      "shaders": {
+        "warmup": 206,
+        "run": 68,
+        "worstMs": 12.299999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "pack",
+      "file": "04-pack.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.927,
+      "backend": "webgl2",
+      "frames": 149,
+      "p50": 17.200000000004366,
+      "p95": 47.69999999999709,
+      "mean": 20.188590604186857,
+      "shaders": {
+        "warmup": 206,
+        "run": 142,
+        "worstMs": 12.299999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "map",
+      "file": "05-map.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.927,
+      "backend": "webgl2",
+      "frames": 149,
+      "p50": 18.900000000001455,
+      "p95": 49.400000000001455,
+      "mean": 20.25838926126495,
+      "shaders": {
+        "warmup": 206,
+        "run": 224,
+        "worstMs": 15.100000023841858,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-dusk",
+      "file": "06-town-dusk.jpg",
+      "query": "title=0&day=0&gl&hour=19.6&weather=fair",
+      "loadS": 20.003,
+      "backend": "webgl2",
+      "frames": 221,
+      "p50": 11.400000000001455,
+      "p95": 29.099999999998545,
+      "mean": 13.628959276341748,
+      "shaders": {
+        "warmup": 206,
+        "run": 49,
+        "worstMs": 10.399999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "town-night",
+      "file": "07-town-night.jpg",
+      "query": "title=0&day=0&gl&hour=23&weather=clear",
+      "loadS": 19.859,
+      "backend": "webgl2",
+      "frames": 253,
+      "p50": 12,
+      "p95": 14.200000000000728,
+      "mean": 11.886166008093612,
+      "shaders": {
+        "warmup": 206,
+        "run": 13,
+        "worstMs": 10.800000071525574,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "town-rain",
+      "file": "08-town-rain.jpg",
+      "query": "title=0&day=0&gl&hour=14&weather=rain",
+      "loadS": 32.438,
+      "backend": "webgl2",
+      "frames": 114,
+      "p50": 19.200000000004366,
+      "p95": 53.5,
+      "mean": 26.590350877193007,
+      "shaders": {
+        "warmup": 207,
+        "run": 75,
+        "worstMs": 11.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "cellar",
+      "file": "09-cellar.jpg",
+      "query": "title=0&day=0&gl&hour=12&cellar=2",
+      "loadS": 24.532,
+      "backend": "webgl2",
+      "frames": 358,
+      "p50": 5.799999999999272,
+      "p95": 17.200000000000728,
+      "mean": 8.401955307462359,
+      "shaders": {
+        "warmup": 207,
+        "run": 1,
+        "worstMs": 24.399999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "barrow",
+      "file": "10-barrow.jpg",
+      "query": "title=0&day=0&gl&hour=15&weather=fair&barrow",
+      "loadS": 32.314,
+      "backend": "webgl2",
+      "frames": 331,
+      "p50": 9,
+      "p95": 10.69999999999709,
+      "mean": 9.081268882031162,
+      "shaders": {
+        "warmup": 226,
+        "run": 0,
+        "worstMs": 13.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "wild",
+      "file": "11-wild.jpg",
+      "query": "title=0&day=0&gl&hour=9&weather=fair&wild=deer",
+      "loadS": 32.291,
+      "backend": "webgl2",
+      "frames": 293,
+      "p50": 10.39999999999418,
+      "p95": 12.099999999998545,
+      "mean": 10.243003412887921,
+      "shaders": {
+        "warmup": 240,
+        "run": 0,
+        "worstMs": 12,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "fight",
+      "file": "12-fight.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=clear&wild=wolves",
+      "loadS": 25.512,
+      "backend": "webgl2",
+      "frames": 236,
+      "p50": 12.599999999998545,
+      "p95": 15,
+      "mean": 12.7266949154563,
+      "shaders": {
+        "warmup": 210,
+        "run": 0,
+        "worstMs": 11.399999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "talk",
+      "file": "13-talk.jpg",
+      "query": "title=0&day=0&gl&hour=20&talk=inn&topics=news",
+      "loadS": 20.234,
+      "backend": "webgl2",
+      "frames": 205,
+      "p50": 10.599999999998545,
+      "p95": 32.900000000001455,
+      "mean": 14.653170731823614,
+      "shaders": {
+        "warmup": 199,
+        "run": 57,
+        "worstMs": 10.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    }
+  ]
+}
