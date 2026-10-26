@@ -8,12 +8,11 @@
  */
 import { DIRS, LayoutGrid, type Door, type DungeonLayout, type PathCell, type PlacedLink } from '@futuremagic/dungeon';
 import { smin } from '@futuremagic/core';
-import { CELL, STOREY } from './cellar';
+import { CELL, DOOR_W, STOREY } from './cellar';
 
 /** Clear height of passages (rooms reach their storey's full height). */
 export const PASSAGE_H = 2.5;
-/** Width of a door's opening, metres. */
-export const DOOR_W = 1.3;
+export { DOOR_W };
 
 export interface SpaceEvent {
   readonly kind: 'key' | 'unlocked' | 'unbarred' | 'found';
