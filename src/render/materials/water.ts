@@ -130,8 +130,9 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const bands = sin(depth.mul(4.2).sub(t.mul(1.7)).add(n.mul(5))).mul(0.5).add(0.5);
     const foam = clamp(
       shore.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
-        // The wet rim: on running water only a thin line (a brook is shallow all across, and would turn all white).
-        .add(float(1).sub(smoothstep(0.0, mix(float(0.3), float(0.05), still.oneMinus()), depth)).mul(mix(float(0.6), float(0.35), still.oneMinus())))
+        // The wet rim, on still water only: running water's depth comes from masks too coarse for a brook, which is
+        // shallow all across and would turn white; its edge is where the surface meets the bank.
+        .add(float(1).sub(smoothstep(0.0, 0.3, depth)).mul(0.6).mul(still))
         .add(smoothstep(0.55, 1.0, vCrest).mul(smoothstep(0.45, 0.75, n)).mul(0.7))
         .add(float(1).sub(still).mul(smoothstep(0.72, 0.9, streak)).mul(0.35))
         // White water: below a fall the current churns, and the falling sheet itself is all foam.
