@@ -889,6 +889,8 @@ export async function start(b: Boot): Promise<void> {
       herds?.step(dt);
       stock?.herd(dt, view.camera.position);
       if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
+      // Drinkers between the camera and the hero hid the talk: it comes in front of them.
+      player.heroCam.bodies = folk?.indoors ?? [];
       if (above) {
         folk?.follow(dt, view.camera);
         if (boot.trees) flora.update(dt, view.camera);

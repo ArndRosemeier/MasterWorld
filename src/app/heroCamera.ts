@@ -4,7 +4,7 @@
  * src/input/controls.ts). Right mouse button held:
  * mouse look, the hero turns with the camera; left button held: the camera alone orbits the hero; both
  * buttons: run forward. The wheel zooms, all the way into first person. The camera stays out of the
- * ground and the rock.
+ * ground and the rock, and in front of the people in a room.
  */
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { clamp, damp } from '@futuremagic/core';
@@ -33,6 +33,8 @@ export class HeroCamera {
   private lmb = false;
   private rmb = false;
   private readonly eye = new Vector3();
+  /** People standing or sitting about (feet), whom the camera stays in front of as of the walls (a room's). */
+  bodies: readonly { x: number; y: number; z: number }[] = [];
 
   constructor(private readonly camera: PerspectiveCamera, el: HTMLElement, private readonly world: WalkWorld) {
     window.addEventListener('keydown', (e) => { if (this.on && !e.repeat) this.controls.press(e.code); });
@@ -114,7 +116,8 @@ export class HeroCamera {
       const d = (i / steps) * this.zoom;
       const x = head.x - dir.x * d, y = head.y - dir.y * d, z = head.z - dir.z * d;
       const rock = this.world.rockSurface(x, y, z);
-      if (y < this.world.height(x, z) + 0.35 || (rock !== null && rock < 0.35)) { free = Math.max(0, d - 0.3); break; }
+      const body = this.bodies.some((b) => y > b.y && y < b.y + 1.9 && (x - b.x) ** 2 + (z - b.z) ** 2 < 0.4 * 0.4);
+      if (y < this.world.height(x, z) + 0.35 || (rock !== null && rock < 0.35) || body) { free = Math.max(0, d - 0.3); break; }
     }
     this.dist = free < this.dist ? free : this.dist + (free - this.dist) * damp(3, dt);
     this.eye.copy(head).addScaledVector(dir, -this.dist);

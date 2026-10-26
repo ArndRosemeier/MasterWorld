@@ -125,7 +125,8 @@ const CLIP: Record<ActivityKind, string> = {
 export function clipOf(act: ActivityKind, id: number): string {
   if (act === 'garden' && id % 2) return 'plant seeds';
   if (act === 'chat' && id % 3 === 0) return 'nod';
-  if (act === 'drink' && id % 2) return 'sit and talk';
+  // Drinking stands (at the counter, at a table out of doors); sitting talks now and then.
+  if (act === 'sit' && id % 2) return 'sit and talk';
   return CLIP[act];
 }
 
