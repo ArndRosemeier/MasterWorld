@@ -28,10 +28,11 @@ interface Kind {
   readonly shape?: Readonly<Record<string, number>>;
   readonly coat?: Readonly<Record<string, number | readonly number[]>>;
   /**
-   * The coat's own colours (not its white) times this, for every breed: the game's bright day lifts Actors'
-   * mid-tone coats to a pale, flat beige or silver that reads as a stand-in.
+   * The coat's own colours (not its white) for every breed: `[times, hue]`, darker by `times` and up to `hue` times as
+   * far from grey (the greyer the more). The game's bright, sky-blue day lifts Actors' mid-tone coats to a flat beige or
+   * silver and takes their brown away, so they read as stand-ins.
    */
-  readonly shade?: number;
+  readonly shade?: readonly [number, number];
 }
 
 /** The setting's beasts and the farms' cattle, on Actors' bodies (the boar on the dog's rig: Actors has no pig). */
@@ -40,9 +41,9 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     pack: 'dog', preset: 'wolf',
     clips: { idle: 'idle', alert: 'alert', feed: 'idle', walk: 'walk', run: 'run', blow: 'bite', hurt: null, dead: 'death' },
     pace: { walk: 1.5, run: 7 },
-    // Grey-brown all over with a darker saddle and a paler belly and muzzle: Actors' grey wolf reads as a
+    // Grey-brown all over (warmer than it looks in Actors' light: the sky's blue cools it) with a darker saddle and a paler belly and muzzle: Actors' grey wolf reads as a
     // husky in the game's light (white face and legs, a black back), and a mid grey as pale silver.
-    coat: { base: [0.36, 0.32, 0.27], second: [0.17, 0.15, 0.13], tan: [0.48, 0.4, 0.3], white: [0.58, 0.54, 0.47], saddle: 0.6, mask: 0.2, points: 0, socks: 0, blaze: 0, belly: 0.5, bib: 0.3, paleMask: 0.3, tanLegs: 0.3, agouti: 0.5 },
+    coat: { base: [0.4, 0.33, 0.24], second: [0.18, 0.15, 0.12], tan: [0.56, 0.42, 0.27], white: [0.58, 0.54, 0.47], saddle: 0.6, mask: 0.2, points: 0, socks: 0, blaze: 0, belly: 0.5, bib: 0.3, paleMask: 0.3, tanLegs: 0.3, agouti: 0.5 },
   },
   boar: {
     pack: 'dog', preset: 'wolf',
@@ -66,7 +67,7 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     pack: 'cow', preset: 'braunvieh', presets: ['braunvieh', 'braunvieh', 'fleckvieh', 'jersey', 'highland'],
     clips: { idle: 'idle', alert: 'idle', feed: 'eat', walk: 'walk', run: 'trot', blow: 'headbutt', hurt: null, dead: 'death' },
     pace: { walk: 1, run: 2.5 },
-    shade: 0.7,
+    shade: [0.75, 1.8],
   },
   // The woods' squirrels (sim/smallLife.ts): a hop to forage, a run up the trunk, a flick of the tail.
   squirrel: {
@@ -121,19 +122,23 @@ export async function animalBody(species: string, seed: number, renderer: WebGPU
   const animal = Animal.share(first);
   animal.setPreset(preset ?? (def.presets ? def.presets[Math.floor(hash2f(seed, 2, 9) * def.presets.length) % def.presets.length] : def.preset));
   if (def.shape || def.coat) animal.params = { shape: { ...animal.shape, ...def.shape }, coat: { ...animal.coat, ...def.coat } };
-  if (def.shade) animal.params = { shape: animal.shape, coat: shaded(animal.coat as Record<string, unknown>, def.shade) };
+  if (def.shade) animal.params = { shape: animal.shape, coat: shaded(animal.coat as Record<string, unknown>, ...def.shade) };
   const shape = animal.shape as { size?: number };
   if (typeof shape.size === 'number') shape.size *= 0.92 + hash2f(seed, 1, 7) * 0.16;
   const { actor, place } = await furActor(animal, renderer, species);
   return { kind: 'animal', place, actor, animal, def, doing: '' };
 }
 
-/** `coat` with its base, second and tan colours times `k` (sRGB; the white and the nose stay). */
-export function shaded(coat: Record<string, unknown>, k: number): Record<string, unknown> {
+/** `coat` with its base, second and tan colours times `k`, and up to `hue` times as far from their grey (sRGB, kept in 0..1; the white and the nose stay). */
+export function shaded(coat: Record<string, unknown>, k: number, hue = 1): Record<string, unknown> {
   const out = { ...coat };
   for (const key of ['base', 'second', 'tan']) {
     const c = coat[key];
-    if (Array.isArray(c)) out[key] = c.map((v: number) => v * k);
+    if (!Array.isArray(c)) continue;
+    // Greyer coats gain the most (a red Highland is red enough already).
+    const grey = (c[0] + c[1] + c[2]) / 3, top = Math.max(...c), sat = top > 0 ? (top - Math.min(...c)) / top : 0;
+    const h = 1 + (hue - 1) * (1 - sat);
+    out[key] = c.map((v: number) => Math.min(1, Math.max(0, (grey + (v - grey) * h) * k)));
   }
   return out;
 }
