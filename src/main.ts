@@ -506,6 +506,7 @@ export async function start(b: Boot): Promise<void> {
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
       jobs: terrainJobs,
+      cleared: (d) => void roadWork.clear(d),
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       depth: (down, keep) => {

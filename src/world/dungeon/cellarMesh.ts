@@ -36,7 +36,7 @@ export interface CellarMeshes {
 }
 
 const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], EARTH: Tint = [120, 96, 72];
-const OAK: Tint = [120, 90, 62], DARK_OAK: Tint = [84, 62, 44], IRON: Tint = [60, 60, 64];
+const OAK: Tint = [120, 90, 62], DARK_OAK: Tint = [84, 62, 44], IRON: Tint = [60, 60, 64], ROPE: Tint = [150, 128, 92];
 /** Tints on the cellar's own textures (they carry their colour; these only age them). */
 const WASH: Tint = [236, 228, 210], FLAGS: Tint = [204, 200, 194], OLD_FLAGS: Tint = [188, 186, 180], BRICK: Tint = [214, 200, 188];
 const RAFTERS: Tint = [168, 146, 124], DIRT: Tint = [176, 160, 140];
@@ -220,9 +220,9 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
     const mx = (ax + bx) / 2, mz = (az + bz) / 2, ux = (bx - ax) / CELL, uz = (bz - az) / CELL;
     const y = door.level * STOREY, yaw = Math.atan2(ux, uz) - Math.PI / 2;
     const kind = pl.link.kind;
-    // Posts and lintel, standing a little into the room (in a cave only where someone hung a door in the rock).
+    // Posts and lintel, standing a little into the room (a cave's openings are the rock's own).
     const ox = -DIRS[k][0] * 0.06, oz = -DIRS[k][1] * 0.06;
-    if (!carved || (isFeature(o) && (kind === 'locked' || kind === 'oneway'))) {
+    if (!carved) {
       for (const side of [-1, 1]) shell.box(mx + ox + ux * side * (DOOR_W / 2 + 0.08), y, mz + oz + uz * side * (DOOR_W / 2 + 0.08), 0.16, DOOR_H, 0.16, yaw, M.Oak, OAK);
       shell.box(mx + ox, y + DOOR_H, mz + oz, DOOR_W + 0.32, 0.18, 0.18, yaw, M.Oak, OAK);
     }
@@ -249,6 +249,26 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
         const pale: Tint = c.setPiece.tint && pl.link.id === c.pieceLink ? [...c.setPiece.tint] as unknown as Tint : CAVE_ROCK;
         const rng = new Rng(deriveSeed(c.decision.seed, 'stacked', pl.link.id));
         for (let row = 0; row < 5; row++) for (let s = -2; s <= 2; s++) kit.stone(mx + ux * (s * 0.42 + (row % 2) * 0.2), y + row * 0.46 - 0.05, mz + uz * (s * 0.42 + (row % 2) * 0.2), 0.46, 0.5, 0.5, yaw + rng.range(-0.15, 0.15), WildMat.Rock, varyTint(rng, pale, 0.1), rng, 0.05, 0.4);
+      } else if (kind === 'oneway' && carved && c.setPiece.id === 'pulled-ladder' && pl.link.id === c.pieceLink) {
+        // A step of rock too high to climb, the rope ladder pulled up and coiled on its top, tied to a spur.
+        const rng = new Rng(deriveSeed(c.decision.seed, 'step', pl.link.id));
+        kit.stone(mx, y - 0.2, mz, DOOR_W + 0.6, 2.1, 1.2, yaw, WildMat.Rock, varyTint(rng, CAVE_ROCK, 0.06), rng, 0.07, 0.35);
+        const tx = mx + out[0] * 0.3, tz = mz + out[1] * 0.3;
+        for (let n = 0; n < 5; n++) kit.box(tx + ux * (n - 2) * 0.08, y + 1.92 + n * 0.05, tz + uz * (n - 2) * 0.08, 0.5, 0.04, 0.05, yaw + n * 0.25, M.Oak, DARK_OAK);
+        kit.cylinder(tx + ux * 0.6, y + 1.9, tz + uz * 0.6, 0.06, 0.35, 6, M.Thatch, ROPE);
+      } else if (kind === 'oneway' && carved) {
+        // A boulder rolled into the gap from beyond and wedged there with smaller stones: levered out from the far side.
+        const rng = new Rng(deriveSeed(c.decision.seed, 'wedged', pl.link.id));
+        kit.stone(mx + out[0] * 0.15, y - 0.15, mz + out[1] * 0.15, DOOR_W + 0.5, DOOR_H + 0.25, 1.1, yaw + rng.range(-0.1, 0.1), WildMat.Rock, varyTint(rng, CAVE_ROCK, 0.06), rng, 0.08, 0.6);
+        for (let n = 0; n < 4; n++) {
+          const s = rng.range(-1, 1);
+          kit.stone(mx + ux * s * 0.7 + out[0] * rng.range(0.7, 1.1), y - 0.05, mz + uz * s * 0.7 + out[1] * rng.range(0.7, 1.1), rng.range(0.3, 0.5), rng.range(0.25, 0.45), rng.range(0.3, 0.5), rng.range(0, 3), WildMat.Rock, varyTint(rng, CAVE_ROCK, 0.1), rng, 0.06, 0.4);
+        }
+      } else if (kind === 'locked' && carved) {
+        // An iron grate leaded into the rock, chained and locked: whoever used the cave kept the far side to themselves.
+        for (let s = -3; s <= 3; s++) kit.box(mx + ux * s * (DOOR_W / 6), y - 0.1, mz + uz * s * (DOOR_W / 6), 0.05, DOOR_H + 0.4, 0.05, yaw, M.Slate, IRON);
+        for (const h of [0.35, 1.25, DOOR_H + 0.1]) kit.box(mx, y + h, mz, DOOR_W + 0.3, 0.06, 0.06, yaw, M.Slate, IRON);
+        kit.box(mx + ux * 0.45 - out[0] * 0.06, y + 1.05, mz + uz * 0.45 - out[1] * 0.06, 0.16, 0.14, 0.06, yaw, M.Slate, IRON);
       } else if (kind === 'secret') {
         const pale: Tint = c.setPiece.tint && pl.link.id === c.pieceLink ? [...c.setPiece.tint] as unknown as Tint : STONE;
         kit.box(mx, y, mz, DOOR_W + 0.02, DOOR_H + 0.02, 0.24, yaw, M.Rubble, pale);

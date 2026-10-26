@@ -7,6 +7,8 @@ import { caveMouth, inMouthShape, MOUTH_WAY_DOWN } from '../src/world/dungeon/ca
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../src/world/dungeon/towerMesh';
 import { inFrame, onLand } from '../src/world/dungeon/site';
 import { torchSpots } from '../src/world/dungeon/torches';
+import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
+import { BuildingMat, WildMat } from '../src/world/dungeon/meshKit';
 import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { DungeonNav, navKey } from '../src/sim/dungeonNav';
@@ -84,4 +86,20 @@ test('tower: no way steps off the side of its own stair onto the way above or be
     const h = c.hatch, from = nav.distances(nav.at(h.x - Math.sin(h.yaw), h.y + 0.3, h.z - Math.cos(h.yaw))!, 400);
     for (const r of c.layout.rooms) assert.ok(from.has(navKey(nav.cell(r.x + (r.w >> 1), r.z + (r.d >> 1), r.level)!)), `tower ${n}: room ${r.id} reached`);
   }
+});
+
+test('cave: no wooden doors in the rock; a wedged boulder or an iron grate where a way is shut', () => {
+  let seen = 0;
+  for (let n = 1; n <= 30; n++) {
+    const c = cave(n), ms = cellarMeshes(c);
+    for (const d of ms.doors) {
+      if (d.kind !== 'oneway' && d.kind !== 'locked') continue;
+      const ladder = c.setPiece.id === 'pulled-ladder' && d.link === c.pieceLink;
+      const mats = new Set(d.mesh.mat);
+      if (!ladder) assert.ok(!mats.has(BuildingMat.Oak), `cave ${n}: a wooden ${d.kind} door`);
+      assert.ok(mats.has(d.kind === 'locked' ? BuildingMat.Slate : WildMat.Rock), `cave ${n}: ${d.kind} of ${[...mats]}`);
+      seen++;
+    }
+  }
+  assert.ok(seen > 5, `${seen} shut ways seen`);
 });
