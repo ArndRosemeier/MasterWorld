@@ -1,0 +1,23 @@
+title: ready in 19.8 s
+01-title.jpg: drawn 0.1 s · settled 1.5 s · p50 14.3 ms · p95 19.6 ms · 0 shader violations
+02-creator.jpg: drawn 0.0 s · settled 1.5 s · p50 14.4 ms · p95 18.5 ms · 0 shader violations
+town: ready in 16.3 s
+03-town-noon.jpg: drawn 0.0 s · settled 1.5 s · p50 13.5 ms · p95 18.1 ms · 0 shader violations
+04-pack.jpg: drawn 0.0 s · settled 1.5 s · p50 12.5 ms · p95 17.2 ms · 0 shader violations
+05-map.jpg: drawn 0.0 s · settled 1.5 s · p50 3.6 ms · p95 16.7 ms · 0 shader violations
+06-town-dusk.jpg: drawn 0.1 s · settled 1.5 s · p50 14.6 ms · p95 38.4 ms · 0 shader violations
+07-town-night.jpg: drawn 0.4 s · settled 1.5 s · p50 14.8 ms · p95 30.9 ms · 0 shader violations
+08-town-rain.jpg: drawn 2.7 s · settled 1.5 s · p50 15.6 ms · p95 27.2 ms · 0 shader violations
+09-paddock.jpg: drawn 0.0 s · settled 1.5 s · p50 8.2 ms · p95 11.3 ms · 0 shader violations
+10-trade.jpg: drawn 0.0 s · settled 1.5 s · p50 2.4 ms · p95 10.9 ms · 0 shader violations
+cellar: ready in 13.6 s
+11-cellar.jpg: drawn 0.0 s · settled 4.0 s · p50 5.4 ms · p95 16.4 ms · 0 shader violations
+land: ready in 13.9 s
+12-barrow.jpg: drawn 0.0 s · settled 4.0 s · p50 5.6 ms · p95 10.0 ms · 0 shader violations · 14 errors
+13-wild.jpg: drawn 0.0 s · settled 1.5 s · p50 7.6 ms · p95 11.0 ms · 0 shader violations · 8 errors
+14-fight.jpg: drawn 0.0 s · settled 1.5 s · p50 13.1 ms · p95 15.2 ms · 0 shader violations · 13 errors
+inn: ready in 13.3 s
+15-inn.jpg: drawn 0.0 s · settled 1.5 s · p50 7.6 ms · p95 9.6 ms · 0 shader violations
+talk: ready in 12.9 s
+16-talk.jpg: drawn 0.0 s · settled 1.5 s · p50 7.6 ms · p95 9.4 ms · 0 shader violations
+16 shots in shots\set\2026-10-26-8ca069c (174 s)
