@@ -35,6 +35,38 @@ await page.evaluate(() => {
   };
 });
 
+// Townsfolk churn: Actors' updateHiddenSkin (calls, ms, and from where), dressings begun and characters freed (why).
+await page.evaluate(() => {
+  const f = window.game.folk, C = (window.__churn = { skin: 0, skinMs: 0, from: {}, dress: 0, freed: { hidden: 0, ranked: 0, far: 0 } });
+  if (!f) return;
+  const actor = f.slots[0].ch.actor, proto = Object.getPrototypeOf(actor);
+  let via = 'other';
+  const tag = (o, name, label) => { const fn = o[name]; o[name] = function (...a) { const was = via; via = label; try { return fn.apply(this, a); } finally { via = was; } }; };
+  tag(proto, 'applyShape', 'applyShape');
+  tag(proto, 'updateLod', 'auto level');
+  const skin = proto.updateHiddenSkin;
+  proto.updateHiddenSkin = function (...a) {
+    const s = performance.now();
+    try { return skin.apply(this, a); } finally { C.skin++; C.skinMs += performance.now() - s; const k = `${via} -> level ${this.level}`; C.from[k] = (C.from[k] ?? 0) + 1; }
+  };
+  const dress = f.dress;
+  f.dress = function (s, a) { C.dress++; return dress.call(this, s, a); };
+  // Why a shown person is let go (the reasons follow's own test checks, in its order).
+  const follow = f.follow;
+  f.follow = function (dt, cam) {
+    const before = new Map(this.shown);
+    const r = follow.call(this, dt, cam);
+    for (const [id] of before) {
+      if (this.shown.has(id)) continue;
+      const a = this.life.agents.find((x) => x.person.id === id);
+      const d = a ? Math.hypot(a.x - cam.position.x, a.z - cam.position.z) : Infinity;
+      C.freed[!a || a.hidden ? 'hidden' : d >= 70 ? 'far' : 'ranked']++;
+    }
+    return r;
+  };
+});
+const churn = () => page.evaluate(() => { const C = window.__churn; const out = JSON.parse(JSON.stringify(C)); C.skin = 0; C.skinMs = 0; C.from = {}; C.dress = 0; C.freed = { hidden: 0, ranked: 0, far: 0 }; return out; });
+
 const quiet = () => page.evaluate(() => new Promise((done) => {
   const built = () => { const s = window.shaders?.summary(); return s ? s.warmup + s.run : 0; };
   const t0 = performance.now();
@@ -128,6 +160,10 @@ async function probe(title) {
   }
   await paired('without sun shadow redraw', () => { window.__every = window.game.view.sky.shadowEvery; window.game.view.sky.shadowEvery = 1e9; }, () => { window.game.view.sky.shadowEvery = window.__every; });
   await paired('nothing (empty scene, post chain only)', () => { for (const o of window.game.view.scene.children) if (o.isMesh || o.isGroup || o.isInstancedMesh) { o.userData.probeWas = o.visible; o.visible = false; } }, restore);
+  await churn();
+  await page.waitForTimeout(5000);
+  const c = await churn();
+  console.log(`\ntownsfolk over 5 s: ${c.dress} dressings, freed ${JSON.stringify(c.freed)}; updateHiddenSkin ${c.skin}× ${c.skinMs.toFixed(0)} ms: ${Object.entries(c.from).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n}× ${k}`).join(', ')}`);
   if (process.env.PROBE_PROFILE !== '0') await profile();
   console.log('\nshaders:\n```\n' + await page.evaluate(() => window.shaders.report()) + '\n```');
   const after = await page.evaluate(() => {
