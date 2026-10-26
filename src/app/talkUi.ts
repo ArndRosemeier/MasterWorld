@@ -24,6 +24,8 @@ const REACH = 3;
 const FRONT = 1.0;
 /** Walking this far off ends the talk. */
 const LEAVE = 5;
+/** Every this many frames a talk's shot is chosen again (the same while nothing changed). */
+const REFRAME = 30;
 
 export interface TalkHost {
   paused(open: boolean): void;
@@ -48,6 +50,8 @@ export class TalkUi {
   private near: Agent | null = null;
   private with: Agent | null = null;
   private shown: Topic[] = [];
+  /** Frames since the talk's shot was chosen. */
+  private framed = 0;
 
   constructor(
     private readonly talk: TownTalk,
@@ -77,7 +81,9 @@ export class TalkUi {
   watch(): void {
     if (this.with) {
       const w = this.player.walker.pos, at = this.whereIs(this.with);
-      if (!at || Math.hypot(at.x - w.x, at.z - w.z) > LEAVE || this.host.away) this.close();
+      if (!at || Math.hypot(at.x - w.x, at.z - w.z) > LEAVE || this.host.away) { this.close(); return; }
+      // Framed again now and then: someone walking up after the talk began may stand in the shot.
+      if (++this.framed % REFRAME === 0) this.frame(this.with);
       return;
     }
     this.near = this.host.away ? null : this.inFront();
