@@ -72,7 +72,7 @@ export function createTexturePool(size?: number): TexturePool {
   return new WorkerPool(() => new Worker(new URL('./texture.worker.ts', import.meta.url), { type: 'module' }), size);
 }
 
-export type WorldPool = WorkerPool<import('./world.worker').WorldJob, Float32Array>;
+export type WorldPool = WorkerPool<import('./world.worker').WorldJob, import('./world.worker').WorldResult>;
 
 /** Water masks and plant positions around the camera (one worker: a job now and then). */
 export function createWorldPool(): WorldPool {
@@ -128,7 +128,7 @@ export class WorldJobs {
 
   /** A water (`mask`) or grass mask over a square: `res` samples a side. */
   mask(kind: 'mask' | 'grass', x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
-    return this.pool.run({ kind, seed: this.seed, setting: this.setting, x0, z0, size, res });
+    return this.pool.run({ kind, seed: this.seed, setting: this.setting, x0, z0, size, res }) as Promise<Float32Array>;
   }
 
   /** Ground no plant grows on that the worker does not know of (the places the VGM opened since the start). */
@@ -140,12 +140,20 @@ export class WorldJobs {
 
   /** The roads' mask over a square (world/roads.ts roadMask): `res` samples a side. */
   roadMask(x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
-    return this.pool.run({ kind: 'roads', seed: this.seed, setting: this.setting, x0, z0, size, res });
+    return this.pool.run({ kind: 'roads', seed: this.seed, setting: this.setting, x0, z0, size, res }) as Promise<Float32Array>;
   }
 
   /** Trees and shrubs over a square, candidates `spacing` apart. */
   flora(x0: number, z0: number, size: number, spacing: number): Promise<Float32Array> {
-    return this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing }).then((d) => (this.keepOut ? withoutPlantsIn(d, this.keepOut) : d));
+    return (this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing }) as Promise<Float32Array>).then((d) => (this.keepOut ? withoutPlantsIn(d, this.keepOut) : d));
+  }
+
+  /**
+   * A road from `place` to the network (vgm/roads.ts linkRoad), routed in the world worker: it takes a few
+   * hundred milliseconds. `roads`: the roads already decided (the worker's land has them laid).
+   */
+  linkRoad(roads: readonly import('../world/decisions').RoadDecision[], place: import('../vgm/roads').Place, way: import('../world/decisions').RoadWay, at?: number): Promise<import('../world/decisions').RoadDecision | null> {
+    return this.pool.run({ kind: 'link', seed: this.seed, setting: this.setting, roads, place, way, at }) as Promise<import('../world/decisions').RoadDecision | null>;
   }
 }
 

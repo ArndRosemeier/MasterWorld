@@ -42,7 +42,6 @@ import { settingById } from './setting/index';
 import { CROPS, distSqPointSeg } from '@futuremagic/settlement';
 import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
-import { linkRoad } from './vgm/roads';
 import { RoadWork } from './app/roads';
 import { ordersOf, townOrder } from './vgm/orders';
 import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
@@ -327,18 +326,23 @@ export async function start(b: Boot): Promise<void> {
       if (m) log = [...log, m];
     }
     // A road from a place at (x, z) to the network, laid while playing: how the VGM links a place it founds (game.layRoad).
-    const layRoad = (x: number, z: number, way: RoadWay = 'track'): RoadDecision | null => {
-      const d = linkRoad(terrain, log, { id: `place-${log.length}`, x, z, r: 0 }, way, hours());
-      if (d) { log = [...log, d]; void roadWork.lay(d); }
+    const layRoad = async (x: number, z: number, way: RoadWay = 'track'): Promise<RoadDecision | null> => {
+      const d = await jobs.linkRoad(log.filter((x): x is RoadDecision => x.kind === 'road'), { id: `place-${log.length}`, x, z, r: 0 }, way, hours());
+      if (d) { log = [...log, d]; await roadWork.lay(d); }
       return d;
     };
     // A region the VGM opened goes into the log; a hamlet founded in it gets its cart track to the network (plan 7).
+    // The track is routed in the world worker (it takes a few hundred ms), one road at a time so each sees the last.
+    let roading: Promise<void> = Promise.resolve();
     const regionOpened = (d: RegionDecision): void => {
       log = [...log, d];
       regionSites?.sync(log);
       const place = setting.regions ? settlementsOf([d], setting.regions)[0] : undefined;
-      const road = place ? linkRoad(terrain, log, place, 'track', d.at) : null;
-      if (road) { log = [...log, road]; void roadWork.lay(road); }
+      if (!place) return;
+      roading = roading.then(async () => {
+        const road = await jobs.linkRoad(log.filter((x): x is RoadDecision => x.kind === 'road'), place, 'track', d.at);
+        if (road && !log.some((x) => x.id === road.id)) { log = [...log, road]; await roadWork.lay(road); }
+      }).catch((e: unknown) => console.warn('road to a hamlet:', e));
     };
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {

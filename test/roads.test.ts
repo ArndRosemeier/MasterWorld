@@ -17,7 +17,8 @@ const regions = classic.regions!;
 const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, 0, 5, (d) => d.fill === 'hamlet' && !!d.site);
 const hamlet = settlementsOf(walked, regions)[0];
 const road = linkRoad(terrain, log, hamlet, 'track')!;
-const again = linkRoad(terrain, log, hamlet, 'track');
+// Again, as the world worker routes it (WorldJobs.linkRoad: from the roads alone).
+const again = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'track');
 const pt = (k: number) => ({ x: road.pts[k * 3], y: road.pts[k * 3 + 1], z: road.pts[k * 3 + 2] });
 const n = road.pts.length / 3;
 // Points well inside the road (not at its ends, not in water), and the bare land's height beside them.
@@ -37,7 +38,7 @@ test('roads: a hamlet out on the land gets a cart track to a road out of the tow
   const ends = town.plan.streets.filter((s) => s.kind === 'road').map((s) => [s.pts[s.pts.length - 2], s.pts[s.pts.length - 1]]);
   assert.ok(ends.some(([x, z]) => Math.hypot(x - end.x, z - end.z) < 0.5), 'joins a town road');
   for (let k = 1; k < n; k++) assert.ok(Math.hypot(pt(k).x - pt(k - 1).x, pt(k).z - pt(k - 1).z) < 7, 'points about 6 m apart');
-  // Decided once: the same land, log and place give the same road.
+  // Decided once: the same land, roads and place give the same road (in the worker too).
   assert.deepEqual(again, road);
 });
 
