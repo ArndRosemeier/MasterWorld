@@ -18,7 +18,9 @@ const people = townsfolk(town.plan, seed);
 const cellar = firstDungeon(log)!;
 const inn = people.find((p) => town.plan.buildings[p.home].kind === 'inn' && p.role === 'trade')!;
 const household = people.filter((p) => p.home === cellar.building && p.role !== 'child');
-const stranger = people.find((p) => p.home !== inn.home && p.home !== cellar.building && p.role === 'homemaker' && Math.hypot(town.plan.buildings[p.home].cx - town.plan.buildings[cellar.building].cx, town.plan.buildings[p.home].cz - town.plan.buildings[cellar.building].cz) > 120)!;
+// A homemaker of a house far across town from the cellar's.
+const fromCellar = (p: (typeof people)[number]) => Math.hypot(town.plan.buildings[p.home].cx - town.plan.buildings[cellar.building].cx, town.plan.buildings[p.home].cz - town.plan.buildings[cellar.building].cz);
+const stranger = people.filter((p) => p.home !== inn.home && p.home !== cellar.building && p.role === 'homemaker').sort((a, b) => fromCellar(b) - fromCellar(a))[0];
 
 test('talk: every townsperson has a name, and households share their family name', () => {
   const { folk } = townTalk(seed, classic, town, people, log);

@@ -2,9 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { firstDecisions } from '../src/vgm/builder';
+import { firstDecisions, startPlace } from '../src/vgm/builder';
 import { Terrain } from '../src/world/terrain';
-import { findStart } from '../src/world/start';
 import { FRONTIER, OPEN_GROUND, nextRegion, walkFrontier, regionDecisions, regionLine, regionMapOf, settlementsOf } from '../src/vgm/frontier';
 import { keyId, sizeOf } from '../src/world/regions';
 import { settlementOf, type Decision, type DecisionLog } from '../src/world/decisions';
@@ -16,7 +15,7 @@ import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement, woodsOf } from
 const seed = parseSeed('masterworld');
 // The start's land with small drainage tiles (as the flora, water and roads tests): the same town, faster.
 const terrain = new Terrain(seed, classic, { cell: 2000, core: 96, margin: 32, minArea: 120 });
-const first = firstDecisions(terrain, findStart(terrain.skeleton, classic));
+const first = firstDecisions(terrain, startPlace(terrain));
 terrain.settle(first);
 const home = terrain.towns[0].decision;
 const regions = classic.regions!;

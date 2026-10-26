@@ -131,6 +131,12 @@ export class Terrain {
     return this.skeleton.sample(x, z, this.probe).biome;
   }
 
+  /** The id of the biome at a point (null under the sea). */
+  biomeIdAt(x: number, z: number): string | null {
+    const b = this.biomeAt(x, z);
+    return b < 0 ? null : this.biomes[b].id;
+  }
+
   /** The rock volumes standing on this land. */
   get volumes(): readonly ArchField[] {
     return this.fields;
