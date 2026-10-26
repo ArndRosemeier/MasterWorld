@@ -160,7 +160,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       const down = along.sub(carried(ph));
       const streak = mx_noise_float(vec3(down.mul(0.12).add(seed), sideways.mul(1.1), t.mul(0.2))).mul(0.5).add(0.5);
       const churn = mx_noise_float(vec3(down.mul(0.45).add(seed), sideways.mul(1.3), t.mul(0.5))).mul(0.5).add(0.5);
-      return smoothstep(0.72, 0.95, streak).mul(0.3).add(rush.mul(smoothstep(0.55, 0.85, churn.mul(0.7).add(streak.mul(0.4)))).mul(0.7));
+      return smoothstep(0.69, 0.92, streak).mul(0.38).add(rush.mul(smoothstep(0.55, 0.85, churn.mul(0.7).add(streak.mul(0.4)))).mul(0.7));
     };
     const runningFoam = mix(runFoam(phaseA, 0), runFoam(phaseB, 7.1), layerB).mul(running);
     // The falling sheet: streaks stretched down the fall, rushing.
