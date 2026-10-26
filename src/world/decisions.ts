@@ -27,18 +27,18 @@ export interface VolumeDecision {
  * A dungeon promised under a building of a town (plan 4.2, 8): the seed and the set piece fix what it
  * is; it is sketched, outlined and built from this as the player comes closer (world/dungeon).
  */
-export type DungeonTemplate = 'cellar' | 'barrow';
+export type DungeonTemplate = 'cellar' | 'barrow' | 'cave' | 'tower';
 
 export interface DungeonDecision {
   readonly kind: 'dungeon';
   readonly id: string;
-  /** A cellar under a house of the town; a barrow out on the land near it (plan 8: dungeon kinds). */
+  /** A cellar under a house of the town; a barrow, a cave or a ruined tower out on the land near it (plan 8: dungeon kinds). */
   readonly template: DungeonTemplate;
   /** The town's decision id. */
   readonly town: string;
   /** Index into the town plan's buildings: the house above (a cellar), the household who knows of it (a barrow). */
   readonly building: number;
-  /** A barrow's doorway on the land: world metres, and the way it faces (yaw: 0 faces −z, as the walker). */
+  /** The doorway of a place out on the land (a barrow's passage, a cave's mouth, a tower's door): world metres, and the way it faces (yaw: 0 faces −z, as the walker). */
   readonly site?: { readonly x: number; readonly z: number; readonly yaw: number };
   readonly seed: number;
   /** The signature set piece (world/dungeon/setPieces.ts). */

@@ -104,6 +104,16 @@ export class TerrainJobs {
     return this.pool.broadcast({ kind: 'decisions', decisions: ds, seed: this.seed, setting: this.setting });
   }
 
+  /** A cave's rock (its field and mesh) for its layout: a few hundred milliseconds of work. */
+  caveRock(layout: import('@futuremagic/dungeon').DungeonLayout, cave: number): Promise<import('./terrain.worker').CaveRock> {
+    return this.job({ kind: 'caveRock', layout, cave });
+  }
+
+  /** A cave's mouth on the land at its site. */
+  caveMouth(site: import('../world/dungeon/site').Site, cave: number): Promise<import('../world/dungeon/caveMouth').CaveMouth> {
+    return this.job({ kind: 'caveMouth', site, cave });
+  }
+
   /** The buildings of the `index`th town, merged per cell. */
   townMeshes(index: number): Promise<import('../world/townMesh').TownCellMesh[]> {
     return this.job({ kind: 'town', index });

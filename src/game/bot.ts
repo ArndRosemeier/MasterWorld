@@ -68,6 +68,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   const spots = new Set(opts.spots ?? []);
   const dt = 0.1;
   let path: { x: number; y: number; z: number }[] = [], repath = 0, goal: object | null = null;
+  /** What is being walked to for searching (kept until searched). */
+  let aim: { x: number; y: number; z: number } | null = null;
   const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z } });
   /** One step along the nav towards a point (`key`: what is being walked to, so a new goal is routed at once). */
   const towards = (to: { x: number; y: number; z: number }, key: object): void => {
@@ -116,8 +118,11 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
         ...den.dead.map((id) => den.creatures[id]).filter((c) => fight.bodies.has(c.id)),
         ...delve.hoards.filter((hd) => !delve.hasOpened(hd)),
         ...spots,
-      ].sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
-      const to = left[0] ?? ladder;
+      ].sort((a, b) => Math.hypot(a.x - x, a.z - z, a.y - y) - Math.hypot(b.x - x, b.z - z, b.y - y));
+      // Keep to the thing chosen until it is searched (two about as near, one up a stair, would make it dither).
+      const pick = left.find((it) => it === aim) ?? left[0];
+      aim = pick ?? null;
+      const to = pick ?? ladder;
       if (!left.length && standsBy(ladder, NEAR)) return run(true, t, true);
       towards(to, to);
       continue;
