@@ -643,4 +643,6 @@ StarLord's title is the bar: the game's own world, alive, playful, new every sta
 7. **Seas.**
 8. Later: the LLM hook, multiplayer, crafting.
 
+The order of the work, its steps and their done-checks are in [implementation-plan.md](implementation-plan.md). Milestones 3–4 are finished there as phase A (trading, upkeep, death and roguelike mode, the loop check), 5 is phase B, 6 is phase C and 7 is phase D.
+
 Alongside, from now on: the interface's design language (O17) and the title animation (O18), because both shape how the game feels from the first second.
