@@ -149,6 +149,7 @@ export class FolkView {
     const place = slot.place;
     place.removeFromParent();
     slot.busy = true; // not dressed for anybody while it tries the looks on
+    this.trying = true;
     const looks = coveringLooks(this.life.agents.map((a) => a.person));
     for (let i = 0; i < looks.length; i++) {
       if (i === 1) first();
@@ -171,8 +172,11 @@ export class FolkView {
     ch.setLod(0);
     place.visible = false;
     slot.busy = false;
+    this.trying = false;
   }
   private warm = false;
+  /** The first character tries the looks on (warmAll). */
+  private trying = false;
   private waiting = 0;
 
   /** How many people within CLOSE in the camera's view (or of `focus`) are plain figures while their character is dressed (before the warm-up ends at least 1). */
@@ -208,7 +212,8 @@ export class FolkView {
       }
     }
     near.sort((x, y) => x[0] - y[0]);
-    const want = new Set(near.slice(0, this.slots.length).filter(([d]) => d < RANGE).map(([, a]) => a.person.id));
+    // (Not counting the first character while it tries the looks on: nobody waits for it.)
+    const want = new Set(near.slice(0, this.slots.length - (this.trying ? 1 : 0)).filter(([d]) => d < RANGE).map(([, a]) => a.person.id));
     // Free the characters of people no longer wanted.
     for (const [id, s] of this.shown) {
       if (want.has(id)) continue;
