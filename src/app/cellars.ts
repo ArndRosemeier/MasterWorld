@@ -14,6 +14,7 @@ import type { TownBuilding } from '@futuremagic/settlement';
 import type { Character } from '../game/character';
 import { Delve, type DelveSave } from '../game/delve';
 import { CellarView } from '../render/dungeon/CellarView';
+import type { WarmLights } from '../render/warmLights';
 import { CreatureView } from '../render/dungeon/CreatureView';
 import type { SkyView } from '../render/sky';
 import type { SettingModule } from '../setting/contract';
@@ -42,6 +43,8 @@ export interface CellarsHost {
   readonly canvas: HTMLElement;
   readonly player: Player;
   readonly lantern: PointLight;
+  /** Firelight: the torches while down here. */
+  readonly warm: WarmLights;
   readonly sky: SkyView;
   readonly notes: Notes;
   readonly setting: SettingModule;
@@ -256,7 +259,7 @@ export class Cellars {
     await view.add(h.stage);
     // A barrow: back out into its forecourt, facing away from the mound.
     const out = m ? { door: [...turn(m, 0, 2.2), m.yaw + Math.PI] as const } : s.house;
-    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.sky, h.notes);
+    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes);
     const words = loreOf(h.setting, s.decision.template).words;
     if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
     if (!m) visit.up = () => h.up(s.house);

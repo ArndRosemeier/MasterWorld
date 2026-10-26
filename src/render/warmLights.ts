@@ -1,0 +1,107 @@
+/**
+ * Warm firelight: a few point lights, always in the scene (lights are part of every shader's key) and dark
+ * until needed, moved each frame to the nearest of a list of spots. On the land at night the spots are
+ * the lit doorways; in a cellar they are its torches, and the nearest torch also casts shadows. Each light
+ * fades as the next spot in line comes as near, so none pops on or off.
+ */
+import { PointLight, type Scene, type Vector3 } from 'three/webgpu';
+import { hash32, hashToFloat } from '@futuremagic/core';
+import type { TownBuilding } from '@futuremagic/settlement';
+
+/** Plain point lights in the pool (the shadow torch is one more). */
+export const WARM_LIGHTS = 3;
+/** Metres over which a light fades out as the next spot comes as near. */
+const HAND_OVER = 6;
+/** Candela: a lit doorway, a torch. */
+const DOOR = 6;
+const TORCH = 5;
+/** The shadow torch's cube map side (texels) and reach (m). */
+const SHADOW_MAP = 512;
+const REACH = 12;
+
+interface Spot { x: number; y: number; z: number; roll: number }
+
+export class WarmLights {
+  readonly lights: PointLight[] = [];
+  /** The nearest torch underground: the same light, with shadows. Dark (and its map not redrawn) above. */
+  readonly shadowed: PointLight;
+  private doors: Spot[] = [];
+  private torches: Spot[] | null = null;
+  private time = 0;
+
+  constructor(scene: Scene) {
+    for (let i = 0; i < WARM_LIGHTS; i++) {
+      const l = new PointLight(0xffa860, 0, 11, 2);
+      l.castShadow = false;
+      l.name = 'warm light';
+      this.lights.push(l);
+      scene.add(l);
+    }
+    const s = new PointLight(0xff9a50, 0, REACH, 2);
+    s.name = 'torch shadow light';
+    s.castShadow = true;
+    s.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
+    s.shadow.camera.near = 0.1;
+    s.shadow.camera.far = REACH;
+    s.shadow.bias = -0.002;
+    s.shadow.autoUpdate = false;
+    s.position.set(0, -1e5, 0);
+    this.shadowed = s;
+    scene.add(s);
+  }
+
+  /** The doors: in front of each building's street side, a little above the lintel. */
+  atDoors(buildings: readonly TownBuilding[], groundAt: (x: number, z: number) => number): void {
+    this.doors = buildings.map((b) => {
+      const x = b.cx - b.vx * (b.hv + 0.9), z = b.cz - b.vz * (b.hv + 0.9);
+      return { x, y: groundAt(x, z) + 2.4, z, roll: hashToFloat(hash32(b.id * 7919 + 17)) };
+    });
+  }
+
+  /** Underground: the torches (world positions), or null on the way up again. */
+  lightTorches(spots: readonly { x: number; y: number; z: number }[] | null): void {
+    this.torches = spots ? spots.map((s, i) => ({ ...s, roll: hashToFloat(hash32(i * 104729 + 3)) })) : null;
+    if (!spots) { this.shadowed.intensity = 0; this.shadowed.shadow.autoUpdate = false; }
+  }
+
+  /** Once per frame: `glow` 0 by day .. 1 at night, `share` of the houses with a light on (ignored underground). */
+  shine(cam: Vector3, glow: number, share: number, dt: number): void {
+    this.time += dt;
+    if (this.torches) { this.burn(cam); return; }
+    const near = glow > 0 ? closest(this.doors.filter((d) => d.roll < share), cam, WARM_LIGHTS + 1) : [];
+    this.setLights(this.lights, near, DOOR * glow, false);
+  }
+
+  private burn(cam: Vector3): void {
+    const near = closest(this.torches!, cam, WARM_LIGHTS + 2);
+    // The nearest torch casts shadows; the next ones light without.
+    const first = near[0];
+    const s = this.shadowed;
+    if (first) {
+      s.position.set(first.s.x, first.s.y, first.s.z);
+      s.intensity = TORCH * this.flicker(first.s);
+      s.shadow.autoUpdate = true;
+    } else { s.intensity = 0; s.shadow.autoUpdate = false; }
+    this.setLights(this.lights, near.slice(1), TORCH, true);
+  }
+
+  private setLights(lights: PointLight[], near: { s: Spot; dist: number }[], strength: number, flicker: boolean): void {
+    for (let i = 0; i < lights.length; i++) {
+      const l = lights[i]!, n = near[i];
+      if (!n || strength <= 0) { l.intensity = 0; continue; }
+      const next = near[lights.length]?.dist ?? Infinity;
+      l.position.set(n.s.x, n.s.y, n.s.z);
+      l.intensity = strength * Math.min(1, (next - n.dist) / HAND_OVER) * (flicker ? this.flicker(n.s) : 1);
+    }
+  }
+
+  /** A flame's own unsteady brightness (two slow waves and a quick one, out of step per torch). */
+  private flicker(s: Spot): number {
+    const t = this.time + s.roll * 50;
+    return 0.86 + 0.07 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 13.1 + 1.7) + 0.03 * Math.sin(t * 29.7);
+  }
+}
+
+function closest(spots: readonly Spot[], cam: Vector3, n: number): { s: Spot; dist: number }[] {
+  return spots.map((s) => ({ s, dist: Math.hypot(s.x - cam.x, s.y - cam.y, s.z - cam.z) })).sort((a, b) => a.dist - b.dist).slice(0, n);
+}

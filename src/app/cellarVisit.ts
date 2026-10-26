@@ -10,6 +10,8 @@ import { dungeonWorld } from '../game/dungeonWorld';
 import type { WalkWorld } from '../game/walker';
 import type { CellarView } from '../render/dungeon/CellarView';
 import type { SkyView } from '../render/sky';
+import type { WarmLights } from '../render/warmLights';
+import { torchSpots } from '../world/dungeon/torches';
 import { CELL, STOREY, type Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace, type SpaceEvent } from '../world/dungeon/space';
 import { Fade } from './fade';
@@ -40,6 +42,7 @@ export class CellarVisit {
     private readonly view: CellarView,
     private readonly player: Player,
     private readonly lantern: PointLight,
+    private readonly warm: WarmLights,
     private readonly sky: SkyView,
     private readonly notes: Notes,
   ) {
@@ -56,6 +59,8 @@ export class CellarVisit {
       this.view.group.visible = true;
       this.sky.indoors = true;
       this.onDepth?.(true);
+      const O0 = this.view.origin;
+      this.warm.lightTorches(torchSpots(this.cellar).map((t) => ({ x: O0.x + t.x, y: O0.y + t.y, z: O0.z + t.z })));
       const O = this.view.origin, h = this.cellar.hatch;
       const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
       if (room !== undefined && this.cellar.layout.rooms[room]) {
@@ -75,6 +80,7 @@ export class CellarVisit {
       this.sky.indoors = false;
       this.onDepth?.(false);
       this.lantern.intensity = 0;
+      this.warm.lightTorches(null);
       this.cooldown = 2;
       if (this.up) { await this.up(); return; }
       const [x, z, yaw] = this.house.door;

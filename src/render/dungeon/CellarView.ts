@@ -11,6 +11,8 @@ import type { Cellar } from '../../world/dungeon/cellar';
 import { cellarMeshes } from '../../world/dungeon/cellarMesh';
 import { buildingMeshAt } from '../materials/building';
 import { loadCellarProps } from './props';
+import { flameMesh } from '../materials/flame';
+import { torchSpots } from '../../world/dungeon/torches';
 
 export class CellarView {
   readonly group = new Group();
@@ -27,6 +29,8 @@ export class CellarView {
   async add(stage: Stage): Promise<void> {
     const m = cellarMeshes(this.cellar, await loadCellarProps());
     this.group.add(this.piece(m.shell, 'shell'), this.piece(m.props, 'props'));
+    const torches = torchSpots(this.cellar);
+    if (torches.length) this.group.add(flameMesh(torches, this.origin.x, this.origin.y, this.origin.z));
     for (const d of m.doors) {
       const mesh = this.piece(d.mesh, `door ${d.kind}`);
       mesh.visible = !this.gone.has(d.link);
