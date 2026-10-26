@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { outlineCellar, sketchCellar } from '../src/world/dungeon/cellar';
 import { checkVariety, testDecision, testHouse } from '../src/world/dungeon/variety';
-import { SET_PIECES } from '../src/world/dungeon/setPieces';
+import { setPiecesFor } from '../src/world/dungeon/setPieces';
 
+const SET_PIECES = setPiecesFor('cellar');
 const N = SET_PIECES.length;
 
 const lore = classic.dungeons.cellar;
@@ -15,6 +16,13 @@ test('cellar: a sample of cellars varies and lacks nothing (the full sweep is np
   assert.ok(r.distinct.mainPattern >= 12, `${r.distinct.mainPattern} main patterns`);
   assert.ok(r.distinct.story >= 40, `${r.distinct.story} stories`);
   assert.equal(r.distinct.setPiece, SET_PIECES.length);
+});
+
+test('barrow: a sample of barrows varies and lacks nothing, with their own lore and set pieces', () => {
+  const r = checkVariety(classic.dungeons.barrow!, 60, 2, 'barrow');
+  assert.deepEqual(r.problems, []);
+  assert.equal(r.distinct.setPiece, setPiecesFor('barrow').length);
+  assert.ok(setPiecesFor('barrow').some((p) => p.kinds?.includes('barrow')), 'set pieces of their own');
 });
 
 test('cellar: the same decision gives the same cellar', () => {

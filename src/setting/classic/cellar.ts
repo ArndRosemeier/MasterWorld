@@ -5,6 +5,11 @@
 import type { CellarLore } from '../contract';
 
 export const cellar: CellarLore = {
+  words: {
+    enter: 'You climb down into the cellar of {place}.',
+    quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',
+    thanks: 'The household of {place} hears the cellar is safe and presses {coins} into your hand.',
+  },
   uses: [
     { id: 'store', name: 'the household store', props: ['sack', 'barrel', 'shelf', 'jar', 'lantern'] },
     { id: 'wine-store', name: 'the wine store', props: ['rack', 'cask', 'rack', 'candle'] },

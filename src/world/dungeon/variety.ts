@@ -5,9 +5,9 @@
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore } from '../../setting/contract';
-import type { DungeonDecision } from '../decisions';
-import { outlineCellar, type Cellar } from './cellar';
-import { SET_PIECES } from './setPieces';
+import type { DungeonDecision, DungeonTemplate } from '../decisions';
+import { outlineCellar, type Cellar, type DungeonPlace } from './cellar';
+import { setPiecesFor } from './setPieces';
 
 export interface VarietyReport {
   readonly count: number;
@@ -30,8 +30,14 @@ export function testHouse(i: number): TownBuilding {
   } as unknown as TownBuilding;
 }
 
-export function testDecision(i: number, base = 1): DungeonDecision {
-  return { kind: 'dungeon', id: `cellar-${i}`, template: 'cellar', town: 'town-1', building: i, seed: deriveSeed(base, 'variety', i), setPiece: SET_PIECES[i % SET_PIECES.length].id };
+export function testDecision(i: number, base = 1, template: DungeonTemplate = 'cellar'): DungeonDecision {
+  const pieces = setPiecesFor(template);
+  return { kind: 'dungeon', id: `${template}-${i}`, template, town: 'town-1', building: i, seed: deriveSeed(base, 'variety', template === 'cellar' ? i : `${template}-${i}`), setPiece: pieces[i % pieces.length].id };
+}
+
+/** A test place: a town house for a cellar, a named barrow. */
+function testPlace(i: number, template: DungeonTemplate): DungeonPlace {
+  return template === 'cellar' ? testHouse(i) : { kind: template, hu: 3, hv: 3, name: `the ${template} on the hill` };
 }
 
 /** Limits: the most common value of each aspect may make up at most this share. */
@@ -43,13 +49,13 @@ const LIMITS: Record<string, number> = { layout: 0.03, mainPattern: 0.2, story: 
  */
 const MIN_DISTINCT: Record<string, { readonly n: number; readonly per: number }> = { mainPattern: { n: 14, per: 6 }, pattern: { n: 16, per: 4 }, setPiece: { n: 10, per: 6 } };
 
-export function checkVariety(lore: CellarLore, count: number, base = 1): VarietyReport {
+export function checkVariety(lore: CellarLore, count: number, base = 1, template: DungeonTemplate = 'cellar'): VarietyReport {
   const problems: string[] = [];
   const aspects: Record<string, string[]> = { layout: [], mainPattern: [], pattern: [], story: [], goalRoom: [], dressing: [], setPiece: [] };
   for (let i = 0; i < count; i++) {
     let c: Cellar;
-    try { c = outlineCellar(testDecision(i, base), testHouse(i), lore); } catch (e) { problems.push(`cellar ${i}: ${(e as Error).message}`); continue; }
-    const where = `cellar ${i} (${c.signature.split('|')[0]})`;
+    try { c = outlineCellar(testDecision(i, base, template), testPlace(i, template), lore); } catch (e) { problems.push(`${template} ${i}: ${(e as Error).message}`); continue; }
+    const where = `${template} ${i} (${c.signature.split('|')[0]})`;
     if (c.pace.safe < 0) problems.push(`${where}: no safe spot`);
     if (!c.pace.shortcut) problems.push(`${where}: no shortcut out`);
     if (c.pace.route.length < 3) problems.push(`${where}: the goal is too near the entrance`);
@@ -76,7 +82,9 @@ export function checkVariety(lore: CellarLore, count: number, base = 1): Variety
     // Small samples can't show small shares: allow two of a kind.
     if (LIMITS[k] !== undefined && n > Math.max(2, LIMITS[k] * vals.length)) problems.push(`${k} repeats: "${value.slice(0, 80)}" in ${n} of ${vals.length}`);
     const min = MIN_DISTINCT[k];
-    if (min && counts.size < Math.min(min.n, Math.floor(count / min.per))) problems.push(`${k}: only ${counts.size} different ones (at least ${min.n} wanted)`);
+    // A kind with fewer set pieces of its own than the bar: all of them.
+    const want = min && (k === 'setPiece' ? Math.min(min.n, setPiecesFor(template).length) : min.n);
+    if (min && want && counts.size < Math.min(want, Math.floor(count / min.per))) problems.push(`${k}: only ${counts.size} different ones (at least ${want} wanted)`);
   }
   return { count, problems, top, distinct };
 }

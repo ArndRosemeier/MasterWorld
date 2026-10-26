@@ -1,12 +1,14 @@
 /**
- * Every cellar the VGM has promised under the town's houses (plan 4.2, 8), played one at a time. A cellar
+ * Every cellar the VGM has promised under the town's houses (plan 4.2, 8), and every barrow out on the
+ * land (a cellar's making with its own lore; the mound and its passage stand on the land, and walking
+ * into the passage goes down), played one at a time. A cellar
  * is outlined from its decision when it is promised (cheap), and built (its meshes, its dwellers' den and
  * bodies, its fight) once the hero steps into the house above, so it stands ready by the time they reach
  * the hatch; the first one is built while the game loads. When new dwellers move into a cleared cellar
  * (a move-in, plan 8.1) its den, bodies and fight are made anew; the rooms and the doors the hero opened
  * stay. What each cellar's visit changed goes into the save by promise id.
  */
-import type { PerspectiveCamera, PointLight, WebGPURenderer } from 'three/webgpu';
+import type { Mesh, PerspectiveCamera, PointLight, WebGPURenderer } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { Character } from '../game/character';
@@ -17,11 +19,14 @@ import type { SkyView } from '../render/sky';
 import type { SettingModule } from '../setting/contract';
 import type { Journal } from '../talk/journal';
 import type { Director } from '../vgm/director';
-import { houseOf } from '../vgm/dungeons';
+import { buildingMeshAt } from '../render/materials/building';
+import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { occupationOf } from '../vgm/leads';
 import type { DecisionLog, DungeonDecision, MoveInDecision } from '../world/decisions';
-import { moveIn, occupantId, outlineCellar, type Cellar } from '../world/dungeon/cellar';
+import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh';
+import { moveIn, occupantId, outlineCellar, type Cellar, type DungeonPlace } from '../world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
+import { fill } from '../talk/folk';
 import type { Town } from '../world/town';
 import { Encounter, type Arena, type FightCue, type FightHost } from './encounter';
 import { CellarVisit } from './cellarVisit';
@@ -54,12 +59,31 @@ export interface CellarsHost {
   cue(c: FightCue): void;
   /** `?dweller=`: who lives in every cellar (for looking at them). */
   readonly dweller: string | null;
+  /** The land's height (a barrow stands on it). */
+  ground(x: number, z: number): number;
 }
+
+/** A barrow's mound on the land: where it stands and its mesh. */
+interface Mound {
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  readonly mesh: Mesh;
+  /** Seconds before walking into the passage goes down again (after coming up). */
+  cool: number;
+}
+
+/** A barrow is built (rooms, dwellers) once the hero is this near, metres. */
+const BARROW_NEAR = 250;
 
 /** One cellar: its promise and house; its parts once built. */
 interface Site {
   readonly decision: DungeonDecision;
+  /** A cellar's house above; a barrow's household who knows of it. */
   readonly house: TownBuilding;
+  readonly place: DungeonPlace;
+  /** A barrow's mound on the land (none: a cellar, reached through its house). */
+  readonly mound: Mound | null;
   /** As outlined for its first dwellers (the rooms never change). */
   readonly first: Cellar;
   /** Who lives there now. */
@@ -114,7 +138,38 @@ export class Cellars {
 
   /** The hero is in this building's room: its cellar, if it has one, gets ready below. */
   near(building: number): void {
-    for (const s of this.sites.values()) if (s.house.id === building && !s.built) void this.ensure(s);
+    for (const s of this.sites.values()) if (!s.mound && s.house.id === building && !s.built) void this.ensure(s);
+  }
+
+  /**
+   * Out on the land, every frame (`dt`): barrows near the hero get built, and walking into one's passage
+   * goes down.
+   */
+  approach(dt: number, x: number, z: number): void {
+    for (const s of this.sites.values()) {
+      const m = s.mound;
+      if (!m) continue;
+      m.cool = Math.max(0, m.cool - dt);
+      if (Math.hypot(x - m.x, z - m.z) > BARROW_NEAR) continue;
+      if (!s.built) void this.ensure(s);
+      const [wx, wz] = turn(m, WAY_DOWN.x, WAY_DOWN.z);
+      if (s.ready && !s.ready.visit.inside && m.cool === 0 && Math.hypot(x - wx, z - wz) < 0.9) {
+        m.cool = 3;
+        void s.ready.visit.enter();
+      }
+    }
+  }
+
+  /** Is a body of radius `r` at (x, z) on the land inside a barrow's mound or its slabs? */
+  solid(x: number, z: number, r: number): boolean {
+    for (const s of this.sites.values()) {
+      const m = s.mound;
+      if (!m || Math.abs(x - m.x) > 20 || Math.abs(z - m.z) > 20) continue;
+      // Into the mound's own frame (the inverse of `turn`).
+      const dx = x - m.x, dz = z - m.z, c = Math.cos(m.yaw), sn = Math.sin(m.yaw);
+      if (inBarrowShape(dx * c - dz * sn, dx * sn + dz * c, r)) return true;
+    }
+    return false;
   }
 
   /** Is this dungeon the one the hero is down in? */
@@ -154,18 +209,28 @@ export class Cellars {
   get hudText(): string { return this.downIn?.summary ?? ''; }
 
   private open(d: DungeonDecision): void {
-    const house = houseOf(d, this.towns);
-    if (!house) return;
-    const lore = this.host.setting.dungeons.cellar;
+    const house = houseOf(d, this.towns), place = placeOf(d, this.towns);
+    if (!house || !place) return;
+    const lore = loreOf(this.host.setting, d.template);
     const only = this.host.dweller ? lore.dwellers.filter((w) => w.id === this.host.dweller) : [];
-    const first = only.length ? outlineCellar({ ...d, danger: undefined }, house, { ...lore, dwellers: only }) : outlineCellar(d, house, lore);
+    const first = only.length ? outlineCellar({ ...d, danger: undefined }, place, { ...lore, dwellers: only }) : outlineCellar(d, place, lore);
     const m = occupationOf(this.log, d.id);
-    const s: Site = { decision: d, house, first, cellar: m ? moveIn(first, m, house, lore) : first, built: null, ready: null };
+    const mound = d.site ? this.heap(d.site) : null;
+    const s: Site = { decision: d, house, place, mound, first, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
+    if (mound) return;
     this.down.set(house.id, async (before) => {
       const v = (await this.ensure(s)).visit;
       await v.enter(false, undefined, before);
     });
+  }
+
+  /** A barrow's mound and passage, on the land at its site (the town's building shader: nothing new to build). */
+  private heap(site: { readonly x: number; readonly z: number; readonly yaw: number }): Mound {
+    const mesh = buildingMeshAt(barrowMesh(), site.x, this.host.ground(site.x, site.z) - 0.05, site.z, 'barrow');
+    mesh.rotation.y = site.yaw;
+    void this.host.stage.add(mesh);
+    return { ...site, mesh, cool: 0 };
   }
 
   private moved(m: MoveInDecision): void {
@@ -177,17 +242,22 @@ export class Cellars {
   }
 
   private ensure(s: Site): Promise<Built> {
-    s.built ??= this.make(s).then((b) => (s.ready = b));
+    s.built ??= this.assemble(s).then((b) => (s.ready = b));
     return s.built;
   }
 
-  private async make(s: Site): Promise<Built> {
+  private async assemble(s: Site): Promise<Built> {
     const h = this.host;
     // Its own space, deep under the house.
-    const view = new CellarView(s.first, { x: s.house.cx, y: -400, z: s.house.cz });
+    const m = s.mound, at = m ?? { x: s.house.cx, z: s.house.cz };
+    const view = new CellarView(s.first, { x: at.x, y: -400, z: at.z });
     await view.add(h.stage);
-    const visit = new CellarVisit(s.first, s.house, view, h.player, h.lantern, h.sky, h.notes);
-    visit.up = () => h.up(s.house);
+    // A barrow: back out into its forecourt, facing away from the mound.
+    const out = m ? { door: [...turn(m, 0, 2.2), m.yaw + Math.PI] as const } : s.house;
+    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.sky, h.notes);
+    const words = loreOf(h.setting, s.decision.template).words;
+    if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
+    if (!m) visit.up = () => h.up(s.house);
     visit.onSwap = () => h.swapped();
     const space = this.saved[s.decision.id];
     if (space) visit.restore(space);
@@ -210,13 +280,14 @@ export class Cellars {
     // Its people's shaders build in the Stage's frame slots; they show once warm.
     const drawn = b.creatures;
     this.warming = drawn.warm(h.stage).then(() => h.stage.add(drawn.group));
-    const visit = b.visit, danger = cellarDanger(cellar, h.setting.creatures), house = cellar.house;
+    const visit = b.visit, danger = cellarDanger(cellar, h.setting.creatures), place = cellar.house;
+    const words = loreOf(h.setting, s.decision.template).words ?? CELLAR_WORDS;
     const arena: Arena = {
       get inside() { return visit.inside; },
       get shown() { return visit.inside; },
-      enclosed: true, place: 'this cellar', danger, promise: own,
-      quietLine: `The cellar of ${house} is quiet now. Its household will want to hear.`,
-      thanks: (coins) => `The household of ${house} hears the cellar is safe and presses ${coins} into your hand.`,
+      enclosed: true, place: s.mound ? 'this barrow' : 'this cellar', danger, promise: own,
+      quietLine: fill(words.quiet, { place }),
+      thanks: (coins) => fill(words.thanks, { place, coins }),
     };
     b.fight = new Encounter(arena, b.delve, b.creatures, h.hud, h.player, h.notes, h.director, h.setting, h.journal, h.camera, h.canvas, h.fight, !!mine?.paid);
     b.fight.onCue = (c) => h.cue(c);
@@ -224,6 +295,19 @@ export class Cellars {
 
   /** The newest dwellers' warm-up (loading waits for the first cellar's; later ones warm while the hero walks to the hatch). */
   warming: Promise<void> = Promise.resolve();
+}
+
+/** How a cellar is spoken of when the setting gives no words of its own. */
+const CELLAR_WORDS = {
+  enter: 'You climb down into the cellar of {place}.',
+  quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',
+  thanks: 'The household of {place} hears the cellar is safe and presses {coins} into your hand.',
+};
+
+/** A point of a barrow's own frame (x, z) on the land: turned by its yaw, at its site. */
+function turn(m: { readonly x: number; readonly z: number; readonly yaw: number }, x: number, z: number): [number, number] {
+  const c = Math.cos(m.yaw), s = Math.sin(m.yaw);
+  return [m.x + x * c + z * s, m.z - x * s + z * c];
 }
 
 /** The chests a cellar's earlier dwellers' visit opened (not the lair's hoard). */

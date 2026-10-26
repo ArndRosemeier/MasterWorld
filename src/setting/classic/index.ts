@@ -4,6 +4,7 @@
  */
 import { CONTRACT_VERSION, type SettingModule } from '../contract';
 import { backgrounds } from './backgrounds';
+import { barrow } from './barrow';
 import { cellar } from './cellar';
 import { names, talk } from './people';
 import { creatures } from './creatures';
@@ -48,7 +49,7 @@ export const classic: SettingModule = {
     maxSlope: 0.12,
     vista: 220,
   },
-  dungeons: { cellar },
+  dungeons: { cellar, barrow },
   names,
   talk,
   skills,

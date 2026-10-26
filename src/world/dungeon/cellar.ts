@@ -1,5 +1,6 @@
 /**
- * A cellar dungeon (plan 8, milestone 3) from its decision, in the promise's stages (plan 4.2):
+ * A cellar dungeon (plan 8, milestone 3), or another kind built the same way (a barrow out on the land),
+ * from its decision, in the promise's stages (plan 4.2):
  *
  * - **Sketch**: the place's history in layers (who dug it, what lay there before, what went wrong, who
  *   lives there now), the hints the household can give and the facts they plant. Cheap.
@@ -12,7 +13,6 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { cyclicGraph, layoutDungeon, pace, PATTERNS, DIRS, type DungeonGraph, type DungeonLayout, type Pace, type Room } from '@futuremagic/dungeon';
-import type { TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonProp, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
 import type { DungeonDecision, MoveInDecision } from '../decisions';
 import { setPieceById, type SetPieceDef } from './setPieces';
@@ -45,8 +45,12 @@ export interface CellarSketch {
   readonly facts: Fact[];
   /** Who in town would know: the household of this building of this town. */
   readonly knownBy: { readonly town: string; readonly building: number };
-  /** The house above, as people call it ("the inn"). */
+  /** The house above, as people call it ("the inn"); a barrow's own name ("the barrow north of town"). */
   readonly house: string;
+  /** What talk calls the place, when it is not "the cellar under {house}" (a barrow). */
+  readonly called?: string;
+  /** Where its doorway is on the land, for a dungeon that is not under a house (world metres, yaw). */
+  readonly site?: { readonly x: number; readonly z: number; readonly yaw: number };
   /** Who lives there now, if they moved in after it was cleared (plan 8.1: repopulation): the move-in's id and seed. */
   readonly occupation?: { readonly id: string; readonly seed: number };
 }
@@ -106,9 +110,15 @@ export interface Cellar extends CellarSketch {
   readonly signature: string;
 }
 
-/** How people call a building ("the cottage", "the cooper's workshop"). */
-export const houseName = (b: TownBuilding): string =>
-  b.kind === 'house' || b.kind === 'cottage' ? `the ${b.kind}` : b.kind === 'workshop' && b.trade ? `the ${b.trade}'s workshop` : `the ${b.kind}`;
+/**
+ * Where a dungeon lies, as far as its making needs: the house above a cellar (its kind, trade and size),
+ * or a barrow (`name`: what it is called; its size: the doorway's chamber).
+ */
+export interface DungeonPlace { readonly kind: string; readonly hu: number; readonly hv: number; readonly trade?: string; readonly name?: string }
+
+/** How people call a building ("the cottage", "the cooper's workshop"), or the place's own name. */
+export const houseName = (b: DungeonPlace): string =>
+  b.name ?? (b.kind === 'house' || b.kind === 'cottage' ? `the ${b.kind}` : b.kind === 'workshop' && b.trade ? `the ${b.trade}'s workshop` : `the ${b.kind}`);
 
 const pickDef = <T extends HistoryDef>(rng: Rng, list: readonly T[], ok: (d: T) => boolean = () => true): T => {
   const c = list.filter(ok);
@@ -119,7 +129,7 @@ const pickDef = <T extends HistoryDef>(rng: Rng, list: readonly T[], ok: (d: T) 
  * The sketch: history, hints and facts (no layout). With `moved`, the dwellers who moved in after it was
  * cleared (plan 8.1); its history and hints are theirs, its id the move-in's.
  */
-export function sketchCellar(d: DungeonDecision, house: TownBuilding, lore: CellarLore, moved?: MoveInDecision): CellarSketch {
+export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: CellarLore, moved?: MoveInDecision): CellarSketch {
   const rng = new Rng(deriveSeed(d.seed, 'cellar', 'history'));
   const piece = setPieceById(d.setPiece);
   const name = houseName(house);
@@ -131,7 +141,7 @@ export function sketchCellar(d: DungeonDecision, house: TownBuilding, lore: Cell
   // Who moves in fits the history and the place's danger (D29: fixed by where it lies, not by the hero).
   const first = pickDef(rng, lore.dwellers, (w) => (!w.with || w.with.some((x) => ids.includes(x))) && w.danger <= (d.danger ?? Infinity));
   const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || first;
-  const line = (def: HistoryDef) => def.text.replaceAll('{house}', name);
+  const line = (def: HistoryDef) => def.text.replaceAll('{house}', name).replaceAll('{place}', name);
   const history: HistoryEntry[] = [];
   if (older) history.push({ layer: 'older', def: older, text: line(older) });
   history.push({ layer: 'built', def: builder, text: line(builder) }, { layer: 'trouble', def: trouble, text: line(trouble) }, { layer: 'now', def: dweller, text: line(dweller) });
@@ -139,14 +149,14 @@ export function sketchCellar(d: DungeonDecision, house: TownBuilding, lore: Cell
     ? [...dweller.signs, `It was cleared, and for a while it was quiet down there. Now something else has moved in.`]
     : [...dweller.signs, `They say ${line(trouble).charAt(0).toLowerCase()}${line(trouble).slice(1)}`];
   const facts: Fact[] = [
-    [d.id, 'is under', `${d.town}/building/${d.building}`],
+    d.site ? [d.id, 'lies near', d.town] : [d.id, 'is under', `${d.town}/building/${d.building}`],
     [d.id, 'was dug by', builder.id],
     [d.id, 'suffered', trouble.id],
     [d.id, 'is home to', dweller.id],
   ];
   if (older) facts.push([d.id, 'lies over', older.id]);
   if (moved) facts.push([moved.id, 'moved into', d.id], [moved.id, 'is', dweller.id]);
-  return { decision: d, history, dweller, setPiece: piece, hints, facts, knownBy: { town: d.town, building: d.building }, house: name, ...(moved ? { occupation: { id: moved.id, seed: moved.seed } } : {}) };
+  return { decision: d, history, dweller, setPiece: piece, hints, facts, knownBy: { town: d.town, building: d.building }, house: name, ...(house.name ? { called: name } : {}), ...(d.site ? { site: d.site } : {}), ...(moved ? { occupation: { id: moved.id, seed: moved.seed } } : {}) };
 }
 
 /** A sketch's history layer of a kind, if it has one. */
@@ -157,7 +167,7 @@ export function layerOf(s: CellarSketch, k: HistoryLayer): HistoryEntry | undefi
 const SIZE: Record<Room['size'], readonly [number, number]> = { nook: [2, 2], small: [2, 3], medium: [3, 4], large: [4, 5] };
 
 /** The outline: everything but the meshes. Throws if no layout fits (the variety test keeps that from happening). */
-export function outlineCellar(d: DungeonDecision, house: TownBuilding, lore: CellarLore): Cellar {
+export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: CellarLore): Cellar {
   const sketch = sketchCellar(d, house, lore);
   const minLevel = layerOf(sketch, 'older') ? -1 : 0;
   // Patterns: what the history's layers suggest; the set piece's own for the main cycle when it has one.
@@ -315,7 +325,7 @@ function settle(graph: DungeonGraph, p: Pace, rooms: readonly CellarRoom[], now:
  * and what stands in them stay (the old dwellers' leavings too); who lives there and the story of it are
  * the move-in's.
  */
-export function moveIn(c: Cellar, moved: MoveInDecision, house: TownBuilding, lore: CellarLore): Cellar {
+export function moveIn(c: Cellar, moved: MoveInDecision, house: DungeonPlace, lore: CellarLore): Cellar {
   const sketch = sketchCellar(c.decision, house, lore, moved);
   const spawns = settle(c.graph, c.pace, c.rooms, sketch.dweller, new Rng(deriveSeed(moved.seed, 'move-in')));
   return { ...c, ...sketch, spawns };

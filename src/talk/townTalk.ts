@@ -10,6 +10,7 @@ import { createEnglishResources, englishModule, type EnglishResources } from 'so
 import { hash2f } from '@futuremagic/core';
 import type { SettingModule, TalkDef } from '../setting/contract';
 import type { Person } from '../sim/people';
+import { loreOf, placeOf } from '../vgm/dungeons';
 import { cellarHint, type CellarHint } from '../vgm/hints';
 import type { Decision, DecisionLog, DungeonDecision } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
@@ -51,7 +52,7 @@ export class TownTalk {
   /** Lead topics the player can ask about (cellar ids), in the order heard. */
   private readonly leads: string[] = [];
   private readonly cellarName = new Map<string, string>();
-  private readonly cellarHouse = new Map<string, { building: number; name: string }>();
+  private readonly cellarHouse = new Map<string, { building: number; name: string; dungeon: string; site?: { x: number; z: number } }>();
   /** Turns asked per person (to vary the "nothing" lines). */
   private readonly turns = new Map<number, number>();
   /** What each person last told (so "How do you know?" asks about that alone). */
@@ -114,9 +115,9 @@ export class TownTalk {
       const id = hint.cellar;
       const teller = folk.find((f) => f.person.home === hint.building);
       const house = teller?.house ?? sketch.house;
-      const name = fill(talk.cellar, { house });
+      const name = sketch.called ?? fill(talk.cellar, { house });
       this.cellarName.set(id, name);
-      this.cellarHouse.set(id, { building: hint.building, name: house });
+      this.cellarHouse.set(id, { building: hint.building, name: sketch.called ?? house, dungeon: sketch.decision.id, ...(sketch.site ? { site: sketch.site } : {}) });
       entities[id] = { type: 'place' };
       names[id] = name;
       const knownBy = hint.knowers.map(pid);
@@ -166,13 +167,17 @@ export class TownTalk {
   houseOf(id: string): number { return this.cellarHouse.get(id)?.building ?? -1; }
   houseCalled(id: string): string { return this.cellarHouse.get(id)?.name ?? id; }
 
+  /** A barrow's doorway on the land (the map marks it); null for a cellar (its house's door is marked). */
+  siteOf(id: string): { readonly x: number; readonly z: number } | null { return this.cellarHouse.get(id)?.site ?? null; }
+
   /** The topics the player can pick with this person now. */
   topics(person: number): Topic[] {
     const t = this.talk.topics;
     const out: Topic[] = [{ id: 'self', label: t.self }, { id: 'news', label: t.news }];
     // A cellar moved into again: only its newest story is a topic.
     this.leads.forEach((l, i) => {
-      if (this.leads.slice(i + 1).some((m) => this.houseOf(m) === this.houseOf(l))) return;
+      const place = (x: string) => this.cellarHouse.get(x)?.dungeon;
+      if (this.leads.slice(i + 1).some((m) => place(m) === place(l))) return;
       out.push({ id: `lead:${l}`, label: cap(this.cellarCalled(l)), lead: true });
     });
     if (this.session.core.context(pid(person)).pendingOffer) out.push({ id: 'more', label: t.more });
@@ -262,8 +267,8 @@ export function townTalk(seed: number, setting: SettingModule, town: Town, peopl
 export function talkCellar(d: Decision, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog): TalkCellar | null {
   const dungeon = d.kind === 'dungeon' ? d : d.kind === 'move-in' ? log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === d.dungeon) : undefined;
   if (!dungeon || dungeon.town !== town.decision.id) return null;
-  const house = town.plan.buildings.find((b) => b.id === dungeon.building);
+  const house = placeOf(dungeon, [town]);
   if (!house) return null;
-  const sketch = sketchCellar(dungeon, house, setting.dungeons.cellar, d.kind === 'move-in' ? d : undefined);
+  const sketch = sketchCellar(dungeon, house, loreOf(setting, dungeon.template), d.kind === 'move-in' ? d : undefined);
   return { sketch, hint: cellarHint(sketch, people, town.plan) };
 }

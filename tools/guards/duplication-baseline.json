@@ -96,10 +96,6 @@
     "reason": "Each place builds its encounter's Arena (app/encounter.ts) as an object literal: a cellar's and a band's; one interface, two arenas."
   },
   {
-    "key": "same name: masterworld/app/cellars.ts#thanks + masterworld/app/wildLand.ts#thanks",
-    "reason": "Each place builds its encounter's Arena (app/encounter.ts) as an object literal: a cellar's and a band's; one interface, two arenas."
-  },
-  {
     "key": "same name: masterworld/app/cellars.ts#step + masterworld/game/delve.ts#step",
     "reason": "Per-frame step of unrelated things (the cellars' visits vs one fight); only the name matches."
   },
@@ -134,5 +130,9 @@
   {
     "key": "same name: masterworld/sim/dungeonNav.ts#slide + masterworld/sim/wild.ts#slide",
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
+  },
+  {
+    "key": "same name: masterworld/app/cellars.ts#solid + masterworld/world/town.ts#solid",
+    "reason": "Both answer the walker's wall test out of doors (main.ts WalkWorld.wall): the town's buildings, the barrows' mounds; one role, two kinds of obstacle."
   }
 ]

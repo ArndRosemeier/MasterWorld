@@ -38,12 +38,12 @@ import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
 import { TOWN_RASTER } from './world/town';
-import { firstDungeon, houseOf } from './vgm/dungeons';
+import { firstDungeon, houseOf, promiseBarrow } from './vgm/dungeons';
 import { keepPromise, nextPromise, keptOf } from './vgm/leads';
 import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
-import type { Decision } from './world/decisions';
+import type { Decision, DungeonDecision } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
 import { InteriorView } from './render/town/InteriorView';
 import { lookFromDegrees } from './app/look';
@@ -150,7 +150,7 @@ export async function start(b: Boot): Promise<void> {
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
       // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
-      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || trunks.blocks(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
+      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
@@ -317,6 +317,7 @@ export async function start(b: Boot): Promise<void> {
       swapped: () => autosave(),
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
+      ground: (x, z) => terrain.height(x, z),
     }, terrain.towns, save?.cellars ?? {});
     cellars.sync(log);
     // The wild on the land around the town: built as the hero comes near (D27, plan 9.3).
@@ -332,6 +333,15 @@ export async function start(b: Boot): Promise<void> {
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!town.solid(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
     }, save?.wild ?? {}) : null;
+    // `barrow`: before a barrow's forecourt, looking at it (one is promised now if there is none).
+    if (params.barrow && town) {
+      let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === 'barrow') ?? null;
+      if (!b) {
+        b = promiseBarrow(seed, terrain, town, log, home, wild?.territories ?? []);
+        if (b) { log = [...log, { ...b, at: hours() }]; cellars.sync(log); }
+      }
+      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * 9, undefined, b.site.z + Math.cos(b.site.yaw) * 9, b.site.yaw);
+    }
     // `wild=<kind>`: beside its first group (for looking at them).
     const by = params.wildAt ? wild?.territories.find((t) => t.def.id === params.wildAt) : undefined;
     if (by) player.teleport(by.x + by.r + 20, undefined, by.z, Math.PI / 2);
@@ -579,7 +589,7 @@ export async function start(b: Boot): Promise<void> {
       builderClock += dt;
       if (builderClock < 3 || !town || !life || title?.holding || creator?.showing) return;
       builderClock = 0;
-      const d = nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id), lore: setting.dungeons.cellar });
+      const d = nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id), dungeons: setting.dungeons, terrain, avoid: wild?.territories ?? [] });
       if (!d) return;
       console.info(`[vgm] ${d.kind} ${d.id}${d.kind === 'move-in' ? ` into ${d.dungeon}` : ''} at ${hours().toFixed(1)} h`);
       log = [...log, d];
@@ -598,6 +608,7 @@ export async function start(b: Boot): Promise<void> {
       if (!rooms?.inside) {
         cellars.step(dt);
         if (!visit()) wild?.near(player.walker.pos.x, player.walker.pos.z);
+        if (!visit() && !player.flying) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
         stepEncounters(dt, [...cellars.encounters, ...(wild?.encounters ?? [])], { hero: character, player, hud: fightHud });
       }
       if (!visit()) rooms?.update(dt);

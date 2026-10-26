@@ -6,11 +6,12 @@
  * Everything it decides goes into the decision log, so a save replays it. Pure.
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
-import type { CellarLore } from '../setting/contract';
+import type { SettingModule } from '../setting/contract';
 import type { Decision, DecisionLog, DungeonDecision, KeptDecision, MoveInDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
+import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
-import { houseOf, promiseCellar } from './dungeons';
+import { loreOf, placeOf, promiseBarrow, promiseCellar } from './dungeons';
 
 export const LEADS = {
   /** Open promises the world always has. */
@@ -65,8 +66,15 @@ export interface LeadsContext {
   readonly purposeOverdue: boolean;
   /** The hero is down in this dungeon now (nothing moves in under their feet). */
   readonly inside: (dungeon: string) => boolean;
-  readonly lore: CellarLore;
+  readonly dungeons: SettingModule['dungeons'];
+  /** The land (barrows are promised on it); none: only cellars. */
+  readonly terrain?: Terrain;
+  /** Ground a barrow keeps away from (the wild's territories). */
+  readonly avoid?: readonly { readonly x: number; readonly z: number; readonly r: number }[];
 }
+
+/** Share of new places that are barrows, when the setting has them and none is open. */
+const BARROWS = 0.4;
 
 /** The Builder's next promise, if one is due now. */
 export function nextPromise(c: LeadsContext): Decision | null {
@@ -77,9 +85,12 @@ export function nextPromise(c: LeadsContext): Decision | null {
   const n = promisesOf(c.log).length;
   const s = deriveSeed(c.seed, 'vgm', 'lead', n);
   const moved = moveInto(c, s);
-  // Rather a new place; a cleared one is moved into now and then (or when no house is left).
+  // Rather a new place; a cleared one is moved into now and then (or when no place is left). Now and
+  // then the new place is a barrow out on the land (one open at a time).
   const town = c.towns[0];
-  const fresh = town ? promiseCellar(c.seed, town, c.log, c.home) : null;
+  const barrowOpen = openPromises(c.log).some((p) => p.kind === 'dungeon' && p.template === 'barrow');
+  const barrow = town && c.terrain && c.dungeons.barrow && !barrowOpen && hash2f(s, 6, 2) < BARROWS ? promiseBarrow(c.seed, c.terrain, town, c.log, c.home, c.avoid) : null;
+  const fresh = barrow ?? (town ? promiseCellar(c.seed, town, c.log, c.home) : null);
   if (moved && (!fresh || hash2f(s, 5, 1) < 0.4)) return moved;
   return fresh ? { ...fresh, at: c.hours } : null;
 }
@@ -94,16 +105,16 @@ function moveInto(c: LeadsContext, s: number): MoveInDecision | null {
     const now = occupationOf(c.log, d.id);
     const k = kept.find((x) => x.promise === (now?.id ?? d.id));
     if (!k || c.hours - k.at < LEADS.settle) continue;
-    const house = houseOf(d, c.towns);
+    const house = placeOf(d, c.towns);
     if (!house) continue;
-    const sketch = sketchCellar(d, house, c.lore, now ?? undefined);
+    const sketch = sketchCellar(d, house, loreOf(c, d.template), now ?? undefined);
     ready.push({ d, was: sketch.dweller.id });
   }
   if (!ready.length) return null;
   const pick = ready[Math.floor(hash2f(s, 2, 7) * ready.length)];
-  const house = houseOf(pick.d, c.towns)!;
-  const layers = sketchCellar(pick.d, house, c.lore).history.map((h) => h.def.id);
-  const fits = c.lore.dwellers.filter((w) => w.id !== pick.was && w.danger <= (pick.d.danger ?? Infinity) && (!w.with || w.with.some((x) => layers.includes(x))));
+  const house = placeOf(pick.d, c.towns)!, lore = loreOf(c, pick.d.template);
+  const layers = sketchCellar(pick.d, house, lore).history.map((h) => h.def.id);
+  const fits = lore.dwellers.filter((w) => w.id !== pick.was && w.danger <= (pick.d.danger ?? Infinity) && (!w.with || w.with.some((x) => layers.includes(x))));
   if (!fits.length) return null;
   const dweller = fits[Math.floor(hash2f(s, 4, 3) * fits.length)];
   const n = c.log.filter((d) => d.kind === 'move-in').length + 1;
