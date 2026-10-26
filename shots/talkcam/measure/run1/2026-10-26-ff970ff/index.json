@@ -1,0 +1,63 @@
+{
+  "commit": "ff970ff1c6dcbae2dc2fa217ce66cb97bdb11147",
+  "dirty": false,
+  "date": "2026-10-26",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": false,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 39.546,
+  "shots": [
+    {
+      "name": "inn",
+      "file": "01-inn.jpg",
+      "query": "title=0&day=0&hour=20&room=inn",
+      "loadS": 15.726,
+      "drawnS": 0.026,
+      "settledS": 1.5076000000238419,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 207,
+      "p50": 9.799999999999272,
+      "p95": 13.200000000000728,
+      "mean": 9.686956521854302,
+      "shaders": {
+        "warmup": 81,
+        "run": 0,
+        "late": 0,
+        "worstMs": 11.399999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "talk",
+      "file": "02-talk.jpg",
+      "query": "title=0&day=0&hour=20&talk=inn&topics=news",
+      "loadS": 15.645,
+      "drawnS": 0.025,
+      "settledS": 1.5226999999284745,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 189,
+      "p50": 10.899999999997817,
+      "p95": 14.299999999999272,
+      "mean": 10.628571428571425,
+      "shaders": {
+        "warmup": 81,
+        "run": 0,
+        "late": 0,
+        "worstMs": 14.600000023841858,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    }
+  ]
+}
