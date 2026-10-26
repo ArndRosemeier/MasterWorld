@@ -44,7 +44,7 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   // Dry indoors.
   const wet = WEATHER.wet.mul(float(1).sub(inside));
   m.colorNode = a.rgb.mul(tint).mul(mix(float(1), float(0.65), wet)).mul(n.a.mul(0.6).add(0.4));
-  m.roughnessNode = mix(a.a, a.a.mul(0.45), wet);
+  m.roughnessNode = mix(a.a, a.a.mul(0.75), wet);
   m.aoNode = n.a.mul(mix(float(1), level.mul(level).mul(ROOM_LIGHT.gain).add(ROOM_LIGHT.fill).min(1), inside));
   const xy = n.xy.mul(2).sub(1);
   const z = float(1).sub(xy.dot(xy)).max(0).sqrt();

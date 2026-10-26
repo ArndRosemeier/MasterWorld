@@ -253,8 +253,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   col = col.mul(mix(float(1), float(UNDER_CROWNS), unshaded));
   const afar = woodsFromAfar(col, crown, cover, varying(cn.z, 'vWoodsSpacing'), p);
   col = mix(col, afar.color, woods);
-  // Crowns are matt: no sheen of the sky on the woods from afar.
-  m.specularIntensityNode = mix(float(0.25), float(0.05), woods);
+  // Crowns are matt: no sheen of the sky on the woods from afar (set with the rest of the sheen below).
   rough = mix(rough, float(0.9), woods);
   pert = mix(pert, afar.bump.mul(0.9), woods);
 
@@ -290,11 +289,15 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const rim = smoothstep(-0.08, 0.0, depth).mul(puddle.oneMinus()).mul(where);
   // Water is dark where it does not mirror: the stone under it shows deep and the sky only at a slant.
   col = col.mul(mix(float(1), float(0.6), rain)).mul(mix(float(1), float(0.72), rim)).mul(mix(float(1), float(0.22), puddle));
-  rough = mix(mix(mix(rough, float(0.42), rain.mul(0.85)), float(0.3), rim), float(0.14), puddle);
+  // A meadow stays matt in the wet: the grass over it, not a film of water, is what the eye sees.
+  const meadow = w.x;
+  rough = mix(mix(mix(rough, float(0.55), rain.mul(0.85).mul(meadow.mul(0.8).oneMinus())), float(0.3), rim), float(0.14), puddle);
   const rings = rainRings(p.xz).mul(smoothstep(6.0, 25.0, length(cameraPosition.sub(positionWorld))).oneMinus());
   pert = mix(pert, vec3(rings.x, 0, rings.y), puddle); ao = mix(ao, float(1), puddle);
   // A puddle under a grey sky mirrors it at a slant: kept faint, or it reads as a pale sheet of ice.
-  m.specularIntensityNode = mix(mix(float(0.25), float(0.5), rain), float(0.22), puddle);
+  // Wet ground only a little glossier: toward a low sun a broad sheen of it glares the whole square white.
+  // Grassland's sheen is weak: toward a low sun the env map's sun lobe glared meadows white.
+  m.specularIntensityNode = mix(mix(float(0.25), float(0.35), rain), float(0.22), puddle).mul(meadow.mul(0.7).oneMinus()).mul(mix(float(1), float(0.2), woods));
   // Caustics only where there is water above (a branch: the land above the sea pays nothing).
   m.emissiveNode = Fn(() => {
     const e = vec3(0).toVar();
