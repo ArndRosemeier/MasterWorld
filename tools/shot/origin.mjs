@@ -79,7 +79,8 @@ for (const spot of spots) for (const zero of [false, true]) {
   if (!ready) { failed = true; errors.push('the page did not report ready'); }
   await page.addStyleTag({ content: '#loading{display:none!important}#hud{visibility:hidden!important}' });
   const missing = await drawnNear(page, 15000);
-  await shadersQuiet(page, 4000);
+  // Longer than the shot set: the step check needs nothing left to build (new land streams in at the far spot).
+  await shadersQuiet(page, 12000);
   const name = `${spot.id}-${zero ? 'zero' : 'origin'}`;
   const row = { name, spot: spot.label, origin: !zero, missing, errors };
   if (!zero) Object.assign(row, await measureFrames(page, 2000));
@@ -93,11 +94,16 @@ for (const spot of spots) for (const zero of [false, true]) {
     await page.evaluate((grain) => { const g = window.game; g.followOrigin = false; g.origin.moveTo(g.origin.at.x + grain, g.origin.at.z); }, GRAIN);
     await page.waitForTimeout(BETWEEN);
     const b = await page.screenshot({ type: 'png', timeout: TIMEOUT });
+    const stepBuilds = (await builds(page)) - before;
     await page.screenshot({ path: join(dir, `${spot.id}-stepped.jpg`), type: 'jpeg', quality: 92, timeout: TIMEOUT });
-    const moment = await difference(page, a, a2), step = await difference(page, a2, b);
-    row.step = { moment, step, builds: (await builds(page)) - before };
+    await page.waitForTimeout(BETWEEN);
+    const b2 = await page.screenshot({ type: 'png', timeout: TIMEOUT });
+    // What a moment changes by itself, before the step and after it (the larger of the two).
+    const m1 = await difference(page, a, a2), m2 = await difference(page, b, b2), step = await difference(page, a2, b);
+    const moment = m1.mean >= m2.mean ? m1 : m2;
+    row.step = { moment, step, builds: stepBuilds };
     // The step may change no more than a moment of the world going on by itself (with a little slack for noise).
-    row.step.ok = row.step.builds === 0 && step.mean <= moment.mean * 2 + 0.5 && step.changed <= moment.changed * 2 + 0.002;
+    row.step.ok = row.step.builds === 0 && step.mean <= moment.mean * 1.5 + 0.5 && step.changed <= moment.changed * 1.5 + 0.002;
     if (!row.step.ok) failed = true;
   }
   row.shaders = await page.evaluate(() => { const m = window.shaders; return m ? { ...m.summary(), lines: m.violations() } : null; });
