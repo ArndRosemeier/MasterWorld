@@ -315,7 +315,7 @@ export class SmallLife {
     const cy = this.land.height(ox, oz) + rng.range(16, 26);
     const birds: Bird[] = [], weave: Flock['weave'] = [];
     for (let k = 0; k < n; k++) {
-      weave.push({ p1: rng.range(0, 6.3), p2: rng.range(0, 6.3), p3: rng.range(0, 6.3), r: rng.range(2, 4) + kind.size * 14, gx: rng.range(-1, 1), gz: rng.range(-1, 1) });
+      weave.push({ p1: rng.range(0, 6.3), p2: rng.range(0, 6.3), p3: rng.range(0, 6.3), r: rng.range(1.5, 3) + kind.size * 8, gx: rng.range(-1, 1), gz: rng.range(-1, 1) });
       const b = this.bird(kind, rng, ox, oz);
       b.y = cy;
       b.doing = 'fly';
