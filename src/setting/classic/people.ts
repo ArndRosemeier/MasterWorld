@@ -53,4 +53,19 @@ export const talk: TalkDef = {
   lead: 'Something is wrong in {cellar}.',
   marked: '{name} marks {house} on your map.',
   handOver: 'You hold out your map. {name} takes it and marks the place.',
+  comes: [
+    '{name} has seen you and comes over.',
+    '“You there, a word!” {name} is coming your way.',
+    '{name} waves to you and hurries over.',
+  ],
+  beckon: [
+    'You have the look of someone who can handle trouble. And there is trouble, if you will hear it.',
+    'A stranger on the road, just when we could use one. Something has been going on here, you know.',
+    'Forgive me for stopping you. You are not from here, are you? Then you will not have heard what people are saying.',
+  ],
+  arrival: {
+    title: 'Find work in town',
+    text: 'A light purse and a long road behind me. Innkeepers hear every rumour: ask at {inn} whether anything strange has happened lately, or ask the townsfolk.',
+    from: 'your own hand',
+  },
 };

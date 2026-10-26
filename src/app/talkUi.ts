@@ -70,6 +70,9 @@ export class TalkUi {
 
   get open(): boolean { return this.with !== null; }
 
+  /** Who the hero is talking with now. */
+  get partner(): Agent | null { return this.with; }
+
   /** Each frame: who is near enough to talk to, or whether the talk partner was walked away from. */
   watch(): void {
     if (this.with) {
@@ -131,6 +134,8 @@ export class TalkUi {
     this.lines.replaceChildren();
     this.box.classList.add('open');
     this.host.paused(true);
+    const at = this.whereIs(a);
+    if (at) this.player.frameTalk(true, at.x, at.z);
     this.speak(this.talk.greet(a.person.id).text);
     this.offer();
   }
@@ -183,6 +188,7 @@ export class TalkUi {
     this.with = null;
     this.life.letGo(a);
     this.box.classList.remove('open');
+    this.player.frameTalk(false);
     this.host.paused(false);
   }
 }

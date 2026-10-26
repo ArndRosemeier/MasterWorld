@@ -44,17 +44,22 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
     return s.i;
   };
   const out: Cast[] = [];
+  // Drinking at a table is drinking seated on its bench (standing on the bench showed their legs under it).
+  const actAt = (i: number): ActivityKind => {
+    const s = plan.spots[i], act = ACT[s.kind];
+    return act === 'drink' && plan.fixtures.some((f) => f.kind === 'bench' && Math.abs(s.a - f.a) <= f.w / 2 && Math.abs(s.b - f.b) <= f.d / 2) ? 'sit' : act;
+  };
   // Workers first, so the counter is never taken by a guest.
   const workers = inside.filter((a) => a.person.work === building), rest = inside.filter((a) => a.person.work !== building);
   for (const a of workers) {
     const i = take((k) => WORK.has(k) || (a.person.role === 'keeper' && k === 'pray'), a.person.id);
-    if (i >= 0) out.push({ agent: a, spot: i, act: ACT[plan.spots[i].kind] });
+    if (i >= 0) out.push({ agent: a, spot: i, act: actAt(i) });
     else rest.push(a);
   }
   for (const a of rest) {
     let i = -1;
     for (const k of REST) if ((i = take((x) => x === k, a.person.id)) >= 0) break;
-    if (i >= 0) out.push({ agent: a, spot: i, act: ACT[plan.spots[i].kind] });
+    if (i >= 0) out.push({ agent: a, spot: i, act: actAt(i) });
   }
   return out.sort((x, y) => x.agent.person.id - y.agent.person.id);
 }

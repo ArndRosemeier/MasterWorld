@@ -39,3 +39,15 @@ test('room cast: the innkeeper held for a talk stays at the counter (holding sho
   const after = roomCast(life.agents, life.spots, inn.id, room).find((x) => x.agent === keeper.agent);
   assert.equal(after?.spot, keeper.spot);
 });
+
+test('room cast: drinkers at the inn tables sit on the benches, those at the counter stand', () => {
+  const life = new TownLife(plan, 7, 19);
+  for (let s = 0; s < 300; s++) life.step(1, 19);
+  const inn = plan.buildings.find((b) => b.kind === 'inn')!, room = planInterior(inn);
+  const benches = room.fixtures.filter((f) => f.kind === 'bench');
+  const onBench = (i: number) => benches.some((f) => Math.abs(room.spots[i].a - f.a) <= f.w / 2 && Math.abs(room.spots[i].b - f.b) <= f.d / 2);
+  const cast = roomCast(life.agents, life.spots, inn.id, room).filter((x) => room.spots[x.spot].kind === 'drink');
+  assert.ok(cast.length > 2, `${cast.length} drinking`);
+  for (const x of cast) assert.equal(x.act, onBench(x.spot) ? 'sit' : 'drink');
+  assert.ok(cast.some((x) => x.act === 'sit'), 'somebody at a table');
+});

@@ -17,6 +17,10 @@ const TURN = 2.6;
 const LOOK = 0.0035;
 /** Zoom range (m from the head); below FIRST it is first person. */
 const NEAR = 0, FAR = 18, FIRST = 0.6;
+/** A talk's view: above the higher of the hero's head and the aim (m). */
+const TALK_UP = 0.55;
+/** The shots tried for a talk, best first: back and to the right (m). */
+const TALK_SHOTS: readonly (readonly [number, number])[] = [[1.3, 0.45], [1.3, -0.45], [1.3, 0], [1.0, 0.8], [1.0, -0.8], [0.8, 0.3], [0.8, -0.3]];
 
 export class HeroCamera {
   /** The camera's own direction (rad): yaw as the walker's, pitch up positive. */
@@ -103,8 +107,48 @@ export class HeroCamera {
     };
   }
 
+  /** In a talk: the camera holds the talk's view (`frameTalk`) instead of trailing. */
+  private talking = false;
+
+  /**
+   * A talk's view (`on`): close over the hero's right shoulder and above the heads, looking at `at` (the
+   * one talked to, about chest high), so that neither people behind the hero (a room's drinkers), nor a
+   * counter in front, nor the posts of an open front hide them. Off: trailing again as before.
+   */
+  frameTalk(on: boolean, head: Vector3, at?: Vector3): void {
+    this.talking = on && !!at;
+    if (!this.talking || !at) { this.trail(head, 0); return; }
+    const dx = at.x - head.x, dz = at.z - head.z, len = Math.hypot(dx, dz) || 1;
+    const fx = dx / len, fz = dz / len;
+    // Over the right shoulder, else the shot least in the way of walls and posts: the fewest touched at
+    // the camera, on the way to the hero's head (short of it: the hero may stand against a wall), and on
+    // the near half of the way to the one talked to (a counter may stand in the far half).
+    const hits = (x: number, z: number): number => {
+      const wallHit = (px: number, pz: number, r: number) => (this.world.wall?.(px, pz, r) ? 1 : 0);
+      let n = wallHit(x, z, 0.3) * 3;
+      for (let t = 0.1; t < 0.75; t += 0.1) n += wallHit(x + (head.x - x) * t, z + (head.z - z) * t, 0.08) + wallHit(x + (at.x - x) * t * 0.6, z + (at.z - z) * t * 0.6, 0.08);
+      return n;
+    };
+    let back = 0, side = 0, least = Infinity;
+    for (const [b, sd] of TALK_SHOTS) {
+      const n = hits(head.x - fx * b - fz * sd, head.z - fz * b + fx * sd);
+      if (n < least) { least = n; back = b; side = sd; }
+      if (!n) break;
+    }
+    const eye = new Vector3(head.x - fx * back - fz * side, Math.max(head.y, at.y) + TALK_UP, head.z - fz * back + fx * side);
+    // Under a ceiling: down until clear of it.
+    for (let i = 0; i < 8; i++) {
+      const rock = this.world.rockSurface(eye.x, eye.y, eye.z);
+      if (rock === null || rock >= 0.3) break;
+      eye.y -= 0.1;
+    }
+    this.camera.position.copy(eye);
+    this.camera.lookAt(at);
+  }
+
   /** Place the camera behind the hero's head (`head` the point it orbits). */
   trail(head: Vector3, dt: number): void {
+    if (this.talking) return;
     const cp = Math.cos(this.pitch);
     const dir = new Vector3(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
     // As far back as wanted, short of ground and rock (with a margin), eased out again after.

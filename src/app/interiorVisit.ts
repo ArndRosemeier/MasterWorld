@@ -19,6 +19,10 @@ import type { Player } from './player';
 /** What a room is called when one walks in. */
 const NAMES: Partial<Record<TownBuilding['kind'], string>> = { inn: 'the inn', smithy: 'the smithy', bakery: 'the bakery', temple: 'the temple', hall: 'the hall', mill: 'the mill', workshop: 'a workshop', stable: 'the stable' };
 
+/** Races who stand on a step behind a counter, and its height (m; the counter is 1.05 m, made for men). */
+const SMALL = new Set(['halfling', 'dwarf']);
+const SERVE_STEP = 0.3;
+
 interface Room { b: TownBuilding; plan: InteriorPlan; frame: RoomFrame; world: WalkWorld; floor: number }
 
 export class InteriorVisit {
@@ -116,7 +120,9 @@ export class InteriorVisit {
     // Only those drawn (Actors makes adults): a child would hold a seat and show nobody.
     return roomCast(life.agents, life.spots, r.b.id, r.plan).map(({ agent, spot, act }) => {
       const s = r.plan.spots[spot], [x, z] = r.frame.toWorld(s.a, s.b);
-      return { agent, x, y: r.floor, z, dir: r.frame.dirOf(s.yaw), act };
+      // The small folk serve from a step behind the counter (unseen behind it): else only their hair shows.
+      const step = s.kind === 'serve' && SMALL.has(agent.person.race) ? SERVE_STEP : 0;
+      return { agent, x, y: r.floor + step, z, dir: r.frame.dirOf(s.yaw), act };
     });
   }
 
