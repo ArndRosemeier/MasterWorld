@@ -93,6 +93,27 @@ export interface OrderDecision {
   readonly order: TownOrder;
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision;
+/** A path (people on foot), a cart track (to hamlets and farms) or a road (between towns): plan 7. */
+export type RoadWay = 'path' | 'track' | 'road';
+
+/**
+ * A road links a place to the network (plan 7): its centre line, routed over the land when it was
+ * decided (vgm/roads.ts), with the height it runs at (its profile; the ground is cut and filled to it).
+ * The route is kept, not routed again, so the road never moves once seen.
+ */
+export interface RoadDecision {
+  readonly kind: 'road';
+  readonly id: string;
+  readonly way: RoadWay;
+  /** What it links: the place it was made for, and the place or road it joins. */
+  readonly from: string;
+  readonly to: string;
+  /** Centre line x, y, z per point (about 6 m apart), from `from` to `to`. */
+  readonly pts: readonly number[];
+  /** When it was decided, game hours since the world began (none: when the world was opened). */
+  readonly at?: number;
+}
+
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision;
 
 export type DecisionLog = readonly Decision[];

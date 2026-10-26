@@ -47,7 +47,7 @@ export class WaterView {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
     // Each rebaked once the camera is a fifth of its side from its centre.
-    this.masks = [WATER.near, WATER.mid, WATER.far].map((mask) => new FollowedMask(mask, (x0, z0) => jobs.mask('mask', x0, z0, mask.side, mask.res), mask.side / 5, mask.side / 16));
+    this.masks = [WATER.near, WATER.mid, WATER.far].map((mask) => new FollowedMask(mask, (x0, z0, side, res) => jobs.mask('mask', x0, z0, side, res), mask.side / 5, mask.side / 16));
     // The swell runs with the prevailing wind (the weather's gusts and turns only change its height).
     const a = prevailingWind(jobs.seed);
     WATER.wind.value.set(Math.cos(a), Math.sin(a));

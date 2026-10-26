@@ -7,7 +7,7 @@ import { BufferAttribute, BufferGeometry, type Camera, type Mesh } from 'three/w
 import type { Stage } from '@futuremagic/stage';
 import { CANOPY_RISE, TERRAIN, kindMesh } from '../materials';
 import { chunkIndex, type ChunkMesh } from '../../world/chunkMesh';
-import type { TerrainJobs } from '../../workers/pool';
+import { until, type TerrainJobs } from '../../workers/pool';
 import { SEGS, chunkId, chunkSize, selectChunks, type ChunkKey } from './lod';
 
 /** Built chunks kept around after they leave the view, for coming back. */
@@ -23,6 +23,8 @@ export class TerrainView {
   private wanted: ChunkKey[] = [];
   private last = { x: Infinity, z: Infinity, y: Infinity };
   private swapping = false;
+  /** Chunks being built from a land that has changed since (a road): built once more when they arrive. */
+  private readonly again = new Set<string>();
 
   constructor(private readonly stage: Stage, private readonly jobs: TerrainJobs, private readonly groundAt: (x: number, z: number) => number) {}
 
@@ -66,10 +68,36 @@ export class TerrainView {
   private request(k: ChunkKey): void {
     const id = chunkId(k), size = chunkSize(k.level);
     this.building.add(id);
-    void this.jobs.chunk(k.x * size, k.z * size, size, SEGS).then((m) => {
+    void this.jobs.chunk(k.x * size, k.z * size, size, SEGS).then(async (m) => {
+      if (this.again.delete(id)) { this.building.delete(id); this.request(k); return; }
+      const fresh = this.mesh(k, m), old = this.built.get(id);
+      if (old && this.shown.has(id)) await until(() => !this.swapping);
+      if (old && this.shown.has(id)) {
+        // A chunk in view built anew: the new one goes in before the old one comes out (no hole); no swap meanwhile.
+        this.swapping = true;
+        await this.stage.add(fresh);
+        this.stage.remove(old);
+        this.swapping = false;
+      }
+      if (old) freeChunk(old);
       this.building.delete(id);
-      this.built.set(id, this.mesh(k, m));
+      this.built.set(id, fresh);
     });
+  }
+
+  /** Every built chunk over a square `touches` names is built anew (a road was laid there); the old one shows until then. */
+  refresh(touches: (x0: number, z0: number, x1: number, z1: number) => boolean): void {
+    const hit = (id: string) => {
+      const [level, x, z] = id.split(':').map(Number), s = chunkSize(level);
+      return touches(x * s, z * s, (x + 1) * s, (z + 1) * s);
+    };
+    for (const id of this.building) if (hit(id)) this.again.add(id);
+    for (const id of [...this.built.keys()]) {
+      if (!hit(id) || this.building.has(id)) continue;
+      if (!this.shown.has(id)) { freeChunk(this.built.get(id)!); this.built.delete(id); continue; }
+      const [level, x, z] = id.split(':').map(Number);
+      this.request({ level, x, z });
+    }
   }
 
   private mesh(k: ChunkKey, m: ChunkMesh): Mesh {
@@ -94,12 +122,16 @@ export class TerrainView {
     for (const [id, m] of this.built) {
       if (this.built.size <= KEEP) break;
       if (this.shown.has(id)) continue;
-      // The index is shared by every chunk: detach it first, so disposing frees only this chunk's buffers.
-      m.geometry.setIndex(null);
-      m.geometry.dispose();
+      freeChunk(m);
       this.built.delete(id);
     }
   }
+}
+
+/** The index is shared by every chunk: detach it first, so disposing frees only this chunk's buffers. */
+function freeChunk(m: Mesh): void {
+  m.geometry.setIndex(null);
+  m.geometry.dispose();
 }
 
 /**

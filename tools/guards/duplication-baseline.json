@@ -196,7 +196,7 @@
     "reason": "A heading from one point to another (Math.atan2 of the z and x differences): every moving thing faces where it goes; one line, not a helper."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/world/volumes.ts",
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/roads.ts + masterworld/world/volumes.ts",
     "reason": "A point along a heading (x + cos a * d, z + sin a * d): plain trigonometry each mover does in its own terms."
   },
   {
@@ -222,5 +222,17 @@
   {
     "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/smallLife.ts#step",
     "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (a.mul(k).add(b)): every shader's sums and products are spelled this way; there is nothing to fold."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (a.mul(k).add(b)): every shader's sums and products are spelled this way; there is nothing to fold."
+  },
+  {
+    "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/terrain/TerrainView.ts#refresh",
+    "reason": "The same seam on purpose: app/roads.ts asks every view built from the land to build again over the squares a new road passes; each view rebuilds its own cells."
   }
 ]

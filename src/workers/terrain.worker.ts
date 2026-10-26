@@ -8,14 +8,16 @@ import { openWorld } from '../vgm/builder';
 import { settingById } from '../setting/index';
 import { horizonMap, type HorizonSpec } from '../world/horizon';
 import { serve } from './serve';
+import type { Decision } from '../world/decisions';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; index: number } | ({ kind: 'horizon' } & HorizonSpec));
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; index: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'decisions'; decisions: readonly Decision[] });
 export type TerrainResult = ChunkMesh | VolumeMesh[] | TownCellMesh[] | Uint8Array;
 
 let terrain: Terrain | null = null;
 
 serve<TerrainJob, TerrainResult>((job) => {
   if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = openWorld(job.seed, settingById(job.setting)).terrain;
+  if (job.kind === 'decisions') { terrain.settleMore(job.decisions); return { result: new Uint8Array(0), transfer: [] }; }
   if (job.kind === 'volumes') {
     const t = terrain;
     const meshes = t.volumes.map((f) => archMesh(t, f.site)).filter((m): m is VolumeMesh => !!m);

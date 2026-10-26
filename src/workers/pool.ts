@@ -37,7 +37,19 @@ export class WorkerPool<Job, Result> {
     });
   }
 
-  dispose(): void {
+  /** The same job to every worker (each answers once); jobs sent after it see what it did. */
+  broadcast(job: Job): Promise<Result[]> {
+    return Promise.all(this.workers.map((worker, w) => {
+      const id = this.nextId++;
+      this.busy[w]++;
+      return new Promise<Result>((resolve, reject) => {
+        this.waiting.set(id, { resolve, reject, worker: w });
+        worker.postMessage({ id, job });
+      });
+    }));
+  }
+
+    dispose(): void {
     for (const w of this.workers) w.terminate();
     for (const p of this.waiting.values()) p.reject(new Error('worker pool disposed'));
     this.waiting.clear();
@@ -87,6 +99,11 @@ export class TerrainJobs {
     return this.job({ kind: 'horizon', ...spec });
   }
 
+  /** Decisions made while playing that change the land (roads), for every terrain worker. */
+  decisions(ds: readonly import('../world/decisions').Decision[]): Promise<unknown> {
+    return this.pool.broadcast({ kind: 'decisions', decisions: ds, seed: this.seed, setting: this.setting });
+  }
+
   /** The buildings of the `index`th town, merged per cell. */
   townMeshes(index: number): Promise<import('../world/townMesh').TownCellMesh[]> {
     return this.job({ kind: 'town', index });
@@ -100,6 +117,16 @@ export class WorldJobs {
   /** A water (`mask`) or grass mask over a square: `res` samples a side. */
   mask(kind: 'mask' | 'grass', x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
     return this.pool.run({ kind, seed: this.seed, setting: this.setting, x0, z0, size, res });
+  }
+
+  /** Decisions made while playing that change the land (roads), for the world worker. */
+  decisions(ds: readonly import('../world/decisions').Decision[]): Promise<unknown> {
+    return this.pool.broadcast({ kind: 'decisions', decisions: ds, seed: this.seed, setting: this.setting });
+  }
+
+  /** The roads' mask over a square (world/roads.ts roadMask): `res` samples a side. */
+  roadMask(x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
+    return this.pool.run({ kind: 'roads', seed: this.seed, setting: this.setting, x0, z0, size, res });
   }
 
   /** Trees and shrubs over a square, candidates `spacing` apart. */

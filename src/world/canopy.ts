@@ -63,6 +63,8 @@ export function canopySampler(t: Terrain): (x: number, z: number, out: Canopy) =
     const slope = Math.hypot(t.height(x + 3, z) - h, t.height(x, z + 3) - h) / 3;
     keep *= 1 - smoothstep(0.6, 0.85, slope);
     if (keep <= 0 || t.rockAt(x, z, h) || t.townGround(x, z) !== TownGround.None) return out;
+    // A road through the woods opens a lane in the canopy.
+    if (!t.roads.empty) { keep *= smoothstep(1, 5, t.roads.fromEdge(x, z)); if (keep <= 0) return out; }
     // Trees per square metre as world/flora.ts places them (at most one in two near candidates).
     const woods = woodsAt(cover, flora, x, z);
     const density = Math.min((flora.trees / 10000) * (0.08 + 0.92 * woods), 0.5 / NEAR_SPACING ** 2) * keep;
