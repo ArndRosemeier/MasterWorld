@@ -7,7 +7,7 @@ import type { Quarry } from '../src/sim/creatures';
 import type { Land } from '../src/sim/wild';
 import { COURT, FACE, POSTS, holdBare, holdGround, holdSite, inHoldShape } from '../src/world/hold';
 import { holdMesh } from '../src/world/holdMesh';
-import { siteToWorld } from '../src/world/site';
+import { onLand } from '../src/world/dungeon/site';
 
 const dwarves = classic.peoples.find((p) => p.id === 'dwarf')!;
 const def = dwarves.hold!;
@@ -22,15 +22,15 @@ test('hold: the gate stands on a hillside in its ring, facing down the slope, it
   const d = Math.hypot(site.x - town.x, site.z - town.z);
   assert.ok(d >= def.ring[0] - 1 && d <= def.ring[1] + 1, `${d.toFixed(0)} m from town`);
   // Out of the gate is downhill (+z here).
-  const [ox, oz] = siteToWorld(site, 0, 10);
+  const [ox, oz] = onLand(site, 0, 10);
   assert.ok(oz - site.z > 9 && Math.abs(ox - site.x) < 1, 'faces down the slope');
-  const ground = (u: number, v: number) => { const [x, z] = siteToWorld(site, u, v); return holdGround(site, x, z, hill.height(x, z)); };
+  const ground = (u: number, v: number) => { const [x, z] = onLand(site, u, v); return holdGround(site, x, z, hill.height(x, z)); };
   for (const [u, v] of [[0, 1], [-COURT.half + 1, 5], [COURT.half - 1, COURT.depth - 1]]) assert.ok(Math.abs(ground(u, v) - site.level) < 1e-6, `court level at ${u}, ${v}`);
   assert.ok(Math.abs(ground(0, -2.5) - site.level) < 0.05, 'the doorway\'s recess level too');
   assert.ok(ground(0, -FACE.foot - FACE.run - 1) >= site.level + FACE.h * 0.8, 'a rock face behind the gate');
-  const [fx, fz] = siteToWorld(site, 0, 200);
+  const [fx, fz] = onLand(site, 0, 200);
   assert.equal(holdGround(site, fx, fz, 3), 3, 'far off the land is its own');
-  const [cx, cz] = siteToWorld(site, 3, 8);
+  const [cx, cz] = onLand(site, 3, 8);
   assert.ok(holdBare(site, cx, cz) && !holdBare(site, fx, fz), 'nothing grows in the court');
   assert.deepEqual(holdSite(hill, town, 'dwarf', def, 7), site, 'the same every time');
 });
@@ -56,7 +56,7 @@ function scene(tier: number) {
   const guard = { defence: 20, armour: 1, open: false };
   const events: HoldEvent[] = [];
   const stand = (v: number, secs: number) => {
-    const [x, z] = siteToWorld(site, 0, v);
+    const [x, z] = onLand(site, 0, v);
     const q: Quarry = { x, y: site.level, z, noise: 0.4, light: 0, alive: true, guard };
     for (let t = 0; t < secs; t += 0.1) { den.step(0.1, q); events.push(...watch.judge(0.1, q)); }
   };
@@ -107,7 +107,7 @@ test('hold: the hated are attacked on sight; once the hero is gone the wardens g
   s.stand(COURT.depth + 400, 60);
   assert.ok(s.den.peace && !s.watch.atWar, 'peace again');
   s.den.creatures.forEach((c, i) => {
-    const [px, pz] = siteToWorld(site, POSTS[i][0], POSTS[i][1]);
+    const [px, pz] = onLand(site, POSTS[i][0], POSTS[i][1]);
     assert.ok(Math.hypot(c.x - px, c.z - pz) < 3, `warden ${i} back at the post`);
   });
 });

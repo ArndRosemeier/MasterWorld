@@ -100,10 +100,11 @@ export class Town {
   }
 
   /** Does a body of radius `r` standing at (x, z) touch a building's walls (or the temple's sanctuary, or a fence)? */
-  solid(x: number, z: number, r: number): boolean {
+  solid(x: number, z: number, r: number, skip = -1): boolean {
     if (!this.near(x, z, r)) return false;
     if (this.fenced(x, z, r)) return true;
     for (const b of this.plan.buildings) {
+      if (b.id === skip) continue;
       const s = b.sanctuary;
       if (s && Math.hypot(x - s.cx, z - s.cz) < s.r + r) return true;
       const reach = Math.max(b.hu, b.hv) * 1.5 + 3 + r; // the porch stands out before the door

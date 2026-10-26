@@ -151,7 +151,7 @@ export class HeroCamera {
     const eye = new Vector3(head.x - fx * back - fz * side, Math.max(head.y + TALK_OVER_HEAD, at.y + TALK_UP), head.z - fz * back + fx * side);
     // Under a ceiling: down until clear of it.
     for (let i = 0; i < 8; i++) {
-      const rock = this.world.rockSurface(eye.x, eye.y, eye.z);
+      const rock = (this.world.sightSurface ?? this.world.rockSurface)(eye.x, eye.y, eye.z);
       if (rock === null || rock >= 0.3) break;
       eye.y -= 0.1;
     }
@@ -170,7 +170,7 @@ export class HeroCamera {
     for (let i = 1; i <= steps; i++) {
       const d = (i / steps) * this.zoom;
       const x = head.x - dir.x * d, y = head.y - dir.y * d, z = head.z - dir.z * d;
-      const rock = this.world.rockSurface(x, y, z);
+      const rock = (this.world.sightSurface ?? this.world.rockSurface)(x, y, z);
       if (y < this.world.height(x, z) + 0.35 || (rock !== null && rock < 0.35)) { free = Math.max(0, d - 0.3); break; }
     }
     this.dist = free < this.dist ? free : this.dist + (free - this.dist) * damp(3, dt);

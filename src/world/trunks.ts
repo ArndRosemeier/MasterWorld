@@ -25,6 +25,8 @@ export class Trunks {
   private readonly cells = new Map<number, Float32Array>();
 
   private readonly asked = new Set<number>();
+  /** Counts `forget`s: an answer asked for before the last one is dropped (it was placed on the old land). */
+  private epoch = 0;
 
   /** `fetch`: the flora of a square from the world workers (WorldJobs.flora); without it cells are placed here. */
   constructor(private readonly terrain: Terrain, private readonly fetch?: (x0: number, z0: number, size: number, spacing: number) => Promise<Float32Array>) {}
@@ -41,10 +43,20 @@ export class Trunks {
     const key = keyOf(i, j);
     if (!this.fetch || this.cells.has(key) || this.asked.has(key)) return;
     this.asked.add(key);
+    const e = this.epoch;
     void this.fetch(i * CELL, j * CELL, CELL, NEAR_SPACING).then((d) => {
       this.asked.delete(key);
-      if (!this.cells.has(key)) this.keep(key, trunksOf(d));
+      if (e === this.epoch && !this.cells.has(key)) this.keep(key, trunksOf(d));
     });
+  }
+
+  /** Drop the cells of the squares `touches` names (a road was laid through them): they are asked for again. */
+  forgetOver(touches: (x0: number, z0: number, x1: number, z1: number) => boolean): void {
+    this.epoch++;
+    for (const key of [...this.cells.keys()]) {
+      const i = Math.floor(key / 65536) - 32768, j = (key % 65536) - 32768;
+      if (touches(i * CELL, j * CELL, (i + 1) * CELL, (j + 1) * CELL)) this.cells.delete(key);
+    }
   }
 
   /** Does a body of radius `r` standing at (x, z) touch a trunk? */

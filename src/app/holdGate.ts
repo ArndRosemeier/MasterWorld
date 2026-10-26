@@ -16,7 +16,7 @@ import type { PeopleDef } from '../setting/contract';
 import { awake, groupDanger, type Land } from '../sim/wild';
 import type { HoldDecision } from '../world/decisions';
 import { inHoldShape } from '../world/hold';
-import { worldToSite } from '../world/site';
+import { inFrame } from '../world/dungeon/site';
 import { holdMesh } from '../world/holdMesh';
 import { Encounter, type Arena } from './encounter';
 import type { WildHost } from './wildLand';
@@ -68,7 +68,7 @@ export class HoldGate {
   /** Is a body of radius `r` at (x, z) in the gate's stone or the court's walls? */
   solid(x: number, z: number, r: number): boolean {
     if (Math.abs(x - this.site.x) > 40 || Math.abs(z - this.site.z) > 40) return false;
-    const [u, v] = worldToSite(this.site, x, z);
+    const [u, v] = inFrame(this.site, x, z);
     return inHoldShape(u, v, r);
   }
 

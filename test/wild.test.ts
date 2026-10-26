@@ -7,7 +7,7 @@ import { OpenGround, Wilds, placeWild, groupDanger, type Land } from '../src/sim
 import { Den, type Quarry } from '../src/sim/creatures';
 import { Delve, type DelveSave } from '../src/game/delve';
 import { Character } from '../src/game/character';
-import { siteToWorld } from '../src/world/site';
+import { onLand } from '../src/world/dungeon/site';
 
 const seed = parseSeed('masterworld');
 const { terrain } = openWorld(seed, classic);
@@ -94,7 +94,7 @@ test('wild: the dwarves\' hold stands on the land (plan 11.6): in its ring from 
   const d = Math.hypot(hold.x - town.decision.x, hold.z - town.decision.z);
   assert.ok(d >= ring[0] - 1 && d <= ring[1] + 1, `${d.toFixed(0)} m out`);
   for (const [u, v] of [[0, 2], [-10, 12], [10, 20]]) {
-    const [x, z] = siteToWorld(hold, u, v);
+    const [x, z] = onLand(hold, u, v);
     assert.ok(Math.abs(terrain.height(x, z) - hold.level) < 1e-6, 'the court is level');
     assert.ok(terrain.rockAt(x, z, hold.level), 'and nothing grows there');
     assert.equal(terrain.waterDepth(x, z), 0);

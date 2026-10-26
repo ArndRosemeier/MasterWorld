@@ -3,3 +3,5 @@ node_modules/
 dist/
 /shots/
 /public/packs/
+/public/wildmesh3d/
+/vendor/private-assets

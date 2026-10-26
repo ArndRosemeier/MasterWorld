@@ -196,7 +196,7 @@ export class FolkView {
   /** How many people within CLOSE in the camera's view (or of `focus`) are plain figures while their character is dressed (before the warm-up ends at least 1). */
   get undressed(): number { return this.warm ? this.waiting : Math.max(1, this.waiting); }
 
-  /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
+  /** While a building is drawn open: the people in it, where it has them (drawn besides those out of doors). */
   indoors: readonly Placed[] | null = null;
 
   /** Where nobody out of doors is drawn just now (the creator's view of the hero), or null. */
@@ -216,14 +216,11 @@ export class FolkView {
     // The nearest people out of doors (or those in the room).
     const near: [number, Agent][] = [];
     const placed = new Map<number, Placed>();
-    if (this.indoors) {
-      for (const p of this.indoors) { near.push([Math.hypot(p.x - cx, p.z - cz), p.agent]); placed.set(p.agent.person.id, p); }
-    } else {
-      for (const a of this.life.agents) {
-        if (a.hidden || this.clear?.(a.x, a.z)) continue;
-        const d = Math.hypot(a.x - cx, a.z - cz);
-        if (d < FAR) near.push([d, a]);
-      }
+    for (const p of this.indoors ?? []) { near.push([Math.hypot(p.x - cx, p.z - cz), p.agent]); placed.set(p.agent.person.id, p); }
+    for (const a of this.life.agents) {
+      if (a.hidden || placed.has(a.person.id) || this.clear?.(a.x, a.z)) continue;
+      const d = Math.hypot(a.x - cx, a.z - cz);
+      if (d < FAR) near.push([d, a]);
     }
     near.sort((x, y) => x[0] - y[0]);
     // (Not counting the first character while it tries the looks on: nobody waits for it.)
@@ -274,7 +271,8 @@ export class FolkView {
     }
     // The rest (and those whose character is still being dressed) as plain figures.
     const pending = near.filter(([, a]) => !this.shown.get(a.person.id)?.ready);
-    this.far.place(this.indoors ? [] : pending.map(([, a]) => a), this.height);
+    // (Those in the open building wait for a character: a plain figure stands on the ground, not on its floor.)
+    this.far.place(pending.filter(([, a]) => !placed.has(a.person.id)).map(([, a]) => a), this.height);
     // How many of those (or of the room's people), close in view, wait for a character (beyond the characters' count they stay plain).
     VIEW.setFromProjectionMatrix(SCRATCH.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     let waiting = 0;

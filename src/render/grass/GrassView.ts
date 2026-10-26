@@ -57,7 +57,7 @@ export class GrassView {
   constructor(jobs: WorldJobs) {
     const M = GRASS.mask;
     // Rebaked well before the drawn grass (REACH) nears the mask's edge.
-    this.mask = new FollowedMask(M, (x0, z0) => jobs.mask('grass', x0, z0, M.side, M.res), M.side / 2 - REACH - 4, 8);
+    this.mask = new FollowedMask(M, (x0, z0, side, res) => jobs.mask('grass', x0, z0, side, res), M.side / 2 - REACH - 4, 8);
     const parts = patchGeometry(), mat = createGrassMaterial();
     const layer = (cap: number, blades: number): Layer => {
       const g = new InstancedBufferGeometry();
@@ -90,6 +90,11 @@ export class GrassView {
   async sow(cam: Vector3): Promise<void> {
     await this.mask.start(cam);
     this.near.mesh.geometry.instanceCount = this.far.mesh.geometry.instanceCount = 1;
+  }
+
+  /** The land changed (a road was laid): the mask is baked again. */
+  invalidate(): void {
+    this.mask.invalidate();
   }
 
   /** Each frame: the mask follows, the patches in view are listed (the wind is the weather's: WeatherView). */

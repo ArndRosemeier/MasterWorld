@@ -8,14 +8,26 @@ import { openWorld } from '../vgm/builder';
 import { settingById } from '../setting/index';
 import { horizonMap, type HorizonSpec } from '../world/horizon';
 import { serve } from './serve';
+import type { Decision } from '../world/decisions';
+import type { DungeonLayout } from '@futuremagic/dungeon';
+import type { BuildingMesh } from '@futuremagic/settlement';
+import { caveField, caveShell, type CaveField } from '../world/dungeon/caveRock';
+import { mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
+import type { Site } from '../world/dungeon/site';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; index: number } | ({ kind: 'horizon' } & HorizonSpec));
-export type TerrainResult = ChunkMesh | VolumeMesh[] | TownCellMesh[] | Uint8Array;
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; index: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'decisions'; decisions: readonly Decision[] });
+export type TerrainResult = ChunkMesh | VolumeMesh[] | TownCellMesh[] | Uint8Array | CaveRock | CaveMouth;
+
+/** A cave's rock: the field the walker reads and its mesh. */
+export interface CaveRock { readonly field: CaveField; readonly shell: BuildingMesh }
+
+const meshBuffers = (m: BuildingMesh): ArrayBuffer[] => Object.values(m).flatMap((v) => (ArrayBuffer.isView(v) ? [v.buffer as ArrayBuffer] : []));
 
 let terrain: Terrain | null = null;
 
 serve<TerrainJob, TerrainResult>((job) => {
   if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = openWorld(job.seed, settingById(job.setting)).terrain;
+  if (job.kind === 'decisions') { terrain.settleMore(job.decisions); return { result: new Uint8Array(0), transfer: [] }; }
   if (job.kind === 'volumes') {
     const t = terrain;
     const meshes = t.volumes.map((f) => archMesh(t, f.site)).filter((m): m is VolumeMesh => !!m);
@@ -26,6 +38,14 @@ serve<TerrainJob, TerrainResult>((job) => {
     const cells = town ? townMeshes(town) : [];
     return { result: cells, transfer: townMeshBuffers(cells) };
   }
+  if (job.kind === 'caveRock') {
+    const field = caveField(job.layout, job.cave), shell = caveShell(field, job.layout, job.cave);
+    return { result: { field, shell }, transfer: [field.d.buffer, ...meshBuffers(shell)] };
+  }
+  if (job.kind === 'caveMouth') {
+    const t = terrain, mouth = mouthOnLand((x, z) => t.height(x, z), job.site, job.cave);
+    return { result: mouth, transfer: [mouth.blocked.buffer, ...meshBuffers(mouth.mesh)] };
+  }
   if (job.kind === 'horizon') {
     const t = terrain;
     const map = horizonMap((x, z) => t.height(x, z), job);
@@ -34,3 +54,4 @@ serve<TerrainJob, TerrainResult>((job) => {
   const mesh = buildChunk(terrain, job);
   return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer, mesh.level.buffer, mesh.canopy.buffer] };
 });
+

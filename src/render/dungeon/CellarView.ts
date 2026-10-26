@@ -19,6 +19,8 @@ export class CellarView {
   private readonly doors = new Map<number, Mesh>();
 
   private readonly gone = new Set<number>();
+  /** A cave's carved rock (world/dungeon/caveRock.ts), drawn with the rest; set before `add`. */
+  rock: BuildingMesh | null = null;
 
   constructor(readonly cellar: Cellar, readonly origin: { x: number; y: number; z: number }) {
     this.group.name = `cellar ${cellar.decision.id}`;
@@ -29,6 +31,7 @@ export class CellarView {
   async add(stage: Stage): Promise<void> {
     const m = cellarMeshes(this.cellar, await loadCellarProps());
     this.group.add(this.piece(m.shell, 'shell'), this.piece(m.props, 'props'));
+    if (this.rock) this.group.add(this.piece(this.rock, 'rock'));
     const torches = torchSpots(this.cellar);
     if (torches.length) this.group.add(flameMesh(torches, this.origin.x, this.origin.y, this.origin.z));
     for (const d of m.doors) {

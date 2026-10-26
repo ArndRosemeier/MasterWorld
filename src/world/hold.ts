@@ -8,7 +8,7 @@
 import { hash2f, lerp, smoothstep } from '@futuremagic/core';
 import type { HoldDef } from '../setting/contract';
 import type { HoldDecision } from './decisions';
-import { siteToWorld, worldToSite } from './site';
+import { inFrame, onLand } from './dungeon/site';
 
 /** The level court: half its width and how far it reaches out from the gate's face (m). */
 export const COURT = { half: 13, depth: 24 } as const;
@@ -44,7 +44,7 @@ export const HOLD_REACH = FACE.back + 40 + COURT.depth;
  */
 export function holdGround(d: HoldDecision, x: number, z: number, h: number): number {
   if (Math.abs(x - d.x) > HOLD_REACH || Math.abs(z - d.z) > HOLD_REACH) return h;
-  const [u, v] = worldToSite(d, x, z);
+  const [u, v] = inFrame(d, x, z);
   const out = outsideCourt(u, v);
   let g = out < COURT_BLEND ? lerp(d.level, h, smoothstep(0, COURT_BLEND, out)) : h;
   if (v < 0) {
@@ -60,7 +60,7 @@ export function holdGround(d: HoldDecision, x: number, z: number, h: number): nu
 /** The court and the gate itself (in the gate's frame): nothing grows there. */
 export function holdBare(d: HoldDecision, x: number, z: number): boolean {
   if (Math.abs(x - d.x) > HOLD_REACH || Math.abs(z - d.z) > HOLD_REACH) return false;
-  const [u, v] = worldToSite(d, x, z);
+  const [u, v] = inFrame(d, x, z);
   return outsideCourt(u, v) < 4 || (v < 0 && v > -FACE.foot - FACE.run - 2 && Math.abs(u) < FACE.half);
 }
 
@@ -104,7 +104,7 @@ export function holdSite(land: HoldLand, town: { readonly x: number; readonly z:
     const gx = land.height(x + 8, z) - land.height(x - 8, z), gz = land.height(x, z + 8) - land.height(x, z - 8);
     const yaw = Math.hypot(gx, gz) > 0.8 ? Math.atan2(-gx, -gz) : Math.atan2(town.x - x, town.z - z);
     const site = { x, z, yaw };
-    const sample = (u: number, v: number) => { const [px, pz] = siteToWorld(site, u, v); return { h: land.height(px, pz), wet: land.waterDepth(px, pz) > 0 }; };
+    const sample = (u: number, v: number) => { const [px, pz] = onLand(site, u, v); return { h: land.height(px, pz), wet: land.waterDepth(px, pz) > 0 }; };
     // The court: dry, and its mean height is where it is levelled.
     const court = [[0, 2], [-COURT.half, 4], [COURT.half, 4], [0, COURT.depth / 2], [-COURT.half, COURT.depth], [COURT.half, COURT.depth], [0, COURT.depth]].map(([u, v]) => sample(u, v));
     if (court.some((c) => c.wet)) continue;

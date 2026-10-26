@@ -13,7 +13,7 @@ import type { P3 } from '../sim/dungeonNav';
 import { OpenGround, type Land } from '../sim/wild';
 import type { HoldDecision } from '../world/decisions';
 import { COURT, POSTS } from '../world/hold';
-import { siteToWorld, worldToSite } from '../world/site';
+import { inFrame, onLand } from '../world/dungeon/site';
 import { atLeast, type Standing, type StandingChange } from './standing';
 
 /** The ground of the court: open land whose homes are the wardens' posts, each stands at its own. */
@@ -30,7 +30,7 @@ export class PostGround extends OpenGround {
 
 /** The wardens' den: one at each post (as many posts as the hold has guards), at peace, the dead staying dead. */
 export function holdDen(site: HoldDecision, def: HoldDef, land: Land, defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []): Den {
-  const posts = POSTS.slice(0, def.guards).map(([u, v]) => { const [x, z] = siteToWorld(site, u, v); return { x, z }; });
+  const posts = POSTS.slice(0, def.guards).map(([u, v]) => { const [x, z] = onLand(site, u, v); return { x, z }; });
   const den = new Den(new PostGround(land, posts), posts.map((_, room) => ({ creature: def.guard, room })), defs, deriveSeed(seed, 'hold', site.id), dead);
   den.peace = true;
   // At their posts, looking out over the court (dir as the den's: atan2 of z over x).
@@ -76,7 +76,7 @@ export class HoldWatch {
 
   /** How far (m) the hero at (x, z) is outside the court (0: in it). */
   offCourt(x: number, z: number): number {
-    const [u, v] = worldToSite(this.site, x, z);
+    const [u, v] = inFrame(this.site, x, z);
     return Math.hypot(Math.max(0, Math.abs(u) - COURT.half), Math.max(0, v - COURT.depth, -v));
   }
 

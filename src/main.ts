@@ -34,7 +34,7 @@ import { FloraView } from './render/flora/FloraView';
 import { GrassView } from './render/grass/GrassView';
 import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
-import { useFieldGround, useTownGround, useTownTextures } from './render/materials/townGround';
+import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
@@ -42,24 +42,27 @@ import { settingById } from './setting/index';
 import { CROPS, distSqPointSeg } from '@futuremagic/settlement';
 import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
+import { RoadWork } from './app/roads';
 import { ordersOf, townOrder } from './vgm/orders';
 import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
 import { TOWN_RASTER, TownGround } from './world/town';
-import { firstDungeon, houseOf, promiseBarrow } from './vgm/dungeons';
+import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
 import { LEADS, keepPromise, keptOf, moveInto, nextPromise, openPromises } from './vgm/leads';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
+import { RegionSites } from './app/regionSites';
+import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
-import type { Decision, DungeonDecision } from './world/decisions';
+import type { Decision, DungeonDecision, RegionDecision, RoadDecision, RoadWay } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
-import { InteriorView } from './render/town/InteriorView';
+import { HouseView } from './render/town/HouseView';
 import { lookFromDegrees } from './app/look';
 import { Sound } from './app/sound';
 import { SoundDirector } from './app/soundDirector';
@@ -99,7 +102,7 @@ import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
 import { Standing, changeLine, householdOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
-import { siteToWorld } from './world/site';
+import { onLand } from './world/dungeon/site';
 
 declare global {
   interface Window {
@@ -150,8 +153,10 @@ export async function start(b: Boot): Promise<void> {
     // The world as saved: the seed's own decisions, then what the VGM decided while the game was played.
     // (By id: a newer version may open the world with more decisions, such as a people's hold, plan 11.6.)
     const openedIds = new Map(opened.log.map((d) => [d.id, JSON.stringify(d)]));
-    const later = save ? save.log.filter((d) => !openedIds.has(d.id)) : [];
+    const later: Decision[] = save ? save.log.filter((d) => !openedIds.has(d.id)) : [];
     if (save && save.log.some((d) => openedIds.has(d.id) && openedIds.get(d.id) !== JSON.stringify(d))) console.warn('save: this world was made by an older version; it is rebuilt from its seed');
+    // Roads decided while the last game was played level the land from the start.
+    terrain.settleMore(later);
     const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
     const hour = title && !params.hourSet ? title.draw.hour : params.hour;
     if (params.weather) {
@@ -176,22 +181,42 @@ export async function start(b: Boot): Promise<void> {
     const visit = () => cellars?.downIn ?? null;
     // Behind a door the walker walks the room.
     let rooms: InteriorVisit | null = null;
+    // The regions the VGM opens as the hero walks, and the places in them (set once the log stands).
+    let regionSites: RegionSites | null = null;
     // The land, and the steps and porches before the doors (where the townsfolk stand).
     // The town's people once they live (set below).
     let folkLife: TownLife | null = null;
     const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), town?.stand(x, z) ?? -Infinity);
     // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
     const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
-    const below = () => visit()?.world ?? rooms?.world ?? null;
+    const below = () => visit()?.world ?? null;
+    // The building drawn open (its storeys, stairs and furniture where it stands).
+    const openHouse = () => (visit() ? null : rooms?.walk ?? null);
+    // Rock, and the open building's floors, walls and stairs (`shut`: its doorway too).
+    const surfaceAt = (x: number, y: number, z: number, shut: boolean): number | null => {
+      const b = below();
+      if (b) return b.rockSurface(x, y, z);
+      const t = terrain.rockSurface(x, y, z), h = openHouse()?.rockSurface(x, y, z, shut) ?? null;
+      return t === null ? h : h === null ? t : Math.min(t, h);
+    };
     const world: WalkWorld = {
       // Out of doors also the steps and porches before the doors (as floors: climbed a step at a time).
       height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
       floor: (x, z) => (below() ? null : town?.stand(x, z) ?? null),
-      rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
+      rockSurface: (x, y, z) => surfaceAt(x, y, z, false),
+      // In a building the camera stays in the room (its doorway shut to it).
+      sightSurface: (x, y, z) => surfaceAt(x, y, z, !!rooms?.inside),
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
       // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
-      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!hold?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
+      wall: (x, z, r, y) => {
+        const b = below();
+        if (b) return !!b.wall?.(x, z, r);
+        // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
+        const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
+        if (inHouse !== null) return inHouse;
+        return !!town?.solid(x, z, r, h?.building.id) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+      },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
@@ -251,8 +276,7 @@ export async function start(b: Boot): Promise<void> {
       if (town) {
         // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
         useTownTextures(await loadTownTextures(texPool));
-        useTownGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER));
-        useFieldGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => {
+        useTownMasks(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER), (i, j) => {
           const x = town.x0 + (i + 0.5) * TOWN_RASTER, z = town.z0 + (j + 0.5) * TOWN_RASTER;
           const f = town.fieldAt(x, z), path = town.groundAt(x, z) === TownGround.Path;
           return f || path ? { path, crop: f ? CROPS.indexOf(f.crop) : -1, rows: f?.rows ?? 0 } : null;
@@ -268,6 +292,10 @@ export async function start(b: Boot): Promise<void> {
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
     const jobs = new WorldJobs(createWorldPool(), seed, setting.id);
+    // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
+    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
+    const roadWork = new RoadWork(terrain, jobs, terrainJobs);
+    void roadWork.start(later);
     const sea = new WaterView(jobs);
     water = sea;
     await sea.prime(view.camera.position);
@@ -325,6 +353,42 @@ export async function start(b: Boot): Promise<void> {
       if (k) log = [...log, k];
       const m = moveInto({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain }, deriveSeed(seed, 'moved'));
       if (m) log = [...log, m];
+    }
+    // A road from a place at (x, z) to the network, laid while playing: how the VGM links a place it founds (game.layRoad).
+    const layRoad = async (x: number, z: number, way: RoadWay = 'track'): Promise<RoadDecision | null> => {
+      const d = await jobs.linkRoad(log.filter((x): x is RoadDecision => x.kind === 'road'), { id: `place-${log.length}`, x, z, r: 0 }, way, hours());
+      if (d) { log = [...log, d]; await roadWork.lay(d); }
+      return d;
+    };
+    // A region the VGM opened goes into the log; a hamlet founded in it gets its cart track to the network (plan 7).
+    // The track is routed in the world worker (it takes a few hundred ms), one road at a time so each sees the last.
+    let roading: Promise<void> = Promise.resolve();
+    const regionOpened = (d: RegionDecision): void => {
+      log = [...log, d];
+      regionSites?.sync(log);
+      const place = setting.regions ? settlementsOf([d], setting.regions)[0] : undefined;
+      if (!place) return;
+      roading = roading.then(async () => {
+        const road = await jobs.linkRoad(log.filter((x): x is RoadDecision => x.kind === 'road'), place, 'track', d.at);
+        if (road && !log.some((x) => x.id === road.id)) { log = [...log, road]; await roadWork.lay(road); }
+      }).catch((e: unknown) => console.warn('road to a hamlet:', e));
+    };
+    // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
+    if (setting.regions && params.regions) {
+      regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: town?.decision ?? opened.home }, log);
+      const sites = regionSites;
+      jobs.keepOut = (x, z) => sites.cleared(x, z);
+      // `site=<place>`: walk out from the start until one opens, then stand before it.
+      const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
+      for (let dir = 0; kind && dir < 8; dir++) {
+        const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: town?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
+        const found = walked.at(-1);
+        if (!found?.site || !ids.has(found.fill)) continue;
+        for (const d of walked) regionOpened(d);
+        const s = found.site, d = s.r + 14;
+        player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
+        break;
+      }
     }
     const orderTown = (o: TownOrder): void => {
       if (!life || !town) return;
@@ -384,8 +448,9 @@ export async function start(b: Boot): Promise<void> {
     const folkWarm = folk ? await folk.warmObjects() : [];
     await painted;
     // The land, its rock and the town's houses are built in workers meanwhile; their shaders compile with the rest.
-    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
+    roadWork.rebuilds({ ground, flora, grass, trunks });
+    await roadWork.mask.start(view.camera.position);
     const rock = new VolumeView(view.stage, terrainJobs).raise();
     const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
     if (houses && town) view.warm.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
@@ -476,6 +541,8 @@ export async function start(b: Boot): Promise<void> {
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
+      jobs: terrainJobs,
+      cleared: (d) => void roadWork.clear(d),
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       depth: (down, keep) => {
@@ -514,16 +581,19 @@ export async function start(b: Boot): Promise<void> {
       }, save?.hold);
       // `hold`: in the court, facing the gate; `hold=<tier>`: standing with its people at that tier.
       if (params.holdTier) standing.change(holdSite.people, tierFloor(params.holdTier) + 1 - standing.value(holdSite.people));
-      if (params.hold) { const [x, z] = siteToWorld(holdSite, 0, COURT.depth + 4); player.teleport(x, undefined, z, holdSite.yaw); }
+      if (params.hold) { const [x, z] = onLand(holdSite, 0, COURT.depth + 4); player.teleport(x, undefined, z, holdSite.yaw); }
     }
-    // `barrow`: before a barrow's forecourt, looking at it (one is promised now if there is none).
-    if (params.barrow && town) {
-      let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === 'barrow') ?? null;
+    // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
+    const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
+    if (lookAt && town) {
+      let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === lookAt) ?? null;
       if (!b) {
-        b = promiseBarrow(seed, terrain, town, log, home, wild?.territories ?? []);
+        b = promisePlace(lookAt, seed, terrain, town, log, home, wild?.territories ?? []);
         if (b) { log = [...log, { ...b, at: hours() }]; cellars.sync(log); }
       }
-      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * 9, undefined, b.site.z + Math.cos(b.site.yaw) * 9, b.site.yaw);
+      // Far enough off to see it whole.
+      const off = { barrow: 9, cave: 16, tower: 32 }[lookAt];
+      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * off, undefined, b.site.z + Math.cos(b.site.yaw) * off, b.site.yaw);
     }
     // `wild=<kind>`: beside its first group (for looking at them).
     const by = params.wildAt ? wild?.territories.find((t) => t.def.id === params.wildAt) : undefined;
@@ -556,7 +626,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     // Every door of the town opens on its room; a cellar's house has the hatch down.
-    if (town) rooms = new InteriorVisit(town.plan.buildings, cellars.down, new InteriorView(view.stage), player, view.lantern, view.sky, notes);
+    if (town) rooms = new InteriorVisit(town.plan.buildings, cellars.down, new HouseView(view.stage, houses), player, view.lantern, view.sky, notes);
     if (rooms && town && params.room !== null) {
       const b = params.room === 'cellar' ? house : town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
       if (b) await rooms.enter(b, true, params.room === 'cellar'); // the cellar: beside its hatch
@@ -885,7 +955,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1012,6 +1082,12 @@ export async function start(b: Boot): Promise<void> {
           standBeside(seen, 12);
         }
         if (!visit() && !player.flying) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
+        // The VGM opens the land ahead (plan 5.5): a region at a time into the log, its place drawn as the hero nears.
+        if (regionSites && !visit()) {
+          const asking = !title?.holding && !creator?.showing && !!window.__mwReady;
+          const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
+          if (opened) regionOpened(opened);
+        }
         stepEncounters(dt, [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])], { hero: character, player, hud: fightHud });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }
@@ -1037,6 +1113,7 @@ export async function start(b: Boot): Promise<void> {
       if (above) {
         sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
         ground.update(view.camera);
+        roadWork.follow(view.camera.position);
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         houses?.update(view.camera.position);
       }
@@ -1072,7 +1149,8 @@ export async function start(b: Boot): Promise<void> {
         if (out) for (const e of small.step(dt, hero, daylight(view.sky.hour), wx.shown.rain, hero ?? view.camera.position)) sounds?.wings(e);
         smallView.show(dt, view.camera.position, out);
       }
-      if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
+      // The people in the building drawn open (seen through its door and windows too).
+      if (folk) folk.indoors = life && rooms && !visit() ? rooms.people(life) : null;
       if (above) {
         // Until the game begins, the people round the hero's place are dressed (the title's fly-over is far up).
         if (folk) folk.focus = title?.holding || !window.__mwReady ? player.walker.pos : null;
@@ -1089,7 +1167,7 @@ export async function start(b: Boot): Promise<void> {
       }
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }

@@ -19,6 +19,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Read access to the private ArndRosemeier/PrivateAssets (the library animals); without it the game draws Actors' animals.
+      PRIVATE_ASSETS_TOKEN: ${{ secrets.PRIVATE_ASSETS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,6 +38,14 @@ jobs:
         with:
           path: node_modules/.cache/actors
           key: actors-packs-${{ hashFiles('package-lock.json') }}
+      # The library animals (licensed for Arnd's games: shipped inside the built game, never committed here).
+      - uses: actions/checkout@v4
+        if: env.PRIVATE_ASSETS_TOKEN != ''
+        with:
+          repository: ArndRosemeier/PrivateAssets
+          token: ${{ secrets.PRIVATE_ASSETS_TOKEN }}
+          path: vendor/private-assets
+          sparse-checkout: wildmesh3d
       - run: npm run packs
       - run: npm run build
         env:

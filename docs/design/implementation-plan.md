@@ -26,7 +26,7 @@ The coordinator enforces these rules. A thread that wants to break one asks Arnd
 |---|---|---|
 | The land, sky, water, weather, trees, grass, light | Built, hero-class on GPU; dusk and night fixed (PR #82), bloom and AO (#94, #96) | 5, D17 |
 | The town and its folk | One town, day plans, interiors, farms, horses | 7, 9.2 |
-| Promises and dungeons | Leads keep coming (#88), cellars and barrows, twelve set pieces, variety check in CI | 4.2, 8 |
+| Promises and dungeons | Leads keep coming (#88), cellars, barrows, caves and ruined towers (B5), set pieces per kind, variety check in CI | 4.2, 8 |
 | Fights, items, the Director | Tab combat, rarity cards, needs and tension, music | 11.2, 11.5 |
 | Map, talk, journal, saves | Orientation skill, map hand-over, Conversations, saves v3 | 9.1, 11.7 |
 | Title, creator, sound, UI | Title fly-over with giant, Actors creator, warded-brass windows and compass (#87) | 16, 17 |
@@ -81,8 +81,8 @@ Goal: the world grows as you walk. There is more than one place to go, and the p
 
 | Step | Delivers | Done when | Design |
 |---|---|---|---|
-| B0 | **A floating origin**: rendering is relative to an origin near the hero that moves in steps (whole chunks), so float32 stays exact wherever the hero walks. The start town already sits 32 km from zero, and skinning shimmered there until Actors 0.17.1 and AG #94 worked round it one system at a time | Shots at 30 km and at 300 km from zero show no shimmer on folk, creatures, water or shadows; the origin step causes no visible jump and no shader rebuild | 5.2, D17 |
-| B1 | **Opening regions as the player walks**: the VGM opens regions ahead of the hero (5.5) and fills them from the setting (a hamlet, a camp, ruins, a barrow field), all logged | Test: walking 5 km in one direction opens regions and the log replays them | 4.2, 5.2, 5.5 |
+| B0 ✓ | **A floating origin**: rendering is relative to an origin near the hero that moves in steps (whole chunks), so float32 stays exact wherever the hero walks. The start town already sits 32 km from zero, and skinning shimmered there until Actors 0.17.1 and AG #94 worked round it one system at a time | Shots at 30 km and at 300 km from zero show no shimmer on folk, creatures, water or shadows; the origin step causes no visible jump and no shader rebuild | 5.2, D17 |
+| B1 ✓ | **Opening regions as the player walks**: the VGM opens regions ahead of the hero (5.5) and fills them from the setting (a hamlet, a camp, ruins, a barrow field), all logged | Test: walking 5 km in one direction opens regions and the log replays them | 4.2, 5.2, 5.5 |
 | B2 | **Roads** between settlements, which beat vegetation (section 7 footprints) | Shot: a road leaving town to the hamlet | 7 |
 | B3 | **Settlement sizes**: hamlet, village and town from one planner; the capital is prepared but not placed | Shots of each size; leads come from every settlement | 7, D41 |
 | B4 ✓ | **Peoples and reputation**: each people has a reputation number; it changes greetings, prices, talk and guards; a people's own area (the first: a dwarf hold gate or an orc town); entering it unwelcome is dangerous | Tests: reputation changes prices and greetings; a shot of the people's area | 11.6, D34 |

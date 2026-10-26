@@ -59,8 +59,15 @@ export const params = {
   /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about). */
   small: q.get('small') !== '0',
   smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
+  /** Regions open as the hero walks (`regions=0`: only the start's land). */
+  regions: q.get('regions') !== '0',
+  /** Start beside a place the VGM opens out on the land: `site=hamlet`, `camp`, `ruin` or `barrows` (the first a walk finds). */
+  site: q.get('site'),
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
+  /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
+  cave: q.has('cave'),
+  tower: q.has('tower'),
   /**
    * Start in the court of the first people's hold, facing its gate (`hold`); `hold=friend` (or another
    * tier: hated, unwelcome, stranger, honoured) sets the hero's standing with that people to it.

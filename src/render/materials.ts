@@ -11,9 +11,11 @@ import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWo
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import { TOWN_GROUND_LAYER, TOWN_TILE_METERS, type GroundTextures } from './terrain/groundTextures';
-import { CROP_LOOK, CROP_STEP, FIELD_GROUND, TOWN_GROUND, townTextures } from './materials/townGround';
+import { CROP_LOOK, CROP_STEP, TOWN_MASKS, townTextures } from './materials/townGround';
 import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
+import { ROAD } from './materials/roads';
+import { inside, sampleMask } from './materials/masks';
 import { WEATHER, rainRings } from './materials/weather';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
@@ -147,7 +149,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
     const st = p.xz.mul(1 / (TOWN_TILE_METERS[k] * scale));
     return { a: texture(town.albedo).sample(st).depth(int(k)), n: texture(town.normal).sample(st).depth(int(k)) };
   };
-  const tg = texture(TOWN_GROUND.mask).sample(p.xz.sub(TOWN_GROUND.origin).div(TOWN_GROUND.size));
+  // The town's two masks share one texture, side by side (materials/townGround.ts TOWN_MASKS); each read stays in its half.
+  const tuv = clamp(p.xz.sub(TOWN_MASKS.origin).div(TOWN_MASKS.size), TOWN_MASKS.half, vec2(1).sub(TOWN_MASKS.half));
+  const tg = texture(TOWN_MASKS.mask).sample(vec2(tuv.x.mul(0.5), tuv.y));
   const ragged = fine.mul(0.18).add(mid.mul(0.1));
   const paths = smoothstep(0.1, 0.45, mx_fractal_noise_float(p.xz.mul(0.18), 2, 2.0, 0.5).add(tg.a.mul(0.5)));
   // A village's stones are laid where the traffic is, not wall to wall: toward their edges the street and
@@ -174,18 +178,18 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
     pert = mix(pert, vec3(tn(g.n).x, 0, tn(g.n).y), b); h = mix(h, g.n.b, b);
   }
 
-  // The farmland (materials/townGround.ts FIELD_GROUND): earth tracks, then each field's crop from above,
+  // The farmland (materials/townGround.ts TOWN_MASKS, right half): earth tracks, then each field's crop from above,
   // in rows along its run: corn closes over the soil, cabbages and beans stand in lines on ridges,
   // ploughed land is all furrows. The rows fade out with distance (they would only shimmer).
-  const fg = texture(FIELD_GROUND.mask).sample(p.xz.sub(FIELD_GROUND.origin).div(FIELD_GROUND.size));
+  const fg = texture(TOWN_MASKS.mask).sample(vec2(tuv.x.mul(0.5).add(0.5), tuv.y));
   const earth = tl(TOWN_GROUND_LAYER.dirt, 1);
   {
     const tb = hblend(clamp(fg.r.add(ragged.mul(fg.r.mul(float(1).sub(fg.r)).mul(4))), 0, 1), earth.n.b.sub(h), 2).mul(0.9);
     col = mix(col, earth.a.rgb.mul(float(0.95).add(mid.mul(0.12))), tb); rough = mix(rough, earth.a.a, tb); ao = mix(ao, earth.n.a, tb);
     pert = mix(pert, vec3(tn(earth.n).x, 0, tn(earth.n).y), tb);
   }
-  const cropU = fg.b.mul(255 / CROP_STEP).round().add(0.5).div(CROP_LOOK.count);
-  const look = texture(CROP_LOOK.texture).sample(vec2(cropU, 0.25)), shape = texture(CROP_LOOK.texture).sample(vec2(cropU, 0.75));
+  const crop = int(fg.b.mul(255 / CROP_STEP).round().clamp(0, CROP_LOOK.count - 1));
+  const look = CROP_LOOK.table.element(crop) as unknown as Node<'vec4'>, shape = CROP_LOOK.table.element(crop.add(CROP_LOOK.count)) as unknown as Node<'vec4'>;
   const ang = fg.a.mul(Math.PI), across = vec2(sin(ang).negate(), cos(ang));
   const spacing = max(shape.r.mul(2), 0.1);
   const cAcross = dot(p.xz, across).div(spacing), cAlong = dot(p.xz, vec2(cos(ang), sin(ang))).div(spacing);
@@ -203,6 +207,25 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   rough = mix(rough, float(0.95), fieldT);
   // Furrows: the ground's normal tilts across the rows.
   pert = mix(pert, vec3(across.x, 0, across.y).mul(cos(cAcross.mul(Math.PI * 2)).mul(shape.b).mul(rowsSeen).mul(0.5)).add(vec3(tn(earth.n).x, 0, tn(earth.n).y).mul(float(1).sub(plants))), fieldT);
+
+  // Roads between the places (materials/roads.ts): trodden earth with a ragged edge that frays into the
+  // verge; a cart track has two dark ruts with grass between them, a road is wider and more worn.
+  {
+    const rd = sampleMask(ROAD.mask, p.xz) as Node<'vec4'>;
+    const across = abs(rd.x), track = float(1).sub(abs(rd.y.sub(1))).clamp(0, 1);
+    const shown = smoothstep(0, 0.02, inside(ROAD.mask, p.xz) as Node<'float'>);
+    const fray = fine.mul(0.35).add(mid.mul(0.25)).add(patchy.mul(0.2));
+    let rt: Node<'float'> = smoothstep(0.45, -0.45, rd.z.add(fray)).mul(shown);
+    // The grass strip down a track's middle (the grass mask grows its blades).
+    rt = rt.mul(float(1).sub(track.mul(0.75).mul(smoothstep(0.42, 0.22, across.add(fine.mul(0.08))))));
+    const rb = hblend(clamp(rt, 0, 1), earth.n.b.sub(h), 2);
+    const tone = float(0.9).add(mid.mul(0.12)).add(patchy.mul(0.1));
+    col = mix(col, earth.a.rgb.mul(tone), rb); rough = mix(rough, earth.a.a, rb); ao = mix(ao, earth.n.a, rb);
+    pert = mix(pert, vec3(tn(earth.n).x, 0, tn(earth.n).y), rb); h = mix(h, earth.n.b, rb);
+    // The ruts: two grooves a wheel's gauge apart, darker and damper.
+    const rut = float(1).sub(smoothstep(0.08, 0.24, abs(across.sub(0.78)).add(fine.mul(0.04)))).mul(track).mul(rb);
+    col = col.mul(mix(float(1), float(0.68), rut)); rough = mix(rough, float(0.7), rut.mul(0.5));
+  }
 
   // Rock: triplanar, strata on the side faces, weathered rock on top.
   const bw0 = pow(abs(n), vec3(4));
