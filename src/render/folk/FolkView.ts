@@ -18,6 +18,8 @@ import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } f
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
 /** People farther than this get no character (m). */
 const RANGE = 70;
+/** Nearer than this a plain figure stands out in a picture (`undressed` counts these), m. */
+const CLOSE = 40;
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
 
@@ -154,7 +156,7 @@ export class FolkView {
   private warm = false;
   private waiting = 0;
 
-  /** How many people near enough for their own character are still drawn as plain figures (dressing, or before the warm-up ends). */
+  /** How many people within CLOSE are still drawn as plain figures (being dressed, or before the warm-up ends). */
   get undressed(): number { return this.warm ? this.waiting : Math.max(1, this.waiting); }
 
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
@@ -213,7 +215,7 @@ export class FolkView {
       s.ch.update(dt);
     }
     let waiting = 0;
-    for (const id of want) if (!this.shown.get(id)?.ready) waiting++;
+    for (const [d, a] of near) if (d < CLOSE && want.has(a.person.id) && !this.shown.get(a.person.id)?.ready) waiting++;
     this.waiting = waiting;
     // The rest (and those whose character is still being dressed) as plain figures.
     if (this.indoors) this.far.place([], this.height);
