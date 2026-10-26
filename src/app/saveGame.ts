@@ -7,6 +7,7 @@
 import type { CharacterPatch } from '@actors/generator';
 import type { CharacterSave } from '../game/character';
 import type { DelveSave } from '../game/delve';
+import type { MarketSave } from '../game/trade';
 import type { DirectorSave } from '../vgm/director';
 import type { TownTalkSave } from '../talk/townTalk';
 import { clock } from './dom';
@@ -47,6 +48,8 @@ export interface SaveData {
   readonly character: CharacterSave | null;
   /** The Director's needs and tension (version 2). */
   readonly director: DirectorSave | null;
+  /** The town's merchants: their stock and coin (none in older saves: fresh shelves). */
+  readonly market?: MarketSave;
   /** The hero's name and look as made in the character creator (Actors' character config; version 3; none: a new hero drawn from the seed). */
   readonly looks: { readonly name: string; readonly look: CharacterPatch } | null;
 }

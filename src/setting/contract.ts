@@ -392,6 +392,35 @@ export interface UpkeepDef {
   };
 }
 
+/**
+ * A kind of shop (plan 11.5): who keeps it, what they keep in stock and buy, and how much coin they hold.
+ * Prices follow what the town has: what a shop here makes is cheaper, and the more of a thing the town's
+ * merchants already hold, the less they pay for it and ask for it.
+ */
+export interface ShopDef {
+  /** The keeper's trade ('smith', 'innkeeper'), or 'trader' for a stall on the market. */
+  readonly keeper: string;
+  /** What the shop is called ("The smithy"). */
+  readonly name: string;
+  /** The talk topic that opens it ("Show me your wares."). */
+  readonly topic: string;
+  /** What the keeper says as the trade window opens. */
+  readonly line: string;
+  /** What they make or keep: item ids with how many they like to have in stock. */
+  readonly goods: readonly (readonly [string, number])[];
+  /** The kinds of thing they buy from the hero. */
+  readonly buys: readonly ItemDef['kind'][];
+  /** The coin they keep (copper); spent on what they buy, it comes back over the days. */
+  readonly purse: number;
+  /** Share of a thing's worth they pay for it, and ask for it (before the hero's speech). */
+  readonly pays: number;
+  readonly asks: number;
+  /** At most this many keep the shop in a town (the market's first stalls; absent: every keeper). */
+  readonly most?: number;
+  /** Fine work: their goods roll rarity as finds at this danger (absent: all plain). */
+  readonly quality?: number;
+}
+
 /** A weapon ability on the belt (plan 11.2; Norgo's recipe format comes with milestone 6). */
 export interface AbilityDef {
   readonly id: string;
@@ -553,6 +582,8 @@ export interface SettingModule {
   readonly items: ItemCatalog;
   /** Rooms and mending (plan 11.5). */
   readonly upkeep: UpkeepDef;
+  /** The town's shops (plan 11.5), by who keeps them. */
+  readonly shops: readonly ShopDef[];
   readonly abilities: readonly AbilityDef[];
   readonly director: DirectorDef;
   readonly hero: HeroLooksDef;
@@ -668,6 +699,11 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (i.slot && !SLOTS.includes(i.slot)) out.push(`${where}: item "${i.id}" slot "${i.slot}" is unknown`);
     if ((i.kind === 'weapon' || i.kind === 'shield' || i.kind === 'armour') && !i.slot) out.push(`${where}: item "${i.id}" is worn but has no slot`);
   }
+  for (const sh of m.shops) {
+    for (const [id, n] of sh.goods) if (!items.has(id) || !(n > 0)) out.push(`${where}: shop "${sh.keeper}" keeps unknown item "${id}" or none of it`);
+    if (!(sh.pays > 0 && sh.pays < sh.asks) || !(sh.purse > 0)) out.push(`${where}: shop "${sh.keeper}" must pay less than it asks, and hold some coin`);
+  }
+  if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);
     for (const k of Object.keys(u.bonuses)) if (!skills.has(k)) out.push(`${where}: unique "${u.id}" raises unknown skill "${k}"`);

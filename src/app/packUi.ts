@@ -39,8 +39,7 @@ export class PackUi extends BodyWindow {
   protected opened(): void {
     const h = this.hero;
     // Opening, the cards make their entrance one after another; re-drawn after a click, they are just there.
-    let k = 0;
-    const enter = () => (this.fresh ? 0.35 + 0.05 * k++ : null);
+    const enter = this.entrances(0.35, 0.05);
     const worn = WORN.map((s) => {
       const it = h.worn[s];
       const cell = el('div', { className: `slot${it ? ' full' : ''}` }, el('div', { className: 'label', textContent: SLOT_NAME[s] }), it ? itemCard(it, this.setting, enter()) : el('div', { className: 'empty', textContent: '—' }));
