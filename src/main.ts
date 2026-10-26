@@ -132,7 +132,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post, postSamples: params.postSamples, postFloatDepth: params.postFloatDepth });
     if (save) view.sky.day = save.clock.day;
     view.sky.look = setting.look?.grade ?? [];
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
@@ -723,7 +723,7 @@ export async function start(b: Boot): Promise<void> {
       // thread to the window. Drawing the land takes most of a 60 Hz frame, so a window on top tipped it to 30 Hz.
       if (!document.querySelector('.shade.open') || (frame++ & 1) === 0) {
         view.stage.frame();
-        view.renderer.render(view.scene, view.camera);
+        view.draw();
       }
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
