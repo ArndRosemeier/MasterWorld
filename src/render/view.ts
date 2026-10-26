@@ -29,8 +29,12 @@ export interface View {
 
 /** What glows: brighter than this on screen (after exposure, before the tone curve). */
 const BLOOM_AT = 4;
+/** After dark (and below ground) a lower one: lit windows, doorways and torches glow softly. */
+const BLOOM_AT_NIGHT = 1.6;
 /** How strong and how wide the glow is (wide and strong veils the whole sunlit frame). */
 const BLOOM_STRENGTH = 0.16, BLOOM_RADIUS = 0.3;
+/** At night the glow round lights is a little stronger and wider (as it was before the day was tuned). */
+const BLOOM_STRENGTH_NIGHT = 0.22, BLOOM_RADIUS_NIGHT = 0.45;
 
 export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean; hour: number; dayMinutes: number; tone?: 'aces' | 'agx' | 'graded'; post?: boolean; postSamples?: number; postFloatDepth?: boolean; ao?: { radius: number; strength: number } | null; bloom?: number[] }): Promise<View> {
   // Reversed depth: precision from a metre to the far horizon in one view.
@@ -60,7 +64,12 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const post = opts.post === false ? null : createPost(renderer, scene, camera, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth });
   const draw = (): void => {
     if (!post) { renderer.render(scene, camera); return; }
-    post.bloom!.threshold.value = (opts.bloom?.[0] ?? BLOOM_AT) / Math.max(1e-3, renderer.toneMappingExposure);
+    const day = sky.indoors ? 0 : sky.light.day;
+    post.bloom!.threshold.value = (opts.bloom?.[0] ?? BLOOM_AT_NIGHT + (BLOOM_AT - BLOOM_AT_NIGHT) * day) / Math.max(1e-3, renderer.toneMappingExposure);
+    if (!opts.bloom) {
+      post.bloom!.strength.value = BLOOM_STRENGTH_NIGHT + (BLOOM_STRENGTH - BLOOM_STRENGTH_NIGHT) * day;
+      post.bloom!.radius.value = BLOOM_RADIUS_NIGHT + (BLOOM_RADIUS - BLOOM_RADIUS_NIGHT) * day;
+    }
     post.draw();
   };
   const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute, target: post ? post.target : undefined, draw });
