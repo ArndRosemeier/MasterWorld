@@ -121,7 +121,9 @@ export class HeroCamera {
     const dx = at.x - head.x, dz = at.z - head.z, len = Math.hypot(dx, dz) || 1;
     const fx = dx / len, fz = dz / len;
     // Over the right shoulder; the left, straight behind or closer where a wall or post is in the way.
-    const clear = (x: number, z: number) => !this.world.wall?.(x, z, 0.25) && !this.world.wall?.((x + head.x) / 2, (z + head.z) / 2, 0.15);
+    // Clear: nothing at the camera, nor on the way to the hero's head or most of the way to the one talked to.
+    const clear = (x: number, z: number) => !this.world.wall?.(x, z, 0.25)
+      && [0.25, 0.5, 0.75].every((t) => !this.world.wall?.(x + (head.x - x) * t, z + (head.z - z) * t, 0.12) && !this.world.wall?.(x + (at.x - x) * t * 0.8, z + (at.z - z) * t * 0.8, 0.12));
     const [back, side] = TALK_SHOTS.find(([b, sd]) => clear(head.x - fx * b - fz * sd, head.z - fz * b + fx * sd)) ?? TALK_SHOTS[0];
     const eye = new Vector3(head.x - fx * back - fz * side, Math.max(head.y, at.y) + TALK_UP, head.z - fz * back + fx * side);
     // Under a ceiling: down until clear of it.
