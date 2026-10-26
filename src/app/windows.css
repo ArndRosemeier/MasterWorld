@@ -162,6 +162,7 @@
 .trade .coin.c::before { background: radial-gradient(circle at 35% 30%, #ffd2a0, #c0703a 60%, #6a3414); }
 .trade .ware.for-you .card { box-shadow: 0 0 0 1px var(--ward), 0 0 12px #8fe3ff66; }
 .trade .mark { position: absolute; left: 8px; top: -7px; z-index: 2; padding: 0 7px; border-radius: 8px; background: #0d1a1e; border: 1px solid var(--ward); color: var(--ward); font: 10px/14px 'Marcellus SC', Georgia, serif; letter-spacing: .14em; text-transform: uppercase; animation: ward-breathe 2.4s ease-in-out infinite; }
+.trade .count { position: absolute; right: 8px; top: 6px; z-index: 2; min-width: 22px; padding: 1px 6px; border-radius: 10px; text-align: center; background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass-mid) 60%, var(--brass-lo)); color: #1e140a; font: 12px/16px 'Marcellus SC', Georgia, serif; box-shadow: 0 1px 0 var(--brass-dark); }
 .trade .foot .purse { display: inline-flex; gap: 8px; align-items: center; }
 /* The balance: a post, a beam on a knob, two pans on cords. It sways gently while the window is open. */
 .trade .scales { position: relative; flex: none; width: 120px; height: 66px; --tilt: 0deg; }
@@ -189,6 +190,30 @@
 /* Refused: the balance shudders. */
 .trade .scales.balk { animation: balk .4s ease-in-out; }
 @keyframes balk { 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+
+/* Lessons (lessonsUi.ts): set down like a slate; each skill a brass rule, a ward line up to the hero's level,
+   a notch where the teacher's knowledge ends. A lesson lights the line up to its new mark, the number turns. */
+.panel.lessons { width: min(620px, 100%); }
+.shade.open .panel.lessons { animation: win-slate .7s cubic-bezier(.2, 1.4, .4, 1) backwards; }
+@keyframes win-slate { 0% { transform: scale(1.12) translateY(-12px); filter: blur(3px); opacity: 0; } 60% { filter: none; opacity: 1; transform: scale(.985); } }
+.lessons .says { margin: 0 0 8px; font-style: italic; color: var(--ink-dim); }
+.lessons .rules { display: flex; flex-direction: column; gap: 6px; }
+.lessons .lesson { display: grid; grid-template-columns: 150px 36px 1fr 110px; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--brass-lo); border-radius: 8px; background: linear-gradient(#251a12, #17100b); cursor: pointer; transition: transform .15s, border-color .15s; }
+.lessons .lesson:hover { transform: translateX(3px); border-color: var(--brass); }
+.lessons .lesson.dear, .lessons .lesson.done { opacity: .6; }
+.lessons .lesson .name { font: 15px 'Marcellus SC', Georgia, serif; letter-spacing: .04em; color: var(--brass); }
+.lessons .lesson .level { text-align: right; font: 16px 'Marcellus SC', Georgia, serif; color: var(--ink); overflow: hidden; }
+.lessons .lesson.rose .level b { display: inline-block; animation: lesson-turn .6s cubic-bezier(.3, 1.6, .5, 1); color: var(--ward); }
+@keyframes lesson-turn { from { transform: translateY(-100%); opacity: 0; } }
+.lessons .rule { position: relative; height: 8px; border-radius: 4px; background: linear-gradient(#0b0807, #241a12); border: 1px solid var(--brass-lo); background-image: linear-gradient(#0b0807, #241a12), repeating-linear-gradient(90deg, var(--brass-lo) 0 1px, transparent 1px 10%); }
+.lessons .rule .line { position: absolute; left: 0; top: 1px; bottom: 1px; width: calc(var(--v) * 100%); border-radius: 3px; background: linear-gradient(90deg, #2e7f95, var(--ward)); box-shadow: 0 0 6px #8fe3ff88; opacity: calc(.4 + var(--wake) * .6); transform-origin: 0 50%; }
+.shade.open .panel.lessons:not(.settled) .rule .line { animation: lesson-fill 1.1s cubic-bezier(.3, 1.2, .4, 1) .4s backwards; }
+.lessons .lesson.rose .rule .line { animation: lesson-fill .9s cubic-bezier(.3, 1.4, .4, 1); box-shadow: 0 0 12px var(--ward-hot); }
+@keyframes lesson-fill { from { transform: scaleX(0); } }
+.lessons .rule .cap { position: absolute; left: calc(var(--cap) * 100%); top: -4px; width: 3px; height: 14px; margin-left: -1px; border-radius: 1px; background: linear-gradient(var(--brass-hi), var(--brass-mid)); box-shadow: 0 0 4px #000; }
+.lessons .lesson .price { text-align: right; font: 13px 'Marcellus SC', Georgia, serif; color: var(--brass); }
+.lessons .lesson.done .price { font-style: italic; font-family: 'EB Garamond', Georgia, serif; color: #6a6458; }
+@media (max-width: 560px) { .lessons .lesson { grid-template-columns: 1fr 36px 90px; } .lessons .rule { grid-column: 1 / -1; grid-row: 2; } }
 
 /* Talk (talkUi.ts): a brass speaking-ring; the topics turn into place like a dial, ones with a new lead glow. */
 #talk-prompt { position: fixed; left: 50%; bottom: 18%; transform: translateX(-50%); z-index: 5; padding: 6px 14px; background: linear-gradient(var(--leather-hi), var(--leather)); border: 1px solid var(--brass-mid); border-radius: 16px; color: var(--ink); font: 15px/1.3 'EB Garamond', Georgia, serif; pointer-events: none; opacity: 0; transition: opacity .2s, transform .25s cubic-bezier(.3, 1.6, .5, 1); box-shadow: 0 4px 14px #0009; }

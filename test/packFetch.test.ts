@@ -55,11 +55,18 @@ test('isPackUrl and installPackFetch: only pack files are routed', async () => {
   assert.ok(isPackUrl('https://x.github.io/MasterWorld/packs/horse/manifest.json', '/MasterWorld/'));
   assert.ok(!isPackUrl('/MasterWorld/assets/index.js', '/MasterWorld/'));
   assert.ok(!isPackUrl('https://x.io/other/packs/a', '/MasterWorld/'));
-  let calls = 0;
-  const scope = { fetch: (async () => new Response('', { status: ++calls === 1 ? 503 : 200 })) as typeof fetch };
-  installPackFetch(scope, '/');
-  installPackFetch(scope, '/'); // once only
+  const asked: string[] = [];
+  let fail = true;
+  const scope = { fetch: (async (u: string) => {
+    asked.push(String(u));
+    if (String(u).endsWith('bundles.json')) return new Response('', { status: 404 });
+    if (fail) { fail = false; return new Response('', { status: 503 }); }
+    return new Response('x');
+  }) as typeof fetch };
+  const store = installPackFetch(scope, '/');
+  assert.equal(installPackFetch(scope, '/'), store); // once only
   await quiet(async () => assert.equal((await scope.fetch('/packs/a')).status, 200));
-  calls = 0;
+  fail = true;
   assert.equal((await scope.fetch('/assets/a.js')).status, 503); // not a pack: not retried
+  assert.deepEqual(asked.filter((u) => u.includes('/a')), ['/packs/a', '/packs/a', '/assets/a.js']);
 });

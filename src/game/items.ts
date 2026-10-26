@@ -64,7 +64,16 @@ export function rollItem(cat: ItemCatalog, id: string, danger: number, rng: Rng)
     return { def: u.base, rarity: 'legendary', name: u.name, bonuses: { ...u.bonuses }, lore: u.lore };
   }
   const rarity: Rarity = x < odds.legendary + odds.rare ? 'rare' : x < odds.legendary + odds.rare + odds.uncommon ? 'uncommon' : 'common';
-  if (rarity === 'common') return plainItem(cat, id);
+  return itemAs(cat, id, rarity, danger, rng);
+}
+
+/**
+ * One item of kind `id` of a given rarity (common, uncommon or rare), its bonuses as found at `danger`:
+ * uncommon raises one skill, rare two and carries its full name. Fine work in a shop is made with it.
+ */
+export function itemAs(cat: ItemCatalog, id: string, rarity: Exclude<Rarity, 'legendary'>, danger: number, rng: Rng): Item {
+  const d = defOf(cat, id);
+  if (rarity === 'common' || !wearable(d)) return plainItem(cat, id);
   const pool = bonusSkills(d), bonuses: Record<string, number> = {};
   const first = rng.chance(0.65) ? pool[0] : rng.pick(pool);
   const size = (lo: number, hi: number) => Math.round(rng.range(lo, hi) + danger * 0.15);

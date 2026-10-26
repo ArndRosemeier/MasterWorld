@@ -9,6 +9,8 @@
  * (human.worker.ts, animal.worker.ts). Pure: no three.js, no DOM.
  */
 
+import { PackStore } from './packStore';
+
 type Fetch = typeof fetch;
 
 export interface PackFetchOptions {
@@ -66,12 +68,24 @@ export const isPackUrl = (url: string, base: string): boolean => new URL(url, 'h
 
 const INSTALLED = Symbol.for('masterworld.packFetch');
 
-/** Routes the global `fetch` for pack URLs through `packFetch` (once per page or worker). */
-export function installPackFetch(scope: { fetch: Fetch } = globalThis, base: string = import.meta.env.BASE_URL): void {
-  const s = scope as { fetch: Fetch; [INSTALLED]?: true };
-  if (s[INSTALLED]) return;
-  s[INSTALLED] = true;
+/**
+ * Routes the global `fetch` for pack URLs through the pack store (bundles and the browser's cache, packStore.ts) and
+ * `packFetch` (once per page or worker). Returns the store (the page warms it at boot).
+ */
+export function installPackFetch(scope: { fetch: Fetch } = globalThis, base: string = import.meta.env.BASE_URL, o: { tidy?: boolean } = {}): PackStore {
+  const s = scope as { fetch: Fetch; [INSTALLED]?: PackStore };
+  const had = s[INSTALLED];
+  if (had) return had;
   const plain = s.fetch.bind(scope);
   const queued = packFetch(plain);
-  s.fetch = (input, init) => (isPackUrl(urlOf(input), base) ? queued(input, init) : plain(input, init));
+  const g = globalThis as { caches?: CacheStorage; navigator?: { locks?: LockManager }; location?: { href: string } };
+  const store = new PackStore({ base, origin: g.location?.href ?? 'http://page/', fetch: queued, caches: g.caches ?? null, locks: g.navigator?.locks ?? null, tidy: o.tidy });
+  s[INSTALLED] = store;
+  const root = `${base}packs/`;
+  s.fetch = (input, init) => {
+    const url = urlOf(input);
+    if (!isPackUrl(url, base) || (init?.method && init.method !== 'GET')) return plain(input, init);
+    return store.get(decodeURIComponent(new URL(url, 'http://page/').pathname.slice(root.length)), url, init);
+  };
+  return store;
 }

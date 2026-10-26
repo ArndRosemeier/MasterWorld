@@ -1,0 +1,410 @@
+/**
+ * The loop check (plan A6, design 11.3): a scripted hero plays an evening headless, the way a player
+ * would: asks at the inn for news and hears a lead, walks there through the streets (or out over the land
+ * to a barrow), goes down and clears it with the fight bot (game/bot.ts), searches the bodies and chests,
+ * climbs out, walks back, sells the finds, has the smith mend the gear, buys an upgrade, takes a room at
+ * the inn and hears the next lead in the morning. A fall is played as designed (classic mode: the pack
+ * stays where the hero fell, they wake at the inn or temple and go back for it). Every step is written to
+ * the result, so a failure says where the evening broke. Pure: the land, the town, the VGM's leads, the
+ * talk and the market are the game's own; only the renderer and the townsfolk walking about are left out.
+ */
+import { MinHeap, deriveSeed } from '@futuremagic/core';
+import { polyCentroid, type TownBuilding } from '@futuremagic/settlement';
+import type { SettingModule } from '../setting/contract';
+import { buildingOf, townsfolk, type Person } from '../sim/people';
+import { talkCellar, townTalk } from '../talk/townTalk';
+import { openWorld } from '../vgm/builder';
+import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
+import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
+import type { Decision, DungeonDecision } from '../world/decisions';
+import { moveIn, outlineCellar, type Cellar } from '../world/dungeon/cellar';
+import type { Town } from '../world/town';
+import { Character } from './character';
+import { fallClassic, gather, remainsId, type Remains } from './death';
+import type { DelveSave } from './delve';
+import { fightBot } from './bot';
+import { defOf, type Item } from './items';
+import { Market, itemWorth, type Merchant } from './trade';
+import { mendAll, takeRoom, wakePlace } from './upkeep';
+import { lessonPrice, takeLesson, teacherOf } from './lessons';
+import { WALK, Walker, type WalkWorld } from './walker';
+import type { Terrain } from '../world/terrain';
+
+/** One thing that happened, at a game hour (hours since the world began). */
+export interface EveningStep {
+  readonly hour: number;
+  readonly what: string;
+}
+
+export interface EveningResult {
+  /** Every evening played through. */
+  readonly ok: boolean;
+  /** Where it broke, if it did. */
+  readonly failed: string | null;
+  readonly steps: readonly EveningStep[];
+  /** Promises cleared, by id. */
+  readonly cleared: readonly string[];
+  readonly falls: number;
+  /** Copper the finds fetched, and what was bought. */
+  readonly earned: number;
+  readonly bought: readonly string[];
+  /** Lessons taken ("blades 13"). */
+  readonly lessons: readonly string[];
+  /** Per evening: copper spent on gear and lessons (the coin sink, plan A2b). */
+  readonly spent: readonly number[];
+  /** The purse at the end. */
+  readonly purse: number;
+  /** The hero's power at the start and at the end. */
+  readonly power: readonly [number, number];
+  /** Simulated seconds walking and fighting. */
+  readonly seconds: number;
+}
+
+export interface EveningOptions {
+  /** Evenings to play (each: a lead, the place, back, trade, a night at the inn). */
+  readonly evenings?: number;
+  /** Falls allowed before the check gives up. */
+  readonly falls?: number;
+  /** Each step as it happens. */
+  readonly log?: (s: EveningStep) => void;
+  /** The first time down, the hero goes in badly hurt and without potions: the check of a fall (D12, classic mode). */
+  readonly reckless?: boolean;
+}
+
+/** One game day takes 60 real minutes (D37): game hours per second played. */
+const HOURS_PER_SECOND = 24 / 3600;
+/** The game starts in the morning. */
+const START_HOUR = 8;
+/** The longest walk the check allows, seconds (a barrow is at most ~1.4 km out). */
+const WALK_LIMIT = 900;
+/** How long one visit below may take, seconds. */
+const DELVE_LIMIT = 1200;
+
+/** Copper kept back from lessons (with the room): a mending or two. */
+const LESSON_RESERVE = 40;
+/** Lessons in one skill an evening, at most. */
+const LESSONS_A_DAY = 2;
+/** A purse above this at the end means coin piles up with nothing to buy (plan A2b). */
+const SENSIBLE_PURSE = 400;
+
+/** A failure of the evening: thrown inside, returned as `failed`. */
+class Broke extends Error {}
+
+export function playEvening(seed: number, setting: SettingModule, opts: EveningOptions = {}): EveningResult {
+  const steps: EveningStep[] = [];
+  const { terrain, log: first, home } = openWorld(seed, setting);
+  const town = terrain.towns[0];
+  if (!town) throw new Error('no town to start in');
+  const people = townsfolk(town.plan, seed);
+  let log: Decision[] = [...first];
+  let hours = START_HOUR;
+  const say = (what: string) => { const s = { hour: hours, what }; steps.push(s); opts.log?.(s); };
+  const { talk } = townTalk(seed, setting, town, people, log);
+  const market = new Market(setting, people, seed, 0);
+  const hero = new Character(setting);
+  const land = new LandWalk(terrain, town);
+  land.walker.place(home.x, home.z);
+  const power0 = hero.power;
+  const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
+  let falls = 0, earned = 0, seconds = 0;
+  const pass = (s: number) => { seconds += s; hours += s * HOURS_PER_SECOND; };
+
+  /** The Builder at work (as the game's VGM tick): new promises as they come due, told to the town. */
+  const promiseDue = () => {
+    for (let d = vgmNext(); d; d = vgmNext()) {
+      log = [...log, d];
+      say(`the VGM promises ${d.kind === 'move-in' ? `new dwellers in ${d.dungeon}` : d.kind === 'dungeon' ? `${d.template} ${d.id}` : d.id}`);
+      const c = talkCellarOf(d);
+      if (c) talk.add(c);
+    }
+  };
+  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain });
+  const talkCellarOf = (d: Decision) => talkCellar(d, setting, town, people, log);
+
+  const walkTo = (what: string, x: number, z: number) => {
+    const s = land.go(x, z);
+    pass(s.seconds);
+    if (!s.arrived) throw new Broke(`stuck on the way to ${what}: ${s.left.toFixed(0)} m short at (${land.walker.pos.x.toFixed(0)}, ${land.walker.pos.z.toFixed(0)})`);
+    say(`walked to ${what} (${s.metres.toFixed(0)} m, ${s.seconds.toFixed(0)} s)`);
+  };
+  const workplace = (m: Merchant): { at: [number, number]; name: string } => workOf(people[m.person], m.shop.keeper);
+  const workOf = (p: Person, keeper: string): { at: [number, number]; name: string } => {
+    const b = p.work >= 0 ? town.plan.buildings[p.work] : null;
+    if (b) return { at: front(b), name: `the ${keeper}'s` };
+    const [x, z] = polyCentroid(town.plan.market);
+    return { at: [x, z], name: `the ${keeper} at the market` };
+  };
+  const teachers = people.flatMap((p) => { const t = teacherOf(setting, p); return t ? [{ p, t }] : []; });
+  const merchant = (keeper: string) => market.merchants.find((m) => m.shop.keeper === keeper) ?? null;
+
+  /** Ask around for news, the innkeeper first; the first lead heard that is still open. */
+  const hearLead = (known: ReadonlySet<string>): DungeonDecision | Extract<Decision, { kind: 'move-in' }> => {
+    const inn = people.find((p) => town.plan.buildings[p.work]?.kind === 'inn' && p.role === 'trade') ?? null;
+    const ask = [inn, ...people.filter((p) => p !== inn && p.role !== 'child')].filter((p): p is Person => !!p);
+    const open = openPromises(log);
+    for (const p of ask) {
+      // News, and "tell me more" while they have more to tell.
+      let reply = talk.ask(p.id, 'news');
+      for (let more = 0; more < 4; more++) {
+        const lead = open.find((o) => !known.has(o.id) && reply.heard.includes(o.id));
+        if (lead) { say(`heard of ${lead.id} from person ${p.id}${p === inn ? ' (the innkeeper)' : ''}`); return lead; }
+        if (!talk.topics(p.id).some((t) => t.id === 'more')) break;
+        reply = talk.ask(p.id, 'more');
+      }
+    }
+    throw new Broke(`nobody in town tells of a new lead (open: ${open.map((o) => o.id).join(', ') || 'none'})`);
+  };
+
+  const heard = new Set<string>();
+  try {
+    promiseDue();
+    const evenings = opts.evenings ?? 1;
+    for (let e = 0; e < evenings; e++) {
+      say(`evening ${e + 1}: power ${hero.power}, ${hero.coins} copper, ${hero.pack.length} in the pack`);
+      let paid = 0;
+      const lead = hearLead(heard);
+      heard.add(lead.id);
+      const dungeon = lead.kind === 'dungeon' ? lead : (log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.id === lead.dungeon) ?? null);
+      if (!dungeon) throw new Broke(`no dungeon for ${lead.id}`);
+      const place = placeOf(dungeon, terrain.towns), house = houseOf(dungeon, terrain.towns);
+      if (!place || !house) throw new Broke(`${dungeon.id} has no place`);
+      const lore = loreOf(setting, dungeon.template);
+      const firstCellar = outlineCellar(dungeon, place, lore);
+      const moved = occupationOf(log, dungeon.id);
+      const cellar: Cellar = moved ? moveIn(firstCellar, moved, place, lore) : firstCellar;
+      const name = `${cellar.house} (${dungeon.template}, ${cellar.dweller.id})`;
+      // Out to the door above, or the barrow's mouth.
+      const goDown = () => (dungeon.site ? walkTo(name, dungeon.site.x - Math.sin(dungeon.site.yaw) * 2, dungeon.site.z - Math.cos(dungeon.site.yaw) * 2) : walkTo(name, ...front(house)));
+      goDown();
+      if (opts.reckless && e === 0) {
+        const kept = hero.pack.filter((it) => defOf(setting.items, it.def).kind !== 'potion');
+        hero.pack.length = 0;
+        hero.pack.push(...kept);
+        hero.health = Math.max(1, Math.round(hero.maxHealth * 0.1));
+        say(`goes down reckless: ${hero.health} health, no potions`);
+      }
+      let saved: DelveSave | undefined;
+      let left: Remains | null = null;
+      for (;;) {
+        const spots = left ? [{ ...left.at, reached: () => { gather(hero, left!); say(`took up the pack left at the fall (${left!.items.length} ${left!.items.length === 1 ? 'thing' : 'things'})`); left = null; } }] : [];
+        const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0 });
+        pass(r.seconds);
+        saved = r.delve.tally();
+        if (r.won && r.out) {
+          say(`cleared ${name}: ${r.kills} killed, ${r.spared} spared, ${r.looted} searched, ${r.potions} potions, health ${(r.health * 100).toFixed(0)}%`);
+          break;
+        }
+        if (r.won) throw new Broke(`beat ${name} but did not get back to the ladder in ${DELVE_LIMIT} s`);
+        if (r.seconds >= DELVE_LIMIT) throw new Broke(`could not finish ${name} in ${DELVE_LIMIT} s (${r.kills} killed)`);
+        // A fall, as designed: the pack stays below, the hero wakes in town and goes back for it.
+        falls++;
+        const fell = fallClassic(hero, { ...r.at, below: lead.id, mark: dungeon.site ?? { x: house.cx, z: house.cz }, label: `in ${cellar.house}` }, remainsId(hours), Math.floor(hours / 24));
+        // A second fall before the first pack was found: one heap with both.
+        if (fell.remains) left = left ? { ...fell.remains, items: [...left.items, ...fell.remains.items] } : fell.remains;
+        const wake = wakePlace(hero.lodging, town.decision.id, town.plan);
+        if (!wake) throw new Broke('nowhere to wake after a fall');
+        say(`fell in ${name} after ${r.kills} kills; lost ${fell.lost} copper, the pack stays below; wakes at the ${wake.kind}`);
+        if (falls > (opts.falls ?? 2)) throw new Broke(`fell ${falls} times in ${name}`);
+        hours += 2;
+        land.walker.place(...front(town.plan.buildings[wake.building]));
+        // Rest before going back: a room if the purse holds one, else the night where they woke.
+        const inn = town.plan.buildings[wake.building];
+        if (!takeRoom(hero, hours, { town: town.decision.id, building: inn.id }, setting.upkeep)) { hero.health = hero.maxHealth; hero.stamina = hero.maxStamina; }
+        hours += 8;
+        goDown();
+      }
+      if (left) throw new Broke(`cleared ${name} but never found the pack left at the fall`);
+      const kept = keepPromise(log, lead.id, hours);
+      if (kept) log = [...log, kept];
+      cleared.push(lead.id);
+      promiseDue();
+
+      // Back in town: sell, mend, upgrade.
+      const smith = merchant('smith'), trader = merchant('trader'), keeper = merchant('innkeeper');
+      if (!smith) throw new Broke('no smith in town');
+      const finds = hero.pack.filter((it) => defOf(setting.items, it.def).slot || defOf(setting.items, it.def).value > 0);
+      say(`brought back ${finds.length} finds and ${hero.coins} copper`);
+      const sellAt = (m: Merchant | null) => {
+        if (!m) return 0;
+        const w = workplace(m);
+        walkTo(w.name, ...w.at);
+        let got = 0;
+        for (const it of [...hero.pack]) {
+          if (keepIt(it)) continue;
+          const price = market.pays(m, it, hero.skill('speech'));
+          if (price > 0 && !market.sell(hero, m, it)) got += price;
+        }
+        if (got) say(`sold to ${w.name} for ${got} copper`);
+        return got;
+      };
+      // Potions and food stay in the pack for the next place.
+      const keepIt = (it: Item) => ['potion', 'food'].includes(defOf(setting.items, it.def).kind);
+      earned += sellAt(smith);
+      const mend = mendAll(hero, (it) => itemWorth(setting.items, it), setting.upkeep);
+      if (mend.mended.length) say(`the smith mends ${mend.mended.length} things for ${mend.spent} copper`);
+      earned += sellAt(trader);
+      if (keeper) earned += sellAt(keeper);
+      // The best upgrade the purse allows, at the smith's (and the market's).
+      for (const m of [smith, trader]) {
+        if (!m) continue;
+        const up = market.upgradeFor(hero, m);
+        if (!up) continue;
+        const w = workplace(m);
+        walkTo(w.name, ...w.at);
+        const was = hero.power;
+        const before = hero.coins;
+        if (market.buy(hero, m, up.item)) continue;
+        paid += before - hero.coins;
+        hero.equip(up.item);
+        bought.push(up.item.name);
+        say(`bought ${up.item.name} from the ${m.shop.keeper}: power ${was} -> ${hero.power}`);
+        break;
+      }
+      // Lessons with what is left above a night's room and a mending (the weapon's skill first, then guarding).
+      const reserve = setting.upkeep.room + LESSON_RESERVE;
+      for (const skill of [hero.weapon.skill, 'armour', 'dodge', 'shields']) {
+        const by = teachers.find(({ t }) => t.skills.includes(skill));
+        if (!by) continue;
+        let walked = false;
+        for (let n = 0; n < LESSONS_A_DAY; n++) {
+          if (hero.coins - lessonPrice(by.t, hero.skills.get(skill) ?? 0) < reserve) break;
+          if (!walked) { const w = workOf(by.p, by.t.keeper); walkTo(w.name, ...w.at); walked = true; }
+          const before = hero.coins;
+          if (takeLesson(hero, by.t, skill)) break;
+          paid += before - hero.coins;
+          hours += by.t.hours;
+          taught.push(`${skill} ${Math.floor(hero.skills.get(skill) ?? 0)}`);
+          say(`a lesson in ${skill} from the ${by.t.keeper} for ${before - hero.coins} copper: ${Math.floor(hero.skills.get(skill) ?? 0)}`);
+        }
+      }
+      spent.push(paid);
+      if (e > 0 && !paid && !spent[e - 1]) throw new Broke(`two evenings with nothing bought and no lesson (${hero.coins} copper)`);
+      // A room for the night, and the next morning's news.
+      const innB = buildingOf(town.plan, 'inn');
+      if (!innB) throw new Broke('no inn in town');
+      walkTo('the inn', ...front(innB));
+      const night = takeRoom(hero, hours, { town: town.decision.id, building: innB.id }, setting.upkeep);
+      if (night) { say(`took a room for ${night.paid} copper; wakes at ${(night.wake % 24).toFixed(0)}:00 on day ${Math.floor(night.wake / 24)}`); hours = night.wake; }
+      else { say(`too poor for a room (${hero.coins} copper)`); hours += 10; }
+      market.restock(Math.floor(hours / 24));
+      promiseDue();
+    }
+    if (opts.reckless && !falls) throw new Broke('went down reckless and did not fall');
+    if (!bought.length) throw new Broke(`bought no upgrade in ${evenings} evenings (${hero.coins} copper left)`);
+    if (hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
+    // The next lead: someone has news of a place not yet visited.
+    const next = hearLead(heard);
+    say(`the next lead is ${next.id}`);
+  } catch (e) {
+    if (!(e instanceof Broke)) throw e;
+    say(`BROKE: ${e.message}`);
+    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], seconds };
+  }
+  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], seconds };
+}
+
+/** A point just outside a building's door. */
+function front(b: TownBuilding): [number, number] {
+  return [b.door[0] - b.vx * 1.2, b.door[1] - b.vz * 1.2];
+}
+
+/** The hero's body walking the land and the town (the game's walk world without the townsfolk and trees). */
+class LandWalk {
+  readonly walker: Walker;
+  constructor(private readonly terrain: Terrain, private readonly town: Town) {
+    const world: WalkWorld = {
+      height: (x, z) => terrain.height(x, z),
+      floor: (x, z) => town.stand(x, z),
+      rockSurface: (x, y, z) => terrain.rockSurface(x, y, z),
+      waterLevel: (x, z) => { const d = terrain.waterDepth(x, z); return d > 0.4 ? terrain.height(x, z) + d : null; },
+      wall: (x, z, r) => town.solid(x, z, r),
+    };
+    this.walker = new Walker(world);
+  }
+
+  /** Walk to (x, z) the way `route` finds. */
+  go(x: number, z: number): { arrived: boolean; seconds: number; metres: number; left: number } {
+    const w = this.walker, p = w.pos;
+    const pts = this.route(p.x, p.z, x, z);
+    const dt = 0.1;
+    let t = 0, metres = 0, check = { x: p.x, z: p.z, t: 0 }, side = 1;
+    let detour: [number, number] | null = null;
+    while (pts.length && t < WALK_LIMIT) {
+      const [tx, tz]: [number, number] = detour ?? pts[0];
+      const dx: number = tx - p.x, dz: number = tz - p.z, d = Math.hypot(dx, dz);
+      if (d < (detour ? 0.8 : pts.length === 1 ? 0.6 : 1.2)) { if (detour) detour = null; else pts.shift(); continue; }
+      const bx = p.x, bz = p.z;
+      w.step({ forward: 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: false, up: false, down: false }, dt);
+      metres += Math.hypot(p.x - bx, p.z - bz);
+      t += dt;
+      // No headway for a while (a slope, a rock): step aside and hop, alternating sides, further each time.
+      if (t - check.t > 1.5) {
+        if (Math.hypot(p.x - check.x, p.z - check.z) < 1) {
+          const n: number = Math.hypot(dx, dz) || 1, reach = 3 + 2 * Math.min(4, Math.abs(side));
+          detour = [p.x - (dz / n) * reach * Math.sign(side) - (dx / n), p.z + (dx / n) * reach * Math.sign(side) - (dz / n)];
+          side = -side + Math.sign(-side);
+          w.step({ forward: 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: false, up: true, down: false }, dt);
+        }
+        check = { x: p.x, z: p.z, t };
+      }
+    }
+    const left = Math.hypot(x - p.x, z - p.z);
+    return { arrived: left < 2, seconds: t, metres, left };
+  }
+
+  /**
+   * Waypoints from (ax, az) to (bx, bz), as a player steers: A* over 1 m cells of the ground between
+   * them, round walls and fences, not up slopes too steep to climb, wading and swimming only where it
+   * must. Cells are looked at only as the search reaches them.
+   */
+  private route(ax: number, az: number, bx: number, bz: number): [number, number][] {
+    const M = 120, x0 = Math.floor(Math.min(ax, bx) - M), z0 = Math.floor(Math.min(az, bz) - M);
+    const nx = Math.ceil(Math.max(ax, bx) + M) - x0, nz = Math.ceil(Math.max(az, bz) + M) - z0, N = nx * nz;
+    const { terrain, town } = this;
+    const cellCentre = (c: number): [number, number] => [x0 + (c % nx) + 0.5, z0 + Math.floor(c / nx) + 0.5];
+    // Per cell, once: its height, and 1 free / 2 wall / 3 water.
+    const hs = new Float32Array(N), kind = new Uint8Array(N);
+    const look = (c: number) => {
+      if (kind[c]) return;
+      const [x, z] = cellCentre(c);
+      hs[c] = terrain.height(x, z);
+      kind[c] = town.solid(x, z, WALK.radius + 0.25) ? 2 : terrain.waterDepth(x, z) > 0.4 ? 3 : 1;
+    };
+    const cell = (x: number, z: number) => Math.floor(x - x0) + Math.floor(z - z0) * nx;
+    const a = cell(ax, az), b = cell(bx, bz);
+    const g = new Float64Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), done = new Uint8Array(N);
+    const [gx, gz] = cellCentre(b);
+    const toGoal = (c: number) => { const [x, z] = cellCentre(c); return Math.hypot(x - gx, z - gz); };
+    const open = new MinHeap();
+    g[a] = 0;
+    look(a);
+    open.push(toGoal(a), a);
+    while (open.size) {
+      const c = open.pop();
+      if (done[c]) continue;
+      done[c] = 1;
+      if (c === b) break;
+      const i = c % nx, j = Math.floor(c / nx);
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = i + di, jj = j + dj;
+        if ((!di && !dj) || ii < 0 || jj < 0 || ii >= nx || jj >= nz) continue;
+        const n = ii + jj * nx;
+        look(n);
+        // The goal's own cell may touch a wall (before a door); corners are not cut.
+        if (kind[n] === 2 && n !== b) continue;
+        if (di && dj) { look(i + di + j * nx); look(i + (j + dj) * nx); if (kind[i + di + j * nx] === 2 || kind[i + (j + dj) * nx] === 2) continue; }
+        const run = di && dj ? Math.SQRT2 : 1;
+        if ((hs[n] - hs[c]) / run > WALK.maxSlope * 0.8) continue;
+        const cost = g[c] + run * (kind[n] === 3 ? 3 : 1);
+        if (cost < g[n]) { g[n] = cost; from[n] = c; open.push(cost + toGoal(n), n); }
+      }
+    }
+    if (from[b] < 0 && a !== b) return [[bx, bz]];
+    const cells: number[] = [];
+    for (let c = b; c !== a && c >= 0; c = from[c]) cells.push(c);
+    // Every third cell is enough to steer by; the end itself last.
+    const out = cells.reverse().filter((_, k) => k % 3 === 2).map(cellCentre);
+    out.push([bx, bz]);
+    return out;
+  }
+}

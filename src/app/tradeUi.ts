@@ -8,7 +8,7 @@
 import type { SettingModule } from '../setting/contract';
 import type { Character } from '../game/character';
 import { coinText, type Item } from '../game/items';
-import type { Market, Merchant, Refusal } from '../game/trade';
+import { stackAlike, type Market, type Merchant, type Refusal } from '../game/trade';
 import { el } from './dom';
 import { itemCard } from './itemCard';
 import { replay } from './ward';
@@ -67,20 +67,25 @@ export class TradeUi extends BodyWindow {
     const h = this.hero, speech = h.skill('speech');
     const enter = this.entrances(0.45, 0.04);
     const up = this.market.upgradeFor(h, m)?.item;
-    const wares = m.stock.map((it) => {
+    // Alike things lie in one stack with its count; a click deals the top one (the marked upgrade, if it is there).
+    const count = (n: number) => (n > 1 ? [el('div', { className: 'count', textContent: `×${n}` })] : []);
+    const arrived = (st: Item[]) => (this.moved && st.includes(this.moved) ? ' arrived' : '');
+    const wares = stackAlike(m.stock).map((st) => {
+      const it = up && st.includes(up) ? up : st[0];
       const price = this.market.asks(m, it, speech), dear = price > h.coins;
       const card = itemCard(it, this.setting, enter());
       const tag = el('div', { className: `tag${dear ? ' dear' : ''}` }, coins(price));
-      const cell = el('div', { className: `ware${it === up ? ' for-you' : ''}${it === this.moved ? ' arrived' : ''}`, title: dear ? 'More than you have' : `Buy it for ${coinText(price)}` }, card, tag);
+      const cell = el('div', { className: `ware${it === up ? ' for-you' : ''}${arrived(st)}`, title: dear ? 'More than you have' : `Buy it for ${coinText(price)}` }, card, tag, ...count(st.length));
       if (it === up) cell.append(el('div', { className: 'mark', textContent: 'for you' }));
       cell.addEventListener('click', () => this.deal(() => this.market.buy(h, m, it), it, 'yours'));
       return cell;
     });
-    const pack = h.pack.map((it) => {
+    const pack = stackAlike(h.pack).map((st) => {
+      const it = st[0];
       const offer = this.market.pays(m, it, speech);
       const card = itemCard(it, this.setting, enter());
       const tag = el('div', { className: `tag${!offer ? ' none' : offer > m.coins ? ' dear' : ''}` }, offer ? coins(offer) : 'not their trade');
-      const cell = el('div', { className: `ware${!offer ? ' dim' : ''}${it === this.moved ? ' arrived' : ''}`, title: offer ? `Sell it for ${coinText(offer)}` : `${this.who} does not deal in that` }, card, tag);
+      const cell = el('div', { className: `ware${!offer ? ' dim' : ''}${arrived(st)}`, title: offer ? `Sell it for ${coinText(offer)}` : `${this.who} does not deal in that` }, card, tag, ...count(st.length));
       cell.addEventListener('click', () => this.deal(() => this.market.sell(h, m, it), it, 'theirs'));
       return cell;
     });

@@ -11,7 +11,7 @@ import { Rng, deriveSeed } from '@futuremagic/core';
 import type { ItemCatalog, Rarity, SettingModule, ShopDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import { Character } from './character';
-import { defOf, plainItem, rollItem, type Item } from './items';
+import { defOf, itemAs, plainItem, type Item } from './items';
 import { condition } from './upkeep';
 
 /** How much more a rarer thing is worth than a plain one of its kind. */
@@ -81,31 +81,42 @@ export class Market {
   /** The merchant a townsperson is, or null. */
   of(person: number): Merchant | null { return this.byPerson.get(person) ?? null; }
 
-  /** A shop's first stock: some of each of its goods. */
+  /** A shop's first stock: some of each of its goods, and its fine work. */
   private fresh(shop: ShopDef, person: number): Item[] {
     const r = new Rng(deriveSeed(this.seed, 'shop', person, 'open'));
     const out: Item[] = [];
-    for (const [id, want] of shop.goods) for (let n = r.int(Math.ceil(want / 2), want); n > 0; n--) out.push(this.forge(shop, id, r));
+    for (const [id, want] of shop.goods) for (let n = r.int(Math.ceil(want / 2), want); n > 0; n--) out.push(plainItem(this.cat, id));
+    this.fineWork(shop, out, r);
     return out;
   }
 
-  private forge(shop: ShopDef, id: string, r: Rng): Item {
-    return shop.quality ? rollItem(this.cat, id, shop.quality, r) : plainItem(this.cat, id);
+  /** Make the fine pieces the shelf lacks: uncommon ones of any wearable good, the rare ones of the dearest. */
+  private fineWork(shop: ShopDef, stock: Item[], r: Rng): void {
+    const f = shop.fine;
+    if (!f) return;
+    const own = shop.goods.map(([id]) => defOf(this.cat, id)).filter((d) => d.slot);
+    const dearest = [...own].sort((a, b) => b.value - a.value)[0];
+    const has = (rarity: Rarity) => stock.filter((i) => i.rarity === rarity && own.some((d) => d.id === i.def)).length;
+    for (let n = has('uncommon'); n < f.uncommon; n++) stock.push(itemAs(this.cat, r.pick(own).id, 'uncommon', f.danger, r));
+    for (let n = has('rare'); n < f.rare; n++) stock.push(itemAs(this.cat, dearest.id, 'rare', f.danger, r));
   }
 
   /**
-   * A new day (or days): each merchant's coin comes back halfway to their purse a day, a missing piece of
-   * their own goods is made again with an even chance a day, and old second-hand things are sold on.
+   * Days pass: each merchant's coin comes back halfway to their purse a day; on the shop's restock day
+   * (every `restock` days, each shop on its own) the shelf is filled again: the plain goods to what they
+   * like to hold, the fine work made anew where it was sold, old second-hand things sold on.
    */
   restock(day: number): void {
     for (const m of this.merchants) {
       for (let d = m.day + 1; d <= day; d++) {
-        const r = new Rng(deriveSeed(this.seed, 'shop', m.person, d));
         m.coins = Math.round(m.coins + (m.shop.purse - m.coins) * 0.5);
+        if ((d + m.person) % m.shop.restock) continue;
+        const r = new Rng(deriveSeed(this.seed, 'shop', m.person, d));
         for (const [id, want] of m.shop.goods) {
-          const have = m.stock.filter((i) => i.def === id).length;
-          for (let n = have; n < want; n++) if (r.chance(0.5)) m.stock.push(this.forge(m.shop, id, r));
+          const have = m.stock.filter((i) => i.def === id && i.rarity === 'common').length;
+          for (let n = have; n < want; n++) m.stock.push(plainItem(this.cat, id));
         }
+        this.fineWork(m.shop, m.stock, r);
         const own = new Set(m.shop.goods.map(([id]) => id));
         const second = m.stock.filter((i) => !own.has(i.def));
         for (const i of second.slice(0, Math.max(0, second.length - SECOND_HAND))) m.stock.splice(m.stock.indexOf(i), 1);
@@ -190,10 +201,25 @@ export class Market {
   }
 }
 
+/** Items that are alike (same kind, rarity, name, bonuses and wear) in stacks, in the order first met. */
+export function stackAlike(items: readonly Item[]): Item[][] {
+  const by = new Map<string, Item[]>();
+  for (const it of items) {
+    const k = JSON.stringify([it.def, it.rarity, it.name, Object.entries(it.bonuses).sort(), it.wear ?? 0]);
+    const s = by.get(k);
+    if (s) s.push(it); else by.set(k, [it]);
+  }
+  return [...by.values()];
+}
+
+/** What a townsperson keeps, as the setting names keepers: their trade (the temple's keeper too), 'trader' at a market stall, '' for none. */
+export function keeperOf(p: Person): string {
+  return p.role === 'trader' ? 'trader' : p.role === 'trade' || p.role === 'keeper' ? p.trade : '';
+}
+
 /** The shop a townsperson keeps, if any: their own trade's, or the market's for a trader. */
 export function shopOf(setting: SettingModule, p: Person): ShopDef | null {
-  const keeper = p.role === 'trader' ? 'trader' : p.role === 'trade' ? p.trade : '';
-  return (keeper && setting.shops.find((s) => s.keeper === keeper)) || null;
+  return setting.shops.find((s) => s.keeper === keeperOf(p)) ?? null;
 }
 
 /** How hard a bargain of this size trains speech (a skill level's worth of challenge). */

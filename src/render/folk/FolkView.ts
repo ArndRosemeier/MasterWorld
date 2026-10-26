@@ -4,7 +4,7 @@
  * the shape worker) and shown once ready; until then, and everyone farther off, is a plain figure
  * (FarFolk). Characters far off draw their "Crowd" level (one draw call plus the hair).
  */
-import { Group, type Camera, type Material, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Frustum, Group, Matrix4, Vector3, type Camera, type Material, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
@@ -32,6 +32,9 @@ const LOD_BIAS = 0.7;
 const DETAILED = 6;
 /** People farther than this (m) cast no shadow (in the Crowd level only the body casts one). */
 const SHADOW_RANGE = 35;
+/** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
+const CLOSE = 40;
+const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3();
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
 
@@ -143,14 +146,29 @@ export class FolkView {
    * After the warm-up, while the loop runs (the Stage compiles in its frame slots): every detail level
    * of the first character, dressed in turn as a few townsfolk who between them wear everything in town
    * (each garment, hairstyle and beard draws, and casts its shadow, with shaders of its own). Nobody is
-   * drawn before.
+   * drawn before the first look stands in every detail level: then `shown` resolves and the town fills (each
+   * character still compiles what it wears before it shows, `prepareSlot`), while the other looks warm on,
+   * behind play (plan A7: load what the first view needs, the rest after).
    */
-  async warmLods(): Promise<void> {
-    const ch = this.slots[0].ch;
-    const place = this.slots[0].place;
+  warmLods(): { shown: Promise<void>; done: Promise<void> } {
+    let show = (): void => {};
+    const shown = new Promise<void>((r) => { show = r; });
+    const done = this.warmAll(() => {
+      this.stage.scene.add(this.far.mesh);
+      this.warm = true;
+      show();
+    }).finally(show);
+    return { shown, done };
+  }
+
+  private async warmAll(first: () => void): Promise<void> {
+    const slot = this.slots[0], ch = slot.ch;
+    const place = slot.place;
     place.removeFromParent();
+    slot.busy = true; // not dressed for anybody while it tries the looks on
     const looks = coveringLooks(this.life.agents.map((a) => a.person));
     for (let i = 0; i < looks.length; i++) {
+      if (i === 1) first();
       // A look whose files would not load is skipped: its garments then compile when first worn.
       try {
         if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
@@ -163,12 +181,16 @@ export class FolkView {
         console.error('[folk] warming a look failed', e);
       }
     }
+    if (!this.warm) first();
     ch.setLod(0);
-    this.slots[0].place.visible = false;
-    this.stage.scene.add(this.far.mesh);
-    this.warm = true;
+    place.visible = false;
+    slot.busy = false;
   }
   private warm = false;
+  private waiting = 0;
+
+  /** How many people within CLOSE in the camera's view are plain figures while their character is dressed (before the warm-up ends at least 1). */
+  get undressed(): number { return this.warm ? this.waiting : Math.max(1, this.waiting); }
 
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
   indoors: readonly Placed[] | null = null;
@@ -230,8 +252,13 @@ export class FolkView {
       s.ch.update(dt);
     }
     // The rest (and those whose character is still being dressed) as plain figures.
-    if (this.indoors) this.far.place([], this.height);
-    else this.far.place(near.filter(([, a]) => !this.shown.get(a.person.id)?.ready).map(([, a]) => a), this.height);
+    const plain = this.indoors ? [] : near.filter(([, a]) => !this.shown.get(a.person.id)?.ready);
+    this.far.place(plain.map(([, a]) => a), this.height);
+    // How many of those, close in view, wait for a character (beyond the characters' count they stay plain).
+    VIEW.setFromProjectionMatrix(SCRATCH.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    let waiting = 0;
+    for (const [d, a] of plain) if (d < CLOSE && want.has(a.person.id) && VIEW.containsPoint(AT.set(a.x, this.height(a.x, a.z) + 1, a.z))) waiting++;
+    this.waiting = waiting;
   }
 
   /**

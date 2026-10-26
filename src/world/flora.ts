@@ -65,7 +65,8 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     const gi = gi0 + i, gj = gj0 + j;
     const roll = hash2f(seed, gi * 7 + spacing, gj);
     if (roll > MAX_P) continue; // a quick out before any sampling
-    const x = (gi + hash2f(seed + 1, gi, gj)) * spacing, z = (gj + hash2f(seed + 2, gi, gj)) * spacing;
+    // Where it will stand (the output holds 32-bit floats): checked there, so a plant on a field's edge stays off it.
+    const x = Math.fround((gi + hash2f(seed + 1, gi, gj)) * spacing), z = Math.fround((gj + hash2f(seed + 2, gi, gj)) * spacing);
     const bi = t.biomeAt(x, z);
     const flora = bi >= 0 ? biomes[bi].flora : undefined;
     if (!flora) continue;

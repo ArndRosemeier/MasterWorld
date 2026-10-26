@@ -43,10 +43,10 @@ These hold in every phase. A PR that breaks one is fixed before new work goes on
 
 | # | Floor | Check |
 |---|---|---|
-| F1 | **Standard shots.** One script takes the same set on a GPU: title, the creator, town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map, talk. They are saved with the commit hash. | `npm run shot:set` (`tools/shot/set.mjs`, built in A1). Run at every phase gate and after visual PRs. |
-| F2 | **Frame time** on the reference GPU (Arnd's RTX 5070, webgl2, 1080p): at most 16.7 ms in every standard shot, aiming for 12 ms. No shot may be twice as slow as the town at noon. | The `&hud` frame time in F1 shots, written into the set's index. |
+| F1 | **Standard shots.** One script takes the same set on a GPU: title, the creator, town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack, the map, the trade window, talk. They are saved with the commit hash. | `npm run shot:set` (`tools/shot/set.mjs`, built in A1). Run at every phase gate and after visual PRs. |
+| F2 | **Frame time** on the reference GPU (Arnd's RTX 5070, 1080p, the game's default backend, WebGPU): at most 16.7 ms in every standard shot, aiming for 12 ms. No shot may be twice as slow as the town at noon. The WebGL fallback (`?gl`) may be at most 1.5× slower. | The `&hud` frame time in F1 shots, written into the set's index. |
 | F3 | **Shaders** per [SHADERS.md](../SHADERS.md): 0 violations in every shot. | HUD line "policy ok". |
-| F4 | **Load time**: title in under 1 s and playable in under 20 s on the reference machine; music streams and is not part of the start download. | `tools/shot/perf.mjs`. Sound today is 42 MB in `public/sound`. |
+| F4 | **Load time**: title in under 1 s and playable in under 20 s on the reference machine, cold, on the default backend (WebGPU); the WebGL fallback (`?gl`) playable in under 30 s; music streams and is not part of the start download. | `tools/shot/load.mjs` (title, playable, start download; fails on game music in it), `tools/shot/perf.mjs`. Sound is 42 MB in `public/sound`, 34 MB of it music. |
 | F5 | **Tests** per [CHECKS.md](../CHECKS.md): 5 s per test, 60 s for `npm test`; variety check in CI. | CI. |
 | F6 | **No duplicates, no `Math.random`, layers kept** (CLAUDE.md). | `npm run dup`, `npm run repeated`, guards. |
 | F7 | **The world stays fixed by place** (D29): nothing scales to the hero's power. | Review at each gate. |
@@ -65,13 +65,15 @@ Goal: an evening of play works end to end. You get a lead, travel, clear the pla
 | Step | Delivers | Done when | Design |
 |---|---|---|---|
 | A1 | **The standard shot set** (F1, F2): one script, one folder per commit, an index with frame times | The set runs in one go on the reference GPU and the shots of today's main are judged | 3 |
-| A2 | **Trade**: merchants in the town's shops (smith, general store, the inn's keeper) with limited stock and coin; prices follow what the town has; sell finds, buy gear; copper, silver and gold; a trade window in warded brass with item cards | A seeded test sells a find and buys an upgrade; the trade window is in the F1 set | 11.5 |
+| A2 ✓ | **Trade**: merchants in the town's shops (smith, general store, the inn's keeper) with limited stock and coin; prices follow what the town has; sell finds, buy gear; copper, silver and gold; a trade window in warded brass with item cards | A seeded test sells a find and buys an upgrade; the trade window is in the F1 set | 11.5 |
+| A2b ✓ | **Something to spend on**: each shop keeps a few uncommon pieces and one rare piece at prices that take several evenings to save for; shops restock every few game days (seeded); trainers (the smith, a caravan guard, the hedge witch) sell lessons that cost more as the skill rises. Fixed by town, never by the hero's power (F7) | The A6 bot spends on an upgrade or a lesson at least every second evening and its purse stays sensible at evening six; a test for restock and lesson prices | 11.4, 11.5 |
 | A3 ✓ | **Upkeep**: gear wears and the smith repairs it; a room at the inn restores you and sets where you wake | Test: wear, repair cost, waking at the inn | 11.5, 11.2 |
-| A4 | **Death as designed**: in classic mode carried gear stays where you fell, as a mark on the map to go back for; **roguelike mode** (one save the game writes, death ends the hero, the world stays for the next one) | Tests for both modes; the New game screen offers the mode | 11.1, D12 |
-| A5 | **Music streams** (F4): the start loads no music; tracks load when first needed | F4 load time passes | 16 |
-| A6 | **The loop check**: a scripted hero (extending `src/game/bot.ts`) plays an evening headless: hears a lead, walks to it, clears it, comes back, sells, buys an upgrade, hears the next lead. It is a slow check of at most 5 min | The check passes on main and runs before every phase gate | 11.3 |
+| A4 ✓ | **Death as designed**: in classic mode carried gear stays where you fell, as a mark on the map to go back for; **roguelike mode** (one save the game writes, death ends the hero, the world stays for the next one) | Tests for both modes; the New game screen offers the mode | 11.1, D12 |
+| A5 ✓ | **Music streams** (F4): the start loads no music; tracks load when first needed | `npm run load`: no game music before playable (only the title's theme). The load times are A7 | 16 |
+| A6 ✓ | **The loop check**: a scripted hero (extending `src/game/bot.ts`) plays an evening headless: hears a lead, walks to it, clears it, comes back, sells, buys an upgrade, hears the next lead. It is a slow check of at most 5 min | The check passes on main and runs before every phase gate | 11.3 |
+| A7 ✓ | **Load fast** (F4): the start fetches only what the first view needs. Today a cold load on the reference GPU shows the title at 1.4 s and is playable at 62 s, with 97 MB fetched (Actors human packs 68 MB in 654 files, cow 14, horse 8, dog 4.5). Bundle the packs into a few files, load the people and animals near the start first and the rest behind play, and cache in the browser | `npm run load` on the reference machine: title under 1 s, playable under 20 s, cold | 3 (F4), 17.2 |
 
-Gate A: A1–A6 done, the F1 set judged, no placeholders.
+Gate A: A1–A7 and A2b done, the F1 set judged, no placeholders.
 
 ### Phase B: The frontier (milestone 5)
 
@@ -79,6 +81,7 @@ Goal: the world grows as you walk. There is more than one place to go, and the p
 
 | Step | Delivers | Done when | Design |
 |---|---|---|---|
+| B0 | **A floating origin**: rendering is relative to an origin near the hero that moves in steps (whole chunks), so float32 stays exact wherever the hero walks. The start town already sits 32 km from zero, and skinning shimmered there until Actors 0.17.1 and AG #94 worked round it one system at a time | Shots at 30 km and at 300 km from zero show no shimmer on folk, creatures, water or shadows; the origin step causes no visible jump and no shader rebuild | 5.2, D17 |
 | B1 | **Opening regions as the player walks**: the VGM opens regions ahead of the hero (5.5) and fills them from the setting (a hamlet, a camp, ruins, a barrow field), all logged | Test: walking 5 km in one direction opens regions and the log replays them | 4.2, 5.2, 5.5 |
 | B2 | **Roads** between settlements, which beat vegetation (section 7 footprints) | Shot: a road leaving town to the hamlet | 7 |
 | B3 | **Settlement sizes**: hamlet, village and town from one planner; the capital is prepared but not placed | Shots of each size; leads come from every settlement | 7, D41 |

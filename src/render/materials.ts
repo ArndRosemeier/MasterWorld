@@ -255,15 +255,21 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Rain: the ground darkens and turns glossy; flat hollows hold puddles that mirror the sky, ringed by
   // the drops while it rains. They dry from the edges in (the hollow's depth against the wetness).
   const rain = WEATHER.wet.mul(snowB.oneMinus());
-  const hollow = mx_fractal_noise_float(p.xz.mul(0.11), 2, 2.0, 0.5).add(fine.mul(0.06)).add(mid.mul(0.15));
-  // Fewer in meadows (the grass stands in them), most on bare soil and the forest floor.
-  const puddle = smoothstep(0.02, 0.06, hollow.sub(float(0.62).sub(rain.mul(0.42)))).mul(w.x.mul(0.6).oneMinus())
-    .mul(smoothstep(0.95, 0.99, up)).mul(smoothstep(0.85, 0.95, level)).mul(rockB.oneMinus()).mul(sandB.oneMinus()).mul(smoothstep(0.3, 0.6, rain));
-  col = col.mul(mix(float(1), float(0.6), rain)).mul(mix(float(1), float(0.5), puddle));
-  rough = mix(mix(rough, float(0.42), rain.mul(0.85)), float(0.03), puddle);
+  const hollow = mx_fractal_noise_float(p.xz.mul(0.16), 2, 2.0, 0.5).add(fine.mul(0.06)).add(mid.mul(0.15));
+  // Fewer in meadows (the grass stands in them), most on bare soil, cobbles and the forest floor.
+  const where = w.x.mul(0.6).oneMinus().mul(smoothstep(0.95, 0.99, up)).mul(smoothstep(0.85, 0.95, level))
+    .mul(rockB.oneMinus()).mul(sandB.oneMinus()).mul(smoothstep(0.3, 0.6, rain));
+  const depth = hollow.sub(float(0.62).sub(rain.mul(0.3)));
+  const puddle = smoothstep(0.0, 0.1, depth).mul(where);
+  // A soaked rim round each, darker than the wet ground, so the edge reads as water, not a pale sheet.
+  const rim = smoothstep(-0.08, 0.0, depth).mul(puddle.oneMinus()).mul(where);
+  // Water is dark where it does not mirror: the stone under it shows deep and the sky only at a slant.
+  col = col.mul(mix(float(1), float(0.6), rain)).mul(mix(float(1), float(0.72), rim)).mul(mix(float(1), float(0.22), puddle));
+  rough = mix(mix(mix(rough, float(0.42), rain.mul(0.85)), float(0.3), rim), float(0.14), puddle);
   const rings = rainRings(p.xz).mul(smoothstep(6.0, 25.0, length(cameraPosition.sub(p))).oneMinus());
   pert = mix(pert, vec3(rings.x, 0, rings.y), puddle); ao = mix(ao, float(1), puddle);
-  m.specularIntensityNode = mix(mix(float(0.25), float(0.5), rain), float(1), puddle);
+  // A puddle under a grey sky mirrors it at a slant: kept faint, or it reads as a pale sheet of ice.
+  m.specularIntensityNode = mix(mix(float(0.25), float(0.5), rain), float(0.22), puddle);
   // Caustics only where there is water above (a branch: the land above the sea pays nothing).
   m.emissiveNode = Fn(() => {
     const e = vec3(0).toVar();

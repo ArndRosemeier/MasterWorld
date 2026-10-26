@@ -1,13 +1,15 @@
 /**
  * The farms' animals as drawn (sim/livestock.ts moves them). The setting says which animal grazes the
- * paddocks; each kind has its own drawing (only horses so far: Actors' horse without saddle and
- * bridle). At most `max` are drawn, the nearest to the camera, and none farther than REACH.
+ * paddocks; each kind has its own drawing (Actors' cows in mixed breeds, or Actors' horse without
+ * saddle and bridle). At most `max` are drawn, the nearest to the camera, and none farther than REACH.
  */
 import type { Object3D, Vector3, WebGPURenderer } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { LivestockKind } from '../../setting/contract';
 import type { Herds } from '../../sim/livestock';
 import { HorseView } from '../horse/HorseView';
+import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from '../dungeon/animals';
+import { deriveSeed } from '@futuremagic/core';
 
 /** Farther than this (m) an animal is not drawn. */
 const REACH = 180;
@@ -23,7 +25,33 @@ interface Bodies {
 const MAKE: Record<LivestockKind, (renderer: WebGPURenderer, count: number) => Promise<Bodies>> = {
   // Coats from the third on, so the saddled horses at the start look different.
   horse: (renderer, count) => HorseView.make(renderer, count, { tack: false, coat0: 2 }),
+  cow: (renderer, count) => ActorsHerd.make('cow', renderer, count),
 };
+
+/** What a grazer's act shows as. */
+const DOING: Record<'eat' | 'idle' | 'walk', AnimalDoing> = { eat: 'feed', idle: 'idle', walk: 'walk' };
+
+/** Bodies of one of Actors' animals (render/dungeon/animals.ts), each its own breed and size by seed. */
+class ActorsHerd implements Bodies {
+  private constructor(private readonly bodies: AnimalBody[]) {}
+
+  static async make(species: string, renderer: WebGPURenderer, count: number): Promise<ActorsHerd> {
+    const bodies: AnimalBody[] = [];
+    for (let i = 0; i < count; i++) {
+      const b = await animalBody(species, deriveSeed(0x5106, species, i), renderer);
+      if (!b) throw new Error(`no Actors animal for ${species}`);
+      bodies.push(b);
+    }
+    return new ActorsHerd(bodies);
+  }
+
+  warmObjects(): Object3D[] { return this.bodies.map((b) => b.place); }
+  async show(stage: Stage): Promise<void> { for (const b of this.bodies) await stage.add(b.place); }
+  shown(i: number, on: boolean): void { this.bodies[i].place.visible = on; }
+  pose(i: number, p: { x: number; y: number; z: number; yaw: number; act: 'eat' | 'idle' | 'walk'; speed: number }, dt: number): void {
+    poseAnimal(this.bodies[i], p.x, p.y, p.z, p.yaw, DOING[p.act], p.speed, dt);
+  }
+}
 
 export class StockView {
   /** Which animal each body shows (-1 none). */

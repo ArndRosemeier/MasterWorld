@@ -3,10 +3,10 @@
  * (@futuremagic/sky, from Scale; the weather itself comes from WeatherView). The sun casts one shadow map that follows the camera. Everything that changes any shader's key
  * (the environment map, shadows, fog type) is set up in the constructor, before the warm-up.
  */
-import { BoxGeometry, Color, Mesh, PMREMGenerator, Scene, Vector3, type DirectionalLight, type HemisphereLight, type OrthographicCamera, type PerspectiveCamera, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
+import { BoxGeometry, Color, Mesh, type Sprite, PMREMGenerator, Scene, Vector3, type DirectionalLight, type HemisphereLight, type OrthographicCamera, type PerspectiveCamera, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
 import { positionWorld, uniform } from 'three/tsl';
-import { CLEAR, moonAt, skyLight, skyPath, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
-import { cloudShadow } from '@futuremagic/sky/node';
+import { CLEAR, moonAt, skyLight, skyPath, starField, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
+import { MOON_RADIUS, cloudShadow, makeStarsNode } from '@futuremagic/sky/node';
 import { smoothstep } from '@futuremagic/core';
 import { GRADE, gradeAt, type GradeKey } from '@futuremagic/stage';
 import { SKY, makeEnvSky, skyUniforms, type SkyUniforms } from './materials';
@@ -33,6 +33,8 @@ const FOG_SCALE = 0.28;
 const SUN_ADAPT = 0.6;
 /** Metres up to the clouds: they pass overhead as you travel, and their shadows fall where they are. */
 const CLOUD_HEIGHT = 1500;
+/** The star field's seed (the same sky over every world). */
+const STAR_SEED = 1771;
 
 
 /**
@@ -65,6 +67,8 @@ export class SkyView {
   readonly gain = LIGHT;
   /** The camera is under water: fog turns to the water's own colour. */
   underwater = false;
+  /** The star field (its opacity follows the night and the cloud cover). */
+  private readonly stars: Sprite;
   /** Below ground (a cellar, a dungeon): no sun or sky, a faint warm fill, darkness closing in. */
   indoors = false;
   /** Mist in the low ground 0..1, and the height it lies at (the weather sets both). */
@@ -118,6 +122,13 @@ export class SkyView {
     this.U = skyUniforms(mat);
     this.U.cloudHeight.value = CLOUD_HEIGHT;
     scene.background = null;
+    // The stars: a seeded field on a dome inside the sky box, faded in at night (and hidden behind the moon).
+    const field = starField(STAR_SEED);
+    this.stars = makeStarsNode(field.position, field.color, 2, this.U.moonDir, Math.cos(MOON_RADIUS * 1.15));
+    this.stars.name = 'stars';
+    this.stars.renderOrder = -999;
+    this.stars.frustumCulled = false;
+    scene.add(this.stars);
 
     this.envSky = makeEnvSky();
     this.envSky.name = 'env sky';
@@ -183,6 +194,8 @@ export class SkyView {
     this.U.moonDir.value.set(...moon.dir);
     this.U.moonSun.value.set(...moon.sunSide);
     this.U.moonBright.value = L.moonBright;
+    this.envU.moonDir.value.set(...moon.dir);
+    (this.stars.material as { opacity: number }).opacity = this.indoors || this.underwater ? 0 : L.stars;
     this.U.time.value = this.time;
     this.U.flash.value = this.flash;
     this.U.flashDir.value.set(Math.cos(this.flashBearing) * 0.8, 0.5, Math.sin(this.flashBearing) * 0.8);
@@ -238,6 +251,7 @@ export class SkyView {
       this.scene.environmentIntensity = 0.01;
       this.renderer.toneMappingExposure = 1.4 * this.exposure / EXPOSURE;
       this.dome.visible = false;
+      (this.stars.material as { opacity: number }).opacity = 0;
       fog.setRGB(0.008, 0.006, 0.005);
       FOG.density.value = 0.06;
       FOG.mist.value = 0;
@@ -256,7 +270,7 @@ export class SkyView {
     this.sun.target.position.set(fx, focus.y, fz);
     this.sun.position.set(fx + d[0] * r, focus.y + d[1] * r, fz + d[2] * r);
     this.sun.target.updateMatrixWorld();
-    if (camera) this.dome.position.copy(camera.position);
+    if (camera) { this.dome.position.copy(camera.position); this.stars.position.copy(camera.position); }
     // The map keeps the box it was drawn with (three moves its matrix only when it draws), so a frame between
     // draws still lines up; a jump of the box draws it at once.
     const jumped = Math.hypot(fx - this.shadowAt.x, fz - this.shadowAt.z) > SHADOW_JUMP;

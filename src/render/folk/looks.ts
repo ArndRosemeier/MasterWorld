@@ -118,7 +118,7 @@ const CLIP: Record<ActivityKind, string> = {
   sell: 'talk', serve: 'talk', tend: 'water plants',
   fetchWater: 'pick up', fetchWood: 'pick up', chop: 'chop wood', garden: 'harvest', washing: 'interact', feedHens: 'plant seeds',
   browse: 'arms folded', sit: 'sit', chat: 'talk', drink: 'eat or drink', pray: 'crouch', mourn: 'arms folded', play: 'idle',
-  plough: 'harvest', sow: 'plant seeds', hoe: 'harvest', reap: 'harvest', tendHorses: 'interact', muckOut: 'pick up',
+  plough: 'harvest', sow: 'plant seeds', hoe: 'harvest', reap: 'harvest', tendStock: 'interact', muckOut: 'pick up',
 };
 
 /** The clip that shows `act` (`id` varies a few between people). */
