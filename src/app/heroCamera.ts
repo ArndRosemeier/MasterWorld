@@ -125,9 +125,8 @@ export class HeroCamera {
     // the near half of the way to the one talked to (a counter may stand in the far half).
     const hits = (x: number, z: number): number => {
       const wallHit = (px: number, pz: number, r: number) => (this.world.wall?.(px, pz, r) ? 1 : 0);
-      // A wall just beside the camera fills the frame's edge: the more room around it, the better.
-      let n = wallHit(x, z, 0.3) * 30 + wallHit(x, z, 0.8) + wallHit(x, z, 1.2);
-      for (let t = 0.1; t < 0.75; t += 0.1) n += (wallHit(x + (head.x - x) * t, z + (head.z - z) * t, 0.08) + wallHit(x + (at.x - x) * t * 0.6, z + (at.z - z) * t * 0.6, 0.08)) * 10;
+      let n = wallHit(x, z, 0.3) * 3;
+      for (let t = 0.1; t < 0.75; t += 0.1) n += wallHit(x + (head.x - x) * t, z + (head.z - z) * t, 0.08) + wallHit(x + (at.x - x) * t * 0.6, z + (at.z - z) * t * 0.6, 0.08);
       return n;
     };
     let back = 0, side = 0, least = Infinity;
