@@ -104,8 +104,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     };
     // Faster water is rougher. (Blended, not branched: an If here turned rivers opaque on WebGPU, the refraction
     // read below lost its view of the bed.)
-    const rough = mix(float(1), float(1.8), smoothstep(1.0, 3.0, speed));
-    const runSlope = mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(rough);
+    const choppy = mix(float(1), float(1.8), smoothstep(1.0, 3.0, speed));
+    const runSlope = mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(choppy);
     const rippled = mix(slopeOf(hStill), runSlope, running);
     // Raindrops ring the surface near the camera.
     const rings = rainRings(p.xz).mul(smoothstep(12.0, 50.0, camDist).oneMinus());
