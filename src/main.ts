@@ -46,7 +46,9 @@ import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
 import { TOWN_RASTER, TownGround } from './world/town';
 import { firstDungeon, houseOf, promiseBarrow } from './vgm/dungeons';
-import { LEADS, keepPromise, keptOf, moveInto, nextPromise } from './vgm/leads';
+import { LEADS, keepPromise, keptOf, moveInto, nextPromise, openPromises } from './vgm/leads';
+import { ARRIVAL, arrivalEntry } from './vgm/guide';
+import { Hails } from './app/hails';
 import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
@@ -572,6 +574,7 @@ export async function start(b: Boot): Promise<void> {
         return shop ? [{ id: 'trade', label: shop.topic, line: shop.line }] : [];
       };
     }
+    const keyName = (k: 'journal' | 'map' | 'talk') => (settings.current.bindings[k][0] || settings.current.bindings[k][1]).replace(/^Key/, '');
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -579,7 +582,9 @@ export async function start(b: Boot): Promise<void> {
       get away() { return player.flying || !!visit() || !!title?.holding; },
       heard: (lead) => {
         handOver?.give(lead.id);
-        notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
+        // The hero's own first page ("ask at the inn") has done its work.
+        journal.fulfil(ARRIVAL);
+        notes.say(`${lead.note} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 6);
       },
       serve: (id, a) => services.get(id)?.(a),
       get roomPeople() { return rooms?.inside && life ? rooms.people(life) : null; },
@@ -839,11 +844,16 @@ export async function start(b: Boot): Promise<void> {
       director.strict = mode === 'roguelike';
       if (mode === 'roguelike') autosave();
       meetOldFriends();
+      // A new hero's own first page: where to ask for work (the inn's door is marked on the map).
+      const innB = town ? buildingOf(town.plan, 'inn') : null;
+      const keeper = innB && life ? life.agents.find((a) => town.plan.buildings[a.person.home] === innB) : undefined;
+      if (innB && keeper && townWords && !journal.leads.length) journal.remember(arrivalEntry(setting.talk, townWords.homeCalled(keeper.person.id), { x: innB.door[0], z: innB.door[1] }));
       // Behind the hero, looking the way they face.
       player.teleport(w.pos.x, undefined, w.pos.z, w.yaw);
       paused(false);
       const friends = townWords ? friendsOf(bg).map((a) => townWords.nameOf(a.person.id)) : [];
-      notes.say(`${made.name} steps out onto the market square.${friends.length ? ` ${friends.join(' and ')} will know you.` : ''}`, 6);
+      const page = journal.open.some((l) => l.id === ARRIVAL) ? ` Your journal (${keyName('journal')}) says where to ask for work.` : '';
+      notes.say(`${made.name} steps out onto the market square.${friends.length ? ` ${friends.join(' and ')} will know you.` : ''}${page}`, 8);
     };
     onBegin = (people) => {
       if (save && !save.heir) paused(false);
@@ -859,6 +869,14 @@ export async function start(b: Boot): Promise<void> {
     // The Director's turn every frame; the Builder's every few seconds: a new promise when one is due
     // (plan 4.1, 4.2: always a few open leads), which the cellars and the townsfolk learn of at once.
     let builderClock = 0;
+    // While the hero has nothing to follow, someone who has heard of a promised place comes over (vgm/guide.ts).
+    const hails = town && life && townWords ? new Hails(life, townWords, setting.talk, journal, {
+      get heroAt() { return player.walker.pos; },
+      get busy() { return open > 0 || player.flying || !!rooms?.inside || !!title?.holding || !!creator?.showing || !window.__mwReady; },
+      get open() { return new Set(openPromises(log).map((d) => d.id)); },
+      get talkingTo() { return talk?.partner ?? null; },
+      say: (text) => notes.say(text, 6),
+    }) : null;
     const direct = (dt: number): void => {
       const below = !!visit();
       let fighting = 0, pressure = 0;
@@ -867,6 +885,7 @@ export async function start(b: Boot): Promise<void> {
       const m = director.next();
       if (m) notes.say(m, 6);
       if (!title?.holding && !creator?.showing) gatherNear();
+      hails?.sendFor(dt, fighting > 0 || below);
       builderClock += dt;
       if (builderClock < 3 || !town || !life || title?.holding || creator?.showing) return;
       builderClock = 0;
