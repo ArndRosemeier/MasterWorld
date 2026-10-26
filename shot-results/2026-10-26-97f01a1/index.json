@@ -1,0 +1,353 @@
+{
+  "commit": "97f01a1ec43b417bd0a6b4ef1663ae7c05825a85",
+  "dirty": false,
+  "date": "2026-10-26",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": true,
+  "viewport": "1920x1080",
+  "settleMs": 6000,
+  "measureMs": 2000,
+  "seconds": 356.579,
+  "shots": [
+    {
+      "name": "title",
+      "file": "01-title.jpg",
+      "query": "title&gl",
+      "loadS": 55.206,
+      "settledS": 1.5083999999761581,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 99,
+      "p50": 12.19999999999709,
+      "p95": 39.599999999998545,
+      "mean": 20.241414141414158,
+      "shaders": {
+        "warmup": 135,
+        "run": 71,
+        "worstMs": 13,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "creator",
+      "file": "02-creator.jpg",
+      "query": "title=0&day=0&gl&create&hour=11&weather=clear",
+      "loadS": 28.058,
+      "settledS": 6.0375,
+      "missing": [
+        "6 townsfolk"
+      ],
+      "backend": "webgl2",
+      "frames": 34,
+      "p50": 46.599999999998545,
+      "p95": 376.90000000000146,
+      "mean": 62.57647058893652,
+      "shaders": {
+        "warmup": 206,
+        "run": 201,
+        "worstMs": 15.700000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "not all drawn: 6 townsfolk"
+      ]
+    },
+    {
+      "name": "town-noon",
+      "file": "03-town-noon.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.884,
+      "settledS": 6.042300000071526,
+      "missing": [
+        "1 townsfolk"
+      ],
+      "backend": "webgl2",
+      "frames": 47,
+      "p50": 32,
+      "p95": 124.09999999999854,
+      "mean": 45.063829788248654,
+      "shaders": {
+        "warmup": 206,
+        "run": 266,
+        "worstMs": 13.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "not all drawn: 1 townsfolk"
+      ]
+    },
+    {
+      "name": "pack",
+      "file": "04-pack.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.884,
+      "settledS": 4.913199999928475,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 108,
+      "p50": 20.30000000000291,
+      "p95": 39.80000000000291,
+      "mean": 18.562962963404466,
+      "shaders": {
+        "warmup": 206,
+        "run": 306,
+        "worstMs": 13.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "map",
+      "file": "05-map.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.884,
+      "settledS": 1.508899999976158,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 134,
+      "p50": 18.200000000004366,
+      "p95": 30,
+      "mean": 15.064925373668112,
+      "shaders": {
+        "warmup": 206,
+        "run": 310,
+        "worstMs": 13.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-dusk",
+      "file": "06-town-dusk.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.884,
+      "settledS": 5.825600000023842,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 66,
+      "p50": 25.5,
+      "p95": 63,
+      "mean": 30.536363636002395,
+      "shaders": {
+        "warmup": 206,
+        "run": 358,
+        "worstMs": 13.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-night",
+      "file": "07-town-night.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.884,
+      "settledS": 6.048699999928474,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 80,
+      "p50": 26.19999999999709,
+      "p95": 42.20000000001164,
+      "mean": 25.09875000029806,
+      "shaders": {
+        "warmup": 206,
+        "run": 389,
+        "worstMs": 13.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-rain",
+      "file": "08-town-rain.jpg",
+      "query": "title=0&day=0&gl&hour=12&weather=clear",
+      "loadS": 21.884,
+      "settledS": 6.078299999952316,
+      "missing": [
+        "6 townsfolk"
+      ],
+      "backend": "webgl2",
+      "frames": 74,
+      "p50": 21.5,
+      "p95": 76.20000000001164,
+      "mean": 27.035135135135214,
+      "shaders": {
+        "warmup": 206,
+        "run": 525,
+        "worstMs": 13.5,
+        "violations": 1,
+        "repeats": 0,
+        "lines": [
+          "run: \"MeshBasicNodeMaterial\" started 0 ms after a build of 6 ms ended (minimum 12 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms",
+        "1 shader violations",
+        "not all drawn: 6 townsfolk"
+      ]
+    },
+    {
+      "name": "cellar",
+      "file": "09-cellar.jpg",
+      "query": "title=0&day=0&gl&hour=12&cellar=2",
+      "loadS": 47.472,
+      "settledS": 1.5023999999761581,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 249,
+      "p50": 5.30000000000291,
+      "p95": 16.39999999999418,
+      "mean": 8.064658634729659,
+      "shaders": {
+        "warmup": 207,
+        "run": 1,
+        "worstMs": 30.899999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "barrow",
+      "file": "10-barrow.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 31.058,
+      "settledS": 1.5017000000476837,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 257,
+      "p50": 7.700000000004366,
+      "p95": 10.89999999999418,
+      "mean": 7.803112840559708,
+      "shaders": {
+        "warmup": 226,
+        "run": 0,
+        "worstMs": 11.899999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "wild",
+      "file": "11-wild.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 31.058,
+      "settledS": 1.5128000000715256,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 198,
+      "p50": 10,
+      "p95": 14.099999999998545,
+      "mean": 10.14242424290591,
+      "shaders": {
+        "warmup": 226,
+        "run": 48,
+        "worstMs": 11.899999976158142,
+        "violations": 3,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh brows-eyebrow001<bandit<creatures (shadow warm-up)\" started 0 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh brows-eyebrow001<bandit<creatures (shadow warm-up)\" started 0 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh brows-eyebrow001<bandit<creatures (shadow warm-up)\" started 0 ms after a build of 1 ms ended (minimum 2 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "3 shader violations"
+      ]
+    },
+    {
+      "name": "fight",
+      "file": "12-fight.jpg",
+      "query": "title=0&day=0&gl&hour=10&weather=fair&barrow",
+      "loadS": 31.058,
+      "settledS": 1.522,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 159,
+      "p50": 12.80000000000291,
+      "p95": 14.599999999998545,
+      "mean": 12.594968553459111,
+      "shaders": {
+        "warmup": 226,
+        "run": 59,
+        "worstMs": 11.899999976158142,
+        "violations": 3,
+        "repeats": 0,
+        "lines": [
+          "run: \"ShadowMaterial of SkinnedMesh brows-eyebrow001<bandit<creatures (shadow warm-up)\" started 0 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh brows-eyebrow001<bandit<creatures (shadow warm-up)\" started 0 ms after a build of 1 ms ended (minimum 2 ms)",
+          "run: \"ShadowMaterial of SkinnedMesh brows-eyebrow001<bandit<creatures (shadow warm-up)\" started 0 ms after a build of 1 ms ended (minimum 2 ms)"
+        ]
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim",
+        "3 shader violations"
+      ]
+    },
+    {
+      "name": "talk",
+      "file": "13-talk.jpg",
+      "query": "title=0&day=0&gl&hour=20&talk=inn&topics=news",
+      "loadS": 23.234,
+      "settledS": 1.909,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 180,
+      "p50": 11,
+      "p95": 14.200000000000728,
+      "mean": 11.111666666931585,
+      "shaders": {
+        "warmup": 199,
+        "run": 57,
+        "worstMs": 11.399999976158142,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    }
+  ]
+}
