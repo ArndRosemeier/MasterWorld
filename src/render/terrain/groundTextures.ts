@@ -3,7 +3,7 @@
  * texture arrays (albedo + roughness, normal + height + AO), one layer per natural surface.
  */
 import { DataArrayTexture, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RGBAFormat, RepeatWrapping, SRGBColorSpace, UnsignedByteType } from 'three/webgpu';
-import { FACADE_TILE_METERS, GROUND_TILE_METERS, MEDIEVAL_NAMES, MEDIEVAL_TILE_METERS, NATURAL_LAYER_COUNT } from '@futuremagic/texgen';
+import { FACADE_TILE_METERS, GROUND_TILE_METERS, MEDIEVAL_NAMES, MEDIEVAL_TILE_METERS, NATURAL_LAYER_COUNT, NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import type { TexturePool } from '../../workers/pool';
 import type { TextureSet } from '../../workers/texture.worker';
 
@@ -41,11 +41,13 @@ export function loadGroundTextures(pool: TexturePool, size = 512): Promise<Groun
   return loadLayers(pool, Array.from({ length: NATURAL_LAYER_COUNT }, (_, layer) => ({ set: 'natural' as const, layer })), size);
 }
 
-const MED = (name: string): { set: TextureSet; layer: number } => {
-  const layer = MEDIEVAL_NAMES.indexOf(name);
-  if (layer < 0) throw new Error(`texgen has no medieval layer "${name}"`);
-  return { set: 'medieval', layer };
+/** A texgen layer of a named set (medieval, natural) by its name. */
+const named = (set: 'medieval' | 'natural', names: readonly string[]) => (name: string): { set: TextureSet; layer: number } => {
+  const layer = names.indexOf(name);
+  if (layer < 0) throw new Error(`texgen has no ${set} layer "${name}"`);
+  return { set, layer };
 };
+const MED = named('medieval', MEDIEVAL_NAMES), NAT = named('natural', NATURAL_NAMES);
 /** texgen facade layers used in towns (FACADE_WALLS then ROOFS order). */
 const FACADE = { limestone: 4, plaster: 6, clayTile: 17, slate: 18 };
 /** texgen ground layers used in towns (GROUNDS order). */
@@ -53,7 +55,7 @@ const GROUND = { dirt: 11 };
 
 /**
  * The town's layers: first one per BuildingMat (@futuremagic/settlement, in its order), then the town's
- * ground (TOWN_GROUND_LAYER), then the cellars' surfaces (CellarMat).
+ * ground (TOWN_GROUND_LAYER), then the cellars' surfaces (CellarMat), then the land's (WildMat).
  */
 export const TOWN_LAYERS: readonly { set: TextureSet; layer: number }[] = [
   { set: 'facade', layer: FACADE.plaster }, MED('rubble'), { set: 'facade', layer: FACADE.limestone }, MED('oak'), MED('thatch'),
@@ -61,11 +63,13 @@ export const TOWN_LAYERS: readonly { set: TextureSet; layer: number }[] = [
   MED('cobbles'), { set: 'ground', layer: GROUND.dirt },
   // The cellars' (world/dungeon/meshKit.ts CellarMat).
   MED('flagstone'), MED('brick'), MED('boards'), MED('limewash'),
+  // The land's rock and grass, for what stands out on it (meshKit.ts WildMat: a barrow's stones and turf).
+  NAT('rockFace'), NAT('wildGrass'),
 ];
 /** Where the town's ground layers sit in TOWN_LAYERS: cobbles (streets and market) and trodden earth (yards). */
 export const TOWN_GROUND_LAYER = { cobble: 9, dirt: 10 };
 
-const TILE: Record<TextureSet, readonly number[]> = { facade: FACADE_TILE_METERS, ground: GROUND_TILE_METERS, medieval: MEDIEVAL_TILE_METERS, natural: [] };
+const TILE: Record<TextureSet, readonly number[]> = { facade: FACADE_TILE_METERS, ground: GROUND_TILE_METERS, medieval: MEDIEVAL_TILE_METERS, natural: NATURAL_TILE_METERS };
 /** Metres one tile of each TOWN_LAYERS layer covers. */
 export const TOWN_TILE_METERS: readonly number[] = TOWN_LAYERS.map((l) => TILE[l.set][l.layer]);
 

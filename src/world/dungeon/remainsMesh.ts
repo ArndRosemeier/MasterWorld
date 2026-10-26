@@ -5,9 +5,8 @@
  */
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { BuildingMat as M, MeshKit } from './meshKit';
+import { BuildingMat as M, MeshKit, varyTint } from './meshKit';
 import { stampModel, type PropModels } from './propModels';
-import { varyTint } from './cellarMesh';
 
 /** The look of remains: a pack, or a grave. `seed` varies the stones and the slump. */
 export interface RemainsLook {

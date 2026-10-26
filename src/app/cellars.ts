@@ -11,6 +11,7 @@
 import type { Mesh, Object3D, PerspectiveCamera, PointLight, WebGPURenderer } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { TownBuilding } from '@futuremagic/settlement';
+import { deriveSeed } from '@futuremagic/core';
 import type { Character } from '../game/character';
 import { Delve, type DelveSave } from '../game/delve';
 import { CellarView } from '../render/dungeon/CellarView';
@@ -220,7 +221,7 @@ export class Cellars {
     const only = this.host.dweller ? lore.dwellers.filter((w) => w.id === this.host.dweller) : [];
     const first = only.length ? outlineCellar({ ...d, danger: undefined }, place, { ...lore, dwellers: only }) : outlineCellar(d, place, lore);
     const m = occupationOf(this.log, d.id);
-    const mound = d.site ? this.heap(d.site) : null;
+    const mound = d.site ? this.heap(d.site, d.seed) : null;
     const s: Site = { decision: d, house, place, mound, first, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;
@@ -231,8 +232,8 @@ export class Cellars {
   }
 
   /** A barrow's mound and passage, on the land at its site (the town's building shader: nothing new to build). */
-  private heap(site: { readonly x: number; readonly z: number; readonly yaw: number }): Mound {
-    const mesh = buildingMeshAt(barrowMesh(), site.x, this.host.ground(site.x, site.z) - 0.05, site.z, 'barrow');
+  private heap(site: { readonly x: number; readonly z: number; readonly yaw: number }, seed: number): Mound {
+    const mesh = buildingMeshAt(barrowMesh(deriveSeed(seed, 'barrow')), site.x, this.host.ground(site.x, site.z) - 0.05, site.z, 'barrow');
     mesh.rotation.y = site.yaw;
     void this.host.stage.add(mesh);
     return { ...site, mesh, cool: 0 };

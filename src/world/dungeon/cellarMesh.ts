@@ -12,7 +12,7 @@ import { DIRS, type Door, type PathCell, type PlacedLink } from '@futuremagic/du
 import type { BuildingMesh } from '@futuremagic/settlement';
 import type { DungeonProp } from '../../setting/contract';
 import { CELL, STOREY, cellIn, type Cellar, type Prop } from './cellar';
-import { BuildingMat as M, CellarMat as C, MeshKit, type Tint } from './meshKit';
+import { BuildingMat as M, CellarMat as C, MeshKit, varyTint, type Tint } from './meshKit';
 import { stampModel, type PropModels, type Stamp } from './propModels';
 import { DOOR_W, PASSAGE_H, isFeature, stairDrop } from './space';
 import { TORCH_OUT, torchSpots } from './torches';
@@ -43,8 +43,6 @@ const RAFTERS: Tint = [168, 146, 124], DIRT: Tint = [176, 160, 140];
 /** A wall's look: its layer, tint, and how damp its foot is (0 dry .. 1 wet). */
 interface WallLook { readonly mat: number; readonly tint: Tint; readonly damp: number }
 
-/** `base` a little lighter or darker, by up to ±v. */
-export const varyTint = (rng: Rng, base: Tint, v: number): Tint => base.map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + rng.range(-v, v)))))) as unknown as Tint;
 
 const scaleTint = (t: Tint, k: number): Tint => [Math.round(t[0] * k), Math.round(t[1] * k), Math.round(t[2] * k)];
 
