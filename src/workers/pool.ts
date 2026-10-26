@@ -82,6 +82,11 @@ export class TerrainJobs {
     return this.job({ kind: 'volumes' });
   }
 
+  /** The skylines around a square (world/horizon.ts), for the hills' shadows. */
+  horizon(spec: import('../world/horizon').HorizonSpec): Promise<Uint8Array> {
+    return this.job({ kind: 'horizon', ...spec });
+  }
+
   /** The buildings of the `index`th town, merged per cell. */
   townMeshes(index: number): Promise<import('../world/townMesh').TownCellMesh[]> {
     return this.job({ kind: 'town', index });

@@ -25,6 +25,7 @@ import { GrassView } from './render/grass/GrassView';
 import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
 import { useTownGround, useTownTextures } from './render/materials/townGround';
+import { WINDOWS } from './render/materials/building';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
@@ -125,6 +126,7 @@ export async function start(b: Boot): Promise<void> {
     loading.set('Starting the renderer');
     const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone });
     if (save) view.sky.day = save.clock.day;
+    view.sky.look = setting.look?.grade ?? [];
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
     let water: WaterView | null = null;
     // Down in the cellar the walker walks the cellar's space instead of the land.
@@ -271,6 +273,7 @@ export async function start(b: Boot): Promise<void> {
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
     const rock = new VolumeView(view.stage, terrainJobs).raise();
     const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
+    if (houses && town) view.doors.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
     const raised = houses?.build(0, view.camera.position);
     await ground.ready(view.camera);
     await rock;
@@ -574,7 +577,9 @@ export async function start(b: Boot): Promise<void> {
       view.sky.update(dt, view.camera);
       sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
       ground.update(view.camera);
+      view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
       houses?.update(view.camera.position);
+      view.doors.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value);
       if (life) {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });

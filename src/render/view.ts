@@ -6,6 +6,7 @@ import { SkyView } from './sky';
 import { GRADE, Stage, createRenderer } from '@futuremagic/stage';
 import { Float32BufferAttribute, type BufferGeometry } from 'three/webgpu';
 import { allKinds } from './materials';
+import { DoorLights } from './town/doorLights';
 
 export interface View {
   readonly renderer: WebGPURenderer;
@@ -16,6 +17,8 @@ export interface View {
   readonly sun: DirectionalLight;
   /** The hero's lantern: dark below ground (off, intensity 0, above it). */
   readonly lantern: PointLight;
+  /** Warm light from the town's doorways at night. */
+  readonly doors: DoorLights;
   readonly sky: SkyView;
 }
 
@@ -38,6 +41,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const lantern = new PointLight(0xffc27a, 0, 14, 1.6);
   lantern.castShadow = false;
   scene.add(sun, sun.target, hemi, lantern);
+  const doors = new DoorLights(scene);
   // Sky, fog, environment map and the sun's shadow (all part of shader keys) before the Stage warms up.
   // AgX (with or without our look) needs more exposure than ACES for the same mid-grey (ACES divides by 0.6).
   const sky = new SkyView(renderer, scene, sun, hemi, { ...opts, exposure: (opts.tone ?? 'graded') === 'aces' ? 1 : (opts.tone ?? 'graded') === 'agx' ? 1.5 : 1.6 });
@@ -51,7 +55,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   fit();
   window.addEventListener('resize', fit);
   stage.shadowCamera = sun.shadow.camera;
-  return { renderer, backend, scene, camera, stage, sun, lantern, sky };
+  return { renderer, backend, scene, camera, stage, sun, lantern, doors, sky };
 }
 
 /** Our own vertex attributes on the Stage's warm-up stand-ins (same size as on real meshes). */

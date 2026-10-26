@@ -7,7 +7,11 @@ import { BoxGeometry, Color, Mesh, PMREMGenerator, Scene, Vector3, type Directio
 import { positionWorld, uniform } from 'three/tsl';
 import { CLEAR, moonAt, skyLight, skyPath, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
 import { cloudShadow } from '@futuremagic/sky/node';
+import { smoothstep } from '@futuremagic/core';
+import { GRADE, gradeAt, type GradeKey } from '@futuremagic/stage';
 import { SKY, makeEnvSky, skyUniforms, type SkyUniforms } from './materials';
+import { HorizonShadow } from './horizonShadow';
+import { WINDOWS } from './materials/building';
 import { ENV_SATURATION, FOG, fogNode } from './materials/weather';
 
 /** Half the side of the sun's shadow box around the camera, metres. */
@@ -123,7 +127,7 @@ export class SkyView {
     scene.fog = null;
     (scene as unknown as { fogNode: unknown }).fogNode = fogNode(this.envRT.texture);
     // The clouds' shadows on everything the sun lights (three takes a light's colorNode in place of its colour).
-    (sun as unknown as { colorNode: unknown }).colorNode = this.sunLight.mul(cloudShadow(this.U, positionWorld, this.lightDir));
+    (sun as unknown as { colorNode: unknown }).colorNode = this.sunLight.mul(cloudShadow(this.U, positionWorld, this.lightDir)).mul(this.horizon.shade(positionWorld));
 
     sun.castShadow = true;
     sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
@@ -138,6 +142,15 @@ export class SkyView {
 
   /** The sky's environment map (reflections). */
   get envTexture() { return this.envRT.texture; }
+
+  /** Toward the sun (or the moon at night), as lit last frame. */
+  get lightDirection(): Vector3 { return this.lightDir.value; }
+
+  /** The hills' shadows beyond the shadow map: main feeds it the camera and the terrain workers. */
+  readonly horizon = new HorizonShadow();
+
+  /** The setting's colour key over the day (empty: the grade stays as the view set it). */
+  look: readonly GradeKey[] = [];
 
   /** Once per frame. `camera` null: only the light (the constructor). */
   update(dt: number, camera: PerspectiveCamera | null): void {
@@ -171,7 +184,9 @@ export class SkyView {
     // The hemisphere light is only the light thrown back by the sunlit ground (from below); the sky's own
     // light comes from the environment map. Lightning lights the land from the whole sky for a moment.
     const f = this.flash * 0.84;
-    this.hemi.color.setRGB(0.75 * f, 0.8 * f, f);
+    // From dusk on, the dim sky is most of the light: without this, the shade under the moon is black.
+    const dusk = (1 - L.day) * (1 - 0.5 * L.overcast);
+    this.hemi.color.setRGB(0.75 * f + 0.05 * dusk, 0.8 * f + 0.06 * dusk, f + 0.09 * dusk);
     this.hemi.groundColor.setRGB(...L.bounce);
     this.hemi.intensity = LIGHT;
     const fog = FOG.color.value;
@@ -193,9 +208,20 @@ export class SkyView {
       FOG.flat.value = 1;
     }
     this.scene.environmentIntensity = L.envIntensity * ENV * lowSunSky(sun[1]);
+    // Windows light up from dusk; most rooms in the evening, few after midnight, some before dawn.
+    WINDOWS.glow.value = 1 - smoothstep(-0.1, 0.06, sun[1]);
+    const hr = this.hour;
+    WINDOWS.share.value = hr >= 12 ? 0.7 - 0.25 * smoothstep(21.5, 24, hr) : 0.45 - 0.33 * smoothstep(0, 1.5, hr) + 0.2 * smoothstep(4.5, 6, hr);
     this.renderer.toneMappingExposure = L.exposure * this.exposure;
+    if (this.look.length) {
+      // Indoors the lamps set the colour: the day key (neutral).
+      const g = gradeAt(this.look, this.indoors ? 1 : sun[1]);
+      GRADE.slope.value.set(...g.slope);
+      GRADE.saturation.value = g.saturation;
+    }
     if (this.indoors) {
       this.sun.intensity = 0;
+      WINDOWS.glow.value = 0;
       this.hemi.color.setRGB(0.55, 0.42, 0.3);
       this.hemi.groundColor.setRGB(0.12, 0.09, 0.07);
       this.hemi.intensity = 0.05;
