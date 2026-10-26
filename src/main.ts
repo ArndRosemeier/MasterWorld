@@ -485,6 +485,8 @@ export async function start(b: Boot): Promise<void> {
     let lookWild = by ? by.def.id : null;
     // `small=squirrel` / `birds` / `flock`: beside the first that is about (for looking at them).
     let lookSmall = params.smallAt;
+    /** With `fly`: the one the free camera follows, and how far off. */
+    let watchSmall: { it: { x: number; y: number; z: number }; d: number } | null = null;
     /** The hero `d` metres from `seen`, on the side they are on, facing it. */
     const standBeside = (seen: { x: number; z: number }, d: number) => {
       const p = player.walker.pos, k = Math.max(1, Math.hypot(p.x - seen.x, p.z - seen.z));
@@ -960,18 +962,20 @@ export async function start(b: Boot): Promise<void> {
         // Out of doors only: below or inside, the land's small life waits.
         const out = above && !rooms?.inside, w = player.walker;
         const near = lookSmall ? small.firstSeen(lookSmall) : null;
-        if (near) {
-          // With `fly`: the free camera close by, looking at it (a free camera alarms no one).
-          if (!player.flying) standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
-          else {
-            const p = view.camera.position, k = Math.max(1, Math.hypot(p.x - near.x, p.z - near.z)), d = lookSmall === 'flock' ? 30 : 2.5;
-            const cx = near.x + (p.x - near.x) / k * d + (p.z - near.z) / k * d * 0.4, cz = near.z + (p.z - near.z) / k * d - (p.x - near.x) / k * d * 0.4;
-            const cy = lookSmall === 'flock' ? near.y - 6 : terrain.height(cx, cz) + 0.9;
-            player.fly.place(cx, cz, cy, true);
-            const dx = near.x - cx, dy = near.y + 0.1 - cy, dz = near.z - cz;
-            player.fly.setLook(Math.atan2(dx, -dz) * 180 / Math.PI, Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI);
-          }
+        if (near && lookSmall) {
+          // With `fly`: the free camera follows it close by (a free camera alarms no one).
+          if (player.flying) watchSmall = { it: near, d: lookSmall === 'flock' ? 25 : 2.5 };
+          else standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
           lookSmall = null;
+        }
+        if (watchSmall && player.flying) {
+          const { it, d } = watchSmall, c = view.camera.position, k = Math.max(0.01, Math.hypot(c.x - it.x, c.z - it.z));
+          if (k > d * 1.5 || k < d * 0.5) {
+            const cx = it.x + (c.x - it.x) / k * d, cz = it.z + (c.z - it.z) / k * d;
+            player.fly.place(cx, cz, d > 5 ? it.y - 4 : terrain.height(cx, cz) + 0.9, true);
+          }
+          const dx = it.x - c.x, dy = it.y + 0.1 - c.y, dz = it.z - c.z;
+          player.fly.setLook(Math.atan2(dx, -dz) * 180 / Math.PI, Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI);
         }
         // A free camera disturbs no one; they live round it.
         const hero = player.flying ? null : { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed };

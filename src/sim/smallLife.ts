@@ -191,11 +191,11 @@ export class SmallLife {
     for (const f of this.flocks.values()) if (f && this.rain < 0.35) for (const b of f.birds) if (b.shown) yield b;
   }
 
-  /** The first squirrel on the ground, bird pecking on it, or flock in the air (for `small=`: look at them). */
+  /** The first squirrel on the ground, bird pecking on it, or bird of a flock in the air (live, for `small=`: look at them). */
   firstSeen(kind: 'squirrel' | 'birds' | 'flock'): { x: number; y: number; z: number } | null {
     if (kind === 'squirrel') return this.squirrels.find((s) => !s.trunk) ?? null;
     if (kind === 'flock') {
-      for (const f of this.flocks.values()) if (f?.state === 'wheel') return { x: f.cx, y: f.cy, z: f.cz };
+      for (const f of this.flocks.values()) if (f?.state === 'wheel') return f.birds[0];
       return null;
     }
     return this.parties.find((p) => p.state === 'ground')?.birds[0] ?? null;
