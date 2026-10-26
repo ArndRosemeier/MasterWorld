@@ -378,16 +378,17 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
   const hatch = props[0];
   // The set piece next (its clues must find a place): its own dressing and its clues.
   piece.dress({ link, graph, rooms, trouble, dweller: now, rng, put, clue: (text, room, l) => { clues.push({ text, room, ...(l !== undefined ? { link: l } : {}) }); return clues.length - 1; } });
-  for (const r of rooms) {
-    const R = placed[r.id], n = Math.max(2, Math.min(7, Math.round(R.w * R.d * 0.45)));
-    for (let i = 0; i < n; i++) put(r.id, r.use.props[i % r.use.props.length]);
-  }
   // Traces of history: each layer's in the rooms of its time, the dwellers' also near the entrance (foreshadowing).
   for (const h of sketch.history) for (const kind of h.def.traces ?? []) {
     const own = rooms.filter((r) => r.era === h.layer);
     const where = h.layer === 'now' ? rooms.filter((r) => r.beat === 'foreshadow' || r.era === 'now') : own.length ? own : rooms.filter((r) => r.id !== graph.goal);
     // Two of each, in rooms that have a free wall (a small room full of doors may have none).
     for (let i = 0, tries = 0; i < 2 && tries < where.length * 2; tries++) if (put(where[rng.int(0, where.length - 1)].id, kind, h.layer)) i++;
+  }
+  // Then what each room is used for, as far as its walls hold.
+  for (const r of rooms) {
+    const R = placed[r.id], n = Math.max(2, Math.min(7, Math.round(R.w * R.d * 0.45)));
+    for (let i = 0; i < n; i++) put(r.id, r.use.props[i % r.use.props.length]);
   }
 
   // The builders' ledger often tells of the older layer (a clue for those who read).
