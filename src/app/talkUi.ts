@@ -131,6 +131,8 @@ export class TalkUi {
     this.lines.replaceChildren();
     this.box.classList.add('open');
     this.host.paused(true);
+    const at = this.whereIs(a);
+    if (at) this.player.frameTalk(true, at.x, at.z);
     this.speak(this.talk.greet(a.person.id).text);
     this.offer();
   }
@@ -183,6 +185,7 @@ export class TalkUi {
     this.with = null;
     this.life.letGo(a);
     this.box.classList.remove('open');
+    this.player.frameTalk(false);
     this.host.paused(false);
   }
 }
