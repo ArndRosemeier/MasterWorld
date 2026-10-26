@@ -81,6 +81,7 @@ Goal: the world grows as you walk. There is more than one place to go, and the p
 
 | Step | Delivers | Done when | Design |
 |---|---|---|---|
+| B0 | **A floating origin**: rendering is relative to an origin near the hero that moves in steps (whole chunks), so float32 stays exact wherever the hero walks. The start town already sits 32 km from zero, and skinning shimmered there until Actors 0.17.1 and AG #94 worked round it one system at a time | Shots at 30 km and at 300 km from zero show no shimmer on folk, creatures, water or shadows; the origin step causes no visible jump and no shader rebuild | 5.2, D17 |
 | B1 | **Opening regions as the player walks**: the VGM opens regions ahead of the hero (5.5) and fills them from the setting (a hamlet, a camp, ruins, a barrow field), all logged | Test: walking 5 km in one direction opens regions and the log replays them | 4.2, 5.2, 5.5 |
 | B2 | **Roads** between settlements, which beat vegetation (section 7 footprints) | Shot: a road leaving town to the hamlet | 7 |
 | B3 | **Settlement sizes**: hamlet, village and town from one planner; the capital is prepared but not placed | Shots of each size; leads come from every settlement | 7, D41 |
