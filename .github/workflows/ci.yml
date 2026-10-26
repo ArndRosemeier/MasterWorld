@@ -22,5 +22,7 @@ jobs:
       - run: npm ci
       - name: Tests and guards
         run: npm test
+      - name: Dungeon variety
+        run: npm run variety
       - name: Typecheck and build
         run: npm run build

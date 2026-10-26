@@ -53,4 +53,29 @@ export const creatures: readonly CreatureDef[] = [
     attacks: [{ name: 'claws', damage: [5, 11], kind: 'claw', reach: 0.9, time: 1.5, skill: 40 }],
     loot: 'grave', tell: 'Cold breath on your neck, and the sweet smell of the grave.',
   },
+  // The land around the town (plan 9.3: the world simulation's wild).
+  {
+    id: 'highwayman', name: 'bandit', plural: 'bandits', body: { kind: 'humanoid', race: 'human', height: 1.8, outfit: 'bandit', held: 'short-sword' },
+    health: 34, armour: 2, defence: 22, speed: 5, senses: { sight: 24, hearing: 18 }, temper: 'hostile', morale: 0.55, pack: true, role: 'melee', danger: 11,
+    attacks: [{ name: 'short sword', damage: [3, 8], kind: 'cut', reach: 1.0, time: 2.0, skill: 28 }],
+    loot: 'bandit', tell: 'Woodsmoke where no farm is, and a whistle that is not a bird.',
+  },
+  {
+    id: 'wolf', name: 'wolf', plural: 'wolves', body: { kind: 'beast', species: 'wolf', length: 1.15, color: '#6e665a' },
+    health: 26, armour: 0, defence: 26, speed: 7.5, senses: { sight: 26, hearing: 34 }, temper: 'hostile', morale: 0.5, pack: true, role: 'melee', danger: 6,
+    attacks: [{ name: 'bite', damage: [3, 7], kind: 'bite', reach: 0.7, time: 1.3, skill: 30 }],
+    loot: 'wolf', tell: 'A howl, far off, and then another, nearer.',
+  },
+  {
+    id: 'boar', name: 'boar', plural: 'boars', body: { kind: 'beast', species: 'boar', length: 1.4, color: '#4a3c30' },
+    health: 42, armour: 2, defence: 14, speed: 6.2, senses: { sight: 10, hearing: 20 }, temper: 'hostile', morale: 0.85, pack: false, role: 'melee', danger: 9,
+    attacks: [{ name: 'tusks', damage: [4, 9], kind: 'pierce', reach: 0.8, time: 1.8, skill: 28 }],
+    loot: 'boar', tell: 'The earth turned over under the oaks, and a grunting in the undergrowth.',
+  },
+  {
+    id: 'deer', name: 'deer', plural: 'deer', body: { kind: 'beast', species: 'deer', length: 1.5, color: '#8a6a48' },
+    health: 22, armour: 0, defence: 30, speed: 9, senses: { sight: 34, hearing: 40 }, temper: 'skittish', morale: 0.2, pack: true, role: 'swarm', danger: 2,
+    attacks: [{ name: 'kick', damage: [2, 5], kind: 'blunt', reach: 0.7, time: 1.6, skill: 18 }],
+    loot: 'deer', tell: 'Hoof-prints in the soft ground, and the white of a tail between the trees.',
+  },
 ];

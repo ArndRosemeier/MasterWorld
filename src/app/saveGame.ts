@@ -35,9 +35,12 @@ export interface SaveData {
   readonly seed: string;
   readonly log: DecisionLog;
   readonly clock: { readonly day: number; readonly hour: number };
-  readonly hero: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly below: boolean };
-  /** By dungeon decision id. */
+  /** `cellar`: the dungeon the hero is down in (none in older saves: the first). */
+  readonly hero: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly below: boolean; readonly cellar?: string };
+  /** By promise id: a dungeon decision's (its rooms, and its first dwellers), a move-in's (those dwellers). */
   readonly cellars: Readonly<Record<string, CellarDiff>>;
+  /** The wild's groups met, by territory id: who died, was spared, was searched (none in older saves). */
+  readonly wild?: Readonly<Record<string, DelveSave>>;
   readonly talk: TownTalkSave | null;
   readonly journal: readonly Lead[];
   /** The hero's skills, health, gear and purse (version 2; none: a fresh hero). */

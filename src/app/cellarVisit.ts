@@ -1,11 +1,11 @@
 /**
  * Going down into the cellar and back up (plan 7, D38: a space of its own behind a door, a short fade).
- * Step onto the hatch in the cellar house's room to go down; walk to the ladder under it to come up. Inside,
+ * Step onto the hatch in the cellar house's room to go down (a barrow: walk into its passage); walk to the
+ * ladder under it to come up. Inside,
  * the walker walks the cellar's space, the sky is off and the hero's lantern is lit; keys, bars, hidden
  * doors and the things worth reading speak through short notes.
  */
 import type { PointLight } from 'three/webgpu';
-import type { TownBuilding } from '@futuremagic/settlement';
 import { dungeonWorld } from '../game/dungeonWorld';
 import type { WalkWorld } from '../game/walker';
 import type { CellarView } from '../render/dungeon/CellarView';
@@ -30,10 +30,13 @@ export class CellarVisit {
   onDepth: ((below: boolean) => void) | null = null;
   /** Up the ladder: into the house's room (set by the game; the hatch is in it). */
   up: (() => Promise<void>) | null = null;
+  /** The note on the way down. */
+  entering: string;
 
   constructor(
     readonly cellar: Cellar,
-    private readonly house: TownBuilding,
+    /** Where the hero comes out when there is no room above (`up`): a house's door, a barrow's forecourt (x, z, yaw). */
+    private readonly house: { readonly door: readonly [number, number, number] },
     private readonly view: CellarView,
     private readonly player: Player,
     private readonly lantern: PointLight,
@@ -42,6 +45,7 @@ export class CellarVisit {
   ) {
     this.space = new DungeonSpace(cellar.layout);
     this.world = dungeonWorld(this.space, view.origin);
+    this.entering = `You climb down into the cellar of ${cellar.house}.`;
   }
 
   /** Go down (now: at once, no fade); `room` to stand in the middle of that room instead of at the ladder. */
@@ -58,7 +62,7 @@ export class CellarVisit {
         const r = this.cellar.layout.rooms[room];
         this.player.teleport(O.x + (r.x + r.w / 2) * CELL, O.y + r.level * STOREY, O.z + (r.z + r.d / 2) * CELL, h.yaw);
       } else this.player.teleport(O.x + h.x - fx * 1.0, O.y + h.y, O.z + h.z - fz * 1.0, h.yaw);
-      this.notes.say(`You climb down into the cellar of ${this.cellar.house}.`);
+      this.notes.say(this.entering);
     });
     if (!now) this.onSwap?.();
   }
@@ -112,7 +116,7 @@ export class CellarVisit {
     for (const r of d.read) this.read.add(r);
   }
 
-  /** The house's door above (x, z, yaw). */
+  /** The house's door above, or the barrow's forecourt (x, z, yaw). */
   get houseDoor(): readonly [number, number, number] { return this.house.door; }
 
   /** Where the hero is, for the HUD. */

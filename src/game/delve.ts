@@ -1,6 +1,6 @@
 /**
- * One cellar played (plan 8, 11.2): its den, the hero's fight in it, the bodies of the fallen and the
- * cellar's chests and hoard to search, and what of it is saved (who died, who was spared, what was
+ * One cellar played (plan 8, 11.2), or a band of the wild met on the land (sim/wild.ts): its den, the
+ * hero's fight with it, the bodies of the fallen and (in a cellar) the chests and hoard to search, and what of it is saved (who died, who was spared, what was
  * taken). The game feeds it the hero's pose every frame and turns its events into notes, sounds and the
  * HUD; the bot and the checks drive it the same way. Positions are the cellar's own frame. Pure.
  */
@@ -38,14 +38,15 @@ export class Delve {
   private readonly opened = new Set<number>();
   private readonly searched = new Set<number>();
 
-  constructor(readonly cellar: Cellar, space: DungeonSpace, private readonly setting: SettingModule, readonly hero: Character, seed: number, saved?: DelveSave) {
-    this.den = new Den(space, cellar.spawns, setting.creatures, deriveSeed(seed, 'den'), saved?.dead ?? []);
+  /** A cellar and its space, or (no cellar) a den already standing on its ground. */
+  constructor(readonly cellar: Cellar | null, ground: DungeonSpace | Den, private readonly setting: SettingModule, readonly hero: Character, seed: number, saved?: DelveSave) {
+    this.den = ground instanceof Den ? ground : new Den(ground, cellar?.spawns ?? [], setting.creatures, deriveSeed(seed, 'den'), saved?.dead ?? []);
     for (const id of saved?.spared ?? []) {
       const c = this.den.creatures[id];
       if (c && c.state !== 'dead') { c.state = 'meek'; c.act = 'stand'; }
     }
     this.fight = new Fight(hero, this.den, setting, seed);
-    this.hoards = hoardsOf(cellar, setting.creatures);
+    this.hoards = cellar ? hoardsOf(cellar, setting.creatures) : [];
     for (const h of saved?.opened ?? []) this.opened.add(h);
     for (const b of saved?.searched ?? []) this.searched.add(b);
     // The fallen not yet searched still carry what they had (rolled from their own seed).
@@ -55,8 +56,8 @@ export class Delve {
   /** The cellar is quiet: nobody left who would fight. */
   get beaten(): boolean { return this.den.beaten; }
 
-  step(dt: number, pose: HeroPose): FightEvent[] {
-    return this.fight.advance(dt, pose);
+  step(dt: number, pose: HeroPose, breathe = true): FightEvent[] {
+    return this.fight.advance(dt, pose, breathe);
   }
 
   /** The nearest thing within reach to search (a body with something on it, an unopened chest or hoard). */

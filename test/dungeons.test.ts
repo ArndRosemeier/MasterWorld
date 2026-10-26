@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveSeed } from '@futuremagic/core';
 import { nextSetPiece } from '../src/vgm/dungeons';
-import { SET_PIECES } from '../src/world/dungeon/setPieces';
+import { setPiecesFor } from '../src/world/dungeon/setPieces';
+
+const SET_PIECES = setPiecesFor('cellar');
 
 test('vgm: no set piece repeats until the library has been used through', () => {
   for (let w = 0; w < 5; w++) {

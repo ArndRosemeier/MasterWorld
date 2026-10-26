@@ -5,10 +5,10 @@
  */
 import type { TownPlan } from '@futuremagic/settlement';
 import type { Person } from '../sim/people';
-import type { CellarSketch } from '../world/dungeon/cellar';
+import { occupantId, type CellarSketch } from '../world/dungeon/cellar';
 
 export interface CellarHint {
-  /** The dungeon decision's id. */
+  /** The promise's id: the dungeon decision's, or the move-in's when new dwellers came. */
   readonly cellar: string;
   /** The building above (index into the town plan's buildings). */
   readonly building: number;
@@ -42,5 +42,5 @@ export function cellarHint(sketch: CellarSketch, people: readonly Person[], plan
       .slice(0, NEIGHBOURS).map(({ p }) => p);
     for (const p of [...inn, ...near]) told.push({ from: teller.id, to: p.id });
   }
-  return { cellar: sketch.decision.id, building: b, knowers, told };
+  return { cellar: occupantId(sketch), building: b, knowers, told };
 }

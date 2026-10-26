@@ -72,6 +72,14 @@ export class FightHud {
 
   set shown(on: boolean) { this.root.classList.toggle('hidden', !on); }
 
+  /** Every frame without a fight: only the gauges (no target, nothing to search). */
+  calm(hero: Character): void {
+    this.vial('health', hero.health, hero.maxHealth);
+    this.vial('stamina', hero.stamina, hero.maxStamina);
+    if (this.shownFor) { this.shownFor = null; this.target.classList.remove('shown'); }
+    this.prompt.classList.remove('shown');
+  }
+
   /** Every frame: the gauges, the belt, the target. */
   show(fight: Fight, hero: Character, search: string | null): void {
     this.vial('health', hero.health, hero.maxHealth);

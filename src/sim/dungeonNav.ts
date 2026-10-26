@@ -125,3 +125,70 @@ export class DungeonNav {
 }
 
 export const navKey = key;
+
+/** A point in a den's frame. */
+export interface P3 { readonly x: number; readonly y: number; readonly z: number }
+
+/**
+ * Where a den's creatures live and walk (sim/creatures.ts): a dungeon's rooms, or open land outside
+ * (sim/wild.ts). Homes are numbered (a room, a territory). Positions are the den's own frame.
+ */
+export interface DenGround {
+  /** A free point in home `home` to stand on. */
+  spot(home: number, rng: { range(a: number, b: number): number }): P3;
+  /** The floor under (x, z) near height y, or null. */
+  floorAt(x: number, z: number, y: number): number | null;
+  /** Free room around a point (metres; negative inside a wall). */
+  clearance(x: number, y: number, z: number): number;
+  /** Is there a clear line between two points at the height `eye` above each? */
+  sees(ax: number, ay: number, az: number, bx: number, by: number, bz: number, eye?: number): boolean;
+  /** The way from one point to another as points, the start left out (empty: no way). */
+  way(from: P3, to: P3): P3[];
+  /** Move a body by (dx, dz), sliding along what is in the way; null if it cannot move at all. */
+  slide(x: number, y: number, z: number, dx: number, dz: number, r: number): { x: number; z: number } | null;
+  /** A way off from `from`, as far from `q` as it goes (empty: nowhere). */
+  away(from: P3, q: P3): P3[];
+}
+
+/** A dungeon as a den's ground: its rooms are the homes. */
+export class DungeonGround implements DenGround {
+  readonly nav: DungeonNav;
+
+  constructor(readonly space: DungeonSpace) {
+    this.nav = new DungeonNav(space);
+  }
+
+  spot(room: number, rng: { range(a: number, b: number): number }): P3 {
+    const r = this.space.layout.rooms[room];
+    const x = (r.x + rng.range(0.25, r.w - 0.25)) * CELL, z = (r.z + rng.range(0.25, r.d - 0.25)) * CELL;
+    return { x, y: this.space.floorAt(x, z, r.level * STOREY + 1) ?? r.level * STOREY, z };
+  }
+
+  floorAt(x: number, z: number, y: number): number | null { return this.space.floorAt(x, z, y); }
+
+  clearance(x: number, y: number, z: number): number { return this.space.sdf(x, y + 0.5, z); }
+
+  sees(ax: number, ay: number, az: number, bx: number, by: number, bz: number, eye = 1.2): boolean { return this.nav.sees(ax, ay, az, bx, by, bz, eye); }
+
+  way(from: P3, to: P3): P3[] {
+    const a = this.nav.at(from.x, from.y + 0.3, from.z), b = this.nav.at(to.x, to.y + 0.3, to.z);
+    if (!a || !b) return [];
+    const way = this.nav.way(a, b, 60);
+    // In the same room (or the last step): straight to the point itself.
+    return way.length ? [...way.slice(0, -1), to] : this.nav.roomOf(a) === this.nav.roomOf(b) && this.nav.roomOf(a) >= 0 ? [to] : [];
+  }
+
+  slide(x: number, y: number, z: number, dx: number, dz: number, r: number): { x: number; z: number } | null { return this.nav.slide(x, y, z, dx, dz, r); }
+
+  /** The reachable cell that is farthest from `q`, within a few rooms. */
+  away(from: P3, q: P3): P3[] {
+    const a = this.nav.at(from.x, from.y + 0.3, from.z);
+    if (!a) return [];
+    let best: NavCell | null = null, score = -Infinity;
+    for (const { cell, d } of this.nav.distances(a, 24).values()) {
+      const p = this.nav.centre(cell), far = Math.hypot(p.x - q.x, p.z - q.z) - d * 0.3;
+      if (far > score) { score = far; best = cell; }
+    }
+    return best ? this.nav.way(a, best, 24) : [];
+  }
+}

@@ -56,10 +56,6 @@
     "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/world/volumes.ts",
-    "reason": "Stepping a point along a heading (x += cos(a) * d, z += sin(a) * d) in three unrelated places (title toys, grazing animals, the arch's feet); a two-line idiom, not a copied helper."
-  },
-  {
     "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/livestock.ts#step",
     "reason": "Each world-simulation behaviour advances by step(dt): dungeon creatures (sight, packs, fights) and grazing farm animals (wander in a paddock) share only the name."
   },
@@ -78,5 +74,65 @@
   {
     "key": "same name: masterworld/render/hero/HeroView.ts#dress + masterworld/world/dungeon/setPieces.ts#dress",
     "reason": "Dressing the hero in clothes vs dressing a dungeon room with a set piece's props; only the word matches."
+  },
+  {
+    "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/sim/creatures.ts + masterworld/sim/wild.ts",
+    "reason": "Bearing between two ground points (Math.atan2 of dz, dx): the plain formula, used where a body faces or flees; a helper would hide nothing."
+  },
+  {
+    "key": "idiom: [.from Array] in masterworld/render/terrain/groundTextures.ts + masterworld/sim/wild.ts + masterworld/world/flora.ts",
+    "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper."
+  },
+  {
+    "key": "same name: masterworld/app/cellars.ts#encounters + masterworld/app/wildLand.ts#encounters",
+    "reason": "Both hand their built encounters to stepEncounters (app/encounter.ts): one role, two owners (cellars, the wild)."
+  },
+  {
+    "key": "same name: masterworld/app/cellars.ts#inside + masterworld/app/interiorVisit.ts#inside",
+    "reason": "Each place builds its encounter's Arena (app/encounter.ts) as an object literal: a cellar's and a band's; one interface, two arenas."
+  },
+  {
+    "key": "same name: masterworld/app/cellars.ts#shown + masterworld/app/wildLand.ts#shown",
+    "reason": "Each place builds its encounter's Arena (app/encounter.ts) as an object literal: a cellar's and a band's; one interface, two arenas."
+  },
+  {
+    "key": "same name: masterworld/app/cellars.ts#step + masterworld/game/delve.ts#step",
+    "reason": "Per-frame step of unrelated things (the cellars' visits vs one fight); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/wildLand.ts#hudText + masterworld/render/folk/FolkView.ts#hudText",
+    "reason": "Each system's line on the debug HUD; only the name matches."
+  },
+  {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/wild.ts#step",
+    "reason": "Wilds.step steps each awake band's Den.step: the outer loop over dens, by design."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#away + masterworld/sim/people.ts#away",
+    "reason": "Unrelated: a den's way off from a threat vs a townsperson being away from home; only the name matches."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#away + masterworld/sim/wild.ts#away",
+    "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#clearance + masterworld/sim/wild.ts#clearance",
+    "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#floorAt + masterworld/sim/wild.ts#floorAt",
+    "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#sees + masterworld/sim/wild.ts#sees",
+    "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#slide + masterworld/sim/wild.ts#slide",
+    "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/wild.ts + masterworld/world/volumes.ts",
+    "reason": "A point at an angle and distance (x + cos a * d, z + sin a * d): the plain formula in unrelated places."
   }
 ]
