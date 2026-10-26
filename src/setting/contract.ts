@@ -536,6 +536,12 @@ export interface TalkDef {
   readonly marked: string;
   /** The line in the talk as the hero hands over the map to be marked (`{name}` who takes it). */
   readonly handOver: string;
+  /** Someone the guide sends over (vgm/guide.ts) as they come: a note (`{name}`); one is picked per person. */
+  readonly comes: readonly string[];
+  /** How they open the talk then: why they came over, leading to the news. */
+  readonly beckon: readonly string[];
+  /** The hero's own first journal page in a new game (`{inn}`: the inn as it is called): where to ask. */
+  readonly arrival: { readonly title: string; readonly text: string; readonly from: string };
 }
 
 /**

@@ -73,6 +73,8 @@ export class TownTalk {
   private readonly told = new Map<number, Atom>();
   /** People who know the hero from before (plan 11.4), and how they greet them. */
   private readonly friends = new Map<number, string>();
+  /** Sent over to the hero by the guide (vgm/guide.ts): they open with a hail, and their news glows. */
+  private readonly beckoned = new Set<number>();
   /** What each person offers besides talk (set by the game: trade, repairs, a room). */
   services: (person: number) => readonly Service[] = () => [];
 
@@ -176,6 +178,9 @@ export class TownTalk {
   /** The person's name. */
   nameOf(person: number): string { return this.byId.get(person)?.name ?? '?'; }
 
+  /** Where the person lives, as people call it ("the inn of the Hollin family"). */
+  homeCalled(person: number): string { return this.byId.get(person)?.house ?? '?'; }
+
   /** What a cellar is called in talk ("the cellar under the cottage of the Hollin family"). */
   cellarCalled(id: string): string { return this.cellarName.get(id) ?? id; }
 
@@ -186,10 +191,26 @@ export class TownTalk {
   /** A barrow's doorway on the land (the map marks it); null for a cellar (its house's door is marked). */
   siteOf(id: string): { readonly x: number; readonly z: number } | null { return this.cellarHouse.get(id)?.site ?? null; }
 
+  /** Who has heard of any of these promises (first-hand or told), by person id. */
+  knowersOf(ids: ReadonlySet<string>): Set<number> {
+    const out = new Set<number>();
+    for (const { hint } of this.cellars) {
+      if (!ids.has(hint.cellar)) continue;
+      for (const k of hint.knowers) out.add(k);
+      for (const t of hint.told) out.add(t.to);
+    }
+    return out;
+  }
+
+  /** The guide sent this person over (true) or they gave up waiting (false). */
+  beckon(person: number, on: boolean): void {
+    if (on) this.beckoned.add(person); else this.beckoned.delete(person);
+  }
+
   /** The topics the player can pick with this person now. */
   topics(person: number): Topic[] {
     const t = this.talk.topics;
-    const out: Topic[] = [{ id: 'self', label: t.self }, { id: 'news', label: t.news }];
+    const out: Topic[] = [{ id: 'self', label: t.self }, { id: 'news', label: t.news, ...(this.beckoned.has(person) ? { lead: true } : {}) }];
     // A cellar moved into again: only its newest story is a topic.
     this.leads.forEach((l, i) => {
       const place = (x: string) => this.cellarHouse.get(x)?.dungeon;
@@ -214,12 +235,16 @@ export class TownTalk {
     this.told.delete(person);
     const reply = this.respond(person, { function: 'greet' });
     const friend = this.friends.get(person);
-    return friend ? { ...reply, text: friend } : reply;
+    if (friend) return { ...reply, text: friend };
+    // Come over to the hero: they open with why (one of the setting's hails, the same for a person each time).
+    const hail = this.talk.beckon;
+    return this.beckoned.has(person) && hail.length ? { ...reply, text: hail[person % hail.length] } : reply;
   }
 
   /** Pick a topic. */
   ask(person: number, topic: string): Reply {
     if (topic === 'self') return this.respond(person, { function: 'social', topic: 'identity' });
+    if (topic === 'news') this.beckoned.delete(person);
     if (topic === 'news') return this.respond(person, { function: 'ask', query: { predicate: 'troubled' } });
     if (topic === 'more') return this.respond(person, { function: 'elaborate' });
     if (topic === 'source') {

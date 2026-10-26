@@ -1,7 +1,7 @@
 /**
  * The loop check (plan A6, design 11.3): a scripted hero plays an evening headless, the way a player
- * would: asks at the inn for news and hears a lead, walks there through the streets (or out over the land
- * to a barrow), goes down and clears it with the fight bot (game/bot.ts), searches the bodies and chests,
+ * would: a new hero on the market is hailed by someone who has heard of trouble (later evenings: asks at
+ * the inn for news) and hears a lead, walks there through the streets (or out over the land to a barrow), goes down and clears it with the fight bot (game/bot.ts), searches the bodies and chests,
  * climbs out, walks back, sells the finds, has the smith mend the gear, buys an upgrade, takes a room at
  * the inn and hears the next lead in the morning. A fall is played as designed (classic mode: the pack
  * stays where the hero fell, they wake at the inn or temple and go back for it). Every step is written to
@@ -16,6 +16,7 @@ import { talkCellar, townTalk } from '../talk/townTalk';
 import { openWorld } from '../vgm/builder';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
+import { hailer } from '../vgm/guide';
 import type { Decision, DungeonDecision } from '../world/decisions';
 import { moveIn, outlineCellar, type Cellar } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
@@ -155,6 +156,25 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     throw new Broke(`nobody in town tells of a new lead (open: ${open.map((o) => o.id).join(', ') || 'none'})`);
   };
 
+  /**
+   * A new hero on the market who asks nobody (vgm/guide.ts): someone who has heard of a promised place is
+   * sent over (stepping out of their door), opens with a hail, and their news is the first lead.
+   */
+  const hailed = (): DungeonDecision | Extract<Decision, { kind: 'move-in' }> => {
+    const open = openPromises(log);
+    const [mx, mz] = polyCentroid(town.plan.market);
+    const knows = talk.knowersOf(new Set(open.map((o) => o.id)));
+    const id = hailer(people.map((p) => { const d = town.plan.buildings[p.home].door; return { id: p.id, x: d[0], z: d[1], asleep: false, busy: p.role === 'child' }; }), knows, { x: mx, z: mz });
+    if (id === null) throw new Broke(`nobody who knows of a lead lives within reach of the market (${knows.size} know)`);
+    talk.beckon(id, true);
+    talk.greet(id);
+    const reply = talk.ask(id, 'news');
+    const lead = open.find((o) => reply.heard.includes(o.id));
+    if (!lead) throw new Broke(`person ${id} came over to the new hero but told of no lead: "${reply.text}"`);
+    say(`a new hero on the market: person ${id} comes over and tells of ${lead.id}`);
+    return lead;
+  };
+
   const heard = new Set<string>();
   try {
     promiseDue();
@@ -162,7 +182,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     for (let e = 0; e < evenings; e++) {
       say(`evening ${e + 1}: power ${hero.power}, ${hero.coins} copper, ${hero.pack.length} in the pack`);
       let paid = 0;
-      const lead = hearLead(heard);
+      const lead = e === 0 ? hailed() : hearLead(heard);
       heard.add(lead.id);
       const dungeon = lead.kind === 'dungeon' ? lead : (log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.id === lead.dungeon) ?? null);
       if (!dungeon) throw new Broke(`no dungeon for ${lead.id}`);

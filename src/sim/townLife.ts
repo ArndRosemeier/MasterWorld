@@ -53,12 +53,17 @@ export interface Agent {
   rng: Rng;
   /** Stopped for a talk with the player: stands, faces them, and goes on with the day when let go. */
   held?: boolean;
+  /** Sent over by the VGM (plan D27): walks up to (x, z), then waits there facing `face` until let go or `until`. */
+  seek?: { x: number; z: number; face: { x: number; z: number } };
 }
 
 export interface TownWeather {
   /** 0 dry .. 1 pouring. */
   rain: number;
 }
+
+/** The facing (as `Agent.dir`) from `a` towards (x, z). */
+const facing = (a: Agent, x: number, z: number): number => Math.atan2(z - a.z, x - a.x);
 
 /** A townsperson's radius as an obstacle (m). */
 const BODY = 0.28;
@@ -132,6 +137,7 @@ export class TownLife {
     for (const a of this.agents) {
       if (a.held) continue;
       if (a.act === 'walk') this.walk(a, dt);
+      else if (a.seek && this.time < a.until) continue;
       else if (this.time >= a.until || this.taskOf(a) !== a.task) this.choose(a, false);
     }
   }
@@ -141,7 +147,25 @@ export class TownLife {
     a.held = true;
     a.act = 'chat';
     a.hidden = false;
-    a.dir = Math.atan2(z - a.z, x - a.x);
+    a.dir = facing(a, x, z);
+  }
+
+  /**
+   * The VGM sends someone over (plan D27; vgm/guide.ts): they leave what they are doing (out of their door
+   * if indoors), walk along the streets to (x, z) and wait there `secs` facing `face`, then go on with their
+   * day. Sent again while on the way, they turn towards the new point.
+   */
+  seek(a: Agent, x: number, z: number, face: { x: number; z: number }, secs: number): void {
+    const was = a.spot >= 0 ? this.spots[a.spot] : null;
+    this.freeSpot(a);
+    a.spot = -1;
+    a.seek = { x, z, face: { ...face } };
+    a.next = 'chat';
+    a.until = this.time + secs;
+    a.path = this.wayTo(a, a.act === 'walk' ? null : was, x, z, null);
+    a.pi = 0;
+    a.act = 'walk';
+    a.hidden = false;
   }
 
   /** The talk is over: they pick up their day from here. */
@@ -197,7 +221,8 @@ export class TownLife {
   /** Pick the next thing to do and set off (or, `here`, start there at once). */
   private choose(a: Agent, here: boolean): void {
     const was = a.spot >= 0 ? this.spots[a.spot] : null;
-    if (was) { was.users--; if (was.seats?.[a.seat] === a.person.id) was.seats[a.seat] = -1; }
+    this.freeSpot(a);
+    a.seek = undefined;
     a.task = this.taskOf(a);
     const pick = this.pick(a);
     a.spot = pick.spot;
@@ -225,6 +250,12 @@ export class TownLife {
     a.hidden = false;
   }
 
+  /** Give up the spot (and seat) the agent holds. */
+  private freeSpot(a: Agent): void {
+    const was = a.spot >= 0 ? this.spots[a.spot] : null;
+    if (was) { was.users--; if (was.seats?.[a.seat] === a.person.id) was.seats[a.seat] = -1; }
+  }
+
   private arrive(a: Agent, x: number, z: number, dir: number): void {
     a.x = x; a.z = z; a.dir = dir;
     a.act = a.next;
@@ -245,7 +276,8 @@ export class TownLife {
       const s = a.spot >= 0 ? this.spots[a.spot] : null;
       // The turn starts on arrival: its length counts from now.
       const length = a.until - this.time;
-      this.arrive(a, a.x, a.z, s ? s.dir : a.dir);
+      const f = a.seek?.face;
+      this.arrive(a, a.x, a.z, f ? facing(a, f.x, f.z) : s ? s.dir : a.dir);
       a.until = this.time + Math.max(length, 5);
     }
   }

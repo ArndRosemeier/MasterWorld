@@ -147,11 +147,11 @@ export class Player {
     this.heroCam.trail(this.toHead(), 0);
   }
 
-  /** A talk's view of the one at (x, z) on the hero's ground, over the hero's shoulder (`on`), or trailing again. */
-  frameTalk(on: boolean, x?: number, z?: number): void {
+  /** A talk's view of the one at (x, z) on the hero's ground, over the hero's shoulder and past `others` (`on`), or trailing again. */
+  frameTalk(on: boolean, x?: number, z?: number, others: readonly { x: number; z: number }[] = []): void {
     if (this.flying) return;
     const at = on && x !== undefined && z !== undefined ? new Vector3(x, this.walker.pos.y + TALK_AIM, z) : undefined;
-    this.heroCam.frameTalk(on, this.toHead(), at);
+    this.heroCam.frameTalk(on, this.toHead(), at, others);
   }
 
   update(dt: number): void {
