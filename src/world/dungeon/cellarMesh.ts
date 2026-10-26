@@ -2,13 +2,20 @@
  * A cellar as meshes (pure): walls, floors, ceilings, stairs and door frames in one static mesh; each
  * door with a state (locked, barred, hidden) as its own piece, so it can vanish when it opens; the props.
  * Positions in the cellar's own frame (metres), in the building format, drawn with the building shader.
+ *
+ * Hand-made, not boxes: walls of limewash, rubble, brick or ashlar by the room's use and age, flagstone and
+ * earth floors, plank ceilings on joists; damp darkens every wall's foot and soot its top (tints per
+ * corner); the props are AssetGenerator's (propModels.ts) when their pack is given, the simple kit pieces
+ * otherwise (tests, tools); torch sconces where torchSpots says.
  */
 import { DIRS, type Door, type PathCell, type PlacedLink } from '@futuremagic/dungeon';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import type { DungeonProp } from '../../setting/contract';
-import { CELL, STOREY, type Cellar, type Prop } from './cellar';
-import { BuildingMat as M, MeshKit, type Tint } from './meshKit';
+import { CELL, STOREY, cellIn, type Cellar, type Prop } from './cellar';
+import { BuildingMat as M, CellarMat as C, MeshKit, type Tint } from './meshKit';
+import { stampModel, type PropModels, type Stamp } from './propModels';
 import { DOOR_W, PASSAGE_H, isFeature, stairDrop } from './space';
+import { TORCH_OUT, torchSpots } from './torches';
 import { Rng, deriveSeed } from '@futuremagic/core';
 
 /** Height of a door's opening. */
@@ -27,8 +34,31 @@ export interface CellarMeshes {
   readonly doors: DoorPiece[];
 }
 
-const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], LIME: Tint = [214, 206, 190], EARTH: Tint = [120, 96, 72];
-const FLAG: Tint = [128, 118, 102], OAK: Tint = [120, 90, 62], DARK_OAK: Tint = [84, 62, 44], IRON: Tint = [60, 60, 64];
+const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], EARTH: Tint = [120, 96, 72];
+const OAK: Tint = [120, 90, 62], DARK_OAK: Tint = [84, 62, 44], IRON: Tint = [60, 60, 64];
+/** Tints on the cellar's own textures (they carry their colour; these only age them). */
+const WASH: Tint = [236, 228, 210], FLAGS: Tint = [214, 206, 192], OLD_FLAGS: Tint = [188, 186, 180], BRICK: Tint = [214, 200, 188];
+const RAFTERS: Tint = [168, 146, 124], DIRT: Tint = [176, 160, 140];
+
+/** A wall's look: its layer, tint, and how damp its foot is (0 dry .. 1 wet). */
+interface WallLook { readonly mat: number; readonly tint: Tint; readonly damp: number }
+
+const scaleTint = (t: Tint, k: number): Tint => [Math.round(t[0] * k), Math.round(t[1] * k), Math.round(t[2] * k)];
+
+/**
+ * A wall face from (px, pz) to (qx, qz), h0 .. h1, on a storey from `floor` to `top`: cut at the bands so
+ * damp darkens the first 0.8 m up from the floor and soot the last half metre under the ceiling.
+ */
+function grimyWall(kit: MeshKit, px: number, pz: number, qx: number, qz: number, h0: number, h1: number, floor: number, top: number, look: WallLook, u0: number): void {
+  const foot = 0.8, soot = 0.5;
+  const grimeAt = (y: number): Tint => {
+    const f = Math.min(1, Math.max(0, (y - floor) / foot)), t = Math.min(1, Math.max(0, (top - y) / soot));
+    const k = (0.5 + 0.5 * f * f - 0.15 * look.damp * (1 - f)) * (0.72 + 0.28 * t);
+    return scaleTint(look.tint, Math.max(0.25, k));
+  };
+  const cuts = [h0, floor + foot * 0.5, floor + foot, top - soot, h1].filter((y, i, a) => i === 0 || i === a.length - 1 || (y > h0 + 0.01 && y < h1 - 0.01)).sort((a, b) => a - b);
+  for (let i = 0; i + 1 < cuts.length; i++) kit.wall(px, pz, qx, qz, cuts[i], cuts[i + 1], look.mat, look.tint, u0, grimeAt(cuts[i]), grimeAt(cuts[i + 1]));
+}
 
 /** Corners of side `k` of cell (i, j), travelling so that the face looks into the cell. */
 function sideEdge(i: number, j: number, k: number): [number, number, number, number] {
@@ -36,14 +66,17 @@ function sideEdge(i: number, j: number, k: number): [number, number, number, num
   return k === 0 ? [x1, z1, x1, z0] : k === 1 ? [x0, z1, x1, z1] : k === 2 ? [x0, z0, x0, z1] : [x1, z0, x0, z0];
 }
 
-/** A wall face on side k of a cell from y0 to y1, with an optional hole (lateral s0..s1 along the face, height h0..h1). */
-function wallWithHole(kit: MeshKit, i: number, j: number, k: number, y0: number, y1: number, hole: [number, number, number, number] | null, mat: M, tint: Tint): void {
+/**
+ * A wall face on side k of a cell from y0 to y1, with an optional hole (lateral s0..s1 along the face, height
+ * h0..h1); its grime runs from `floor` to `top` (default y0 .. y1).
+ */
+function wallWithHole(kit: MeshKit, i: number, j: number, k: number, y0: number, y1: number, hole: [number, number, number, number] | null, look: WallLook, floor = y0, top = y1): void {
   const [ax, az, bx, bz] = sideEdge(i, j, k);
   const along = (s: number) => [ax + ((bx - ax) * s) / CELL, az + ((bz - az) * s) / CELL];
   const seg = (s0: number, s1: number, h0: number, h1: number) => {
     if (s1 - s0 < 0.005 || h1 - h0 < 0.005) return;
     const [px, pz] = along(s0), [qx, qz] = along(s1);
-    kit.wall(px, pz, qx, qz, h0, h1, mat, tint, s0 + i * 0.37 + j * 0.71);
+    grimyWall(kit, px, pz, qx, qz, h0, h1, floor, top, look, s0 + i * 0.37 + j * 0.71);
   };
   if (!hole) { seg(0, CELL, y0, y1); return; }
   const [s0, s1, h0, h1] = hole;
@@ -53,11 +86,18 @@ function wallWithHole(kit: MeshKit, i: number, j: number, k: number, y0: number,
   seg(s0, s1, Math.min(y1, h1), y1);
 }
 
-export function cellarMeshes(c: Cellar): CellarMeshes {
+/** Room uses whose walls are limewashed (lived-in, kept) and whose are brick (old vaults, cells). */
+const WASHED = new Set(['store', 'counting-room', 'herb-store', 'bunks', 'refuge', 'wine-store', 'lookout']);
+const BRICKED = new Set(['cistern', 'watch-cells', 'ward-niche', 'cask-hall']);
+const EARTHEN = new Set(['burrow', 'rat-nest', 'coal-hole', 'collapse', 'flooded-way']);
+const WET = new Set(['cistern', 'flooded-way']);
+
+/** `models`: AssetGenerator's props (public/props/cellar.fmpk); without them, the kit pieces. */
+export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
   const shell = new MeshKit(), propKit = new MeshKit();
   const L = c.layout;
   const owner = (i: number, j: number, l: number) => {
-    for (const r of L.rooms) if (i >= r.x && i < r.x + r.w && j >= r.z && j < r.z + r.d && l >= r.level && l < r.level + r.height) return r.id;
+    for (const r of L.rooms) if (cellIn(r, i, j) && l >= r.level && l < r.level + r.height) return r.id;
     return undefined;
   };
   // Path cells by key, and which path they belong to.
@@ -87,20 +127,29 @@ export function cellarMeshes(c: Cellar): CellarMeshes {
     return [CELL / 2 - DOOR_W / 2, CELL / 2 + DOOR_W / 2, lv * STOREY, lv * STOREY + DOOR_H];
   };
   const eraOf = (room: number) => c.rooms[room].era;
-  const wallMat = (room: number): [M, Tint] => room === c.graph.entrance ? [M.Plaster, LIME] : eraOf(room) === 'older' ? [M.Ashlar, OLD] : c.rooms[room].use.id === 'burrow' ? [M.Rubble, EARTH] : [M.Rubble, STONE];
+  const useOf = (room: number) => c.rooms[room].use.id;
+  const wallLook = (room: number): WallLook => {
+    const use = useOf(room), damp = WET.has(use) ? 1 : eraOf(room) === 'older' ? 0.6 : 0.3;
+    if (room === c.graph.entrance || WASHED.has(use)) return { mat: C.Limewash, tint: WASH, damp };
+    if (EARTHEN.has(use)) return { mat: M.Rubble, tint: EARTH, damp };
+    if (BRICKED.has(use)) return { mat: C.Brick, tint: BRICK, damp };
+    return eraOf(room) === 'older' ? { mat: M.Ashlar, tint: OLD, damp } : { mat: M.Rubble, tint: STONE, damp };
+  };
+  const floorLook = (room: number): [number, Tint] => EARTHEN.has(useOf(room)) ? [C.Earth, DIRT] : eraOf(room) === 'older' ? [C.Flagstone, OLD_FLAGS] : [C.Flagstone, FLAGS];
 
-  // Rooms: floor, ceiling (beams under the house's storey), walls per storey with their openings.
+  // Rooms: floor, ceiling (planks on joists under the house's storey; older: a brick vault's flat), walls per storey with their openings.
   for (const r of L.rooms) {
-    const [wm, wt] = wallMat(r.id);
+    const look = wallLook(r.id);
     const y0 = r.level * STOREY, y1 = (r.level + r.height) * STOREY;
     const older = eraOf(r.id) === 'older';
-    shell.flat(r.x * CELL, r.z * CELL, (r.x + r.w) * CELL, (r.z + r.d) * CELL, y0, true, older ? M.Ashlar : M.Ashlar, older ? OLD : FLAG);
-    shell.flat(r.x * CELL, r.z * CELL, (r.x + r.w) * CELL, (r.z + r.d) * CELL, y1, false, older ? M.Ashlar : M.Oak, older ? OLD : DARK_OAK);
+    const [fm, ft] = floorLook(r.id);
+    shell.flat(r.x * CELL, r.z * CELL, (r.x + r.w) * CELL, (r.z + r.d) * CELL, y0, true, fm, ft);
+    shell.flat(r.x * CELL, r.z * CELL, (r.x + r.w) * CELL, (r.z + r.d) * CELL, y1, false, older ? C.Brick : C.Boards, older ? scaleTint(BRICK, 0.8) : RAFTERS);
     if (!older) for (let b = 0.6; b < r.w * CELL - 0.3; b += 1.4) shell.box(r.x * CELL + b, y1 - 0.22, (r.z + r.d / 2) * CELL, 0.2, 0.22, r.d * CELL, 0, M.Oak, DARK_OAK);
     for (let j = r.z; j < r.z + r.d; j++) for (let i = r.x; i < r.x + r.w; i++) for (let k = 0; k < 4; k++) {
       const ni = i + DIRS[k][0], nj = j + DIRS[k][1];
-      if (ni >= r.x && ni < r.x + r.w && nj >= r.z && nj < r.z + r.d) continue;
-      for (let lv = r.level; lv < r.level + r.height; lv++) wallWithHole(shell, i, j, k, lv * STOREY, (lv + 1) * STOREY, hole(i, j, lv, k), wm, wt);
+      if (cellIn(r, ni, nj)) continue;
+      for (let lv = r.level; lv < r.level + r.height; lv++) wallWithHole(shell, i, j, k, lv * STOREY, (lv + 1) * STOREY, hole(i, j, lv, k), look, y0, y1);
     }
   }
   // Passages: floor, ceiling, walls; stairs as steps.
@@ -108,12 +157,13 @@ export function cellarMeshes(c: Cellar): CellarMeshes {
     for (const cell of pl.path) {
       const { x: i, z: j, level: l } = cell;
       const old = l < 0;
-      const [wm, wt]: [M, Tint] = pl.link.tags.includes('dug') ? [M.Rubble, EARTH] : old ? [M.Ashlar, OLD] : [M.Rubble, STONE];
+      const dug = pl.link.tags.includes('dug');
+      const look: WallLook = dug ? { mat: M.Rubble, tint: EARTH, damp: 0.5 } : old ? { mat: C.Brick, tint: BRICK, damp: 0.6 } : { mat: M.Rubble, tint: STONE, damp: 0.3 };
       const top = l * STOREY, ceil = top + PASSAGE_H;
       const st = cell.stair;
       const lo = st ? top - stairDrop(cell, (i + (st.dir === 0 ? 1 : st.dir === 2 ? 0 : 0.5)) * CELL, (j + (st.dir === 1 ? 1 : st.dir === 3 ? 0 : 0.5)) * CELL) : top;
-      shell.flat(i * CELL, j * CELL, (i + 1) * CELL, (j + 1) * CELL, ceil, false, M.Oak, DARK_OAK);
-      if (!st) shell.flat(i * CELL, j * CELL, (i + 1) * CELL, (j + 1) * CELL, top, true, M.Ashlar, FLAG);
+      shell.flat(i * CELL, j * CELL, (i + 1) * CELL, (j + 1) * CELL, ceil, false, old ? C.Brick : C.Boards, old ? scaleTint(BRICK, 0.8) : RAFTERS);
+      if (!st) shell.flat(i * CELL, j * CELL, (i + 1) * CELL, (j + 1) * CELL, top, true, dug ? C.Earth : C.Flagstone, dug ? DIRT : old ? OLD_FLAGS : FLAGS);
       else {
         // Steps: four per cell, solid down to the bottom of the flight.
         const steps = 4, d = st.dir, base = top - ((st.step + 1) / st.run) * STOREY;
@@ -121,7 +171,7 @@ export function cellarMeshes(c: Cellar): CellarMeshes {
           const t0 = s / steps, t1 = (s + 1) / steps, h = top - ((st.step + t0 + 0.5 / steps) / st.run) * STOREY;
           const a0 = d === 0 || d === 1 ? t0 : 1 - t1, a1 = d === 0 || d === 1 ? t1 : 1 - t0;
           const [x0, x1, z0, z1] = d % 2 === 0 ? [i + a0, i + a1, j, j + 1] : [i, i + 1, j + a0, j + a1];
-          shell.box(((x0 + x1) / 2) * CELL, base, ((z0 + z1) / 2) * CELL, (x1 - x0) * CELL, h - base, (z1 - z0) * CELL, 0, M.Ashlar, FLAG);
+          shell.box(((x0 + x1) / 2) * CELL, base, ((z0 + z1) / 2) * CELL, (x1 - x0) * CELL, h - base, (z1 - z0) * CELL, 0, dug ? C.Earth : C.Flagstone, dug ? DIRT : FLAGS);
         }
       }
       for (let k = 0; k < 4; k++) {
@@ -136,8 +186,8 @@ export function cellarMeshes(c: Cellar): CellarMeshes {
             const nf = n.stair ? n.level * STOREY - ((n.stair.step + (k === n.stair.dir ? 0 : 1)) / n.stair.run) * STOREY : n.level * STOREY;
             gap = [0, CELL, Math.min(nf, gap?.[2] ?? Infinity), Math.max((n.stair ? n.level * STOREY : nf) + PASSAGE_H, gap?.[3] ?? -Infinity)];
           }
-          wallWithHole(shell, i, j, k, bottom, ceil, gap, wm, wt);
-        } else if (!same(l)) wallWithHole(shell, i, j, k, top, ceil, hole(i, j, l, k), wm, wt);
+          wallWithHole(shell, i, j, k, bottom, ceil, gap, look, lo, ceil);
+        } else if (!same(l)) wallWithHole(shell, i, j, k, top, ceil, hole(i, j, l, k), look);
       }
     }
   });
@@ -173,7 +223,13 @@ export function cellarMeshes(c: Cellar): CellarMeshes {
         const pale: Tint = c.setPiece.tint && pl.link.id === c.pieceLink ? [...c.setPiece.tint] as unknown as Tint : STONE;
         kit.box(mx, y, mz, DOOR_W + 0.02, DOOR_H + 0.02, 0.24, yaw, M.Rubble, pale);
       } else {
-        kit.box(mx, y, mz, DOOR_W, DOOR_H, 0.08, yaw, M.Oak, OAK);
+        const leaf = models?.get(kind === 'locked' ? 'door_sturdy' : 'door_plank');
+        if (leaf) {
+          // The leaf's origin is its hinge: start it at the left post.
+          const w = leaf.max[0] - leaf.min[0], sx = DOOR_W / w, sy = DOOR_H / (leaf.max[1] - leaf.min[1]);
+          const c0 = Math.cos(yaw), s0 = Math.sin(yaw);
+          stampModel(kit, leaf, { x: mx - c0 * (DOOR_W / 2 + leaf.min[0] * sx), y, z: mz + s0 * (DOOR_W / 2 + leaf.min[0] * sx), yaw, scale: [sx, sy, 1] });
+        } else kit.box(mx, y, mz, DOOR_W, DOOR_H, 0.08, yaw, M.Oak, OAK);
         if (kind === 'locked') kit.box(mx + ux * 0.45 - out[0] * 0.06, y + 1.0, mz + uz * 0.45 - out[1] * 0.06, 0.12, 0.16, 0.04, yaw, M.Slate, IRON);
         // The bar sits on the far side (the side it is opened from).
         else kit.box(mx + out[0] * 0.12, y + 1.1, mz + out[1] * 0.12, DOOR_W + 0.3, 0.14, 0.1, yaw, M.Oak, DARK_OAK);
@@ -182,8 +238,118 @@ export function cellarMeshes(c: Cellar): CellarMeshes {
     }
   });
 
-  for (const p of c.props) prop(propKit, p);
+  for (const p of c.props) if (!models || !modelProp(propKit, p, models)) prop(propKit, p);
+  if (models) dress(propKit, c, models);
+  for (const t of torchSpots(c)) sconce(shell, t.x, t.y, t.z, t.nx, t.nz);
   return { shell: shell.mesh(), props: propKit.mesh(), doors };
+}
+
+/** A torch in an iron sconce, its flame (lit by the lights) at (x, y, z), the wall behind it along -n. */
+function sconce(k: MeshKit, x: number, y: number, z: number, nx: number, nz: number): void {
+  const yaw = Math.atan2(nx, nz);
+  const wx = x - nx * TORCH_OUT, wz = z - nz * TORCH_OUT;
+  k.box(wx + nx * 0.02, y - 0.42, wz + nz * 0.02, 0.1, 0.22, 0.04, yaw, M.Slate, IRON); // wall plate
+  k.box(x - nx * 0.12, y - 0.36, z - nz * 0.12, 0.03, 0.03, 0.22, yaw, M.Slate, IRON); // arm
+  k.cylinder(x, y - 0.38, z, 0.045, 0.06, 8, M.Slate, IRON); // ring
+  k.cylinder(x, y - 0.5, z, 0.028, 0.44, 6, M.Oak, DARK_OAK); // shaft
+  k.cylinder(x, y - 0.08, z, 0.05, 0.1, 8, M.Thatch, [70, 52, 38]); // pitch-soaked head
+}
+
+/** Props drawn with AssetGenerator's models; false if the kind has none (the kit draws it). */
+function modelProp(k: MeshKit, p: Prop, models: PropModels): boolean {
+  const { x, y, z, yaw } = p;
+  const rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), p.kind));
+  const fwd = [Math.sin(yaw), Math.cos(yaw)];
+  const spot = (u: number, w: number) => [x + Math.cos(yaw) * u + fwd[0] * w, z - Math.sin(yaw) * u + fwd[1] * w];
+  const stampAs = (name: string, s: Partial<Stamp> & { x: number; z: number }): boolean => {
+    const m = models.get(name);
+    if (!m) return false;
+    stampModel(k, m, { y, yaw, shade: rng.range(0.85, 1.12), ...s });
+    return true;
+  };
+  switch (p.kind) {
+    case 'barrel': return stampAs('prop_barrel', { x, z, yaw: rng.range(0, 6.28), round: true });
+    case 'cask': {
+      // Two casks on their sides in a cradle.
+      k.box(x, y, z, 1.5, 0.14, 0.5, yaw, M.Oak, DARK_OAK);
+      for (const u of [-0.4, 0.4]) { const [a, b] = spot(u, 0); stampAs('prop_barrel', { x: a, y: y + 0.12, z: b, yaw: yaw + Math.PI / 2, roll: Math.PI / 2, round: true, scale: [1.15, 1.05, 1.15] }); }
+      return true;
+    }
+    case 'vat': return stampAs('prop_barrel', { x, z, yaw: rng.range(0, 6.28), round: true, scale: [2.1, 1.45, 2.1] });
+    case 'crate': {
+      stampAs('prop_crate', { x, z, yaw: yaw + rng.range(-0.3, 0.3), across: true, scale: [1.15, 1.1, 1.15] });
+      if (rng.chance(0.5)) stampAs('prop_crate', { x: x + rng.range(-0.06, 0.06), y: y + 0.6, z: z + rng.range(-0.06, 0.06), yaw: yaw + rng.range(-0.5, 0.5), across: true, scale: [0.9, 0.85, 0.9] });
+      return true;
+    }
+    case 'bin': return stampAs('prop_crate', { x, z, across: true, scale: [1.7, 1.4, 1.1] });
+    case 'shelf': case 'rack': {
+      stampAs('furn_cellar_shelf', { x, z, scale: [p.kind === 'shelf' ? 0.9 : 1, 0.95, 1] });
+      // Bottles, jars and candles on the boards.
+      const boards = [0.06, 0.66, 1.26];
+      for (let s = 0; s < 6; s++) {
+        const [a, b] = spot(-0.6 + s * 0.24, 0);
+        const yy = y + boards[s % 3] + 0.05;
+        if (p.kind === 'rack') k.cylinder(a, yy, b, 0.045, 0.3, 6, M.Glass, [40, 60, 40]);
+        else if (!stampAs('sculpt_clay_urn', { x: a, y: yy, z: b, yaw: rng.range(0, 6.28), round: true, scale: [0.28, 0.32, 0.28] })) return true;
+      }
+      return true;
+    }
+    case 'table': {
+      const [a, b] = spot(0, -0.3);
+      stampAs('furn_kitchen_table', { x: a, z: b, across: true });
+      if (rng.chance(0.6)) stampAs('prop_candles', { x: a + rng.range(-0.3, 0.3), y: y + 0.77, z: b + rng.range(-0.15, 0.15), round: true });
+      return true;
+    }
+    case 'stool': return stampAs('furn_chair', { x, z, yaw: yaw + rng.range(-0.6, 0.6) });
+    case 'cot': return stampAs('furn_bed', { x, z, yaw: yaw + Math.PI / 2, across: true, scale: [0.6, 0.6, 0.9] });
+    case 'chest': return stampAs('furn_chest', { x, z, across: true });
+    case 'candle': return stampAs('prop_candles', { x, z, round: true });
+    case 'lantern': return stampAs('prop_crypt_lantern', { x, z, round: true });
+    case 'bones': return stampAs('prop_bone_pile', { x, z, yaw: rng.range(0, 6.28), scale: [0.9, 0.7, 0.9] });
+    case 'jar': return stampAs('sculpt_clay_urn', { x, z, yaw: rng.range(0, 6.28), round: true, scale: [0.55, 0.6, 0.55] });
+    case 'rubble': {
+      for (let n = 0; n < 6; n++) stampAs(n < 2 ? 'rock_chunk_angular' : 'rock_cobble_worn', { x: x + rng.range(-0.5, 0.5), z: z + rng.range(-0.5, 0.5), yaw: rng.range(0, 6.28), scale: n < 2 ? [0.45, 0.4, 0.45] : [0.8, 0.9, 0.8] });
+      return true;
+    }
+    default: return false;
+  }
+}
+
+/** Small things left about (not in anyone's way): buckets, rope, a skull, stones; by the room's use. */
+const LITTER: Readonly<Record<string, readonly string[]>> = {
+  store: ['prop_bucket', 'prop_rope_coil'], 'grain-store': ['prop_bucket'], cooperage: ['prop_bucket', 'prop_rope_coil'],
+  brewhouse: ['prop_bucket'], 'cask-hall': ['prop_bucket'], 'smugglers-store': ['prop_rope_coil', 'prop_bucket'],
+  bunks: ['prop_bucket'], hideout: ['prop_rope_coil', 'prop_candles'], 'watch-cells': ['prop_skull', 'rock_cobble_worn'],
+  guardroom: ['prop_bucket', 'prop_skull'], burrow: ['prop_skull', 'rock_cobble_worn'], 'rat-nest': ['prop_skull'],
+  'web-hall': ['prop_skull'], collapse: ['rock_cobble_worn', 'rock_cobble_worn'], 'old-hall': ['rock_cobble_worn'],
+  'realm-store': ['rock_cobble_worn'], cistern: ['rock_cobble_worn'], refuge: ['prop_candles'],
+};
+
+/** Litter along the walls of every room, clear of the doors and the props already standing. */
+function dress(k: MeshKit, c: Cellar, models: PropModels): void {
+  const L = c.layout;
+  const doors = L.links.flatMap((pl) => pl.doors.map((d) => [(d.x + 0.5 + DIRS[d.dir][0] * 0.5) * CELL, (d.z + 0.5 + DIRS[d.dir][1] * 0.5) * CELL, d.level]));
+  for (const r of L.rooms) {
+    const kinds = LITTER[c.rooms[r.id].use.id];
+    if (!kinds) continue;
+    const rng = new Rng(deriveSeed(c.decision.seed, 'litter', r.id));
+    const taken = c.props.filter((p) => p.room === r.id).map((p) => [p.x, p.z]);
+    const y = r.level * STOREY;
+    for (let n = 0, tries = 0; n < kinds.length + 1 && tries < 24; tries++) {
+      const name = kinds[n % kinds.length];
+      const m = models.get(name);
+      if (!m) break;
+      // A spot a little in from a random wall.
+      const side = rng.int(0, 3), t = rng.range(0.15, 0.85), inset = 0.35;
+      const x0 = r.x * CELL + inset, x1 = (r.x + r.w) * CELL - inset, z0 = r.z * CELL + inset, z1 = (r.z + r.d) * CELL - inset;
+      const x = side === 0 ? x0 : side === 1 ? x1 : x0 + (x1 - x0) * t, z = side === 2 ? z0 : side === 3 ? z1 : z0 + (z1 - z0) * t;
+      if (doors.some((d) => d[2] === r.level && Math.hypot(d[0] - x, d[1] - z) < 1.3)) continue;
+      if (taken.some((q) => Math.hypot(q[0] - x, q[1] - z) < 0.9)) continue;
+      taken.push([x, z]);
+      stampModel(k, m, { x, y, z, yaw: rng.range(0, 6.28), shade: rng.range(0.85, 1.1), round: name !== 'prop_rope_coil' && name !== 'rock_cobble_worn', scale: name === 'rock_cobble_worn' ? [0.6, 0.7, 0.6] : undefined });
+      n++;
+    }
+  }
 }
 
 /** One prop from the kit of simple pieces. */

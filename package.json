@@ -10,6 +10,7 @@
   },
   "scripts": {
     "packs": "node tools/packs/actors.mjs",
+    "props": "node tools/props/pack.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
@@ -29,6 +30,7 @@
     "@futuremagic/creatures": "file:vendor/assetgenerator/packages/creatures",
     "@futuremagic/dungeon": "file:vendor/assetgenerator/packages/dungeon",
     "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",
+    "@futuremagic/props": "file:vendor/assetgenerator/packages/props",
     "@futuremagic/settlement": "file:vendor/assetgenerator/packages/settlement",
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",
     "@futuremagic/stage": "file:vendor/assetgenerator/packages/stage",

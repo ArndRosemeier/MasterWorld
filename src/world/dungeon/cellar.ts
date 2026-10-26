@@ -20,6 +20,9 @@ import { setPieceById, type SetPieceDef } from './setPieces';
 /** Metres per layout cell, per storey, and stairs per storey (cells). */
 export const CELL = 2;
 export const STOREY = 2.8;
+
+/** Cell (i, j) lies in the room's footprint. */
+export const cellIn = (r: { x: number; z: number; w: number; d: number }, i: number, j: number): boolean => i >= r.x && i < r.x + r.w && j >= r.z && j < r.z + r.d;
 export const STAIR_RUN = 2;
 
 export type HistoryLayer = 'built' | 'older' | 'trouble' | 'now';
@@ -225,7 +228,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     const doors = doorsOf(room).filter((dr) => dr.level === R.level);
     for (let z = R.z; z < R.z + R.d; z++) for (let x = R.x; x < R.x + R.w; x++) for (let k = 0; k < 4; k++) {
       const nx = x + DIRS[k][0], nz = z + DIRS[k][1];
-      if (nx >= R.x && nx < R.x + R.w && nz >= R.z && nz < R.z + R.d) continue;
+      if (cellIn(R, nx, nz)) continue;
       if (doors.some((dr) => dr.x === x && dr.z === z)) continue;
       out.push({ x, z, dir: k });
     }
