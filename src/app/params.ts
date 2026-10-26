@@ -67,10 +67,14 @@ export const params = {
   moved: q.has('moved'),
   /** Start inside a building of the town: `room=inn` (the first of that kind), `room=12` (building 12) or `room=cellar` (the cellar's house, with its hatch). */
   room: q.get('room'),
-  /** Start in a talk (for screenshots): `talk=inn` with the innkeeper, `talk=house` with the cellar's household; `topics=news,source` asked first. */
+  /** Start in a talk (for screenshots): `talk=inn` with the innkeeper, `talk=smith` with the smith, `talk=house` with the cellar's household; `topics=news,source` asked first (`topics=repair` opens the smith's bench). */
   talk: q.get('talk'),
   topics: q.get('topics')?.split(',') ?? [],
-  /** Open the map (or `journal`, `saves`, `pack`) at the start, after any `talk`. */
+  /** The hero's gear starts this worn (for looking at the smith's bench): `wear=0.6`, the main hand most, the rest less. */
+  wear: Math.min(1, Math.max(0, Number(q.get('wear') ?? 0))),
+  /** Lay remains in front of the start (for screenshots): `remains=pack` or `remains=grave`. */
+  remains: q.get('remains'),
+  /** Open the map (or `journal`, `saves`, `pack`, `tale`: a roguelike end) at the start, after any `talk`. */
   open: q.get('open'),
   /** The title's giant in this fly-over, whatever the draw says (for looking at it). */
   giant: q.has('giant'),

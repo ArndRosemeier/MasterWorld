@@ -15,6 +15,8 @@ export interface Item {
   /** Skill id → points while worn. */
   readonly bonuses: Readonly<Record<string, number>>;
   readonly lore?: string;
+  /** How worn it is (game/upkeep.ts): 0 new .. 1 broken; absent: new. */
+  readonly wear?: number;
 }
 
 export interface Loot {

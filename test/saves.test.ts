@@ -5,7 +5,7 @@ import { SAVE_VERSION, checkSave, saveLabel, type SaveData } from '../src/app/sa
 const save: SaveData = {
   version: SAVE_VERSION, game: '0.001', setting: { id: 'classic', version: 1 }, seed: 'masterworld', log: [],
   clock: { day: 1, hour: 14.5 }, hero: { x: 1, y: 2, z: 3, yaw: 0, below: false }, cellars: { 'cellar-1': { open: [2], keys: [1], read: [0] } },
-  talk: null, journal: [], character: null, director: null,
+  talk: null, journal: [], character: null, director: null, mode: 'classic', remains: [],
   looks: { name: 'Wenna', look: { race: 'dwarf', body: { gender: 0.1, ageYears: 33 }, outfit: ['briefs', 'med-tunic'], garmentColors: { 'med-tunic': '#7a3a2a' } } },
 };
 

@@ -158,3 +158,8 @@ body.titled .shade { z-index: 25; }
   .t-hint { display: none; }
   .t-panel { bottom: 64px; }
 }
+
+/* A choice was made before the world was ready: it shows as taken, the rest step back, the build line speaks up. */
+#title.chosen .t-peoples .t-btn:not(.picked) { opacity: .4; pointer-events: none; }
+#title.chosen .t-btn.picked { pointer-events: none; }
+.t-build.t-wait { color: var(--ink); font-size: 16px; }

@@ -355,6 +355,43 @@ export interface ItemCatalog {
   readonly affixes: Readonly<Record<string, { readonly prefix: string; readonly suffix: string }>>;
 }
 
+/**
+ * Upkeep (plan 11.5, 11.2): what a room and mending cost, and how it is said. Lines may use `{price}`
+ * (coins as said), `{items}` (what was mended), `{name}` (the smith or keeper).
+ */
+export interface UpkeepDef {
+  /** A night's room at the inn, copper. */
+  readonly room: number;
+  /** Mending a broken item costs this share of its worth as new (less for one only worn). */
+  readonly repair: number;
+  /** The hour the hero rises after a night at the inn. */
+  readonly rise: number;
+  readonly words: {
+    /** Talk topics: the innkeeper's room, the smith's mending. */
+    readonly roomTopic: string;
+    readonly repairTopic: string;
+    /** The keeper's answer as the room is taken (`{price}`), or when the purse is too light. */
+    readonly roomGiven: string;
+    readonly roomTooDear: string;
+    /** The smith's answer as the bench is opened. */
+    readonly repairLine: string;
+    /** The note on waking after a night at the inn. */
+    readonly slept: string;
+    /** The smith: nothing needs mending; mended; could not mend it all (`{left}`). */
+    readonly nothingToMend: string;
+    readonly mended: string;
+    readonly mendTooDear: string;
+    /** A worn thing looks so now (`{item}`). */
+    readonly worn: string;
+    readonly battered: string;
+    readonly broken: string;
+    /** Where one wakes after a fall, as in "You wake in …": one's room at the inn, the temple, the inn (no room, no temple). */
+    readonly wakeRoom: string;
+    readonly wakeTemple: string;
+    readonly wakeInn: string;
+  };
+}
+
 /** A weapon ability on the belt (plan 11.2; Norgo's recipe format comes with milestone 6). */
 export interface AbilityDef {
   readonly id: string;
@@ -514,6 +551,8 @@ export interface SettingModule {
   readonly skills: readonly SkillDef[];
   readonly creatures: readonly CreatureDef[];
   readonly items: ItemCatalog;
+  /** Rooms and mending (plan 11.5). */
+  readonly upkeep: UpkeepDef;
   readonly abilities: readonly AbilityDef[];
   readonly director: DirectorDef;
   readonly hero: HeroLooksDef;

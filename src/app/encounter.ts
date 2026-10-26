@@ -3,8 +3,8 @@
  * wild (sim/wild.ts); its `Arena` says which. Each frame the hero's pose goes to the delve, its events
  * become notes, the HUD's moments and the hero's blows; Tab, a click and the belt's keys pick a target
  * and use abilities; G searches the fallen and opens chests. The Director (vgm/director.ts) watches it
- * all, warns at the door of a place too hard, and its messages come one at a time. Falling ends in
- * waking at the inn, lighter of coin. A place gone quiet that was promised keeps the promise once the
+ * all, warns at the door of a place too hard, and its messages come one at a time. Falling ends as the
+ * game's mode says (game/death.ts): waking at the inn without the pack, or the hero's end. A place gone quiet that was promised keeps the promise once the
  * hero leaves it: the journal marks it done and the household pays. Only one encounter plays at a time
  * (`stepEncounters`); the others rest.
  */
@@ -21,6 +21,7 @@ import type { CreatureView } from '../render/dungeon/CreatureView';
 import { warning, type Director } from '../vgm/director';
 import type { Journal } from '../talk/journal';
 import { cap } from '../talk/townTalk';
+import { fill } from '../talk/folk';
 import type { FightHud } from './fightHud';
 import type { Notes } from './notes';
 import type { Player } from './player';
@@ -29,8 +30,11 @@ export interface FightHost {
   readonly bindings: Bindings;
   /** A dialog is open (keys are the dialog's). */
   readonly blocked: boolean;
-  /** Fallen: carry the hero to the inn. */
-  wake(): void;
+  /**
+   * Fallen and the wards gone dark (game/death.ts): in classic mode the hero is carried off, wakes and this
+   * is the waking line; in roguelike mode the hero's tale ends (null) and they stay down.
+   */
+  wake(): string | null;
   /** Hold the hero still (fallen) or let go. */
   still(on: boolean): void;
   /** What the hero holds changed. */
@@ -191,7 +195,7 @@ export class Encounter {
     if (this.retired) return;
     this.cueInside();
     this.creatures.group.visible = this.arena.shown;
-    if (!this.arena.inside && !this.paid && this.arena.promise && this.delve.beaten) this.keepPromise(this.arena.promise);
+    if (!this.arena.inside && !this.paid && this.arena.promise && this.delve.beaten) this.honour(this.arena.promise);
   }
 
   private cueInside(): void {
@@ -294,6 +298,7 @@ export class Encounter {
       case 'killed': if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
       case 'skill': this.director.queue(`Your ${e.up.name} rises to ${e.up.level}.`, 1); break;
       case 'refused': this.notes.say(e.text, 2.5); break;
+      case 'worn': if (e.state !== 'new') this.director.queue(fill(this.setting.upkeep.words[e.state], { item: e.item.name.toLowerCase() }), 1); break;
       case 'fallen':
         this.fallenFor = 0;
         this.down = 0;
@@ -304,26 +309,22 @@ export class Encounter {
     }
   }
 
-  /** Waking at the inn (classic mode): half the purse gone, sore but alive. */
+  /** The wards gone dark: the hero wakes somewhere safe (classic), or stays down for good (roguelike). */
   private wakeUp(): void {
     this.fallenFor = -1;
-    const lost = Math.floor(this.hero.coins / 2);
-    this.hero.coins -= lost;
-    this.hero.health = Math.round(this.hero.maxHealth * 0.5);
-    this.hero.stamina = this.hero.maxStamina;
     this.fight.pick(null);
+    const woke = this.host.wake();
+    if (woke === null) return;
     this.hud.fallen(false);
     this.host.still(false);
-    this.host.wake();
     this.onCue({ kind: 'woke' });
-    this.notes.say(`You wake in the inn, aching. Someone carried you up${lost ? `, and ${coinText(lost)} went with them` : ''}.`, 8);
+    this.notes.say(woke, 8);
   }
 
   /** Away from a quiet place that was promised: the promise is kept and the household pays. */
-  private keepPromise(id: string): void {
+  private honour(id: string): void {
     this.paid = true;
-    const lead = this.journal.leads.find((l) => l.id === id);
-    if (lead) lead.done = true;
+    this.journal.fulfil(id);
     this.host.kept(id);
     const pay = Math.round(this.arena.danger * REWARD_PER_DANGER);
     this.hero.coins += pay;

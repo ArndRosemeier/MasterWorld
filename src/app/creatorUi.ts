@@ -9,6 +9,7 @@ import { CharacterEditor, randomConfig, type Character, type CharacterConfig } f
 import { Vector3, type PerspectiveCamera, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed, lerp } from '@futuremagic/core';
 import type { BackgroundDef, NamesDef } from '../setting/contract';
+import { GAME_MODES, MODE_TEXT, type GameMode } from '../game/death';
 import type { People } from './title/lines';
 import type { HeroLooks, HeroView } from '../render/hero/HeroView';
 import { button, el, svg } from './dom';
@@ -35,6 +36,8 @@ export interface CreatorHost {
   knownBy(bg: BackgroundDef): string[];
   /** A soft click for the brass (sound). */
   click?(): void;
+  /** The game's mode when it is already settled (an heir in a roguelike world); null: the player picks it. */
+  readonly mode: GameMode | null;
 }
 
 /** The hero as made: a name, Actors' look and a past (a background id). */
@@ -42,6 +45,8 @@ export interface MadeHero {
   readonly name: string;
   readonly look: CharacterConfig;
   readonly background: string;
+  /** Classic or roguelike (plan 11.1). */
+  readonly mode: GameMode;
 }
 
 /** The title's peoples card, by Actors' race id. */
@@ -74,6 +79,7 @@ export class Creator {
   private zoomShown = 1;
   private named = false;
   private past = '';
+  private mode: GameMode = 'classic';
   private rolls = 0;
   private readonly drag = { on: false, x: 0 };
   /** The camera as the creator found it, and how far it has come round (0..1). */
@@ -88,12 +94,8 @@ export class Creator {
 
   /** Opens the glass and resolves with the hero once Begin is pressed. `race` comes from the title's peoples card. */
   async open(race: string | null): Promise<MadeHero> {
-    const { hero, renderer, looks } = this.host;
-    const model = (this.model = await hero.model(renderer, looks));
-    if (race && race !== model.config.race && model.catalog.races.some((r) => r.id === race)) {
-      await model.set(randomConfig(model.catalog, model.config, { random: this.random(), race: race as never, outfit: false }));
-      void hero.dress(model.config);
-    }
+    const { hero } = this.host;
+    const model = (this.model = await this.ready(race));
     this.stop = model.onChange((c) => {
       void hero.dress(c);
       if (!this.named) this.name.value = this.defaultName(c);
@@ -107,6 +109,27 @@ export class Creator {
     this.listen(true);
     return new Promise((resolve) => { this.done = resolve; });
   }
+
+  /**
+   * Loads the editor's character in the people's race (its files come over the network), so the glass opens
+   * at once after the dive: called as soon as the title's choice is made. `open` waits for it.
+   */
+  ready(race: string | null): Promise<Character> {
+    this.readying ??= (async () => {
+      const { hero, renderer, looks } = this.host;
+      const model = await hero.model(renderer, looks);
+      if (race && race !== model.config.race && model.catalog.races.some((r) => r.id === race)) {
+        await model.set(randomConfig(model.catalog, model.config, { random: this.random(), race: race as never, outfit: false }));
+        // The hero the dive lands on is already of that people.
+        void hero.dress(model.config);
+      }
+      return model;
+    })();
+    // A failed load (its files would not come) is tried afresh by the next call.
+    this.readying.catch(() => { this.readying = null; });
+    return this.readying;
+  }
+  private readying: Promise<Character> | null = null;
 
   get showing(): boolean { return this.root.classList.contains('open'); }
 
@@ -164,13 +187,14 @@ export class Creator {
         svg(rimSvg),
         el('div', { className: 'cr-head' }, el('div', { className: 'label', textContent: 'A hero steps forth' }), el('label', { className: 'cr-name' }, el('span', { textContent: 'Name' }), this.name)),
         tabs, pane,
+        this.modes(),
         el('div', { className: 'cr-foot' }, roll, begin)),
       turn);
   }
 
   private begin(): void {
     if (!this.model || !this.done) return;
-    const made: MadeHero = { name: this.name.value.trim() || this.defaultName(this.model.config), look: this.model.config, background: this.past };
+    const made: MadeHero = { name: this.name.value.trim() || this.defaultName(this.model.config), look: this.model.config, background: this.past, mode: this.mode };
     const done = this.done;
     this.done = null;
     this.host.click?.();
@@ -186,6 +210,35 @@ export class Creator {
     this.root.classList.add('closing');
     window.setTimeout(() => this.root.remove(), 900);
     done(made);
+  }
+
+  /**
+   * The tale's lever (plan 11.1, D12): classic or roguelike. A brass lever slides between the two; set to
+   * roguelike the ward runs ember-red and a candle burns by it. An heir in a roguelike world finds it set.
+   */
+  private modes(): HTMLElement {
+    const fixed = this.host.mode;
+    this.mode = fixed ?? 'classic';
+    const row = el('div', { className: 'cr-mode', role: 'radiogroup', ariaLabel: 'How the tale is told' });
+    const hint = el('span', { className: 'cr-mode-hint' });
+    const set = (m: GameMode) => {
+      this.mode = m;
+      row.dataset.mode = m;
+      hint.textContent = fixed ? `${MODE_TEXT[m].text} This world is a roguelike one: its next hero lives by the same rule.` : MODE_TEXT[m].text;
+      for (const b of row.querySelectorAll('.cr-mode-opt')) b.setAttribute('aria-checked', String((b as HTMLElement).dataset.mode === m));
+    };
+    const opt = (m: GameMode) => {
+      const b = button(MODE_TEXT[m].name, () => { if (fixed || this.mode === m) return; set(m); this.host.click?.(); }, { className: 'cr-mode-opt', type: 'button', role: 'radio' });
+      b.dataset.mode = m;
+      if (fixed && fixed !== m) b.disabled = true;
+      return b;
+    };
+    const [left, right] = GAME_MODES;
+    const lever = el('span', { className: 'cr-lever', ariaHidden: 'true' }, el('span', { className: 'cr-knob' }));
+    lever.addEventListener('click', () => { if (!fixed) { set(this.mode === left ? right : left); this.host.click?.(); } });
+    row.append(el('span', { className: 'label', textContent: 'The tale' }), opt(left), lever, opt(right), el('span', { className: 'cr-candle', ariaHidden: 'true' }), hint);
+    set(this.mode);
+    return row;
   }
 
   /** The Past tab: one card per background, what it gives and who knows you; one is chosen. */

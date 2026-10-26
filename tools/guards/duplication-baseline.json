@@ -52,7 +52,7 @@
     "reason": "Both implement the WalkWorld interface (game/walker.ts): no water below ground or indoors."
   },
   {
-    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/setting/contract.ts",
+    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",
     "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   },
   {
@@ -150,5 +150,13 @@
   {
     "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/render/flora/FloraView.ts#add",
     "reason": "Each view's own add(stage): builds its meshes and hands them to the Stage; only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/mapUi.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   }
 ]
