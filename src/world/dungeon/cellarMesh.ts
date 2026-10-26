@@ -436,8 +436,9 @@ function prop(k: MeshKit, p: Prop): void {
       const [a, b] = spot(0, -0.5);
       for (const u of [-0.75, 0.75]) { const [px, pz] = spot(u, -0.45); k.box(px, y, pz, 0.3, 2.4, 0.3, yaw, M.Ashlar, t([186, 176, 160])); }
       { const [px, pz] = spot(0, -0.45); k.box(px, y + 2.4, pz, 1.8, 0.35, 0.34, yaw, M.Ashlar, t([186, 176, 160])); }
-      k.box(a, y, b, 1.2, 2.4, 0.04, yaw, M.Plaster, [228, 232, 236]);
-      { const [px, pz] = spot(-0.25, -0.05); k.box(px, y, pz, 1.1, 2.3, 0.08, yaw - 1.1, M.Oak, t(DARK_OAK)); }
+      k.box(a, y, b, 1.2, 2.4, 0.04, yaw, M.Plaster, [196, 204, 212]);
+      // The leaf stands open, back against the wall beside its frame.
+      { const [px, pz] = spot(-1.45, -0.4); k.box(px, y, pz, 1.1, 2.3, 0.08, yaw, M.Oak, t(DARK_OAK)); }
       break;
     }
     case 'ladder': { const [a, b] = spot(0, -0.15); for (const u of [-0.3, 0.3]) { const [px, pz] = spot(u, -0.15); k.box(px, y, pz, 0.08, STOREY, 0.08, yaw, M.Oak, t(OAK)); } for (let s = 0; s < 8; s++) k.box(a, y + 0.3 + s * 0.32, b, 0.6, 0.05, 0.06, yaw, M.Oak, t(OAK)); break; }

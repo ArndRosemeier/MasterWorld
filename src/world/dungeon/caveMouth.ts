@@ -17,7 +17,7 @@ import { onLand, type Site } from './site';
 /** Where in the mouth the hero goes down (its frame). */
 export const MOUTH_WAY_DOWN = { x: 0, z: -3.2 } as const;
 /** The crag's extent in its frame (x half width, z from front to back), metres. */
-const EXTENT = { half: 12, front: 4, back: -17, top: 11 } as const;
+const EXTENT = { half: 12, front: 4, back: -17, top: 14 } as const;
 /** Sample spacing of the mouth's field, metres. */
 const STEP = 0.5;
 /** How far the walk raster reaches beyond a body (the walker's radius and a little). */
@@ -34,37 +34,41 @@ export interface CaveMouth {
   readonly rows: number;
 }
 
-interface Blob { readonly c: readonly [number, number, number]; readonly r: readonly [number, number, number] }
-
-/** The crag's rock (positive in air), without the ground; and the tunnel's air (positive inside). */
+/**
+ * The crag's rock (positive in air), without the ground; and the tunnel's air (positive inside). The rock is
+ * a knoll cut off at the front by a weathered face: high at the face, its top falling back into the hill
+ * behind and its flanks sinking into the ground at the sides, so the face stands out of the hillside.
+ */
 class Crag {
-  private readonly blobs: Blob[];
   private readonly noise: Noise;
+  private readonly lean: number;
+  private readonly high: number;
 
-  constructor(seed: number) {
+  constructor(seed: number, private readonly ground: (x: number, z: number) => number) {
     const rng = new Rng(deriveSeed(seed, 'cave', 'mouth'));
     this.noise = new Noise(deriveSeed(seed, 'cave', 'crag'));
-    const lean = rng.range(-1.5, 1.5);
-    this.blobs = [
-      { c: [lean * 0.4, 2.2, -6.8], r: [6.4 + rng.range(-0.6, 0.8), 4.6 + rng.range(-0.5, 1.2), 5.6] },
-      { c: [lean + rng.range(-1, 1), 4.2 + rng.range(0, 1.5), -10], r: [5.2, 4.2, 4.6] },
-      { c: [-3.7, 1.3, -2.8 + rng.range(-0.4, 0.4)], r: [2.5, 2.9 + rng.range(-0.3, 0.6), 2.4] },
-      { c: [3.7, 1.3, -2.8 + rng.range(-0.4, 0.4)], r: [2.5, 2.9 + rng.range(-0.3, 0.6), 2.4] },
-      { c: [rng.range(-2, 2), 2.6, -3.4], r: [3.4, 1.6, 2.2] },
-    ];
+    this.lean = rng.range(-0.05, 0.05);
+    this.high = rng.range(4.6, 6.2);
+  }
+
+  /** The face's line: z of the face at x (it curves back at the sides). */
+  private front(x: number, y: number): number {
+    return -1.1 - 0.03 * x * x + this.lean * x - y * 0.12 + this.noise.fbm3(x / 3, y / 3, 0.5, 2) * 0.7;
+  }
+
+  /** Height of the knoll's top over the land at (x, z). */
+  top(x: number, z: number): number {
+    const back = 1 - smoothstep(-4, EXTENT.back + 1, z), sides = 1 - smoothstep(2.5, EXTENT.half - 0.5, Math.abs(x));
+    return (this.high * Math.pow(back, 0.8) + this.noise.fbm3(x / 5, 0.3, z / 5, 2) * 0.6) * sides - 0.3;
   }
 
   rock(x: number, y: number, z: number): number {
-    let d = Infinity;
-    for (const b of this.blobs) {
-      const u = (x - b.c[0]) / b.r[0], v = (y - b.c[1]) / b.r[1], w = (z - b.c[2]) / b.r[2];
-      const e = (Math.sqrt(u * u + v * v + w * w) - 1) * Math.min(b.r[0], b.r[1], b.r[2]);
-      d = d === Infinity ? e : smin(d, e, 1.4);
-    }
+    const h = this.ground(x, z);
+    const d = Math.max((z - this.front(x, y - h)) * 0.8, y - h - this.top(x, z));
     if (d > 4) return d;
-    const n = this.noise;
-    // Weathered: big lumps, smaller knocks, and the beds of the rock as faint steps.
-    return d + n.fbm3(x / 3.4, y / 3.4, z / 3.4, 3) * 1.1 + n.fbm3(x / 1.1 + 9.1, y / 1.1, z / 1.1, 2) * 0.22 + Math.sin(y * 1.6 + n.fbm3(x / 12, y / 12, z / 12, 2) * 3) * 0.12;
+    // Weathered: big lumps and smaller knocks on the face, and the beds of the rock as faint steps.
+    const n = this.noise, face = smoothstep(-1.5, 0.5, z - this.front(x, y - h));
+    return d + (n.fbm3(x / 3.4, y / 3.4, z / 3.4, 3) * 0.9 + n.fbm3(x / 1.1 + 9.1, y / 1.1, z / 1.1, 2) * 0.22) * (0.12 + 0.88 * face) + Math.sin(y * 1.6 + n.fbm3(x / 12, y / 12, z / 12, 2) * 3) * 0.12 * face;
   }
 
   /** The way in: a low passage, wider at the mouth, sloping a little down as it goes in. */
@@ -81,7 +85,6 @@ class Crag {
  * the mouth (the caller turns the frame onto the land).
  */
 export function caveMouth(seed: number, ground: (x: number, z: number) => number): CaveMouth {
-  const crag = new Crag(seed);
   const nx = Math.ceil((2 * EXTENT.half) / STEP) + 1, nz = Math.ceil((EXTENT.front - EXTENT.back) / STEP) + 1;
   let low = 0;
   const g = new Float32Array(nx * nz);
@@ -90,6 +93,11 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
     g[k * nx + i] = h;
     low = Math.min(low, h);
   }
+  const groundUnder = (x: number, z: number) => {
+    const i = Math.max(0, Math.min(nx - 1, Math.round((x + EXTENT.half) / STEP))), k = Math.max(0, Math.min(nz - 1, Math.round((z - EXTENT.back) / STEP)));
+    return g[k * nx + i];
+  };
+  const crag = new Crag(seed, groundUnder);
   const oy = low - 2, ny = Math.ceil((EXTENT.top - oy) / STEP) + 1;
   const air = (i: number, y: number, k: number) => {
     const x = -EXTENT.half + i * STEP, z = EXTENT.back + k * STEP, h = g[k * nx + i];
@@ -101,18 +109,17 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
   const d = new Float32Array(nx * ny * nz);
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) d[i + nx * (j + ny * k)] = air(i, oy + j * STEP, k);
   const field: Field = { ox: -EXTENT.half, oy, oz: EXTENT.back, step: STEP, nx, ny, nz, d };
-  const groundUnder = (x: number, z: number) => {
-    const i = Math.max(0, Math.min(nx - 1, Math.round((x + EXTENT.half) / STEP))), k = Math.max(0, Math.min(nz - 1, Math.round((z - EXTENT.back) / STEP)));
-    return g[k * nx + i];
-  };
   const look = new Noise(deriveSeed(seed, 'cave', 'mouth-look'));
   const mesh = meshField(field, {
     // Only the crag and its fillet: the plain ground around and the floor of the way in are the land's own.
     mat: (x, y, z, up) => {
       const h = groundUnder(x, z);
+      // Not the field's own edges (where it is cut off).
+      if (Math.abs(x) > EXTENT.half - 0.6 || z < EXTENT.back + 0.6 || z > EXTENT.front - 0.6) return null;
       if (crag.rock(x, y, z) > 2.4) return null;
       if (up > 0.6 && y < h + 0.35) return null;
-      return up > 0.72 && y > h + 0.6 ? WildMat.Grass : WildMat.Rock;
+      // Turf on the knoll's top and flanks, bare rock on its face.
+      return up > 0.45 && (up > 0.75 || y > h + crag.top(x, z) - 0.7) ? WildMat.Grass : WildMat.Rock;
     },
     tint: (x, y, z, m) => {
       // Deeper in the way, darker, until it is black where it goes on down.

@@ -488,7 +488,9 @@ export async function start(b: Boot): Promise<void> {
         b = promisePlace(lookAt, seed, terrain, town, log, home, wild?.territories ?? []);
         if (b) { log = [...log, { ...b, at: hours() }]; cellars.sync(log); }
       }
-      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * 14, undefined, b.site.z + Math.cos(b.site.yaw) * 14, b.site.yaw);
+      // Far enough off to see it whole.
+      const off = { barrow: 9, cave: 16, tower: 32 }[lookAt];
+      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * off, undefined, b.site.z + Math.cos(b.site.yaw) * off, b.site.yaw);
     }
     // `wild=<kind>`: beside its first group (for looking at them).
     const by = params.wildAt ? wild?.territories.find((t) => t.def.id === params.wildAt) : undefined;

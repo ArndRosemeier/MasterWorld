@@ -83,8 +83,8 @@ const LAND: Readonly<Record<LandKind, { readonly ring: readonly [number, number]
         // Into the hill: uphill from the mouth, with rock enough above it to go into.
         const ix = gx / slope, iz = gz / slope, h = t.height(x, z);
         const rise = t.height(x + ix * 14, z + iz * 14) - h;
-        if (rise < 2.5) return null;
-        return { score: Math.min(1, rise / 8) - woods(x, z) - Math.max(0, slope - 0.35) + hash2f(s, k, 3) * 0.3, yaw: Math.atan2(-ix, -iz) };
+        if (rise < 3) return null;
+        return { score: Math.min(1.5, rise / 8) - woods(x, z) - Math.max(0, slope - 0.35) + hash2f(s, k, 3) * 0.3, yaw: Math.atan2(-ix, -iz) };
       };
     },
   },
