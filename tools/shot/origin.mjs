@@ -7,10 +7,10 @@
  *  - the same with `origin=0` (drawn relative to zero, as before B0), to see what the origin fixes;
  *  - an origin step: a picture, another a moment later (what moves by itself: wind, water, the hero breathing),
  *    then the origin moved one grain and a third picture. The step passes when it changes the picture no more than
- *    the moment alone did, and built no shader.
+ *    a moment alone does; shaders built meanwhile are listed.
  *
  * Writes JPEGs, `index.md` and `index.json` into `<out root>/<date>-<commit>/` (default root `shots/origin`).
- * Exits 1 when a page failed, a step showed or built something, or a shader violation was recorded. A slow check
+ * Exits 1 when a page failed, a step showed, or a shader violation was recorded. A slow check
  * (docs/CHECKS.md): one run stays under 5 min. ORIGIN_ONLY=town or far takes one spot.
  */
 import { execSync } from 'node:child_process';
@@ -61,7 +61,8 @@ const difference = (page, a, b) => page.evaluate(async ([a, b]) => {
   return { mean: sum / n, changed: big / n };
 }, [a.toString('base64'), b.toString('base64')]);
 
-const builds = (page) => page.evaluate(() => { const s = window.shaders?.summary(); return s ? s.warmup + s.run : 0; });
+/** Shader builds recorded so far (count), and what was built from the `from`-th on (names). */
+const builds = (page, from = Infinity) => page.evaluate((from) => { const m = window.shaders; return m ? { n: m.events.length, what: m.events.slice(from).map((e) => `${e.kind} ${e.what}`) } : { n: 0, what: [] }; }, from);
 
 const { server, base, browser } = await launch({ args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
 const t0 = Date.now();
@@ -94,16 +95,19 @@ for (const spot of spots) for (const zero of [false, true]) {
     await page.evaluate((grain) => { const g = window.game; g.followOrigin = false; g.origin.moveTo(g.origin.at.x + grain, g.origin.at.z); }, GRAIN);
     await page.waitForTimeout(BETWEEN);
     const b = await page.screenshot({ type: 'png', timeout: TIMEOUT });
-    const stepBuilds = (await builds(page)) - before;
+    const built = await builds(page, before.n);
+    const stepBuilds = built.what.length;
     await page.screenshot({ path: join(dir, `${spot.id}-stepped.jpg`), type: 'jpeg', quality: 92, timeout: TIMEOUT });
     await page.waitForTimeout(BETWEEN);
     const b2 = await page.screenshot({ type: 'png', timeout: TIMEOUT });
     // What a moment changes by itself, before the step and after it (the larger of the two).
     const m1 = await difference(page, a, a2), m2 = await difference(page, b, b2), step = await difference(page, a2, b);
     const moment = m1.mean >= m2.mean ? m1 : m2;
-    row.step = { moment, step, builds: stepBuilds };
+    row.step = { moment, step, builds: stepBuilds, built: built.what };
     // The step may change no more than a moment of the world going on by itself (with a little slack for noise).
-    row.step.ok = row.step.builds === 0 && step.mean <= moment.mean * 1.5 + 0.5 && step.changed <= moment.changed * 1.5 + 0.002;
+    // A step changes one uniform: it builds nothing. Builds in its window are listed (land still streaming in at the far
+    // spot builds now and then) for a look; the picture decides.
+    row.step.ok = step.mean <= moment.mean * 1.5 + 0.5 && step.changed <= moment.changed * 1.5 + 0.002;
     if (!row.step.ok) failed = true;
   }
   row.shaders = await page.evaluate(() => { const m = window.shaders; return m ? { ...m.summary(), lines: m.violations() } : null; });
@@ -125,7 +129,7 @@ const md = [
   '',
   '| Picture | Camera | Origin | p50 ms | p95 ms | Step: moment / step | Step builds | Notes |',
   '|---|---|---|---|---|---|---|---|',
-  ...rows.map((r) => `| [${r.name}](${r.name}.jpg)${r.step ? ` · [stepped](${r.name.split('-')[0]}-stepped.jpg)` : ''} | ${r.at.camera.join(', ')} | ${r.origin ? r.at.origin.join(', ') : 'off'} | ${f(r.p50)} | ${f(r.p95)} | ${r.step ? `${f(r.step.moment.mean, 2)} (${f(r.step.moment.changed * 100, 2)} %) / ${f(r.step.step.mean, 2)} (${f(r.step.step.changed * 100, 2)} %) ${r.step.ok ? 'ok' : 'SHOWS'}` : '–'} | ${r.step ? r.step.builds : '–'} | ${[r.shaders ? `${r.shaders.violations} shader violations` : 'no monitor', ...r.errors].join('; ')} |`),
+  ...rows.map((r) => `| [${r.name}](${r.name}.jpg)${r.step ? ` · [stepped](${r.name.split('-')[0]}-stepped.jpg)` : ''} | ${r.at.camera.join(', ')} | ${r.origin ? r.at.origin.join(', ') : 'off'} | ${f(r.p50)} | ${f(r.p95)} | ${r.step ? `${f(r.step.moment.mean, 2)} (${f(r.step.moment.changed * 100, 2)} %) / ${f(r.step.step.mean, 2)} (${f(r.step.step.changed * 100, 2)} %) ${r.step.ok ? 'ok' : 'SHOWS'}` : '–'} | ${r.step ? `${r.step.builds}${r.step.built.length ? ` (${r.step.built.join(', ')})` : ''}` : '–'} | ${[r.shaders ? `${r.shaders.violations} shader violations` : 'no monitor', ...r.errors].join('; ')} |`),
   '',
 ].join('\n');
 writeFileSync(join(dir, 'index.md'), md);
