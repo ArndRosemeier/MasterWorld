@@ -12,10 +12,6 @@
     "reason": "Per-frame update methods of unrelated systems (camera movement vs chunk selection); only the name matches."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (x.add(y).mul(z)) in three shader kinds: it is how three.js nodes are written, not a copied helper. It crossed the info floor when the talk code grew the corpus."
-  },
-  {
     "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (going in and out of the cellar vs chunk selection); only the name matches."
   },
@@ -138,10 +134,6 @@
   {
     "key": "same name: masterworld/app/title/TitleCamera.ts#pose + masterworld/render/horse/HorseView.ts#pose",
     "reason": "A camera's pose along the title's path vs a horse's frame (StockView's Bodies.pose interface); only the name matches. It showed once the horse's fur setup moved to render/furAnimal.ts and its pose got short."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
   },
   {
     "key": "idiom: [.setAttribute .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/water/WaterView.ts + stage/stage.ts",
