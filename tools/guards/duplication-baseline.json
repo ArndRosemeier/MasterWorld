@@ -194,5 +194,17 @@
   {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
     "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
+  },
+  {
+    "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/lessonsUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/mapUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   }
 ]

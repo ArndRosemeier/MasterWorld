@@ -64,6 +64,7 @@ import { TalkUi } from './app/talkUi';
 import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
 import { TradeUi } from './app/tradeUi';
+import { LessonsUi } from './app/lessonsUi';
 import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
 import { Orientation, mastery } from './game/orientation';
@@ -75,6 +76,7 @@ import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, type SaveD
 import { release } from './app/release';
 import { Character } from './game/character';
 import { Market, itemWorth } from './game/trade';
+import { teacherOf } from './game/lessons';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -598,6 +600,22 @@ export async function start(b: Boot): Promise<void> {
       const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
       townWords.services = (id) => { const p = person(id); return [...others(id), ...(p ? upkeep.services(p) : [])]; };
       for (const id of UPKEEP_SERVICES) services.set(id, (a) => upkeep.answer(id, a.person, townWords.nameOf(a.person.id)));
+    }
+    // Lessons (plan 11.4): the smith, the old caravan guard and the innkeeper teach for coin; one more service.
+    const lessons = life && townWords ? new LessonsUi(character, setting, {
+      paused,
+      get bindings() { return settings.current.bindings; },
+      taught: (h) => { const t = hours() + h; view.sky.day = Math.floor(t / 24); view.sky.hour = t - view.sky.day * 24; sounds?.coins(); },
+      changed: armHero,
+    }) : null;
+    if (lessons && townWords && life) {
+      const others = townWords.services.bind(townWords);
+      const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
+      townWords.services = (id) => {
+        const p = person(id), t = p ? teacherOf(setting, p) : null;
+        return [...others(id), ...(t ? [{ id: 'lessons', label: t.topic, line: t.line }] : [])];
+      };
+      services.set('lessons', (a) => { const t = teacherOf(setting, a.person); if (t) lessons.teach(t, townWords.nameOf(a.person.id)); });
     }
     const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {

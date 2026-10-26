@@ -66,13 +66,14 @@ Goal: an evening of play works end to end. You get a lead, travel, clear the pla
 |---|---|---|---|
 | A1 | **The standard shot set** (F1, F2): one script, one folder per commit, an index with frame times | The set runs in one go on the reference GPU and the shots of today's main are judged | 3 |
 | A2 ✓ | **Trade**: merchants in the town's shops (smith, general store, the inn's keeper) with limited stock and coin; prices follow what the town has; sell finds, buy gear; copper, silver and gold; a trade window in warded brass with item cards | A seeded test sells a find and buys an upgrade; the trade window is in the F1 set | 11.5 |
-| A2b | **Something to spend on**: each shop keeps a few uncommon pieces and one rare piece at prices that take several evenings to save for; shops restock every few game days (seeded); trainers (the smith, a caravan guard, the hedge witch) sell lessons that cost more as the skill rises. Fixed by town, never by the hero's power (F7) | The A6 bot spends on an upgrade or a lesson at least every second evening and its purse stays sensible at evening six; a test for restock and lesson prices | 11.4, 11.5 |
+| A2b ✓ | **Something to spend on**: each shop keeps a few uncommon pieces and one rare piece at prices that take several evenings to save for; shops restock every few game days (seeded); trainers (the smith, a caravan guard, the hedge witch) sell lessons that cost more as the skill rises. Fixed by town, never by the hero's power (F7) | The A6 bot spends on an upgrade or a lesson at least every second evening and its purse stays sensible at evening six; a test for restock and lesson prices | 11.4, 11.5 |
 | A3 ✓ | **Upkeep**: gear wears and the smith repairs it; a room at the inn restores you and sets where you wake | Test: wear, repair cost, waking at the inn | 11.5, 11.2 |
 | A4 ✓ | **Death as designed**: in classic mode carried gear stays where you fell, as a mark on the map to go back for; **roguelike mode** (one save the game writes, death ends the hero, the world stays for the next one) | Tests for both modes; the New game screen offers the mode | 11.1, D12 |
-| A5 | **Music streams** (F4): the start loads no music; tracks load when first needed | F4 load time passes | 16 |
+| A5 ✓ | **Music streams** (F4): the start loads no music; tracks load when first needed | `npm run load`: no game music before playable (only the title's theme). The load times are A7 | 16 |
 | A6 ✓ | **The loop check**: a scripted hero (extending `src/game/bot.ts`) plays an evening headless: hears a lead, walks to it, clears it, comes back, sells, buys an upgrade, hears the next lead. It is a slow check of at most 5 min | The check passes on main and runs before every phase gate | 11.3 |
+| A7 | **Load fast** (F4): the start fetches only what the first view needs. Today a cold load on the reference GPU shows the title at 1.4 s and is playable at 62 s, with 97 MB fetched (Actors human packs 68 MB in 654 files, cow 14, horse 8, dog 4.5). Bundle the packs into a few files, load the people and animals near the start first and the rest behind play, and cache in the browser | `npm run load` on the reference machine: title under 1 s, playable under 20 s, cold | 3 (F4), 17.2 |
 
-Gate A: A1–A6 and A2b done, the F1 set judged, no placeholders.
+Gate A: A1–A7 and A2b done, the F1 set judged, no placeholders.
 
 ### Phase B: The frontier (milestone 5)
 
@@ -139,4 +140,3 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | freeryder / free LLMs (O15) | Parked by Arnd |
 | The capital | Prepared in B3, placed once a road network exists |
 | Companions (animals, elementals, summons) | After magic (C), since summons need it |
-| A paddock fence can cut across a street (seed `alpha`, beside the smithy): the townsfolk walk through it, the hero has to go round | Seen by the loop check (A6); the town plan comes from `@futuremagic/settlement`, so the fix belongs there. The default seed has none |
