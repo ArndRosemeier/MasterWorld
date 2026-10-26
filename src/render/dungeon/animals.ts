@@ -18,6 +18,8 @@ export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 
 interface Kind {
   readonly pack: string;
   readonly preset: string;
+  /** Breeds to pick from by seed (over `preset`): a herd of mixed cattle. */
+  readonly presets?: readonly string[];
   /** The pack's clip for each thing it does (null: the idle). */
   readonly clips: Record<AnimalDoing, string | null>;
   /** The ground speed (m/s) its walk and run show at their own pace. */
@@ -27,7 +29,7 @@ interface Kind {
   readonly coat?: Readonly<Record<string, number | readonly number[]>>;
 }
 
-/** The setting's beasts, on Actors' bodies (the boar on the dog's rig: Actors has no pig). */
+/** The setting's beasts and the farms' cattle, on Actors' bodies (the boar on the dog's rig: Actors has no pig). */
 export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
   wolf: {
     pack: 'dog', preset: 'wolf',
@@ -52,6 +54,13 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
       base: [0.24, 0.19, 0.14], second: [0.24, 0.19, 0.14], tan: [0.24, 0.19, 0.14], white: [0.24, 0.19, 0.14],
       saddle: 0, mask: 0, points: 0, belly: 0, bib: 0, socks: 0, blaze: 0, tailTip: 0, spots: 0, shade: 0.15, paleMask: 0, agouti: 0.3, tanLegs: 0, length: 0.06, fluff: 0.05,
     },
+  },
+  // The farms' cattle (render/livestock/StockView.ts): old brown, red-pied and shaggy breeds, no modern
+  // Holsteins. A cow does not run; its gallop is a startled trot.
+  cow: {
+    pack: 'cow', preset: 'braunvieh', presets: ['braunvieh', 'braunvieh', 'fleckvieh', 'jersey', 'highland'],
+    clips: { idle: 'idle', alert: 'idle', feed: 'eat', walk: 'walk', run: 'trot', blow: 'headbutt', hurt: null, dead: 'death' },
+    pace: { walk: 1, run: 2.5 },
   },
   deer: {
     pack: 'deer', preset: 'red',
@@ -94,7 +103,7 @@ export async function animalBody(species: string, seed: number, renderer: WebGPU
   if (!def) return null;
   const first = await lead(def.pack);
   const animal = Animal.share(first);
-  animal.setPreset(def.preset);
+  animal.setPreset(def.presets ? def.presets[Math.floor(hash2f(seed, 2, 9) * def.presets.length) % def.presets.length] : def.preset);
   if (def.shape || def.coat) animal.params = { shape: { ...animal.shape, ...def.shape }, coat: { ...animal.coat, ...def.coat } };
   const shape = animal.shape as { size?: number };
   if (typeof shape.size === 'number') shape.size *= 0.92 + hash2f(seed, 1, 7) * 0.16;

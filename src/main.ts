@@ -313,11 +313,11 @@ export async function start(b: Boot): Promise<void> {
       player.horses = horses;
       if (params.ride && player.steeds[0]) player.mount(player.steeds[0]);
     }
-    // The farms' animals in their paddocks (the setting says which; horses until Actors has cattle).
+    // The farms' animals in their paddocks (the setting says which).
     const herds = town && town.plan.paddocks.length ? new Herds(town.plan, seed) : null;
     let stock: StockView | null = null;
     if (herds && params.stock > 0) {
-      loading.set('Turning out the horses');
+      loading.set('Turning out the herds');
       stock = await StockView.forHerds(view.renderer, setting.world.livestock, herds, params.stock, (x, z) => terrain.height(x, z));
     }
     let folk: FolkView | null = null;
