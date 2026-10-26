@@ -1,0 +1,28 @@
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?hud&title=0 shots/guide-a.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.1 s: Finding the start
+[page] [load] 1.1 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 1.4 s: Painting the ground
+[page] [load] 1.4 s: Filling the seas
+[page] [load] 5.1 s: Dressing the hero
+[page] [load] 6.0 s: Saddling the horses
+[page] [load] 6.1 s: Turning out the herds
+[page] [load] 6.2 s: Waking the town
+[page] [load] 7.1 s: Growing the woods
+[page] [load] 8.2 s: Dressing the townsfolk
+[page] [load] 8.3 s: Preparing shaders
+[page] [load] 17.9 s: Raising the land
+[page] [load] 18.3 s: Waking the cellar
+[page] [load] 20.8 s: Planting the trees
+[page] [load] 21.8 s: cellar ready (shaders 76 warm-up + 0 later · worst 44 ms · policy ok)
+[page] [load] 22.4 s: townsfolk ready (shaders 77 warm-up + 0 later · worst 44 ms · policy ok)
+[page] [load] 24.6 s: trees ready (shaders 88 warm-up + 0 later · worst 44 ms · policy ok)
+[page] [load] 24.5 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 31.4 s: townsfolk, every look ready (shaders 92 warm-up + 17 later · worst 44 ms · policy ok)
+shots/guide-a.png: webgpu · 29.7 ms · -31896, 89, 31907 · chunks 270 (+0) · grass 99+325 · 0.00 dense 0.00 m · folk 30/30
+shaders: 92 built in warm-up, 18 after, worst block 44 ms, 0 violations, 0 built again alike

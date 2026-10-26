@@ -1,0 +1,29 @@
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?hud&title=0 shots/guide-b.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.5 s: Finding the start
+[page] [load] 1.3 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 1.4 s: Painting the ground
+[page] [load] 1.4 s: Filling the seas
+[page] [load] 3.7 s: Dressing the hero
+[page] [load] 4.8 s: Saddling the horses
+[page] [load] 4.8 s: Turning out the herds
+[page] [load] 4.9 s: Waking the town
+[page] [load] 5.7 s: Growing the woods
+[page] [load] 7.3 s: Dressing the townsfolk
+[page] [load] 7.5 s: Preparing shaders
+[page] [load] 17.7 s: Raising the land
+[page] [load] 18.3 s: Waking the cellar
+[page] [load] 19.4 s: Planting the trees
+[page] [load] 20.2 s: cellar ready (shaders 76 warm-up + 0 later · worst 17 ms · policy ok)
+[page] [load] 20.6 s: townsfolk ready (shaders 77 warm-up + 0 later · worst 17 ms · policy ok)
+[page] [load] 24.0 s: trees ready (shaders 88 warm-up + 0 later · worst 17 ms · policy ok)
+[page] [load] 24.0 s: Waking the townsfolk
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 31.7 s: townsfolk, every look ready (shaders 92 warm-up + 20 later · worst 17 ms · 1 POLICY VIOLATIONS (shaders.report()))
+shots/guide-b.png: webgpu · 40.8 ms · -31896, 89, 31907 · chunks 270 (+0) · grass 99+325 · 0.00 dense 0.00 m · folk 30/30
+shaders: 92 built in warm-up, 21 after, worst block 17 ms, 1 violations, 0 built again alike
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started 46 ms after a build of 80 ms ended (minimum 160 ms)
