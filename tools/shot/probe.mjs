@@ -66,7 +66,11 @@ const parts = () => page.evaluate(() => {
   g.view.scene.children.forEach((o, i) => {
     let meshes = 0, tris = 0, casters = 0, skinned = 0;
     o.traverse((m) => { if (m.isMesh) { meshes++; if (m.castShadow) casters++; if (m.isSkinnedMesh) skinned++; tris += (m.geometry.index?.count ?? m.geometry.attributes.position?.count ?? 0) / 3 * (m.isInstancedMesh ? m.count : 1); } });
-    if (meshes && o.visible) out.push({ i, name: `${o.name || o.type}`, meshes, casters, skinned, tris: Math.round(tris) });
+    if (!meshes || !o.visible) return;
+    // Parts of one kind (terrain chunks named by their tile, each townsperson) count together.
+    const name = (o.name || o.type).replace(/ [-\d:]+$/, ''), e = out.find((x) => x.name === name);
+    if (e) { e.n++; e.meshes += meshes; e.casters += casters; e.skinned += skinned; e.tris += Math.round(tris); }
+    else out.push({ name, n: 1, meshes, casters, skinned, tris: Math.round(tris) });
   });
   return out;
 });
@@ -76,17 +80,15 @@ const row = (label, m, base) => console.log(`| ${label} | ${m.p50.toFixed(1)} | 
 async function probe(title) {
   console.log(`\n## ${title}\n\nsettled in ${(await quiet()).toFixed(1)} s\n`);
   const list = await parts();
-  console.log('| part | meshes | casters | skinned | triangles |\n|---|---|---|---|---|');
-  for (const p of list) console.log(`| ${p.i} ${p.name} | ${p.meshes} | ${p.casters} | ${p.skinned} | ${p.tris} |`);
+  console.log('| part | objects | meshes | casters | skinned | triangles |\n|---|---|---|---|---|---|');
+  for (const p of list) console.log(`| ${p.name} | ${p.n} | ${p.meshes} | ${p.casters} | ${p.skinned} | ${p.tris} |`);
   console.log('\n| drawn | p50 ms | p95 ms | render ms (main thread) | scene draw calls | shaders built | saves ms |\n|---|---|---|---|---|---|---|');
   const base = await measure();
   row('everything', base);
-  // Groups of parts with the same name are hidden together (each townsperson is a group of its own).
-  const names = [...new Set(list.map((p) => p.name))];
-  for (const name of names) {
-    await page.evaluate((name) => { for (const o of window.game.view.scene.children) if ((o.name || o.type) === name) { o.userData.probeWas = o.visible; o.visible = false; } }, name);
+  for (const { name } of list) {
+    await page.evaluate((name) => { for (const o of window.game.view.scene.children) if ((o.name || o.type).replace(/ [-\d:]+$/, '') === name) { o.userData.probeWas = o.visible; o.visible = false; } }, name);
     row(`without ${name}`, await measure(), base);
-    await page.evaluate((name) => { for (const o of window.game.view.scene.children) if ((o.name || o.type) === name) o.visible = o.userData.probeWas; }, name);
+    await page.evaluate((name) => { for (const o of window.game.view.scene.children) if (o.userData.probeWas !== undefined) { o.visible = o.userData.probeWas; delete o.userData.probeWas; } }, name);
   }
   await page.evaluate(() => { const s = window.game.view.sun.shadow; s.autoUpdate = false; });
   row('without sun shadow redraw', await measure(), base);
