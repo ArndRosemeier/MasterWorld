@@ -42,3 +42,7 @@ A guard in `tools/guards/rules.json` lets `positionWorld` and `modelWorldMatrix`
 - `compileAsync` skips objects outside the view, which then compile on the render path the first time the camera turns. The Stage turns culling off while compiling.
 - Pipelines cost separately from shader source and need their own async path.
 - Shadow passes build their own shaders. Warm those too.
+
+## Texture units
+
+WebGL 2 promises a fragment shader 16 textures, and a shader that reads more does not link (the land drew white after the roads, MW #155). The land's shader is near the limit (15 in October 2026): a new mask goes into a channel or a half of a texture it already reads (the town's two masks share one, `TOWN_MASKS`), a small table into a uniform array (`CROP_LOOK`). `npm run check:units` (in CI) fails above 16.
