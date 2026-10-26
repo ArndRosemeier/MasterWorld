@@ -7,7 +7,7 @@
 import { Group, type Camera, type Material, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
-import HumanWorker from '@actors/human/worker?worker';
+import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
 import type { ActivityKind } from '../../sim/spots';
@@ -114,7 +114,8 @@ export class FolkView {
   /** Dresses the first character as somebody from town and returns what to compile in the warm-up. */
   async warmObjects(): Promise<Object3D[]> {
     const s = this.slots[0], look = coveringLooks(this.life.agents.map((a) => a.person))[0];
-    if (look) await s.ch.set({ ...look, animation: 'walk' });
+    // Undressed if the look's files would not load: the warm-up still compiles the body.
+    if (look) await s.ch.set({ ...look, animation: 'walk' }).catch((e: unknown) => console.error('[folk] dressing the first failed', e));
     s.ch.setLod(0);
     this.adapt(s.place);
     s.place.visible = true; // the warm-up compiles what is shown; hidden again in warmLods
@@ -133,11 +134,16 @@ export class FolkView {
     place.removeFromParent();
     const looks = coveringLooks(this.life.agents.map((a) => a.person));
     for (let i = 0; i < looks.length; i++) {
-      if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
-      for (let k = i > 0 ? 0 : 1; k < ch.lods.length; k++) {
-        ch.setLod(k);
-        this.adapt(place);
-        await this.stage.prepare(place, { everyCaster: true });
+      // A look whose files would not load is skipped: its garments then compile when first worn.
+      try {
+        if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
+        for (let k = i > 0 ? 0 : 1; k < ch.lods.length; k++) {
+          ch.setLod(k);
+          this.adapt(place);
+          await this.stage.prepare(place, { everyCaster: true });
+        }
+      } catch (e) {
+        console.error('[folk] warming a look failed', e);
       }
     }
     ch.setLod(0);
