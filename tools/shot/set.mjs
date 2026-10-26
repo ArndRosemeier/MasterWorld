@@ -4,7 +4,7 @@
  * title, the creator, the town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack,
  * the map, talk) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
  * writes `index.md` and `index.json` there. Before each shot it waits until everything near the hero is drawn
- * as itself (`game.undrawn` empty: townsfolk dressed, creatures warm; at most SET_DRAWN ms, default 8000) and
+ * as itself (`game.undrawn` empty: townsfolk dressed, creatures warm; at most SET_DRAWN ms, default 6000) and
  * then until no shader was built for 1.5 s (at most SET_SETTLE ms, default 4000). Per shot the index has the
  * frame time (median and 95th percentile over SET_MEASURE ms, default 2000, no frame cap), the shader summary
  * (F3), the page's errors and what was not drawn; it marks a shot over 16.7 ms or more than twice as slow as
@@ -94,7 +94,7 @@ let failed = false, gpuName = '';
  * Waits until everything near the hero is drawn as itself (`game.undrawn` empty: no townsfolk still plain
  * figures, no creatures still warming), at most DRAWN ms; returns what is still waiting.
  */
-const DRAWN = Number(process.env.SET_DRAWN ?? 8000);
+const DRAWN = Number(process.env.SET_DRAWN ?? 6000);
 const drawn = (page) => page.waitForFunction(() => !window.game || window.game.undrawn.length === 0, null, { timeout: DRAWN, polling: 200 })
   .then(() => [], () => page.evaluate(() => window.game.undrawn));
 

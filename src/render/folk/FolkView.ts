@@ -157,7 +157,7 @@ export class FolkView {
   private warm = false;
   private waiting = 0;
 
-  /** How many plain figures stand within CLOSE in the camera's view (people being dressed or beyond the characters; before the warm-up ends at least 1). */
+  /** How many people within CLOSE in the camera's view are plain figures while their character is dressed (before the warm-up ends at least 1). */
   get undressed(): number { return this.warm ? this.waiting : Math.max(1, this.waiting); }
 
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
@@ -218,10 +218,10 @@ export class FolkView {
     // The rest (and those whose character is still being dressed) as plain figures.
     const plain = this.indoors ? [] : near.filter(([, a]) => !this.shown.get(a.person.id)?.ready);
     this.far.place(plain.map(([, a]) => a), this.height);
-    // How many of those plain figures stand close in view.
+    // How many of those, close in view, wait for a character (beyond the characters' count they stay plain).
     VIEW.setFromProjectionMatrix(SCRATCH.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     let waiting = 0;
-    for (const [d, a] of plain) if (d < CLOSE && VIEW.containsPoint(AT.set(a.x, this.height(a.x, a.z) + 1, a.z))) waiting++;
+    for (const [d, a] of plain) if (d < CLOSE && want.has(a.person.id) && VIEW.containsPoint(AT.set(a.x, this.height(a.x, a.z) + 1, a.z))) waiting++;
     this.waiting = waiting;
   }
 
