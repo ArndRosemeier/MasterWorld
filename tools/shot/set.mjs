@@ -8,8 +8,8 @@
  * or more than twice as slow as the town at noon (F2). A slow check (docs/CHECKS.md): one run must stay
  * under 5 min.
  * SET_ONLY=town,fight takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2;
- * SET_MEASURE=<ms> how long frame times are taken (default 3000); SET_SETTLE=<ms> how long the scene
- * settles first (default 3000). Exits 1 when a page failed or a shot breaks F2 or F3.
+ * SET_MEASURE=<ms> how long frame times are taken (default 2000); SET_SETTLE=<ms> the longest wait for the
+ * scene to settle (no shader built for 1.5 s; default 12000). Exits 1 when a page failed or a shot breaks F2 or F3.
  */
 import { execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -17,36 +17,45 @@ import { join } from 'node:path';
 import { launch } from './launch.mjs';
 
 const TIMEOUT = 120000;
-const SETTLE = Number(process.env.SET_SETTLE ?? 3000);
-const MEASURE = Number(process.env.SET_MEASURE ?? 3000);
+const SETTLE = Number(process.env.SET_SETTLE ?? 12000);
+const MEASURE = Number(process.env.SET_MEASURE ?? 2000);
 const BUDGET = 16.7, AIM = 12;
 const gl = process.env.SET_GL !== '0';
 // The clock stands still and the hud is off the picture (frame times are taken here, not read off it).
 const still = `title=0&day=0${gl ? '&gl' : ''}`;
 
+/** Another time and weather on the loaded page (the hour on the sky, a VGM order over all others). */
+const turn = (hour, kind) => (page) => page.evaluate(([hour, kind]) => {
+  const g = window.game, now = g.view.sky.day * 24 + g.view.sky.hour;
+  g.view.sky.hour = hour;
+  g.weather.cancel(now);
+  g.weather.order({ kind, from: -1e6, to: 1e6 });
+}, [hour, kind]);
+const close = async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(600); };
+
 /**
- * The sessions: one page load each, then its shots in order. A shot's `act` runs before it settles
- * (key presses on the page); `first` runs once the page is loaded instead of waiting for it to be ready.
+ * The sessions: one page load each (loads are most of the run's time), then its shots in order. A shot's
+ * `act` runs before it settles; `first` runs once the page is loaded, before waiting for it to be ready.
  */
 const SESSIONS = [
   { id: 'title', query: `title${gl ? '&gl' : ''}`, first: async (page) => {
     await page.waitForSelector('.t-gate', { timeout: TIMEOUT });
     await page.keyboard.press('Space'); // the title waits for a first press (sound needs one)
   }, shots: [{ name: 'title' }] },
-  { id: 'creator', query: `${still}&create&hour=11`, shots: [{ name: 'creator' }] },
+  { id: 'creator', query: `${still}&create&hour=11&weather=clear`, shots: [{ name: 'creator' }] },
   { id: 'town', query: `${still}&hour=12&weather=clear`, shots: [
     { name: 'town-noon' },
     { name: 'pack', act: (p) => p.keyboard.press('KeyI') },
-    { name: 'map', act: async (p) => { await p.keyboard.press('Escape'); await p.waitForTimeout(600); await p.keyboard.press('KeyM'); } },
+    { name: 'map', act: async (p) => { await close(p); await p.keyboard.press('KeyM'); } },
+    { name: 'town-dusk', act: async (p) => { await close(p); await turn(18.3, 'fair')(p); } },
+    { name: 'town-night', act: turn(23, 'clear') },
+    { name: 'town-rain', act: turn(14, 'rain') },
   ] },
-  { id: 'dusk', query: `${still}&hour=19.6&weather=fair`, shots: [{ name: 'town-dusk' }] },
-  { id: 'night', query: `${still}&hour=23&weather=clear`, shots: [{ name: 'town-night' }] },
-  { id: 'rain', query: `${still}&hour=14&weather=rain`, shots: [{ name: 'town-rain' }] },
   { id: 'cellar', query: `${still}&hour=12&cellar=2`, shots: [{ name: 'cellar' }] },
   { id: 'barrow', query: `${still}&hour=15&weather=fair&barrow`, shots: [{ name: 'barrow' }] },
   { id: 'wild', query: `${still}&hour=9&weather=fair&wild=deer`, shots: [{ name: 'wild' }] },
   { id: 'fight', query: `${still}&hour=10&weather=clear&wild=wolves`, shots: [
-    { name: 'fight', act: async (p) => { await p.waitForTimeout(2000); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
+    { name: 'fight', act: async (p) => { await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
   ] },
   { id: 'talk', query: `${still}&hour=20&talk=inn&topics=news`, shots: [{ name: 'talk' }] },
 ];
@@ -62,9 +71,25 @@ mkdirSync(dir, { recursive: true });
 
 // No frame cap: with vsync a GPU frame shows as the screen's 16.7 ms however little it costs.
 const { server, base, browser } = await launch({ args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } }); // one cache for all loads
 const t0 = Date.now();
 const rows = [];
 let failed = false, gpuName = '';
+
+/**
+ * Waits until no shader was built for 1.5 s (the scene is warm: what is still warming up is not its frame
+ * time), at least 1.5 s and at most SETTLE; returns how long that took (s).
+ */
+const quiet = (page) => page.evaluate(([most]) => new Promise((done) => {
+  const built = () => { const s = window.shaders?.summary(); return s ? s.warmup + s.run : 0; };
+  const t0 = performance.now();
+  let n = built(), since = t0;
+  const id = setInterval(() => {
+    const now = performance.now(), m = built();
+    if (m !== n) { n = m; since = now; }
+    if (now - since >= 1500 || now - t0 >= most) { clearInterval(id); done((now - t0) / 1000); }
+  }, 100);
+}), [SETTLE]);
 
 /** Frame intervals over `ms` (requestAnimationFrame), sorted: median, 95th percentile, mean. */
 const measure = (page) => page.evaluate((ms) => new Promise((done) => {
@@ -83,7 +108,7 @@ const measure = (page) => page.evaluate((ms) => new Promise((done) => {
 
 for (const s of sessions) {
   const errors = [];
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const page = await context.newPage();
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => { failed = true; errors.push(`page error: ${e.message}`); });
   const started = Date.now();
@@ -100,7 +125,7 @@ for (const s of sessions) {
   });
   for (const shot of s.shots) {
     if (shot.act) await shot.act(page);
-    await page.waitForTimeout(SETTLE);
+    const settled = await quiet(page);
     const ft = await measure(page);
     const file = `${String(rows.length + 1).padStart(2, '0')}-${shot.name}.jpg`;
     await page.screenshot({ path: join(dir, file), type: 'jpeg', quality: 92, timeout: TIMEOUT });
@@ -109,12 +134,13 @@ for (const s of sessions) {
       return m ? { ...m.summary(), lines: m.violations() } : null;
     });
     const backend = (await page.evaluate(() => window.game?.view?.backend ?? '')) || '';
-    rows.push({ name: shot.name, file, query: s.query, loadS, backend, ...ft, shaders: sh, errors: [...errors] });
-    console.log(`${file}: p50 ${ft.p50.toFixed(1)} ms · p95 ${ft.p95.toFixed(1)} ms · ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}${errors.length ? ` · ${errors.length} errors` : ''}`);
+    rows.push({ name: shot.name, file, query: s.query, loadS, settledS: settled, backend, ...ft, shaders: sh, errors: [...errors] });
+    console.log(`${file}: settled ${settled.toFixed(1)} s · p50 ${ft.p50.toFixed(1)} ms · p95 ${ft.p95.toFixed(1)} ms · ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}${errors.length ? ` · ${errors.length} errors` : ''}`);
     errors.length = 0;
   }
   await page.close();
 }
+await context.close();
 await browser.close();
 await server.close();
 
@@ -136,11 +162,11 @@ writeFileSync(join(dir, 'index.json'), JSON.stringify({ ...meta, shots: rows }, 
 const md = [
   `# Standard shots ${date} · ${commit}${dirty}`,
   '',
-  `${gpuName || 'unknown GPU'} · ${gl ? 'WebGL 2' : 'WebGPU'} · 1920×1080 · frame times over ${MEASURE / 1000} s after ${SETTLE / 1000} s settling, no frame cap · run took ${seconds.toFixed(0)} s`,
+  `${gpuName || 'unknown GPU'} · ${gl ? 'WebGL 2' : 'WebGPU'} · 1920×1080 · frame times over ${MEASURE / 1000} s once no shader was built for 1.5 s (at most ${SETTLE / 1000} s), no frame cap · run took ${seconds.toFixed(0)} s`,
   '',
-  '| Shot | p50 ms | p95 ms | Shaders (warm-up + later, worst) | Notes |',
-  '|---|---|---|---|---|',
-  ...rows.map((r) => `| [${r.name}](${r.file}) | ${r.p50.toFixed(1)} | ${r.p95.toFixed(1)} | ${r.shaders ? `${r.shaders.warmup} + ${r.shaders.run}, ${r.shaders.worstMs.toFixed(0)} ms` : '–'} | ${r.marks.join('; ') || 'ok'} |`),
+  '| Shot | p50 ms | p95 ms | Settled s | Shaders (warm-up + later, worst) | Notes |',
+  '|---|---|---|---|---|---|',
+  ...rows.map((r) => `| [${r.name}](${r.file}) | ${r.p50.toFixed(1)} | ${r.p95.toFixed(1)} | ${r.settledS.toFixed(1)} | ${r.shaders ? `${r.shaders.warmup} + ${r.shaders.run}, ${r.shaders.worstMs.toFixed(0)} ms` : '–'} | ${r.marks.join('; ') || 'ok'} |`),
   '',
   ...rows.filter((r) => r.errors.length || r.shaders?.lines.length).flatMap((r) => [`## ${r.name}`, '', ...[...(r.shaders?.lines ?? []), ...r.errors].map((l) => `- ${l}`), '']),
 ].join('\n');
