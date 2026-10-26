@@ -1,5 +1,5 @@
 /**
- * Load-time probe (F4, a slow check run after `npm run build`): `node tools/shot/load.mjs ["?query"]`.
+ * Load-time probe (F4, A7; a slow check run after `npm run build`): `node tools/shot/load.mjs ["?query"] [--record]`.
  * Opens the game as a player does (presses a key at the title's gate, so sound may start), and reports when the title
  * shows, when the world is playable (`__mwReady`), and what was downloaded until then, by folder. It fails when the
  * start downloads music other than the title's own theme (music streams: a piece loads when it first plays), or when
@@ -12,7 +12,9 @@ import { launch } from './launch.mjs';
 // `--record`: the pack files this start fetched become tools/packs/start.json, the start bundle's list
 // (tools/packs/bundle.mjs); the run fetches them one by one, so the bundle is set aside meanwhile.
 const record = process.argv.includes('--record');
-const [query = '?gl'] = process.argv.slice(2).filter((a) => a !== '--record');
+// The game's own default backend on a real GPU (WebGPU where the browser has it: what a player gets); WebGL in the
+// cloud's SwiftShader. Pass "?gl" to time the WebGL fallback on a GPU.
+const [query = process.env.SHOT_GPU ? '?' : '?gl'] = process.argv.slice(2).filter((a) => a !== '--record');
 const bundles = 'dist/packs/bundles.json';
 if (record && existsSync(bundles)) renameSync(bundles, `${bundles}.off`);
 const limits = process.env.LIMITS !== '0';
