@@ -79,6 +79,8 @@ export class SmallLifeView {
       const body = await animalBody('squirrel', s.seed, this.renderer, s.look);
       if (!body) return;
       body.place.visible = false;
+      // A squirrel's shadow is a speck: none, and no shadow shaders to build in play.
+      body.place.traverse((m) => { m.castShadow = false; });
       await preparePeople(this.stage, body.place);
       await this.stage.add(body.place);
       this.bodies.push({ look: s.look, body, who: null });

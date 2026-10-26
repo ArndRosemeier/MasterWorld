@@ -190,10 +190,10 @@ export class SmallLife {
   }
 
   /** The first squirrel on the ground, bird pecking on it, or flock in the air (for `small=`: look at them). */
-  sight(kind: 'squirrel' | 'birds' | 'flock'): { x: number; z: number } | null {
+  sight(kind: 'squirrel' | 'birds' | 'flock'): { x: number; y: number; z: number } | null {
     if (kind === 'squirrel') return this.squirrels.find((s) => !s.trunk) ?? null;
     if (kind === 'flock') {
-      for (const f of this.flocks.values()) if (f?.state === 'wheel') return { x: f.cx, z: f.cz };
+      for (const f of this.flocks.values()) if (f?.state === 'wheel') return { x: f.cx, y: f.cy, z: f.cz };
       return null;
     }
     return this.parties.find((p) => p.state === 'ground')?.birds[0] ?? null;

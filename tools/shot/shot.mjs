@@ -2,7 +2,7 @@
  * Headless screenshots: `npm run shot -- "<url query>" out.png [more pairs...]` (run `npm run build` first).
  * Serves the production build and renders in Chromium with SwiftShader (no GPU needed), so it works in a
  * cloud container; there use `?gl` (headless WebGPU is not reliable) and set CHROMIUM_PATH if Playwright's
- * own browser is not installed. Prints the HUD line, the shader report and the page's console errors.
+ * own browser is not installed. Prints the HUD, the shader report and the page's console errors.
  * SHOT_WAIT=<ms> waits that long after ready; SHOT_TIMEOUT=<ms> gives SwiftShader longer (default 5 min,
  * the slow-check limit in docs/CHECKS.md). SHOT_HOLD=<key codes, comma separated> holds those keys down
  * during the wait (KeyW: the hero runs). SHOT_LOG=1 prints all of the page's console, not only errors. SHOT_GPU=1 renders on the machine's own GPU instead (new headless
@@ -32,7 +32,7 @@ for (let i = 0; i < args.length; i += 2) {
   for (const k of hold) await page.keyboard.down(k);
   await page.waitForTimeout(Number(process.env.SHOT_WAIT ?? 0));
   await page.screenshot({ path: out, timeout: TIMEOUT });
-  const hud = (await page.textContent('#hud', { timeout: TIMEOUT }))?.split('\n')[0] ?? '';
+  const hud = (await page.textContent('#hud', { timeout: TIMEOUT })) ?? '';
   const shaders = await page.evaluate(() => window.shaders?.report?.() ?? 'shaders: no monitor');
   console.log(`${out}: ${hud}\n${shaders}`);
   await page.close();

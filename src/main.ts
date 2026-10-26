@@ -962,6 +962,15 @@ export async function start(b: Boot): Promise<void> {
         const near = lookSmall ? small.sight(lookSmall) : null;
         if (near) {
           standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
+          // With `fly`: the free camera close by, looking at it (the hero stays off where it does not alarm them).
+          if (player.flying) {
+            const p = player.walker.pos, k = Math.max(1, Math.hypot(p.x - near.x, p.z - near.z)), d = lookSmall === 'flock' ? 30 : 2.5;
+            const cx = near.x + (p.x - near.x) / k * d + (p.z - near.z) / k * d * 0.4, cz = near.z + (p.z - near.z) / k * d - (p.x - near.x) / k * d * 0.4;
+            const cy = lookSmall === 'flock' ? near.y - 6 : terrain.height(cx, cz) + 0.9;
+            player.fly.place(cx, cz, cy, true);
+            const dx = near.x - cx, dy = near.y + 0.1 - cy, dz = near.z - cz;
+            player.fly.setLook(Math.atan2(dx, -dz) * 180 / Math.PI, Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI);
+          }
           lookSmall = null;
         }
         if (out) for (const e of small.step(dt, { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed }, daylight(view.sky.hour), wx.shown.rain)) sounds?.wings(e);
