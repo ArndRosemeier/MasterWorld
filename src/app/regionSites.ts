@@ -2,12 +2,13 @@
  * The regions the VGM opens as the hero walks (plan 5.5, B1), in the game: asks the frontier (vgm/frontier.ts)
  * a few times a second for the next region and logs it, and draws the places in them (world/sites.ts)
  * once the hero comes within a walk of them, with the town's building shader (nothing new to build).
- * The walker cannot go through them, and trees keep out of their footprints.
+ * The walker cannot go through them, and trees keep out of their footprints. Hamlets and villages are
+ * towns of their size: app/settlements.ts draws those.
  */
 import type { Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { RegionsDef } from '../setting/contract';
-import type { DecisionLog, RegionDecision } from '../world/decisions';
+import { settlementOf, type DecisionLog, type RegionDecision } from '../world/decisions';
 import { hitsSolid, layOutSite, type SiteLayout } from '../world/sites';
 import type { RegionMap } from '../world/regions';
 import { fillOf, keyOf, nextRegion, regionDecisions, regionLine, regionMapOf, type FrontierContext, type RegionData } from '../vgm/frontier';
@@ -61,7 +62,8 @@ export class RegionSites {
     for (const d of all.slice(this.seen)) {
       this.map.open(keyOf(d), { fill: d.fill, decision: d.id }, () => ({ fill: this.host.regions.country, decision: d.id }));
       const place = fillOf(d, this.host.regions)?.place ?? 'none';
-      if (d.site && place !== 'none') this.sites.push({ decision: d, place, layout: null, mesh: null });
+      // Hamlets and villages are towns of their size (app/settlements.ts draws them).
+      if (d.site && place !== 'none' && !settlementOf(d, this.host.regions.fills)) this.sites.push({ decision: d, place, layout: null, mesh: null });
     }
     this.seen = all.length;
   }

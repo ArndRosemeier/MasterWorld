@@ -7,10 +7,10 @@ import { SHORE, Skeleton, emptySample } from './skeleton';
 import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
-import type { Decision, DecisionLog, RoadDecision, TownDecision } from './decisions';
+import { settlementOf, type Decision, type DecisionLog, type RoadDecision, type TownDecision } from './decisions';
 import { clearingOf, type Clearing } from './dungeon/site';
 import { RoadNet } from './roads';
-import type { Field } from '@futuremagic/settlement';
+import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
 
 export class Terrain {
@@ -38,7 +38,8 @@ export class Terrain {
   private readonly clearingMap = new Map<string, Clearing>();
 
   /**
-   * Build what the decision log says stands on the land (plan 5.1): rock volumes and towns. The land
+   * Build what the decision log says stands on the land (plan 5.1): rock volumes and towns (the start's,
+   * and the hamlets and villages the VGM founded in regions it opened). The land
    * under a town calms down (less small relief, a level market), so call this before anything is built
    * from the heights.
    */
@@ -50,10 +51,10 @@ export class Terrain {
     for (const d of log) {
       if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
       else if (d.kind === 'town') this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
-      else if (d.kind === 'road') this.roadNet.insert(d);
     }
     this.clearingMap.clear();
-    this.settleMore(log.filter((d) => d.kind === 'dungeon'));
+    // Roads, clearings, and the settlements founded in regions (after the towns of the log, in its order).
+    this.settleMore(log);
   }
 
   /**
@@ -77,11 +78,31 @@ export class Terrain {
         const c = clearingOf(d.template, d.site);
         if (c) this.clearingMap.set(d.id, c);
       } else if (d.kind === 'region' && d.site) {
-        // A place the VGM opened as the hero walked: its footprint and what its people cleared round it.
-        const f = this.setting.regions?.fills.find((k) => k.id === d.fill), { x, z, r } = d.site;
+        // A place the VGM opened as the hero walked: a settlement is a town of its size (its fields clear
+        // the wood); another place keeps its footprint and what was cleared round it free of trees.
+        const fills = this.setting.regions?.fills ?? [], town = settlementOf(d, fills);
+        if (town) { this.addTown(town); continue; }
+        const f = fills.find((k) => k.id === d.fill), { x, z, r } = d.site;
         if (f && f.place !== 'none') this.clearingMap.set(d.id, { x, z, r: r + (f.clearing ?? 0) });
       }
     }
+  }
+
+  /**
+   * A town founded while the game runs (a region's hamlet or village): its ground calms from now on.
+   * `plan`: its plan, if a worker planned it (planning takes too long for a frame); else planned when asked.
+   * Settling it twice changes nothing.
+   */
+  addTown(d: TownDecision, plan?: TownPlan): void {
+    if (this.townSpots.some((s) => s.d.id === d.id)) return;
+    this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
+    if (this.townList) this.townList.push(new Town(d, this, plan));
+  }
+
+  /** The town of this id (the start's or a settlement founded since), if it stands on this land. */
+  town(id: string): Town | undefined {
+    const i = this.townSpots.findIndex((s) => s.d.id === id);
+    return i < 0 ? undefined : this.towns[i];
   }
 
   /** Ground kept free of trees round the places out on the land (by the place's id). */

@@ -274,8 +274,8 @@ export interface RegionFillDef {
   /** How often, against the other fills that fit. */
   readonly weight: number;
   /** What stands there (none: plain country, nothing placed). */
-  readonly place: 'none' | 'hamlet' | 'camp' | 'ruin' | 'barrows';
-  /** Footprint radius of the place, metres (trees keep out of it). */
+  readonly place: 'none' | 'hamlet' | 'village' | 'camp' | 'ruin' | 'barrows';
+  /** Footprint radius of the place, metres (trees keep out of it); a hamlet's or village's outline radius (its fields reach farther). */
   readonly radius?: number;
   /** How much farther round the footprint the trees keep off, metres (fields and gardens cleared, firewood cut). */
   readonly clearing?: number;
