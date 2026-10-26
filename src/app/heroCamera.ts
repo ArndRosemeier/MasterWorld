@@ -17,8 +17,8 @@ const TURN = 2.6;
 const LOOK = 0.0035;
 /** Zoom range (m from the head); below FIRST it is first person. */
 const NEAR = 0, FAR = 18, FIRST = 0.6;
-/** A talk's view: this far behind the head at most, looking this much down (rad). */
-const TALK_ZOOM = 2.4, TALK_PITCH = -0.25;
+/** A talk's view (m): behind the hero's head, to its right, above the higher of the head and the aim. */
+const TALK_BACK = 1.3, TALK_SIDE = 0.45, TALK_UP = 0.55;
 
 export class HeroCamera {
   /** The camera's own direction (rad): yaw as the walker's, pitch up positive. */
@@ -105,30 +105,33 @@ export class HeroCamera {
     };
   }
 
-  /** Before a talk: the zoom and pitch it had. */
-  private beforeTalk: { zoom: number; pitch: number } | null = null;
+  /** In a talk: the camera holds the talk's view (`frameTalk`) instead of trailing. */
+  private talking = false;
 
   /**
-   * A talk's view (`on`), looking at (x, z) over the hero's shoulder from close behind and above, so
-   * that people in between (a room's drinkers) and a counter do not hide the one talked to; off: back
-   * to the view before.
+   * A talk's view (`on`): close over the hero's right shoulder and above the heads, looking at `at` (the
+   * one talked to, about chest high), so that neither people behind the hero (a room's drinkers), nor a
+   * counter in front, nor the posts of an open front hide them. Off: trailing again as before.
    */
-  frameTalk(on: boolean, head: Vector3, x = 0, z = 0): void {
-    if (on) {
-      this.beforeTalk ??= { zoom: this.zoom, pitch: this.pitch };
-      this.yaw = Math.atan2(head.x - x, head.z - z);
-      this.zoom = Math.min(this.zoom, TALK_ZOOM);
-      this.pitch = TALK_PITCH;
-    } else if (this.beforeTalk) {
-      ({ zoom: this.zoom, pitch: this.pitch } = this.beforeTalk);
-      this.beforeTalk = null;
+  frameTalk(on: boolean, head: Vector3, at?: Vector3): void {
+    this.talking = on && !!at;
+    if (!this.talking || !at) { this.trail(head, 0); return; }
+    const dx = at.x - head.x, dz = at.z - head.z, len = Math.hypot(dx, dz) || 1;
+    const fx = dx / len, fz = dz / len;
+    const eye = new Vector3(head.x - fx * TALK_BACK - fz * TALK_SIDE, Math.max(head.y, at.y) + TALK_UP, head.z - fz * TALK_BACK + fx * TALK_SIDE);
+    // Under a ceiling: down until clear of it.
+    for (let i = 0; i < 8; i++) {
+      const rock = this.world.rockSurface(eye.x, eye.y, eye.z);
+      if (rock === null || rock >= 0.3) break;
+      eye.y -= 0.1;
     }
-    this.dist = this.zoom;
-    this.trail(head, 0);
+    this.camera.position.copy(eye);
+    this.camera.lookAt(at);
   }
 
   /** Place the camera behind the hero's head (`head` the point it orbits). */
   trail(head: Vector3, dt: number): void {
+    if (this.talking) return;
     const cp = Math.cos(this.pitch);
     const dir = new Vector3(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
     // As far back as wanted, short of ground and rock (with a margin), eased out again after.

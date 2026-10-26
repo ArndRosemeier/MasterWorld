@@ -13,6 +13,9 @@ import { FlyCamera } from './flyCamera';
 import { HeroCamera } from './heroCamera';
 import { lookFromDegrees } from './look';
 
+/** Where a talk's view looks, above the ground (m): a halfling's face behind a counter, an adult's chest. */
+const TALK_AIM = 1.1;
+
 export class Player {
   readonly walker: Walker;
   readonly heroCam: HeroCamera;
@@ -144,9 +147,11 @@ export class Player {
     this.heroCam.trail(this.toHead(), 0);
   }
 
-  /** A talk's view, at (x, z) over the hero's shoulder (`on`), or the view from before it again. */
+  /** A talk's view of the one at (x, z) on the hero's ground, over the hero's shoulder (`on`), or trailing again. */
   frameTalk(on: boolean, x?: number, z?: number): void {
-    if (!this.flying) this.heroCam.frameTalk(on, this.toHead(), x, z);
+    if (this.flying) return;
+    const at = on && x !== undefined && z !== undefined ? new Vector3(x, this.walker.pos.y + TALK_AIM, z) : undefined;
+    this.heroCam.frameTalk(on, this.toHead(), at);
   }
 
   update(dt: number): void {
