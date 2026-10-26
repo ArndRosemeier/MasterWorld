@@ -27,6 +27,9 @@ const EXPOSURE = 1.15;
 /** In a building: the sky's light on the people there, and the eye's adaptation to the room (exposure). */
 const SHELTER_SKY = 0.45;
 const SHELTER_EXPOSURE = 1.7;
+/** Indoors the lamp lights the room at night as by day: the eye does not open up to the dark outside
+ *  (night exposure is about 3x the day's, which blew the lamp's wall out to white). */
+const SHELTER_EXPOSURE_CAP = 0.8;
 const LIGHT = 3.4;
 /** The environment (sky) light on the land and in the water's reflections. */
 export const ENV = 2.4;
@@ -255,7 +258,8 @@ export class SkyView {
     this.renderer.toneMappingExposure = L.exposure * this.exposure;
     if (this.look.length) {
       // Indoors the lamps set the colour: the day key (neutral).
-      const g = gradeAt(this.look, this.indoors ? 1 : sun[1]);
+      // In a building's room the same, as far as one is in (its lamp, not the night outside).
+      const g = gradeAt(this.look, this.indoors ? 1 : sun[1] + (1 - sun[1]) * this.shelter);
       GRADE.slope.value.set(...g.slope);
       GRADE.saturation.value = g.saturation;
     }
@@ -264,7 +268,8 @@ export class SkyView {
       const k = this.shelter, dim = 1 - k * (1 - SHELTER_SKY);
       this.scene.environmentIntensity *= dim;
       this.hemi.intensity *= dim;
-      this.renderer.toneMappingExposure *= 1 + k * (SHELTER_EXPOSURE - 1);
+      const room = Math.min(L.exposure, SHELTER_EXPOSURE_CAP) * this.exposure * SHELTER_EXPOSURE;
+      this.renderer.toneMappingExposure += (room - this.renderer.toneMappingExposure) * k;
     }
     if (this.indoors) {
       this.sun.intensity = 0;
