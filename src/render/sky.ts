@@ -17,6 +17,8 @@ import { ENV_SATURATION, FOG, fogNode } from './materials/weather';
 /** Half the side of the sun's shadow box around the camera, metres. */
 const SHADOW_EXTENT = 160;
 const SHADOW_MAP = 4096;
+/** Metres the shadow box may move between two draws of the map before it is drawn at once (a teleport). */
+const SHADOW_JUMP = 4;
 /**
  * Scale's rig is tuned for its bright city materials; the land is darker (physical albedos), so the lights
  * are stronger here, while the exposure (and so the sky) stays Scale's.
@@ -99,6 +101,13 @@ export class SkyView {
   private readonly lightDir = uniform(new Vector3(0, 1, 0));
   /** The weather the environment map was last rendered with. */
   private lastEnvWx = '';
+  /**
+   * The sun's shadow map is drawn every this many frames (and at once after a jump): drawing it took about 7 ms of
+   * a town frame on the reference machine (every caster drawn again). A shadow a frame late does not show.
+   */
+  shadowEvery = 2;
+  private shadowFrame = 0;
+  private readonly shadowAt = { x: Infinity, z: Infinity };
 
   constructor(
     private readonly renderer: WebGPURenderer,
@@ -149,6 +158,7 @@ export class SkyView {
     (sun as unknown as { colorNode: unknown }).colorNode = this.sunLight.mul(cloudShadow(this.U, positionWorld, this.lightDir)).mul(this.horizon.shade(positionWorld));
 
     sun.castShadow = true;
+    sun.shadow.autoUpdate = false; // drawn when `update` says (shadowEvery)
     sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
     sun.shadow.bias = -0.0004;
     const sc = sun.shadow.camera as OrthographicCamera;
@@ -269,6 +279,14 @@ export class SkyView {
     this.sun.position.set(fx + d[0] * r, focus.y + d[1] * r, fz + d[2] * r);
     this.sun.target.updateMatrixWorld();
     if (camera) { this.dome.position.copy(camera.position); this.stars.position.copy(camera.position); }
+    // The map keeps the box it was drawn with (three moves its matrix only when it draws), so a frame between
+    // draws still lines up; a jump of the box draws it at once.
+    const jumped = Math.hypot(fx - this.shadowAt.x, fz - this.shadowAt.z) > SHADOW_JUMP;
+    if (jumped || ++this.shadowFrame >= this.shadowEvery) {
+      this.shadowFrame = 0;
+      this.shadowAt.x = fx; this.shadowAt.z = fz;
+      this.sun.shadow.needsUpdate = true;
+    }
 
     // The environment map when the sun moved or the weather changed noticeably.
     const l = this.lastEnvSun;

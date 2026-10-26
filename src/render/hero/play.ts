@@ -36,7 +36,14 @@ export async function preparePeople(stage: Stage, obj: Object3D): Promise<void> 
   for (const o of hidden) o.visible = false;
 }
 
-/** Every mesh of an Actors person casts a shadow (but the anatomy, which clothes cover). */
+/**
+ * The parts of an Actors person too small or too hidden to show in a shadow: the anatomy (clothes cover it), the
+ * eyes, lashes, brows, teeth and tongue. Each would be a draw call more in every shadow map for nothing, and the
+ * lashes and brows (see-through and two-sided) two shadow shaders at once.
+ */
+const NO_SHADOW = /^(genitals|eyes|eyelashes|brows|teeth|tongue)/;
+
+/** Every mesh of an Actors person casts a shadow, but the bits in NO_SHADOW. */
 export function castShadows(o: Object3D): void {
-  o.traverse((m) => { if ((m as { isMesh?: boolean }).isMesh && !m.name.startsWith('genitals')) m.castShadow = true; });
+  o.traverse((m) => { if ((m as { isMesh?: boolean }).isMesh) m.castShadow = !NO_SHADOW.test(m.name); });
 }
