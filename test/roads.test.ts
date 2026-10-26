@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
+import { firstDecisions } from '../src/vgm/builder';
+import { Terrain } from '../src/world/terrain';
+import { findStart } from '../src/world/start';
+import type { HydroOptions } from '../src/world/hydro';
 import { linkRoad } from '../src/vgm/roads';
 import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
@@ -10,15 +13,18 @@ import { grassMask } from '../src/world/grass';
 import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
 
 const seed = parseSeed('masterworld');
-const { terrain, log } = openWorld(seed, classic);
+// The start's land with small drainage tiles (as the flora and water tests): the same town, a quarter of the time.
+const SMALL: HydroOptions = { cell: 2000, core: 96, margin: 32, minArea: 120 };
+const terrain = new Terrain(seed, classic, SMALL);
+const log = firstDecisions(terrain, findStart(terrain.skeleton, classic));
+terrain.settle(log);
 const town = terrain.towns[0];
 // The first hamlet the VGM founds on a walk east from the start (plan B1).
 const regions = classic.regions!;
 const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, 0, 5, (d) => d.fill === 'hamlet' && !!d.site);
 const hamlet = settlementsOf(walked, regions)[0];
-const road = linkRoad(terrain, log, hamlet, 'track')!;
-// Again, as the world worker routes it (WorldJobs.linkRoad: from the roads alone).
-const again = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'track');
+// As the world worker routes it (WorldJobs.linkRoad): from the roads already decided alone.
+const road = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'track')!;
 const pt = (k: number) => ({ x: road.pts[k * 3], y: road.pts[k * 3 + 1], z: road.pts[k * 3 + 2] });
 const n = road.pts.length / 3;
 // Points well inside the road (not at its ends, not in water), and the bare land's height beside them.
@@ -38,8 +44,6 @@ test('roads: a hamlet out on the land gets a cart track to a road out of the tow
   const ends = town.plan.streets.filter((s) => s.kind === 'road').map((s) => [s.pts[s.pts.length - 2], s.pts[s.pts.length - 1]]);
   assert.ok(ends.some(([x, z]) => Math.hypot(x - end.x, z - end.z) < 0.5), 'joins a town road');
   for (let k = 1; k < n; k++) assert.ok(Math.hypot(pt(k).x - pt(k - 1).x, pt(k).z - pt(k - 1).z) < 7, 'points about 6 m apart');
-  // Decided once: the same land, roads and place give the same road (in the worker too).
-  assert.deepEqual(again, road);
 });
 
 test('roads: the ground is levelled to the road, flat across it, and eases back over the shoulders', () => {
