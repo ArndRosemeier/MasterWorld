@@ -318,6 +318,42 @@ export class HydroTile {
     }
   }
 
+  /**
+   * Every river point within `within` metres of (x, z) (resampled points, STEP apart): its river, index and
+   * distance. For siting by the water (freshWater.ts).
+   */
+  riverPoints(x: number, z: number, within: number, visit: (r: River, k: number, d: number) => void): void {
+    const B = this.bucket;
+    const seen = new Set<number>();
+    for (let i = Math.floor((x - within) / B); i <= Math.floor((x + within) / B); i++) for (let j = Math.floor((z - within) / B); j <= Math.floor((z + within) / B); j++) {
+      const list = this.buckets.get(this.key(i, j));
+      if (list) for (let q = 0; q < list.length; q += 2) {
+        const ri = list[q], k = list[q + 1], id = ri * 65536 + k;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const r = this.rivers[ri], d = Math.hypot(r.xz[k * 2] - x, r.xz[k * 2 + 1] - z);
+        if (d <= within) visit(r, k, d);
+      }
+    }
+  }
+
+  /** Metres from (x, z) to the nearest river's edge (negative in the water), if one lies within `within`; else Infinity. */
+  riverEdge(x: number, z: number, within: number): number {
+    const B = this.bucket;
+    let best = Infinity;
+    for (let i = Math.floor((x - within) / B); i <= Math.floor((x + within) / B); i++) for (let j = Math.floor((z - within) / B); j <= Math.floor((z + within) / B); j++) {
+      const list = this.buckets.get(this.key(i, j));
+      if (list) for (let q = 0; q < list.length; q += 2) {
+        const r = this.rivers[list[q]], k = list[q + 1];
+        const ax = r.xz[k * 2], az = r.xz[k * 2 + 1], dx = r.xz[k * 2 + 2] - ax, dz = r.xz[k * 2 + 3] - az;
+        const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1), 0, 1);
+        const e = Math.hypot(x - ax - dx * t, z - az - dz * t) - (r.half[k] + (r.half[k + 1] - r.half[k]) * t);
+        if (e < best) best = e;
+      }
+    }
+    return best <= within ? best : Infinity;
+  }
+
   /** The water at (x, z): the nearest river whose valley reaches here, and the lake of this cell. */
   query(x: number, z: number, out: WaterHere = emptyWater()): WaterHere {
     out.river = false; out.dist = Infinity; out.lake = NaN; out.fallAt = Infinity; out.fallDrop = 0;
@@ -374,5 +410,13 @@ export class Hydrology {
 
   query(x: number, z: number, out: WaterHere = emptyWater()): WaterHere {
     return this.tileAt(x, z).query(x, z, out);
+  }
+
+  riverEdge(x: number, z: number, within: number): number {
+    return this.tileAt(x, z).riverEdge(x, z, within);
+  }
+
+  riverPoints(x: number, z: number, within: number, visit: (r: River, k: number, d: number) => void): void {
+    this.tileAt(x, z).riverPoints(x, z, within, visit);
   }
 }

@@ -2,7 +2,7 @@
  * The loop check (plan A6, design 11.3): a scripted hero plays an evening headless, the way a player
  * would: a new hero on the market is hailed by someone who has heard of trouble (later evenings: asks at
  * the inn for news) and hears a lead, walks there through the streets (or out over the land to a barrow), goes down and clears it with the fight bot (game/bot.ts), searches the bodies and chests,
- * climbs out, walks back, sells the finds, has the smith mend the gear, buys an upgrade, takes a room at
+ * climbs out, tells the household it is safe (they pay and pass on a rumour of the next lead), sells the finds, has the smith mend the gear, buys an upgrade, takes a room at
  * the inn and hears the next lead in the morning. A fall is played as designed (classic mode: the pack
  * stays where the hero fell, they wake at the inn or temple and go back for it). Every step is written to
  * the result, so a failure says where the evening broke. Pure: the land, the town, the VGM's leads, the
@@ -25,6 +25,7 @@ import { fallClassic, gather, remainsId, type Remains } from './death';
 import type { DelveSave } from './delve';
 import { fightBot } from './bot';
 import { defOf, type Item } from './items';
+import { rewardFor } from './reward';
 import { Market, itemWorth, type Merchant } from './trade';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
 import { lessonPrice, takeLesson, teacherOf } from './lessons';
@@ -176,13 +177,18 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   };
 
   const heard = new Set<string>();
+  /** The next lead a household passed on when told their place was safe. */
+  let rumour: ReturnType<typeof openPromises>[number] | null = null;
   try {
     promiseDue();
     const evenings = opts.evenings ?? 1;
     for (let e = 0; e < evenings; e++) {
       say(`evening ${e + 1}: power ${hero.power}, ${hero.coins} copper, ${hero.pack.length} in the pack`);
       let paid = 0;
-      const lead = e === 0 ? hailed() : hearLead(heard);
+      const fromRumour = rumour && openPromises(log).some((o) => o.id === rumour!.id) ? rumour : null;
+      if (fromRumour) say(`follows the rumour of ${fromRumour.id}`);
+      const lead = e === 0 ? hailed() : fromRumour ?? hearLead(heard);
+      rumour = null;
       heard.add(lead.id);
       const dungeon = dungeonOf(log, lead);
       if (!dungeon) throw new Broke(`no dungeon for ${lead.id}`);
@@ -234,10 +240,23 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         goDown();
       }
       if (left) throw new Broke(`cleared ${name} but never found the pack left at the fall`);
+      // Quiet, and the hero gone: back to its household to tell them (plan 4.2). They pay, the promise is
+      // kept, and with the next lead already about they pass on its rumour.
+      if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
+      const to = talk.reportTo(lead.id).map((id) => people.find((p) => p.id === id)).find((p) => !!p);
+      if (!to) throw new Broke(`nobody to tell that ${name} is safe`);
+      walkTo(`${talk.nameOf(to.id)}'s door`, ...front(town.plan.buildings[to.home]));
+      if (!talk.topics(to.id).some((t) => t.id === `report:${lead.id}`)) throw new Broke(`${talk.nameOf(to.id)} cannot be told that ${name} is safe`);
+      const reward = rewardFor(cellar, setting.creatures);
+      hero.coins += reward;
       const kept = keepPromise(log, lead.id, hours);
       if (kept) log = [...log, kept];
       cleared.push(lead.id);
       promiseDue();
+      const told = talk.toldSafe(to.id, lead.id, `paid ${reward}`);
+      rumour = openPromises(log).find((o) => told.heard.includes(o.id) && !heard.has(o.id)) ?? null;
+      say(`told ${talk.nameOf(to.id)} that ${name} is safe: paid ${reward} copper${rumour ? `, and heard a rumour of ${rumour.id}` : ''}`);
+      if (talk.ask(to.id, 'news').heard.includes(lead.id)) throw new Broke(`${talk.nameOf(to.id)} still tells of ${name} after hearing it is safe`);
 
       // Back in town: sell, mend, upgrade.
       const smith = merchant('smith'), trader = merchant('trader'), keeper = merchant('innkeeper');

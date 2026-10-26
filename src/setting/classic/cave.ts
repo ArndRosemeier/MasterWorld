@@ -10,7 +10,7 @@ export const cave: CellarLore = {
   words: {
     enter: 'You duck under the overhang and feel your way down into {place}.',
     quiet: 'Nothing stirs in {place} now. The household who told you of it will want to hear.',
-    thanks: 'Word that {place} is quiet has reached the household who told you of it; they press {coins} into your hand.',
+    thanks: '{place} is quiet? Then the hill road is safe again. Take {coins}, with our thanks.',
   },
   uses: [
     { id: 'mouth', name: 'the cave mouth', props: ['rubble', 'bones', 'straw'] },

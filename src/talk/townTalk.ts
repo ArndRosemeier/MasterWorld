@@ -48,6 +48,8 @@ export interface Reply {
   readonly opens?: string;
   /** Cellars (decision ids) this answer told the player about, and who told. */
   readonly heard: readonly string[];
+  /** The promise the hero just told this household was kept (its place is safe again). */
+  readonly reported?: string;
   /** The conversation is over (farewell). */
   readonly done: boolean;
 }
@@ -88,6 +90,10 @@ export class TownTalk {
   private readonly beckoned = new Set<number>();
   /** What each person offers besides talk (set by the game: trade, repairs, a room). */
   services: (person: number) => readonly Service[] = () => [];
+  /** Promises whose place has gone quiet, waiting for the hero to tell their household (plan 4.2). */
+  private readonly quiet = new Set<string>();
+  /** Promises kept: the household was told, and nobody speaks of the trouble any more. */
+  private readonly settled = new Set<string>();
   /** How each person's people stand with the hero (set by the game; none: as with any stranger). */
   manner: (person: Person) => Manner | null = () => null;
 
@@ -100,8 +106,11 @@ export class TownTalk {
     for (const f of folk) this.byId.set(f.person.id, f);
     this.cellars = [...cellars];
     this.open(saved?.session);
-    if (saved) this.leads.push(...saved.leads.filter((l) => this.cellarName.has(l)));
-    else this.spread(this.cellars);
+    if (saved) {
+      this.leads.push(...saved.leads.filter((l) => this.cellarName.has(l)));
+      for (const id of saved.settled ?? []) this.settled.add(id);
+      for (const id of saved.quiet ?? []) if (!this.settled.has(id)) this.quiet.add(id);
+    } else this.spread(this.cellars);
   }
 
   /**
@@ -213,11 +222,79 @@ export class TownTalk {
   knowersOf(ids: ReadonlySet<string>): Set<number> {
     const out = new Set<number>();
     for (const { hint } of this.cellars) {
-      if (!ids.has(hint.cellar)) continue;
+      if (!ids.has(hint.cellar) || this.quiet.has(hint.cellar) || this.settled.has(hint.cellar)) continue;
       for (const k of hint.knowers) out.add(k);
       for (const t of hint.told) out.add(t.to);
     }
     return out;
+  }
+
+  /**
+   * The place of a promise has gone quiet (its dwellers are gone and the hero has left): its household
+   * can be told. True when this is news (not already quiet or kept).
+   */
+  clear(id: string): boolean {
+    if (!this.cellarName.has(id) || this.quiet.has(id) || this.settled.has(id)) return false;
+    this.quiet.add(id);
+    return true;
+  }
+
+  /** Quiet and not yet told to its household. */
+  isQuiet(id: string): boolean { return this.quiet.has(id); }
+
+  /** Kept: the household knows it is safe again. */
+  isSettled(id: string): boolean { return this.settled.has(id); }
+
+  /** Who is told a promise's place is safe again: the household (with none grown, whoever they had told). */
+  reportTo(id: string): readonly number[] {
+    const hint = this.cellars.find((c) => c.hint.cellar === id)?.hint;
+    if (!hint) return [];
+    return hint.knowers.length ? hint.knowers : hint.told.map((t) => t.to);
+  }
+
+  /**
+   * The promise kept (told to its household, or kept before this was asked): everyone who knew of the
+   * trouble now knows it is over, so its hint lines stop and its lead is no longer a topic.
+   */
+  hush(id: string): void {
+    this.quiet.delete(id);
+    if (this.settled.has(id) || !this.cellarName.has(id)) return;
+    this.settled.add(id);
+    const hint = this.cellars.find((c) => c.hint.cellar === id)!.hint;
+    const observers = [...new Set([...hint.knowers, ...hint.told.map((t) => t.to)])].map(pid);
+    this.session.core.applyEvent({ id: `settled/${id}`, changes: [{ atom: { predicate: 'troubled', args: { subject: id }, polarity: false } }], observers, origin: { kind: 'vgm', promise: id } });
+  }
+
+  /**
+   * The hero tells `person` the place of promise `id` is safe again: the promise is kept, and they say
+   * `thanks` (the game pays). With a lead the hero has not heard of yet, they pass on its rumour (the
+   * journal and the map take it up as any lead heard).
+   */
+  toldSafe(person: number, id: string, thanks: string): Reply {
+    this.hush(id);
+    this.beckoned.delete(person);
+    const next = this.rumour(person, id);
+    return { text: next ? `${thanks} ${this.talk.cleared.rumour} ${next.text}` : thanks, heard: next ? next.heard : [], done: false, reported: id };
+  }
+
+  /** A lead the hero has not heard of, as `person` tells it (first-hand, or as hearsay passed to them now); null: none open. */
+  private rumour(person: number, except: string): Reply | null {
+    const open = this.cellars.filter(({ hint }) => {
+      const id = hint.cellar;
+      return id !== except && !this.settled.has(id) && !this.quiet.has(id) && !this.leads.includes(id);
+    });
+    // The newest promise first (what has just come up is what people talk of).
+    const pick = open[open.length - 1];
+    if (!pick) return null;
+    const id = pick.hint.cellar;
+    if (!pick.hint.knowers.includes(person)) {
+      const from = pick.hint.knowers[0] ?? pick.hint.told[0]?.from;
+      if (from === undefined) return null;
+      const plan = this.session.core.respond(pid(from), { function: 'ask', query: { predicate: 'troubled', args: { subject: id } }, speaker: pid(person) });
+      hearResponse(this.session.core, pid(from), pid(person), plan);
+    }
+    const r = this.respond(person, { function: 'ask', query: { predicate: 'troubled', args: { subject: id }, polarity: true } });
+    return r.heard.includes(id) ? r : null;
   }
 
   /** The guide sent this person over (true) or they gave up waiting (false). */
@@ -230,9 +307,17 @@ export class TownTalk {
     const t = this.talk.topics;
     if (this.mannerOf(person)?.refuse) return [{ id: 'bye', label: t.bye }];
     const out: Topic[] = [{ id: 'self', label: t.self }, { id: 'news', label: t.news, ...(this.beckoned.has(person) ? { lead: true } : {}) }];
-    // A cellar moved into again: only its newest story is a topic.
+    // A place gone quiet: its household can be told.
+    for (const id of this.quiet) {
+      if (!this.reportTo(id).includes(person)) continue;
+      const h = this.cellarHouse.get(id);
+      const own = h && !h.site && this.byId.get(person)?.person.home === h.building;
+      out.push({ id: `report:${id}`, label: cap(fill(this.talk.cleared.topic, { place: own ? this.talk.cleared.yours : this.cellarCalled(id) })), lead: true });
+    }
+    // A cellar moved into again: only its newest story is a topic; a quiet or kept one is none.
     this.leads.forEach((l, i) => {
       const place = (x: string) => this.cellarHouse.get(x)?.dungeon;
+      if (this.quiet.has(l) || this.settled.has(l)) return;
       if (this.leads.slice(i + 1).some((m) => place(m) === place(l))) return;
       out.push({ id: `lead:${l}`, label: cap(this.cellarCalled(l)), lead: true });
     });
@@ -272,7 +357,8 @@ export class TownTalk {
     if (curt && (topic === 'news' || topic === 'more' || topic === 'source' || topic.startsWith('lead:'))) return { text: curt, heard: [], done: false };
     if (topic === 'self') return this.respond(person, { function: 'social', topic: 'identity' });
     if (topic === 'news') this.beckoned.delete(person);
-    if (topic === 'news') return this.respond(person, { function: 'ask', query: { predicate: 'troubled' } });
+    // Only trouble still open is news (a place made safe is not).
+    if (topic === 'news') return this.respond(person, { function: 'ask', query: { predicate: 'troubled', polarity: true } });
     if (topic === 'more') return this.respond(person, { function: 'elaborate' });
     if (topic === 'source') {
       const a = this.told.get(person);
@@ -281,6 +367,7 @@ export class TownTalk {
     if (topic === 'bye') return { ...this.respond(person, { function: 'farewell' }), done: true };
     const service = this.services(person).find((s) => s.id === topic);
     if (service) return { text: service.line, heard: [], done: true, opens: service.id };
+    if (topic.startsWith('report:')) throw new Error(`a report is told with toldSafe(), not asked: ${topic}`);
     if (topic.startsWith('lead:')) return this.respond(person, { function: 'ask', query: { args: { subject: topic.slice(5) } } });
     throw new Error(`unknown topic ${topic}`);
   }
@@ -316,13 +403,17 @@ export class TownTalk {
 
   /** For the save (plan 17: the talk's evidence and the leads). */
   save(): TownTalkSave {
-    return { session: this.session.snapshot(), leads: [...this.leads] };
+    return { session: this.session.snapshot(), leads: [...this.leads], quiet: [...this.quiet], settled: [...this.settled] };
   }
 }
 
 export interface TownTalkSave {
   readonly session: SettingSnapshot;
   readonly leads: readonly string[];
+  /** Places gone quiet, not yet told (none in older saves). */
+  readonly quiet?: readonly string[];
+  /** Promises kept and told (none in older saves: the game settles what its log has kept). */
+  readonly settled?: readonly string[];
 }
 
 /** The subjects a plan's answers are about. */

@@ -105,6 +105,9 @@ const LAND: Readonly<Record<LandKind, { readonly ring: readonly [number, number]
   },
 };
 
+/** Spots on the ring tried for a place on the land (a town in a gentle river valley has few slopes for a cave). */
+const TRIES = 128;
+
 /**
  * A place promised out on the land near the town (plan 8: dungeon kinds besides cellars): on dry ground
  * that fits its kind (`LAND`), on a ring around the market, away from `avoid` (the wild's territories) and
@@ -119,7 +122,7 @@ export function promisePlace(kind: LandKind, seed: number, terrain: Terrain, tow
   const away = [...avoid, ...sitesIn(log, 150)];
   const rule = LAND[kind], [r0, r1] = rule.ring, fit = rule.fit(terrain, s);
   let best: { x: number; z: number; score: number; yaw?: number } | null = null;
-  for (let k = 0; k < 64; k++) {
+  for (let k = 0; k < TRIES; k++) {
     const d = r0 + (r1 - r0) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
     const x = tx + Math.cos(a) * d, z = tz + Math.sin(a) * d;
     if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < 3) continue;

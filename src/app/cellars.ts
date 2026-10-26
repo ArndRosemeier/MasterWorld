@@ -36,6 +36,8 @@ import type { BuildingMesh } from '@futuremagic/settlement';
 import { moveIn, occupantId, outlineCellar, type Cellar, type DungeonPlace } from '../world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
 import { fill } from '../talk/folk';
+import { cap } from '../talk/townTalk';
+import { rewardFor } from '../game/reward';
 import type { Town } from '../world/town';
 import { Encounter, type Arena, type FightCue, type FightHost } from './encounter';
 import { CellarVisit } from './cellarVisit';
@@ -213,9 +215,28 @@ export class Cellars {
     return out;
   }
 
+  /** Promises kept since loading (their households were told). */
+  private readonly kept = new Set<string>();
+
+  /**
+   * A promise kept: its household was told the place is safe (`id`: the dungeon's, or the move-in's).
+   * What they pay and how they thank the hero; null for a promise with no place here.
+   */
+  keep(id: string): { readonly coins: number; thanks(coins: string): string } | null {
+    for (const s of this.sites.values()) {
+      if (occupantId(s.cellar) !== id) continue;
+      this.kept.add(id);
+      if (s.ready) s.ready.fight.paid = true;
+      const words = loreOf(this.host.setting, s.decision.template).words ?? CELLAR_WORDS;
+      return { coins: rewardFor(s.cellar, this.host.setting.creatures), thanks: (coins) => cap(fill(words.thanks, { place: s.cellar.house, coins })) };
+    }
+    return null;
+  }
+
   /** What each cellar's visit changed, by promise id (cellars not built since loading keep what the save had). */
   diffs(): Record<string, CellarDiff> {
     const out: Record<string, CellarDiff> = { ...this.saved };
+    for (const id of this.kept) out[id] = { ...(out[id] ?? { open: [], keys: [], read: [] }), paid: true };
     for (const s of this.sites.values()) {
       const b = s.ready;
       if (!b) continue;
@@ -343,9 +364,8 @@ export class Cellars {
       get shown() { return visit.inside; },
       enclosed: true, place: `this ${s.decision.template === 'tower' ? 'tower' : s.decision.template}`, danger, promise: own,
       quietLine: fill(words.quiet, { place }),
-      thanks: (coins) => fill(words.thanks, { place, coins }),
     };
-    b.fight = new Encounter(arena, b.delve, b.creatures, h.hud, h.player, h.notes, h.director, h.setting, h.journal, h.camera, h.canvas, h.fight, !!mine?.paid);
+    b.fight = new Encounter(arena, b.delve, b.creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight, !!mine?.paid || this.kept.has(own));
     b.fight.onCue = (c) => h.cue(c);
   }
 
@@ -359,7 +379,7 @@ export class Cellars {
 const CELLAR_WORDS = {
   enter: 'You climb down into the cellar of {place}.',
   quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',
-  thanks: 'The household of {place} hears the cellar is safe and presses {coins} into your hand.',
+  thanks: 'Quiet down there at last? Here, {coins}, and our thanks.',
 };
 
 /** A tower's keep for its rooms: as wide and deep as the rooms above the ground, as many storeys as they climb. */

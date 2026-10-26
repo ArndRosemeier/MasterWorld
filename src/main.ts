@@ -82,9 +82,10 @@ import { HandOver } from './app/handOver';
 import { Orientation, mastery } from './game/orientation';
 import { Compass, type SkyGlyph } from './app/compass';
 import { talkCellar, townTalk } from './talk/townTalk';
+import { fill } from './talk/folk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
-import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, type SaveData } from './app/saveGame';
+import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
 import { Market, itemWorth } from './game/trade';
@@ -138,15 +139,19 @@ export async function start(b: Boot): Promise<void> {
     if (errors.length) throw new Error(errors.join('; '));
     // A load asked for before this start: the world is built again from the save's seed.
     const loaded = await pendingLoad(setting);
-    const save = typeof loaded === 'object' ? loaded : null;
-    // The title's Continue: straight on with a loaded save, or offered when one is kept.
-    if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
-    else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
-    const seedText = save?.seed ?? params.seed;
+    const asked = typeof loaded === 'object' ? loaded : null;
+    const seedText = asked?.seed ?? params.seed;
     const seed = parseSeed(seedText);
     loading.set('Finding the start');
     // The VGM's first decisions: the start town (and the arch outside it) stand on the land.
     const opened = openWorld(seed, setting);
+    // A save whose start town stood elsewhere (before D49 moved it to its river) belongs to a world that is
+    // gone: a new game begins in this one.
+    const lost = asked !== null && startMoved(asked.log, opened.log);
+    const save = lost ? null : asked;
+    // The title's Continue: straight on with a loaded save, or offered when one is kept.
+    if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
+    else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const { terrain } = opened;
     const town = terrain.towns[0];
     const home = town ? marketStart(town.plan) : opened.home;
@@ -484,6 +489,7 @@ export async function start(b: Boot): Promise<void> {
     await view.stage.add(wx.precip);
 
     const notes = new Notes();
+    if (lost) notes.say('That save was made before the town moved to its river: its world is gone, so a new game begins.', 10);
     // The Director watching over the pacing, the fight's HUD and the journal (the cellars report to them).
     const director = new Director(setting.director, save?.director ?? undefined);
     // One life (roguelike): the Director is stricter with fairness (plan 11.1).
@@ -494,6 +500,8 @@ export async function start(b: Boot): Promise<void> {
     // Every cellar the VGM promised under the town's houses: the first is built now, the others when the hero steps into the house above.
     const firstPromise = firstDungeon(log);
     const house = firstPromise ? houseOf(firstPromise, terrain.towns) : null;
+    /** A place gone quiet with the hero away from it: its household waits to be told (set once the town talks). */
+    let quietPlace: ((id: string) => boolean) | null = null;
     // What the fights (down in a cellar, out on the land) ask of the game.
     const fightHost: FightHost = {
       get bindings() { return settings.current.bindings; },
@@ -525,14 +533,7 @@ export async function start(b: Boot): Promise<void> {
       },
       still: (on) => paused(on),
       armed: armHero,
-      kept: (id) => {
-        const k = keepPromise(log, id, hours());
-        if (k) log = [...log, k];
-        // The household's people think better of the hero (and the others hear of it).
-        const who = life ? householdOf(log, id, life.agents.map((a) => a.person)) : null;
-        const own = who ? standing.keptFor(who.race).find((c) => c.people.id === who.race) : undefined;
-        if (own) notes.say(changeLine(own), 5);
-      },
+      quiet: (id) => quietPlace?.(id) ?? false,
     };
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
@@ -694,6 +695,17 @@ export async function start(b: Boot): Promise<void> {
       titleHolds: () => !!title?.holding || !!creator?.showing || !window.__mwReady,
     });
     const townWords = town && life ? townTalk(seed, setting, town, life.agents.map((a) => a.person), log, save?.talk ?? undefined).talk : null;
+    // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
+    for (const id of keptOf(log)) townWords?.hush(id);
+    // A place gone quiet: the journal says whom to tell, and the map marks their door.
+    if (townWords && town && life) quietPlace = (id) => {
+      if (!townWords.clear(id)) return true;
+      const to = townWords.reportTo(id)[0], p = life.agents.find((a) => a.person.id === to)?.person;
+      if (p === undefined) return true;
+      const name = townWords.nameOf(p.id), house = townWords.homeCalled(p.id), door = town.plan.buildings[p.home].door;
+      journal.quiet(id, { text: fill(setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
+      return true;
+    };
     // Who knows the hero from before (plan 11.4): their greeting names them.
     const friendsOf = (bg: BackgroundDef | undefined) => (bg && life ? acquaintances(bg, life.agents.map((a) => a.person)) : []);
     const meetOldFriends = () => {
@@ -734,6 +746,23 @@ export async function start(b: Boot): Promise<void> {
         notes.say(`${lead.note} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 6);
       },
       serve: (id, a) => services.get(id)?.(a),
+      report: (id, a) => {
+        // The household hears it is safe again: they pay, the promise is kept, and the VGM's next lead may come up in the same breath.
+        const due = cellars.keep(id);
+        const coins = due?.coins ?? 0;
+        character.coins += coins;
+        if (coins) sounds?.cue({ kind: 'paid', coins });
+        const k = keepPromise(log, id, hours());
+        if (k) log = [...log, k];
+        journal.fulfil(id);
+        director.met('purpose');
+        // The household's people think better of the hero (and the others hear of it).
+        const who = householdOf(log, id, life.agents.map((p) => p.person));
+        const own = who ? standing.keptFor(who.race).find((c) => c.people.id === who.race) : undefined;
+        if (own) notes.say(changeLine(own), 5);
+        promiseDue();
+        return townWords.toldSafe(a.person.id, id, due ? due.thanks(coinText(coins)) : '');
+      },
       get roomPeople() { return rooms?.inside && life ? rooms.people(life) : null; },
     }) : null;
     // A room at the inn and the smith's mending (plan 11.5): two more services.
@@ -1056,6 +1085,11 @@ export async function start(b: Boot): Promise<void> {
       builderClock += dt;
       if (builderClock < 3 || !town || !life || title?.holding || creator?.showing) return;
       builderClock = 0;
+      promiseDue();
+    };
+    /** The Builder's next promise, if one is due now: into the log, and told to the town. */
+    const promiseDue = (): void => {
+      if (!town || !life) return;
       const d = nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id), dungeons: setting.dungeons, terrain, avoid: wild?.territories ?? [] });
       if (!d) return;
       console.info(`[vgm] ${d.kind} ${d.id}${d.kind === 'move-in' ? ` into ${d.dungeon}` : ''} at ${hours().toFixed(1)} h`);
