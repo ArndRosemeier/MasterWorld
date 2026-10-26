@@ -122,8 +122,8 @@ export class CellarVisit {
 
   private event(e: SpaceEvent): void {
     this.view.opened(e.link);
-    const piece = e.link === this.cellar.pieceLink && this.cellar.setPiece.id === 'bricked-wall';
-    const text = { key: 'You find a key on a nail by the door.', unlocked: 'The key turns, stiffly. The door gives.', unbarred: 'You lift the bar from its brackets. The way back is open.', found: piece ? 'The pale bricks give under your shoulder: a way through.' : 'A draught from the wall: a hidden door.' }[e.kind];
+    const own = e.link === this.cellar.pieceLink ? this.cellar.setPiece.found : undefined;
+    const text = own && (e.kind === 'found' || e.kind === 'unbarred') ? own : { key: 'You find a key on a nail by the door.', unlocked: 'The key turns, stiffly. The door gives.', unbarred: 'You lift the bar from its brackets. The way back is open.', found: 'A draught from the wall: a hidden door.' }[e.kind];
     this.notes.say(text);
   }
 }

@@ -8,7 +8,7 @@
 
 import type { GradeKey } from '@futuremagic/stage';
 
-export const CONTRACT_VERSION = 7;
+export const CONTRACT_VERSION = 8;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -369,6 +369,8 @@ export interface TalkDef {
   readonly lead: string;
   /** The note when a place is marked on the player's map (`{name}` who marks it, `{house}`). */
   readonly marked: string;
+  /** The line in the talk as the hero hands over the map to be marked (`{name}` who takes it). */
+  readonly handOver: string;
 }
 
 /**
@@ -406,6 +408,57 @@ export interface BackgroundDef {
   readonly known: readonly { readonly trade: string; readonly line: string }[];
 }
 
+/**
+ * What a townsperson is about in one part of their day (plan 9.2). The simulation turns each into the
+ * places that fit it: `work` is their trade's tools, `errands` the well, the stalls and the shops, `inn`
+ * the inn's rooms and tables, `temple` the temple, `home` indoors at home, `lodge` the inn for a guest.
+ */
+export const DAY_TASKS = ['sleep', 'rise', 'meal', 'work', 'chores', 'errands', 'leisure', 'home', 'inn', 'temple', 'play', 'lodge'] as const;
+export type DayTask = (typeof DAY_TASKS)[number];
+
+/** The traits that tilt a choice (0..1 each person). */
+export type DayTrait = 'social' | 'diligent' | 'pious';
+
+/** One part of a day: from hour `at` (0..24) until the next part starts. */
+export interface DayPart {
+  readonly at: number;
+  readonly do: DayTask;
+  /**
+   * On some days, for some people, something else instead (decided once a day): `chance` is the share
+   * of people on an average day; with a `trait` it scales with it (twice the chance at 1, none at 0).
+   */
+  readonly or?: { readonly do: DayTask; readonly chance: number; readonly trait?: DayTrait };
+}
+
+/** A day plan: a working day and a rest day (the rest day falls back to the routines' `restday`). */
+export interface RoutineDef {
+  readonly workday: readonly DayPart[];
+  readonly restday?: readonly DayPart[];
+}
+
+/**
+ * The townsfolk's days (plan 9.2): a routine for each part people play in town (the simulation's roles:
+ * trade, trader, keeper, hand, homemaker, child, traveller), trades that keep other hours (the baker
+ * before dawn, the innkeeper into the night), and the week with its rest day. Every town of the
+ * setting lives by these; a town without an inn or temple sends people home instead.
+ */
+export interface RoutinesDef {
+  /** Days in a week, and which of them (0-based, day 0 is the first of the game) is the rest day. */
+  readonly week: number;
+  readonly restDay: number;
+  /** The rest day for everyone without a rest day of their own. */
+  readonly restday: readonly DayPart[];
+  /** Early risers start up to this many hours sooner, late ones as much later (all but midnight). */
+  readonly shift: number;
+  /** And each day varies by up to this many hours either way. */
+  readonly jitter: number;
+  /** When it is dark (hours): out of doors only what has to be. */
+  readonly dark: readonly [number, number];
+  readonly roles: Readonly<Record<string, RoutineDef>>;
+  /** Trades that keep their own hours, by trade ('baker', 'innkeeper', 'farmer' ...). */
+  readonly trades: Readonly<Record<string, RoutineDef>>;
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -428,6 +481,8 @@ export interface SettingModule {
   readonly hero: HeroLooksDef;
   /** The pasts a hero can choose (plan 11.4), the first the default. */
   readonly backgrounds: readonly BackgroundDef[];
+  /** How the townsfolk spend their days. */
+  readonly routines: RoutinesDef;
   /** The setting's colour key over the day; without it the engine's neutral grade. */
   readonly look?: LookDef;
 }
@@ -511,6 +566,7 @@ export function validateSetting(m: SettingModule): string[] {
   if (!t.nothing.length) out.push(`${where}: talk.nothing is empty`);
   if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
   out.push(...validateFight(m, where));
+  out.push(...validateRoutines(m.routines, where));
   return out;
 }
 
@@ -554,5 +610,29 @@ function validateFight(m: SettingModule, where: string): string[] {
   }
   for (const d of m.dungeons.cellar.dwellers) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: cellar dweller "${d.id}" creature "${c}" is unknown`);
   if (!m.abilities.length) out.push(`${where}: no abilities`);
+  return out;
+}
+
+/** Day plans: rising hours from midnight, known tasks, a rest day in the week, every role covered. */
+export function validateRoutines(r: RoutinesDef, where: string): string[] {
+  const out: string[] = [];
+  if (!(Number.isInteger(r.week) && r.week >= 1)) out.push(`${where}: routines.week must be a whole number of days`);
+  if (!(Number.isInteger(r.restDay) && r.restDay >= 0 && r.restDay < r.week)) out.push(`${where}: routines.restDay must be a day of the week`);
+  if (!(r.shift >= 0 && r.shift <= 2) || !(r.jitter >= 0 && r.jitter <= 1)) out.push(`${where}: routines.shift must be 0..2 h and jitter 0..1 h`);
+  const day = (name: string, parts: readonly DayPart[]) => {
+    if (!parts.length || parts[0].at !== 0) out.push(`${where}: routine ${name} must start at hour 0`);
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      if (!(p.at >= 0 && p.at < 24) || (i > 0 && !(p.at > parts[i - 1].at))) out.push(`${where}: routine ${name} hours must rise within 0..24`);
+      for (const t of [p.do, p.or?.do]) if (t && !DAY_TASKS.includes(t)) out.push(`${where}: routine ${name} task "${t}" is unknown`);
+      if (p.or && !(p.or.chance >= 0 && p.or.chance <= 1)) out.push(`${where}: routine ${name} chance must be 0..1`);
+    }
+  };
+  day('restday', r.restday);
+  for (const [k, d] of [...Object.entries(r.roles).map(([k, d]) => [`role ${k}`, d] as const), ...Object.entries(r.trades).map(([k, d]) => [`trade ${k}`, d] as const)]) {
+    day(`${k} workday`, d.workday);
+    if (d.restday) day(`${k} restday`, d.restday);
+  }
+  for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child', 'traveller']) if (!r.roles[k]) out.push(`${where}: routines.roles has no "${k}"`);
   return out;
 }

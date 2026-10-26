@@ -154,9 +154,11 @@ export class Walker {
     v.x += (fx * speed - v.x) * a;
     v.z += (fz * speed - v.z) * a;
 
-    // Across: blocked by rock (try each axis alone, to slide along a wall) and by too steep a slope.
+    // Across: blocked by rock (try each axis alone, to slide along a wall) and by too steep a slope. A body
+    // already in something (placed against a tree) may move, so it can walk out.
+    const stuck = this.blocked(p.x, p.y, p.z);
     const tryMove = (nx: number, nz: number): boolean => {
-      if (this.blocked(nx, p.y, nz)) return false;
+      if (!stuck && this.blocked(nx, p.y, nz)) return false;
       if (this.mode === 'ground') {
         const run = Math.hypot(nx - p.x, nz - p.z);
         const rise = this.support(nx, nz, p.y) - p.y;

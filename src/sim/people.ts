@@ -2,7 +2,7 @@
  * The townsfolk (plan 9.2): who lives in which house, what each does for a living, and their day.
  * Households come from the town plan; the first of a house with a trade works it, the market's stalls
  * get traders, the temple a keeper, and the rest keep house, lend a hand at a trade or, as children,
- * play. Traits (sociable, diligent, pious, early riser) shift the day and the choices. Pure.
+ * play. Traits (sociable, diligent, pious, early riser) shift the day (routines.ts) and the choices. Pure.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { distToPoly, type TownPlan } from '@futuremagic/settlement';
@@ -36,8 +36,8 @@ export interface Person {
   seed: number;
 }
 
-/** The parts of a day (each person's own hours). */
-export type Block = 'sleep' | 'morning' | 'work' | 'meal' | 'evening' | 'away';
+/** Buildings whose whole household works there. */
+const FAMILY_TRADES = new Set<string>(['inn', 'farmhouse']);
 
 /** Everyone living in a town. */
 export function townsfolk(plan: TownPlan, seed: number): Person[] {
@@ -58,8 +58,10 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
       if (k === 0 && b.trade) { houseOne(b.id, b.id, 'trade', b.trade); adults++; continue; }
       if (adults < 2 || r.chance(0.15)) {
         adults++;
-        // Some lend a hand at a trade in town, most keep house.
-        if (trades.length && r.chance(0.3)) { const t = r.pick(trades); houseOne(b.id, t.id, 'hand', t.trade); } else houseOne(b.id, -1, 'homemaker', '');
+        // A household that lives by its own place (the inn, a farm) all work it; elsewhere some lend a
+        // hand at a trade in town, most keep house.
+        if (b.trade && FAMILY_TRADES.has(b.kind)) houseOne(b.id, b.id, 'hand', b.trade);
+        else if (trades.length && r.chance(0.3)) { const t = r.pick(trades); houseOne(b.id, t.id, 'hand', t.trade); } else houseOne(b.id, -1, 'homemaker', '');
       } else houseOne(b.id, -1, 'child', '');
     }
   }
@@ -69,7 +71,7 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     .sort((a, b) => marketDist(plan, a.home) - marketDist(plan, b.home));
   for (const p of byMarket.slice(0, stalls)) p.role = 'trader';
   // The temple's keeper lives nearest to it.
-  const temple = plan.buildings.find((b) => b.kind === 'temple');
+  const temple = buildingOf(plan, 'temple');
   if (temple) {
     const near = people.filter((p) => p.role === 'homemaker')
       .sort((a, b) => dist(plan, a.home, temple.cx, temple.cz) - dist(plan, b.home, temple.cx, temple.cz))[0];
@@ -85,7 +87,7 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     else if (b.kind === 'inn') p.race = 'halfling';
   }
   // The odd elf passing through, lodging at the inn while in town (away()).
-  const inn = plan.buildings.find((b) => b.kind === 'inn');
+  const inn = buildingOf(plan, 'inn');
   if (inn) {
     const elf = houseOne(inn.id, -1, 'traveller', '');
     elf.race = 'elf';
@@ -93,6 +95,9 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
   }
   return people;
 }
+
+/** The town's first building of a kind (its inn, its temple), if it has one. */
+export const buildingOf = (plan: TownPlan, kind: string) => plan.buildings.find((b) => b.kind === kind);
 
 const marketDist = (plan: TownPlan, home: number) => {
   const b = plan.buildings[home];
@@ -113,15 +118,4 @@ export function away(p: Person, hours: number): boolean {
   const r = new Rng(deriveSeed(p.seed, 'visit', k));
   const from = r.range(9, 15), to = 24 + r.range(10, 15);
   return t < from || t >= to;
-}
-
-/** Which part of their day a person is in at `hour` (0..24). */
-export function blockAt(p: Person, hour: number): Block {
-  const h = ((hour % 24) + 24) % 24;
-  const wake = 5.5 + p.early * 1.5, bed = p.role === 'child' ? 20 + p.early * 0.5 : 21 + p.social * 1.5;
-  if (h < wake || h >= bed) return 'sleep';
-  if (h < wake + 1) return 'morning';
-  if (h >= 12 - p.diligent * 0.25 && h < 13 - p.diligent * 0.25) return 'meal';
-  if (h < 17 + p.diligent * 0.75) return 'work';
-  return 'evening';
 }

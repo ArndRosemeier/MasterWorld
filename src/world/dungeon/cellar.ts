@@ -155,8 +155,8 @@ export function outlineCellar(d: DungeonDecision, house: TownBuilding, lore: Cel
   const known = new Set(PATTERNS.map((p) => p.id));
   const fitting = (ids: readonly string[]) => ids.filter((id) => known.has(id) && (minLevel < 0 || !PATTERNS.find((p) => p.id === id)!.descends));
   const main = fitting(sketch.setPiece.main ?? told);
-  const inserts = fitting([...new Set([...told, 'twin-paths', 'side-loop', 'barred-return', 'hidden-shortcut'])]);
   const prefer = sketch.setPiece.prefer ?? [];
+  const inserts = fitting([...new Set([...told, ...prefer, 'twin-paths', 'side-loop', 'barred-return', 'hidden-shortcut'])]);
   const weight = (id: string) => 0.3 + told.filter((t) => t === id).length + (prefer.includes(id) ? 2 : 0);
   // Entrance: the house's cellar under its footprint.
   const ew = Math.max(2, Math.min(5, Math.floor(house.hu))), ed = Math.max(2, Math.min(5, Math.floor(house.hv)));
@@ -166,8 +166,8 @@ export function outlineCellar(d: DungeonDecision, house: TownBuilding, lore: Cel
     const link = sketch.setPiece.find(graph);
     if (!link) continue;
     const walk = pace(graph);
-    // The way to the goal never needs a hidden door, and is more than a step.
-    if (walk.needsSecret || new Set(walk.route).size < 3) continue;
+    // The way to the goal never needs a hidden door, is more than a step, and has a quicker way back.
+    if (walk.needsSecret || !walk.shortcut || new Set(walk.route).size < 3) continue;
     const layout = layoutDungeon(graph, seed, {
       entrance: { x: -(ew >> 1), z: -(ed >> 1), w: ew, d: ed },
       radius: 16,
@@ -189,6 +189,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
   const built = layerOf(sketch, 'built')!.def, older = layerOf(sketch, 'older')?.def, trouble = layerOf(sketch, 'trouble')!.def, now = sketch.dweller;
   const piece = sketch.setPiece;
   const link = graph.links.find((l) => l.id === pieceLink)!;
+  const pieceRoom = piece.use && useById.has(piece.use.id) ? piece.use.room(graph, link) : -1;
 
   // Room uses: the entrance is the household's, the goal the dwellers' lair; below lies the older layer;
   // dug rooms are burrows; the safe spot a dry little room; the rest follow the builders, then the troubles
@@ -204,7 +205,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     if (r.id === graph.entrance) u = built.uses[0];
     else if (r.id === graph.goal) { u = now.lair; era = 'now'; }
     else if (r.id === p.safe) u = 'refuge';
-    else if (piece.id === 'broken-floor' && r.id === link.a) { u = 'collapse'; era = 'trouble'; }
+    else if (r.id === pieceRoom) { u = piece.use!.id; era = piece.use!.era ?? 'trouble'; }
     else if (r.level < 0 && olderUse) { u = olderUse(); era = 'older'; }
     else if (r.tags.includes('dug')) { u = 'burrow'; era = 'now'; }
     else if (r.tags.includes('key') && built.uses.includes('counting-room')) u = 'counting-room';
@@ -230,13 +231,13 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     }
     return out;
   };
-  const put = (room: number, kind: DungeonProp, trace?: HistoryLayer, clue?: number) => {
+  const put = (room: number, kind: DungeonProp, trace?: HistoryLayer, clue?: number): boolean => {
     const R = placed[room];
     const clear = (s: { x: number; z: number }) => !props.some((q) => q.room === room && Math.hypot(q.x - (s.x + 0.5) * CELL, q.z - (s.z + 0.5) * CELL) < 1.2);
     let spots = wallSpots(room).filter(clear);
     // A full room: crowd it (props may stand closer).
     if (!spots.length) spots = wallSpots(room);
-    if (!spots.length) return;
+    if (!spots.length) return false;
     const s = spots[rng.int(0, spots.length - 1)];
     // Against the wall, facing into the room; yaw: −z is 0 (as the walker), facing away from the wall.
     const inset = 0.55;
@@ -244,6 +245,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     const z = (s.z + 0.5) * CELL + DIRS[s.dir][1] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][0] !== 0 ? 1 : 0);
     const yaw = Math.atan2(DIRS[s.dir][0], DIRS[s.dir][1]);
     props.push({ kind, x, z, y: R.level * STOREY, yaw, room, ...(trace ? { trace } : {}), ...(clue !== undefined ? { clue } : {}) });
+    return true;
   };
   // The ladder up to the hatch first, so nothing stands in front of it.
   put(graph.entrance, 'ladder');
@@ -256,23 +258,12 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
   for (const h of sketch.history) for (const kind of h.def.traces ?? []) {
     const own = rooms.filter((r) => r.era === h.layer);
     const where = h.layer === 'now' ? rooms.filter((r) => r.beat === 'foreshadow' || r.era === 'now') : own.length ? own : rooms.filter((r) => r.id !== graph.goal);
-    for (let i = 0; i < 2 && where.length; i++) put(where[rng.int(0, where.length - 1)].id, kind, h.layer);
+    // Two of each, in rooms that have a free wall (a small room full of doors may have none).
+    for (let i = 0, tries = 0; i < 2 && tries < where.length * 2; tries++) if (put(where[rng.int(0, where.length - 1)].id, kind, h.layer)) i++;
   }
 
   // The set piece: its own dressing and its clues.
-  if (piece.id === 'broken-floor') {
-    clues.push({ text: 'The boards end in splinters over a drop. Far below, an older hall: stone, not timber. Someone lives down there.', room: link.a, link: link.id });
-    put(link.a, 'rubble', 'trouble', clues.length - 1); put(link.a, 'beam', 'trouble');
-    put(link.b, 'rubble', 'trouble'); put(link.b, 'beam', 'trouble');
-  } else if (piece.id === 'bricked-wall') {
-    const hidden = link.b;
-    const by = trouble.id === 'debt' ? 'the owner, the week before he fled' : 'the household, the summer of the sickness';
-    clues.push({ text: `The mortar on this stretch of wall is paler than the rest, and it rings hollow under a knock.`, room: hidden, link: link.id });
-    const ledgerRoom = rooms.find((r) => r.use.id === 'counting-room')?.id ?? graph.entrance;
-    clues.push({ text: `A ledger: "To the mason, for bricking the north wall below, three silver." Paid by ${by}. The house has no such wall on any plan.`, room: ledgerRoom, link: link.id });
-    put(hidden, 'bricks', 'trouble', clues.length - 2);
-    put(ledgerRoom, 'ledger', 'trouble', clues.length - 1);
-  }
+  piece.dress({ link, graph, rooms, trouble, dweller: now, rng, put, clue: (text, room, l) => { clues.push({ text, room, ...(l !== undefined ? { link: l } : {}) }); return clues.length - 1; } });
   // The builders' ledger often tells of the older layer (a clue for those who read).
   const lower = layerOf(sketch, 'older');
   if (lower && rng.chance(0.7)) {

@@ -52,4 +52,5 @@ export const talk: TalkDef = {
   ownHouse: 'our own house',
   lead: 'Something is wrong in {cellar}.',
   marked: '{name} marks {house} on your map.',
+  handOver: 'You hold out your map. {name} takes it and marks the place.',
 };

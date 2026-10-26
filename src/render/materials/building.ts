@@ -39,8 +39,8 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   const room = floor(positionWorld.div(vec3(3.5, 3, 3.5)));
   const roll = fract(sin(dot(room, vec3(12.9898, 78.233, 37.719))).mul(43758.5453));
   const glass = float(1).sub(step(0.5, layer.sub(BuildingMat.Glass).abs().toFloat()));
-  const warm = mix(vec3(1.0, 0.5, 0.18), vec3(1.0, 0.62, 0.3), fract(roll.mul(7.3)));
-  m.emissiveNode = warm.mul(glass).mul(step(roll, WINDOWS.share)).mul(WINDOWS.glow).mul(2.2);
+  const warm = mix(vec3(1.0, 0.42, 0.13), vec3(1.0, 0.55, 0.22), fract(roll.mul(7.3)));
+  m.emissiveNode = warm.mul(glass).mul(step(roll, WINDOWS.share)).mul(WINDOWS.glow).mul(0.7);
   return m;
 });
 
