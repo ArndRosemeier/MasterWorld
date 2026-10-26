@@ -172,7 +172,7 @@ export class FolkView {
   private warm = false;
   private waiting = 0;
 
-  /** How many people within CLOSE in the camera's view are plain figures while their character is dressed (before the warm-up ends at least 1). */
+  /** How many people within CLOSE in the camera's view (or of `focus`) are plain figures while their character is dressed (before the warm-up ends at least 1). */
   get undressed(): number { return this.warm ? this.waiting : Math.max(1, this.waiting); }
 
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
@@ -181,10 +181,17 @@ export class FolkView {
   /** Where nobody out of doors is drawn just now (the creator's view of the hero), or null. */
   clear: ((x: number, z: number) => boolean) | null = null;
 
+  /**
+   * Whom to dress for, if not the camera: the hero's place while the title's fly-over (far up) covers the town, so
+   * the people round the hero are dressed before the dive lands there (plan A7). `undressed` then counts everyone
+   * near it, in view or not.
+   */
+  focus: { readonly x: number; readonly z: number } | null = null;
+
   /** Each frame: who is drawn, where and doing what. */
   follow(dt: number, cam: Camera): void {
     if (!this.warm) return;
-    const cx = cam.position.x, cz = cam.position.z;
+    const cx = this.focus?.x ?? cam.position.x, cz = this.focus?.z ?? cam.position.z;
     // The nearest people out of doors (or those in the room).
     const near: [number, Agent][] = [];
     const placed = new Map<number, Placed>();
@@ -239,7 +246,7 @@ export class FolkView {
     // In a room too (nobody there is a plain figure: the undressed are not drawn at all).
     for (const [d, a] of pending) {
       const p = placed.get(a.person.id);
-      if (d < CLOSE && want.has(a.person.id) && VIEW.containsPoint(p ? AT.set(p.x, p.y + 1, p.z) : AT.set(a.x, this.height(a.x, a.z) + 1, a.z))) waiting++;
+      if (d < CLOSE && want.has(a.person.id) && (this.focus || VIEW.containsPoint(p ? AT.set(p.x, p.y + 1, p.z) : AT.set(a.x, this.height(a.x, a.z) + 1, a.z)))) waiting++;
     }
     this.waiting = waiting;
   }
