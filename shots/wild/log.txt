@@ -1,0 +1,43 @@
+=== a squirrel ===
+shots/wild/squirrel.png: webgpu · 30.0 ms · -31851, 90, 31938 · chunks 276 (+0) · grass 101+325 · 0.26 dense 0.26 m · folk 30/30
+weather cover 0.95 rain 0.07 storm 0.00 mist 0.01 wind 0.14 wet 0.07
+shaders 93 warm-up + 8 later · worst 12 ms · 1 POLICY VIOLATIONS (shaders.report()) · wild - (1/7 built) · small life 1 squirrels, 164/164 birds (42 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 93 built in warm-up, 8 after, worst block 12 ms, 1 violations, 0 built again alike
+run: "ShadowMaterial of SkinnedMesh eyes<squirrel<Shadow Map [ ID: 14 ]" started 0 ms after a build of 7 ms ended (minimum 14 ms)
+=== b birds ===
+shots/wild/birds.png: webgpu · 31.7 ms · -31933, 87, 31841 · chunks 276 (+0) · grass 100+322 · 0.10 dense 0.22 m · folk 30/30
+weather cover 0.95 rain 0.06 storm 0.00 mist 0.01 wind 0.13 wet 0.06
+shaders 97 warm-up + 4 later · worst 13 ms · policy ok · wild - (1/7 built) · small life 0 squirrels, 161/161 birds (70 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 97 built in warm-up, 4 after, worst block 13 ms, 0 violations, 0 built again alike
+=== c flock ===
+shots/wild/flock.png: webgpu · 16.5 ms · -32020, 86, 31833 · chunks 285 (+0) · grass 99+322 · 0.46 dense 0.60 m · folk 0/30
+weather cover 0.95 rain 0.06 storm 0.00 mist 0.01 wind 0.13 wet 0.06
+shaders 91 warm-up + 23 later · worst 17 ms · policy ok · wild - (1/7 built) · small life 1 squirrels, 146/146 birds (80 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 91 built in warm-up, 23 after, worst block 17 ms, 0 violations, 0 built again alike
+=== d squirrel-run (SHOT_HOLD=KeyW) ===
+shots/wild/squirrel-run.png: webgpu · 43.6 ms · -31845, 91, 31943 · chunks 276 (+0) · grass 100+311 · 0.26 dense 0.26 m · folk 18/30
+weather cover 0.95 rain 0.07 storm 0.00 mist 0.01 wind 0.14 wet 0.07
+shaders 91 warm-up + 11 later · worst 14 ms · 2 POLICY VIOLATIONS (shaders.report()) · wild - (1/7 built) · small life 1 squirrels, 157/162 birds (39 drawn, 1/1 squirrel bodies)
+sound: 16.3 MB, 0 shots · bed/wind-soft 0.43, bed/wind-open 0.11, bed/rain 0.06, bed/town-day 0.97, work:3 0.90 · music music/town-1 · mood town
+shaders: 91 built in warm-up, 11 after, worst block 14 ms, 2 violations, 0 built again alike
+run: "ShadowMaterial of SkinnedMesh body<squirrel<Shadow Map [ ID: 14 ]" started 0 ms after a build of 2 ms ended (minimum 3 ms)
+run: "ShadowMaterial of SkinnedMesh body-crowd<townsfolk<Shadow Map [ ID: 14 ]" started 42 ms after a build of 41 ms ended (minimum 82 ms)
+=== e1 ft-on ===
+shots/wild/ft-on.png: webgpu · 27.7 ms · -31851, 90, 31938 · chunks 276 (+0) · grass 101+325 · 0.26 dense 0.26 m · folk 30/30
+weather cover 0.95 rain 0.06 storm 0.00 mist 0.01 wind 0.14 wet 0.06
+shaders 93 warm-up + 7 later · worst 17 ms · 1 POLICY VIOLATIONS (shaders.report()) · wild - (1/7 built) · small life 1 squirrels, 164/164 birds (42 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 93 built in warm-up, 7 after, worst block 17 ms, 1 violations, 0 built again alike
+run: "ShadowMaterial of SkinnedMesh eyes<squirrel<Shadow Map [ ID: 14 ]" started 1 ms after a build of 8 ms ended (minimum 16 ms)
+=== e2 ft-off (pos of shot a) ===
+shots/wild/ft-off.png: webgpu · 27.3 ms · -31851, 90, 31943 · chunks 279 (+0) · grass 100+325 · 0.00 dense 0.00 m · folk 26/30
+weather cover 0.95 rain 0.06 storm 0.00 mist 0.01 wind 0.14 wet 0.06
+shaders 89 warm-up + 5 later · worst 11 ms · policy ok · wild - (0/7 built)
+sound: waiting for a click · mood town
+shaders: 89 built in warm-up, 5 after, worst block 11 ms, 0 violations, 0 built again alike
+
+=== note ===
+tools/shot/shot.mjs was temporarily patched locally (not committed) to print the full multi-line HUD instead of only its first line, so the "small life" count shows. No [page] errors were printed in any run.
