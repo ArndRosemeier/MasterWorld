@@ -335,10 +335,12 @@ export async function start(b: Boot): Promise<void> {
       stock = await StockView.forHerds(view.renderer, setting.world.livestock, herds, params.stock, (x, z) => terrain.height(x, z));
     }
     // Birds and squirrels about the land (plan 9.3): their squares are the trunks' cells.
+    const woods = woodsOf(terrain);
     const small = setting.smallLife && params.small ? new SmallLife(seed, {
       height: (x, z) => terrain.height(x, z),
       waterDepth: (x, z) => terrain.waterDepth(x, z),
-      woods: woodsOf(terrain),
+      // The town's farmland and fields are open land whatever the woods round them.
+      woods: (x, z) => (terrain.townGround(x, z) >= TownGround.Street ? 0 : woods(x, z)),
       trees: (i, j) => trunks.peek(i, j),
       blocked: (x, z, r) => !!town?.solid(x, z, r),
     }, setting.smallLife) : null;
@@ -481,7 +483,7 @@ export async function start(b: Boot): Promise<void> {
     if (by) player.teleport(by.x + by.r + 20, undefined, by.z, Math.PI / 2);
     // Once that group is built, the hero steps up to one of them (a dozen metres off, facing it).
     let lookWild = by ? by.def.id : null;
-    // `small=squirrel` / `small=birds`: beside the first that is about (for looking at them).
+    // `small=squirrel` / `birds` / `flock`: beside the first that is about (for looking at them).
     let lookSmall = params.smallAt;
     /** The hero `d` metres from `seen`, on the side they are on, facing it. */
     const standBeside = (seen: { x: number; z: number }, d: number) => {
@@ -959,7 +961,7 @@ export async function start(b: Boot): Promise<void> {
         const out = above && !rooms?.inside, w = player.walker;
         const near = lookSmall ? small.sight(lookSmall) : null;
         if (near) {
-          standBeside(near, lookSmall === 'squirrel' ? 13 : 15);
+          standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
           lookSmall = null;
         }
         if (out) for (const e of small.step(dt, { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed }, daylight(view.sky.hour), wx.shown.rain)) sounds?.wings(e);
