@@ -13,6 +13,7 @@ import { Trunks } from './world/trunks';
 import { HeroView } from './render/hero/HeroView';
 import { preparePeople } from './render/hero/play';
 import { GiantView } from './render/giant/GiantView';
+import { routePackImages } from './render/packImages';
 import { GIANT_SPEED, giantPose, type Orbit } from './app/title/route';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
@@ -104,6 +105,8 @@ export interface Boot {
 export async function start(b: Boot): Promise<void> {
   const { settings, sound, title, loading } = b;
   const boot = settings.start;
+  // The people's textures come from the pack bundles and the browser's cache too, not from an <img> of their own.
+  routePackImages();
   const canvas = document.createElement('canvas');
   document.body.prepend(canvas);
   try {

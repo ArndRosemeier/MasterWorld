@@ -28,6 +28,8 @@ const loading = title?.screen ?? new LoadingScreen();
 loading.set('Fetching the world');
 // The start's people and animals download beside the game's code (the title already shows).
 if (!params.bake) void packs.warm();
+// One frame for the title to be painted before the game's code arrives and its start keeps the page busy.
+await new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 // The game's code; if it cannot be fetched, the screen says so (start reports its own failures).
 const game = await import('./main').catch((err: unknown) => {
   loading.fail('Could not load the game', err instanceof Error ? err.message : String(err));
