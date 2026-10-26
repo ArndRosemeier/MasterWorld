@@ -97,7 +97,7 @@ export class WeatherView {
     const amb = L.hemiIntensity * g * 0.7, sun = L.lightIntensity * g * 0.12 + this.flash.light * 2;
     W.light.value.setRGB(L.skyColor[0] * amb + L.lightColor[0] * sun, L.skyColor[1] * amb + L.lightColor[1] * sun, L.skyColor[2] * amb + L.lightColor[2] * sun);
     const n = Math.round(Math.min(1, s.rain * 1.15) * DROPS);
-    this.precip.visible = n > 0 && !sky.underwater && !sky.indoors;
+    this.precip.visible = n > 0 && !sky.underwater && !sky.indoors && !sky.sheltered;
     this.precip.geometry.instanceCount = Math.max(1, n);
   }
 

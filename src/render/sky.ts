@@ -24,6 +24,9 @@ const SHADOW_JUMP = 4;
  * are stronger here, while the exposure (and so the sky) stays Scale's.
  */
 const EXPOSURE = 1.15;
+/** In a building: the sky's light on the people there, and the eye's adaptation to the room (exposure). */
+const SHELTER_SKY = 0.45;
+const SHELTER_EXPOSURE = 1.7;
 const LIGHT = 3.4;
 /** The environment (sky) light on the land and in the water's reflections. */
 export const ENV = 2.4;
@@ -77,6 +80,12 @@ export class SkyView {
   private readonly stars: Sprite;
   /** Below ground (a cellar, a dungeon): no sun or sky, a faint warm fill, darkness closing in. */
   indoors = false;
+  /**
+   * In a building above ground (drawn open in its place): the sun and sky go on, through its windows and
+   * door; the eye adapts to the room over a moment and less of the sky's light falls on the people in it.
+   */
+  sheltered = false;
+  private shelter = 0;
   /** Mist in the low ground 0..1, and the height it lies at (the weather sets both). */
   mist = 0;
   mistBase = 0;
@@ -249,6 +258,13 @@ export class SkyView {
       const g = gradeAt(this.look, this.indoors ? 1 : sun[1]);
       GRADE.slope.value.set(...g.slope);
       GRADE.saturation.value = g.saturation;
+    }
+    this.shelter += ((this.sheltered ? 1 : 0) - this.shelter) * Math.min(1, dt * 2.5);
+    if (this.shelter > 1e-3 && !this.indoors) {
+      const k = this.shelter, dim = 1 - k * (1 - SHELTER_SKY);
+      this.scene.environmentIntensity *= dim;
+      this.hemi.intensity *= dim;
+      this.renderer.toneMappingExposure *= 1 + k * (SHELTER_EXPOSURE - 1);
     }
     if (this.indoors) {
       this.sun.intensity = 0;

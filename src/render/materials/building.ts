@@ -6,8 +6,8 @@
  * coordinates are in metres and scaled per layer. Rain darkens and wets the walls and roofs.
  */
 import { BufferAttribute, BufferGeometry, MeshPhysicalNodeMaterial, type Mesh } from 'three/webgpu';
-import { attribute, dot, float, floor, fract, int, mix, normalMap, positionWorld, pow, round, sin, step, texture, uniform, uniformArray, vec3 } from 'three/tsl';
-import { BuildingMat, type BuildingMesh } from '@futuremagic/settlement';
+import { attribute, dot, float, floor, fract, int, mix, normalMap, positionWorld, pow, round, sin, step, texture, uniform, uniformArray, varying, vec3 } from 'three/tsl';
+import { BuildingMat, INSIDE_LIGHT, type BuildingMesh } from '@futuremagic/settlement';
 import { defineKind, kindMesh } from '../materials';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 import { townTextures } from './townGround';
@@ -19,19 +19,32 @@ import { WEATHER } from './weather';
  */
 export const WINDOWS = { glow: uniform(0), share: uniform(0.7) };
 
+/**
+ * The sky's light inside an open building (@futuremagic/settlement INSIDE_LIGHT): its inside faces get the
+ * share their windows and door let in, times `gain`, plus `fill` (light thrown about by the room and its
+ * lamps). The sun's comes in through the openings by itself (the walls cast shadows).
+ */
+export const ROOM_LIGHT = { gain: uniform(1), fill: uniform(0.05) };
+
 export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat', 'tint'], () => {
   const { albedo: A, normal: N } = townTextures();
   const m = new MeshPhysicalNodeMaterial({ roughness: 0.9, metalness: 0, specularIntensity: 0.35 });
-  const layer = int(round(attribute('mat', 'float')));
+  // `mat` holds the material and, on inside faces, a daylight level (INSIDE_LIGHT): split per vertex, so the
+  // material comes through unblended and the daylight smoothly.
+  const mat = attribute('mat', 'float');
+  const layer = int(round(varying(mat.mod(INSIDE_LIGHT))));
+  const level = varying(floor(mat.div(INSIDE_LIGHT)).div(15));
+  const inside = step(0.5 / 15, level);
   const scale = uniformArray(TOWN_TILE_METERS.map((w) => 1 / w), 'float');
   const st = attribute('uv', 'vec2').mul(scale.element(layer));
   const a = texture(A).sample(st).depth(layer), n = texture(N).sample(st).depth(layer);
   // Tint is sRGB (0..1 after normalising); the texture is already linear.
   const tint = pow(attribute('tint', 'vec3'), vec3(2.2));
-  const wet = WEATHER.wet;
+  // Dry indoors.
+  const wet = WEATHER.wet.mul(float(1).sub(inside));
   m.colorNode = a.rgb.mul(tint).mul(mix(float(1), float(0.65), wet)).mul(n.a.mul(0.6).add(0.4));
   m.roughnessNode = mix(a.a, a.a.mul(0.45), wet);
-  m.aoNode = n.a;
+  m.aoNode = n.a.mul(mix(float(1), level.mul(level).mul(ROOM_LIGHT.gain).add(ROOM_LIGHT.fill).min(1), inside));
   const xy = n.xy.mul(2).sub(1);
   const z = float(1).sub(xy.dot(xy)).max(0).sqrt();
   m.normalNode = normalMap(vec3(n.xy, z.mul(0.5).add(0.5)));

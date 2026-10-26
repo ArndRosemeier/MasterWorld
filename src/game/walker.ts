@@ -18,8 +18,8 @@ export interface WalkWorld {
   waterLevel(x: number, z: number): number | null;
   /** Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. */
   floor?(x: number, z: number): number | null;
-  /** Walls (buildings): does a body of radius `r` at (x, z) touch one? */
-  wall?(x: number, z: number, r: number): boolean;
+  /** Walls (buildings, furniture): does a body of radius `r` at (x, z), its feet at `y` (the storey it is on), touch one? */
+  wall?(x: number, z: number, r: number, y?: number): boolean;
 }
 
 /** What the player wants this frame. */
@@ -112,7 +112,7 @@ export class Walker {
   /** Whether the body would be in rock at (x, z) with its feet at y. */
   private blocked(x: number, y: number, z: number): boolean {
     const r = this.spec.radius;
-    if (this.world.wall?.(x, z, r)) return true;
+    if (this.world.wall?.(x, z, r, y)) return true;
     for (const k of [0.75, 1.3, this.height - r]) {
       const d = this.world.rockSurface(x, y + k, z);
       if (d !== null && d < r) return true;

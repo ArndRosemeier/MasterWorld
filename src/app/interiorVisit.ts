@@ -1,143 +1,176 @@
 /**
- * Going into a building and out again (D38: a space of its own behind each door, a short fade). Walk
- * into a door to go in; walk back out through it to leave. Inside, the walker walks the room (its walls,
- * ceiling and furniture), the sky is off and one warm light hangs under the ceiling.
+ * Going into a building and out again (D38, in place): as one comes up to a door, that one building is
+ * drawn open where it stands (HouseView): its door open, every storey inside as the outside shows it,
+ * stairs, windows one looks out of. One walks in and out with no fade; the building shuts again once one
+ * has walked away. Inside, the sky's light comes in through the openings, a lamp burns under the ceiling
+ * of the storey one is on (with shadows, so it lights nothing outside the walls) and the eye adapts.
  */
-import type { PointLight } from 'three/webgpu';
 import { interiorBlocked, planInterior, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
-import { interiorWorld, roomFrame, type RoomFrame } from '../game/interiorWorld';
-import type { WalkWorld } from '../game/walker';
-import { ROOM_DEPTH, type InteriorView } from '../render/town/InteriorView';
+import { houseWalk, type HouseWalk } from '../game/interiorWorld';
+import type { HouseView } from '../render/town/HouseView';
 import type { SkyView } from '../render/sky';
+import type { WarmLights } from '../render/warmLights';
 import type { Placed } from '../render/folk/FolkView';
 import { roomCast } from '../sim/roomCast';
 import type { TownLife } from '../sim/townLife';
-import { Fade } from './fade';
 import type { Notes } from './notes';
 import type { Player } from './player';
 
 /** What a room is called when one walks in. */
-const NAMES: Partial<Record<TownBuilding['kind'], string>> = { inn: 'the inn', smithy: 'the smithy', bakery: 'the bakery', temple: 'the temple', hall: 'the hall', mill: 'the mill', workshop: 'a workshop', stable: 'the stable' };
+const NAMES: Partial<Record<TownBuilding['kind'], string>> = { inn: 'the inn', smithy: 'the smithy', bakery: 'the bakery', temple: 'the temple', hall: 'the hall', mill: 'the mill', workshop: 'a workshop', stable: 'the stable', barn: 'the barn' };
 
 /** Races who stand on a step behind a counter, and its height (m; the counter is 1.05 m, made for men). */
 const SMALL = new Set(['halfling', 'dwarf']);
 const SERVE_STEP = 0.3;
+/** A building opens as one comes this near its door (m), and shuts once one is this far from it, outside. */
+const OPEN_AT = 7;
+const SHUT_AT = 14;
 
-interface Room { b: TownBuilding; plan: InteriorPlan; frame: RoomFrame; world: WalkWorld; floor: number }
+interface Open { b: TownBuilding; plan: InteriorPlan; walk: HouseWalk }
 
 export class InteriorVisit {
-  private room: Room | null = null;
-  private readonly fade = new Fade();
-  private cooldown = 0;
+  private open: Open | null = null;
+  /** The player is within its walls. */
+  private within = false;
+  /** The storey the lamp burns on (-1: out). */
+  private lampOn = -1;
+  private readonly plans = new Map<number, InteriorPlan>();
+  /** On the way down to the cellar. */
+  private going = false;
 
   constructor(
     private readonly buildings: readonly TownBuilding[],
     /** Houses with a cellar: a hatch in the room, and the way down (`before` runs once the screen is dark). */
     private readonly cellars: ReadonlyMap<number, (before: () => void) => Promise<void>>,
-    private readonly view: InteriorView,
+    private readonly view: HouseView,
     private readonly player: Player,
-    private readonly light: PointLight,
+    private readonly warm: WarmLights,
     private readonly sky: SkyView,
     private readonly notes: Notes,
   ) {}
 
-  get inside(): boolean { return this.room !== null; }
-  get world(): WalkWorld | null { return this.room?.world ?? null; }
+  /** The player is inside a building. */
+  get inside(): boolean { return this.within; }
+  /** What the open building adds to the walker's world (null: none open). */
+  get walk(): HouseWalk | null { return this.open?.walk ?? null; }
   /** The building the player is in (-1: outside). */
-  get building(): number { return this.room?.b.id ?? -1; }
+  get building(): number { return this.within ? this.open!.b.id : -1; }
 
-  /** Into `b` (now: at once, no fade); `up`: coming up through its hatch rather than in at the door. */
-  async enter(b: TownBuilding, now = false, up = false): Promise<void> {
-    await this.fade.swap(now, async () => {
-      const plan = planInterior(b, { hatch: this.cellars.has(b.id) }), y = b.floorY + ROOM_DEPTH, frame = roomFrame(b, { x: b.cx, z: b.cz });
-      await this.view.show(plan, b, y);
-      this.room = { b, plan, frame, world: interiorWorld(plan, frame, y), floor: y };
-      this.sky.indoors = true;
-      // A light under the ceiling, nearer the back.
-      const [lx, lz] = frame.toWorld(0, plan.hb * 0.2);
-      this.light.position.set(lx, y + plan.height - 0.35, lz);
-      // Brighter and farther-reaching in a big room (the temple's hall).
-      const big = Math.min(3, Math.max(1, (plan.ha * plan.hb) / 12));
-      this.light.intensity = 10 * big;
-      this.light.distance = 14 * Math.sqrt(big);
-      // Just inside the door, facing in (the walker's forward is (-sin yaw, -cos yaw)); or beside the hatch.
-      const hatch = up ? plan.fixtures.find((f) => f.kind === 'hatch') : undefined;
-      const [a, bb] = hatch ? besideHatch(plan, hatch) : [0, -plan.hb + 1.3];
-      const [x, z] = frame.toWorld(a, bb);
-      this.player.teleport(x, y, z, Math.atan2(-b.vx, -b.vz));
-      if (up) this.cooldown = 1.5;
-      // A cellar's house: the trapdoor in the floor is the way down (it lies in a dark corner, easy to miss).
-      else {
-        const trapdoor = plan.fixtures.some((f) => f.kind === 'hatch');
-        this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.${trapdoor ? ' A trapdoor in the floor leads down to the cellar.' : ''}`, trapdoor ? 6 : 3);
-      }
-    });
+  private planOf(b: TownBuilding): InteriorPlan {
+    let p = this.plans.get(b.id);
+    if (!p) this.plans.set(b.id, (p = planInterior(b, { hatch: this.cellars.has(b.id) })));
+    return p;
   }
 
-  /** Back out of the door. */
-  async leave(): Promise<void> {
-    const r = this.room;
-    if (!r) return;
-    await this.fade.swap(false, () => {
-      this.room = null;
-      this.view.hide();
-      this.sky.indoors = false;
-      this.light.intensity = 0;
-      this.light.distance = 14; // the lantern's own
-      const [x, z] = r.b.door;
-      this.player.teleport(x, undefined, z, Math.atan2(r.b.vx, r.b.vz));
-      this.cooldown = 1.5;
-    });
+  /** Draws `b` open (shutting the last). */
+  private async openUp(b: TownBuilding): Promise<Open> {
+    if (this.open?.b.id === b.id) return this.open;
+    this.shut();
+    const plan = this.planOf(b);
+    this.open = { b, plan, walk: houseWalk(b, plan) };
+    await this.view.drawOpen(b, plan);
+    return this.open;
   }
 
-  update(dt: number): void {
-    this.cooldown = Math.max(0, this.cooldown - dt);
-    if (this.fade.busy || this.player.flying || this.cooldown > 0) return;
-    const w = this.player.walker;
-    const speed = w.groundSpeed;
-    if (speed < 0.5) return;
-    const fx = -Math.sin(w.yaw), fz = -Math.cos(w.yaw);
-    if (!this.room) {
-      // Into a door: walking at it, facing in (along the building's v).
+  private shut(): void {
+    if (!this.open) return;
+    this.out();
+    this.open = null;
+    this.view.hide();
+  }
+
+  /** Into `b` at once: just inside its door, or (`up`, coming up through its hatch) beside the hatch. */
+  async enter(b: TownBuilding, _now = true, up = false): Promise<void> {
+    const o = await this.openUp(b);
+    const hatch = up ? o.plan.fixtures.find((f) => f.kind === 'hatch') : undefined;
+    const [a, bb] = hatch ? besideHatch(o.plan, hatch) : [0, o.plan.storeys[0].b0 + 1.0];
+    const p = o.walk.floorAt(a, bb, 0);
+    this.player.teleport(p.x, p.y, p.z, Math.atan2(-b.vx, -b.vz));
+    this.come();
+  }
+
+  update(_dt: number): void {
+    if (this.player.flying) return;
+    const w = this.player.walker, x = w.pos.x, z = w.pos.z;
+    // The nearest door within reach opens (not while one is inside another).
+    if (!this.within) {
+      let best: TownBuilding | null = null, bd = OPEN_AT;
       for (const b of this.buildings) {
-        if (Math.abs(b.door[0] - w.pos.x) > 1 || Math.abs(b.door[1] - w.pos.z) > 1) continue;
-        if (Math.hypot(b.door[0] - w.pos.x, b.door[1] - w.pos.z) < 0.9 && fx * b.vx + fz * b.vz > 0.5) { void this.enter(b); return; }
+        if (Math.abs(b.door[0] - x) > OPEN_AT || Math.abs(b.door[1] - z) > OPEN_AT) continue;
+        const d = Math.hypot(b.door[0] - x, b.door[1] - z);
+        if (d < bd) { bd = d; best = b; }
       }
-      return;
+      if (best && best.id !== this.open?.b.id) void this.openUp(best);
+      else if (!best && this.open && Math.hypot(this.open.b.door[0] - x, this.open.b.door[1] - z) > SHUT_AT && !this.open.walk.within(x, z)) this.shut();
     }
-    // Out of the door: at it, facing out.
-    const { plan, frame, b } = this.room;
-    const [a, bb] = frame.toRoom(w.pos.x, w.pos.z);
+    const o = this.open;
+    if (!o) return;
+    const inNow = o.walk.within(x, z);
+    if (inNow && !this.within) this.come();
+    else if (!inNow && this.within) this.out();
+    if (!this.within) return;
+    // The lamp on the storey one is on.
+    const k = o.walk.storey(w.pos.y);
+    if (k !== this.lampOn) this.lamp(k);
     // Onto the hatch: down to the cellar.
-    const hatch = plan.fixtures.find((f) => f.kind === 'hatch'), down = this.cellars.get(b.id);
-    if (hatch && down && Math.abs(a - hatch.a) < hatch.w / 2 - 0.1 && Math.abs(bb - hatch.b) < hatch.d / 2 - 0.1) {
-      void down(() => { this.room = null; this.view.hide(); this.light.distance = 14; });
-      return;
+    const [a, bb] = o.walk.frame.toRoom(x, z);
+    const hatch = o.plan.fixtures.find((f) => f.kind === 'hatch'), down = this.cellars.get(o.b.id);
+    if (!this.going && k === 0 && hatch && down && Math.abs(a - hatch.a) < hatch.w / 2 - 0.1 && Math.abs(bb - hatch.b) < hatch.d / 2 - 0.1) {
+      this.going = true;
+      void down(() => this.shut()).finally(() => { this.going = false; });
     }
-    if (Math.abs(a) < plan.doorW && bb < -plan.hb + 0.5 && fx * b.vx + fz * b.vz < -0.5) void this.leave();
   }
 
-  /** The people the town has in this room now, placed on its spots (null: not in a room). */
+  /** Stepping in. */
+  private come(): void {
+    if (this.within || !this.open) return;
+    this.within = true;
+    this.sky.sheltered = true;
+    this.lamp(this.open.walk.storey(this.player.walker.pos.y));
+    // A cellar's house: the trapdoor in the floor is the way down (it lies in a dark corner, easy to miss).
+    const b = this.open.b, trapdoor = this.open.plan.fixtures.some((f) => f.kind === 'hatch');
+    this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.${trapdoor ? ' A trapdoor in the floor leads down to the cellar.' : ''}`, trapdoor ? 6 : 3);
+  }
+
+  /** Stepping out. */
+  private out(): void {
+    if (!this.within) return;
+    this.within = false;
+    this.sky.sheltered = false;
+    this.lampOn = -1;
+    this.warm.lightTorches(null);
+  }
+
+  /** The room's lamp: under the ceiling of storey `k`, towards the back. */
+  private lamp(k: number): void {
+    const o = this.open!, s = o.plan.storeys[k];
+    const p = o.walk.floorAt((s.a0 + s.a1) / 2, s.b1 - (s.b1 - s.b0) * 0.3, k);
+    this.warm.lightTorches([{ x: p.x, y: p.y + s.height - 0.35, z: p.z }]);
+    this.lampOn = k;
+  }
+
+  /** The people the town has in the open building now, placed on its spots (null: none open). */
   people(life: TownLife): Placed[] | null {
-    const r = this.room;
-    if (!r) return null;
+    const o = this.open;
+    if (!o) return null;
     // Only those drawn (Actors makes adults): a child would hold a seat and show nobody.
-    return roomCast(life.agents, life.spots, r.b.id, r.plan).map(({ agent, spot, act }) => {
-      const s = r.plan.spots[spot], [x, z] = r.frame.toWorld(s.a, s.b);
+    return roomCast(life.agents, life.spots, o.b.id, o.plan).map(({ agent, spot, act }) => {
+      const s = o.plan.spots[spot], p = o.walk.floorAt(s.a, s.b, s.storey);
       // The small folk serve from a step behind the counter (unseen behind it): else only their hair shows.
       const step = s.kind === 'serve' && SMALL.has(agent.person.race) ? SERVE_STEP : 0;
-      return { agent, x, y: r.floor + step, z, dir: r.frame.dirOf(s.yaw), act };
+      return { agent, x: p.x, y: p.y + step, z: p.z, dir: o.walk.frame.dirOf(s.yaw), act };
     });
   }
 
-  /** Where one stands outside the room's door (null: not in a room). */
+  /** Where one stands outside the door of the building one is in (null: outside). */
   get outside(): { x: number; y: number; z: number; yaw: number } | null {
-    const b = this.room?.b;
+    const b = this.within ? this.open?.b : undefined;
     return b ? { x: b.door[0], y: b.floorY, z: b.door[1], yaw: Math.atan2(b.vx, b.vz) } : null;
   }
 
-  get summary(): string {
-    return this.room ? `in ${this.room.b.kind} #${this.room.b.id}` : '';
+  get roomText(): string {
+    if (!this.open) return '';
+    return `${this.within ? 'in' : 'open'} ${this.open.b.kind} #${this.open.b.id}${this.within ? ` storey ${this.lampOn}` : ''}`;
   }
 }
 
@@ -146,8 +179,8 @@ function besideHatch(plan: InteriorPlan, h: InteriorFixture): [number, number] {
   for (const d of [0.9, 1.2, 1.5]) {
     for (const [da, db] of [[0, -1], [1, 0], [-1, 0], [0, 1]]) {
       const a = h.a + da * d, b = h.b + db * d;
-      if (!interiorBlocked(plan, a, b, 0.35)) return [a, b];
+      if (!interiorBlocked(plan, a, b, 0.35, 0, true)) return [a, b];
     }
   }
-  return [0, -plan.hb + 1.3];
+  return [0, plan.storeys[0].b0 + 1.0];
 }
