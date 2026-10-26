@@ -7,7 +7,7 @@
  */
 import { DoubleSide, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
-  Fn, If, abs, cameraPosition, clamp, cross, dot, exp, float, frontFacing, length, max, mix, mx_noise_float, normalize, pmremTexture,
+  Fn, abs, cameraPosition, clamp, cross, dot, exp, float, frontFacing, length, max, mix, mx_noise_float, normalize, pmremTexture,
   positionLocal, positionWorld, pow, fract, reflect, screenUV, select, sin, smoothstep, texture, varying, vec2, vec3, vec4, viewportSharedTexture,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
@@ -102,14 +102,11 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       const h0 = h(p.xz);
       return vec2(h0.sub(h(p.xz.add(vec2(e, 0)))), h0.sub(h(p.xz.add(vec2(0, e))))).div(e);
     };
-    const rippled = vec2(0).toVar();
-    If(running.greaterThan(0.5), () => {
-      // Faster water is rougher.
-      const rough = mix(float(1), float(1.8), smoothstep(1.0, 3.0, speed));
-      rippled.assign(mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(rough));
-    }).Else(() => {
-      rippled.assign(slopeOf(hStill));
-    });
+    // Faster water is rougher. (Blended, not branched: an If here turned rivers opaque on WebGPU, the refraction
+    // read below lost its view of the bed.)
+    const rough = mix(float(1), float(1.8), smoothstep(1.0, 3.0, speed));
+    const runSlope = mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(rough);
+    const rippled = mix(slopeOf(hStill), runSlope, running);
     // Raindrops ring the surface near the camera.
     const rings = rainRings(p.xz).mul(smoothstep(12.0, 50.0, camDist).oneMinus());
     const faded = rippled.mul(fade).add(rings);
@@ -155,9 +152,17 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const shore = float(1).sub(smoothstep(0.0, 2.8, depth)).mul(still);
     // Streaks: noise stretched along the flow and carried with it (in the same two layers as the ripples).
     const along = dot(p.xz, fdir), sideways = dot(p.xz, across);
-    const streakAt = (ph: Node<'float'>, seed: number) =>
-      mx_noise_float(vec3(along.sub(carried(ph)).mul(0.12).add(seed), sideways.mul(1.1), t.mul(0.2)));
-    const streak = mix(streakAt(phaseA, 0), streakAt(phaseB, 7.1), layerB).mul(0.5).add(0.5);
+    // Each layer is made foam first and then blended: blending the noise would lower its contrast mid-cycle, and the
+    // foam would pulse with the cycle instead of drifting. Streaks lie along the current; where it rushes (a steep
+    // brook, below a fall) finer churned water breaks white, carried the same way.
+    const rush = smoothstep(1.3, 3.2, speed);
+    const runFoam = (ph: Node<'float'>, seed: number) => {
+      const down = along.sub(carried(ph));
+      const streak = mx_noise_float(vec3(down.mul(0.12).add(seed), sideways.mul(1.1), t.mul(0.2))).mul(0.5).add(0.5);
+      const churn = mx_noise_float(vec3(down.mul(0.45).add(seed), sideways.mul(1.3), t.mul(0.5))).mul(0.5).add(0.5);
+      return smoothstep(0.66, 0.88, streak).mul(0.45).add(rush.mul(smoothstep(0.42, 0.78, churn.mul(0.6).add(streak.mul(0.5)))).mul(0.8));
+    };
+    const runningFoam = mix(runFoam(phaseA, 0), runFoam(phaseB, 7.1), layerB).mul(running);
     // The falling sheet: streaks stretched down the fall, rushing.
     const sheet = mx_noise_float(vec3(sideways.mul(1.4), p.y.mul(0.18).add(t.mul(3.0)), t.mul(0.4))).mul(0.35)
       .add(mx_noise_float(vec3(sideways.mul(4.0), p.y.mul(0.5).add(t.mul(6.0)), 3.1)).mul(0.15)).add(0.5);
@@ -168,9 +173,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
         // shallow all across and would turn white; its edge is where the surface meets the bank.
         .add(float(1).sub(smoothstep(0.0, 0.3, depth)).mul(0.6).mul(still))
         .add(smoothstep(0.55, 1.0, vCrest).mul(smoothstep(0.45, 0.75, n)).mul(0.7))
-        .add(float(1).sub(still).mul(smoothstep(0.72, 0.9, streak)).mul(0.35))
-        // White water: below a fall the current churns, and the falling sheet itself is all foam.
-        .add(smoothstep(1.3, 3.2, speed).mul(smoothstep(0.35, 0.8, n.mul(0.6).add(streak.mul(0.6)))).mul(0.8)),
+        // Streaks and white water on running water (the falling sheet itself is all foam, below).
+        .add(runningFoam),
       0, 1);
     const foamCol = W.ambient.mul(1.1).add(W.sunColor.mul(0.5).mul(sunUp));
     col = mix(col, foamCol, foam.mul(0.85));
