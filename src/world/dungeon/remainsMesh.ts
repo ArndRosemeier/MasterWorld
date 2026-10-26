@@ -27,7 +27,7 @@ export function remainsMesh(r: RemainsLook, models?: PropModels): BuildingMesh {
     for (const [n, rad, y, s] of rings) {
       for (let i = 0; i < n; i++) {
         const a = (i / n) * 6.28 + rng.range(-0.25, 0.25), x = Math.cos(a) * rad * rng.range(0.85, 1.1), z = Math.sin(a) * rad * rng.range(0.85, 1.1);
-        if (stone) stampModel(k, stone, { x, y, z, yaw: rng.range(0, 6.28), shade: rng.range(0.75, 1.05), scale: [s, s * rng.range(0.8, 1.1), s] });
+        if (stone) stampModel(k, stone, { x, y, z, yaw: rng.range(0, 6.28), shade: rng.range(0.42, 0.62), scale: [s, s * rng.range(0.8, 1.1), s] });
         else k.box(x, y, z, 0.3 * s, 0.24 * s, 0.26 * s, rng.range(0, 6.28), M.Plaster, varyTint(rng, [120, 118, 110], 0.15));
       }
     }

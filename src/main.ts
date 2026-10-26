@@ -267,8 +267,8 @@ export async function start(b: Boot): Promise<void> {
     const remainsView = new RemainsView(view.stage);
     const drawRemains = () => void remainsView.lay(remains.map((r) => ({ id: r.id, x: r.at.x, y: r.at.y, z: r.at.z, grave: !!r.grave, seed: r.id })));
     if (params.remains && !save) {
-      // In front of where the hero stands (just out of reach), on the ground.
-      const w = player.walker, x = w.pos.x - Math.sin(w.yaw) * 2.6, z = w.pos.z - Math.cos(w.yaw) * 2.6;
+      // In front of where the hero stands and a little to the right (out of reach, not hidden behind them), on the ground.
+      const w = player.walker, x = w.pos.x - Math.sin(w.yaw) * 2.6 + Math.cos(w.yaw) * 1.3, z = w.pos.z - Math.cos(w.yaw) * 2.6 - Math.sin(w.yaw) * 1.3;
       const at: FallPlace = { x, y: terrain.height(x, z), z, below: null, mark: { x, z }, label: 'out on the land' };
       remains.push({ id: 'remains-shown', grave: params.remains === 'grave' ? 'Wenna Stonehelm' : null, at, items: [], coins: 0, day: 0 });
     }
