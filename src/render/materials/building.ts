@@ -35,12 +35,13 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   const xy = n.xy.mul(2).sub(1);
   const z = float(1).sub(xy.dot(xy)).max(0).sqrt();
   m.normalNode = normalMap(vec3(n.xy, z.mul(0.5).add(0.5)));
-  // Candle and hearth light behind the glass: room by room (cells of about a room), some rooms dark.
+  // Candle and hearth light behind the glass: room by room (cells of about a room), some rooms dark. Dim:
+  // the night exposure is high, and brighter glows go white under AgX.
   const room = floor(positionWorld.div(vec3(3.5, 3, 3.5)));
   const roll = fract(sin(dot(room, vec3(12.9898, 78.233, 37.719))).mul(43758.5453));
   const glass = float(1).sub(step(0.5, layer.sub(BuildingMat.Glass).abs().toFloat()));
   const warm = mix(vec3(1.0, 0.42, 0.13), vec3(1.0, 0.55, 0.22), fract(roll.mul(7.3)));
-  m.emissiveNode = warm.mul(glass).mul(step(roll, WINDOWS.share)).mul(WINDOWS.glow).mul(0.7);
+  m.emissiveNode = warm.mul(glass).mul(step(roll, WINDOWS.share)).mul(WINDOWS.glow).mul(0.12);
   return m;
 });
 
