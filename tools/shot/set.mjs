@@ -2,7 +2,7 @@
  * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack,
- * the map, talk) into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
+ * the map, talk) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
  * writes `index.md` and `index.json` there: each shot's frame time (median and 95th percentile over a few
  * seconds, no frame cap), its shader summary (F3) and the page's errors. The index marks a shot over 16.7 ms,
  * or more than twice as slow as the town at noon (F2). A slow check (docs/CHECKS.md): one run must stay
@@ -102,8 +102,8 @@ for (const s of sessions) {
     if (shot.act) await shot.act(page);
     await page.waitForTimeout(SETTLE);
     const ft = await measure(page);
-    const file = `${String(rows.length + 1).padStart(2, '0')}-${shot.name}.png`;
-    await page.screenshot({ path: join(dir, file), timeout: TIMEOUT });
+    const file = `${String(rows.length + 1).padStart(2, '0')}-${shot.name}.jpg`;
+    await page.screenshot({ path: join(dir, file), type: 'jpeg', quality: 92, timeout: TIMEOUT });
     const sh = await page.evaluate(() => {
       const m = window.shaders;
       return m ? { ...m.summary(), lines: m.violations() } : null;
