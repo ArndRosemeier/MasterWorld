@@ -231,12 +231,16 @@ export class FolkView {
       s.ch.update(dt);
     }
     // The rest (and those whose character is still being dressed) as plain figures.
-    const plain = this.indoors ? [] : near.filter(([, a]) => !this.shown.get(a.person.id)?.ready);
-    this.far.place(plain.map(([, a]) => a), this.height);
-    // How many of those, close in view, wait for a character (beyond the characters' count they stay plain).
+    const pending = near.filter(([, a]) => !this.shown.get(a.person.id)?.ready);
+    this.far.place(this.indoors ? [] : pending.map(([, a]) => a), this.height);
+    // How many of those (or of the room's people), close in view, wait for a character (beyond the characters' count they stay plain).
     VIEW.setFromProjectionMatrix(SCRATCH.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     let waiting = 0;
-    for (const [d, a] of plain) if (d < CLOSE && want.has(a.person.id) && VIEW.containsPoint(AT.set(a.x, this.height(a.x, a.z) + 1, a.z))) waiting++;
+    // In a room too (nobody there is a plain figure: the undressed are not drawn at all).
+    for (const [d, a] of pending) {
+      const p = placed.get(a.person.id);
+      if (d < CLOSE && want.has(a.person.id) && VIEW.containsPoint(p ? AT.set(p.x, p.y + 1, p.z) : AT.set(a.x, this.height(a.x, a.z) + 1, a.z))) waiting++;
+    }
     this.waiting = waiting;
   }
 

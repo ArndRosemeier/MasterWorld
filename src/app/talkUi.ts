@@ -89,13 +89,16 @@ export class TalkUi {
     }
   }
 
+  /** The people about: in a room, those in it where they stand there; out of doors, everyone not indoors. */
+  private about(): readonly { agent: Agent; x: number; z: number }[] {
+    return this.host.roomPeople ?? this.life.agents.filter((a) => !a.hidden).map((a) => ({ agent: a, x: a.x, z: a.z }));
+  }
+
   /** The grown-up nearest in front of the hero, within reach. */
   private inFront(): Agent | null {
     const w = this.player.walker;
     let best: Agent | null = null, bd = REACH;
-    // In a room, the people in it where they stand there; out of doors, everyone not indoors.
-    const here = this.host.roomPeople ?? this.life.agents.filter((a) => !a.hidden).map((a) => ({ agent: a, x: a.x, z: a.z }));
-    for (const { agent: a, x, z } of here) {
+    for (const { agent: a, x, z } of this.about()) {
       if (a.person.role === 'child') continue;
       const dx = x - w.pos.x, dz = z - w.pos.z, d = Math.hypot(dx, dz);
       if (d >= bd) continue;
@@ -134,10 +137,15 @@ export class TalkUi {
     this.lines.replaceChildren();
     this.box.classList.add('open');
     this.host.paused(true);
-    const at = this.whereIs(a);
-    if (at) this.player.frameTalk(true, at.x, at.z);
+    this.frame(a);
     this.speak(this.talk.greet(a.person.id).text);
     this.offer();
+  }
+
+  /** The talk's view of `a`, past the others about. */
+  private frame(a: Agent): void {
+    const at = this.whereIs(a);
+    if (at) this.player.frameTalk(true, at.x, at.z, this.about().filter((o) => o.agent !== a));
   }
 
   /** Pick a topic by id, if it is offered now. */
