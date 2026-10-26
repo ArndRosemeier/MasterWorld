@@ -9,7 +9,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "packs": "node tools/packs/actors.mjs && node tools/packs/bundle.mjs",
+    "packs": "node tools/packs/actors.mjs && node tools/packs/library.mjs && node tools/packs/bundle.mjs",
     "props": "node tools/props/pack.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -22,12 +22,13 @@
     "shot": "node tools/shot/shot.mjs",
     "load": "node tools/shot/load.mjs",
     "shot:set": "node tools/shot/set.mjs",
+    "shot:origin": "node tools/shot/origin.mjs",
     "variety": "node --import tsx tools/variety/cellars.ts",
     "loop": "node --import tsx tools/loop/evening.ts"
   },
   "dependencies": {
-    "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.17.2/actors-animal-0.17.2.tgz",
-    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.17.2/actors-generator-0.17.2.tgz",
+    "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.0/actors-animal-0.19.0.tgz",
+    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.0/actors-generator-0.19.0.tgz",
     "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/creatures": "file:vendor/assetgenerator/packages/creatures",

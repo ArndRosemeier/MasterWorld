@@ -44,15 +44,26 @@ export function barrowMesh(seed = 1): BuildingMesh {
   return k.mesh();
 }
 
+/**
+ * A barrow long sealed (a barrow field's, B1): the same mound under grass, ringed all round with
+ * kerbstones and no way in. Its own frame: the mound's middle at the origin, the ground at y 0.
+ */
+export function sealedBarrowMesh(seed = 1): BuildingMesh {
+  const k = new MeshKit(), rng = new Rng(seed);
+  mound(k, 0);
+  kerb(k, rng, true);
+  return k.mesh();
+}
+
 /** The mound: rings of a flattened dome under grass, then a skirt into the ground (the land is never quite level). */
-function mound(k: MeshKit): void {
+function mound(k: MeshKit, back: number = MOUND.back): void {
   const seg = 28, rings = 7, start = k.mark;
   // Grass laid round the dome (u, along its rings) and down it (v, from the top), in metres near enough.
   const down = (Math.PI / 4) * (MOUND.r + MOUND.h);
   const ringPoint = (ring: number, s: number): { p: number[]; uv: number[] } => {
     const phi = (ring / rings) * (Math.PI / 2), a = (s / seg) * Math.PI * 2;
     const r = ring > rings ? MOUND.r : MOUND.r * Math.sin(phi), y = ring > rings ? -2 : MOUND.h * Math.cos(phi);
-    return { p: [Math.cos(a) * r, y, -MOUND.back + Math.sin(a) * r], uv: [a * Math.max(1.5, r), ring > rings ? down + 2 : (ring / rings) * down] };
+    return { p: [Math.cos(a) * r, y, -back + Math.sin(a) * r], uv: [a * Math.max(1.5, r), ring > rings ? down + 2 : (ring / rings) * down] };
   };
   for (let i = 0; i <= rings; i++) for (let s = 0; s < seg; s++) {
     const q = [ringPoint(i, s), ringPoint(i, s + 1), ringPoint(i + 1, s + 1), ringPoint(i + 1, s)];
@@ -129,14 +140,16 @@ function passage(k: MeshKit, rng: Rng): void {
 }
 
 /** A ring of half-sunk kerbstones round the mound's foot, and a boulder or two holding each foot of the bank. */
-function kerb(k: MeshKit, rng: Rng): void {
-  // Round from one side of the bank to the other, behind; each stone along the ring (yaw a quarter turn on).
-  const gap = Math.asin(BANK.half / MOUND.r) + 0.12, from = Math.PI / 2 + gap, step = (2 * Math.PI - 2 * gap) / 25, quarter = -Math.PI / 2;
-  for (let i = 0; i < 26; i++) {
+function kerb(k: MeshKit, rng: Rng, sealed = false): void {
+  // Round from one side of the bank to the other, behind (sealed: all round); each stone along the ring (yaw a quarter turn on).
+  const gap = sealed ? 0 : Math.asin(BANK.half / MOUND.r) + 0.12, from = Math.PI / 2 + gap, count = sealed ? 30 : 26;
+  const step = (2 * Math.PI - 2 * gap) / (sealed ? count : count - 1), quarter = -Math.PI / 2, back = sealed ? 0 : MOUND.back;
+  for (let i = 0; i < count; i++) {
     const a = from + (i + rng.range(-0.25, 0.25)) * step;
-    const r = MOUND.r - 0.1, x = Math.cos(a) * r, z = -MOUND.back + Math.sin(a) * r;
+    const r = MOUND.r - 0.1, x = Math.cos(a) * r, z = -back + Math.sin(a) * r;
     k.stone(x, -0.4, z, rng.range(0.7, 1.1), rng.range(0.6, 0.95), rng.range(0.55, 0.8), quarter - a + rng.range(-0.15, 0.15), WildMat.Rock, varyTint(rng, ROCK, 0.08), rng, 0.08, 0.5);
   }
+  if (sealed) return;
   for (const side of [-1, 1]) for (let j = 0; j < 2; j++) {
     const s = rng.range(0.55, 0.9);
     k.stone(side * (BANK.half - 0.35 - j * 0.5), -0.35, PASSAGE.front - 0.6 - j * 1.1 - rng.range(0, 0.3), s * 1.2, s * 0.8, s, rng.range(0, 3), WildMat.Rock, varyTint(rng, ROCK, 0.08), rng, 0.1, 0.55);

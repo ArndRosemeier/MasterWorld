@@ -9,6 +9,7 @@ import { FAR_FOLK } from '../materials/folk';
 import type { Agent } from '../../sim/townLife';
 import type { Race } from '../../sim/people';
 import { lookOf, youthOf } from './looks';
+import { ORIGIN } from '../origin';
 
 /** People farther than this are not drawn at all (m). */
 export const FAR = 320;
@@ -43,6 +44,8 @@ export class FarFolk {
     // Colours from the start: instance colour is part of the shader's key.
     this.mesh.setColorAt(0, new Color(0.5, 0.45, 0.4));
     this.mesh.count = 1;
+    // Placed relative to the floating origin (each figure's matrix), so the mesh draws at the identity.
+    ORIGIN.pin(this.mesh);
   }
 
   /** Each frame: `who` (nearest first), placed on the ground at `height`. */
@@ -52,7 +55,7 @@ export class FarFolk {
       // A child stands as Actors scales it: down to 0.56 of a grown-up at `youth` 1.
       const a = who[i], p = a.person, s = TALL[p.race] * (1 - 0.44 * youthOf(p)) * (0.94 + 0.12 * ((p.id * 0.618) % 1));
       this.q.setFromAxisAngle(this.up, Math.PI / 2 - a.dir);
-      this.m.compose(this.at.set(a.x, height(a.x, a.z), a.z), this.q, this.size.set(s * (p.race === 'dwarf' ? 1.2 : 0.9), s, s * (p.race === 'dwarf' ? 1 : 0.75)));
+      this.m.compose(this.at.set(a.x - ORIGIN.at.x, height(a.x, a.z), a.z - ORIGIN.at.z), this.q, this.size.set(s * (p.race === 'dwarf' ? 1.2 : 0.9), s, s * (p.race === 'dwarf' ? 1 : 0.75)));
       this.mesh.setMatrixAt(i, this.m);
       this.mesh.setColorAt(i, this.colorOf(a));
     }

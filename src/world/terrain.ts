@@ -7,7 +7,9 @@ import { SHORE, Skeleton, emptySample } from './skeleton';
 import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
-import type { DecisionLog, TownDecision } from './decisions';
+import type { Decision, DecisionLog, RoadDecision, TownDecision } from './decisions';
+import { clearingOf, type Clearing } from './dungeon/site';
+import { RoadNet } from './roads';
 import type { Field } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
 
@@ -32,6 +34,8 @@ export class Terrain {
   private townList: Town[] | null = null;
   private readonly probe = emptySample();
   private readonly wet = { river: 0, lake: 0 };
+  private roadNet = new RoadNet();
+  private readonly clearingMap = new Map<string, Clearing>();
 
   /**
    * Build what the decision log says stands on the land (plan 5.1): rock volumes and towns. The land
@@ -42,10 +46,54 @@ export class Terrain {
     this.fields = [];
     this.townSpots = [];
     this.townList = null;
+    this.roadNet = new RoadNet();
     for (const d of log) {
       if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
       else if (d.kind === 'town') this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
+      else if (d.kind === 'road') this.roadNet.insert(d);
     }
+    this.clearingMap.clear();
+    this.settleMore(log.filter((d) => d.kind === 'dungeon'));
+  }
+
+  /**
+   * Lay a road decided while the game runs (plan 7): the ground under it is levelled from now on. Whatever
+   * was built from the old heights near it (meshes, plants) is for the caller to build again.
+   */
+  addRoad(d: RoadDecision): void {
+    this.roadNet.insert(d);
+  }
+
+  /**
+   * Decisions made while the game runs that change the land, in workers as on the main thread (they reach
+   * the workers as a `decisions` job): roads, and the clearings round places out on the land. Others leave
+   * the land as it is.
+   */
+  settleMore(ds: readonly Decision[]): void {
+    for (const d of ds) {
+      if (d.kind === 'road') this.addRoad(d);
+      else if (d.kind === 'dungeon' && d.site) {
+        const c = clearingOf(d.template, d.site);
+        if (c) this.clearingMap.set(d.id, c);
+      }
+    }
+  }
+
+  /** Ground kept free of trees round the places out on the land (by the place's id). */
+  get clearings(): ReadonlyMap<string, Clearing> {
+    return this.clearingMap;
+  }
+
+  /** How far (x, z) lies outside the nearest clearing, metres (negative inside; Infinity with none). */
+  fromClearing(x: number, z: number): number {
+    let best = Infinity;
+    for (const c of this.clearingMap.values()) best = Math.min(best, Math.hypot(x - c.x, z - c.z) - c.r);
+    return best;
+  }
+
+  /** The roads on this land. */
+  get roads(): RoadNet {
+    return this.roadNet;
   }
 
   /** The biome at a point (an index into `biomes`; -1 under the sea). */
@@ -135,10 +183,14 @@ export class Terrain {
       calm *= (1 - 0.75 * smoothstep(R * 1.8, R * 1.1, d)) * (1 - market);
       level = lerp(level, s.level, market);
     }
-    if (calm <= 0) return this.shapeByWater(x, z, level);
-    const rough = 1 + Math.min(4, e / 600);
-    const d = this.detail.fbm2(x / 70, z / 70, 3) * 2.2 + this.detail.fbm2(x / 9 + 71.3, z / 9 - 12.9, 2) * 0.25;
-    return this.shapeByWater(x, z, Math.max(Math.min(level, 0.5), level + d * rough * calm));
+    if (calm > 0) {
+      const rough = 1 + Math.min(4, e / 600);
+      const d = this.detail.fbm2(x / 70, z / 70, 3) * 2.2 + this.detail.fbm2(x / 9 + 71.3, z / 9 - 12.9, 2) * 0.25;
+      level = Math.max(Math.min(level, 0.5), level + d * rough * calm);
+    }
+    // A road levels its bed and shoulders (the river still cuts its ford through it).
+    if (!this.roadNet.empty) level = this.roadNet.level(x, z, level);
+    return this.shapeByWater(x, z, level);
   }
 
   /**

@@ -14,6 +14,7 @@ import {
 import { FloatMask, inside, sampleMask } from './masks';
 import { WATER } from './waterInputs';
 import { WEATHER } from './weather';
+import { ORIGIN } from '../origin';
 
 /** Side of a patch, metres, and blades in it (the near density: 48 a square metre). */
 export const PATCH = 4;
@@ -37,7 +38,7 @@ export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   // Physical for its weak specular: blades seen edge-on far away must not mirror the bright sky.
   const m = new MeshPhysicalNodeMaterial({ side: DoubleSide, roughness: 0.9, metalness: 0, specularIntensity: 0.15 });
   const blade = attribute('gBlade', 'vec4'); // x, z in the patch; rank 0..1; a random number
-  const patch = attribute('gPatch', 'vec2'); // the patch's minimum corner
+  const patch = attribute('gPatch', 'vec2'); // the patch's minimum corner (world)
   const side = positionGeometry.x, t = positionGeometry.y; // across the blade -1..1; along it 0..1
 
   // Grass grows in tufts: each blade is drawn towards the centre of its tuft (a cell of TUFT metres), and
@@ -52,7 +53,10 @@ export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   const xz = mix(spot, centre, 0.45);
   const g = sampleMask(GRASS.mask, xz);
   const r1 = blade.w, r2 = mix(th, fract(r1.mul(91.7).add(blade.z.mul(13.3))), 0.3), r3 = fract(r1.mul(53.1).add(0.37)), r4 = fract(r1.mul(17.9).add(0.71));
-  const d = length(xz.sub(cameraPosition.xz));
+  // Placed in the world (xz, the mask, the tufts); drawn relative to the floating origin (render/origin.ts), so the
+  // blade's own small offsets are added to a small number. The mesh is pinned (GrassView).
+  const xzRel = xz.sub(ORIGIN.node.xz);
+  const d = length(xzRel.sub(cameraPosition.xz));
   const keep = mix(float(1), float(0.25), smoothstep(NEAR_FULL, NEAR_END, d));
   const fade = float(1).sub(smoothstep(REACH * 0.7, REACH, d));
   // A blade grows if its rank is within what this distance keeps, and its roll within the density here.
@@ -71,7 +75,7 @@ export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   const sway = GRASS.wind.mul(gust.mul(0.55).add(sin(GRASS.time.mul(2.6).add(r1.mul(6.28)).add(dot(xz, normalize(WATER.wind)).mul(0.35))).mul(0.08)));
   const push = vec3(wd.x, 0, wd.y).mul(sway).add(f.mul(lean));
   const t2 = t.mul(t);
-  const base = vec3(xz.x, g.x.sub(0.04), xz.y);
+  const base = vec3(xzRel.x, g.x.sub(0.04), xzRel.y);
   const pos = base.add(tg.mul(side.mul(width).mul(pow(float(1).sub(t), 0.85)))).add(vec3(0, t, 0).mul(height)).add(push.mul(t2.mul(height)));
   m.positionNode = pos;
 

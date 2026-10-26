@@ -25,6 +25,24 @@ test('barrow: a sample of barrows varies and lacks nothing, with their own lore 
   assert.ok(setPiecesFor('barrow').some((p) => p.kinds?.includes('barrow')), 'set pieces of their own');
 });
 
+for (const kind of ['cave', 'tower'] as const) {
+  test(`${kind}: a sample varies and lacks nothing, with its own lore and set pieces`, () => {
+    const r = checkVariety(classic.dungeons[kind]!, 60, 2, kind);
+    assert.deepEqual(r.problems, []);
+    assert.equal(r.distinct.setPiece, setPiecesFor(kind).length);
+    assert.ok(setPiecesFor(kind).some((p) => p.kinds?.length === 1 && p.kinds[0] === kind), 'set pieces of its own');
+  });
+}
+
+test('tower: its rooms climb (the goal up the tower), a cellar at most one storey under its foot', () => {
+  for (let n = 1; n <= 12; n++) {
+    const c = outlineCellar(testDecision(n, 1, 'tower'), testHouse(n), classic.dungeons.tower!);
+    const L = c.layout, goal = L.rooms.find((r) => r.id === c.graph.goal)!;
+    assert.ok(L.levels[0] >= -1, `tower ${n}: ${L.levels}`);
+    assert.ok(goal.level >= 1, `tower ${n}: goal on storey ${goal.level}`);
+  }
+});
+
 test('cellar: the same decision gives the same cellar', () => {
   const a = outlineCellar(testDecision(5), testHouse(5), lore), b = outlineCellar(testDecision(5), testHouse(5), lore);
   assert.deepEqual(a, b);

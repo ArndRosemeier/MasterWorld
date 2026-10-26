@@ -27,18 +27,18 @@ export interface VolumeDecision {
  * A dungeon promised under a building of a town (plan 4.2, 8): the seed and the set piece fix what it
  * is; it is sketched, outlined and built from this as the player comes closer (world/dungeon).
  */
-export type DungeonTemplate = 'cellar' | 'barrow';
+export type DungeonTemplate = 'cellar' | 'barrow' | 'cave' | 'tower';
 
 export interface DungeonDecision {
   readonly kind: 'dungeon';
   readonly id: string;
-  /** A cellar under a house of the town; a barrow out on the land near it (plan 8: dungeon kinds). */
+  /** A cellar under a house of the town; a barrow, a cave or a ruined tower out on the land near it (plan 8: dungeon kinds). */
   readonly template: DungeonTemplate;
   /** The town's decision id. */
   readonly town: string;
   /** Index into the town plan's buildings: the house above (a cellar), the household who knows of it (a barrow). */
   readonly building: number;
-  /** A barrow's doorway on the land: world metres, and the way it faces (yaw: 0 faces −z, as the walker). */
+  /** The doorway of a place out on the land (a barrow's passage, a cave's mouth, a tower's door): world metres, and the way it faces (yaw: 0 faces −z, as the walker). */
   readonly site?: { readonly x: number; readonly z: number; readonly yaw: number };
   readonly seed: number;
   /** The signature set piece (world/dungeon/setPieces.ts). */
@@ -93,6 +93,61 @@ export interface OrderDecision {
   readonly order: TownOrder;
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision;
+/**
+ * A region opened (plan 5.2, 5.5, D16): the VGM opened the aligned square `(level, x, z)` of side
+ * 250 m × 2^level ahead of the hero and filled it from the setting (`fill`: a fill id of the setting's
+ * regions, such as a hamlet, a camp, ruins or a barrow field). Where smaller regions inside the square were
+ * open already, the free rest opens as plain country (RegionMap.open); replaying the log rebuilds it so.
+ */
+export interface RegionDecision {
+  readonly kind: 'region';
+  readonly id: string;
+  readonly level: number;
+  readonly x: number;
+  readonly z: number;
+  readonly fill: string;
+  readonly seed: number;
+  /** What the fill placed: its middle (world metres), the way it faces (yaw) and its footprint's radius (m). */
+  readonly site?: { readonly x: number; readonly z: number; readonly yaw: number; readonly r: number };
+  /** Game hours since the world began. */
+  readonly at: number;
+}
+
+
+/** A path (people on foot), a cart track (to hamlets and farms) or a road (between towns): plan 7. */
+export type RoadWay = 'path' | 'track' | 'road';
+
+/**
+ * A road links a place to the network (plan 7): its centre line, routed over the land when it was
+ * decided (vgm/roads.ts), with the height it runs at (its profile; the ground is cut and filled to it).
+ * The route is kept, not routed again, so the road never moves once seen.
+ */
+export interface RoadDecision {
+  readonly kind: 'road';
+  readonly id: string;
+  readonly way: RoadWay;
+  /** What it links: the place it was made for, and the place or road it joins. */
+  readonly from: string;
+  readonly to: string;
+  /** Centre line x, y, z per point (about 6 m apart), from `from` to `to`. */
+  readonly pts: readonly number[];
+  /** When it was decided, game hours since the world began (none: when the world was opened). */
+  readonly at?: number;
+}
+
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision;
 
 export type DecisionLog = readonly Decision[];
+
+/**
+ * Ground the log has put something on out on the land: barrows (`dungeonR` metres round each) and the places
+ * in opened regions (their own footprint). New places keep away from it.
+ */
+export function sitesIn(log: DecisionLog, dungeonR: number): { x: number; z: number; r: number }[] {
+  const out: { x: number; z: number; r: number }[] = [];
+  for (const d of log) {
+    if (d.kind === 'dungeon' && d.site) out.push({ x: d.site.x, z: d.site.z, r: dungeonR });
+    else if (d.kind === 'region' && d.site) out.push({ x: d.site.x, z: d.site.z, r: d.site.r });
+  }
+  return out;
+}

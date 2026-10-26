@@ -128,7 +128,7 @@ export interface StartSpec {
 /** The props the engine can draw in a dungeon (simple kit pieces). */
 export const DUNGEON_PROPS = [
   'barrel', 'cask', 'rack', 'crate', 'sack', 'shelf', 'table', 'stool', 'cot', 'straw', 'rubble', 'bones',
-  'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar', 'ladder',
+  'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar', 'ladder', 'door',
 ] as const;
 export type DungeonProp = (typeof DUNGEON_PROPS)[number];
 
@@ -258,6 +258,38 @@ export interface WildDef {
   readonly range: number;
   /** Territories of this kind around a town. */
   readonly groups: number;
+}
+
+/**
+ * What fills a region the VGM opens (plan 5.2, 5.5, B1): plain country, or a place (a hamlet, a camp,
+ * ruins, a barrow field) on dry, gentle ground inside it. The VGM picks among the fills that fit by
+ * weight, keeping places of a kind apart.
+ */
+export interface RegionFillDef {
+  readonly id: string;
+  /** As the log and the map say it ("a hamlet"). */
+  readonly name: string;
+  /** Region size: 250 m × 2^level. */
+  readonly level: number;
+  /** How often, against the other fills that fit. */
+  readonly weight: number;
+  /** What stands there (none: plain country, nothing placed). */
+  readonly place: 'none' | 'hamlet' | 'camp' | 'ruin' | 'barrows';
+  /** Footprint radius of the place, metres (trees keep out of it). */
+  readonly radius?: number;
+  /** Biomes it may lie in (none: any on land). */
+  readonly biomes?: readonly string[];
+  /** Metres from the start where it may lie, at least (and at most). */
+  readonly ring?: readonly [number, number?];
+  /** Places of this fill keep at least this far apart, metres. */
+  readonly apart?: number;
+}
+
+/** The regions the VGM opens as the hero walks (plan 5.5): the fills, which is plain country, and the start's. */
+export interface RegionsDef {
+  readonly fills: readonly RegionFillDef[];
+  /** The fill for land with nothing on it, and for the free rest of a square partly taken. */
+  readonly country: string;
 }
 
 /**
@@ -642,7 +674,7 @@ export interface SettingModule {
   readonly world: WorldShape;
   readonly start: StartSpec;
   /** Material for dungeons, per kind (plan 8). */
-  readonly dungeons: { readonly cellar: CellarLore; readonly barrow?: CellarLore };
+  readonly dungeons: { readonly cellar: CellarLore; readonly barrow?: CellarLore; readonly cave?: CellarLore; readonly tower?: CellarLore };
   /** Names of the peoples, by Actors' race id (human, dwarf, halfling, elf). */
   readonly names: Readonly<Record<string, NamesDef>>;
   readonly talk: TalkDef;
@@ -666,6 +698,8 @@ export interface SettingModule {
   readonly wild: readonly WildDef[];
   /** Birds and squirrels about the land; without it the land has none. */
   readonly smallLife?: SmallLifeDef;
+  /** What fills the regions the VGM opens as the hero walks; without it no regions open beyond the start. */
+  readonly regions?: RegionsDef;
   /** The setting's colour key over the day; without it the engine's neutral grade. */
   readonly look?: LookDef;
 }
@@ -714,6 +748,17 @@ export function validateSetting(m: SettingModule): string[] {
   if (!(m.start.elevation[0] >= 0 && m.start.elevation[0] < m.start.elevation[1])) out.push(`${where}: start.elevation must be a rising range above the sea`);
   if (!(m.start.maxSlope > 0)) out.push(`${where}: start.maxSlope must be > 0`);
   if (!(m.start.vista >= 0)) out.push(`${where}: start.vista must be >= 0`);
+  if (m.regions) {
+    const fills = new Set(m.regions.fills.map((f) => f.id));
+    if (fills.size !== m.regions.fills.length) out.push(`${where}: a region fill is defined twice`);
+    if (!fills.has(m.regions.country)) out.push(`${where}: regions.country "${m.regions.country}" is not a fill`);
+    for (const f of m.regions.fills) {
+      if (!(Number.isInteger(f.level) && f.level >= 0 && f.level <= 6)) out.push(`${where}: region fill "${f.id}" level must be 0..6`);
+      if (!(f.weight >= 0)) out.push(`${where}: region fill "${f.id}" weight must be >= 0`);
+      if (f.place !== 'none' && !(f.radius && f.radius > 0 && f.radius * 2 + 20 < 250 * 2 ** f.level)) out.push(`${where}: region fill "${f.id}" needs a radius that fits its region`);
+      for (const b of f.biomes ?? []) if (!ids.has(b)) out.push(`${where}: region fill "${f.id}" biome "${b}" is not defined`);
+    }
+  }
   for (const [kind, c] of Object.entries(m.dungeons) as [string, CellarLore | undefined][]) {
     if (!c) continue;
     const uses = new Set(c.uses.map((u) => u.id));

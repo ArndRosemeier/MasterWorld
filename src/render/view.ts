@@ -8,12 +8,16 @@ import { Float32BufferAttribute, type BufferGeometry } from 'three/webgpu';
 import { allKinds } from './materials';
 import { WarmLights } from './warmLights';
 import './materials/flame';
+import { ORIGIN } from './origin';
 
 export interface View {
   readonly renderer: WebGPURenderer;
   readonly backend: 'webgpu' | 'webgl2';
   readonly scene: Scene;
+  /** The game's camera, in world coordinates (never drawn itself: `drawn` is). */
   readonly camera: PerspectiveCamera;
+  /** The camera as the renderer sees it: `camera` relative to the floating origin (origin.ts), set by `draw`. */
+  readonly drawn: PerspectiveCamera;
   readonly stage: Stage;
   readonly sun: DirectionalLight;
   /** The hero's lantern: dark below ground (off, intensity 0, above it). */
@@ -48,6 +52,10 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const scene = new Scene();
   const camera = new PerspectiveCamera(55, 1, 0.2, 120000);
   camera.position.set(0, 2, 0);
+  // Drawn relative to the floating origin: the scene's root stands at minus it, the renderer's camera is a copy of
+  // the game's placed relative to it (each frame, in `draw`).
+  ORIGIN.attach(scene);
+  const drawn = ORIGIN.view(camera, new PerspectiveCamera());
   // Lights are fixed before the warm-up: their number and order are part of every shader's key.
   const sun = new DirectionalLight(0xfff0d8, 4.2);
   const hemi = new HemisphereLight(0xbcd6f0, 0x5a5040, 1.4);
@@ -61,9 +69,10 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const sky = new SkyView(renderer, scene, sun, hemi, { ...opts, exposure: (opts.tone ?? 'graded') === 'aces' ? 1 : (opts.tone ?? 'graded') === 'agx' ? 1.5 : 1.6 });
   // Bloom: a soft glow round the sun, lit windows and fire. Its threshold follows the exposure (frame()).
   // Ambient occlusion: contact shade in corners, under eaves, round feet and stones.
-  const post = opts.post === false ? null : createPost(renderer, scene, camera, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth });
+  const post = opts.post === false ? null : createPost(renderer, scene, drawn, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth });
   const draw = (): void => {
-    if (!post) { renderer.render(scene, camera); return; }
+    ORIGIN.view(camera, drawn);
+    if (!post) { renderer.render(scene, drawn); return; }
     const day = sky.indoors ? 0 : sky.light.day;
     post.bloom!.threshold.value = (opts.bloom?.[0] ?? BLOOM_AT_NIGHT + (BLOOM_AT - BLOOM_AT_NIGHT) * day) / Math.max(1e-3, renderer.toneMappingExposure);
     if (!opts.bloom) {
@@ -72,7 +81,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
     }
     post.draw();
   };
-  const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute, target: post ? post.target : undefined, draw });
+  const stage = new Stage(renderer, scene, drawn, { kinds: allKinds, attribute: standInAttribute, target: post ? post.target : undefined, draw });
   const fit = (): void => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);
@@ -82,7 +91,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   fit();
   window.addEventListener('resize', fit);
   stage.shadowCamera = sun.shadow.camera;
-  return { renderer, backend, scene, camera, stage, sun, lantern, warm, sky, post, draw };
+  return { renderer, backend, scene, camera, drawn, stage, sun, lantern, warm, sky, post, draw };
 }
 
 /** Our own vertex attributes on the Stage's warm-up stand-ins (same size as on real meshes). */

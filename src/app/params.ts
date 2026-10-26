@@ -32,6 +32,8 @@ export const params = {
   grass: q.get('grass') !== '0',
   /** `horizon=0`: no hill shadows beyond the sun's shadow map (for comparing). */
   horizon: q.get('horizon') !== '0',
+  /** `origin=0`: no floating origin, everything drawn relative to zero as before plan B0 (for comparing). */
+  origin: q.get('origin') !== '0',
   /** `post=0`: no post chain (bloom), straight to the screen (for comparing). */
   post: q.get('post') !== '0',
   /** Post chain checks: `postSamples=4` multisampling in its scene target (default none; black on WebGL2), `postDepth=int` a fixed-point depth buffer. */
@@ -57,8 +59,15 @@ export const params = {
   /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about). */
   small: q.get('small') !== '0',
   smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
+  /** Regions open as the hero walks (`regions=0`: only the start's land). */
+  regions: q.get('regions') !== '0',
+  /** Start beside a place the VGM opens out on the land: `site=hamlet`, `camp`, `ruin` or `barrows` (the first a walk finds). */
+  site: q.get('site'),
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
+  /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
+  cave: q.has('cave'),
+  tower: q.has('tower'),
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
   /** Open character creation at once, without the title (`create`; with the title it follows New game). */

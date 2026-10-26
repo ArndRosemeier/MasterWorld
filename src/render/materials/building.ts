@@ -6,7 +6,8 @@
  * coordinates are in metres and scaled per layer. Rain darkens and wets the walls and roofs.
  */
 import { BufferAttribute, BufferGeometry, MeshPhysicalNodeMaterial, type Mesh } from 'three/webgpu';
-import { attribute, dot, float, floor, fract, int, mix, normalMap, positionWorld, pow, round, sin, step, texture, uniform, uniformArray, varying, vec3 } from 'three/tsl';
+import { attribute, dot, float, floor, fract, int, mix, normalMap, pow, round, sin, step, texture, uniform, uniformArray, varying, vec3 } from 'three/tsl';
+import { WORLD } from '../origin';
 import { BuildingMat, INSIDE_LEVELS, INSIDE_LIGHT, type BuildingMesh } from '@futuremagic/settlement';
 import { defineKind, kindMesh } from '../materials';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
@@ -50,7 +51,7 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   m.normalNode = normalMap(vec3(n.xy, z.mul(0.5).add(0.5)));
   // Candle and hearth light behind the glass: room by room (cells of about a room), some rooms dark. Dim:
   // the night exposure is high, and brighter glows go white under AgX.
-  const room = floor(positionWorld.div(vec3(3.5, 3, 3.5)));
+  const room = floor(WORLD.div(vec3(3.5, 3, 3.5)));
   const roll = fract(sin(dot(room, vec3(12.9898, 78.233, 37.719))).mul(43758.5453));
   const glass = float(1).sub(step(0.5, layer.sub(BuildingMat.Glass).abs().toFloat()));
   const warm = mix(vec3(1.0, 0.42, 0.13), vec3(1.0, 0.55, 0.22), fract(roll.mul(7.3)));

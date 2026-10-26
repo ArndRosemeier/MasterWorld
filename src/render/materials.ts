@@ -14,10 +14,13 @@ import { TOWN_GROUND_LAYER, TOWN_TILE_METERS, type GroundTextures } from './terr
 import { CROP_LOOK, CROP_STEP, FIELD_GROUND, TOWN_GROUND, townTextures } from './materials/townGround';
 import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
+import { ROAD } from './materials/roads';
+import { inside, sampleMask } from './materials/masks';
 import { WEATHER, rainRings } from './materials/weather';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 import { woodsFromAfar } from '@futuremagic/vegetation/node';
+import { ORIGIN, WORLD } from './origin';
 
 export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy' | 'mat' | 'tint' | 'look';
 
@@ -101,7 +104,8 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const placed = modelWorldMatrix.mul(vec4(positionLocal, 1)).xyz;
   const far0 = smoothstep(WOODS.band.x, WOODS.band.y, length(placed.xz.sub(cameraPosition.xz)));
   m.positionNode = positionLocal.add(vec3(0, cn.y.mul(smoothstep(0.05, 0.7, cn.x)).mul(0.8).mul(far0), 0));
-  const p = positionWorld, n = normalWorldGeometry, up = n.y;
+  // The world point (patterns, masks); distances to the camera from the origin-relative positionWorld.
+  const p = WORLD, n = normalWorldGeometry, up = n.y;
   // How level the ground is, smoothed over a few metres per vertex: what rock and sand follow, so their
   // edges run smoothly instead of along the triangles where a cliff's normal flips between vertices.
   const level = attribute('level', 'float');
@@ -187,7 +191,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const ang = fg.a.mul(Math.PI), across = vec2(sin(ang).negate(), cos(ang));
   const spacing = max(shape.r.mul(2), 0.1);
   const cAcross = dot(p.xz, across).div(spacing), cAlong = dot(p.xz, vec2(cos(ang), sin(ang))).div(spacing);
-  const camD = length(cameraPosition.sub(p));
+  const camD = length(cameraPosition.sub(positionWorld));
   const rowsSeen = shape.a.mul(float(1).sub(smoothstep(25, 110, camD)));
   const wave = sin(cAcross.mul(Math.PI * 2));
   // Plants on the ridges: a line, or clumps along it.
@@ -201,6 +205,25 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   rough = mix(rough, float(0.95), fieldT);
   // Furrows: the ground's normal tilts across the rows.
   pert = mix(pert, vec3(across.x, 0, across.y).mul(cos(cAcross.mul(Math.PI * 2)).mul(shape.b).mul(rowsSeen).mul(0.5)).add(vec3(tn(earth.n).x, 0, tn(earth.n).y).mul(float(1).sub(plants))), fieldT);
+
+  // Roads between the places (materials/roads.ts): trodden earth with a ragged edge that frays into the
+  // verge; a cart track has two dark ruts with grass between them, a road is wider and more worn.
+  {
+    const rd = sampleMask(ROAD.mask, p.xz) as Node<'vec4'>;
+    const across = abs(rd.x), track = float(1).sub(abs(rd.y.sub(1))).clamp(0, 1);
+    const shown = smoothstep(0, 0.02, inside(ROAD.mask, p.xz) as Node<'float'>);
+    const fray = fine.mul(0.35).add(mid.mul(0.25)).add(patchy.mul(0.2));
+    let rt: Node<'float'> = smoothstep(0.45, -0.45, rd.z.add(fray)).mul(shown);
+    // The grass strip down a track's middle (the grass mask grows its blades).
+    rt = rt.mul(float(1).sub(track.mul(0.75).mul(smoothstep(0.42, 0.22, across.add(fine.mul(0.08))))));
+    const rb = hblend(clamp(rt, 0, 1), earth.n.b.sub(h), 2);
+    const tone = float(0.9).add(mid.mul(0.12)).add(patchy.mul(0.1));
+    col = mix(col, earth.a.rgb.mul(tone), rb); rough = mix(rough, earth.a.a, rb); ao = mix(ao, earth.n.a, rb);
+    pert = mix(pert, vec3(tn(earth.n).x, 0, tn(earth.n).y), rb); h = mix(h, earth.n.b, rb);
+    // The ruts: two grooves a wheel's gauge apart, darker and damper.
+    const rut = float(1).sub(smoothstep(0.08, 0.24, abs(across.sub(0.78)).add(fine.mul(0.04)))).mul(track).mul(rb);
+    col = col.mul(mix(float(1), float(0.68), rut)); rough = mix(rough, float(0.7), rut.mul(0.5));
+  }
 
   // Rock: triplanar, strata on the side faces, weathered rock on top.
   const bw0 = pow(abs(n), vec3(4));
@@ -224,7 +247,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const cover = varying(cn.x, 'vWoodsCover'), crown = mix(CROWN_BROAD, CROWN_CONIFER, varying(cn.w, 'vWoodsConifer'));
   const woods = far.mul(smoothstep(0.0, 0.05, cover)).mul(float(1).sub(rockB));
   // Past the shadow box no tree shades the floor: the crowns' shade on average instead.
-  const unshaded = smoothstep(110, 150, length(p.sub(cameraPosition))).mul(cover).mul(float(1).sub(woods));
+  const unshaded = smoothstep(110, 150, length(positionWorld.sub(cameraPosition))).mul(cover).mul(float(1).sub(woods));
   col = col.mul(mix(float(1), float(UNDER_CROWNS), unshaded));
   const afar = woodsFromAfar(col, crown, cover, varying(cn.z, 'vWoodsSpacing'), p);
   col = mix(col, afar.color, woods);
@@ -266,7 +289,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Water is dark where it does not mirror: the stone under it shows deep and the sky only at a slant.
   col = col.mul(mix(float(1), float(0.6), rain)).mul(mix(float(1), float(0.72), rim)).mul(mix(float(1), float(0.22), puddle));
   rough = mix(mix(mix(rough, float(0.42), rain.mul(0.85)), float(0.3), rim), float(0.14), puddle);
-  const rings = rainRings(p.xz).mul(smoothstep(6.0, 25.0, length(cameraPosition.sub(p))).oneMinus());
+  const rings = rainRings(p.xz).mul(smoothstep(6.0, 25.0, length(cameraPosition.sub(positionWorld))).oneMinus());
   pert = mix(pert, vec3(rings.x, 0, rings.y), puddle); ao = mix(ao, float(1), puddle);
   // A puddle under a grey sky mirrors it at a slant: kept faint, or it reads as a pale sheet of ice.
   m.specularIntensityNode = mix(mix(float(0.25), float(0.5), rain), float(0.22), puddle);
@@ -299,7 +322,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
 const SURFACE_LAYER: Record<Surface, string> = { grass: 'wildGrass', forest: 'forestFloor', sand: 'sand', scree: 'scree' };
 
 /** The sky dome (a unit box on the camera, drawn at the far plane). Its uniforms: `skyUniforms`. */
-export const SKY = defineKind('sky', ['position', 'normal', 'uv'], () => makeSkyNode({ reversed: true }).material as Material, { cast: false, receive: false });
+export const SKY = defineKind('sky', ['position', 'normal', 'uv'], () => makeSkyNode({ reversed: true, origin: ORIGIN.node }).material as Material, { cast: false, receive: false });
 
 /** The sky as the environment map sees it (rendered only into the PMREM, never into the view). */
 export function makeEnvSky(): Mesh {

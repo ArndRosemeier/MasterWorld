@@ -8,6 +8,7 @@
 import { Matrix4, Quaternion, Vector3, type BufferGeometry, type Camera, type DirectionalLight, type Material } from 'three/webgpu';
 import { shrubModel, treeModel, vegetationUniforms, type TreeSpecies } from '@futuremagic/vegetation';
 import { createBarkMaterial, createFarTreeMaterial, createLeafMaterial, createLeafPasses } from '@futuremagic/vegetation/node';
+import { ORIGIN } from '../origin';
 import { createInstanceDraws, DITHER, KIND, RECORD, type DrawKind, type DrawPart, type InstanceDraws } from '@futuremagic/instances';
 import type { Stage } from '@futuremagic/stage';
 import { hash2f } from '@futuremagic/core';
@@ -28,7 +29,8 @@ const HULL_THIN = 300;
 /** How far a tree's shadow reaches (m): trees just out of view whose shadows fall into it stay drawn. */
 const SHADOW_REACH = 80;
 
-interface Cell { pending: boolean; data: Float32Array | null }
+/** `again`: the land changed while it was being placed (a road): it is asked for once more. */
+interface Cell { pending: boolean; data: Float32Array | null; again?: boolean }
 
 export class FloraView {
   private readonly near = new Map<string, Cell>();
@@ -50,6 +52,8 @@ export class FloraView {
   constructor(private readonly stage: Stage, private readonly jobs: WorldJobs, private readonly sun?: DirectionalLight, opts: { leafDepth?: boolean; shadows?: boolean } = {}) {
     WOODS.band.value.set(HULL_END - HULL_THIN, HULL_END);
     const U = vegetationUniforms;
+    // Drawn relative to the floating origin (wind and tints read the world position through it).
+    U.uOrigin.value = ORIGIN.at;
     const shadows = opts.shadows ?? true, leafDepth = opts.leafDepth ?? true;
     const bark = createBarkMaterial(U), hull = createFarTreeMaterial(U);
     const reversed = !!(stage.renderer as unknown as { backend?: { parameters?: { reversedDepthBuffer?: boolean } } }).backend?.parameters?.reversedDepthBuffer;
@@ -67,8 +71,9 @@ export class FloraView {
       return { lods };
     });
     this.hasHull = kinds.map((k) => k.lods.length > 1);
-    this.draws = createInstanceDraws(stage.renderer, kinds, { horizontal: true, shadow: { dir: this.sunDir, reach: SHADOW_REACH }, capacity: 16384 });
+    this.draws = createInstanceDraws(stage.renderer, kinds, { horizontal: true, shadow: { dir: this.sunDir, reach: SHADOW_REACH }, capacity: 16384, origin: ORIGIN.at });
     this.draws.group.name = 'flora';
+    ORIGIN.pin(this.draws.group);
   }
 
   get group() { return this.draws.group; }
@@ -100,16 +105,35 @@ export class FloraView {
       if (cells.has(key)) continue;
       const cell: Cell = { pending: true, data: null };
       cells.set(key, cell);
-      void this.jobs.flora(i * side, j * side, side, spacing).then((d) => {
-        cell.data = d;
-        cell.pending = false;
-        this.dirty = true;
-      });
+      this.placeCell(cell, i, j, side, spacing);
     }
     // Forget cells well out of reach (kept a little while, so walking back and forth costs nothing).
     for (const [key, c] of cells) {
       const [i, j] = key.split(',').map(Number);
       if (!c.pending && Math.max(Math.abs(i - ci), Math.abs(j - cj)) > reach + 2) cells.delete(key);
+    }
+  }
+
+  /** Asks the worker for a cell's plants (again, if the land changes meanwhile); the old ones stay until then. */
+  private placeCell(cell: Cell, i: number, j: number, side: number, spacing: number): void {
+    cell.pending = true;
+    void this.jobs.flora(i * side, j * side, side, spacing).then((d) => {
+      if (cell.again) { cell.again = false; this.placeCell(cell, i, j, side, spacing); return; }
+      cell.data = d;
+      cell.pending = false;
+      this.dirty = true;
+    });
+  }
+
+  /** The plants of every cell `touches` names are placed anew (a road was laid through them). */
+  refresh(touches: (x0: number, z0: number, x1: number, z1: number) => boolean): void {
+    for (const [cells, side, spacing] of [[this.near, NEAR_CELL, NEAR_SPACING], [this.far, FAR_CELL, FAR_SPACING]] as const) {
+      for (const [key, c] of cells) {
+        const [i, j] = key.split(',').map(Number);
+        if (!touches(i * side, j * side, (i + 1) * side, (j + 1) * side)) continue;
+        if (c.pending) c.again = true;
+        else this.placeCell(c, i, j, side, spacing);
+      }
     }
   }
 
