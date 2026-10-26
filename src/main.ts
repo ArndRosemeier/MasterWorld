@@ -627,15 +627,17 @@ export async function start(b: Boot): Promise<void> {
       player.teleport(h.x, h.below ? h.y : undefined, h.z, h.yaw);
       notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
     } else if (typeof loaded === 'string') notes.say(`Could not load the save: ${loaded}.`, 8);
-    if (params.trade && market && trade && townWords && life) {
-      // Straight to a merchant's counter: in front of them, their wares out.
-      const m = market.merchants.find((x) => x.shop.keeper === params.trade);
-      const a = m && life.agents.find((x) => x.person.id === m.person);
-      if (m && a) {
-        player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
-        trade.show(m, townWords.nameOf(a.person.id));
-      }
-    }
+    // Straight to a merchant's counter (`?trade=smith`, or `game.tradeAt('smith')` in the console and the shot set): in front of them, their wares out.
+    const tradeAt = (keeper: string): boolean => {
+      const m = market?.merchants.find((x) => x.shop.keeper === keeper);
+      const a = m && life?.agents.find((x) => x.person.id === m.person);
+      if (!m || !a || !trade || !townWords) return false;
+      talk?.close();
+      player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
+      trade.show(m, townWords.nameOf(a.person.id));
+      return true;
+    };
+    if (params.trade) tradeAt(params.trade);
     if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else map?.setOpen(true); }
     new DebugMenu({
       paused,
@@ -662,7 +664,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, market, trade, fightHud, compass },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, market, trade, tradeAt, fightHud, compass },
     });
     b.menus.menu = new Menu(settings, {
       paused,
