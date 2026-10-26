@@ -1,0 +1,183 @@
+MasterWorld cold load time on RTX 5070 (plan step A7)
+Date: 2026-10-26 · commit 6828737 (claude/project-thread-5r4nf6) · npm ci, npm run packs (Actors 0.17.1), npm run build
+Environment: SHOT_GPU=1 (launch.mjs uses SwiftShader without it), LIMITS=0. Each run is a fresh browser profile (cold).
+Browser: Playwright Chromium 156.0.8078.4, headless (channel chromium, --enable-unsafe-webgpu --ignore-gpu-blocklist)
+WebGPU adapter: vendor nvidia, architecture blackwell
+WebGL renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)
+Default query is ?gl (WebGL); run 4 uses "?" (WebGPU).
+[packs] retry lines: none in any run.
+
+Summary:
+  run 1 ?gl : title 1.39 s · playable 72.5 s
+  run 2 ?gl : title 1.39 s · playable 68.3 s
+  run 3 ?gl : title 1.37 s · playable 64.2 s
+  run 4 ?   : title 0.85 s · playable 31.7 s
+  Start download 98.8 MB every run. "Preparing shaders" -> "Raising the land" is the biggest step: 36-43 s on ?gl, 13.3 s on WebGPU.
+=== Run 1: SHOT_GPU=1 LIMITS=0 npm run load (default ?gl) ===
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs
+
+  [title] dawn, fair, 9.1 h
+  [load] 0.0 s: Fetching the world
+page loaded 0.1
+  [load] 0.1 s: Finding the start
+  [load] 0.9 s: Starting the renderer
+  [load] 1.4 s: Painting the ground
+title 1.39
+  [load] 3.4 s: Filling the seas
+  [load] 5.2 s: Dressing the hero
+  [load] 6.5 s: Saddling the horses
+  [load] 6.5 s: Turning out the herds
+  [load] 6.7 s: Waking the town
+  [load] 7.5 s: Growing the woods
+  [load] 8.6 s: Dressing the townsfolk
+  [load] 8.8 s: Preparing shaders
+  [load] 51.7 s: Raising the land
+  [load] 55.0 s: Waking the cellar
+  [load] 55.7 s: Planting the trees
+  [load] 59.1 s: trees ready (shaders 140 warm-up + 0 later · worst 28 ms · policy ok)
+  [load] 59.1 s: Waking the townsfolk
+  [load] 72.4 s: townsfolk ready (shaders 141 warm-up + 71 later · worst 28 ms · policy ok)
+playable 72.5
+title 1.39 s · playable 72.5 s · start download 98.8 MB
+  packs/human                    654 files    68.28 MB
+  packs/cow                       10 files    13.86 MB
+  packs/horse                      4 files     7.92 MB
+  packs/dog                       10 files     4.53 MB
+  sound/music                      1 files     1.63 MB
+  assets                          33 files     0.82 MB
+  title                           10 files     0.65 MB
+  props                            1 files     0.51 MB
+  sound/title                      4 files     0.24 MB
+  sound/step                      49 files     0.23 MB
+  sound/swim                       7 files     0.09 MB
+  sound/body                       5 files     0.05 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: ok
+=== Run 2: SHOT_GPU=1 LIMITS=0 npm run load (default ?gl) ===
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs
+
+  [title] dawn, fair, 9.1 h
+  [load] 0.1 s: Fetching the world
+page loaded 0.1
+  [load] 0.1 s: Finding the start
+  [load] 0.9 s: Starting the renderer
+  [load] 1.4 s: Painting the ground
+title 1.39
+  [load] 4.1 s: Filling the seas
+  [load] 6.0 s: Dressing the hero
+  [load] 7.5 s: Saddling the horses
+  [load] 7.6 s: Turning out the herds
+  [load] 7.7 s: Waking the town
+  [load] 8.7 s: Growing the woods
+  [load] 9.8 s: Dressing the townsfolk
+  [load] 10.1 s: Preparing shaders
+  [load] 48.5 s: Raising the land
+  [load] 51.3 s: Waking the cellar
+  [load] 51.9 s: Planting the trees
+  [load] 55.2 s: trees ready (shaders 140 warm-up + 0 later · worst 50 ms · policy ok)
+  [load] 55.2 s: Waking the townsfolk
+  [load] 68.3 s: townsfolk ready (shaders 141 warm-up + 71 later · worst 50 ms · policy ok)
+playable 68.3
+title 1.39 s · playable 68.3 s · start download 98.8 MB
+  packs/human                    654 files    68.28 MB
+  packs/cow                       10 files    13.86 MB
+  packs/horse                      4 files     7.92 MB
+  packs/dog                       10 files     4.53 MB
+  sound/music                      1 files     1.63 MB
+  assets                          33 files     0.82 MB
+  title                           10 files     0.65 MB
+  props                            1 files     0.51 MB
+  sound/title                      4 files     0.24 MB
+  sound/step                      49 files     0.23 MB
+  sound/swim                       7 files     0.09 MB
+  sound/body                       5 files     0.05 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: ok
+=== Run 3: SHOT_GPU=1 LIMITS=0 npm run load (default ?gl) ===
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs
+
+  [title] dawn, fair, 9.1 h
+  [load] 0.0 s: Fetching the world
+page loaded 0.1
+  [load] 0.1 s: Finding the start
+  [load] 0.9 s: Starting the renderer
+  [load] 1.4 s: Painting the ground
+title 1.37
+  [load] 3.4 s: Filling the seas
+  [load] 5.2 s: Dressing the hero
+  [load] 6.9 s: Saddling the horses
+  [load] 7.0 s: Turning out the herds
+  [load] 7.2 s: Waking the town
+  [load] 8.1 s: Growing the woods
+  [load] 9.2 s: Dressing the townsfolk
+  [load] 9.4 s: Preparing shaders
+  [load] 45.6 s: Raising the land
+  [load] 48.4 s: Waking the cellar
+  [load] 49.0 s: Planting the trees
+  [load] 52.1 s: trees ready (shaders 140 warm-up + 0 later · worst 14 ms · policy ok)
+  [load] 52.1 s: Waking the townsfolk
+  [load] 64.2 s: townsfolk ready (shaders 141 warm-up + 71 later · worst 14 ms · policy ok)
+playable 64.2
+title 1.37 s · playable 64.2 s · start download 98.8 MB
+  packs/human                    654 files    68.28 MB
+  packs/cow                       10 files    13.86 MB
+  packs/horse                      4 files     7.92 MB
+  packs/dog                       10 files     4.53 MB
+  sound/music                      1 files     1.63 MB
+  assets                          33 files     0.82 MB
+  title                            9 files     0.65 MB
+  props                            1 files     0.51 MB
+  sound/title                      4 files     0.24 MB
+  sound/step                      49 files     0.23 MB
+  sound/swim                       7 files     0.09 MB
+  sound/body                       5 files     0.05 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: ok
+=== Run 4: SHOT_GPU=1 LIMITS=0 npm run load -- "?" (WebGPU) ===
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs ?
+
+  [title] dawn, fair, 9.1 h
+  [load] 0.0 s: Fetching the world
+page loaded 0.1
+  [load] 0.1 s: Finding the start
+  [load] 0.8 s: Starting the renderer
+title 0.85
+  [load] 1.1 s: Painting the ground
+  [load] 2.9 s: Filling the seas
+  [load] 4.6 s: Dressing the hero
+  [load] 5.7 s: Saddling the horses
+  [load] 5.8 s: Turning out the herds
+  [load] 5.9 s: Waking the town
+  [load] 6.7 s: Growing the woods
+  [load] 7.8 s: Dressing the townsfolk
+  [load] 7.9 s: Preparing shaders
+  [load] 21.2 s: Raising the land
+  [load] 24.1 s: Waking the cellar
+  [load] 24.8 s: Planting the trees
+  [load] 26.7 s: trees ready (shaders 146 warm-up + 0 later · worst 14 ms · policy ok)
+  [load] 26.7 s: Waking the townsfolk
+  [load] 31.7 s: townsfolk ready (shaders 147 warm-up + 66 later · worst 14 ms · policy ok)
+playable 31.7
+title 0.85 s · playable 31.7 s · start download 98.8 MB
+  packs/human                    654 files    68.18 MB
+  packs/cow                       10 files    13.86 MB
+  packs/horse                      4 files     7.92 MB
+  packs/dog                       10 files     4.53 MB
+  sound/music                      1 files     1.63 MB
+  assets                          33 files     0.82 MB
+  title                            5 files     0.65 MB
+  props                            1 files     0.51 MB
+  sound/title                      4 files     0.24 MB
+  sound/step                      49 files     0.23 MB
+  sound/swim                       7 files     0.09 MB
+  sound/body                       5 files     0.05 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: ok
