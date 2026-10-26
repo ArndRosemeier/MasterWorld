@@ -36,6 +36,8 @@ export class TitleScreen {
   private readonly card: HTMLDivElement;
   private people = 0;
   private cardTimer = 0;
+  /** The card's turn still to fill in (it waits for the flip's midpoint). */
+  private flipTimer = 0;
   private toastEl: HTMLDivElement | null = null;
   private leavingNow = false;
 
@@ -156,6 +158,9 @@ export class TitleScreen {
    */
   waiting(people: People['id'] | null = null): void {
     window.clearInterval(this.cardTimer);
+    // A turn under way would fill the card anew after the pick (another people, and no turning gear).
+    window.clearTimeout(this.flipTimer);
+    this.card.classList.remove('flip');
     this.root.classList.add('chosen');
     const button = people ? this.card.querySelector<HTMLButtonElement>('.nav .t-btn:not(.arrow)') : this.startButton;
     (button ?? this.startButton).classList.add('waiting', 'picked');
@@ -224,7 +229,8 @@ export class TitleScreen {
     this.card.classList.remove('flip');
     void this.card.offsetWidth;
     this.card.classList.add('flip');
-    window.setTimeout(fill, 350);
+    window.clearTimeout(this.flipTimer);
+    this.flipTimer = window.setTimeout(fill, 350);
   }
 
   private restartCard(): void {
