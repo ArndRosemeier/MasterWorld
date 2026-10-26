@@ -101,9 +101,8 @@ export class HoldGate {
       get danger() { return watch.atWar ? danger : 0; },
       promise: null,
       quietLine: null,
-      thanks: (coins) => `You are paid ${coins}.`,
     };
-    const e = new Encounter(arena, delve, creatures, h.hud, h.player, h.notes, h.director, h.setting, h.journal, h.camera, h.canvas, h.fight);
+    const e = new Encounter(arena, delve, creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight);
     e.onCue = (c) => h.cue(c);
     this.delve = delve;
     this.watch = watch;

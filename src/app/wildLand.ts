@@ -123,9 +123,8 @@ export class WildLand {
       danger: groupDanger(t.members, h.setting.creatures),
       promise: null,
       quietLine: null,
-      thanks: (coins) => `You are paid ${coins}.`,
     };
-    const e = new Encounter(arena, delve, creatures, h.hud, h.player, h.notes, h.director, h.setting, h.journal, h.camera, h.canvas, h.fight);
+    const e = new Encounter(arena, delve, creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight);
     e.onCue = (c) => h.cue(c);
     g.delve = delve;
     g.encounter = e;

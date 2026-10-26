@@ -10,7 +10,7 @@ export const tower: CellarLore = {
   words: {
     enter: 'You push past the broken door and step into {place}.',
     quiet: 'Nothing moves in {place} now. The household who told you of it will want to hear.',
-    thanks: 'Word that {place} is quiet has reached the household who told you of it; they press {coins} into your hand.',
+    thanks: 'Nothing left alive in {place}? Then we can look up at it without fear. Here, {coins}, and well earned.',
   },
   uses: [
     { id: 'gatehall', name: 'the gate hall', props: ['rubble', 'beam', 'lantern', 'crate'] },
