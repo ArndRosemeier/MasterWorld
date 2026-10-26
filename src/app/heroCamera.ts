@@ -17,8 +17,8 @@ const TURN = 2.6;
 const LOOK = 0.0035;
 /** Zoom range (m from the head); below FIRST it is first person. */
 const NEAR = 0, FAR = 18, FIRST = 0.6;
-/** A talk's view: above the higher of the hero's head and the aim (m). */
-const TALK_UP = 0.55;
+/** A talk's view (m): this far above the aim (about eye height, under a room's wall tops), and at least this far above the hero's head. */
+const TALK_UP = 0.3, TALK_OVER_HEAD = 0.1;
 /** The shots tried for a talk, best first: back and to the right (m). */
 const TALK_SHOTS: readonly (readonly [number, number])[] = [[1.3, 0.45], [1.3, -0.45], [1.3, 0], [1.0, 0.8], [1.0, -0.8], [0.8, 0.3], [0.8, -0.3]];
 
@@ -148,7 +148,7 @@ export class HeroCamera {
       if (n < least) { least = n; back = b; side = sd; }
       if (!n) break;
     }
-    const eye = new Vector3(head.x - fx * back - fz * side, Math.max(head.y, at.y) + TALK_UP, head.z - fz * back + fx * side);
+    const eye = new Vector3(head.x - fx * back - fz * side, Math.max(head.y + TALK_OVER_HEAD, at.y + TALK_UP), head.z - fz * back + fx * side);
     // Under a ceiling: down until clear of it.
     for (let i = 0; i < 8; i++) {
       const rock = this.world.rockSurface(eye.x, eye.y, eye.z);
