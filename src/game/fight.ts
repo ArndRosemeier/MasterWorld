@@ -78,8 +78,15 @@ export class Fight {
     return { x: p.x, y: p.y, z: p.z, noise, light: this.light, alive: this.hero.alive, guard: this.hero.guard(this.hero.stamina <= 0) };
   }
 
-  /** Threat of a creature against the hero (the target frame's ward). */
-  threat(c: Creature): Threat { return threatOf(c.def.danger, this.hero.power); }
+  /**
+   * Threat of a creature against the hero (the target frame's ward): with all who fight the hero beside it,
+   * so one wolf of a pack that surrounds the hero is read as the pack. `together` when others count.
+   */
+  threat(c: Creature): { readonly threat: Threat; readonly together: boolean } {
+    const others = this.den.fighting.filter((o) => o !== c);
+    const danger = c.def.danger + others.reduce((a, o) => a + o.def.danger, 0);
+    return { threat: threatOf(danger, this.hero.power), together: others.length > 0 };
+  }
 
   /** Seconds before an ability can be used again (0: ready). */
   cooling(id: string): number { return this.cooldown.get(id) ?? 0; }
