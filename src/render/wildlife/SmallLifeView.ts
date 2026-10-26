@@ -17,6 +17,8 @@ import type { SmallLife, Squirrel, SquirrelDoing } from '../../sim/smallLife';
 const BIRDS = 384, BIRD_REACH = 600;
 /** Squirrel bodies at most, and how near (m) one must be to get a body. */
 const MAX = 4, REACH = 45;
+/** Seconds without new squirrel bodies after one could not be made. */
+const PAUSE = 30;
 
 const DOING: Record<SquirrelDoing, AnimalDoing> = { idle: 'idle', alert: 'alert', eat: 'feed', hop: 'walk', run: 'run', flick: 'flick', climb: 'run', cling: 'idle' };
 
@@ -27,6 +29,9 @@ export class SmallLifeView {
   private readonly bodies: Body[] = [];
   private building = false;
   private sortIn = 0;
+  /** After a body could not be made (its pack would not load): seconds until the next try. */
+  private pause = 0;
+  private warned = false;
 
   constructor(private readonly life: SmallLife, private readonly stage: Stage, private readonly renderer: WebGPURenderer) {}
 
@@ -51,6 +56,7 @@ export class SmallLifeView {
 
   private squirrels(dt: number, cam: Vector3, shown: boolean): void {
     const off = (s: Squirrel) => Math.hypot(s.x - cam.x, s.z - cam.z);
+    this.pause -= dt;
     if ((this.sortIn -= dt) <= 0) {
       this.sortIn = 0.5;
       const want = shown ? this.life.squirrels.filter((s) => !s.hidden && off(s) < REACH).sort((a, b) => off(a) - off(b)).slice(0, MAX) : [];
@@ -59,7 +65,7 @@ export class SmallLifeView {
         if (this.bodies.some((x) => x.who === s)) continue;
         const free = this.bodies.find((x) => !x.who && x.look === s.look);
         if (free) free.who = s;
-        else if (this.bodies.length < MAX * 2 && !this.building) void this.makeBody(s);
+        else if (this.bodies.length < MAX * 2 && !this.building && this.pause <= 0) void this.makeBody(s);
       }
     }
     for (const x of this.bodies) {
@@ -85,6 +91,11 @@ export class SmallLifeView {
       await this.stage.add(body.place);
       this.bodies.push({ look: s.look, body, who: null });
       this.sortIn = 0;
+    } catch (err) {
+      // No squirrels for a while (the woods go on without them), and one note rather than one per squirrel.
+      if (!this.warned) console.warn('squirrels:', err instanceof Error ? err.message : err);
+      this.warned = true;
+      this.pause = PAUSE;
     } finally {
       this.building = false;
     }
