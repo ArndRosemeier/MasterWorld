@@ -42,9 +42,18 @@ export function loadAtRestart(slot: string): void {
   location.reload();
 }
 
-/** The most recent save, if any (for the title's Continue). */
-export async function latestSave(): Promise<SlotInfo | null> {
-  return (await listSlots()).reduce<SlotInfo | null>((best, s) => (!best || s.at > best.at ? s : best), null);
+/**
+ * The most recent save this version can continue, if any (for the title's Continue): one it cannot read, or
+ * that `fits` turns down, is passed over (offered, it would only bring the player back to the title).
+ */
+export async function latestSave(setting: { id: string; version: number }, fits: (s: SaveData) => boolean = () => true): Promise<SlotInfo | null> {
+  for (const s of (await listSlots()).sort((a, b) => b.at - a.at)) {
+    try {
+      const data = checkSave(await readSlot(s.slot), setting);
+      if (typeof data === 'object' && fits(data)) return s;
+    } catch { /* unreadable: the next one */ }
+  }
+  return null;
 }
 
 /** Save into a slot now; false if the browser refused. */

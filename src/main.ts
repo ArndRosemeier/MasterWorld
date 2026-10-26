@@ -150,7 +150,8 @@ export async function start(b: Boot): Promise<void> {
     const save = lost ? null : asked;
     // The title's Continue: straight on with a loaded save, or offered when one is kept.
     if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
-    else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
+    // Only a save that can go on in this world (not one from before the town moved).
+    else if (title) void latestSave(setting, (s) => !startMoved(s.log, opened.log)).then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const { terrain } = opened;
     // Where the game began: a new hero steps out on its market, the title circles it, the map is drawn round it.
     // Everything else in a town works alike in every town (app/towns.ts, game/township.ts).
