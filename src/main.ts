@@ -314,7 +314,7 @@ export async function start(b: Boot): Promise<void> {
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
     const rock = new VolumeView(view.stage, terrainJobs).raise();
     const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
-    if (houses && town) view.doors.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
+    if (houses && town) view.warm.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
     const raised = houses?.build(0, view.camera.position);
     await ground.ready(view.camera);
     await rock;
@@ -353,7 +353,7 @@ export async function start(b: Boot): Promise<void> {
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
     cellars = new Cellars({
-      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
+      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
       fight: fightHost,
       up: (b) => rooms?.enter(b, true, true) ?? Promise.resolve(),
       swapped: () => autosave(),
@@ -703,8 +703,9 @@ export async function start(b: Boot): Promise<void> {
         ground.update(view.camera);
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         houses?.update(view.camera.position);
-        view.doors.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value);
       }
+      // Doorways at night above, torches below.
+      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt);
       if (life) {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });
