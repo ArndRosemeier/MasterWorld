@@ -76,14 +76,6 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     // A full brush of a tail (the presets' is thin at game distance).
     shape: { tailPlume: 1 },
   },
-  // The woods' squirrels (sim/smallLife.ts): a hop to forage, a run up the trunk, a flick of the tail.
-  squirrel: {
-    pack: 'squirrel', preset: 'red',
-    clips: { idle: 'idle', alert: 'alert', feed: 'eat', walk: 'hop', run: 'run', flick: 'flick', dead: 'death' },
-    pace: { walk: 1.3, run: 4.5 },
-    // A full brush of a tail (the presets' is thin at game distance).
-    shape: { tailPlume: 1 },
-  },
   deer: {
     pack: 'deer', preset: 'red',
     clips: { idle: 'idle', alert: 'idle2', feed: 'eat', walk: 'walk', run: 'gallop', blow: 'kick', hurt: 'hit', dead: 'death' },
