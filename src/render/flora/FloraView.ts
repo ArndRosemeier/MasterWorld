@@ -30,7 +30,7 @@ const HULL_THIN = 300;
 const SHADOW_REACH = 80;
 
 /** `again`: the land changed while it was being placed (a road): it is asked for once more. */
-interface Cell { pending: boolean; data: Float32Array | null; again?: boolean }
+interface Cell { pending: boolean; data: Float32Array | null; again?: boolean; anew?: boolean }
 
 export class FloraView {
   private readonly near = new Map<string, Cell>();
@@ -40,6 +40,8 @@ export class FloraView {
   private readonly hasHull: boolean[];
   private center = { i: NaN, j: NaN };
   private dirty = true;
+  /** Cells being placed anew after the land changed: every plant is rebuilt once when the last is back, not once per cell. */
+  private anew = 0;
   private records = new Float32Array(0);
   private readonly sunDir = new Vector3(0, -1, 0);
   private readonly m = new Matrix4();
@@ -121,6 +123,7 @@ export class FloraView {
       if (cell.again) { cell.again = false; this.placeCell(cell, i, j, side, spacing); return; }
       cell.data = d;
       cell.pending = false;
+      if (cell.anew) { cell.anew = false; this.anew--; }
       this.dirty = true;
     });
   }
@@ -131,6 +134,7 @@ export class FloraView {
       for (const [key, c] of cells) {
         const [i, j] = key.split(',').map(Number);
         if (!touches(i * side, j * side, (i + 1) * side, (j + 1) * side)) continue;
+        if (!c.anew) { c.anew = true; this.anew++; }
         if (c.pending) c.again = true;
         else this.placeCell(c, i, j, side, spacing);
       }
@@ -140,7 +144,7 @@ export class FloraView {
   update(dt: number, camera: Camera): void {
     vegetationUniforms.uTime.value += dt;
     this.follow(camera.position);
-    if (this.dirty) this.rebuild();
+    if (this.dirty && !this.anew) this.rebuild();
     if (this.sun) this.sunDir.subVectors(this.sun.target.position, this.sun.position).normalize();
     this.draws.update(camera);
   }

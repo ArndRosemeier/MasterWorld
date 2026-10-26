@@ -70,8 +70,8 @@ export class RoadWork {
     this.views?.ground.refresh(touches);
     this.views?.flora.refresh(touches);
     this.views?.trunks.forgetOver(touches);
-    this.views?.grass?.invalidate();
-    this.mask.invalidate();
+    this.views?.grass?.invalidate(touches);
+    this.mask.invalidate(touches);
   }
 
   /** A place out on the land (already in the log): the trees go from its clearing, and the plants and trunks near it are placed anew. */
@@ -114,7 +114,7 @@ export class RoadWork {
     this.views?.ground.refresh(touches);
     this.views?.flora.refresh(touches);
     this.views?.trunks.forgetOver(touches);
-    this.views?.grass?.invalidate();
+    this.views?.grass?.invalidate(touches);
   }
 
   /** Each frame: the mask follows the camera. */
