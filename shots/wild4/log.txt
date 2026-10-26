@@ -1,0 +1,24 @@
+=== a squirrel ===
+shots/wild4/squirrel.png: webgpu · 21.1 ms · -31843, 90, 31945 · chunks 276 (+0) · grass 100+400 · 0.26 dense 0.26 m · folk 16/30
+weather cover 0.95 rain 0.07 storm 0.00 mist 0.01 wind 0.14 wet 0.07
+shaders 90 warm-up + 9 later · worst 9 ms · policy ok · wild - (0/7 built) · small life 1 squirrels, 157/157 birds (44 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 90 built in warm-up, 9 after, worst block 9 ms, 0 violations, 0 built again alike
+=== b birds ===
+shots/wild4/birds.png: webgpu · 20.0 ms · -31927, 82, 31757 · chunks 291 (+0) · grass 99+405 · 0.08 dense 0.28 m · folk 5/30
+weather cover 0.95 rain 0.09 storm 0.00 mist 0.01 wind 0.14 wet 0.09
+shaders 92 warm-up + 4 later · worst 10 ms · policy ok · wild - (0/7 built) · small life 1 squirrels, 167/167 birds (67 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 92 built in warm-up, 4 after, worst block 10 ms, 0 violations, 0 built again alike
+=== c flock ===
+shots/wild4/flock.png: webgpu · 20.3 ms · -32087, 93, 31809 · chunks 273 (+0) · grass 102+208 · 0.32 dense 0.22 m · folk 0/30
+weather cover 0.95 rain 0.06 storm 0.00 mist 0.01 wind 0.14 wet 0.06
+shaders 89 warm-up + 22 later · worst 8 ms · policy ok · wild - (0/7 built) · small life 5 squirrels, 168/168 birds (54 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 89 built in warm-up, 22 after, worst block 8 ms, 0 violations, 0 built again alike
+=== d squirrel-early ===
+shots/wild4/squirrel-early.png: webgpu · 18.1 ms · -31840, 90, 31947 · chunks 276 (+0) · grass 98+403 · 0.26 dense 0.26 m · folk 16/30
+weather cover 0.94 rain 0.04 storm 0.00 mist 0.00 wind 0.13 wet 0.04
+shaders 90 warm-up + 9 later · worst 8 ms · policy ok · wild - (0/7 built) · small life 1 squirrels, 157/157 birds (64 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 90 built in warm-up, 9 after, worst block 8 ms, 0 violations, 0 built again alike
