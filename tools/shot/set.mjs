@@ -3,13 +3,14 @@
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack,
  * the map, talk) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
- * writes `index.md` and `index.json` there: each shot's frame time (median and 95th percentile over a few
- * seconds, no frame cap), its shader summary (F3) and the page's errors. The index marks a shot over 16.7 ms,
- * or more than twice as slow as the town at noon (F2). A slow check (docs/CHECKS.md): one run must stay
- * under 5 min.
- * SET_ONLY=town,fight takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2;
- * SET_MEASURE=<ms> how long frame times are taken (default 2000); SET_SETTLE=<ms> the longest wait for the
- * scene to settle (no shader built for 1.5 s; default 12000). Exits 1 when a page failed or a shot breaks F2 or F3.
+ * writes `index.md` and `index.json` there. Before each shot it waits until everything near the hero is drawn
+ * as itself (`game.undrawn` empty: townsfolk dressed, creatures warm; at most SET_DRAWN ms, default 30000) and
+ * then until no shader was built for 1.5 s (at most SET_SETTLE ms, default 6000). Per shot the index has the
+ * frame time (median and 95th percentile over SET_MEASURE ms, default 2000, no frame cap), the shader summary
+ * (F3), the page's errors and what was not drawn; it marks a shot over 16.7 ms or more than twice as slow as
+ * the town at noon (F2). A slow check (docs/CHECKS.md): one run must stay under 5 min.
+ * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
+ * Exits 1 when a page failed, something was not drawn, or a shot breaks F2 or F3.
  */
 import { execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -90,6 +91,14 @@ const rows = [];
 let failed = false, gpuName = '';
 
 /**
+ * Waits until everything near the hero is drawn as itself (`game.undrawn` empty: no townsfolk still plain
+ * figures, no creatures still warming), at most DRAWN ms; returns what is still waiting.
+ */
+const DRAWN = Number(process.env.SET_DRAWN ?? 30000);
+const drawn = (page) => page.waitForFunction(() => !window.game || window.game.undrawn.length === 0, null, { timeout: DRAWN, polling: 200 })
+  .then(() => [], () => page.evaluate(() => window.game.undrawn));
+
+/**
  * Waits until no shader was built for 1.5 s (the scene is warm: what is still warming up is not its frame
  * time), at least 1.5 s and at most SETTLE; returns how long that took (s).
  */
@@ -140,6 +149,7 @@ for (const s of sessions) {
   });
   for (const shot of s.shots) {
     if (shot.act) await shot.act(page);
+    const missing = await drawn(page);
     const settled = await quiet(page);
     const ft = await measure(page);
     const file = `${String(rows.length + 1).padStart(2, '0')}-${shot.name}.jpg`;
@@ -149,8 +159,8 @@ for (const s of sessions) {
       return m ? { ...m.summary(), lines: m.violations() } : null;
     });
     const backend = (await page.evaluate(() => window.game?.view?.backend ?? '')) || '';
-    rows.push({ name: shot.name, file, query: s.query, loadS, settledS: settled, backend, ...ft, shaders: sh, errors: [...errors] });
-    console.log(`${file}: settled ${settled.toFixed(1)} s · p50 ${ft.p50.toFixed(1)} ms · p95 ${ft.p95.toFixed(1)} ms · ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}${errors.length ? ` · ${errors.length} errors` : ''}`);
+    rows.push({ name: shot.name, file, query: s.query, loadS, settledS: settled, missing, backend, ...ft, shaders: sh, errors: [...errors] });
+    console.log(`${file}: settled ${settled.toFixed(1)} s · p50 ${ft.p50.toFixed(1)} ms · p95 ${ft.p95.toFixed(1)} ms · ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}${errors.length ? ` · ${errors.length} errors` : ''}${missing.length ? ` · not drawn: ${missing.join(', ')}` : ''}`);
     errors.length = 0;
   }
   await context.close();
@@ -168,6 +178,7 @@ for (const r of rows) {
   if (!r.shaders) r.marks.push('no shader monitor');
   else if (r.shaders.violations) r.marks.push(`${r.shaders.violations} shader violations`);
   if (r.errors.length) r.marks.push(`${r.errors.length} page errors`);
+  if (r.missing.length) r.marks.push(`not all drawn: ${r.missing.join(', ')}`);
   if (r.marks.some((m) => !m.startsWith('over the'))) failed = true;
 }
 const seconds = (Date.now() - t0) / 1000;
