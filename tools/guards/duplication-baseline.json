@@ -62,5 +62,21 @@
   {
     "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/livestock.ts#step",
     "reason": "Each world-simulation behaviour advances by step(dt): dungeon creatures (sight, packs, fights) and grazing farm animals (wander in a paddock) share only the name."
+  },
+  {
+    "key": "clone: masterworld/world/dungeon/setPieces.ts#dress",
+    "reason": "Each set piece is a data entry with its own find/dress method (plan 8.1: a library of hand-designed moments); the methods share a name and a shape by design, the content differs."
+  },
+  {
+    "key": "clone: masterworld/world/dungeon/setPieces.ts#find",
+    "reason": "Each set piece is a data entry with its own find/dress method (plan 8.1: a library of hand-designed moments); the methods share a name and a shape by design, the content differs."
+  },
+  {
+    "key": "same name: masterworld/render/folk/FolkView.ts#dress + masterworld/world/dungeon/setPieces.ts#dress",
+    "reason": "Dressing townsfolk in clothes vs dressing a dungeon room with a set piece's props; only the word matches."
+  },
+  {
+    "key": "same name: masterworld/render/hero/HeroView.ts#dress + masterworld/world/dungeon/setPieces.ts#dress",
+    "reason": "Dressing the hero in clothes vs dressing a dungeon room with a set piece's props; only the word matches."
   }
 ]

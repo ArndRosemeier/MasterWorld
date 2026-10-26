@@ -6,12 +6,18 @@
  * coordinates are in metres and scaled per layer. Rain darkens and wets the walls and roofs.
  */
 import { BufferAttribute, BufferGeometry, MeshPhysicalNodeMaterial, type Mesh } from 'three/webgpu';
-import type { BuildingMesh } from '@futuremagic/settlement';
-import { attribute, float, int, mix, normalMap, pow, round, texture, uniformArray, vec3 } from 'three/tsl';
+import { attribute, dot, float, floor, fract, int, mix, normalMap, positionWorld, pow, round, sin, step, texture, uniform, uniformArray, vec3 } from 'three/tsl';
+import { BuildingMat, type BuildingMesh } from '@futuremagic/settlement';
 import { defineKind, kindMesh } from '../materials';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 import { townTextures } from './townGround';
 import { WEATHER } from './weather';
+
+/**
+ * Lit windows after dusk (sky.ts sets them): `glow` 0 by day .. 1 at night, `share` of the rooms with a
+ * light on (most in the evening, few after midnight).
+ */
+export const WINDOWS = { glow: uniform(0), share: uniform(0.7) };
 
 export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat', 'tint'], () => {
   const { albedo: A, normal: N } = townTextures();
@@ -29,6 +35,13 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   const xy = n.xy.mul(2).sub(1);
   const z = float(1).sub(xy.dot(xy)).max(0).sqrt();
   m.normalNode = normalMap(vec3(n.xy, z.mul(0.5).add(0.5)));
+  // Candle and hearth light behind the glass: room by room (cells of about a room), some rooms dark. Dim:
+  // the night exposure is high, and brighter glows go white under AgX.
+  const room = floor(positionWorld.div(vec3(3.5, 3, 3.5)));
+  const roll = fract(sin(dot(room, vec3(12.9898, 78.233, 37.719))).mul(43758.5453));
+  const glass = float(1).sub(step(0.5, layer.sub(BuildingMat.Glass).abs().toFloat()));
+  const warm = mix(vec3(1.0, 0.42, 0.13), vec3(1.0, 0.55, 0.22), fract(roll.mul(7.3)));
+  m.emissiveNode = warm.mul(glass).mul(step(roll, WINDOWS.share)).mul(WINDOWS.glow).mul(0.12);
   return m;
 });
 

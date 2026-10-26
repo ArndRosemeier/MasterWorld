@@ -30,6 +30,8 @@ export const params = {
   leafDepth: q.get('leafDepth') !== '0',
   /** Draw the grass (`grass=0` leaves it out, for quick screenshots). */
   grass: q.get('grass') !== '0',
+  /** `horizon=0`: no hill shadows beyond the sun's shadow map (for comparing). */
+  horizon: q.get('horizon') !== '0',
   /** Draw the town's buildings (`town=0` leaves them out, for comparisons). */
   town: q.get('town') !== '0',
   /** How many townsfolk are drawn at most (`folk=0`: none). */
