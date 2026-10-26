@@ -18,7 +18,7 @@ const sound = new Sound();
 sound.volume = settings.current.volume;
 const menus: { menu: Menu | null } = { menu: null };
 const calm = settings.current.calm || !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menus.menu?.show('settings'), whatsNew: () => menus.menu?.show('news') }, calm) : null;
+const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menus.menu?.showDialog('settings'), whatsNew: () => menus.menu?.showDialog('news') }, calm) : null;
 const loading = title?.screen ?? new LoadingScreen();
 loading.set('Fetching the world');
 // The game's code; if it cannot be fetched, the screen says so (start reports its own failures).
