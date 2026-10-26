@@ -101,6 +101,9 @@ declare global {
   }
 }
 
+/** The longest the start waits for the people round the hero to be dressed (ms). */
+const DRESS_WAIT = 15000;
+
 /** What the first, small script (boot.ts) made before the game's code arrived. */
 export interface Boot {
   readonly settings: SettingsStore;
@@ -536,7 +539,8 @@ export async function start(b: Boot): Promise<void> {
     void survive('townsfolk', folkLooks?.done.then(took('townsfolk, every look')));
     void survive('cellar', dwellers?.then(took('cellar')));
     void survive('giant', giantReady);
-    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folkLooks?.shown.then(took('townsfolk'))), params.cellar ? survive('cellar', dwellers) : null]).then(() => { planted = true; });
+    let plantedAt = 0, dressedAt = 0;
+    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folkLooks?.shown.then(took('townsfolk'))), params.cellar ? survive('cellar', dwellers) : null]).then(() => { planted = true; plantedAt = performance.now(); });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -1003,6 +1007,8 @@ export async function start(b: Boot): Promise<void> {
       }
       if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
       if (above) {
+        // Until the game begins, the people round the hero's place are dressed (the title's fly-over is far up).
+        if (folk) folk.focus = title?.holding || !window.__mwReady ? player.walker.pos : null;
         folk?.follow(dt, view.camera);
         if (boot.trees) flora.update(dt, view.camera);
         trunks.around(player.walker.pos.x, player.walker.pos.z);
@@ -1020,7 +1026,13 @@ export async function start(b: Boot): Promise<void> {
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }
-      if (planted && !window.__mwReady) {
+      // Playable once the people round the hero are dressed too (no plain stand-ins on the square), unless one
+      // will not dress (a file that would not load): then after DRESS_WAIT, as one failed part must not hold the start.
+      if (planted && !dressedAt && (!folk || visit() || !folk.undressed || now - plantedAt > DRESS_WAIT)) {
+        dressedAt = now;
+        if (folk && !visit()) console.info(`[load] ${(now / 1000).toFixed(1)} s: townsfolk round the hero ${folk.undressed ? `not all dressed (${folk.undressed} left)` : 'dressed'}`);
+      }
+      if (planted && dressedAt && !window.__mwReady) {
         window.__mwReady = true;
         shown();
         if (title) title.worldReady();

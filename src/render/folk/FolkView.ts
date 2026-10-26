@@ -149,9 +149,13 @@ export class FolkView {
     const place = slot.place;
     place.removeFromParent();
     slot.busy = true; // not dressed for anybody while it tries the looks on
+    this.trying = true;
     const looks = coveringLooks(this.life.agents.map((a) => a.person));
     for (let i = 0; i < looks.length; i++) {
       if (i === 1) first();
+      // Before the game begins the people round the hero come first: their dressing compiles what they wear, and
+      // the looks nobody there wears wait (they are tried on behind play).
+      while (i > 0 && this.focus && (this.dressing > 0 || this.waiting > 0)) await new Promise((r) => setTimeout(r, 50));
       // A look whose files would not load is skipped: its garments then compile when first worn.
       try {
         if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
@@ -168,11 +172,14 @@ export class FolkView {
     ch.setLod(0);
     place.visible = false;
     slot.busy = false;
+    this.trying = false;
   }
   private warm = false;
+  /** The first character tries the looks on (warmAll). */
+  private trying = false;
   private waiting = 0;
 
-  /** How many people within CLOSE in the camera's view are plain figures while their character is dressed (before the warm-up ends at least 1). */
+  /** How many people within CLOSE in the camera's view (or of `focus`) are plain figures while their character is dressed (before the warm-up ends at least 1). */
   get undressed(): number { return this.warm ? this.waiting : Math.max(1, this.waiting); }
 
   /** While the player is in a room: the people in it (and nobody out of doors is drawn). */
@@ -181,10 +188,17 @@ export class FolkView {
   /** Where nobody out of doors is drawn just now (the creator's view of the hero), or null. */
   clear: ((x: number, z: number) => boolean) | null = null;
 
+  /**
+   * Whom to dress for, if not the camera: the hero's place while the title's fly-over (far up) covers the town, so
+   * the people round the hero are dressed before the dive lands there (plan A7). `undressed` then counts everyone
+   * near it, in view or not.
+   */
+  focus: { readonly x: number; readonly z: number } | null = null;
+
   /** Each frame: who is drawn, where and doing what. */
   follow(dt: number, cam: Camera): void {
     if (!this.warm) return;
-    const cx = cam.position.x, cz = cam.position.z;
+    const cx = this.focus?.x ?? cam.position.x, cz = this.focus?.z ?? cam.position.z;
     // The nearest people out of doors (or those in the room).
     const near: [number, Agent][] = [];
     const placed = new Map<number, Placed>();
@@ -198,7 +212,8 @@ export class FolkView {
       }
     }
     near.sort((x, y) => x[0] - y[0]);
-    const want = new Set(near.slice(0, this.slots.length).filter(([d]) => d < RANGE).map(([, a]) => a.person.id));
+    // (Not counting the first character while it tries the looks on: nobody waits for it.)
+    const want = new Set(near.slice(0, this.slots.length - (this.trying ? 1 : 0)).filter(([d]) => d < RANGE).map(([, a]) => a.person.id));
     // Free the characters of people no longer wanted.
     for (const [id, s] of this.shown) {
       if (want.has(id)) continue;
@@ -239,7 +254,7 @@ export class FolkView {
     // In a room too (nobody there is a plain figure: the undressed are not drawn at all).
     for (const [d, a] of pending) {
       const p = placed.get(a.person.id);
-      if (d < CLOSE && want.has(a.person.id) && VIEW.containsPoint(p ? AT.set(p.x, p.y + 1, p.z) : AT.set(a.x, this.height(a.x, a.z) + 1, a.z))) waiting++;
+      if (d < CLOSE && want.has(a.person.id) && (this.focus || VIEW.containsPoint(p ? AT.set(p.x, p.y + 1, p.z) : AT.set(a.x, this.height(a.x, a.z) + 1, a.z)))) waiting++;
     }
     this.waiting = waiting;
   }
