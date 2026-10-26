@@ -75,6 +75,7 @@ import { Character } from './game/character';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
+import { RemainsView } from './render/remainsView';
 import { writeSlot } from './persist/saves';
 import { acquaintances } from './game/background';
 import { Director } from './vgm/director';
@@ -262,6 +263,16 @@ export async function start(b: Boot): Promise<void> {
     // Classic or roguelike (plan 11.1): chosen in the creator, kept in the save. What fallen heroes left lies where they fell.
     let mode: GameMode = save?.mode ?? 'classic';
     const remains: Remains[] = [...(save?.remains ?? [])];
+    // Drawn where they lie (a pack, a cairn), in the land or down in a cellar.
+    const remainsView = new RemainsView(view.stage);
+    const drawRemains = () => void remainsView.lay(remains.map((r) => ({ id: r.id, x: r.at.x, y: r.at.y, z: r.at.z, grave: !!r.grave, seed: r.id })));
+    if (params.remains && !save) {
+      // In front of where the hero stands (just out of reach), on the ground.
+      const w = player.walker, x = w.pos.x - Math.sin(w.yaw) * 2.6, z = w.pos.z - Math.cos(w.yaw) * 2.6;
+      const at: FallPlace = { x, y: terrain.height(x, z), z, below: null, mark: { x, z }, label: 'out on the land' };
+      remains.push({ id: 'remains-shown', grave: params.remains === 'grave' ? 'Wenna Stonehelm' : null, at, items: [], coins: 0, day: 0 });
+    }
+    drawRemains();
     // A roguelike hero fell: the heir's save is written and nothing saves over it.
     let ended = false;
     // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
@@ -408,7 +419,7 @@ export async function start(b: Boot): Promise<void> {
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       depth: (down, keep) => {
         if (!down) { for (const o of hidden) o.visible = true; hidden.length = 0; return; }
-        const kept = new Set<Object3D>([...keep, hero.object, view.camera]);
+        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group]);
         for (const o of view.scene.children) if (o.visible && !kept.has(o) && !(o as Light).isLight) { o.visible = false; hidden.push(o); }
       },
     }, terrain.towns, save?.cellars ?? {});
@@ -634,6 +645,7 @@ export async function start(b: Boot): Promise<void> {
       remains.push(r);
       journal.remember(remainsEntry(r));
       justLeft = r;
+      drawRemains();
     };
     const gatherNear = () => {
       if (!remains.length || !character.alive) return;
@@ -644,6 +656,7 @@ export async function start(b: Boot): Promise<void> {
       gather(character, r);
       remains.splice(remains.indexOf(r), 1);
       journal.fulfil(r.id);
+      drawRemains();
       notes.say(gatheredLine(r), 6);
       sounds?.cue({ kind: 'found', loot: { items: [...r.items], coins: r.coins } });
     };

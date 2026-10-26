@@ -103,3 +103,12 @@ test('death: a save from before modes loads as classic with nothing left anywher
   assert.equal(back.mode, 'classic');
   assert.deepEqual(back.remains, []);
 });
+
+test('death: remains are drawn, a grave as a cairn bigger than a pack', async () => {
+  const { remainsMesh } = await import('../src/world/dungeon/remainsMesh');
+  const pack = remainsMesh({ grave: false, seed: 'remains-1' }), grave = remainsMesh({ grave: true, seed: 'remains-1' });
+  assert.ok(pack.index.length > 100);
+  assert.ok(grave.index.length > pack.index.length);
+  assert.ok(pack.position.every(Number.isFinite));
+  assert.deepEqual(remainsMesh({ grave: true, seed: 'a' }).position, remainsMesh({ grave: true, seed: 'a' }).position);
+});
