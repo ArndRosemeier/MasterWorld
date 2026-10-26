@@ -4,7 +4,7 @@
  * the shape worker) and shown once ready; until then, and everyone farther off, is a plain figure
  * (FarFolk). Characters far off draw their "Crowd" level (one draw call plus the hair).
  */
-import { Frustum, Group, Matrix4, Vector3, type Camera, type Material, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Frustum, Group, Matrix4, Vector3, type Camera, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
@@ -102,28 +102,7 @@ export class FolkView {
       place.visible = false;
       const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false };
       this.slots.push(slot);
-      ch.object.addEventListener('childadded', ({ child }) => this.late(slot, child));
     }
-  }
-
-  /** Materials compiled for the characters (a mesh made later with one of these needs nothing). */
-  private readonly compiled = new WeakSet<Material>();
-
-  /**
-   * Actors makes some meshes only once a detail level or a fitted shape first needs them, sometimes after
-   * the character is drawn: such a mesh with a material of its own would build its shader on the render
-   * path. Taken out of the scene at once (the mesh is added before it is drawn), compiled, and back.
-   */
-  private late(s: Slot, child: Object3D): void {
-    if (!s.ready) return;
-    let fresh = false;
-    child.traverse((m) => { for (const x of materialsOf(m)) if (!this.compiled.has(x)) fresh = true; });
-    if (!fresh) return;
-    s.ready = false;
-    s.place.removeFromParent();
-    this.dressing++;
-    s.busy = true;
-    void this.prepareSlot(s, s.agent).finally(() => { this.dressing--; s.busy = false; });
   }
 
   /**
@@ -322,7 +301,10 @@ export class FolkView {
       .finally(() => { this.dressing--; s.busy = false; });
   }
 
-  /** Compiles a dressed character (a cache hit for kinds already seen) and puts it in the scene. */
+  /**
+   * Compiles a dressed character (a cache hit for kinds already seen) and puts it in the scene. A mesh Actors makes
+   * later (a detail level's merged crowd mesh) is left to the Stage: drawn once its shader is built in a cap slot.
+   */
   private async prepareSlot(s: Slot, id: number): Promise<void> {
     // Out of the scene and shown while compiling (compileAsync skips hidden objects, and the shadow
     // pass is warmed only for objects not yet in the scene).
@@ -340,7 +322,6 @@ export class FolkView {
       s.place.traverse((m) => { if (!m.visible && (m as Mesh).isMesh) { hidden.push(m); m.visible = true; } });
       await this.stage.prepare(s.place, { everyCaster: true });
       for (const m of hidden) m.visible = false;
-      s.place.traverse((m) => { for (const x of materialsOf(m)) this.compiled.add(x); });
     }
     s.ch.setLod('auto');
     s.look = ''; // `detail` sets it again on the next frame
@@ -365,8 +346,3 @@ export class FolkView {
   }
 }
 
-/** A mesh's materials (none for other objects). */
-function materialsOf(o: Object3D): Material[] {
-  const m = (o as Mesh).material;
-  return !(o as Mesh).isMesh || !m ? [] : Array.isArray(m) ? m : [m];
-}
