@@ -58,13 +58,13 @@ export class RepairUi extends BodyWindow {
 
   private row(m: Mend): HTMLElement {
     const it = m.item, c = condition(it), state = wearState(it);
-    const bar = el('div', { className: `temper ${state}` }, el('i'));
+    const bar = el('div', { className: `temper ${state === 'new' ? 'sound' : state}` }, el('i'));
     bar.style.setProperty('--c', c.toFixed(3));
     const dear = m.cost > this.hero.coins;
     const r = el('div', { className: `piece${dear ? ' dear' : ''}${this.flare.has(m.slot) ? ' flare' : ''}`, title: dear ? 'Not enough coin' : 'Mend it' },
       itemCard(it, this.setting),
       bar,
-      el('div', { className: 'cost' }, el('span', { textContent: `${Math.round(c * 100)}% sound` }), el('b', { textContent: coinText(m.cost) })));
+      el('div', { className: 'cost' }, el('span', { textContent: dear ? 'not enough coin' : 'mend it' }), el('b', { textContent: coinText(m.cost) })));
     r.addEventListener('click', () => this.clickPiece(m));
     return r;
   }
