@@ -27,6 +27,11 @@ interface Kind {
   /** Over the preset: shape values and coat. */
   readonly shape?: Readonly<Record<string, number>>;
   readonly coat?: Readonly<Record<string, number | readonly number[]>>;
+  /**
+   * The coat's own colours (not its white) times this, for every breed: the game's bright day lifts Actors'
+   * mid-tone coats to a pale, flat beige or silver that reads as a stand-in.
+   */
+  readonly shade?: number;
 }
 
 /** The setting's beasts and the farms' cattle, on Actors' bodies (the boar on the dog's rig: Actors has no pig). */
@@ -35,9 +40,9 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     pack: 'dog', preset: 'wolf',
     clips: { idle: 'idle', alert: 'alert', feed: 'idle', walk: 'walk', run: 'run', blow: 'bite', hurt: null, dead: 'death' },
     pace: { walk: 1.5, run: 7 },
-    // Grey-brown all over with a paler belly and muzzle: Actors' grey wolf reads as a husky in the
-    // game's light (white face and legs, a black back).
-    coat: { base: [0.46, 0.42, 0.37], second: [0.3, 0.27, 0.24], tan: [0.52, 0.47, 0.4], white: [0.6, 0.56, 0.5], saddle: 0.45, mask: 0.2, points: 0, socks: 0, blaze: 0, belly: 0.5, bib: 0.3, paleMask: 0.3, tanLegs: 0.3 },
+    // Grey-brown all over with a darker saddle and a paler belly and muzzle: Actors' grey wolf reads as a
+    // husky in the game's light (white face and legs, a black back), and a mid grey as pale silver.
+    coat: { base: [0.36, 0.32, 0.27], second: [0.17, 0.15, 0.13], tan: [0.48, 0.4, 0.3], white: [0.58, 0.54, 0.47], saddle: 0.6, mask: 0.2, points: 0, socks: 0, blaze: 0, belly: 0.5, bib: 0.3, paleMask: 0.3, tanLegs: 0.3, agouti: 0.5 },
   },
   boar: {
     pack: 'dog', preset: 'wolf',
@@ -61,6 +66,7 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     pack: 'cow', preset: 'braunvieh', presets: ['braunvieh', 'braunvieh', 'fleckvieh', 'jersey', 'highland'],
     clips: { idle: 'idle', alert: 'idle', feed: 'eat', walk: 'walk', run: 'trot', blow: 'headbutt', hurt: null, dead: 'death' },
     pace: { walk: 1, run: 2.5 },
+    shade: 0.7,
   },
   // The woods' squirrels (sim/smallLife.ts): a hop to forage, a run up the trunk, a flick of the tail.
   squirrel: {
@@ -100,6 +106,8 @@ function lead(pack: string): Promise<Animal<object, object>> {
       await a.useWorker(new AnimalWorker());
       return a;
     })();
+    // A pack that failed (offline, or missing from the build) is asked for again by the next body, not kept failed.
+    p.catch(() => { if (leads.get(pack) === p) leads.delete(pack); });
     leads.set(pack, p);
   }
   return p;
@@ -113,10 +121,21 @@ export async function animalBody(species: string, seed: number, renderer: WebGPU
   const animal = Animal.share(first);
   animal.setPreset(preset ?? (def.presets ? def.presets[Math.floor(hash2f(seed, 2, 9) * def.presets.length) % def.presets.length] : def.preset));
   if (def.shape || def.coat) animal.params = { shape: { ...animal.shape, ...def.shape }, coat: { ...animal.coat, ...def.coat } };
+  if (def.shade) animal.params = { shape: animal.shape, coat: shaded(animal.coat as Record<string, unknown>, def.shade) };
   const shape = animal.shape as { size?: number };
   if (typeof shape.size === 'number') shape.size *= 0.92 + hash2f(seed, 1, 7) * 0.16;
   const { actor, place } = await furActor(animal, renderer, species);
   return { kind: 'animal', place, actor, animal, def, doing: '' };
+}
+
+/** `coat` with its base, second and tan colours times `k` (sRGB; the white and the nose stay). */
+export function shaded(coat: Record<string, unknown>, k: number): Record<string, unknown> {
+  const out = { ...coat };
+  for (const key of ['base', 'second', 'tan']) {
+    const c = coat[key];
+    if (Array.isArray(c)) out[key] = c.map((v: number) => v * k);
+  }
+  return out;
 }
 
 /** A frame of an animal: where it stands, facing `yaw` (−z turned), what it does, how fast it goes. */
