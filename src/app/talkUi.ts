@@ -18,6 +18,7 @@ import './windows.css';
 import { button, el, overlay } from './dom';
 import { stagger, wardRim } from './ward';
 import type { Player } from './player';
+import type { Township } from '../game/township';
 
 /** How close (m) and how nearly in front someone must be to talk to them. */
 const REACH = 3;
@@ -43,13 +44,6 @@ export interface TalkHost {
   readonly roomPeople: readonly { agent: Agent; x: number; z: number }[] | null;
 }
 
-/** Where the hero talks: a town's people, their words and its plan (the start town's, or a settlement's, plan B3). */
-export interface TalkPlace {
-  readonly talk: TownTalk;
-  readonly life: TownLife;
-  readonly plan: TownPlan;
-}
-
 export class TalkUi {
   private readonly prompt: HTMLElement;
   private readonly box: HTMLDivElement;
@@ -62,10 +56,10 @@ export class TalkUi {
   /** Frames since the talk's shot was chosen. */
   private framed = 0;
 
-  private at: TalkPlace;
+  private at: Township;
 
   constructor(
-    place: TalkPlace,
+    place: Township,
     private readonly words: TalkDef,
     private readonly journal: Journal,
     private readonly player: Player,
@@ -85,11 +79,11 @@ export class TalkUi {
   get open(): boolean { return this.with !== null; }
 
   /** The town talked in now; a new one (the hero came to another settlement) takes over once no talk is open. */
-  get place(): TalkPlace { return this.at; }
-  set place(p: TalkPlace) { if (!this.with) this.at = p; }
+  get place(): Township { return this.at; }
+  set place(p: Township) { if (!this.with) this.at = p; }
   private get talk(): TownTalk { return this.at.talk; }
-  private get life(): TownLife { return this.at.life; }
-  private get plan(): TownPlan { return this.at.plan; }
+  private get folk(): TownLife { return this.at.life; }
+  private get plan(): TownPlan { return this.at.town.plan; }
 
   /** Who the hero is talking with now. */
   get partner(): Agent | null { return this.with; }
@@ -114,7 +108,7 @@ export class TalkUi {
 
   /** The people about: in a room, those in it where they stand there; out of doors, everyone not indoors. */
   private about(): readonly { agent: Agent; x: number; z: number }[] {
-    return this.host.roomPeople ?? this.life.agents.filter((a) => !a.hidden).map((a) => ({ agent: a, x: a.x, z: a.z }));
+    return this.host.roomPeople ?? this.folk.agents.filter((a) => !a.hidden).map((a) => ({ agent: a, x: a.x, z: a.z }));
   }
 
   /** The grown-up nearest in front of the hero, within reach. */
@@ -154,7 +148,7 @@ export class TalkUi {
   begin(a: Agent): void {
     this.with = a;
     const w = this.player.walker.pos;
-    this.life.hold(a, w.x, w.z);
+    this.folk.hold(a, w.x, w.z);
     this.prompt.classList.remove('on');
     this.who.textContent = this.talk.nameOf(a.person.id);
     this.lines.replaceChildren();
@@ -217,7 +211,7 @@ export class TalkUi {
     const a = this.with;
     if (!a) return;
     this.with = null;
-    this.life.letGo(a);
+    this.folk.letGo(a);
     this.box.classList.remove('open');
     this.player.frameTalk(false);
     this.host.paused(false);

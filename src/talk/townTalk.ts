@@ -184,7 +184,8 @@ export class TownTalk {
       social,
       sources: { 'source.house': talk.ownHouse },
     };
-    const version = Math.max(1, cellars.length);
+    // One version per cellar known, counting from 1 with none (a town whose first cellar comes later, plan B3a).
+    const version = cellars.length + 1;
     const domain: Domain = {
         version,
         migrateFrom: Array.from({ length: version - 1 }, (_, i) => i + 1),

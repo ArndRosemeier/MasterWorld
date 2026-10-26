@@ -4,7 +4,7 @@
  * After the game is ready and has settled, the hero is moved along a straight line at WALK_SPEED m/s (default
  * 25, a fast ride, so a few minutes reach the hamlets 1.5-5 km out) for WALK_KM km (default 5) in direction
  * WALK_DIR (radians, atan2(z, x); default 0, east). Every frame's interval is kept, and what the main thread
- * spent in the frontier (regionSites.heroAt), the settlements (settlements.tick) and the renderer; long tasks
+ * spent in the frontier (regionSites.heroAt), the towns (towns.tick) and the renderer; long tasks
  * are caught. Prints the frame-time spread, the slow frames (with where the hero was and what had been
  * founded by then) and the regions and settlements opened.
  */
@@ -35,7 +35,7 @@ const result = await page.evaluate(({ speed, km, dir, slow }) => new Promise((do
   };
   wrap('render', g.view.renderer, 'render');
   wrap('frontier', g.regionSites, 'heroAt');
-  wrap('settlements', g.settlements, 'tick');
+  wrap('towns', g.towns, 'tick');
   wrap('flora', g.flora, 'update');
   wrap('ground', g.ground, 'update');
   const long = [];
@@ -44,7 +44,7 @@ const result = await page.evaluate(({ speed, km, dir, slow }) => new Promise((do
   const dts = [], slowFrames = [];
   let last = performance.now(), gone = 0;
   const t0 = last;
-  const where = () => `${(gone / 1000).toFixed(2)} km · ${g.regionSites?.status ?? 'no regions'} · ${g.settlements?.tally ?? ''}`;
+  const where = () => `${(gone / 1000).toFixed(2)} km · ${g.regionSites?.status ?? 'no regions'} · ${g.towns?.tally ?? ''}`;
   const step = (now) => {
     const dt = now - last; last = now;
     dts.push(dt);

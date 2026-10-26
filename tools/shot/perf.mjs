@@ -39,7 +39,7 @@ await page.evaluate(() => {
   wrap('sky', g.view.sky, 'update');
   wrap('sea', g.sea, 'update');
   wrap('ground', g.ground, 'update');
-  wrap('life', g.life, 'step');
+  wrap('life', g.towns, 'live');
   wrap('flora', g.flora, 'update');
   wrap('grass', g.grass, 'tend');
   wrap('weather', g.wx, 'apply');

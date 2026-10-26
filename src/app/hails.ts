@@ -5,9 +5,9 @@
  * back to their day.
  */
 import type { TalkDef } from '../setting/contract';
-import type { Agent, TownLife } from '../sim/townLife';
+import type { Agent } from '../sim/townLife';
 import type { Journal } from '../talk/journal';
-import type { TownTalk } from '../talk/townTalk';
+import type { Township } from '../game/township';
 import { fill } from '../talk/folk';
 import { ARRIVAL, Guide, HAIL, hailer, besideHero } from '../vgm/guide';
 
@@ -20,6 +20,8 @@ export interface HailHost {
   readonly open: ReadonlySet<string>;
   /** Who the hero is talking with. */
   readonly talkingTo: Agent | null;
+  /** The town the hero is in (null: none: nobody comes over out on the land). */
+  readonly town: Township | null;
   say(text: string): void;
 }
 
@@ -28,46 +30,52 @@ const FOLLOW = { every: 2, moved: 4 };
 
 export class Hails {
   private readonly guide = new Guide();
-  private coming: Agent | null = null;
+  /** Who is on the way over, from which town. */
+  private coming: { a: Agent; town: Township } | null = null;
   private clock = 0;
-  /** Sent before (a fresh face each time while others know). */
-  private readonly sent = new Set<number>();
+  /** Sent before, by town (a fresh face each time while others know). */
+  private readonly sent = new Map<Township, Set<number>>();
 
-  constructor(private readonly life: TownLife, private readonly talk: TownTalk, private readonly words: TalkDef, private readonly journal: Journal, private readonly host: HailHost) {}
+  constructor(private readonly words: TalkDef, private readonly journal: Journal, private readonly host: HailHost) {}
 
   /** `held`: a fight or below ground, nobody comes now either. */
   sendFor(dt: number, held = false): void {
     const leads = this.journal.open.filter((l) => l.id !== ARRIVAL).length;
-    const h = this.host.heroAt, a = this.coming;
-    if (a) {
+    const h = this.host.heroAt, c = this.coming;
+    if (c) {
+      const a = c.a;
       // Talked to (their hail stays until the news is asked), gave up waiting, or a lead heard elsewhere.
       if (this.host.talkingTo === a) { this.coming = null; return; }
-      if (!a.seek || leads > 0) { this.talk.beckon(a.person.id, false); this.coming = null; return; }
+      if (!a.seek || leads > 0) { c.town.talk.beckon(a.person.id, false); this.coming = null; return; }
       if ((this.clock += dt) < FOLLOW.every) return;
       this.clock = 0;
       if (Math.hypot(a.seek.face.x - h.x, a.seek.face.z - h.z) > FOLLOW.moved) {
         const at = besideHero(a, h);
-        this.life.seek(a, at.x, at.z, h, HAIL.wait);
+        c.town.life.seek(a, at.x, at.z, h, HAIL.wait);
       }
       return;
     }
-    if (!this.guide.due(dt, { leads, busy: held || this.host.busy })) return;
+    const town = this.host.town;
+    if (!town || !this.guide.due(dt, { leads, busy: held || this.host.busy })) return;
     this.guide.hailed();
-    const knows = this.talk.knowersOf(this.host.open);
-    const id = hailer(this.life.agents.map((g) => ({
+    const life = town.life, talk = town.talk;
+    const knows = talk.knowersOf(this.host.open);
+    let sent = this.sent.get(town);
+    if (!sent) this.sent.set(town, (sent = new Set()));
+    const id = hailer(life.agents.map((g) => ({
       id: g.person.id, x: g.x, z: g.z,
       asleep: g.act === 'sleep' || g.act === 'away',
       busy: !!g.held || !!g.seek || g.person.role === 'child',
-    })), knows, h, this.sent);
-    const b = id === null ? null : this.life.agents.find((g) => g.person.id === id) ?? null;
+    })), knows, h, sent);
+    const b = id === null ? null : life.agents.find((g) => g.person.id === id) ?? null;
     if (!b) return;
-    this.sent.add(b.person.id);
+    sent.add(b.person.id);
     const at = besideHero(b, h);
-    this.life.seek(b, at.x, at.z, h, HAIL.wait);
-    this.talk.beckon(b.person.id, true);
-    this.coming = b;
+    life.seek(b, at.x, at.z, h, HAIL.wait);
+    talk.beckon(b.person.id, true);
+    this.coming = { a: b, town };
     this.clock = 0;
     const comes = this.words.comes;
-    if (comes.length) this.host.say(fill(comes[b.person.id % comes.length], { name: this.talk.nameOf(b.person.id) }));
+    if (comes.length) this.host.say(fill(comes[b.person.id % comes.length], { name: talk.nameOf(b.person.id) }));
   }
 }

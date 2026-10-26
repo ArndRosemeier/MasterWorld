@@ -1,12 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { firstDecisions, startPlace } from '../src/vgm/builder';
 import { regionDecisions, walkFrontier } from '../src/vgm/frontier';
 import { nextPromise, openPromises } from '../src/vgm/leads';
 import { TownLife } from '../src/sim/townLife';
-import { townTalk } from '../src/talk/townTalk';
+import { townTalk, type TownTalkSave } from '../src/talk/townTalk';
+import { Township } from '../src/game/township';
+import { townSaves, type SaveData } from '../src/app/saveGame';
+import { houseKey } from '../src/world/town';
 import { Terrain } from '../src/world/terrain';
 import { settlementOf, type Decision, type DecisionLog } from '../src/world/decisions';
 
@@ -51,8 +55,9 @@ test('settlements: in a hamlet the VGM promises a place from it, and its people 
   const d = nextPromise({ ...ctx(log, town), hours: 20 });
   assert.ok(d && d.kind === 'dungeon', 'the hamlet gets a lead of its own');
   assert.equal(d.town, town.decision.id);
-  assert.ok(d.site, 'a place out on the land (its houses have no cellars to go down yet)');
-  assert.ok(Math.hypot(d.site.x - town.decision.x, d.site.z - town.decision.z) < 1500, 'near the hamlet');
+  // A cellar under one of its houses, or a place out on the land near it.
+  const at = d.site ?? { x: town.plan.buildings[d.building].cx, z: town.plan.buildings[d.building].cz };
+  assert.ok(Math.hypot(at.x - town.decision.x, at.z - town.decision.z) < 1500, 'near the hamlet');
   log = [...log, d];
   assert.equal(nextPromise({ ...ctx(log, town), hours: 30 }), null, 'one at a time');
   const life = new TownLife(town.plan, town.decision.seed!, 9, classic.routines);
@@ -61,4 +66,49 @@ test('settlements: in a hamlet the VGM promises a place from it, and its people 
   assert.ok(knowers.length > 0, 'somebody in the hamlet knows of it');
   const told = knowers.some((p) => words.ask(p, 'news').heard.includes(d.id));
   assert.ok(told, 'and tells of it');
+});
+
+// Plan B3a: every town runs on the one core (game/township.ts), the start town as any hamlet.
+test('settlements: a hamlet\'s core is the start town\'s code: people, words, promises and a save', () => {
+  let log: Decision[] = [...walked];
+  const ctxOf = { seed, setting: classic, log: () => log, hours: () => 9 };
+  const here = new Township(town, ctxOf), start = new Township(terrain.towns[0], ctxOf);
+  assert.equal(here.seed, town.decision.seed);
+  assert.equal(start.seed, seed, 'the start town keeps the world\'s seed');
+  assert.ok(here.residents.length >= 4 && here.life.agents.length === here.residents.length);
+  assert.notEqual(here.talk.nameOf(0), start.talk.nameOf(0));
+  // A promise made after its words were: they hear of it (as the start town's people do).
+  const d = nextPromise({ ...ctx(log, town), hours: 20, purposeOverdue: true })!;
+  assert.ok(d && d.kind === 'dungeon' && d.town === town.decision.id);
+  log = [...log, d];
+  here.promised(d);
+  start.promised(d);
+  const knows = [...here.talk.knowersOf(new Set([d.id]))];
+  assert.ok(knows.some((p) => here.talk.ask(p, 'news').heard.includes(d.id)), 'the hamlet tells of its new lead');
+  // Its words come back from a save, as the start town's.
+  const saved = here.toSave();
+  assert.ok(saved.talk);
+  const again = new Township(town, ctxOf, JSON.parse(JSON.stringify(saved)));
+  assert.equal(again.talk.nameOf(0), here.talk.nameOf(0));
+  assert.deepEqual(new Township(town, ctxOf).toSave(), {}, 'nothing kept where nobody talked');
+});
+
+test('settlements: houses are told apart by town (building ids start at 0 in each)', () => {
+  assert.notEqual(houseKey(town.decision.id, 0), houseKey(terrain.towns[0].decision.id, 0));
+  // An older save's start-town words and market go to the start town; the newer one keeps every town's.
+  const t = { messages: [] } as unknown as TownTalkSave;
+  assert.deepEqual(Object.keys(townSaves({ talk: t, talks: { [town.decision.id]: t } } as unknown as SaveData, 'town-1')).sort(), ['town-1', town.decision.id].sort());
+  assert.deepEqual(townSaves({ towns: { a: {} } } as unknown as SaveData, 'town-1'), { a: {} });
+});
+
+// The town systems take the town they work in; none reaches for the start town by itself.
+test('settlements: no town system names the start town', () => {
+  const systems = ['app/talkUi.ts', 'app/interiorVisit.ts', 'app/upkeepUi.ts', 'app/hails.ts', 'app/tradeUi.ts', 'app/cellars.ts', 'app/soundDirector.ts', 'app/mapUi.ts', 'app/towns.ts', 'game/township.ts', 'sim/townLife.ts', 'talk/townTalk.ts', 'game/trade.ts', 'game/upkeep.ts', 'game/lessons.ts'];
+  const startTown = /towns\[0\]|'town-1'|"town-1"|\bstartTown\b|\bstart\.decision\b/;
+  for (const f of systems) {
+    const src = readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8').split('\n');
+    // The registry may say which town the game started in (a new hero's place), nothing more.
+    const hits = src.filter((l, i) => startTown.test(l) && !(f === 'app/towns.ts' && /get start\(\)|const t = this\.h\.terrain\.towns\[0\]|this\.masked = /.test(l + (src[i - 1] ?? ''))));
+    assert.deepEqual(hits, [], `${f} names the start town`);
+  }
 });

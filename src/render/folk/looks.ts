@@ -134,7 +134,7 @@ export function clipOf(act: ActivityKind, id: number): string {
  * A few of `people` whose looks between them wear every garment, hairstyle and beard any of them has:
  * dressed in turn behind the loading screen, they compile every kind of mesh the town will show.
  */
-export function coveringLooks(people: Person[]): CharacterPatch[] {
+export function coveringLooks(people: readonly Person[]): CharacterPatch[] {
   const partsOf = (l: CharacterPatch) => [...(l.outfit ?? []), `hair:${l.hair}`, `beard:${l.beard}`, `race:${l.race}`];
   const looks = people.map(lookOf);
   const left = new Set(looks.flatMap(partsOf));

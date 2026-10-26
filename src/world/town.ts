@@ -3,7 +3,7 @@
  * (@futuremagic/settlement), and what the ground is at a point of it (street, building, yard) for
  * the terrain, the plants and later the ground's look. Pure, runs in workers.
  */
-import { buildingEntrance, distToPoly, planTown, pointInPoly, polyBounds, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
+import { buildingEntrance, distToPoly, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { TownDecision } from './decisions';
 import type { Terrain } from './terrain';
 
@@ -246,4 +246,13 @@ function hull(pts: number[], grow: number): number[] {
 /** A town's plan (AG settlement planTown, the one planner for every size), on the land as settled. */
 export function townPlanOf(d: TownDecision, t: Terrain): TownPlan {
   return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t) });
+}
+
+/** A building's key among every town's (building ids count from 0 in each town). */
+export const houseKey = (town: string, building: number): string => `${town}#${building}`;
+
+/** Where a hero starts in a town (a new game, the loop check): on its market or green, a few steps from the middle. */
+export function marketStart(plan: TownPlan): { x: number; z: number } {
+  const [x, z] = polyCentroid(plan.market);
+  return { x: x + 5, z: z + 4 };
 }

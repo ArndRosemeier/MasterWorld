@@ -13,16 +13,19 @@ import type { TownView } from './TownView';
 export class HouseView {
   private mesh: Mesh | null = null;
   private id = -1;
+  /** The town whose building is drawn open (it leaves that building out meanwhile). */
+  private town: TownView | null = null;
 
-  constructor(private readonly stage: Stage, private readonly town: TownView | null) {}
+  constructor(private readonly stage: Stage) {}
 
   /** The building drawn open now (-1: none). */
   get open(): number { return this.id; }
 
-  /** Draws `b` open (in place of the last one opened). */
-  async drawOpen(b: TownBuilding, plan: InteriorPlan): Promise<void> {
-    if (this.id === b.id) return;
+  /** Draws `b` of `town` open (in place of the last one opened). */
+  async drawOpen(b: TownBuilding, plan: InteriorPlan, town: TownView | null): Promise<void> {
+    if (this.id === b.id && this.town === town) return;
     this.hide();
+    this.town = town;
     const at: [number, number, number] = [b.cx, 0, b.cz];
     const m = mergeMeshes([buildingMesh(b, at, true, { open: true }), interiorMesh(plan, b, at)]);
     const mesh = buildingMeshAt(m, b.cx, 0, b.cz, `open ${b.kind} ${b.id}`);
@@ -31,7 +34,7 @@ export class HouseView {
     await this.stage.add(mesh);
     // Shut again meanwhile: not drawn after all.
     if (this.mesh !== mesh) { this.stage.remove(mesh); mesh.geometry.dispose(); return; }
-    this.town?.hide(b.id, true);
+    town?.hide(b.id, true);
   }
 
   /** Shut: the town's own building stands there again. */

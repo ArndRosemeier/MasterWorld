@@ -10,6 +10,7 @@ import { remainsLead, type GameMode, type Remains } from '../game/death';
 import type { DelveSave } from '../game/delve';
 import type { StandingSave } from '../game/standing';
 import type { MarketSave } from '../game/trade';
+import type { TownshipSave } from '../game/township';
 import type { DirectorSave } from '../vgm/director';
 import type { TownTalkSave } from '../talk/townTalk';
 import { clock } from './dom';
@@ -48,8 +49,10 @@ export interface SaveData {
   /** The wild's groups met, by territory id: who died, was spared, was searched (none in older saves). */
   readonly wild?: Readonly<Record<string, DelveSave>>;
   readonly talk: TownTalkSave | null;
-  /** What the people of each hamlet and village know, by town id (plan B3; none in older saves). */
+  /** What the people of each hamlet and village knew, by town id (plan B3; saves before every town kept its own `towns`). */
   readonly talks?: Readonly<Record<string, TownTalkSave>>;
+  /** What every town keeps (its people's words, its merchants), by town id (plan B3a; older saves: `talk`, `market`, `talks`). */
+  readonly towns?: Readonly<Record<string, TownshipSave>>;
   readonly journal: readonly Lead[];
   /** The hero's skills, health, gear and purse (version 2; none: a fresh hero). */
   readonly character: CharacterSave | null;
@@ -126,4 +129,18 @@ export function heirSave(s: SaveData, grave: Remains, start: SaveData['hero']): 
 /** A save's one-line description for the slot list. */
 export function saveLabel(s: SaveData, where: string): string {
   return `Day ${s.clock.day + 1}, ${clock(s.clock.hour)}, ${where}`;
+}
+
+/**
+ * What each town kept, by town id: a save's `towns`, or an older save's start-town talk and market and its
+ * settlements' talk (before every town kept its own).
+ */
+export function townSaves(save: SaveData | null, start: string | null): Record<string, TownshipSave> {
+  if (!save) return {};
+  if (save.towns) return { ...save.towns };
+  const out: Record<string, TownshipSave> = {};
+  const talks = save.talks ?? {};
+  for (const id in talks) out[id] = { talk: talks[id] };
+  if (start && (save.talk || save.market)) out[start] = { ...(save.talk ? { talk: save.talk } : {}), ...(save.market ? { market: save.market } : {}) };
+  return out;
 }

@@ -38,7 +38,7 @@ import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
 import { fill } from '../talk/folk';
 import { cap } from '../talk/townTalk';
 import { rewardFor } from '../game/reward';
-import type { Town } from '../world/town';
+import { houseKey, type Town } from '../world/town';
 import { Encounter, type Arena, type FightCue, type FightHost } from './encounter';
 import { CellarVisit } from './cellarVisit';
 import type { FightHud } from './fightHud';
@@ -65,7 +65,7 @@ export interface CellarsHost {
   readonly hud: FightHud;
   readonly fight: FightHost;
   /** Up the ladder of a cellar: into its house's room. */
-  up(house: TownBuilding): Promise<void>;
+  up(town: string, house: TownBuilding): Promise<void>;
   /** After going down or coming up (the game autosaves). */
   swapped(): void;
   /** A fight's sounds and music. */
@@ -130,8 +130,8 @@ interface Built {
 
 export class Cellars {
   private readonly sites = new Map<string, Site>();
-  /** Houses with a cellar, and the way down (the town's rooms read it). */
-  readonly down = new Map<number, (before: () => void) => Promise<void>>();
+  /** Houses with a cellar (by houseKey: every town's), and the way down (the rooms read it). */
+  readonly down = new Map<string, (before: () => void) => Promise<void>>();
   private log: DecisionLog = [];
 
   constructor(private readonly host: CellarsHost, private readonly towns: readonly Town[], private readonly saved: Readonly<Record<string, CellarDiff>> = {}) {}
@@ -165,8 +165,8 @@ export class Cellars {
   }
 
   /** The hero is in this building's room: its cellar, if it has one, gets ready below. */
-  near(building: number): void {
-    for (const s of this.sites.values()) if (!s.mound && s.house.id === building && !s.built) void this.ensure(s);
+  nearHouse(town: string, building: number): void {
+    for (const s of this.sites.values()) if (!s.mound && s.decision.town === town && s.house.id === building && !s.built) void this.ensure(s);
   }
 
   /**
@@ -266,7 +266,7 @@ export class Cellars {
     const s: Site = { decision: d, house, place, mound, first, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;
-    this.down.set(house.id, async (before) => {
+    this.down.set(houseKey(d.town, house.id), async (before) => {
       const v = (await this.ensure(s)).visit;
       await v.enter(false, undefined, before);
     });
@@ -331,7 +331,7 @@ export class Cellars {
     const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, carved);
     const words = loreOf(h.setting, s.decision.template).words;
     if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
-    if (!m) visit.up = () => h.up(s.house);
+    if (!m) visit.up = () => h.up(s.decision.town, s.house);
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
     visit.onDepth = (below) => h.depth(below, [view.group, ...(s.ready ? [s.ready.creatures.group] : [])]);
     visit.onSwap = () => h.swapped();
