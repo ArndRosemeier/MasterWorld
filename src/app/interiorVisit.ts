@@ -3,13 +3,14 @@
  * drawn open where it stands (HouseView): its door open, every storey inside as the outside shows it,
  * stairs, windows one looks out of. One walks in and out with no fade; the building shuts again once one
  * has walked away. Inside, the sky's light comes in through the openings, a lamp burns under the ceiling
- * of the storey one is on (with shadows, so it lights nothing outside the walls) and the eye adapts.
+ * of the storey one is on (reaching about the room: no shadows, which would build shaders for everyone it
+ * lit) and the eye adapts.
  */
 import { interiorBlocked, planInterior, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
 import type { HouseView } from '../render/town/HouseView';
 import type { SkyView } from '../render/sky';
-import type { WarmLights } from '../render/warmLights';
+import type { PointLight } from 'three/webgpu';
 import type { Placed } from '../render/folk/FolkView';
 import { roomCast } from '../sim/roomCast';
 import type { TownLife } from '../sim/townLife';
@@ -44,7 +45,8 @@ export class InteriorVisit {
     private readonly cellars: ReadonlyMap<number, (before: () => void) => Promise<void>>,
     private readonly view: HouseView,
     private readonly player: Player,
-    private readonly warm: WarmLights,
+    /** The room's lamp (the hero's lantern below ground: one light, always in the scene). */
+    private readonly light: PointLight,
     private readonly sky: SkyView,
     private readonly notes: Notes,
   ) {}
@@ -138,14 +140,19 @@ export class InteriorVisit {
     this.within = false;
     this.sky.sheltered = false;
     this.lampOn = -1;
-    this.warm.lightTorches(null);
+    this.light.intensity = 0;
+    this.light.distance = 14; // the lantern's own
   }
 
   /** The room's lamp: under the ceiling of storey `k`, towards the back. */
   private lamp(k: number): void {
     const o = this.open!, s = o.plan.storeys[k];
     const p = o.walk.floorAt((s.a0 + s.a1) / 2, s.b1 - (s.b1 - s.b0) * 0.3, k);
-    this.warm.lightTorches([{ x: p.x, y: p.y + s.height - 0.35, z: p.z }]);
+    this.light.position.set(p.x, p.y + s.height - 0.35, p.z);
+    // Brighter and farther-reaching in a big room (the temple's hall), never far past its walls.
+    const area = (s.a1 - s.a0) * (s.b1 - s.b0), big = Math.min(3, Math.max(1, area / 12));
+    this.light.intensity = 10 * big;
+    this.light.distance = Math.hypot(s.a1 - s.a0, s.b1 - s.b0) * 0.6 + 1.5;
     this.lampOn = k;
   }
 

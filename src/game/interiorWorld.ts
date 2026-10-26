@@ -34,8 +34,8 @@ export interface HouseWalk {
   readonly building: TownBuilding;
   readonly plan: InteriorPlan;
   readonly frame: RoomFrame;
-  /** The solids' signed distance (positive in air), or null away from the building. */
-  rockSurface(x: number, y: number, z: number): number | null;
+  /** The solids' signed distance (positive in air), or null away from the building; `shut`: the doorway too. */
+  rockSurface(x: number, y: number, z: number, shut?: boolean): number | null;
   /** Whether a body there touches a wall or furniture, or null outside the building (its feet at `y`). */
   wallAt(x: number, z: number, r: number, y?: number): boolean | null;
   /** Whether (x, z) lies within the building's walls (any storey's). */
@@ -53,15 +53,16 @@ export function houseWalk(b: TownBuilding, plan: InteriorPlan): HouseWalk {
   // Each storey's outer walls (b: jettied ones stand further out).
   const outer = plan.storeys.map((s) => ({ a0: s.a0 - W, a1: s.a1 + W, b0: s.b0 - W, b1: s.b1 + W }));
   const storey = (y: number) => storeyAt(plan, y - b.floorY);
+  const g = plan.storeys[0], door: InteriorBox = { a0: -plan.doorW, a1: plan.doorW, y0: g.y - 0.5, y1: g.y + plan.doorH, b0: g.b0 - W, b1: g.b0 };
   return {
     building: b, plan, frame, storey,
-    rockSurface: (x, y, z) => {
+    rockSurface: (x, y, z, shut = false) => {
       if (Math.abs(x - b.cx) > reach || Math.abs(z - b.cz) > reach) return null;
       const [a, bb] = frame.toRoom(x, z), h = y - b.floorY;
       if (Math.abs(a) > b.hu + 1 || bb < outer[outer.length - 1].b0 - 1 || bb > outer[outer.length - 1].b1 + 1) return null;
       let d = Infinity;
       for (const q of solids) d = Math.min(d, boxDistance(q, a, h, bb));
-      return d;
+      return shut ? Math.min(d, boxDistance(door, a, h, bb)) : d;
     },
     wallAt: (x, z, r, y) => {
       const [a, bb] = frame.toRoom(x, z), k = y === undefined ? 0 : storey(y), o = outer[k];

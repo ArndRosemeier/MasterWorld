@@ -18,6 +18,8 @@ export interface WalkWorld {
   waterLevel(x: number, z: number): number | null;
   /** Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. */
   floor?(x: number, z: number): number | null;
+  /** What the camera keeps clear of, if not `rockSurface` (a building one is in: its doorway shut too, so the camera stays in the room). */
+  sightSurface?(x: number, y: number, z: number): number | null;
   /** Walls (buildings, furniture): does a body of radius `r` at (x, z), its feet at `y` (the storey it is on), touch one? */
   wall?(x: number, z: number, r: number, y?: number): boolean;
 }

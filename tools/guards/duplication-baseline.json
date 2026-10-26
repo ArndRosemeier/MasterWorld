@@ -20,8 +20,8 @@
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the shared part already lives in the base class."
   },
   {
-    "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",
-    "reason": "The walker's world in main.ts delegates to the terrain's rockSurface (or the cellar's space below ground); an adapter, not a copy."
+    "key": "same name: masterworld/game/evening.ts#rockSurface + masterworld/main.ts#rockSurface",
+    "reason": "Both implement the WalkWorld interface (game/walker.ts): the evening check's land, and the game's land with the open building in it."
   },
   {
     "key": "same name: masterworld/app/loading.ts#fail + masterworld/app/title/TitleScreen.ts#fail",

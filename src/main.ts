@@ -174,16 +174,20 @@ export async function start(b: Boot): Promise<void> {
     const below = () => visit()?.world ?? null;
     // The building drawn open (its storeys, stairs and furniture where it stands).
     const openHouse = () => (visit() ? null : rooms?.walk ?? null);
+    // Rock, and the open building's floors, walls and stairs (`shut`: its doorway too).
+    const surfaceAt = (x: number, y: number, z: number, shut: boolean): number | null => {
+      const b = below();
+      if (b) return b.rockSurface(x, y, z);
+      const t = terrain.rockSurface(x, y, z), h = openHouse()?.rockSurface(x, y, z, shut) ?? null;
+      return t === null ? h : h === null ? t : Math.min(t, h);
+    };
     const world: WalkWorld = {
       // Out of doors also the steps and porches before the doors (as floors: climbed a step at a time).
       height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
       floor: (x, z) => (below() ? null : town?.stand(x, z) ?? null),
-      rockSurface: (x, y, z) => {
-        const b = below();
-        if (b) return b.rockSurface(x, y, z);
-        const t = terrain.rockSurface(x, y, z), h = openHouse()?.rockSurface(x, y, z) ?? null;
-        return t === null ? h : h === null ? t : Math.min(t, h);
-      },
+      rockSurface: (x, y, z) => surfaceAt(x, y, z, false),
+      // In a building the camera stays in the room (its doorway shut to it).
+      sightSurface: (x, y, z) => surfaceAt(x, y, z, !!rooms?.inside),
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
       // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
@@ -528,7 +532,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     // Every door of the town opens on its room; a cellar's house has the hatch down.
-    if (town) rooms = new InteriorVisit(town.plan.buildings, cellars.down, new HouseView(view.stage, houses), player, view.warm, view.sky, notes);
+    if (town) rooms = new InteriorVisit(town.plan.buildings, cellars.down, new HouseView(view.stage, houses), player, view.lantern, view.sky, notes);
     if (rooms && town && params.room !== null) {
       const b = params.room === 'cellar' ? house : town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
       if (b) await rooms.enter(b, true, params.room === 'cellar'); // the cellar: beside its hatch

@@ -7,7 +7,7 @@
  */
 import { BufferAttribute, BufferGeometry, MeshPhysicalNodeMaterial, type Mesh } from 'three/webgpu';
 import { attribute, dot, float, floor, fract, int, mix, normalMap, positionWorld, pow, round, sin, step, texture, uniform, uniformArray, varying, vec3 } from 'three/tsl';
-import { BuildingMat, INSIDE_LIGHT, type BuildingMesh } from '@futuremagic/settlement';
+import { BuildingMat, INSIDE_LEVELS, INSIDE_LIGHT, type BuildingMesh } from '@futuremagic/settlement';
 import { defineKind, kindMesh } from '../materials';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 import { townTextures } from './townGround';
@@ -33,8 +33,8 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   // material comes through unblended and the daylight smoothly.
   const mat = attribute('mat', 'float');
   const layer = int(round(varying(mat.mod(INSIDE_LIGHT))));
-  const level = varying(floor(mat.div(INSIDE_LIGHT)).div(15));
-  const inside = step(0.5 / 15, level);
+  const level = varying(floor(mat.div(INSIDE_LIGHT)).div(INSIDE_LEVELS));
+  const inside = step(0.5 / INSIDE_LEVELS, level);
   const scale = uniformArray(TOWN_TILE_METERS.map((w) => 1 / w), 'float');
   const st = attribute('uv', 'vec2').mul(scale.element(layer));
   const a = texture(A).sample(st).depth(layer), n = texture(N).sample(st).depth(layer);
