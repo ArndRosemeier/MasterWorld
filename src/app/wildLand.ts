@@ -97,6 +97,9 @@ export class WildLand {
     return c ? { x: c.x, y: c.y, z: c.z } : null;
   }
 
+  /** Groups being built near the hero whose bodies are not drawn yet. */
+  get warming(): number { return this.groups.filter((g) => g.built && !g.encounter).length; }
+
   /** The HUD's line: groups built and awake. */
   get hudText(): string {
     const up = this.groups.filter((g) => g.encounter), on = up.filter((g) => g.awake);
