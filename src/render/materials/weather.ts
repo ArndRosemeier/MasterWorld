@@ -8,7 +8,7 @@ import { Color, DoubleSide, MeshBasicNodeMaterial, Vector2, Vector3, type Textur
 import { skyToward } from '@futuremagic/sky/node';
 import {
   Fn, attribute, cameraPosition, clamp, cross, dot, exp, float, fog, fract, length, max, mix, mod, normalize, positionGeometry,
-  log, positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
+  positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 
 export const WEATHER = {
@@ -60,6 +60,9 @@ export const fullSky = (c) => mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c,
  * sky's environment map: distant land fades into the sky behind it (aerial perspective), warm toward the
  * sun, blue away from it, grey in overcast (the sky turns grey itself).
  */
+/** Haze colour: linear up to FOG_KNEE, then levelling off toward FOG_PEAK (before exposure). */
+export const FOG_KNEE = 0.8, FOG_PEAK = 1.25;
+
 export function fogNode(env: Texture) {
   const factor = Fn(() => {
     const ray = positionWorld.sub(cameraPosition);
@@ -75,9 +78,12 @@ export function fogNode(env: Texture) {
   });
   // The sky's colour toward the view, a shade darker than the sky itself so far hills stay hills.
   const raw = fullSky(skyToward(env, positionWorld.sub(cameraPosition))).mul(0.75);
-  // The glow toward the sun runs far above 1 in the env map: the same soft knee the sky dome has on screen.
+  // Toward the sun the blurred env map holds the sun disc's own energy, many times the sky's: a soft knee
+  // that levels off at FOG_PEAK, so haze toward a low sun glows but never washes the land out to white.
   const peak = max(raw.x, max(raw.y, raw.z));
-  const toward = select(peak.greaterThan(1), raw.mul(log(peak).add(1).div(peak)), raw);
+  const over = FOG_PEAK - FOG_KNEE;
+  const kneed = float(FOG_KNEE).add(exp(peak.sub(FOG_KNEE).div(over).negate()).oneMinus().mul(over));
+  const toward = select(peak.greaterThan(FOG_KNEE), raw.mul(kneed.div(peak)), raw);
   return fog(mix(toward, FOG.color, FOG.flat), factor());
 }
 
