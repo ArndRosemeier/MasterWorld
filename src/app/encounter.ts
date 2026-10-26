@@ -216,7 +216,7 @@ export class Encounter {
       this.hud.shown = this.arena.enclosed || this.delve.den.fighting.length > 0 || !!this.fight.target || this.hero.health < this.hero.maxHealth || !this.hero.alive;
       if (!this.warned) {
         this.warned = true;
-        const w = warning(this.arena.danger, this.hero.power, this.arena.place);
+        const w = warning(this.arena.danger, this.hero.power, this.arena.place, this.director.fairness);
         if (w) this.director.queue(w, 3);
       }
     }

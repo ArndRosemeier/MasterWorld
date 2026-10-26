@@ -367,6 +367,8 @@ export async function start(b: Boot): Promise<void> {
     const notes = new Notes();
     // The Director watching over the pacing, the fight's HUD and the journal (the cellars report to them).
     const director = new Director(setting.director, save?.director ?? undefined);
+    // One life (roguelike): the Director is stricter with fairness (plan 11.1).
+    director.strict = save?.mode === 'roguelike';
     const fightHud = new FightHud(setting, () => settings.current.bindings);
     const journal = new Journal(save?.journal);
     const inn = town ? buildingOf(town.plan, 'inn') : undefined;
@@ -773,6 +775,7 @@ export async function start(b: Boot): Promise<void> {
       if (bg) { character.beginAs(bg); armHero(); }
       // A roguelike tale has its one save from the first step.
       mode = made.mode;
+      director.strict = mode === 'roguelike';
       if (mode === 'roguelike') autosave();
       meetOldFriends();
       // Behind the hero, looking the way they face.
