@@ -37,8 +37,10 @@ export class TradeUi extends BodyWindow {
   private who = '';
   /** The thing that just changed hands: it arrives on its new side. */
   private moved: Item | null = null;
+  /** The market of the merchant's town (every town's merchants trade alike). */
+  private market!: Market;
 
-  constructor(private readonly hero: Character, private readonly setting: SettingModule, private readonly market: Market, private readonly tradeHost: TradeHost) {
+  constructor(private readonly hero: Character, private readonly setting: SettingModule, private readonly tradeHost: TradeHost) {
     super('Trade', 'trade', null, tradeHost);
     this.line = el('p', { className: 'says' });
     const pan = (side: string) => el('div', { className: `pan ${side}` }, el('i', { className: 'cord l' }), el('i', { className: 'cord r' }), el('div', { className: 'dish' }));
@@ -46,8 +48,9 @@ export class TradeUi extends BodyWindow {
       el('div', { className: 'post' }), el('div', { className: 'beam' }, pan('theirs'), pan('yours')), el('div', { className: 'knob' }));
   }
 
-  /** Open the window with this merchant (`who`: their name). */
-  show(m: Merchant, who: string): void {
+  /** Open the window with this merchant of `market` (`who`: their name). */
+  show(market: Market, m: Merchant, who: string): void {
+    this.market = market;
     this.with = m;
     this.who = who;
     this.moved = null;

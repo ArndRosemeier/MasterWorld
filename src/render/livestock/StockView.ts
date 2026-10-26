@@ -6,7 +6,7 @@
 import type { Object3D, Vector3, WebGPURenderer } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { LivestockKind } from '../../setting/contract';
-import type { Herds } from '../../sim/livestock';
+import type { Grazer, Herds } from '../../sim/livestock';
 import { HorseView } from '../horse/HorseView';
 import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from '../dungeon/animals';
 import { deriveSeed } from '@futuremagic/core';
@@ -54,37 +54,36 @@ class ActorsHerd implements Bodies {
 }
 
 export class StockView {
-  /** Which animal each body shows (-1 none). */
-  private readonly slot: number[];
+  /** Which animal each body shows (null: none). */
+  private readonly slot: (Grazer | null)[];
   private sortIn = 0;
 
-  private constructor(private readonly bodies: Bodies, private readonly herds: Herds, private readonly height: (x: number, z: number) => number, count: number) {
-    this.slot = new Array<number>(count).fill(-1);
+  private constructor(private readonly bodies: Bodies, private readonly height: (x: number, z: number) => number, count: number) {
+    this.slot = new Array<Grazer | null>(count).fill(null);
   }
 
-  static async forHerds(renderer: WebGPURenderer, kind: LivestockKind, herds: Herds, max: number, height: (x: number, z: number) => number): Promise<StockView | null> {
-    const count = Math.min(max, herds.animals.length);
+  /** `count` bodies for the nearest animals of whichever town's herds (plan B3a: every town's paddocks alike). */
+  static async pool(renderer: WebGPURenderer, kind: LivestockKind, count: number, height: (x: number, z: number) => number): Promise<StockView | null> {
     if (count <= 0) return null;
-    return new StockView(await MAKE[kind](renderer, count), herds, height, count);
+    return new StockView(await MAKE[kind](renderer, count), height, count);
   }
 
   toWarm(): Object3D[] { return this.bodies.warmObjects(); }
   enter(stage: Stage): Promise<void> { return this.bodies.show(stage); }
 
-  /** Each frame, after the herds have stepped. */
-  herd(dt: number, cam: Vector3): void {
-    const animals = this.herds.animals;
+  /** Each frame, after the herds have stepped: the animals of `herds` nearest the camera get the bodies. */
+  herd(dt: number, cam: Vector3, herds: readonly Herds[]): void {
     // Now and then: the nearest animals get the bodies. One that keeps its place keeps its body.
     if ((this.sortIn -= dt) <= 0) {
       this.sortIn = 1;
-      const d = (i: number) => Math.hypot(animals[i].x - cam.x, animals[i].z - cam.z);
-      const want = animals.map((_, i) => i).filter((i) => d(i) < REACH).sort((a, b) => d(a) - d(b)).slice(0, this.slot.length);
+      const d = (a: Grazer) => Math.hypot(a.x - cam.x, a.z - cam.z);
+      const want = herds.flatMap((h) => h.animals).filter((a) => d(a) < REACH).sort((a, b) => d(a) - d(b)).slice(0, this.slot.length);
       const keep = new Set(want);
-      for (let s = 0; s < this.slot.length; s++) if (!keep.has(this.slot[s])) this.slot[s] = -1;
-      for (const a of want) if (!this.slot.includes(a)) this.slot[this.slot.indexOf(-1)] = a;
+      for (let s = 0; s < this.slot.length; s++) if (this.slot[s] && !keep.has(this.slot[s]!)) this.slot[s] = null;
+      for (const a of want) if (!this.slot.includes(a)) this.slot[this.slot.indexOf(null)] = a;
     }
     for (let s = 0; s < this.slot.length; s++) {
-      const a = this.slot[s] >= 0 ? animals[this.slot[s]] : null;
+      const a = this.slot[s];
       this.bodies.shown(s, !!a);
       if (!a) continue;
       // The walker's yaw convention: 0 faces −z.

@@ -73,8 +73,8 @@ export interface LeadsContext {
   readonly avoid?: readonly { readonly x: number; readonly z: number; readonly r: number }[];
   /**
    * The hamlet or village the hero is in (plan B3), if any: while none of the open promises is its own, its
-   * people get one (a place out on the land near it; its houses have no cellars to go down into yet), even
-   * when the world has its few open leads already (one more than `max` at most).
+   * people get one (a cellar under one of its houses or a place out on the land near it, as the start town's
+   * people do), even when the world has its few open leads already (one more than `max` at most).
    */
   readonly near?: Town | null;
 }
@@ -92,7 +92,7 @@ export function nextPromise(c: LeadsContext): Decision | null {
   const n = promisesOf(c.log).length;
   const s = deriveSeed(c.seed, 'vgm', 'lead', n);
   if (local) {
-    const d = landPlace(c, s, local, true);
+    const d = landPlace(c, s, local) ?? promiseCellar(c.seed, local, c.log, c.home) ?? landPlace(c, s, local, true);
     if (d) return { ...d, at: c.hours };
     if (open >= LEADS.max || (open >= LEADS.min && !c.purposeOverdue)) return null;
   }

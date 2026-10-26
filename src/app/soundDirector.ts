@@ -28,7 +28,8 @@ export interface SoundHost {
   readonly camera: PerspectiveCamera;
   readonly walker: Walker;
   readonly terrain: Terrain;
-  readonly town: Town | null;
+  /** The town nearest the listener (its bell, smithies and mills, its bustle; null: none). */
+  town(): Town | null;
   /** Water surface and depth at a point (the masks), null where unknown. */
   water(x: number, z: number): { level: number; depth: number } | null;
   /** Calm water level under the walker in its own space (null in rooms and the cellar). */
@@ -98,23 +99,12 @@ export class SoundDirector {
   private rider: Steed | null = null;
   private nextNeigh = 15;
   private neighs = 0;
-  /** Smithies and mills: where their work is heard from. */
-  private readonly works: { id: number; kind: 'smithy' | 'mill'; at: [number, number, number] }[] = [];
-  private readonly belfry: [number, number, number] | null = null;
-  private readonly townAt: { x: number; z: number; r: number } | null = null;
+  /** What each town sounds like from where (every town alike), worked out when first heard. */
+  private readonly heard = new WeakMap<Town, TownSounds>();
 
   constructor(private readonly host: SoundHost) {
     this.picker = new MusicPicker(MUSIC, host.seed, { hold: 45, urgent: ['fight', 'danger'], rest: 90 });
     this.canopy = canopySampler(host.terrain);
-    const t = host.town;
-    if (t) {
-      const [cx, cz] = t.plan.centre;
-      this.townAt = { x: cx, z: cz, r: Math.max(t.plan.radius, (Math.max(t.nx, t.nz) * TOWN_RASTER) / 2) };
-      for (const b of t.plan.buildings) if (b.kind === 'smithy' || b.kind === 'mill') this.works.push({ id: b.id, kind: b.kind, at: [b.cx, b.floorY + 1.5, b.cz] });
-      let tower = null;
-      for (const b of t.plan.buildings) if (b.kind === 'temple' || (b.kind === 'hall' && !tower)) tower = b;
-      if (tower) this.belfry = [tower.cx, tower.floorY + tower.floors * tower.floorH + 4, tower.cz];
-    }
     host.engine.preload(PRELOAD);
     host.engine.onMusicEnded = () => this.picker.ended(this.clock);
     // Every button of the interface clicks like brass (the title's own buttons click themselves).
@@ -221,10 +211,11 @@ export class SoundDirector {
     // Smithies and mills at work, from where they stand (outside; inside, the room's bed is theirs).
     if (h.place === 'land') {
       const cam = this.host.camera.position, day = daylight(h.hour);
-      for (const w of this.works) {
+      const t = this.host.town(), works = t ? this.soundsOf(t).works : [];
+      for (const w of works) {
         const d = Math.hypot(w.at[0] - cam.x, w.at[2] - cam.z);
         const on = w.kind === 'mill' ? 0.9 : day * (1 - smoothstep(0.3, 0.8, h.rain)) * 0.9;
-        if (d < 160 && on > 0.01) e.bed(`loop/${w.kind}`, on, { at: w.at, ref: w.kind === 'mill' ? 8 : 6 }, `work:${w.id}`);
+        if (d < 160 && on > 0.01) e.bed(`loop/${w.kind}`, on, { at: w.at, ref: w.kind === 'mill' ? 8 : 6 }, `work:${t!.decision.id}:${w.id}`);
       }
     }
     e.settle();
@@ -235,6 +226,12 @@ export class SoundDirector {
     const mood = musicMood(h, this.host.threat());
     const next = this.picker.want(mood, this.clock);
     if (next !== undefined) e.music(next, mood === 'fight' || mood === 'danger' ? 2 : 6);
+  }
+
+  private soundsOf(t: Town): TownSounds {
+    let s = this.heard.get(t);
+    if (!s) this.heard.set(t, (s = townSounds(t)));
+    return s;
   }
 
   private hear(): Hearing {
@@ -257,7 +254,7 @@ export class SoundDirector {
     const w = this.w;
     const river = w.river && w.dist < w.valley ? { bank: Math.max(0, w.dist - w.half), half: w.half } : null;
     const fall = Number.isFinite(w.fallAt) && w.fallDrop > 0 ? { dist: Math.hypot(w.fallAt, w.dist), drop: w.fallDrop } : null;
-    const t = this.townAt, town = t ? 1 - smoothstep(t.r * 0.45, t.r * 1.15, Math.hypot(x - t.x, z - t.z)) : 0;
+    const near = this.host.town(), t = near ? this.soundsOf(near).at : null, town = t ? 1 - smoothstep(t.r * 0.45, t.r * 1.15, Math.hypot(x - t.x, z - t.z)) : 0;
     this.canopy(x, z, this.c);
     return {
       hour: this.host.hour(), place: where.place, room: where.room, under: this.host.camera.position.y < (this.host.water(camera.position.x, camera.position.z)?.level ?? -1e9) - 0.05 && where.place === 'land',
@@ -383,9 +380,10 @@ export class SoundDirector {
     }
     // The bell: on the hour from 8 to 20, heard across the town and a little beyond.
     const hour = Math.floor(h.hour);
-    if (this.belfry && h.hour - hour < 0.1 && hour !== this.rung && hour >= 8 && hour <= 20) {
+    const near = this.host.town(), belfry = near ? this.soundsOf(near).belfry : null;
+    if (belfry && h.hour - hour < 0.1 && hour !== this.rung && hour >= 8 && hour <= 20) {
       this.rung = hour;
-      if (Math.hypot(this.belfry[0] - cam.x, this.belfry[2] - cam.z) < 900) e.play('call/bell', { at: this.belfry, ref: 60, gain: 0.8, late: 1 });
+      if (Math.hypot(belfry[0] - cam.x, belfry[2] - cam.z) < 900) e.play('call/bell', { at: belfry, ref: 60, gain: 0.8, late: 1 });
     }
     if (this.clock < this.nextCall) return;
     const n = this.calls++, draw = (k: number): number => hashToFloat(hash3i(seed, n, k, 0xb12d));
@@ -408,4 +406,24 @@ export class SoundDirector {
     const a = draw(2) * Math.PI * 2, d = 12 + draw(3) * 40, up = id === 'call/gull' ? 15 : id === 'call/dog' || id === 'call/rooster' ? 0.5 : 4 + draw(4) * 8;
     e.play(id, { at: [cam.x + Math.cos(a) * d, cam.y + up, cam.z + Math.sin(a) * d], ref: 10, gain: 0.7, late: 1 });
   }
+}
+
+/** Where a town is heard from: its middle and reach, its smithies and mills at work, its bell tower. */
+interface TownSounds {
+  readonly at: { x: number; z: number; r: number };
+  readonly works: readonly { id: number; kind: 'smithy' | 'mill'; at: [number, number, number] }[];
+  readonly belfry: [number, number, number] | null;
+}
+
+function townSounds(t: Town): TownSounds {
+  const [cx, cz] = t.plan.centre;
+  const works: { id: number; kind: 'smithy' | 'mill'; at: [number, number, number] }[] = [];
+  for (const b of t.plan.buildings) if (b.kind === 'smithy' || b.kind === 'mill') works.push({ id: b.id, kind: b.kind, at: [b.cx, b.floorY + 1.5, b.cz] });
+  let tower = null;
+  for (const b of t.plan.buildings) if (b.kind === 'temple' || (b.kind === 'hall' && !tower)) tower = b;
+  return {
+    at: { x: cx, z: cz, r: Math.max(t.plan.radius, (Math.max(t.nx, t.nz) * TOWN_RASTER) / 2) },
+    works,
+    belfry: tower ? [tower.cx, tower.floorY + tower.floors * tower.floorH + 4, tower.cz] : null,
+  };
 }

@@ -85,7 +85,7 @@ await page.evaluate(() => {
     span(proto, 'update', 'actors update');
     span(g.folk, 'follow', 'folk follow');
   }
-  span(g.life, 'step', 'town life');
+  span(g.towns, 'live', 'town life');
   span(g.view.stage, 'prepare', 'stage prepare (sync part)');
   span(g.view.renderer, 'render', 'render');
 });

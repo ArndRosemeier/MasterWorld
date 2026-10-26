@@ -6,7 +6,7 @@ import { openWorld } from '../src/vgm/builder';
 import { openPromises } from '../src/vgm/leads';
 import { TownLife } from '../src/sim/townLife';
 import { townTalk } from '../src/talk/townTalk';
-import { marketStart } from '../src/app/places';
+import { marketStart } from '../src/world/town';
 import { ARRIVAL, Guide, HAIL, arrivalEntry, hailer, besideHero } from '../src/vgm/guide';
 
 test('guide: the first hail soon after arrival, then each one waits longer; a lead stops it, none left starts it over', () => {

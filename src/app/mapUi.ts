@@ -6,7 +6,7 @@
  * hand-over). Where the hero is follows their orientation skill: a vague area for a novice, an exact arrow
  * at mastery (src/game/orientation.ts).
  */
-import { polyCentroid, type TownPlan } from '@futuremagic/settlement';
+import type { TownPlan } from '@futuremagic/settlement';
 import type { Bearing } from '../game/orientation';
 import type { Journal } from '../talk/journal';
 import { el } from './dom';
@@ -36,7 +36,8 @@ export class MapUi extends KeyWindow {
   private stroke = 1;
   private frame = 0;
 
-  constructor(private readonly plan: TownPlan, private readonly journal: Journal, private readonly map: MapHost) {
+  /** `centre`: the middle of the sheet (where the game began); `plans`: every town on the land, each drawn alike. */
+  constructor(private readonly centre: readonly [number, number], private readonly plans: () => readonly TownPlan[], private readonly journal: Journal, private readonly map: MapHost) {
     const canvas = el('canvas', { width: SIZE, height: SIZE, className: 'parchment' });
     super('Map', 'map', 'map', map, el('div', { className: 'body' }, canvas, el('p', { className: 'hint', textContent: 'Wheel: zoom. Drag: move. Marks show what people told you of.' })));
     this.canvas = canvas;
@@ -72,8 +73,7 @@ export class MapUi extends KeyWindow {
   }
 
   private middle(): [number, number] {
-    const [x, z] = polyCentroid(this.plan.market);
-    return [x, z];
+    return [this.centre[0], this.centre[1]];
   }
 
   /** The land under the parchment: hill shade, water and contours, once (it does not change). */
@@ -135,20 +135,22 @@ export class MapUi extends KeyWindow {
     }
     const ink = '#3a2c1c';
     g.lineCap = 'round'; g.lineJoin = 'round';
-    for (const st of this.plan.streets) {
-      g.strokeStyle = st.kind === 'track' ? '#8a7350' : '#6a5438';
-      g.lineWidth = Math.max(1, st.width * s * 0.8);
-      g.beginPath();
-      for (let i = 0; i < st.pts.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, X(st.pts[i]), Z(st.pts[i + 1]));
-      if (st.closed) g.closePath();
-      g.stroke();
-    }
-    poly(g, this.plan.market, X, Z);
-    g.fillStyle = '#c9b48a'; g.fill();
-    for (const b of this.plan.buildings) {
-      poly(g, b.poly, X, Z);
-      g.fillStyle = b.kind === 'temple' || b.kind === 'hall' || b.kind === 'inn' ? '#5a3a24' : ink;
-      g.fill();
+    for (const plan of this.plans()) {
+      for (const st of plan.streets) {
+        g.strokeStyle = st.kind === 'track' ? '#8a7350' : '#6a5438';
+        g.lineWidth = Math.max(1, st.width * s * 0.8);
+        g.beginPath();
+        for (let i = 0; i < st.pts.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, X(st.pts[i]), Z(st.pts[i + 1]));
+        if (st.closed) g.closePath();
+        g.stroke();
+      }
+      poly(g, plan.market, X, Z);
+      g.fillStyle = '#c9b48a'; g.fill();
+      for (const b of plan.buildings) {
+        poly(g, b.poly, X, Z);
+        g.fillStyle = b.kind === 'temple' || b.kind === 'hall' || b.kind === 'inn' ? '#5a3a24' : ink;
+        g.fill();
+      }
     }
     // The marks: a ring of red ink and the place's name.
     for (const l of this.journal.open) {

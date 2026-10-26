@@ -10,6 +10,7 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
+import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
 import { castShadows } from '../hero/play';
@@ -90,12 +91,12 @@ export class FolkView {
   /** Seconds until the next dressing may begin (DRESS_GAP). */
   private dressWait = 0;
   private readonly shown = new Map<Agent, Slot>();
-  /** The people of the settlements near the hero (plan B3), drawn besides the start town's. */
-  others: readonly TownLife[] = [];
+  /** The people of every town near the hero (plan B3a: the start town's and each settlement's alike). */
+  lives: readonly TownLife[] = [];
   /** Everyone out of doors without a character, as plain figures. */
   private readonly far = new FarFolk();
 
-  private constructor(private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
+  private constructor(private readonly stage: Stage, private readonly dressedAs: readonly Person[], private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
     for (const ch of [lead, ...others]) {
       ch.lodBias = LOD_BIAS;
       const place = new Group();
@@ -111,7 +112,7 @@ export class FolkView {
    * Loads the pack and `count` characters behind the loading screen, the first dressed like a
    * townsman so its shaders (skin, cloth, hair, each detail level) are compiled by `warm`.
    */
-  static async create(stage: Stage, renderer: WebGPURenderer, life: TownLife, height: (x: number, z: number) => number, count: number): Promise<FolkView> {
+  static async create(stage: Stage, renderer: WebGPURenderer, dressedAs: readonly Person[], height: (x: number, z: number) => number, count: number): Promise<FolkView> {
     const worker = new HumanWorker();
     // Only what the town's pack has (tools/packs/actors.mjs).
     const catalog = (c: CharacterCatalog): CharacterCatalog => ({
@@ -126,13 +127,13 @@ export class FolkView {
     const lead = first;
     const others: Character[] = [];
     for (let i = 1; i < count; i++) others.push(await share());
-    const view = new FolkView(stage, life, height, lead, others);
+    const view = new FolkView(stage, dressedAs, height, lead, others);
     return view;
   }
 
   /** Dresses the first character as somebody from town and returns what to compile in the warm-up. */
   async warmObjects(): Promise<Object3D[]> {
-    const s = this.slots[0], look = coveringLooks(this.life.persons)[0];
+    const s = this.slots[0], look = coveringLooks(this.dressedAs)[0];
     // Undressed if the look's files would not load: the warm-up still compiles the body.
     if (look) await s.ch.set({ ...look, animation: 'walk' }).catch((e: unknown) => console.error('[folk] dressing the first failed', e));
     s.ch.setLod(0);
@@ -166,7 +167,7 @@ export class FolkView {
     place.removeFromParent();
     slot.busy = true; // not dressed for anybody while it tries the looks on
     this.trying = true;
-    const looks = coveringLooks(this.life.persons);
+    const looks = coveringLooks(this.dressedAs);
     for (let i = 0; i < looks.length; i++) {
       if (i === 1) first();
       // Before the game begins the people round the hero come first: their dressing compiles what they wear, and
@@ -219,7 +220,7 @@ export class FolkView {
     const near: [number, Agent][] = [];
     const placed = new Map<Agent, Placed>();
     for (const p of this.indoors ?? []) { near.push([Math.hypot(p.x - cx, p.z - cz), p.agent]); placed.set(p.agent, p); }
-    for (const life of [this.life, ...this.others]) {
+    for (const life of this.lives) {
       for (const a of life.agents) {
         if (a.hidden || placed.has(a) || this.clear?.(a.x, a.z)) continue;
         const d = Math.hypot(a.x - cx, a.z - cz);

@@ -302,5 +302,9 @@
   {
     "key": "same name: masterworld/game/trade.ts#save + masterworld/talk/townTalk.ts#save",
     "reason": "Each class writes its own state for the save (talk evidence and leads vs the hero's skills and kit vs the merchants' stock); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/evening.ts#log + masterworld/main.ts#log",
+    "reason": "Both hand a town core (game/township.ts TownshipContext) the decision log as it grows; one-line closures over each caller's own log, the seam is the interface."
   }
 ]
