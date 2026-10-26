@@ -43,6 +43,9 @@ const RAFTERS: Tint = [168, 146, 124], DIRT: Tint = [176, 160, 140];
 /** A wall's look: its layer, tint, and how damp its foot is (0 dry .. 1 wet). */
 interface WallLook { readonly mat: number; readonly tint: Tint; readonly damp: number }
 
+/** `base` a little lighter or darker, by up to ±v. */
+const varyTint = (rng: Rng, base: Tint, v: number): Tint => base.map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + rng.range(-v, v)))))) as unknown as Tint;
+
 const scaleTint = (t: Tint, k: number): Tint => [Math.round(t[0] * k), Math.round(t[1] * k), Math.round(t[2] * k)];
 
 /**
@@ -261,7 +264,7 @@ function modelProp(k: MeshKit, p: Prop, models: PropModels): boolean {
   const rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), p.kind));
   const fwd = [Math.sin(yaw), Math.cos(yaw)];
   const spot = (u: number, w: number) => [x + Math.cos(yaw) * u + fwd[0] * w, z - Math.sin(yaw) * u + fwd[1] * w];
-  const t = (base: Tint, v = 0.12): Tint => base.map((ch) => Math.max(0, Math.min(255, Math.round(ch * (1 + rng.range(-v, v)))))) as unknown as Tint;
+  const t = (base: Tint, v = 0.12): Tint => varyTint(rng, base, v);
   const stampAs = (name: string, s: Partial<Stamp> & { x: number; z: number }): boolean => {
     const m = models.get(name);
     if (!m) return false;
@@ -360,7 +363,7 @@ function dress(k: MeshKit, c: Cellar, models: PropModels): void {
 function prop(k: MeshKit, p: Prop): void {
   const { x, y, z, yaw } = p;
   const rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), p.kind));
-  const t = (base: Tint, v = 0.12): Tint => base.map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + rng.range(-v, v)))))) as unknown as Tint;
+  const t = (base: Tint, v = 0.12): Tint => varyTint(rng, base, v);
   const fwd = [Math.sin(yaw), Math.cos(yaw)];
   const spot = (u: number, w: number) => [x + Math.cos(yaw) * u + fwd[0] * w, z - Math.sin(yaw) * u + fwd[1] * w];
   const kind: DungeonProp = p.kind;
