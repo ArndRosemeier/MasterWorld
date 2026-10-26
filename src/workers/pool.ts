@@ -39,7 +39,19 @@ export class WorkerPool<Job, Result> {
     });
   }
 
-  dispose(): void {
+  /** The same job to every worker (each answers once); jobs sent after it see what it did. */
+  broadcast(job: Job): Promise<Result[]> {
+    return Promise.all(this.workers.map((worker, w) => {
+      const id = this.nextId++;
+      this.busy[w]++;
+      return new Promise<Result>((resolve, reject) => {
+        this.waiting.set(id, { resolve, reject, worker: w });
+        worker.postMessage({ id, job });
+      });
+    }));
+  }
+
+    dispose(): void {
     for (const w of this.workers) w.terminate();
     for (const p of this.waiting.values()) p.reject(new Error('worker pool disposed'));
     this.waiting.clear();
@@ -89,6 +101,11 @@ export class TerrainJobs {
     return this.job({ kind: 'horizon', ...spec });
   }
 
+  /** Decisions made while playing that change the land (roads), for every terrain worker. */
+  decisions(ds: readonly import('../world/decisions').Decision[]): Promise<unknown> {
+    return this.pool.broadcast({ kind: 'decisions', decisions: ds, seed: this.seed, setting: this.setting });
+  }
+
   /** A cave's rock (its field and mesh) for its layout: a few hundred milliseconds of work. */
   caveRock(layout: import('@futuremagic/dungeon').DungeonLayout, cave: number): Promise<import('./terrain.worker').CaveRock> {
     return this.job({ kind: 'caveRock', layout, cave });
@@ -116,6 +133,15 @@ export class WorldJobs {
 
   /** Ground no plant grows on that the worker does not know of (the places the VGM opened since the start). */
   keepOut: ((x: number, z: number) => boolean) | null = null;
+  /** Decisions made while playing that change the land (roads), for the world worker. */
+  decisions(ds: readonly import('../world/decisions').Decision[]): Promise<unknown> {
+    return this.pool.broadcast({ kind: 'decisions', decisions: ds, seed: this.seed, setting: this.setting });
+  }
+
+  /** The roads' mask over a square (world/roads.ts roadMask): `res` samples a side. */
+  roadMask(x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
+    return this.pool.run({ kind: 'roads', seed: this.seed, setting: this.setting, x0, z0, size, res });
+  }
 
   /** Trees and shrubs over a square, candidates `spacing` apart. */
   flora(x0: number, z0: number, size: number, spacing: number): Promise<Float32Array> {

@@ -254,5 +254,9 @@
   {
     "key": "idiom: [.range .stone] in masterworld/world/dungeon/barrowMesh.ts + masterworld/world/dungeon/towerMesh.ts + masterworld/world/sites.ts",
     "reason": "MeshKit.stone with seeded sizes (rng.range): the kit is the shared seam; each caller lays its own stones (a barrow's kerb, a tower's rubble, a camp's fire ring and a ruin's walls)."
+  },
+  {
+    "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/terrain/TerrainView.ts#refresh",
+    "reason": "The same seam on purpose: app/roads.ts asks every view built from the land to build again over the squares a new road passes; each view rebuilds its own cells."
   }
 ]

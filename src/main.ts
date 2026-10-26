@@ -42,6 +42,8 @@ import { settingById } from './setting/index';
 import { CROPS, distSqPointSeg } from '@futuremagic/settlement';
 import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
+import { linkRoad } from './vgm/roads';
+import { RoadWork } from './app/roads';
 import { ordersOf, townOrder } from './vgm/orders';
 import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
@@ -56,10 +58,10 @@ import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
-import { walkFrontier } from './vgm/frontier';
+import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
-import type { Decision, DungeonDecision } from './world/decisions';
+import type { Decision, DungeonDecision, RegionDecision, RoadDecision, RoadWay } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
 import { InteriorView } from './render/town/InteriorView';
 import { lookFromDegrees } from './app/look';
@@ -144,7 +146,9 @@ export async function start(b: Boot): Promise<void> {
     const home = town ? marketStart(town.plan) : opened.home;
 
     // The world as saved: the seed's own decisions, then what the VGM decided while the game was played.
-    const later = save ? save.log.slice(opened.log.length) : [];
+    const later: Decision[] = save ? save.log.slice(opened.log.length) : [];
+    // Roads decided while the last game was played level the land from the start.
+    terrain.settleMore(later);
     if (save && JSON.stringify(save.log.slice(0, opened.log.length)) !== JSON.stringify(opened.log)) console.warn('save: this world was made by an older version; it is rebuilt from its seed');
     const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
     const hour = title && !params.hourSet ? title.draw.hour : params.hour;
@@ -262,6 +266,10 @@ export async function start(b: Boot): Promise<void> {
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
     const jobs = new WorldJobs(createWorldPool(), seed, setting.id);
+    // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
+    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
+    const roadWork = new RoadWork(terrain, jobs, terrainJobs);
+    void roadWork.start(later);
     const sea = new WaterView(jobs);
     water = sea;
     await sea.prime(view.camera.position);
@@ -318,6 +326,20 @@ export async function start(b: Boot): Promise<void> {
       const m = moveInto({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain }, deriveSeed(seed, 'moved'));
       if (m) log = [...log, m];
     }
+    // A road from a place at (x, z) to the network, laid while playing: how the VGM links a place it founds (game.layRoad).
+    const layRoad = (x: number, z: number, way: RoadWay = 'track'): RoadDecision | null => {
+      const d = linkRoad(terrain, log, { id: `place-${log.length}`, x, z, r: 0 }, way, hours());
+      if (d) { log = [...log, d]; void roadWork.lay(d); }
+      return d;
+    };
+    // A region the VGM opened goes into the log; a hamlet founded in it gets its cart track to the network (plan 7).
+    const regionOpened = (d: RegionDecision): void => {
+      log = [...log, d];
+      regionSites?.sync(log);
+      const place = setting.regions ? settlementsOf([d], setting.regions)[0] : undefined;
+      const road = place ? linkRoad(terrain, log, place, 'track', d.at) : null;
+      if (road) { log = [...log, road]; void roadWork.lay(road); }
+    };
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: town?.decision ?? opened.home }, log);
@@ -329,8 +351,7 @@ export async function start(b: Boot): Promise<void> {
         const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: town?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
-        log = [...log, ...walked];
-        sites.sync(log);
+        for (const d of walked) regionOpened(d);
         const s = found.site, d = s.r + 14;
         player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
         break;
@@ -394,8 +415,9 @@ export async function start(b: Boot): Promise<void> {
     const folkWarm = folk ? await folk.warmObjects() : [];
     await painted;
     // The land, its rock and the town's houses are built in workers meanwhile; their shaders compile with the rest.
-    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
+    roadWork.rebuilds({ ground, flora, grass, trunks });
+    await roadWork.mask.start(view.camera.position);
     const rock = new VolumeView(view.stage, terrainJobs).raise();
     const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
     if (houses && town) view.warm.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
@@ -855,7 +877,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass,
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass,
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -983,7 +1005,7 @@ export async function start(b: Boot): Promise<void> {
         if (regionSites && !visit()) {
           const asking = !title?.holding && !creator?.showing && !!window.__mwReady;
           const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
-          if (opened) { log = [...log, opened]; regionSites.sync(log); }
+          if (opened) regionOpened(opened);
         }
         stepEncounters(dt, [...cellars.encounters, ...(wild?.encounters ?? [])], { hero: character, player, hud: fightHud });
       }
@@ -1009,6 +1031,7 @@ export async function start(b: Boot): Promise<void> {
       if (above) {
         sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
         ground.update(view.camera);
+        roadWork.follow(view.camera.position);
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         houses?.update(view.camera.position);
       }
