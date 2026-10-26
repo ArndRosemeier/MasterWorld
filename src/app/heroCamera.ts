@@ -4,7 +4,7 @@
  * src/input/controls.ts). Right mouse button held:
  * mouse look, the hero turns with the camera; left button held: the camera alone orbits the hero; both
  * buttons: run forward. The wheel zooms, all the way into first person. The camera stays out of the
- * ground and the rock, and in front of the people in a room.
+ * ground and the rock.
  */
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { clamp, damp } from '@futuremagic/core';
@@ -17,6 +17,8 @@ const TURN = 2.6;
 const LOOK = 0.0035;
 /** Zoom range (m from the head); below FIRST it is first person. */
 const NEAR = 0, FAR = 18, FIRST = 0.6;
+/** A talk's view: this far behind the head at most, looking this much down (rad). */
+const TALK_ZOOM = 2.4, TALK_PITCH = -0.25;
 
 export class HeroCamera {
   /** The camera's own direction (rad): yaw as the walker's, pitch up positive. */
@@ -33,8 +35,6 @@ export class HeroCamera {
   private lmb = false;
   private rmb = false;
   private readonly eye = new Vector3();
-  /** People standing or sitting about (feet), whom the camera stays in front of as of the walls (a room's). */
-  bodies: readonly { x: number; y: number; z: number }[] = [];
 
   constructor(private readonly camera: PerspectiveCamera, el: HTMLElement, private readonly world: WalkWorld) {
     window.addEventListener('keydown', (e) => { if (this.on && !e.repeat) this.controls.press(e.code); });
@@ -105,6 +105,28 @@ export class HeroCamera {
     };
   }
 
+  /** Before a talk: the zoom and pitch it had. */
+  private beforeTalk: { zoom: number; pitch: number } | null = null;
+
+  /**
+   * A talk's view (`on`), looking at (x, z) over the hero's shoulder from close behind and above, so
+   * that people in between (a room's drinkers) and a counter do not hide the one talked to; off: back
+   * to the view before.
+   */
+  frameTalk(on: boolean, head: Vector3, x = 0, z = 0): void {
+    if (on) {
+      this.beforeTalk ??= { zoom: this.zoom, pitch: this.pitch };
+      this.yaw = Math.atan2(head.x - x, head.z - z);
+      this.zoom = Math.min(this.zoom, TALK_ZOOM);
+      this.pitch = TALK_PITCH;
+    } else if (this.beforeTalk) {
+      ({ zoom: this.zoom, pitch: this.pitch } = this.beforeTalk);
+      this.beforeTalk = null;
+    }
+    this.dist = this.zoom;
+    this.trail(head, 0);
+  }
+
   /** Place the camera behind the hero's head (`head` the point it orbits). */
   trail(head: Vector3, dt: number): void {
     const cp = Math.cos(this.pitch);
@@ -116,8 +138,7 @@ export class HeroCamera {
       const d = (i / steps) * this.zoom;
       const x = head.x - dir.x * d, y = head.y - dir.y * d, z = head.z - dir.z * d;
       const rock = this.world.rockSurface(x, y, z);
-      const body = this.bodies.some((b) => y > b.y && y < b.y + 1.9 && (x - b.x) ** 2 + (z - b.z) ** 2 < 0.4 * 0.4);
-      if (y < this.world.height(x, z) + 0.35 || (rock !== null && rock < 0.35) || body) { free = Math.max(0, d - 0.3); break; }
+      if (y < this.world.height(x, z) + 0.35 || (rock !== null && rock < 0.35)) { free = Math.max(0, d - 0.3); break; }
     }
     this.dist = free < this.dist ? free : this.dist + (free - this.dist) * damp(3, dt);
     this.eye.copy(head).addScaledVector(dir, -this.dist);

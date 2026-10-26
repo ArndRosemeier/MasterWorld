@@ -144,6 +144,11 @@ export class Player {
     this.heroCam.trail(this.toHead(), 0);
   }
 
+  /** A talk's view, at (x, z) over the hero's shoulder (`on`), or the view from before it again. */
+  frameTalk(on: boolean, x?: number, z?: number): void {
+    if (!this.flying) this.heroCam.frameTalk(on, this.toHead(), x, z);
+  }
+
   update(dt: number): void {
     const { walker, heroCam, riding } = this;
     if (this.flying) {
