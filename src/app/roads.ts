@@ -29,6 +29,8 @@ export class RoadWork {
   /** The road mask round the camera (rebaked 600 m before its edge comes into the drawn ground). */
   readonly mask: FollowedMask;
   private views: RoadViews | null = null;
+  /** Where land changed before the views existed (some may have been built from the old land meanwhile). */
+  private readonly early: ((x0: number, z0: number, x1: number, z1: number) => boolean)[] = [];
   /** The places whose clearings the workers have heard of. */
   private readonly sent = new Set<string>();
 
@@ -55,6 +57,8 @@ export class RoadWork {
   /** The views that are built from the land; from now on a laid road has them built again near it. */
   rebuilds(views: RoadViews): void {
     this.views = views;
+    // Settlements founded while the views were being built (a start beside one): built anew round them.
+    for (const touches of this.early.splice(0)) this.rebuildNear(touches);
   }
 
   /** Lay a road decided while playing (already in the log): the land changes, and what stood near the road is built anew. */
@@ -101,6 +105,12 @@ export class RoadWork {
     const reach = town.radius * 1.8 + 10;
     const x0 = Math.min(t.x0, town.x - reach), z0 = Math.min(t.z0, town.z - reach), x1 = Math.max(t.x0 + t.nx, town.x + reach), z1 = Math.max(t.z0 + t.nz, town.z + reach);
     const touches = (ax: number, az: number, bx: number, bz: number) => ax < x1 && bx > x0 && az < z1 && bz > z0;
+    if (this.views) this.rebuildNear(touches);
+    else this.early.push(touches);
+  }
+
+  /** The ground, plants, trunks and grass where `touches` says, built anew from the land as it is now. */
+  private rebuildNear(touches: (x0: number, z0: number, x1: number, z1: number) => boolean): void {
     this.views?.ground.refresh(touches);
     this.views?.flora.refresh(touches);
     this.views?.trunks.forgetOver(touches);
