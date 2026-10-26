@@ -242,14 +242,17 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
   const clues: Clue[] = [];
   const doorsOf = (room: number) => layout.links.flatMap((pl) => pl.doors.filter((dr) => dr.room === room));
   const placed = layout.rooms;
-  /** Free spots along a room's walls (not in front of doors), as cell + wall side. */
-  const wallSpots = (room: number) => {
+  /**
+   * Free spots along a room's walls (not in front of doors), as cell + wall side. `tight`: a room with a door
+   * in every cell (a small hub) still has the walls beside its doors.
+   */
+  const wallSpots = (room: number, tight = false) => {
     const R = placed[room], out: { x: number; z: number; dir: number }[] = [];
     const doors = doorsOf(room).filter((dr) => dr.level === R.level);
     for (let z = R.z; z < R.z + R.d; z++) for (let x = R.x; x < R.x + R.w; x++) for (let k = 0; k < 4; k++) {
       const nx = x + DIRS[k][0], nz = z + DIRS[k][1];
       if (cellIn(R, nx, nz)) continue;
-      if (doors.some((dr) => dr.x === x && dr.z === z)) continue;
+      if (doors.some((dr) => dr.x === x && dr.z === z && (!tight || dr.dir === k))) continue;
       out.push({ x, z, dir: k });
     }
     return out;
@@ -260,6 +263,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     let spots = wallSpots(room).filter(clear);
     // A full room: crowd it (props may stand closer).
     if (!spots.length) spots = wallSpots(room);
+    if (!spots.length) spots = wallSpots(room, true);
     if (!spots.length) return false;
     const s = spots[rng.int(0, spots.length - 1)];
     // Against the wall, facing into the room; yaw: −z is 0 (as the walker), facing away from the wall.

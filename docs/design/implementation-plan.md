@@ -69,7 +69,7 @@ Goal: an evening of play works end to end. You get a lead, travel, clear the pla
 | A3 ✓ | **Upkeep**: gear wears and the smith repairs it; a room at the inn restores you and sets where you wake | Test: wear, repair cost, waking at the inn | 11.5, 11.2 |
 | A4 ✓ | **Death as designed**: in classic mode carried gear stays where you fell, as a mark on the map to go back for; **roguelike mode** (one save the game writes, death ends the hero, the world stays for the next one) | Tests for both modes; the New game screen offers the mode | 11.1, D12 |
 | A5 | **Music streams** (F4): the start loads no music; tracks load when first needed | F4 load time passes | 16 |
-| A6 | **The loop check**: a scripted hero (extending `src/game/bot.ts`) plays an evening headless: hears a lead, walks to it, clears it, comes back, sells, buys an upgrade, hears the next lead. It is a slow check of at most 5 min | The check passes on main and runs before every phase gate | 11.3 |
+| A6 ✓ | **The loop check**: a scripted hero (extending `src/game/bot.ts`) plays an evening headless: hears a lead, walks to it, clears it, comes back, sells, buys an upgrade, hears the next lead. It is a slow check of at most 5 min | The check passes on main and runs before every phase gate | 11.3 |
 
 Gate A: A1–A6 done, the F1 set judged, no placeholders.
 
@@ -138,3 +138,5 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | freeryder / free LLMs (O15) | Parked by Arnd |
 | The capital | Prepared in B3, placed once a road network exists |
 | Companions (animals, elementals, summons) | After magic (C), since summons need it |
+| Coin piles up: by the sixth evening the loop check's hero carries 400 to 1000 copper the smith has nothing left to sell for, and a room costs 10 | Seen by the loop check (A6, 2026-10-26). Wants dearer goods and more to spend on (training, B-phase shops, a house) rather than meaner prices now |
+| A paddock fence can cut across a street (seed `alpha`, beside the smithy): the townsfolk walk through it, the hero has to go round | Seen by the loop check (A6); the town plan comes from `@futuremagic/settlement`, so the fix belongs there. The default seed has none |

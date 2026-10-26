@@ -64,6 +64,7 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
     if (c.pieceLink < 0) problems.push(`${where}: no signature set piece`);
     if (!c.clues.length) problems.push(`${where}: nothing to read`);
     if (!c.spawns.length) problems.push(`${where}: nobody lives there`);
+    if (!c.hatch || c.hatch.kind !== 'ladder') problems.push(`${where}: no ladder up to the hatch`);
     aspects.layout.push(c.signature);
     aspects.mainPattern.push(c.graph.patterns[0]);
     aspects.pattern.push(...c.graph.patterns.filter((p) => p !== 'shortcut' && p !== 'refuge'));
