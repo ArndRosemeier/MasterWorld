@@ -12,7 +12,7 @@ import { Box3, Group, Vector3, type Object3D, type WebGPURenderer } from 'three/
 import { Rng, deriveSeed, hexToRgb } from '@futuremagic/core';
 import { Character } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
-import HumanWorker from '@actors/human/worker?worker';
+import HumanWorker from '../../workers/human.worker?worker';
 import { grow, type BodyPlan, type CritterRole, type Integument } from '@futuremagic/creatures';
 import { CritterModel, ModelledCreature, type ClipUse, type CritterFigure, type ModelledFigure, type RigInput } from '@futuremagic/creatures/three';
 import type { CreatureDef } from '../../setting/contract';

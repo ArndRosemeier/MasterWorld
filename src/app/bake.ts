@@ -7,7 +7,7 @@
 import { AmbientLight, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene } from 'three/webgpu';
 import { createRenderer } from '@futuremagic/stage';
 import { Character, type CharacterCatalog, type CharacterConfig } from '@actors/generator';
-import HumanWorker from '@actors/human/worker?worker';
+import HumanWorker from '../workers/human.worker?worker';
 import { settingById } from '../setting/index';
 import { loadOptions, newHero } from '../render/hero/HeroView';
 import { PEOPLE_RACE } from './creatorUi';

@@ -14,7 +14,7 @@ import type { RaceId } from '@actors/human';
 import { Mount } from '@actors/three';
 import { nodeMaterials } from '@actors/three/webgpu';
 import { RIDE } from '@actors/human';
-import HumanWorker from '@actors/human/worker?worker';
+import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import { buildArm } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE } from './clips';
