@@ -16,10 +16,14 @@ import { execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
+import { drawnNear, measureFrames, shadersQuiet } from './wait.mjs';
 
 const TIMEOUT = 120000;
 const SETTLE = Number(process.env.SET_SETTLE ?? 4000);
 const MEASURE = Number(process.env.SET_MEASURE ?? 2000);
+// Dressing the town's 30 characters takes about 6 s after the page is ready (two at a time, about 1 s each, some 4 s):
+// a shorter limit cut the first town shot off with one still plain.
+const DRAWN = Number(process.env.SET_DRAWN ?? 15000);
 const BUDGET = 16.7, AIM = 12;
 const gl = process.env.SET_GL !== '0';
 // The clock stands still and the hud is off the picture (frame times are taken here, not read off it).
@@ -109,46 +113,6 @@ const t0 = Date.now();
 const rows = [];
 let failed = false, gpuName = '';
 
-/**
- * Waits until everything near the hero is drawn as itself (`game.undrawn` empty: no townsfolk still plain
- * figures, no creatures still warming), at most DRAWN ms; returns what is still waiting.
- */
-// Dressing the town's 30 characters takes about 6 s after the page is ready (two at a time, about 1 s each, some 4 s):
-// a shorter limit cut the first town shot off with one still plain.
-const DRAWN = Number(process.env.SET_DRAWN ?? 15000);
-const drawn = (page) => page.waitForFunction(() => !window.game || window.game.undrawn.length === 0, null, { timeout: DRAWN, polling: 200 })
-  .then(() => [], () => page.evaluate(() => window.game.undrawn));
-
-/**
- * Waits until no shader was built for 1.5 s (the scene is warm: what is still warming up is not its frame
- * time), at least 1.5 s and at most SETTLE; returns how long that took (s).
- */
-const quiet = (page) => page.evaluate(([most]) => new Promise((done) => {
-  const built = () => { const s = window.shaders?.summary(); return s ? s.warmup + s.run : 0; };
-  const t0 = performance.now();
-  let n = built(), since = t0;
-  const id = setInterval(() => {
-    const now = performance.now(), m = built();
-    if (m !== n) { n = m; since = now; }
-    if (now - since >= 1500 || now - t0 >= most) { clearInterval(id); done((now - t0) / 1000); }
-  }, 100);
-}), [SETTLE]);
-
-/** Frame intervals over `ms` (requestAnimationFrame), sorted: median, 95th percentile, mean. */
-const measure = (page) => page.evaluate((ms) => new Promise((done) => {
-  const dts = [];
-  let last = performance.now();
-  const t0 = last;
-  const step = (now) => {
-    dts.push(now - last); last = now;
-    if (now - t0 < ms) return requestAnimationFrame(step);
-    dts.sort((a, b) => a - b);
-    const n = dts.length;
-    done({ frames: n, p50: dts[n >> 1], p95: dts[Math.floor(n * 0.95)], mean: dts.reduce((a, b) => a + b, 0) / n });
-  };
-  requestAnimationFrame(step);
-}), MEASURE);
-
 for (const s of sessions) {
   const errors = [];
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } }); // its own, as a player's first visit
@@ -170,9 +134,9 @@ for (const s of sessions) {
   });
   for (const shot of s.shots) {
     if (shot.act) await shot.act(page);
-    const d0 = Date.now(), missing = await drawn(page), drawnS = (Date.now() - d0) / 1000;
-    const settled = await quiet(page);
-    const ft = await measure(page);
+    const d0 = Date.now(), missing = await drawnNear(page, DRAWN), drawnS = (Date.now() - d0) / 1000;
+    const settled = await shadersQuiet(page, SETTLE);
+    const ft = await measureFrames(page, MEASURE);
     const file = `${String(rows.length + 1).padStart(2, '0')}-${shot.name}.jpg`;
     await page.screenshot({ path: join(dir, file), type: 'jpeg', quality: 92, timeout: TIMEOUT });
     const sh = await page.evaluate(() => {

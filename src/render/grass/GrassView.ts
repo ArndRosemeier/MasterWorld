@@ -11,6 +11,7 @@ import {
 import { BLADES, GRASS, NEAR_END, PATCH, REACH, SEGMENTS, createGrassMaterial } from '../materials/grass';
 import type { WorldJobs } from '../../workers/pool';
 import { FollowedMask } from '../followedMask';
+import { ORIGIN } from '../origin';
 
 /** Vertices and triangles of one blade. */
 const VERTS = 2 * SEGMENTS + 1, TRIS = 2 * SEGMENTS - 1;
@@ -81,6 +82,8 @@ export class GrassView {
     this.near = layer(r(NEAR_END), BLADES);
     this.far = layer(r(REACH), BLADES / 4);
     this.group.name = 'grass';
+    // Placed on the GPU relative to the floating origin: the group draws at the identity.
+    ORIGIN.pin(this.group);
   }
 
   /** The mask for the start, before the first frame; one patch each so the warm-up builds the shader. */

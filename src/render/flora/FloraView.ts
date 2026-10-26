@@ -8,6 +8,7 @@
 import { Matrix4, Quaternion, Vector3, type BufferGeometry, type Camera, type DirectionalLight, type Material } from 'three/webgpu';
 import { shrubModel, treeModel, vegetationUniforms, type TreeSpecies } from '@futuremagic/vegetation';
 import { createBarkMaterial, createFarTreeMaterial, createLeafMaterial, createLeafPasses } from '@futuremagic/vegetation/node';
+import { ORIGIN } from '../origin';
 import { createInstanceDraws, DITHER, KIND, RECORD, type DrawKind, type DrawPart, type InstanceDraws } from '@futuremagic/instances';
 import type { Stage } from '@futuremagic/stage';
 import { hash2f } from '@futuremagic/core';
@@ -50,6 +51,8 @@ export class FloraView {
   constructor(private readonly stage: Stage, private readonly jobs: WorldJobs, private readonly sun?: DirectionalLight, opts: { leafDepth?: boolean; shadows?: boolean } = {}) {
     WOODS.band.value.set(HULL_END - HULL_THIN, HULL_END);
     const U = vegetationUniforms;
+    // Drawn relative to the floating origin (wind and tints read the world position through it).
+    U.uOrigin.value = ORIGIN.at;
     const shadows = opts.shadows ?? true, leafDepth = opts.leafDepth ?? true;
     const bark = createBarkMaterial(U), hull = createFarTreeMaterial(U);
     const reversed = !!(stage.renderer as unknown as { backend?: { parameters?: { reversedDepthBuffer?: boolean } } }).backend?.parameters?.reversedDepthBuffer;
@@ -67,8 +70,9 @@ export class FloraView {
       return { lods };
     });
     this.hasHull = kinds.map((k) => k.lods.length > 1);
-    this.draws = createInstanceDraws(stage.renderer, kinds, { horizontal: true, shadow: { dir: this.sunDir, reach: SHADOW_REACH }, capacity: 16384 });
+    this.draws = createInstanceDraws(stage.renderer, kinds, { horizontal: true, shadow: { dir: this.sunDir, reach: SHADOW_REACH }, capacity: 16384, origin: ORIGIN.at });
     this.draws.group.name = 'flora';
+    ORIGIN.pin(this.draws.group);
   }
 
   get group() { return this.draws.group; }

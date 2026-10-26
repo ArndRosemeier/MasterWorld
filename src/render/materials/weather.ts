@@ -27,6 +27,8 @@ export const WEATHER = {
   drift: uniform(new Vector2()),
   /** Light on the falling drops and flakes. */
   light: uniform(new Color(0.5, 0.5, 0.5)),
+  /** The floating origin (render/origin.ts) modulo the box of drops (`precipShift`): the drops stay put in the world when it steps. */
+  precipShift: uniform(new Vector3()),
 };
 
 /**
@@ -107,6 +109,12 @@ export function rainRings(p) {
 /** Box of falling drops around the camera: half width and height (m). */
 export const PRECIP_HALF = 18, PRECIP_HEIGHT = 22;
 
+/** `WEATHER.precipShift` for an origin at (x, z): its remainder in the box (the box's y is not shifted: the origin's y is 0). */
+export function precipShift(x: number, z: number, out: Vector3): Vector3 {
+  const w = PRECIP_HALF * 2, r = (v: number) => ((v % w) + w) % w;
+  return out.set(r(x), 0, r(z));
+}
+
 /**
  * Rain and snow: one shader. Each instance is a drop at a seeded spot in a box that wraps around the
  * camera; it falls with the wind, drawn as a thin streak along its motion (rain) or a soft flake (snow).
@@ -122,9 +130,11 @@ export function createPrecipMaterial(): MeshBasicNodeMaterial {
   const vel = vec3(W.windDir.x.mul(push), fall.negate(), W.windDir.y.mul(push));
   const wander = vec3(sin(W.time.mul(mix(0.7, 1.3, r)).add(r.mul(40.0))), 0, sin(W.time.mul(mix(0.5, 1.1, r)).add(r.mul(17.0)).add(1.3))).mul(snow.mul(0.6));
   const size = vec3(PRECIP_HALF * 2, PRECIP_HEIGHT, PRECIP_HALF * 2);
+  // Relative to the floating origin (the mesh is pinned): the box wraps around the camera as it would in world
+  // coordinates, the origin's share of the wrap given by `precipShift`, so nothing large enters the math.
   const lo = cameraPosition.sub(vec3(PRECIP_HALF, PRECIP_HEIGHT * 0.4, PRECIP_HALF));
   const p0 = drop.xyz.mul(size).add(vel.mul(W.time)).add(wander);
-  const centre = mod(p0.sub(lo), size).add(lo);
+  const centre = mod(p0.sub(W.precipShift).sub(lo), size).add(lo);
   // Streak along the motion (motion blur), turned to face the camera.
   const toCam = cameraPosition.sub(centre);
   const dist = length(toCam);
