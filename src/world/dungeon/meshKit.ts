@@ -88,13 +88,42 @@ export class MeshKit {
   }
 
   /**
-   * A rough-hewn stone: a box whose corners `rng` knocks out of true by up to `rough` (m), darker and damper
-   * at its foot (`tint` at its top), its texture shifted so no two stones match.
+   * A rough stone about the size of a box centred at (x, y0 + sy/2, z), turned by yaw: each face a 3 by 3
+   * grid, the box rounded by `round` (0 a box, 1 a ball) and every point knocked out of true by up to `rough` (m), so
+   * it shows facets rather than a crate's flat sides. Darker and damper at its foot (`tint` at its top);
+   * its texture runs upright on the sides and is shifted so no two stones match.
    */
-  stone(x: number, y0: number, z: number, sx: number, sy: number, sz: number, yaw: number, mat: number, tint: Tint, rng: Rng, rough = 0.07): void {
-    const v = corners(x, y0, z, sx, sy, sz, yaw).map((p) => p.map((c) => c + rng.range(-rough, rough)));
+  stone(x: number, y0: number, z: number, sx: number, sy: number, sz: number, yaw: number, mat: number, tint: Tint, rng: Rng, rough = 0.07, round = 0.45): void {
+    const n = 3, c = Math.cos(yaw), s = Math.sin(yaw), half = [sx / 2, sy / 2, sz / 2], o = rng.range(0, 8);
     const foot: Tint = [Math.round(tint[0] * 0.62), Math.round(tint[1] * 0.66), Math.round(tint[2] * 0.6)];
-    this.solid(v, sx, sy, sz, mat, foot, tint, rng.range(0, 8));
+    // One knock per point of the cube, so faces that share an edge share its points.
+    const knocks = new Map<string, number[]>();
+    const place = (p: number[]): { at: number[]; t: Tint } => {
+      const key = p.join(',');
+      let k = knocks.get(key);
+      if (!k) knocks.set(key, (k = [rng.range(-rough, rough), rng.range(-rough, rough), rng.range(-rough, rough)]));
+      const l = Math.hypot(p[0], p[1], p[2]);
+      const q = p.map((v, i) => (v * (1 - round) + (v / l) * round) * half[i] + k[i]);
+      const lx = q[0], ly = q[1] + half[1], lz = q[2];
+      const up = (p[1] + 1) / 2;
+      return { at: [x + lx * c + lz * s, y0 + ly, z - lx * s + lz * c], t: foot.map((f, i) => Math.round(f + (tint[i] - f) * up)) as unknown as Tint };
+    };
+    // Each face: its axis, side, and the two axes its grid runs along (sides: across, then up).
+    const faces: [number, number, number, number][] = [[2, 1, 0, 1], [2, -1, 0, 1], [0, 1, 2, 1], [0, -1, 2, 1], [1, 1, 0, 2], [1, -1, 0, 2]];
+    for (const [ax, side, u, v] of faces) {
+      // The grid's turn (u × v: +z for x,y; −x for z,y; −y for x,z) against the face's outward side.
+      const flip = (ax === 2 ? 1 : -1) * side < 0;
+      const pt = (i: number, j: number) => {
+        const p = [0, 0, 0];
+        p[ax] = side; p[u] = -1 + (2 * i) / n; p[v] = -1 + (2 * j) / n;
+        return { ...place(p), uv: [o + p[u] * half[u], o + p[v] * half[v]] };
+      };
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const a = pt(i, j), b = pt(i + 1, j), cc = pt(i + 1, j + 1), d = pt(i, j + 1);
+        const q = flip ? [a, d, cc, b] : [a, b, cc, d];
+        this.quad(q[0].at, q[1].at, q[2].at, q[3].at, q.map((e) => e.uv), mat, q.map((e) => e.t));
+      }
+    }
   }
 
   /** The six faces of a box from its corners (bottom four, then top four); `lo` tints the foot, `hi` the top. */

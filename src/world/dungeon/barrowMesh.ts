@@ -25,9 +25,9 @@ export const PORTAL = { outer: PASSAGE.half + 0.62, top: PASSAGE.h + 0.5 } as co
 export const BANK = { half: 3.1, h: 2.7, slope: 1.6, back: -6.4 } as const;
 
 /** The land's rock and grass as they are (weathered, a little lichen), and grass worn thin and shaded by the stones. */
-const ROCK: Tint = [236, 236, 226];
-const GRASS: Tint = [235, 240, 222];
-const WORN: Tint = [150, 140, 104];
+const ROCK: Tint = [186, 182, 170];
+const GRASS: Tint = [200, 198, 172];
+const WORN: Tint = [140, 132, 100];
 /** The passage: dry-stone walls and flags in the daylight at its mouth, black where it goes on down. */
 const DRYSTONE: Tint = [190, 182, 166];
 const FLAGS: Tint = [150, 142, 128];
@@ -47,20 +47,19 @@ export function barrowMesh(seed = 1): BuildingMesh {
 /** The mound: rings of a flattened dome under grass, then a skirt into the ground (the land is never quite level). */
 function mound(k: MeshKit): void {
   const seg = 28, rings = 7, start = k.mark;
-  const ringPoint = (ring: number, s: number): number[] => {
+  // Grass laid round the dome (u, along its rings) and down it (v, from the top), in metres near enough.
+  const down = (Math.PI / 4) * (MOUND.r + MOUND.h);
+  const ringPoint = (ring: number, s: number): { p: number[]; uv: number[] } => {
     const phi = (ring / rings) * (Math.PI / 2), a = (s / seg) * Math.PI * 2;
     const r = ring > rings ? MOUND.r : MOUND.r * Math.sin(phi), y = ring > rings ? -2 : MOUND.h * Math.cos(phi);
-    return [Math.cos(a) * r, y, -MOUND.back + Math.sin(a) * r];
+    return { p: [Math.cos(a) * r, y, -MOUND.back + Math.sin(a) * r], uv: [a * Math.max(1.5, r), ring > rings ? down + 2 : (ring / rings) * down] };
   };
   for (let i = 0; i <= rings; i++) for (let s = 0; s < seg; s++) {
-    const a = ringPoint(i, s), b = ringPoint(i + 1, s), c = ringPoint(i + 1, s + 1), d = ringPoint(i, s + 1);
-    k.quad(a, d, c, b, [a, d, c, b].map(earthUv), WildMat.Grass, GRASS);
+    const q = [ringPoint(i, s), ringPoint(i, s + 1), ringPoint(i + 1, s + 1), ringPoint(i + 1, s)];
+    k.quad(q[0].p, q[1].p, q[2].p, q[3].p, q.map((e) => e.uv), WildMat.Grass, GRASS);
   }
   k.smoothFrom(start);
 }
-
-/** Grass on a slope: u across, v along the fall, both in metres near enough. */
-const earthUv = (p: number[]): number[] => [p[0], p[2] + p[1]];
 
 /**
  * The earth heaped over the passage and against the portal: a ridge from the mound that slopes down at the
@@ -90,10 +89,17 @@ function bank(k: MeshKit): void {
     const R = out[0].p, L = out[n].p;
     return [{ p: [R[0] + 0.5, -1.6, r.z], t: out[0].t }, ...out, { p: [L[0] - 0.5, -1.6, r.z], t: out[n].t }];
   };
-  const all = rings.map(ring);
+  // Grass laid over the arch (u, metres along each ring from its right foot) and along the bank (v, its z).
+  const all = rings.map(ring).map((pts) => {
+    let run = 0;
+    return pts.map((e, i) => {
+      if (i) run += Math.hypot(e.p[0] - pts[i - 1].p[0], e.p[1] - pts[i - 1].p[1]);
+      return { ...e, uv: [run, e.p[2]] };
+    });
+  });
   for (let r = 0; r + 1 < all.length; r++) for (let i = 0; i + 1 < all[r].length; i++) {
-    const a = all[r][i], b = all[r][i + 1], c = all[r + 1][i + 1], d = all[r + 1][i];
-    k.quad(a.p, d.p, c.p, b.p, [a.p, d.p, c.p, b.p].map(earthUv), WildMat.Grass, [a.t, d.t, c.t, b.t]);
+    const q = [all[r][i], all[r + 1][i], all[r + 1][i + 1], all[r][i + 1]];
+    k.quad(q[0].p, q[1].p, q[2].p, q[3].p, q.map((e) => e.uv), WildMat.Grass, q.map((e) => e.t));
   }
   k.smoothFrom(start);
 }
@@ -105,13 +111,13 @@ function bank(k: MeshKit): void {
 function passage(k: MeshKit, rng: Rng): void {
   const { half, h, front, end } = PASSAGE, w = PORTAL.outer - half;
   const rock = (v = 0.07): Tint => varyTint(rng, ROCK, v);
-  for (const side of [-1, 1]) k.stone(side * (half + w / 2), -0.45, front - 0.3, w, h + 0.45, 0.6, rng.range(-0.05, 0.05), WildMat.Rock, rock(), rng);
-  k.stone(0, h - 0.02, front - 0.32, 2 * PORTAL.outer + 0.35, PORTAL.top - h + 0.02, 0.75, rng.range(-0.03, 0.03), WildMat.Rock, rock(), rng, 0.05);
-  k.stone(0, -0.26, front - 0.12, 2 * half + 0.2, 0.3, 0.36, 0, WildMat.Rock, rock(), rng, 0.03);
+  for (const side of [-1, 1]) k.stone(side * (half + w / 2), -0.45, front - 0.3, w, h + 0.45, 0.6, rng.range(-0.05, 0.05), WildMat.Rock, rock(), rng, 0.05, 0.2);
+  k.stone(0, h - 0.02, front - 0.32, 2 * PORTAL.outer + 0.35, PORTAL.top - h + 0.02, 0.75, rng.range(-0.03, 0.03), WildMat.Rock, rock(), rng, 0.05, 0.2);
+  k.stone(0, -0.26, front - 0.12, 2 * half + 0.2, 0.3, 0.36, 0, WildMat.Rock, rock(), rng, 0.03, 0.2);
   // Capstones over the passage behind the lintel.
   const roofFrom = front - 0.68, step = (roofFrom - end) / 3;
   for (let i = 0; i < 3; i++) {
-    k.stone(rng.range(-0.08, 0.08), h + 0.02, roofFrom - step * (i + 0.5), 2 * PORTAL.outer + 0.1, 0.42, step + 0.08, rng.range(-0.06, 0.06), WildMat.Rock, rock(), rng);
+    k.stone(rng.range(-0.08, 0.08), h + 0.02, roofFrom - step * (i + 0.5), 2 * PORTAL.outer + 0.1, 0.42, step + 0.08, rng.range(-0.06, 0.06), WildMat.Rock, rock(), rng, 0.06, 0.2);
   }
   // Dry-stone walls and flags, fading from the light at the mouth to the dark at the back.
   const back = end + 0.3, dim = mix(DRYSTONE, DARK, 0.85), mouth = front - 0.55;
@@ -129,11 +135,11 @@ function kerb(k: MeshKit, rng: Rng): void {
   for (let i = 0; i < 26; i++) {
     const a = from + (i + rng.range(-0.25, 0.25)) * step;
     const r = MOUND.r - 0.1, x = Math.cos(a) * r, z = -MOUND.back + Math.sin(a) * r;
-    k.stone(x, -0.5, z, rng.range(0.6, 1.1), rng.range(0.75, 1.2), rng.range(0.35, 0.55), quarter - a + rng.range(-0.15, 0.15), WildMat.Rock, varyTint(rng, ROCK, 0.08), rng);
+    k.stone(x, -0.4, z, rng.range(0.7, 1.1), rng.range(0.6, 0.95), rng.range(0.55, 0.8), quarter - a + rng.range(-0.15, 0.15), WildMat.Rock, varyTint(rng, ROCK, 0.08), rng, 0.08, 0.5);
   }
   for (const side of [-1, 1]) for (let j = 0; j < 2; j++) {
     const s = rng.range(0.55, 0.9);
-    k.stone(side * (BANK.half - 0.35 - j * 0.5), -0.35, PASSAGE.front - 0.6 - j * 1.1 - rng.range(0, 0.3), s * 1.2, s * 0.8, s, rng.range(0, 3), WildMat.Rock, varyTint(rng, ROCK, 0.08), rng, 0.1);
+    k.stone(side * (BANK.half - 0.35 - j * 0.5), -0.35, PASSAGE.front - 0.6 - j * 1.1 - rng.range(0, 0.3), s * 1.2, s * 0.8, s, rng.range(0, 3), WildMat.Rock, varyTint(rng, ROCK, 0.08), rng, 0.1, 0.55);
   }
 }
 
