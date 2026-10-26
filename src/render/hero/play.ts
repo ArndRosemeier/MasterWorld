@@ -3,7 +3,8 @@
  * flinch, a death), optionally stretched to `dur` seconds, blended in over `fade` seconds (0 cuts).
  * Shared by everyone drawn as an Actors person.
  */
-import { LoopOnce } from 'three/webgpu';
+import { LoopOnce, type Object3D } from 'three/webgpu';
+import type { Stage } from '@futuremagic/stage';
 import type { Character } from '@actors/generator';
 
 /** Cross-fades (s): between gaits, and into a blow, a flinch or a fall (quicker, so it lands in time). */
@@ -22,4 +23,20 @@ export function playClip(ch: Character, clip: string, once: boolean, still: () =
     a.enabled = true;
     if (dur) a.timeScale = a.getClip().duration / dur;
   });
+}
+
+/**
+ * Compiles every shader Actors people under `obj` draw with, each one's shadow casters too (their shadow
+ * builds are their own), meshes Actors keeps hidden included (compileAsync skips hidden ones).
+ */
+export async function preparePeople(stage: Stage, obj: Object3D): Promise<void> {
+  const hidden: Object3D[] = [];
+  obj.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+  await stage.prepare(obj, { everyCaster: true });
+  for (const o of hidden) o.visible = false;
+}
+
+/** Every mesh of an Actors person casts a shadow (but the anatomy, which clothes cover). */
+export function castShadows(o: Object3D): void {
+  o.traverse((m) => { if ((m as { isMesh?: boolean }).isMesh && !m.name.startsWith('genitals')) m.castShadow = true; });
 }

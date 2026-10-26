@@ -17,7 +17,7 @@ export interface MapHost extends WindowHost {
   height(x: number, z: number): number;
   water(x: number, z: number): number;
   /** Where the hero believes they are and face (yaw as the walker's: 0 north), by their orientation. */
-  readonly hero: Bearing;
+  heroBearing(): Bearing;
 }
 
 /** Metres across the whole parchment, and its raster (samples per side). */
@@ -171,7 +171,7 @@ export class MapUi extends KeyWindow {
 
   /** The hero as their orientation knows it: a wash of blue ink where they may be, and the arrow once they can tell their facing. */
   private paintHero(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number, s: number): void {
-    const hero = this.map.hero;
+    const hero = this.map.heroBearing();
     const hx = X(hero.x), hz = Z(hero.z);
     const blue = '#1e4a8a';
     if (hero.radius > 0) {

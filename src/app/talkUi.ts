@@ -2,7 +2,8 @@
  * Talking in the game (plan 9.1, 17): walk up to a townsperson and press the talk key (T). They stop and
  * turn to you; the dialogue window opens at the side so they stay in view. Pick a topic with the mouse or
  * its number key; Escape, the talk key or walking off ends it. What they tell of a promised cellar goes
- * into the journal, and the place onto the map.
+ * into the journal, and the place onto the map. In warded brass (windows.css): a speaking-ring whose
+ * topics turn into place like a dial, the ones with a new lead glowing.
  */
 import { angleDiff } from '@futuremagic/core';
 import type { TownPlan } from '@futuremagic/settlement';
@@ -13,7 +14,9 @@ import type { Agent, TownLife } from '../sim/townLife';
 import type { Journal } from '../talk/journal';
 import type { TownTalk, Topic } from '../talk/townTalk';
 import { fill } from '../talk/folk';
+import './windows.css';
 import { button, el, overlay } from './dom';
+import { stagger, wardRim } from './ward';
 import type { Player } from './player';
 
 /** How close (m) and how nearly in front someone must be to talk to them. */
@@ -55,7 +58,7 @@ export class TalkUi {
     this.who = el('div', { className: 'who' });
     this.lines = el('div', { className: 'lines' });
     this.topicList = el('div', { className: 'topics' });
-    this.box = el('div', { className: 'talk', role: 'dialog' }, this.who, this.lines, this.topicList);
+    this.box = el('div', { className: 'talk', role: 'dialog' }, this.who, this.lines, this.topicList, wardRim({ sparks: 1, delay: 0.25 }));
     document.body.append(this.box);
     // Before the menu's Escape (registered first), so Escape ends a talk instead of opening the settings.
     onKeyDown((e) => this.onKey(e), true);
@@ -116,7 +119,7 @@ export class TalkUi {
     this.lines.replaceChildren();
     this.box.classList.add('open');
     this.host.paused(true);
-    this.say(this.talk.greet(a.person.id).text);
+    this.speak(this.talk.greet(a.person.id).text);
     this.offer();
   }
 
@@ -131,7 +134,7 @@ export class TalkUi {
     if (!a) return;
     this.lines.append(el('p', { className: 'you', textContent: t.label }));
     const r = this.talk.ask(a.person.id, t.id);
-    this.say(r.text);
+    this.speak(r.text);
     const from = this.talk.nameOf(a.person.id);
     for (const id of r.heard) {
       const b = this.plan.buildings[this.talk.houseOf(id)];
@@ -147,7 +150,7 @@ export class TalkUi {
     this.offer();
   }
 
-  private say(text: string): void {
+  private speak(text: string): void {
     this.lines.append(el('p', { textContent: text }));
     this.lines.scrollTop = this.lines.scrollHeight;
   }
@@ -158,6 +161,7 @@ export class TalkUi {
     this.shown = this.talk.topics(a.person.id);
     this.topicList.replaceChildren(...this.shown.map((t, i) =>
       button(el('kbd', { textContent: String(i + 1) }), () => this.pick(t), { className: t.lead ? 'lead' : '' }, t.label)));
+    stagger(this.topicList.children, 0.05, 0.07);
   }
 
   close(): void {

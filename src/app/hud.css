@@ -6,11 +6,7 @@
   transition: opacity .6s;
 }
 #fight.hidden { opacity: 0; }
-#fight .plate, .pack .plate {
-  background: linear-gradient(var(--leather-hi), var(--leather)); border: 2px solid var(--brass-mid); border-radius: 8px;
-  box-shadow: inset 0 0 0 1px var(--brass-lo), inset 0 0 0 4px var(--leather), inset 0 0 0 5px var(--brass-lo), 0 8px 24px #000a;
-}
-#fight .name, .pack .card .name { font-family: 'Marcellus SC', Georgia, serif; letter-spacing: .04em; }
+#fight .name { font-family: 'Marcellus SC', Georgia, serif; letter-spacing: .04em; }
 
 /* Health and stamina: brass vials, liquid behind glass; it sloshes when hit, bubbles when healed, the ward glows as it runs low. */
 #fight .gauges { position: absolute; left: 22px; bottom: 22px; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
@@ -44,7 +40,7 @@
 @keyframes hud-ready { from { background-position: 120% 0; } to { background-position: -60% 0; } }
 
 /* The target plate: drops in on a hinge; its ward shows the creature's threat. */
-#fight .target { position: absolute; left: 50%; top: 64px; width: 260px; margin-left: -130px; padding: 8px 14px 10px; transform-origin: top center; transform: rotateX(-90deg); opacity: 0; transition: transform .45s cubic-bezier(.3, 1.6, .5, 1), opacity .2s; }
+#fight .target { position: absolute; left: 50%; top: 128px; width: 260px; margin-left: -130px; padding: 8px 14px 10px; transform-origin: top center; transform: rotateX(-90deg); opacity: 0; transition: transform .45s cubic-bezier(.3, 1.6, .5, 1), opacity .2s; }
 #fight .target.shown { transform: none; opacity: 1; }
 #fight .target .name { font-size: 16px; text-align: center; }
 #fight .target .state { font-size: 12px; text-align: center; color: var(--ink-dim); font-style: italic; height: 15px; }
@@ -54,8 +50,6 @@
 #fight .target .hit { position: absolute; right: 10px; top: -6px; font: 18px 'Marcellus SC', serif; color: #ffd27a; text-shadow: 0 1px 3px #000; animation: hud-rise .9s ease-out forwards; }
 #fight .target .hit.miss { color: var(--ink-dim); font-size: 14px; }
 #fight .target .hit.crit { color: #fff0c0; font-size: 24px; }
-@keyframes hud-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-@keyframes hud-rise { from { transform: translateY(6px); opacity: 1; } to { transform: translateY(-22px); opacity: 0; } }
 
 /* Hurt: the screen's edge flushes red. */
 #fight .hurt { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, #a0100888 100%); opacity: 0; transition: opacity .5s; }
@@ -66,33 +60,13 @@
 #fight .prompt.shown { opacity: 1; }
 #fight .prompt b { font-family: 'Marcellus SC', serif; color: var(--brass-hi); }
 
-/* Finds: one card per item (in the pack window too, there without the entrances), the rarity setting the ward and the entrance. */
+/* Finds: one card per item (brass.css), the rarity setting the ward and the entrance; they slide off after a while. */
 #fight .finds { position: absolute; right: 24px; bottom: 120px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
-#fight .card { position: relative; width: 250px; padding: 8px 12px 9px; overflow: hidden; animation: hud-drop .5s cubic-bezier(.3, 1.5, .5, 1) both; }
-#fight .card.uncommon { animation-name: hud-slide; }
-#fight .card.rare { animation-name: hud-flip; }
-#fight .card.legendary { animation-name: hud-iris; animation-duration: .9s; }
-:is(#fight, .pack) .card .name { font-size: 15px; }
-:is(#fight, .pack) .card.common .name { color: var(--common); }
-:is(#fight, .pack) .card.uncommon .name { color: var(--uncommon); }
-:is(#fight, .pack) .card.rare .name { color: var(--rare); }
-:is(#fight, .pack) .card.legendary .name { color: var(--legendary); }
-#fight .card .line { font-size: 13px; color: var(--ink-dim); opacity: 0; animation: hud-line .4s ease-out forwards; }
-:is(#fight, .pack) .card .lore { font-style: italic; font-size: 12px; }
-:is(#fight, .pack) .card .ward { position: absolute; inset: 3px; border-radius: 6px; border: 1px solid transparent; pointer-events: none; }
-:is(#fight, .pack) .card.uncommon .ward { border-color: var(--uncommon); animation: hud-pulse 2.4s ease-in-out infinite; }
-:is(#fight, .pack) .card.rare .ward, :is(#fight, .pack) .card.legendary .ward { border-color: var(--rare); }
-:is(#fight, .pack) .card.legendary .ward { border-color: var(--legendary); box-shadow: 0 0 10px var(--legendary); }
-:is(#fight, .pack) .card.rare .spark, :is(#fight, .pack) .card.legendary .spark { position: absolute; top: 2px; width: 30px; height: 2px; border-radius: 1px; background: #fff; box-shadow: 0 0 6px #fff; animation: hud-run 3s linear infinite; }
-:is(#fight, .pack) .card.legendary .spark.b { top: auto; bottom: 2px; animation-delay: -1.5s; animation-direction: reverse; }
+#fight .card { width: 250px; }
 #fight .card.out { animation: hud-out .5s ease-in forwards; }
-@keyframes hud-drop { from { transform: translateY(-30px) scaleY(.2); opacity: 0; } }
-@keyframes hud-slide { from { transform: translateX(60px); opacity: 0; } }
-@keyframes hud-flip { from { transform: rotateY(90deg); opacity: 0; } }
-@keyframes hud-iris { from { clip-path: circle(0 at 50% 50%); } to { clip-path: circle(120% at 50% 50%); } }
-@keyframes hud-line { from { transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@keyframes hud-run { from { left: -30px; } to { left: 100%; } }
 @keyframes hud-out { to { transform: translateX(40px); opacity: 0; } }
+@keyframes hud-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes hud-rise { from { transform: translateY(6px); opacity: 1; } to { transform: translateY(-22px); opacity: 0; } }
 
 /* Fallen: the wards go dark one by one; waking, they relight from the centre. */
 #fight.fallen .socket, #fight.fallen .vial, #fight.fallen .target { filter: grayscale(1) brightness(.4); transition: filter 1.2s; }
@@ -102,16 +76,30 @@
 @media (prefers-reduced-motion: reduce) { #fight * { animation-duration: 1ms !important; } }
 @media (max-width: 640px) { #fight .vial { width: 140px; } #fight .socket { width: 40px; height: 40px; font-size: 18px; } #fight .finds { right: 12px; } #fight .card { width: 200px; } }
 
-/* The pack window (src/app/packUi.ts): worn slots, carried cards, skills. */
-.panel.pack { width: min(720px, 100%); }
-.pack .card { position: relative; padding: 6px 10px 7px; overflow: hidden; }
-.pack .card .line { font-size: 13px; color: var(--ink-dim); }
-.pack .worn { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-.pack .slot .label { font: 11px ui-monospace, monospace; color: #8a8070; margin-bottom: 3px; }
-.pack .slot .empty { height: 34px; border: 1px dashed #3a352c; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4a4438; }
-.pack .slot.full, .pack .card.use { cursor: pointer; }
-.pack .slot.full:hover .card, .pack .card.use:hover { border-color: var(--brass); box-shadow: 0 0 10px #e2bd6855; }
-.pack .carried { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-.pack .skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 2px 18px; }
-.pack .skill { display: flex; justify-content: space-between; border-bottom: 1px solid #22201c; padding: 3px 0; color: var(--ink-dim); }
-.pack .foot { color: var(--ink-dim); font-size: 13px; }
+/* The compass (src/app/compass.ts): a brass ring at the top that turns with the camera; its needle breathes and
+   settles; marks ride the rim as glowing studs. Beside it the orrery: sun and moon by the hour, the weather. */
+#compass { position: fixed; left: 50%; top: 10px; z-index: 4; display: flex; align-items: flex-start; gap: 6px; transform: translateX(-50%); pointer-events: none;
+  transform-origin: 50% 0; opacity: 0; visibility: hidden; transition: opacity .3s, visibility 0s .3s; }
+#compass.shown { opacity: 1; visibility: visible; transition: opacity .3s; animation: compass-drop .7s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+@keyframes compass-drop { from { transform: translateX(-50%) perspective(400px) rotateX(-90deg); } to { transform: translateX(-50%); } }
+#compass .ring { position: relative; width: 96px; height: 96px; border-radius: 50%; box-shadow: 0 4px 14px #000a; margin-left: 40px; }
+#compass .dial, #compass .needle { position: absolute; inset: 0; will-change: transform; }
+#compass svg { display: block; width: 100%; height: 100%; }
+#compass .ward { opacity: var(--wake); stroke-dasharray: 100; animation: ward-trace 1.4s ease-out .5s backwards; filter: drop-shadow(0 0 1.5px var(--ward)); }
+#compass .letters { transition: opacity 1.2s; }
+#compass.lost .letters { opacity: .25; }
+#compass .studs { position: absolute; left: 50%; top: 50%; }
+#compass .stud { position: absolute; left: -3.5px; top: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, #ff9a7a 45%, #c0391b); box-shadow: 0 0 6px #ff7a50; }
+#compass .stud.new { animation: stud-in 1.2s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+@keyframes stud-in { from { scale: 3.5; opacity: 0; } }
+#compass .lubber { position: absolute; left: 50%; top: -4px; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-top: 9px solid var(--brass); filter: drop-shadow(0 1px 1px #000); }
+#compass .orrery { position: relative; width: 34px; height: 34px; margin-top: 8px; }
+#compass .orrery .face { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #2c3b52, #121722 70%); border: 2px solid var(--brass-mid); box-shadow: 0 2px 8px #000a; overflow: hidden; }
+#compass .orrery .arm { position: absolute; inset: 2px; will-change: transform; }
+#compass .orrery .sun, #compass .orrery .moon { position: absolute; left: 50%; width: 9px; height: 9px; margin-left: -4.5px; border-radius: 50%; }
+#compass .orrery .sun { top: 0; background: radial-gradient(circle at 40% 35%, #fff6c8, #ffc040 60%, #c07a10); box-shadow: 0 0 6px #ffc040; }
+#compass .orrery .moon { bottom: 0; background: radial-gradient(circle at 35% 35%, #f4f0e4, #b8b4a8); box-shadow: 0 0 4px #cfe4ff88; }
+#compass .orrery .glyph { position: absolute; left: 22px; top: 20px; width: 22px; height: 18px; }
+#compass .orrery .glyph svg { animation: glyph-bob 4s ease-in-out infinite; }
+@keyframes glyph-bob { 50% { transform: translateY(-2px); } }
+@media (max-width: 640px) { #compass .ring { width: 72px; height: 72px; margin-left: 20px; } }

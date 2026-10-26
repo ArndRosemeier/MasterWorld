@@ -56,6 +56,10 @@
     "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   },
   {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/livestock.ts#step",
+    "reason": "Each world-simulation behaviour advances by step(dt): dungeon creatures (sight, packs, fights) and grazing farm animals (wander in a paddock) share only the name."
+  },
+  {
     "key": "clone: masterworld/world/dungeon/setPieces.ts#dress",
     "reason": "Each set piece is a data entry with its own find/dress method (plan 8.1: a library of hand-designed moments); the methods share a name and a shape by design, the content differs."
   },
@@ -74,10 +78,6 @@
   {
     "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/sim/creatures.ts + masterworld/sim/wild.ts",
     "reason": "Bearing between two ground points (Math.atan2 of dz, dx): the plain formula, used where a body faces or flees; a helper would hide nothing."
-  },
-  {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/wild.ts + masterworld/world/volumes.ts",
-    "reason": "A point at an angle and distance (x + cos a * d, z + sin a * d): the plain formula in unrelated places."
   },
   {
     "key": "idiom: [.from Array] in masterworld/render/terrain/groundTextures.ts + masterworld/sim/wild.ts + masterworld/world/flora.ts",
@@ -132,7 +132,7 @@
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
   },
   {
-    "key": "same name: masterworld/app/cellars.ts#solid + masterworld/world/town.ts#solid",
-    "reason": "Both answer the walker's wall test out of doors (main.ts WalkWorld.wall): the town's buildings, the barrows' mounds; one role, two kinds of obstacle."
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/wild.ts + masterworld/world/volumes.ts",
+    "reason": "A point at an angle and distance (x + cos a * d, z + sin a * d): the plain formula in unrelated places."
   }
 ]

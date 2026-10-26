@@ -20,7 +20,7 @@ import type { Creature, Den } from '../../sim/creatures';
 import { critterMaterials, ratMaterial } from '../materials/creatures';
 import { buildArm } from '../hero/arms';
 import { gripHeld } from '../hero/grips';
-import { FADE, playClip } from '../hero/play';
+import { FADE, castShadows, playClip, preparePeople } from '../hero/play';
 import { foeClip, foeLook, type FoeDoing } from './foes';
 import type { Stage } from '@futuremagic/stage';
 
@@ -116,7 +116,7 @@ export class CreatureView {
         place.name = c.def.name;
         place.add(ch.object);
         place.scale.setScalar(b.height / (ch.height || 1.75));
-        ch.object.traverse((m) => { if ((m as { isMesh?: boolean }).isMesh) m.castShadow = !m.name.startsWith('genitals'); });
+        castShadows(ch.object);
         v.group.add(place);
         body = { kind: 'person', ch, place, held: b.held ? buildArm(b.held) : null, clip: '', drawn: null };
       } else if (b.kind === 'rat') {
@@ -219,15 +219,9 @@ export class CreatureView {
     }
   }
 
-  /**
-   * Compile every shader its people draw with, each one's shadow casters too (Actors people's shadow
-   * builds are their own), meshes Actors keeps hidden included (compileAsync skips hidden ones).
-   */
-  async warm(stage: Stage): Promise<void> {
-    const hidden: Object3D[] = [];
-    this.group.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
-    await stage.prepare(this.group, { everyCaster: true });
-    for (const o of hidden) o.visible = false;
+  /** Compile every shader it draws with (preparePeople). */
+  warm(stage: Stage): Promise<void> {
+    return preparePeople(stage, this.group);
   }
 
   /** The creature drawn nearest to a ray from the camera (a click), within `slack` metres of it. */

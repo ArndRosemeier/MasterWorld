@@ -1,4 +1,5 @@
-/* Warded brass (plan 17.1): the colours and faces every window shares. */
+/* Warded brass (plan 17.1, D45): the colours and faces every window shares, and the shared pieces built from them
+   (src/app/ward.ts): brass buttons, the ward rim with its sparks and gear, twinkles, item cards by rarity. */
 @font-face { font-family: 'Marcellus SC'; src: url('./fonts/marcellus-sc.woff2') format('woff2'); font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('./fonts/eb-garamond.woff2') format('woff2'); font-weight: 400 600; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('./fonts/eb-garamond-italic.woff2') format('woff2'); font-style: italic; font-display: swap; }
@@ -7,4 +8,97 @@
   --brass-hi: #fff0c0; --brass: #e2bd68; --brass-mid: #b08532; --brass-lo: #6e4f17; --brass-dark: #4a3510;
   --leather: #1d1510; --leather-hi: #2a1c14; --ink: #efe3cc; --ink-dim: #cbb898; --ward: #8fe3ff; --ward-hot: #e8fbff;
   --common: #c9c2b4; --uncommon: #6fdc7a; --rare: #5fa8ff; --legendary: #ffa940;
+  /* How awake the wards are (0..1): dim early on, brighter as magic returns (the story sets it). */
+  --wake: .7;
 }
+
+/* Brass buttons: the title's, every window's and the corner's. */
+.t-btn, .brass-btn, :where(.panel button:not(.close, .key, .tab), #corner button) { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 18px; font: 17px/1 'Marcellus SC', Georgia, serif; letter-spacing: .08em; color: #1e140a; background: linear-gradient(#e2bd68, #b08532); border: 1px solid var(--brass-lo); border-radius: 22px; cursor: pointer; box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark); transition: transform .15s, box-shadow .15s; text-align: left; }
+:is(.t-btn, .brass-btn):hover, :is(.t-btn, .brass-btn):focus-visible, :where(.panel button:not(.close, .key, .tab), #corner button):is(:hover, :focus-visible) { transform: translateY(-2px) rotate(-1deg); box-shadow: inset 0 1px 0 var(--brass-hi), 0 4px 0 var(--brass-dark), 0 0 14px #8fe3ff88; outline: none; }
+:is(.t-btn, .brass-btn):active, :where(.panel button:not(.close, .key, .tab), #corner button):active { transform: translateY(1px); box-shadow: inset 0 1px 0 var(--brass-hi), 0 1px 0 var(--brass-dark); }
+.t-btn svg { width: 18px; height: 18px; flex: none; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.t-btn:hover svg { transform: rotate(120deg); }
+.t-btn[hidden] { display: none; }
+.t-btn small { margin-left: auto; max-width: 13em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: italic 14px 'EB Garamond', Georgia, serif; letter-spacing: 0; color: #3a2a12; }
+.t-btn.primary { font-size: 20px; min-height: 52px; animation: t-rise .5s ease-out both, t-breathe 3s ease-in-out 9s infinite; }
+.t-btn.waiting svg { animation: t-spin 1.6s linear infinite; }
+:is(.t-btn, .brass-btn).quiet { min-height: 36px; font-size: 14px; color: var(--ink-dim); background: transparent; border-color: var(--brass-lo); box-shadow: none; }
+:is(.t-btn, .brass-btn).quiet:hover { color: var(--ward); border-color: var(--ward); }
+@keyframes t-rise { 0% { opacity: 0; transform: translateY(14px) scale(.97); } 70% { opacity: 1; transform: translateY(-3px); } 100% { opacity: 1; transform: none; } }
+@keyframes t-breathe { 0%, 100% { box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark), 0 0 0 #8fe3ff00; } 50% { box-shadow: inset 0 1px 0 var(--brass-hi), 0 2px 0 var(--brass-dark), 0 0 18px #8fe3ffaa; } }
+@keyframes t-spin { to { transform: rotate(360deg); } }
+
+/* The ward rim (wardRim): the line traces itself in, then rests with a slow pulse; sparks run along it, a gear
+   spins in and ticks. Only the trace repaints; the pulse is opacity and the sparks and gear move by transform. */
+.rim { position: absolute; inset: 4px; pointer-events: none; border-radius: 6px; --rim-delay: .2s; }
+.rim-line { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; opacity: var(--wake); filter: drop-shadow(0 0 2.5px var(--ward-colour, var(--ward)));
+  animation: ward-pulse 3.6s ease-in-out calc(var(--rim-delay) + 1.4s) infinite; will-change: opacity; }
+.rim-line rect { fill: none; stroke: var(--ward-colour, var(--ward)); stroke-width: 1.5; stroke-dasharray: 100; animation: ward-trace 1.3s ease-out var(--rim-delay) backwards; }
+.rim .spark { position: absolute; left: 0; top: 0; width: 28px; height: 3px; border-radius: 2px; opacity: 0; will-change: transform;
+  background: linear-gradient(90deg, transparent, var(--ward-hot)); box-shadow: 0 0 6px var(--ward-colour, var(--ward));
+  offset-path: inset(0 round 6px); offset-rotate: auto; animation: ward-run 6s linear calc(var(--rim-delay) + 1.5s) infinite; }
+.rim .spark.s1 { width: 20px; background: linear-gradient(90deg, transparent, var(--ward)); animation-duration: 8.5s; animation-direction: reverse; animation-delay: calc(var(--rim-delay) + 2.2s); }
+.rim .gear { position: absolute; right: -17px; top: -17px; width: 34px; height: 34px; animation: gear-in 1.3s cubic-bezier(.2, .8, .2, 1) var(--rim-delay) backwards; }
+.rim .gear svg { display: block; width: 100%; height: 100%; animation: gear-tick 2.4s steps(1) calc(var(--rim-delay) + 1.6s) infinite; }
+@keyframes ward-trace { from { stroke-dashoffset: 100; } }
+@keyframes ward-pulse { 0%, 100% { opacity: var(--wake); } 50% { opacity: calc(var(--wake) * .5); } }
+@keyframes ward-run { 0% { offset-distance: 0%; opacity: 1; } 100% { offset-distance: 100%; opacity: 1; } }
+@keyframes gear-in { from { transform: rotate(-540deg) scale(.3); opacity: 0; } }
+@keyframes gear-tick { 0%, 80% { transform: rotate(0); } 90%, 100% { transform: rotate(20deg); } }
+
+/* Stars that twinkle in turn (twinkles). */
+.twinkles svg { width: 40px; height: 15px; vertical-align: -2px; }
+.twinkles .tw { transform-box: fill-box; transform-origin: center; animation: twinkle 2.4s ease-in-out infinite; }
+.twinkles .tw1 { animation-duration: 2.9s; animation-delay: .7s; }
+.twinkles .tw2 { animation-duration: 3.3s; animation-delay: 1.4s; }
+@keyframes twinkle { 0%, 100% { opacity: .1; transform: scale(.3) rotate(0); } 50% { opacity: 1; transform: scale(1) rotate(90deg); } }
+
+/* A glint of light that crosses plain brass now and then. */
+.glint { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
+.glint::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 50px; background: linear-gradient(90deg, transparent, #ffe6a01c, transparent); transform: translateX(-120px) skewX(-20deg); animation: glint 7s ease-in-out 1.2s infinite; will-change: transform; }
+@keyframes glint { 0%, 72% { transform: translateX(-120px) skewX(-20deg); } 100% { transform: translateX(560px) skewX(-20deg); } }
+
+/* A leather plate in a brass rim (cards, gauges, the target). */
+.plate {
+  background: linear-gradient(var(--leather-hi), var(--leather)); border: 2px solid var(--brass-mid); border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--brass-lo), inset 0 0 0 4px var(--leather), inset 0 0 0 5px var(--brass-lo), 0 8px 24px #000a;
+}
+
+/* Item cards (itemCard): the rarity is the strength of the ward and sets the entrance; the lines rise one by one.
+   Common: plain brass with a glint. Uncommon: a breathing ward. Rare: a running spark and frost. Legendary: two sparks, a gear, stars. */
+.card { position: relative; padding: 8px 12px 9px; font-family: 'EB Garamond', Georgia, serif; color: var(--ink); }
+.card .rarity { font: 10px/1.2 'Marcellus SC', Georgia, serif; letter-spacing: .18em; text-transform: uppercase; opacity: .85; }
+.card .name { font: 15px/1.2 'Marcellus SC', Georgia, serif; letter-spacing: .04em; }
+.card .line { font-size: 13px; color: var(--ink-dim); }
+.card .line.bonus { color: #a9e38f; }
+.card .lore { font-style: italic; font-size: 12px; }
+.card.common { --ward-colour: var(--common); }
+.card.uncommon { --ward-colour: var(--uncommon); border-color: #a07a2e; }
+.card.rare { --ward-colour: var(--rare); background: linear-gradient(#1f1f2a, #16151c); }
+.card.legendary { --ward-colour: var(--legendary); border-color: #c99a3e; }
+.card.common :is(.name, .rarity) { color: var(--common); }
+.card.uncommon :is(.name, .rarity) { color: var(--uncommon); }
+.card.rare :is(.name, .rarity) { color: #8ccbff; }
+.card.legendary :is(.name, .rarity) { color: #ffc46b; }
+.card.uncommon .rim-line { animation: ward-breathe 4s ease-in-out calc(var(--rim-delay) + 1.4s) infinite; }
+@keyframes ward-breathe { 0%, 100% { opacity: calc(var(--wake) * .45); } 50% { opacity: var(--wake); } }
+.card.rare .frost { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: radial-gradient(circle at 10% 8%, #b4e1ff40, transparent 40%), radial-gradient(circle at 92% 94%, #b4e1ff38, transparent 36%); animation: frost 3.6s ease-in-out 1.5s infinite; will-change: opacity; }
+@keyframes frost { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+.card .rim .gear { width: 26px; height: 26px; right: -14px; top: -14px; }
+.card .rim .gear svg { animation-name: spin; animation-duration: 9s; animation-timing-function: linear; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Entrances, by rarity (where a card is shown fresh: the finds, a window opening). */
+.card.enter { animation: card-drop .55s cubic-bezier(.3, 1.4, .5, 1) backwards; }
+.card.enter.uncommon { animation-name: card-slide; animation-duration: .65s; }
+.card.enter.rare { animation-name: card-flip; animation-duration: .8s; }
+.card.enter.legendary { animation-name: card-iris; animation-duration: .95s; animation-timing-function: cubic-bezier(.5, 0, .2, 1); }
+.card.enter :is(.rarity, .name, .line) { animation: line-rise .45s ease-out backwards; }
+@keyframes card-drop { from { transform: translateY(-28px) scaleY(.4); opacity: 0; } }
+@keyframes card-slide { 0% { transform: translateX(-40px) rotate(-4deg); opacity: 0; } 75% { transform: translateX(5px) rotate(1deg); opacity: 1; } }
+@keyframes card-flip { 0% { transform: perspective(700px) rotateY(-90deg); opacity: 0; } 60% { transform: perspective(700px) rotateY(12deg); opacity: 1; } }
+@keyframes card-iris { from { clip-path: circle(0 at 50% 50%); } to { clip-path: circle(75% at 50% 50%); } }
+@keyframes line-rise { 0% { opacity: 0; transform: translateY(8px); } 70% { opacity: 1; transform: translateY(-2px); } }
+
+/* Calm motion (the setting) and the system's reduced motion: no shows, nothing idles. */
+html.calm :is(.panel, .talk, .card, #compass, #note, #corner) :is(*, *::before, *::after), html.calm :is(.panel, .talk, .card, #compass, #note) { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { :is(.panel, .talk, .card, #compass, #note) :is(*, *::before, *::after) { animation: none !important; } }

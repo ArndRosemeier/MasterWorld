@@ -36,6 +36,8 @@ export const params = {
   town: q.get('town') !== '0',
   /** How many townsfolk are drawn at most (`folk=0`: none). */
   folk: Number(q.get('folk') ?? 30),
+  /** How many of the farms' grazing animals are drawn at most, the nearest (`stock=0`: none). */
+  stock: Number(q.get('stock') ?? 6),
   /** How many saddled horses wait near the start (`horses=0`: none). */
   horses: Number(q.get('horses') ?? 2),
   /** The wild around the town (`wild=0` leaves it out; `wild=wolves` starts beside the first group of that kind). */
@@ -61,6 +63,8 @@ export const params = {
   topics: q.get('topics')?.split(',') ?? [],
   /** Open the map (or `journal`, `saves`, `pack`) at the start, after any `talk`. */
   open: q.get('open'),
+  /** The title's giant in this fly-over, whatever the draw says (for looking at it). */
+  giant: q.has('giant'),
   /** A tool page instead of the game: `bake=peoples` draws the title card's turning figures (tools/assets/peoples.mjs). */
   bake: q.get('bake'),
   /** Setting module id. */

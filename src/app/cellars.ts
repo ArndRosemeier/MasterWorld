@@ -8,7 +8,7 @@
  * (a move-in, plan 8.1) its den, bodies and fight are made anew; the rooms and the doors the hero opened
  * stay. What each cellar's visit changed goes into the save by promise id.
  */
-import type { Mesh, PerspectiveCamera, PointLight, WebGPURenderer } from 'three/webgpu';
+import type { Mesh, Object3D, PerspectiveCamera, PointLight, WebGPURenderer } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { Character } from '../game/character';
@@ -61,6 +61,8 @@ export interface CellarsHost {
   readonly dweller: string | null;
   /** The land's height (a barrow stands on it). */
   ground(x: number, z: number): number;
+  /** Down (true) or up again: the land above leaves the frame meanwhile, all but `keep` (the cellar and its dwellers). */
+  depth(below: boolean, keep: readonly Object3D[]): void;
 }
 
 /** A barrow's mound on the land: where it stands and its mesh. */
@@ -258,6 +260,8 @@ export class Cellars {
     const words = loreOf(h.setting, s.decision.template).words;
     if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
     if (!m) visit.up = () => h.up(s.house);
+    // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
+    visit.onDepth = (below) => h.depth(below, [view.group, ...(s.ready ? [s.ready.creatures.group] : [])]);
     visit.onSwap = () => h.swapped();
     const space = this.saved[s.decision.id];
     if (space) visit.restore(space);

@@ -15,7 +15,8 @@ import { coinText } from '../game/items';
 import { keyLabel, type Bindings } from '../input/controls';
 import { cap } from '../talk/townTalk';
 import { el } from './dom';
-import { itemCard } from './itemCard';
+import { itemCard, plainCard } from './itemCard';
+import { replay } from './ward';
 
 const THREAT: Record<Threat, string> = { trivial: '#9c9a94', easy: '#6fdc7a', even: '#f2d65c', hard: '#ff9a3c', deadly: '#ff4a3a' };
 const THREAT_WORD: Record<Threat, string> = { trivial: 'no match for you', easy: 'weaker than you', even: 'a fair fight', hard: 'stronger than you', deadly: 'far beyond you' };
@@ -24,7 +25,7 @@ const ICON: Record<string, string> = { strike: '⚔', heavy: '⚒', shove: '✋'
 const BELT = ['strike', 'heavy', 'shove', 'breath'] as const;
 const STATE: Partial<Record<Creature['state'], string>> = { alert: 'wary', fight: 'fighting', flee: 'fleeing', beg: 'begging', meek: 'cowed', dead: 'dead' };
 
-interface Socket { readonly el: HTMLElement; readonly ring: HTMLElement; readonly count: HTMLElement; was: number }
+interface Socket { readonly el: HTMLElement; readonly ring: HTMLElement; readonly count: HTMLElement; was: number; done: string }
 
 export class FightHud {
   private readonly root = el('div', { id: 'fight', className: 'hidden' });
@@ -39,12 +40,13 @@ export class FightHud {
   private readonly hurtEdge = el('div', { className: 'hurt' });
   private readonly dark = el('div', { className: 'dark' });
   private shownFor: Creature | null = null;
+  private searchShown: string | null = null;
 
   constructor(private readonly setting: SettingModule, private readonly bindings: () => Bindings) {
     const vial = (kind: 'health' | 'stamina') => {
       const liquid = el('div', { className: 'liquid' }), text = el('div', { className: 'text' });
       const box = el('div', { className: `vial ${kind}` }, liquid, text);
-      return { box, liquid, text, was: 1 };
+      return { box, liquid, text, was: -1 };
     };
     this.vials = { health: vial('health'), stamina: vial('stamina') };
     const belt = el('div', { className: 'belt' });
@@ -53,7 +55,7 @@ export class FightHud {
       const ring = el('div', { className: 'ring' }), count = el('div', { className: 'count' });
       const s = el('div', { className: 'socket', title: a?.name ?? 'Potion' }, ring, el('span', {}, ICON[id] ?? '•'), el('div', { className: 'key' }), count, el('div', { className: 'tip' }, a?.name ?? 'Drink a potion'));
       belt.append(s);
-      this.sockets.set(id, { el: s, ring, count, was: 0 });
+      this.sockets.set(id, { el: s, ring, count, was: 0, done: '' });
     }
     this.target.append(el('div', { className: 'ward' }), this.tName, this.tState, el('div', { className: 'bar' }, this.tBar));
     this.root.append(this.hurtEdge, el('div', { className: 'gauges plate' }, this.vials.health.box, this.vials.stamina.box), belt, this.target, this.prompt, this.finds, this.dark);
@@ -86,34 +88,36 @@ export class FightHud {
       const a = this.setting.abilities.find((x) => x.id === id) as AbilityDef | undefined;
       const s = this.sockets.get(id)!;
       const left = fight.cooling(id), frac = a && a.cooldown > 0 ? 1 - left / a.cooldown : 1;
-      s.ring.style.setProperty('--done', `${Math.round(frac * 360)}deg`);
+      const done = `${Math.round(frac * 360)}deg`;
+      if (s.done !== done) { s.ring.style.setProperty('--done', done); s.done = done; }
       s.el.classList.toggle('cooling', left > 0 || (!!a && hero.stamina < a.stamina));
       s.el.classList.toggle('on', id === 'strike' && fight.attacking);
-      if (s.was > 0 && left === 0) this.glint(s.el);
+      if (s.was > 0 && left === 0) replay(s.el, 'ready');
       s.was = left;
     }
     const pots = hero.pack.filter((i) => this.setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
     const p = this.sockets.get('potion')!;
-    p.count.textContent = pots ? String(pots) : '';
+    if (p.count.textContent !== (pots ? String(pots) : '')) p.count.textContent = pots ? String(pots) : '';
     p.el.classList.toggle('cooling', pots === 0);
     const t = fight.target;
     if (t !== this.shownFor) {
       this.shownFor = t;
       this.target.classList.remove('shown');
       if (t) {
-        void this.target.offsetWidth;
-        this.target.classList.add('shown');
+        replay(this.target, 'shown');
         this.tName.textContent = cap(t.def.name);
       }
     }
     if (t) {
       const threat = fight.threat(t);
-      this.target.style.setProperty('--threat', THREAT[threat]);
-      this.tState.textContent = [STATE[t.state], THREAT_WORD[threat]].filter(Boolean).join(' · ');
-      this.tBar.style.width = `${Math.max(0, (t.health / t.def.health) * 100)}%`;
+      if (this.target.style.getPropertyValue('--threat') !== THREAT[threat]) this.target.style.setProperty('--threat', THREAT[threat]);
+      const state = [STATE[t.state], THREAT_WORD[threat]].filter(Boolean).join(' · '), bar = `${Math.max(0, (t.health / t.def.health) * 100).toFixed(1)}%`;
+      if (this.tState.textContent !== state) this.tState.textContent = state;
+      if (this.tBar.style.width !== bar) this.tBar.style.width = bar;
     }
     this.prompt.classList.toggle('shown', !!search);
-    if (search) this.prompt.replaceChildren(el('b', {}, keyLabel(this.bindings().search[0])), ` ${search}`);
+    if (search && search !== this.searchShown) this.prompt.replaceChildren(el('b', {}, keyLabel(this.bindings().search[0])), ` ${search}`);
+    this.searchShown = search;
   }
 
   /** A blow of the hero's landed on the target (or missed). */
@@ -125,20 +129,19 @@ export class FightHud {
 
   /** The hero was hit: the vial sloshes, the edge flushes. */
   hurt(): void {
-    this.flash(this.vials.health.box, 'slosh');
+    replay(this.vials.health.box, 'slosh');
     this.hurtEdge.classList.add('on');
     requestAnimationFrame(() => requestAnimationFrame(() => this.hurtEdge.classList.remove('on')));
   }
 
-  healed(): void { this.flash(this.vials.health.box, 'bubble'); }
+  healed(): void { replay(this.vials.health.box, 'bubble'); }
 
   /** What a search turned up, a card for each item and one for the coin. */
   showFinds(loot: Loot): void {
-    const cards: HTMLElement[] = loot.items.map((i) => itemCard(i, this.setting, true));
-    if (loot.coins) cards.push(this.plain(coinText(loot.coins)));
-    if (!cards.length) cards.push(this.plain('Nothing worth taking.'));
+    const cards: HTMLElement[] = loot.items.map((i, k) => itemCard(i, this.setting, k * 0.15));
+    if (loot.coins) cards.push(plainCard(coinText(loot.coins), cards.length * 0.15));
+    if (!cards.length) cards.push(plainCard('Nothing worth taking.', 0));
     cards.forEach((c, k) => {
-      c.style.animationDelay = `${k * 0.12}s`;
       this.finds.append(c);
       setTimeout(() => { c.classList.add('out'); setTimeout(() => c.remove(), 520); }, 5500 + k * 400);
     });
@@ -150,23 +153,12 @@ export class FightHud {
     this.dark.textContent = text;
   }
 
-  private plain(text: string): HTMLElement {
-    return el('div', { className: 'card plate common' }, el('div', { className: 'name' }, text));
-  }
-
   private vial(k: 'health' | 'stamina', v: number, max: number): void {
     const g = this.vials[k], f = Math.max(0, v / Math.max(1, max));
-    g.liquid.style.width = `${f * 100}%`;
-    g.text.textContent = `${Math.ceil(v)} / ${max}`;
+    // Only what changed: the HUD is read every frame, and every write costs a style pass.
+    const text = `${Math.ceil(v)} / ${max}`;
+    if (Math.abs(f - g.was) > 0.002) { g.liquid.style.width = `${(f * 100).toFixed(1)}%`; g.was = f; }
+    if (g.text.textContent !== text) g.text.textContent = text;
     g.box.classList.toggle('low', f < 0.3);
-    g.was = f;
   }
-
-  private flash(e: HTMLElement, cls: string): void {
-    e.classList.remove(cls);
-    void e.offsetWidth;
-    e.classList.add(cls);
-  }
-
-  private glint(e: HTMLElement): void { this.flash(e, 'ready'); }
 }

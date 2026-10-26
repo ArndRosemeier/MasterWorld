@@ -42,19 +42,22 @@ export class HorseView {
 
   private constructor(private readonly animal: Animal<HorseShape, HorseCoat>, private readonly horses: Drawn[]) {}
 
-  /** Loads the pack and `count` horses (shapes evaluated here, behind the loading screen). */
-  static async make(renderer: WebGPURenderer, count: number): Promise<HorseView> {
+  /**
+   * Loads the pack and `count` horses (shapes evaluated here, behind the loading screen). `tack` false:
+   * no saddle or bridle (horses at grass); `coat0` the first horse's place in the coats.
+   */
+  static async make(renderer: WebGPURenderer, count: number, { tack: saddled = true, coat0 = 0 } = {}): Promise<HorseView> {
     const lead = await Animal.load<HorseShape, HorseCoat>(PACK);
     const reversedDepth = renderer.reversedDepthBuffer === true;
     const tack = (lead.runtime.manifest.meshes ?? []).filter((m) => m.tags?.includes('tack')).map((m) => m.name);
     const horses: Drawn[] = [];
     for (let i = 0; i < count; i++) {
       const a = i === 0 ? lead : Animal.share(lead);
-      a.setPreset(COATS[i % COATS.length]);
+      a.setPreset(COATS[(i + coat0) % COATS.length]);
       const fur = createFurUniforms();
       const actor = new ThreeActor(a.runtime, animalNodeMaterials(fur), { reversedDepth });
       // Tack first: the shape applies pending visibility, so its meshes exist before the warm-up compiles.
-      for (const name of tack) actor.setVisible(name, true);
+      if (saddled) for (const name of tack) actor.setVisible(name, true);
       actor.applyShape(await a.evaluate());
       actor.object.position.y = actor.groundOffset();
       setFurCoat(fur, a.coat as never, a.shape.size);
@@ -84,6 +87,9 @@ export class HorseView {
   async show(stage: Stage): Promise<void> {
     for (const h of this.horses) await stage.add(h.place);
   }
+
+  /** Show or hide horse `i` (a hidden one need not be posed). */
+  shown(i: number, on: boolean): void { this.horses[i].place.visible = on; }
 
   /** Each frame: where horse `i` is and what it does. */
   pose(i: number, p: HorsePose, dt: number): void {

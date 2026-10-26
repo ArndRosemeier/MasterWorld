@@ -8,7 +8,7 @@ import { type BufferGeometry, Color, InstancedMesh, LatheGeometry, Matrix4, Quat
 import { FAR_FOLK } from '../materials/folk';
 import type { Agent } from '../../sim/townLife';
 import type { Race } from '../../sim/people';
-import { lookOf } from './looks';
+import { lookOf, youthOf } from './looks';
 
 /** People farther than this are not drawn at all (m). */
 export const FAR = 320;
@@ -49,7 +49,8 @@ export class FarFolk {
   place(who: readonly Agent[], height: (x: number, z: number) => number): void {
     const n = Math.min(MAX, who.length);
     for (let i = 0; i < n; i++) {
-      const a = who[i], p = a.person, s = TALL[p.race] * (0.94 + 0.12 * ((p.id * 0.618) % 1));
+      // A child stands as Actors scales it: down to 0.56 of a grown-up at `youth` 1.
+      const a = who[i], p = a.person, s = TALL[p.race] * (1 - 0.44 * youthOf(p)) * (0.94 + 0.12 * ((p.id * 0.618) % 1));
       this.q.setFromAxisAngle(this.up, Math.PI / 2 - a.dir);
       this.m.compose(this.at.set(a.x, height(a.x, a.z), a.z), this.q, this.size.set(s * (p.race === 'dwarf' ? 1.2 : 0.9), s, s * (p.race === 'dwarf' ? 1 : 0.75)));
       this.mesh.setMatrixAt(i, this.m);

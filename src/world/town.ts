@@ -3,7 +3,7 @@
  * (@futuremagic/settlement), and what the ground is at a point of it (street, building, yard) for
  * the terrain, the plants and later the ground's look. Pure, runs in workers.
  */
-import { buildingEntrance, distToPoly, planTown, pointInPoly, polyBounds, type Entrance, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
+import { buildingEntrance, distToPoly, planTown, pointInPoly, polyBounds, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { TownDecision } from './decisions';
 import type { Terrain } from './terrain';
 
@@ -19,6 +19,12 @@ export const TownGround = {
   Market: 3,
   /** Under a building. */
   Building: 4,
+  /** Open farm ground: the grass between the strips, round the farmsteads (no trees). */
+  Farmland: 5,
+  /** A field under crop, or a paddock's pasture (fieldAt says which). */
+  Field: 6,
+  /** A farm track, or a road out in the fields (trodden earth). */
+  Path: 7,
 } as const;
 export type TownGround = (typeof TownGround)[keyof typeof TownGround];
 
@@ -29,6 +35,8 @@ export class Town {
   readonly plan: TownPlan;
   /** The ground raster over the town's bounds (TownGround per TOWN_RASTER). */
   private readonly ground: Uint8Array;
+  /** The field per cell (its id + 1; 0 none). */
+  private readonly fieldIds: Uint16Array;
   readonly x0: number;
   readonly z0: number;
   readonly nx: number;
@@ -37,7 +45,7 @@ export class Town {
   /** `t`: the land, already settled (its heights calmed for this town). */
   constructor(readonly decision: TownDecision, t: Terrain) {
     this.plan = planTown({ seed: t.seed, x: decision.x, z: decision.z, radius: decision.radius, height: t.height.bind(t), water: t.waterDepth.bind(t) });
-    let [x0, z0, x1, z1] = polyBounds(this.plan.outline);
+    let [x0, z0, x1, z1] = polyBounds(this.plan.farmEdge);
     for (const s of this.plan.streets) {
       const b = polyBounds(s.pts);
       x0 = Math.min(x0, b[0]); z0 = Math.min(z0, b[1]); x1 = Math.max(x1, b[2]); z1 = Math.max(z1, b[3]);
@@ -45,6 +53,7 @@ export class Town {
     this.x0 = Math.floor(x0 - 4); this.z0 = Math.floor(z0 - 4);
     this.nx = Math.ceil((x1 + 4 - this.x0) / TOWN_RASTER); this.nz = Math.ceil((z1 + 4 - this.z0) / TOWN_RASTER);
     this.ground = new Uint8Array(this.nx * this.nz);
+    this.fieldIds = new Uint16Array(this.nx * this.nz);
     this.rasterise();
   }
 
@@ -55,9 +64,45 @@ export class Town {
     return this.ground[i + j * this.nx] as TownGround;
   }
 
-  /** Does a body of radius `r` standing at (x, z) touch a building's walls (or the temple's sanctuary)? */
+  /** The field at a point (crop and rows), or null. */
+  fieldAt(x: number, z: number): Field | null {
+    const i = Math.floor((x - this.x0) / TOWN_RASTER), j = Math.floor((z - this.z0) / TOWN_RASTER);
+    if (i < 0 || j < 0 || i >= this.nx || j >= this.nz) return null;
+    const f = this.fieldIds[i + j * this.nx];
+    return f ? this.plan.fields[f - 1] : null;
+  }
+
+  /** The paddocks' fences as segments (ax, az, bx, bz), with each paddock's bounds. */
+  private fences: { box: [number, number, number, number]; seg: number[] }[] | null = null;
+
+  /** Does a body of radius `r` at (x, z) touch a paddock's fence (the gate is open)? */
+  fenced(x: number, z: number, r: number): boolean {
+    this.fences ??= this.plan.props.flatMap((p) => {
+      if (p.kind !== 'fence') return [];
+      const seg: number[] = [];
+      for (let k = 0; k + 5 < p.posts.length; k += 3) {
+        if (Math.hypot(p.posts[k + 3] - p.posts[k], p.posts[k + 5] - p.posts[k + 2]) > 4) continue; // the gate
+        seg.push(p.posts[k], p.posts[k + 2], p.posts[k + 3], p.posts[k + 5]);
+      }
+      const xs = seg.filter((_, i) => i % 2 === 0), zs = seg.filter((_, i) => i % 2 === 1);
+      return [{ box: [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)] as [number, number, number, number], seg }];
+    });
+    const d = r + 0.08;
+    for (const f of this.fences) {
+      if (x < f.box[0] - d || z < f.box[1] - d || x > f.box[2] + d || z > f.box[3] + d) continue;
+      for (let k = 0; k < f.seg.length; k += 4) {
+        const ax = f.seg[k], az = f.seg[k + 1], dx = f.seg[k + 2] - ax, dz = f.seg[k + 3] - az, L2 = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+        if ((ax + dx * t - x) ** 2 + (az + dz * t - z) ** 2 < d * d) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Does a body of radius `r` standing at (x, z) touch a building's walls (or the temple's sanctuary, or a fence)? */
   solid(x: number, z: number, r: number): boolean {
     if (!this.near(x, z, r)) return false;
+    if (this.fenced(x, z, r)) return true;
     for (const b of this.plan.buildings) {
       const s = b.sanctuary;
       if (s && Math.hypot(x - s.cx, z - s.cz) < s.r + r) return true;
@@ -110,14 +155,31 @@ export class Town {
 
   private rasterise(): void {
     const p = this.plan;
+    // The farmland first: open ground, the fields on it, the farmsteads' grounds and yards.
+    for (const f of p.furlongs) this.fill(f, TownGround.Farmland);
+    for (const fm of p.farms) {
+      const ids = [fm.house, fm.barn, fm.stable].filter((i) => i >= 0);
+      this.fill(hull([...ids.flatMap((i) => p.buildings[i].poly), ...p.paddocks[fm.paddock].poly, ...fm.yard], 6), TownGround.Farmland);
+    }
+    for (const f of p.fields) this.fill(f.poly, TownGround.Field, f.id + 1);
+    for (const fm of p.farms) this.fill(fm.yard, TownGround.Yard);
     this.fill(p.outline, TownGround.Yard);
-    for (const s of p.streets) this.stroke(s.closed ? [...s.pts, s.pts[0], s.pts[1]] : s.pts, s.width / 2, TownGround.Street);
+    // Roads are cobbled in town; out in the fields they are earth, like the farm tracks.
+    for (const s of p.streets) {
+      const pts = s.closed ? [...s.pts, s.pts[0], s.pts[1]] : s.pts;
+      if (s.kind === 'path') { this.stroke(pts, s.width / 2, TownGround.Path); continue; }
+      if (s.kind !== 'road') { this.stroke(pts, s.width / 2, TownGround.Street); continue; }
+      for (let k = 0; k + 3 < pts.length; k += 2) {
+        const inside = pointInPoly(p.outline, (pts[k] + pts[k + 2]) / 2, (pts[k + 1] + pts[k + 3]) / 2);
+        this.stroke(pts.slice(k, k + 4), s.width / 2, inside ? TownGround.Street : TownGround.Path);
+      }
+    }
     this.fill(p.market, TownGround.Market);
     for (const b of p.buildings) this.fill(b.poly, TownGround.Building);
   }
 
-  /** Every cell whose middle lies in the polygon gets `v`. */
-  private fill(poly: ArrayLike<number>, v: TownGround): void {
+  /** Every cell whose middle lies in the polygon gets `v` (and the field id `field`, if given). */
+  private fill(poly: ArrayLike<number>, v: TownGround, field = 0): void {
     const n = poly.length >> 1;
     let z0 = Infinity, z1 = -Infinity;
     for (let k = 0; k < n; k++) { z0 = Math.min(z0, poly[k * 2 + 1]); z1 = Math.max(z1, poly[k * 2 + 1]); }
@@ -133,7 +195,7 @@ export class Town {
       xs.sort((a, b) => a - b);
       for (let k = 0; k + 1 < xs.length; k += 2) {
         const i0 = Math.max(0, Math.ceil((xs[k] - this.x0) / TOWN_RASTER - 0.5)), i1 = Math.min(this.nx - 1, Math.floor((xs[k + 1] - this.x0) / TOWN_RASTER - 0.5));
-        for (let i = i0; i <= i1; i++) this.ground[i + j * this.nx] = v;
+        for (let i = i0; i <= i1; i++) { this.ground[i + j * this.nx] = v; this.fieldIds[i + j * this.nx] = field; }
       }
     }
   }
@@ -149,8 +211,22 @@ export class Town {
         const x = this.x0 + (i + 0.5) * TOWN_RASTER, z = this.z0 + (j + 0.5) * TOWN_RASTER;
         const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
         const ex = ax + dx * t - x, ez = az + dz * t - z;
-        if (ex * ex + ez * ez <= half * half) this.ground[i + j * this.nx] = v;
+        if (ex * ex + ez * ez <= half * half) { this.ground[i + j * this.nx] = v; this.fieldIds[i + j * this.nx] = 0; }
       }
     }
   }
+}
+
+/** The convex hull of points (x, z, ...), grown by `grow` m (each corner pushed out from the middle). */
+function hull(pts: number[], grow: number): number[] {
+  const p: [number, number][] = [];
+  for (let i = 0; i < pts.length; i += 2) p.push([pts[i], pts[i + 1]]);
+  p.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o: number[], a: number[], b: number[]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo: [number, number][] = [], hi: [number, number][] = [];
+  for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of [...p].reverse()) { while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
+  const h = [...lo.slice(0, -1), ...hi.slice(0, -1)];
+  const cx = h.reduce((s, q) => s + q[0], 0) / h.length, cz = h.reduce((s, q) => s + q[1], 0) / h.length;
+  return h.flatMap(([x, z]) => { const d = Math.hypot(x - cx, z - cz) || 1; return [x + ((x - cx) / d) * grow, z + ((z - cz) / d) * grow]; });
 }

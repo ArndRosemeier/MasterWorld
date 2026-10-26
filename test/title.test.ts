@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dayOf, drawTitle, shuffled, titleSeed } from '../src/app/title/draw';
 import { CodeWatch, PEOPLES, RUMOURS, SECRET, TOASTS } from '../src/app/title/lines';
-import { DIVE_SECONDS, divePose, orbitPose, type Orbit } from '../src/app/title/route';
+import { DIVE_SECONDS, GIANT_SPEED, divePose, giantPose, orbitPose, type Orbit } from '../src/app/title/route';
 import { WEATHER_KINDS } from '../src/world/weather';
 
 test('title: the same day and counter draw the same title, others differ', () => {
@@ -64,4 +64,26 @@ test('title: the dive starts at the orbit and lands exactly behind the hero', ()
   const mid = divePose(from, to, 0.5);
   assert.ok(mid.at[1] > to.at[1] + 40);
   assert.ok(DIVE_SECONDS > 2 && DIVE_SECONDS < 6);
+});
+
+test('title: the giant comes now and then, and paces the land by the town on the ground', () => {
+  const many = Array.from({ length: 200 }, (_, i) => drawTitle(titleSeed('2026-10-25', i)).giant);
+  const share = many.filter(Boolean).length / many.length;
+  assert.ok(share > 0.15 && share < 0.45, `giant in ${share} of the titles`);
+  const o: Orbit = { centre: [100, 20, -50], turn: -1, angle: 1.2, ground: (x, z) => 20 + Math.sin(x * 0.01) * 5 + z * 0.001 };
+  let last = giantPose(o, 9, 0);
+  for (let t = 0.5; t < 400; t += 0.5) {
+    const p = giantPose(o, 9, t);
+    const far = Math.hypot(p.x - 100, p.z + 50);
+    assert.ok(far > 100 && far < 350, `near the town (${far} m)`);
+    assert.equal(p.y, o.ground(p.x, p.z));
+    const step = Math.hypot(p.x - last.x, p.z - last.z);
+    assert.ok(step <= GIANT_SPEED * 0.5 + 1e-6, `walks, does not jump (${step} m)`);
+    // It faces the way it walks (but where it turns round).
+    if (step > GIANT_SPEED * 0.5 - 1e-3 && p.yaw === last.yaw) {
+      const d = Math.atan2(-(p.x - last.x), -(p.z - last.z)) - p.yaw;
+      assert.ok(Math.abs(Math.atan2(Math.sin(d), Math.cos(d))) < 1e-6, `facing off by ${d}`);
+    }
+    last = p;
+  }
 });

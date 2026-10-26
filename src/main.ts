@@ -1,3 +1,4 @@
+import type { Light, Object3D } from 'three/webgpu';
 import { GraphicsUnavailable } from '@futuremagic/stage';
 import { parseSeed } from '@futuremagic/core';
 import { LoadingScreen } from './app/loading';
@@ -10,8 +11,13 @@ import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
 import { HeroView } from './render/hero/HeroView';
+import { preparePeople } from './render/hero/play';
+import { GiantView } from './render/giant/GiantView';
+import { GIANT_SPEED, giantPose, type Orbit } from './app/title/route';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
+import { StockView } from './render/livestock/StockView';
+import { Herds } from './sim/livestock';
 import { Steed, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import { TownLife, type TownOrder } from './sim/townLife';
@@ -24,12 +30,12 @@ import { FloraView } from './render/flora/FloraView';
 import { GrassView } from './render/grass/GrassView';
 import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
-import { useTownGround, useTownTextures } from './render/materials/townGround';
+import { useFieldGround, useTownGround, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
 import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
-import { distSqPointSeg } from '@futuremagic/settlement';
+import { CROPS, distSqPointSeg } from '@futuremagic/settlement';
 import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { ordersOf, townOrder } from './vgm/orders';
@@ -37,7 +43,7 @@ import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
-import { TOWN_RASTER } from './world/town';
+import { TOWN_RASTER, TownGround } from './world/town';
 import { firstDungeon, houseOf, promiseBarrow } from './vgm/dungeons';
 import { keepPromise, nextPromise, keptOf } from './vgm/leads';
 import { Cellars } from './app/cellars';
@@ -58,7 +64,8 @@ import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
 import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
-import { Orientation } from './game/orientation';
+import { Orientation, mastery } from './game/orientation';
+import { Compass, type SkyGlyph } from './app/compass';
 import { talkCellar, townTalk } from './talk/townTalk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
@@ -163,19 +170,23 @@ export async function start(b: Boot): Promise<void> {
       const was = open;
       open = Math.max(0, open + (on ? 1 : -1));
       player.pause(open > 0);
+      // Calm motion (the setting) stills the windows' shows; read again as any window opens or closes.
+      document.documentElement.classList.toggle('calm', settings.current.calm);
       if ((was > 0) !== (open > 0)) sounds?.dialogSound(open > 0, opening);
     };
     // A dialog with a sound of its own as it opens (the journal's page, the map unrolled).
     const pausedWith = (sound: string) => (on: boolean) => { opening = sound; paused(on); opening = 'ui/open'; };
     // What New game leads to once the dive lands (set once the hero exists: character creation).
     let onBegin: ((people: People['id'] | null) => void) | null = null;
+    let orbit: Orbit | null = null;
     if (title) {
       paused(true);
       // The fly-over circles the market, where the game starts.
       const middle = { x: home.x, z: home.z, r: town ? (Math.max(town.nx, town.nz) * TOWN_RASTER) / 2 : 0 };
+      orbit = { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) };
       await title.attach({
         camera: view.camera,
-        orbit: { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) },
+        orbit,
         toys: {
           height: (x, z) => terrain.height(x, z),
           water: (x, z) => water?.waterAt(x, z) ?? null,
@@ -194,6 +205,11 @@ export async function start(b: Boot): Promise<void> {
       // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
       useTownTextures(await loadTownTextures(texPool));
       useTownGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => town.groundAt(town.x0 + (i + 0.5) * TOWN_RASTER, town.z0 + (j + 0.5) * TOWN_RASTER));
+      useFieldGround(town.x0, town.z0, town.nx, town.nz, TOWN_RASTER, (i, j) => {
+        const x = town.x0 + (i + 0.5) * TOWN_RASTER, z = town.z0 + (j + 0.5) * TOWN_RASTER;
+        const f = town.fieldAt(x, z), path = town.groundAt(x, z) === TownGround.Path;
+        return f || path ? { path, crop: f ? CROPS.indexOf(f.crop) : -1, rows: f?.rows ?? 0 } : null;
+      });
     }
     texPool.dispose();
 
@@ -216,6 +232,14 @@ export async function start(b: Boot): Promise<void> {
     player.walker.height = hero.height;
     hero.onLook(() => { player.walker.height = hero.height; });
     player.hero = hero;
+    // Now and then a giant walks past the town while the title flies (compiled before it shows).
+    let giant: { view: GiantView; t: number } | null = null;
+    let giantReady: Promise<void> | null = null;
+    if ((title?.draw.giant || params.giant) && title && !title.calm && orbit) {
+      const g = { view: await GiantView.grow(view.renderer, GIANT_SPEED), t: 0 };
+      g.view.frame(0, giantPose(orbit, title.draw.seed, 0));
+      giantReady = preparePeople(view.stage, g.view.object).then(() => view.stage.add(g.view.object)).then(() => { giant = g; });
+    }
     let heroName = save?.looks?.name ?? '';
     // The hero's sheet (skills, health, gear, purse) and what they hold.
     const character = new Character(setting, save?.character ?? undefined);
@@ -250,6 +274,13 @@ export async function start(b: Boot): Promise<void> {
       player.horses = horses;
       if (params.ride && player.steeds[0]) player.mount(player.steeds[0]);
     }
+    // The farms' animals in their paddocks (the setting says which; horses until Actors has cattle).
+    const herds = town && town.plan.paddocks.length ? new Herds(town.plan, seed) : null;
+    let stock: StockView | null = null;
+    if (herds && params.stock > 0) {
+      loading.set('Turning out the horses');
+      stock = await StockView.forHerds(view.renderer, setting.world.livestock, herds, params.stock, (x, z) => terrain.height(x, z));
+    }
     let folk: FolkView | null = null;
     if (life && params.folk > 0) {
       loading.set('Waking the town');
@@ -263,7 +294,7 @@ export async function start(b: Boot): Promise<void> {
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(folk ? await folk.warmObjects() : [])]);
+    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(folk ? await folk.warmObjects() : [])]);
     // While the loading screen (or the title's painted still) still covers the view, the land, trees and
     // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
     const capShare = view.stage.cap.share;
@@ -285,6 +316,7 @@ export async function start(b: Boot): Promise<void> {
     if (grass) await view.stage.add(grass.group);
     await view.stage.add(hero.object);
     await horses?.show(view.stage);
+    await stock?.enter(view.stage);
     await view.stage.add(wx.precip);
 
     const notes = new Notes();
@@ -310,6 +342,8 @@ export async function start(b: Boot): Promise<void> {
       armed: armHero,
       kept: (id) => { const k = keepPromise(log, id, hours()); if (k) log = [...log, k]; },
     };
+    // What of the land left the frame while the hero is below.
+    const hidden: Object3D[] = [];
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
       fight: fightHost,
@@ -318,6 +352,13 @@ export async function start(b: Boot): Promise<void> {
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
+      // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
+      // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
+      depth: (down, keep) => {
+        if (!down) { for (const o of hidden) o.visible = true; hidden.length = 0; return; }
+        const kept = new Set<Object3D>([...keep, hero.object, view.camera]);
+        for (const o of view.scene.children) if (o.visible && !kept.has(o) && !(o as Light).isLight) { o.visible = false; hidden.push(o); }
+      },
     }, terrain.towns, save?.cellars ?? {});
     cellars.sync(log);
     // The wild on the land around the town: built as the hero comes near (D27, plan 9.3).
@@ -378,7 +419,7 @@ export async function start(b: Boot): Promise<void> {
     const trees = (boot.trees ? flora.plant() : Promise.resolve()).then(took('trees'));
     let landed = false;
     void trees.then(() => { landed = true; if (folk) loading.set('Waking the townsfolk'); });
-    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk')), dwellers]).then(() => { planted = true; });
+    const planting = Promise.all([trees, folk?.warmLods().then(took('townsfolk')), dwellers, giantReady]).then(() => { planted = true; });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -426,7 +467,8 @@ export async function start(b: Boot): Promise<void> {
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
-      get away() { return player.flying || !!visit(); },
+      // Flying, below in a cellar, or still at the title (its fly-over is no place to talk).
+      get away() { return player.flying || !!visit() || !!title?.holding; },
       heard: (lead) => {
         handOver?.give(lead.id);
         notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
@@ -441,17 +483,24 @@ export async function start(b: Boot): Promise<void> {
     });
     // How exactly the hero knows where they are (plan 11.7): the map shows it, travel and reading it train it.
     const orientation = new Orientation(seed, character, home);
+    // Where the hero believes they are, facing `yaw` (down in a cellar: at its house; in a barrow: at its forecourt).
+    const believed = (yaw: number) => {
+      const h = visit()?.houseDoor ?? null, w = player.walker;
+      return h ? orientation.bearing(h[0], h[1], h[2]) : orientation.bearing(w.pos.x, w.pos.z, yaw);
+    };
     const map = town ? new MapUi(town.plan, journal, {
       paused: pausedWith('ui/map'),
       get bindings() { return settings.current.bindings; },
       height: (x, z) => terrain.height(x, z),
       water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
-      get hero() {
-        // Down in the cellar: at its house.
-        const h = visit()?.houseDoor ?? null, w = player.walker;
-        return h ? orientation.bearing(h[0], h[1], h[2]) : orientation.bearing(w.pos.x, w.pos.z, w.yaw);
-      },
+      heroBearing: () => believed(player.walker.yaw),
     }) : null;
+    // The compass at the top (plan 17.1): turns with the camera, its needle as true as the orientation skill.
+    const compass = new Compass(seed);
+    const skyGlyph = (): SkyGlyph => {
+      const w = wx.shown;
+      return w.rain > 0.1 ? (w.snow > 0.5 ? 'snow' : 'rain') : w.cover > 0.6 ? 'cloud' : 'clear';
+    };
     // Telling of a place: the hero hands the map over and the teller marks it.
     const handOver = map ? new HandOver((id, c, t) => map.markIn(id, c, t), () => sounds?.noted()) : null;
     if (talk && life && town && params.talk) {
@@ -528,7 +577,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, title, sound, get sounds() { return sounds; }, life },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, fightHud, compass },
     });
     b.menus.menu = new Menu(settings, {
       paused,
@@ -597,10 +646,14 @@ export async function start(b: Boot): Promise<void> {
       const c = townWords ? talkCellar(d, setting, town, life.agents.map((a) => a.person), log) : null;
       if (c) townWords?.add(c);
     };
-    let last = performance.now();
+    let last = performance.now(), frame = 0;
     view.renderer.setAnimationLoop(() => {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       title?.run(dt);
+      if (giant && orbit && title) {
+        if (title.holding) giant.view.frame(dt, giantPose(orbit, title.draw.seed, (giant.t += dt)));
+        else { giant.view.dispose(); giant = null; }
+      }
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
       creator?.orbit(dt);
@@ -616,27 +669,44 @@ export async function start(b: Boot): Promise<void> {
       talk?.watch();
       const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.flying && !visit());
       if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }
+      compass.visible = !title?.holding && !creator?.showing && !!window.__mwReady;
+      if (compass.visible) {
+        const look = player.flying ? player.fly.yaw : player.heroCam.yaw;
+        compass.read(dt, { bearing: believed(look), look, mastery: mastery(character.skill('orientation')), hour: view.sky.hour, sky: skyGlyph(), marks: journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })) });
+      }
       direct(dt);
       notes.update(dt);
       view.sky.underwater = sea.submerged(view.camera.position);
       wx.apply(dt, view.camera.position, hours(), view.sky);
       view.sky.update(dt, view.camera);
-      sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
-      ground.update(view.camera);
-      view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
-      houses?.update(view.camera.position);
-      view.doors.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value);
+      // Down in the cellar the land above is out of the frame (visit.onDepth): its updates wait.
+      const above = !visit();
+      if (above) {
+        sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
+        ground.update(view.camera);
+        view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
+        houses?.update(view.camera.position);
+        view.doors.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value);
+      }
       if (life) {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });
       }
+      herds?.step(dt);
+      stock?.herd(dt, view.camera.position);
       if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
-      folk?.follow(dt, view.camera);
-      if (boot.trees) flora.update(dt, view.camera);
-      trunks.around(player.walker.pos.x, player.walker.pos.z);
-      grass?.tend(dt, view.camera);
-      view.stage.frame();
-      view.renderer.render(view.scene, view.camera);
+      if (above) {
+        folk?.follow(dt, view.camera);
+        if (boot.trees) flora.update(dt, view.camera);
+        trunks.around(player.walker.pos.x, player.walker.pos.z);
+        grass?.tend(dt, view.camera);
+      }
+      // Behind an open window the land is only glimpsed: it is drawn every other frame, which leaves the main
+      // thread to the window. Drawing the land takes most of a 60 Hz frame, so a window on top tipped it to 30 Hz.
+      if (!document.querySelector('.shade.open') || (frame++ & 1) === 0) {
+        view.stage.frame();
+        view.renderer.render(view.scene, view.camera);
+      }
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
         hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
