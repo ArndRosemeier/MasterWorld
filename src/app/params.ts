@@ -37,6 +37,8 @@ export const params = {
   /** Post chain checks: `postSamples=4` multisampling in its scene target (default none; black on WebGL2), `postDepth=int` a fixed-point depth buffer. */
   postSamples: q.has('postSamples') ? Number(q.get('postSamples')) : undefined,
   postFloatDepth: q.get('postDepth') !== 'int',
+  /** Bloom tuning: `bloom=4,0.16,0.3` its threshold (screen light after exposure), strength and radius. */
+  bloom: q.get('bloom')?.split(',').map(Number),
   /** Ambient occlusion in the post chain: `ao=0` off; `ao=1.5,0.8` its radius (m) and strength, for tuning. */
   ao: q.get('ao') === '0' ? null : { radius: Number(q.get('ao')?.split(',')[0] || 1), strength: Number(q.get('ao')?.split(',')[1] || 0.6) },
   /** Draw the town's buildings (`town=0` leaves them out, for comparisons). */
