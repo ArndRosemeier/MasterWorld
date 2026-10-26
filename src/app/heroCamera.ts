@@ -124,9 +124,9 @@ export class HeroCamera {
     // the camera, on the way to the hero's head (short of it: the hero may stand against a wall), and on
     // the near half of the way to the one talked to (a counter may stand in the far half).
     const hits = (x: number, z: number): number => {
-      const wall = (px: number, pz: number, r: number) => (this.world.wall?.(px, pz, r) ? 1 : 0);
-      let n = wall(x, z, 0.3) * 3;
-      for (let t = 0.1; t < 0.75; t += 0.1) n += wall(x + (head.x - x) * t, z + (head.z - z) * t, 0.08) + wall(x + (at.x - x) * t * 0.6, z + (at.z - z) * t * 0.6, 0.08);
+      const wallHit = (px: number, pz: number, r: number) => (this.world.wall?.(px, pz, r) ? 1 : 0);
+      let n = wallHit(x, z, 0.3) * 3;
+      for (let t = 0.1; t < 0.75; t += 0.1) n += wallHit(x + (head.x - x) * t, z + (head.z - z) * t, 0.08) + wallHit(x + (at.x - x) * t * 0.6, z + (at.z - z) * t * 0.6, 0.08);
       return n;
     };
     let back = 0, side = 0, least = Infinity;
