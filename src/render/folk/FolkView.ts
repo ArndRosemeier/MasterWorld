@@ -152,6 +152,9 @@ export class FolkView {
     const looks = coveringLooks(this.life.agents.map((a) => a.person));
     for (let i = 0; i < looks.length; i++) {
       if (i === 1) first();
+      // Before the game begins the people round the hero come first: their dressing compiles what they wear, and
+      // the looks nobody there wears wait (they are tried on behind play).
+      while (i > 0 && this.focus && (this.dressing > 0 || this.waiting > 0)) await new Promise((r) => setTimeout(r, 50));
       // A look whose files would not load is skipped: its garments then compile when first worn.
       try {
         if (i > 0) await ch.set({ ...looks[i], animation: 'walk' });
