@@ -20,7 +20,7 @@ import { StockView } from './render/livestock/StockView';
 import { Herds } from './sim/livestock';
 import { Steed, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
-import { TownLife, type TownOrder } from './sim/townLife';
+import { TownLife, type Agent, type TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
 import { VolumeView } from './render/terrain/VolumeView';
@@ -75,6 +75,8 @@ import { Character } from './game/character';
 import { acquaintances } from './game/background';
 import { Director } from './vgm/director';
 import { FightHud } from './app/fightHud';
+import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
+import { defOf } from './game/items';
 
 declare global {
   interface Window {
@@ -249,6 +251,8 @@ export async function start(b: Boot): Promise<void> {
     let heroName = save?.looks?.name ?? '';
     // The hero's sheet (skills, health, gear, purse) and what they hold.
     const character = new Character(setting, save?.character ?? undefined);
+    // `wear`: the gear starts worn, the main hand most (for looking at the smith's bench).
+    if (params.wear) Object.entries(character.worn).forEach(([slot, it], i) => { if (it) character.worn[slot as keyof typeof character.worn] = { ...it, wear: params.wear * Math.max(0.3, 1 - i * 0.25) }; });
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
     armHero();
     // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
@@ -354,9 +358,16 @@ export async function start(b: Boot): Promise<void> {
       get blocked() { return open > 0; },
       wake: () => {
         const v = visit();
-        const toInn = () => { if (inn) { const [x, z, yaw] = inn.door; player.teleport(x - Math.sin(yaw) * 1.2, undefined, z - Math.cos(yaw) * 1.2, yaw + Math.PI); } };
-        if (v) void v.leave().then(toInn);
-        else toInn();
+        // Where the hero last took a room (plan 11.2), else the temple: inside it; with no town, by the inn's door.
+        const at = upkeep?.waking() ?? null;
+        const carry = () => {
+          if (at?.building && rooms) return rooms.enter(at.building, true);
+          if (inn) { const [x, z, yaw] = inn.door; player.teleport(x - Math.sin(yaw) * 1.2, undefined, z - Math.cos(yaw) * 1.2, yaw + Math.PI); }
+          return Promise.resolve();
+        };
+        if (v) void v.leave().then(carry);
+        else void carry();
+        return at?.said ?? setting.upkeep.words.wakeInn;
       },
       still: (on) => paused(on),
       armed: armHero,
@@ -488,6 +499,8 @@ export async function start(b: Boot): Promise<void> {
       townWords?.acquaint(friendsOf(bg).map((a) => ({ person: a.person.id, line: a.line })), heroName || 'friend');
     };
     meetOldFriends();
+    // What townsfolk do besides talk (trade, repairs, a room): a talk topic each, which opens its window.
+    const services = new Map<string, (a: Agent) => void>();
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -497,7 +510,26 @@ export async function start(b: Boot): Promise<void> {
         handOver?.give(lead.id);
         notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
       },
+      serve: (id, a) => services.get(id)?.(a),
     }) : null;
+    // A room at the inn and the smith's mending (plan 11.5): two more services.
+    const upkeep = town && life && townWords ? new UpkeepUi(character, setting, {
+      paused,
+      get bindings() { return settings.current.bindings; },
+      town: { id: town.decision.id, plan: town.plan },
+      hours,
+      setClock: (h) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; },
+      enter: (b) => rooms?.enter(b, true) ?? Promise.resolve(),
+      say: (text, secs) => notes.say(text, secs),
+      worth: (it) => defOf(setting.items, it.def).value,
+      rang: () => sounds?.rang(),
+    }) : null;
+    if (upkeep && townWords && life) {
+      const others = townWords.services.bind(townWords);
+      const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
+      townWords.services = (id) => { const p = person(id); return [...others(id), ...(p ? upkeep.services(p) : [])]; };
+      for (const id of UPKEEP_SERVICES) services.set(id, (a) => upkeep.answer(id, a.person, townWords.nameOf(a.person.id)));
+    }
     const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {
       paused,
@@ -531,6 +563,8 @@ export async function start(b: Boot): Promise<void> {
       // Straight into a talk: in front of the innkeeper or of the cellar's household.
       const pick = params.talk === 'house'
         ? life.agents.find((a) => a.person.home === firstPromise?.building && a.person.role !== 'child')
+        : params.talk === 'smith'
+        ? life.agents.find((a) => a.person.trade === 'smith' && a.person.role === 'trade')
         : life.agents.find((a) => town.plan.buildings[a.person.home].kind === 'inn' && a.person.role === 'trade');
       if (pick) {
         const yaw = pick.dir;

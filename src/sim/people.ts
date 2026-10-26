@@ -97,7 +97,7 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
 }
 
 /** The town's first building of a kind (its inn, its temple), if it has one. */
-export const buildingOf = (plan: TownPlan, kind: string) => plan.buildings.find((b) => b.kind === kind);
+export const buildingOf = (plan: Pick<TownPlan, 'buildings'>, kind: string) => plan.buildings.find((b) => b.kind === kind);
 
 const marketDist = (plan: TownPlan, home: number) => {
   const b = plan.buildings[home];

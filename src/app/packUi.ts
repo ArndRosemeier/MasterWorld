@@ -10,7 +10,7 @@ import type { Character } from '../game/character';
 import { coinText, defOf } from '../game/items';
 import { el } from './dom';
 import { itemCard } from './itemCard';
-import { KeyWindow, type WindowHost } from './window';
+import { BodyWindow, type WindowHost } from './window';
 
 const SLOT_NAME: Record<Slot | 'ring2', string> = {
   main: 'Main hand', off: 'Off hand', head: 'Head', body: 'Body', hands: 'Hands', feet: 'Feet', cloak: 'Cloak', ring: 'Ring', ring2: 'Ring', amulet: 'Amulet',
@@ -28,17 +28,12 @@ export interface PackHost extends WindowHost {
 /** Where a gauge's needle stands for a skill (degrees from pointing left; full at 100). */
 const angle = (v: number) => Math.min(180, Math.max(0, v * 1.8));
 
-export class PackUi extends KeyWindow {
-  private readonly body: HTMLDivElement;
-  private readonly foot: HTMLDivElement;
+export class PackUi extends BodyWindow {
   /** Each skill as last shown: a needle that rose since swings up again. */
   private readonly seen = new Map<string, number>();
 
   constructor(private readonly hero: Character, private readonly setting: SettingModule, private readonly packHost: PackHost) {
-    const body = el('div', { className: 'body' }), foot = el('div', { className: 'foot' });
-    super('Pack', 'pack', 'pack', packHost, body, foot);
-    this.body = body;
-    this.foot = foot;
+    super('Pack', 'pack', 'pack', packHost);
   }
 
   protected opened(): void {

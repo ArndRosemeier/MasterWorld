@@ -33,6 +33,8 @@ export interface TalkHost {
   readonly bindings: Bindings;
   /** A lead was opened: say it, and the journal and map show it (the hero hands the map over to be marked). */
   heard(lead: { id: string; title: string; note: string }): void;
+  /** A service was asked for (trade, a repair, a room): the talk has ended, open its window. */
+  serve(service: string, agent: Agent): void;
 }
 
 export class TalkUi {
@@ -146,6 +148,7 @@ export class TalkUi {
       this.lines.scrollTop = this.lines.scrollHeight;
       this.host.heard({ id, title, note: fill(this.words.marked, { name: from, house: this.talk.houseCalled(id) }) });
     }
+    if (r.opens) { const id = r.opens; this.topicList.replaceChildren(); setTimeout(() => { this.close(); this.host.serve(id, a); }, 600); return; }
     if (r.done) { setTimeout(() => this.close(), 900); this.topicList.replaceChildren(); return; }
     this.offer();
   }

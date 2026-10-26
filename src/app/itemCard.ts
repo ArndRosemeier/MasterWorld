@@ -7,6 +7,7 @@
  */
 import type { Rarity, SettingModule } from '../setting/contract';
 import type { Item } from '../game/items';
+import { condition, wearState } from '../game/upkeep';
 import { el } from './dom';
 import { twinkles, wardRim } from './ward';
 
@@ -18,6 +19,8 @@ export function itemLines(i: Item, setting: SettingModule): string[] {
   if (d?.armour) lines.unshift(`armour ${d.armour}`);
   if (d?.block) lines.unshift(`blocks ${Math.round(d.block * 100)}%`);
   if (d?.heal) lines.unshift(`restores ${d.heal} health`);
+  // Worn gear says how worn (game/upkeep.ts): it strikes and guards less well until a smith mends it.
+  if (i.wear) lines.push(`${wearState(i)}: ${Math.round(condition(i) * 100)}% sound`);
   return lines;
 }
 
@@ -28,7 +31,7 @@ const DRESS: Record<Rarity, { sparks: number; gear: boolean }> = {
 
 /** The card; with `enter` (seconds) it makes its entrance after that delay and its lines rise one by one. */
 export function itemCard(i: Item, setting: SettingModule, enter: number | null = null): HTMLElement {
-  const lines = itemLines(i, setting).map((l) => el('div', { className: `line${l.startsWith('+') ? ' bonus' : ''}` }, l));
+  const lines = itemLines(i, setting).map((l) => el('div', { className: `line${l.startsWith('+') ? ' bonus' : l.endsWith('% sound') ? ' wear' : ''}` }, l));
   if (i.lore) lines.push(el('div', { className: 'line lore' }, i.lore));
   const head = el('div', { className: 'rarity' }, i.rarity, ...(i.rarity === 'legendary' ? [' ', twinkles()] : []));
   const c = el('div', { className: `card plate ${i.rarity}` }, head, el('div', { className: 'name' }, i.name), ...lines);
