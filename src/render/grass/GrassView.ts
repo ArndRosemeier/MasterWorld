@@ -92,9 +92,9 @@ export class GrassView {
     this.near.mesh.geometry.instanceCount = this.far.mesh.geometry.instanceCount = 1;
   }
 
-  /** The land changed (a road was laid): the mask is baked again. */
-  invalidate(): void {
-    this.mask.invalidate();
+  /** The land changed (a road was laid): the mask is baked again (with `touches`, only if the change reaches it). */
+  invalidate(touches?: (x0: number, z0: number, x1: number, z1: number) => boolean): void {
+    this.mask.invalidate(touches);
   }
 
   /** Each frame: the mask follows, the patches in view are listed (the wind is the weather's: WeatherView). */

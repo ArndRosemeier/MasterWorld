@@ -35,8 +35,12 @@ export class FollowedMask {
     });
   }
 
-  /** The land changed (a road was laid): bake again at the next `follow`, keeping this one until then. */
-  invalidate(): void {
+  /**
+   * The land changed (a road was laid): bake again at the next `follow`, keeping this one until then;
+   * with `touches`, only if the change reaches the square this mask covers.
+   */
+  invalidate(touches?: (x0: number, z0: number, x1: number, z1: number) => boolean): void {
+    if (touches && this.ready && !touches(this.x0, this.z0, this.x0 + this.mask.side, this.z0 + this.mask.side)) return;
     this.stale = true;
   }
 
