@@ -21,6 +21,54 @@ import { setPieceById, type SetPieceDef } from './setPieces';
 /** Metres per layout cell, per storey, and stairs per storey (cells). */
 export const CELL = 2;
 export const STOREY = 2.8;
+/** Width of a door's opening, metres. */
+export const DOOR_W = 1.3;
+
+/**
+ * What stands at a wall takes up, as half its size along the wall and out from it (m), with room for the
+ * small turn each piece is given. Things lying loose (bones, straw, rubble) may lie among each other; a
+ * puddle under anything. Nothing stands in front of a door.
+ */
+const FOOT: Readonly<Record<DungeonProp, readonly [number, number]>> = {
+  barrel: [0.34, 0.34], cask: [0.8, 0.42], rack: [0.82, 0.25], crate: [0.42, 0.4], sack: [0.3, 0.3], shelf: [0.75, 0.24],
+  table: [0.58, 0.45], stool: [0.26, 0.26], cot: [0.96, 0.5], straw: [0.62, 0.5], rubble: [0.75, 0.75], bones: [0.35, 0.35],
+  candle: [0.12, 0.12], lantern: [0.13, 0.13], ledger: [0.27, 0.22], chest: [0.47, 0.28], web: [0.85, 0.3], nest: [0.75, 0.75],
+  vat: [0.7, 0.7], bricks: [0.42, 0.32], beam: [1.25, 0.5], puddle: [0.7, 0.5], bin: [0.55, 0.35], jar: [0.2, 0.2],
+  ladder: [0.35, 0.3], door: [0.7, 0.3],
+};
+const LOOSE: ReadonlySet<DungeonProp> = new Set(['bones', 'straw', 'rubble', 'nest']);
+/** The floor kept clear before a doorway: half its width, and how far into the room (m). */
+const DOOR_CLEAR: readonly [number, number] = [DOOR_W / 2 + 0.2, 1.4];
+
+/** A rectangle on the floor: centre, its first axis (unit), half sizes along that axis and across it. */
+interface Rect { readonly x: number; readonly z: number; readonly ux: number; readonly uz: number; readonly a: number; readonly b: number }
+
+/** Two rectangles on the floor overlap (by more than `slack` m). */
+function rectsMeet(p: Rect, q: Rect, slack = 0.02): boolean {
+  for (const [ax, az] of [[p.ux, p.uz], [-p.uz, p.ux], [q.ux, q.uz], [-q.uz, q.ux]]) {
+    const reach = (r: Rect) => r.a * Math.abs(ax * r.ux + az * r.uz) + r.b * Math.abs(-ax * r.uz + az * r.ux);
+    if (Math.abs((q.x - p.x) * ax + (q.z - p.z) * az) >= reach(p) + reach(q) - slack) return false;
+  }
+  return true;
+}
+
+/** The floor a prop takes up (its along-wall axis is (cos yaw, −sin yaw), as the props are drawn). */
+export const propRect = (p: { kind: DungeonProp; x: number; z: number; yaw: number }): Rect =>
+  ({ x: p.x, z: p.z, ux: Math.cos(p.yaw), uz: -Math.sin(p.yaw), a: FOOT[p.kind][0], b: FOOT[p.kind][1] });
+
+/** The floor kept clear before a door, on the side of its room. */
+export const doorRect = (d: { x: number; z: number; dir: number }): Rect => {
+  const [dx, dz] = DIRS[d.dir];
+  return { x: (d.x + 0.5 + dx * 0.5) * CELL - dx * DOOR_CLEAR[1] / 2, z: (d.z + 0.5 + dz * 0.5) * CELL - dz * DOOR_CLEAR[1] / 2, ux: -dz, uz: dx, a: DOOR_CLEAR[0], b: DOOR_CLEAR[1] / 2 };
+};
+
+/** Prop `p` may stand beside `q` (loose things lie among each other; a puddle under anything). */
+export const propsClash = (p: { kind: DungeonProp; x: number; z: number; yaw: number }, q: { kind: DungeonProp; x: number; z: number; yaw: number }): boolean =>
+  p.kind !== 'puddle' && q.kind !== 'puddle' && !(LOOSE.has(p.kind) && LOOSE.has(q.kind)) && rectsMeet(propRect(p), propRect(q));
+
+/** Prop `p` stands in the way of door `d` (a puddle may lie there). */
+export const blocksDoor = (p: { kind: DungeonProp; x: number; z: number; yaw: number }, d: { x: number; z: number; dir: number }): boolean =>
+  p.kind !== 'puddle' && rectsMeet(propRect(p), doorRect(d));
 
 /** Cell (i, j) lies in the room's footprint. */
 export const cellIn = (r: { x: number; z: number; w: number; d: number }, i: number, j: number): boolean => i >= r.x && i < r.x + r.w && j >= r.z && j < r.z + r.d;
@@ -286,45 +334,50 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
   const clues: Clue[] = [];
   const doorsOf = (room: number) => layout.links.flatMap((pl) => pl.doors.filter((dr) => dr.room === room));
   const placed = layout.rooms;
-  /**
-   * Free spots along a room's walls (not in front of doors), as cell + wall side. `tight`: a room with a door
-   * in every cell (a small hub) still has the walls beside its doors.
-   */
-  const wallSpots = (room: number, tight = false) => {
+  /** Spots along a room's walls (not a doorway's own), as cell + wall side; `put` keeps the floor before doors clear. */
+  const wallSpots = (room: number) => {
     const R = placed[room], out: { x: number; z: number; dir: number }[] = [];
     const doors = doorsOf(room).filter((dr) => dr.level === R.level);
     for (let z = R.z; z < R.z + R.d; z++) for (let x = R.x; x < R.x + R.w; x++) for (let k = 0; k < 4; k++) {
       const nx = x + DIRS[k][0], nz = z + DIRS[k][1];
       if (cellIn(R, nx, nz)) continue;
-      if (doors.some((dr) => dr.x === x && dr.z === z && (!tight || dr.dir === k))) continue;
+      if (doors.some((dr) => dr.x === x && dr.z === z && dr.dir === k)) continue;
       out.push({ x, z, dir: k });
     }
     return out;
   };
   const put = (room: number, kind: DungeonProp, trace?: HistoryLayer, clue?: number): boolean => {
     const R = placed[room];
-    const clear = (s: { x: number; z: number }) => !props.some((q) => q.room === room && Math.hypot(q.x - (s.x + 0.5) * CELL, q.z - (s.z + 0.5) * CELL) < 1.2);
-    let spots = wallSpots(room).filter(clear);
-    // A full room: crowd it (props may stand closer).
-    if (!spots.length) spots = wallSpots(room);
-    if (!spots.length) spots = wallSpots(room, true);
-    if (!spots.length) return false;
-    const s = spots[rng.int(0, spots.length - 1)];
+    const doors = doorsOf(room).filter((dr) => dr.level === R.level);
+    const here = props.filter((q) => q.room === room);
     // Against the wall, facing into the room; yaw: −z is 0 (as the walker), facing away from the wall.
     const inset = shape.inset;
-    const x = (s.x + 0.5) * CELL + DIRS[s.dir][0] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][1] !== 0 ? 1 : 0);
-    const z = (s.z + 0.5) * CELL + DIRS[s.dir][1] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][0] !== 0 ? 1 : 0);
-    const yaw = Math.atan2(DIRS[s.dir][0], DIRS[s.dir][1]);
-    props.push({ kind, x, z, y: R.level * STOREY, yaw, room, ...(trace ? { trace } : {}), ...(clue !== undefined ? { clue } : {}) });
+    const standAt = (s: { x: number; z: number; dir: number }) => ({
+      kind,
+      x: (s.x + 0.5) * CELL + DIRS[s.dir][0] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][1] !== 0 ? 1 : 0),
+      z: (s.z + 0.5) * CELL + DIRS[s.dir][1] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][0] !== 0 ? 1 : 0),
+      yaw: Math.atan2(DIRS[s.dir][0], DIRS[s.dir][1]),
+    });
+    // Where it fits: clear of the doors and of what already stands there.
+    const fits = (p: ReturnType<typeof standAt>, doorsClear: boolean) => !(doorsClear && doors.some((d) => blocksDoor(p, d))) && !here.some((q) => propsClash(p, q));
+    const roomy = (s: { x: number; z: number }) => !here.some((q) => Math.hypot(q.x - (s.x + 0.5) * CELL, q.z - (s.z + 0.5) * CELL) < 1.2);
+    // A wall of its own if there is one; a full room is crowded (props stand closer), never piled up. The way
+    // out must stand somewhere: in a small room with a door in every cell, beside a door.
+    const all = wallSpots(room);
+    let spot: ReturnType<typeof standAt> | null = null;
+    for (const [spots, doorsClear] of [[all.filter(roomy), true], [all, true], [kind === shape.way ? all : [], false]] as const) {
+      for (const s of rng.shuffle(spots.slice())) { const p = standAt(s); if (fits(p, doorsClear)) { spot = p; break; } }
+      if (spot) break;
+    }
+    if (!spot) return false;
+    props.push({ ...spot, y: R.level * STOREY, room, ...(trace ? { trace } : {}), ...(clue !== undefined ? { clue } : {}) });
     return true;
   };
   // The way out first (the ladder up to the hatch, a tower's door), so nothing stands in front of it.
   put(graph.entrance, shape.way);
   const hatch = props[0];
-  for (const r of rooms) {
-    const R = placed[r.id], n = Math.max(2, Math.min(7, Math.round(R.w * R.d * 0.45)));
-    for (let i = 0; i < n; i++) put(r.id, r.use.props[i % r.use.props.length]);
-  }
+  // The set piece next (its clues must find a place): its own dressing and its clues.
+  piece.dress({ link, graph, rooms, trouble, dweller: now, rng, put, clue: (text, room, l) => { clues.push({ text, room, ...(l !== undefined ? { link: l } : {}) }); return clues.length - 1; } });
   // Traces of history: each layer's in the rooms of its time, the dwellers' also near the entrance (foreshadowing).
   for (const h of sketch.history) for (const kind of h.def.traces ?? []) {
     const own = rooms.filter((r) => r.era === h.layer);
@@ -332,17 +385,21 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     // Two of each, in rooms that have a free wall (a small room full of doors may have none).
     for (let i = 0, tries = 0; i < 2 && tries < where.length * 2; tries++) if (put(where[rng.int(0, where.length - 1)].id, kind, h.layer)) i++;
   }
+  // Then what each room is used for, as far as its walls hold.
+  for (const r of rooms) {
+    const R = placed[r.id], n = Math.max(2, Math.min(7, Math.round(R.w * R.d * 0.45)));
+    for (let i = 0; i < n; i++) put(r.id, r.use.props[i % r.use.props.length]);
+  }
 
-  // The set piece: its own dressing and its clues.
-  piece.dress({ link, graph, rooms, trouble, dweller: now, rng, put, clue: (text, room, l) => { clues.push({ text, room, ...(l !== undefined ? { link: l } : {}) }); return clues.length - 1; } });
   // The builders' ledger often tells of the older layer (a clue for those who read).
   const lower = layerOf(sketch, 'older');
   if (lower && rng.chance(0.7)) {
-    clues.push({ text: `An old note in the ledger: "${lower.text}"`, room: graph.entrance });
-    put(graph.entrance, 'ledger', 'built', clues.length - 1);
+    // Only if a ledger finds a place to lie (a clue nothing tells is no clue).
+    if (put(graph.entrance, 'ledger', 'built', clues.length)) clues.push({ text: `An old note in the ledger: "${lower.text}"`, room: graph.entrance });
   }
 
-  const spawns = settle(graph, p, rooms, now, rng);
+  // Who lives where draws from its own stream, so how the rooms are dressed never changes it.
+  const spawns = settle(graph, p, rooms, now, new Rng(deriveSeed(sketch.decision.seed, 'settle')));
 
   const form = layout.rooms.map((r) => `${r.w}x${r.d}x${r.height}@${r.level}`).sort().join(',');
   const signature = `${graph.patterns.join('+')}|${graph.rooms.length}r${graph.links.length}l|${form}`;

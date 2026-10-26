@@ -12,6 +12,7 @@ import { DungeonSpace } from '../world/dungeon/space';
 import { Character } from './character';
 import { Delve, type DelveSave } from './delve';
 import type { HeroPose } from './fight';
+import type { Creature } from '../sim/creatures';
 
 export interface BotResult {
   readonly won: boolean;
@@ -70,6 +71,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   let path: { x: number; y: number; z: number }[] = [], repath = 0, goal: object | null = null;
   /** What is being walked to for searching (kept until searched). */
   let aim: { x: number; y: number; z: number } | null = null;
+  /** The foe being walked to (kept until it falls or a fight starts). */
+  let chase: Creature | null = null;
   const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z } });
   /** One step along the nav towards a point (`key`: what is being walked to, so a new goal is routed at once). */
   const towards = (to: { x: number; y: number; z: number }, key: object): void => {
@@ -129,7 +132,11 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
     }
     // Nearest one that would fight (a begging one is left alone).
     const foes = den.alive.filter((c) => c.state !== 'meek' && c.state !== 'beg');
-    const foe = foes.sort((a, b) => Math.hypot(a.x - x, a.z - z, a.y - y) - Math.hypot(b.x - x, b.z - z, b.y - y))[0];
+    // Keep to the one chosen while it is still there, unless another is fighting (two idle ones about as far,
+    // their ways leading opposite ways, would make it dither between them).
+    const nearest = foes.sort((a, b) => Math.hypot(a.x - x, a.z - z, a.y - y) - Math.hypot(b.x - x, b.z - z, b.y - y))[0];
+    const foe: Creature | undefined = chase && foes.includes(chase) && !den.fighting.length ? chase : nearest;
+    chase = foe ?? null;
     if (!foe) {
       // Only beggars left: go and hear them out (from afar they only cower, and the den is not beaten).
       const beggar = den.alive.find((c) => c.state === 'beg');

@@ -236,8 +236,13 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
       for (let s = -2; s <= 2; s++) shell.box(mx + ux * s * (DOOR_W / 5), y, mz + uz * s * (DOOR_W / 5), 0.04, DOOR_H, 0.04, yaw, M.Slate, IRON);
       shell.box(mx, y + 1.0, mz, DOOR_W, 0.05, 0.05, yaw, M.Slate, IRON);
     } else if (kind === 'blocked') {
+      // The fallen way: a heap of stones up to the lintel, each on the ones below; in a cellar a ceiling beam came down with it.
       const rng = new Rng(deriveSeed(c.decision.seed, 'rubble', pl.link.id));
-      for (let n = 0; n < 14; n++) shell.box(mx + ux * rng.range(-0.7, 0.7) + out[0] * rng.range(-0.5, 0.5), y + rng.range(0, 1.6), mz + uz * rng.range(-0.7, 0.7) + out[1] * rng.range(-0.5, 0.5), rng.range(0.25, 0.6), rng.range(0.2, 0.5), rng.range(0.25, 0.6), rng.range(0, 3), M.Rubble, STONE);
+      for (const st of fallStones(rng, mx, y, mz, ux, uz, out[0], out[1])) {
+        if (carved) shell.stone(st.x, st.y0, st.z, st.sx, st.sy, st.sz, st.yaw, WildMat.Rock, varyTint(rng, CAVE_ROCK, 0.1), rng, 0.06, 0.4);
+        else shell.stone(st.x, st.y0, st.z, st.sx, st.sy, st.sz, st.yaw, M.Rubble, varyTint(rng, STONE, 0.12), rng, 0.05, 0.3);
+      }
+      if (!carved) shell.box(mx - out[0] * 0.25, y + 3 * FALL_ROW - 0.04, mz - out[1] * 0.25, DOOR_W + 0.5, 0.2, 0.22, yaw + rng.range(-0.25, 0.25), M.Oak, DARK_OAK);
     } else if (kind === 'drop' && !carved) {
       // The broken edge: splintered boards and a beam end over the drop.
       const rng = new Rng(deriveSeed(c.decision.seed, 'ledge', pl.link.id));
@@ -296,6 +301,31 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
   if (models) dress(propKit, c, models);
   for (const t of torchSpots(c)) sconce(shell, t.x, t.y, t.z, t.nx, t.nz);
   return { shell: shell.mesh(), props: propKit.mesh(), doors };
+}
+
+/** Height of one course of a fallen way's heap (five reach the lintel). */
+const FALL_ROW = DOOR_H / 5;
+
+/** A stone of a heap: a box centred at (x, y0 + sy/2, z), turned by yaw. */
+export interface HeapStone { readonly x: number; readonly y0: number; readonly z: number; readonly sx: number; readonly sy: number; readonly sz: number; readonly yaw: number }
+
+/**
+ * The stones of a fallen way in the doorway at (mx, y, mz) (u along the wall, o out through it): courses
+ * that narrow towards the lintel, so the heap spills out on both sides and every stone rests on the course
+ * below (its foot a little into it), the lowest on the floor.
+ */
+export function fallStones(rng: Rng, mx: number, y: number, mz: number, ux: number, uz: number, ox: number, oz: number): HeapStone[] {
+  const out: HeapStone[] = [];
+  for (let r = 0; r < 5; r++) {
+    const deep = 1.1 - r * 0.22, wide = DOOR_W / 2 + (r === 0 ? 0.25 : 0.05), size = 0.5 - r * 0.03;
+    const nu = Math.max(1, Math.round((2 * wide) / size)), no = Math.max(1, Math.round((2 * deep) / size));
+    for (let i = 0; i < nu; i++) for (let j = 0; j < no; j++) {
+      const u = -wide + ((i + 0.5) / nu) * 2 * wide + rng.range(-0.06, 0.06), o = -deep + ((j + 0.5) / no) * 2 * deep + rng.range(-0.06, 0.06);
+      const sx = Math.min(size * rng.range(0.85, 1.15), (2 * wide) / nu + 0.1), sz = Math.min(size * rng.range(0.85, 1.15), (2 * deep) / no + 0.1);
+      out.push({ x: mx + ux * u + ox * o, y0: y + r * FALL_ROW - (r ? 0.06 : 0.03), z: mz + uz * u + oz * o, sx, sy: FALL_ROW + rng.range(0.04, 0.12), sz, yaw: Math.atan2(ux, uz) - Math.PI / 2 + rng.range(-0.3, 0.3) });
+    }
+  }
+  return out;
 }
 
 /** A torch in an iron sconce, its flame (lit by the lights) at (x, y, z), the wall behind it along -n. */
@@ -435,7 +465,7 @@ function prop(k: MeshKit, p: Prop): void {
     case 'cot': k.box(x, y, z, 1.9, 0.35, 0.8, yaw + Math.PI / 2, M.Oak, t(DARK_OAK)); k.box(x, y + 0.35, z, 1.8, 0.1, 0.7, yaw + Math.PI / 2, M.Thatch, t([180, 160, 110])); break;
     case 'straw': k.box(x, y, z, 1.2, 0.18, 0.9, yaw + rng.range(-0.5, 0.5), M.Thatch, t([190, 165, 100], 0.2)); break;
     case 'nest': for (let n = 0; n < 5; n++) k.box(x + rng.range(-0.4, 0.4), y, z + rng.range(-0.4, 0.4), rng.range(0.4, 0.8), rng.range(0.15, 0.35), rng.range(0.4, 0.8), rng.range(0, 3), M.Thatch, t([120, 100, 70], 0.25)); break;
-    case 'rubble': for (let n = 0; n < 7; n++) k.box(x + rng.range(-0.5, 0.5), y + (n > 4 ? 0.25 : 0), z + rng.range(-0.5, 0.5), rng.range(0.2, 0.5), rng.range(0.15, 0.35), rng.range(0.2, 0.5), rng.range(0, 3), M.Rubble, t(STONE, 0.2)); break;
+    case 'rubble': for (let n = 0; n < 7; n++) k.box(x + rng.range(-0.5, 0.5), y, z + rng.range(-0.5, 0.5), rng.range(0.2, 0.5), rng.range(0.15, 0.35), rng.range(0.2, 0.5), rng.range(0, 3), M.Rubble, t(STONE, 0.2)); break;
     case 'bones': for (let n = 0; n < 6; n++) k.box(x + rng.range(-0.4, 0.4), y, z + rng.range(-0.4, 0.4), 0.05, 0.05, rng.range(0.2, 0.45), rng.range(0, 3), M.Plaster, t([225, 215, 190])); k.cylinder(x + 0.2, y, z - 0.1, 0.1, 0.16, 8, M.Plaster, [225, 215, 190], 0.5); break;
     case 'candle': k.cylinder(x, y, z, 0.04, 0.25, 6, M.Plaster, [240, 230, 200]); break;
     case 'lantern': k.box(x, y, z, 0.2, 0.32, 0.2, yaw, M.Slate, IRON); k.box(x, y + 0.04, z, 0.14, 0.22, 0.14, yaw, M.Glass, [255, 200, 120]); break;
