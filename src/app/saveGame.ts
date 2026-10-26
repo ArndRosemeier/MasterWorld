@@ -48,6 +48,8 @@ export interface SaveData {
   /** The wild's groups met, by territory id: who died, was spared, was searched (none in older saves). */
   readonly wild?: Readonly<Record<string, DelveSave>>;
   readonly talk: TownTalkSave | null;
+  /** What the people of each hamlet and village know, by town id (plan B3; none in older saves). */
+  readonly talks?: Readonly<Record<string, TownTalkSave>>;
   readonly journal: readonly Lead[];
   /** The hero's skills, health, gear and purse (version 2; none: a fresh hero). */
   readonly character: CharacterSave | null;

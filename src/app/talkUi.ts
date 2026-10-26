@@ -43,6 +43,13 @@ export interface TalkHost {
   readonly roomPeople: readonly { agent: Agent; x: number; z: number }[] | null;
 }
 
+/** Where the hero talks: a town's people, their words and its plan (the start town's, or a settlement's, plan B3). */
+export interface TalkPlace {
+  readonly talk: TownTalk;
+  readonly life: TownLife;
+  readonly plan: TownPlan;
+}
+
 export class TalkUi {
   private readonly prompt: HTMLElement;
   private readonly box: HTMLDivElement;
@@ -55,15 +62,16 @@ export class TalkUi {
   /** Frames since the talk's shot was chosen. */
   private framed = 0;
 
+  private at: TalkPlace;
+
   constructor(
-    private readonly talk: TownTalk,
+    place: TalkPlace,
     private readonly words: TalkDef,
     private readonly journal: Journal,
-    private readonly life: TownLife,
-    private readonly plan: TownPlan,
     private readonly player: Player,
     private readonly host: TalkHost,
   ) {
+    this.at = place;
     this.prompt = overlay('talk-prompt', '');
     this.who = el('div', { className: 'who' });
     this.lines = el('div', { className: 'lines' });
@@ -75,6 +83,13 @@ export class TalkUi {
   }
 
   get open(): boolean { return this.with !== null; }
+
+  /** The town talked in now; a new one (the hero came to another settlement) takes over once no talk is open. */
+  get place(): TalkPlace { return this.at; }
+  set place(p: TalkPlace) { if (!this.with) this.at = p; }
+  private get talk(): TownTalk { return this.at.talk; }
+  private get life(): TownLife { return this.at.life; }
+  private get plan(): TownPlan { return this.at.plan; }
 
   /** Who the hero is talking with now. */
   get partner(): Agent | null { return this.with; }

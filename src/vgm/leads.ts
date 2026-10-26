@@ -7,7 +7,7 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
-import type { Decision, DecisionLog, DungeonDecision, KeptDecision, MoveInDecision } from '../world/decisions';
+import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type KeptDecision, type MoveInDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
@@ -71,6 +71,12 @@ export interface LeadsContext {
   readonly terrain?: Terrain;
   /** Ground a place on the land keeps away from (the wild's territories). */
   readonly avoid?: readonly { readonly x: number; readonly z: number; readonly r: number }[];
+  /**
+   * The hamlet or village the hero is in (plan B3), if any: while none of the open promises is its own, its
+   * people get one (a place out on the land near it; its houses have no cellars to go down into yet), even
+   * when the world has its few open leads already (one more than `max` at most).
+   */
+  readonly near?: Town | null;
 }
 
 /** Share of new places that lie out on the land (a barrow, a cave, a tower), when the setting has a kind none of which is open. */
@@ -78,12 +84,18 @@ const LAND_SHARE = 0.55;
 
 /** The Builder's next promise, if one is due now. */
 export function nextPromise(c: LeadsContext): Decision | null {
-  const open = openPromises(c.log).length;
-  if (open >= LEADS.max || (open >= LEADS.min && !c.purposeOverdue)) return null;
+  const promised = openPromises(c.log), open = promised.length;
+  const local = c.near && c.near !== c.towns[0] && c.terrain && !promised.some((p) => dungeonOf(c.log, p)?.town === c.near!.decision.id) ? c.near : null;
+  if (open >= LEADS.max + (local ? 1 : 0) || (open >= LEADS.min && !c.purposeOverdue && !local)) return null;
   const last = Math.max(-Infinity, ...promisesOf(c.log).map((p) => p.at ?? -Infinity));
   if (c.hours - last < LEADS.gap) return null;
   const n = promisesOf(c.log).length;
   const s = deriveSeed(c.seed, 'vgm', 'lead', n);
+  if (local) {
+    const d = landPlace(c, s, local, true);
+    if (d) return { ...d, at: c.hours };
+    if (open >= LEADS.max || (open >= LEADS.min && !c.purposeOverdue)) return null;
+  }
   const moved = moveInto(c, s);
   // Rather a new place; a cleared one is moved into now and then (or when no place is left). Now and
   // then the new place lies out on the land: a barrow, a cave or a tower (one of each kind open at a time).
@@ -93,11 +105,11 @@ export function nextPromise(c: LeadsContext): Decision | null {
   return fresh ? { ...fresh, at: c.hours } : null;
 }
 
-/** A new place out on the land, of a kind the setting has and none of which is open; now and then. */
-function landPlace(c: LeadsContext, s: number, town: Town): DungeonDecision | null {
-  if (!c.terrain || hash2f(s, 6, 2) >= LAND_SHARE) return null;
+/** A new place out on the land, of a kind the setting has and none of which is open; now and then (`always`: if any fits). */
+function landPlace(c: LeadsContext, s: number, town: Town, always = false): DungeonDecision | null {
+  if (!c.terrain || (!always && hash2f(s, 6, 2) >= LAND_SHARE)) return null;
   const open = new Set(openPromises(c.log).flatMap((p) => (p.kind === 'dungeon' ? [p.template] : [])));
-  const kinds = LAND_KINDS.filter((k) => c.dungeons[k] && !open.has(k));
+  const kinds = LAND_KINDS.filter((k) => c.dungeons[k] && (always || !open.has(k)));
   // One kind by chance; if no ground fits it, the next.
   const first = Math.floor(hash2f(s, 6, 3) * kinds.length);
   for (let i = 0; i < kinds.length; i++) {
