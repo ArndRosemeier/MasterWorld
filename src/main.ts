@@ -881,8 +881,8 @@ export async function start(b: Boot): Promise<void> {
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         houses?.update(view.camera.position);
       }
-      // Doorways at night above, torches below.
-      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt);
+      // Doorways at night above, torches below, a soft fill on the hero in a room.
+      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
       if (life) {
         life.focus = { x: view.camera.position.x, z: view.camera.position.z };
         life.step(dt, hours(), { rain: wx.shown.rain });
