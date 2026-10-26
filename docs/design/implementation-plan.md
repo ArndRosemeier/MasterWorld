@@ -139,5 +139,4 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | freeryder / free LLMs (O15) | Parked by Arnd |
 | The capital | Prepared in B3, placed once a road network exists |
 | Companions (animals, elementals, summons) | After magic (C), since summons need it |
-| Coin piles up: by the sixth evening the loop check's hero carries 400 to 1000 copper the smith has nothing left to sell for, and a room costs 10 | Seen by the loop check (A6, 2026-10-26). Wants dearer goods and more to spend on (training, B-phase shops, a house) rather than meaner prices now |
 | A paddock fence can cut across a street (seed `alpha`, beside the smithy): the townsfolk walk through it, the hero has to go round | Seen by the loop check (A6); the town plan comes from `@futuremagic/settlement`, so the fix belongs there. The default seed has none |
