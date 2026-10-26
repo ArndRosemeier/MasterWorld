@@ -10,7 +10,7 @@ import type { Character } from '../game/character';
 import { coinText, defOf } from '../game/items';
 import { el } from './dom';
 import { itemCard } from './itemCard';
-import { KeyWindow, type WindowHost } from './window';
+import { BodyWindow, type WindowHost } from './window';
 
 const SLOT_NAME: Record<Slot | 'ring2', string> = {
   main: 'Main hand', off: 'Off hand', head: 'Head', body: 'Body', hands: 'Hands', feet: 'Feet', cloak: 'Cloak', ring: 'Ring', ring2: 'Ring', amulet: 'Amulet',
@@ -28,24 +28,18 @@ export interface PackHost extends WindowHost {
 /** Where a gauge's needle stands for a skill (degrees from pointing left; full at 100). */
 const angle = (v: number) => Math.min(180, Math.max(0, v * 1.8));
 
-export class PackUi extends KeyWindow {
-  private readonly body: HTMLDivElement;
-  private readonly foot: HTMLDivElement;
+export class PackUi extends BodyWindow {
   /** Each skill as last shown: a needle that rose since swings up again. */
   private readonly seen = new Map<string, number>();
 
   constructor(private readonly hero: Character, private readonly setting: SettingModule, private readonly packHost: PackHost) {
-    const body = el('div', { className: 'body' }), foot = el('div', { className: 'foot' });
-    super('Pack', 'pack', 'pack', packHost, body, foot);
-    this.body = body;
-    this.foot = foot;
+    super('Pack', 'pack', 'pack', packHost);
   }
 
   protected opened(): void {
     const h = this.hero;
     // Opening, the cards make their entrance one after another; re-drawn after a click, they are just there.
-    let k = 0;
-    const enter = () => (this.fresh ? 0.35 + 0.05 * k++ : null);
+    const enter = this.entrances(0.35, 0.05);
     const worn = WORN.map((s) => {
       const it = h.worn[s];
       const cell = el('div', { className: `slot${it ? ' full' : ''}` }, el('div', { className: 'label', textContent: SLOT_NAME[s] }), it ? itemCard(it, this.setting, enter()) : el('div', { className: 'empty', textContent: '—' }));
@@ -78,14 +72,14 @@ export class PackUi extends KeyWindow {
       return el('div', { className: `gauge${rose ? ' up' : ''}`, title: plus ? `${s.name}: ${base}, +${plus} from what you wear` : `${s.name}: ${base}` },
         dial, el('div', { className: 'name', textContent: s.name }), el('div', { className: 'value' }, String(base), ...(plus ? [' ', el('b', { textContent: `+${plus}` })] : [])));
     });
-    this.body.replaceChildren(
+    this.fill([
       el('h3', { textContent: 'Worn' }), el('div', { className: 'worn' }, ...worn),
       el('h3', { textContent: 'Carried' }),
       carried.length ? el('div', { className: 'carried' }, ...carried) : el('p', { className: 'hint', textContent: 'Nothing but lint.' }),
       el('p', { className: 'hint', textContent: 'Click something carried to put it on, drink or eat it; click something worn to take it off.' }),
-      el('h3', { textContent: 'Skills' }), el('div', { className: 'skills' }, ...skills));
-    this.foot.replaceChildren(
+      el('h3', { textContent: 'Skills' }), el('div', { className: 'skills' }, ...skills)],
+    [
       el('span', { textContent: `Health ${Math.ceil(h.health)} / ${h.maxHealth} · Stamina ${Math.ceil(h.stamina)} / ${h.maxStamina}` }),
-      el('span', { textContent: `${coinText(h.coins)} · ${h.carried.toFixed(1)} kg` }));
+      el('span', { textContent: `${coinText(h.coins)} · ${h.carried.toFixed(1)} kg` })]);
   }
 }

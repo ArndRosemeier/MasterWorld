@@ -3,7 +3,7 @@
  * of armour, potions, food, tools and valuables; a few legendary pieces with their history; what places
  * and creatures of some danger hold. Rarity and the skill bonuses are rolled when an item is found.
  */
-import type { ItemCatalog } from '../contract';
+import type { ItemCatalog, UpkeepDef } from '../contract';
 
 export const items: ItemCatalog = {
   items: [
@@ -78,5 +78,29 @@ export const items: ItemCatalog = {
     stealth: { prefix: 'Quiet', suffix: 'of Shadows' },
     orientation: { prefix: "Wayfinder's", suffix: 'of the Road' },
     speech: { prefix: 'Silver', suffix: 'of the Market' },
+  },
+};
+
+/** Rooms and mending (plan 11.5): a night at the inn costs about a day's wage, mending a third of the price as new. */
+export const upkeep: UpkeepDef = {
+  room: 10,
+  repair: 0.35,
+  rise: 7,
+  words: {
+    roomTopic: 'A room for the night ({price})',
+    repairTopic: 'Can you mend my gear?',
+    roomGiven: '{price}, and the room under the eaves is yours. Sleep well.',
+    repairLine: 'Let me see what you have done to it.',
+    roomTooDear: 'A room is {price}, friend, and your purse says otherwise. The hearth is free to sit by, though.',
+    slept: 'You sleep in a narrow bed under the eaves and wake rested. The room is yours whenever you come back to this inn.',
+    nothingToMend: 'That all looks sound to me. Come back when you have dented something.',
+    mended: 'There. {items}, good as new. That will be {price}.',
+    mendTooDear: 'I can do the rest, but not {left} for what you have left. Bring more coin.',
+    worn: 'Your {item} is showing wear.',
+    battered: 'Your {item} is badly battered. A smith could mend it.',
+    broken: 'Your {item} is broken and does you little good. Take it to a smith.',
+    wakeRoom: 'your room at the inn',
+    wakeTemple: 'the temple',
+    wakeInn: 'the inn',
   },
 };

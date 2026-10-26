@@ -8,7 +8,7 @@
 
 import type { GradeKey } from '@futuremagic/stage';
 
-export const CONTRACT_VERSION = 8;
+export const CONTRACT_VERSION = 9;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -355,6 +355,72 @@ export interface ItemCatalog {
   readonly affixes: Readonly<Record<string, { readonly prefix: string; readonly suffix: string }>>;
 }
 
+/**
+ * Upkeep (plan 11.5, 11.2): what a room and mending cost, and how it is said. Lines may use `{price}`
+ * (coins as said), `{items}` (what was mended), `{name}` (the smith or keeper).
+ */
+export interface UpkeepDef {
+  /** A night's room at the inn, copper. */
+  readonly room: number;
+  /** Mending a broken item costs this share of its worth as new (less for one only worn). */
+  readonly repair: number;
+  /** The hour the hero rises after a night at the inn. */
+  readonly rise: number;
+  readonly words: {
+    /** Talk topics: the innkeeper's room, the smith's mending. */
+    readonly roomTopic: string;
+    readonly repairTopic: string;
+    /** The keeper's answer as the room is taken (`{price}`), or when the purse is too light. */
+    readonly roomGiven: string;
+    readonly roomTooDear: string;
+    /** The smith's answer as the bench is opened. */
+    readonly repairLine: string;
+    /** The note on waking after a night at the inn. */
+    readonly slept: string;
+    /** The smith: nothing needs mending; mended; could not mend it all (`{left}`). */
+    readonly nothingToMend: string;
+    readonly mended: string;
+    readonly mendTooDear: string;
+    /** A worn thing looks so now (`{item}`). */
+    readonly worn: string;
+    readonly battered: string;
+    readonly broken: string;
+    /** Where one wakes after a fall, as in "You wake in …": one's room at the inn, the temple, the inn (no room, no temple). */
+    readonly wakeRoom: string;
+    readonly wakeTemple: string;
+    readonly wakeInn: string;
+  };
+}
+
+/**
+ * A kind of shop (plan 11.5): who keeps it, what they keep in stock and buy, and how much coin they hold.
+ * Prices follow what the town has: what a shop here makes is cheaper, and the more of a thing the town's
+ * merchants already hold, the less they pay for it and ask for it.
+ */
+export interface ShopDef {
+  /** The keeper's trade ('smith', 'innkeeper'), or 'trader' for a stall on the market. */
+  readonly keeper: string;
+  /** What the shop is called ("The smithy"). */
+  readonly name: string;
+  /** The talk topic that opens it ("Show me your wares."). */
+  readonly topic: string;
+  /** What the keeper says as the trade window opens. */
+  readonly line: string;
+  /** What they make or keep: item ids with how many they like to have in stock. */
+  readonly goods: readonly (readonly [string, number])[];
+  /** The kinds of thing they buy from the hero. */
+  readonly buys: readonly ItemDef['kind'][];
+  /** The coin they keep (copper); spent on what they buy, it comes back over the days. */
+  readonly purse: number;
+  /** Share of a thing's worth they pay for it, and ask for it (before the hero's speech). */
+  readonly pays: number;
+  readonly asks: number;
+  /** At most this many keep the shop in a town (the market's first stalls; absent: every keeper). */
+  readonly most?: number;
+  /** Fine work: their goods roll rarity as finds at this danger (absent: all plain). */
+  readonly quality?: number;
+}
+
 /** A weapon ability on the belt (plan 11.2; Norgo's recipe format comes with milestone 6). */
 export interface AbilityDef {
   readonly id: string;
@@ -514,6 +580,10 @@ export interface SettingModule {
   readonly skills: readonly SkillDef[];
   readonly creatures: readonly CreatureDef[];
   readonly items: ItemCatalog;
+  /** Rooms and mending (plan 11.5). */
+  readonly upkeep: UpkeepDef;
+  /** The town's shops (plan 11.5), by who keeps them. */
+  readonly shops: readonly ShopDef[];
   readonly abilities: readonly AbilityDef[];
   readonly director: DirectorDef;
   readonly hero: HeroLooksDef;
@@ -629,6 +699,11 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (i.slot && !SLOTS.includes(i.slot)) out.push(`${where}: item "${i.id}" slot "${i.slot}" is unknown`);
     if ((i.kind === 'weapon' || i.kind === 'shield' || i.kind === 'armour') && !i.slot) out.push(`${where}: item "${i.id}" is worn but has no slot`);
   }
+  for (const sh of m.shops) {
+    for (const [id, n] of sh.goods) if (!items.has(id) || !(n > 0)) out.push(`${where}: shop "${sh.keeper}" keeps unknown item "${id}" or none of it`);
+    if (!(sh.pays > 0 && sh.pays < sh.asks) || !(sh.purse > 0)) out.push(`${where}: shop "${sh.keeper}" must pay less than it asks, and hold some coin`);
+  }
+  if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);
     for (const k of Object.keys(u.bonuses)) if (!skills.has(k)) out.push(`${where}: unique "${u.id}" raises unknown skill "${k}"`);

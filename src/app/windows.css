@@ -131,6 +131,65 @@
 .pack .gauge .value b { color: var(--ward); font-weight: 400; }
 .pack .gauge.up .needle { animation: needle-rise 1.4s cubic-bezier(.3, 1.6, .4, 1) .2s backwards; }
 
+/* Trade (tradeUi.ts): their wares and your pack with brass price tags, a brass balance between that tips towards
+   whoever was paid, coins dropping into that pan. The window swings in like a shop's hanging sign. */
+.panel.trade { width: min(880px, 100%); }
+.shade.open .panel.trade { transform-origin: 50% -40px; animation: win-sign .9s cubic-bezier(.3, 1.2, .5, 1) backwards; }
+@keyframes win-sign { 0% { transform: rotate(9deg) translateY(-30px); opacity: 0; } 35% { opacity: 1; transform: rotate(-4deg); } 65% { transform: rotate(1.5deg); } }
+.trade .counter { display: flex; align-items: center; gap: 18px; margin: 2px 0 4px; }
+.trade .says { flex: 1; margin: 0; font-style: italic; color: var(--ink-dim); }
+.trade .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 640px) { .trade .sides { grid-template-columns: 1fr; } }
+.trade .wares { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 9px; }
+.trade .card { padding: 6px 10px 7px; }
+.trade .ware { position: relative; display: flex; flex-direction: column; cursor: pointer; transition: transform .15s; }
+.trade .ware:hover { transform: translateY(-2px); }
+.trade .ware:hover .card { border-color: var(--brass); }
+.trade .ware.dim { opacity: .55; }
+.trade .ware.arrived { animation: ware-arrive .55s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes ware-arrive { from { transform: scale(.85) translateY(-10px); filter: brightness(1.8); } }
+.trade .tag { align-self: flex-end; margin: -3px 8px 0 0; padding: 2px 8px 3px; position: relative; z-index: 1; border: 1px solid var(--brass-lo); border-top: none; border-radius: 0 0 9px 9px; background: linear-gradient(#3a2818, #1d140d); font: 12px/1.2 'Marcellus SC', Georgia, serif; color: var(--brass); transform-origin: 50% 0; animation: tag-swing 2.8s ease-in-out infinite; animation-delay: inherit; }
+.trade .ware:nth-child(3n) .tag { animation-duration: 3.4s; }
+.trade .ware:nth-child(3n+1) .tag { animation-duration: 2.3s; }
+@keyframes tag-swing { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+.trade .tag.dear { color: #b07a6a; }
+.trade .tag.none { color: #6a6458; font-style: italic; font-family: 'EB Garamond', Georgia, serif; }
+.trade .coins { display: inline-flex; gap: 6px; }
+.trade .coin { display: inline-flex; align-items: center; gap: 3px; }
+.trade .coin::before { content: ''; width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 -1px 0 #0006, 0 0 3px #0008; }
+.trade .coin.g::before { background: radial-gradient(circle at 35% 30%, #fff4c0, #e8b830 60%, #8a6410); }
+.trade .coin.s::before { background: radial-gradient(circle at 35% 30%, #ffffff, #c8ccd2 60%, #6c7078); }
+.trade .coin.c::before { background: radial-gradient(circle at 35% 30%, #ffd2a0, #c0703a 60%, #6a3414); }
+.trade .ware.for-you .card { box-shadow: 0 0 0 1px var(--ward), 0 0 12px #8fe3ff66; }
+.trade .mark { position: absolute; left: 8px; top: -7px; z-index: 2; padding: 0 7px; border-radius: 8px; background: #0d1a1e; border: 1px solid var(--ward); color: var(--ward); font: 10px/14px 'Marcellus SC', Georgia, serif; letter-spacing: .14em; text-transform: uppercase; animation: ward-breathe 2.4s ease-in-out infinite; }
+.trade .foot .purse { display: inline-flex; gap: 8px; align-items: center; }
+/* The balance: a post, a beam on a knob, two pans on cords. It sways gently while the window is open. */
+.trade .scales { position: relative; flex: none; width: 120px; height: 66px; --tilt: 0deg; }
+.trade .scales .post { position: absolute; left: 57px; top: 10px; width: 6px; height: 50px; border-radius: 3px; background: linear-gradient(90deg, var(--brass-lo), var(--brass), var(--brass-lo)); }
+.trade .scales .post::after { content: ''; position: absolute; left: -17px; bottom: -4px; width: 40px; height: 7px; border-radius: 4px 4px 2px 2px; background: linear-gradient(var(--brass), var(--brass-dark)); }
+.trade .scales .knob { position: absolute; left: 54px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass-mid) 55%, var(--brass-lo)); box-shadow: 0 0 6px #8fe3ff66; }
+.trade .scales .beam { position: absolute; left: 6px; top: 10px; width: 108px; height: 4px; border-radius: 2px; background: linear-gradient(var(--brass-hi), var(--brass-mid)); transform: rotate(var(--tilt)); animation: beam-sway 5s ease-in-out infinite; }
+@keyframes beam-sway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+.trade .scales .pan { position: absolute; top: 2px; width: 34px; height: 30px; transform-origin: 50% 0; animation: pan-hang 5s ease-in-out infinite; }
+@keyframes pan-hang { 0%, 100% { transform: rotate(1.5deg); } 50% { transform: rotate(-1.5deg); } }
+.trade .scales .pan.theirs { left: -14px; }
+.trade .scales .pan.yours { right: -14px; }
+.trade .scales .cord { position: absolute; top: 0; width: 1px; height: 22px; background: var(--brass-lo); }
+.trade .scales .cord.l { left: 17px; transform: rotate(28deg); transform-origin: 0 0; }
+.trade .scales .cord.r { left: 17px; transform: rotate(-28deg); transform-origin: 0 0; }
+.trade .scales .dish { position: absolute; left: 3px; top: 19px; width: 28px; height: 8px; border-radius: 0 0 14px 14px; background: linear-gradient(var(--brass), var(--brass-dark)); box-shadow: 0 0 0 1px var(--brass-lo); }
+/* Paid: the beam dips towards the pan the coins fell into, then swings back; a coin drops and glints. */
+.trade .scales.tipped[data-tip=theirs] .beam { animation: beam-dip-l 1.4s cubic-bezier(.3, 1.6, .4, 1); }
+.trade .scales.tipped[data-tip=yours] .beam { animation: beam-dip-r 1.4s cubic-bezier(.3, 1.6, .4, 1); }
+@keyframes beam-dip-l { 25% { transform: rotate(-14deg); } }
+@keyframes beam-dip-r { 25% { transform: rotate(14deg); } }
+.trade .scales.tipped .dish::after { content: ''; position: absolute; left: 10px; top: -26px; width: 9px; height: 9px; border-radius: 50%; opacity: 0; background: radial-gradient(circle at 35% 30%, #fff4c0, #e8b830 60%, #8a6410); box-shadow: 0 0 8px #ffc46b; }
+.trade .scales.tipped[data-tip=theirs] .pan.theirs .dish::after, .trade .scales.tipped[data-tip=yours] .pan.yours .dish::after { animation: coin-drop .6s cubic-bezier(.5, 0, 1, .5); }
+@keyframes coin-drop { 0% { opacity: 1; transform: translateY(0); } 85% { opacity: 1; transform: translateY(22px); } 100% { opacity: 0; transform: translateY(20px) scale(1.4); } }
+/* Refused: the balance shudders. */
+.trade .scales.balk { animation: balk .4s ease-in-out; }
+@keyframes balk { 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+
 /* Talk (talkUi.ts): a brass speaking-ring; the topics turn into place like a dial, ones with a new lead glow. */
 #talk-prompt { position: fixed; left: 50%; bottom: 18%; transform: translateX(-50%); z-index: 5; padding: 6px 14px; background: linear-gradient(var(--leather-hi), var(--leather)); border: 1px solid var(--brass-mid); border-radius: 16px; color: var(--ink); font: 15px/1.3 'EB Garamond', Georgia, serif; pointer-events: none; opacity: 0; transition: opacity .2s, transform .25s cubic-bezier(.3, 1.6, .5, 1); box-shadow: 0 4px 14px #0009; }
 #talk-prompt.on { opacity: 1; transform: translateX(-50%) translateY(-4px); }
@@ -169,3 +228,27 @@
 #corner:hover { opacity: 1; }
 #corner .version { margin-right: 4px; color: var(--ink); text-shadow: 0 1px 2px #000; font: 13px/1 'Marcellus SC', Georgia, serif; letter-spacing: .06em; }
 #corner button { display: inline-flex; min-height: 30px; padding: 4px 13px; font-size: 13px; }
+
+/* The end of a roguelike tale (talesEnd.ts): ash over the frame, a plaque settles, the epitaph is engraved, the ward burns down like a wick. */
+.tales-end { position: fixed; inset: 0; z-index: 14; display: flex; align-items: center; justify-content: center; padding: 16px; background: #0b0806; opacity: 0; transition: opacity 1.4s ease-in; }
+.tales-end.open { opacity: .94; }
+.tales-end .te-plaque { position: relative; width: min(520px, 100%); box-sizing: border-box; padding: 30px 32px 26px; text-align: center; font: 18px/1.45 'EB Garamond', Georgia, serif; color: var(--ink);
+  background: linear-gradient(170deg, #2e2016, var(--leather) 45%, #170f0b); border: 3px solid var(--brass-mid); border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--brass-lo), inset 0 0 0 7px var(--leather), inset 0 0 0 8px var(--brass-lo), 0 18px 60px #000;
+  animation: te-settle 1.2s cubic-bezier(.3, 1.3, .5, 1) .5s backwards; }
+.tales-end h2 { margin: 6px 0 14px; font: 400 30px/1.1 'Marcellus SC', Georgia, serif; letter-spacing: .12em; color: var(--brass); text-shadow: 0 1px 0 #000, 0 0 16px #ff7a3a44; }
+.tales-end .label { font: 13px/1 'Marcellus SC', Georgia, serif; letter-spacing: .2em; color: #c4562a; }
+.tales-end .te-epitaph { margin: 0 0 12px; min-height: 2.9em; }
+.tales-end .te-epitaph span { animation: te-carve .25s ease-out backwards; white-space: pre-wrap; }
+.tales-end .te-world { margin: 0 0 18px; font-size: 15px; font-style: italic; color: #a8987a; }
+.tales-end .t-btn { margin: 0 auto; animation: t-rise .6s ease-out backwards; }
+/* The ward: two wicks along the top rim burning in from the corners to the middle, an ember rising where they meet. */
+.tales-end .te-wick { position: absolute; top: 4px; height: 2px; width: 50%; background: linear-gradient(90deg, var(--ward), #ff9a3a); box-shadow: 0 0 6px #ff7a3a; animation: te-burn 7s linear 1.2s forwards; }
+.tales-end .te-wick.l { left: 0; transform-origin: 0 50%; }
+.tales-end .te-wick.r { right: 0; transform-origin: 100% 50%; transform: scaleX(-1); }
+.tales-end .te-ember { position: absolute; left: 50%; top: 0; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: #ffb46a; box-shadow: 0 0 8px #ff7a3a; opacity: 0; animation: te-rise 3s ease-out 8s infinite; }
+@keyframes te-settle { from { opacity: 0; transform: translateY(-30px) scale(.97); } }
+@keyframes te-carve { from { opacity: 0; color: #ffc46b; text-shadow: 0 0 8px #ff9a3a; } to { opacity: 1; } }
+@keyframes te-burn { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); opacity: .2; } }
+@keyframes te-rise { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -60px); } }
+@media (prefers-reduced-motion: reduce) { .tales-end *, .tales-end { animation: none !important; transition: none !important; } }

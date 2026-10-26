@@ -9,6 +9,7 @@ import { townTalk, TownTalk } from '../src/talk/townTalk';
 import { Journal } from '../src/talk/journal';
 import { firstDungeon } from '../src/vgm/dungeons';
 import { acquaintances } from '../src/game/background';
+import { Market } from '../src/game/trade';
 
 const seed = parseSeed('masterworld');
 const { terrain, log } = openWorld(seed, classic);
@@ -113,4 +114,17 @@ test('talk: people who know the hero from before greet them by name, others as u
   talk.acquaint(friends.map((f) => ({ person: f.person.id, line: f.line })), 'Wenna Hollin');
   assert.match(talk.greet(friends[0].person.id).text, /Wenna Hollin/);
   assert.doesNotMatch(talk.greet(stranger.id).text, /Wenna Hollin/);
+});
+
+test('talk: a merchant offers trade as a topic, and asking for it opens the trade window', () => {
+  const { talk } = townTalk(seed, classic, town, people, log);
+  const market = new Market(classic, people, seed, 0);
+  talk.services = (p) => { const s = market.of(p)?.shop; return s ? [{ id: 'trade', label: s.topic, line: s.line }] : []; };
+  const topics = talk.topics(inn.id).map((t) => t.id);
+  assert.ok(topics.includes('trade') && topics.indexOf('trade') < topics.indexOf('bye'), topics.join(','));
+  assert.ok(!talk.topics(stranger.id).some((t) => t.id === 'trade'), 'a homemaker sells nothing');
+  const r = talk.ask(inn.id, 'trade');
+  assert.equal(r.opens, 'trade');
+  assert.ok(r.done);
+  assert.equal(r.text, market.of(inn.id)!.shop.line);
 });

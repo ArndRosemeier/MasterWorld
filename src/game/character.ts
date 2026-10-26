@@ -6,6 +6,7 @@
 import type { AbilityDef, BackgroundDef, DamageKind, ItemCatalog, SettingModule, Slot } from '../setting/contract';
 import type { Blow, Guard } from '../sim/combat';
 import { defOf, plainItem, type Item } from './items';
+import { strengthOf, wearState, wornBy, type Lodging, type WearState } from './upkeep';
 
 export interface CharacterSave {
   readonly skills: Readonly<Record<string, number>>;
@@ -16,6 +17,8 @@ export interface CharacterSave {
   readonly coins: number;
   /** The hero's past (a background id; absent in saves from before backgrounds). */
   readonly background?: string;
+  /** The inn where the hero last took a room: where they wake after a fall (absent: none yet). */
+  readonly lodging?: Lodging;
 }
 
 /** A skill rose to a new whole point. */
@@ -45,6 +48,8 @@ export class Character {
   coins = 0;
   /** The hero's past (plan 11.4): a background id, '' before one is chosen. */
   background = '';
+  /** The inn where the hero last took a room (plan 11.2: where they wake after a fall); null: none yet. */
+  lodging: Lodging | null = null;
   private readonly cat: ItemCatalog;
 
   constructor(private readonly setting: SettingModule, saved?: CharacterSave) {
@@ -55,6 +60,7 @@ export class Character {
       this.pack.push(...saved.pack);
       this.coins = saved.coins;
       this.background = saved.background ?? '';
+      this.lodging = saved.lodging ?? null;
     } else this.beginAs(setting.backgrounds[0]);
     this.health = Math.min(saved?.health ?? Infinity, this.maxHealth);
     this.stamina = Math.min(saved?.stamina ?? Infinity, this.maxStamina);
@@ -63,6 +69,7 @@ export class Character {
   /** Starts a new hero's life with this past: its skills over the starts, its kit and coins, fully rested. */
   beginAs(bg: BackgroundDef): void {
     this.background = bg.id;
+    this.lodging = null;
     for (const s of this.setting.skills) this.skills.set(s.id, s.start + (bg.skills[s.id] ?? 0));
     for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) delete this.worn[k];
     this.pack.length = 0;
@@ -91,19 +98,22 @@ export class Character {
 
   /** What the main hand swings. */
   get weapon(): WeaponStats {
-    const it = this.worn.main;
-    return (it && defOf(this.cat, it.def).weapon) || FISTS;
+    const it = this.worn.main, w = it && defOf(this.cat, it.def).weapon;
+    if (!w) return FISTS;
+    // A worn blade cuts less well (plan 11.5: gear wears, the smith mends it).
+    const k = strengthOf(it);
+    return k === 1 ? w : { ...w, damage: [w.damage[0] * k, w.damage[1] * k] };
   }
 
   get armour(): number {
     let a = 0;
-    for (const it of Object.values(this.worn)) a += it ? defOf(this.cat, it.def).armour ?? 0 : 0;
+    for (const it of Object.values(this.worn)) a += it ? (defOf(this.cat, it.def).armour ?? 0) * strengthOf(it) : 0;
     // Wearing it well: the armour skill makes it count for more.
     return a * (1 + this.skill('armour') / 150);
   }
 
   get blockChance(): number {
-    const it = this.worn.off, b = it ? defOf(this.cat, it.def).block ?? 0 : 0;
+    const it = this.worn.off, b = it ? (defOf(this.cat, it.def).block ?? 0) * strengthOf(it) : 0;
     return b ? Math.min(0.6, b * (1 + this.skill('shields') / 80)) : 0;
   }
 
@@ -140,6 +150,19 @@ export class Character {
     const next = Math.min(100, v + gain);
     this.skills.set(id, next);
     return Math.floor(next) > Math.floor(v) ? { skill: id, name: def.name, level: Math.floor(next) } : null;
+  }
+
+  /**
+   * Use wears what is worn in `slot` by `amount` (upkeep.ts WEAR); returns its new look when that changed
+   * (worn, battered, broken), so the game can say so.
+   */
+  wear(slot: Slot | 'ring2', amount: number): { readonly item: Item; readonly state: WearState } | null {
+    const it = this.worn[slot];
+    if (!it || amount <= 0) return null;
+    const next = wornBy(it, amount);
+    this.worn[slot] = next;
+    const state = wearState(next);
+    return state !== wearState(it) ? { item: next, state } : null;
   }
 
   /** Put an item from the pack on; what was there goes into the pack. */
@@ -195,6 +218,6 @@ export class Character {
   }
 
   save(): CharacterSave {
-    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background };
+    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}) };
   }
 }
