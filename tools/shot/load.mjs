@@ -6,9 +6,15 @@
  * LIMIT_TITLE / LIMIT_READY (seconds, default 1 and 20, the F4 marks on the reference machine; SwiftShader in the cloud
  * container is far slower, so set them there or pass LIMITS=0 to only report).
  */
+import { existsSync, renameSync, writeFileSync } from 'node:fs';
 import { launch } from './launch.mjs';
 
-const [query = '?gl'] = process.argv.slice(2);
+// `--record`: the pack files this start fetched become tools/packs/start.json, the start bundle's list
+// (tools/packs/bundle.mjs); the run fetches them one by one, so the bundle is set aside meanwhile.
+const record = process.argv.includes('--record');
+const [query = '?gl'] = process.argv.slice(2).filter((a) => a !== '--record');
+const bundles = 'dist/packs/bundles.json';
+if (record && existsSync(bundles)) renameSync(bundles, `${bundles}.off`);
 const limits = process.env.LIMITS !== '0';
 const LIMIT_TITLE = Number(process.env.LIMIT_TITLE ?? 1), LIMIT_READY = Number(process.env.LIMIT_READY ?? 20);
 
@@ -30,9 +36,16 @@ page.on('requestfinished', async (r) => {
 const t0 = Date.now();
 await page.goto(base + (query.startsWith('?') ? query : '?' + query));
 console.log('page loaded', ((Date.now() - t0) / 1000).toFixed(1));
-const gate = await page.waitForSelector('.t-gate', { timeout: 60000 }).then(() => (Date.now() - t0) / 1000).catch(() => null);
+const seen = await page.waitForSelector('.t-gate', { timeout: 60000 }).then(() => (Date.now() - t0) / 1000).catch(() => null);
+// When the title was first painted: the browser's element timing of the gate's name (`elementtiming="title"`). The
+// probe's own look (`seen`) can come seconds later, as the game's start keeps the page's thread busy meanwhile.
+const painted = seen === null ? null : await page.evaluate(() => new Promise((done) => {
+  setTimeout(() => done(null), 5000);
+  new PerformanceObserver((l) => { const e = l.getEntries().find((x) => x.identifier === 'title'); if (e) done(e.renderTime || e.loadTime); }).observe({ type: 'element', buffered: true });
+}));
+const gate = seen === null ? null : painted !== null ? painted / 1000 : seen;
 if (gate !== null) await page.keyboard.press('Space');
-if (gate !== null) console.log('title', gate.toFixed(2));
+if (gate !== null) console.log(`title ${gate.toFixed(2)} (first paint; the probe saw it at ${seen.toFixed(2)})`);
 const came = await page.waitForFunction(() => window.__mwReady === true, null, { timeout: Number(process.env.LOAD_WAIT ?? 300) * 1000 }).then(() => true, () => false);
 const playable = came ? (Date.now() - t0) / 1000 : Infinity;
 console.log('playable', playable.toFixed(1));
@@ -42,6 +55,13 @@ await page.waitForTimeout(Number(process.env.LOAD_AFTER ?? 3000));
 await browser.close();
 server.httpServer.closeAllConnections?.();
 await server.close();
+
+if (record && existsSync(`${bundles}.off`)) renameSync(`${bundles}.off`, bundles);
+if (record) {
+  const files = [...new Set(got.filter((g) => !g.ready && g.path.startsWith('packs/') && !g.path.endsWith('bundles.json')).map((g) => decodeURIComponent(g.path.slice('packs/'.length))))].sort();
+  writeFileSync('tools/packs/start.json', `${JSON.stringify({ note: 'The pack files a start fetches (npm run load -- --record); tools/packs/bundle.mjs joins them.', files }, null, 1)}\n`);
+  console.log(`tools/packs/start.json: ${files.length} files`);
+}
 
 const MB = 1024 * 1024;
 const byFolder = new Map();

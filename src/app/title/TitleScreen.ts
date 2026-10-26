@@ -74,8 +74,11 @@ export class TitleScreen {
     this.build = el('div', { className: 't-build', textContent: 'Waking the world' });
     // Browsers allow sound only after a press: the opening waits for one, so the theme and the ward line
     // begin together (the world keeps loading meanwhile).
+    // `elementtiming`: `npm run load` reads when the title was first painted.
+    const name = el('div', { className: 'name', textContent: 'MasterWorld' });
+    name.setAttribute('elementtiming', 'title');
     this.gate = el('div', { className: 't-gate', role: 'button', ariaLabel: 'Press any key to begin' },
-      el('div', { className: 'name', textContent: 'MasterWorld' }), el('div', { className: 'press', textContent: 'Press any key' }));
+      name, el('div', { className: 'press', textContent: 'Press any key' }));
     this.root = el('div', { id: 'title', className: calm ? 'calm gated' : 'gated' },
       still, svg(dawnSvg(wardLine(draw.seed))), this.toys, el('div', { className: 't-vignette' }),
       logo, panel, peoples, this.crier(), el('div', { className: 't-hint', textContent: HINT }), this.build, this.gate);
