@@ -44,7 +44,7 @@ const RAFTERS: Tint = [168, 146, 124], DIRT: Tint = [176, 160, 140];
 interface WallLook { readonly mat: number; readonly tint: Tint; readonly damp: number }
 
 /** `base` a little lighter or darker, by up to ±v. */
-const varyTint = (rng: Rng, base: Tint, v: number): Tint => base.map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + rng.range(-v, v)))))) as unknown as Tint;
+export const varyTint = (rng: Rng, base: Tint, v: number): Tint => base.map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + rng.range(-v, v)))))) as unknown as Tint;
 
 const scaleTint = (t: Tint, k: number): Tint => [Math.round(t[0] * k), Math.round(t[1] * k), Math.round(t[2] * k)];
 

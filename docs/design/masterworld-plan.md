@@ -422,6 +422,8 @@ Like Dunfinity:
 
 The mode is a setting the VGM honours (D4): in roguelike mode it is stricter with fairness, since a death costs more.
 
+* **Built (2026-10-26, A4)**: `src/game/death.ts` holds both rules. The creator's foot has the tale's lever (Classic or Roguelike, with what each means), and the save keeps the mode (save version 4). **Classic**: the hero wakes at the inn with half the purse gone; what is worn stays on, the pack stays where they fell as remains, with a lead in the journal and a mark on the map and compass (at the dungeon's door when it was below). Walking back to the spot takes it all up and closes the lead. **Roguelike**: the game writes one slot (`roguelike`) every minute, at every door and as the page closes, and nothing is saved, loaded or exported by hand. Falling ends the tale: the save is rewritten at once as the heir's (`heirSave`: the same seed, ledger, places, townsfolk and clock; no hero), everything the fallen hero had lies there as a grave, the end plaque shows (`src/app/talesEnd.ts`), and "A new hero" opens the creator in the same world, where the town's talk marks the grave on the new hero's map. `?open=tale` shows the plaque. The remains are drawn where they lie (`src/world/dungeon/remainsMesh.ts`, `src/render/remainsView.ts`): a slumped pack with a coil of rope, or a low cairn with the pack at its foot, in the town's building shader (no new shaders); `?remains=pack|grave` lays one in front of the start. Not yet: the VGM's stricter fairness in roguelike mode.
+
 ### 11.2 Combat and controls (D13)
 
 * **Real-time combat with tab targeting.** Tab cycles through hostile targets in front of the player, nearest and most threatening first. Abilities fire at the current target.
