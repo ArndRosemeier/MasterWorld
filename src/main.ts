@@ -961,10 +961,10 @@ export async function start(b: Boot): Promise<void> {
         const out = above && !rooms?.inside, w = player.walker;
         const near = lookSmall ? small.firstSeen(lookSmall) : null;
         if (near) {
-          standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
-          // With `fly`: the free camera close by, looking at it (the hero stays off where it does not alarm them).
-          if (player.flying) {
-            const p = player.walker.pos, k = Math.max(1, Math.hypot(p.x - near.x, p.z - near.z)), d = lookSmall === 'flock' ? 30 : 2.5;
+          // With `fly`: the free camera close by, looking at it (a free camera alarms no one).
+          if (!player.flying) standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
+          else {
+            const p = view.camera.position, k = Math.max(1, Math.hypot(p.x - near.x, p.z - near.z)), d = lookSmall === 'flock' ? 30 : 2.5;
             const cx = near.x + (p.x - near.x) / k * d + (p.z - near.z) / k * d * 0.4, cz = near.z + (p.z - near.z) / k * d - (p.x - near.x) / k * d * 0.4;
             const cy = lookSmall === 'flock' ? near.y - 6 : terrain.height(cx, cz) + 0.9;
             player.fly.place(cx, cz, cy, true);
@@ -973,7 +973,9 @@ export async function start(b: Boot): Promise<void> {
           }
           lookSmall = null;
         }
-        if (out) for (const e of small.step(dt, { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed }, daylight(view.sky.hour), wx.shown.rain)) sounds?.wings(e);
+        // A free camera disturbs no one; they live round it.
+        const hero = player.flying ? null : { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed };
+        if (out) for (const e of small.step(dt, hero, daylight(view.sky.hour), wx.shown.rain, hero ?? view.camera.position)) sounds?.wings(e);
         smallView.show(dt, view.camera.position, out);
       }
       if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;

@@ -167,6 +167,8 @@ const key = (i: number, j: number) => (i + 32768) * 65536 + (j + 32768);
 
 /** How near someone comes (m) before a squirrel watches, flees; before ground birds and flocks take wing (walking; running adds). */
 const WATCH = 16, BOLT = 8, FLUSH = 9, FLOCK_FLUSH = 22, RUN_EXTRA = 1.7;
+/** No one about (far beyond every sense). */
+const NOBODY: LifeHero = { x: 1e9, y: 0, z: 1e9, speed: 0 };
 /** Running pace (m/s) from which the hero counts as running. */
 const RUNNING = 3.5;
 
@@ -208,12 +210,16 @@ export class SmallLife {
     return `small life ${this.squirrels.length} squirrels, ${shown}/${birds} birds`;
   }
 
-  /** Advance `dt` seconds with the hero where they are; `day`: daylight 0..1; `rain` 0..1. */
-  step(dt: number, hero: LifeHero, day: number, rain: number): LifeEvent[] {
+  /**
+   * Advance `dt` seconds with the hero where they are (null: nobody about to disturb them, a free camera);
+   * `day`: daylight 0..1; `rain` 0..1; `around`: where they live (the hero, or the free camera).
+   */
+  step(dt: number, hero: LifeHero | null, day: number, rain: number, around: { x: number; z: number } = hero ?? NOBODY): LifeEvent[] {
     this.time += dt;
     this.day = day;
     this.rain = rain;
-    this.liveAround(hero);
+    this.liveAround(around);
+    hero ??= NOBODY;
     const events: LifeEvent[] = [];
     const dark = day < 0.25;
     for (const s of this.squirrels) {
@@ -229,7 +235,7 @@ export class SmallLife {
 
   // --- The squares around the hero ---
 
-  private liveAround(hero: LifeHero): void {
+  private liveAround(hero: { x: number; z: number }): void {
     const C = LIFE_CELL;
     const ci = Math.floor(hero.x / C), cj = Math.floor(hero.z / C), n = Math.ceil(LIVE / C);
     for (const [k, sq] of this.squares) {

@@ -234,5 +234,9 @@
   {
     "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/sim/wild.ts#step",
     "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+  },
+  {
+    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/smallLife.ts#step",
+    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
   }
 ]
