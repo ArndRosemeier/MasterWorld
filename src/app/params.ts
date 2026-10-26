@@ -32,6 +32,11 @@ export const params = {
   grass: q.get('grass') !== '0',
   /** `horizon=0`: no hill shadows beyond the sun's shadow map (for comparing). */
   horizon: q.get('horizon') !== '0',
+  /** `post=0`: no post chain (bloom), straight to the screen (for comparing). */
+  post: q.get('post') !== '0',
+  /** Post chain checks: `postSamples=0` no multisampling in its scene pass, `postDepth=int` a fixed-point depth buffer. */
+  postSamples: q.has('postSamples') ? Number(q.get('postSamples')) : undefined,
+  postFloatDepth: q.get('postDepth') !== 'int',
   /** Draw the town's buildings (`town=0` leaves them out, for comparisons). */
   town: q.get('town') !== '0',
   /** How many townsfolk are drawn at most (`folk=0`: none). */
