@@ -22,9 +22,19 @@ export function missingPacks(dist = join(root, 'dist')) {
   return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).filter((k) => !existsSync(join(dist, 'packs', k, 'manifest.json')));
 }
 
+/** The Actors version the build's packs were copied from, when it is not the installed one (else ''). */
+export function stalePacks(dist = join(root, 'dist')) {
+  const want = JSON.parse(readFileSync(join(root, 'node_modules/@actors/generator/package.json'), 'utf8')).version;
+  const stamp = join(dist, 'packs/human/.selection');
+  const have = existsSync(stamp) ? JSON.parse(readFileSync(stamp, 'utf8')).version : 'none';
+  return have === want ? '' : `dist/packs are from Actors ${have}, installed is ${want}`;
+}
+
 export async function launch({ headed = false, args: extra = [] } = {}) {
   const missing = missingPacks();
   if (missing.length) throw new Error(`dist/packs has no ${missing.join(', ')}: run \`npm run packs\` and \`npm run build\` first`);
+  const stale = stalePacks();
+  if (stale) throw new Error(`${stale}: run \`npm run packs\` and \`npm run build\` first`);
   const server = await preview({ preview: { port: 5202, strictPort: false }, logLevel: 'silent' });
   const base = server.resolvedUrls.local[0];
   const gpu = !!process.env.SHOT_GPU;
