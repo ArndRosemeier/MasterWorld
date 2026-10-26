@@ -100,6 +100,23 @@ export interface OrderDecision {
 }
 
 /**
+ * A people's own place (plan 11.6, D34): the gate of a hold cut into a hillside, with a level court before
+ * it. The ground is shaped for it (world/hold.ts): the court levelled at `level`, a rock face rising behind
+ * the gate. Its doorway's middle, and the way it faces (yaw as a barrow's: facing the gate is facing yaw).
+ */
+export interface HoldDecision {
+  readonly kind: 'hold';
+  readonly id: string;
+  /** The people's id (an Actors race id). */
+  readonly people: string;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  /** The court's height above the sea, metres. */
+  readonly level: number;
+}
+
+/**
  * A region opened (plan 5.2, 5.5, D16): the VGM opened the aligned square `(level, x, z)` of side
  * 250 m × 2^level ahead of the hero and filled it from the setting (`fill`: a fill id of the setting's
  * regions, such as a hamlet, a camp, ruins or a barrow field). Where smaller regions inside the square were
@@ -118,7 +135,6 @@ export interface RegionDecision {
   /** Game hours since the world began. */
   readonly at: number;
 }
-
 
 /** A path (people on foot), a cart track (to hamlets and farms) or a road (between towns): plan 7. */
 export type RoadWay = 'path' | 'track' | 'road';
@@ -151,19 +167,30 @@ export function settlementOf(d: RegionDecision, fills: readonly RegionFillDef[])
   return { kind: 'town', id: d.id, x: d.site.x, z: d.site.z, radius: d.site.r, size: f.place, seed: d.seed };
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision;
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision;
 
 export type DecisionLog = readonly Decision[];
 
+/** How far other places keep from a people's hold, metres. */
+const HOLD_KEEP = 90;
+
 /**
- * Ground the log has put something on out on the land: barrows (`dungeonR` metres round each) and the places
- * in opened regions (their own footprint). New places keep away from it.
+ * Ground the log has put something on out on the land: barrows (`dungeonR` metres round each), the places
+ * in opened regions (their own footprint) and the peoples' holds. New places keep away from it.
  */
 export function sitesIn(log: DecisionLog, dungeonR: number): { x: number; z: number; r: number }[] {
   const out: { x: number; z: number; r: number }[] = [];
   for (const d of log) {
     if (d.kind === 'dungeon' && d.site) out.push({ x: d.site.x, z: d.site.z, r: dungeonR });
     else if (d.kind === 'region' && d.site) out.push({ x: d.site.x, z: d.site.z, r: d.site.r });
+    else if (d.kind === 'hold') out.push({ x: d.x, z: d.z, r: HOLD_KEEP });
   }
   return out;
+}
+
+/** The dungeon a promise is about: a dungeon decision itself, or the one a move-in moved into (else null). */
+export function dungeonOf(log: DecisionLog, d: Decision | undefined): DungeonDecision | null {
+  if (d?.kind === 'dungeon') return d;
+  if (d?.kind !== 'move-in') return null;
+  return log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === d.dungeon) ?? null;
 }

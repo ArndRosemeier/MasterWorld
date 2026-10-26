@@ -20,6 +20,10 @@ const DRAB = ['#5a4a32', '#4e4434', '#62563e', '#3f382c', '#6a5c44'];
 const GRAVE = ['#5f5c52', '#4f4c44', '#6b665a'];
 const LEATHER = ['#3a2416', '#2a1d14', '#4a3020'];
 
+/** A hold's wardens: steel-grey mail over quilting, a tabard in the hold's deep red, dark hose. */
+const HOLD_RED = ['#6e2222', '#64201f', '#742a24'];
+const HOSE = ['#3b3a33', '#33302a'];
+
 /** Grey, white and dead-straw hair of the dead that walk. */
 const GRAVE_HAIR = ['#8a8580', '#b0aca4', '#6e6a5e', '#a89a78'];
 
@@ -27,6 +31,8 @@ const GRAVE_HAIR = ['#8a8580', '#b0aca4', '#6e6a5e', '#a89a78'];
 function hairOf(b: Humanoid, female: boolean, r: Rng): CharacterPatch {
   if (b.bones) return { hair: null, beard: 'none', stubble: 0 };
   if (b.gaunt) return { hair: r.chance(0.7) ? r.pick(['hair-long01', 'hair-shaggy']) : null, hairColor: r.pick(GRAVE_HAIR), beard: 'none', stubble: 0 };
+  // Dwarves: long, braided or forked beards (and under a mail coif no hair to poke through).
+  if (b.race === 'dwarf') return { hair: b.outfit === 'guard' ? null : r.pick(female ? WOMEN_HAIR : MEN_HAIR), hairColor: r.pick(HAIR_COLORS), beard: female ? 'none' : r.pick(['long', 'braided', 'forked', 'full'] as const), stubble: female ? 0 : r.range(0.3, 0.7) };
   if (b.race === 'goblin') return { hair: r.chance(0.5) ? r.pick(['hair-shaggy', 'hair-short-messy']) : null, hairColor: r.pick(['#1c1814', '#2a1d14', '#3b2417']), beard: 'none', stubble: 0 };
   return {
     hair: r.pick(female ? WOMEN_HAIR : MEN_HAIR), hairColor: r.pick(HAIR_COLORS),
@@ -45,6 +51,9 @@ export function foeLook(def: CreatureDef, seed: number, id: number): CharacterPa
   const outfit = b.outfit === 'bandit'
     ? [...under, wear('med-tunic', r.pick(DRAB)), wear('med-hose', r.pick(DRAB)), wear('med-jerkin', r.pick(LEATHER)), wear('med-belt', r.pick(LEATHER)),
       wear('leather-boots', r.pick(LEATHER)), ...(r.chance(0.6) ? [wear('hood-down', r.pick(DRAB))] : [])]
+    : b.outfit === 'guard'
+      ? [...under, wear('med-hose', r.pick(HOSE)), 'med-gambeson', 'med-hauberk', 'med-coif', wear('med-tabard', r.pick(HOLD_RED)), wear('med-belt', r.pick(LEATHER)),
+        wear('gauntlet-gloves', r.pick(LEATHER)), wear('leather-boots', r.pick(LEATHER))]
     : b.outfit === 'grave'
       ? [...under, wear('med-long-tunic', r.pick(GRAVE))]
       : [...under, wear('med-tunic', r.pick(DRAB)), wear('wool-pants', r.pick(DRAB))];

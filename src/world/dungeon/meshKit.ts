@@ -216,7 +216,16 @@ function corners(x: number, y0: number, z: number, sx: number, sy: number, sz: n
 /** `base` a little lighter or darker, by up to ±v. */
 /** A tint made lighter or darker by `k` (clamped to 0..255). */
 export const scaleTint = (t: Tint, k: number): Tint => t.map((c) => Math.max(0, Math.min(255, Math.round(c * k)))) as unknown as Tint;
-export const varyTint = (rng: Rng, base: Tint, v: number): Tint => base.map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + rng.range(-v, v)))))) as unknown as Tint;
+/** Between two tints, `t` of the way from `a` to `b`. */
+export const mixTint = (a: Tint, b: Tint, t: number): Tint => a.map((c, i) => Math.round(c + (b[i] - c) * t)) as unknown as Tint;
+/**
+ * A tint a little lighter or darker (up to `v`), its hue moved only a trace: a hue drawn per channel turns grey
+ * stone pink, green or blue next to its neighbours.
+ */
+export const varyTint = (rng: Rng, base: Tint, v: number): Tint => {
+  const k = 1 + rng.range(-v, v), hue = [0, rng.range(-v, v) * 0.15, rng.range(-v, v) * 0.15];
+  return base.map((c, i) => Math.max(0, Math.min(255, Math.round(c * k * (1 + hue[i]))))) as unknown as Tint;
+};
 
 export { BuildingMat };
 

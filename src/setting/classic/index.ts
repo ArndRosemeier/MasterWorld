@@ -8,6 +8,7 @@ import { barrow } from './barrow';
 import { cave } from './cave';
 import { cellar } from './cellar';
 import { names, talk } from './people';
+import { peoples, standing } from './peoples';
 import { creatures } from './creatures';
 import { hero } from './hero';
 import { routines } from './routines';
@@ -58,6 +59,8 @@ export const classic: SettingModule = {
   },
   dungeons: { cellar, barrow, cave, tower },
   names,
+  peoples,
+  standing,
   talk,
   skills,
   creatures,

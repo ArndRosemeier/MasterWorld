@@ -68,6 +68,12 @@ export const params = {
   /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
   cave: q.has('cave'),
   tower: q.has('tower'),
+  /**
+   * Start in the court of the first people's hold, facing its gate (`hold`); `hold=friend` (or another
+   * tier: hated, unwelcome, stranger, honoured) sets the hero's standing with that people to it.
+   */
+  hold: q.has('hold'),
+  holdTier: (['hated', 'unwelcome', 'stranger', 'friend', 'honoured'] as const).find((k) => k === q.get('hold')) ?? null,
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
   /** Open character creation at once, without the title (`create`; with the title it follows New game). */

@@ -58,6 +58,7 @@ export const items: ItemCatalog = {
     { id: 'boar', items: [['boar-tusk', 2], ['venison', 1]], count: [1, 2], coins: [0, 0] },
     { id: 'deer', items: [['deer-hide', 1], ['venison', 2]], count: [1, 1], coins: [0, 0] },
     { id: 'web', items: [['silk', 4], ['old-coin', 2], ['dagger', 1], ['boots', 1], ['ring', 1]], count: [1, 2], coins: [0, 20] },
+    { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1]], count: [0, 1], coins: [10, 40] },
     { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1]], count: [0, 1], coins: [0, 10] },
     { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2]], count: [1, 2], coins: [3, 25] },
     {

@@ -258,10 +258,7 @@ export class Cellars {
   private heap(d: DungeonDecision, site: LandSite, layout: DungeonLayout): Mound {
     const h = this.host, y = h.ground(site.x, site.z);
     const put = (mesh: BuildingMesh, sink: number): Mesh => {
-      const m = buildingMeshAt(mesh, site.x, y - sink, site.z, d.template);
-      m.rotation.y = site.yaw;
-      // The mesh keeps the matrix it was made with (matrixAutoUpdate off): turn that too.
-      m.updateMatrix();
+      const m = buildingMeshAt(mesh, site.x, y - sink, site.z, d.template, site.yaw);
       void h.stage.add(m);
       return m;
     };

@@ -53,6 +53,14 @@ export const creatures: readonly CreatureDef[] = [
     attacks: [{ name: 'claws', damage: [5, 11], kind: 'claw', reach: 0.9, time: 1.5, skill: 40 }],
     loot: 'grave', tell: 'Cold breath on your neck, and the sweet smell of the grave.',
   },
+  // The dwarves' wardens at the gate of their hold (plan 11.6): they stand their posts and fight only an
+  // outsider who will not turn back (game/hold.ts). Never run, and hard: the hold is no place to brawl.
+  {
+    id: 'hold-warden', name: 'warden', plural: 'wardens', body: { kind: 'humanoid', race: 'dwarf', height: 1.42, outfit: 'guard', held: 'bearded-axe' },
+    health: 74, armour: 5, defence: 34, speed: 4.4, senses: { sight: 32, hearing: 22 }, temper: 'hostile', morale: 1, pack: true, role: 'melee', danger: 24,
+    attacks: [{ name: 'bearded axe', damage: [7, 13], kind: 'cut', reach: 1.0, time: 2.3, skill: 46 }],
+    loot: 'hold', tell: 'Iron on stone, and a horn somewhere above the gate.',
+  },
   // The land around the town (plan 9.3: the world simulation's wild).
   {
     id: 'highwayman', name: 'bandit', plural: 'bandits', body: { kind: 'humanoid', race: 'human', height: 1.8, outfit: 'bandit', held: 'short-sword' },

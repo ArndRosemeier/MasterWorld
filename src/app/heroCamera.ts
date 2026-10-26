@@ -19,8 +19,13 @@ const LOOK = 0.0035;
 const NEAR = 0, FAR = 18, FIRST = 0.6;
 /** A talk's view (m): this far above the aim (about eye height, under a room's wall tops), and at least this far above the hero's head. */
 const TALK_UP = 0.3, TALK_OVER_HEAD = 0.1;
-/** The shots tried for a talk, best first: back and to the right (m). */
-const TALK_SHOTS: readonly (readonly [number, number])[] = [[1.3, 0.45], [1.3, -0.45], [1.3, 0], [1.0, 0.8], [1.0, -0.8], [0.8, 0.3], [0.8, -0.3]];
+/** The top of a hood or helmet above the head point (m), and how far a talk's view may rise to leave it out of the shot. */
+const TALK_HEAD_TOP = 0.15, TALK_RISE = 0.8;
+/**
+ * The shots tried for a talk, best first: back and to the right (m). Never straight behind: there the hero's
+ * head (a hood, a helmet) fills the bottom middle of the frame.
+ */
+const TALK_SHOTS: readonly (readonly [number, number])[] = [[1.3, 0.45], [1.3, -0.45], [1.6, 0.7], [1.6, -0.7], [1.0, 0.8], [1.0, -0.8], [0.8, 0.45], [0.8, -0.45]];
 
 export class HeroCamera {
   /** The camera's own direction (rad): yaw as the walker's, pitch up positive. */
@@ -115,6 +120,8 @@ export class HeroCamera {
 
   /** In a talk: the camera holds the talk's view (`frameTalk`) instead of trailing. */
   private talking = false;
+  /** The talk's shot as chosen (back, side, how much is in the way), for checks. */
+  talkShot: { back: number; side: number; hits: number } | null = null;
 
   /**
    * A talk's view (`on`): close over the hero's right shoulder and above the heads, looking at `at` (the
@@ -148,15 +155,29 @@ export class HeroCamera {
       if (n < least) { least = n; back = b; side = sd; }
       if (!n) break;
     }
+    this.talkShot = { back, side, hits: least };
     const eye = new Vector3(head.x - fx * back - fz * side, Math.max(head.y + TALK_OVER_HEAD, at.y + TALK_UP), head.z - fz * back + fx * side);
+    const sight = this.world.sightSurface ?? this.world.rockSurface;
+    const clear = () => { const rock = sight(eye.x, eye.y, eye.z); return rock === null || rock >= 0.3; };
     // Under a ceiling: down until clear of it.
-    for (let i = 0; i < 8; i++) {
-      const rock = (this.world.sightSurface ?? this.world.rockSurface)(eye.x, eye.y, eye.z);
-      if (rock === null || rock >= 0.3) break;
-      eye.y -= 0.1;
+    for (let i = 0; i < 8 && !clear(); i++) eye.y -= 0.1;
+    // Up while the top of the hero's head (a hood, a helmet) is in the shot, as far as the room allows: from
+    // close behind, the head would fill the bottom of the frame.
+    const top = new Vector3(head.x, head.y + TALK_HEAD_TOP, head.z);
+    for (let i = 0; i < TALK_RISE / 0.1; i++) {
+      this.aimTalk(eye, at);
+      const p = top.clone().project(this.camera);
+      if (p.y < -1.05 || Math.abs(p.x) > 1.05) break;
+      eye.y += 0.1;
+      if (!clear()) { eye.y -= 0.1; break; }
     }
+    this.aimTalk(eye, at);
+  }
+
+  private aimTalk(eye: Vector3, at: Vector3): void {
     this.camera.position.copy(eye);
     this.camera.lookAt(at);
+    this.camera.updateMatrixWorld();
   }
 
   /** Place the camera behind the hero's head (`head` the point it orbits). */

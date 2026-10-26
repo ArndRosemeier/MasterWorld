@@ -103,3 +103,18 @@ test('cave: no wooden doors in the rock; a wedged boulder or an iron grate where
   }
   assert.ok(seen > 5, `${seen} shut ways seen`);
 });
+
+test('tower: weathered stone, greyed and greened, never pastel; its foot darker than its walls', () => {
+  const m = towerMesh(towerSize(12, 16, 4), 7);
+  let foot = 0, nf = 0, wall = 0, nw = 0;
+  for (let v = 0; v < m.position.length / 3; v++) {
+    if (m.mat[v] !== BuildingMat.Ashlar) continue;
+    const [r, g, b] = [m.tint[3 * v], m.tint[3 * v + 1], m.tint[3 * v + 2]];
+    assert.ok(b <= g + 3 && r - g <= 16, `a pastel stone: ${r},${g},${b}`);
+    const y = m.position[3 * v + 1], l = r + g + b;
+    // The faces outside are cut where the damp is darkest (0.9 m up) and where it has gone (3.2 m).
+    if (Math.abs(y - 0.9) < 1e-4) { foot += l; nf++; } else if (Math.abs(y - 3.2) < 1e-4) { wall += l; nw++; }
+  }
+  assert.ok(nf > 20 && nw > 20);
+  assert.ok(foot / nf < (wall / nw) * 0.7, `foot ${(foot / nf).toFixed(0)} vs wall ${(wall / nw).toFixed(0)}`);
+});

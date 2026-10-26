@@ -2,7 +2,7 @@
  * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack,
- * the map, the trade window, talk) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
+ * the map, the trade window, talk, a people's hold) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
  * writes `index.md` and `index.json` there. Before each shot it waits until everything near the hero is drawn
  * as itself (`game.undrawn` empty: townsfolk dressed, creatures warm; at most SET_DRAWN ms, default 15000; it ends as soon as all are drawn) and
  * then until no shader was built for 1.5 s (at most SET_SETTLE ms, default 4000). Per shot the index has the
@@ -96,6 +96,8 @@ const SESSIONS = [
   ] },
   { id: 'inn', query: `${still}&hour=20&room=inn`, shots: [{ name: 'inn' }] },
   { id: 'talk', query: `${still}&hour=20&talk=inn&topics=news`, shots: [{ name: 'talk' }] },
+  // The dwarves' hold (plan 11.6): before its gate as a stranger, the wardens calling out.
+  { id: 'hold', query: `${still}&hour=15&weather=fair&hold=stranger`, shots: [{ name: 'hold' }] },
 ];
 
 const only = process.env.SET_ONLY?.split(',');

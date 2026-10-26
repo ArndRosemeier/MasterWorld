@@ -7,7 +7,7 @@
  */
 import { Rng, smoothstep } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
-import { BuildingMat, MeshKit, WildMat, scaleTint, varyTint, type Tint } from './meshKit';
+import { BuildingMat, MeshKit, WildMat, mixTint, scaleTint, type Tint } from './meshKit';
 
 /** The keep: half its width, its depth (from the front wall back), the walls' thickness, metres. */
 export interface TowerSize { readonly half: number; readonly depth: number; readonly storeys: number }
@@ -22,6 +22,12 @@ const FOOT = 2.2;
 const STOREY_OUT = 3.4;
 
 const STONE: Tint = [170, 162, 148], COURSE: Tint = [132, 124, 112], DARK: Tint = [10, 9, 8], MOSS: Tint = [150, 156, 120];
+/** Weathering: the damp, greened foot of the walls; rain-streaks running down from a broken top; moss on what faces the sky. */
+const DAMP: Tint = [62, 70, 50], STAIN: Tint = [74, 76, 66], LICHEN: Tint = [96, 116, 58];
+/** The ground's damp: darkest up to the first height, gone by the second, metres (grass hides the first metre). */
+const DAMP_FULL = 0.9, DAMP_UP = 3.2;
+/** The green of moss along a wall's broken top, metres down from it. */
+const MOSS_DOWN = 0.7;
 
 /** The keep's size for a tower dungeon whose rooms span `w` × `d` metres over `storeys` storeys above the ground. */
 export function towerSize(w: number, d: number, storeys: number): TowerSize {
@@ -57,11 +63,13 @@ export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
     const front = az === 0 && bz === 0, mid = Math.floor(n / 2);
     for (let s = 0; s < n; s++) {
       const t0 = s * w, t1 = (s + 1) * w, cx = ax + ux * (t0 + w / 2) + ix * (WALL / 2), cz = az + uz * (t0 + w / 2) + iz * (WALL / 2);
-      // Merlons stand a little higher on every other pier, where the top has not fallen.
-      const h = wallTop(cx, cz) + (s % 2 === 0 && wallTop(cx, cz) > top - 1.6 ? 0.9 : 0);
+      // Merlons stand a little higher on every other pier, where the top has not fallen (and not all of those are left).
+      const h = wallTop(cx, cz) + (s % 2 === 0 && wallTop(cx, cz) > top - 1.6 && rng.chance(0.55) ? 0.9 : 0);
       // Lighter or darker, never another hue: a hue per pier reads as pastel bands down the wall.
       const tint = scaleTint(STONE, rng.range(0.95, 1.05));
-      const run = (y0: number, y1: number) => pier(k, ax, az, ux, uz, t0, t1, y0, y1, tint);
+      // Rain runs down some piers from the top, further where the wall has broken.
+      const look: Weather = { streak: rng.chance(0.6) ? rng.range(0.6, 1) : 0, down: rng.range(2, 5) + (top - h) * 0.3 };
+      const run = (y0: number, y1: number) => pier(k, ax, az, ux, uz, t0, t1, y0, y1, tint, look);
       if (front && Math.abs(cx) < TOWER_DOOR.half + 0.5 && Math.abs(cx) < TOWER_DOOR.half) { run(TOWER_DOOR.h, h); continue; }
       // A window on the upper storeys: the pier stands round a dark opening.
       const win = s === mid && !front;
@@ -77,7 +85,7 @@ export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
       } else run(-FOOT, h);
       // A string course at every storey, and an arrow slit (dark) on some of the piers.
       for (let st = 1; st < size.storeys && st * STOREY_OUT < h - 0.4; st++) {
-        k.box(cx - ix * 0.08, st * STOREY_OUT - 0.12, cz - iz * 0.08, w + 0.03, 0.22, WALL + 0.16, yaw, BuildingMat.Ashlar, COURSE);
+        k.box(cx - ix * 0.08, st * STOREY_OUT - 0.12, cz - iz * 0.08, w + 0.03, 0.22, WALL + 0.16, yaw, BuildingMat.Ashlar, mixTint(COURSE, LICHEN, rng.range(0.3, 0.8)));
         if (s % 4 === 2 && !win && st * STOREY_OUT + 2 < h) k.box(cx - ix * (WALL / 2 + 0.01), st * STOREY_OUT + 0.6, cz - iz * (WALL / 2 + 0.01), 0.18, 1.1, 0.02, yaw, BuildingMat.Plaster, DARK);
       }
     }
@@ -86,7 +94,7 @@ export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
   const floorY = (size.storeys - 1) * STOREY_OUT;
   k.flat(-half + WALL, -depth + WALL, half - WALL, -WALL, floorY, true, WildMat.Grass, MOSS);
   // The doorway: jambs of bigger stones, and the dark of the vestibule beyond.
-  for (const side of [-1, 1]) k.stone(side * (TOWER_DOOR.half + 0.3), -0.2, 0.1, 0.6, TOWER_DOOR.h + 0.2, 0.5, rng.range(-0.04, 0.04), BuildingMat.Ashlar, varyTint(rng, STONE, 0.05), rng, 0.03, 0.2);
+  for (const side of [-1, 1]) k.stone(side * (TOWER_DOOR.half + 0.3), -0.2, 0.1, 0.6, TOWER_DOOR.h + 0.2, 0.5, rng.range(-0.04, 0.04), BuildingMat.Ashlar, scaleTint(STONE, rng.range(0.92, 1.04)), rng, 0.03, 0.2);
   const back = -TOWER_DOOR.deep;
   k.quad([-TOWER_DOOR.half, -0.1, back], [-TOWER_DOOR.half, TOWER_DOOR.h, back], [-TOWER_DOOR.half, TOWER_DOOR.h, -0.05], [-TOWER_DOOR.half, -0.1, -0.05], [[0, 0], [0, 1], [1, 1], [1, 0]], BuildingMat.Ashlar, [DARK, DARK, STONE, STONE]);
   k.quad([TOWER_DOOR.half, -0.1, -0.05], [TOWER_DOOR.half, TOWER_DOOR.h, -0.05], [TOWER_DOOR.half, TOWER_DOOR.h, back], [TOWER_DOOR.half, -0.1, back], [[0, 0], [0, 1], [1, 1], [1, 0]], BuildingMat.Ashlar, [STONE, STONE, DARK, DARK]);
@@ -102,7 +110,9 @@ export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
     if (Math.abs(bx) < TOWER_DOOR.half + 1.2 && bz > -1 && bz < 4.5) continue;
     if (Math.abs(bx) < half - 0.2 && bz < -0.2 && bz > -depth + 0.2) continue;
     const s = rng.range(0.4, 0.95);
-    k.stone(bx, -0.25, bz, s * rng.range(1, 1.6), s * 0.7, s, rng.range(0, 3), BuildingMat.Ashlar, varyTint(rng, STONE, 0.1), rng, 0.08, 0.35);
+    // Lighter or darker and greened by the weather, never another hue.
+    const fell = mixTint(scaleTint(STONE, rng.range(0.82, 1.02)), LICHEN, rng.range(0, 0.45));
+    k.stone(bx, -0.25, bz, s * rng.range(1, 1.6), s * 0.7, s, rng.range(0, 3), BuildingMat.Ashlar, fell, rng, 0.08, 0.35);
   }
   return k.mesh();
 }
@@ -112,16 +122,31 @@ function onWall(ax: number, az: number, ux: number, uz: number, t: number, inw: 
   return [ax + ux * t + uz * inw, y, az + uz * t - ux * inw];
 }
 
-/** One pier of a wall from `t0` to `t1` along it, `y0` to `y1`: its faces outside, inside, on top and at its ends. */
-function pier(k: MeshKit, ax: number, az: number, ux: number, uz: number, t0: number, t1: number, y0: number, y1: number, tint: Tint): void {
+/** How the weather has marked a pier: how dark the rain-streak from its top (0 none), how far down it runs. */
+interface Weather { readonly streak: number; readonly down: number }
+
+/**
+ * One pier of a wall from `t0` to `t1` along it, `y0` to `y1`: its faces outside, inside, on top and at its
+ * ends, weathered: damp and greened at the foot, streaked from the top, moss on top.
+ */
+function pier(k: MeshKit, ax: number, az: number, ux: number, uz: number, t0: number, t1: number, y0: number, y1: number, tint: Tint, look: Weather): void {
   if (y1 - y0 < 0.01) return;
   const P0 = onWall(ax, az, ux, uz, t0, 0, 0), P1 = onWall(ax, az, ux, uz, t1, 0, 0), Q0 = onWall(ax, az, ux, uz, t0, WALL, 0), Q1 = onWall(ax, az, ux, uz, t1, WALL, 0);
-  const foot = scaleTint(tint, 0.72), crown = scaleTint(tint, 1.05);
-  // (MeshKit.wall faces right of its way: outside is left of the wall's run, so the outer face runs back.)
-  k.wall(P1[0], P1[2], P0[0], P0[2], y0, y1, BuildingMat.Ashlar, tint, -t1, foot, crown);
+  const weathered = (y: number): Tint => {
+    const damp = 1 - smoothstep(DAMP_FULL, DAMP_UP, y), streak = look.streak * smoothstep(y1 - look.down, y1, y), moss = smoothstep(y1 - MOSS_DOWN, y1, y);
+    return mixTint(mixTint(mixTint(tint, STAIN, streak), LICHEN, moss * 0.7), DAMP, damp * 0.9);
+  };
+  // Bands where the weathering turns (the texture runs on in metres, so the courses carry across them).
+  const cuts = [y0, DAMP_FULL, DAMP_UP, y1 - look.down, y1 - MOSS_DOWN, y1].filter((y) => y >= y0 && y <= y1).sort((a, b) => a - b);
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const a = cuts[i], b = cuts[i + 1], lo = weathered(a), hi = weathered(b);
+    // (MeshKit.wall faces right of its way: outside is left of the wall's run, so the outer face runs back.)
+    k.wall(P1[0], P1[2], P0[0], P0[2], a, b, BuildingMat.Ashlar, tint, -t1, lo, hi);
+    k.wall(P0[0], P0[2], Q0[0], Q0[2], a, b, BuildingMat.Ashlar, tint, 0, lo, hi);
+    k.wall(Q1[0], Q1[2], P1[0], P1[2], a, b, BuildingMat.Ashlar, tint, 0, lo, hi);
+  }
   k.wall(Q0[0], Q0[2], Q1[0], Q1[2], y0, y1, BuildingMat.Ashlar, scaleTint(tint, 0.85), t0);
-  k.wall(P0[0], P0[2], Q0[0], Q0[2], y0, y1, BuildingMat.Ashlar, tint, 0, foot, crown);
-  k.wall(Q1[0], Q1[2], P1[0], P1[2], y0, y1, BuildingMat.Ashlar, tint, 0, foot, crown);
+  const crown = mixTint(weathered(y1), LICHEN, 0.55);
   const T = [P0, Q0, Q1, P1].map((p) => [p[0], y1, p[2]]);
   // Facing up: wound the way that gives an upward normal.
   const e1 = [T[2][0] - T[0][0], T[2][2] - T[0][2]], e2 = [T[3][0] - T[1][0], T[3][2] - T[1][2]];
