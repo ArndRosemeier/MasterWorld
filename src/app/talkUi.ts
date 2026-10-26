@@ -70,6 +70,9 @@ export class TalkUi {
 
   get open(): boolean { return this.with !== null; }
 
+  /** Who the hero is talking with now. */
+  get partner(): Agent | null { return this.with; }
+
   /** Each frame: who is near enough to talk to, or whether the talk partner was walked away from. */
   watch(): void {
     if (this.with) {
