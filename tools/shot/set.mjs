@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { launch } from './launch.mjs';
 
 const TIMEOUT = 120000;
-const SETTLE = Number(process.env.SET_SETTLE ?? 12000);
+const SETTLE = Number(process.env.SET_SETTLE ?? 6000);
 const MEASURE = Number(process.env.SET_MEASURE ?? 2000);
 const BUDGET = 16.7, AIM = 12;
 const gl = process.env.SET_GL !== '0';
@@ -31,6 +31,19 @@ const turn = (hour, kind) => (page) => page.evaluate(([hour, kind]) => {
   g.weather.cancel(now);
   g.weather.order({ kind, from: -1e6, to: 1e6 });
 }, [hour, kind]);
+/** The hero a few metres from a group of the wild (`kind`), facing it, once it is built near them. */
+const meet = (kind, d) => async (page) => {
+  await page.evaluate((kind) => {
+    const g = window.game, t = g.wild.territories.find((t) => t.def.id === kind);
+    g.player.teleport(t.x + t.r + 20, undefined, t.z, Math.PI / 2);
+  }, kind);
+  await page.waitForFunction((kind) => !!window.game.wild.sight(kind), kind, { timeout: TIMEOUT });
+  await page.evaluate(([kind, d]) => {
+    const g = window.game, seen = g.wild.sight(kind), p = g.player.walker.pos;
+    const l = Math.max(1, Math.hypot(p.x - seen.x, p.z - seen.z)), x = seen.x + (p.x - seen.x) / l * d, z = seen.z + (p.z - seen.z) / l * d;
+    g.player.teleport(x, undefined, z, Math.atan2(x - seen.x, z - seen.z));
+  }, [kind, d]);
+};
 const close = async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(600); };
 
 /**
@@ -52,10 +65,11 @@ const SESSIONS = [
     { name: 'town-rain', act: turn(14, 'rain') },
   ] },
   { id: 'cellar', query: `${still}&hour=12&cellar=2`, shots: [{ name: 'cellar' }] },
-  { id: 'barrow', query: `${still}&hour=15&weather=fair&barrow`, shots: [{ name: 'barrow' }] },
-  { id: 'wild', query: `${still}&hour=9&weather=fair&wild=deer`, shots: [{ name: 'wild' }] },
-  { id: 'fight', query: `${still}&hour=10&weather=clear&wild=wolves`, shots: [
-    { name: 'fight', act: async (p) => { await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
+  // Out on the land: the barrow, then the hero is moved to the deer and the wolves (a load is the dearest part).
+  { id: 'land', query: `${still}&hour=10&weather=fair&barrow`, shots: [
+    { name: 'barrow' },
+    { name: 'wild', act: meet('deer', 25) },
+    { name: 'fight', act: async (p) => { await meet('wolves', 12)(p); await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
   ] },
   { id: 'talk', query: `${still}&hour=20&talk=inn&topics=news`, shots: [{ name: 'talk' }] },
 ];
@@ -71,7 +85,6 @@ mkdirSync(dir, { recursive: true });
 
 // No frame cap: with vsync a GPU frame shows as the screen's 16.7 ms however little it costs.
 const { server, base, browser } = await launch({ args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
-const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } }); // one cache for all loads
 const t0 = Date.now();
 const rows = [];
 let failed = false, gpuName = '';
@@ -108,6 +121,7 @@ const measure = (page) => page.evaluate((ms) => new Promise((done) => {
 
 for (const s of sessions) {
   const errors = [];
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } }); // its own, as a player's first visit
   const page = await context.newPage();
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => { failed = true; errors.push(`page error: ${e.message}`); });
@@ -117,6 +131,7 @@ for (const s of sessions) {
   const ready = await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT }).then(() => true, () => false);
   if (!ready) { failed = true; errors.push('the page did not report ready'); }
   const loadS = (Date.now() - started) / 1000;
+  console.log(`${s.id}: ready in ${loadS.toFixed(1)} s`);
   await page.addStyleTag({ content: '#loading{display:none!important}#hud{visibility:hidden!important}' });
   if (!gpuName) gpuName = await page.evaluate(() => {
     const c = document.createElement('canvas').getContext('webgl2');
@@ -138,9 +153,8 @@ for (const s of sessions) {
     console.log(`${file}: settled ${settled.toFixed(1)} s · p50 ${ft.p50.toFixed(1)} ms · p95 ${ft.p95.toFixed(1)} ms · ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}${errors.length ? ` · ${errors.length} errors` : ''}`);
     errors.length = 0;
   }
-  await page.close();
+  await context.close();
 }
-await context.close();
 await browser.close();
 await server.close();
 
