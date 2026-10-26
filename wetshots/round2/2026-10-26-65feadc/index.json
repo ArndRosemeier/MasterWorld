@@ -1,0 +1,250 @@
+{
+  "commit": "65feadc561250a2e30540b017037ca61ee02622a",
+  "dirty": false,
+  "date": "2026-10-26",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": false,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 77.504,
+  "shots": [
+    {
+      "name": "town-noon",
+      "file": "01-town-noon.jpg",
+      "query": "title=0&day=0&hour=12&weather=clear",
+      "loadS": 19.067,
+      "drawnS": 0.044,
+      "settledS": 1.5169000000953674,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 147,
+      "p50": 13.399999999997817,
+      "p95": 19.299999999999272,
+      "mean": 13.606802721575013,
+      "shaders": {
+        "warmup": 84,
+        "run": 0,
+        "late": 0,
+        "worstMs": 9.600000023841858,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "pack",
+      "file": "02-pack.jpg",
+      "query": "title=0&day=0&hour=12&weather=clear",
+      "loadS": 19.067,
+      "drawnS": 0.043,
+      "settledS": 1.506899999976158,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 206,
+      "p50": 11.700000000000728,
+      "p95": 20.299999999999272,
+      "mean": 9.742233009940216,
+      "shaders": {
+        "warmup": 84,
+        "run": 0,
+        "late": 0,
+        "worstMs": 9.600000023841858,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "map",
+      "file": "03-map.jpg",
+      "query": "title=0&day=0&hour=12&weather=clear",
+      "loadS": 19.067,
+      "drawnS": 0.051,
+      "settledS": 1.504,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 146,
+      "p50": 13.700000000000728,
+      "p95": 28.099999999998545,
+      "mean": 13.717123288161144,
+      "shaders": {
+        "warmup": 84,
+        "run": 0,
+        "late": 0,
+        "worstMs": 9.600000023841858,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "town-dusk",
+      "file": "04-town-dusk.jpg",
+      "query": "title=0&day=0&hour=12&weather=clear",
+      "loadS": 19.067,
+      "drawnS": 0.058,
+      "settledS": 1.5325,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 130,
+      "p50": 13.89999999999418,
+      "p95": 31.30000000000291,
+      "mean": 15.410769230769242,
+      "shaders": {
+        "warmup": 84,
+        "run": 1,
+        "late": 0,
+        "worstMs": 11.299999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "town-night",
+      "file": "05-town-night.jpg",
+      "query": "title=0&day=0&hour=12&weather=clear",
+      "loadS": 19.067,
+      "drawnS": 0.039,
+      "settledS": 1.5153000000715255,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 107,
+      "p50": 17.299999999995634,
+      "p95": 38.900000000001455,
+      "mean": 18.901869158878505,
+      "shaders": {
+        "warmup": 84,
+        "run": 1,
+        "late": 0,
+        "worstMs": 11.299999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "town-rain",
+      "file": "06-town-rain.jpg",
+      "query": "title=0&day=0&hour=12&weather=clear",
+      "loadS": 19.067,
+      "drawnS": 0.038,
+      "settledS": 1.5607999999523163,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 105,
+      "p50": 16.10000000000582,
+      "p95": 40.799999999995634,
+      "mean": 19.089523809977912,
+      "shaders": {
+        "warmup": 84,
+        "run": 1,
+        "late": 0,
+        "worstMs": 11.299999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "paddock",
+      "file": "07-paddock.jpg",
+      "query": "title=0&day=0&hour=12&weather=clear",
+      "loadS": 19.067,
+      "drawnS": 0.052,
+      "settledS": 1.5141000000238418,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 190,
+      "p50": 10.30000000000291,
+      "p95": 15,
+      "mean": 10.576315789473684,
+      "shaders": {
+        "warmup": 84,
+        "run": 1,
+        "late": 0,
+        "worstMs": 11.299999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "trade",
+      "file": "08-trade.jpg",
+      "query": "title=0&day=0&hour=12&weather=clear",
+      "loadS": 19.067,
+      "drawnS": 0.018,
+      "settledS": 1.5061999999284745,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 155,
+      "p50": 11.599999999998545,
+      "p95": 36.900000000001455,
+      "mean": 12.930322581260453,
+      "shaders": {
+        "warmup": 84,
+        "run": 1,
+        "late": 0,
+        "worstMs": 11.299999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "town-wet-sun",
+      "file": "09-town-wet-sun.jpg",
+      "query": "title=0&day=0&hour=15&look=270,-4",
+      "loadS": 20.129,
+      "drawnS": 0.068,
+      "settledS": 1.5017999999523164,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 139,
+      "p50": 13.700000000000728,
+      "p95": 20.599999999998545,
+      "mean": 14.39352517985612,
+      "shaders": {
+        "warmup": 83,
+        "run": 1,
+        "late": 0,
+        "worstMs": 13.200000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    }
+  ]
+}
