@@ -528,6 +528,8 @@ export interface TalkDef {
   readonly cellar: string;
   /** The clause for "something is wrong down there" (`{subject}` the cellar). */
   readonly troubled: string;
+  /** How the household calls the cellar under their own house ("our cellar"). */
+  readonly ownCellar: string;
   /** The household's own source, as in "I know it from our own house". */
   readonly ownHouse: string;
   /** How a lead reads in the journal (`{cellar}`). */

@@ -38,7 +38,7 @@ test('talk: the household knows first-hand, the inn heard it from them, a strang
   const { talk } = townTalk(seed, classic, town, people, log);
   const own = talk.ask(household[0].id, 'news');
   assert.deepEqual(own.heard, [cellar.id]);
-  assert.match(own.text, /something is wrong in the cellar under/i);
+  assert.match(own.text, /something is wrong in our cellar/i);
   const innNews = talk.ask(inn.id, 'news');
   assert.deepEqual(innNews.heard, [cellar.id]);
   assert.match(innNews.text, /heard/i, 'hearsay is told as hearsay');
@@ -127,4 +127,12 @@ test('talk: a merchant offers trade as a topic, and asking for it opens the trad
   assert.equal(r.opens, 'trade');
   assert.ok(r.done);
   assert.equal(r.text, market.of(inn.id)!.shop.line);
+});
+
+test('talk: the household calls the cellar under their own house "our cellar"; the inn names the house', () => {
+  const { talk } = townTalk(seed, classic, town, people, log);
+  const own = talk.ask(household[0].id, 'news');
+  assert.match(own.text, /our cellar/i, own.text);
+  assert.doesNotMatch(own.text, /cellar under/i, own.text);
+  assert.match(talk.ask(inn.id, 'news').text, /cellar under/i);
 });

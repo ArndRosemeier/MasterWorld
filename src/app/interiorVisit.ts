@@ -66,7 +66,11 @@ export class InteriorVisit {
       const [x, z] = frame.toWorld(a, bb);
       this.player.teleport(x, y, z, Math.atan2(-b.vx, -b.vz));
       if (up) this.cooldown = 1.5;
-      else this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.`, 3);
+      // A cellar's house: the trapdoor in the floor is the way down (it lies in a dark corner, easy to miss).
+      else {
+        const trapdoor = plan.fixtures.some((f) => f.kind === 'hatch');
+        this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.${trapdoor ? ' A trapdoor in the floor leads down to the cellar.' : ''}`, trapdoor ? 6 : 3);
+      }
     });
   }
 

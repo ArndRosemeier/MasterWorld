@@ -271,8 +271,20 @@ export class TownTalk {
     }
     // Knowing nothing reads as plain talk, not as the engine's "I don't know about that".
     const nothing = this.talk.nothing;
-    const text = factual && !r.plan.results.length && act.function === 'ask' ? nothing[(person + n) % nothing.length] : r.text;
+    const text = factual && !r.plan.results.length && act.function === 'ask' ? nothing[(person + n) % nothing.length] : this.ownWords(person, r.text);
     return { text, heard, done: false };
+  }
+
+  /** The household speaks of the cellar under their own house as theirs ("our cellar"), not by its house's name. */
+  private ownWords(person: number, text: string): string {
+    const home = this.byId.get(person)?.person.home;
+    let out = text;
+    for (const [id, h] of this.cellarHouse) {
+      if (h.building !== home || h.site) continue;
+      const name = this.cellarName.get(id)!;
+      out = out.split(name).join(this.talk.ownCellar).split(cap(name)).join(cap(this.talk.ownCellar));
+    }
+    return out;
   }
 
   /** For the save (plan 17: the talk's evidence and the leads). */

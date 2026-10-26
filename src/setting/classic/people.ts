@@ -50,6 +50,7 @@ export const talk: TalkDef = {
   cellar: 'the cellar under {house}',
   troubled: 'something is wrong in {subject}',
   ownHouse: 'our own house',
+  ownCellar: 'our cellar',
   lead: 'Something is wrong in {cellar}.',
   marked: '{name} marks {house} on your map.',
   handOver: 'You hold out your map. {name} takes it and marks the place.',
