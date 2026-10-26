@@ -5,7 +5,9 @@
  * the scene hidden in turn (each top-level object of the scene, the sun's shadow map, the post chain), and prints
  * a table: what a part costs is how much the frame drops without it. Also the draw calls, the shaders built
  * after warm-up (and what they were), and the same for `PROBE_TURNS` (e.g. `23:clear,14:rain`: hour and weather).
- * PROBE_MEASURE=<ms> per measurement (default 2000).
+ * Each row is measured between two runs with everything drawn (the frame time drifts), and a CPU profile of the main
+ * thread follows (self time by script and function; PROBE_PROFILE=0 skips it; build with `npx vite build --minify
+ * false` for readable names). PROBE_MEASURE=<ms> per measurement (default 2000).
  */
 import { launch } from './launch.mjs';
 
@@ -77,26 +79,56 @@ const parts = () => page.evaluate(() => {
 
 const row = (label, m, base) => console.log(`| ${label} | ${m.p50.toFixed(1)} | ${m.p95.toFixed(1)} | ${m.render.toFixed(1)} | ${m.calls.toFixed(0)} | ${m.built} | ${base ? (base.p50 - m.p50).toFixed(1) : ''} |`);
 
+/** Main-thread CPU profile over a few seconds: self time by function, and by script. */
+async function profile() {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+  await cdp.send('Profiler.start');
+  await page.waitForTimeout(3000);
+  const { profile: prof } = await cdp.send('Profiler.stop');
+  const dt = new Map();
+  for (let i = 0; i < prof.samples.length; i++) dt.set(prof.samples[i], (dt.get(prof.samples[i]) ?? 0) + (prof.timeDeltas[i] ?? 0) / 1000);
+  const total = [...dt.values()].reduce((a, b) => a + b, 0);
+  const byFn = new Map(), byFile = new Map();
+  for (const n of prof.nodes) {
+    const t = dt.get(n.id) ?? 0;
+    if (!t) continue;
+    const f = n.callFrame, file = (f.url.split('/').pop() || '(native)').replace(/-[\w-]{8}\.js$/, '.js');
+    const k = `${f.functionName || '(anonymous)'} ${file}:${f.lineNumber + 1}:${f.columnNumber + 1}`;
+    byFn.set(k, (byFn.get(k) ?? 0) + t);
+    byFile.set(file, (byFile.get(file) ?? 0) + t);
+  }
+  const top = (m, n) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, t]) => `| ${k} | ${t.toFixed(0)} | ${(100 * t / total).toFixed(1)} |`).join('\n');
+  console.log(`\nCPU profile, 3 s (${total.toFixed(0)} ms sampled):\n\n| script | ms | % |\n|---|---|---|\n${top(byFile, 12)}\n\n| function (self time) | ms | % |\n|---|---|---|\n${top(byFn, 45)}`);
+  await cdp.detach();
+}
+
 async function probe(title) {
   console.log(`\n## ${title}\n\nsettled in ${(await quiet()).toFixed(1)} s\n`);
   const list = await parts();
   console.log('| part | objects | meshes | casters | skinned | triangles |\n|---|---|---|---|---|---|');
   for (const p of list) console.log(`| ${p.name} | ${p.n} | ${p.meshes} | ${p.casters} | ${p.skinned} | ${p.tris} |`);
-  console.log('\n| drawn | p50 ms | p95 ms | render ms (main thread) | scene draw calls | shaders built | saves ms |\n|---|---|---|---|---|---|---|');
-  const base = await measure();
-  row('everything', base);
+  console.log('\n| drawn | p50 ms | p95 ms | render ms (main thread) | draw calls | shaders built | saves ms (vs the runs next to it) |\n|---|---|---|---|---|---|---|');
+  // The frame time drifts: each row is measured between two runs with everything, and compared with their mean.
+  let before = await measure();
+  row('everything', before);
+  const paired = async (label, off, on) => {
+    await page.evaluate(off);
+    const m = await measure();
+    await page.evaluate(on);
+    const after = await measure();
+    row(label, m, { p50: (before.p50 + after.p50) / 2 });
+    before = after;
+  };
+  const restore = () => { for (const o of window.game.view.scene.children) if (o.userData.probeWas !== undefined) { o.visible = o.userData.probeWas; delete o.userData.probeWas; } };
   for (const { name } of list) {
-    await page.evaluate((name) => { for (const o of window.game.view.scene.children) if ((o.name || o.type).replace(/ [-\d:]+$/, '') === name) { o.userData.probeWas = o.visible; o.visible = false; } }, name);
-    row(`without ${name}`, await measure(), base);
-    await page.evaluate((name) => { for (const o of window.game.view.scene.children) if (o.userData.probeWas !== undefined) { o.visible = o.userData.probeWas; delete o.userData.probeWas; } }, name);
+    await page.evaluate((name) => { window.__hide = name; }, name);
+    await paired(`without ${name}`, () => { for (const o of window.game.view.scene.children) if ((o.name || o.type).replace(/ [-\d:]+$/, '') === window.__hide) { o.userData.probeWas = o.visible; o.visible = false; } }, restore);
   }
-  await page.evaluate(() => { const s = window.game.view.sun.shadow; s.autoUpdate = false; });
-  row('without sun shadow redraw', await measure(), base);
-  await page.evaluate(() => { const s = window.game.view.sun.shadow; s.autoUpdate = true; });
-  // Everything but the sky: what the land itself costs.
-  await page.evaluate(() => { for (const o of window.game.view.scene.children) if (o.isMesh || o.isGroup || o.isInstancedMesh) { o.userData.probeWas = o.visible; o.visible = false; } });
-  row('nothing (empty scene, post chain only)', await measure(), base);
-  await page.evaluate(() => { for (const o of window.game.view.scene.children) if (o.userData.probeWas !== undefined) { o.visible = o.userData.probeWas; delete o.userData.probeWas; } });
+  await paired('without sun shadow redraw', () => { window.game.view.sun.shadow.autoUpdate = false; }, () => { window.game.view.sun.shadow.autoUpdate = true; });
+  await paired('nothing (empty scene, post chain only)', () => { for (const o of window.game.view.scene.children) if (o.isMesh || o.isGroup || o.isInstancedMesh) { o.userData.probeWas = o.visible; o.visible = false; } }, restore);
+  if (process.env.PROBE_PROFILE !== '0') await profile();
   console.log('\nshaders:\n```\n' + await page.evaluate(() => window.shaders.report()) + '\n```');
   const after = await page.evaluate(() => {
     const by = new Map();
