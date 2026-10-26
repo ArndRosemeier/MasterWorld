@@ -62,7 +62,7 @@ import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
 import type { Decision, DungeonDecision, RegionDecision, RoadDecision, RoadWay } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
-import { InteriorView } from './render/town/InteriorView';
+import { HouseView } from './render/town/HouseView';
 import { lookFromDegrees } from './app/look';
 import { Sound } from './app/sound';
 import { SoundDirector } from './app/soundDirector';
@@ -179,16 +179,34 @@ export async function start(b: Boot): Promise<void> {
     const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), town?.stand(x, z) ?? -Infinity);
     // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
     const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
-    const below = () => visit()?.world ?? rooms?.world ?? null;
+    const below = () => visit()?.world ?? null;
+    // The building drawn open (its storeys, stairs and furniture where it stands).
+    const openHouse = () => (visit() ? null : rooms?.walk ?? null);
+    // Rock, and the open building's floors, walls and stairs (`shut`: its doorway too).
+    const surfaceAt = (x: number, y: number, z: number, shut: boolean): number | null => {
+      const b = below();
+      if (b) return b.rockSurface(x, y, z);
+      const t = terrain.rockSurface(x, y, z), h = openHouse()?.rockSurface(x, y, z, shut) ?? null;
+      return t === null ? h : h === null ? t : Math.min(t, h);
+    };
     const world: WalkWorld = {
       // Out of doors also the steps and porches before the doors (as floors: climbed a step at a time).
       height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
       floor: (x, z) => (below() ? null : town?.stand(x, z) ?? null),
-      rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : terrain.rockSurface(x, y, z); },
+      rockSurface: (x, y, z) => surfaceAt(x, y, z, false),
+      // In a building the camera stays in the room (its doorway shut to it).
+      sightSurface: (x, y, z) => surfaceAt(x, y, z, !!rooms?.inside),
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
       // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
-      wall: (x, z, r) => { const b = below(); return b ? !!b.wall?.(x, z, r) : !!town?.solid(x, z, r) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z); },
+      wall: (x, z, r, y) => {
+        const b = below();
+        if (b) return !!b.wall?.(x, z, r);
+        // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
+        const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
+        if (inHouse !== null) return inHouse;
+        return !!town?.solid(x, z, r, h?.building.id) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+      },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
@@ -571,7 +589,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     // Every door of the town opens on its room; a cellar's house has the hatch down.
-    if (town) rooms = new InteriorVisit(town.plan.buildings, cellars.down, new InteriorView(view.stage), player, view.lantern, view.sky, notes);
+    if (town) rooms = new InteriorVisit(town.plan.buildings, cellars.down, new HouseView(view.stage, houses), player, view.lantern, view.sky, notes);
     if (rooms && town && params.room !== null) {
       const b = params.room === 'cellar' ? house : town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
       if (b) await rooms.enter(b, true, params.room === 'cellar'); // the cellar: beside its hatch
@@ -1071,7 +1089,8 @@ export async function start(b: Boot): Promise<void> {
         if (out) for (const e of small.step(dt, hero, daylight(view.sky.hour), wx.shown.rain, hero ?? view.camera.position)) sounds?.wings(e);
         smallView.show(dt, view.camera.position, out);
       }
-      if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
+      // The people in the building drawn open (seen through its door and windows too).
+      if (folk) folk.indoors = life && rooms && !visit() ? rooms.people(life) : null;
       if (above) {
         // Until the game begins, the people round the hero's place are dressed (the title's fly-over is far up).
         if (folk) folk.focus = title?.holding || !window.__mwReady ? player.walker.pos : null;
@@ -1088,7 +1107,7 @@ export async function start(b: Boot): Promise<void> {
       }
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }

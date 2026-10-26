@@ -20,20 +20,12 @@
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the shared part already lives in the base class."
   },
   {
-    "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",
-    "reason": "The walker's world in main.ts delegates to the terrain's rockSurface (or the cellar's space below ground); an adapter, not a copy."
+    "key": "same name: masterworld/game/evening.ts#rockSurface + masterworld/main.ts#rockSurface",
+    "reason": "Both implement the WalkWorld interface (game/walker.ts): the evening check's land, and the game's land with the open building in it."
   },
   {
     "key": "same name: masterworld/app/loading.ts#fail + masterworld/app/title/TitleScreen.ts#fail",
     "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
-  },
-  {
-    "key": "same name: masterworld/app/cellarVisit.ts#enter + masterworld/app/interiorVisit.ts#enter",
-    "reason": "Two spaces behind a way in (the cellar's dungeon space under its hatch, a building's room behind its door), each going in, out and checking its exits; the fade they share is app/fade.ts, the notes app/notes.ts. Different spaces, different checks."
-  },
-  {
-    "key": "same name: masterworld/app/cellarVisit.ts#leave + masterworld/app/interiorVisit.ts#leave",
-    "reason": "Two spaces behind a way in (the cellar's dungeon space under its hatch, a building's room behind its door), each going in, out and checking its exits; the fade they share is app/fade.ts, the notes app/notes.ts. Different spaces, different checks."
   },
   {
     "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/app/interiorVisit.ts#update",
@@ -42,10 +34,6 @@
   {
     "key": "same name: masterworld/app/interiorVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (going in and out of rooms vs chunk selection); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/game/dungeonWorld.ts#waterLevel + masterworld/game/interiorWorld.ts#waterLevel",
-    "reason": "Both implement the WalkWorld interface (game/walker.ts): no water below ground or indoors."
   },
   {
     "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",

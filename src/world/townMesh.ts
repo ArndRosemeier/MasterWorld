@@ -9,12 +9,17 @@ import type { Town } from './town';
 /** Side of a merge cell, metres. */
 export const TOWN_CELL = 64;
 
-/** The buildings of one cell, near and far, positions relative to (x, 0, z). */
+/** Where one building's triangles are in a merged mesh: its id, the first index and how many. */
+export type MeshRange = [id: number, start: number, count: number];
+
+/** The buildings of one cell, near and far, positions relative to (x, 0, z), and each building's place in them (to hide one). */
 export interface TownCellMesh {
   x: number;
   z: number;
   near: BuildingMesh;
   far: BuildingMesh;
+  nearRanges: MeshRange[];
+  farRanges: MeshRange[];
 }
 
 /** Every cell of a town that has buildings in it. */
@@ -30,9 +35,19 @@ export function townMeshes(town: Town): TownCellMesh[] {
   for (const p of town.plan.props) (p.kind === 'fence' ? cellAt(p.posts[0], p.posts[2]) : cellAt(p.x, p.z)).props.push(p);
   return [...cells.values()].map(({ i, j, list, props }) => {
     const x = (i + 0.5) * TOWN_CELL, z = (j + 0.5) * TOWN_CELL;
-    const meshes = (detail: boolean) => mergeMeshes([...list.map((b) => buildingMesh(b, [x, 0, z], detail)), ...props.map((p) => propMesh(p, [x, 0, z], detail))]);
-    return { x, z, near: meshes(true), far: meshes(false) };
+    const meshes = (detail: boolean) => {
+      const parts = list.map((b) => buildingMesh(b, [x, 0, z], detail));
+      return { mesh: mergeMeshes([...parts, ...props.map((p) => propMesh(p, [x, 0, z], detail))]), ranges: rangesOf(list, parts) };
+    };
+    const near = meshes(true), far = meshes(false);
+    return { x, z, near: near.mesh, far: far.mesh, nearRanges: near.ranges, farRanges: far.ranges };
   });
+}
+
+/** Each building's index range in a mesh merged from `parts` (in order, first). */
+function rangesOf(list: readonly TownBuilding[], parts: readonly BuildingMesh[]): MeshRange[] {
+  let k = 0;
+  return parts.map((p, i) => { const r: MeshRange = [list[i].id, k, p.index.length]; k += p.index.length; return r; });
 }
 
 /** The buffers to hand over from a worker. */
