@@ -81,17 +81,17 @@ export const items: ItemCatalog = {
   },
 };
 
-/** Rooms and mending (plan 11.5): a night at the inn costs about a day's wage, mending a third of the price as new. */
+/** Rooms and mending (plan 11.5): a night at the inn with supper costs about a day's wage, mending a third of the price as new. */
 export const upkeep: UpkeepDef = {
-  room: 10,
+  room: 16,
   repair: 0.35,
   rise: 7,
   words: {
-    roomTopic: 'A room for the night ({price})',
+    roomTopic: 'A room and supper ({price})',
     repairTopic: 'Can you mend my gear?',
-    roomGiven: '{price}, and the room under the eaves is yours. Sleep well.',
+    roomGiven: '{price}, with supper and a mug of ale, and the room under the eaves is yours. Sleep well.',
     repairLine: 'Let me see what you have done to it.',
-    roomTooDear: 'A room is {price}, friend, and your purse says otherwise. The hearth is free to sit by, though.',
+    roomTooDear: 'A room and supper is {price}, friend, and your purse says otherwise. The hearth is free to sit by, though.',
     slept: 'You sleep in a narrow bed under the eaves and wake rested. The room is yours whenever you come back to this inn.',
     nothingToMend: 'That all looks sound to me. Come back when you have dented something.',
     mended: 'There. {items}, good as new. That will be {price}.',
