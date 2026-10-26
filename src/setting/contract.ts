@@ -277,6 +277,8 @@ export interface RegionFillDef {
   readonly place: 'none' | 'hamlet' | 'camp' | 'ruin' | 'barrows';
   /** Footprint radius of the place, metres (trees keep out of it). */
   readonly radius?: number;
+  /** How much farther round the footprint the trees keep off, metres (fields and gardens cleared, firewood cut). */
+  readonly clearing?: number;
   /** Biomes it may lie in (none: any on land). */
   readonly biomes?: readonly string[];
   /** Metres from the start where it may lie, at least (and at most). */

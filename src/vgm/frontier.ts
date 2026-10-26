@@ -101,17 +101,38 @@ function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; 
   for (const f of pool) { if ((roll -= f.weight) < 0) { pick = f; break; } }
   const base = { kind: 'region' as const, id: `region-${n}`, seed: s, at: c.hours };
   if (pick.place !== 'none') {
-    // The place needs a square of its own: its size if that is free, else the largest free one round the point.
+    // The place needs a square of its own: its size if that is free, else the largest free one round the
+    // point. Open ground first: the point's square, then the free squares beside it; woodland only when
+    // none of them has open ground.
     for (let level = pick.level; level >= 0; level--) {
-      const k = keyAt(level, p.x, p.z), free = map.freeParts(k);
-      if (free.length !== 1 || keyId(free[0]) !== keyId(k)) continue;
-      const site = findSite(c, pick, k, s);
-      if (site) return { ...base, ...k, fill: pick.id, site };
+      const k = keyAt(level, p.x, p.z);
+      if (!wholeFree(map, k)) continue;
+      let wooded: { k: RegionKey; site: Spot } | null = null;
+      for (const [dx, dz] of AROUND) {
+        const q = { level, x: k.x + dx, z: k.z + dz };
+        if (!wholeFree(map, q)) continue;
+        const site = findSite(c, pick, q, s);
+        if (site?.open) return { ...base, ...q, fill: pick.id, site: site.at };
+        if (site && !wooded) wooded = { k: q, site };
+      }
+      if (wooded) return { ...base, ...wooded.k, fill: pick.id, site: wooded.site.at };
       break;
     }
   }
   return { ...base, ...keyAt(country.level, p.x, p.z), fill: country.id };
 }
+
+/** The point's own square first, then the eight beside it. */
+const AROUND: readonly (readonly [number, number])[] = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+
+/** Is this square free of every open region (none covers it, none lies inside it)? */
+function wholeFree(map: RegionMap<RegionData>, k: RegionKey): boolean {
+  const free = map.freeParts(k);
+  return free.length === 1 && keyId(free[0]) === keyId(k);
+}
+
+/** A place's spot, and whether it lies on open ground. */
+interface Spot { readonly at: NonNullable<RegionDecision['site']>; readonly open: boolean }
 
 /** Whether a fill may lie round this point: its biomes, its ring round the start, and apart from others of its kind. */
 function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number }, done: readonly RegionDecision[]): boolean {
@@ -131,6 +152,8 @@ const woods = new WeakMap<Terrain, (x: number, z: number) => number>();
 
 /** How steep the ground may be round a place of each kind (rise per metre over its radius). */
 const STEEP: Record<RegionFillDef['place'], number> = { none: 1, hamlet: 0.12, camp: 0.16, ruin: 0.25, barrows: 0.16 };
+/** Ground this wooded or less (woodsOf, 0..1) round a place counts as open. */
+export const OPEN_GROUND = 0.3;
 /** How much a place of each kind keeps out of thick woods (ruins do not mind: the wood grew round them). */
 const OPEN: Record<RegionFillDef['place'], number> = { none: 0, hamlet: 1.2, camp: 0.3, ruin: 0, barrows: 0.8 };
 
@@ -138,7 +161,7 @@ const OPEN: Record<RegionFillDef['place'], number> = { none: 0, hamlet: 1.2, cam
  * Where in the square a place stands: dry, gentle ground with room for its footprint, away from towns and
  * other places; the way it faces (yaw: towards the start). Null if no ground fits.
  */
-function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number): RegionDecision['site'] | null {
+function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number): Spot | null {
   const t = c.terrain, r = f.radius ?? 20;
   const [x0, z0] = boundsOf(k), size = sizeOf(k.level), margin = r + 12;
   const away = [
@@ -148,7 +171,7 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
   ];
   const wood = woods.get(t) ?? woods.set(t, woodsOf(t)).get(t)!;
   // The best spot so far (lowest score).
-  let bx = NaN, bz = NaN, low = Infinity;
+  let bx = NaN, bz = NaN, low = Infinity, open = false;
   const N = 7;
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const x = x0 + margin + (size - 2 * margin) * ((i + hash2f(s, i, j + 40)) / N);
@@ -168,11 +191,16 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
       steep = Math.max(steep, Math.abs(ph - h) / rr);
     }
     if (!ok || steep > STEEP[f.place]) continue;
-    const rank = steep / STEEP[f.place] + wood(x, z) * OPEN[f.place] + hash2f(s, i, j) * 0.4;
-    if (rank < low) { low = rank; bx = x; bz = z; }
+    // Open ground first (the place is seen from afar); woodland only when the square has none.
+    // How wooded the place's footprint is, on the whole (its clearing opens the rest round it).
+    let woods = wood(x, z);
+    for (let a = 0; a < 8; a++) woods += wood(x + Math.cos((a * Math.PI) / 4) * r * 0.7, z + Math.sin((a * Math.PI) / 4) * r * 0.7);
+    woods /= 9;
+    const rank = (woods > OPEN_GROUND ? 10 + woods : 0) + steep / STEEP[f.place] + woods * OPEN[f.place] + hash2f(s, i, j) * 0.4;
+    if (rank < low) { low = rank; bx = x; bz = z; open = woods <= OPEN_GROUND; }
   }
   if (low === Infinity) return null;
-  return { x: bx, z: bz, yaw: Math.atan2(-(c.home.x - bx), -(c.home.z - bz)), r };
+  return { at: { x: bx, z: bz, yaw: Math.atan2(-(c.home.x - bx), -(c.home.z - bz)), r }, open };
 }
 
 /** The settlements in the log (the towns and the hamlets): for roads and for whatever links places. */

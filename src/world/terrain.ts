@@ -70,7 +70,8 @@ export class Terrain {
 
   /**
    * Decisions made while the game runs that change the land, in workers as on the main thread (they reach
-   * the workers as a `decisions` job): roads, and the clearings round places out on the land. Others leave
+   * the workers as a `decisions` job): roads, and the clearings round places out on the land (dungeons and
+   * the places of opened regions). Others leave
    * the land as it is.
    */
   settleMore(ds: readonly Decision[]): void {
@@ -79,6 +80,10 @@ export class Terrain {
       else if (d.kind === 'dungeon' && d.site) {
         const c = clearingOf(d.template, d.site);
         if (c) this.clearingMap.set(d.id, c);
+      } else if (d.kind === 'region' && d.site) {
+        // A place the VGM opened as the hero walked: its footprint and what its people cleared round it.
+        const f = this.setting.regions?.fills.find((k) => k.id === d.fill), { x, z, r } = d.site;
+        if (f && f.place !== 'none') this.clearingMap.set(d.id, { x, z, r: r + (f.clearing ?? 0) });
       }
     }
   }

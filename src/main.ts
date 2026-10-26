@@ -366,6 +366,7 @@ export async function start(b: Boot): Promise<void> {
     const regionOpened = (d: RegionDecision): void => {
       log = [...log, d];
       regionSites?.sync(log);
+      if (d.site) void roadWork.clear(d);
       const place = setting.regions ? settlementsOf([d], setting.regions)[0] : undefined;
       if (!place) return;
       roading = roading.then(async () => {
@@ -376,8 +377,7 @@ export async function start(b: Boot): Promise<void> {
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: town?.decision ?? opened.home }, log);
-      const sites = regionSites;
-      jobs.keepOut = (x, z) => sites.cleared(x, z);
+      for (const d of log) if (d.kind === 'region' && d.site) void roadWork.clear(d);
       // `site=<place>`: walk out from the start until one opens, then stand before it.
       const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
       for (let dir = 0; kind && dir < 8; dir++) {

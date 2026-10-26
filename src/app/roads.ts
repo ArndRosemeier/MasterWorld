@@ -2,10 +2,10 @@
  * Roads in the running game (plan 7): road decisions reach the main thread's land and every worker, the
  * terrain shader's road mask follows the camera, and a road laid while playing (the VGM linking a new
  * place) has the land, plants, trunks and masks near it built again. A place out on the land (a tower, a
- * cave, a barrow) clears its trees the same way.
+ * cave, a barrow, a hamlet or camp of an opened region) clears its trees the same way.
  */
 import type { Vector3 } from 'three/webgpu';
-import type { Decision, DungeonDecision, RoadDecision } from '../world/decisions';
+import type { Decision, DungeonDecision, RegionDecision, RoadDecision } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
 import type { Trunks } from '../world/trunks';
 import type { TerrainJobs, WorldJobs } from '../workers/pool';
@@ -64,7 +64,7 @@ export class RoadWork {
   }
 
   /** A place out on the land (already in the log): the trees go from its clearing, and the plants and trunks near it are placed anew. */
-  async clear(d: DungeonDecision): Promise<void> {
+  async clear(d: DungeonDecision | RegionDecision): Promise<void> {
     if (this.sent.has(d.id)) return;
     this.sent.add(d.id);
     this.terrain.settleMore([d]);

@@ -2,7 +2,6 @@
  * The worker pool: the one place workers are created (guarded). Jobs go to the least busy worker; results
  * come back as promises. Each worker script handles `{ id, job }` and answers `{ id, result }` or `{ id, error }`.
  */
-import { FLORA_STRIDE } from '../world/flora';
 
 export class WorkerPool<Job, Result> {
   private readonly workers: Worker[] = [];
@@ -131,8 +130,6 @@ export class WorldJobs {
     return this.pool.run({ kind, seed: this.seed, setting: this.setting, x0, z0, size, res }) as Promise<Float32Array>;
   }
 
-  /** Ground no plant grows on that the worker does not know of (the places the VGM opened since the start). */
-  keepOut: ((x: number, z: number) => boolean) | null = null;
   /** Decisions made while playing that change the land (roads), for the world worker. */
   decisions(ds: readonly import('../world/decisions').Decision[]): Promise<unknown> {
     return this.pool.broadcast({ kind: 'decisions', decisions: ds, seed: this.seed, setting: this.setting });
@@ -145,7 +142,7 @@ export class WorldJobs {
 
   /** Trees and shrubs over a square, candidates `spacing` apart. */
   flora(x0: number, z0: number, size: number, spacing: number): Promise<Float32Array> {
-    return (this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing }) as Promise<Float32Array>).then((d) => (this.keepOut ? withoutPlantsIn(d, this.keepOut) : d));
+    return this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing }) as Promise<Float32Array>;
   }
 
   /**
@@ -155,13 +152,6 @@ export class WorldJobs {
   linkRoad(roads: readonly import('../world/decisions').RoadDecision[], place: import('../vgm/roads').Place, way: import('../world/decisions').RoadWay, at?: number): Promise<import('../world/decisions').RoadDecision | null> {
     return this.pool.run({ kind: 'link', seed: this.seed, setting: this.setting, roads, place, way, at }) as Promise<import('../world/decisions').RoadDecision | null>;
   }
-}
-
-/** Plant placements (FLORA_STRIDE floats each: x, y, z first) without those standing where `out` says. */
-export function withoutPlantsIn(d: Float32Array, out: (x: number, z: number) => boolean): Float32Array {
-  const keep: number[] = [];
-  for (let i = 0; i < d.length; i += FLORA_STRIDE) if (!out(d[i], d[i + 2])) for (let k = 0; k < FLORA_STRIDE; k++) keep.push(d[i + k]);
-  return keep.length === d.length ? d : Float32Array.from(keep);
 }
 
 /** Resolves once `test()` holds (checked every 20 ms): for loading steps that wait on worker results. */

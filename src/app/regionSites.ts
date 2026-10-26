@@ -117,15 +117,6 @@ export class RegionSites {
     return false;
   }
 
-  /** Does a point lie in a place's footprint (no tree grows there)? */
-  cleared(x: number, z: number): boolean {
-    for (const s of this.sites) {
-      const site = s.decision.site!;
-      if ((x - site.x) ** 2 + (z - site.z) ** 2 < site.r * site.r) return true;
-    }
-    return false;
-  }
-
   /** The HUD's part: regions open, places drawn. */
   get status(): string {
     return `regions ${this.seen} (${this.sites.filter((s) => s.mesh).length} places drawn)`;
