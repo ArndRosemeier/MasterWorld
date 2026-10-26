@@ -1,0 +1,32 @@
+=== a squirrel (fly) ===
+shots/wild2/squirrel.png: webgpu · 28.2 ms · -31896, 89, 31902 · chunks 270 (+0) · grass 33+99 · 0.00 dense 0.00 m · folk 30/30
+weather cover 0.95 rain 0.07 storm 0.00 mist 0.01 wind 0.14 wet 0.07
+shaders 98 warm-up + 25 later · worst 12 ms · 2 POLICY VIOLATIONS (shaders.report()) · wild - (0/7 built) · small life 0 squirrels, 0/0 birds (0 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 98 built in warm-up, 25 after, worst block 12 ms, 2 violations, 0 built again alike
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started 19 ms after a build of 18 ms ended (minimum 35 ms)
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started 0 ms after a build of 1 ms ended (minimum 1 ms)
+=== b birds (fly) ===
+shots/wild2/birds.png: webgpu · 38.2 ms · -31896, 89, 31902 · chunks 270 (+0) · grass 33+99 · 0.00 dense 0.00 m · folk 29/30
+weather cover 0.94 rain 0.05 storm 0.00 mist 0.01 wind 0.13 wet 0.05
+shaders 95 warm-up + 30 later · worst 12 ms · 3 POLICY VIOLATIONS (shaders.report()) · wild - (0/7 built) · small life 0 squirrels, 0/0 birds (0 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 95 built in warm-up, 30 after, worst block 12 ms, 3 violations, 0 built again alike
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started 16 ms after a build of 27 ms ended (minimum 54 ms)
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started -34 ms after a build of 60 ms ended (minimum 119 ms)
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started 1 ms after a build of 1 ms ended (minimum 3 ms)
+=== c flock (fly) ===
+shots/wild2/flock.png: webgpu · 39.2 ms · -31896, 89, 31902 · chunks 270 (+0) · grass 33+99 · 0.00 dense 0.00 m · folk 30/30
+weather cover 0.95 rain 0.06 storm 0.00 mist 0.01 wind 0.13 wet 0.06
+shaders 91 warm-up + 41 later · worst 12 ms · 3 POLICY VIOLATIONS (shaders.report()) · wild - (0/7 built) · small life 0 squirrels, 0/0 birds (0 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 91 built in warm-up, 41 after, worst block 12 ms, 3 violations, 0 built again alike
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started 21 ms after a build of 28 ms ended (minimum 57 ms)
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started 27 ms after a build of 20 ms ended (minimum 40 ms)
+run: "ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 14 ]" started 0 ms after a build of 1 ms ended (minimum 2 ms)
+=== d squirrel-hero ===
+shots/wild2/squirrel-hero.png: webgpu · 30.0 ms · -31851, 90, 31938 · chunks 276 (+0) · grass 101+325 · 0.26 dense 0.26 m · folk 30/30
+weather cover 0.95 rain 0.07 storm 0.00 mist 0.01 wind 0.14 wet 0.07
+shaders 93 warm-up + 5 later · worst 14 ms · policy ok · wild - (1/7 built) · small life 1 squirrels, 164/164 birds (42 drawn, 1/1 squirrel bodies)
+sound: waiting for a click · mood town
+shaders: 93 built in warm-up, 5 after, worst block 14 ms, 0 violations, 0 built again alike
