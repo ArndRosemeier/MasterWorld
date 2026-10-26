@@ -143,3 +143,16 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   }
   return { position, normal, color, surface, level, canopy, minY: minY - drop, maxY };
 }
+
+/** Moves world-space vertices (x, y, z triples) to be relative to their middle (whole metres, xz); returns it. */
+export function recentre(position: Float32Array): [number, number] {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (let i = 0; i < position.length; i += 3) {
+    x0 = Math.min(x0, position[i]); x1 = Math.max(x1, position[i]);
+    z0 = Math.min(z0, position[i + 2]); z1 = Math.max(z1, position[i + 2]);
+  }
+  if (!(x0 <= x1)) return [0, 0];
+  const cx = Math.round((x0 + x1) / 2), cz = Math.round((z0 + z1) / 2);
+  for (let i = 0; i < position.length; i += 3) { position[i] -= cx; position[i + 2] -= cz; }
+  return [cx, cz];
+}

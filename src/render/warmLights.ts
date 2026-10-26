@@ -7,6 +7,7 @@
 import { PointLight, type Scene, type Vector3 } from 'three/webgpu';
 import { hash32, hashToFloat } from '@futuremagic/core';
 import type { TownBuilding } from '@futuremagic/settlement';
+import { ORIGIN } from './origin';
 
 /** Plain point lights in the pool (the shadow torch is one more). */
 export const WARM_LIGHTS = 3;
@@ -32,6 +33,8 @@ export class WarmLights {
   private torches: Spot[] | null = null;
   private time = 0;
   private frames = 0;
+  /** The floating origin's steps when the torch's map was last drawn. */
+  private steps = -1;
 
   constructor(scene: Scene) {
     for (let i = 0; i < WARM_LIGHTS; i++) {
@@ -97,7 +100,9 @@ export class WarmLights {
     if (first) {
       // The cube map (six views) is redrawn when the torch changes and every third frame after:
       // walls stand still, only people and creatures move.
-      const moved = s.position.x !== first.s.x || s.position.y !== first.s.y || s.position.z !== first.s.z;
+      // A step of the floating origin moves what the map was drawn of: drawn again too.
+      const moved = s.position.x !== first.s.x || s.position.y !== first.s.y || s.position.z !== first.s.z || this.steps !== ORIGIN.steps;
+      this.steps = ORIGIN.steps;
       s.position.set(first.s.x, first.s.y, first.s.z);
       s.intensity = TORCH * this.flicker(first.s);
       if (moved || ++this.frames % 3 === 0) s.shadow.needsUpdate = true;

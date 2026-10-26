@@ -25,6 +25,7 @@ import { Steed, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import { TownLife, type Agent, type TownOrder } from './sim/townLife';
 import { createView } from './render/view';
+import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
 import { VolumeView } from './render/terrain/VolumeView';
 import { TerrainJobs, WorldJobs, createTerrainPool, createTexturePool, createWorldPool } from './workers/pool';
@@ -184,6 +185,10 @@ export async function start(b: Boot): Promise<void> {
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? [home.x, home.z], params.look);
+    // The floating origin starts where the camera does (everything drawn is relative to it: render/origin.ts).
+    if (params.origin) ORIGIN.moveTo(view.camera.position.x, view.camera.position.z);
+    // Off (`origin=0`, or from the debug console: game.followOrigin) the origin stays where it is.
+    let followOrigin = params.origin;
     // Dialogs (and the title) hold the game's keys and mouse while open.
     let open = 0;
     // The game's sound (set once the world stands): a dialog's sound, and the music steps back while it is open.
@@ -824,7 +829,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass,
+      game: { player, view, origin: ORIGIN, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass,
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -962,6 +967,8 @@ export async function start(b: Boot): Promise<void> {
       }
       direct(dt);
       notes.update(dt);
+      // The floating origin steps once the camera strays from it, before anything writes origin-relative data.
+      if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
       view.sky.underwater = sea.submerged(view.camera.position);
       wx.apply(dt, view.camera.position, hours(), view.sky);
       view.sky.update(dt, view.camera);

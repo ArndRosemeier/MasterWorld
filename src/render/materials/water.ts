@@ -15,6 +15,7 @@ import { defineKind } from '../materials';
 import { WATER, waterAt } from './waterInputs';
 import { WAVES, waveMotion } from '../../world/swell';
 import { WEATHER, fullSky, rainRings } from './weather';
+import { EYE, WORLD } from '../origin';
 
 let envTex: Texture | null = null;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
@@ -26,10 +27,12 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
   const W = WATER;
 
   // --- Vertex: Gerstner waves, faded out in shallows and far away.
+  // The vertex in the world (the mesh's centre is a world point), and its distance from the camera (the mesh is
+  // drawn relative to the floating origin, render/origin.ts, as cameraPosition is).
   const wp = positionLocal.add(W.center);
   const here = waterAt(wp.xz);
   const depthV = here.y;
-  const dist = length(wp.xz.sub(cameraPosition.xz));
+  const dist = length(positionLocal.xz.add(W.center.xz.sub(EYE.xz)));
   // Waves on the sea; lakes get small ones, rivers none (their surface moves by its flow).
   const sea = float(1).sub(smoothstep(0.5, 2.0, abs(here.x)));
   const still = float(1).sub(smoothstep(0.05, 0.3, length(here.zw)));
@@ -56,11 +59,12 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
 
   // --- Fragment.
   m.colorNode = Fn(() => {
-    const p = positionWorld;
+    // The world point for the masks and ripples; the view ray in origin-relative terms (exact near the camera).
+    const p = WORLD;
     // Depth per fragment (the mesh is coarse far out, shores need the detail).
     const vDepth = waterAt(p.xz).y;
-    const V = normalize(cameraPosition.sub(p));
-    const camDist = length(cameraPosition.sub(p));
+    const V = normalize(cameraPosition.sub(positionWorld));
+    const camDist = length(cameraPosition.sub(positionWorld));
     const fade = float(1).sub(smoothstep(40.0, 300.0, camDist));
     // Ripples: the slope of three drifting octaves of small waves (metres of height), finer ones faster.
     const t = W.time;
@@ -145,7 +149,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
   // Dry land under a wave's edge: nothing.
   m.alphaTestNode = null;
   // (A falling sheet stays whole: it hangs over its own lip.)
-  m.opacityNode = select(waterAt(positionWorld.xz).y.lessThan(-0.2).and(vFall.lessThan(0.3)), float(0), float(1));
+  m.opacityNode = select(waterAt(WORLD.xz).y.lessThan(-0.2).and(vFall.lessThan(0.3)), float(0), float(1));
   m.alphaTest = 0.5;
   return m;
 }, { cast: false, receive: false });

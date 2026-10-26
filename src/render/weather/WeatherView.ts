@@ -7,7 +7,8 @@ import { Float32BufferAttribute, InstancedBufferAttribute, InstancedBufferGeomet
 import { Rng, damp, deriveSeed, lerp, lerpAngle } from '@futuremagic/core';
 import { vegetationUniforms } from '@futuremagic/vegetation';
 import { calm, lightning, type Flash, type Weather, type WeatherState } from '../../world/weather';
-import { WEATHER, createPrecipMaterial } from '../materials/weather';
+import { WEATHER, createPrecipMaterial, precipShift } from '../materials/weather';
+import { ORIGIN } from '../origin';
 import { WATER } from '../materials/waterInputs';
 import { GRASS } from '../materials/grass';
 import type { SkyView } from '../sky';
@@ -48,6 +49,8 @@ export class WeatherView {
     this.precip.name = 'rain';
     this.precip.frustumCulled = false;
     this.precip.renderOrder = 5;
+    // Placed on the GPU relative to the floating origin: drawn at the identity.
+    ORIGIN.pin(this.precip);
   }
 
   /** Each frame: `hours` is the game clock (day * 24 + hour). */
@@ -89,6 +92,7 @@ export class WeatherView {
 
     // Rain and snow, the wet ground.
     W.time.value = this.seconds % WRAP;
+    precipShift(ORIGIN.at.x, ORIGIN.at.z, W.precipShift.value);
     W.rain.value = s.rain;
     W.snow.value = s.snow;
     W.wet.value = s.wet;

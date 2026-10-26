@@ -4,7 +4,8 @@
  * (the environment map, shadows, fog type) is set up in the constructor, before the warm-up.
  */
 import { BoxGeometry, Color, Mesh, type Sprite, PMREMGenerator, Scene, Vector3, type DirectionalLight, type HemisphereLight, type OrthographicCamera, type PerspectiveCamera, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
-import { positionWorld, uniform } from 'three/tsl';
+import { uniform } from 'three/tsl';
+import { ORIGIN, WORLD } from './origin';
 import { CLEAR, moonAt, skyLight, skyPath, starField, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
 import { MOON_RADIUS, cloudShadow, makeStarsNode } from '@futuremagic/sky/node';
 import { smoothstep } from '@futuremagic/core';
@@ -108,6 +109,7 @@ export class SkyView {
   shadowEvery = 2;
   private shadowFrame = 0;
   private readonly shadowAt = { x: Infinity, z: Infinity };
+  private shadowSteps = -1;
 
   constructor(
     private readonly renderer: WebGPURenderer,
@@ -155,7 +157,7 @@ export class SkyView {
     scene.fog = null;
     (scene as unknown as { fogNode: unknown }).fogNode = fogNode(this.envRT.texture);
     // The clouds' shadows on everything the sun lights (three takes a light's colorNode in place of its colour).
-    (sun as unknown as { colorNode: unknown }).colorNode = this.sunLight.mul(cloudShadow(this.U, positionWorld, this.lightDir)).mul(this.horizon.shade(positionWorld));
+    (sun as unknown as { colorNode: unknown }).colorNode = this.sunLight.mul(cloudShadow(this.U, WORLD, this.lightDir)).mul(this.horizon.shade(WORLD));
 
     sun.castShadow = true;
     sun.shadow.autoUpdate = false; // drawn when `update` says (shadowEvery)
@@ -281,7 +283,9 @@ export class SkyView {
     if (camera) { this.dome.position.copy(camera.position); this.stars.position.copy(camera.position); }
     // The map keeps the box it was drawn with (three moves its matrix only when it draws), so a frame between
     // draws still lines up; a jump of the box draws it at once.
-    const jumped = Math.hypot(fx - this.shadowAt.x, fz - this.shadowAt.z) > SHADOW_JUMP;
+    // A step of the floating origin moves the scene under the map's old box: drawn again at once too.
+    const jumped = Math.hypot(fx - this.shadowAt.x, fz - this.shadowAt.z) > SHADOW_JUMP || ORIGIN.steps !== this.shadowSteps;
+    this.shadowSteps = ORIGIN.steps;
     if (jumped || ++this.shadowFrame >= this.shadowEvery) {
       this.shadowFrame = 0;
       this.shadowAt.x = fx; this.shadowAt.z = fz;

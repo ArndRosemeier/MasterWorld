@@ -12,6 +12,7 @@ import type { HorseCoat, HorseShape } from '@actors/animal';
 import type { ThreeActor } from '@actors/three';
 import { furActor, gaitPace } from '../furAnimal';
 import type { Stage } from '@futuremagic/stage';
+import { ORIGIN } from '../origin';
 
 /** Where the build serves the horse pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/horse/manifest.json`;
@@ -105,6 +106,7 @@ export class HorseView {
     // The seat bone's motion since the bind pose, applied to its bind-pose head (like a skinned vertex).
     const bone = h.actor.bones[h.seat.index];
     this.m.multiplyMatrices(bone.matrixWorld, h.actor.skeleton.boneInverses[h.seat.index]);
-    return out.copy(h.seat.head).applyMatrix4(this.m);
+    // matrixWorld is relative to the floating origin (render/origin.ts): back to the world.
+    return ORIGIN.toWorld(out.copy(h.seat.head).applyMatrix4(this.m));
   }
 }

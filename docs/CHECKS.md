@@ -10,7 +10,7 @@ Tests are only useful if people run them all the time, so they must stay fast.
 | The whole of `npm test` | **60 s** | Checked by hand for now. Keep `npm test` free of browsers, network and big worlds. |
 | A slow check (browser, screenshots, shader check, long simulation) | **5 min** each | Own script, never inside `npm test`. Run on demand and after changes to what it covers. |
 
-The slow checks today: `npm run variety` (every kind of dungeon, 1000 each) and `npm run loop` (whole evenings played headless, plan A6) run in CI after `npm test`; `npm run shot:set` (the standard shots, F1) runs on the reference GPU.
+The slow checks today: `npm run variety` (every kind of dungeon, 1000 each) and `npm run loop` (whole evenings played headless, plan A6) run in CI after `npm test`; `npm run shot:set` (the standard shots, F1) and `npm run shot:origin` (the floating origin at 32 km and 300 km from zero and across a step, plan B0) run on the reference GPU.
 
 Tests use seeds, fake clocks and small fixtures, never wall-clock waits.
 
