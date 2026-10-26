@@ -68,7 +68,7 @@
 .panel .row.check { display: flex; gap: 10px; cursor: pointer; }
 .panel .row.keys { grid-template-columns: 1fr 110px 110px; }
 .panel .value { text-align: right; color: var(--brass); font: 13px 'Marcellus SC', Georgia, serif; letter-spacing: .04em; }
-.panel .key { font: 13px 'Marcellus SC', Georgia, serif; padding: 4px 6px; color: var(--ink); background: linear-gradient(#2b2d33, #17181c); border: 1px solid #4a4c55; border-bottom-width: 3px; border-radius: 5px; cursor: pointer; }
+.panel .key { font: 13px 'Marcellus SC', Georgia, serif; padding: 4px 6px; color: var(--brass-hi); background: linear-gradient(#3a2818, #1d140d); border: 1px solid var(--brass-lo); border-bottom-width: 3px; border-radius: 5px; cursor: pointer; }
 .panel .key:hover { border-color: var(--brass); }
 .panel .key.free { color: #6a6458; }
 .panel .key.waiting { border-color: var(--ward); color: var(--ward); box-shadow: 0 0 10px #8fe3ff66; }
@@ -104,7 +104,7 @@
 
 /* The map: the parchment in a brass case. */
 .panel.map { width: min(720px, 100%); }
-.map .parchment { display: block; width: 100%; height: auto; border: 6px solid #6a5434; border-radius: 4px; box-shadow: inset 0 0 30px #0006, 0 0 0 2px var(--brass-lo); cursor: grab; }
+.map .parchment { display: block; width: auto; max-width: 100%; height: auto; max-height: calc(100vh - 150px); margin: 0 auto; border: 6px solid #6a5434; border-radius: 4px; box-shadow: inset 0 0 30px #0006, 0 0 0 2px var(--brass-lo); cursor: grab; }
 
 /* The pack: the worn slots and carried things as cards, the skills as brass gauges. */
 .panel.pack { width: min(760px, 100%); }
@@ -116,7 +116,7 @@
 .pack .slot.full .card, .pack .card.use { transition: transform .15s; }
 .pack .slot.full:hover .card, .pack .card.use:hover { transform: translateY(-2px); border-color: var(--brass); }
 .pack .carried { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.pack .skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px 12px; }
+.pack .skills { padding-bottom: 6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px 12px; }
 .pack .gauge { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .pack .gauge .dial { position: relative; width: 70px; height: 40px; overflow: hidden; }
 .pack .gauge .face { position: absolute; left: 0; top: 0; width: 70px; height: 70px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--brass-mid); background: radial-gradient(circle at 50% 50%, #0d0907 40%, var(--leather-hi)); box-shadow: inset 0 0 0 1px var(--brass-lo); }
