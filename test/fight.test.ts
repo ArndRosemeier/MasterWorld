@@ -233,3 +233,13 @@ test('fight: every past gives its skills and kit, and a fresh hero of any past i
     assert.equal(new Character(classic, JSON.parse(JSON.stringify(h.save()))).background, bg.id);
   }
 });
+
+test('fight: the target plate reads all who fight the hero at once, not the one alone', () => {
+  const c = cellars.find((x) => x.dweller.id === 'rats')!;
+  const d = new Delve(c, openSpace(c), classic, new Character(classic), 4);
+  const [one, ...rest] = d.den.creatures;
+  assert.deepEqual(d.fight.threat(one), { threat: threatOf(one.def.danger, d.fight.hero.power), together: false });
+  for (const o of [one, ...rest]) o.state = 'fight';
+  const all = [one, ...rest].reduce((a, o) => a + o.def.danger, 0);
+  assert.deepEqual(d.fight.threat(one), { threat: threatOf(all, d.fight.hero.power), together: rest.length > 0 });
+});

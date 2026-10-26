@@ -44,6 +44,25 @@ interface Queued { readonly text: string; readonly priority: number; readonly at
 /** Least seconds between two queued messages. */
 const GAP = 2.5;
 
+/**
+ * How careful the world is with the hero (plan 11.1): a roguelike hero has one life, so the Director is
+ * stricter with fairness. `health`/`rest`: the world presses only above this health and this many seconds
+ * after a fight; `fitTop`: a fitting place is at most this times the hero's power; `warnAt`: the least threat
+ * a place's door warns of; `retreat`: below this health in a fight the hero is told to get out (0: never).
+ */
+export interface Fairness {
+  readonly health: number;
+  readonly rest: number;
+  readonly fitTop: number;
+  readonly warnAt: Threat;
+  readonly retreat: number;
+}
+
+export const FAIRNESS: { readonly classic: Fairness; readonly strict: Fairness } = {
+  classic: { health: 0.6, rest: 30, fitTop: 1.5, warnAt: 'hard', retreat: 0 },
+  strict: { health: 0.85, rest: 60, fitTop: 1.2, warnAt: 'even', retreat: 0.35 },
+};
+
 export class Director {
   readonly needs: Record<Need, number>;
   /** 0 .. 1. */
@@ -55,6 +74,10 @@ export class Director {
   private gap = 0;
   private readonly waiting: Queued[] = [];
   private signals: Signals | null = null;
+  /** Told to get out in this fight already. */
+  private urged = false;
+  /** One life (roguelike): stricter fairness. */
+  strict = false;
 
   constructor(private readonly def: DirectorDef, saved?: DirectorSave) {
     this.needs = { discovery: 0, challenge: 0, reward: 0, people: 0, purpose: 0, ...(saved?.needs ?? {}) };
@@ -76,7 +99,12 @@ export class Director {
     const rate = goal > this.tension ? 1.5 : 0.08;
     this.tension += (goal - this.tension) * Math.min(1, rate * dt);
     if (s.fighting > 0) this.sinceFight = 0;
-    else this.sinceFight += dt;
+    else { this.sinceFight += dt; this.urged = false; }
+    // One life: badly hurt in a fight, the hero is told to get out while they can.
+    if (s.fighting > 0 && !this.urged && s.health > 0 && s.health < this.fairness.retreat) {
+      this.urged = true;
+      this.queue('You are badly hurt, and there will be no waking at the inn. Get out while you still can.', 3);
+    }
     this.phase = s.fighting > 0 ? 'peak' : this.sinceFight < 25 ? 'relief' : this.tension > 0.3 ? 'build' : 'calm';
     this.gap = Math.max(0, this.gap - dt);
   }
@@ -100,10 +128,12 @@ export class Director {
     return s?.inTown ? 'town' : 'explore';
   }
 
-  /** May the world press the hero now (an ambush, a spawn): never while hurt, talking or just after a fight. */
+  get fairness(): Fairness { return this.strict ? FAIRNESS.strict : FAIRNESS.classic; }
+
+  /** May the world press the hero now (an ambush, a spawn): never while hurt, talking or just after a fight (stricter with one life). */
   get fair(): boolean {
-    const s = this.signals;
-    return !!s && !s.talking && s.health > 0.6 && this.sinceFight > 30;
+    const s = this.signals, f = this.fairness;
+    return !!s && !s.talking && s.health > f.health && this.sinceFight > f.rest;
   }
 
   /** Queue a message; the most important waiting one comes first, one every few seconds. */
@@ -126,18 +156,19 @@ export class Director {
 }
 
 /** How a place's danger reads to a hero of `power` (plan 4.1: dangerous places are signposted). */
-export function warning(danger: number, power: number, place: string): string | null {
-  const t: Threat = threatOf(danger, power);
+export function warning(danger: number, power: number, place: string, f: Fairness = FAIRNESS.classic): string | null {
+  const t: Threat = threatOf(danger, power), Place = `${place.charAt(0).toUpperCase()}${place.slice(1)}`;
   if (t === 'deadly') return `Everything in you says to turn back: whatever lives in ${place} is far beyond you yet.`;
-  if (t === 'hard') return `A chill runs down your back. ${place.charAt(0).toUpperCase()}${place.slice(1)} will be a hard fight.`;
+  if (t === 'hard') return `A chill runs down your back. ${Place} will be a hard fight.`;
+  if (t === 'even' && f.warnAt === 'even') return `${Place} will be an even fight. You have one life: keep a way out behind you.`;
   return null;
 }
 
 /**
  * Is there a place at the hero's level among those known (plan 4.1, D29: the VGM makes sure there is
- * always something to find)? Fitting: danger between half and one and a half times the hero's power.
+ * always something to find)? Fitting: danger between half and `fitTop` times the hero's power (1.5; 1.2 with one life).
  */
-export function fittingPlace(places: readonly { readonly id: string; readonly danger: number; readonly done: boolean }[], power: number): string | null {
-  const fit = places.filter((p) => !p.done && p.danger >= power * 0.5 && p.danger <= power * 1.5);
+export function fittingPlace(places: readonly { readonly id: string; readonly danger: number; readonly done: boolean }[], power: number, f: Fairness = FAIRNESS.classic): string | null {
+  const fit = places.filter((p) => !p.done && p.danger >= power * 0.5 && p.danger <= power * f.fitTop);
   return fit.length ? fit.sort((a, b) => Math.abs(a.danger - power) - Math.abs(b.danger - power))[0].id : null;
 }

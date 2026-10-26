@@ -12,10 +12,6 @@
     "reason": "Per-frame update methods of unrelated systems (camera movement vs chunk selection); only the name matches."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (x.add(y).mul(z)) in three shader kinds: it is how three.js nodes are written, not a copied helper. It crossed the info floor when the talk code grew the corpus."
-  },
-  {
     "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",
     "reason": "Per-frame update methods of unrelated systems (going in and out of the cellar vs chunk selection); only the name matches."
   },
@@ -52,7 +48,7 @@
     "reason": "Both implement the WalkWorld interface (game/walker.ts): no water below ground or indoors."
   },
   {
-    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/setting/contract.ts",
+    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",
     "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   },
   {
@@ -140,15 +136,47 @@
     "reason": "A camera's pose along the title's path vs a horse's frame (StockView's Bodies.pose interface); only the name matches. It showed once the horse's fur setup moved to render/furAnimal.ts and its pose got short."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
-  },
-  {
     "key": "idiom: [.setAttribute .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/water/WaterView.ts + stage/stage.ts",
     "reason": "Building a BufferGeometry (attributes, then the index) is three.js's own API; each builds a different mesh."
   },
   {
     "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/render/flora/FloraView.ts#add",
     "reason": "Each view's own add(stage): builds its meshes and hands them to the Stage; only the name matches."
+  },
+  {
+    "key": "same name: masterworld/render/horse/HorseView.ts#show + masterworld/render/livestock/StockView.ts#show",
+    "reason": "StockView's ActorsHerd and HorseView both implement StockView's Bodies seam (warm, show, hide, pose a fixed set of bodies); the same method names are the interface, the bodies differ (Actors animals vs the horse view)."
+  },
+  {
+    "key": "same name: masterworld/render/horse/HorseView.ts#shown + masterworld/render/livestock/StockView.ts#shown",
+    "reason": "StockView's ActorsHerd and HorseView both implement StockView's Bodies seam (warm, show, hide, pose a fixed set of bodies); the same method names are the interface, the bodies differ (Actors animals vs the horse view)."
+  },
+  {
+    "key": "same name: masterworld/render/horse/HorseView.ts#warmObjects + masterworld/render/livestock/StockView.ts#warmObjects",
+    "reason": "StockView's ActorsHerd and HorseView both implement StockView's Bodies seam (warm, show, hide, pose a fixed set of bodies); the same method names are the interface, the bodies differ (Actors animals vs the horse view)."
+  },
+  {
+    "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/mapUi.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/packUi.ts#opened + masterworld/app/tradeUi.ts#opened",
+    "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the card entrances are shared in KeyWindow.entrances."
+  },
+  {
+    "key": "same name: masterworld/game/character.ts#save + masterworld/game/trade.ts#save",
+    "reason": "Each pure game object writes its own plain save data (the hero's sheet, the town's merchants); only the name matches."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (x.add(y).mul(z)) in three shader kinds: it is how three.js nodes are written, not a copied helper. It crossed the info floor when the talk code grew the corpus."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
   }
 ]

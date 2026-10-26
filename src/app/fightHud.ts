@@ -109,9 +109,11 @@ export class FightHud {
       }
     }
     if (t) {
-      const threat = fight.threat(t);
+      const { threat, together } = fight.threat(t);
       if (this.target.style.getPropertyValue('--threat') !== THREAT[threat]) this.target.style.setProperty('--threat', THREAT[threat]);
-      const state = [STATE[t.state], THREAT_WORD[threat]].filter(Boolean).join(' · '), bar = `${Math.max(0, (t.health / t.def.health) * 100).toFixed(1)}%`;
+      // Several at once: the ward and the words are for all of them ("the pack" when it hunts as one).
+      const who = together ? (t.def.pack ? 'the pack: ' : 'together: ') : '';
+      const state = [STATE[t.state], who + THREAT_WORD[threat]].filter(Boolean).join(' · '), bar = `${Math.max(0, (t.health / t.def.health) * 100).toFixed(1)}%`;
       if (this.tState.textContent !== state) this.tState.textContent = state;
       if (this.tBar.style.width !== bar) this.tBar.style.width = bar;
     }

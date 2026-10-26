@@ -71,6 +71,7 @@
 .card .name { font: 15px/1.2 'Marcellus SC', Georgia, serif; letter-spacing: .04em; }
 .card .line { font-size: 13px; color: var(--ink-dim); }
 .card .line.bonus { color: #a9e38f; }
+.card .line.wear { color: #d08a3a; font-style: italic; }
 .card .lore { font-style: italic; font-size: 12px; }
 .card.common { --ward-colour: var(--common); }
 .card.uncommon { --ward-colour: var(--uncommon); border-color: #a07a2e; }

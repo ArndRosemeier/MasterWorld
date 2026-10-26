@@ -33,6 +33,10 @@ export interface TalkHost {
   readonly bindings: Bindings;
   /** A lead was opened: say it, and the journal and map show it (the hero hands the map over to be marked). */
   heard(lead: { id: string; title: string; note: string }): void;
+  /** A service was asked for (trade, a repair, a room): the talk has ended, open its window. */
+  serve(service: string, agent: Agent): void;
+  /** In a room: who is in it and where they stand there (their own x, z are out in the town); null outside. */
+  readonly roomPeople: readonly { agent: Agent; x: number; z: number }[] | null;
 }
 
 export class TalkUi {
@@ -69,8 +73,8 @@ export class TalkUi {
   /** Each frame: who is near enough to talk to, or whether the talk partner was walked away from. */
   watch(): void {
     if (this.with) {
-      const w = this.player.walker.pos;
-      if (Math.hypot(this.with.x - w.x, this.with.z - w.z) > LEAVE || this.host.away) this.close();
+      const w = this.player.walker.pos, at = this.whereIs(this.with);
+      if (!at || Math.hypot(at.x - w.x, at.z - w.z) > LEAVE || this.host.away) this.close();
       return;
     }
     this.near = this.host.away ? null : this.inFront();
@@ -86,9 +90,11 @@ export class TalkUi {
   private inFront(): Agent | null {
     const w = this.player.walker;
     let best: Agent | null = null, bd = REACH;
-    for (const a of this.life.agents) {
-      if (a.hidden || a.person.role === 'child') continue;
-      const dx = a.x - w.pos.x, dz = a.z - w.pos.z, d = Math.hypot(dx, dz);
+    // In a room, the people in it where they stand there; out of doors, everyone not indoors.
+    const here = this.host.roomPeople ?? this.life.agents.filter((a) => !a.hidden).map((a) => ({ agent: a, x: a.x, z: a.z }));
+    for (const { agent: a, x, z } of here) {
+      if (a.person.role === 'child') continue;
+      const dx = x - w.pos.x, dz = z - w.pos.z, d = Math.hypot(dx, dz);
       if (d >= bd) continue;
       // The walker's yaw faces −z at 0 (walker.ts); the direction to them as the same kind of angle.
       if (Math.abs(angleDiff(Math.atan2(-dx, -dz), w.yaw)) > FRONT) continue;
@@ -107,6 +113,12 @@ export class TalkUi {
       return;
     }
     if (talkKey && this.near && !document.querySelector('.shade.open')) { e.preventDefault(); this.begin(this.near); }
+  }
+
+  /** Where `a` stands now: in the room the hero is in, or out in the town (null: not in this room). */
+  private whereIs(a: Agent): { x: number; z: number } | null {
+    const room = this.host.roomPeople;
+    return room ? room.find((p) => p.agent === a) ?? null : a;
   }
 
   /** Start talking with someone (the talk key, or `?talk`). */
@@ -146,6 +158,7 @@ export class TalkUi {
       this.lines.scrollTop = this.lines.scrollHeight;
       this.host.heard({ id, title, note: fill(this.words.marked, { name: from, house: this.talk.houseCalled(id) }) });
     }
+    if (r.opens) { const id = r.opens; this.topicList.replaceChildren(); setTimeout(() => { this.close(); this.host.serve(id, a); }, 600); return; }
     if (r.done) { setTimeout(() => this.close(), 900); this.topicList.replaceChildren(); return; }
     this.offer();
   }

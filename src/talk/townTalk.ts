@@ -30,8 +30,22 @@ export interface Topic {
   readonly lead?: boolean;
 }
 
+/**
+ * Something a townsperson does for the hero besides talk (trade, a repair, a room): a topic of its own
+ * whose answer opens the game's window for it instead of asking the dialogue engine.
+ */
+export interface Service {
+  /** Topic id; the reply's `opens`. */
+  readonly id: string;
+  readonly label: string;
+  /** What they say as it opens. */
+  readonly line: string;
+}
+
 export interface Reply {
   readonly text: string;
+  /** A service's id: the game opens its window (the talk ends). */
+  readonly opens?: string;
   /** Cellars (decision ids) this answer told the player about, and who told. */
   readonly heard: readonly string[];
   /** The conversation is over (farewell). */
@@ -59,6 +73,8 @@ export class TownTalk {
   private readonly told = new Map<number, Atom>();
   /** People who know the hero from before (plan 11.4), and how they greet them. */
   private readonly friends = new Map<number, string>();
+  /** What each person offers besides talk (set by the game: trade, repairs, a room). */
+  services: (person: number) => readonly Service[] = () => [];
 
   constructor(private readonly folk: readonly Folk[], private readonly talk: TalkDef, cellars: readonly TalkCellar[], saved?: TownTalkSave) {
     for (const f of folk) this.byId.set(f.person.id, f);
@@ -182,6 +198,7 @@ export class TownTalk {
     });
     if (this.session.core.context(pid(person)).pendingOffer) out.push({ id: 'more', label: t.more });
     if (this.told.has(person)) out.push({ id: 'source', label: t.source });
+    for (const s of this.services(person)) out.push({ id: s.id, label: s.label });
     out.push({ id: 'bye', label: t.bye });
     return out;
   }
@@ -210,6 +227,8 @@ export class TownTalk {
       return this.respond(person, { function: 'ask_evidence', ...(a ? { query: { predicate: a.predicate, args: a.args } } : {}) });
     }
     if (topic === 'bye') return { ...this.respond(person, { function: 'farewell' }), done: true };
+    const service = this.services(person).find((s) => s.id === topic);
+    if (service) return { text: service.line, heard: [], done: true, opens: service.id };
     if (topic.startsWith('lead:')) return this.respond(person, { function: 'ask', query: { args: { subject: topic.slice(5) } } });
     throw new Error(`unknown topic ${topic}`);
   }

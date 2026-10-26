@@ -20,7 +20,7 @@ import { StockView } from './render/livestock/StockView';
 import { Herds } from './sim/livestock';
 import { Steed, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
-import { TownLife, type TownOrder } from './sim/townLife';
+import { TownLife, type Agent, type TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { TerrainView } from './render/terrain/TerrainView';
 import { VolumeView } from './render/terrain/VolumeView';
@@ -62,6 +62,7 @@ import { Notes } from './app/notes';
 import { TalkUi } from './app/talkUi';
 import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
+import { TradeUi } from './app/tradeUi';
 import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
 import { Orientation, mastery } from './game/orientation';
@@ -69,12 +70,19 @@ import { Compass, type SkyGlyph } from './app/compass';
 import { talkCellar, townTalk } from './talk/townTalk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
-import { SAVE_VERSION, saveLabel, type SaveData } from './app/saveGame';
+import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
+import { Market, itemWorth } from './game/trade';
+import { coinText } from './game/items';
+import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
+import { TalesEnd } from './app/talesEnd';
+import { RemainsView } from './render/remainsView';
+import { writeSlot } from './persist/saves';
 import { acquaintances } from './game/background';
 import { Director } from './vgm/director';
 import { FightHud } from './app/fightHud';
+import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 
 declare global {
   interface Window {
@@ -106,7 +114,7 @@ export async function start(b: Boot): Promise<void> {
     const loaded = await pendingLoad(setting);
     const save = typeof loaded === 'object' ? loaded : null;
     // The title's Continue: straight on with a loaded save, or offered when one is kept.
-    if (title && save) title.continuing(saveLabel(save, 'where you left off'));
+    if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
     else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const seedText = save?.seed ?? params.seed;
     const seed = parseSeed(seedText);
@@ -132,7 +140,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post, postSamples: params.postSamples, postFloatDepth: params.postFloatDepth, ao: params.ao });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post, postSamples: params.postSamples, postFloatDepth: params.postFloatDepth, ao: params.ao, bloom: params.bloom });
     if (save) view.sky.day = save.clock.day;
     view.sky.look = setting.look?.grade ?? [];
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
@@ -178,6 +186,11 @@ export async function start(b: Boot): Promise<void> {
     const pausedWith = (sound: string) => (on: boolean) => { opening = sound; paused(on); opening = 'ui/open'; };
     // What New game leads to once the dive lands (set once the hero exists: character creation).
     let onBegin: ((people: People['id'] | null) => void) | null = null;
+    // New game pressed before the world was ready: the rest of the build may take the whole frame (the
+    // player waits for it), and the creator gets its people ready meanwhile (set once the hero exists).
+    let chosen = null as { people: People['id'] | null } | null;
+    let onChose: ((people: People['id'] | null) => void) | null = null;
+    let hurry = (): void => {};
     let orbit: Orbit | null = null;
     if (title) {
       paused(true);
@@ -195,6 +208,7 @@ export async function start(b: Boot): Promise<void> {
         },
         heroView: () => player.heroView(),
         begin: (people) => { if (onBegin) onBegin(people); else paused(false); },
+        chose: (people) => { chosen = { people }; hurry(); onChose?.(people); },
       });
     }
 
@@ -243,8 +257,25 @@ export async function start(b: Boot): Promise<void> {
     let heroName = save?.looks?.name ?? '';
     // The hero's sheet (skills, health, gear, purse) and what they hold.
     const character = new Character(setting, save?.character ?? undefined);
+    // `wear`: the gear starts worn, the main hand most (for looking at the smith's bench).
+    if (params.wear) Object.entries(character.worn).forEach(([slot, it], i) => { if (it) character.worn[slot as keyof typeof character.worn] = { ...it, wear: params.wear * Math.max(0.3, 1 - i * 0.25) }; });
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
     armHero();
+    // Classic or roguelike (plan 11.1): chosen in the creator, kept in the save. What fallen heroes left lies where they fell.
+    let mode: GameMode = save?.mode ?? 'classic';
+    const remains: Remains[] = [...(save?.remains ?? [])];
+    // Drawn where they lie (a pack, a cairn), in the land or down in a cellar.
+    const remainsView = new RemainsView(view.stage);
+    const drawRemains = () => void remainsView.lay(remains.map((r) => ({ id: r.id, x: r.at.x, y: r.at.y, z: r.at.z, grave: !!r.grave, seed: r.id })));
+    if (params.remains && !save) {
+      // In front of where the hero stands and a little to the right (out of reach, not hidden behind them), on the ground.
+      const w = player.walker, x = w.pos.x - Math.sin(w.yaw) * 2.6 + Math.cos(w.yaw) * 1.3, z = w.pos.z - Math.cos(w.yaw) * 2.6 - Math.sin(w.yaw) * 1.3;
+      const at: FallPlace = { x, y: terrain.height(x, z), z, below: null, mark: { x, z }, label: 'out on the land' };
+      remains.push({ id: 'remains-shown', grave: params.remains === 'grave' ? 'Wenna Stonehelm' : null, at, items: [], coins: 0, day: 0 });
+    }
+    drawRemains();
+    // A roguelike hero fell: the heir's save is written and nothing saves over it.
+    let ended = false;
     // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
     const life = town ? new TownLife(town.plan, seed, hours(), setting.routines) : null;
     folkLife = life;
@@ -282,11 +313,11 @@ export async function start(b: Boot): Promise<void> {
       player.horses = horses;
       if (params.ride && player.steeds[0]) player.mount(player.steeds[0]);
     }
-    // The farms' animals in their paddocks (the setting says which; horses until Actors has cattle).
+    // The farms' animals in their paddocks (the setting says which).
     const herds = town && town.plan.paddocks.length ? new Herds(town.plan, seed) : null;
     let stock: StockView | null = null;
     if (herds && params.stock > 0) {
-      loading.set('Turning out the horses');
+      loading.set('Turning out the herds');
       stock = await StockView.forHerds(view.renderer, setting.world.livestock, herds, params.stock, (x, z) => terrain.height(x, z));
     }
     let folk: FolkView | null = null;
@@ -311,7 +342,10 @@ export async function start(b: Boot): Promise<void> {
     const capShare = view.stage.cap.share;
     view.stage.cap.share = 1;
     view.stage.monitor.phase = 'warmup';
-    const shown = () => { view.stage.cap.share = capShare; view.stage.monitor.phase = 'run'; };
+    let hurried = false;
+    const shown = () => { view.stage.cap.share = hurried && !window.__mwReady ? 1 : capShare; view.stage.monitor.phase = hurried && !window.__mwReady ? 'warmup' : 'run'; };
+    hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
+    if (chosen) hurry();
     loading.set('Raising the land');
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
@@ -333,6 +367,8 @@ export async function start(b: Boot): Promise<void> {
     const notes = new Notes();
     // The Director watching over the pacing, the fight's HUD and the journal (the cellars report to them).
     const director = new Director(setting.director, save?.director ?? undefined);
+    // One life (roguelike): the Director is stricter with fairness (plan 11.1).
+    director.strict = save?.mode === 'roguelike';
     const fightHud = new FightHud(setting, () => settings.current.bindings);
     const journal = new Journal(save?.journal);
     const inn = town ? buildingOf(town.plan, 'inn') : undefined;
@@ -344,10 +380,29 @@ export async function start(b: Boot): Promise<void> {
       get bindings() { return settings.current.bindings; },
       get blocked() { return open > 0; },
       wake: () => {
-        const v = visit();
-        const toInn = () => { if (inn) { const [x, z, yaw] = inn.door; player.teleport(x - Math.sin(yaw) * 1.2, undefined, z - Math.cos(yaw) * 1.2, yaw + Math.PI); } };
-        if (v) void v.leave().then(toInn);
-        else toInn();
+        const v = visit(), w = player.walker.pos;
+        const fellAt: FallPlace = {
+          x: w.x, y: w.y, z: w.z, below: v ? v.cellar.decision.id : null,
+          mark: v ? { x: v.houseDoor[0], z: v.houseDoor[1] } : { x: w.x, z: w.z },
+          label: v ? `in ${v.cellar.house}'s cellar` : 'out on the land',
+        };
+        const id = remainsId(hours());
+        if (mode === 'roguelike') { endTale(fellAt, id); return null; }
+        // Classic: carried off to wake somewhere safe, the pack left where the hero fell.
+        const fell = fallClassic(character, fellAt, id, view.sky.day);
+        if (fell.remains) leaveRemains(fell.remains);
+        // Where the hero last took a room (plan 11.2), else the temple: inside it; with no town, by the inn's door.
+        const at = upkeep?.waking() ?? null;
+        const carry = () => {
+          if (at?.building && rooms) return rooms.enter(at.building, true);
+          if (inn) { const [x, z, yaw] = inn.door; player.teleport(x - Math.sin(yaw) * 1.2, undefined, z - Math.cos(yaw) * 1.2, yaw + Math.PI); }
+          return Promise.resolve();
+        };
+        if (v) void v.leave().then(carry);
+        else void carry();
+        const place = at?.said ?? setting.upkeep.words.wakeInn;
+        return `You wake in ${place}, aching. Someone carried you there${fell.lost ? `, and ${coinText(fell.lost)} went with them` : ''}.`
+          + (fell.remains ? ' Your pack stayed where you fell; your map marks the place.' : '');
       },
       still: (on) => paused(on),
       armed: armHero,
@@ -367,7 +422,7 @@ export async function start(b: Boot): Promise<void> {
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       depth: (down, keep) => {
         if (!down) { for (const o of hidden) o.visible = true; hidden.length = 0; return; }
-        const kept = new Set<Object3D>([...keep, hero.object, view.camera]);
+        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group]);
         for (const o of view.scene.children) if (o.visible && !kept.has(o) && !(o as Light).isLight) { o.visible = false; hidden.push(o); }
       },
     }, terrain.towns, save?.cellars ?? {});
@@ -480,6 +535,24 @@ export async function start(b: Boot): Promise<void> {
       townWords?.acquaint(friendsOf(bg).map((a) => ({ person: a.person.id, line: a.line })), heroName || 'friend');
     };
     meetOldFriends();
+    // What townsfolk do besides talk (trade, repairs, a room): a talk topic each, which opens its window.
+    const services = new Map<string, (a: Agent) => void>();
+    // The town's merchants (plan 11.5): the smith, the inn's keeper and the market's stalls.
+    const market = life ? new Market(setting, life.agents.map((a) => a.person), seed, view.sky.day, save?.market) : null;
+    const trade = market ? new TradeUi(character, setting, market, {
+      paused,
+      get bindings() { return settings.current.bindings; },
+      get day() { return view.sky.day; },
+      traded: () => sounds?.coins(),
+      say: (text) => notes.say(text),
+    }) : null;
+    if (market && trade && townWords) {
+      services.set('trade', (a) => { const m = market.of(a.person.id); if (m) trade.show(m, townWords.nameOf(a.person.id)); });
+      townWords.services = (person) => {
+        const shop = market.of(person)?.shop;
+        return shop ? [{ id: 'trade', label: shop.topic, line: shop.line }] : [];
+      };
+    }
     const talk = town && life && townWords ? new TalkUi(townWords, setting.talk, journal, life, town.plan, player, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -489,7 +562,27 @@ export async function start(b: Boot): Promise<void> {
         handOver?.give(lead.id);
         notes.say(`${lead.note} (Journal: ${settings.current.bindings.journal[0].replace(/^Key/, '')})`, 6);
       },
+      serve: (id, a) => services.get(id)?.(a),
+      get roomPeople() { return rooms?.inside && life ? rooms.people(life) : null; },
     }) : null;
+    // A room at the inn and the smith's mending (plan 11.5): two more services.
+    const upkeep = town && life && townWords ? new UpkeepUi(character, setting, {
+      paused,
+      get bindings() { return settings.current.bindings; },
+      town: { id: town.decision.id, plan: town.plan },
+      hours,
+      setClock: (h) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; },
+      enter: (b) => rooms?.enter(b, true) ?? Promise.resolve(),
+      say: (text, secs) => notes.say(text, secs),
+      worth: (it) => itemWorth(setting.items, it),
+      rang: () => sounds?.rang(),
+    }) : null;
+    if (upkeep && townWords && life) {
+      const others = townWords.services.bind(townWords);
+      const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
+      townWords.services = (id) => { const p = person(id); return [...others(id), ...(p ? upkeep.services(p) : [])]; };
+      for (const id of UPKEEP_SERVICES) services.set(id, (a) => upkeep.answer(id, a.person, townWords.nameOf(a.person.id)));
+    }
     const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {
       paused,
@@ -519,14 +612,30 @@ export async function start(b: Boot): Promise<void> {
     };
     // Telling of a place: the hero hands the map over and the teller marks it.
     const handOver = map ? new HandOver((id, c, t) => map.markIn(id, c, t), () => sounds?.noted()) : null;
+    /**
+     * The hero in front of `a` (for `?talk`, `?trade` and the shot set): in their room when they are
+     * indoors (out in the town an indoor person stands inside the building's walls, seen from within),
+     * else where they are.
+     */
+    const standBefore = async (a: Agent): Promise<void> => {
+      const s = a.spot >= 0 ? life?.spots[a.spot] : undefined;
+      const b = a.hidden && s && s.building >= 0 ? town?.plan.buildings[s.building] : undefined;
+      if (b && rooms && life) {
+        if (rooms.building !== b.id) await rooms.enter(b, true);
+        const p = rooms.people(life)?.find((x) => x.agent === a);
+        if (p) { player.teleport(p.x + Math.cos(p.dir) * 1.3, p.y, p.z + Math.sin(p.dir) * 1.3, Math.atan2(Math.cos(p.dir), Math.sin(p.dir))); return; }
+      }
+      player.teleport(a.x + Math.cos(a.dir) * 1.6, undefined, a.z + Math.sin(a.dir) * 1.6, Math.atan2(Math.cos(a.dir), Math.sin(a.dir)));
+    };
     if (talk && life && town && params.talk) {
       // Straight into a talk: in front of the innkeeper or of the cellar's household.
       const pick = params.talk === 'house'
         ? life.agents.find((a) => a.person.home === firstPromise?.building && a.person.role !== 'child')
+        : params.talk === 'smith'
+        ? life.agents.find((a) => a.person.trade === 'smith' && a.person.role === 'trade')
         : life.agents.find((a) => town.plan.buildings[a.person.home].kind === 'inn' && a.person.role === 'trade');
       if (pick) {
-        const yaw = pick.dir;
-        player.teleport(pick.x + Math.cos(yaw) * 1.6, undefined, pick.z + Math.sin(yaw) * 1.6, Math.atan2(Math.cos(yaw), Math.sin(yaw)));
+        await standBefore(pick);
         talk.begin(pick);
         for (const t of params.topics) talk.choose(t);
       }
@@ -537,6 +646,7 @@ export async function start(b: Boot): Promise<void> {
       get bindings() { return settings.current.bindings; },
       setting: { id: setting.id, version: setting.version },
       say: (text) => notes.say(text),
+      get mode() { return mode; },
       capture: () => {
         // In a room: saved as standing at its door outside (rooms are built when entered).
         const w = rooms?.outside ?? player.walker.pos;
@@ -549,25 +659,74 @@ export async function start(b: Boot): Promise<void> {
           talk: townWords?.save() ?? null,
           journal: journal.entries(),
           character: character.save(),
+          ...(market ? { market: market.save() } : {}),
           looks: { name: heroName, look: hero.look },
           director: director.snapshot(),
+          mode,
+          remains: [...remains],
         };
         const v = visit();
         return { data, where: v ? `in ${v.cellar.house}'s cellar` : 'in the town' };
       },
     };
     const saves = new SavesUi(savesHost);
-    const autosave = () => void saveNow(savesHost, AUTOSAVE);
-    setInterval(autosave, 5 * 60 * 1000);
+    // A classic game autosaves every 5 minutes; a roguelike one keeps its one save every minute and as the page goes.
+    const autosave = () => { if (!ended) void saveNow(savesHost, mode === 'roguelike' ? ROGUE_SLOT : AUTOSAVE); };
+    let minutes = 0;
+    setInterval(() => { if (mode === 'roguelike' || ++minutes % 5 === 0) autosave(); }, 60 * 1000);
+    addEventListener('pagehide', () => { if (mode === 'roguelike' && heroName) autosave(); });
+    // Remains left where a hero fell: on the map until taken up again. The ones just left wait until the hero has been away.
+    let justLeft: Remains | null = null;
+    const leaveRemains = (r: Remains) => {
+      remains.push(r);
+      journal.remember(remainsEntry(r));
+      justLeft = r;
+      drawRemains();
+    };
+    const gatherNear = () => {
+      if (!remains.length || !character.alive) return;
+      const v = visit(), w = player.walker.pos, below = v ? v.cellar.decision.id : null;
+      if (justLeft && (justLeft.at.below !== below || Math.hypot(justLeft.at.x - w.x, justLeft.at.z - w.z) > 8)) justLeft = null;
+      const r = remainsNear(remains, below, w.x, w.y, w.z);
+      if (!r || r === justLeft) return;
+      gather(character, r);
+      remains.splice(remains.indexOf(r), 1);
+      journal.fulfil(r.id);
+      drawRemains();
+      notes.say(gatheredLine(r), 6);
+      sounds?.cue({ kind: 'found', loot: { items: [...r.items], coins: r.coins } });
+    };
+    // `?open=tale`: the end of a roguelike tale as it shows (for the standard shots), without ending anything.
+    const showTale = () => { paused(true); new TalesEnd().show(heroName || 'Wenna Stonehelm', epitaph(heroName || 'Wenna Stonehelm', view.sky.day, { x: 0, y: 0, z: 0, below: null, mark: { x: 0, z: 0 }, label: 'out on the land' }), () => location.reload()); };
+    // Roguelike (plan 11.1): the hero's tale ends where they fell. The world goes on; the next start makes a new hero in it.
+    const endTale = (at: FallPlace, id: string) => {
+      ended = true;
+      const name = heroName || 'a nameless wanderer', day = view.sky.day;
+      const grave = fallRoguelike(character, name, at, id, day);
+      const heir = heirSave(savesHost.capture().data, grave, { x: home.x, y: 0, z: home.z, yaw: 0, below: false });
+      const written = writeSlot(ROGUE_SLOT, saveLabel(heir, `after ${name} fell`), heir).catch(() => notes.say('The browser would not keep the tale.', 8));
+      new TalesEnd().show(name, epitaph(name, day, at), () => void written.then(() => loadAtRestart(ROGUE_SLOT)));
+    };
     if (save) {
       // Lay the save over the fresh world (each cellar takes its changes as it is built), then the hero where they were.
       const h = save.hero;
       const down = h.below ? await cellars.build(h.cellar ?? firstPromise?.id ?? '') : null;
       if (down) await down.enter(true);
       player.teleport(h.x, h.below ? h.y : undefined, h.z, h.yaw);
-      notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
+      if (!save.heir) notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
     } else if (typeof loaded === 'string') notes.say(`Could not load the save: ${loaded}.`, 8);
-    if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else map?.setOpen(true); }
+    // Straight to a merchant's counter (`?trade=smith`, or `game.tradeAt('smith')` in the console and the shot set): in front of them, their wares out.
+    const tradeAt = async (keeper: string): Promise<boolean> => {
+      const m = market?.merchants.find((x) => x.shop.keeper === keeper);
+      const a = m && life?.agents.find((x) => x.person.id === m.person);
+      if (!m || !a || !trade || !townWords) return false;
+      talk?.close();
+      await standBefore(a);
+      trade.show(m, townWords.nameOf(a.person.id));
+      return true;
+    };
+    if (params.trade) await tradeAt(params.trade);
+    if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else if (params.open === 'tale') showTale(); else map?.setOpen(true); }
     new DebugMenu({
       paused,
       get freeCamera() { return player.flying; },
@@ -593,7 +752,7 @@ export async function start(b: Boot): Promise<void> {
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, fightHud, compass },
+      game: { player, view, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, character, market, trade, tradeAt, fightHud, compass },
     });
     b.menus.menu = new Menu(settings, {
       paused,
@@ -602,17 +761,24 @@ export async function start(b: Boot): Promise<void> {
     });
     saves.dock();
     // Character creation (plan 11.4): after New game's dive (or at once with `?create`), unless a save is loaded.
+    const w = player.walker;
+    const makeCreator = (): Creator => new Creator({
+      camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
+      nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
+      backgrounds: setting.backgrounds,
+      skillName: (id) => setting.skills.find((k) => k.id === id)?.name ?? id,
+      itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
+      knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
+      click: () => sound.play('click'),
+      mode: save?.heir ? 'roguelike' : null,
+    }, seed);
+    // Made (and its people loaded) as soon as the title's choice is made, so the glass opens right after the dive.
+    let readied: Creator | null = null;
+    onChose = (people) => { if (!save || save.heir) (readied ??= makeCreator()).ready(people ? PEOPLE_RACE[people] : null).catch((e: unknown) => console.error('[creator] getting ready failed', e)); };
+    if (chosen) onChose(chosen.people);
     const create = async (race: string | null): Promise<void> => {
-      const w = player.walker;
-      creator = new Creator({
-        camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
-        nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
-        backgrounds: setting.backgrounds,
-        skillName: (id) => setting.skills.find((k) => k.id === id)?.name ?? id,
-        itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
-        knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
-        click: () => sound.play('click'),
-      }, seed);
+      creator = readied ?? makeCreator();
+      readied = null;
       // Nobody walks between the camera and the hero while the glass is open.
       const cam = view.camera.position;
       if (folk) folk.clear = (x, z) => distSqPointSeg(x, z, cam.x, cam.z, w.pos.x, w.pos.z) < 1.5 * 1.5;
@@ -623,6 +789,10 @@ export async function start(b: Boot): Promise<void> {
       // The past chosen: its skills, kit and the people in town who know the hero.
       const bg = setting.backgrounds.find((b) => b.id === made.background);
       if (bg) { character.beginAs(bg); armHero(); }
+      // A roguelike tale has its one save from the first step.
+      mode = made.mode;
+      director.strict = mode === 'roguelike';
+      if (mode === 'roguelike') autosave();
       meetOldFriends();
       // Behind the hero, looking the way they face.
       player.teleport(w.pos.x, undefined, w.pos.z, w.yaw);
@@ -631,10 +801,10 @@ export async function start(b: Boot): Promise<void> {
       notes.say(`${made.name} steps out onto the market square.${friends.length ? ` ${friends.join(' and ')} will know you.` : ''}`, 6);
     };
     onBegin = (people) => {
-      if (save) paused(false);
+      if (save && !save.heir) paused(false);
       else void create(people ? PEOPLE_RACE[people] : null);
     };
-    if (!title && params.create && !save) { paused(true); void create(null); }
+    if (!title && ((params.create && !save) || save?.heir)) { paused(true); void create(null); }
     // F flies, H gets on or off a horse (the keys are in the settings).
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
@@ -651,6 +821,7 @@ export async function start(b: Boot): Promise<void> {
       director.observe(dt, { fighting, pressure, health: character.health / character.maxHealth, talking: open > 0, underground: below, inTown: !!town && !below, leads: journal.open.length });
       const m = director.next();
       if (m) notes.say(m, 6);
+      if (!title?.holding && !creator?.showing) gatherNear();
       builderClock += dt;
       if (builderClock < 3 || !town || !life || title?.holding || creator?.showing) return;
       builderClock = 0;

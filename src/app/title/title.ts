@@ -25,6 +25,8 @@ export interface TitleWorld {
   heroView(): Pose;
   /** The title is over: the game takes the camera and the keys. */
   begin(people: People['id'] | null): void;
+  /** New game was pressed (perhaps long before the world is ready): get what follows the dive ready. */
+  chose?(people: People['id'] | null): void;
 }
 
 export interface TitleMenus {
@@ -44,6 +46,7 @@ export class Title {
   private playable = false;
   private wanted: { people: People['id'] | null } | null = null;
   private over = false;
+  private continued = false;
 
   /** This start's draw: today's date and how many titles were shown before (kept in the browser). */
   static drawToday(): TitleDraw {
@@ -82,6 +85,7 @@ export class Title {
   /** This start loads a save: no menu choice is left, the title dives to it once the world is built. */
   continuing(label: string): void {
     this.wanted = { people: null };
+    this.continued = true;
     this.screen.continuing(label);
   }
 
@@ -93,6 +97,7 @@ export class Title {
     // The camera and the toys use three.js: loaded with the game, not with the title's first picture.
     const [{ TitleCamera }, { Toys }] = await Promise.all([import('./TitleCamera'), import('./Toys')]);
     this.world = world;
+    if (this.wanted && !this.continued) world.chose?.(this.wanted.people);
     this.cam = new TitleCamera(world.camera, world.orbit);
     this.cam.fly(0);
     if (!this.calm) this.toys = new Toys(this.screen.toys, world.camera, world.toys, this.draw.seed, { toast: (t) => this.screen.toast(t), sound: this.sound });
@@ -134,8 +139,9 @@ export class Title {
   private start(people: People['id'] | null): void {
     if (this.screen.leaving || this.wanted) return;
     this.wanted = { people };
+    this.world?.chose?.(people);
     if (this.playable) this.go(people);
-    else this.screen.waiting();
+    else this.screen.waiting(people);
   }
 
   /** Into the game: the dive (or with calm motion a fade), then the game begins. */

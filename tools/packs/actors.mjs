@@ -3,7 +3,7 @@
  * (cached in node_modules/.cache) and copies what the town needs into public/packs/human: the body, its
  * morph targets and skins, the medieval wardrobe, a few hairstyles and the clips in src/render/folk/looks.ts;
  * and the animal packs whole: the horse (about 10 MB, with its tack and clips), the dog (the wild's wolves)
- * and the deer, each into public/packs/<kind>.
+ * the deer and the cow (the farms' cattle), each into public/packs/<kind>.
  * The full pack is about 530 MB (the CMU motion library, 90 garments, 64 hairstyles); this is a tenth.
  * Runs again only when the Actors version or the selection changes. `--force` copies anew.
  */
@@ -35,7 +35,7 @@ const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK
 
 const dest = join(root, 'public/packs/human');
 const stamp = join(dest, '.selection');
-const ANIMALS = ['horse', 'dog', 'deer'];
+const ANIMALS = ['horse', 'dog', 'deer', 'cow'];
 const want = JSON.stringify({ version, themes, animals: ANIMALS, keep: Object.fromEntries(Object.entries(keep).map(([k, v]) => [k, [...v].sort()])) });
 if (!process.argv.includes('--force') && existsSync(stamp) && readFileSync(stamp, 'utf8') === want && ANIMALS.every((k) => existsSync(join(root, 'public/packs', k, 'manifest.json')))) {
   console.log(`public/packs/human already has the Actors ${version} selection`);

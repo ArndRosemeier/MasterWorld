@@ -10,7 +10,8 @@ import type { AbilityDef, SettingModule } from '../setting/contract';
 import { strike, threatOf, type Strike, type Threat } from '../sim/combat';
 import { radiusOf, type Creature, type Den, type DenEvent, type Quarry } from '../sim/creatures';
 import type { Character, SkillUp } from './character';
-import { rollLoot, type Loot } from './items';
+import { defOf, rollLoot, type Item, type Loot } from './items';
+import { WEAR, type WearState } from './upkeep';
 
 export interface HeroPose {
   readonly x: number;
@@ -34,6 +35,8 @@ export type FightEvent =
   | { readonly kind: 'skill'; readonly up: SkillUp }
   | { readonly kind: 'heal'; readonly amount: number }
   | { readonly kind: 'fallen' }
+  /** Something worn looks different now (worn, battered, broken): the smith can mend it. */
+  | { readonly kind: 'worn'; readonly item: Item; readonly state: WearState }
   | { readonly kind: 'refused'; readonly text: string };
 
 /** Hero body radius, metres. */
@@ -75,8 +78,15 @@ export class Fight {
     return { x: p.x, y: p.y, z: p.z, noise, light: this.light, alive: this.hero.alive, guard: this.hero.guard(this.hero.stamina <= 0) };
   }
 
-  /** Threat of a creature against the hero (the target frame's ward). */
-  threat(c: Creature): Threat { return threatOf(c.def.danger, this.hero.power); }
+  /**
+   * Threat of a creature against the hero (the target frame's ward): with all who fight the hero beside it,
+   * so one wolf of a pack that surrounds the hero is read as the pack. `together` when others count.
+   */
+  threat(c: Creature): { readonly threat: Threat; readonly together: boolean } {
+    const others = this.den.fighting.filter((o) => o !== c);
+    const danger = c.def.danger + others.reduce((a, o) => a + o.def.danger, 0);
+    return { threat: threatOf(danger, this.hero.power), together: others.length > 0 };
+  }
 
   /** Seconds before an ability can be used again (0: ready). */
   cooling(id: string): number { return this.cooldown.get(id) ?? 0; }
@@ -183,6 +193,7 @@ export class Fight {
     this.quiet = 0;
     const s = strike(this.hero.blow(a), this.den.guardOf(t), this.rng);
     out.push({ kind: 'struck', who: t, strike: s, ability: a.id });
+    this.wearOut('main', WEAR.blow * (s.outcome === 'miss' ? 1 / 3 : 1), out);
     this.train(w.skill, t.def.danger, s.outcome === 'miss' ? 0.5 : 1, out);
     for (const e of this.den.wound(t, s, p, a.effect === 'stagger' ? 1.6 : 0)) this.denEvent(e, out);
   }
@@ -195,6 +206,11 @@ export class Fight {
         const s = e.strike;
         hero.health = Math.max(0, hero.health - s.damage);
         out.push({ kind: 'hurt', by: e.who, strike: s });
+        // Blows taken wear the armour; a blow stopped, the shield.
+        if (s.outcome === 'block') this.wearOut('off', WEAR.block, out);
+        else if (s.outcome !== 'miss') {
+          for (const [slot, it] of Object.entries(hero.worn)) if (it && defOf(this.setting.items, it.def).kind === 'armour') this.wearOut(slot as keyof typeof hero.worn, WEAR.hit, out);
+        }
         // Dodging a blow trains dodging; a block, the shield; taking one, the armour.
         if (s.outcome === 'miss') this.train('dodge', e.who.def.danger, 1, out);
         else if (s.outcome === 'block') this.train('shields', e.who.def.danger, 1, out);
@@ -210,6 +226,11 @@ export class Fight {
       case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who) }); break;
       default: break;
     }
+  }
+
+  private wearOut(slot: keyof Character['worn'], amount: number, out: FightEvent[]): void {
+    const w = this.hero.wear(slot, amount);
+    if (w) out.push({ kind: 'worn', item: w.item, state: w.state });
   }
 
   private train(skill: string, challenge: number, amount: number, out: FightEvent[]): void {

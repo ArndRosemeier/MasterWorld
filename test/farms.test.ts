@@ -15,7 +15,7 @@ test('farms: farm households work their own farm, and its fields offer work by t
     assert.ok(folk.length >= 2, `farm ${fm.id}: ${folk.length} adults`);
     for (const p of folk) assert.ok(p.trade === 'farmer' && p.work === fm.house, `farm ${fm.id}: ${p.role} ${p.trade} works at ${p.work}`);
     const work = spots.filter((s) => s.building === fm.house && s.use === 'work');
-    assert.ok(work.some((s) => s.activity === 'tendHorses') && work.some((s) => s.activity === 'muckOut'), 'paddock and stable work');
+    assert.ok(work.some((s) => s.activity === 'tendStock') && work.some((s) => s.activity === 'muckOut'), 'paddock and stable work');
     const field = work.filter((s) => ['plough', 'sow', 'hoe', 'reap'].includes(s.activity));
     assert.ok(field.length >= 2, `farm ${fm.id}: ${field.length} places in the fields`);
   }
