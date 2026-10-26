@@ -77,6 +77,8 @@ export interface CellarsHost {
     caveRock(layout: DungeonLayout, cave: number): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
     caveMouth(site: LandSite, cave: number): Promise<CaveMouth>;
   };
+  /** A place out on the land opens: the trees round it go (the land's views are built again there). */
+  cleared?(d: DungeonDecision): void;
   /** Down (true) or up again: the land above leaves the frame meanwhile, all but `keep` (the cellar and its dwellers). */
   depth(below: boolean, keep: readonly Object3D[]): void;
 }
@@ -239,6 +241,7 @@ export class Cellars {
     const first = only.length ? outlineCellar({ ...d, danger: undefined }, place, { ...lore, dwellers: only }) : outlineCellar(d, place, lore);
     const m = occupationOf(this.log, d.id);
     const mound = d.site ? this.heap(d, d.site, first.layout) : null;
+    if (d.site) this.host.cleared?.(d);
     const s: Site = { decision: d, house, place, mound, first, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;

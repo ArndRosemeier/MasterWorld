@@ -48,6 +48,8 @@ export interface FloraJob {
 
 /** Spacing of the full-density candidate grid: at most 625 plants a hectare. */
 export const NEAR_SPACING = 4;
+/** Metres beyond a clearing over which the trees come back (thin at first). */
+const CLEARING_EDGE = 8;
 /** Highest share of candidates with a plant (far candidates in thick woods). */
 const MAX_P = 0.9;
 
@@ -92,6 +94,11 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     if (built >= TownGround.Street || (built === TownGround.Yard && !shrub && hash2f(seed + 8, gi, gj) < 0.85)) continue;
     // Roads keep a lane clear: no trunk within crown's reach of the edge, no bush on it.
     if (!t.roads.empty && t.roads.fromEdge(x, z) < (shrub ? 0.8 : 3)) continue;
+    // Places out on the land stand in the open: no trunk in their clearing and fewer towards its edge, bushes only round its rim.
+    if (t.clearings.size) {
+      const out = t.fromClearing(x, z);
+      if (shrub ? out < -6 : out < 0 || out < CLEARING_EDGE * hash2f(seed + 9, gi, gj)) continue;
+    }
     const kind = shrub ? SHRUB + (hash2f(seed + 3, gi, gj) < 0.5 ? 0 : 1) : pickTree(flora.mix, hash2f(seed + 4, gi, gj), hash2f(seed + 5, gi, gj));
     if (kind < 0) continue;
     const size0 = 0.8 + 0.45 * hash2f(seed + 6, gi, gj);

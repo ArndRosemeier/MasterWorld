@@ -1,10 +1,11 @@
 /**
  * Roads in the running game (plan 7): road decisions reach the main thread's land and every worker, the
  * terrain shader's road mask follows the camera, and a road laid while playing (the VGM linking a new
- * place) has the land, plants, trunks and masks near it built again.
+ * place) has the land, plants, trunks and masks near it built again. A place out on the land (a tower, a
+ * cave, a barrow) clears its trees the same way.
  */
 import type { Vector3 } from 'three/webgpu';
-import type { Decision, RoadDecision } from '../world/decisions';
+import type { Decision, DungeonDecision, RoadDecision } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
 import type { Trunks } from '../world/trunks';
 import type { TerrainJobs, WorldJobs } from '../workers/pool';
@@ -26,6 +27,8 @@ export class RoadWork {
   /** The road mask round the camera (rebaked 600 m before its edge comes into the drawn ground). */
   readonly mask: FollowedMask;
   private views: RoadViews | null = null;
+  /** The places whose clearings the workers have heard of. */
+  private readonly sent = new Set<string>();
 
   constructor(private readonly terrain: Terrain, private readonly world: WorldJobs, private readonly land: TerrainJobs) {
     this.mask = new FollowedMask(ROAD.mask, (x0, z0, side, res) => world.roadMask(x0, z0, side, res), ROAD.mask.side / 2 - 600, 64);
@@ -58,6 +61,21 @@ export class RoadWork {
     this.views?.trunks.forgetOver(touches);
     this.views?.grass?.invalidate();
     this.mask.invalidate();
+  }
+
+  /** A place out on the land (already in the log): the trees go from its clearing, and the plants and trunks near it are placed anew. */
+  async clear(d: DungeonDecision): Promise<void> {
+    if (this.sent.has(d.id)) return;
+    this.sent.add(d.id);
+    this.terrain.settleMore([d]);
+    const c = this.terrain.clearings.get(d.id);
+    if (!c) return;
+    await Promise.all([this.world.decisions([d]), this.land.decisions([d])]);
+    // Squares that reach the clearing or the edge where the trees come back.
+    const reach = c.r + 10;
+    const touches = (x0: number, z0: number, x1: number, z1: number) => Math.hypot(Math.max(x0 - c.x, 0, c.x - x1), Math.max(z0 - c.z, 0, c.z - z1)) < reach;
+    this.views?.flora.refresh(touches);
+    this.views?.trunks.forgetOver(touches);
   }
 
   /** Each frame: the mask follows the camera. */

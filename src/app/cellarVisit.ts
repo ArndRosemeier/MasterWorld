@@ -142,8 +142,12 @@ export class CellarVisit {
   private event(e: SpaceEvent): void {
     this.view.opened(e.link);
     const own = e.link === this.cellar.pieceLink ? this.cellar.setPiece.found : undefined;
-    const text = own && (e.kind === 'found' || e.kind === 'unbarred') ? own : { key: 'You find a key on a nail by the door.', unlocked: 'The key turns, stiffly. The door gives.', unbarred: 'You lift the bar from its brackets. The way back is open.', found: 'A draught from the wall: a hidden door.' }[e.kind];
+    const said = shapeOf(this.cellar.decision.template).carved ? CARVED_SAYS : BUILT_SAYS;
+    const text = own && (e.kind === 'found' || e.kind === 'unbarred') ? own : said[e.kind];
     this.notes.say(text);
   }
 }
 
+/** What the hero notices as a way opens, in built rooms and in a natural cave's rock. */
+const BUILT_SAYS = { key: 'You find a key on a nail by the door.', unlocked: 'The key turns, stiffly. The door gives.', unbarred: 'You lift the bar from its brackets. The way back is open.', found: 'A draught from the wall: a hidden door.' } as const;
+const CARVED_SAYS = { key: 'You find a key wedged in a crack of the rock.', unlocked: 'The key turns, stiffly. The grate swings back on its pins.', unbarred: 'You lever the wedged boulder out of the gap. The way back is open.', found: 'A draught through stacked stones: a way hidden behind them.' } as const;

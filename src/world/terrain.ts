@@ -8,6 +8,7 @@ import { FALL_LIP, HYDRO, Hydrology, emptyWater, type HydroOptions, type WaterHe
 import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
 import type { Decision, DecisionLog, RoadDecision, TownDecision } from './decisions';
+import { clearingOf, type Clearing } from './dungeon/site';
 import { RoadNet } from './roads';
 import type { Field } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
@@ -34,6 +35,7 @@ export class Terrain {
   private readonly probe = emptySample();
   private readonly wet = { river: 0, lake: 0 };
   private roadNet = new RoadNet();
+  private readonly clearingMap = new Map<string, Clearing>();
 
   /**
    * Build what the decision log says stands on the land (plan 5.1): rock volumes and towns. The land
@@ -50,6 +52,8 @@ export class Terrain {
       else if (d.kind === 'town') this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
       else if (d.kind === 'road') this.roadNet.insert(d);
     }
+    this.clearingMap.clear();
+    this.settleMore(log.filter((d) => d.kind === 'dungeon'));
   }
 
   /**
@@ -62,10 +66,29 @@ export class Terrain {
 
   /**
    * Decisions made while the game runs that change the land, in workers as on the main thread (they reach
-   * the workers as a `decisions` job): so far roads. Others leave the land as it is.
+   * the workers as a `decisions` job): roads, and the clearings round places out on the land. Others leave
+   * the land as it is.
    */
   settleMore(ds: readonly Decision[]): void {
-    for (const d of ds) if (d.kind === 'road') this.addRoad(d);
+    for (const d of ds) {
+      if (d.kind === 'road') this.addRoad(d);
+      else if (d.kind === 'dungeon' && d.site) {
+        const c = clearingOf(d.template, d.site);
+        if (c) this.clearingMap.set(d.id, c);
+      }
+    }
+  }
+
+  /** Ground kept free of trees round the places out on the land (by the place's id). */
+  get clearings(): ReadonlyMap<string, Clearing> {
+    return this.clearingMap;
+  }
+
+  /** How far (x, z) lies outside the nearest clearing, metres (negative inside; Infinity with none). */
+  fromClearing(x: number, z: number): number {
+    let best = Infinity;
+    for (const c of this.clearingMap.values()) best = Math.min(best, Math.hypot(x - c.x, z - c.z) - c.r);
+    return best;
   }
 
   /** The roads on this land. */
