@@ -214,6 +214,8 @@ function corners(x: number, y0: number, z: number, sx: number, sy: number, sz: n
 }
 
 /** `base` a little lighter or darker, by up to ±v. */
+/** A tint made lighter or darker by `k` (clamped to 0..255). */
+export const scaleTint = (t: Tint, k: number): Tint => t.map((c) => Math.max(0, Math.min(255, Math.round(c * k)))) as unknown as Tint;
 export const varyTint = (rng: Rng, base: Tint, v: number): Tint => base.map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + rng.range(-v, v)))))) as unknown as Tint;
 
 export { BuildingMat };

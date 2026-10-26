@@ -15,6 +15,7 @@ import { Rng, deriveSeed } from '@futuremagic/core';
 import { cyclicGraph, layoutDungeon, pace, PATTERNS, DIRS, type DungeonGraph, type DungeonLayout, type Pace, type Room } from '@futuremagic/dungeon';
 import type { CellarLore, DungeonProp, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
 import type { DungeonDecision, MoveInDecision } from '../decisions';
+import { shapeOf } from './kinds';
 import { setPieceById, type SetPieceDef } from './setPieces';
 
 /** Metres per layout cell, per storey, and stairs per storey (cells). */
@@ -107,7 +108,7 @@ export interface Cellar extends CellarSketch {
   readonly spawns: Spawn[];
   /** The link the set piece hangs on. */
   readonly pieceLink: number;
-  /** The way up to the house: the ladder under the hatch (a prop in the entrance room). */
+  /** The way back out: the ladder under the hatch (a tower's door; a prop in the entrance room). */
   readonly hatch: Prop;
   /** For variety checks: what makes this cellar's shape. */
   readonly signature: string;
@@ -172,7 +173,8 @@ const SIZE: Record<Room['size'], readonly [number, number]> = { nook: [2, 2], sm
 /** The outline: everything but the meshes. Throws if no layout fits (the variety test keeps that from happening). */
 export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: CellarLore): Cellar {
   const sketch = sketchCellar(d, house, lore);
-  const minLevel = layerOf(sketch, 'older') ? -1 : 0;
+  const shape = shapeOf(d.template);
+  const minLevel = shape.depth(!!layerOf(sketch, 'older'));
   // Patterns: what the history's layers suggest; the set piece's own for the main cycle when it has one.
   const told = sketch.history.flatMap((h) => h.def.patterns ?? []);
   const known = new Set(PATTERNS.map((p) => p.id));
@@ -181,21 +183,23 @@ export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: Cel
   const prefer = sketch.setPiece.prefer ?? [];
   const inserts = fitting([...new Set([...told, ...prefer, 'twin-paths', 'side-loop', 'barred-return', 'hidden-shortcut'])]);
   const weight = (id: string) => 0.3 + told.filter((t) => t === id).length + (prefer.includes(id) ? 2 : 0);
-  // Entrance: the house's cellar under its footprint.
-  const ew = Math.max(2, Math.min(5, Math.floor(house.hu))), ed = Math.max(2, Math.min(5, Math.floor(house.hv)));
+  // Entrance: under a house, the house's cellar under its footprint.
+  const [ew, ed] = shape.entrance(house);
   for (let attempt = 0; attempt < 40; attempt++) {
     const seed = deriveSeed(d.seed, 'cellar', 'outline', attempt);
-    const graph = cyclicGraph({ main: main.length ? main : fitting(['twin-paths']), inserts, insertCount: [1, 2], maxRooms: 11, minLevel, weight }, seed);
+    const graph = cyclicGraph({ main: main.length ? main : fitting(['twin-paths']), inserts, insertCount: [1, 2], maxRooms: shape.maxRooms, minLevel, weight }, seed);
     const link = sketch.setPiece.find(graph);
     if (!link) continue;
     const walk = pace(graph);
     // The way to the goal never needs a hidden door, is more than a step, and has a quicker way back.
     if (walk.needsSecret || !walk.shortcut || new Set(walk.route).size < 3) continue;
+    // A tower whose rooms could not all be kept within a flight of each other does not fit its foot: the next.
+    if (shape.rise && !climb(graph, walk, shape.rise, minLevel < 0 && !!layerOf(sketch, 'older'))) continue;
     const layout = layoutDungeon(graph, seed, {
       entrance: { x: -(ew >> 1), z: -(ed >> 1), w: ew, d: ed },
-      radius: 16,
+      radius: shape.radius,
       stairRun: STAIR_RUN,
-      maxPath: 6,
+      maxPath: shape.rise ? 8 : 6,
       attempts: 6,
       size: (room, r) => { const [lo, hi] = SIZE[room.size]; return [r.int(lo, hi), r.int(lo, hi)]; },
     });
@@ -205,7 +209,47 @@ export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: Cel
   throw new Error(`cellar ${d.id}: no layout fits`);
 }
 
+/**
+ * A tower's rooms climb: the graph's ways down become ways up (a hall entered over a ledge from a stair up to
+ * its gallery), and every room rises by how far along the tension curve it lies (`rise` storeys at most), so
+ * the way in starts on the ground and the goal lies near the top. With an older layer, the quietest room
+ * off the way goes under the ground instead: the vault at the tower's foot.
+ */
+function climb(graph: DungeonGraph, walk: Pace, rise: number, older: boolean): boolean {
+  for (const r of graph.rooms) {
+    if (r.id === graph.entrance) continue;
+    r.level = -r.level - (r.height - 1) + Math.round(walk.tension[r.id] * rise);
+  }
+  // One flight of stairs between linked rooms at most (a narrow tower has no room for more): from the
+  // entrance out, a room comes down to within a storey of the room it is reached from.
+  const seen = new Set([graph.entrance]), queue = [graph.entrance];
+  while (queue.length) {
+    const at = graph.rooms[queue.shift()!];
+    for (const l of graph.links) {
+      if (l.a !== at.id && l.b !== at.id) continue;
+      const o = graph.rooms[l.a === at.id ? l.b : l.a];
+      if (seen.has(o.id)) continue;
+      seen.add(o.id);
+      queue.push(o.id);
+      // A drop still goes down (the mirror turned it upside down): from the room above onto the ledge of the tall room below.
+      if (l.kind === 'drop') o.level = o.id === l.b ? at.level - 1 : at.level + 1;
+      else o.level = Math.max(at.level - 1, Math.min(at.level + at.height, o.level));
+    }
+  }
+  // Every link a flight of stairs at most (from either storey of a tall room).
+  const gap = (a: Room, b: Room) => Math.max(0, a.level - (b.level + b.height - 1), b.level - (a.level + a.height - 1));
+  if (graph.links.some((l) => l.kind !== 'drop' && gap(graph.rooms[l.a], graph.rooms[l.b]) > 1)) return false;
+  if (!older) return true;
+  // Off the way to the goal, and next to the ground floor only (a stair down from there).
+  const on = new Set(walk.route);
+  const low = (r: Room) => graph.links.every((l) => (l.a !== r.id && l.b !== r.id) || graph.rooms[l.a === r.id ? l.b : l.a].level === 0);
+  const quiet = graph.rooms.filter((r) => r.id !== graph.entrance && r.id !== graph.goal && r.height === 1 && !on.has(r.id) && low(r)).sort((a, b) => walk.tension[a.id] - walk.tension[b.id])[0];
+  if (quiet) quiet.level = -1;
+  return true;
+}
+
 function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayout, pieceLink: number, rng: Rng, lore: CellarLore): Cellar {
+  const shape = shapeOf(sketch.decision.template);
   const p = pace(graph);
   const useById = new Map(lore.uses.map((u) => [u.id, u]));
   const use = (id: string) => useById.get(id)!;
@@ -267,15 +311,15 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     if (!spots.length) return false;
     const s = spots[rng.int(0, spots.length - 1)];
     // Against the wall, facing into the room; yaw: −z is 0 (as the walker), facing away from the wall.
-    const inset = 0.55;
+    const inset = shape.inset;
     const x = (s.x + 0.5) * CELL + DIRS[s.dir][0] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][1] !== 0 ? 1 : 0);
     const z = (s.z + 0.5) * CELL + DIRS[s.dir][1] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][0] !== 0 ? 1 : 0);
     const yaw = Math.atan2(DIRS[s.dir][0], DIRS[s.dir][1]);
     props.push({ kind, x, z, y: R.level * STOREY, yaw, room, ...(trace ? { trace } : {}), ...(clue !== undefined ? { clue } : {}) });
     return true;
   };
-  // The ladder up to the hatch first, so nothing stands in front of it.
-  put(graph.entrance, 'ladder');
+  // The way out first (the ladder up to the hatch, a tower's door), so nothing stands in front of it.
+  put(graph.entrance, shape.way);
   const hatch = props[0];
   for (const r of rooms) {
     const R = placed[r.id], n = Math.max(2, Math.min(7, Math.round(R.w * R.d * 0.45)));
@@ -300,8 +344,8 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
 
   const spawns = settle(graph, p, rooms, now, rng);
 
-  const shape = layout.rooms.map((r) => `${r.w}x${r.d}x${r.height}@${r.level}`).sort().join(',');
-  const signature = `${graph.patterns.join('+')}|${graph.rooms.length}r${graph.links.length}l|${shape}`;
+  const form = layout.rooms.map((r) => `${r.w}x${r.d}x${r.height}@${r.level}`).sort().join(',');
+  const signature = `${graph.patterns.join('+')}|${graph.rooms.length}r${graph.links.length}l|${form}`;
   return { ...sketch, graph, pace: p, layout, rooms, props, clues, spawns, pieceLink, hatch, signature };
 }
 

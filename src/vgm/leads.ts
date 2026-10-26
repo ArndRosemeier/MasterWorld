@@ -11,7 +11,7 @@ import type { Decision, DecisionLog, DungeonDecision, KeptDecision, MoveInDecisi
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
-import { loreOf, placeOf, promiseBarrow, promiseCellar } from './dungeons';
+import { LAND_KINDS, loreOf, placeOf, promiseCellar, promisePlace } from './dungeons';
 
 export const LEADS = {
   /** Open promises the world always has. */
@@ -67,14 +67,14 @@ export interface LeadsContext {
   /** The hero is down in this dungeon now (nothing moves in under their feet). */
   readonly inside: (dungeon: string) => boolean;
   readonly dungeons: SettingModule['dungeons'];
-  /** The land (barrows are promised on it); none: only cellars. */
+  /** The land (barrows, caves and towers are promised on it); none: only cellars. */
   readonly terrain?: Terrain;
-  /** Ground a barrow keeps away from (the wild's territories). */
+  /** Ground a place on the land keeps away from (the wild's territories). */
   readonly avoid?: readonly { readonly x: number; readonly z: number; readonly r: number }[];
 }
 
-/** Share of new places that are barrows, when the setting has them and none is open. */
-const BARROWS = 0.4;
+/** Share of new places that lie out on the land (a barrow, a cave, a tower), when the setting has a kind none of which is open. */
+const LAND_SHARE = 0.55;
 
 /** The Builder's next promise, if one is due now. */
 export function nextPromise(c: LeadsContext): Decision | null {
@@ -86,13 +86,25 @@ export function nextPromise(c: LeadsContext): Decision | null {
   const s = deriveSeed(c.seed, 'vgm', 'lead', n);
   const moved = moveInto(c, s);
   // Rather a new place; a cleared one is moved into now and then (or when no place is left). Now and
-  // then the new place is a barrow out on the land (one open at a time).
+  // then the new place lies out on the land: a barrow, a cave or a tower (one of each kind open at a time).
   const town = c.towns[0];
-  const barrowOpen = openPromises(c.log).some((p) => p.kind === 'dungeon' && p.template === 'barrow');
-  const barrow = town && c.terrain && c.dungeons.barrow && !barrowOpen && hash2f(s, 6, 2) < BARROWS ? promiseBarrow(c.seed, c.terrain, town, c.log, c.home, c.avoid) : null;
-  const fresh = barrow ?? (town ? promiseCellar(c.seed, town, c.log, c.home) : null);
+  const fresh = (town && landPlace(c, s, town)) ?? (town ? promiseCellar(c.seed, town, c.log, c.home) : null);
   if (moved && (!fresh || hash2f(s, 5, 1) < 0.4)) return moved;
   return fresh ? { ...fresh, at: c.hours } : null;
+}
+
+/** A new place out on the land, of a kind the setting has and none of which is open; now and then. */
+function landPlace(c: LeadsContext, s: number, town: Town): DungeonDecision | null {
+  if (!c.terrain || hash2f(s, 6, 2) >= LAND_SHARE) return null;
+  const open = new Set(openPromises(c.log).flatMap((p) => (p.kind === 'dungeon' ? [p.template] : [])));
+  const kinds = LAND_KINDS.filter((k) => c.dungeons[k] && !open.has(k));
+  // One kind by chance; if no ground fits it, the next.
+  const first = Math.floor(hash2f(s, 6, 3) * kinds.length);
+  for (let i = 0; i < kinds.length; i++) {
+    const d = promisePlace(kinds[(first + i) % kinds.length], c.seed, c.terrain, town, c.log, c.home, c.avoid);
+    if (d) return d;
+  }
+  return null;
 }
 
 /** New dwellers for a dungeon kept long enough ago, if any fits. */

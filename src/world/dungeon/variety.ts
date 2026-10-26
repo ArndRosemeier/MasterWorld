@@ -7,6 +7,7 @@ import type { TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore } from '../../setting/contract';
 import type { DungeonDecision, DungeonTemplate } from '../decisions';
 import { outlineCellar, type Cellar, type DungeonPlace } from './cellar';
+import { shapeOf } from './kinds';
 import { setPiecesFor } from './setPieces';
 
 export interface VarietyReport {
@@ -64,7 +65,7 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
     if (c.pieceLink < 0) problems.push(`${where}: no signature set piece`);
     if (!c.clues.length) problems.push(`${where}: nothing to read`);
     if (!c.spawns.length) problems.push(`${where}: nobody lives there`);
-    if (!c.hatch || c.hatch.kind !== 'ladder') problems.push(`${where}: no ladder up to the hatch`);
+    if (!c.hatch || c.hatch.kind !== shapeOf(template).way) problems.push(`${where}: no way back out`);
     aspects.layout.push(c.signature);
     aspects.mainPattern.push(c.graph.patterns[0]);
     aspects.pattern.push(...c.graph.patterns.filter((p) => p !== 'shortcut' && p !== 'refuge'));
