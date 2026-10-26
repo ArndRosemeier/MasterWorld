@@ -41,6 +41,8 @@ export const params = {
   bloom: q.get('bloom')?.split(',').map(Number),
   /** Ambient occlusion in the post chain: `ao=0` off; `ao=1.5,0.8` its radius (m) and strength, for tuning. */
   ao: q.get('ao') === '0' ? null : { radius: Number(q.get('ao')?.split(',')[0] || 1), strength: Number(q.get('ao')?.split(',')[1] || 0.6) },
+  /** The sky light from below the horizon, as a share of the horizon's (`envGround=1` the old even light; for comparing). */
+  envGround: q.has('envGround') ? Number(q.get('envGround')) : undefined,
   /** Draw the town's buildings (`town=0` leaves them out, for comparisons). */
   town: q.get('town') !== '0',
   /** How many townsfolk are drawn at most (`folk=0`: none). */
@@ -52,6 +54,9 @@ export const params = {
   /** The wild around the town (`wild=0` leaves it out; `wild=wolves` starts beside the first group of that kind). */
   wild: q.get('wild') !== '0',
   wildAt: ['0', '1', '', null].includes(q.get('wild')) ? null : q.get('wild'),
+  /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about). */
+  small: q.get('small') !== '0',
+  smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
   /** Start in the saddle of the first horse (`ride`). */

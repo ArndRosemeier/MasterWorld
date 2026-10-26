@@ -9,14 +9,19 @@ import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from './flora
 import type { Terrain } from './terrain';
 
 /** Cell side (m), a multiple of NEAR_SPACING so cells share the drawn trees' candidate grid. */
-const CELL = 32;
+export const TRUNK_CELL = 32;
+const CELL = TRUNK_CELL;
+/** Floats per tree in a cell: x, z, trunk radius, the tree's scale. */
+export const TREE_STRIDE = 4;
+/** A tree's height at scale 1 (m): the vegetation package's species are 11 to 18 m tall. */
+export const TREE_TALL = 14;
 /** Cells kept (the oldest are dropped): a few hundred metres of land around the player. */
 const KEEP = 96;
 /** The widest trunk there is (m, at the largest scale): how far beyond a cell a trunk can reach. */
 const REACH = Math.max(...FLORA_KINDS.map((k) => k.trunk)) * 1.3;
 
 export class Trunks {
-  /** Per cell: x, z, radius of each trunk in it. */
+  /** Per cell: x, z, radius and scale of each tree in it (TREE_STRIDE). */
   private readonly cells = new Map<number, Float32Array>();
 
   private readonly asked = new Set<number>();
@@ -28,15 +33,18 @@ export class Trunks {
   around(x: number, z: number): void {
     if (!this.fetch) return;
     const ci = Math.floor(x / CELL), cj = Math.floor(z / CELL);
-    for (let j = cj - 2; j <= cj + 2; j++) for (let i = ci - 2; i <= ci + 2; i++) {
-      const key = keyOf(i, j);
-      if (this.cells.has(key) || this.asked.has(key)) continue;
-      this.asked.add(key);
-      void this.fetch(i * CELL, j * CELL, CELL, NEAR_SPACING).then((d) => {
-        this.asked.delete(key);
-        if (!this.cells.has(key)) this.keep(key, trunksOf(d));
-      });
-    }
+    for (let j = cj - 2; j <= cj + 2; j++) for (let i = ci - 2; i <= ci + 2; i++) this.ask(i, j);
+  }
+
+  /** Asks the workers for cell (i, j) unless it is here or asked for. */
+  private ask(i: number, j: number): void {
+    const key = keyOf(i, j);
+    if (!this.fetch || this.cells.has(key) || this.asked.has(key)) return;
+    this.asked.add(key);
+    void this.fetch(i * CELL, j * CELL, CELL, NEAR_SPACING).then((d) => {
+      this.asked.delete(key);
+      if (!this.cells.has(key)) this.keep(key, trunksOf(d));
+    });
   }
 
   /** Does a body of radius `r` standing at (x, z) touch a trunk? */
@@ -46,12 +54,23 @@ export class Trunks {
     const j0 = Math.floor((z - m) / CELL), j1 = Math.floor((z + m) / CELL);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const c = this.trunksIn(i, j);
-      for (let k = 0; k < c.length; k += 3) {
+      for (let k = 0; k < c.length; k += TREE_STRIDE) {
         const dx = c[k] - x, dz = c[k + 1] - z, rr = c[k + 2] + r;
         if (dx * dx + dz * dz < rr * rr) return true;
       }
     }
     return false;
+  }
+
+  /**
+   * The trees of cell (i, j) (TREE_STRIDE floats each). With workers to ask: null until fetched (the cell
+   * is asked for); without: placed here.
+   */
+  peek(i: number, j: number): Float32Array | null {
+    if (!this.fetch) return this.trunksIn(i, j);
+    const c = this.cells.get(keyOf(i, j));
+    if (!c) this.ask(i, j);
+    return c ?? null;
   }
 
   private trunksIn(i: number, j: number): Float32Array {
@@ -72,12 +91,12 @@ export class Trunks {
 /** Cell indices stay well inside ±2^15 (a world of ±1000 km), so one number is the key. */
 const keyOf = (i: number, j: number) => (i + 32768) * 65536 + (j + 32768);
 
-/** x, z, radius of each tree's trunk among flora records. */
+/** x, z, radius and scale of each tree among flora records (shrubs left out). */
 function trunksOf(d: Float32Array): Float32Array {
   const out: number[] = [];
   for (let r = 0; r < d.length; r += FLORA_STRIDE) {
     const trunk = FLORA_KINDS[d[r + 5]].trunk;
-    if (trunk > 0) out.push(d[r], d[r + 2], trunk * d[r + 3]);
+    if (trunk > 0) out.push(d[r], d[r + 2], trunk * d[r + 3], d[r + 3]);
   }
   return Float32Array.from(out);
 }

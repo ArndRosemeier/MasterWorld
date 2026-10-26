@@ -27,6 +27,12 @@ const EXPOSURE = 1.15;
 const LIGHT = 3.4;
 /** The environment (sky) light on the land and in the water's reflections. */
 export const ENV = 2.4;
+/**
+ * The env map below the horizon, as a share of the horizon: the ground gives back about a fifth of the sky
+ * (the rest of its bounce is the hemisphere light). At 1 everything was lit from below as from the sky, and
+ * under clouds a head or a hood showed no shaded side at all.
+ */
+const ENV_GROUND = 0.25;
 /** The world is large: fog thinner than Scale's city. */
 const FOG_SCALE = 0.28;
 /** How much of the low sun's dimming by the air the eye adapts away (0 none, 1 all). */
@@ -108,7 +114,7 @@ export class SkyView {
     private readonly scene: Scene,
     private readonly sun: DirectionalLight,
     private readonly hemi: HemisphereLight,
-    opts: { hour: number; dayMinutes: number; exposure?: number },
+    opts: { hour: number; dayMinutes: number; exposure?: number; envGround?: number },
   ) {
     this.exposure = EXPOSURE * (opts.exposure ?? 1);
     this.hour = opts.hour;
@@ -135,6 +141,8 @@ export class SkyView {
     this.envSky.scale.setScalar(1000);
     this.envU = skyUniforms(this.envSky.material as never);
     this.envU.envSaturation.value = ENV_SATURATION;
+    // The hemisphere light throws the ground's bounce up: the env map below the horizon is only a little of it.
+    this.envU.envGround.value = opts.envGround ?? ENV_GROUND;
     this.envScene.add(this.envSky);
     this.pmrem = new PMREMGenerator(renderer);
     // An environment map from the start: it is part of every lit shader's key. Later refreshes (the first in

@@ -36,7 +36,7 @@ const BLOOM_STRENGTH = 0.16, BLOOM_RADIUS = 0.3;
 /** At night the glow round lights is a little stronger and wider (as it was before the day was tuned). */
 const BLOOM_STRENGTH_NIGHT = 0.22, BLOOM_RADIUS_NIGHT = 0.45;
 
-export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean; hour: number; dayMinutes: number; tone?: 'aces' | 'agx' | 'graded'; post?: boolean; postSamples?: number; postFloatDepth?: boolean; ao?: { radius: number; strength: number } | null; bloom?: number[] }): Promise<View> {
+export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: boolean; hour: number; dayMinutes: number; tone?: 'aces' | 'agx' | 'graded'; post?: boolean; postSamples?: number; postFloatDepth?: boolean; ao?: { radius: number; strength: number } | null; bloom?: number[]; envGround?: number }): Promise<View> {
   // Reversed depth: precision from a metre to the far horizon in one view.
   const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL: opts.forceWebGL, depth: 'reversed', exposure: 1.9, tone: opts.tone ?? 'graded' });
   // Our look on AgX: close to its Punchy look (AgX alone reads washed out on the greens).

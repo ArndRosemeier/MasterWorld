@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Submodule pins only move forward
+        run: node tools/guards/pins.mjs
       - run: npm ci
       - name: Tests and guards
         run: npm test

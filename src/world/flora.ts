@@ -108,6 +108,16 @@ export function woodsAt(cover: Noise, flora: FloraDef, x: number, z: number): nu
   return smoothstep(-0.15, 0.25, cover.fbm2(x / 260, z / 260, 3) + flora.cover);
 }
 
+/** How wooded the land is at a point, 0 (open) .. 1 (closed wood): biomes with few trees count as open. */
+export function woodsOf(t: Terrain): (x: number, z: number) => number {
+  const cover = coverNoise(t.seed);
+  return (x, z) => {
+    const b = t.biomeAt(x, z);
+    const f: FloraDef | undefined = b >= 0 ? t.setting.world.biomes[b]?.flora : undefined;
+    return f && f.trees > 20 ? woodsAt(cover, f, x, z) : 0;
+  };
+}
+
 /** A species by weight, then one of its variants: an index into FLORA_KINDS (-1: no species). */
 function pickTree(mix: Readonly<Partial<Record<TreeName, number>>>, r: number, rv: number): number {
   let total = 0;
