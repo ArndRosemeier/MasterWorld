@@ -188,14 +188,6 @@
     "reason": "Both fill LeadsContext.inside (vgm/leads.ts) for nextPromise: the game asks its cellars, the loop check is never below while the VGM thinks."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (x.add(y).mul(z)) in three shader kinds: it is how three.js nodes are written, not a copied helper. It crossed the info floor when the talk code grew the corpus."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
-  },
-  {
     "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/lessonsUi.ts#opened",
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   },
