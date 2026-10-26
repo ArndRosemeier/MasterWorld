@@ -2,21 +2,29 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
-import { FRONTIER, nextRegion, walkFrontier, regionDecisions, regionLine, regionMapOf, settlementsOf } from '../src/vgm/frontier';
+import { firstDecisions } from '../src/vgm/builder';
+import { Terrain } from '../src/world/terrain';
+import { findStart } from '../src/world/start';
+import { FRONTIER, OPEN_GROUND, nextRegion, walkFrontier, regionDecisions, regionLine, regionMapOf, settlementsOf } from '../src/vgm/frontier';
 import { keyId, sizeOf } from '../src/world/regions';
 import type { Decision, DecisionLog } from '../src/world/decisions';
 import { hitsSolid, layOutSite } from '../src/world/sites';
 import { TOWN_LAYERS } from '../src/render/terrain/groundTextures';
+import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement, woodsOf } from '../src/world/flora';
 
 const seed = parseSeed('masterworld');
-const { terrain, log: first, home } = openWorld(seed, classic);
+// The start's land with small drainage tiles (as the flora, water and roads tests): the same town, faster.
+const terrain = new Terrain(seed, classic, { cell: 2000, core: 96, margin: 32, minArea: 120 });
+const first = firstDecisions(terrain, findStart(terrain.skeleton, classic));
+terrain.settle(first);
+const home = terrain.towns[0].decision;
 const regions = classic.regions!;
 
 /** Walks `km` from the start along `dir` (radians, atan2(z, x)). */
 const walk = (km: number, dir: number, from: DecisionLog = first): Decision[] => [...from, ...walkFrontier({ seed, log: from, terrain, regions, home }, dir, km)];
 
 const east = walk(5, 0);
+const south = walk(5, Math.PI / 2), west = walk(5, Math.PI);
 
 test('frontier: walking 5 km opens the start region first, then regions ahead, all in the log', () => {
   const opened = regionDecisions(east);
@@ -74,7 +82,7 @@ test('frontier: every place lays out on the land, seeded, with known layers, sol
   const h = (x: number, z: number) => terrain.height(x, z);
   const seen = new Set<string>();
   for (const dir of [0, Math.PI / 2, Math.PI]) {
-    const log = dir === 0 ? east : walk(5, dir);
+    const log = dir === 0 ? east : dir < 2 ? south : west;
     for (const d of regionDecisions(log)) {
       const fill = regions.fills.find((f) => f.id === d.fill);
       if (!d.site || !fill || seen.has(fill.place)) continue;
@@ -96,4 +104,39 @@ test('frontier: every place lays out on the land, seeded, with known layers, sol
     }
   }
   assert.deepEqual([...seen].sort(), ['barrows', 'camp', 'hamlet', 'ruin']);
+});
+
+test('frontier: places take open ground where there is any (the woods round the start are mostly closed)', () => {
+  const w = woodsOf(terrain);
+  const around = (x: number, z: number, r: number) => {
+    let s = w(x, z);
+    for (let a = 0; a < 8; a++) s += w(x + Math.cos((a * Math.PI) / 4) * r * 0.7, z + Math.sin((a * Math.PI) / 4) * r * 0.7);
+    return s / 9;
+  };
+  let land = 0, openLand = 0;
+  for (let x = -5000; x <= 5000; x += 250) for (let z = -5000; z <= 5000; z += 250) {
+    if (terrain.height(home.x + x, home.z + z) < 2) continue;
+    land++;
+    if (around(home.x + x, home.z + z, 30) <= OPEN_GROUND) openLand++;
+  }
+  const sites = [0, Math.PI / 2, Math.PI].flatMap((dir) => regionDecisions(dir === 0 ? east : dir < 2 ? south : west).flatMap((d) => (d.site ? [d.site] : [])));
+  const open = sites.filter((s) => around(s.x, s.z, s.r) <= OPEN_GROUND).length;
+  // Few spots are open, yet most places find one: the frontier looks beside the point when its own square has none.
+  assert.ok(open / sites.length >= 0.5 && open / sites.length > (5 * openLand) / land, `${open} of ${sites.length} places on open ground; ${openLand} of ${land} spots of land are open`);
+});
+
+test('frontier: trees keep out of a place and what its people cleared round it, in workers as here', () => {
+  const hamlet = regionDecisions(east).find((d) => d.fill === 'hamlet' && d.site)!;
+  const s = hamlet.site!;
+  // The workers and the main thread hear of the region as a later decision (RoadWork.clear).
+  terrain.settleMore([hamlet]);
+  const c = terrain.clearings.get(hamlet.id)!;
+  assert.ok(c && c.r === s.r + regions.fills.find((f) => f.id === 'hamlet')!.clearing!, 'the clearing reaches past the footprint');
+  const x0 = Math.floor((s.x - 48) / 32) * 32, z0 = Math.floor((s.z - 48) / 32) * 32;
+  const plants = floraPlacement(terrain, { seed, setting: classic.id, x0, z0, size: 96, spacing: NEAR_SPACING });
+  for (let i = 0; i < plants.length; i += FLORA_STRIDE) {
+    if (FLORA_KINDS[plants[i + 5]].trunk > 0) assert.ok(Math.hypot(plants[i] - c.x, plants[i + 2] - c.z) >= c.r, 'no trunk in the clearing');
+  }
+  terrain.settle(first);
+  assert.equal(terrain.clearings.has(hamlet.id), false);
 });
