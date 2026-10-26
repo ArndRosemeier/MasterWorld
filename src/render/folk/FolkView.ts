@@ -25,6 +25,13 @@ const RANGE = 70;
  * about 10 ms of a town frame on the reference machine.
  */
 const LOD_BIAS = 0.7;
+/**
+ * Only this many of the nearest people get more than the Crowd level; the rest draw as Crowd (one mesh and their
+ * hair) wherever they stand. A crowded square no longer costs a dozen draws a head.
+ */
+const DETAILED = 6;
+/** People farther than this (m) cast no shadow (in the Crowd level only the body casts one). */
+const SHADOW_RANGE = 35;
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
 
@@ -54,6 +61,8 @@ interface Slot {
    * compiled), and that level then built its shaders on the render path.
    */
   busy: boolean;
+  /** The detail and shadows set last (`detail`), so they change only when they must. */
+  look: string;
 }
 
 export class FolkView {
@@ -70,7 +79,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false };
+      const slot: Slot = { ch, place, agent: -1, ready: false, clip: '', busy: false, look: '' };
       this.slots.push(slot);
       ch.object.addEventListener('childadded', ({ child }) => this.late(slot, child));
     }
@@ -201,6 +210,10 @@ export class FolkView {
       if (!s) break;
       this.dress(s, a);
     }
+    const ranked: [number, Slot][] = [];
+    for (const s of this.shown.values()) if (s.ready) ranked.push([Math.hypot(s.place.position.x - cx, s.place.position.z - cz), s]);
+    ranked.sort((x, y) => x[0] - y[0]);
+    ranked.forEach(([d, s], i) => this.detail(s, i < DETAILED, d < SHADOW_RANGE));
     for (const s of this.shown.values()) {
       if (!s.ready) continue;
       const a = this.life.agents[s.agent], p = placed.get(a.person.id);
@@ -219,6 +232,24 @@ export class FolkView {
     // The rest (and those whose character is still being dressed) as plain figures.
     if (this.indoors) this.far.place([], this.height);
     else this.far.place(near.filter(([, a]) => !this.shown.get(a.person.id)?.ready).map(([, a]) => a), this.height);
+  }
+
+  /**
+   * How much of `s` is drawn: its own detail by distance (Actors' "auto") or the Crowd level, and shadows from every
+   * part (but NO_SHADOW's), from the Crowd body alone, or none. Every caster's shadow shader was built when it was
+   * dressed (prepareSlot), so switching builds nothing.
+   */
+  private detail(s: Slot, detailed: boolean, shadow: boolean): void {
+    const look = `${detailed}${shadow}`;
+    if (look === s.look) return;
+    s.look = look;
+    const crowd = s.ch.lods.length - 1;
+    s.ch.setLod(detailed ? 'auto' : crowd);
+    castShadows(s.place);
+    s.place.traverse((m) => {
+      if (!(m as Mesh).isMesh) return;
+      if (!shadow || (!detailed && m.name !== 'crowd')) m.castShadow = false;
+    });
   }
 
   private dress(s: Slot, a: Agent): void {
@@ -256,6 +287,7 @@ export class FolkView {
       s.place.traverse((m) => { for (const x of materialsOf(m)) this.compiled.add(x); });
     }
     s.ch.setLod('auto');
+    s.look = ''; // `detail` sets it again on the next frame
     if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
     this.stage.scene.add(s.place);
     s.ready = true;
