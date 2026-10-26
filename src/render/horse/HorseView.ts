@@ -6,11 +6,11 @@
  * The coat is Actors' fur on node materials: the body in its coat colours and markings under a stack
  * of fur shells (two shaders for every horse: each coat is an input of the shared graphs).
  */
-import { Group, Matrix4, Vector3, type Object3D, type WebGPURenderer, type Mesh } from 'three/webgpu';
+import { Matrix4, Vector3, type Group, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Animal } from '@actors/animal';
 import type { HorseCoat, HorseShape } from '@actors/animal';
-import { ThreeActor, createFurUniforms, setFurCoat } from '@actors/three';
-import { addNodeFurShells, animalNodeMaterials } from '@actors/three/webgpu';
+import type { ThreeActor } from '@actors/three';
+import { furActor, gaitPace } from '../furAnimal';
 import type { Stage } from '@futuremagic/stage';
 
 /** Where the build serves the horse pack (`npm run packs` fills public/packs). */
@@ -48,30 +48,18 @@ export class HorseView {
    */
   static async make(renderer: WebGPURenderer, count: number, { tack: saddled = true, coat0 = 0 } = {}): Promise<HorseView> {
     const lead = await Animal.load<HorseShape, HorseCoat>(PACK);
-    const reversedDepth = renderer.reversedDepthBuffer === true;
     const tack = (lead.runtime.manifest.meshes ?? []).filter((m) => m.tags?.includes('tack')).map((m) => m.name);
     const horses: Drawn[] = [];
     for (let i = 0; i < count; i++) {
       const a = i === 0 ? lead : Animal.share(lead);
       a.setPreset(COATS[(i + coat0) % COATS.length]);
-      const fur = createFurUniforms();
-      const actor = new ThreeActor(a.runtime, animalNodeMaterials(fur), { reversedDepth });
       // Tack first: the shape applies pending visibility, so its meshes exist before the warm-up compiles.
-      if (saddled) for (const name of tack) actor.setVisible(name, true);
-      actor.applyShape(await a.evaluate());
-      actor.object.position.y = actor.groundOffset();
-      setFurCoat(fur, a.coat as never, a.shape.size);
-      addNodeFurShells(actor, fur);
-      const place = new Group();
-      place.name = 'horse';
-      place.add(actor.object);
+      const { actor, place } = await furActor(a as never, renderer, 'horse', (actor) => { if (saddled) for (const name of tack) actor.setVisible(name, true); });
       const seatBone = (a.extra.seat?.bone) ?? 'saddle';
       const f = actor.fittedSkeleton;
       const index = f ? f.names.indexOf(seatBone) : -1;
       horses.push({ actor, place, act: '', seat: f && index >= 0 ? { index, head: new Vector3(...f.heads[index]) } : null });
     }
-    // (The fur shells cast no shadow: the body does.)
-    for (const o of horses) o.place.traverse((m) => { if ((m as Mesh).isMesh && !m.name.endsWith(':fur')) (m as Mesh).castShadow = true; });
     return new HorseView(lead, horses);
   }
 
@@ -102,9 +90,7 @@ export class HorseView {
       const act = p.act;
       void this.animal.runtime.loadClip(act).then((clip) => { if (h.act === act) h.actor.play(clip); });
     }
-    const pace = PACE[p.act];
-    const action = h.actor.currentAction;
-    if (action) action.timeScale = pace ? Math.min(1.6, Math.max(0.5, p.speed / pace)) : 1;
+    gaitPace(h.actor, p.speed, PACE[p.act]);
     h.actor.update(dt);
   }
 

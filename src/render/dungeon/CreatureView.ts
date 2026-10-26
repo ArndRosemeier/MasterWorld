@@ -23,6 +23,7 @@ import { gripHeld } from '../hero/grips';
 import { FADE, castShadows, playClip, preparePeople } from '../hero/play';
 import { foeClip, foeLook, type FoeDoing } from './foes';
 import type { Stage } from '@futuremagic/stage';
+import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from './animals';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -39,6 +40,7 @@ const RAT_CLIPS: Record<string, ClipUse> = {
 type Body =
   | { readonly kind: 'critter'; readonly fig: CritterFigure; readonly scale: number }
   | { readonly kind: 'modelled'; readonly fig: ModelledFigure; readonly scale: number }
+  | AnimalBody
   | { readonly kind: 'person'; readonly ch: Character; readonly place: Group; readonly held: Object3D | null; clip: string; drawn: boolean | null };
 
 interface Shown {
@@ -107,6 +109,8 @@ export class CreatureView {
     for (const c of den.creatures) {
       const b = c.def.body;
       let body: Body;
+      // The wild's beasts are Actors' animals (render/dungeon/animals.ts).
+      const animal = b.kind === 'beast' ? await animalBody(b.species, deriveSeed(seed, 'animal', c.id), renderer) : null;
       if (b.kind === 'humanoid') {
         const ch = await person();
         await ch.set(foeLook(c.def, seed, c.id));
@@ -132,6 +136,9 @@ export class CreatureView {
         fig.root.name = c.def.name;
         v.group.add(fig.root);
         body = { kind: 'modelled', fig, scale };
+      } else if (animal) {
+        body = animal;
+        v.group.add(animal.place);
       } else {
         let m = models.get(c.def.id);
         if (!m) { m = new CritterModel(speciesFor(c.def, seed), critterMaterials()); models.set(c.def.id, m); }
@@ -178,6 +185,11 @@ export class CreatureView {
         f.pace(s.walked / k);
         if (hurtT < 1 && hurtT * FLINCH < dt + 1e-6 && !dead) f.hurt();
         f.advance(dt);
+      } else if (s.body.kind === 'animal') {
+        const speed = Math.hypot(vx, vz);
+        const doing: AnimalDoing = dead ? 'dead' : blowT < 1 ? 'blow' : hurtT < 1 ? 'hurt' : speed > 2.2 ? 'run' : speed > 0.2 ? 'walk'
+          : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
+        poseAnimal(s.body, c.x, c.y, c.z, yaw, doing, speed, dt);
       } else if (s.body.kind === 'critter') {
         const i = this.input;
         i.x = c.x; i.y = c.y; i.z = c.z; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
@@ -230,7 +242,7 @@ export class CreatureView {
     const O = this.group.position;
     for (const s of this.shown) {
       const c = s.c;
-      const h = c.def.body.kind === 'humanoid' ? c.def.body.height * 0.6 : 0.2;
+      const h = c.def.body.kind === 'humanoid' ? c.def.body.height * 0.6 : s.body.kind === 'animal' ? 0.55 : 0.2;
       const px = c.x + O.x - from.x, py = c.y + h + O.y - from.y, pz = c.z + O.z - from.z;
       const along = px * dir.x + py * dir.y + pz * dir.z;
       if (along < 0) continue;

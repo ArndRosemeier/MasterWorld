@@ -136,6 +136,10 @@
     "reason": "A point at an angle and distance (x + cos a * d, z + sin a * d): the plain formula in unrelated places."
   },
   {
+    "key": "same name: masterworld/app/title/TitleCamera.ts#pose + masterworld/render/horse/HorseView.ts#pose",
+    "reason": "A camera's pose along the title's path vs a horse's frame (StockView's Bodies.pose interface); only the name matches. It showed once the horse's fur setup moved to render/furAnimal.ts and its pose got short."
+  },
+  {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
     "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
   },
