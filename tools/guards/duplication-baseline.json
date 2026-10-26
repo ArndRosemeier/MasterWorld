@@ -72,10 +72,6 @@
     "reason": "Dressing the hero in clothes vs dressing a dungeon room with a set piece's props; only the word matches."
   },
   {
-    "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/sim/creatures.ts + masterworld/sim/wild.ts",
-    "reason": "Bearing between two ground points (Math.atan2 of dz, dx): the plain formula, used where a body faces or flees; a helper would hide nothing."
-  },
-  {
     "key": "idiom: [.from Array] in masterworld/render/terrain/groundTextures.ts + masterworld/sim/wild.ts + masterworld/world/flora.ts",
     "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper."
   },
@@ -126,10 +122,6 @@
   {
     "key": "same name: masterworld/sim/dungeonNav.ts#slide + masterworld/sim/wild.ts#slide",
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
-  },
-  {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/wild.ts + masterworld/world/volumes.ts",
-    "reason": "A point at an angle and distance (x + cos a * d, z + sin a * d): the plain formula in unrelated places."
   },
   {
     "key": "same name: masterworld/app/title/TitleCamera.ts#pose + masterworld/render/horse/HorseView.ts#pose",
@@ -198,5 +190,53 @@
   {
     "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/repairUi.ts#opened",
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "idiom: [.PI .range Math] in masterworld/sim/creatures.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts",
+    "reason": "A seeded angle round a point (rng.range(0, Math.PI * 2)): each sim picks its own spots (small life folds its own into aboutPoint); one line of arithmetic, not a copied helper."
+  },
+  {
+    "key": "idiom: [.PI .range Math] in masterworld/sim/smallLife.ts + masterworld/sim/townLife.ts + masterworld/sim/wild.ts",
+    "reason": "A seeded angle round a point (rng.range(0, Math.PI * 2)): each sim picks its own spots (small life folds its own into aboutPoint); one line of arithmetic, not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (x.add(y).mul(z)) in shader kinds: how three.js nodes are written, not a copied helper."
+  },
+  {
+    "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
+    "reason": "A heading from one point to another (Math.atan2 of the z and x differences): every moving thing faces where it goes; one line, not a helper."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/world/volumes.ts",
+    "reason": "A point along a heading (x + cos a * d, z + sin a * d): plain trigonometry each mover does in its own terms."
+  },
+  {
+    "key": "idiom: [.count .int] in masterworld/game/items.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
+    "reason": "A seeded count from a [min, max] pair in setting data (rng.int(count[0], count[1])): one call, the data shape is the seam."
+  },
+  {
+    "key": "idiom: [.range .rng .time .until] in masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/townLife.ts",
+    "reason": "Agents waiting a seeded while before their next act (until = time + rng.range(a, b)): the shape of every world-sim agent, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/smallLife.ts#step",
+    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+  },
+  {
+    "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+  },
+  {
+    "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/sim/wild.ts#step",
+    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+  },
+  {
+    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/smallLife.ts#step",
+    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
   }
 ]

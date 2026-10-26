@@ -10,6 +10,8 @@ import { Player } from './app/player';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
+import { woodsOf } from './world/flora';
+import { daylight } from './game/soundscape';
 import { HeroView } from './render/hero/HeroView';
 import { preparePeople } from './render/hero/play';
 import { GiantView } from './render/giant/GiantView';
@@ -52,6 +54,8 @@ import { Hails } from './app/hails';
 import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
+import { SmallLife } from './sim/smallLife';
+import { SmallLifeView } from './render/wildlife/SmallLifeView';
 import type { Decision, DungeonDecision } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
 import { InteriorView } from './render/town/InteriorView';
@@ -332,6 +336,17 @@ export async function start(b: Boot): Promise<void> {
       loading.set('Turning out the herds');
       stock = await StockView.forHerds(view.renderer, setting.world.livestock, herds, params.stock, (x, z) => terrain.height(x, z));
     }
+    // Birds and squirrels about the land (plan 9.3): their squares are the trunks' cells.
+    const woods = woodsOf(terrain);
+    const small = setting.smallLife && params.small ? new SmallLife(seed, {
+      height: (x, z) => terrain.height(x, z),
+      waterDepth: (x, z) => terrain.waterDepth(x, z),
+      // The town's farmland and fields are open land whatever the woods round them.
+      woods: (x, z) => (terrain.townGround(x, z) >= TownGround.Street ? 0 : woods(x, z)),
+      trees: (i, j) => trunks.peek(i, j),
+      blocked: (x, z, r) => !!town?.solid(x, z, r),
+    }, setting.smallLife) : null;
+    const smallView = small ? new SmallLifeView(small, view.stage, view.renderer) : null;
     let folk: FolkView | null = null;
     if (life && params.folk > 0) {
       loading.set('Waking the town');
@@ -357,7 +372,7 @@ export async function start(b: Boot): Promise<void> {
     const raised = houses?.build(0, view.camera.position);
     const landReady = ground.ready(view.camera);
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...folkWarm]);
+    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm]);
     // While the loading screen (or the title's painted still) still covers the view, the land, trees and
     // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
     const capShare = view.stage.cap.share;
@@ -377,6 +392,7 @@ export async function start(b: Boot): Promise<void> {
     await view.stage.add(hero.object);
     await horses?.show(view.stage);
     await stock?.enter(view.stage);
+    await smallView?.addBirds();
     await view.stage.add(wx.precip);
 
     const notes = new Notes();
@@ -469,6 +485,16 @@ export async function start(b: Boot): Promise<void> {
     if (by) player.teleport(by.x + by.r + 20, undefined, by.z, Math.PI / 2);
     // Once that group is built, the hero steps up to one of them (a dozen metres off, facing it).
     let lookWild = by ? by.def.id : null;
+    // `small=squirrel` / `birds` / `flock`: beside the first that is about (for looking at them).
+    let lookSmall = params.smallAt;
+    /** With `fly`: the one the free camera follows, and how far off. */
+    let watchSmall: { it: { x: number; y: number; z: number }; d: number } | null = null;
+    /** The hero `d` metres from `seen`, on the side they are on, facing it. */
+    const standBeside = (seen: { x: number; z: number }, d: number) => {
+      const p = player.walker.pos, k = Math.max(1, Math.hypot(p.x - seen.x, p.z - seen.z));
+      const x = seen.x + (p.x - seen.x) / k * d, z = seen.z + (p.z - seen.z) / k * d;
+      player.teleport(x, undefined, z, Math.atan2(x - seen.x, z - seen.z));
+    };
     // A save from before kept promises were logged: the cellars its household paid for are kept.
     for (const id of Object.keys(save?.cellars ?? {})) if (save?.cellars[id].paid && !keptOf(log).has(id)) { const k = keepPromise(log, id, hours()); if (k) log = [...log, k]; }
     let dwellers: Promise<void> | null = null;
@@ -915,9 +941,7 @@ export async function start(b: Boot): Promise<void> {
         const seen = lookWild ? wild?.sight(lookWild) : null;
         if (seen) {
           lookWild = null;
-          const p = player.walker.pos, d = Math.max(1, Math.hypot(p.x - seen.x, p.z - seen.z));
-          const x = seen.x + (p.x - seen.x) / d * 12, z = seen.z + (p.z - seen.z) / d * 12;
-          player.teleport(x, undefined, z, Math.atan2(x - seen.x, z - seen.z));
+          standBeside(seen, 12);
         }
         if (!visit() && !player.flying) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
         stepEncounters(dt, [...cellars.encounters, ...(wild?.encounters ?? [])], { hero: character, player, hud: fightHud });
@@ -953,6 +977,30 @@ export async function start(b: Boot): Promise<void> {
       }
       herds?.step(dt);
       stock?.herd(dt, view.camera.position);
+      if (small && smallView) {
+        // Out of doors only: below or inside, the land's small life waits.
+        const out = above && !rooms?.inside, w = player.walker;
+        const near = lookSmall ? small.firstSeen(lookSmall) : null;
+        if (near && lookSmall) {
+          // With `fly`: the free camera follows it close by (a free camera alarms no one).
+          if (player.flying) watchSmall = { it: near, d: lookSmall === 'flock' ? 25 : 2.5 };
+          else standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
+          lookSmall = null;
+        }
+        if (watchSmall && player.flying) {
+          const { it, d } = watchSmall, c = view.camera.position, k = Math.max(0.01, Math.hypot(c.x - it.x, c.z - it.z));
+          if (k > d * 1.5 || k < d * 0.5) {
+            const cx = it.x + (c.x - it.x) / k * d, cz = it.z + (c.z - it.z) / k * d;
+            player.fly.place(cx, cz, d > 5 ? it.y - 4 : terrain.height(cx, cz) + 0.9, true);
+          }
+          const dx = it.x - c.x, dy = it.y + 0.1 - c.y, dz = it.z - c.z;
+          player.fly.setLook(Math.atan2(dx, -dz) * 180 / Math.PI, Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI);
+        }
+        // A free camera disturbs no one; they live round it.
+        const hero = player.flying ? null : { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed };
+        if (out) for (const e of small.step(dt, hero, daylight(view.sky.hour), wx.shown.rain, hero ?? view.camera.position)) sounds?.wings(e);
+        smallView.show(dt, view.camera.position, out);
+      }
       if (folk) folk.indoors = life && rooms?.inside ? rooms.people(life) : null;
       if (above) {
         folk?.follow(dt, view.camera);
@@ -968,7 +1016,7 @@ export async function start(b: Boot): Promise<void> {
       }
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }

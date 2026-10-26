@@ -52,6 +52,9 @@ export const params = {
   /** The wild around the town (`wild=0` leaves it out; `wild=wolves` starts beside the first group of that kind). */
   wild: q.get('wild') !== '0',
   wildAt: ['0', '1', '', null].includes(q.get('wild')) ? null : q.get('wild'),
+  /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about). */
+  small: q.get('small') !== '0',
+  smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
   /** Start in the saddle of the first horse (`ride`). */

@@ -11,6 +11,7 @@ import { Vector3 } from 'three/webgpu';
 import { hash3i, hashToFloat, smoothstep } from '@futuremagic/core';
 import { MusicPicker, Stride, strideAt } from '@futuremagic/audio';
 import type { AudioEngine } from '@futuremagic/audio/web';
+import type { LifeEvent } from '../sim/smallLife';
 import { MUSIC, daylight, hoofSound, musicMood, soundscape, stepSound, type Footing, type Hearing, type Place, type Threat } from '../game/soundscape';
 import type { Walker } from '../game/walker';
 import type { Steed } from '../game/horse';
@@ -143,6 +144,11 @@ export class SoundDirector {
     this.places();
     this.sky();
     this.wildlife();
+  }
+
+  /** Small birds taking wing (sim/smallLife.ts): a flurry from where they rose, fuller the more they are. */
+  wings(e: LifeEvent): void {
+    this.host.engine.play('title/birds', { at: [e.x, e.y + 0.5, e.z], gain: Math.min(0.9, 0.3 + e.count * 0.04), pitch: e.count > 12 ? 0.9 : 1.15 });
   }
 
   /** A fight's cue (Encounter.onCue): blows, cries and falls from where they happen. */

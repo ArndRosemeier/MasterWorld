@@ -8,8 +8,8 @@
  * fixed by where they live (D29), never by the hero. Positions are world metres. Pure.
  */
 import { Rng, deriveSeed, hash2f } from '@futuremagic/core';
-import type { CreatureDef, FloraDef, WildDef } from '../setting/contract';
-import { coverNoise, woodsAt } from '../world/flora';
+import type { CreatureDef, WildDef } from '../setting/contract';
+import { woodsOf } from '../world/flora';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { Den, type Quarry, type DenEvent } from './creatures';
@@ -119,13 +119,8 @@ export function groupDanger(members: readonly string[], defs: readonly CreatureD
  */
 export function placeWild(seed: number, terrain: Terrain, town: Town, wild: readonly WildDef[]): Territory[] {
   const out: Territory[] = [];
-  const cover = coverNoise(terrain.seed);
   const { x: tx, z: tz } = town.decision;
-  const woods = (x: number, z: number) => {
-    const b = terrain.biomeAt(x, z);
-    const f: FloraDef | undefined = b >= 0 ? terrain.setting.world.biomes[b]?.flora : undefined;
-    return f && f.trees > 20 ? woodsAt(cover, f, x, z) : 0;
-  };
+  const woods = woodsOf(terrain);
   const roads = town.plan.streets.filter((s) => s.kind === 'road').map((s) => {
     const n = s.pts.length;
     return Math.atan2(s.pts[n - 1] - tz, s.pts[n - 2] - tx);
