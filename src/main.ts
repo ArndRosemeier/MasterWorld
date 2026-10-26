@@ -178,6 +178,11 @@ export async function start(b: Boot): Promise<void> {
     const pausedWith = (sound: string) => (on: boolean) => { opening = sound; paused(on); opening = 'ui/open'; };
     // What New game leads to once the dive lands (set once the hero exists: character creation).
     let onBegin: ((people: People['id'] | null) => void) | null = null;
+    // New game pressed before the world was ready: the rest of the build may take the whole frame (the
+    // player waits for it), and the creator gets its people ready meanwhile (set once the hero exists).
+    let chosen = null as { people: People['id'] | null } | null;
+    let onChose: ((people: People['id'] | null) => void) | null = null;
+    let hurry = (): void => {};
     let orbit: Orbit | null = null;
     if (title) {
       paused(true);
@@ -195,6 +200,7 @@ export async function start(b: Boot): Promise<void> {
         },
         heroView: () => player.heroView(),
         begin: (people) => { if (onBegin) onBegin(people); else paused(false); },
+        chose: (people) => { chosen = { people }; hurry(); onChose?.(people); },
       });
     }
 
@@ -311,7 +317,10 @@ export async function start(b: Boot): Promise<void> {
     const capShare = view.stage.cap.share;
     view.stage.cap.share = 1;
     view.stage.monitor.phase = 'warmup';
-    const shown = () => { view.stage.cap.share = capShare; view.stage.monitor.phase = 'run'; };
+    let hurried = false;
+    const shown = () => { view.stage.cap.share = hurried && !window.__mwReady ? 1 : capShare; view.stage.monitor.phase = hurried && !window.__mwReady ? 'warmup' : 'run'; };
+    hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
+    if (chosen) hurry();
     loading.set('Raising the land');
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
@@ -601,17 +610,23 @@ export async function start(b: Boot): Promise<void> {
     });
     saves.dock();
     // Character creation (plan 11.4): after New game's dive (or at once with `?create`), unless a save is loaded.
+    const w = player.walker;
+    const makeCreator = (): Creator => new Creator({
+      camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
+      nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
+      backgrounds: setting.backgrounds,
+      skillName: (id) => setting.skills.find((k) => k.id === id)?.name ?? id,
+      itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
+      knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
+      click: () => sound.play('click'),
+    }, seed);
+    // Made (and its people loaded) as soon as the title's choice is made, so the glass opens right after the dive.
+    let readied: Creator | null = null;
+    onChose = (people) => { if (!save) (readied ??= makeCreator()).ready(people ? PEOPLE_RACE[people] : null).catch((e: unknown) => console.error('[creator] getting ready failed', e)); };
+    if (chosen) onChose(chosen.people);
     const create = async (race: string | null): Promise<void> => {
-      const w = player.walker;
-      creator = new Creator({
-        camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
-        nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
-        backgrounds: setting.backgrounds,
-        skillName: (id) => setting.skills.find((k) => k.id === id)?.name ?? id,
-        itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
-        knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
-        click: () => sound.play('click'),
-      }, seed);
+      creator = readied ?? makeCreator();
+      readied = null;
       // Nobody walks between the camera and the hero while the glass is open.
       const cam = view.camera.position;
       if (folk) folk.clear = (x, z) => distSqPointSeg(x, z, cam.x, cam.z, w.pos.x, w.pos.z) < 1.5 * 1.5;

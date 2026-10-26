@@ -102,7 +102,7 @@ export class TitleScreen {
 
   // The loading screen's part (main.ts calls these while the world is built).
   set(step: string): void {
-    if (!this.root.classList.contains('awake')) this.build.textContent = step;
+    if (!this.root.classList.contains('awake')) this.build.textContent = this.root.classList.contains('chosen') ? `${step} · you set off once it is done` : step;
     console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: ${step}`);
   }
 
@@ -147,9 +147,17 @@ export class TitleScreen {
     this.waiting();
   }
 
-  /** New game was pressed but the world is still being built: the button's gear turns meanwhile. */
-  waiting(): void {
-    this.startButton.classList.add('waiting');
+  /**
+   * New game (or a people's Walk with…) was pressed but the world is still being built: that button's gear
+   * turns, the card stays put, the other choices step back, and the build line says what it waits for.
+   */
+  waiting(people: People['id'] | null = null): void {
+    window.clearInterval(this.cardTimer);
+    this.root.classList.add('chosen');
+    const button = people ? this.card.querySelector<HTMLButtonElement>('.nav .t-btn:not(.arrow)') : this.startButton;
+    (button ?? this.startButton).classList.add('waiting', 'picked');
+    this.build.classList.add('t-wait');
+    if (!this.root.classList.contains('awake')) this.build.textContent = `${this.build.textContent} · you set off once it is done`;
   }
 
   get leaving(): boolean { return this.leavingNow; }
