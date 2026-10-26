@@ -12,12 +12,19 @@ import type { Stage } from '@futuremagic/stage';
 import type { Agent, TownLife } from '../../sim/townLife';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
+import { castShadows } from '../hero/play';
 import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
 /** People farther than this get no character (m). */
 const RANGE = 70;
+/**
+ * Detail drops sooner than Actors suggests (its levels switch at 8 and 25 m): Medium from about 5.6 m, the one-draw
+ * Crowd level from about 17 m. Thirty people in full detail, each a dozen draws and as many in the shadow, took
+ * about 10 ms of a town frame on the reference machine.
+ */
+const LOD_BIAS = 0.7;
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
 
@@ -58,6 +65,7 @@ export class FolkView {
 
   private constructor(private readonly stage: Stage, private readonly life: TownLife, private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
     for (const ch of [lead, ...others]) {
+      ch.lodBias = LOD_BIAS;
       const place = new Group();
       place.add(ch.object);
       place.name = 'townsfolk';
@@ -255,9 +263,7 @@ export class FolkView {
 
   /** What never shows casts no shadow (Actors flips its garments' polygon offsets for reversed depth itself). */
   private adapt(o: Object3D): void {
-    o.traverse((m) => {
-      if (m.name.startsWith('genitals')) m.castShadow = false; // always clothed: a shadow shader for nothing
-    });
+    castShadows(o);
   }
 
   /** The camera that picks each character's detail level. */

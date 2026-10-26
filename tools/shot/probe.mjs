@@ -126,7 +126,7 @@ async function probe(title) {
     await page.evaluate((name) => { window.__hide = name; }, name);
     await paired(`without ${name}`, () => { for (const o of window.game.view.scene.children) if ((o.name || o.type).replace(/ [-\d:]+$/, '') === window.__hide) { o.userData.probeWas = o.visible; o.visible = false; } }, restore);
   }
-  await paired('without sun shadow redraw', () => { window.game.view.sun.shadow.autoUpdate = false; }, () => { window.game.view.sun.shadow.autoUpdate = true; });
+  await paired('without sun shadow redraw', () => { window.__every = window.game.view.sky.shadowEvery; window.game.view.sky.shadowEvery = 1e9; }, () => { window.game.view.sky.shadowEvery = window.__every; });
   await paired('nothing (empty scene, post chain only)', () => { for (const o of window.game.view.scene.children) if (o.isMesh || o.isGroup || o.isInstancedMesh) { o.userData.probeWas = o.visible; o.visible = false; } }, restore);
   if (process.env.PROBE_PROFILE !== '0') await profile();
   console.log('\nshaders:\n```\n' + await page.evaluate(() => window.shaders.report()) + '\n```');
@@ -136,6 +136,19 @@ async function probe(title) {
     return [...by].sort((a, b) => b[1] - a[1]).slice(0, 40);
   });
   console.log('\nbuilt after warm-up, by what:\n' + after.map(([w, n]) => `- ${n}× ${w}`).join('\n'));
+  // Around each policy breach: the shader events just before it (kind, start, ms, what).
+  const near = await page.evaluate(() => {
+    const ev = window.shaders.events.filter((e) => e.phase === 'run');
+    const starts = ev.filter((e) => e.kind === 'node-sync' || e.kind === 'node-async');
+    const out = [];
+    for (let i = 1; i < starts.length; i++) {
+      const a = starts[i - 1], b = starts[i];
+      if (b.t >= a.t + a.ms * 3 - 1) continue;
+      out.push(ev.filter((e) => e.t >= a.t - 50 && e.t <= b.t + b.ms + 5).map((e) => `${e.kind} t=${e.t.toFixed(1)} ${e.ms.toFixed(1)} ms ${e.what}`).join('\n'));
+    }
+    return out;
+  });
+  if (near.length) console.log('\nevents around breaches:\n```\n' + near.join('\n---\n') + '\n```');
 }
 
 await probe(`noon: ${query}`);
