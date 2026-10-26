@@ -39,6 +39,17 @@ export class Journal {
     return lead;
   }
 
+  /** A lead the hero gave themselves (where they fell, plan 11.1). */
+  remember(lead: Lead): void {
+    if (!this.leads.some((l) => l.id === lead.id)) this.leads.push({ ...lead, notes: [...lead.notes] });
+  }
+
+  /** A lead's goal reached. */
+  fulfil(id: string): void {
+    const l = this.leads.find((x) => x.id === id);
+    if (l) l.done = true;
+  }
+
   get open(): Lead[] { return this.leads.filter((l) => !l.done); }
 
   /** For the save. */
