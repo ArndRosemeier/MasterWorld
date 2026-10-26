@@ -126,7 +126,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Starting the renderer');
-    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone });
+    const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post });
     if (save) view.sky.day = save.clock.day;
     view.sky.look = setting.look?.grade ?? [];
     // The hero walks the land; F (or `?fly`) flies the free camera instead.
@@ -607,7 +607,7 @@ export async function start(b: Boot): Promise<void> {
       trunks.around(player.walker.pos.x, player.walker.pos.z);
       grass?.tend(dt, view.camera);
       view.stage.frame();
-      view.renderer.render(view.scene, view.camera);
+      view.draw();
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
         hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit?.inside ? `\n${visit.summary}` : ''}${rooms?.inside ? `\n${rooms.summary}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
