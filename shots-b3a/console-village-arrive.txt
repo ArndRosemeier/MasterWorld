@@ -1,0 +1,38 @@
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?title=0&site=village&hud shots-b3a/village-arrive.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.6 s: Finding the start
+[page] [load] 1.6 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 1.8 s: Painting the ground
+[page] [load] 1.8 s: Filling the seas
+[page] [load] 4.4 s: Dressing the hero
+[page] [load] 5.3 s: Saddling the horses
+[page] [load] 5.4 s: Turning out the herds
+[page] [load] 5.5 s: Waking the town
+[page] [load] 6.7 s: Growing the woods
+[page] [load] 7.8 s: Dressing the townsfolk
+[page] [load] 8.6 s: Preparing shaders
+[page] [load] 16.8 s: Raising the land
+[page] [load] 16.8 s: Waking the cellar
+[page] [load] 17.7 s: Planting the trees
+[page] [load] 18.5 s: cellar ready (shaders 65 warm-up + 0 later · worst 9 ms · policy ok)
+[page] [load] 19.4 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 9 ms · policy ok)
+[page] [load] 19.8 s: trees ready (shaders 71 warm-up + 0 later · worst 9 ms · policy ok)
+[page] [load] 19.8 s: Waking the townsfolk
+[page] [load] 19.8 s: townsfolk round the hero dressed
+[page] [vgm] region region-38: open country, 9.0 km east of the start (a 1 km square)
+[page] [vgm] region region-39: open country, 9.3 km east of the start (a 1 km square)
+[page] [vgm] region region-40: open country, 8.4 km east of the start (a 1 km square)
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [vgm] region region-41: ruins of the old realm, 7.8 km east of the start (a 250 m square)
+[page] [vgm] region region-42: open country, 7.8 km east of the start (a 1 km square)
+[page] [load] 22.4 s: townsfolk, every look ready (shaders 75 warm-up + 8 later · worst 9 ms · policy ok)
+[page] [vgm] region region-43: open country, 8.8 km east of the start (a 1 km square)
+shots-b3a/village-arrive.png: webgpu · 16.3 ms · -22001, 60, 36399 · chunks 273 (+0) · grass 100+327 · 0.95 dense 0.13 m · folk 6/30
+weather cover 0.34 rain 0.00 storm 0.00 mist 0.00 wind 0.30 wet 0.27
+shaders 75 warm-up + 8 later · worst 9 ms · policy ok · wild - (0/7 built) · regions 43 (1 places drawn) · towns 3 (106 folk) · small life 0 squirrels, 69/69 birds (33 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 75 built in warm-up, 8 after (0 drawn late), worst block 9 ms, 0 violations, 0 built again alike

@@ -1,0 +1,33 @@
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?title=0&room=inn&hud shots-b3a/start-inn-room.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.4 s: Finding the start
+[page] [load] 1.3 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 1.5 s: Painting the ground
+[page] [load] 1.5 s: Filling the seas
+[page] [load] 3.7 s: Dressing the hero
+[page] [load] 4.3 s: Saddling the horses
+[page] [load] 4.4 s: Turning out the herds
+[page] [load] 4.4 s: Waking the town
+[page] [load] 5.0 s: Growing the woods
+[page] [load] 6.0 s: Dressing the townsfolk
+[page] [load] 6.0 s: Preparing shaders
+[page] [load] 12.5 s: Raising the land
+[page] [load] 12.5 s: Waking the cellar
+[page] [load] 13.0 s: Planting the trees
+[page] [load] 13.3 s: cellar ready (shaders 65 warm-up + 0 later · worst 8 ms · policy ok)
+[page] [load] 13.8 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 8 ms · policy ok)
+[page] [load] 14.1 s: trees ready (shaders 74 warm-up + 0 later · worst 8 ms · policy ok)
+[page] [load] 14.1 s: Waking the townsfolk
+[page] [load] 15.9 s: townsfolk round the hero dressed
+[page] [vgm] dungeon cellar-2 at 16.0 h
+[page] [load] 16.9 s: townsfolk, every look ready (shaders 81 warm-up + 0 later · worst 8 ms · policy ok)
+shots-b3a/start-inn-room.png: webgpu · 20.2 ms · -30265, 41, 34286 · chunks 273 (+0) · grass 101+320 · 0.00 dense 0.00 m · folk 30/30
+weather cover 0.36 rain 0.00 storm 0.00 mist 0.00 wind 0.30 wet 0.38
+shaders 81 warm-up + 0 later · worst 8 ms · policy ok · wild - (0/7 built) · regions 0 (0 places drawn) · towns 1 (123 folk) · small life 0 squirrels, 0/0 birds (0 drawn, 0/0 squirrel bodies)
+in inn #15 of town-1 storey 0
+sound: waiting for a click · mood -
+shaders: 81 built in warm-up, 0 after (0 drawn late), worst block 8 ms, 0 violations, 0 built again alike

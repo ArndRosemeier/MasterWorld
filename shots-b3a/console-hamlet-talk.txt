@@ -1,0 +1,36 @@
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?title=0&site=hamlet&talk=inn&hud shots-b3a/hamlet-talk.png
+
+[page] [load] 0.0 s: Fetching the world
+[page] [load] 0.5 s: Finding the start
+[page] [load] 1.5 s: Starting the renderer
+[page] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+[page] [load] 1.6 s: Painting the ground
+[page] [load] 1.6 s: Filling the seas
+[page] [load] 4.0 s: Dressing the hero
+[page] [load] 6.3 s: Saddling the horses
+[page] [load] 6.3 s: Turning out the herds
+[page] [load] 6.4 s: Waking the town
+[page] [load] 7.3 s: Growing the woods
+[page] [load] 8.5 s: Dressing the townsfolk
+[page] [load] 9.4 s: Preparing shaders
+[page] [load] 16.2 s: Raising the land
+[page] [load] 16.2 s: Waking the cellar
+[page] [load] 16.7 s: Planting the trees
+[page] [load] 17.0 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)
+[page] [load] 17.5 s: townsfolk ready (shaders 69 warm-up + 0 later · worst 10 ms · policy ok)
+[page] [load] 17.8 s: trees ready (shaders 73 warm-up + 0 later · worst 10 ms · policy ok)
+[page] [load] 17.8 s: Waking the townsfolk
+[page] [load] 17.8 s: townsfolk round the hero dressed
+[page] [vgm] region region-10: open country, 2.1 km south-east of the start (a 1 km square)
+[page] [vgm] region region-11: open country, 3.0 km south-east of the start (a 1 km square)
+[page] [vgm] region region-12: open country, 2.8 km south-east of the start (a 1 km square)
+[page] [vgm] region region-13: open country, 2.3 km south of the start (a 1 km square)
+[page] [load] 19.6 s: townsfolk, every look ready (shaders 77 warm-up + 1 later · worst 10 ms · policy ok)
+[page] [vgm] dungeon cellar-2 at 16.0 h
+shots-b3a/hamlet-talk.png: webgpu · 20.2 ms · -28666, 47, 35412 · chunks 291 (+0) · grass 97+323 · 0.90 dense 0.67 m · folk 9/30
+weather cover 0.38 rain 0.00 storm 0.00 mist 0.00 wind 0.30 wet 0.37
+shaders 77 warm-up + 1 later · worst 10 ms · policy ok · wild - (0/7 built) · regions 13 (1 places drawn) · towns 2 (22 folk) · small life 1 squirrels, 54/57 birds (14 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 77 built in warm-up, 1 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike
