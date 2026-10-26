@@ -29,6 +29,7 @@ import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh
 import { moveIn, occupantId, outlineCellar, type Cellar, type DungeonPlace } from '../world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
 import { fill } from '../talk/folk';
+import { siteToWorld, worldToSite } from '../world/site';
 import type { Town } from '../world/town';
 import { Encounter, type Arena, type FightCue, type FightHost } from './encounter';
 import { CellarVisit } from './cellarVisit';
@@ -158,7 +159,7 @@ export class Cellars {
       m.cool = Math.max(0, m.cool - dt);
       if (Math.hypot(x - m.x, z - m.z) > BARROW_NEAR) continue;
       if (!s.built) void this.ensure(s);
-      const [wx, wz] = turn(m, WAY_DOWN.x, WAY_DOWN.z);
+      const [wx, wz] = siteToWorld(m, WAY_DOWN.x, WAY_DOWN.z);
       if (s.ready && !s.ready.visit.inside && m.cool === 0 && Math.hypot(x - wx, z - wz) < 0.9) {
         m.cool = 3;
         void s.ready.visit.enter();
@@ -171,9 +172,9 @@ export class Cellars {
     for (const s of this.sites.values()) {
       const m = s.mound;
       if (!m || Math.abs(x - m.x) > 20 || Math.abs(z - m.z) > 20) continue;
-      // Into the mound's own frame (the inverse of `turn`).
-      const dx = x - m.x, dz = z - m.z, c = Math.cos(m.yaw), sn = Math.sin(m.yaw);
-      if (inBarrowShape(dx * c - dz * sn, dx * sn + dz * c, r)) return true;
+      // Into the mound's own frame.
+      const [u, v] = worldToSite(m, x, z);
+      if (inBarrowShape(u, v, r)) return true;
     }
     return false;
   }
@@ -259,7 +260,7 @@ export class Cellars {
     const view = new CellarView(s.first, { x: at.x, y: -400, z: at.z });
     await view.add(h.stage);
     // A barrow: back out into its forecourt, facing away from the mound.
-    const out = m ? { door: [...turn(m, 0, 2.2), m.yaw + Math.PI] as const } : s.house;
+    const out = m ? { door: [...siteToWorld(m, 0, 2.2), m.yaw + Math.PI] as const } : s.house;
     const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes);
     const words = loreOf(h.setting, s.decision.template).words;
     if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
@@ -314,12 +315,6 @@ const CELLAR_WORDS = {
   quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',
   thanks: 'The household of {place} hears the cellar is safe and presses {coins} into your hand.',
 };
-
-/** A point of a barrow's own frame (x, z) on the land: turned by its yaw, at its site. */
-function turn(m: { readonly x: number; readonly z: number; readonly yaw: number }, x: number, z: number): [number, number] {
-  const c = Math.cos(m.yaw), s = Math.sin(m.yaw);
-  return [m.x + x * c + z * s, m.z - x * s + z * c];
-}
 
 /** The chests a cellar's earlier dwellers' visit opened (not the lair's hoard). */
 function priorChests(c: Cellar, tally: DelveSave | undefined, setting: SettingModule): number[] {

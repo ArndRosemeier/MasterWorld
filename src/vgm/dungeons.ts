@@ -63,7 +63,8 @@ export function promiseBarrow(seed: number, terrain: Terrain, town: Town, log: D
   const n = dungeons.filter((d) => d.template === 'barrow').length + 1;
   const s = deriveSeed(seed, 'vgm', 'barrow', n);
   const { x: tx, z: tz } = town.decision;
-  const away = [...avoid, ...dungeons.flatMap((d) => (d.site ? [{ x: d.site.x, z: d.site.z, r: 150 }] : []))];
+  // Away from the wild, from other barrows and from a people's hold.
+  const away = [...avoid, ...dungeons.flatMap((d) => (d.site ? [{ x: d.site.x, z: d.site.z, r: 150 }] : [])), ...terrain.holds.map((h) => ({ x: h.x, z: h.z, r: 90 }))];
   let best: { x: number; z: number; score: number } | null = null;
   for (let k = 0; k < 64; k++) {
     const d = BARROW_RING[0] + (BARROW_RING[1] - BARROW_RING[0]) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;

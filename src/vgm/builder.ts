@@ -1,13 +1,14 @@
 /**
  * The Builder (plan 4.2), first cut: the decisions a new world starts with. The start (plan 6) is a small
  * town near the setting's start place, on gentle dry ground, ideally near a river, with the stone arch
- * of milestone 1 a short walk outside it. Deterministic per seed; the result goes into the decision log.
+ * of milestone 1 a short walk outside it, and the hold of a people (plan 11.6) in the hills a walk away. Deterministic per seed; the result goes into the decision log.
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
 import type { Decision, DecisionLog, TownDecision } from '../world/decisions';
 import { findStart, type StartPlace } from '../world/start';
 import { Terrain } from '../world/terrain';
+import { holdSite } from '../world/hold';
 import { archNear, type ArchSite } from '../world/volumes';
 import { promiseCellar } from './dungeons';
 
@@ -38,6 +39,10 @@ export function firstDecisions(t: Terrain, home: { x: number; z: number }): Deci
   if (arch) out.push({ kind: 'volume', id: 'arch-1', site: arch });
   const town = startTown(t, home, arch);
   if (town) out.push(town);
+  // A people's own place (plan 11.6): the first hold in the hills near the start town.
+  const people = t.setting.peoples.find((p) => p.hold);
+  const hold = town && people ? holdSite(t, town, people.id, people.hold, deriveSeed(t.seed, 'vgm', 'hold', people.id)) : null;
+  if (hold) out.push(hold);
   return out;
 }
 

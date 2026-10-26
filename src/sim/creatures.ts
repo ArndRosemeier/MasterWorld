@@ -101,6 +101,11 @@ export class Den {
   readonly creatures: Creature[] = [];
   /** Sim seconds. */
   time = 0;
+  /**
+   * At peace (a hold's wardens, plan 11.6): they watch the hero and turn to follow them, but only fight
+   * once struck or once the peace is ended (game/hold.ts).
+   */
+  peace = false;
 
   /** A dungeon's space (its rooms are the homes), or any other ground (open land: sim/wild.ts). */
   constructor(ground: DungeonSpace | DenGround, spawns: readonly Spawn[], defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []) {
@@ -147,7 +152,7 @@ export class Den {
       c.repath = Math.max(0, c.repath - dt);
       this.sense(c, q, dt, out);
       switch (c.state) {
-        case 'idle': this.idle(c, dt); break;
+        case 'idle': if (this.peace && c.aware > 0.35) this.watch(c, q, dt); else this.idle(c, dt); break;
         case 'alert': this.alert(c, q, dt); break;
         case 'fight': this.fight(c, q, dt, out); break;
         case 'flee': this.flee(c, q, dt, out); break;
@@ -179,6 +184,7 @@ export class Den {
       c.aware = Math.max(0, c.aware - dt * 0.08);
       c.lost += dt;
     }
+    if (this.peace) { if (c.state === 'alert') c.state = 'idle'; return; }
     if ((c.state === 'idle' || c.state === 'alert') && c.aware >= 1) this.notice(c, q, out);
     else if (c.state === 'idle' && c.aware > 0.35) { c.state = 'alert'; c.path = []; }
   }
@@ -236,9 +242,17 @@ export class Den {
         : b.kind === 'spider' ? (r.chance(0.6) ? 'watch' : 'spin')
         // Deer and boar graze and root, a wolf noses about and keeps watch.
         : b.kind === 'beast' ? (b.species === 'wolf' ? (r.chance(0.5) ? 'sniff' : 'watch') : r.chance(0.7) ? 'graze' : 'watch')
-        : r.chance(0.5) ? 'watch' : 'rummage';
+        // A warden keeps watch at its post; others rummage about now and then.
+        : (b.kind === 'humanoid' && b.outfit === 'guard') || r.chance(0.5) ? 'watch' : 'rummage';
       c.until = r.range(2, 6);
     }
+  }
+
+  /** At peace and someone there: back to its post, and it turns to keep them in sight. */
+  private watch(c: Creature, q: Quarry, dt: number): void {
+    if (this.move(c, dt, 0.32)) return;
+    c.act = 'watch';
+    c.dir = Math.atan2(q.z - c.z, q.x - c.x);
   }
 
   /** Something is there: it turns towards it and creeps closer. */

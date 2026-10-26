@@ -230,7 +230,7 @@ export interface AttackDef {
 /** How a creature is drawn: an Actors person (race, look) or one of the engine's small bodies. */
 export type CreatureBody =
   | {
-    readonly kind: 'humanoid'; readonly race: string; readonly height: number; readonly skin?: string; readonly outfit: 'rags' | 'bandit' | 'grave'; readonly gaunt?: boolean;
+    readonly kind: 'humanoid'; readonly race: string; readonly height: number; readonly skin?: string; readonly outfit: 'rags' | 'bandit' | 'grave' | 'guard'; readonly gaunt?: boolean;
     /** What it holds (an item id). */
     readonly held?: string;
     /** Only its bones: the raised dead. */
@@ -632,6 +632,74 @@ export interface RoutinesDef {
   readonly trades: Readonly<Record<string, RoutineDef>>;
 }
 
+/** How the hero stands with a people (plan 11.6, D34), from the lowest to the highest. */
+export const TIERS = ['hated', 'unwelcome', 'stranger', 'friend', 'honoured'] as const;
+export type Tier = (typeof TIERS)[number];
+
+/**
+ * A people as a faction (plan 11.6, D34): what they think of the hero is one number, −100 .. 100, that
+ * the game reads for greetings, prices, who will talk and whether the guards let the hero in.
+ */
+export interface PeopleDef {
+  /** Actors' race id (human, dwarf, halfling, elf). */
+  readonly id: string;
+  /** One of them, and all of them ("dwarf", "dwarves"). */
+  readonly name: string;
+  readonly plural: string;
+  /** What they think of a stranger at first, and of one of their own kin (−100 .. 100). */
+  readonly regard: number;
+  readonly kin: number;
+  /** How they open a talk, by standing (one picked per person; none for a tier: the talk's own greeting). */
+  readonly greet: Partial<Readonly<Record<Tier, readonly string[]>>>;
+  /** What they say instead of talking, hated (one picked per person). */
+  readonly refuse: readonly string[];
+  /** Unwelcome: what they say instead of their news. */
+  readonly curt: readonly string[];
+  /** Their own place (none: they live among others). */
+  readonly hold?: HoldDef;
+}
+
+/**
+ * A people's own place (plan 11.6): the gate of a hold cut into a hillside, a court before it and its
+ * guards. Walking in unwelcome is dangerous: the guards warn twice, then fight.
+ */
+export interface HoldDef {
+  /** What it is called ("Durgan's Gate"). */
+  readonly name: string;
+  /** Metres from the start town's market where it lies (the VGM picks a hillside in that ring). */
+  readonly ring: readonly [number, number];
+  /** The least standing the guards let in. */
+  readonly welcome: Tier;
+  /** Who keeps the gate (a creature id) and how many. */
+  readonly guard: string;
+  readonly guards: number;
+  /** What the guards call out: the first warning, the last, as they attack, and to someone welcome. */
+  readonly warn: readonly string[];
+  readonly last: readonly string[];
+  readonly attack: string;
+  readonly hail: readonly string[];
+  /** Their own people in a town tell of it: the topic, the answer (`{hold}`), and the journal's title. */
+  readonly topic: string;
+  readonly told: string;
+  readonly lead: string;
+}
+
+/**
+ * What changes the hero's standing (plan 11.6): a promise kept for one of a people's households (the
+ * other peoples in town hear of it too, a third as much), a gift, walking into a hold unwelcome,
+ * striking its guards, killing one.
+ */
+export interface StandingDef {
+  readonly kept: number;
+  /** A gift: what it costs (copper; each gift to the same people costs this much more) and how much it raises standing, up to `giftsUpTo`. */
+  readonly gift: { readonly price: number; readonly raise: number; readonly upTo: number; readonly topic: string; readonly line: string };
+  readonly trespass: number;
+  readonly struck: number;
+  readonly killed: number;
+  /** How far standing moves prices: the merchant's margin at −100 and at 100 (×, e.g. 1.3 and 0.85). */
+  readonly prices: readonly [number, number];
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -645,6 +713,9 @@ export interface SettingModule {
   readonly dungeons: { readonly cellar: CellarLore; readonly barrow?: CellarLore };
   /** Names of the peoples, by Actors' race id (human, dwarf, halfling, elf). */
   readonly names: Readonly<Record<string, NamesDef>>;
+  /** The peoples as factions (plan 11.6, D34), and what changes the hero's standing with them. */
+  readonly peoples: readonly PeopleDef[];
+  readonly standing: StandingDef;
   readonly talk: TalkDef;
   readonly skills: readonly SkillDef[];
   readonly creatures: readonly CreatureDef[];
@@ -753,7 +824,30 @@ export function validateSetting(m: SettingModule): string[] {
   if (!t.nothing.length) out.push(`${where}: talk.nothing is empty`);
   if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
   out.push(...validateFight(m, where));
+  out.push(...validatePeoples(m, where));
   out.push(...validateRoutines(m.routines, where));
+  return out;
+}
+
+/** The peoples: one for every people with names, sensible regard, and a hold's guard that exists. */
+function validatePeoples(m: SettingModule, where: string): string[] {
+  const out: string[] = [];
+  const ids = new Set(m.peoples.map((p) => p.id));
+  if (ids.size !== m.peoples.length) out.push(`${where}: a people is defined twice`);
+  for (const id of Object.keys(m.names)) if (!ids.has(id)) out.push(`${where}: people "${id}" has names but no faction`);
+  for (const p of m.peoples) {
+    if (!(Math.abs(p.regard) <= 100 && Math.abs(p.kin) <= 100)) out.push(`${where}: people "${p.id}" regard and kin must be in −100..100`);
+    if (!p.refuse.length || !p.curt.length) out.push(`${where}: people "${p.id}" needs refuse and curt lines`);
+    const h = p.hold;
+    if (!h) continue;
+    if (!m.creatures.some((c) => c.id === h.guard)) out.push(`${where}: hold "${h.name}" guard "${h.guard}" is unknown`);
+    if (!(h.guards >= 1) || !(h.ring[0] > 0 && h.ring[0] < h.ring[1])) out.push(`${where}: hold "${h.name}" needs guards and a rising ring`);
+    if (!h.warn.length || !h.last.length || !h.hail.length) out.push(`${where}: hold "${h.name}" needs warn, last and hail lines`);
+    if (!h.told.includes('{hold}')) out.push(`${where}: hold "${h.name}" told must name {hold}`);
+  }
+  const s = m.standing;
+  if (!(s.prices[0] > 1 && s.prices[1] > 0 && s.prices[1] < 1)) out.push(`${where}: standing.prices must be above 1 when hated and below 1 when honoured`);
+  if (!(s.gift.price > 0 && s.gift.raise > 0)) out.push(`${where}: standing.gift needs a price and a raise`);
   return out;
 }
 

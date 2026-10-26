@@ -93,6 +93,30 @@ export interface OrderDecision {
   readonly order: TownOrder;
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision;
+/**
+ * A people's own place (plan 11.6, D34): the gate of a hold cut into a hillside, with a level court before
+ * it. The ground is shaped for it (world/hold.ts): the court levelled at `level`, a rock face rising behind
+ * the gate. Its doorway's middle, and the way it faces (yaw as a barrow's: facing the gate is facing yaw).
+ */
+export interface HoldDecision {
+  readonly kind: 'hold';
+  readonly id: string;
+  /** The people's id (an Actors race id). */
+  readonly people: string;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  /** The court's height above the sea, metres. */
+  readonly level: number;
+}
+
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | HoldDecision;
 
 export type DecisionLog = readonly Decision[];
+
+/** The dungeon a promise is about: a dungeon decision itself, or the one a move-in moved into (else null). */
+export function dungeonOf(log: DecisionLog, d: Decision | undefined): DungeonDecision | null {
+  if (d?.kind === 'dungeon') return d;
+  if (d?.kind !== 'move-in') return null;
+  return log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === d.dungeon) ?? null;
+}

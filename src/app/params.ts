@@ -61,6 +61,12 @@ export const params = {
   smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
+  /**
+   * Start in the court of the first people's hold, facing its gate (`hold`); `hold=friend` (or another
+   * tier: hated, unwelcome, stranger, honoured) sets the hero's standing with that people to it.
+   */
+  hold: q.has('hold'),
+  holdTier: (['hated', 'unwelcome', 'stranger', 'friend', 'honoured'] as const).find((k) => k === q.get('hold')) ?? null,
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
   /** Open character creation at once, without the title (`create`; with the title it follows New game). */

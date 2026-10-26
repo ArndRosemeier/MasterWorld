@@ -141,8 +141,8 @@ export function placeWild(seed: number, terrain: Terrain, town: Town, wild: read
         if (slope > 0.45) continue;
         const w = woods(x, z);
         const fit = def.habitat === 'wood' ? w : def.habitat === 'open' ? 1 - w : 0.6 + (1 - w) * 0.2;
-        // Apart from the other groups.
-        const crowd = out.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + def.range + 60) ? 1 : 0;
+        // Apart from the other groups, and clear of a people's hold.
+        const crowd = out.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + def.range + 60) || terrain.holds.some((h) => Math.hypot(h.x - x, h.z - z) < def.range + 110) ? 1 : 0;
         const score = fit - crowd - slope + hash2f(s, k, 5) * 0.1;
         if (!best || score > best.score) best = { x, z, score };
       }
