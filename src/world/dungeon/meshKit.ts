@@ -3,6 +3,7 @@
  * @futuremagic/settlement (positions, normals, uv in metres, a material layer and a tint per vertex), so
  * dungeons draw with the town's one building shader.
  */
+import type { Rng } from '@futuremagic/core';
 import { BuildingMat, type BuildingMesh } from '@futuremagic/settlement';
 
 export type Tint = readonly [number, number, number];
@@ -16,13 +17,16 @@ export class MeshKit {
   private idx: number[] = [];
 
   get empty(): boolean { return this.idx.length === 0; }
+  /** How many vertices so far (smoothFrom from here). */
+  get mark(): number { return this.p.length / 3; }
 
   /**
    * A quad a, b, c, d (counter-clockwise seen from the front), uv from each corner's (u, v) in metres; one
    * tint, or one per corner (grime that fades up a wall).
    */
   quad(a: number[], b: number[], c: number[], d: number[], uv: number[][], mat: number, tint: Tint | readonly Tint[]): void {
-    const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+    // Across the diagonals: right for a quad that is not flat, and for one with two corners in one (a cone's tip).
+    const e1 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]], e2 = [d[0] - b[0], d[1] - b[1], d[2] - b[2]];
     let nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0];
     const l = Math.hypot(nx, ny, nz) || 1;
     nx /= l; ny /= l; nz /= l;
@@ -80,17 +84,29 @@ export class MeshKit {
 
   /** A box centred at (x, y0 + sy/2, z), turned by yaw about +y. */
   box(x: number, y0: number, z: number, sx: number, sy: number, sz: number, yaw: number, mat: number, tint: Tint): void {
-    const c = Math.cos(yaw), s = Math.sin(yaw);
-    const P = (u: number, v: number, w: number) => [x + u * c + w * s, y0 + v, z - u * s + w * c];
-    const hx = sx / 2, hz = sz / 2;
-    const v = [P(-hx, 0, -hz), P(hx, 0, -hz), P(hx, 0, hz), P(-hx, 0, hz), P(-hx, sy, -hz), P(hx, sy, -hz), P(hx, sy, hz), P(-hx, sy, hz)];
-    const U = (a: number, b: number) => [[0, 0], [0, b], [a, b], [a, 0]];
-    this.quad(v[4], v[7], v[6], v[5], U(sx, sz), mat, tint); // top
-    this.quad(v[0], v[1], v[2], v[3], U(sx, sz), mat, tint); // bottom
-    this.quad(v[0], v[4], v[5], v[1], U(sy, sx), mat, tint); // -z
-    this.quad(v[2], v[6], v[7], v[3], U(sy, sx), mat, tint); // +z
-    this.quad(v[3], v[7], v[4], v[0], U(sy, sz), mat, tint); // -x
-    this.quad(v[1], v[5], v[6], v[2], U(sy, sz), mat, tint); // +x
+    this.solid(corners(x, y0, z, sx, sy, sz, yaw), sx, sy, sz, mat, tint, tint, 0);
+  }
+
+  /**
+   * A rough-hewn stone: a box whose corners `rng` knocks out of true by up to `rough` (m), darker and damper
+   * at its foot (`tint` at its top), its texture shifted so no two stones match.
+   */
+  stone(x: number, y0: number, z: number, sx: number, sy: number, sz: number, yaw: number, mat: number, tint: Tint, rng: Rng, rough = 0.07): void {
+    const v = corners(x, y0, z, sx, sy, sz, yaw).map((p) => p.map((c) => c + rng.range(-rough, rough)));
+    const foot: Tint = [Math.round(tint[0] * 0.62), Math.round(tint[1] * 0.66), Math.round(tint[2] * 0.6)];
+    this.solid(v, sx, sy, sz, mat, foot, tint, rng.range(0, 8));
+  }
+
+  /** The six faces of a box from its corners (bottom four, then top four); `lo` tints the foot, `hi` the top. */
+  private solid(v: number[][], sx: number, sy: number, sz: number, mat: number, lo: Tint, hi: Tint, o: number): void {
+    const U = (a: number, b: number) => [[o, o], [o, o + b], [o + a, o + b], [o + a, o]];
+    const side = [lo, hi, hi, lo];
+    this.quad(v[4], v[7], v[6], v[5], U(sx, sz), mat, hi); // top
+    this.quad(v[0], v[1], v[2], v[3], U(sx, sz), mat, lo); // bottom
+    this.quad(v[0], v[4], v[5], v[1], U(sy, sx), mat, side); // -z
+    this.quad(v[2], v[6], v[7], v[3], U(sy, sx), mat, side); // +z
+    this.quad(v[3], v[7], v[4], v[0], U(sy, sz), mat, side); // -x
+    this.quad(v[1], v[5], v[6], v[2], U(sy, sz), mat, side); // +x
   }
 
   /** An upright cylinder (a barrel, a vat, a candle), `bulge` widens its middle. */
@@ -160,6 +176,17 @@ export class MeshKit {
   }
 }
 
+/** A box's corners, centred at (x, y0 + sy/2, z) and turned by yaw about +y: the bottom four, then the top four. */
+function corners(x: number, y0: number, z: number, sx: number, sy: number, sz: number, yaw: number): number[][] {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const P = (u: number, v: number, w: number) => [x + u * c + w * s, y0 + v, z - u * s + w * c];
+  const hx = sx / 2, hz = sz / 2;
+  return [P(-hx, 0, -hz), P(hx, 0, -hz), P(hx, 0, hz), P(-hx, 0, hz), P(-hx, sy, -hz), P(hx, sy, -hz), P(hx, sy, hz), P(-hx, sy, hz)];
+}
+
+/** `base` a little lighter or darker, by up to ±v. */
+export const varyTint = (rng: Rng, base: Tint, v: number): Tint => base.map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + rng.range(-v, v)))))) as unknown as Tint;
+
 export { BuildingMat };
 
 /**
@@ -167,3 +194,6 @@ export { BuildingMat };
  * groundTextures.ts TOWN_LAYERS: the BuildingMats, cobbles 9, trodden earth 10, then these).
  */
 export const CellarMat = { Earth: 10, Flagstone: 11, Brick: 12, Boards: 13, Limewash: 14 } as const;
+
+/** The land's own surfaces for what stands out on it (a barrow's stones and turf), after the cellars' layers. */
+export const WildMat = { Rock: 15, Grass: 16 } as const;
