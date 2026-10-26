@@ -257,6 +257,8 @@ export class Cellars {
     const put = (mesh: BuildingMesh, sink: number): Mesh => {
       const m = buildingMeshAt(mesh, site.x, y - sink, site.z, d.template);
       m.rotation.y = site.yaw;
+      // The mesh keeps the matrix it was made with (matrixAutoUpdate off): turn that too.
+      m.updateMatrix();
       void h.stage.add(m);
       return m;
     };

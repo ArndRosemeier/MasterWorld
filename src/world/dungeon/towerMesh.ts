@@ -59,7 +59,8 @@ export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
       const t0 = s * w, t1 = (s + 1) * w, cx = ax + ux * (t0 + w / 2) + ix * (WALL / 2), cz = az + uz * (t0 + w / 2) + iz * (WALL / 2);
       // Merlons stand a little higher on every other pier, where the top has not fallen.
       const h = wallTop(cx, cz) + (s % 2 === 0 && wallTop(cx, cz) > top - 1.6 ? 0.9 : 0);
-      const tint = varyTint(rng, STONE, 0.07);
+      // Lighter or darker, never another hue: a hue per pier reads as pastel bands down the wall.
+      const tint = scaleTint(STONE, rng.range(0.95, 1.05));
       const run = (y0: number, y1: number) => pier(k, ax, az, ux, uz, t0, t1, y0, y1, tint);
       if (front && Math.abs(cx) < TOWER_DOOR.half + 0.5 && Math.abs(cx) < TOWER_DOOR.half) { run(TOWER_DOOR.h, h); continue; }
       // A window on the upper storeys: the pier stands round a dark opening.
