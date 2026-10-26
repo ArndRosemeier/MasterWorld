@@ -78,3 +78,15 @@ test('cellar: every set piece hangs on its link, leaves a clue that points at it
     }
   }
 });
+
+test('cellar: an entrance room with a door in every cell still has its ladder up to the hatch (found by the loop check)', () => {
+  // Seed '99', the third promise: a 2 x 2 entrance room with four doors.
+  const d = { kind: 'dungeon', id: 'cellar-3', template: 'cellar', town: 'town-1', building: 25, seed: 1271959754, setPiece: 'barred-view', danger: 18, at: 9.14 } as const;
+  const house = { kind: 'cottage', hu: 2.672, hv: 2.7196 };
+  const c = outlineCellar(d, house, lore);
+  const entrance = c.layout.rooms[0];
+  assert.equal(entrance.w * entrance.d, 4);
+  assert.equal(c.layout.links.flatMap((l) => l.doors).filter((dr) => dr.room === entrance.id).length, 4);
+  assert.equal(c.hatch?.kind, 'ladder');
+  assert.equal(c.hatch.room, entrance.id);
+});
