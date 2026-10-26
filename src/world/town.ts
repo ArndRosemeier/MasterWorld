@@ -167,7 +167,12 @@ export class Town {
     }
     for (const f of p.fields) this.fill(f.poly, TownGround.Field, f.id + 1);
     for (const fm of p.farms) this.fill(fm.yard, TownGround.Yard);
-    this.fill(p.outline, TownGround.Yard);
+    if (this.decision.size === 'hamlet' || this.decision.size === 'village') {
+      // A hamlet's or village's blocks are wide: inside the outline it is open ground (kept grass, no
+      // wood), the plots round the houses its yards and gardens.
+      this.fill(p.outline, TownGround.Farmland);
+      for (const l of p.lots) this.fill(l.poly, TownGround.Yard);
+    } else this.fill(p.outline, TownGround.Yard);
     // Roads are cobbled in town; out in the fields they are earth, like the farm tracks.
     for (const s of p.streets) {
       const pts = s.closed ? [...s.pts, s.pts[0], s.pts[1]] : s.pts;
