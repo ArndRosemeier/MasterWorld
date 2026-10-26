@@ -14,6 +14,8 @@ import { TOWN_GROUND_LAYER, TOWN_TILE_METERS, type GroundTextures } from './terr
 import { CROP_LOOK, CROP_STEP, FIELD_GROUND, TOWN_GROUND, townTextures } from './materials/townGround';
 import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
+import { ROAD } from './materials/roads';
+import { inside, sampleMask } from './materials/masks';
 import { WEATHER, rainRings } from './materials/weather';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
@@ -203,6 +205,25 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   rough = mix(rough, float(0.95), fieldT);
   // Furrows: the ground's normal tilts across the rows.
   pert = mix(pert, vec3(across.x, 0, across.y).mul(cos(cAcross.mul(Math.PI * 2)).mul(shape.b).mul(rowsSeen).mul(0.5)).add(vec3(tn(earth.n).x, 0, tn(earth.n).y).mul(float(1).sub(plants))), fieldT);
+
+  // Roads between the places (materials/roads.ts): trodden earth with a ragged edge that frays into the
+  // verge; a cart track has two dark ruts with grass between them, a road is wider and more worn.
+  {
+    const rd = sampleMask(ROAD.mask, p.xz) as Node<'vec4'>;
+    const across = abs(rd.x), track = float(1).sub(abs(rd.y.sub(1))).clamp(0, 1);
+    const shown = smoothstep(0, 0.02, inside(ROAD.mask, p.xz) as Node<'float'>);
+    const fray = fine.mul(0.35).add(mid.mul(0.25)).add(patchy.mul(0.2));
+    let rt: Node<'float'> = smoothstep(0.45, -0.45, rd.z.add(fray)).mul(shown);
+    // The grass strip down a track's middle (the grass mask grows its blades).
+    rt = rt.mul(float(1).sub(track.mul(0.75).mul(smoothstep(0.42, 0.22, across.add(fine.mul(0.08))))));
+    const rb = hblend(clamp(rt, 0, 1), earth.n.b.sub(h), 2);
+    const tone = float(0.9).add(mid.mul(0.12)).add(patchy.mul(0.1));
+    col = mix(col, earth.a.rgb.mul(tone), rb); rough = mix(rough, earth.a.a, rb); ao = mix(ao, earth.n.a, rb);
+    pert = mix(pert, vec3(tn(earth.n).x, 0, tn(earth.n).y), rb); h = mix(h, earth.n.b, rb);
+    // The ruts: two grooves a wheel's gauge apart, darker and damper.
+    const rut = float(1).sub(smoothstep(0.08, 0.24, abs(across.sub(0.78)).add(fine.mul(0.04)))).mul(track).mul(rb);
+    col = col.mul(mix(float(1), float(0.68), rut)); rough = mix(rough, float(0.7), rut.mul(0.5));
+  }
 
   // Rock: triplanar, strata on the side faces, weathered rock on top.
   const bw0 = pow(abs(n), vec3(4));

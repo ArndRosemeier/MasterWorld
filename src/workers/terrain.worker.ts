@@ -8,13 +8,14 @@ import { openWorld } from '../vgm/builder';
 import { settingById } from '../setting/index';
 import { horizonMap, type HorizonSpec } from '../world/horizon';
 import { serve } from './serve';
+import type { Decision } from '../world/decisions';
 import type { DungeonLayout } from '@futuremagic/dungeon';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { caveField, caveShell, type CaveField } from '../world/dungeon/caveRock';
 import { mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
 import type { Site } from '../world/dungeon/site';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; index: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number });
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; index: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'decisions'; decisions: readonly Decision[] });
 export type TerrainResult = ChunkMesh | VolumeMesh[] | TownCellMesh[] | Uint8Array | CaveRock | CaveMouth;
 
 /** A cave's rock: the field the walker reads and its mesh. */
@@ -26,6 +27,7 @@ let terrain: Terrain | null = null;
 
 serve<TerrainJob, TerrainResult>((job) => {
   if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = openWorld(job.seed, settingById(job.setting)).terrain;
+  if (job.kind === 'decisions') { terrain.settleMore(job.decisions); return { result: new Uint8Array(0), transfer: [] }; }
   if (job.kind === 'volumes') {
     const t = terrain;
     const meshes = t.volumes.map((f) => archMesh(t, f.site)).filter((m): m is VolumeMesh => !!m);
