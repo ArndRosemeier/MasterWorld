@@ -1,6 +1,6 @@
 import type { Light, Object3D } from 'three/webgpu';
 import { GraphicsUnavailable } from '@futuremagic/stage';
-import { parseSeed } from '@futuremagic/core';
+import { deriveSeed, parseSeed } from '@futuremagic/core';
 import { LoadingScreen } from './app/loading';
 import { params } from './app/params';
 import { DebugMenu } from './app/debugMenu';
@@ -45,7 +45,7 @@ import { onKeyDown } from './input/keys';
 import { marketStart } from './app/places';
 import { TOWN_RASTER, TownGround } from './world/town';
 import { firstDungeon, houseOf, promiseBarrow } from './vgm/dungeons';
-import { keepPromise, nextPromise, keptOf } from './vgm/leads';
+import { LEADS, keepPromise, keptOf, moveInto, nextPromise } from './vgm/leads';
 import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
@@ -251,6 +251,14 @@ export async function start(b: Boot): Promise<void> {
     // The VGM's orders to the town (logged; a save replays them).
     let log: readonly Decision[] = [...opened.log, ...later];
     if (life && town) for (const o of ordersOf(log, town.decision.id)) life.order(o);
+    // `moved`: the first cellar was cleared long ago, and new dwellers have moved in since.
+    const cleared = params.moved && town ? firstDungeon(log) : null;
+    if (cleared && town && !keptOf(log).has(cleared.id)) {
+      const k = keepPromise(log, cleared.id, hours() - LEADS.settle - 1);
+      if (k) log = [...log, k];
+      const m = moveInto({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain }, deriveSeed(seed, 'moved'));
+      if (m) log = [...log, m];
+    }
     const orderTown = (o: TownOrder): void => {
       if (!life || !town) return;
       const d = townOrder(log, town.decision.id, o);
@@ -386,6 +394,8 @@ export async function start(b: Boot): Promise<void> {
     // `wild=<kind>`: beside its first group (for looking at them).
     const by = params.wildAt ? wild?.territories.find((t) => t.def.id === params.wildAt) : undefined;
     if (by) player.teleport(by.x + by.r + 20, undefined, by.z, Math.PI / 2);
+    // Once that group is built, the hero steps up to one of them (a dozen metres off, facing it).
+    let lookWild = by ? by.def.id : null;
     // A save from before kept promises were logged: the cellars its household paid for are kept.
     for (const id of Object.keys(save?.cellars ?? {})) if (save?.cellars[id].paid && !keptOf(log).has(id)) { const k = keepPromise(log, id, hours()); if (k) log = [...log, k]; }
     let dwellers: Promise<void> | null = null;
@@ -661,6 +671,13 @@ export async function start(b: Boot): Promise<void> {
       if (!rooms?.inside) {
         cellars.step(dt);
         if (!visit()) wild?.near(player.walker.pos.x, player.walker.pos.z);
+        const seen = lookWild ? wild?.sight(lookWild) : null;
+        if (seen) {
+          lookWild = null;
+          const p = player.walker.pos, d = Math.max(1, Math.hypot(p.x - seen.x, p.z - seen.z));
+          const x = seen.x + (p.x - seen.x) / d * 12, z = seen.z + (p.z - seen.z) / d * 12;
+          player.teleport(x, undefined, z, Math.atan2(x - seen.x, z - seen.z));
+        }
         if (!visit() && !player.flying) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
         stepEncounters(dt, [...cellars.encounters, ...(wild?.encounters ?? [])], { hero: character, player, hud: fightHud });
       }

@@ -90,6 +90,13 @@ export class WildLand {
     return out;
   }
 
+  /** A living member of the first built group of a kind, where it is now (for `wild=<kind>`: look at them). */
+  sight(kind: string): { x: number; y: number; z: number } | null {
+    const g = this.groups.find((g) => g.territory.def.id === kind && g.delve);
+    const c = g?.delve?.den.creatures.find((c) => c.state !== 'dead');
+    return c ? { x: c.x, y: c.y, z: c.z } : null;
+  }
+
   /** The HUD's line: groups built and awake. */
   get hudText(): string {
     const up = this.groups.filter((g) => g.encounter), on = up.filter((g) => g.awake);
