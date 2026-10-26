@@ -17,8 +17,10 @@ const TURN = 2.6;
 const LOOK = 0.0035;
 /** Zoom range (m from the head); below FIRST it is first person. */
 const NEAR = 0, FAR = 18, FIRST = 0.6;
-/** A talk's view (m): behind the hero's head, to its right, above the higher of the head and the aim. */
-const TALK_BACK = 1.3, TALK_SIDE = 0.45, TALK_UP = 0.55;
+/** A talk's view: above the higher of the hero's head and the aim (m). */
+const TALK_UP = 0.55;
+/** The shots tried for a talk, best first: back and to the right (m). */
+const TALK_SHOTS: readonly (readonly [number, number])[] = [[1.3, 0.45], [1.3, -0.45], [1.3, 0], [0.8, 0.3], [0.8, -0.3]];
 
 export class HeroCamera {
   /** The camera's own direction (rad): yaw as the walker's, pitch up positive. */
@@ -118,7 +120,10 @@ export class HeroCamera {
     if (!this.talking || !at) { this.trail(head, 0); return; }
     const dx = at.x - head.x, dz = at.z - head.z, len = Math.hypot(dx, dz) || 1;
     const fx = dx / len, fz = dz / len;
-    const eye = new Vector3(head.x - fx * TALK_BACK - fz * TALK_SIDE, Math.max(head.y, at.y) + TALK_UP, head.z - fz * TALK_BACK + fx * TALK_SIDE);
+    // Over the right shoulder; the left, straight behind or closer where a wall or post is in the way.
+    const clear = (x: number, z: number) => !this.world.wall?.(x, z, 0.25) && !this.world.wall?.((x + head.x) / 2, (z + head.z) / 2, 0.15);
+    const [back, side] = TALK_SHOTS.find(([b, sd]) => clear(head.x - fx * b - fz * sd, head.z - fz * b + fx * sd)) ?? TALK_SHOTS[0];
+    const eye = new Vector3(head.x - fx * back - fz * side, Math.max(head.y, at.y) + TALK_UP, head.z - fz * back + fx * side);
     // Under a ceiling: down until clear of it.
     for (let i = 0; i < 8; i++) {
       const rock = this.world.rockSurface(eye.x, eye.y, eye.z);
