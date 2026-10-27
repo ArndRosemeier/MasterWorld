@@ -386,6 +386,13 @@ export class Den {
     return text;
   }
 
+  /** Terror (a spell): it runs from the hero, unless it already runs or is dead. */
+  frighten(c: Creature): DenEvent[] {
+    const out: DenEvent[] = [];
+    if (c.state === 'fight' || c.state === 'alert' || c.state === 'idle') this.toFlee(c, out);
+    return out;
+  }
+
   private toFlee(c: Creature, out: DenEvent[]): void {
     c.state = 'flee';
     c.path = [];

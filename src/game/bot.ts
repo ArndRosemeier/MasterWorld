@@ -60,6 +60,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   const space = new DungeonSpace(cellar.layout);
   // A thorough player finds every key and door.
   for (const pl of cellar.layout.links) space.open.add(pl.link.id);
+  // The way down took longer than any cooldown: the hero comes in fresh.
+  hero.cooldowns.clear();
   const delve = new Delve(cellar, space, setting, hero, seed, opts.saved);
   const { den, fight } = delve;
   const h = cellar.hatch;

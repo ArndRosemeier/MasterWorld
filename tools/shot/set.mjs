@@ -17,6 +17,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
 import { drawnNear, measureFrames, shadersQuiet } from './wait.mjs';
+import { meet } from './acts.mjs';
 
 const TIMEOUT = 120000;
 const SETTLE = Number(process.env.SET_SETTLE ?? 4000);
@@ -36,19 +37,6 @@ const turn = (hour, kind) => (page) => page.evaluate(([hour, kind]) => {
   g.weather.cancel(now);
   g.weather.order({ kind, from: -1e6, to: 1e6 });
 }, [hour, kind]);
-/** The hero a few metres from a group of the wild (`kind`), facing it, once it is built near them. */
-const meet = (kind, d) => async (page) => {
-  await page.evaluate((kind) => {
-    const g = window.game, t = g.wild.territories.find((t) => t.def.id === kind);
-    g.player.teleport(t.x + t.r + 20, undefined, t.z, Math.PI / 2);
-  }, kind);
-  await page.waitForFunction((kind) => !!window.game.wild.sight(kind), kind, { timeout: TIMEOUT });
-  await page.evaluate(([kind, d]) => {
-    const g = window.game, seen = g.wild.sight(kind), p = g.player.walker.pos;
-    const l = Math.max(1, Math.hypot(p.x - seen.x, p.z - seen.z)), x = seen.x + (p.x - seen.x) / l * d, z = seen.z + (p.z - seen.z) / l * d;
-    g.player.teleport(x, undefined, z, Math.atan2(x - seen.x, z - seen.z));
-  }, [kind, d]);
-};
 const close = async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(600); };
 
 /**

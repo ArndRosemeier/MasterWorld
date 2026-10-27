@@ -102,7 +102,8 @@ import { ActionBarUi } from './app/actionBarUi';
 import { AbilityBook } from './app/abilityBook';
 import { POTION } from './game/actionBar';
 import { BirdForm } from './app/birdForm';
-import { blowOf, shapeOf } from './game/recipe';
+import { Alone, blowOf, Recipes, shapeOf, type RecipeEvent } from './game/recipe';
+import { SpellView } from './app/spellView';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
@@ -534,6 +535,9 @@ export async function start(b: Boot): Promise<void> {
     await stock?.enter(view.stage);
     await smallView?.addBirds();
     await view.stage.add(wx.precip);
+    // Spells (plan 10): one shader, built now behind the loading screen.
+    const spellView = new SpellView(setting);
+    await spellView.enter(view.stage);
 
     const notes = new Notes();
     if (lost) notes.say('That save was made before the town moved to its river: its world is gone, so a new game begins.', 10);
@@ -913,6 +917,9 @@ export async function start(b: Boot): Promise<void> {
     const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
     const leading = () => encounters().find((e) => e.leading) ?? null;
     const potions = () => character.pack.filter((i) => setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
+    // Out of a fight the hero's own spells still work (healing, wards): the recipe runner with nobody else about.
+    const alone = new Recipes(character, new Alone(character, () => player.walker.pos), setting.effects ?? [], deriveSeed(seed, 'alone'));
+    const aloneCues: RecipeEvent[] = [];
     // Bird form (plan 10): the hero becomes a pheasant and flies; the change takes its time and never in a fight.
     const birdAbility = setting.abilities.find((a) => shapeOf(a)?.into === 'bird') ?? null;
     const birdForm = birdAbility ? new BirdForm(birdAbility, player, world, {
@@ -921,28 +928,30 @@ export async function start(b: Boot): Promise<void> {
       changed: () => autosave(),
     }) : null;
     if (birdForm && birdAbility && character.knows(birdAbility.id)) void birdForm.warm();
+    /** An ability from the action bar (or a shot): bird form, the fight's, the hero's own out of a fight, the potion. A line why not, or null. */
+    const useAbility = (id: string): string | null => {
+      const e = leading();
+      if (birdForm && id === birdAbility?.id) return birdForm.invoke();
+      if (birdForm?.flying) return 'A pheasant cannot do that.';
+      if (e) return e.use(id);
+      const a = setting.abilities.find((x) => x.id === id);
+      if (a && !blowOf(a)) return alone.begin(a, null, player.walker.pos);
+      if (id !== POTION) return 'There is nothing here to fight.';
+      const r = character.remedy;
+      if (r && character.consume(r) > 0) fightHud.healed();
+      return r ? null : 'You have nothing to drink.';
+    };
     const actionBar = new ActionBarUi(character, setting, {
       get bindings() { return settings.current.bindings; },
       get blocked() { return open > 0; },
-      trigger: (id) => {
-        const e = leading();
-        let said: string | null;
-        if (birdForm && id === birdAbility?.id) said = birdForm.invoke();
-        else if (birdForm?.flying) said = 'A pheasant cannot do that.';
-        else if (e) said = e.use(id);
-        else if (id === POTION) {
-          const r = character.remedy;
-          said = r ? null : 'You have nothing to drink.';
-          if (r && character.consume(r) > 0) fightHud.healed();
-        } else said = 'There is nothing here to fight.';
-        if (said) notes.say(said, 2.5);
-      },
+      trigger: (id) => { const said = useAbility(id); if (said) notes.say(said, 2.5); },
       state: (id) => {
         const f = leading()?.fighting ?? null;
         if (id === POTION) { const n = potions(); return { left: 0, total: 0, dim: n === 0, on: false, count: n }; }
         if (birdForm && id === birdAbility?.id) { const b = birdForm.state; return { left: b.left, total: birdAbility.cooldown, dim: false, on: b.on }; }
         const a = setting.abilities.find((x) => x.id === id);
-        if (!a || !f) return { left: 0, total: 0, dim: true, on: false };
+        if (!a) return { left: 0, total: 0, dim: true, on: false };
+        if (!f) return { left: alone.cooling(id), total: a.cooldown, dim: !!blowOf(a) || character.mana < (a.cost?.mana ?? 0), on: alone.casting?.def === a };
         return { left: f.recipes.cooling(id), total: a.cooldown, dim: character.stamina < (a.cost?.stamina ?? 0) || character.mana < (a.cost?.mana ?? 0), on: (!!blowOf(a)?.again && f.attacking) || f.recipes.casting?.def === a };
       },
       arranged: () => { book.redraw(); },
@@ -1139,7 +1148,7 @@ export async function start(b: Boot): Promise<void> {
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1280,7 +1289,9 @@ export async function start(b: Boot): Promise<void> {
           const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
           if (opened) regionOpened(opened);
         }
-        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud });
+        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
+        const lead = leading();
+        spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }
       if (!visit()) rooms?.update(dt);

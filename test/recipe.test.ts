@@ -134,11 +134,11 @@ test('recipes: effects wear on: bleeding hurts over its time, mending heals, hel
   r.putOn(1, { id: 'bleeding', magnitude: 2, duration: 3 });
   r.putOn(1, { id: 'held', magnitude: 1, duration: 1 });
   r.putOn(SELF, { id: 'warded', magnitude: 4, duration: 2 });
-  assert.ok(r.held(1) && r.heldFor(1) === 1 && r.wardOf(SELF) === 4);
+  assert.ok(r.isHeld(1) && r.heldFor(1) === 1 && r.wardOf(SELF) === 4);
   run(r, 3.2, 0.1);
   const total = w.hurts.filter((x) => x.id === 1).reduce((a, x) => a + x.amount, 0);
   assert.ok(Math.abs(total - 6) < 0.3, `bled ${total}`);
-  assert.ok(!r.held(1) && r.wardOf(SELF) === 0);
+  assert.ok(!r.isHeld(1) && r.wardOf(SELF) === 0);
   // The same effect again refreshes it rather than stacking.
   r.putOn(SELF, { id: 'mending', magnitude: 3, duration: 2 });
   r.putOn(SELF, { id: 'mending', magnitude: 3, duration: 2 });
@@ -147,7 +147,7 @@ test('recipes: effects wear on: bleeding hurts over its time, mending heals, hel
   assert.ok(Math.abs(healed - 6) < 0.3, `mended ${healed}`);
   // A chance of 0 never takes.
   r.putOn(1, { id: 'held', magnitude: 1, duration: 5, chance: 0 });
-  assert.ok(!r.held(1));
+  assert.ok(!r.isHeld(1));
 });
 
 test('recipes: a terrain step asks the world, a delay waits, a change of shape goes to the world', () => {

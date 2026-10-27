@@ -44,6 +44,17 @@ export interface Caster {
   health: number;
   readonly maxHealth: number;
   skill(id: string): number;
+  /** Cooldowns kept by the caster, shared by every runner it casts with (absent: the runner's own). */
+  readonly cooldowns?: Map<string, number>;
+  /** The caster's own status effects, kept by the caster the same way (absent: the runner's own). */
+  readonly effectsOn?: Worn[];
+}
+
+/** Health back to the caster, up to its most; how much it took. */
+export function mendCaster(c: Caster, amount: number): number {
+  const before = c.health;
+  c.health = Math.min(c.maxHealth, c.health + amount);
+  return c.health - before;
 }
 
 /** The land reshaped by a terrain step, for the world to build where it can. */
@@ -163,20 +174,24 @@ const flat = (a: Spot, b: Spot) => Math.hypot(a.x - b.x, a.z - b.z);
 
 export class Recipes {
   private readonly rng: Rng;
-  private readonly cooldown = new Map<string, number>();
+  private readonly cooldown: Map<string, number>;
   private readonly effectDefs: ReadonlyMap<string, EffectDef>;
   /** The cast under way (null: none). */
   casting: { readonly def: AbilityDef; readonly target: number | null; left: number } | null = null;
   readonly shots: Shot[] = [];
   readonly zones: Zone[] = [];
   private readonly later: { left: number; ops: readonly AbilityOp[]; play: Play }[] = [];
-  /** Status effects worn, by mark id. */
-  readonly worn = new Map<number, Worn[]>();
+  /** Status effects the caster wears (shared with the caster's other runners). */
+  private readonly mine: Worn[];
+  /** Status effects on everyone else, by mark id (this runner's world only). */
+  private readonly others = new Map<number, Worn[]>();
   private readonly pending: RecipeEvent[] = [];
   private serial = 0;
 
   constructor(readonly caster: Caster, readonly world: RecipeWorld, effects: readonly EffectDef[], seed: number) {
     this.rng = new Rng(seed);
+    this.cooldown = caster.cooldowns ?? new Map();
+    this.mine = caster.effectsOn ?? [];
     this.effectDefs = new Map(effects.map((e) => [e.id, e]));
   }
 
@@ -192,7 +207,8 @@ export class Recipes {
   /** Why the ability cannot be used now at this target, or null. `me`: where the caster stands. */
   check(def: AbilityDef, target: number | null, me: Spot): string | null {
     if (this.cooling(def.id) > 0) return `${def.name} is not ready yet.`;
-    if (this.held(SELF)) return 'You are held fast.';
+    if (this.isHeld(SELF)) return 'You are held fast.';
+    if (def.skill && (def.level ?? 0) > this.caster.skill(def.skill)) return `You are not yet skilled enough for ${def.name}.`;
     if (this.casting) return `You are casting ${this.casting.def.name}.`;
     const why = this.afford(def);
     if (why) return why;
@@ -257,13 +273,17 @@ export class Recipes {
     this.playRest(def, target, me);
   }
 
-  /** Time passes: the cast, what flies, the zones, delayed steps and effects. `speed`: how fast the caster moves. */
-  elapse(dt: number, me: Spot, speed = 0): RecipeEvent[] {
-    for (const [k, v] of this.cooldown) this.cooldown.set(k, Math.max(0, v - dt));
+  /**
+   * Time passes: the cast, what flies, the zones, delayed steps and effects. `speed`: how fast the caster moves.
+   * `own`: this runner leads (the caster's cooldowns and own effects wear here); false for a second runner in
+   * the same frame (another fight the hero stands in), which keeps only its own world going.
+   */
+  elapse(dt: number, me: Spot, speed = 0, own = true): RecipeEvent[] {
+    if (own) for (const [k, v] of this.cooldown) this.cooldown.set(k, Math.max(0, v - dt));
     const c = this.casting;
     if (c) {
       if (speed > STILL) this.interrupt('You moved, and the cast is lost.');
-      else if (this.held(SELF)) this.interrupt('You are held fast, and the cast is lost.');
+      else if (this.isHeld(SELF)) this.interrupt('You are held fast, and the cast is lost.');
       else if ((c.left -= dt) <= 0) {
         this.casting = null;
         // The world may have moved on while the words were said.
@@ -289,7 +309,7 @@ export class Recipes {
       this.later.splice(i, 1);
       this.playSteps(l.ops, l.play);
     }
-    this.wear(dt);
+    this.wearAll(dt, own);
     return this.pending.splice(0);
   }
 
@@ -300,7 +320,7 @@ export class Recipes {
     const def = this.effectDefs.get(apply.id);
     if (!def || (apply.chance !== undefined && !this.rng.chance(apply.chance))) return;
     const magnitude = apply.magnitude * (def.dot || def.hot ? 1 + skill / 150 : 1);
-    const list = this.worn.get(id) ?? [];
+    const list = this.listOf(id, true);
     const was = list.find((w) => w.def.id === def.id);
     if (was) {
       was.magnitude = Math.max(was.magnitude, magnitude);
@@ -308,14 +328,21 @@ export class Recipes {
       return;
     }
     list.push({ def, magnitude, left: apply.duration, tick: 1 });
-    this.worn.set(id, list);
     this.pending.push({ kind: 'effect', on: id, effect: def, started: true });
+  }
+
+  /** The effects someone wears (`make`: an empty list kept for them when there is none). */
+  listOf(id: number, make = false): Worn[] {
+    if (id === SELF) return this.mine;
+    let l = this.others.get(id);
+    if (!l && make) this.others.set(id, (l = []));
+    return l ?? [];
   }
 
   /** The most of something among the effects someone wears (0 when none has it). */
   private most(id: number, has: (d: EffectDef) => boolean | undefined, of: (w: Worn) => number): number {
     let m = 0;
-    for (const w of this.worn.get(id) ?? []) if (has(w.def)) m = Math.max(m, of(w));
+    for (const w of this.listOf(id)) if (has(w.def)) m = Math.max(m, of(w));
     return m;
   }
 
@@ -323,33 +350,45 @@ export class Recipes {
   slowOf(id: number): number { return Math.min(0.9, this.most(id, (d) => d.slow, (w) => w.magnitude)); }
 
   /** Someone cannot act (held, frozen). */
-  held(id: number): boolean { return (this.worn.get(id) ?? []).some((w) => w.def.hold); }
+  isHeld(id: number): boolean { return (this.listOf(id)).some((w) => w.def.hold); }
 
   /** Seconds someone is still held. */
   heldFor(id: number): number { return this.most(id, (d) => d.hold, (w) => w.left); }
 
-  /** Armour added by wards. */
-  wardOf(id: number): number { return (this.worn.get(id) ?? []).filter((w) => w.def.ward).reduce((a, w) => a + w.magnitude, 0); }
+  /** How hidden someone is (0..1). */
+  veilOf(id: number): number { return Math.min(0.9, this.most(id, (d) => d.veil, (w) => w.magnitude)); }
 
-  private wear(dt: number): void {
+  /** Someone is afraid (runs). */
+  afraid(id: number): boolean { return this.most(id, (d) => d.fear, () => 1) > 0; }
+
+  /** Armour added by wards. */
+  wardOf(id: number): number { return (this.listOf(id)).filter((w) => w.def.ward).reduce((a, w) => a + w.magnitude, 0); }
+
+  /** Effects wear on and off; the caster's own only in the runner that leads (`own`), so they wear once a frame. */
+  private wearAll(dt: number, own: boolean): void {
     const alive = new Set(this.world.marks().map((m) => m.id));
-    for (const [id, list] of this.worn) {
-      if (!alive.has(id)) { this.worn.delete(id); continue; }
-      for (let i = list.length - 1; i >= 0; i--) {
-        const w = list[i];
-        w.left -= dt;
-        w.tick -= dt;
-        // Damage and healing come once a second, the last second's share when it ends.
-        while (w.tick <= 0 || (w.left <= 0 && w.tick < 1)) {
-          const share = w.tick <= 0 ? 1 : 1 - w.tick;
-          w.tick += 1;
-          if (w.def.dot) this.world.harm(id, w.magnitude * share, w.def.dot);
-          if (w.def.hot) this.healOn(id, w.magnitude * share, true);
-          if (w.left <= 0) break;
-        }
-        if (w.left <= 0) { list.splice(i, 1); this.pending.push({ kind: 'effect', on: id, effect: w.def, started: false }); }
+    for (const [id, list] of this.others) {
+      if (!alive.has(id)) { this.others.delete(id); continue; }
+      this.wearList(id, list, dt);
+      if (!list.length) this.others.delete(id);
+    }
+    if (own && alive.has(SELF)) this.wearList(SELF, this.mine, dt);
+  }
+
+  private wearList(id: number, list: Worn[], dt: number): void {
+    for (let i = list.length - 1; i >= 0; i--) {
+      const w = list[i];
+      w.left -= dt;
+      w.tick -= dt;
+      // Damage and healing come once a second, the last second's share when it ends.
+      while (w.tick <= 0 || (w.left <= 0 && w.tick < 1)) {
+        const share = w.tick <= 0 ? 1 : 1 - w.tick;
+        w.tick += 1;
+        if (w.def.dot) this.world.harm(id, w.magnitude * share, w.def.dot);
+        if (w.def.hot) this.healOn(id, w.magnitude * share, true);
+        if (w.left <= 0) break;
       }
-      if (!list.length) this.worn.delete(id);
+      if (w.left <= 0) { list.splice(i, 1); this.pending.push({ kind: 'effect', on: id, effect: w.def, started: false }); }
     }
   }
 
@@ -486,4 +525,29 @@ export class Recipes {
     const m = on === null ? undefined : this.mark(on);
     if (o.onHit) this.playSteps(o.onHit, { ...p, target: on, point: m ? { x: m.x, y: m.y, z: m.z } : { x: s.x, y: s.y, z: s.z } });
   }
+}
+
+/**
+ * The world with nobody to fight (out of an encounter): only the caster, whose own spells (healing, wards) still
+ * work; a foe-aimed spell finds no target.
+ */
+export class Alone implements RecipeWorld {
+  constructor(private readonly caster: Caster, private readonly at: () => Spot) {}
+
+  marks(): readonly Mark[] {
+    const p = this.at();
+    return this.caster.health > 0 ? [{ id: SELF, x: p.x, y: p.y, z: p.z, radius: 0.35, foe: false }] : [];
+  }
+
+  hit(): void {}
+
+  harm(id: number, amount: number): void {
+    if (id === SELF) this.caster.health = Math.max(1, this.caster.health - amount);
+  }
+
+  heal(id: number, amount: number): number { return id === SELF ? mendCaster(this.caster, amount) : 0; }
+
+  terrain(): boolean { return false; }
+
+  shape(): string | null { return null; }
 }

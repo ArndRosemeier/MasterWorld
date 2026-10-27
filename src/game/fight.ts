@@ -11,7 +11,7 @@ import { strike, threatOf, type Blow, type Strike, type Threat } from '../sim/co
 import { radiusOf, type Creature, type Den, type DenEvent, type Quarry } from '../sim/creatures';
 import type { Character, SkillUp } from './character';
 import { defOf, rollLoot, type Item, type Loot } from './items';
-import { blowOf, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
+import { blowOf, mendCaster, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
 import { WEAR, type WearState } from './upkeep';
 
 export interface HeroPose {
@@ -82,9 +82,11 @@ export class Fight implements RecipeWorld {
   quarry(p: HeroPose): Quarry {
     const stealth = this.hero.skill('stealth');
     const moving = p.speed > 3.5 ? 1 : p.speed > 0.5 ? 0.4 : 0.08;
-    const noise = Math.max(this.quiet < 3 ? 1 : 0, moving * (1 - stealth / 160));
-    const g = this.hero.guard(this.hero.stamina <= 0 || this.recipes.held(SELF));
-    return { x: p.x, y: p.y, z: p.z, noise, light: this.light, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) } };
+    // Veiled in shadow, the hero is heard and seen less.
+    const veil = 1 - this.recipes.veilOf(SELF);
+    const noise = Math.max(this.quiet < 3 ? 1 : 0, moving * (1 - stealth / 160)) * veil;
+    const g = this.hero.guard(this.hero.stamina <= 0 || this.recipes.isHeld(SELF));
+    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) } };
   }
 
   /**
@@ -176,12 +178,13 @@ export class Fight implements RecipeWorld {
     for (const c of this.den.alive) {
       c.slow = this.recipes.slowOf(c.id);
       c.stagger = Math.max(c.stagger, this.recipes.heldFor(c.id));
+      if (this.recipes.afraid(c.id)) for (const e of this.den.frighten(c)) this.denEvent(e, out);
     }
     for (const e of this.den.step(dt, this.quarry(p))) this.denEvent(e, out);
-    for (const e of this.recipes.elapse(dt, p, p.speed)) this.recipeEvent(e, out);
+    for (const e of this.recipes.elapse(dt, p, p.speed, breathe)) this.recipeEvent(e, out);
     const t = this.target;
     if (t && t.state === 'dead') { this.target = null; this.attacking = false; }
-    if (hero.alive && this.attacking && this.target && this.swing === 0 && !this.recipes.held(SELF) && !this.recipes.casting) this.blow(this.target, p, out);
+    if (hero.alive && this.attacking && this.target && this.swing === 0 && !this.recipes.isHeld(SELF) && !this.recipes.casting) this.blow(this.target, p, out);
     this.still = p.speed < 0.3 ? this.still + dt : 0;
     if (breathe) hero.recover(dt, this.den.fighting.length > 0 || this.quiet < 6, this.still);
     return out.splice(0);
@@ -212,12 +215,7 @@ export class Fight implements RecipeWorld {
     if (c) for (const e of this.den.wound(c, { outcome: 'hit', damage: amount }, this.at, 0, false)) this.denEvent(e, this.pending);
   }
 
-  heal(id: number, amount: number): number {
-    if (id !== SELF) return 0;
-    const before = this.hero.health;
-    this.hero.health = Math.min(this.hero.maxHealth, this.hero.health + amount);
-    return this.hero.health - before;
-  }
+  heal(id: number, amount: number): number { return id === SELF ? mendCaster(this.hero, amount) : 0; }
 
   /** The land below does not change yet (geomancy builds on volumes, C2). */
   terrain(_edit: TerrainEdit): boolean { return false; }

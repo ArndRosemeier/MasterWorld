@@ -209,10 +209,12 @@ export interface SkillDef {
   readonly rate: number;
   /** Everyone can use it from the start (with guilds, D49: other skills wait for a trainer or a past). */
   readonly open?: boolean;
+  /** Its colour (sRGB 0..1): a school of magic's spells glow in it. */
+  readonly color?: readonly [number, number, number];
 }
 
 /** How a blow lands: the engine reads it for armour, sounds and the clip. */
-export const DAMAGE_KINDS = ['cut', 'pierce', 'blunt', 'bite', 'claw', 'cold'] as const;
+export const DAMAGE_KINDS = ['cut', 'pierce', 'blunt', 'bite', 'claw', 'cold', 'fire', 'radiant', 'shadow'] as const;
 export type DamageKind = (typeof DAMAGE_KINDS)[number];
 
 /** One way to hit: a creature's bite, a weapon's swing. */
@@ -595,6 +597,8 @@ export interface AbilityDef {
   readonly taught?: boolean;
   /** The skill that powers it and that its use trains (absent: the weapon's). */
   readonly skill?: string;
+  /** How good at its skill the hero must be to use it (absent: 0); a teacher opens it by rank (C3). */
+  readonly level?: number;
   /** What it is aimed at: a foe (the target), or the hero themself. Absent: a foe when a step needs one. */
   readonly aim?: 'foe' | 'self';
   /** How far the target may be, metres (absent: the weapon's reach for a blow, else 24). */
@@ -680,6 +684,10 @@ export interface EffectDef {
   readonly hold?: boolean;
   /** Magnitude added to armour. */
   readonly ward?: boolean;
+  /** Runs from whoever put it on (a creature's terror). */
+  readonly fear?: boolean;
+  /** Harder to see and hear, by magnitude (0..1, a share). */
+  readonly veil?: boolean;
 }
 
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */
@@ -1138,6 +1146,7 @@ function validateAbilities(m: SettingModule, skills: ReadonlySet<string>, where:
     if (ids.has(a.id)) out.push(`${at} defined twice`);
     ids.add(a.id);
     if (a.skill && !skills.has(a.skill)) out.push(`${at} trains unknown skill "${a.skill}"`);
+    if (a.level !== undefined && (!a.skill || !(a.level >= 0 && a.level <= 100))) out.push(`${at} needs a skill for its level, and a level 0..100`);
     if (!(a.cooldown >= 0) || !((a.cast ?? 0) >= 0) || Object.values(a.cost ?? {}).some((v) => !(v >= 0))) out.push(`${at} needs cooldown, cast and costs of 0 or more`);
     if (!a.ops.length) out.push(`${at} has no steps`);
     const check = (ops: readonly AbilityOp[], depth: number): void => {
