@@ -4,7 +4,7 @@
  * the road runs low over the water), parapets, and one arch or more over the water, its feet in the bank.
  * The hero walks on the deck (`deckAt`, a floor). Rivers keep their fords. Pure.
  */
-import { lerp } from '@futuremagic/core';
+import { lerp, smoothstep } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { emptyWater, inChannel, type Hydrology } from './hydro';
 import { WAY_WIDTH, emptyRoad, type RoadNet } from './roads';
@@ -19,8 +19,11 @@ const STEP = 1;
 const PAD = 2.5;
 /** Parapets: height over the deck, thickness; the deck's thickness at the crown; longest single arch, m. */
 const PARAPET = 0.75, PARAPET_T = 0.32, DECK_T = 0.45, ARCH_MAX = 7;
-/** The deck's ends stand this much proud of the road (no flicker between the deck and the road under it). */
-const LIP = 0.1;
+/**
+ * The deck stands this much proud of the road (no flicker between the deck and the road under it); its
+ * ends start just under the road's surface and ramp up to that over RAMP m, so there is no step onto it.
+ */
+const LIP = 0.1, SUNK = 0.04, RAMP = 1.5;
 
 const here = emptyRoad(), centreWater = emptyWater();
 
@@ -62,7 +65,10 @@ export interface Bridge {
 }
 
 /** The deck's top at `t` (0..1) along it. */
-export const deckY = (b: Bridge, t: number): number => lerp(b.y0, b.y1, t) + LIP + b.hump * Math.sin(Math.PI * t);
+export function deckY(b: Bridge, t: number): number {
+  const m = Math.min(t, 1 - t) * Math.hypot(b.x1 - b.x0, b.z1 - b.z0);
+  return lerp(b.y0, b.y1, t) + lerp(-SUNK, LIP, smoothstep(0, RAMP, m)) + b.hump * Math.sin(Math.PI * t);
+}
 
 /** Under the deck at `t`: the arch's underside over the water, else null (solid down to the foot). */
 export function archY(b: Bridge, t: number): number | null {
