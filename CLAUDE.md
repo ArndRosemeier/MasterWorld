@@ -9,5 +9,6 @@
 7. **Shared code comes from packages** (D23): `@futuremagic/core` and `@futuremagic/stage` from the AssetGenerator submodule (`vendor/assetgenerator`, clone with `--recurse-submodules`). Do not copy their code.
 8. **Layers** are in `tools/guards/rules.json`: `src/world`, `src/setting` and `src/vgm` are pure (no three.js), so they run in workers and tests.
 9. **Build in plan order:** [docs/design/implementation-plan.md](docs/design/implementation-plan.md) says what comes next and when a step is done. Every PR description has a `PLAN:` line (`PLAN: A2 trade`, `PLAN: floor F4`, `PLAN: fix`).
+10. **The VGM's tools live in `src/vgm`** (D51): anything the VGM can make (a place, a dungeon kind, an encounter, an event, an order) is a tool there, its data in the setting, and gets its row in [docs/design/vgm.md](docs/design/vgm.md). The app only applies decisions; it never decides what the world gets.
 
 Checks: `npm test` (unit tests and guards), `npm run build` (typecheck and bundle), `npm run shot -- "?gl&hud" shots/x.png` (headless screenshot after a build). In the cloud container set `CHROMIUM_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome` and use `?gl`.
