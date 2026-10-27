@@ -222,7 +222,9 @@ export class HeroView {
     } else {
       o.position.set(p.pos.x, p.pos.y - (clip === 'swim' || clip === 'tread water' ? this.height * SWIM_DROP : 0), p.pos.z);
     }
-    if (this.held.drawn !== !!p.combat) { this.held.drawn = !!p.combat; this.moveHeld(); }
+    // A spell is cast with empty hands: the weapon goes away while it gathers and is thrown.
+    const drawn = !!p.combat && !acting?.id.startsWith('spell_');
+    if (this.held.drawn !== drawn) { this.held.drawn = drawn; this.moveHeld(); }
   }
 
   private gaitClip(p: HeroPose, speed: number): string {

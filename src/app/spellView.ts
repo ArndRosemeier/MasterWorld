@@ -36,6 +36,12 @@ const GHOSTS = 5, GHOST_GAP = 0.018;
 const HANDS_AHEAD = 0.5, HANDS_UP = 1.45;
 /** Smallest orb drawn for what flies (m): a dart must show from behind the hero across a clearing. */
 const BOLT_MIN = 0.26;
+/**
+ * The least time a bolt is seen flying (s). A dart at a foe two steps away lands within a frame or two of leaving
+ * the hand, too quick to see; then it is drawn flying from the hands to where it struck over this long, and its
+ * burst and sound wait for it. Only the drawing waits: the hit itself was dealt when it landed.
+ */
+const MIN_FLIGHT = 0.22;
 const AHEAD = new Vector3(0, 0, 1);
 
 /** One fight's (or the calm land's) spells, and where its frame sits in the world. */
@@ -52,6 +58,9 @@ export interface SpellFrame {
 }
 
 interface Flash { x: number; y: number; z: number; radius: number; look: Look; age: number; life: number; grow: boolean }
+
+/** A bolt drawn on after it landed (MIN_FLIGHT), from the hands to where it struck; `land` bursts it there. */
+interface Tracer { readonly from: Spot; readonly to: Spot; readonly look: Look; readonly rad: number; readonly n: number; readonly life: number; age: number; readonly land: (() => void)[] }
 
 /** What a spell's sound is: gathering in the hands, let go, or striking. */
 export type SpellSound = 'gather' | 'loose' | 'hit';
@@ -71,6 +80,9 @@ export class SpellView {
   readonly group = Object.assign(new Group(), { name: 'spells' });
   private readonly mesh: InstancedMesh;
   private readonly flashes: Flash[] = [];
+  private readonly tracers: Tracer[] = [];
+  /** When each bolt left the hands (by its number), for MIN_FLIGHT. */
+  private readonly born = new Map<number, number>();
   private readonly looks = new Map<string, Look>();
   private readonly o = new Object3D();
   private readonly tint: InstancedBufferAttribute;
@@ -83,7 +95,7 @@ export class SpellView {
   private readonly dir = new Vector3();
   /** Held as last drawn (shots of a spell in flight); the spells go on underneath. */
   frozen = false;
-  /** What the last frame drew: things flying, bursts or flares, and motes (shots wait for them). */
+  /** What the last frame drew: things flying (bolts and those drawn on after landing), bursts or flares, and motes (shots wait for them). */
   shown = { shots: 0, flashes: 0, motes: 0 };
   /** Hears casts, releases and hits (main.ts: the hero's clips and the sounds). */
   listener: SpellListener | null = null;
@@ -143,16 +155,9 @@ export class SpellView {
       for (const s of r.shots) {
         const rad = Math.max(BOLT_MIN, (s.op.radius ?? 0.18) * 1.4), l = this.showingOf(s.ability), x = O.x + s.x, y = O.y + s.y, z = O.z + s.z;
         const before = this.was.get(s.n), along = before ? this.dir.set(x, y, z).sub(before) : null;
-        const len = along && dt > 0 ? along.length() : 0, speed = len > 1e-4 ? len / dt : 0;
-        if (along && len > 1e-4) this.o.quaternion.setFromUnitVectors(AHEAD, along.divideScalar(len));
-        // The tail first (the turn on `o` is the bolt's): ghosts behind it along its flight, smaller and dimmer.
-        if (len > 1e-4) for (let g = 1; g <= GHOSTS; g++) {
-          const back = speed * GHOST_GAP * g, k = 1 - g / (GHOSTS + 1), r = rad * (0.35 + 0.55 * k);
-          this.put(x - this.dir.x * back, y - this.dir.y * back, z - this.dir.z * back, r, r, l, 0, 1.1 * k, s.n + g, Math.max(r, speed * STREAK * 0.6));
-        }
-        this.put(x, y, z, rad, rad, l, 0, 1.8, s.n, Math.max(rad, speed * STREAK));
+        const len = along && dt > 0 ? along.length() : 0;
+        this.streak(x, y, z, len > 1e-4 ? along!.divideScalar(len) : null, len > 1e-4 ? len / dt : 0, rad, l, s.n, dt);
         was.set(s.n, (before ?? new Vector3()).set(x, y, z));
-        this.motes.shed(l.motif, l, TRAIL * dt, x, y, z, rad * 0.6);
       }
       this.was = was;
       for (const z of r.zones) {
@@ -160,6 +165,15 @@ export class SpellView {
         this.put(O.x + z.x, O.y + z.y + 0.08, O.z + z.z, z.radius, 0.06, l, 0, (0.35 + 0.12 * Math.sin(this.t * 5 + z.n)) * fade, z.n);
         this.motes.shed(l.motif, l, LINGER * z.radius * dt * fade, O.x + z.x, O.y + z.y + 0.1, O.z + z.z, z.radius * 0.9);
       }
+    }
+    for (let i = this.tracers.length - 1; i >= 0; i--) {
+      const tr = this.tracers[i];
+      tr.age += dt;
+      if (tr.age >= tr.life) { this.tracers.splice(i, 1); for (const land of tr.land) land(); continue; }
+      const a = tr.age / tr.life, A = tr.from, B = tr.to;
+      this.dir.set(B.x - A.x, B.y - A.y, B.z - A.z);
+      const len = this.dir.length();
+      this.streak(A.x + (B.x - A.x) * a, A.y + (B.y - A.y) * a, A.z + (B.z - A.z) * a, len > 1e-4 ? this.dir.divideScalar(len) : null, len / tr.life, tr.rad, tr.look, tr.n, dt);
     }
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       const fl = this.flashes[i];
@@ -173,7 +187,7 @@ export class SpellView {
       const a = m.age / m.way.life, size = m.way.size * (1 - 0.5 * a);
       this.put(m.x, m.y, m.z, size, size, m.tint as Look, 1, m.way.bright * (1 - a), m.seed * 97);
     }
-    this.shown = { shots: f?.recipes.shots.length ?? 0, flashes: this.flashes.length, motes: this.motes.list.length };
+    this.shown = { shots: (f?.recipes.shots.length ?? 0) + this.tracers.length, flashes: this.flashes.length, motes: this.motes.list.length };
     this.mesh.count = this.n;
     this.mesh.instanceMatrix.needsUpdate = true;
     this.tint.needsUpdate = true;
@@ -203,6 +217,22 @@ export class SpellView {
     return !!def.glow || this.setting.skills.find((s) => s.id === def.skill)?.group === 'magic';
   }
 
+  /**
+   * A bolt at (x, y, z) flying along unit `dir` (null: not moving yet) at `speed` m/s: stretched into a streak with a
+   * tail of ghosts behind it, smaller and dimmer, shedding its motes.
+   */
+  private streak(x: number, y: number, z: number, dir: Vector3 | null, speed: number, rad: number, l: Look, n: number, dt: number): void {
+    if (dir) {
+      this.o.quaternion.setFromUnitVectors(AHEAD, dir);
+      for (let g = 1; g <= GHOSTS; g++) {
+        const back = speed * GHOST_GAP * g, k = 1 - g / (GHOSTS + 1), r = rad * (0.35 + 0.55 * k);
+        this.put(x - dir.x * back, y - dir.y * back, z - dir.z * back, r, r, l, 0, 1.1 * k, n + g, Math.max(r, speed * STREAK * 0.6));
+      }
+    }
+    this.put(x, y, z, rad, rad, l, 0, 1.8, n, dir ? Math.max(rad, speed * STREAK) : undefined);
+    this.motes.shed(l.motif, l, TRAIL * dt, x, y, z, rad * 0.6);
+  }
+
   /** Where the caster's hands hold a spell, in the world. */
   private handsAt(f: SpellFrame): Spot {
     const O = f.offset;
@@ -228,7 +258,7 @@ export class SpellView {
       case 'went': {
         if (!this.isSpell(e.ability)) break;
         // Released: the hands throw and flash (a spell on the caster flares by its own look).
-        this.listener?.hands('release', 0.55);
+        this.listener?.hands('release', 0.8);
         const h = this.handsAt(f), look = this.showingOf(e.ability);
         this.flashes.push({ x: h.x, y: h.y, z: h.z, radius: 0.45, look, age: 0, life: 0.25, grow: true });
         this.motes.shed(look.motif, look, 12, h.x, h.y, h.z, 0.15, 1.2);
@@ -236,12 +266,27 @@ export class SpellView {
         break;
       }
       case 'broken': this.listener?.hands('stop', 0); break;
-      case 'area': flash(e.at, e.radius, e.ability, BURST, true, 10 + 6 * e.radius); if (e.look) say('hit', e.ability, O.x + e.at.x, O.y + e.at.y + 0.5, O.z + e.at.z); break;
+      case 'loosed': this.born.set(e.shot.n, this.t); break;
+      case 'area': {
+        const burst = () => { flash(e.at, e.radius, e.ability, BURST, true, 10 + 6 * e.radius); if (e.look) say('hit', e.ability, O.x + e.at.x, O.y + e.at.y + 0.5, O.z + e.at.z); };
+        // A bolt that bursts into an area (a fireball) still drawn flying: the area bursts when it gets there.
+        const flying = this.tracers.find((t) => t.age === 0 && t.look === this.showingOf(e.ability));
+        if (flying) flying.land.push(burst); else burst();
+        break;
+      }
       case 'landed': {
         // Whatever it strikes bursts (a bolt that bursts into an area shows that area too, smaller here).
-        const at = { x: e.shot.x, y: e.shot.y - 0.3, z: e.shot.z }, big = e.shot.op.onHit ? 0.6 : 1;
-        flash(at, 0.9 * big, e.shot.ability, 0.45, true, 22 * big);
-        if (!e.shot.op.onHit) say('hit', e.shot.ability, O.x + e.shot.x, O.y + e.shot.y, O.z + e.shot.z);
+        const s = e.shot, at = { x: s.x, y: s.y - 0.3, z: s.z }, big = s.op.onHit ? 0.6 : 1;
+        const burst = () => {
+          flash(at, 0.9 * big, s.ability, 0.45, true, 22 * big);
+          if (!s.op.onHit) say('hit', s.ability, O.x + s.x, O.y + s.y, O.z + s.z);
+        };
+        const flown = this.t - (this.born.get(s.n) ?? this.t);
+        this.born.delete(s.n);
+        if (flown >= MIN_FLIGHT) { burst(); break; }
+        // On from where it was last drawn (the hands if it never was), for the rest of its least flight.
+        const seen = this.was.get(s.n), from = seen ? { x: seen.x, y: seen.y, z: seen.z } : this.handsAt(f), rad = Math.max(BOLT_MIN, (s.op.radius ?? 0.18) * 1.4);
+        this.tracers.push({ from, to: { x: O.x + s.x, y: O.y + s.y, z: O.z + s.z }, look: this.showingOf(s.ability), rad, n: s.n, life: Math.max(0.08, MIN_FLIGHT - flown), age: 0, land: [burst] });
         break;
       }
       case 'look': {
