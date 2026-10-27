@@ -1,7 +1,7 @@
 /**
  * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
- * title, the creator, the town at noon, dusk, night and in rain, a cellar, a barrow, the wild, a fight, the pack,
+ * title, the creator, the town at noon, dusk, night, in rain and wet toward the afternoon sun, a cellar, a barrow, the wild, a fight, the pack,
  * the map, the trade window, talk, a people's hold) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
  * writes `index.md` and `index.json` there. Before each shot it waits until everything near the hero is drawn
  * as itself (`game.undrawn` empty: townsfolk dressed, creatures warm; at most SET_DRAWN ms, default 15000; it ends as soon as all are drawn) and
@@ -86,6 +86,16 @@ const SESSIONS = [
     } },
     // Last, as it moves the hero to the smith's counter.
     { name: 'trade', act: async (p) => { await p.evaluate(() => window.game.tradeAt('smith')); await p.waitForTimeout(1800); } },
+  ] },
+  // A wet afternoon looking west into the sun: rain until half an hour ago, fair now. Haze and wet ground toward
+  // a low sun once washed the whole square out to white.
+  { id: 'wet', query: `${still}&hour=15&look=270,-4`, shots: [
+    { name: 'town-wet-sun', act: (p) => p.evaluate(() => {
+      const g = window.game, now = g.view.sky.day * 24 + g.view.sky.hour;
+      g.weather.cancel(now);
+      g.weather.order({ kind: 'rain', from: now - 3, to: now - 1.25 });
+      g.weather.order({ kind: 'fair', from: now - 0.5, to: 1e6 });
+    }) },
   ] },
   { id: 'cellar', query: `${still}&hour=12&cellar=2`, shots: [{ name: 'cellar' }] },
   // Out on the land: the barrow, then the hero is moved to the deer and the wolves (a load is the dearest part).

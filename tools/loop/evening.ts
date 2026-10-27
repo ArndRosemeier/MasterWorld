@@ -1,6 +1,6 @@
 /**
  * The loop check (plan A6): a scripted hero plays evenings headless (game/evening.ts) in a few worlds, and
- * once goes down reckless to check a fall. `npm run loop [-- evenings seed...]`. A slow check (at most
+ * once goes down reckless to check a fall; then evenings in a village and a hamlet (plan B3a). `npm run loop [-- evenings seed...]`. A slow check (at most
  * 5 min), run in CI beside npm test and before every phase gate. Prints each step; exits 1 if an evening broke.
  */
 import { parseSeed } from '@futuremagic/core';
@@ -13,6 +13,9 @@ const clock = (h: number) => `day ${Math.floor(h / 24)} ${String(Math.floor(h % 
 const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   ...seeds.map((seed) => ({ seed, opts: { evenings }, what: `${evenings} evenings` })),
   { seed: seeds[0], opts: { evenings: 1, reckless: true }, what: 'a reckless evening (a fall)' },
+  // A second town (plan B3a): the same game in a village out on the land, through the same code.
+  { seed: seeds[0], opts: { evenings: 3, settlement: 'village' }, what: '3 evenings in a village' },
+  { seed: seeds[1] ?? seeds[0], opts: { evenings: 2, settlement: 'hamlet' }, what: '2 evenings in a hamlet' },
 ];
 let failed = 0;
 const all = performance.now();

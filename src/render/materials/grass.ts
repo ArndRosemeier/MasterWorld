@@ -99,7 +99,7 @@ export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   // Rain darkens the blades a little.
   const col = varying(mix(lush, straw, dry).mul(tip).mul(root).mul(mix(float(1), float(0.72), WEATHER.wet)), 'vGrassCol');
   m.colorNode = vec4(col, 1);
-  m.roughnessNode = mix(float(0.9), float(0.6), WEATHER.wet);
+  m.roughnessNode = mix(float(0.9), float(0.72), WEATHER.wet);
   // Light through the blades when looking towards the sun.
   const back = pow(max(dot(normalize(cameraPosition.sub(pos)).negate(), WATER.sunDir), 0), 4);
   m.emissiveNode = col.mul(WATER.sunColor).mul(back.mul(0.35).mul(varying(t, 'vGrassT')));

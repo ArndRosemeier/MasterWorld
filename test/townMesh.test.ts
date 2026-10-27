@@ -4,7 +4,7 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
 import { townMeshes } from '../src/world/townMesh';
-import { marketStart } from '../src/app/places';
+import { marketStart } from '../src/world/town';
 
 const { terrain } = openWorld(parseSeed('masterworld'), classic);
 

@@ -20,10 +20,9 @@ import { GIANT_SPEED, giantPose, type Orbit } from './app/title/route';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
 import { StockView } from './render/livestock/StockView';
-import { Herds } from './sim/livestock';
 import { Steed, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
-import { TownLife, type Agent, type TownOrder } from './sim/townLife';
+import type { Agent, TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
@@ -36,19 +35,17 @@ import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
 import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
-import { TownView } from './render/town/TownView';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg } from '@futuremagic/settlement';
 import { validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
-import { ordersOf, townOrder } from './vgm/orders';
+import { townOrder } from './vgm/orders';
 import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
-import { marketStart } from './app/places';
-import { TOWN_RASTER, TownGround } from './world/town';
+import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
 import { LEADS, keepPromise, keptOf, moveInto, nextPromise, openPromises } from './vgm/leads';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
@@ -57,11 +54,13 @@ import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
-import { Settlements, type SettlementFolk } from './app/settlements';
+import { Towns } from './app/towns';
+import type { Township } from './game/township';
+import type { TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
-import type { Decision, DungeonDecision, RegionDecision, RoadDecision, RoadWay } from './world/decisions';
+import { dungeonOf, type Decision, type DungeonDecision, type RegionDecision, type RoadDecision, type RoadWay } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
 import { HouseView } from './render/town/HouseView';
 import { lookFromDegrees } from './app/look';
@@ -72,7 +71,7 @@ import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
 import { Notes } from './app/notes';
 import { BrookPrefetch } from './app/brooks';
-import { TalkUi, type TalkPlace } from './app/talkUi';
+import { TalkUi } from './app/talkUi';
 import { standingPlace } from './game/standingPlace';
 import { JournalUi } from './app/journalUi';
 import { PackUi } from './app/packUi';
@@ -82,14 +81,13 @@ import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
 import { Orientation, mastery } from './game/orientation';
 import { Compass, type SkyGlyph } from './app/compass';
-import { talkCellar, townTalk } from './talk/townTalk';
 import { fill } from './talk/folk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
-import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved, type SaveData } from './app/saveGame';
+import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved, townSaves, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { Character } from './game/character';
-import { Market, itemWorth } from './game/trade';
+import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
@@ -152,10 +150,13 @@ export async function start(b: Boot): Promise<void> {
     const save = lost ? null : asked;
     // The title's Continue: straight on with a loaded save, or offered when one is kept.
     if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
-    else if (title) void latestSave().then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
+    // Only a save that can go on in this world (not one from before the town moved).
+    else if (title) void latestSave(setting, (s) => !startMoved(s.log, opened.log)).then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const { terrain } = opened;
-    const town = terrain.towns[0];
-    const home = town ? marketStart(town.plan) : opened.home;
+    // Where the game began: a new hero steps out on its market, the title circles it, the map is drawn round it.
+    // Everything else in a town works alike in every town (app/towns.ts, game/township.ts).
+    const start = terrain.towns[0];
+    const home = start ? marketStart(start.plan) : opened.home;
 
     // The world as saved: the seed's own decisions, then what the VGM decided while the game was played.
     // (By id: a newer version may open the world with more decisions, such as a people's hold, plan 11.6.)
@@ -190,11 +191,10 @@ export async function start(b: Boot): Promise<void> {
     let rooms: InteriorVisit | null = null;
     // The regions the VGM opens as the hero walks, and the places in them (set once the log stands).
     let regionSites: RegionSites | null = null;
-    let settlements: Settlements | null = null;
+    // Every town (the start's and each settlement's): their cores and their buildings (set once the workers run).
+    let towns: Towns | null = null;
     // The land, and the steps and porches before the doors (where the townsfolk stand).
-    // The town's people once they live (set below).
-    let folkLife: TownLife | null = null;
-    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), town?.stand(x, z) ?? -Infinity);
+    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), towns?.stand(x, z) ?? -Infinity);
     // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
     const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
     const below = () => visit()?.world ?? null;
@@ -210,7 +210,7 @@ export async function start(b: Boot): Promise<void> {
     const world: WalkWorld = {
       // Out of doors also the steps and porches before the doors (as floors: climbed a step at a time).
       height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
-      floor: (x, z) => (below() ? null : town?.stand(x, z) ?? null),
+      floor: (x, z) => (below() ? null : towns?.stand(x, z) ?? null),
       rockSurface: (x, y, z) => surfaceAt(x, y, z, false),
       // In a building the camera stays in the room (its doorway shut to it).
       sightSurface: (x, y, z) => surfaceAt(x, y, z, !!rooms?.inside),
@@ -223,7 +223,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return !!town?.solid(x, z, r, h?.building.id) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!settlements?.solid(x, z, r) || !!hold?.solid(x, z, r) || !!folkLife?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z) || !!settlements?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
@@ -258,7 +258,7 @@ export async function start(b: Boot): Promise<void> {
     if (title) {
       paused(true);
       // The fly-over circles the market, where the game starts.
-      const middle = { x: home.x, z: home.z, r: town ? (Math.max(town.nx, town.nz) * TOWN_RASTER) / 2 : 0 };
+      const middle = { x: home.x, z: home.z, r: start ? (Math.max(start.nx, start.nz) * TOWN_RASTER) / 2 : 0 };
       orbit = { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) };
       await title.attach({
         camera: view.camera,
@@ -266,7 +266,7 @@ export async function start(b: Boot): Promise<void> {
         toys: {
           height: (x, z) => terrain.height(x, z),
           water: (x, z) => water?.waterAt(x, z) ?? null,
-          town: town ? middle : null,
+          town: start ? middle : null,
           hour: () => view.sky.hour,
         },
         heroView: () => player.heroView(),
@@ -281,10 +281,11 @@ export async function start(b: Boot): Promise<void> {
     const painted = (async () => {
       const texPool = createTexturePool();
       useGroundTextures(await loadGroundTextures(texPool));
-      if (town) {
-        // The town's walls, roofs and streets, and where its streets run (the terrain shader reads both).
+      if (start) {
+        // The towns' walls, roofs and streets, and where their streets run (the terrain shader reads both; the
+        // masks' texture is made the start town's size and moves to whichever town the hero is nearest).
         useTownTextures(await loadTownTextures(texPool));
-        useTownMasks(town);
+        useTownMasks(start);
       }
       texPool.dispose();
     })();
@@ -302,12 +303,19 @@ export async function start(b: Boot): Promise<void> {
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
-    // The hamlets and villages founded out on the land (plan B3): towns of their size, planned in a worker.
-    settlements = new Settlements({ stage: view.stage, terrain, land: terrainJobs, roads: roadWork, home: town?.decision.id ?? null, masks: !!town && params.town,
-      setting, seed, hours, log: () => log, saved: save?.talks,
-      // Their people take the hero as their kin stand with them (plan 11.6), as the start town's do.
-      talked: (words) => { words.manner = (p) => standing.manner(p.race, p.seed); },
+    // Every town: the start's, and the hamlets and villages founded out on the land (plan B3), all alike (B3a).
+    // A town's words are tied into the game (how its people take the hero, what they offer) once the game's
+    // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.
+    let tieTalk: ((t: Township, words: TownTalk) => void) | null = null;
+    const lit: Township[] = [];
+    towns = new Towns({
+      stage: view.stage, terrain, land: terrainJobs, roads: roadWork, masks: !!start && params.town, drawn: params.town,
+      setting, seed, hours, log: () => log, get standing() { return standing; },
+      saved: townSaves(save, start?.decision.id ?? null),
+      made: (t) => { t.onTalk = (words) => tieTalk?.(t, words); },
+      raised: (t) => { lit.push(t); view.warm.atDoors(lit.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z)); },
     });
+    const startTown = towns.start;
     const sea = new WaterView(jobs);
     water = sea;
     await sea.prime(view.camera.position);
@@ -352,18 +360,14 @@ export async function start(b: Boot): Promise<void> {
     drawRemains();
     // A roguelike hero fell: the heir's save is written and nothing saves over it.
     let ended = false;
-    // The townsfolk: their lives (the world simulation) and the nearest of them drawn.
-    const life = town ? new TownLife(town.plan, seed, hours(), setting.routines) : null;
-    folkLife = life;
-    // The VGM's orders to the town (logged; a save replays them).
+    // The VGM's decisions so far (the towns' orders among them: each town's people follow theirs, game/township.ts).
     let log: readonly Decision[] = [...opened.log, ...later];
-    if (life && town) for (const o of ordersOf(log, town.decision.id)) life.order(o);
     // `moved`: the first cellar was cleared long ago, and new dwellers have moved in since.
-    const cleared = params.moved && town ? firstDungeon(log) : null;
-    if (cleared && town && !keptOf(log).has(cleared.id)) {
+    const cleared = params.moved && start ? firstDungeon(log) : null;
+    if (cleared && start && !keptOf(log).has(cleared.id)) {
       const k = keepPromise(log, cleared.id, hours() - LEADS.settle - 1);
       if (k) log = [...log, k];
-      const m = moveInto({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain }, deriveSeed(seed, 'moved'));
+      const m = moveInto({ seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain }, deriveSeed(seed, 'moved'));
       if (m) log = [...log, m];
     }
     // A road from a place at (x, z) to the network, laid while playing: how the VGM links a place it founds (game.layRoad).
@@ -383,19 +387,19 @@ export async function start(b: Boot): Promise<void> {
       const place = setting.regions ? settlementsOf([d], setting.regions)[0] : undefined;
       if (!place) return;
       roading = roading.then(async () => {
-        await settlements?.found(d, view.camera.position);
+        await towns?.found(d, view.camera.position);
         const road = await jobs.linkRoad(log.filter((x): x is RoadDecision => x.kind === 'road'), place, 'track', d.at);
         if (road && !log.some((x) => x.id === road.id)) { log = [...log, road]; await roadWork.lay(road); }
       }).catch((e: unknown) => console.warn('founding a settlement:', e));
     };
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {
-      regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: town?.decision ?? opened.home }, log);
+      regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home }, log);
       for (const d of log) if (d.kind === 'region' && d.site) void roadWork.clear(d);
       // `site=<place>`: walk out from the start until one opens, then stand before it.
       const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
       for (let dir = 0; kind && dir < 8; dir++) {
-        const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: town?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
+        const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: start?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
         for (const d of walked) regionOpened(d);
@@ -404,19 +408,18 @@ export async function start(b: Boot): Promise<void> {
         break;
       }
     }
-    const orderTown = (o: TownOrder): void => {
-      if (!life || !town) return;
-      const d = townOrder(log, town.decision.id, o);
-      log = [...log, d];
-      life.order(o);
+    // A VGM order for the town the hero is in (the debug menu's): into the log, and its people follow it.
+    const orderTown = (t: Township, o: TownOrder): void => {
+      log = [...log, townOrder(log, t.id, o)];
+      t.obey(o);
     };
     // Saddled horses waiting by the start (Actors' horse): the mount key gets on.
     let horses: HorseView | null = null;
     if (params.horses > 0) {
       loading.set('Saddling the horses');
       const free = (x: number, z: number, r: number) => !world.wall?.(x, z, r) && world.waterLevel(x, z) === null;
-      const start = player.walker.pos;
-      const spots = horseSpots(start.x, start.z, player.walker.yaw, params.horses, free);
+      const by = player.walker.pos;
+      const spots = horseSpots(by.x, by.z, player.walker.yaw, params.horses, free);
       horses = await HorseView.make(view.renderer, spots.length);
       player.steeds = spots.map((p, i) => {
         const s = new Steed(world, i, seed);
@@ -427,12 +430,11 @@ export async function start(b: Boot): Promise<void> {
       player.horses = horses;
       if (params.ride && player.steeds[0]) player.mount(player.steeds[0]);
     }
-    // The farms' animals in their paddocks (the setting says which).
-    const herds = town && town.plan.paddocks.length ? new Herds(town.plan, seed) : null;
+    // The farms' animals in every town's paddocks (the setting says which): bodies for the nearest.
     let stock: StockView | null = null;
-    if (herds && params.stock > 0) {
+    if (params.stock > 0) {
       loading.set('Turning out the herds');
-      stock = await StockView.forHerds(view.renderer, setting.world.livestock, herds, params.stock, (x, z) => terrain.height(x, z));
+      stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => terrain.height(x, z));
     }
     // Birds and squirrels about the land (plan 9.3): their squares are the trunks' cells.
     const woods = woodsOf(terrain);
@@ -442,13 +444,14 @@ export async function start(b: Boot): Promise<void> {
       // The town's farmland and fields are open land whatever the woods round them.
       woods: (x, z) => (terrain.townGround(x, z) >= TownGround.Street ? 0 : woods(x, z)),
       trees: (i, j) => trunks.peek(i, j),
-      blocked: (x, z, r) => !!town?.solid(x, z, r),
+      blocked: (x, z, r) => !!towns?.solid(x, z, r),
     }, setting.smallLife) : null;
     const smallView = small ? new SmallLifeView(small, view.stage, view.renderer) : null;
     let folk: FolkView | null = null;
-    if (life && params.folk > 0) {
+    if (startTown && params.folk > 0) {
       loading.set('Waking the town');
-      folk = await FolkView.create(view.stage, view.renderer, life, outdoors, params.folk);
+      // One pool of characters for every town's people, warmed in the start town's clothes (the one wardrobe).
+      folk = await FolkView.create(view.stage, view.renderer, startTown.residents, outdoors, params.folk);
       folk.camera = view.camera;
     }
     loading.set('Growing the woods');
@@ -466,10 +469,8 @@ export async function start(b: Boot): Promise<void> {
     roadWork.rebuilds({ ground, flora, grass, trunks });
     await roadWork.mask.start(view.camera.position);
     const rock = new VolumeView(view.stage, terrainJobs).raise();
-    const houses = town && params.town ? new TownView(view.stage, terrainJobs) : null;
-    if (houses && town) view.warm.atDoors(town.plan.buildings, (x, z) => terrain.height(x, z));
-    const raised = houses?.build(town!.decision.id, view.camera.position);
-    void settlements.standing(view.camera.position);
+    // Every town that stands (the start's; a loaded game's settlements too), drawn alike.
+    const raised = towns.standing(view.camera.position);
     const landReady = ground.ready(view.camera);
     loading.set('Preparing shaders');
     await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm]);
@@ -503,7 +504,6 @@ export async function start(b: Boot): Promise<void> {
     director.strict = save?.mode === 'roguelike';
     const fightHud = new FightHud(setting, () => settings.current.bindings);
     const journal = new Journal(save?.journal);
-    const inn = town ? buildingOf(town.plan, 'inn') : undefined;
     // Every cellar the VGM promised under the town's houses: the first is built now, the others when the hero steps into the house above.
     const firstPromise = firstDungeon(log);
     const house = firstPromise ? houseOf(firstPromise, terrain.towns) : null;
@@ -525,13 +525,9 @@ export async function start(b: Boot): Promise<void> {
         // Classic: carried off to wake somewhere safe, the pack left where the hero fell.
         const fell = fallClassic(character, fellAt, id, view.sky.day);
         if (fell.remains) leaveRemains(fell.remains);
-        // Where the hero last took a room (plan 11.2), else the temple: inside it; with no town, by the inn's door.
+        // Where the hero last took a room (plan 11.2), else the nearest town's temple or inn: inside it.
         const at = upkeep?.waking() ?? null;
-        const carry = () => {
-          if (at?.building && rooms) return rooms.enter(at.building, true);
-          if (inn) { const [x, z, yaw] = inn.door; player.teleport(x - Math.sin(yaw) * 1.2, undefined, z - Math.cos(yaw) * 1.2, yaw + Math.PI); }
-          return Promise.resolve();
-        };
+        const carry = () => (at?.door && rooms ? rooms.enter(at.door, true) : Promise.resolve());
         if (v) void v.leave().then(carry);
         else void carry();
         const place = at?.said ?? setting.upkeep.words.wakeInn;
@@ -547,7 +543,7 @@ export async function start(b: Boot): Promise<void> {
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
       fight: fightHost,
-      up: (b) => rooms?.enter(b, true, true) ?? Promise.resolve(),
+      up: (id, b) => { const t = towns?.get(id); return t && rooms ? rooms.enter({ town: t, b }, true, true) : Promise.resolve(); },
       swapped: () => autosave(),
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
@@ -564,17 +560,17 @@ export async function start(b: Boot): Promise<void> {
     }, terrain.towns, save?.cellars ?? {});
     cellars.sync(log);
     // The wild on the land around the town: built as the hero comes near (D27, plan 9.3).
-    const wild = town && params.wild ? new WildLand({
+    const wild = start && params.wild ? new WildLand({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, seed, director, journal, hud: fightHud, fight: fightHost,
       cue: (c) => sounds?.cue(c),
       out: () => !visit() && !rooms?.inside && !player.flying,
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
-    }, terrain, town, {
+    }, terrain, start, {
       height: (x, z) => terrain.height(x, z),
       waterDepth: (x, z) => terrain.waterDepth(x, z),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
-      blocked: (x, z, r) => !!town.solid(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
+      blocked: (x, z, r) => !!towns?.solid(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
     }, save?.wild ?? {}) : null;
     // The first people's hold (plan 11.6): its gate and court, its wardens built as the hero comes near.
     const holdSite = log.find((d): d is HoldDecision => d.kind === 'hold') ?? null;
@@ -596,10 +592,10 @@ export async function start(b: Boot): Promise<void> {
     }
     // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
     const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
-    if (lookAt && town) {
+    if (lookAt && start) {
       let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === lookAt) ?? null;
       if (!b) {
-        b = promisePlace(lookAt, seed, terrain, town, log, home, wild?.territories ?? []);
+        b = promisePlace(lookAt, seed, terrain, start, log, home, wild?.territories ?? []);
         if (b) { log = [...log, { ...b, at: hours() }]; cellars.sync(log); }
       }
       // Far enough off to see it whole.
@@ -636,11 +632,14 @@ export async function start(b: Boot): Promise<void> {
       }
     }
 
-    // Every door of the town opens on its room; a cellar's house has the hatch down.
-    if (town) rooms = new InteriorVisit(town.plan.buildings, cellars.down, new HouseView(view.stage, houses), player, view.lantern, view.sky, notes);
-    if (rooms && town && params.room !== null) {
-      const b = params.room === 'cellar' ? house : town.plan.buildings.find((x) => x.kind === params.room) ?? town.plan.buildings[Number(params.room)];
-      if (b) await rooms.enter(b, true, params.room === 'cellar'); // the cellar: beside its hatch
+    // Every door of every town opens on its room; a cellar's house has the hatch down.
+    rooms = new InteriorVisit(towns, cellars.down, new HouseView(view.stage), player, view.lantern, view.sky, notes);
+    // `room=<kind|number|cellar>`: in that building of the town the hero is in (the cellar: the first promise's house).
+    const roomTown = params.room === 'cellar' && firstPromise ? towns.get(firstPromise.town) : towns.townAt(player.walker.pos.x, player.walker.pos.z) ?? startTown;
+    if (roomTown && params.room !== null) {
+      const plan = roomTown.town.plan;
+      const b = params.room === 'cellar' ? house : plan.buildings.find((x) => x.kind === params.room) ?? plan.buildings[Number(params.room)];
+      if (b) await rooms.enter({ town: roomTown, b }, true, params.room === 'cellar'); // the cellar: beside its hatch
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
 
@@ -687,13 +686,13 @@ export async function start(b: Boot): Promise<void> {
     // Declared before the sounds read it: a `?talk=` start opens a dialog right away.
     let creator: Creator | null = null;
     sounds = new SoundDirector({
-      engine: sound.engine, seed, camera: view.camera, walker: player.walker, terrain, town: town ?? null,
+      engine: sound.engine, seed, camera: view.camera, walker: player.walker, terrain, town: () => towns?.nearest(view.camera.position.x, view.camera.position.z)?.town ?? null,
       water: (x, z) => sea.waterAt(x, z),
       waterLevel: (x, z) => world.waterLevel(x, z),
       weather: () => wx.shown,
       hour: () => view.sky.hour,
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
-      where: () => (visit() ? { place: 'cellar', room: null } : rooms?.inside && town ? { place: 'room', room: town.plan.buildings[rooms.building]?.kind ?? null } : { place: 'land', room: null }),
+      where: () => (visit() ? { place: 'cellar', room: null } : rooms?.door ? { place: 'room', room: rooms.door.b.kind } : { place: 'land', room: null }),
       inFlight: () => player.flying,
       horses: () => player.steeds,
       riding: () => player.riding,
@@ -701,60 +700,49 @@ export async function start(b: Boot): Promise<void> {
       // Silent until the world is playable: no beds, steps or music (it streams, D44/F4) compete with the start's downloads.
       titleHolds: () => !!title?.holding || !!creator?.showing || !window.__mwReady,
     });
-    const townWords = town && life ? townTalk(seed, setting, town, life.persons, log, save?.talk ?? undefined).talk : null;
-    // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
-    for (const id of keptOf(log)) townWords?.hush(id);
-    // A place gone quiet: the journal says whom to tell, and the map marks their door.
-    // (A place promised from a hamlet or village: its own people are the ones to tell, plan B3.)
-    if (townWords && town && life) quietPlace = (id) => {
-      const f = settlements?.wordsFor(id);
-      const words = f ? settlements!.wordsOf(f) : townWords, people = f ? f.life : life, plan = f ? f.town.plan : town.plan;
-      if (!words.clear(id)) return true;
-      const to = words.reportTo(id)[0], p = people.agents.find((a) => a.person.id === to)?.person;
+    // A town's people and their words, in every town alike (plan B3a). The town the hero is in: within reach of
+    // its edge (out on the land: none).
+    const here = (): Township | null => towns?.townAt(player.walker.pos.x, player.walker.pos.z) ?? null;
+    /** The town whose people know of promise `id` (its household lives there). */
+    const townOfPromise = (id: string): Township | null => {
+      const d = dungeonOf(log, log.find((x) => x.id === id));
+      return d ? towns?.get(d.town) ?? null : null;
+    };
+    // A place gone quiet: the journal says whom of its household to tell, and the map marks their door.
+    quietPlace = (id) => {
+      const t = townOfPromise(id);
+      if (!t || !t.talk.clear(id)) return true;
+      const words = t.talk, to = words.reportTo(id)[0], p = t.residents.find((x) => x.id === to);
       if (p === undefined) return true;
-      const name = words.nameOf(p.id), house = words.homeCalled(p.id), door = plan.buildings[p.home].door;
+      const name = words.nameOf(p.id), house = words.homeCalled(p.id), door = t.town.plan.buildings[p.home].door;
       journal.quiet(id, { text: fill(setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
       return true;
     };
-    // Who knows the hero from before (plan 11.4): their greeting names them.
-    const friendsOf = (bg: BackgroundDef | undefined) => (bg && life ? acquaintances(bg, life.persons) : []);
+    // Who knows the hero from before (plan 11.4): people of the town the game began in; their greeting names them.
+    const friendsOf = (bg: BackgroundDef | undefined) => (bg && startTown ? acquaintances(bg, startTown.residents) : []);
     const meetOldFriends = () => {
       const bg = setting.backgrounds.find((b) => b.id === character.background);
-      townWords?.acquaint(friendsOf(bg).map((a) => ({ person: a.person.id, line: a.line })), heroName || 'friend');
+      startTown?.talk.acquaint(friendsOf(bg).map((a) => ({ person: a.person.id, line: a.line })), heroName || 'friend');
     };
-    meetOldFriends();
-    // What townsfolk do besides talk (trade, repairs, a room): a talk topic each, which opens its window.
+    // What townsfolk do besides talk (trade, repairs, a room): a talk topic each, which opens its window for
+    // the person asked, in their town (`talk.place`).
     const services = new Map<string, (a: Agent) => void>();
-    // The town's merchants (plan 11.5): the smith, the inn's keeper and the market's stalls.
-    const market = life ? new Market(setting, life.persons, seed, view.sky.day, save?.market) : null;
-    // Merchants ask more of someone their people dislike, and less of a friend (plan 11.6).
-    if (market) market.standing = standing;
-    const trade = market ? new TradeUi(character, setting, market, {
+    const keyName = (k: 'journal' | 'map' | 'talk') => (settings.current.bindings[k][0] || settings.current.bindings[k][1]).replace(/^Key/, '');
+    // Every town's merchants (plan 11.5): the smith, the inn's keeper and the market's stalls; their prices
+    // follow how the hero stands with their people (plan 11.6).
+    const trade = new TradeUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
       get day() { return view.sky.day; },
       traded: () => sounds?.coins(),
       say: (text) => notes.say(text),
-    }) : null;
-    if (market && trade && townWords) {
-      services.set('trade', (a) => { const m = market.of(a.person.id); if (m) trade.show(m, townWords.nameOf(a.person.id)); });
-      townWords.services = (person) => {
-        const shop = market.of(person)?.shop;
-        return shop ? [{ id: 'trade', label: shop.topic, line: shop.line }] : [];
-      };
-    }
-    const keyName = (k: 'journal' | 'map' | 'talk') => (settings.current.bindings[k][0] || settings.current.bindings[k][1]).replace(/^Key/, '');
-    // Where the hero talks: in the start town, or in the hamlet or village they are in (plan B3).
-    const homePlace: TalkPlace | null = town && life && townWords ? { talk: townWords, life, plan: town.plan } : null;
-    const settledPlaces = new WeakMap<SettlementFolk, TalkPlace>();
-    const placeHere = (): TalkPlace | null => {
-      const w = player.walker.pos, f = settlements?.folkAt(w.x, w.z);
-      if (!f) return homePlace;
-      let p = settledPlaces.get(f);
-      if (!p) settledPlaces.set(f, (p = { talk: settlements!.wordsOf(f), life: f.life, plan: f.town.plan }));
-      return p;
-    };
-    const talk: TalkUi | null = homePlace ? new TalkUi(homePlace, setting.talk, journal, player, {
+    });
+    /** Talk here: the town of whoever the hero talks with (or would, at the talk key). */
+    const talkTown = (): Township | null => talk?.place ?? null;
+    const nameHere = (id: number): string => talkTown()?.talk.nameOf(id) ?? '';
+    services.set('trade', (a) => { const t = talkTown(), m = t?.market.of(a.person.id); if (t && m) trade.show(t.market, m, t.talk.nameOf(a.person.id)); });
+    // Talk: in the town the hero is in (it follows them from town to town, below).
+    const talk: TalkUi | null = startTown ? new TalkUi(startTown, setting.talk, journal, player, {
       paused,
       get bindings() { return settings.current.bindings; },
       // Flying, below in a cellar, or still at the title (its fly-over is no place to talk).
@@ -777,64 +765,76 @@ export async function start(b: Boot): Promise<void> {
         journal.fulfil(id);
         director.met('purpose');
         // The household's people think better of the hero (and the others hear of it).
-        const here = talk!.place;
-        const who = householdOf(log, id, here.life.persons);
+        const t = talk!.place;
+        const who = householdOf(log, id, t.residents);
         const own = who ? standing.keptFor(who.race).find((c) => c.people.id === who.race) : undefined;
         if (own) notes.say(changeLine(own), 5);
         promiseDue();
-        return here.talk.toldSafe(a.person.id, id, due ? due.thanks(coinText(coins)) : '');
+        return t.talk.toldSafe(a.person.id, id, due ? due.thanks(coinText(coins)) : '');
       },
-      get roomPeople() { return rooms?.inside && life ? rooms.people(life) : null; },
+      get roomPeople() { return rooms?.inside ? rooms.people() : null; },
     }) : null;
-    // A room at the inn and the smith's mending (plan 11.5): two more services.
-    const upkeep = town && life && townWords ? new UpkeepUi(character, setting, {
+    // A room at the inn and the smith's mending (plan 11.5): two more services, in whichever town.
+    const upkeep = new UpkeepUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
-      town: { id: town.decision.id, plan: town.plan },
+      get town() { return talkTown(); },
+      townOf: (id) => towns?.get(id) ?? null,
+      // Carried off with no room taken: to the nearest town with a temple or an inn.
+      get refuge() {
+        const w = player.walker.pos;
+        let best: Township | null = null, low = Infinity;
+        for (const t of towns?.every ?? []) {
+          if (!buildingOf(t.town.plan, 'temple') && !buildingOf(t.town.plan, 'inn')) continue;
+          const d = Math.hypot(t.town.decision.x - w.x, t.town.decision.z - w.z);
+          if (d < low) { low = d; best = t; }
+        }
+        return best;
+      },
       hours,
       setClock: (h) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; },
-      enter: (b) => rooms?.enter(b, true) ?? Promise.resolve(),
+      enter: (door) => rooms?.enter(door, true) ?? Promise.resolve(),
       say: (text, secs) => notes.say(text, secs),
       worth: (it) => itemWorth(setting.items, it),
       rang: () => sounds?.rang(),
-    }) : null;
-    if (upkeep && townWords && life) {
-      const others = townWords.services.bind(townWords);
-      const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
-      townWords.services = (id) => { const p = person(id); return [...others(id), ...(p ? upkeep.services(p) : [])]; };
-      for (const id of UPKEEP_SERVICES) services.set(id, (a) => upkeep.answer(id, a.person, townWords.nameOf(a.person.id)));
-    }
+    });
+    for (const id of UPKEEP_SERVICES) services.set(id, (a) => { const t = talkTown(); if (t) upkeep.answer(id, a.person, t.talk.nameOf(a.person.id)); });
     // Lessons (plan 11.4): the smith, the old caravan guard and the innkeeper teach for coin; one more service.
-    const lessons = life && townWords ? new LessonsUi(character, setting, {
+    const lessons = new LessonsUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
       taught: (h) => { const t = hours() + h; view.sky.day = Math.floor(t / 24); view.sky.hour = t - view.sky.day * 24; sounds?.coins(); },
       changed: armHero,
-    }) : null;
-    if (lessons && townWords && life) {
-      const others = townWords.services.bind(townWords);
-      const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
-      townWords.services = (id) => {
-        const p = person(id), t = p ? teacherOf(setting, p) : null;
-        return [...others(id), ...(t ? [{ id: 'lessons', label: t.topic, line: t.line }] : [])];
-      };
-      services.set('lessons', (a) => { const t = teacherOf(setting, a.person); if (t) lessons.teach(t, townWords.nameOf(a.person.id)); });
-    }
+    });
+    services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id)); });
     // The peoples in talk (plan 11.6): greetings, refusals and kept news by standing; where a people's hold is, and gifts.
-    if (townWords && life) {
-      townWords.manner = (p) => standing.manner(p.race, p.seed);
-      const peoples = new PeoplesTalk({
-        setting, character, standing, journal, holds: terrain.holds,
-        nameOf: (id) => townWords.nameOf(id),
-        say: (text, secs) => notes.say(text, secs),
-        marked: (id) => { handOver?.give(id); notes.say(`${holdPeople?.hold?.name ?? 'The hold'} is marked on your map. (Map: ${keyName('map')})`, 6); },
-        paid: () => sounds?.coins(),
-      });
-      const others = townWords.services.bind(townWords);
-      const person = (id: number) => life.agents.find((a) => a.person.id === id)?.person;
-      townWords.services = (id) => { const p = person(id); return [...others(id), ...(p ? peoples.services(p) : [])]; };
-      for (const id of PEOPLE_SERVICES) services.set(id, (a) => peoples.serve(id, a.person));
-    }
+    const peoples = new PeoplesTalk({
+      setting, character, standing, journal, holds: terrain.holds,
+      nameOf: nameHere,
+      say: (text, secs) => notes.say(text, secs),
+      marked: (id) => { handOver?.give(id); notes.say(`${holdPeople?.hold?.name ?? 'The hold'} is marked on your map. (Map: ${keyName('map')})`, 6); },
+      paid: () => sounds?.coins(),
+    });
+    for (const id of PEOPLE_SERVICES) services.set(id, (a) => peoples.serve(id, a.person));
+    // Every town's words, tied in as they are made: how its people take the hero, and what each offers
+    // besides talk (their shop, a room, mending, lessons, the peoples' services). The same for every town.
+    tieTalk = (t, words) => {
+      words.manner = (p) => standing.manner(p.race, p.seed);
+      words.services = (id) => {
+        const p = t.residents.find((x) => x.id === id);
+        if (!p) return [];
+        const shop = t.market.of(id)?.shop, teacher = teacherOf(setting, p);
+        return [
+          ...(shop ? [{ id: 'trade', label: shop.topic, line: shop.line }] : []),
+          ...upkeep.services(p),
+          ...(teacher ? [{ id: 'lessons', label: teacher.topic, line: teacher.line }] : []),
+          ...peoples.services(p),
+        ];
+      };
+    };
+    // Words made before the game's windows existed (none should be: the first talk is asked for below).
+    for (const t of towns.every) if (t.talked) tieTalk(t, t.talk);
+    meetOldFriends();
     const journalUi = new JournalUi(journal, { paused: pausedWith('ui/page'), get bindings() { return settings.current.bindings; } });
     const pack = new PackUi(character, setting, {
       paused,
@@ -849,7 +849,8 @@ export async function start(b: Boot): Promise<void> {
       const h = visit()?.houseDoor ?? null, w = player.walker;
       return h ? orientation.bearing(h[0], h[1], h[2]) : orientation.bearing(w.pos.x, w.pos.z, yaw);
     };
-    const map = town ? new MapUi(town.plan, journal, {
+    // The map: the sheet round where the game began, every town on it.
+    const map = start ? new MapUi([home.x, home.z], () => terrain.towns.map((t) => t.plan), journal, {
       paused: pausedWith('ui/map'),
       get bindings() { return settings.current.bindings; },
       height: (x, z) => terrain.height(x, z),
@@ -870,26 +871,30 @@ export async function start(b: Boot): Promise<void> {
      * else where they are.
      */
     const standBefore = async (a: Agent): Promise<void> => {
-      const s = a.spot >= 0 ? life?.spots[a.spot] : undefined;
-      const b = a.hidden && s && s.building >= 0 ? town?.plan.buildings[s.building] : undefined;
-      if (b && rooms && life) {
-        if (rooms.building !== b.id) await rooms.enter(b, true);
-        const p = rooms.people(life)?.find((x) => x.agent === a);
+      const t = towns?.townOf(a);
+      const s = a.spot >= 0 ? t?.life.spots[a.spot] : undefined;
+      const b = a.hidden && s && s.building >= 0 ? t?.town.plan.buildings[s.building] : undefined;
+      if (t && b && rooms) {
+        if (rooms.door?.town !== t || rooms.door.b.id !== b.id) await rooms.enter({ town: t, b }, true);
+        const p = rooms.people()?.find((x) => x.agent === a);
         if (p) { player.teleport(p.x + Math.cos(p.dir) * 1.3, p.y, p.z + Math.sin(p.dir) * 1.3, Math.atan2(Math.cos(p.dir), Math.sin(p.dir))); return; }
       }
       // Clear of walls: a building's corner beside the hero filled the talk's shot.
-      const at = standingPlace(a.x, a.z, a.dir, (x, z, r) => !!town?.solid(x, z, r));
+      const at = standingPlace(a.x, a.z, a.dir, (x, z, r) => !!towns?.solid(x, z, r));
       player.teleport(at.x, undefined, at.z, Math.atan2(at.x - a.x, at.z - a.z));
     };
-    if (talk && life && town && params.talk) {
-      // Straight into a talk: in front of the innkeeper or of the cellar's household.
+    // `talk=house|smith|inn`: straight into a talk in the town the hero is in (`house`: the first cellar's household).
+    const talkIn = params.talk === 'house' && firstPromise ? towns.get(firstPromise.town) : here() ?? startTown;
+    if (talk && talkIn && params.talk) {
+      const agents = talkIn.life.agents, plan = talkIn.town.plan;
       const pick = params.talk === 'house'
-        ? life.agents.find((a) => a.person.home === firstPromise?.building && a.person.role !== 'child')
+        ? agents.find((a) => a.person.home === firstPromise?.building && a.person.role !== 'child')
         : params.talk === 'smith'
-        ? life.agents.find((a) => a.person.trade === 'smith' && a.person.role === 'trade')
-        : life.agents.find((a) => town.plan.buildings[a.person.home].kind === 'inn' && a.person.role === 'trade');
+        ? agents.find((a) => a.person.trade === 'smith' && a.person.role === 'trade')
+        : agents.find((a) => plan.buildings[a.person.home].kind === 'inn' && a.person.role === 'trade');
       if (pick) {
         await standBefore(pick);
+        talk.place = talkIn;
         talk.begin(pick);
         for (const t of params.topics) talk.choose(t);
       }
@@ -910,11 +915,10 @@ export async function start(b: Boot): Promise<void> {
           hero: { x: w.x, y: w.y, z: w.z, yaw: rooms?.outside?.yaw ?? player.walker.yaw, below: !!visit(), ...(visit() ? { cellar: visit()!.cellar.decision.id } : {}) },
           cellars: cellars?.diffs() ?? {},
           wild: wild?.diffs() ?? save?.wild ?? {},
-          talk: townWords?.save() ?? null,
-          ...(settlements ? { talks: settlements.talksSaved() } : {}),
+          talk: null,
+          towns: towns?.toSave() ?? {},
           journal: journal.entries(),
           character: character.save(),
-          ...(market ? { market: market.save() } : {}),
           standing: standing.save(),
           ...(hold?.diff() ? { hold: hold.diff() } : {}),
           looks: { name: heroName, look: hero.look },
@@ -972,14 +976,16 @@ export async function start(b: Boot): Promise<void> {
       player.teleport(h.x, h.below ? h.y : undefined, h.z, h.yaw);
       if (!save.heir) notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
     } else if (typeof loaded === 'string') notes.say(`Could not load the save: ${loaded}.`, 8);
-    // Straight to a merchant's counter (`?trade=smith`, or `game.tradeAt('smith')` in the console and the shot set): in front of them, their wares out.
+    // Straight to a merchant's counter (`?trade=smith`, or `game.tradeAt('smith')` in the console and the shot set):
+    // in the town the hero is in, in front of them, their wares out.
     const tradeAt = async (keeper: string): Promise<boolean> => {
-      const m = market?.merchants.find((x) => x.shop.keeper === keeper);
-      const a = m && life?.agents.find((x) => x.person.id === m.person);
-      if (!m || !a || !trade || !townWords) return false;
+      const t = here() ?? startTown;
+      const m = t?.market.merchants.find((x) => x.shop.keeper === keeper);
+      const a = m && t?.life.agents.find((x) => x.person.id === m.person);
+      if (!t || !m || !a) return false;
       talk?.close();
       await standBefore(a);
-      trade.show(m, townWords.nameOf(a.person.id));
+      trade.show(t.market, m, t.talk.nameOf(a.person.id));
       return true;
     };
     if (params.trade) await tradeAt(params.trade);
@@ -1002,14 +1008,15 @@ export async function start(b: Boot): Promise<void> {
         return kind ? `${kind} for 6 game hours` : 'natural weather';
       },
       town: (kind) => {
-        if (!life || !town) return 'no town';
-        const [x, z] = town.plan.centre;
-        orderTown(kind === 'gather' ? { kind, x, z, radius: 14, from: hours(), to: hours() + 2 } : { kind, from: hours(), to: hours() + 2 });
+        const t = here() ?? startTown;
+        if (!t) return 'no town';
+        const [x, z] = t.town.plan.centre;
+        orderTown(t, kind === 'gather' ? { kind, x, z, radius: 14, from: hours(), to: hours() + 2 } : { kind, from: hours(), to: hours() + 2 });
         return kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
       },
       get viewParams() { return player.viewParams; },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, get settlements() { return settlements; }, title, sound, get sounds() { return sounds; }, life, get folk() { return folk; }, get rooms() { return rooms; }, herds, character, market, trade, tradeAt, fightHud, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1034,7 +1041,7 @@ export async function start(b: Boot): Promise<void> {
       backgrounds: setting.backgrounds,
       skillName: (id) => setting.skills.find((k) => k.id === id)?.name ?? id,
       itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
-      knownBy: (bg) => (townWords ? friendsOf(bg).map((a) => `${townWords.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
+      knownBy: (bg) => (startTown ? friendsOf(bg).map((a) => `${startTown.talk.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
       click: () => sound.play('click'),
       mode: save?.heir ? 'roguelike' : null,
     }, seed);
@@ -1063,13 +1070,13 @@ export async function start(b: Boot): Promise<void> {
       if (mode === 'roguelike') autosave();
       meetOldFriends();
       // A new hero's own first page: where to ask for work (the inn's door is marked on the map).
-      const innB = town ? buildingOf(town.plan, 'inn') : null;
-      const keeper = innB && life ? life.agents.find((a) => town.plan.buildings[a.person.home] === innB) : undefined;
-      if (innB && keeper && townWords && !journal.leads.length) journal.remember(arrivalEntry(setting.talk, townWords.homeCalled(keeper.person.id), { x: innB.door[0], z: innB.door[1] }));
+      const innB = startTown ? buildingOf(startTown.town.plan, 'inn') : null;
+      const keeper = innB && startTown ? startTown.residents.find((p) => p.home === innB.id) : undefined;
+      if (innB && keeper && startTown && !journal.leads.length) journal.remember(arrivalEntry(setting.talk, startTown.talk.homeCalled(keeper.id), { x: innB.door[0], z: innB.door[1] }));
       // Behind the hero, looking the way they face.
       player.teleport(w.pos.x, undefined, w.pos.z, w.yaw);
       paused(false);
-      const friends = townWords ? friendsOf(bg).map((a) => townWords.nameOf(a.person.id)) : [];
+      const friends = startTown ? friendsOf(bg).map((a) => startTown.talk.nameOf(a.person.id)) : [];
       const page = journal.open.some((l) => l.id === ARRIVAL) ? ` Your journal (${keyName('journal')}) says where to ask for work.` : '';
       notes.say(`${made.name} steps out onto the market square.${friends.length ? ` ${friends.join(' and ')} will know you.` : ''}${page}`, 8);
     };
@@ -1088,38 +1095,38 @@ export async function start(b: Boot): Promise<void> {
     // (plan 4.1, 4.2: always a few open leads), which the cellars and the townsfolk learn of at once.
     let builderClock = 0;
     // While the hero has nothing to follow, someone who has heard of a promised place comes over (vgm/guide.ts).
-    const hails = town && life && townWords ? new Hails(life, townWords, setting.talk, journal, {
+    const hails = new Hails(setting.talk, journal, {
+      get town() { return here(); },
       get heroAt() { return player.walker.pos; },
       get busy() { return open > 0 || player.flying || !!rooms?.inside || !!title?.holding || !!creator?.showing || !window.__mwReady; },
       get open() { return new Set(openPromises(log).map((d) => d.id)); },
       get talkingTo() { return talk?.partner ?? null; },
       say: (text) => notes.say(text, 6),
-    }) : null;
+    });
     const direct = (dt: number): void => {
       const below = !!visit();
       let fighting = 0, pressure = 0;
       for (const e of [...(cellars?.encounters ?? []), ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])]) { const p = e.pressure; fighting += p.fighting; pressure += p.pressure; }
-      director.observe(dt, { fighting, pressure, health: character.health / character.maxHealth, talking: open > 0, underground: below, inTown: !!town && !below, leads: journal.open.length });
+      director.observe(dt, { fighting, pressure, health: character.health / character.maxHealth, talking: open > 0, underground: below, inTown: !!here() && !below, leads: journal.open.length });
       const m = director.next();
       if (m) notes.say(m, 6);
       if (!title?.holding && !creator?.showing) gatherNear();
       hails?.sendFor(dt, fighting > 0 || below);
       builderClock += dt;
-      if (builderClock < 3 || !town || !life || title?.holding || creator?.showing) return;
+      if (builderClock < 3 || title?.holding || creator?.showing) return;
       builderClock = 0;
       promiseDue();
     };
     /** The Builder's next promise, if one is due now: into the log, and told to the town. */
     const promiseDue = (): void => {
-      if (!town || !life) return;
-      const d = nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id), dungeons: setting.dungeons, terrain, avoid: wild?.territories ?? [], near: settlements?.folkAt(player.walker.pos.x, player.walker.pos.z)?.town ?? null });
+      if (!start) return;
+      const d = nextPromise({ seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id), dungeons: setting.dungeons, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null });
       if (!d) return;
       console.info(`[vgm] ${d.kind} ${d.id}${d.kind === 'move-in' ? ` into ${d.dungeon}` : ''} at ${hours().toFixed(1)} h`);
       log = [...log, d];
       cellars?.sync(log);
-      const c = townWords ? talkCellar(d, setting, town, life.persons, log) : null;
-      if (c) townWords?.add(c);
-      settlements?.promised(d);
+      // Its household's town hears of it (every town checks whether it is theirs).
+      for (const t of towns?.every ?? []) t.promised(d);
     };
     let last = performance.now(), frame = 0;
     view.renderer.setAnimationLoop(() => {
@@ -1153,8 +1160,9 @@ export async function start(b: Boot): Promise<void> {
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }
       if (!visit()) rooms?.update(dt);
-      if (rooms?.inside) cellars.near(rooms.building);
-      if (talk) { const p = placeHere(); if (p) talk.place = p; }
+      if (rooms?.door) cellars.nearHouse(rooms.door.town.id, rooms.door.b.id);
+      // Talk follows the hero from town to town (a talk going on stays where it is).
+      if (talk) { const t = here(); if (t) talk.place = t; }
       talk?.watch();
       const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.flying && !visit());
       if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }
@@ -1177,20 +1185,15 @@ export async function start(b: Boot): Promise<void> {
         ground.update(view.camera);
         roadWork.follow(view.camera.position);
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
-        houses?.update(view.camera.position);
-        settlements?.tick(dt, view.camera.position);
+        towns.tick(dt, view.camera.position);
       }
       // Doorways at night above, torches below, a soft fill on the hero in a room.
       view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
-      if (life) {
-        life.focus = { x: view.camera.position.x, z: view.camera.position.z };
-        life.step(dt, hours(), { rain: wx.shown.rain });
-      }
-      // The people of the hamlets and villages near the hero (plan B3), drawn besides the start town's.
-      const settled = settlements?.live(dt, { x: view.camera.position.x, z: view.camera.position.z }, { rain: wx.shown.rain }) ?? [];
-      if (folk) folk.others = settled;
-      herds?.step(dt);
-      stock?.herd(dt, view.camera.position);
+      // Every town's people near the hero live (and are drawn), and its animals graze.
+      const cam = view.camera.position;
+      const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain });
+      if (folk) folk.lives = lives;
+      stock?.herd(dt, cam, towns.graze(dt, cam.x, cam.z));
       if (small && smallView) {
         // Out of doors only: below or inside, the land's small life waits.
         const out = above && !rooms?.inside, w = player.walker;
@@ -1216,7 +1219,7 @@ export async function start(b: Boot): Promise<void> {
         smallView.show(dt, view.camera.position, out);
       }
       // The people in the building drawn open (seen through its door and windows too).
-      if (folk) folk.indoors = life && rooms && !visit() ? rooms.people(life) : null;
+      if (folk) folk.indoors = rooms && !visit() ? rooms.people() : null;
       if (above) {
         // Until the game begins, the people round the hero's place are dressed (the title's fly-over is far up).
         if (folk) folk.focus = title?.holding || !window.__mwReady ? player.walker.pos : null;
@@ -1233,7 +1236,7 @@ export async function start(b: Boot): Promise<void> {
       }
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${settlements?.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
+        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${towns.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }

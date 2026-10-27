@@ -91,7 +91,8 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     if (slope > 0.75 || t.rockAt(x, z, h)) continue;
     // Nothing on streets and under houses; in yards and gardens a fruit tree now and then, and bushes.
     const built = t.townGround(x, z);
-    if (built >= TownGround.Street || (built === TownGround.Yard && !shrub && (hash2f(seed + 8, gi, gj) < 0.85 || besideWalls(t, x, z)))) continue;
+    // A bush keeps its crown's reach off the house walls (else its leaves show inside the rooms).
+    if (built >= TownGround.Street || (built === TownGround.Yard && (shrub ? besideWalls(t, x, z, SHRUB_REACH, false) : hash2f(seed + 8, gi, gj) < 0.85 || besideWalls(t, x, z, TREE_REACH, true)))) continue;
     // Roads keep a lane clear: no trunk within crown's reach of the edge, no bush on it.
     if (!t.roads.empty && t.roads.fromEdge(x, z) < (shrub ? 0.8 : 3)) continue;
     // Places out on the land stand in the open: no trunk in their clearing and fewer towards its edge, bushes only round its rim.
@@ -140,11 +141,18 @@ function pickTree(mix: Readonly<Partial<Record<TreeName, number>>>, r: number, r
   return (TREES.length - 1) * VARIANTS;
 }
 
-/** Does a house wall or a street lie within a crown's reach (5 m) of a yard's spot? A tree there would lean on it. */
-function besideWalls(t: Terrain, x: number, z: number): boolean {
-  for (const [dx, dz] of [[5, 0], [-5, 0], [0, 5], [0, -5], [3.5, 3.5], [-3.5, 3.5], [3.5, -3.5], [-3.5, -3.5]]) {
-    const g = t.townGround(x + dx, z + dz);
-    if (g === TownGround.Building || g === TownGround.Street || g === TownGround.Market) return true;
+/** Metres a tree's crown (and a tree in a yard keeps from walls and streets), and a bush's at its largest, reach from the stem. */
+const TREE_REACH = 5;
+const SHRUB_REACH = 2.2;
+
+/**
+ * Does a house wall (and with `streets` a street or the market) lie within `reach` of a yard's spot? A
+ * plant there would lean on it, or grow through it into the rooms. Looked for at the reach and halfway.
+ */
+function besideWalls(t: Terrain, x: number, z: number, reach: number, streets: boolean): boolean {
+  for (const k of [1, 0.5]) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]]) {
+    const g = t.townGround(x + dx * reach * k, z + dz * reach * k);
+    if (g === TownGround.Building || (streets && (g === TownGround.Street || g === TownGround.Market))) return true;
   }
   return false;
 }

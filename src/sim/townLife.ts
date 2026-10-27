@@ -98,7 +98,8 @@ export class TownLife {
   private readonly shops: number[];
 
   /** `routines`: the setting's (the classic one by default); every town of a setting lives by them. */
-  constructor(readonly plan: TownPlan, seed: number, hour: number, readonly routines: RoutinesDef = classicRoutines) {
+  /** `people`: who lives here (townsfolk(plan, seed) unless given: the town's core passes its own). */
+  constructor(readonly plan: TownPlan, seed: number, hour: number, readonly routines: RoutinesDef = classicRoutines, people: readonly Person[] = townsfolk(plan, seed)) {
     this.nav = new NavGraph(plan);
     this.spots = townSpots(plan);
     this.market = polyCentroid(plan.market) as [number, number];
@@ -115,7 +116,7 @@ export class TownLife {
     this.inn = doorOfKind('inn');
     this.temple = doorOfKind('temple');
     this.shops = plan.buildings.filter((b) => SHOPS.has(b.trade)).map((b) => this.doorOf(b.id));
-    this.agents = townsfolk(plan, seed).map((p) => {
+    this.agents = people.map((p) => {
       const d = plan.buildings[p.home].door;
       const a: Agent = { person: p, x: d[0], z: d[1], dir: d[2], act: 'wait', next: 'wait', spot: -1, seat: 0, hidden: false, until: 0, path: [], pi: 0, task: 'sleep', plan: { day: NaN, rest: false, at: [0], task: ['sleep'] }, rng: new Rng(deriveSeed(seed, 'life', p.id)) };
       // Start in the middle of something, already there.

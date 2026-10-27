@@ -9,24 +9,25 @@
  * talk and the market are the game's own; only the renderer and the townsfolk walking about are left out.
  */
 import { MinHeap, deriveSeed } from '@futuremagic/core';
-import { polyCentroid, type TownBuilding } from '@futuremagic/settlement';
+import { polyCentroid, type SettlementSize, type TownBuilding } from '@futuremagic/settlement';
 import type { SettingModule } from '../setting/contract';
-import { buildingOf, townsfolk, type Person } from '../sim/people';
-import { talkCellar, townTalk } from '../talk/townTalk';
+import { buildingOf, type Person } from '../sim/people';
 import { openWorld } from '../vgm/builder';
+import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
 import { hailer } from '../vgm/guide';
-import { dungeonOf, type Decision, type DungeonDecision } from '../world/decisions';
+import { dungeonOf, settlementOf, type Decision, type DungeonDecision } from '../world/decisions';
 import { moveIn, outlineCellar, type Cellar } from '../world/dungeon/cellar';
-import type { Town } from '../world/town';
+import { marketStart, type Town } from '../world/town';
 import { Character } from './character';
 import { fallClassic, gather, remainsId, type Remains } from './death';
 import type { DelveSave } from './delve';
 import { fightBot } from './bot';
 import { defOf, type Item } from './items';
 import { rewardFor } from './reward';
-import { Market, itemWorth, type Merchant } from './trade';
+import { itemWorth, type Merchant } from './trade';
+import { Township } from './township';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
 import { lessonPrice, takeLesson, teacherOf } from './lessons';
 import { WALK, Walker, type WalkWorld } from './walker';
@@ -71,6 +72,11 @@ export interface EveningOptions {
   readonly log?: (s: EveningStep) => void;
   /** The first time down, the hero goes in badly hurt and without potions: the check of a fall (D12, classic mode). */
   readonly reckless?: boolean;
+  /**
+   * Play in a settlement of this size the VGM founds out on the land (plan B3a: every town runs the same code),
+   * found by walking out from the start; none: the start town.
+   */
+  readonly settlement?: SettlementSize;
 }
 
 /** One game day takes 60 real minutes (D37): game hours per second played. */
@@ -94,17 +100,20 @@ class Broke extends Error {}
 
 export function playEvening(seed: number, setting: SettingModule, opts: EveningOptions = {}): EveningResult {
   const steps: EveningStep[] = [];
-  const { terrain, log: first, home } = openWorld(seed, setting);
-  const town = terrain.towns[0];
-  if (!town) throw new Error('no town to start in');
-  const people = townsfolk(town.plan, seed);
+  const { terrain, log: first } = openWorld(seed, setting);
+  const start = terrain.towns[0];
+  if (!start) throw new Error('no town to start in');
   let log: Decision[] = [...first];
   let hours = START_HOUR;
   const say = (what: string) => { const s = { hour: hours, what }; steps.push(s); opts.log?.(s); };
-  const { talk } = townTalk(seed, setting, town, people, log);
-  const market = new Market(setting, people, seed, 0);
+  const town = opts.settlement ? settlementOut(seed, setting, terrain, start, opts.settlement, (walked) => { log = [...log, ...walked]; }) : start;
+  if (town !== start) say(`plays in ${town.decision.size} ${town.decision.id}, ${Math.hypot(town.decision.x - start.decision.x, town.decision.z - start.decision.z).toFixed(0)} m from the start (${town.plan.buildings.length} buildings)`);
+  // The town's core, as the game has it for every town: its people, their words, its merchants.
+  const township = new Township(town, { seed, setting, log: () => log, hours: () => hours });
+  const people = township.residents, talk = township.talk, market = township.market;
   const hero = new Character(setting);
-  const land = new LandWalk(terrain, town);
+  const land = new LandWalk(terrain);
+  const home = marketStart(town.plan);
   land.walker.place(home.x, home.z);
   const power0 = hero.power;
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
@@ -116,12 +125,11 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     for (let d = vgmNext(); d; d = vgmNext()) {
       log = [...log, d];
       say(`the VGM promises ${d.kind === 'move-in' ? `new dwellers in ${d.dungeon}` : d.kind === 'dungeon' ? `${d.template} ${d.id}` : d.id}`);
-      const c = talkCellarOf(d);
-      if (c) talk.add(c);
+      township.promised(d);
     }
   };
-  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain });
-  const talkCellarOf = (d: Decision) => talkCellar(d, setting, town, people, log);
+  // In a settlement the VGM promises from there (vgm/leads.ts `near`), as the game does while the hero is in one.
+  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: start.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain, near: town === start ? null : town });
 
   const walkTo = (what: string, x: number, z: number) => {
     const s = land.go(x, z);
@@ -137,6 +145,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     return { at: [x, z], name: `the ${keeper} at the market` };
   };
   const teachers = people.flatMap((p) => { const t = teacherOf(setting, p); return t ? [{ p, t }] : []; });
+  const shops = market.merchants.length > 0;
   const merchant = (keeper: string) => market.merchants.find((m) => m.shop.keeper === keeper) ?? null;
 
   /** Ask around for news, the innkeeper first; the first lead heard that is still open. */
@@ -258,9 +267,10 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       say(`told ${talk.nameOf(to.id)} that ${name} is safe: paid ${reward} copper${rumour ? `, and heard a rumour of ${rumour.id}` : ''}`);
       if (talk.ask(to.id, 'news').heard.includes(lead.id)) throw new Broke(`${talk.nameOf(to.id)} still tells of ${name} after hearing it is safe`);
 
-      // Back in town: sell, mend, upgrade.
+      // Back in town: sell, mend, upgrade. A town without shops (a hamlet) has nobody to trade with; one
+      // with any has a smith.
       const smith = merchant('smith'), trader = merchant('trader'), keeper = merchant('innkeeper');
-      if (!smith) throw new Broke('no smith in town');
+      if (shops && !smith) throw new Broke('no smith in town');
       const finds = hero.pack.filter((it) => defOf(setting.items, it.def).slot || defOf(setting.items, it.def).value > 0);
       say(`brought back ${finds.length} finds and ${hero.coins} copper`);
       const sellAt = (m: Merchant | null) => {
@@ -279,7 +289,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       // Potions and food stay in the pack for the next place.
       const keepIt = (it: Item) => ['potion', 'food'].includes(defOf(setting.items, it.def).kind);
       earned += sellAt(smith);
-      const mend = mendAll(hero, (it) => itemWorth(setting.items, it), setting.upkeep);
+      const mend = smith ? mendAll(hero, (it) => itemWorth(setting.items, it), setting.upkeep) : { mended: [], spent: 0 };
       if (mend.mended.length) say(`the smith mends ${mend.mended.length} things for ${mend.spent} copper`);
       earned += sellAt(trader);
       if (keeper) earned += sellAt(keeper);
@@ -317,20 +327,22 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         }
       }
       spent.push(paid);
-      if (e > 0 && !paid && !spent[e - 1]) throw new Broke(`two evenings with nothing bought and no lesson (${hero.coins} copper)`);
+      if (shops && e > 0 && !paid && !spent[e - 1]) throw new Broke(`two evenings with nothing bought and no lesson (${hero.coins} copper)`);
       // A room for the night, and the next morning's news.
+      // A town without an inn (a hamlet): the night at home in the household's barn or by the hearth.
       const innB = buildingOf(town.plan, 'inn');
-      if (!innB) throw new Broke('no inn in town');
-      walkTo('the inn', ...front(innB));
-      const night = takeRoom(hero, hours, { town: town.decision.id, building: innB.id }, setting.upkeep);
-      if (night) { say(`took a room for ${night.paid} copper; wakes at ${(night.wake % 24).toFixed(0)}:00 on day ${Math.floor(night.wake / 24)}`); hours = night.wake; }
+      if (!innB && shops) throw new Broke('no inn in town');
+      if (innB) walkTo('the inn', ...front(innB));
+      const night = innB ? takeRoom(hero, hours, { town: town.decision.id, building: innB.id }, setting.upkeep) : null;
+      if (!innB) { say('no inn here: sleeps in a barn'); hours += 10; hero.health = hero.maxHealth; hero.stamina = hero.maxStamina; }
+      else if (night) { say(`took a room for ${night.paid} copper; wakes at ${(night.wake % 24).toFixed(0)}:00 on day ${Math.floor(night.wake / 24)}`); hours = night.wake; }
       else { say(`too poor for a room (${hero.coins} copper)`); hours += 10; }
       market.restock(Math.floor(hours / 24));
       promiseDue();
     }
     if (opts.reckless && !falls) throw new Broke('went down reckless and did not fall');
-    if (!bought.length) throw new Broke(`bought no upgrade in ${evenings} evenings (${hero.coins} copper left)`);
-    if (hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
+    if (shops && !bought.length) throw new Broke(`bought no upgrade in ${evenings} evenings (${hero.coins} copper left)`);
+    if (shops && hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
     // The next lead: someone has news of a place not yet visited.
     const next = hearLead(heard);
     say(`the next lead is ${next.id}`);
@@ -347,16 +359,35 @@ function front(b: TownBuilding): [number, number] {
   return [b.door[0] - b.vx * 1.2, b.door[1] - b.vz * 1.2];
 }
 
-/** The hero's body walking the land and the town (the game's walk world without the townsfolk and trees). */
+/**
+ * Walks out from the start until the VGM founds a settlement of `size` (the frontier, as the hero walks in
+ * the game), settles it on the land and hands the regions opened on the way to `opened` (for the log).
+ */
+function settlementOut(seed: number, setting: SettingModule, terrain: Terrain, start: Town, size: SettlementSize, opened: (walked: Decision[]) => void): Town {
+  const regions = setting.regions;
+  if (!regions) throw new Error('the setting opens no regions: no settlement to play in');
+  for (let dir = 0; dir < 8; dir++) {
+    const walked = walkFrontier({ seed, log: [start.decision], terrain, regions, home: start.decision }, (dir * Math.PI) / 4, 8, (d) => settlementOf(d, regions.fills)?.size === size);
+    const found = regionDecisions(walked).find((d) => settlementOf(d, regions.fills)?.size === size);
+    if (!found) continue;
+    opened(walked);
+    terrain.settleMore(walked);
+    const town = terrain.town(found.id);
+    if (town) return town;
+  }
+  throw new Error(`no ${size} found within 8 km of the start`);
+}
+
+/** The hero's body walking the land and its towns (the game's walk world without the townsfolk and trees). */
 class LandWalk {
   readonly walker: Walker;
-  constructor(private readonly terrain: Terrain, private readonly town: Town) {
+  constructor(private readonly terrain: Terrain) {
     const world: WalkWorld = {
       height: (x, z) => terrain.height(x, z),
-      floor: (x, z) => town.stand(x, z),
+      floor: (x, z) => standAt(terrain, x, z),
       rockSurface: (x, y, z) => terrain.rockSurface(x, y, z),
       waterLevel: (x, z) => { const d = terrain.waterDepth(x, z); return d > 0.4 ? terrain.height(x, z) + d : null; },
-      wall: (x, z, r) => town.solid(x, z, r),
+      wall: (x, z, r) => solidAt(terrain, x, z, r),
     };
     this.walker = new Walker(world);
   }
@@ -399,7 +430,7 @@ class LandWalk {
   private route(ax: number, az: number, bx: number, bz: number): [number, number][] {
     const M = 120, x0 = Math.floor(Math.min(ax, bx) - M), z0 = Math.floor(Math.min(az, bz) - M);
     const nx = Math.ceil(Math.max(ax, bx) + M) - x0, nz = Math.ceil(Math.max(az, bz) + M) - z0, N = nx * nz;
-    const { terrain, town } = this;
+    const { terrain } = this;
     const cellCentre = (c: number): [number, number] => [x0 + (c % nx) + 0.5, z0 + Math.floor(c / nx) + 0.5];
     // Per cell, once: its height, and 1 free / 2 wall / 3 water.
     const hs = new Float32Array(N), kind = new Uint8Array(N);
@@ -407,7 +438,7 @@ class LandWalk {
       if (kind[c]) return;
       const [x, z] = cellCentre(c);
       hs[c] = terrain.height(x, z);
-      kind[c] = town.solid(x, z, WALK.radius + 0.25) ? 2 : terrain.waterDepth(x, z) > 0.4 ? 3 : 1;
+      kind[c] = solidAt(terrain, x, z, WALK.radius + 0.25) ? 2 : terrain.waterDepth(x, z) > 0.4 ? 3 : 1;
     };
     const cell = (x: number, z: number) => Math.floor(x - x0) + Math.floor(z - z0) * nx;
     const a = cell(ax, az), b = cell(bx, bz);
@@ -446,4 +477,16 @@ class LandWalk {
     out.push([bx, bz]);
     return out;
   }
+}
+
+/** Does a body of radius `r` at (x, z) touch any town's walls or fences? */
+function solidAt(terrain: Terrain, x: number, z: number, r: number): boolean {
+  for (const t of terrain.towns) if (t.solid(x, z, r)) return true;
+  return false;
+}
+
+/** The highest step or porch floor of any town at (x, z) (null: none). */
+function standAt(terrain: Terrain, x: number, z: number): number | null {
+  for (const t of terrain.towns) { const h = t.stand(x, z); if (h !== null) return h; }
+  return null;
 }
