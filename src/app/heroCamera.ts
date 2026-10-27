@@ -27,6 +27,21 @@ const TALK_HEAD_TOP = 0.15, TALK_RISE = 0.8;
  */
 const TALK_SHOTS: readonly (readonly [number, number])[] = [[1.3, 0.45], [1.3, -0.45], [1.6, 0.7], [1.6, -0.7], [1.0, 0.8], [1.0, -0.8], [0.8, 0.45], [0.8, -0.45]];
 
+/** A held shot's distances from what it shows (m; the first the best), and its heights over its floor. */
+const SHOT_OFF = [2.2, 1.8, 2.7, 1.4], SHOT_UP = [1.9, 1.6, 2.2];
+/** A held shot's camera this far from any wall (m); and nothing within SHOT_NEAR of it across its frame (the turns, rad). */
+const SHOT_CLEAR = 0.45, SHOT_NEAR = 1.2, SHOT_EDGES = [-0.55, -0.3, 0.3, 0.55];
+
+/** A scene played out, seen from a held camera (HeroCamera.hold). World coordinates. */
+export interface Shot {
+  /** What the scene is round, on its floor (a hatch, a ladder's foot): the camera's spot is chosen for it. */
+  readonly round: Vector3;
+  /** Where the camera looks (the hero's chest). */
+  readonly at: Vector3;
+  /** How much worse it is seen from the side (dx, dz) of `round` (a lid in the way, the hero's back). */
+  cost?(dx: number, dz: number): number;
+}
+
 export class HeroCamera {
   /** The camera's own direction (rad): yaw as the walker's, pitch up positive. */
   yaw = 0;
@@ -178,6 +193,58 @@ export class HeroCamera {
     this.camera.position.copy(eye);
     this.camera.lookAt(at);
     this.camera.updateMatrixWorld();
+  }
+
+  /** A held shot (Puppet.shot): the spot chosen for the scene it shows, and where it looks (eased). */
+  private held: { round: Vector3; eye: Vector3; look: Vector3 } | null = null;
+
+  /**
+   * Show a scene played out (Puppet.shot): the camera stands still at a clear spot some way off `shot.round` (a
+   * hatch, a ladder's foot; y its floor), a little over head height, and follows `shot.at` with its look. A
+   * room is too small to trail the hero in (the camera would be pulled into first person). Afterwards the
+   * trailing camera goes on from there.
+   */
+  hold(shot: Shot, dt: number): void {
+    this.talking = false;
+    const h = this.held && this.held.round.equals(shot.round) ? this.held : (this.held = { round: shot.round.clone(), eye: this.spotFor(shot), look: shot.at.clone() });
+    h.look.lerp(shot.at, dt > 0 ? damp(5, dt) : 1);
+    this.camera.position.copy(h.eye);
+    this.camera.lookAt(h.look);
+    this.camera.updateMatrixWorld();
+    const dx = h.look.x - h.eye.x, dy = h.look.y - h.eye.y, dz = h.look.z - h.eye.z, len = Math.hypot(dx, dy, dz) || 1;
+    this.yaw = Math.atan2(-dx, -dz);
+    this.pitch = Math.asin(dy / len);
+    this.dist = Math.max(this.dist, FIRST + 0.1);
+  }
+
+  /** The held shot is over: the next one chooses its spot anew. */
+  release(): void { this.held = null; }
+
+  /** The clearest spot round `shot.round` to watch it from: out of walls, with a free line to it, best side first. */
+  private spotFor(shot: Shot): Vector3 {
+    const sight = this.world.sightSurface ?? this.world.rockSurface, r = shot.round;
+    const open = (x: number, y: number, z: number, m: number) => { const d = sight(x, y, z); return d === null || d >= m; };
+    const aim = new Vector3(r.x, r.y + 0.7, r.z);
+    let best = new Vector3(r.x, r.y + SHOT_UP[0], r.z), least = Infinity;
+    for (const dist of SHOT_OFF) for (const up of SHOT_UP) for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2, dx = Math.sin(a), dz = Math.cos(a);
+      const p = new Vector3(r.x + dx * dist, r.y + up, r.z + dz * dist);
+      if (!open(p.x, p.y, p.z, SHOT_CLEAR) || this.world.wall?.(p.x, p.z, SHOT_CLEAR, r.y)) continue;
+      let cost = shot.cost?.(dx, dz) ?? 0;
+      for (let t = 0.1; t < 0.95; t += 0.1) if (!open(p.x + (aim.x - p.x) * t, p.y + (aim.y - p.y) * t, p.z + (aim.z - p.z) * t, 0.05)) cost += 10;
+      // Nothing close across the frame either (a chimney breast, a wall's corner beside the camera fills a third of it).
+      const ax = aim.x - p.x, az = aim.z - p.z, al = Math.hypot(ax, az) || 1;
+      for (const turn of SHOT_EDGES) {
+        const c = Math.cos(turn), sn = Math.sin(turn), rx = (ax * c - az * sn) / al, rz = (ax * sn + az * c) / al;
+        for (let d = 0.3; d <= SHOT_NEAR; d += 0.3) {
+          const x = p.x + rx * d, z = p.z + rz * d;
+          if (!open(x, p.y - d * 0.4, z, 0.05) || this.world.wall?.(x, z, 0.05, r.y)) { cost += 3; break; }
+        }
+      }
+      cost += Math.abs(dist - SHOT_OFF[0]) * 0.5 + Math.abs(up - SHOT_UP[0]);
+      if (cost < least) { least = cost; best = p; }
+    }
+    return best;
   }
 
   /** Place the camera behind the hero's head (`head` the point it orbits). */

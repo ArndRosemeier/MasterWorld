@@ -7,8 +7,8 @@
  * lit) and the eye adapts. The sun that comes in is thrown about the room (game/roomLight.ts): its
  * value eases as the sun moves and is gone at night.
  */
-import { interiorBlocked, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
-import { openHouse, type OpenHouse } from '../world/townMesh';
+import { hatchLadderHalfWidth, HATCH_RAILS_UP, HATCH_RUNG, HATCH_RUNG_IN, HATCH_SHAFT, hatchSides, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
+import { hatchOf, openHouse, type OpenHouse } from '../world/townMesh';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
 import { guildSigns } from '../game/guilds';
 import type { HouseView } from '../render/town/HouseView';
@@ -21,12 +21,12 @@ import type { TownView } from '../render/town/TownView';
 import { houseKey } from '../world/town';
 import { roomBounce, roomSun, type RoomSun } from '../game/roomLight';
 import { ROOM_LIGHT } from '../render/materials/building';
-import type { Notes } from './notes';
 import type { Player } from './player';
 import type { TownDoor } from './towns';
-
-/** What a room is called when one walks in. */
-const NAMES: Partial<Record<TownBuilding['kind'], string>> = { inn: 'the inn', smithy: 'the smithy', bakery: 'the bakery', temple: 'the temple', hall: 'the hall', mill: 'the mill', workshop: 'a workshop', stable: 'the stable', barn: 'the barn' };
+import type { CellarVisit } from './cellarVisit';
+import type { HatchWay } from './hatchClimb';
+import type { Ladder } from '@futuremagic/figure';
+import { Vector3 } from 'three/webgpu';
 
 /** Races who stand on a step behind a counter, and its height (m; the counter is 1.05 m, made for men). */
 const SMALL = new Set(['halfling', 'dwarf']);
@@ -40,6 +40,8 @@ const BOUNCE_EASE = 2;
 const STUCK_FOR = 2;
 /** Houses kept planned and drawn (their meshes) after they shut, for coming back to them. */
 const KEPT = 8;
+/** A hatch is used (E) from this near its middle (m). */
+const HATCH_REACH = 1.9;
 
 interface Open { door: TownDoor; b: TownBuilding; plan: InteriorPlan; walk: HouseWalk; flow: RoomFlow }
 
@@ -61,19 +63,16 @@ export class InteriorVisit {
   private room: RoomSun | null = null;
   /** Houses planned and drawn open (by houseKey), the latest last: being made in a worker, or made. */
   private readonly houses = new Map<string, Promise<OpenHouse>>();
-  /** On the way down to the cellar. */
-  private going = false;
 
   constructor(
     private readonly towns: InteriorTowns,
-    /** Houses with a cellar (by houseKey): a hatch in the room, and the way down (`before` runs once the screen is dark). */
-    private readonly cellars: ReadonlyMap<string, (before: () => void) => Promise<void>>,
+    /** Houses with a cellar (by houseKey): a hatch in the room, and the cellar under it (built when asked). */
+    private readonly cellars: ReadonlyMap<string, () => Promise<CellarVisit>>,
     private readonly view: HouseView,
     private readonly player: Player,
     /** The room's lamp (the hero's lantern below ground: one light, always in the scene). */
     private readonly light: PointLight,
     private readonly sky: SkyView,
-    private readonly notes: Notes,
     /** Plans a house and draws it open (`b`, its cellar's hatch, a guild's hall, the sign): a terrain worker's job. */
     private readonly lay: (b: TownBuilding, hatch: boolean, hall: boolean, sign?: [number, number, number]) => Promise<OpenHouse> =
       async (b, hatch, hall, sign) => openHouse(b, { hatch, hall }, sign),
@@ -114,24 +113,32 @@ export class InteriorVisit {
     const b = door.b, plan = house.plan;
     this.open = { door, b, plan, walk: houseWalk(b, plan), flow: new RoomFlow(plan) };
     this.placed = null;
-    await this.view.drawOpen(b, house.mesh, this.towns.viewOf(door.town.id));
+    await this.view.drawOpen(b, house.mesh, this.towns.viewOf(door.town.id), house.lid, house.ladderTop);
     return this.open;
   }
 
-  private shut(): void {
+  /** Shut the open building (the hero went down below it). */
+  shut(): void {
     if (!this.open) return;
     this.out();
     this.open = null;
     this.view.hide();
   }
 
-  /** Into the door's building at once: just inside its door, or (`up`, coming up through its hatch) beside the hatch. */
-  async enter(door: TownDoor, _now = true, up = false): Promise<void> {
+  /**
+   * Into the door's building at once (a night's sleep, a ride, a talk's shot): just inside its door, or (`byHatch`,
+   * the shots' `room=cellar`) where one gets down into its hatch, facing it.
+   */
+  async enter(door: TownDoor, _now = true, byHatch = false): Promise<void> {
     const o = await this.openUp(door), b = door.b;
-    const hatch = up ? o.plan.fixtures.find((f) => f.kind === 'hatch') : undefined;
-    const [a, bb] = hatch ? besideHatch(o.plan, hatch) : [0, o.plan.storeys[0].b0 + 1.0];
-    const p = o.walk.floorAt(a, bb, 0);
-    this.player.teleport(p.x, p.y, p.z, Math.atan2(-b.vx, -b.vz));
+    const hatch = byHatch ? hatchOf(o.plan) : undefined;
+    if (hatch) {
+      const l = this.wayDown(o, hatch).ladder;
+      this.player.teleport(l.x + l.nx * 1.4, l.floor, l.z + l.nz * 1.4, Math.atan2(l.nx, l.nz));
+    } else {
+      const p = o.walk.floorAt(0, o.plan.storeys[0].b0 + 1.0, 0);
+      this.player.teleport(p.x, p.y, p.z, Math.atan2(-b.vx, -b.vz));
+    }
     this.come();
   }
 
@@ -141,7 +148,8 @@ export class InteriorVisit {
   }
 
   private doors(dt: number): void {
-    if (this.player.offFoot) return;
+    // Climbing through the hatch, the climb opens and shuts the house (app/hatchClimb.ts).
+    if (this.player.offFoot || this.player.puppet) return;
     const w = this.player.walker, x = w.pos.x, z = w.pos.z;
     // The nearest door within reach opens (not while one is inside another).
     if (!this.within) {
@@ -165,13 +173,47 @@ export class InteriorVisit {
     this.bounce(dt);
     const [a, bb] = o.walk.frame.toRoom(x, z);
     // Wedged on a stair for a while, pushing: off it, at the end one was heading for.
-    if (w.stuckFor > STUCK_FOR) this.offStair(o, a, bb, k);
-    // Onto the hatch: down to the cellar.
-    const hatch = o.plan.fixtures.find((f) => f.kind === 'hatch'), down = this.cellars.get(houseKey(o.door.town.id, o.b.id));
-    if (!this.going && k === 0 && hatch && down && Math.abs(a - hatch.a) < hatch.w / 2 - 0.1 && Math.abs(bb - hatch.b) < hatch.d / 2 - 0.1) {
-      this.going = true;
-      void down(() => this.shut()).finally(() => { this.going = false; });
-    }
+    if (w.stuckFor > STUCK_FOR && !this.player.puppet) this.offStair(o, a, bb, k);
+  }
+
+  /** The hatch in the room the hero stands by (within reach, on its storey), with a cellar under it; else null. */
+  hatchNear(): { way: HatchWay; below: () => Promise<CellarVisit> } | null {
+    const o = this.open, w = this.player.walker;
+    if (!o || !this.within) return null;
+    const hatch = hatchOf(o.plan), below = this.cellars.get(houseKey(o.door.town.id, o.b.id));
+    if (!hatch || !below || o.walk.storey(w.pos.y) !== hatch.storey) return null;
+    const [a, b] = o.walk.frame.toRoom(w.pos.x, w.pos.z);
+    if (Math.hypot(a - hatch.a, b - hatch.b) > HATCH_REACH) return null;
+    return { way: this.wayDown(o, hatch), below };
+  }
+
+  /**
+   * Come up into the door's building through its hatch (the climb has the hero on the ladder under it, the screen
+   * dark): drawn open, stepped into; its way down (null: it has no hatch).
+   */
+  async arriveAbove(door: TownDoor): Promise<HatchWay | null> {
+    const o = await this.openUp(door);
+    const hatch = hatchOf(o.plan);
+    if (!hatch) return null;
+    this.come();
+    return this.wayDown(o, hatch);
+  }
+
+  /**
+   * The way down through a hatch, as the house draws it (@futuremagic/settlement hatchSides): the ladder just inside
+   * its edge on its side, facing out of the hole; the lid hinged on its side.
+   */
+  private wayDown(o: Open, f: InteriorFixture): HatchWay {
+    const { ladder: [da, db], hinge: hs } = hatchSides(o.plan, f);
+    const half = Math.abs(da) * f.w / 2 + Math.abs(db) * f.d / 2;
+    const fr = o.walk.frame, [cx, cz] = fr.toWorld(f.a, f.b), [ex, ez] = fr.toWorld(f.a + da, f.b + db);
+    const nx = ex - cx, nz = ez - cz, floor = o.walk.floorAt(f.a, f.b, f.storey).y;
+    const ladder: Ladder = { x: cx + nx * (half - HATCH_RUNG_IN), z: cz + nz * (half - HATCH_RUNG_IN), nx, nz, lo: floor - HATCH_SHAFT, hi: floor + HATCH_RAILS_UP, floor, halfWidth: hatchLadderHalfWidth(f, [da, db]), rung: HATCH_RUNG, rim: true };
+    const [hx, hz] = fr.toWorld(f.a + hs[0], f.b + hs[1]), sx = hx - cx, sz = hz - cz, out = Math.abs(hs[0]) * f.w / 2 + Math.abs(hs[1]) * f.d / 2;
+    const view = this.view, hinge = { x: cx + sx * out, y: floor, z: cz + sz * out };
+    // Up from the hinge: the lid's free edge rises and swings over towards the hinge.
+    const axis = new Vector3(-sx, 0, -sz).cross(new Vector3(0, 1, 0)).normalize();
+    return { ladder, floor, hole: [cx, cz, half], hinge: [sx, sz], lid: (angle) => view.swingLid(hinge.x, hinge.y, hinge.z, axis, angle) };
   }
 
   /** Off the flight under (a, b) of storey `k`, if one stands on it: to its top or its foot, whichever one faces. */
@@ -189,15 +231,12 @@ export class InteriorVisit {
     }
   }
 
-  /** Stepping in. */
+  /** Stepping in (the room shows where one is: no words). */
   private come(): void {
     if (this.within || !this.open) return;
     this.within = true;
     this.sky.sheltered = true;
     this.lamp(this.open.walk.storey(this.player.walker.pos.y));
-    // A cellar's house: the trapdoor in the floor is the way down (it lies in a dark corner, easy to miss).
-    const b = this.open.b, trapdoor = this.open.plan.fixtures.some((f) => f.kind === 'hatch'), g = this.open.door.town.guildAt(b.id);
-    this.notes.say(`You step into ${g && !g.guild.hidden ? g.guild.name : NAMES[b.kind] ?? 'the house'}.${trapdoor ? ' A trapdoor in the floor leads down to the cellar.' : ''}`, trapdoor ? 6 : 3);
   }
 
   /** Stepping out. */
@@ -271,17 +310,6 @@ export class InteriorVisit {
     const g = this.open.door.town.guildAt(this.open.b.id);
     return `${this.within ? 'in' : 'open'} ${this.open.b.kind} #${this.open.b.id}${g ? ` (${g.guild.name})` : ''} of ${this.open.door.town.id}${this.within ? ` storey ${this.lampOn}` : ''}`;
   }
-}
-
-/** A free place beside the hatch, facing nothing in particular (room coordinates). */
-function besideHatch(plan: InteriorPlan, h: InteriorFixture): [number, number] {
-  for (const d of [0.9, 1.2, 1.5]) {
-    for (const [da, db] of [[0, -1], [1, 0], [-1, 0], [0, 1]]) {
-      const a = h.a + da * d, b = h.b + db * d;
-      if (!interiorBlocked(plan, a, b, 0.35, 0, true)) return [a, b];
-    }
-  }
-  return [0, plan.storeys[0].b0 + 1.0];
 }
 
 /** The same building of the same town. */

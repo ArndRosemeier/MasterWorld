@@ -4,7 +4,8 @@
  * accident, once put main back on an older AssetGenerator (#131, fixed by #133).
  *
  * `node tools/guards/pins.mjs [base]`: base defaults to origin/<GITHUB_BASE_REF> in a pull request, else the
- * commit before HEAD (a push to main). Fetches the pins into the submodule when its clone lacks them.
+ * commit before HEAD (a push to main). Fetches the pins into the submodule when its clone lacks them, and its history
+ * when the clone is shallow.
  */
 import { execFileSync } from 'node:child_process';
 
@@ -24,6 +25,8 @@ for (const path of paths) {
   const was = pin(base, path), now = pin('HEAD', path);
   if (!was || !now || was === now) { console.log(`${path}: ${now ? now.slice(0, 7) : 'none'} (unchanged)`); continue; }
   for (const c of [was, now]) if (!ok(['cat-file', '-e', `${c}^{commit}`], path)) ok(['fetch', '--no-tags', 'origin', c], path);
+  // CI clones the submodule shallow: the commits between the two pins are needed to tell whether one descends from the other.
+  if (!ok(['merge-base', '--is-ancestor', was, now], path) && git(['rev-parse', '--is-shallow-repository'], path) === 'true') ok(['fetch', '--no-tags', '--unshallow', 'origin'], path);
   if (ok(['merge-base', '--is-ancestor', was, now], path)) { console.log(`${path}: ${was.slice(0, 7)} -> ${now.slice(0, 7)} (forward)`); continue; }
   failed = true;
   console.error(`${path}: ${was.slice(0, 7)} -> ${now.slice(0, 7)} does not descend from the base's pin. A stale submodule? Run \`git submodule update\` (or move it forward) before committing.`);
