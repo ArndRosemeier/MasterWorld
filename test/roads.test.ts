@@ -9,7 +9,7 @@ import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
 import { grassMask } from '../src/world/grass';
 import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
-import { archY, bridgeMesh, bridgesOn, deckAt, deckY } from '../src/world/bridges';
+import { archY, bridgeMesh, bridgeSideAt, bridgesOn, deckAt, deckY } from '../src/world/bridges';
 import { emptyWater, inChannel } from '../src/world/hydro';
 import { SMALL } from './small';
 
@@ -123,5 +123,14 @@ test('roads: every brook the track crosses has a bridge over its open channel', 
     // Its ends meet the road (a lip, no step to climb).
     assert.ok(Math.abs(deckY(b, 0) - terrain.height(b.x0, b.z0)) < 0.35 && Math.abs(deckY(b, 1) - terrain.height(b.x1, b.z1)) < 0.35, 'the deck meets the road');
     assert.ok(bridgeMesh(b).index.length > 0);
+    // The parapets stop a body on the deck at its sides; the way along it is open, and so is the road beyond.
+    const t = 0.5, dx = b.x1 - b.x0, dz = b.z1 - b.z0, L = Math.hypot(dx, dz), mx = b.x0 + dx * t, mz = b.z0 + dz * t, y = deckY(b, t);
+    const side = (u: number) => [mx - dz / L * u, mz + dx / L * u] as const;
+    assert.equal(bridgeSideAt(b, ...side(0), 0.3, y), false, 'the middle of the deck is open');
+    assert.ok(bridgeSideAt(b, ...side(b.half - 0.2), 0.3, y) && bridgeSideAt(b, ...side(-(b.half - 0.2)), 0.3, y), 'the parapets stop a body on the deck');
+    assert.ok(bridgeSideAt(b, ...side(b.half + 0.2), 0.3, y - 1.5), 'its walls stop a body in the brook beside it');
+    assert.equal(bridgeSideAt(b, ...side(b.half - 0.2), 0.3, y + 1), false, 'not over the parapet');
+    assert.equal(bridgeSideAt(b, b.x0 - dx / L * 2, b.z0 - dz / L * 2, 0.3, y), false, 'the road before it is open');
+    assert.ok(Math.abs(deckAt(b, ...side(0))! - y) < 1e-6, 'the deck is the ground between its parapets');
   }
 });
