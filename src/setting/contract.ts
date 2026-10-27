@@ -379,9 +379,10 @@ export interface StoryEventDef {
   /**
    * How it is told: the lead's title, the news as it reaches the hero, the journal's note, and the line when
    * it is over. `{creatures}` (the plural), `{place}` (a raid's: the farm; a take's: the settlement), `{town}`, `{dir}` (which way from
-   * the town the band is), and a raid's `{animals}` (the setting's livestock).
+   * the town the band is), and a raid's `{animals}` (the setting's livestock). `told`: how the townsfolk tell
+   * it when asked (C11: talk knows events; none: the news).
    */
-  readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string };
+  readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string; readonly told?: string };
 }
 
 /**
@@ -966,6 +967,11 @@ export interface TalkDef {
    * (`{name}` who to tell, `{house}` where they live), and the words before a rumour of the next lead.
    */
   readonly cleared: { readonly topic: string; readonly yours: string; readonly note: string; readonly rumour: string };
+  /**
+   * Story events in talk (C11): where the townsfolk have it from, as in "I know it from {source}": those who
+   * saw it themselves (a raided farm's household), and everyone else.
+   */
+  readonly happened?: { readonly saw: string; readonly heard: string };
   /** The hero's own first journal page in a new game (`{inn}`: the inn as it is called): where to ask. */
   readonly arrival: { readonly title: string; readonly text: string; readonly from: string };
 }

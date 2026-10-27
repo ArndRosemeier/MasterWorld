@@ -362,7 +362,7 @@ export async function start(b: Boot): Promise<void> {
     const lit: Township[] = [];
     towns = new Towns({
       stage: view.stage, terrain, land: terrainJobs, roads: roadWork, masks: !!start && params.town, drawn: params.town,
-      setting, seed, hours, log: () => log, get standing() { return standing; },
+      setting, seed, hours, log: () => log, get standing() { return standing; }, towns: () => terrain.towns,
       saved: townSaves(save, start?.decision.id ?? null),
       made: (t) => { t.onTalk = (words) => tieTalk?.(t, words); },
       raised: (t) => { lit.push(t); view.warm.atDoors(lit.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z)); },
@@ -811,6 +811,7 @@ export async function start(b: Boot): Promise<void> {
         const k = keepPromise(log, id, hours());
         if (k) log = [...log, k];
         journal.fulfil(id);
+        towns?.get(ev.town)?.ended(id);
         director.met('purpose');
         const told = eventTold(setting, log, terrain.towns, ev);
         if (told) director.queue(told.done, 2);
@@ -1406,13 +1407,14 @@ export async function start(b: Boot): Promise<void> {
         wild?.add(bandOf(d));
         const t = towns?.get(d.town), order = gatherFor(setting, terrain.towns, d);
         if (t && order) orderTown(t, order);
+        // Its people know of it (C11: talk knows events).
+        t?.promised(d);
         const told = eventTold(setting, log, terrain.towns, d);
         if (!told) return;
         journal.hear(d.id, told.title, { text: told.note, from: 'word in town' }, { x: d.x, z: d.z, label: told.label });
         notes.say(`${told.news} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 8);
       }
     };
-    /** A story event now (the debug menu): what the town hears, or why none came. */
     /** A situation now, whatever the hour or the odds (the debug menu, shots): what was made, or null. */
     const situationNow = (kind: SituationKind): Made | null => {
       if (kind === 'paddock-wolves' || kind === 'stray-beast') return vgmStep({ tools: [kind], early: true })[0] ?? null;
@@ -1423,6 +1425,7 @@ export async function start(b: Boot): Promise<void> {
       applied(m);
       return m;
     };
+    /** A story event now (the debug menu): what the town hears, or why none came. */
     const storyEventNow = (which?: string): string => {
       if (!start || !wild) return 'no wild here';
       const e = vgmStep({ tools: ['event'], early: true, which }).map((m) => m.decision).find((d) => d.kind === 'event');
