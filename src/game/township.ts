@@ -240,7 +240,7 @@ export class Township {
   get talk(): TownTalk {
     if (this.talkOf) return this.talkOf;
     const log = this.c.log();
-    const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk, this.world).talk;
+    const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk, this.world, this.c.hours()).talk;
     // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
     for (const id of keptOf(log)) t.hush(id);
     this.talkOf = t;
@@ -276,14 +276,14 @@ export class Township {
     if (!this.talkOf) return; // made later, the words read the log
     const log = this.c.log(), c = talkCellar(d, this.c.setting, this.town, this.residents, log);
     if (c) this.talkOf.add(c);
-    const e = talkEvent(d, this.c.setting, this.town, this.residents, log, this.world);
+    const e = talkEvent(d, this.c.setting, this.town, this.residents, log, this.world, this.c.hours());
     if (e) this.talkOf.addEvent(e);
   }
 
   /** A story event of this town is over (its band beaten, or it ran its course): its people tell how it ended (C11). */
   ended(id: string): void {
     const log = this.c.log(), d = log.find((x) => x.id === id);
-    const e = d && this.talkOf ? talkEvent(d, this.c.setting, this.town, this.residents, log, this.world) : null;
+    const e = d && this.talkOf ? talkEvent(d, this.c.setting, this.town, this.residents, log, this.world, this.c.hours()) : null;
     if (e) this.talkOf?.endEvent(id, e.done);
   }
 

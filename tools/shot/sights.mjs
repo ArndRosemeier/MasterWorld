@@ -2,7 +2,7 @@
  * The VGM's answers on the hero's way (implementation plan C9): `node tools/shot/sights.mjs [out dir]` after
  * `npm run build` (and `npm run packs`), SHOT_GPU=1 on the reference machine. The hero stands out on the
  * land east of the start town; the VGM answers Discovery there three times and Reward once (a find, which
- * must go into the pack), each a walk further on, then Challenge (an ambush, seen from 14 m), then People (a traveller resting by the way, from 6 m), then situations (a hurt traveller, who cries out once seen; a raided farm's smoke from up to 150 m): the hero steps up to 16 m of each (inside its glade), the game must say what it
+ * must go into the pack), each a walk further on, then Challenge (an ambush, seen from 14 m), then People (a traveller resting by the way, from 6 m), then situations (a hurt traveller, who cries out once seen; a raided farm's smoke from its fields, 80 m off): the hero steps up to 16 m of each (inside its glade), the game must say what it
  * is, and it is shot. JPEGs into `<out dir>` (default `shots/sights/<date>-<commit>/`). A slow check (docs/CHECKS.md),
  * well under 5 min.
  */
@@ -10,7 +10,7 @@ import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
-import { meet } from './acts.mjs';
+import { meet, standClear } from './acts.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 const gl = process.env.SET_GL === '1';
@@ -127,12 +127,12 @@ else {
   const cry = await page.evaluate(() => window.game.speech.line);
   console.log(`from 20 m: ${cry ?? 'NO CRY'}`);
   if (!cry) failed = true;
-  // Up close for the picture: woods between could hide them at 20 m.
-  await stand(6);
-  await page.waitForTimeout(1500);
+  // Up close for the picture, from a side with no trunk between (woods could hide them at 20 m).
+  await standClear(page, hurt, 5);
+  await page.waitForTimeout(1200);
   await shoot(`0${NEEDS.length + 3}-hurt-traveller`);
 }
-// A situation seen from afar (C10): a farm raided, its barn smoking over the trees, shot from up to 150 m off across the fields.
+// A situation seen from afar (C10): a farm raided, its barn smoking over the trees, shot from its fields 80 m off, looking up.
 const raid = await page.evaluate(() => window.game.storyEvent('farm-raid'));
 console.log(`raid: ${raid}`);
 await page.waitForTimeout(1500);
@@ -140,17 +140,30 @@ const smokeAt = await page.evaluate(() => {
   const g = window.game, e = g.log.filter((d) => d.kind === 'event' && d.paddock !== undefined).at(-1);
   if (!e) return null;
   const t = g.towns.get(e.town).town, pd = t.plan.paddocks[e.paddock], b = t.plan.buildings[t.plan.farms[pd.farm].barn];
-  // From the town's side, across its open fields (from the woods outside, near crowns hide the sky).
-  const [cx, cz] = t.plan.centre, l = Math.max(1, Math.hypot(cx - b.cx, cz - b.cz)), far = Math.min(150, l);
-  const x = b.cx + ((cx - b.cx) / l) * far, z = b.cz + ((cz - b.cz) / l) * far;
+  // Out in the farm's fields, away from the town, looking up at the column (from the woods near crowns
+  // hide the sky; from the town its houses do).
+  const [cx, cz] = t.plan.centre, l = Math.max(1, Math.hypot(b.cx - cx, b.cz - cz));
+  const x = b.cx + ((b.cx - cx) / l) * 80, z = b.cz + ((b.cz - cz) / l) * 80;
   g.player.teleport(x, undefined, z, Math.atan2(x - b.cx, z - b.cz));
+  const cam = g.player.heroCam;
+  cam.yaw = g.player.walker.yaw;
+  cam.pitch = 0.3;
+  cam.zoom = 3;
   return { x: b.cx, z: b.cz };
 });
 console.log(`smoke: ${smokeAt ? `over the barn at ${smokeAt.x.toFixed(0)}, ${smokeAt.z.toFixed(0)}` : 'NO RAIDED FARM'}`);
 if (!smokeAt) failed = true;
 else {
   await page.waitForTimeout(6000);
+  // What is drawn: the columns the view was given, and whether its mesh is shown and in the scene.
+  const drawn = await page.evaluate(() => { const s = window.game.smoke; return { shown: s.mesh.visible, staged: !!s.mesh.parent, columns: s.columns.length }; });
+  console.log(`smoke drawn: ${drawn.columns} column(s), mesh ${drawn.shown ? 'shown' : 'HIDDEN'}, ${drawn.staged ? 'in the scene' : 'NOT IN THE SCENE'}`);
+  if (!drawn.columns || !drawn.shown || !drawn.staged) failed = true;
   await shoot(`0${NEEDS.length + 4}-raid-smoke`);
+  // And close by, at the barn, to tell a column too faint to see from one not drawn at all.
+  await standClear(page, smokeAt, 25, { pitch: 0.45, zoom: 3 });
+  await page.waitForTimeout(3000);
+  await shoot(`0${NEEDS.length + 5}-raid-smoke-near`);
 }
 const sh = await page.evaluate(() => { const m = window.shaders; return m ? m.summary() : null; });
 console.log(`F3: ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}`);

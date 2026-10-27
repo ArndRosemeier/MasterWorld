@@ -10,6 +10,7 @@ import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
 import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
+import { festivityFor } from './festivities';
 import { hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 
@@ -18,9 +19,11 @@ export type Asked = 'start' | 'walk' | 'turn' | 'need' | 'call';
 
 /** What the Builder's turn knows: the log, the land and towns, the hours, the hero and the setting. */
 export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & Omit<EventsContext, 'setting'> & {
-  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations'>;
+  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world'>;
   /** Ask only these turn tools (by id); none: all of them. */
   readonly tools?: readonly string[];
+  /** How much this player enjoys a need (C12: the player model); none: no lean. */
+  readonly lean?: (n: Need) => number;
 };
 
 export interface Tool {
@@ -69,6 +72,8 @@ export const TOOLS: readonly Tool[] = [
       const e = d.kind === 'kept' ? c.log.find((x) => x.id === d.promise) : undefined;
       return e?.kind === 'event' ? `${e.event} in ${e.town} was left alone ${Math.round(c.hours - e.at)} h: it ends without the hero` : d.kind;
     } },
+  { id: 'festivity', name: 'A good day', writes: ['festivity'], need: 'people', asked: 'turn', next: festivityFor,
+    why: (d) => (d.kind === 'festivity' ? `${d.festivity} in ${d.town}${d.for ? `: the hero kept ${d.for}` : ''}` : d.kind) },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
   { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
   { id: 'cache', name: 'A find by the way', writes: ['sight'], need: 'reward', asked: 'need', answer: (c) => sightFor(c, 'reward') },

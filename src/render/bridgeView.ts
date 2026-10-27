@@ -7,7 +7,7 @@
 import { Group, type Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { Terrain } from '../world/terrain';
-import { bridgeMesh, bridgesNear, deckAt, type Bridge } from '../world/bridges';
+import { bridgeMesh, bridgeSideAt, bridgesNear, deckAt, type Bridge } from '../world/bridges';
 import { buildingMeshAt } from './materials/building';
 
 /** Bridges within this of the hero are drawn, m; they go again past FORGET. */
@@ -36,6 +36,21 @@ export class BridgeView {
       if (y !== null) return y;
     }
     return null;
+  }
+
+  /** The ground at (x, z) with the bridges on it: a bridge's deck where that is higher than the land (folk and beasts cross on it). */
+  ground(x: number, z: number, land: number): number {
+    const y = this.deck(x, z);
+    return y !== null && y > land ? y : land;
+  }
+
+  /** Whether a body of radius `r` (feet at `feet`, or anywhere) runs into a bridge's parapets or walls. */
+  side(x: number, z: number, r: number, feet?: number): boolean {
+    for (const d of this.drawn.values()) {
+      if (Math.abs(d.x - x) > 40 || Math.abs(d.z - z) > 40) continue;
+      if (bridgeSideAt(d.b, x, z, r, feet)) return true;
+    }
+    return false;
   }
 
   /** Each frame or so: the bridges round (x, z). */

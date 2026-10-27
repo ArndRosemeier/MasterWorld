@@ -43,6 +43,8 @@ export interface DebugHost {
   answerNeed(need: 'discovery' | 'challenge' | 'reward' | 'people' | 'purpose'): string;
   /** A situation of this kind now (C10), whatever the hour: what was made, or why not. */
   situation(kind: 'hurt-traveller' | 'paddock-wolves' | 'stray-beast'): string;
+  /** A good day now (C11): a feast for a deed kept lately, else a market day in the town the hero is in. */
+  goodDay(): string;
   /** The VGM's log (D53, C8): its moves, oldest first (the tool, the need, why). */
   vgmLog(): readonly VgmLine[];
   /** The world's seed (a fresh one each start unless `?seed=` names it). */
@@ -130,6 +132,7 @@ export class DebugMenu {
         { label: 'Situation now: a hurt traveller', run: () => h.situation('hurt-traveller') },
         { label: 'Situation now: wolves at the paddock (in a town)', run: () => h.situation('paddock-wolves') },
         { label: 'Situation now: a beast got out (in a town)', run: () => h.situation('stray-beast') },
+        { label: 'A good day now (a feast after a deed, else market day in a town)', run: () => h.goodDay() },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },
