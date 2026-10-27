@@ -184,7 +184,31 @@ export interface RetreatDecision {
   readonly yaw: number;
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/**
+ * A story event (plan 4.2, C6): the world moved on its own. `spill`: dwellers of the place `from` (a promise
+ * left open too long) came out and roam the land round (x, z), `r` metres; they are a lead of their own until
+ * they are dead (a `kept` decision with this id).
+ */
+export interface EventDecision {
+  readonly kind: 'event';
+  readonly id: string;
+  /** The setting's event id. */
+  readonly event: string;
+  /** The town whose people it concerns. */
+  readonly town: string;
+  /** The promise it grew from (a dungeon's or a move-in's id). */
+  readonly from: string;
+  readonly x: number;
+  readonly z: number;
+  readonly r: number;
+  /** Who is out on the land (creature ids). */
+  readonly members: readonly string[];
+  readonly seed: number;
+  /** Game hours since the world began. */
+  readonly at: number;
+}
+
+export type Decision = EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

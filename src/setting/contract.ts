@@ -271,6 +271,29 @@ export interface WildDef {
 }
 
 /**
+ * A story event (plan 4.2, C6): the world moves on its own when a thing is left alone, it goes into the
+ * ledger, the land changes and the town hears of it, and there is something new to do.
+ * `spill`: the dwellers of a place promised long ago and never cleared come out and roam the land near it.
+ */
+export interface StoryEventDef {
+  readonly id: string;
+  readonly kind: 'spill';
+  /** Game hours the place must have stood open (promised, not cleared) first. */
+  readonly after: number;
+  /** Least game hours between two events in one town. */
+  readonly cooldown: number;
+  /** How many come out, at least and at most. */
+  readonly count: readonly [number, number];
+  /** Game hours the town's people gather at the market to talk it over (0 or none: they do not). */
+  readonly gather?: number;
+  /**
+   * How it is told: the lead's title, the news as it reaches the hero, the journal's note, and the line when
+   * it is over. `{creatures}` (the plural), `{place}`, `{town}`, `{dir}` (which way from the town).
+   */
+  readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string };
+}
+
+/**
  * What fills a region the VGM opens (plan 5.2, 5.5, B1): plain country, or a place (a hamlet, a camp,
  * ruins, a barrow field) on dry, gentle ground inside it. The VGM picks among the fills that fit by
  * weight, keeping places of a kind apart.
@@ -970,6 +993,8 @@ export interface SettingModule {
   readonly routines: RoutinesDef;
   /** What lives on the land around a town. */
   readonly wild: readonly WildDef[];
+  /** Story events (plan 4.2, C6): what the world does on its own when the hero leaves it be. None: nothing. */
+  readonly events?: readonly StoryEventDef[];
   /** Birds and squirrels about the land; without it the land has none. */
   readonly smallLife?: SmallLifeDef;
   /** What fills the regions the VGM opens as the hero walks; without it no regions open beyond the start. */
@@ -1166,6 +1191,9 @@ function validateFight(m: SettingModule, where: string): string[] {
   for (const [kind, lore] of Object.entries(m.dungeons)) for (const d of lore?.dwellers ?? []) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: ${kind} dweller "${d.id}" creature "${c}" is unknown`);
   for (const b of m.smallLife?.birds ?? []) {
     if (b.size <= 0 || !b.colours.length || b.count[0] < 1 || b.count[1] < b.count[0] || b.beat <= 0) out.push(`${where}: bird "${b.id}" needs a size, colours, a count and a beat`);
+  }
+  for (const e of m.events ?? []) {
+    if (!(e.after >= 0) || !(e.cooldown >= 0) || e.count[0] < 1 || e.count[1] < e.count[0]) out.push(`${where}: event "${e.id}" needs after, cooldown and a count`);
   }
   for (const w of m.wild) {
     for (const c of w.creatures) if (!ids.has(c)) out.push(`${where}: wild "${w.id}" creature "${c}" is unknown`);

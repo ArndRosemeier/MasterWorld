@@ -48,6 +48,7 @@ import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
 import { LEADS, keepPromise, keptOf, moveInto, nextPromise, openPromises } from './vgm/leads';
+import { bandOf, eventTold, gatherFor, nextEvent, openBands } from './vgm/events';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Cellars } from './app/cellars';
@@ -617,7 +618,7 @@ export async function start(b: Boot): Promise<void> {
       waterDepth: (x, z) => terrain.waterDepth(x, z),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
-    }, save?.wild ?? {}) : null;
+    }, save?.wild ?? {}, openBands(log)) : null;
     // The first people's hold (plan 11.6): its gate and court, its wardens built as the hero comes near.
     const holdSite = log.find((d): d is HoldDecision => d.kind === 'hold') ?? null;
     const holdPeople = holdSite ? setting.peoples.find((p) => p.id === holdSite.people && p.hold) : undefined;
@@ -769,6 +770,17 @@ export async function start(b: Boot): Promise<void> {
     };
     // A place gone quiet: the journal says whom of its household to tell, and the map marks their door.
     quietPlace = (id) => {
+      // A story event's band beaten (C6): the lead is done, and its town will hear of it.
+      const ev = log.find((x) => x.id === id);
+      if (ev?.kind === 'event') {
+        const k = keepPromise(log, id, hours());
+        if (k) log = [...log, k];
+        journal.fulfil(id);
+        director.met('purpose');
+        const told = eventTold(setting, log, terrain.towns, ev);
+        if (told) director.queue(told.done, 2);
+        return true;
+      }
       const t = townOfPromise(id);
       if (!t || !t.talk.clear(id)) return true;
       const words = t.talk, to = words.reportTo(id)[0], p = t.residents.find((x) => x.id === to);
@@ -1161,6 +1173,7 @@ export async function start(b: Boot): Promise<void> {
       taught: setting.abilities.filter((a) => a.taught).map((a) => ({ id: a.id, name: a.name })),
       known: (id) => character.knows(id),
       legends: setting.items.uniques.map((u) => ({ id: u.id, name: u.name })),
+      storyEvent: () => eventDue(true),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
         const did = on ? character.learn(id) : character.forget(id);
@@ -1170,7 +1183,7 @@ export async function start(b: Boot): Promise<void> {
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: () => eventDue(true), setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1271,6 +1284,7 @@ export async function start(b: Boot): Promise<void> {
       if (builderClock < 3 || title?.holding || creator?.showing) return;
       builderClock = 0;
       promiseDue();
+      eventDue();
     };
     /** The Builder's next promise, if one is due now: into the log, and told to the town. */
     const promiseDue = (): void => {
@@ -1282,6 +1296,25 @@ export async function start(b: Boot): Promise<void> {
       cellars?.sync(log);
       // Its household's town hears of it (every town checks whether it is theirs).
       for (const t of towns?.every ?? []) t.promised(d);
+    };
+    /**
+     * The world moves on its own (C6): a story event, if one is due, into the log; its band onto the land,
+     * its town gathers to talk it over, and word of it reaches the hero (a lead in the journal).
+     */
+    const eventDue = (early = false): string => {
+      if (!start || !wild) return 'no wild here';
+      const e = nextEvent({ seed, log, towns: terrain.towns, terrain, hours: hours(), setting, inside: (id) => !!cellars?.isInside(id), avoid: wild.territories, early });
+      if (!e) return 'nothing is due';
+      console.info(`[vgm] event ${e.id} (${e.event}) from ${e.from} at ${hours().toFixed(1)} h`);
+      log = [...log, e];
+      wild.add(bandOf(e));
+      const t = towns?.get(e.town), order = gatherFor(setting, terrain.towns, e);
+      if (t && order) orderTown(t, order);
+      const told = eventTold(setting, log, terrain.towns, e);
+      if (!told) return e.id;
+      journal.hear(e.id, told.title, { text: told.note, from: 'word in town' }, { x: e.x, z: e.z, label: told.label });
+      notes.say(`${told.news} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 8);
+      return told.news;
     };
     let last = performance.now(), frame = 0;
     view.renderer.setAnimationLoop(() => {

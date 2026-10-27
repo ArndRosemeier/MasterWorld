@@ -18,6 +18,9 @@ export interface Folk {
   readonly house: string;
 }
 
+/** The first letter upper case. */
+export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
 /** Fill a talk template's `{key}`s. */
 export const fill = (text: string, values: Readonly<Record<string, string>>): string =>
   text.replace(/\{(\w+)\}/g, (m, k: string) => values[k] ?? m);

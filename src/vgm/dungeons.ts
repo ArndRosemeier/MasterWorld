@@ -66,7 +66,7 @@ const LAND: Readonly<Record<LandKind, { readonly ring: readonly [number, number]
   barrow: {
     ring: [550, 1300],
     fit: (t, s) => (x, z, k) => {
-      const h = t.height(x, z), slope = Math.max(Math.abs(t.height(x + 10, z) - h), Math.abs(t.height(x, z + 10) - h)) / 10;
+      const h = t.height(x, z), slope = t.steepness(x, z, 10, h);
       if (slope > 0.3) return null;
       // A barrow stands on a rise: higher than the ground around it scores better.
       const rise = h - (t.height(x + 40, z) + t.height(x - 40, z) + t.height(x, z + 40) + t.height(x, z - 40)) / 4;

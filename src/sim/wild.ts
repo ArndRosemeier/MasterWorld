@@ -137,7 +137,7 @@ export function placeWild(seed: number, terrain: Terrain, town: Town, wild: read
         const x = tx + Math.cos(a) * d, z = tz + Math.sin(a) * d;
         if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < 2) continue;
         // Gentle enough to live on.
-        const h = terrain.height(x, z), slope = Math.max(Math.abs(terrain.height(x + 8, z) - h), Math.abs(terrain.height(x, z + 8) - h)) / 8;
+        const h = terrain.height(x, z), slope = terrain.steepness(x, z, 8, h);
         if (slope > 0.45) continue;
         const w = woods(x, z);
         const fit = def.habitat === 'wood' ? w : def.habitat === 'open' ? 1 - w : 0.6 + (1 - w) * 0.2;
