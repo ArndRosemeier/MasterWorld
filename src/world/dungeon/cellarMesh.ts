@@ -15,7 +15,7 @@ import { CELL, STOREY, cellIn, type Cellar, type Prop } from './cellar';
 import { BuildingMat as M, CellarMat as C, MeshKit, WildMat, scaleTint, varyTint, type Tint } from './meshKit';
 import { stampModel, type PropModels, type Stamp } from './propModels';
 import type { PropModel } from '@futuremagic/props';
-import { DOOR_W, DungeonSpace, PASSAGE_H, isFeature, stairDrop } from './space';
+import { DOOR_W, DungeonSpace, PASSAGE_H, isFeature, keySpot, stairDrop } from './space';
 import { TORCH_OUT, torchSpots } from './torches';
 import { Rng, deriveSeed } from '@futuremagic/core';
 
@@ -56,6 +56,8 @@ export interface CellarMeshes {
   readonly doors: DoorPiece[];
   /** One per chest, in the order of the cellar's props (as world/dungeon/treasure.ts numbers its hoards). */
   readonly lids: ChestLid[];
+  /** The keys lying where they are picked up (keySpot), by the room that holds each. */
+  readonly keys: { readonly room: number; readonly mesh: BuildingMesh }[];
 }
 
 const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], EARTH: Tint = [120, 96, 72];
@@ -340,7 +342,20 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
   }
   if (models) dress(propKit, c, models);
   for (const t of torchSpots(c)) sconce(shell, t.x, t.y, t.z, t.nx, t.nz);
-  return { shell: shell.mesh(), props: propKit.mesh(), doors, lids };
+  const keys = L.links.filter((pl) => pl.link.kind === 'locked' && pl.link.key !== undefined).map((pl) => ({ room: pl.link.key!, mesh: keyMesh(keySpot(L, pl.link.key!), deriveSeed(c.decision.seed, 'key', pl.link.id)) }));
+  return { shell: shell.mesh(), props: propKit.mesh(), doors, lids, keys };
+}
+
+/** An old iron key with a brass bow, lying on the floor at `at`, turned by its seed (a hand long: seen from a few steps). */
+function keyMesh(at: readonly [number, number, number], seed: number): BuildingMesh {
+  const k = new MeshKit(), rng = new Rng(seed), yaw = rng.range(0, 6.28), c = Math.cos(yaw), s = Math.sin(yaw);
+  const [x, y, z] = at, BRASS: Tint = [214, 170, 92], DARK_IRON: Tint = [92, 88, 84];
+  // Along the key (u): the bow's ring of four bars, the shaft, the bit.
+  const put = (u: number, w: number, su: number, sw: number, h: number, t: Tint, mat: number) => k.box(x + c * u + s * w, y + 0.005, z - s * u + c * w, su, h, sw, yaw, mat, t);
+  for (const [u, w, su, sw] of [[-0.13, 0, 0.022, 0.08], [-0.05, 0, 0.022, 0.08], [-0.09, 0.03, 0.08, 0.022], [-0.09, -0.03, 0.08, 0.022]]) put(u, w, su, sw, 0.018, BRASS, M.Plaster);
+  put(0.04, 0, 0.17, 0.018, 0.018, DARK_IRON, M.Slate);
+  put(0.11, 0.025, 0.035, 0.05, 0.012, DARK_IRON, M.Slate);
+  return k.mesh();
 }
 
 /** Where a chest's lid sits on its body (m over its foot; furn_chest's lid is its top 10 cm), and its back (m behind its middle). */

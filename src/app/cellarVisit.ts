@@ -3,8 +3,8 @@
  * down through the hatch in its room and up the ladder again (app/hatchClimb.ts: the hero is seen on the
  * rungs, the screen dark only while the head passes through the floor); a barrow is walked into, its way
  * out walked to (a short fade). Inside, the walker walks the cellar's space, the sky is off and the hero's
- * lantern is lit; doors, bars and hidden ways are seen opening (CellarView), and a key found and the things worth
- * reading speak through short notes.
+ * lantern is lit; doors, bars and hidden ways are seen opening (CellarView), a key lying on a floor is knelt to
+ * and picked up, and the things worth reading speak through short notes.
  */
 import type { PointLight } from 'three/webgpu';
 import { dungeonWorld } from '../game/dungeonWorld';
@@ -14,7 +14,8 @@ import type { SkyView } from '../render/sky';
 import type { WarmLights } from '../render/warmLights';
 import { torchSpots } from '../world/dungeon/torches';
 import { CELL, STOREY, type Cellar } from '../world/dungeon/cellar';
-import { DungeonSpace, type SpaceEvent } from '../world/dungeon/space';
+import { DungeonSpace, keySpot, type SpaceEvent } from '../world/dungeon/space';
+import { SearchKneel } from './searchKneel';
 import { Fade } from './fade';
 import type { Notes } from './notes';
 import type { CellarDiff } from './saveGame';
@@ -134,6 +135,7 @@ export class CellarVisit {
     // The way down is the hatch in the house's room (InteriorVisit).
     if (!this.inside) return;
     this.view.step(dt);
+    if (this.kneel?.done) { if (this.player.puppet === this.kneel) this.player.puppet = null; this.kneel = null; }
     // The lantern, held up and a little ahead.
     this.lantern.intensity = 8;
     this.lantern.position.set(w.pos.x - Math.sin(w.yaw) * 0.4, w.pos.y + 1.9, w.pos.z - Math.cos(w.yaw) * 0.4);
@@ -157,7 +159,7 @@ export class CellarVisit {
 
   /** Lay a saved state over the fresh cellar. */
   restore(d: CellarDiff): void {
-    for (const k of d.keys) this.space.keys.add(k);
+    for (const k of d.keys) { this.space.keys.add(k); this.view.keyTaken(k); }
     for (const l of d.open) { this.space.open.add(l); this.view.opened(l); }
     for (const r of d.read) this.read.add(r);
   }
@@ -178,6 +180,15 @@ export class CellarVisit {
     // A way that opens is seen opening (CellarView), away from the hero: no line says so.
     const w = this.player.walker.pos, O = this.view.origin;
     if (e.kind !== 'key') { this.view.opened(e.link, [w.x - O.x, w.z - O.z]); return; }
-    this.notes.say(this.cellar.form.space.carved ? 'You find a key wedged in a crack of the rock.' : 'You find a key on a nail by the door.');
+    // A key lying there: the hero kneels to it and picks it up (unless something else plays the hero now).
+    const room = this.cellar.layout.links.find((pl) => pl.link.id === e.link)?.link.key;
+    if (room === undefined) return;
+    const [kx, , kz] = keySpot(this.cellar.layout, room), p = this.player;
+    if (p.puppet) { this.view.keyTaken(room); return; }
+    const kneel = new SearchKneel(w, p.walker.yaw, { x: O.x + kx, z: O.z + kz }, null, () => this.view.keyTaken(room));
+    p.puppet = kneel;
+    this.kneel = kneel;
   }
+  /** The hero kneeling to pick up a key (null: not). */
+  private kneel: SearchKneel | null = null;
 }

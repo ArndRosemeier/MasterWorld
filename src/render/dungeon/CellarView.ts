@@ -26,6 +26,9 @@ export class CellarView {
   /** Each chest's lid on a pivot at its hinge, by chest (hoard id), and how far each is to stand open (0..1). */
   private lids: { readonly pivot: Group; readonly axis: Vector3 }[] = [];
   private readonly lift = new Map<number, number>();
+  /** The keys lying where they are picked up, by room; and the rooms whose key is taken. */
+  private readonly keys = new Map<number, Mesh>();
+  private readonly taken = new Set<number>();
   /** A cave's carved rock (world/dungeon/caveRock.ts), drawn with the rest; set before `add`. */
   rock: BuildingMesh | null = null;
 
@@ -45,6 +48,12 @@ export class CellarView {
       this.lids.push({ pivot: this.onPivot(l.mesh, `chest lid ${i}`, l.hinge), axis: new Vector3(l.axis[0], 0, l.axis[1]) });
       this.lidUp(i, this.lift.get(i) ?? 0);
     });
+    for (const k of m.keys) {
+      const mesh = this.piece(k.mesh, `key ${k.room}`);
+      mesh.visible = !this.taken.has(k.room);
+      this.keys.set(k.room, mesh);
+      this.group.add(mesh);
+    }
     for (const d of m.doors) {
       const at = d.opens === 'push' ? farFoot(d) : d.hinge ?? d.at;
       const door: Door = { piece: d, pivot: this.onPivot(d.mesh, `door ${d.kind}`, at), bar: d.bar ? this.onPivot(d.bar, `bar ${d.link}`, d.at) : null, t: -1, away: [d.through[0], d.through[1]] };
@@ -98,16 +107,18 @@ export class CellarView {
 
   private pose(d: Door): void {
     const p = d.piece, [ax, az] = d.away, t = d.t;
-    // A bar first: lifted out of its brackets towards the opener, then set down on the floor along the wall.
+    // A bar first: lifted out of its brackets towards the opener, then laid on the floor beside the doorway,
+    // pointing into the opener's room (along the wall it would stick through into the next cell).
     const swingFrom = d.bar ? BAR_FOR : 0;
     if (d.bar) {
       const k = Math.min(1, t / BAR_FOR), up = smoothstep(0, 0.35, k), down = smoothstep(0.35, 1, k);
-      const [ux, uz] = along(p);
+      const [ux, uz] = along(p), side = DOOR_W / 2 + 0.35, back = 0.25 * up + 0.95 * down;
       d.bar.position.set(
-        this.origin.x + p.at[0] - ax * (0.25 * up + 0.1 * down) + ux * (DOOR_W / 2 + 0.75) * down,
-        this.origin.y + p.at[1] + 0.15 * up - (1.1 - 0.07 + 0.15) * down,
-        this.origin.z + p.at[2] - az * (0.25 * up + 0.1 * down) + uz * (DOOR_W / 2 + 0.75) * down,
+        this.origin.x + p.at[0] - ax * back + ux * side * down,
+        this.origin.y + p.at[1] + 0.15 * up - BAR_DOWN * down,
+        this.origin.z + p.at[2] - az * back + uz * side * down,
       );
+      d.bar.rotation.set(0, (Math.PI / 2) * down, 0);
     }
     const k = Math.min(1, Math.max(0, (t - swingFrom) / OPEN_FOR[p.opens]));
     if (p.opens === 'gone') { d.pivot.visible = k < 1; return; }
@@ -121,6 +132,13 @@ export class CellarView {
     }
   }
   private readonly axis = new Vector3();
+
+  /** Room `room`'s key is picked up: it is gone from the floor. */
+  keyTaken(room: number): void {
+    this.taken.add(room);
+    const k = this.keys.get(room);
+    if (k) k.visible = false;
+  }
 
   /** Chest `i`'s lid lifted by k (0 shut, 1 open), now or once it is built. */
   lidUp(i: number, k: number): void {
@@ -139,6 +157,8 @@ interface Door { readonly piece: DoorPiece; readonly pivot: Group; readonly bar:
 
 /** How long each way takes (s): a door swinging wide, stones toppling, a ladder let down; the bar first. */
 const OPEN_FOR = { swing: 1.2, push: 0.9, gone: 0.4 } as const, BAR_FOR = 0.9;
+/** How far the bar comes down to lie on the floor (m): from its brackets (1.1 m up) and the lift, less its half thickness. */
+const BAR_DOWN = 1.1 + 0.15 - 0.07;
 /** How far a door swings (rad: to just short of the wall), and stones topple. */
 const SWING = 1.5, TOPPLE = 1.2;
 /** The wall's line at a door (unit; from its hinge towards its middle). */
