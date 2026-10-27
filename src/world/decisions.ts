@@ -204,14 +204,34 @@ export interface EventDecision {
   readonly x: number;
   readonly z: number;
   readonly r: number;
-  /** Who is out on the land (creature ids). */
+  /** Who is out on the land: the setting's encounter, and its members (creature ids). */
+  readonly encounter?: string;
   readonly members: readonly string[];
   readonly seed: number;
   /** Game hours since the world began. */
   readonly at: number;
 }
 
-export type Decision = EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/** A group of the wild round a town (C6b, vgm/wild.ts): an encounter living on its territory. */
+export interface WildDecision {
+  readonly kind: 'wild';
+  /** Also the territory's id (saves name the dead by it). */
+  readonly id: string;
+  readonly town: string;
+  /** The setting's wild group it is one of. */
+  readonly group: string;
+  /** Who they are (the setting's encounter), and its members (creature ids, the leader first). */
+  readonly encounter: string;
+  readonly members: readonly string[];
+  readonly x: number;
+  readonly z: number;
+  readonly r: number;
+  readonly seed: number;
+  /** Game hours since the world began. */
+  readonly at: number;
+}
+
+export type Decision = WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

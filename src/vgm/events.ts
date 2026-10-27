@@ -8,9 +8,9 @@
  * `raid`: a wild group left to live near a town (bandits by a road out) comes down on a farm and drives off
  * animals from its paddock; the band that did it holds them out towards its camp. Beat it and they go home.
  */
-import { Rng, deriveSeed, hash2f } from '@futuremagic/core';
+import { deriveSeed, hash2f } from '@futuremagic/core';
 import { farmlandReach } from '@futuremagic/settlement';
-import type { LivestockKind, SettingModule, StoryEventDef, WildDef } from '../setting/contract';
+import type { LivestockKind, SettingModule, StoryEventDef } from '../setting/contract';
 import type { Territory } from '../sim/wild';
 import type { TownOrder } from '../sim/townLife';
 import { dungeonOf, type DecisionLog, type EventDecision } from '../world/decisions';
@@ -19,6 +19,7 @@ import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { compass, houseOf, loreOf, placeOf } from './dungeons';
 import { keptOf, openPromises } from './leads';
+import { encounterFor } from './encounters';
 import { cap, fill } from '../talk/folk';
 
 export interface EventsContext {
@@ -28,7 +29,7 @@ export interface EventsContext {
   readonly terrain: Terrain;
   /** Game hours since the world began. */
   readonly hours: number;
-  readonly setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures'>;
+  readonly setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures' | 'encounters'>;
   /** The wild groups round the towns, and how many of each still live (raiders come from these). */
   readonly wild?: readonly WildGroup[];
   /** The hero is down in this dungeon now (nothing comes out under their feet). */
@@ -77,11 +78,8 @@ export function nextEvent(c: EventsContext): EventDecision | null {
 const rested = (c: EventsContext, def: StoryEventDef, past: readonly EventDecision[], town: string): boolean =>
   !!c.early || !past.some((e) => e.town === town && c.hours - e.at < def.cooldown);
 
-/** The event's band: `count` of `kinds` in turn. */
-function bandMembers(s: number, def: StoryEventDef, kinds: readonly string[]): string[] {
-  const rng = new Rng(deriveSeed(s, 'members'));
-  return Array.from({ length: rng.int(def.count[0], def.count[1]) }, (_, i) => kinds[i % kinds.length]);
-}
+/** The event's band: of the encounter `of` (a place's dwellers, the raiders), as many as the event says. */
+const bandFrom = (c: EventsContext, def: StoryEventDef, of: string, s: number) => encounterFor({ setting: c.setting, seed: s, of: [of], count: def.count });
 
 /** Animals driven off by raids not dealt with yet, by paddock id, in a town. */
 export function takenFrom(log: DecisionLog, town: string): Map<number, number> {
@@ -99,7 +97,7 @@ function raid(c: EventsContext, def: StoryEventDef, past: readonly EventDecision
   const open = new Set(openEvents(c.log).map((e) => e.from));
   for (const g of c.wild ?? []) {
     const t = g.territory, town = c.towns.find((x) => x.decision.id === g.town);
-    if (t.def.id !== def.by || g.left < 1 || open.has(t.id) || !town || !rested(c, def, past, g.town)) continue;
+    if (t.kind !== def.by || g.left < 1 || open.has(t.id) || !town || !rested(c, def, past, g.town)) continue;
     const taken = takenFrom(c.log, g.town), gate = (p: { gate: readonly number[] }) => Math.hypot(p.gate[0] - t.x, p.gate[1] - t.z);
     const pd = town.plan.paddocks.filter((p) => p.animals > (taken.get(p.id) ?? 0)).sort((a, b) => gate(a) - gate(b))[0];
     if (!pd) continue;
@@ -108,7 +106,9 @@ function raid(c: EventsContext, def: StoryEventDef, past: readonly EventDecision
     const at = dryNear(c, pd.gate[0] + (t.x - pd.gate[0]) * 0.55, pd.gate[1] + (t.z - pd.gate[1]) * 0.55, s);
     if (!at) continue;
     const left = pd.animals - (taken.get(pd.id) ?? 0), n = Math.min(left, 1 + Math.floor(hash2f(s, 7, 7) * 3));
-    return { kind: 'event', id: `event-${past.length + 1}`, event: def.id, town: g.town, from: t.id, x: at.x, z: at.z, r: ROAM, members: bandMembers(s, def, t.def.creatures), seed: s, at: c.hours, paddock: pd.id, taken: n };
+    const met = bandFrom(c, def, t.encounter, s);
+    if (!met) continue;
+    return { kind: 'event', id: `event-${past.length + 1}`, event: def.id, town: g.town, from: t.id, x: at.x, z: at.z, r: ROAM, ...met, seed: s, at: c.hours, paddock: pd.id, taken: n };
   }
   return null;
 }
@@ -127,7 +127,9 @@ function spill(c: EventsContext, def: StoryEventDef, past: readonly EventDecisio
     const s = deriveSeed(c.seed, 'vgm', 'event', past.length);
     const at = bandSpot(c, d.site ?? null, houseOf(d, c.towns)?.door ?? null, town, s);
     if (!at) continue;
-    return { kind: 'event', id: `event-${past.length + 1}`, event: def.id, town: d.town, from: p.id, x: at.x, z: at.z, r: ROAM, members: bandMembers(s, def, sketch.dweller.creatures), seed: s, at: c.hours };
+    const met = bandFrom(c, def, sketch.dweller.encounter, s);
+    if (!met) continue;
+    return { kind: 'event', id: `event-${past.length + 1}`, event: def.id, town: d.town, from: p.id, x: at.x, z: at.z, r: ROAM, ...met, seed: s, at: c.hours };
   }
   return null;
 }
@@ -167,8 +169,7 @@ function dryNear(c: EventsContext, ax: number, az: number, s: number): { x: numb
 
 /** A band out on the land as the wild sees it (sim/wild.ts): its territory, named by the event's id. */
 export function bandOf(e: EventDecision): Territory {
-  const def: WildDef = { id: e.event, creatures: e.members, count: [e.members.length, e.members.length], habitat: 'open', ring: [0, 0], range: e.r, groups: 1 };
-  return { def, x: e.x, z: e.z, r: e.r, members: e.members, seed: e.seed, id: e.id };
+  return { kind: e.event, encounter: e.encounter ?? '', x: e.x, z: e.z, r: e.r, members: e.members, seed: e.seed, id: e.id };
 }
 
 /** The bands of the events not dealt with yet. */

@@ -6,7 +6,7 @@ const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 /** The hero a few metres from a group of the wild (`kind`), facing it, once it is built near them. */
 export const meet = (kind, d) => async (page) => {
   await page.evaluate((kind) => {
-    const g = window.game, t = g.wild.territories.find((t) => t.def.id === kind);
+    const g = window.game, t = g.wild.territories.find((t) => t.kind === kind);
     g.player.teleport(t.x + t.r + 20, undefined, t.z, Math.PI / 2);
   }, kind);
   await page.waitForFunction((kind) => !!window.game.wild.sight(kind), kind, { timeout: TIMEOUT });

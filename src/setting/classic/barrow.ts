@@ -5,6 +5,7 @@
  * Fantasy dead and old peoples' rites only: no real-world faith, no churchyard.
  */
 import type { CellarLore } from '../contract';
+import { who } from './encounters';
 
 export const barrow: CellarLore = {
   words: {
@@ -56,27 +57,27 @@ export const barrow: CellarLore = {
   ],
   dwellers: [
     {
-      id: 'restless-dead', text: 'Since the magic began to come back, the dead of {place} do not lie still.', uses: [], creatures: ['skeleton'], lair: 'chieftain-tomb', crowd: 2, danger: 18,
+      id: 'restless-dead', text: 'Since the magic began to come back, the dead of {place} do not lie still.', uses: [], ...who('the-dead'), lair: 'chieftain-tomb', crowd: 2, danger: 18,
       patterns: ['gallery', 'lock-key', 'seen-key', 'ring-hall'], traces: ['bones'],
       signs: ['The sheep will not graze near it any more, and at dusk something walks along the top of the mound.', 'There was a light in the doorway at midnight, cold and green, and a sound like stones grinding.'],
     },
     {
-      id: 'grave-robbers', text: 'A band of grave-robbers have made {place} their camp and dig for what the dead took with them.', uses: ['robbers-camp'], creatures: ['bandit'], lair: 'robbers-camp', crowd: 1, danger: 17,
+      id: 'grave-robbers', text: 'A band of grave-robbers have made {place} their camp and dig for what the dead took with them.', uses: ['robbers-camp'], ...who('smugglers'), lair: 'robbers-camp', crowd: 1, danger: 17,
       patterns: ['hidden-shortcut', 'barred-return', 'false-goal', 'bolt-hole'], traces: ['lantern', 'crate'],
       signs: ['There is smoke from the mound some mornings, and fresh spoil by the doorway.', 'Two strangers bought picks and rope at the smithy and paid in old coin.'],
     },
     {
-      id: 'rats', text: 'Rats found the robbers\' holes and grew fat in {place} on what the dead were given.', uses: ['burrow'], creatures: ['giant rat', 'rat'], lair: 'rat-nest', crowd: 3, danger: 10,
+      id: 'rats', text: 'Rats found the robbers\' holes and grew fat in {place} on what the dead were given.', uses: ['burrow'], ...who('rats'), lair: 'rat-nest', crowd: 3, danger: 10,
       patterns: ['collapsed-way', 'side-loop', 'low-road', 'bolt-hole'], traces: ['nest', 'bones'],
       signs: ['The dog came back from the mound with a bone in its mouth, and it was not an animal bone.', 'Rats as big as cats run from the barrow into the fields at night.'],
     },
     {
-      id: 'spiders', text: 'Giant spiders crept in from the dark below and spun the inner rooms of {place} shut.', uses: [], creatures: ['giant spider'], lair: 'web-hall', crowd: 1, danger: 24,
+      id: 'spiders', text: 'Giant spiders crept in from the dark below and spun the inner rooms of {place} shut.', uses: [], ...who('spiders'), lair: 'web-hall', crowd: 1, danger: 24,
       patterns: ['gallery', 'drop-in', 'seen-goal', 'split-descent'], traces: ['web', 'bones'],
       signs: ['A shepherd went in after a lamb and came out grey with silk.', 'The doorway is webbed over every morning, however often the boys knock it down.'],
     },
     {
-      id: 'barrow-lord', text: 'The chieftain of {place} has woken, and his household rises with him.', uses: [], creatures: ['ghoul', 'skeleton'], lair: 'chieftain-tomb', crowd: 1, danger: 29,
+      id: 'barrow-lord', text: 'The chieftain of {place} has woken, and his household rises with him.', uses: [], ...who('ghoul-and-bones'), lair: 'chieftain-tomb', crowd: 1, danger: 29,
       patterns: ['gallery', 'lock-key', 'seen-key'], traces: ['bones'], with: ['hill-chiefs', 'sealed', 'wards-taken'],
       signs: ['It is cold by the mound even at noon, and the grass on it has gone white.', 'At night something calls from inside it, slow, in a tongue older than the town.'],
     },

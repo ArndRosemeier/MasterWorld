@@ -5,6 +5,7 @@
  * the mouth is rock on the hillside, and inside the rock is carved, not built.
  */
 import type { CellarLore } from '../contract';
+import { who } from './encounters';
 
 export const cave: CellarLore = {
   words: {
@@ -64,38 +65,38 @@ export const cave: CellarLore = {
   ],
   dwellers: [
     {
-      id: 'wolves', text: 'A wolf pack dens in {place} and hunts the valley from it.', uses: [], creatures: ['wolf'], lair: 'den', crowd: 2, danger: 16,
+      id: 'wolves', text: 'A wolf pack dens in {place} and hunts the valley from it.', uses: [], ...who('wolves'), lair: 'den', crowd: 2, danger: 16,
       patterns: ['twin-paths', 'guarded-short', 'bolt-hole', 'gambit'], traces: ['bones'],
       signs: ['Two ewes taken from the high pasture in a week, and the tracks lead up into the rocks.', 'At night the howling comes from the hill, and the dogs will not go out.'],
     },
     {
-      id: 'goblins', text: 'A band of goblins moved into {place} and raid the farms by night.', uses: ['warren'], creatures: ['goblin'], lair: 'warren', crowd: 3, danger: 19,
+      id: 'goblins', text: 'A band of goblins moved into {place} and raid the farms by night.', uses: ['warren'], ...who('goblins'), lair: 'warren', crowd: 3, danger: 19,
       patterns: ['ring-hall', 'false-goal', 'hidden-shortcut', 'barred-return'], traces: ['straw', 'sack'],
       signs: ['The hens are gone, and there are small bare footprints round the coop.', 'Smoke comes out of the rocks on the hill, and singing in no tongue anyone knows.'],
       surprise: 'One of the goblins speaks broken Common and begs for mercy.',
     },
     {
-      id: 'smugglers', text: "Smugglers keep their goods in {place}, well out of the reeve's sight.", uses: ['smugglers-store'], creatures: ['bandit'], lair: 'smugglers-store', crowd: 1, danger: 17,
+      id: 'smugglers', text: "Smugglers keep their goods in {place}, well out of the reeve's sight.", uses: ['smugglers-store'], ...who('smugglers'), lair: 'smugglers-store', crowd: 1, danger: 17,
       patterns: ['hidden-shortcut', 'secret-key', 'seen-key', 'side-loop'], traces: ['lantern', 'crate'],
       signs: ['Mules go up the hill by night with nothing on them and come down loaded.', 'There is good wine at the inn that nobody paid duty on.'],
     },
     {
-      id: 'highwaymen', text: 'The bandits who rob the road lie up in {place} between jobs.', uses: ['camp'], creatures: ['highwayman'], lair: 'camp', crowd: 2, danger: 20,
+      id: 'highwaymen', text: 'The bandits who rob the road lie up in {place} between jobs.', uses: ['camp'], ...who('highwaymen'), lair: 'camp', crowd: 2, danger: 20,
       patterns: ['bolt-hole', 'barred-return', 'guarded-short', 'seen-goal'], traces: ['lantern', 'crate'],
       signs: ['A carter was robbed on the hill road, and the men went up into the rocks after.', 'There is a light in the rocks at night, and horses where no farm keeps them.'],
     },
     {
-      id: 'rats', text: 'Rats came in out of the cold and found the dark of {place} to their liking; some have grown huge.', uses: ['burrow'], creatures: ['giant rat', 'rat'], lair: 'rat-nest', crowd: 3, danger: 10,
+      id: 'rats', text: 'Rats came in out of the cold and found the dark of {place} to their liking; some have grown huge.', uses: ['burrow'], ...who('rats'), lair: 'rat-nest', crowd: 3, danger: 10,
       patterns: ['collapsed-way', 'side-loop', 'low-road', 'bolt-hole'], traces: ['nest', 'bones'],
       signs: ['The rats in the barns all came down from the hill, and they keep coming.', 'Something with a long naked tail as thick as a thumb ran out of the rocks.'],
     },
     {
-      id: 'spiders', text: 'Giant spiders crept up from the dark below and spun the inner caverns of {place} shut.', uses: [], creatures: ['giant spider'], lair: 'web-hall', crowd: 1, danger: 24,
+      id: 'spiders', text: 'Giant spiders crept up from the dark below and spun the inner caverns of {place} shut.', uses: [], ...who('spiders'), lair: 'web-hall', crowd: 1, danger: 24,
       patterns: ['gallery', 'drop-in', 'seen-goal', 'split-descent'], traces: ['web', 'bones'],
       signs: ['A lamb went missing by the rocks, and there was silk on the thorns where it was last seen.', 'The mouth of the cave is grey with webs every morning.'],
     },
     {
-      id: 'ghoul', text: 'Something that eats the dead came up into {place} from the deep places.', uses: [], creatures: ['ghoul'], lair: 'bone-pit', crowd: 1, danger: 26,
+      id: 'ghoul', text: 'Something that eats the dead came up into {place} from the deep places.', uses: [], ...who('ghoul'), lair: 'bone-pit', crowd: 1, danger: 26,
       patterns: ['gallery', 'lock-key', 'seen-key', 'drop-in'], traces: ['bones'], with: ['bone-pit', 'lost', 'painted'],
       signs: ['The grave of the drover buried last spring is open, and the tracks go up the hill.', 'A smell of the grave comes out of the rocks when the wind is from the hill.'],
     },

@@ -2,16 +2,13 @@
  * The wild (plan 9.3, D27): what lives on the land around a town, in the same simulation as the
  * townsfolk and the dwellers below, without the VGM: deer graze in the meadows and bolt, a wolf pack
  * keeps to its woods, boar root under the trees, bandits camp by a road out of town and watch it. Each
- * group has a territory (seeded from the world, the setting says who lives where and how far out) and is
+ * group has a territory (the VGM places them into the log, vgm/wild.ts) and is
  * a den of its own (sim/creatures.ts) on open land: they notice the hero by sight and sound, call their
  * own, fight or flee and go home. Far groups rest (they stay home until the hero comes near). Danger is
  * fixed by where they live (D29), never by the hero. Positions are world metres. Pure.
  */
-import { Rng, deriveSeed, hash2f } from '@futuremagic/core';
-import type { CreatureDef, WildDef } from '../setting/contract';
-import { woodsOf } from '../world/flora';
-import type { Terrain } from '../world/terrain';
-import type { Town } from '../world/town';
+import { deriveSeed } from '@futuremagic/core';
+import type { CreatureDef } from '../setting/contract';
 import { Den, type Quarry, type DenEvent } from './creatures';
 import type { DenGround, P3 } from './dungeonNav';
 
@@ -26,7 +23,10 @@ export interface Land {
 
 /** A group's home ground. */
 export interface Territory {
-  readonly def: WildDef;
+  /** What kind of group (a wild group's id in the setting, or a story event's). */
+  readonly kind: string;
+  /** Who they are (the setting's encounter). */
+  readonly encounter: string;
   readonly x: number;
   readonly z: number;
   readonly r: number;
@@ -111,49 +111,6 @@ export class OpenGround implements DenGround {
 export function groupDanger(members: readonly string[], defs: readonly CreatureDef[]): number {
   const ds = members.map((m) => defs.find((d) => d.id === m)?.danger ?? 0).sort((a, b) => b - a);
   return ds.length ? ds[0] + ds.slice(1).reduce((a, d) => a + d * 0.25, 0) : 0;
-}
-
-/**
- * The territories around a town: for each kind of the setting's wild, its groups on a ring around the
- * town where the land suits them (woods, open land, by a road out), apart from each other.
- */
-export function placeWild(seed: number, terrain: Terrain, town: Town, wild: readonly WildDef[]): Territory[] {
-  const out: Territory[] = [];
-  const { x: tx, z: tz } = town.decision;
-  const woods = woodsOf(terrain);
-  const roads = town.plan.streets.filter((s) => s.kind === 'road').map((s) => {
-    const n = s.pts.length;
-    return Math.atan2(s.pts[n - 1] - tz, s.pts[n - 2] - tx);
-  });
-  for (const def of wild) {
-    for (let g = 0; g < def.groups; g++) {
-      const s = deriveSeed(seed, 'wild', def.id, g);
-      let best: { x: number; z: number; score: number } | null = null;
-      for (let k = 0; k < 48; k++) {
-        const d = def.ring[0] + (def.ring[1] - def.ring[0]) * hash2f(s, k, 1);
-        let a = hash2f(s, k, 2) * Math.PI * 2;
-        // By a road: along one of the roads out, a little off it.
-        if (def.habitat === 'road' && roads.length) a = roads[Math.floor(hash2f(s, k, 3) * roads.length)] + (hash2f(s, k, 4) - 0.5) * 0.35;
-        const x = tx + Math.cos(a) * d, z = tz + Math.sin(a) * d;
-        if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < 2) continue;
-        // Gentle enough to live on.
-        const h = terrain.height(x, z), slope = terrain.steepness(x, z, 8, h);
-        if (slope > 0.45) continue;
-        const w = woods(x, z);
-        const fit = def.habitat === 'wood' ? w : def.habitat === 'open' ? 1 - w : 0.6 + (1 - w) * 0.2;
-        // Apart from the other groups, and clear of a people's hold.
-        const crowd = out.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + def.range + 60) || terrain.holds.some((h) => Math.hypot(h.x - x, h.z - z) < def.range + 110) ? 1 : 0;
-        const score = fit - crowd - slope + hash2f(s, k, 5) * 0.1;
-        if (!best || score > best.score) best = { x, z, score };
-      }
-      if (!best || best.score < 0.2) continue;
-      const rng = new Rng(deriveSeed(s, 'members'));
-      const n = rng.int(def.count[0], def.count[1]);
-      const members = Array.from({ length: n }, (_, i) => (i === 0 ? def.creatures[0] : def.creatures[Math.min(def.creatures.length - 1, rng.int(0, def.creatures.length - 1))]));
-      out.push({ def, x: best.x, z: best.z, r: def.range, members, seed: s, id: `${def.id}-${g + 1}` });
-    }
-  }
-  return out;
 }
 
 /** One group out on the land: its den, and whether it is awake (near the hero). */
