@@ -57,9 +57,8 @@ await page.evaluate(() => {
   f.follow = function (dt, cam) {
     const before = new Map(this.shown);
     const r = follow.call(this, dt, cam);
-    for (const [id] of before) {
-      if (this.shown.has(id)) continue;
-      const a = this.life.agents.find((x) => x.person.id === id);
+    for (const [a] of before) { // keyed by agent
+      if (this.shown.has(a)) continue;
       const d = a ? Math.hypot(a.x - cam.position.x, a.z - cam.position.z) : Infinity;
       C.freed[!a || a.hidden ? 'hidden' : d >= 70 ? 'far' : 'ranked']++;
     }
