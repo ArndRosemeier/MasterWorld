@@ -98,6 +98,8 @@ export const params = {
   /** Start in the town's cellar: `cellar` at the ladder, `cellar=3` in room 3. */
   cellar: q.has('cellar'),
   cellarRoom: q.get('cellar') ? Number(q.get('cellar')) : undefined,
+  /** Slow motion for watching a blow land (tools/shot/hits.mjs): `slow=8` runs everything eight times slower. */
+  slow: Math.max(1, Number(q.get('slow') ?? 1) || 1),
   /** Who lives in the town's cellar (for looking at them): a cellar dweller's id, `dweller=goblins`. */
   dweller: q.get('dweller'),
   /** The first cellar was cleared long ago and others have moved in (`moved`, with `cellar` to look at them). */

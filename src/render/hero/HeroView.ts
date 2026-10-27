@@ -20,6 +20,7 @@ import { buildArm } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE, SIT_DOWN, STAND_UP } from './clips';
 import { gripHeld } from './grips';
 import { FADE, castShadows, playClip, preparePeople, seatOf } from './play';
+import { Jolt, joltRoot, joltSpine } from '../jolt';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -117,6 +118,8 @@ export class HeroView {
   /** Resting: sitting (or sitting down), seconds since it began or ended, standing up, how far down (0 standing, 1 sat). */
   private readonly rest = { on: false, t: 0, rising: false, k: 0 };
   private readonly listeners = new Set<(c: CharacterConfig) => void>();
+  /** The last blow taken: the body knocked back from it, whatever it is doing. */
+  private readonly jolt = new Jolt();
 
   private constructor(private front: Character, private back: Character, private readonly stage: Stage) {
     this.object.name = 'hero';
@@ -206,6 +209,9 @@ export class HeroView {
   /** Shown or not (first person hides it). */
   set visible(v: boolean) { this.object.visible = v; }
 
+  /** Struck: knocked back along (dx, dz) (away from the blow), `k` how hard (1 a plain blow). */
+  struck(dx: number, dz: number, k = 1): void { this.jolt.hit(dx, dz, k); }
+
   /** The next pose at once, not blended (getting on or off a horse). */
   snap(): void { this.cut = true; }
 
@@ -234,6 +240,12 @@ export class HeroView {
     } else {
       o.position.set(p.pos.x, p.pos.y - (clip === 'swim' || clip === 'tread water' ? this.height * SWIM_DROP : 0), p.pos.z);
       if (this.rest.k > 0) this.sitOnGround(p.pos.y, this.rest.k);
+    }
+    this.jolt.step(dt);
+    if (p.gait !== 'dead' && p.gait !== 'ride') {
+      joltRoot(o, this.jolt, 0.08);
+      const f = this.front.actor.fittedSkeleton;
+      if (f) joltSpine(this.front.actor.bones, f.names, this.jolt, 0.4);
     }
     if (this.held.drawn !== !!p.combat) { this.held.drawn = !!p.combat; this.moveHeld(); }
   }
