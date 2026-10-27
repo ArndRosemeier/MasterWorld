@@ -81,13 +81,26 @@ export function archY(b: Bridge, t: number): number | null {
   return null;
 }
 
+/** (x, z) in bridge `b`'s frame: `t` along its deck (0..1 on it) and the distance across from its middle line. */
+function frameOf(b: Bridge, x: number, z: number): { t: number; across: number } {
+  const dx = b.x1 - b.x0, dz = b.z1 - b.z0, L2 = dx * dx + dz * dz;
+  return { t: ((x - b.x0) * dx + (z - b.z0) * dz) / L2, across: Math.abs((x - b.x0) * dz - (z - b.z0) * dx) / Math.sqrt(L2) };
+}
+
 /** The deck's top at (x, z) if that is on bridge `b` (between its parapets), else null. */
 export function deckAt(b: Bridge, x: number, z: number): number | null {
-  const dx = b.x1 - b.x0, dz = b.z1 - b.z0, L2 = dx * dx + dz * dz;
-  const t = ((x - b.x0) * dx + (z - b.z0) * dz) / L2;
-  if (t < 0 || t > 1) return null;
-  const across = Math.abs((x - b.x0) * dz - (z - b.z0) * dx) / Math.sqrt(L2);
-  return across < b.half ? deckY(b, t) : null;
+  const { t, across } = frameOf(b, x, z);
+  return t >= 0 && t <= 1 && across < b.half ? deckY(b, t) : null;
+}
+
+/**
+ * Whether a body of radius `r` at (x, z) runs into bridge `b`'s sides: its parapets from the deck (feet
+ * at `feet` under their top), or its walls from the bank below. `feet` left out: anything in them.
+ */
+export function bridgeSideAt(b: Bridge, x: number, z: number, r: number, feet?: number): boolean {
+  const { t, across } = frameOf(b, x, z);
+  if (t < 0 || t > 1 || across < b.half - PARAPET_T - r || across > b.half + r) return false;
+  return feet === undefined || feet < deckY(b, t) + PARAPET - 0.05;
 }
 
 /** A road's centre line sampled every STEP m: x, y, z, metres along. */
