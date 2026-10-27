@@ -51,3 +51,15 @@ test('room cast: drinkers at the inn tables sit on the benches, those at the cou
   for (const x of cast) assert.equal(x.act, onBench(x.spot) ? 'sit' : 'drink');
   assert.ok(cast.some((x) => x.act === 'sit'), 'somebody at a table');
 });
+
+test('room cast: someone stopped out of doors on their way into the inn stays out there with the hero', () => {
+  const life = new TownLife(plan, 7, 19);
+  for (let s = 0; s < 300; s++) life.step(1, 19);
+  const inn = plan.buildings.find((b) => b.kind === 'inn')!, room = planInterior(inn);
+  const outside = life.agents.find((a) => !a.hidden && a.act !== 'drink' && a.act !== 'pray');
+  assert.ok(outside, 'somebody out of doors');
+  // On their way in: the inn's door is where they are going.
+  outside.spot = life.spots.findIndex((s) => s.door && s.building === inn.id);
+  life.hold(outside, outside.x + 1, outside.z);
+  assert.ok(!roomCast(life.agents, life.spots, inn.id, room).some((x) => x.agent === outside), 'not drawn at a spot in the room');
+});
