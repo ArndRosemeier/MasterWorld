@@ -11,6 +11,10 @@ The VGM has two halves that share one view of the player (plan 4):
 
 It steers the people and creatures of the world simulation only through orders and decisions, never by moving them directly (D27).
 
+**Invisible, and showing rather than telling.** In play the VGM never shows its hand (D53). The game settings show it and its pacing, and the debug menu keeps a log of each move and why (plan step C8). What it makes, the hero should mostly come upon and see: situations that arise naturally, not quests handed out (D52, step C10). A speech bubble is for the rare urgent line, such as a cry for help.
+
+What the VGM should become, and where it falls short today: [The VGM we want](https://claude.ai/artifact/Y9YgAzHphg24tFXZQ3m9Hx).
+
 **One toolbox (D51).** Everything the VGM can make lives in `src/vgm` (pure: no three.js, so it runs in workers, tests and the loop bot). Each kind of thing is a **tool** with the same shape (section 6). The game (`src/app`, `src/main.ts`) only *applies* what a tool decided: it builds, draws and tells it. It never decides on its own what the world gets.
 
 ## 2. The tools today
