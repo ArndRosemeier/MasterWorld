@@ -1,0 +1,33 @@
+start door 1.00
+FAIL the door stands open before the hero comes (1.00)
+shots\doors-gpu1\0-before.jpg
+shots\doors-gpu1\1-in-00.jpg
+shots\doors-gpu1\1-in-01.jpg
+shots\doors-gpu1\1-in-02.jpg
+shots\doors-gpu1\1-in-03.jpg
+shots\doors-gpu1\1-in-04.jpg
+shots\doors-gpu1\1-in-05.jpg
+shots\doors-gpu1\1-in-06.jpg
+shots\doors-gpu1\1-in-07.jpg
+shots\doors-gpu1\1-in-08.jpg
+shots\doors-gpu1\1-in-09.jpg
+in: widest 1.00
+shots\doors-gpu1\2-out-00.jpg
+shots\doors-gpu1\2-out-01.jpg
+shots\doors-gpu1\2-out-02.jpg
+shots\doors-gpu1\2-out-03.jpg
+shots\doors-gpu1\2-out-04.jpg
+shots\doors-gpu1\2-out-05.jpg
+shots\doors-gpu1\2-out-06.jpg
+shots\doors-gpu1\2-out-07.jpg
+shots\doors-gpu1\2-out-08.jpg
+shots\doors-gpu1\2-out-09.jpg
+shots\doors-gpu1\2-out-10.jpg
+shots\doors-gpu1\2-out-11.jpg
+shots\doors-gpu1\2-out-12.jpg
+out: widest 1.00
+end door 1.00
+FAIL the door stays open behind the hero (1.00)
+shots\doors-gpu1\3-shut-behind.jpg
+shaders 92 warm-up + 0 later · worst 11 ms · policy ok
+doors: FAILED
