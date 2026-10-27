@@ -56,8 +56,8 @@ else {
   await shoot('04-market');
   // A raid's farm: its paddock from outside the gate, short of what was driven off.
   const pen = await page.evaluate(() => {
-    const g = window.game, e = g.log.at(-1);
-    if (e?.paddock === undefined) return null;
+    const g = window.game, e = g.log.findLast((d) => d.kind === 'event');
+    if (e?.paddock === undefined) return null; // a spill: no farm
     const t = g.towns.get(e.town), pd = t.town.plan.paddocks[e.paddock], p = pd.poly;
     let cx = 0, cz = 0;
     for (let i = 0; i < p.length; i += 2) { cx += p[i] / (p.length / 2); cz += p[i + 1] / (p.length / 2); }
