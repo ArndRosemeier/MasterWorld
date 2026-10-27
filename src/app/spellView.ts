@@ -1,21 +1,28 @@
 /**
- * Spells drawn (plan 10, C2): what the recipe runner (game/recipe.ts) has going, as glowing shapes in the
- * school's colour, all in one instanced mesh with one shader (materials/spells.ts) built behind the loading
- * screen. A spell being cast gathers as an orb at the caster's hand; what flies is an orb; an area bursts
- * out to its radius and fades; a zone lies as a pulsing disc; a spell on the caster flares round them.
- * C4 gives each school its own look within the shader budget.
+ * Spells drawn (plan 10, C2, C4): what the recipe runner (game/recipe.ts) has going, as glowing shapes in the
+ * school's colour and motif, all in one instanced mesh with one shader (materials/spells.ts) built behind the
+ * loading screen, so a spell never builds a shader when it is first cast. A spell being cast gathers as an orb
+ * at the caster's hand; what flies is an orb with a trail; an area bursts out to its radius and fades; a zone
+ * lies as a pulsing disc; a spell on the caster flares round them. Each school's spells shed their own motes
+ * (spellMotes.ts): sparks, flakes, grit, seeds of light, glints or wisps.
  */
-import { Color, Group, IcosahedronGeometry, InstancedMesh, Object3D } from 'three/webgpu';
+import { Color, Group, IcosahedronGeometry, InstancedBufferAttribute, InstancedMesh, Object3D } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import type { AbilityDef, SettingModule } from '../setting/contract';
+import { deriveSeed } from '@futuremagic/core';
+import type { AbilityDef, SettingModule, SpellMotif } from '../setting/contract';
 import type { RecipeEvent, Recipes, Spot } from '../game/recipe';
 import { SPELL_GLOW } from '../render/materials/spells';
+import { Motes, motifIndex } from './spellMotes';
 
-/** Shapes drawn at once, at most. */
-const MAX = 96;
+/** Shapes drawn at once, at most (bodies and motes). */
+const MAX = 320;
+/** Motes alive at once, at most. */
+const MOTES = 220;
 /** How long an area's burst and a flare last (s). */
 const BURST = 0.5;
 const FLARE = 0.9;
+/** Motes shed per second: by a spell being cast, behind what flies, per metre of a zone's radius. */
+const GATHER = 14, TRAIL = 45, LINGER = 3;
 
 /** One fight's (or the calm land's) spells, and where its frame sits in the world. */
 export interface SpellFrame {
@@ -28,26 +35,36 @@ export interface SpellFrame {
   readonly cues: readonly RecipeEvent[];
 }
 
-interface Flash { x: number; y: number; z: number; radius: number; color: Color; age: number; life: number; grow: boolean }
+interface Flash { x: number; y: number; z: number; radius: number; look: Look; age: number; life: number; grow: boolean }
+
+/** How an ability shows: its school's colour and motif. */
+interface Look { readonly color: Color; readonly motif: SpellMotif; readonly n: number }
 
 export class SpellView {
   readonly group = Object.assign(new Group(), { name: 'spells' });
   private readonly mesh: InstancedMesh;
   private readonly flashes: Flash[] = [];
-  private readonly colors = new Map<string, Color>();
+  private readonly looks = new Map<string, Look>();
   private readonly o = new Object3D();
-  private readonly c = new Color();
+  private readonly tint: InstancedBufferAttribute;
+  private readonly spell: InstancedBufferAttribute;
+  private readonly motes = new Motes(deriveSeed(0x5be11, 'motes'), MOTES);
   private t = 0;
+  private n = 0;
   /** Held as last drawn (shots of a spell in flight); the spells go on underneath. */
   frozen = false;
-  /** What the last frame drew: things flying and bursts or flares (shots wait for them). */
-  shown = { shots: 0, flashes: 0 };
+  /** What the last frame drew: things flying, bursts or flares, and motes (shots wait for them). */
+  shown = { shots: 0, flashes: 0, motes: 0 };
 
   constructor(private readonly setting: SettingModule) {
-    const m = new InstancedMesh(new IcosahedronGeometry(1, 2), SPELL_GLOW.make(), MAX);
+    const g = new IcosahedronGeometry(1, 2);
+    // The per-shape attributes (materials/spells.ts) from the start: they are part of the shader's key.
+    this.tint = new InstancedBufferAttribute(new Float32Array(MAX * 3), 3);
+    this.spell = new InstancedBufferAttribute(new Float32Array(MAX * 4), 4);
+    g.setAttribute('tint', this.tint);
+    g.setAttribute('spell', this.spell);
+    const m = new InstancedMesh(g, SPELL_GLOW.make(), MAX);
     Object.assign(m, { name: 'spell glow', frustumCulled: false, castShadow: false, receiveShadow: false, count: 0 });
-    // The colour attribute from the start: it is part of the shader's key.
-    m.setColorAt(0, new Color(1, 1, 1));
     this.mesh = m;
     this.group.add(m);
   }
@@ -59,16 +76,17 @@ export class SpellView {
     this.mesh.count = 0;
   }
 
-  /** The colour an ability glows in: its skill's (a school's), else a pale gold. */
-  tintOf(def: AbilityDef): Color {
+  /** How an ability shows: its skill's (a school's) colour and motif, else a pale gold radiance. */
+  showingOf(def: AbilityDef): Look {
     const id = def.skill ?? '';
-    let c = this.colors.get(id);
-    if (!c) {
-      const k = this.setting.skills.find((s) => s.id === id)?.color ?? [1, 0.92, 0.7];
-      c = new Color().setRGB(k[0], k[1], k[2]);
-      this.colors.set(id, c);
+    let l = this.looks.get(id);
+    if (!l) {
+      const k = this.setting.skills.find((s) => s.id === id);
+      const c = k?.color ?? [1, 0.92, 0.7], motif = k?.motif ?? 'radiance';
+      l = { color: new Color().setRGB(c[0], c[1], c[2]), motif, n: motifIndex(motif) };
+      this.looks.set(id, l);
     }
-    return c;
+    return l;
   }
 
   /** Every frame: draw the frame's spells (null: none). */
@@ -76,27 +94,24 @@ export class SpellView {
     if (this.frozen) return;
     this.t += dt;
     if (f) for (const e of f.cues) this.hear(e, f);
-    let n = 0;
-    const put = (x: number, y: number, z: number, sx: number, sy: number, col: Color, k: number) => {
-      if (n >= MAX) return;
-      this.o.position.set(x, y, z);
-      this.o.scale.set(sx, sy, sx);
-      this.o.updateMatrix();
-      this.mesh.setMatrixAt(n, this.o.matrix);
-      this.mesh.setColorAt(n, this.c.copy(col).multiplyScalar(Math.max(0, k)));
-      n++;
-    };
+    this.n = 0;
     if (f) {
       const O = f.offset, r = f.recipes;
       const cast = r.casting, share = r.castShare;
-      if (cast && share !== null) put(O.x + f.me.x, O.y + f.me.y + 1.35, O.z + f.me.z, 0.06 + 0.16 * share, 0.06 + 0.16 * share, this.tintOf(cast.def), 0.6 + 0.6 * share);
+      if (cast && share !== null) {
+        const l = this.showingOf(cast.def), x = O.x + f.me.x, y = O.y + f.me.y + 1.35, z = O.z + f.me.z, size = 0.06 + 0.16 * share;
+        this.put(x, y, z, size, size, l, 0, 0.6 + 0.6 * share, 0);
+        this.motes.shed(l.motif, l, GATHER * dt, x, y, z, 0.25);
+      }
       for (const s of r.shots) {
-        const rad = Math.max(0.14, s.op.radius ?? 0.18);
-        put(O.x + s.x, O.y + s.y, O.z + s.z, rad, rad, this.tintOf(s.ability), 1.2);
+        const rad = Math.max(0.14, s.op.radius ?? 0.18), l = this.showingOf(s.ability);
+        this.put(O.x + s.x, O.y + s.y, O.z + s.z, rad, rad, l, 0, 1.2, s.n);
+        this.motes.shed(l.motif, l, TRAIL * dt, O.x + s.x, O.y + s.y, O.z + s.z, rad * 0.6);
       }
       for (const z of r.zones) {
-        const fade = Math.min(1, z.left / 0.5);
-        put(O.x + z.x, O.y + z.y + 0.08, O.z + z.z, z.radius, 0.06, this.tintOf(z.ability), (0.35 + 0.12 * Math.sin(this.t * 5 + z.n)) * fade);
+        const fade = Math.min(1, z.left / 0.5), l = this.showingOf(z.ability);
+        this.put(O.x + z.x, O.y + z.y + 0.08, O.z + z.z, z.radius, 0.06, l, 0, (0.35 + 0.12 * Math.sin(this.t * 5 + z.n)) * fade, z.n);
+        this.motes.shed(l.motif, l, LINGER * z.radius * dt * fade, O.x + z.x, O.y + z.y + 0.1, O.z + z.z, z.radius * 0.9);
       }
     }
     for (let i = this.flashes.length - 1; i >= 0; i--) {
@@ -104,22 +119,45 @@ export class SpellView {
       fl.age += dt;
       if (fl.age >= fl.life) { this.flashes.splice(i, 1); continue; }
       const a = fl.age / fl.life, rad = fl.grow ? fl.radius * (0.3 + 0.7 * a) : fl.radius;
-      put(fl.x, fl.y, fl.z, rad, fl.grow ? rad * 0.6 : rad, fl.color, (1 - a) * (fl.grow ? 0.9 : 0.6));
+      this.put(fl.x, fl.y, fl.z, rad, fl.grow ? rad * 0.6 : rad, fl.look, 0, (1 - a) * (fl.grow ? 0.9 : 0.6), i);
     }
-    this.shown = { shots: f?.recipes.shots.length ?? 0, flashes: this.flashes.length };
-    this.mesh.count = n;
+    this.motes.drift(dt);
+    for (const m of this.motes.list) {
+      const a = m.age / m.way.life, size = m.way.size * (1 - 0.5 * a);
+      this.put(m.x, m.y, m.z, size, size, m.tint as Look, 1, m.way.bright * (1 - a), m.seed * 97);
+    }
+    this.shown = { shots: f?.recipes.shots.length ?? 0, flashes: this.flashes.length, motes: this.motes.list.length };
+    this.mesh.count = this.n;
     this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this.tint.needsUpdate = true;
+    this.spell.needsUpdate = true;
+  }
+
+  /** One shape: an orb (sx = sy), a disc or burst (sy < sx), or a mote (role 1); k dims it. */
+  private put(x: number, y: number, z: number, sx: number, sy: number, l: Look, role: number, k: number, seed: number): void {
+    const n = this.n;
+    if (n >= MAX) return;
+    this.o.position.set(x, y, z);
+    this.o.scale.set(sx, sy, sx);
+    this.o.updateMatrix();
+    this.mesh.setMatrixAt(n, this.o.matrix);
+    this.tint.setXYZ(n, l.color.r, l.color.g, l.color.b);
+    this.spell.setXYZW(n, l.n, (seed * 0.618034) % 1, role, Math.max(0, k));
+    this.n = n + 1;
   }
 
   private hear(e: RecipeEvent, f: SpellFrame): void {
     const O = f.offset;
-    const flash = (at: Spot, radius: number, color: Color, life: number, grow: boolean) =>
-      this.flashes.push({ x: O.x + at.x, y: O.y + at.y + (grow ? 0.3 : 1), z: O.z + at.z, radius, color, age: 0, life, grow });
+    const flash = (at: Spot, radius: number, def: AbilityDef, life: number, grow: boolean, motes: number) => {
+      const look = this.showingOf(def), x = O.x + at.x, y = O.y + at.y + (grow ? 0.3 : 1), z = O.z + at.z;
+      this.flashes.push({ x, y, z, radius, look, age: 0, life, grow });
+      // A burst throws its motes out across its radius; a flare sheds them round the body.
+      this.motes.shed(look.motif, look, motes, x, y, z, grow ? radius * 0.3 : radius * 0.7, grow ? radius * 1.5 : 0);
+    };
     switch (e.kind) {
-      case 'area': flash(e.at, e.radius, this.tintOf(e.ability), BURST, true); break;
-      case 'landed': if (!e.shot.op.onHit) flash({ x: e.shot.x, y: e.shot.y - 1, z: e.shot.z }, 0.5, this.tintOf(e.shot.ability), 0.3, true); break;
-      case 'look': flash(e.at, 0.9, this.tintOf(e.ability), FLARE, false); break;
+      case 'area': flash(e.at, e.radius, e.ability, BURST, true, 10 + 6 * e.radius); break;
+      case 'landed': if (!e.shot.op.onHit) flash({ x: e.shot.x, y: e.shot.y - 1, z: e.shot.z }, 0.5, e.shot.ability, 0.3, true, 10); break;
+      case 'look': flash(e.at, 0.9, e.ability, FLARE, false, 18); break;
       default: break;
     }
   }
