@@ -13,4 +13,13 @@ export const events: readonly StoryEventDef[] = [
       done: 'The {creatures} that came out of {place} are dead. {town} will sleep easier.',
     },
   },
+  {
+    id: 'farm-raid', kind: 'raid', by: 'bandits', after: 36, cooldown: 48, count: [2, 3], gather: 1.5,
+    words: {
+      title: 'The {animals} of {place}',
+      news: 'Word runs through {town}: {creatures} came down on {place} in the night and drove off its {animals}. They hold them {dir} of the town.',
+      note: 'Nobody went after the {creatures} by the road, so they raided {place} and drove off its {animals}. They hold the beasts {dir} of the town. Beat them and the {animals} can go home.',
+      done: 'The {creatures} who raided {place} are beaten, and its {animals} are home again.',
+    },
+  },
 ];

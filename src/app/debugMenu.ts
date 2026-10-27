@@ -33,8 +33,10 @@ export interface DebugHost {
   /** The canon's legendary items (C5), each to put on here and try the ability it gives. */
   readonly legends: readonly { readonly id: string; readonly name: string }[];
   wearLegend(id: string): string;
-  /** A story event now (C6), whatever its wait: what the town hears, or why none came. */
-  storyEvent(): string;
+  /** The setting's story events (C6). */
+  readonly events: readonly { readonly id: string; readonly kind: string }[];
+  /** A story event now (C6), whatever its wait (one of `events` by id, or the first that can): what the town hears, or why none came. */
+  storyEvent(id?: string): string;
   /** Places worth a look in this world. */
   readonly places: readonly Place[];
   /** Everything, for the command line. */
@@ -101,6 +103,7 @@ export class DebugMenu {
       ['Town', [
         { label: 'Everyone to the market', run: () => h.town('gather') },
         { label: 'A story event now', run: () => h.storyEvent() },
+        ...h.events.map((e) => ({ label: `Story event: ${e.kind} (${e.id})`, run: () => h.storyEvent(e.id) })),
         { label: 'Curfew', run: () => h.town('stayIn') },
       ]],
       ['Weather', [
