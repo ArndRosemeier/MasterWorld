@@ -113,7 +113,8 @@ const SESSIONS = [
       await p.keyboard.press('Tab');
       const why = await p.evaluate((id) => window.game.useAbility(id), id);
       if (why) throw new Error(`fight-magic: ${id}: ${why}`);
-      await p.waitForFunction(() => { const s = window.game.spellView.shown; return s.shots > 0 || s.flashes > 0; }, null, { timeout: 20000 });
+      // In flight (a dart, a shard, a lance) or bursting at the wolf; the cast's own glow is not yet the spell.
+      await p.waitForFunction(() => window.game.spellView.shown.shots > 0, null, { timeout: 20000 });
       // Held still while the set waits for the shaders and measures (the last shot of its page): else it is gone.
       await p.evaluate(() => { window.game.spellView.frozen = true; });
     } },
@@ -169,7 +170,7 @@ for (const s of sessions) {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } }); // its own, as a player's first visit
   const page = await context.newPage();
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => { failed = true; errors.push(`page error: ${e.message}`); });
+  page.on('pageerror', (e) => { failed = true; errors.push(`page error: ${e.message}`); console.error(`[page error] ${e.stack ?? e.message}`); });
   const started = Date.now();
   await page.goto(`${base}?${s.query}`);
   if (s.first) await s.first(page);

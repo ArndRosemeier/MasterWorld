@@ -317,15 +317,19 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0 });
         // Below: the fights and the searching spread over the visit, each meeting its need as it ends.
         watch.where = 'below';
-        const parts = r.kills + r.looted + 1;
+        const parts = r.kills + r.looted + 1, cast = r.spells.length;
+        // The spells spread over the fights they were cast in (a fight won with spells shows a mage).
+        const casts = (n: number) => { for (let k = 0; k < n; k++) director.model.count('casts'); };
         for (let k = 0; k < parts; k++) {
           pass(r.seconds / parts);
-          if (k < r.kills) director.met('challenge');
-          else if (k < parts - 1) director.met('reward', 0.4);
+          if (k < r.kills) {
+            casts(Math.floor(((k + 1) * cast) / r.kills) - Math.floor((k * cast) / r.kills));
+            director.met('challenge');
+          } else if (k < parts - 1) director.met('reward', 0.4);
         }
+        if (!r.kills) casts(cast);
         saved = r.delve.tally();
-        spells += r.spells.length;
-        for (let k = 0; k < r.spells.length; k++) director.model.count('casts');
+        spells += cast;
         if (r.won && r.out) {
           say(`cleared ${name}: ${r.kills} killed, ${r.spared} spared, ${r.looted} searched, ${r.potions} potions, health ${(r.health * 100).toFixed(0)}%`);
           break;

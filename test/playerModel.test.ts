@@ -67,3 +67,15 @@ test('player model: a fighter meets the wolves at the paddock more often (C10 le
   assert.equal(at(first.at + 24 * 3), null, 'not three days on, for anyone');
   assert.ok(at(first.at + 24 * 3, (n) => (n === 'challenge' ? 1.5 : 1)), 'three days on, for a fighter');
 });
+
+test('player model: a fight won with spells shows a mage, one without a fighter', () => {
+  const d = new Director(classic.director);
+  d.model.count('casts');
+  d.met('challenge');
+  const mage = d.model.evidence.mage;
+  assert.ok(mage > 1 && d.model.evidence.fighter === 0);
+  d.met('challenge');
+  assert.equal(d.model.evidence.fighter, 1);
+  assert.equal(d.model.evidence.mage, mage);
+  assert.equal(d.model.history.fights, 2);
+});

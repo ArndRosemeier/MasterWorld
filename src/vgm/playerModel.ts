@@ -37,6 +37,8 @@ const SURE = 2;
 export class PlayerModel {
   readonly evidence: Record<Style, number>;
   history: PlayHistory;
+  /** Spells cast since the last fight ended: a fight won with spells shows a mage, not a fighter. */
+  private castsInFight = 0;
 
   constructor(private readonly def: DirectorDef, saved?: PlayerModelSave) {
     this.evidence = { explorer: 0, fighter: 0, socializer: 0, crafter: 0, mage: 0, ...(saved?.evidence ?? {}) };
@@ -53,6 +55,14 @@ export class PlayerModel {
     this.history = { ...this.history, [what]: this.history[what] + 1 };
     const shows = COUNTS[what];
     if (shows) this.note(shows[0], shows[1]);
+    if (what === 'casts') this.castsInFight++;
+  }
+
+  /** A fight ended: the style it showed (a mage's if spells were cast in it, else a fighter's). */
+  fought(): Style {
+    const style = this.castsInFight > 0 ? 'mage' : 'fighter';
+    this.castsInFight = 0;
+    return style;
   }
 
   /** Time passes (real seconds of play): old evidence fades. */
