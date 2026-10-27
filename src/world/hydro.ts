@@ -79,6 +79,8 @@ export interface River {
   reach?: Float32Array;
 }
 
+/** Height (m) below which the land's relief may dip under a brook's drained ground (terrain.ts: up to ~2.5 m down, never below 0.5 m). */
+const LOW_LAND = 2.7;
 /** Metres either way along a river its slope is taken over (its levels come in steps, flat between). */
 const SLOPE_REACH = 200;
 const slopeCache = new WeakMap<River, Float32Array>();
@@ -400,11 +402,30 @@ export class HydroTile {
         // A brook lies in the ground where it runs (its cells are too coarse for the dips between them).
         const lk = L[k] + (L[k + 1] - L[k]) * t;
         if (this.feed) gr.push(this.drainedAt(x + nx * m, z + nz * m));
-        lv.push(this.feed ? Math.min(lk, gr[gr.length - 1] - 0.2) : lk);
+        // Low by the sea, the land's small relief (terrain.ts, down to 0.5 m) dips below a brook's ground: it runs
+        // at the sea's height there, so its banks stay dry.
+        const bl = this.feed ? Math.min(lk, gr[gr.length - 1] - 0.2) : lk;
+        lv.push(this.feed && bl < LOW_LAND ? Math.min(bl, 0.3) : bl);
         hw.push(half);
       }
     }
     xz.push(X[X.length - 1], Z[Z.length - 1]); lv.push(L[L.length - 1]); hw.push(H[H.length - 1]);
+    // A river ends where it meets the sea: its coarse cells would carry it on over the sea floor, a band of water
+    // standing metres above the sea. One point past the shore, at the sea's level, so it reaches the water.
+    const sea = (k: number) => this.skeleton.elevation(xz[k * 2], xz[k * 2 + 1]) < 0;
+    if (lv.length > 2 && sea(lv.length - 1)) {
+      let k = lv.length - 1;
+      while (k > 1 && sea(k - 1)) k--;
+      xz.length = (k + 1) * 2; lv.length = hw.length = k + 1;
+      if (gr.length > k + 1) gr.length = k + 1;
+      lv[k] = Math.min(lv[k], 0);
+      // A river's coarse levels may stand above the low land by the shore: there it runs down with the land.
+      for (let j = k - 1; j > 0 && !brook; j--) {
+        const land = Math.max(0, this.skeleton.elevation(xz[j * 2], xz[j * 2 + 1])) + 0.5;
+        if (lv[j] <= land) break;
+        lv[j] = land;
+      }
+    }
     // Never rise downstream.
     for (let k = 1; k < lv.length; k++) lv[k] = Math.min(lv[k], lv[k - 1]);
     const fall = new Float32Array(lv.length - 1);
@@ -421,6 +442,13 @@ export class HydroTile {
         }
         a = k;
       } else if ((k - a) * step > FALL_RUN) a++;
+    }
+    // Over a high shore it falls into the sea (brooks run down their last stretch).
+    if (!brook && lv[lv.length - 1] <= 0) {
+      let j = -1;
+      for (let k = Math.max(0, lv.length - 4); k < lv.length - 1; k++) if (j < 0 || lv[k] - lv[k + 1] > lv[j] - lv[j + 1]) j = k;
+      const near = fall.subarray(Math.max(0, j - Math.ceil(FALL_SPACING / step)), j).some((f) => f > 0);
+      if (j >= 0 && !near && lv[j] - lv[j + 1] >= FALL_MIN / 2) fall[j] = lv[j] - lv[j + 1];
     }
     const out: River = { xz: Float64Array.from(xz), level: Float32Array.from(lv), half: Float32Array.from(hw), fall };
     const feed = this.feed;

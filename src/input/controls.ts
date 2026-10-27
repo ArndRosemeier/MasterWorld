@@ -24,15 +24,29 @@ export const ACTIONS = [
   { id: 'map', label: 'Map' },
   { id: 'pack', label: 'Pack and skills' },
   { id: 'target', label: 'Next target' },
-  { id: 'strike', label: 'Attack (on and off)' },
-  { id: 'heavy', label: 'Heavy blow' },
-  { id: 'shove', label: 'Shove' },
-  { id: 'breath', label: 'Second wind' },
-  { id: 'potion', label: 'Drink a potion' },
+  { id: 'bar1', label: 'Action bar 1' },
+  { id: 'bar2', label: 'Action bar 2' },
+  { id: 'bar3', label: 'Action bar 3' },
+  { id: 'bar4', label: 'Action bar 4' },
+  { id: 'bar5', label: 'Action bar 5' },
+  { id: 'bar6', label: 'Action bar 6' },
+  { id: 'bar7', label: 'Action bar 7' },
+  { id: 'bar8', label: 'Action bar 8' },
+  { id: 'bar9', label: 'Action bar 9' },
+  { id: 'bar10', label: 'Action bar 10' },
+  { id: 'book', label: 'Abilities (arrange the bar)' },
   { id: 'search', label: 'Search, open, take' },
 ] as const;
 
 export type Action = (typeof ACTIONS)[number]['id'];
+
+/** The action bar's slot keys, slot 0 first. */
+export const BAR_KEYS = ['bar1', 'bar2', 'bar3', 'bar4', 'bar5', 'bar6', 'bar7', 'bar8', 'bar9', 'bar10'] as const satisfies readonly Action[];
+
+/** The bar slot `code` uses (−1: none). */
+export function barSlotOf(b: Bindings, code: string): number {
+  return code === '' ? -1 : BAR_KEYS.findIndex((a) => b[a].includes(code));
+}
 
 /** Up to two keys per action (`KeyboardEvent.code`s; '' is a free slot). */
 export type Bindings = Record<Action, [string, string]>;
@@ -55,11 +69,17 @@ export const DEFAULT_BINDINGS: Bindings = {
   map: ['KeyM', ''],
   pack: ['KeyI', ''],
   target: ['Tab', ''],
-  strike: ['Digit1', ''],
-  heavy: ['Digit2', ''],
-  shove: ['Digit3', ''],
-  breath: ['Digit4', ''],
-  potion: ['Digit5', ''],
+  bar1: ['Digit1', ''],
+  bar2: ['Digit2', ''],
+  bar3: ['Digit3', ''],
+  bar4: ['Digit4', ''],
+  bar5: ['Digit5', ''],
+  bar6: ['Digit6', ''],
+  bar7: ['Digit7', ''],
+  bar8: ['Digit8', ''],
+  bar9: ['Digit9', ''],
+  bar10: ['Digit0', ''],
+  book: ['KeyK', ''],
   search: ['KeyG', ''],
 };
 

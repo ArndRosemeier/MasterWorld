@@ -29,6 +29,13 @@ export class Player {
   horses: HorseView | null = null;
   /** The horse the hero rides, or null on foot. */
   riding: Steed | null = null;
+  /**
+   * Another body is played (bird form, app/birdForm.ts): it takes the frame when it says so (true), moving the
+   * walker with it and drawing what it draws.
+   */
+  shape: { take(dt: number): boolean; readonly aloft: boolean } | null = null;
+  /** The hero's own body is not drawn (a bird flies in its place). */
+  hideHero = false;
   private paused = false;
   private readonly seat = new Vector3();
   private flyingNow: boolean;
@@ -43,6 +50,9 @@ export class Player {
   }
 
   get flying(): boolean { return this.flyingNow; }
+
+  /** The hero is not walking the land as themself: the free camera flies, or a bird does. */
+  get offFoot(): boolean { return this.flyingNow || !!this.shape?.aloft; }
 
   set flying(on: boolean) {
     if (on === this.flying) return;
@@ -161,6 +171,7 @@ export class Player {
       this.standBy(dt);
       return;
     }
+    if (this.shape?.take(dt)) return;
     if (riding) {
       const { intent, facing } = heroCam.intent(dt, riding.yaw);
       riding.travel(dt, intent, facing);
@@ -195,7 +206,7 @@ export class Player {
   }
 
   /** The horses (each its own step, the ridden one moved by the rider) and the hero, drawn where they are. */
-  private drawBodies(dt: number): void {
+  drawBodies(dt: number): void {
     const { walker, hero, riding, horses } = this;
     for (const s of this.steeds) if (s !== riding) s.travel(dt);
     if (horses) {
@@ -204,6 +215,7 @@ export class Player {
       });
     }
     if (!hero) return;
+    if (this.hideHero) { hero.visible = false; return; }
     const ridden = riding && horses ? horses.saddle(this.steeds.indexOf(riding), this.seat) : null;
     if (riding && ridden) {
       // Seated on the saddle: pos is the point under it, the seat its height over the horse's ground.

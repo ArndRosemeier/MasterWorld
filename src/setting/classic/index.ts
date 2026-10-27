@@ -18,6 +18,7 @@ import { smallLife } from './smallLife';
 import { tower } from './tower';
 import { items, upkeep } from './items';
 import { shops, trainers } from './shops';
+import { bard, guilds, skillRanks } from './guilds';
 import { abilities, director, skills } from './skills';
 
 export const classic: SettingModule = {
@@ -68,6 +69,9 @@ export const classic: SettingModule = {
   upkeep,
   shops,
   trainers,
+  guilds,
+  skillRanks,
+  bard,
   abilities,
   director,
   hero,

@@ -22,12 +22,13 @@ export class HouseView {
   get open(): number { return this.id; }
 
   /** Draws `b` of `town` open (in place of the last one opened). */
-  async drawOpen(b: TownBuilding, plan: InteriorPlan, town: TownView | null): Promise<void> {
+  /** `sign`: the shield over its door (a guild house), as the town draws it shut. */
+  async drawOpen(b: TownBuilding, plan: InteriorPlan, town: TownView | null, sign?: [number, number, number]): Promise<void> {
     if (this.id === b.id && this.town === town) return;
     this.hide();
     this.town = town;
     const at: [number, number, number] = [b.cx, 0, b.cz];
-    const m = mergeMeshes([buildingMesh(b, at, true, { open: true }), interiorMesh(plan, b, at)]);
+    const m = mergeMeshes([buildingMesh(b, at, true, { open: true, sign }), interiorMesh(plan, b, at)]);
     const mesh = buildingMeshAt(m, b.cx, 0, b.cz, `open ${b.kind} ${b.id}`);
     this.mesh = mesh;
     this.id = b.id;

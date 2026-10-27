@@ -121,3 +121,20 @@ test('running water: steep brooks rush, lowland rivers glide (speed by slope)', 
   assert.ok(mean(brook) > mean(river), `brooks ${mean(brook)} vs rivers ${mean(river)}`);
   assert.ok(brook.filter((v) => v > 2).length > brook.length * 0.05, 'some brooks rush');
 });
+
+test('water mask: off the water the surface lies under the ground (no sheet floats over a dip by a brook)', () => {
+  let checked = 0;
+  for (const r of own.slice(0, 12)) {
+    const k = Math.floor(r.level.length / 2), x = r.xz[k * 2], z = r.xz[k * 2 + 1];
+    const res = 24, size = 48, x0m = x - size / 2, z0m = z - size / 2;
+    const m = waterMask(terrain, { seed, setting: classic.id, x0: x0m, z0: z0m, size, res });
+    for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
+      const p = (j * res + i) * 4;
+      if (m[p + 1] > 0) continue;
+      const h = terrain.height(x0m + (i + 0.5) * size / res, z0m + (j + 0.5) * size / res);
+      assert.ok(m[p] <= h + 1e-3, `surface ${m[p]} over ground ${h}`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 1000, `${checked} dry samples`);
+});

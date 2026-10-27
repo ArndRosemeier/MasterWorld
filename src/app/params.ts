@@ -87,7 +87,7 @@ export const params = {
   dweller: q.get('dweller'),
   /** The first cellar was cleared long ago and others have moved in (`moved`, with `cellar` to look at them). */
   moved: q.has('moved'),
-  /** Start inside a building of the town: `room=inn` (the first of that kind), `room=12` (building 12) or `room=cellar` (the cellar's house, with its hatch). */
+  /** Start inside a building of the town: `room=inn` (the first of that kind), `room=12` (building 12), `room=cellar` (the cellar's house, with its hatch), `room=guild` (the first guild house; `guild-out`: before its door). */
   room: q.get('room'),
   /** Start in a talk (for screenshots): `talk=inn` with the innkeeper, `talk=smith` with the smith, `talk=house` with the cellar's household; `topics=news,source` asked first (`topics=repair` opens the smith's bench). */
   talk: q.get('talk'),

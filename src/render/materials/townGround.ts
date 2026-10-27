@@ -92,7 +92,7 @@ const CROP_LOOKS: readonly [number, number, number, number, number, number, numb
   [208, 186, 114, 0.88, 0.22, 0, 0.15, 0.25], // barley
   [178, 176, 104, 0.85, 0.25, 0, 0.15, 0.25], // oats
   [66, 98, 42, 0.55, 0.7, 0.4, 0.45, 1], // beans
-  [104, 128, 132, 0.8, 0.25, 0, 0.2, 0.4], // flax (in flower)
+  [92, 122, 74, 0.8, 0.25, 0, 0.2, 0.4], // flax (green stems; its pale blue flowers read as water from the ground)
   [86, 124, 88, 0.45, 0.75, 1, 0.5, 1], // cabbage
   [0, 0, 0, 0, 0.9, 0, 1, 1], // ploughed
   [118, 126, 66, 0.85, 0.9, 0, 0.25, 0.2], // fallow (stubble and weeds over old furrows)

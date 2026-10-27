@@ -22,6 +22,8 @@ export interface Person {
   role: Role;
   /** The building's trade for 'trade' and 'hand' ('smith', 'baker' ...); '' otherwise. */
   trade: string;
+  /** Dressed for their calling rather than by role: a guild's master at arms, an old caravan hand. */
+  dress?: 'fighter' | 'traveller';
   /** 0..1 each. */
   social: number;
   diligent: number;

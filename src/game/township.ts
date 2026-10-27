@@ -13,6 +13,7 @@ import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
 import type { Decision, DecisionLog } from '../world/decisions';
 import type { Town } from '../world/town';
+import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
 
@@ -48,6 +49,7 @@ export class Township {
   private talkOf: TownTalk | null = null;
   private marketOf: Market | null = null;
   private herdsOf: Herds | null | undefined;
+  private housesOf: readonly GuildHouse[] | null = null;
   /** Set on the town's words when they are made (the game: how its people take the hero). */
   onTalk: ((talk: TownTalk) => void) | null = null;
 
@@ -56,9 +58,27 @@ export class Township {
     this.seed = townSeed(town, c.seed);
   }
 
-  /** Everyone living here (the town is planned when first asked: a far town's plan waits). */
+  /** Everyone living here (the town is planned when first asked: a far town's plan waits); its guild houses' trainers among them. */
   get residents(): readonly Person[] {
-    return (this.peopleOf ??= townsfolk(this.town.plan, this.seed));
+    if (this.peopleOf) return this.peopleOf;
+    const people = townsfolk(this.town.plan, this.seed);
+    staffGuilds(people, this.guilds);
+    return (this.peopleOf = people);
+  }
+
+  /** Its guild houses (D49; none in a town too small for any guild). */
+  get guilds(): readonly GuildHouse[] {
+    return (this.housesOf ??= guildHouses(this.town.plan, this.town.decision.size ?? 'town', this.c.setting));
+  }
+
+  /** The guild whose house building `id` is (null: a plain building). */
+  guildAt(id: number): GuildHouse | null {
+    return this.guilds.find((h) => h.b.id === id) ?? null;
+  }
+
+  /** The bard at its inn, who knows every guild house (null: no inn). */
+  get bard(): Person | null {
+    return bardOf(this.residents, this.town.plan);
   }
 
   /** Its people's days (the world simulation), made when first asked for. */

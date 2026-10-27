@@ -23,7 +23,8 @@ export interface TownCellMesh {
 }
 
 /** Every cell of a town that has buildings in it. */
-export function townMeshes(town: Town): TownCellMesh[] {
+/** `signs`: a shield over the door of these buildings (by id, its colour), the guild houses. */
+export function townMeshes(town: Town, signs: ReadonlyMap<number, [number, number, number]> = new Map()): TownCellMesh[] {
   const cells = new Map<string, { i: number; j: number; list: TownBuilding[]; props: TownProp[] }>();
   const cellAt = (x: number, z: number) => {
     const i = Math.floor(x / TOWN_CELL), j = Math.floor(z / TOWN_CELL), key = `${i},${j}`;
@@ -36,7 +37,7 @@ export function townMeshes(town: Town): TownCellMesh[] {
   return [...cells.values()].map(({ i, j, list, props }) => {
     const x = (i + 0.5) * TOWN_CELL, z = (j + 0.5) * TOWN_CELL;
     const meshes = (detail: boolean) => {
-      const parts = list.map((b) => buildingMesh(b, [x, 0, z], detail));
+      const parts = list.map((b) => buildingMesh(b, [x, 0, z], detail, { sign: signs.get(b.id) }));
       return { mesh: mergeMeshes([...parts, ...props.map((p) => propMesh(p, [x, 0, z], detail))]), ranges: rangesOf(list, parts) };
     };
     const near = meshes(true), far = meshes(false);
