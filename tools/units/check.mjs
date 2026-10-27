@@ -8,6 +8,7 @@
  */
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
+import { MUTE } from '../shot/launch.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,7 +33,7 @@ async function main() {
   const server = await createServer({ root, logLevel: 'silent', server: { port: 5203, strictPort: false } });
   await server.listen();
   const url = `${server.resolvedUrls.local[0]}tools/units/units.html`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist', ...MUTE] });
   let failed = false;
   try {
     const page = await browser.newPage();
