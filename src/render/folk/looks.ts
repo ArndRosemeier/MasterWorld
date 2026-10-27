@@ -55,7 +55,12 @@ export function lookOf(p: Person): CharacterPatch {
   const { colors, wear } = garmentColors();
   let outfit: string[];
   const shoes = r.chance(0.5) ? wear('medieval-boots', leather()) : wear('leather-boots', leather());
-  switch (p.role) {
+  switch (p.dress ?? p.role) {
+    case 'fighter':
+      // A master at arms: a padded tunic, hose and a leather jerkin, boots, a broad belt (women too).
+      outfit = ['briefs', ...(f ? ['bra'] : []), wear('med-tunic', r.pick(['#5e1a2b', '#4a3a2a', '#3d5a80', '#5a4a3a'])), wear('med-hose', r.pick(['#4a3a2a', '#3a3a44', '#5a4a3a'])),
+        wear('med-jerkin', leather()), wear('med-belt', leather()), wear('leather-boots', leather())];
+      break;
     case 'trader':
       outfit = f
         ? ['briefs', wear('laced-chemise', plain()), wear('medieval-dress', dyed()), wear('med-belt', leather()), wear('buckled-shoes', leather())]
@@ -97,7 +102,7 @@ export function lookOf(p: Person): CharacterPatch {
   return {
     race: p.race, race2: null, raceMix: 0, raceSize: r.range(0.3, 0.7), youth,
     body: {
-      gender: f ? 0 : 1, ageYears, muscle: r.range(0.3, p.role === 'trade' ? 0.8 : 0.6), weight: r.range(0.3, 0.75),
+      gender: f ? 0 : 1, ageYears, muscle: p.dress === 'fighter' ? r.range(0.7, 0.95) : r.range(0.3, p.role === 'trade' ? 0.8 : 0.6), weight: r.range(0.3, 0.75),
       height: r.range(0.3, 0.7), proportions: r.range(0.3, 0.7),
       african: r.range(0, 0.15), asian: r.range(0, 0.15), caucasian: 1,
     },
