@@ -4,7 +4,7 @@ import { DIRS } from '@futuremagic/dungeon';
 import { classic } from '../src/setting/classic/index';
 import { CELL, STOREY, outlineCellar, type Cellar } from '../src/world/dungeon/cellar';
 import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
-import { DungeonSpace } from '../src/world/dungeon/space';
+import { DungeonSpace, KEY_REACH, keySpot } from '../src/world/dungeon/space';
 import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { Walker } from '../src/game/walker';
 import { dungeonWorld } from '../src/game/dungeonWorld';
@@ -77,7 +77,7 @@ test('cellar space: closed doors hold until opened; walls stop the body', () => 
   }
 });
 
-test('cellar space: the hidden door is found by lingering at it, the key by entering its room', () => {
+test('cellar space: the hidden door is found by lingering at it', () => {
   const c = cellars.find((x) => x.layout.links.some((pl) => pl.link.kind === 'secret'))!;
   const s = new DungeonSpace(c.layout);
   const pl = c.layout.links.find((p) => p.link.kind === 'secret')!;
@@ -100,4 +100,20 @@ test('cellar mesh: sound buffers, door pieces for every door with a state', () =
     const stateful = c.graph.links.filter((l) => ['locked', 'oneway', 'secret'].includes(l.kind)).length;
     assert.equal(m.doors.length, stateful);
   }
+});
+
+test('cellar keys: one lies in the middle of its room and is picked up there, not anywhere in the room', () => {
+  let n = 0;
+  for (const c of cellars) for (const pl of c.layout.links) {
+    if (pl.link.kind !== 'locked' || pl.link.key === undefined) continue;
+    const room = pl.link.key, r = c.layout.rooms[room], s = new DungeonSpace(c.layout), [kx, ky, kz] = keySpot(c.layout, room);
+    assert.equal(s.grid.owner(Math.floor(kx / CELL), Math.floor(kz / CELL), r.level), room, 'it lies in its room');
+    // In a corner of the room (if far enough from the middle): not yet.
+    const cx = r.x * CELL + 0.4, cz = r.z * CELL + 0.4;
+    if (Math.hypot(cx - kx, cz - kz) > KEY_REACH) assert.ok(!s.touch(cx, ky + 0.05, cz, 0.1).some((e) => e.kind === 'key'));
+    assert.ok(s.touch(kx + 0.5, ky + 0.05, kz, 0.1).some((e) => e.kind === 'key' && e.link === pl.link.id));
+    assert.ok(s.keys.has(room));
+    n++;
+  }
+  assert.ok(n > 0, 'some test cellar has a locked door');
 });

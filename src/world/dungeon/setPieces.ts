@@ -46,8 +46,6 @@ export interface SetPieceDef {
   readonly use?: { readonly id: string; readonly era?: HistoryLayer; room(g: DungeonGraph, l: Link): number };
   /** Its own dressing and clues. */
   dress(c: PieceDress): void;
-  /** The note when its link opens (a hidden way found, a bar lifted). */
-  readonly found?: string;
   /** The hidden door's face, if it differs from the walls (sRGB). */
   readonly tint?: readonly [number, number, number];
 }
@@ -78,7 +76,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     troubles: ['sealed', 'debt'],
     prefer: ['hidden-shortcut', 'secret-key', 'side-loop'],
     find: (g) => g.links.find((l) => l.kind === 'secret') ?? null,
-    found: 'The pale bricks give under your shoulder: a way through.',
     tint: [200, 190, 170],
     dress({ link, rooms, graph, trouble, put, clue }) {
       const by = trouble.id === 'debt' ? 'the owner, the week before he fled' : 'the household, the summer of the sickness';
@@ -95,7 +92,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     about: 'A great cask against a wall that never empties and never fills: its tap is dry, it rings hollow, and the floor before it is worn in an arc. It swings out on hinges.',
     prefer: ['hidden-shortcut', 'side-loop', 'secret-key'],
     find: (g) => g.links.find((l) => l.kind === 'secret' && l.b !== g.entrance) ?? g.links.find((l) => l.kind === 'secret') ?? null,
-    found: 'You pull at the cask and it swings out on hidden hinges: a doorway behind it.',
     tint: [92, 70, 52],
     dress({ link, put, clue }) {
       const a = clue('A cask taller than a man. The tap is dry and furred with dust, but the flagstones before it are worn smooth in an arc, as if it often swung out.', link.a, link.id);
@@ -123,7 +119,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     prefer: ['barred-return', 'lock-key', 'bolt-hole'],
     find: (g) => g.links.find((l) => l.kind === 'oneway' && l.a !== g.goal && l.a !== g.entrance) ?? g.links.find((l) => l.kind === 'oneway') ?? null,
     use: { id: 'stand', room: (_g, l) => l.a },
-    found: 'You heave the beams aside and lift the bar. Whoever held this door is long gone.',
     dress({ link, trouble, put, clue }) {
       const why = trouble.id === 'robbed' ? 'the dead came out of the walls' : trouble.id === 'sealed' ? 'they bricked us in with the sick' : trouble.id === 'flood' ? 'the water rose behind us' : 'they came up from below';
       const k = clue(`Scratched into the beam: "Held the door three nights. No more water. ${why.charAt(0).toUpperCase()}${why.slice(1)}." The bar is still down on this side.`, link.a, link.id);
@@ -191,7 +186,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     about: 'The way in is long, through doors; the dwellers dug themselves a bolt-hole straight back, hidden under a sack.',
     main: ['bolt-hole'],
     find: (g) => g.links.find((l) => l.tags.includes('dug') && l.tags.includes('shortcut')) ?? null,
-    found: 'You push through the hole and come out under a sack, near the way in.',
     dress({ link, put, clue }) {
       const k = clue('Fresh earth spilled from under a sack. Behind it, a hole dug by small hands, running back towards the way in.', link.a, link.id);
       put(link.a, 'sack', 'now', k); put(link.a, 'straw', 'now');
@@ -239,7 +233,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     prefer: ['bolt-hole', 'collapsed-way', 'hidden-shortcut'],
     troubles: ['robbed'],
     find: (g) => g.links.find((l) => l.tags.includes('dug')) ?? g.links.find((l) => l.kind === 'secret') ?? null,
-    found: "You crawl through the robbers' hole and come out where they meant to.",
     dress({ link, put, clue }) {
       const k = clue('A pick-head rusted through, and a tally scratched in the wall: seven strokes for those who went in, two for those who came out.', link.a, link.id);
       put(link.a, 'lantern', 'trouble', k); put(link.a, 'rubble', 'trouble');
@@ -280,7 +273,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     about: "A miner's mark scratched on the rock, an arrow and three strokes: the old sign for 'worked on behind'. The rock there is stacked stone, not the hill's own.",
     prefer: ['secret-key', 'hidden-shortcut', 'side-loop'],
     find: (g) => g.links.find((l) => l.kind === 'secret') ?? null,
-    found: "You pull the stacked stones down. Behind them the miners' way goes on.",
     tint: [168, 160, 146],
     dress({ link, put, clue }) {
       const k = clue("Scratched into the rock at shoulder height: an arrow and three strokes, the miners' old sign for 'worked on behind'. The wall under it is stones stacked dry, not the hill's own rock.", link.b, link.id);
@@ -307,7 +299,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     about: 'A rope ladder hangs down a step of rock, pulled up and tied off on the high side by whoever went on beyond it; let down, it is the short way back.',
     prefer: ['barred-return', 'bolt-hole', 'lock-key'],
     find: (g) => g.links.find((l) => l.kind === 'oneway' && l.a !== g.goal && l.a !== g.entrance) ?? g.links.find((l) => l.kind === 'oneway') ?? null,
-    found: 'You untie the rope ladder and let it fall down the step. The way back is short now.',
     dress({ link, dweller, put, clue }) {
       const who = dweller.creatures.some((c) => c === 'bandit' || c === 'highwayman' || c === 'goblin') ? 'The knots are fresh' : 'The rope is grey with damp and the knots have not been undone in years';
       const k = clue(`A rope ladder lies coiled at the top of a step of rock, tied off to a spur so that nobody below could climb it. ${who}.`, link.a, link.id);
@@ -336,7 +327,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     prefer: ['barred-return', 'bolt-hole', 'lock-key'],
     find: (g) => g.links.find((l) => l.kind === 'oneway' && l.a !== g.goal && l.a !== g.entrance) ?? g.links.find((l) => l.kind === 'oneway') ?? null,
     use: { id: 'stand', era: 'trouble', room: (_g, l) => l.a },
-    found: 'You lift the great bar out of its brackets. The door swings back onto the stair below.',
     dress({ link, trouble, put, clue }) {
       const why = trouble.id === 'siege' ? 'held it against the siege, as long as the water lasted' : trouble.id === 'fire' ? 'barred it against the smoke from below' : 'barred it, and nobody ever lifted the bar again';
       const k = clue(`The bar across the inner door is oak as thick as a thigh, and still down. Somebody ${why}. The door's far face, by the look of the light through its cracks, is all arrow-scars.`, link.a, link.id);
@@ -363,7 +353,6 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     about: 'A hanging gnawed to rags stirs where there is no wind: behind it, a narrow stair runs up inside the wall, the way the keepers came and went unseen.',
     prefer: ['hidden-shortcut', 'secret-key', 'side-loop'],
     find: (g) => g.links.find((l) => l.kind === 'secret') ?? null,
-    found: 'You pull the rotten hanging aside: a narrow stair inside the wall.',
     tint: [150, 136, 120],
     dress({ link, put, clue }) {
       const k = clue('What is left of a wall-hanging stirs, though no air moves in the room. The stones behind it are cooler than the rest, and a draught comes round its edges.', link.b, link.id);

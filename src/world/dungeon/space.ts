@@ -19,6 +19,15 @@ export interface SpaceEvent {
   readonly link: number;
 }
 
+/** A key is picked up within this of where it lies (m, across the floor). */
+export const KEY_REACH = 1.3;
+
+/** Where room `room`'s key lies: on the floor in its middle (x, y, z; dungeon frame). */
+export function keySpot(layout: DungeonLayout, room: number): [number, number, number] {
+  const r = layout.rooms[room];
+  return [(r.x + r.w / 2) * CELL, r.level * STOREY, (r.z + r.d / 2) * CELL];
+}
+
 interface Opening { readonly pl: PlacedLink; readonly door: Door; readonly end: 0 | 1 }
 
 const ekey = (x: number, z: number, l: number, dir: number) => {
@@ -179,7 +188,7 @@ export class DungeonSpace {
   }
 
   /**
-   * The body at (x, y, z) this frame: keys are picked up in their rooms, barred doors open from their far
+   * The body at (x, y, z) this frame: keys are picked up where they lie (keySpot), barred doors open from their far
    * side when touched, a hidden door is found by lingering by it (looking closely), locked doors open
    * with their key. Returns what happened.
    */
@@ -188,9 +197,10 @@ export class DungeonSpace {
     const l = this.levelAt(y), i = Math.floor(x / CELL), j = Math.floor(z / CELL);
     const here = this.grid.owner(i, j, l);
     if (here === undefined) return out;
-    if (here >= 0 && !this.keys.has(here) && this.layout.links.some((pl) => pl.link.kind === 'locked' && pl.link.key === here)) {
-      this.keys.add(here);
-      out.push({ kind: 'key', link: this.layout.links.find((pl) => pl.link.kind === 'locked' && pl.link.key === here)!.link.id });
+    const lock = here >= 0 && !this.keys.has(here) ? this.layout.links.find((pl) => pl.link.kind === 'locked' && pl.link.key === here) : undefined;
+    if (lock) {
+      const [kx, , kz] = keySpot(this.layout, here);
+      if (Math.hypot(kx - x, kz - z) < KEY_REACH) { this.keys.add(here); out.push({ kind: 'key', link: lock.link.id }); }
     }
     for (let k = 0; k < 4; k++) {
       const o = this.opening(i, j, l, k);

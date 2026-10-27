@@ -15,7 +15,7 @@ import { CELL, STOREY, cellIn, type Cellar, type Prop } from './cellar';
 import { BuildingMat as M, CellarMat as C, MeshKit, WildMat, scaleTint, varyTint, type Tint } from './meshKit';
 import { stampModel, type PropModels, type Stamp } from './propModels';
 import type { PropModel } from '@futuremagic/props';
-import { DOOR_W, DungeonSpace, PASSAGE_H, isFeature, stairDrop } from './space';
+import { DOOR_W, DungeonSpace, PASSAGE_H, isFeature, keySpot, stairDrop } from './space';
 import { TORCH_OUT, torchSpots } from './torches';
 import { Rng, deriveSeed } from '@futuremagic/core';
 
@@ -27,6 +27,18 @@ export interface DoorPiece {
   readonly link: number;
   readonly kind: 'locked' | 'oneway' | 'secret';
   readonly mesh: BuildingMesh;
+  /** The doorway's middle on its floor (x, y, z), and the way through it (x, z; unit). */
+  readonly at: readonly [number, number, number];
+  readonly through: readonly [number, number];
+  /**
+   * How it opens, seen: `swing` on the vertical line through `hinge` (a door, a grate, a hidden door in the
+   * wall), away from whoever opens it; `push` (stacked stones, a wedged boulder) shoved through the way and
+   * tumbling down; `gone` (a ladder let down out of sight).
+   */
+  readonly opens: 'swing' | 'push' | 'gone';
+  readonly hinge?: readonly [number, number, number];
+  /** A barred door's bar, apart: lifted out of its brackets and set down against the wall before it swings. */
+  readonly bar?: BuildingMesh;
 }
 
 /** A chest's lid, apart from its body, to lift as it is searched: about its hinge along the back's top edge. */
@@ -44,6 +56,8 @@ export interface CellarMeshes {
   readonly doors: DoorPiece[];
   /** One per chest, in the order of the cellar's props (as world/dungeon/treasure.ts numbers its hoards). */
   readonly lids: ChestLid[];
+  /** The keys lying where they are picked up (keySpot), by the room that holds each. */
+  readonly keys: { readonly room: number; readonly mesh: BuildingMesh }[];
 }
 
 const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], EARTH: Tint = [120, 96, 72];
@@ -260,13 +274,18 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
       for (let n = 0; n < 4; n++) shell.box(mx + ux * rng.range(-0.5, 0.5) - out[0] * rng.range(0.2, 0.7), y - 0.08, mz + uz * rng.range(-0.5, 0.5) - out[1] * rng.range(0.2, 0.7), 0.22, 0.06, rng.range(0.6, 1.1), yaw + rng.range(-0.4, 0.4), M.Oak, DARK_OAK);
     } else if (kind === 'locked' || kind === 'oneway' || kind === 'secret') {
       const kit = new MeshKit();
+      let opens: DoorPiece['opens'] = 'swing', hinge: [number, number, number] | undefined, bar: BuildingMesh | undefined;
+      // The left post (as a leaf's hinge is put), `back` further along the wall.
+      const post = (back: number): [number, number, number] => [mx - ux * (DOOR_W / 2 + back), y, mz - uz * (DOOR_W / 2 + back)];
       if (kind === 'secret' && carved) {
         // Stones stacked dry across the way, the hill's own rock around them.
         const pale: Tint = c.setPiece.tint && pl.link.id === c.pieceLink ? [...c.setPiece.tint] as unknown as Tint : CAVE_ROCK;
         const rng = new Rng(deriveSeed(c.decision.seed, 'stacked', pl.link.id));
+        opens = 'push';
         for (let row = 0; row < 5; row++) for (let s = -2; s <= 2; s++) kit.stone(mx + ux * (s * 0.42 + (row % 2) * 0.2), y + row * 0.46 - 0.05, mz + uz * (s * 0.42 + (row % 2) * 0.2), 0.46, 0.5, 0.5, yaw + rng.range(-0.15, 0.15), WildMat.Rock, varyTint(rng, pale, 0.1), rng, 0.05, 0.4);
       } else if (kind === 'oneway' && carved && c.setPiece.id === 'pulled-ladder' && pl.link.id === c.pieceLink) {
         // A step of rock too high to climb, the rope ladder pulled up and coiled on its top, tied to a spur.
+        opens = 'gone';
         const rng = new Rng(deriveSeed(c.decision.seed, 'step', pl.link.id));
         kit.stone(mx, y - 0.2, mz, DOOR_W + 0.6, 2.1, 1.2, yaw, WildMat.Rock, varyTint(rng, CAVE_ROCK, 0.06), rng, 0.07, 0.35);
         const tx = mx + out[0] * 0.3, tz = mz + out[1] * 0.3;
@@ -274,6 +293,7 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
         kit.cylinder(tx + ux * 0.6, y + 1.9, tz + uz * 0.6, 0.06, 0.35, 6, M.Thatch, ROPE);
       } else if (kind === 'oneway' && carved) {
         // A boulder rolled into the gap from beyond and wedged there with smaller stones: levered out from the far side.
+        opens = 'push';
         const rng = new Rng(deriveSeed(c.decision.seed, 'wedged', pl.link.id));
         // Round and knocked about (no slab): a great boulder bulging into the way, a smaller one jammed beside its shoulder.
         const rock = (k: number) => scaleTint(CAVE_ROCK, rng.range(0.82, 1) * k);
@@ -286,13 +306,16 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
         }
       } else if (kind === 'locked' && carved) {
         // An iron grate leaded into the rock, chained and locked: whoever used the cave kept the far side to themselves.
+        hinge = post(0.15);
         for (let s = -3; s <= 3; s++) kit.box(mx + ux * s * (DOOR_W / 6), y - 0.1, mz + uz * s * (DOOR_W / 6), 0.05, DOOR_H + 0.4, 0.05, yaw, M.Slate, IRON);
         for (const h of [0.35, 1.25, DOOR_H + 0.1]) kit.box(mx, y + h, mz, DOOR_W + 0.3, 0.06, 0.06, yaw, M.Slate, IRON);
         kit.box(mx + ux * 0.45 - out[0] * 0.06, y + 1.05, mz + uz * 0.45 - out[1] * 0.06, 0.16, 0.14, 0.06, yaw, M.Slate, IRON);
       } else if (kind === 'secret') {
         const pale: Tint = c.setPiece.tint && pl.link.id === c.pieceLink ? [...c.setPiece.tint] as unknown as Tint : STONE;
         kit.box(mx, y, mz, DOOR_W + 0.02, DOOR_H + 0.02, 0.24, yaw, M.Rubble, pale);
+        hinge = post(0);
       } else {
+        hinge = post(0);
         const leaf = models?.get(kind === 'locked' ? 'door_sturdy' : 'door_plank');
         if (leaf) {
           // The leaf's origin is its hinge: start it at the left post.
@@ -301,10 +324,14 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
           stampModel(kit, leaf, { x: mx - c0 * (DOOR_W / 2 + leaf.min[0] * sx), y, z: mz + s0 * (DOOR_W / 2 + leaf.min[0] * sx), yaw, scale: [sx, sy, 1] });
         } else kit.box(mx, y, mz, DOOR_W, DOOR_H, 0.08, yaw, M.Oak, OAK);
         if (kind === 'locked') kit.box(mx + ux * 0.45 - out[0] * 0.06, y + 1.0, mz + uz * 0.45 - out[1] * 0.06, 0.12, 0.16, 0.04, yaw, M.Slate, IRON);
-        // The bar sits on the far side (the side it is opened from).
-        else kit.box(mx + out[0] * 0.12, y + 1.1, mz + out[1] * 0.12, DOOR_W + 0.3, 0.14, 0.1, yaw, M.Oak, DARK_OAK);
+        else {
+          // The bar sits on the far side (the side it is opened from), apart: it is lifted off first.
+          const b = new MeshKit();
+          b.box(mx + out[0] * 0.12, y + 1.1, mz + out[1] * 0.12, DOOR_W + 0.3, 0.14, 0.1, yaw, M.Oak, DARK_OAK);
+          bar = b.mesh();
+        }
       }
-      doors.push({ link: pl.link.id, kind, mesh: kit.mesh() });
+      doors.push({ link: pl.link.id, kind, mesh: kit.mesh(), at: [mx, y, mz], through: [out[0], out[1]], opens, ...(hinge ? { hinge } : {}), ...(bar ? { bar } : {}) });
     }
   });
 
@@ -315,7 +342,20 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
   }
   if (models) dress(propKit, c, models);
   for (const t of torchSpots(c)) sconce(shell, t.x, t.y, t.z, t.nx, t.nz);
-  return { shell: shell.mesh(), props: propKit.mesh(), doors, lids };
+  const keys = L.links.filter((pl) => pl.link.kind === 'locked' && pl.link.key !== undefined).map((pl) => ({ room: pl.link.key!, mesh: keyMesh(keySpot(L, pl.link.key!), deriveSeed(c.decision.seed, 'key', pl.link.id)) }));
+  return { shell: shell.mesh(), props: propKit.mesh(), doors, lids, keys };
+}
+
+/** An old iron key with a brass bow, lying on the floor at `at`, turned by its seed (a hand long: seen from a few steps). */
+function keyMesh(at: readonly [number, number, number], seed: number): BuildingMesh {
+  const k = new MeshKit(), rng = new Rng(seed), yaw = rng.range(0, 6.28), c = Math.cos(yaw), s = Math.sin(yaw);
+  const [x, y, z] = at, BRASS: Tint = [214, 170, 92], DARK_IRON: Tint = [92, 88, 84];
+  // Along the key (u): the bow's ring of four bars, the shaft, the bit.
+  const put = (u: number, w: number, su: number, sw: number, h: number, t: Tint, mat: number) => k.box(x + c * u + s * w, y + 0.005, z - s * u + c * w, su, h, sw, yaw, mat, t);
+  for (const [u, w, su, sw] of [[-0.13, 0, 0.022, 0.08], [-0.05, 0, 0.022, 0.08], [-0.09, 0.03, 0.08, 0.022], [-0.09, -0.03, 0.08, 0.022]]) put(u, w, su, sw, 0.018, BRASS, M.Plaster);
+  put(0.04, 0, 0.17, 0.018, 0.018, DARK_IRON, M.Slate);
+  put(0.11, 0.025, 0.035, 0.05, 0.012, DARK_IRON, M.Slate);
+  return k.mesh();
 }
 
 /** Where a chest's lid sits on its body (m over its foot; furn_chest's lid is its top 10 cm), and its back (m behind its middle). */
