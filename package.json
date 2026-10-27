@@ -25,6 +25,7 @@
     "shot:origin": "node tools/shot/origin.mjs",
     "shot:spells": "node tools/shot/spells.mjs",
     "shot:events": "node tools/shot/events.mjs",
+    "shot:sights": "node tools/shot/sights.mjs",
     "variety": "node --import tsx tools/variety/cellars.ts",
     "loop": "node --import tsx tools/loop/evening.ts",
     "check:units": "node tools/units/check.mjs"

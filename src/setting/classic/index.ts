@@ -20,6 +20,7 @@ import { regions } from './regions';
 import { smallLife } from './smallLife';
 import { tower } from './tower';
 import { items, travel, upkeep } from './items';
+import { sights } from './sights';
 import { shops, trainers } from './shops';
 import { bard, guilds, skillRanks } from './guilds';
 import { abilities, director, effects, skills } from './skills';
@@ -71,6 +72,7 @@ export const classic: SettingModule = {
   items,
   upkeep,
   travel,
+  sights,
   shops,
   trainers,
   guilds,

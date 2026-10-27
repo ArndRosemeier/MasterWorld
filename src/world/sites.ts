@@ -6,8 +6,8 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { distToPoly, ensureCCW, pointInPoly, rect, type BuildingMesh, type Poly } from '@futuremagic/settlement';
-import type { RegionFillDef } from '../setting/contract';
-import { settles, type RegionDecision } from './decisions';
+import type { RegionFillDef, SightShape } from '../setting/contract';
+import { settles, type RegionDecision, type SightDecision } from './decisions';
 import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
 import { onLand } from './dungeon/site';
 import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type Tint } from './dungeon/meshKit';
@@ -31,12 +31,22 @@ export type Place = RegionFillDef['place'];
 export function layOutSite(d: RegionDecision, place: Place, height: (x: number, z: number) => number): SiteLayout | null {
   const s = d.site;
   if (!s || place === 'none' || settles(place)) return null;
-  const origin: [number, number, number] = [s.x, height(s.x, s.z), s.z];
-  const at: At = { x: s.x, z: s.z, yaw: s.yaw, r: s.r, y0: origin[1], height, rng: new Rng(deriveSeed(d.seed, 'site')), seed: d.seed };
+  return laidOut({ ...s, seed: d.seed }, 'site', height, place === 'camp' ? camp : place === 'ruin' ? ruin : barrows);
+}
+
+/** How far a sight reaches from its middle (m): what it stands on, and what keeps clear of it. */
+export const SIGHT_R = 6;
+
+/** A sight by the way (C9), laid out on the land from its decision: a ring of standing stones, a waystone, a cairn. */
+export function layOutSight(d: SightDecision, shape: SightShape, height: (x: number, z: number) => number): SiteLayout {
+  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : cairn);
+}
+
+/** A place's pieces drawn round its middle (`draw`), seeded from it, on the land's heights. */
+function laidOut(p: { x: number; z: number; yaw: number; r: number; seed: number }, salt: string, height: (x: number, z: number) => number, draw: (at: At, k: MeshKit, solids: Solid[]) => void): SiteLayout {
+  const origin: [number, number, number] = [p.x, height(p.x, p.z), p.z];
   const k = new MeshKit(), solids: Solid[] = [];
-  if (place === 'camp') camp(at, k, solids);
-  else if (place === 'ruin') ruin(at, k, solids);
-  else if (place === 'barrows') barrows(at, k, solids);
+  draw({ x: p.x, z: p.z, yaw: p.yaw, r: p.r, y0: origin[1], height, rng: new Rng(deriveSeed(p.seed, salt)), seed: p.seed }, k, solids);
   return { origin, mesh: k.mesh(), solids };
 }
 
@@ -201,4 +211,40 @@ function barrows(at: At, k: MeshKit, solids: Solid[]): void {
     appendAt(k, sealedBarrowMesh(deriveSeed(at.seed, 'mound', i)), x - at.x, at.height(x, z) - at.y0 - 0.05, z - at.z, r.range(0, Math.PI * 2), scale);
     solids.push({ x, z, r: R * 0.95 });
   }
+}
+
+const OLD_STONE: Tint = [150, 150, 140];
+
+/** Standing stones of the old realm in a ring, a few leaning, one fallen. */
+function stoneRing(at: At, k: MeshKit, solids: Solid[]): void {
+  const r = at.rng, n = r.int(7, 9), R = r.range(3.6, 4.6), fallen = r.int(0, n - 1);
+  for (let i = 0; i < n; i++) {
+    const a = at.yaw + (i / n) * Math.PI * 2 + r.range(-0.08, 0.08), [x, z] = round(at, a, R);
+    const y = at.height(x, z) - at.y0, tint = varyTint(r, r.chance(0.4) ? MOSS : OLD_STONE, 0.08);
+    if (i === fallen) { k.stone(x - at.x, y - 0.2, z - at.z, 0.7, 0.5, r.range(2, 2.6), -a, WildMat.Rock, tint, r, 0.08, 0.35); continue; }
+    k.stone(x - at.x, y - 0.3, z - at.z, r.range(0.6, 0.9), r.range(1.8, 2.8), r.range(0.35, 0.5), -a + Math.PI / 2, WildMat.Rock, tint, r, 0.08, 0.25);
+    solids.push({ x, z, r: 0.45 });
+  }
+}
+
+/** A tall carved waystone on a footing block, where an old road once ran. */
+function waystone(at: At, k: MeshKit, solids: Solid[]): void {
+  const r = at.rng, y = at.height(at.x, at.z) - at.y0;
+  k.stone(0, y - 0.3, 0, 1.4, 0.6, 1.4, at.yaw, BuildingMat.Ashlar, varyTint(r, MOSS, 0.08), r, 0.05, 0.15);
+  k.stone(0, y + 0.25, 0, 0.6, r.range(2.2, 2.8), 0.45, at.yaw, BuildingMat.Ashlar, varyTint(r, OLD_STONE, 0.06), r, 0.03, 0.12);
+  solids.push({ x: at.x, z: at.z, r: 0.8 });
+}
+
+/** A cairn: a heap of field stones, piled to a point. */
+function cairn(at: At, k: MeshKit, solids: Solid[]): void {
+  const r = at.rng, y = at.height(at.x, at.z) - at.y0;
+  for (let layer = 0; layer < 5; layer++) {
+    const ring = Math.max(1, 7 - layer * 2), R = 1.1 - layer * 0.25;
+    for (let i = 0; i < ring; i++) {
+      const a = (i / ring) * Math.PI * 2 + layer * 0.7 + r.range(-0.2, 0.2), sz = r.range(0.35, 0.55) - layer * 0.04;
+      // Laid round the heap, long side along it.
+      k.stone(Math.cos(a) * R, y - 0.1 + layer * 0.32, Math.sin(a) * R, sz * 1.3, sz, sz, Math.PI / 2 - a, WildMat.Rock, varyTint(r, ROCK, 0.12), r, 0.08, 0.5);
+    }
+  }
+  solids.push({ x: at.x, z: at.z, r: 1.3 });
 }
