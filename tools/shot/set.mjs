@@ -118,10 +118,10 @@ const SESSIONS = [
   ] },
   { id: 'village', query: `${still}&hour=16&weather=fair&site=village`, shots: [{ name: 'village' }] },
   // The dwarves' hold (plan 11.6): before its gate as a stranger, the wardens calling out.
-  // Then farther back to see the crag it is cut into, and up to a carved warden.
+  // Then from the court's far corner across to the crag it is cut into (clear of the woods), and up to a carved warden.
   { id: 'hold', query: `${still}&hour=15&weather=fair&hold=stranger`, shots: [
     { name: 'hold' },
-    { name: 'hold-crag', act: atHold(-12, 42, 0, 2) },
+    { name: 'hold-crag', act: atHold(10, 21, -14, -2) },
     { name: 'hold-warden', act: atHold(3, 10, 7.6, 4) },
   ] },
 ];
