@@ -89,3 +89,18 @@ test('schools: dread sends a creature running; a veil makes the hero hard to not
   const hushed = d.fight.quarry({ ...pose, speed: 4 });
   assert.ok(hushed.noise < loud.noise * 0.5 && hushed.light < loud.light);
 });
+
+test('schools: the debug menu’s learn lifts the skill to the spell’s level, never lowers it', () => {
+  const hero = new Character(classic);
+  const fireball = classic.abilities.find((a) => a.id === 'fireball')!;
+  assert.ok((fireball.level ?? 0) > 0);
+  assert.ok(hero.learnToUse('fireball'));
+  assert.equal(hero.skills.get('pyromancy'), fireball.level);
+  assert.equal(hero.mana, hero.maxMana);
+  const r = new Recipes(hero, new Alone(hero, () => ({ x: 0, y: 0, z: 0 })), classic.effects!, 4);
+  assert.doesNotMatch(r.check(fireball, 1, { x: 0, y: 0, z: 0 }) ?? '', /not yet skilled/);
+  hero.skills.set('pyromancy', 40);
+  hero.forget('fireball');
+  assert.ok(hero.learnToUse('fireball'));
+  assert.equal(hero.skills.get('pyromancy'), 40);
+});
