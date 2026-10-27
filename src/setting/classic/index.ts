@@ -19,7 +19,7 @@ import { tower } from './tower';
 import { items, upkeep } from './items';
 import { shops, trainers } from './shops';
 import { bard, guilds, skillRanks } from './guilds';
-import { abilities, director, skills } from './skills';
+import { abilities, director, effects, skills } from './skills';
 
 export const classic: SettingModule = {
   contractVersion: CONTRACT_VERSION,
@@ -73,6 +73,7 @@ export const classic: SettingModule = {
   skillRanks,
   bard,
   abilities,
+  effects,
   director,
   hero,
   backgrounds,

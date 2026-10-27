@@ -578,19 +578,14 @@ export interface BardDef {
 }
 
 /** A weapon ability on the belt (plan 11.2; Norgo's recipe format comes with milestone 6). */
+/**
+ * An ability (plan 10): its costs, cooldown and cast time, and a recipe of steps (`ops`) the recipe runner
+ * (game/recipe.ts) plays, ported from Norgo's format. Weapon abilities are recipes too: a `blow` step lands on
+ * the next swing. Numbers are base values; the ability's skill scales damage, healing and effects.
+ */
 export interface AbilityDef {
   readonly id: string;
   readonly name: string;
-  /** Stamina it costs. */
-  readonly stamina: number;
-  /** Seconds before it can be used again. */
-  readonly cooldown: number;
-  /** Damage as a share of a normal blow. */
-  readonly power: number;
-  /** Extra chance to hit (−1..1). */
-  readonly aim: number;
-  /** What else it does. */
-  readonly effect?: 'stagger' | 'heal';
   readonly text: string;
   /** Its glyph on the action bar and in the ability book. */
   readonly icon?: string;
@@ -598,17 +593,93 @@ export interface AbilityDef {
    * Not known at the start: a teacher opens it (D49), or the debug menu does. Absent: every hero knows it.
    */
   readonly taught?: boolean;
-  /** A change of shape instead of a blow (bird form): what into, and how long the change takes. */
-  readonly shape?: ShapeDef;
+  /** The skill that powers it and that its use trains (absent: the weapon's). */
+  readonly skill?: string;
+  /** What it is aimed at: a foe (the target), or the hero themself. Absent: a foe when a step needs one. */
+  readonly aim?: 'foe' | 'self';
+  /** How far the target may be, metres (absent: the weapon's reach for a blow, else 24). */
+  readonly range?: number;
+  /** What it costs, paid when it goes off. */
+  readonly cost?: AbilityCost;
+  /** Seconds before it can be used again. */
+  readonly cooldown: number;
+  /** Seconds standing still to cast it (absent or 0: at once). Moving breaks the cast. */
+  readonly cast?: number;
+  readonly ops: readonly AbilityOp[];
 }
 
-/** A change of the hero's shape (an ability's `shape`). */
-export interface ShapeDef {
-  /** The body the hero takes; the engine knows 'bird' (it flies). */
-  readonly into: 'bird';
-  /** Seconds the change takes, and the change back. */
-  readonly change: number;
-  readonly back: number;
+export interface AbilityCost {
+  readonly stamina?: number;
+  readonly mana?: number;
+  readonly health?: number;
+}
+
+/** Where a recipe step is centred: the caster, the target, or the point the cast (or zone) works at. */
+export type OpAnchor = 'self' | 'target' | 'point';
+/** Whom an area touches. */
+export type OpWho = 'foes' | 'friends' | 'all';
+
+/** A status effect put on someone (the setting's `effects`); magnitude is per second for damage and healing. */
+export interface EffectApply {
+  readonly id: string;
+  readonly magnitude: number;
+  readonly duration: number;
+  /** 0..1 (absent: always). */
+  readonly chance?: number;
+}
+
+/** Shapes the land may take for a terrain step (geomancy; the world decides where it can). */
+export type TerrainShape = 'wall' | 'pillar' | 'mound' | 'crater' | 'bridge';
+
+/** One step of an ability's recipe (Norgo's format, plan 10). `look` names how the game shows it. */
+export type AbilityOp =
+  /** A weapon blow at the target on the next swing; `again` keeps swinging (Strike). */
+  | { readonly op: 'blow'; readonly power: number; readonly aim?: number; readonly stagger?: number; readonly again?: boolean }
+  /** Something thrown or loosed at the target: it flies at `speed` m/s and lands on whatever it meets first. */
+  | {
+      readonly op: 'projectile'; readonly speed: number; readonly damage?: number; readonly kind?: DamageKind; readonly radius?: number;
+      readonly effect?: EffectApply; readonly onHit?: readonly AbilityOp[]; readonly look?: string;
+    }
+  /** At once on everyone in a sphere. */
+  | {
+      readonly op: 'area'; readonly radius: number; readonly at?: OpAnchor; readonly damage?: number; readonly kind?: DamageKind; readonly heal?: number;
+      readonly effect?: EffectApply; readonly who?: OpWho; readonly look?: string;
+    }
+  /** A lasting place that plays its own steps every `tick` seconds (at its middle) for `duration` seconds. */
+  | { readonly op: 'zone'; readonly radius: number; readonly duration: number; readonly tick: number; readonly at?: OpAnchor; readonly ops: readonly AbilityOp[]; readonly look?: string }
+  /** A status effect on the caster or the target. */
+  | { readonly op: 'effect'; readonly to: 'self' | 'target'; readonly effect: EffectApply }
+  /** Health back: `amount`, or with `share` that share of the most health. */
+  | { readonly op: 'heal'; readonly to: 'self' | 'target'; readonly amount: number; readonly share?: boolean }
+  /** The land reshaped (a wall, a pillar…), where the world allows it (volumes, D9). */
+  | { readonly op: 'terrain'; readonly shape: TerrainShape; readonly at?: OpAnchor; readonly radius: number; readonly height?: number; readonly length?: number }
+  /** A change of the hero's shape (bird form). */
+  | { readonly op: 'shape'; readonly into: 'bird'; readonly change: number; readonly back: number }
+  /** Its steps, `t` seconds later. */
+  | { readonly op: 'delay'; readonly t: number; readonly ops: readonly AbilityOp[] }
+  /** Only for the eye and the ear. */
+  | { readonly op: 'look'; readonly look: string; readonly at?: OpAnchor };
+
+/** A change of the hero's shape (an ability's `shape` step). */
+export type ShapeDef = Extract<AbilityOp, { op: 'shape' }>;
+
+/** A status effect (plan 10): what it does per unit of magnitude while it lasts. */
+export interface EffectDef {
+  readonly id: string;
+  readonly name: string;
+  readonly icon?: string;
+  /** Good or bad for whoever has it. */
+  readonly kind: 'boon' | 'bane';
+  /** Damage of this kind, magnitude per second. */
+  readonly dot?: DamageKind;
+  /** Health back, magnitude per second. */
+  readonly hot?: boolean;
+  /** Slowed by magnitude (0..1, a share of the speed). */
+  readonly slow?: boolean;
+  /** Cannot act at all (staggered, frozen). */
+  readonly hold?: boolean;
+  /** Magnitude added to armour. */
+  readonly ward?: boolean;
 }
 
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */
@@ -849,6 +920,8 @@ export interface SettingModule {
   readonly skillRanks?: readonly SkillRankDef[];
   readonly bard?: BardDef;
   readonly abilities: readonly AbilityDef[];
+  /** Status effects abilities put on (plan 10). */
+  readonly effects?: readonly EffectDef[];
   readonly director: DirectorDef;
   readonly hero: HeroLooksDef;
   /** The pasts a hero can choose (plan 11.4), the first the default. */
@@ -1050,6 +1123,41 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (!w.creatures.length || w.count[0] < 1 || w.count[1] < w.count[0] || w.ring[1] < w.ring[0] || w.range <= 0) out.push(`${where}: wild "${w.id}" needs creatures, a count, a ring and a range`);
   }
   if (!m.abilities.length) out.push(`${where}: no abilities`);
+  out.push(...validateAbilities(m, skills, where));
+  return out;
+}
+
+/** Abilities: known skills and effects, sane numbers, and every step of every recipe well formed. */
+function validateAbilities(m: SettingModule, skills: ReadonlySet<string>, where: string): string[] {
+  const out: string[] = [];
+  const effects = new Set((m.effects ?? []).map((e) => e.id));
+  if (effects.size !== (m.effects ?? []).length) out.push(`${where}: an effect is defined twice`);
+  const ids = new Set<string>();
+  for (const a of m.abilities) {
+    const at = `${where}: ability "${a.id}"`;
+    if (ids.has(a.id)) out.push(`${at} defined twice`);
+    ids.add(a.id);
+    if (a.skill && !skills.has(a.skill)) out.push(`${at} trains unknown skill "${a.skill}"`);
+    if (!(a.cooldown >= 0) || !((a.cast ?? 0) >= 0) || Object.values(a.cost ?? {}).some((v) => !(v >= 0))) out.push(`${at} needs cooldown, cast and costs of 0 or more`);
+    if (!a.ops.length) out.push(`${at} has no steps`);
+    const check = (ops: readonly AbilityOp[], depth: number): void => {
+      if (depth > 4) { out.push(`${at} nests its steps too deep`); return; }
+      for (const o of ops) {
+        const eff = 'effect' in o ? o.effect : undefined;
+        if (eff && (!effects.has(eff.id) || !(eff.duration > 0))) out.push(`${at} puts on unknown effect "${eff.id}" or for no time`);
+        if ('kind' in o && o.kind && !DAMAGE_KINDS.includes(o.kind)) out.push(`${at} deals unknown damage "${o.kind}"`);
+        if (o.op === 'projectile' && !(o.speed > 0)) out.push(`${at}: a projectile needs speed`);
+        if ((o.op === 'area' || o.op === 'zone' || o.op === 'terrain') && !(o.radius > 0)) out.push(`${at}: ${o.op} needs a radius`);
+        if (o.op === 'zone' && !(o.tick > 0 && o.duration >= o.tick)) out.push(`${at}: a zone needs a tick within its duration`);
+        if (o.op === 'shape' && !(o.change > 0 && o.back > 0)) out.push(`${at}: a change of shape needs its times`);
+        if (o.op === 'delay' && !(o.t > 0)) out.push(`${at}: a delay needs time`);
+        if (o.op === 'blow' && ops !== a.ops) out.push(`${at}: a blow belongs at the top of a recipe`);
+        if ('onHit' in o && o.onHit) check(o.onHit, depth + 1);
+        if ('ops' in o) check(o.ops, depth + 1);
+      }
+    };
+    check(a.ops, 0);
+  }
   return out;
 }
 

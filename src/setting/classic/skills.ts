@@ -2,7 +2,7 @@
  * Skills, weapon abilities and the Director's pacing for the classic setting (plan 4.1, 10, 11.4). Skills
  * grow by use (D30); this is the first, fighting-heavy cut of Norgo's forty, the rest come with magic.
  */
-import type { AbilityDef, DirectorDef, SkillDef } from '../contract';
+import type { AbilityDef, DirectorDef, EffectDef, SkillDef } from '../contract';
 
 export const skills: readonly SkillDef[] = [
   { id: 'blades', name: 'Blades', group: 'combat', start: 12, rate: 1 },
@@ -20,16 +20,25 @@ export const skills: readonly SkillDef[] = [
 ];
 
 export const abilities: readonly AbilityDef[] = [
-  { id: 'strike', icon: '⚔', name: 'Strike', stamina: 0, cooldown: 0, power: 1, aim: 0, text: 'Attack your target with what you hold, again and again until you stop.' },
-  { id: 'heavy', icon: '⚒', name: 'Heavy blow', stamina: 25, cooldown: 8, power: 1.9, aim: -0.08, text: 'Put your weight behind one blow: nearly twice the damage, a little harder to land.' },
-  { id: 'shove', icon: '✋', name: 'Shove', stamina: 15, cooldown: 10, power: 0.3, aim: 0.15, effect: 'stagger', text: 'Shove your foe off balance; for a moment it cannot strike back.' },
-  { id: 'breath', icon: '❂', name: 'Second wind', stamina: 0, cooldown: 90, power: 0, aim: 0, effect: 'heal', text: 'Catch your breath: win back a fifth of your health. Once a minute and a half.' },
+  { id: 'strike', icon: '⚔', name: 'Strike', cooldown: 0, ops: [{ op: 'blow', power: 1, again: true }], text: 'Attack your target with what you hold, again and again until you stop.' },
+  { id: 'heavy', icon: '⚒', name: 'Heavy blow', cost: { stamina: 25 }, cooldown: 8, ops: [{ op: 'blow', power: 1.9, aim: -0.08 }], text: 'Put your weight behind one blow: nearly twice the damage, a little harder to land.' },
+  { id: 'shove', icon: '✋', name: 'Shove', cost: { stamina: 15 }, cooldown: 10, ops: [{ op: 'blow', power: 0.3, aim: 0.15, stagger: 1.6 }], text: 'Shove your foe off balance; for a moment it cannot strike back.' },
+  { id: 'breath', icon: '❂', name: 'Second wind', aim: 'self', cooldown: 90, ops: [{ op: 'heal', to: 'self', amount: 0.2, share: true }], text: 'Catch your breath: win back a fifth of your health. Once a minute and a half.' },
   // Bird form (plan 10, D49): one of the old changes the Fading took, taught again by the hidden teachers. Not a man flying: the hero becomes a bird.
   {
-    id: 'bird', icon: '🪶', name: 'Bird form', stamina: 0, cooldown: 30, power: 0, aim: 0, taught: true,
-    shape: { into: 'bird', change: 15, back: 6 },
+    id: 'bird', icon: '🪶', name: 'Bird form', aim: 'self', cooldown: 30, taught: true,
+    ops: [{ op: 'shape', into: 'bird', change: 15, back: 6 }],
     text: 'Kneel and become a pheasant: fifteen slow breaths, and never while you fight. Space takes off, W flaps on, X dives. Use it again to land and be yourself.',
   },
+];
+
+/** Status effects (plan 10): what abilities put on the hero and on what they fight. */
+export const effects: readonly EffectDef[] = [
+  { id: 'bleeding', name: 'Bleeding', icon: '🩸', kind: 'bane', dot: 'cut' },
+  { id: 'chilled', name: 'Chilled', icon: '❄', kind: 'bane', slow: true },
+  { id: 'held', name: 'Held fast', icon: '⛓', kind: 'bane', hold: true },
+  { id: 'mending', name: 'Mending', icon: '✚', kind: 'boon', hot: true },
+  { id: 'warded', name: 'Warded', icon: '⛨', kind: 'boon', ward: true },
 ];
 
 export const director: DirectorDef = {

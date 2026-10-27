@@ -164,7 +164,7 @@
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   },
   {
-    "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
+    "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/game/recipe.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
     "reason": "A heading from one point to another (Math.atan2 of the z and x differences): every moving thing faces where it goes; one line, not a helper."
   },
   {

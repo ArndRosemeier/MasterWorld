@@ -40,6 +40,8 @@ export interface Creature {
   surprise?: string;
   /** Seconds left of a staggered moment. */
   stagger: number;
+  /** Share of its speed lost (a spell's chill, 0..1). */
+  slow: number;
   /** Seconds until its next blow may start. */
   ready: number;
   /** A blow on its way: lands after its wind-up. */
@@ -117,7 +119,7 @@ export class Den {
       const p = this.ground.spot(s.room, rng);
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
-        aware: 0, leader: id === 0 && def.pack, stagger: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
+        aware: 0, leader: id === 0 && def.pack, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
         repath: 0, pleas: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
@@ -338,16 +340,16 @@ export class Den {
 
   /**
    * The hero struck it: health, a stagger, and it knows who did it. Begging or spared, it runs; hurt
-   * enough, it runs; the den hears the fight.
+   * enough, it runs; the den hears the fight. `flinch`: false for what wears on it (bleeding), which does not stagger.
    */
-  wound(c: Creature, s: Strike, from: { x: number; y: number; z: number }, stagger = 0): DenEvent[] {
+  wound(c: Creature, s: Strike, from: { x: number; y: number; z: number }, stagger = 0, flinch = true): DenEvent[] {
     const out: DenEvent[] = [];
     if (c.state === 'dead') return out;
     c.health -= s.damage;
     c.aware = 1;
     c.seen = { ...from };
     c.lost = 0;
-    if (s.damage > 0) { c.stagger = Math.max(c.stagger, stagger, s.outcome === 'crit' ? 0.5 : 0.18); c.windup = 0; }
+    if (s.damage > 0 && flinch) { c.stagger = Math.max(c.stagger, stagger, s.outcome === 'crit' ? 0.5 : 0.18); c.windup = 0; }
     if (c.health <= 0) {
       c.health = 0;
       c.state = 'dead';
@@ -413,7 +415,7 @@ export class Den {
   /** Walk the path at a share of its speed; false when there is nowhere to go. */
   private move(c: Creature, dt: number, pace: number): boolean {
     if (c.pi >= c.path.length) return false;
-    let left = c.def.speed * pace * dt;
+    let left = c.def.speed * pace * (1 - c.slow) * dt;
     const r = radiusOf(c.def);
     for (let n = 0; left > 1e-4 && c.pi < c.path.length && n < 8; n++) {
       const p = c.path[c.pi], dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz);

@@ -4,14 +4,15 @@ import { classic } from '../src/setting/classic/index';
 import { changeLook, Shapeshift } from '../src/game/birdForm';
 import { BirdFlight, FLIGHT, type FlightIntent } from '../src/sim/birdFlight';
 import { Character } from '../src/game/character';
+import { shapeOf } from '../src/game/recipe';
 
 
-const bird = classic.abilities.find((a) => a.shape?.into === 'bird')!;
+const bird = classic.abilities.find((a) => shapeOf(a)?.into === 'bird')!;
 const calm = { fighting: false };
 
 test('bird form: a taught ability, 15 s to change, not known by a fresh hero', () => {
   assert.ok(bird, 'the classic setting has bird form');
-  assert.equal(bird.shape!.change, 15);
+  assert.equal(shapeOf(bird)!.change, 15);
   assert.ok(bird.taught);
   const hero = new Character(classic);
   assert.ok(!hero.knows(bird.id));
@@ -64,7 +65,7 @@ test('bird form: in the air, turning back lands first; on the ground it turns ba
   assert.deepEqual(s.tickChange(0.1, { fighting: false, grounded: true }), ['returning']);
   s.tickChange(1, calm);
   assert.ok(s.progress < 1, "changing back");
-  assert.deepEqual(s.tickChange(bird.shape!.back + 0.1, calm), ['returned']);
+  assert.deepEqual(s.tickChange(shapeOf(bird)!.back + 0.1, calm), ['returned']);
   assert.equal(s.phase, 'self');
   assert.ok(s.cooling > 0);
   assert.match(s.callOn(calm) ?? '', /not ready/);

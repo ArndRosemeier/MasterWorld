@@ -6,6 +6,7 @@
  * the bird moves (walks, takes off, flaps, glides, dives, lands), both stepped by the game each frame.
  */
 import type { AbilityDef, ShapeDef } from '../setting/contract';
+import { shapeOf } from './recipe';
 
 /** Where the change stands: the hero as themself, changing, a bird, changing back. */
 export type FormPhase = 'self' | 'changing' | 'bird' | 'returning';
@@ -36,8 +37,9 @@ export class Shapeshift {
   readonly shape: ShapeDef;
 
   constructor(readonly ability: AbilityDef) {
-    if (!ability.shape) throw new Error(`${ability.id} is not a change of shape`);
-    this.shape = ability.shape;
+    const shape = shapeOf(ability);
+    if (!shape) throw new Error(`${ability.id} is not a change of shape`);
+    this.shape = shape;
   }
 
   /** 0 as themself, 1 as the bird, between while changing either way. */
