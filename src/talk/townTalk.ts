@@ -12,6 +12,7 @@ import type { SettingModule, TalkDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import { loreOf, placeOf } from '../vgm/dungeons';
 import { cellarHint, type CellarHint } from '../vgm/hints';
+import { dwellersOf } from '../vgm/leads';
 import { dungeonOf, type Decision, type DecisionLog } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
@@ -443,6 +444,6 @@ export function talkCellar(d: Decision, setting: SettingModule, town: Town, peop
   if (!dungeon || dungeon.town !== town.decision.id) return null;
   const house = placeOf(dungeon, [town], setting.dungeons);
   if (!house) return null;
-  const sketch = sketchCellar(dungeon, house, loreOf(setting, dungeon.template), d.kind === 'move-in' ? d : undefined);
+  const sketch = sketchCellar(dungeon, house, loreOf(setting, dungeon.template), dwellersOf(log, d));
   return { sketch, hint: cellarHint(sketch, people, town.plan) };
 }

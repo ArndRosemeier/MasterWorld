@@ -57,6 +57,8 @@ export interface DungeonDecision {
   readonly danger?: number;
   /** When it was promised, game hours since the world began (none: when the world was opened). */
   readonly at?: number;
+  /** Who lives there, when the one who asked for it said (an encounter's id, `dungeonFor`); else the lore picks. */
+  readonly dwellers?: string;
 }
 
 /**
@@ -82,6 +84,23 @@ export interface MoveInDecision {
   /** The dungeon decision's id. */
   readonly dungeon: string;
   /** The dweller (id in the setting's lore) who moves in. */
+  readonly dweller: string;
+  readonly seed: number;
+  /** Game hours since the world began. */
+  readonly at: number;
+}
+
+/**
+ * A place taken by others while it stands (plan 8, D10, C6c): goblins drive out the kobolds, bandits make it
+ * their hideout. The layout stays; who lives there and the top of its story change. Not a promise of its own
+ * (an open place's lead stays the lead); a cleared place moved into is a move-in.
+ */
+export interface RetakeDecision {
+  readonly kind: 'retake';
+  readonly id: string;
+  /** The dungeon decision's id. */
+  readonly dungeon: string;
+  /** The dweller (id in the setting's lore) who takes it. */
   readonly dweller: string;
   readonly seed: number;
   /** Game hours since the world began. */
@@ -232,7 +251,7 @@ export interface WildDecision {
   readonly at: number;
 }
 
-export type Decision = WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+export type Decision = RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

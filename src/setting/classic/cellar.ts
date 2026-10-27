@@ -9,7 +9,7 @@ import { who } from './encounters';
 export const CELLAR_SPACE: DungeonSpace = { radius: 16, maxRooms: 11, depth: [0, -1], rise: 0, way: 'ladder', inset: 0.55, entrance: 'footprint', carved: false, torches: true, arriveMid: false, walls: 'rubble' };
 
 export const cellar: CellarLore = {
-  form: { stands: 'house', word: 'cellar', shell: 'hatch', space: CELLAR_SPACE },
+  form: { stands: 'house', word: 'cellar', purposes: ['lead'], shell: 'hatch', space: CELLAR_SPACE },
   words: {
     enter: 'You climb down into the cellar of {place}.',
     quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',

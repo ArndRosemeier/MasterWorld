@@ -11,7 +11,7 @@ import { CELLAR_SPACE } from './cellar';
 export const tower: CellarLore = {
   // A small foot and storeys going up, a cellar under its foot (an older layer's vault, if it has one).
   form: {
-    stands: 'level', ring: [700, 1500], called: 'the old tower {dir} of the town', word: 'tower', shell: 'keep', clearing: { back: 9, r: 24 },
+    stands: 'level', ring: [700, 1500], called: 'the old tower {dir} of the town', word: 'tower', purposes: ['lead', 'hideout'], shell: 'keep', clearing: { back: 9, r: 24 },
     space: { ...CELLAR_SPACE, radius: 7, maxRooms: 10, depth: [-1, -1], rise: 2, way: 'door', entrance: [3, 3], arriveMid: true, walls: 'dressed' },
   },
   words: {

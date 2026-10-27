@@ -230,6 +230,8 @@ export interface DungeonForm {
   readonly called?: string;
   /** One word for it ("this cave"). */
   readonly word: string;
+  /** What the VGM may ask one for (`dungeonFor`): a lead (a place to promise), a hideout, a den. */
+  readonly purposes: readonly string[];
   /** What stands on the land over it, an engine builder by name: a hatch in a house, a mound, a mouth in a crag, a keep. */
   readonly shell: 'hatch' | 'mound' | 'mouth' | 'keep';
   /** Trees keep off it: the clearing's middle this far behind its door, and its radius (metres). */

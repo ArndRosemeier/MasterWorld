@@ -24,7 +24,7 @@ import type { Director } from '../vgm/director';
 import { buildingMeshAt } from '../render/materials/building';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { occupationOf } from '../vgm/leads';
-import type { DecisionLog, DungeonDecision, MoveInDecision } from '../world/decisions';
+import type { DecisionLog, DungeonDecision, MoveInDecision, RetakeDecision } from '../world/decisions';
 import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh';
 import { CaveSpace, caveField, caveShell } from '../world/dungeon/caveRock';
 import { MOUTH_WAY_DOWN, mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
@@ -142,7 +142,7 @@ export class Cellars {
     this.log = log;
     for (const d of log) {
       if (d.kind === 'dungeon' && !this.sites.has(d.id)) this.open(d);
-      else if (d.kind === 'move-in') this.moved(d);
+      else if (d.kind === 'move-in' || d.kind === 'retake') this.moved(d);
     }
   }
 
@@ -302,9 +302,12 @@ export class Cellars {
     return { ...site, mesh: put(barrowMesh(deriveSeed(d.seed, 'barrow')), 0.05), inShape: inBarrowShape, way: WAY_DOWN, out: 2.2, cool: 0 };
   }
 
-  private moved(m: MoveInDecision): void {
+  /** New dwellers (a move-in after a clear, or a retake while it stands): only the latest of them lives there. */
+  private moved(m: MoveInDecision | RetakeDecision): void {
     const s = this.sites.get(m.dungeon);
-    if (!s || occupantId(s.cellar) === m.id || occupationOf(this.log, m.dungeon)?.id !== m.id) return;
+    let latest: string | undefined;
+    for (const d of this.log) if ((d.kind === 'move-in' || d.kind === 'retake') && d.dungeon === m.dungeon) latest = d.id;
+    if (!s || s.cellar.taken === m.id || latest !== m.id) return;
     s.cellar = moveIn(s.first, m, s.place, loreOf(this.host.setting, s.decision.template));
     const b = s.ready;
     if (b) void this.populate(s, b);

@@ -18,7 +18,7 @@ import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { compass, houseOf, loreOf, placeOf } from './dungeons';
-import { keptOf, openPromises } from './leads';
+import { dwellersOf, keptOf, openPromises } from './leads';
 import { encounterFor } from './encounters';
 import { cap, fill } from '../talk/folk';
 
@@ -123,7 +123,7 @@ function spill(c: EventsContext, def: StoryEventDef, past: readonly EventDecisio
     if (!rested(c, def, past, d.town)) continue;
     const place = placeOf(d, c.towns, c.setting.dungeons);
     if (!place) continue;
-    const sketch = sketchCellar(d, place, loreOf(c.setting, d.template), p.kind === 'move-in' ? p : undefined);
+    const sketch = sketchCellar(d, place, loreOf(c.setting, d.template), dwellersOf(c.log, p));
     const s = deriveSeed(c.seed, 'vgm', 'event', past.length);
     const at = bandSpot(c, d.site ?? null, houseOf(d, c.towns)?.door ?? null, town, s);
     if (!at) continue;
@@ -197,7 +197,7 @@ export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | '
 function spillOf(setting: Pick<SettingModule, 'dungeons'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): Record<string, string> | null {
   const from = log.find((x) => x.id === e.from), d = dungeonOf(log, from), place = d && placeOf(d, towns, setting.dungeons);
   if (!d || !place) return null;
-  const sketch = sketchCellar(d, place, loreOf(setting, d.template), from?.kind === 'move-in' ? from : undefined);
+  const sketch = sketchCellar(d, place, loreOf(setting, d.template), from && dwellersOf(log, from));
   return { place: sketch.called ?? `the cellar under ${sketch.house}` };
 }
 

@@ -7,7 +7,7 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
-import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type KeptDecision, type MoveInDecision } from '../world/decisions';
+import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type KeptDecision, type MoveInDecision, type RetakeDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
@@ -45,6 +45,19 @@ export function keepPromise(log: DecisionLog, promise: string, at: number): Kept
   if (keptOf(log).has(promise)) return null;
   const n = log.filter((d) => d.kind === 'kept').length + 1;
   return { kind: 'kept', id: `kept-${n}`, promise, at };
+}
+
+/** Who lives in a place now as its story goes: the latest move-in or retake into it (a move-in promise's: itself or a later retake). */
+export function dwellersOf(log: DecisionLog, p: { readonly kind: string; readonly id: string; readonly dungeon?: string }): MoveInDecision | RetakeDecision | undefined {
+  const dungeon = p.kind === 'move-in' ? p.dungeon : p.id;
+  let last: MoveInDecision | RetakeDecision | undefined = p.kind === 'move-in' ? log.find((d): d is MoveInDecision => d.id === p.id && d.kind === 'move-in') : undefined;
+  let seen = p.kind !== 'move-in';
+  for (const d of log) {
+    if (d.id === p.id) seen = true;
+    // A dungeon's own lead sees only retakes; a move-in's sees those after it.
+    if (seen && d.kind === 'retake' && d.dungeon === dungeon) last = d;
+  }
+  return last;
 }
 
 /** Who lives in a dungeon now: its latest move-in, if any. */
@@ -109,7 +122,7 @@ export function nextPromise(c: LeadsContext): Decision | null {
 function landPlace(c: LeadsContext, s: number, town: Town, always = false): DungeonDecision | null {
   if (!c.terrain || (!always && hash2f(s, 6, 2) >= LAND_SHARE)) return null;
   const open = new Set(openPromises(c.log).flatMap((p) => (p.kind === 'dungeon' ? [p.template] : [])));
-  const kinds = landKinds(c.dungeons).filter((k) => always || !open.has(k));
+  const kinds = landKinds(c.dungeons, 'lead').filter((k) => always || !open.has(k));
   // One kind by chance; if no ground fits it, the next.
   const first = Math.floor(hash2f(s, 6, 3) * kinds.length);
   for (let i = 0; i < kinds.length; i++) {
