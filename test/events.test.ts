@@ -65,7 +65,7 @@ test('events: bandits left alone raid a farm: animals leave its paddock, a band 
   const town = towns.reduce((a, b) => (Math.hypot(b.decision.x - home.x, b.decision.z - home.z) < Math.hypot(a.decision.x - home.x, a.decision.z - home.z) ? b : a));
   const raid = classic.events!.find((e) => e.kind === 'raid')!;
   const groups = (left: (n: number) => number) => placeWild(seed, terrain, town, classic.wild).map((territory) => ({ town: town.decision.id, territory, left: left(territory.members.length) }));
-  const at = (log: Decision[], hours: number, left = (n: number) => n) => ({ ...ctx(log, hours), wild: groups(left), only: raid.id });
+  const at = (log: Decision[], hours: number, left = (n: number) => n) => ({ ...ctx(log, hours), wild: groups(left), which: raid.id });
   assert.ok(town.plan.paddocks.some((p) => p.animals > 0), 'the start town has animals');
   assert.equal(nextEvent(at(first as Decision[], raid.after - 1)), null, 'not before its time');
   assert.equal(nextEvent(at(first as Decision[], raid.after + 1, () => 0)), null, 'not once the bandits are dead');

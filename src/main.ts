@@ -47,8 +47,9 @@ import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
-import { LEADS, keepPromise, keptOf, moveInto, nextPromise, openPromises } from './vgm/leads';
-import { bandOf, eventTold, gatherFor, nextEvent, openBands } from './vgm/events';
+import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
+import { bandOf, eventTold, gatherFor, openBands } from './vgm/events';
+import { vgmTurn } from './vgm/toolbox';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Cellars } from './app/cellars';
@@ -840,7 +841,7 @@ export async function start(b: Boot): Promise<void> {
         const who = householdOf(log, id, t.residents);
         const own = who ? standing.keptFor(who.race).find((c) => c.people.id === who.race) : undefined;
         if (own) notes.say(changeLine(own), 5);
-        promiseDue();
+        vgmStep({ tools: ['promise'] });
         return t.talk.toldSafe(a.person.id, id, due ? due.thanks(coinText(coins)) : '');
       },
       get roomPeople() { return rooms?.inside ? rooms.people() : null; },
@@ -1174,7 +1175,7 @@ export async function start(b: Boot): Promise<void> {
       known: (id) => character.knows(id),
       legends: setting.items.uniques.map((u) => ({ id: u.id, name: u.name })),
       events: setting.events ?? [],
-      storyEvent: (id?: string) => eventDue(true, id),
+      storyEvent: (id?: string) => storyEventNow(id),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
         const did = on ? character.learn(id) : character.forget(id);
@@ -1184,7 +1185,7 @@ export async function start(b: Boot): Promise<void> {
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => eventDue(true, id), get log() { return log; }, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), get log() { return log; }, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1284,38 +1285,48 @@ export async function start(b: Boot): Promise<void> {
       builderClock += dt;
       if (builderClock < 3 || title?.holding || creator?.showing) return;
       builderClock = 0;
-      promiseDue();
-      eventDue();
-    };
-    /** The Builder's next promise, if one is due now: into the log, and told to the town. */
-    const promiseDue = (): void => {
-      if (!start) return;
-      const d = nextPromise({ seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id), dungeons: setting.dungeons, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null });
-      if (!d) return;
-      console.info(`[vgm] ${d.kind} ${d.id}${d.kind === 'move-in' ? ` into ${d.dungeon}` : ''} at ${hours().toFixed(1)} h`);
-      log = [...log, d];
-      cellars?.sync(log);
-      // Its household's town hears of it (every town checks whether it is theirs).
-      for (const t of towns?.every ?? []) t.promised(d);
+      vgmStep();
     };
     /**
-     * The world moves on its own (C6): a story event, if one is due, into the log; its band onto the land,
-     * its town gathers to talk it over, and word of it reaches the hero (a lead in the journal).
+     * The Builder's turn (D51, vgm/toolbox.ts): its tools decide, the game applies each decision (`applied`).
+     * `tools`: only these (the debug menu's story events); `early`: whatever their waits say; `which`: that event.
      */
-    const eventDue = (early = false, only?: string): string => {
+    const vgmStep = (o: { tools?: readonly string[]; early?: boolean; which?: string } = {}): Decision[] => {
+      if (!start) return [];
+      const made = vgmTurn({
+        seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id),
+        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(),
+        // A story event's band needs the wild to roam in.
+        tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which,
+      });
+      for (const d of made) applied(d);
+      return made;
+    };
+    /** A decision of the Builder's turn: into the log, and the game builds, draws and tells it. */
+    const applied = (d: Decision): void => {
+      log = [...log, d];
+      if (d.kind === 'dungeon' || d.kind === 'move-in') {
+        console.info(`[vgm] ${d.kind} ${d.id}${d.kind === 'move-in' ? ` into ${d.dungeon}` : ''} at ${hours().toFixed(1)} h`);
+        cellars?.sync(log);
+        // Its household's town hears of it (every town checks whether it is theirs).
+        for (const t of towns?.every ?? []) t.promised(d);
+      } else if (d.kind === 'event') {
+        // The world moves on its own (C6): the band onto the land, the town gathers, word reaches the hero.
+        console.info(`[vgm] event ${d.id} (${d.event}) from ${d.from} at ${hours().toFixed(1)} h`);
+        wild?.add(bandOf(d));
+        const t = towns?.get(d.town), order = gatherFor(setting, terrain.towns, d);
+        if (t && order) orderTown(t, order);
+        const told = eventTold(setting, log, terrain.towns, d);
+        if (!told) return;
+        journal.hear(d.id, told.title, { text: told.note, from: 'word in town' }, { x: d.x, z: d.z, label: told.label });
+        notes.say(`${told.news} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 8);
+      }
+    };
+    /** A story event now (the debug menu): what the town hears, or why none came. */
+    const storyEventNow = (which?: string): string => {
       if (!start || !wild) return 'no wild here';
-      const e = nextEvent({ seed, log, towns: terrain.towns, terrain, hours: hours(), setting, inside: (id) => !!cellars?.isInside(id), avoid: wild.territories, wild: wild.groupsLeft(), early, only });
-      if (!e) return 'nothing is due';
-      console.info(`[vgm] event ${e.id} (${e.event}) from ${e.from} at ${hours().toFixed(1)} h`);
-      log = [...log, e];
-      wild.add(bandOf(e));
-      const t = towns?.get(e.town), order = gatherFor(setting, terrain.towns, e);
-      if (t && order) orderTown(t, order);
-      const told = eventTold(setting, log, terrain.towns, e);
-      if (!told) return e.id;
-      journal.hear(e.id, told.title, { text: told.note, from: 'word in town' }, { x: e.x, z: e.z, label: told.label });
-      notes.say(`${told.news} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 8);
-      return told.news;
+      const e = vgmStep({ tools: ['event'], early: true, which }).find((d) => d.kind === 'event');
+      return !e ? 'nothing is due' : (e.kind === 'event' && eventTold(setting, log, terrain.towns, e)?.news) || e.id;
     };
     let last = performance.now(), frame = 0;
     view.renderer.setAnimationLoop(() => {
