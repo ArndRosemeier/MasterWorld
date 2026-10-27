@@ -60,6 +60,8 @@ import { criesDue, situationOf, smokesAt } from './vgm/situations';
 import { festivitiesOf, festivityOrder, festivityTold } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
+import { HatchClimb } from './app/hatchClimb';
+import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
@@ -624,7 +626,6 @@ export async function start(b: Boot): Promise<void> {
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
       fight: fightHost,
-      up: (id, b) => { const t = towns?.get(id); return t && rooms ? rooms.enter({ town: t, b }, true, true) : Promise.resolve(); },
       swapped: () => autosave(),
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
@@ -738,7 +739,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     // Every door of every town opens on its room; a cellar's house has the hatch down.
-    rooms = new InteriorVisit(towns, cellars.down, new HouseView(view.stage), player, view.lantern, view.sky, notes, (b, hatch, hall, sign) => terrainJobs.house(b, hatch, hall, sign));
+    rooms = new InteriorVisit(towns, cellars.down, new HouseView(view.stage), player, view.lantern, view.sky, (b, hatch, hall, sign) => terrainJobs.house(b, hatch, hall, sign));
     // `room=<kind|number|cellar>`: in that building of the town the hero is in (the cellar: the first promise's house).
     const roomTown = params.room === 'cellar' && firstPromise ? towns.get(firstPromise.town) : towns.townAt(player.walker.pos.x, player.walker.pos.z) ?? startTown;
     if (roomTown && params.room !== null) {
@@ -1273,7 +1274,7 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1344,10 +1345,24 @@ export async function start(b: Boot): Promise<void> {
       else void create(people ? PEOPLE_RACE[people] : null);
     };
     if (!title && ((params.create && !save) || save?.heir)) { paused(true); void create(null); }
-    // F flies, H gets on or off a horse, X sits down to rest on the ground (dives in the water) (the keys are in the settings).
+    // A cellar's hatch and ladder, climbed in sight (E; app/hatchClimb.ts).
+    const climbs = new HatchClimb({
+      player, fade: new Fade(),
+      hatchNear: () => (visit() ? null : rooms?.hatchNear() ?? null),
+      below: () => visit(),
+      shutHouse: () => rooms?.shut(),
+      openAbove: async (v) => {
+        const t = v.above ? towns?.get(v.above.town) : null;
+        return t && v.above && rooms ? rooms.arriveAbove({ town: t, b: v.above.house }) : null;
+      },
+      swapped: () => autosave(),
+    });
+    // F flies, H gets on or off a horse, X sits down to rest on the ground (dives in the water), E climbs a hatch's
+    // ladder (the keys are in the settings).
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
       const b = settings.current.bindings;
+      if (b.use.includes(e.code) && playing && climbs.use()) return;
       if (b.fly.includes(e.code)) player.flying = !player.flying;
       else if (b.mount.includes(e.code)) player.toggleMount();
       else if (b.dive.includes(e.code) && playing && player.walker.mode === 'ground' && !player.flying) {

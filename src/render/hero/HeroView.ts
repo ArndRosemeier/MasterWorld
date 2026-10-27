@@ -22,6 +22,10 @@ import { gripHeld } from './grips';
 import { ORIGIN } from '../origin';
 import { FADE, castShadows, playClip, preparePeople, seatOf } from './play';
 import { Jolt, joltRoot, joltSpine } from '../jolt';
+import { FigureRig, type LimbGoal, type LimbGoals, type Pose } from '@futuremagic/figure';
+
+/** An empty goal for a hand or foot. */
+const goal = (): LimbGoal => ({ p: new Vector3(), w: 0 });
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -46,6 +50,16 @@ export interface HeroPose {
   seat?: number;
   /** Sitting on the ground to rest (game/rest.ts); only while the gait is idle. */
   rest?: boolean;
+  /** Played by a scene (a climb down a ladder): a pose over the clips, hands and feet put somewhere, its own clip. */
+  puppet?: HeroPuppet;
+}
+
+/** What a scene does with the hero's body this frame (@futuremagic/figure LadderClimb's output); world coordinates. */
+export interface HeroPuppet {
+  readonly pose: { readonly fn: (p: Pose) => void; readonly w: number } | null;
+  readonly limbs: LimbGoals | null;
+  /** The clip under it (else the gait's). */
+  readonly clip?: string;
 }
 
 /** What the setting lets a hero look like (the setting's `hero`): Actors' themes and the peoples. */
@@ -122,6 +136,13 @@ export class HeroView {
   /** The last blow taken: the body knocked back from it, whatever it is doing. */
   private readonly jolt = new Jolt();
 
+  /** Hands-on control of the drawn body's bones (made for it when a scene first plays it). */
+  private rig: { readonly ch: Character; readonly rig: FigureRig } | null = null;
+  /** The rig turned bones last frame (they go back before the clips play again). */
+  private rigged = false;
+  /** The limbs' goals in the scene's frame (the world's less the floating origin). */
+  private readonly goals: LimbGoals = { L: goal(), R: goal(), footL: goal(), footR: goal(), curl: {} };
+
   private constructor(private front: Character, private back: Character, private readonly stage: Stage) {
     this.object.name = 'hero';
     this.object.add(front.object);
@@ -197,6 +218,24 @@ export class HeroView {
   /** Height of the body standing, metres. */
   get height(): number { return this.front.height || 1.75; }
 
+  /** The hips' height over the feet, standing (m). */
+  get hipHeight(): number { return this.rigOf()?.hipHeight ?? 0.52 * this.height; }
+
+  /** The rig of the body drawn now, fitted to it (null before its skeleton is there). */
+  private rigOf(): FigureRig | null {
+    if (this.rig?.ch === this.front) return this.rig.rig;
+    const f = this.front.actor.fittedSkeleton;
+    if (!f) return null;
+    try {
+      const rig = new FigureRig(this.front.object, this.front.actor.bones);
+      rig.fit(this.height);
+      this.rig = { ch: this.front, rig };
+      return rig;
+    } catch {
+      return null;
+    }
+  }
+
   /** Hold these (item ids; null: empty-handed): drawn in a fight, at the hip otherwise. */
   arm(main: string | null, off: string | null = null): void {
     for (const o of [this.held.main, this.held.off]) o?.removeFromParent();
@@ -231,7 +270,9 @@ export class HeroView {
     const speed = Math.hypot(p.vel.x, p.vel.z);
     const acting = p.action && this.time - p.action.t0 < p.action.dur ? p.action : null;
     const resting = this.stepRest(p, dt);
-    const clip = p.gait === 'ride' ? 'ride' : acting ? ACTION_CLIPS[acting.id] ?? 'sword slash A' : resting ?? this.gaitClip(p, speed);
+    const clip = p.puppet?.clip ?? (p.gait === 'ride' ? 'ride' : acting ? ACTION_CLIPS[acting.id] ?? 'sword slash A' : resting ?? this.gaitClip(p, speed));
+    // Bones a scene turned last frame go back as bound first (a finger no clip moves would keep its curl).
+    if (this.rigged) { this.rig?.rig.relax(); this.rigged = false; }
     if (clip !== this.clip || (acting && acting !== this.actionShown)) {
       this.actionShown = acting;
       this.startClip(clip, acting?.dur ?? (clip === 'sit down' ? SIT_DOWN : clip === 'stand up' ? STAND_UP : undefined));
@@ -255,9 +296,33 @@ export class HeroView {
       const f = this.front.actor.fittedSkeleton;
       if (f) joltSpine(this.front.actor.bones, f.names, this.jolt, 0.4);
     }
+    if (p.puppet) this.puppetOn(p.puppet);
     // A spell is cast with empty hands: the weapon goes away while it gathers and is thrown.
     const drawn = !!p.combat && !acting?.id.startsWith('spell_');
     if (this.held.drawn !== drawn) { this.held.drawn = drawn; this.moveHeld(); }
+  }
+
+  /** A scene's pose over the clips, and hands and feet onto its goals (moved into the scene's frame). */
+  private puppetOn(p: HeroPuppet): void {
+    const rig = this.rigOf();
+    if (!rig || (!p.pose && !p.limbs)) return;
+    this.object.updateMatrixWorld(true);
+    if (p.pose) rig.pose(p.pose.fn, p.pose.w);
+    if (p.limbs) {
+      const g = this.goals;
+      for (const k of ['L', 'R', 'footL', 'footR'] as const) {
+        const from = p.limbs[k], to = g[k]!;
+        to.w = from?.w ?? 0;
+        if (!from || to.w <= 0) continue;
+        ORIGIN.toRender(to.p.copy(from.p));
+        to.pole = from.pole;
+        to.flat = from.flat ?? null;
+      }
+      g.curl = p.limbs.curl;
+      g.curlW = p.limbs.curlW;
+      rig.reachFor(g);
+    }
+    this.rigged = true;
   }
 
   /**

@@ -69,7 +69,7 @@ serve<TerrainJob, TerrainResult>((job) => {
   // A building drawn open (D38) as one comes up to its door: its plan and mesh, off the main thread (floor F2).
   if (job.kind === 'house') {
     const house = openHouse(job.b, { hatch: job.hatch, hall: job.hall }, job.sign);
-    return { result: house, transfer: meshBuffers(house.mesh) };
+    return { result: house, transfer: [...meshBuffers(house.mesh), ...(house.lid ? meshBuffers(house.lid) : [])] };
   }
   if (job.kind === 'horizon') {
     const t = terrain;

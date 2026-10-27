@@ -65,8 +65,6 @@ export interface CellarsHost {
   readonly journal: Journal;
   readonly hud: FightHud;
   readonly fight: FightHost;
-  /** Up the ladder of a cellar: into its house's room. */
-  up(town: string, house: TownBuilding): Promise<void>;
   /** After going down or coming up (the game autosaves). */
   swapped(): void;
   /** A fight's sounds and music. */
@@ -132,7 +130,7 @@ interface Built {
 export class Cellars {
   private readonly sites = new Map<string, Site>();
   /** Houses with a cellar (by houseKey: every town's), and the way down (the rooms read it). */
-  readonly down = new Map<string, (before: () => void) => Promise<void>>();
+  readonly down = new Map<string, () => Promise<CellarVisit>>();
   private log: DecisionLog = [];
   /** Places the hero has been down in (Discovery is met the first time). */
   private readonly found = new Set<string>();
@@ -269,10 +267,7 @@ export class Cellars {
     const s: Site = { decision: d, house, place, mound, first, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;
-    this.down.set(houseKey(d.town, house.id), async (before) => {
-      const v = (await this.ensure(s)).visit;
-      await v.enter(false, undefined, before);
-    });
+    this.down.set(houseKey(d.town, house.id), async () => (await this.ensure(s)).visit);
   }
 
   /**
@@ -339,7 +334,7 @@ export class Cellars {
     const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, carved);
     const words = loreOf(h.setting, s.decision.template).words;
     if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
-    if (!m) visit.up = () => h.up(s.decision.town, s.house);
+    if (!m) visit.above = { town: s.decision.town, house: s.house };
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
     visit.onDepth = (below) => {
       // The first time down a place meets the Director's Discovery (plan 4.1, C9); a saved visit was found before.

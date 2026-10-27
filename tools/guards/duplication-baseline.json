@@ -390,5 +390,45 @@
   {
     "key": "same name: masterworld/app/spellFx/particles.ts#step + masterworld/sim/livestock.ts#step",
     "reason": "Only the name matches: the spell drawing's own step (app/spellFx) and an unrelated system's."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#enter + masterworld/app/interiorVisit.ts#enter",
+    "reason": "Going into a cellar's own space (fade, torches, sky off) and into a house drawn open in place: both put the hero at a doorway, nothing else alike."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#begin + masterworld/game/recipe.ts#begin",
+    "reason": "A climb taking the hero's body and a recipe starting a spell's steps: the same verb, different things."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#below + masterworld/app/interiorVisit.ts#below",
+    "reason": "Named arrow callbacks for the cellar under a house (the climb's host and the rooms' map): one reads the other's."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#busy + masterworld/game/birdForm.ts#busy",
+    "reason": "Each scene playing the hero says whether it holds the body now; one-line getters."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#each + masterworld/sim/townLife.ts#each",
+    "reason": "A climb step's per-frame callback (the lid swinging) and a town's per-agent loop: the same word only."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#pos + masterworld/game/horse.ts#pos",
+    "reason": "The puppet's feet (the climb's) and a horse's position: one-line accessors of the same shape."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "Player.puppet's frame step (the climb) and a town's simulation step: per-frame updates of different things."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#use + masterworld/game/fight.ts#use",
+    "reason": "The use key on a hatch or ladder and an ability used in a fight."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#yaw + masterworld/game/horse.ts#yaw",
+    "reason": "One-line facing accessors (the climb's puppet, a horse)."
+  },
+  {
+    "key": "same name: masterworld/app/player.ts#update + masterworld/render/water/WaterView.ts#update",
+    "reason": "The player's frame (walk, ride, puppet) and the water's: per-frame updates of different things."
   }
 ]

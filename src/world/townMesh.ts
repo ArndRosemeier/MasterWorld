@@ -3,7 +3,7 @@
  * building (and each fence and haystack of its farmland), and those of one square cell are merged into
  * one mesh near and one far (fewer draws).
  */
-import { buildingMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
+import { buildingMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
 import type { Town } from './town';
 
 /** Side of a merge cell, metres. */
@@ -74,8 +74,11 @@ export function mergeMeshes(parts: readonly BuildingMesh[]): BuildingMesh {
   return out;
 }
 
-/** A building drawn open (D38): its rooms' plan, and its outside with the door open and every storey inside, as one mesh. */
-export interface OpenHouse { readonly plan: InteriorPlan; readonly mesh: BuildingMesh }
+/**
+ * A building drawn open (D38): its rooms' plan, and its outside with the door open and every storey inside, as one
+ * mesh; a cellar's hatch has its lid apart (`lid`, null: none), to swing open (app/hatchClimb.ts).
+ */
+export interface OpenHouse { readonly plan: InteriorPlan; readonly mesh: BuildingMesh; readonly lid: BuildingMesh | null }
 
 /**
  * `b` planned inside and drawn open round its middle (`hatch`: a cellar's trapdoor; `hall`: a guild's hall; `sign`:
@@ -83,5 +86,5 @@ export interface OpenHouse { readonly plan: InteriorPlan; readonly mesh: Buildin
  */
 export function openHouse(b: TownBuilding, opts: { readonly hatch: boolean; readonly hall: boolean }, sign?: [number, number, number]): OpenHouse {
   const plan = planInterior(b, opts), at: [number, number, number] = [b.cx, 0, b.cz];
-  return { plan, mesh: mergeMeshes([buildingMesh(b, at, true, { open: true, sign }), interiorMesh(plan, b, at)]) };
+  return { plan, mesh: mergeMeshes([buildingMesh(b, at, true, { open: true, sign }), interiorMesh(plan, b, at, { lid: false })]), lid: hatchLidMesh(plan, b, at) };
 }

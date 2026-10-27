@@ -1,9 +1,9 @@
 /**
- * Going down into the cellar and back up (plan 7, D38: a space of its own behind a door, a short fade).
- * Step onto the hatch in the cellar house's room to go down (a barrow: walk into its passage); walk to the
- * ladder under it to come up. Inside,
- * the walker walks the cellar's space, the sky is off and the hero's lantern is lit; keys, bars, hidden
- * doors and the things worth reading speak through short notes.
+ * Down in a cellar and back up (plan 7: a space of its own, deep under its house). Under a house one climbs
+ * down through the hatch in its room and up the ladder again (app/hatchClimb.ts: the hero is seen on the
+ * rungs, the screen dark only while the head passes through the floor); a barrow is walked into, its way
+ * out walked to (a short fade). Inside, the walker walks the cellar's space, the sky is off and the hero's
+ * lantern is lit; keys, bars, hidden doors and the things worth reading speak through short notes.
  */
 import type { PointLight } from 'three/webgpu';
 import { dungeonWorld } from '../game/dungeonWorld';
@@ -18,6 +18,8 @@ import { Fade } from './fade';
 import type { Notes } from './notes';
 import type { CellarDiff } from './saveGame';
 import type { Player } from './player';
+import type { Ladder } from '@futuremagic/figure';
+import type { TownBuilding } from '@futuremagic/settlement';
 
 export class CellarVisit {
   inside = false;
@@ -30,9 +32,9 @@ export class CellarVisit {
   onSwap: (() => void) | null = null;
   /** Down (true) or up again (false), as the view swaps: the game leaves the land above out of the frame meanwhile. */
   onDepth: ((below: boolean) => void) | null = null;
-  /** Up the ladder: into the house's room (set by the game; the hatch is in it). */
-  up: (() => Promise<void>) | null = null;
-  /** The note on the way down. */
+  /** The house above, whose hatch the ladder climbs up to (null: a barrow's way out, walked to). */
+  above: { readonly town: string; readonly house: TownBuilding } | null = null;
+  /** The note on the way down (a barrow's). */
   entering: string;
 
   constructor(
@@ -57,12 +59,7 @@ export class CellarVisit {
   async enter(now = false, room?: number, before?: () => void): Promise<void> {
     await this.fade.swap(now, () => {
       before?.();
-      this.inside = true;
-      this.view.group.visible = true;
-      this.sky.indoors = true;
-      this.onDepth?.(true);
-      const O0 = this.view.origin;
-      this.warm.lightTorches(torchSpots(this.cellar).map((t) => ({ x: O0.x + t.x, y: O0.y + t.y, z: O0.z + t.z })));
+      this.goIn();
       const O = this.view.origin, h = this.cellar.hatch;
       const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
       // Some kinds bring the hero in the middle of the entrance room (world/dungeon/kinds.ts).
@@ -71,22 +68,58 @@ export class CellarVisit {
         const r = this.cellar.layout.rooms[room];
         this.player.teleport(O.x + (r.x + r.w / 2) * CELL, O.y + r.level * STOREY, O.z + (r.z + r.d / 2) * CELL, h.yaw);
       } else this.player.teleport(O.x + h.x - fx * 1.0, O.y + h.y, O.z + h.z - fz * 1.0, h.yaw);
-      this.notes.say(this.entering);
+      if (!this.above) this.notes.say(this.entering);
     });
     if (!now) this.onSwap?.();
   }
 
-  /** Back up the ladder, into the house's room (`up`), else out of its door. */
+  /** Down here now (the climb has the hero on the ladder; the screen is dark). */
+  arrive(): void {
+    this.goIn();
+  }
+
+  /** Up out of here now (the climb goes on up through the hatch above; the screen is dark). */
+  depart(): void {
+    this.goOut();
+  }
+
+  /** The ladder up to the hatch, in the world (rungs 0.32 m apart: world/dungeon/cellarMesh.ts). */
+  get ladder(): Ladder {
+    const O = this.view.origin, h = this.cellar.hatch, fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
+    const y = O.y + h.y;
+    return { x: O.x + h.x - fx * 0.15, z: O.z + h.z - fz * 0.15, nx: fx, nz: fz, lo: y + 0.3, hi: y + 0.3 + 7 * 0.32, floor: y, halfWidth: 0.3, rim: false, rung: 0.32 };
+  }
+
+  /** The hero stands at the foot of the ladder up (to climb it: E). */
+  get atLadder(): boolean {
+    if (!this.inside || !this.above) return false;
+    const l = this.ladder, w = this.player.walker.pos;
+    return Math.hypot(w.x - l.x, w.z - l.z) < 1.4 && Math.abs(w.y - l.floor) < 0.8;
+  }
+
+  private goIn(): void {
+    this.inside = true;
+    this.view.group.visible = true;
+    this.sky.indoors = true;
+    this.onDepth?.(true);
+    const O = this.view.origin;
+    this.warm.lightTorches(torchSpots(this.cellar).map((t) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z })));
+  }
+
+  private goOut(): void {
+    this.inside = false;
+    this.view.group.visible = false;
+    this.sky.indoors = false;
+    this.onDepth?.(false);
+    this.lantern.intensity = 0;
+    this.warm.lightTorches(null);
+    this.cooldown = 2;
+  }
+
+  /** Out of a barrow's way, onto its forecourt. */
   async leave(): Promise<void> {
     await this.fade.swap(false, async () => {
-      this.inside = false;
-      this.view.group.visible = false;
-      this.sky.indoors = false;
-      this.onDepth?.(false);
-      this.lantern.intensity = 0;
-      this.warm.lightTorches(null);
-      this.cooldown = 2;
-      if (this.up) { await this.up(); return; }
+      this.goOut();
       const [x, z, yaw] = this.house.door;
       this.player.teleport(x - Math.sin(yaw) * 0.6, undefined, z - Math.cos(yaw) * 0.6, yaw);
     });
@@ -110,8 +143,9 @@ export class CellarVisit {
       this.read.add(p.clue);
       this.notes.say(this.cellar.clues[p.clue].text, 9);
     }
+    // A barrow's way out is walked to; a house's ladder is climbed (app/hatchClimb.ts).
     const h = this.cellar.hatch;
-    if (this.cooldown === 0 && Math.hypot(h.x - lx, h.z - lz) < 0.75 && Math.abs(h.y - ly) < 1) void this.leave();
+    if (!this.above && this.cooldown === 0 && Math.hypot(h.x - lx, h.z - lz) < 0.75 && Math.abs(h.y - ly) < 1) void this.leave();
   }
 
   /** What changed down here, for the save. */

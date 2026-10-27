@@ -7,7 +7,7 @@
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { Walker, type WalkWorld } from '../game/walker';
 import { nearestSteed, type Steed } from '../game/horse';
-import type { HeroAction, HeroView } from '../render/hero/HeroView';
+import type { HeroAction, HeroPuppet, HeroView } from '../render/hero/HeroView';
 import type { HorseView } from '../render/horse/HorseView';
 import { FlyCamera } from './flyCamera';
 import { HeroCamera } from './heroCamera';
@@ -38,6 +38,11 @@ export class Player {
   hideHero = false;
   /** Sitting on the ground to rest (game/rest.ts): drawn sitting while the hero stands still. */
   resting = false;
+  /**
+   * A scene plays the hero (a climb down through a hatch, app/hatchClimb.ts): each frame it steps, says where the
+   * feet are and how the body is posed, and where the camera looks; no keys move the body meanwhile.
+   */
+  puppet: Puppet | null = null;
   private paused = false;
   private readonly seat = new Vector3();
   private flyingNow: boolean;
@@ -174,6 +179,18 @@ export class Player {
       return;
     }
     if (this.shape?.take(dt)) return;
+    const pp = this.puppet;
+    if (pp) {
+      pp.step(dt);
+      walker.pos.x = pp.pos.x; walker.pos.y = pp.pos.y; walker.pos.z = pp.pos.z;
+      walker.vel.x = pp.vel[0]; walker.vel.y = 0; walker.vel.z = pp.vel[2];
+      walker.yaw = pp.yaw;
+      // The mouse still turns the camera round the hero; the keys do nothing.
+      heroCam.intent(dt, walker.yaw);
+      this.drawBodies(dt);
+      heroCam.trail(pp.eye ?? this.toHead(), dt);
+      return;
+    }
     if (riding) {
       const { intent, facing } = heroCam.intent(dt, riding.yaw);
       riding.travel(dt, intent, facing);
@@ -222,6 +239,9 @@ export class Player {
     if (riding && ridden) {
       // Seated on the saddle: pos is the point under it, the seat its height over the horse's ground.
       hero.animateTo({ pos: { x: ridden.x, y: riding.pos.y, z: ridden.z }, vel: riding.walker.vel, yaw: riding.yaw, gait: 'ride', seat: ridden.y - riding.pos.y }, dt);
+    } else if (this.puppet) {
+      const pp = this.puppet;
+      hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: pp.walking ? 'walk' : 'idle', puppet: pp }, dt);
     } else {
       hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action, rest: this.resting }, dt);
     }
@@ -247,4 +267,16 @@ export class Player {
     const w = this.walker;
     return this.head.set(w.pos.x, w.pos.y + w.height * 0.92, w.pos.z);
   }
+}
+
+/** A scene playing the hero (Player.puppet): stepped once a frame, then read. World coordinates. */
+export interface Puppet extends HeroPuppet {
+  step(dt: number): void;
+  /** Feet (the body's root) and facing, as the walker's. */
+  readonly pos: { readonly x: number; readonly y: number; readonly z: number };
+  readonly yaw: number;
+  readonly vel: readonly [number, number, number];
+  readonly walking: boolean;
+  /** Where the camera looks (null: the hero's head). */
+  readonly eye: Vector3 | null;
 }
