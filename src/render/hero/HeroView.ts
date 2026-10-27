@@ -19,6 +19,7 @@ import type { Stage } from '@futuremagic/stage';
 import { buildArm } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE } from './clips';
 import { gripHeld } from './grips';
+import { ORIGIN } from '../origin';
 import { FADE, castShadows, playClip, preparePeople } from './play';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
@@ -191,6 +192,13 @@ export class HeroView {
 
   /** The body's clock (actions are timed by it). */
   get clock(): number { return this.time; }
+
+  /** Where a hand is in the world (`out`), null before the body has loaded. */
+  handAt(side: 'l' | 'r', out: Vector3): Vector3 | null {
+    const bone = this.front.actor.bones.find((b) => b.name === `hand_${side}`);
+    if (!bone) return null;
+    return ORIGIN.toWorld(bone.getWorldPosition(out));
+  }
 
   /** Shown or not (first person hides it). */
   set visible(v: boolean) { this.object.visible = v; }

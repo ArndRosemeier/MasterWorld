@@ -983,6 +983,8 @@ export async function start(b: Boot): Promise<void> {
     const alone = new Recipes(character, new Alone(character, () => player.walker.pos), setting.effects ?? [], deriveSeed(seed, 'alone'));
     const aloneCues: RecipeEvent[] = [];
     // A spell is cast with the hands (the hero raises them while it gathers and throws them on release) and heard.
+    // Spells gather in the hand the cast clip holds up (the left).
+    spellView.handOf = (out) => player.hero?.handAt('l', out) ?? null;
     spellView.listener = {
       hands: (what, dur) => {
         const h = player.hero;
