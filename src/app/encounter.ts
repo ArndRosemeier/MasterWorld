@@ -2,7 +2,7 @@
  * A fight where the hero is (plan 11.2, D13): down in a cellar, or out on the land with a band of the
  * wild (sim/wild.ts); its `Arena` says which. Each frame the hero's pose goes to the delve, its events
  * become notes, the HUD's moments and the hero's blows; Tab and a click pick a target, the action bar's
- * keys use abilities; G searches the fallen and opens chests. The Director (vgm/director.ts) watches it
+ * keys use abilities; G searches the fallen and opens chests (the hero kneels to it, a chest's lid lifts). The Director (vgm/director.ts) watches it
  * all, warns at the door of a place too hard, and its messages come one at a time. Falling ends as the
  * game's mode says (game/death.ts): waking at the inn without the pack, or the hero's end. A place gone
  * quiet that was promised is reported to the game once the hero leaves it: its household waits to be told
@@ -18,7 +18,7 @@ import { POTION } from '../game/actionBar';
 import type { Character } from '../game/character';
 import type { RecipeEvent, Recipes } from '../game/recipe';
 import type { SpellFrame } from './spellView';
-import { coinText, defOf, type Item, type Loot } from '../game/items';
+import { defOf, type Item, type Loot } from '../game/items';
 import type { Bindings } from '../input/controls';
 import { onKeyDown } from '../input/keys';
 import type { CreatureView } from '../render/dungeon/CreatureView';
@@ -29,6 +29,7 @@ import { fill } from '../talk/folk';
 import type { FightHud } from './fightHud';
 import type { Notes } from './notes';
 import type { Player } from './player';
+import { SearchKneel } from './searchKneel';
 
 export interface FightHost {
   readonly bindings: Bindings;
@@ -85,6 +86,10 @@ export type FightCue =
 export class Encounter {
   /** Hears every cue (the game's sound sets it); nothing listens by default. */
   onCue: (cue: FightCue) => void = () => {};
+  /** A chest's lid lifted by k (0 shut, 1 open): its view sets it (a cellar's); nothing by default. */
+  onLid: (hoard: number, k: number) => void = () => {};
+  /** The hero kneeling to search (null: not searching). */
+  private kneel: SearchKneel | null = null;
   private wasInside = false;
   private warned = false;
   private quietSaid = false;
@@ -177,24 +182,41 @@ export class Encounter {
     if (c) this.fight.pick(c);
   }
 
+  /** The hero steps up to what is near, kneels to it (a chest's lid lifts), and what was there comes once the hands are in. */
   private search(): string | null {
-    const l = this.near;
-    if (!l) return 'There is nothing here to search.';
+    const l = this.near, p = this.player;
+    if (!l || this.kneel || p.puppet) return null;
+    const O = this.creatures.group.position, w = p.walker;
+    const lid = l.kind === 'hoard' && l.hoard.prop ? (k: number) => this.onLid(l.hoard.id, k) : null;
+    // A chest is opened from its front.
+    const f = l.kind === 'hoard' ? l.hoard.front : undefined;
+    this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, lid, () => this.found(l), f && { x: O.x + f[0], z: O.z + f[1] });
+    p.puppet = this.kneel;
+    return null;
+  }
+
+  /** The hands are in what was searched: what it held, if anything. */
+  private found(l: Lootable): void {
     const loot = this.delve.plunder(l);
-    if (!loot) return `${cap(l.name)} holds nothing more.`;
+    if (!loot) return;
     this.takeUp(loot);
     this.director.met('reward', loot.items.some((i) => i.rarity !== 'common') ? 1 : 0.4);
-    return null;
+  }
+
+  /** The kneel played out (or the hero fell meanwhile): the keys are the player's again. */
+  private getUp(): void {
+    if (this.kneel && this.player.puppet === this.kneel) this.player.puppet = null;
+    this.kneel = null;
   }
 
   /** A find: its cards, and what is better than what is worn is taken up at once. */
   private takeUp(loot: Loot): void {
     this.hud.showFinds(loot);
     this.onCue({ kind: 'found', loot });
-    const took: string[] = [];
-    for (const it of loot.items) if (this.better(it)) { this.hero.equip(it); took.push(it.name); }
-    if (took.length) { this.notes.say(`You take up ${took.join(' and ')}.`, 4); this.host.armed(); }
-    else if (loot.coins) this.notes.say(`${cap(coinText(loot.coins))} into your purse.`, 3);
+    // What is better is worn at once: it is seen on the hero, and its card says what it is.
+    let took = false;
+    for (const it of loot.items) if (this.better(it)) { this.hero.equip(it); took = true; }
+    if (took) this.host.armed();
   }
 
   /** Worth wearing instead: the slot is empty, or it is rarer than what is there. */
@@ -240,6 +262,7 @@ export class Encounter {
     }
     // Fallen: the wards go dark, then the hero wakes at the inn.
     if (!this.hero.alive) {
+      this.getUp();
       this.down += dt;
       if (lead && this.down > 3.2 && this.fallenFor >= 0) this.wakeUp();
       this.creatures.pose(dt);
@@ -267,7 +290,8 @@ export class Encounter {
       if (this.arena.quietLine) this.director.queue(this.arena.quietLine, 2);
     }
     if (!lead) return;
-    this.near = this.delve.within(pose);
+    if (this.kneel?.done) this.getUp();
+    this.near = this.kneel ? null : this.delve.within(pose);
     const stance = this.player.stance;
     const swinging = stance.action && this.player.hero ? this.player.hero.clock - stance.action.t0 < stance.action.dur : false;
     this.player.stance = { combat: fighting > 0 || this.fight.attacking, action: swinging ? stance.action : undefined };

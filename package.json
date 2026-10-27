@@ -33,7 +33,8 @@
     "check:units": "node tools/units/check.mjs",
     "shot:spellfx": "node tools/shot/spellfx.mjs",
     "shot:hatch": "node tools/shot/hatch.mjs",
-    "shot:doors": "node tools/shot/doors.mjs"
+    "shot:doors": "node tools/shot/doors.mjs",
+    "shot:search": "node tools/shot/search.mjs"
   },
   "dependencies": {
     "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.3/actors-animal-0.19.3.tgz",

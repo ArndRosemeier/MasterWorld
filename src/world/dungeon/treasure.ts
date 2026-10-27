@@ -23,7 +23,12 @@ export interface Hoard {
   readonly name: string;
   /** Stands on a prop (a chest), or is the lair's heap. */
   readonly prop: boolean;
+  /** Where one kneels to open it (x, z): a chest's front, towards the room (a prop's yaw points to its wall); none for a heap. */
+  readonly front?: readonly [number, number];
 }
+
+/** One kneels this far from a chest's middle, before its front (m): half its depth and a body's. */
+const FRONT = 0.75;
 
 /** Danger of a cellar: its strongest dweller, more for every other one that would join the fight. */
 export function cellarDanger(c: Cellar, defs: readonly CreatureDef[]): number {
@@ -38,7 +43,7 @@ export function hoardsOf(c: Cellar, defs: readonly CreatureDef[]): Hoard[] {
   const out: Hoard[] = [];
   for (const p of c.props) {
     if (p.kind !== 'chest') continue;
-    out.push({ id: out.length, x: p.x, y: p.y, z: p.z, room: p.room, table: 'cellar-chest', danger: danger * 0.7, seed: deriveSeed(c.decision.seed, 'hoard', out.length), name: 'a chest', prop: true });
+    out.push({ id: out.length, x: p.x, y: p.y, z: p.z, room: p.room, table: 'cellar-chest', danger: danger * 0.7, seed: deriveSeed(c.decision.seed, 'hoard', out.length), name: 'a chest', prop: true, front: [p.x - Math.sin(p.yaw) * FRONT, p.z - Math.cos(p.yaw) * FRONT] });
   }
   const r = c.layout.rooms[c.graph.goal];
   out.push({

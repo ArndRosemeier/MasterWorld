@@ -14,6 +14,7 @@ import type { DungeonProp } from '../../setting/contract';
 import { CELL, STOREY, cellIn, type Cellar, type Prop } from './cellar';
 import { BuildingMat as M, CellarMat as C, MeshKit, WildMat, scaleTint, varyTint, type Tint } from './meshKit';
 import { stampModel, type PropModels, type Stamp } from './propModels';
+import type { PropModel } from '@futuremagic/props';
 import { DOOR_W, DungeonSpace, PASSAGE_H, isFeature, stairDrop } from './space';
 import { TORCH_OUT, torchSpots } from './torches';
 import { Rng, deriveSeed } from '@futuremagic/core';
@@ -28,10 +29,21 @@ export interface DoorPiece {
   readonly mesh: BuildingMesh;
 }
 
+/** A chest's lid, apart from its body, to lift as it is searched: about its hinge along the back's top edge. */
+export interface ChestLid {
+  readonly mesh: BuildingMesh;
+  /** A point on the hinge's line (cellar frame). */
+  readonly hinge: readonly [number, number, number];
+  /** The hinge's line (x, z; level), turned about which by a positive angle the lid's front comes up. */
+  readonly axis: readonly [number, number];
+}
+
 export interface CellarMeshes {
   readonly shell: BuildingMesh;
   readonly props: BuildingMesh;
   readonly doors: DoorPiece[];
+  /** One per chest, in the order of the cellar's props (as world/dungeon/treasure.ts numbers its hoards). */
+  readonly lids: ChestLid[];
 }
 
 const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], EARTH: Tint = [120, 96, 72];
@@ -296,10 +308,53 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
     }
   });
 
-  for (const p of c.props) if (!models || !modelProp(propKit, p, models)) prop(propKit, p);
+  const lids: ChestLid[] = [];
+  for (const p of c.props) {
+    if (p.kind === 'chest') lids.push(chest(propKit, p, models));
+    else if (!models || !modelProp(propKit, p, models)) prop(propKit, p);
+  }
   if (models) dress(propKit, c, models);
   for (const t of torchSpots(c)) sconce(shell, t.x, t.y, t.z, t.nx, t.nz);
-  return { shell: shell.mesh(), props: propKit.mesh(), doors };
+  return { shell: shell.mesh(), props: propKit.mesh(), doors, lids };
+}
+
+/** Where a chest's lid sits on its body (m over its foot; furn_chest's lid is its top 10 cm), and its back (m behind its middle). */
+const CHEST_SEAM = 0.42, CHEST_BACK = 0.25;
+/** furn_chest's body and lid apart (no face crosses the seam), once per model. */
+const chestParts = new WeakMap<PropModel, { readonly body: PropModel; readonly lid: PropModel }>();
+
+/** A chest: its body into `body`, its lid apart. */
+function chest(body: MeshKit, p: Prop, models: PropModels | undefined): ChestLid {
+  // A prop's yaw turns the model's +z to the wall it stands at: the chest's front (its lock, where it is opened
+  // from) faces the room, so it is turned round.
+  const { x, y, z } = p, yaw = p.yaw + Math.PI, lid = new MeshKit();
+  const rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), p.kind));
+  const m = models?.get('furn_chest');
+  if (m) {
+    let parts = chestParts.get(m);
+    if (!parts) chestParts.set(m, (parts = { body: facesWhere(m, (cy) => cy < CHEST_SEAM), lid: facesWhere(m, (cy) => cy >= CHEST_SEAM) }));
+    const s: Stamp = { x, y, z, yaw, shade: rng.range(0.85, 1.12), across: true };
+    stampModel(body, parts.body, s);
+    stampModel(lid, parts.lid, s);
+  } else {
+    const t = (base: Tint): Tint => varyTint(rng, base, 0.12);
+    body.box(x, y, z, 0.9, CHEST_SEAM, 0.55, yaw, M.Oak, t(OAK));
+    body.box(x, y + 0.26, z, 0.94, 0.06, 0.59, yaw, M.Slate, IRON);
+    lid.box(x, y + CHEST_SEAM, z, 0.92, 0.12, 0.57, yaw, M.Oak, t(DARK_OAK));
+  }
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  // The model's back top edge, (0, seam, -back), placed as stampModel places it; its line is the model's -x (about
+  // +x a positive turn would take the front, +z, down).
+  return { mesh: lid.mesh(), hinge: [x - CHEST_BACK * s, y + CHEST_SEAM, z - CHEST_BACK * c], axis: [-c, s] };
+}
+
+/** The faces of `m` whose middle's height `keep` takes (the vertices stay; unused ones cost nothing drawn). */
+function facesWhere(m: PropModel, keep: (y: number) => boolean): PropModel {
+  const P = m.positions, I = m.indices, out: number[] = [];
+  for (let t = 0; t < I.length; t += 3) {
+    if (keep((P[3 * I[t] + 1] + P[3 * I[t + 1] + 1] + P[3 * I[t + 2] + 1]) / 3)) out.push(I[t], I[t + 1], I[t + 2]);
+  }
+  return { ...m, indices: Uint32Array.from(out) };
 }
 
 /** Height of one course of a fallen way's heap (five reach the lintel). */
@@ -389,7 +444,6 @@ function modelProp(k: MeshKit, p: Prop, models: PropModels): boolean {
     }
     case 'stool': return stampAs('furn_chair', { x, z, yaw: yaw + rng.range(-0.6, 0.6) });
     case 'cot': return stampAs('furn_bed', { x, z, yaw: yaw + Math.PI / 2, across: true, scale: [0.6, 0.6, 0.9] });
-    case 'chest': return stampAs('furn_chest', { x, z, across: true });
     case 'candle': return stampAs('prop_candles', { x, z, round: true });
     case 'lantern': return stampAs('prop_crypt_lantern', { x, z, round: true });
     case 'bones': return stampAs('prop_bone_pile', { x, z, yaw: rng.range(0, 6.28), scale: [0.9, 0.7, 0.9] });
@@ -469,7 +523,6 @@ function prop(k: MeshKit, p: Prop): void {
     case 'candle': k.cylinder(x, y, z, 0.04, 0.25, 6, M.Plaster, [240, 230, 200]); break;
     case 'lantern': k.box(x, y, z, 0.2, 0.32, 0.2, yaw, M.Slate, IRON); k.box(x, y + 0.04, z, 0.14, 0.22, 0.14, yaw, M.Glass, [255, 200, 120]); break;
     case 'ledger': { const [a, b] = spot(0, -0.3); k.box(a, y, b, 0.5, 0.7, 0.4, yaw, M.Oak, t(DARK_OAK)); k.box(a, y + 0.7, b, 0.34, 0.06, 0.26, yaw + 0.2, M.Plaster, [150, 60, 40]); break; }
-    case 'chest': k.box(x, y, z, 0.9, 0.5, 0.55, yaw, M.Oak, t(OAK)); k.box(x, y + 0.5, z, 0.92, 0.12, 0.57, yaw, M.Oak, t(DARK_OAK)); k.box(x, y + 0.3, z, 0.94, 0.06, 0.59, yaw, M.Slate, IRON); break;
     case 'web': {
       // Threads spun across the corner of wall and ceiling: spokes from a hub, a few turns of spiral.
       const [hx, hz] = spot(0, -0.35), hy = y + 2.0, spokes = 8, silk: Tint = [205, 205, 198];
