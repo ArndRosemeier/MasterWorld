@@ -26,6 +26,10 @@ export interface DebugHost {
   town(kind: 'gather' | 'stayIn'): string;
   /** The view as URL parameters (`pos=…&look=…`). */
   readonly viewParams: string;
+  /** Abilities a teacher opens (D49): learn or forget them here, to try them. */
+  readonly taught: readonly { readonly id: string; readonly name: string }[];
+  known(id: string): boolean;
+  learn(id: string, on: boolean): string;
   /** Places worth a look in this world. */
   readonly places: readonly Place[];
   /** Everything, for the command line. */
@@ -80,6 +84,7 @@ export class DebugMenu {
         { label: 'Copy link to this view', run: () => this.copyLink() },
         { label: 'Where am I', run: () => h.viewParams },
       ]],
+      ['Abilities', h.taught.map(({ id, name }) => ({ label: `Learn / forget ${name}`, run: () => { const on = !h.known(id); return h.learn(id, on); } }))],
       ['Time', [
         ...([['Dawn', 6], ['Morning', 9], ['Noon', 12], ['Afternoon', 15], ['Evening', 18.5], ['Night', 23]] as const).map(([label, hour]) => ({ label, run: () => { h.hour = hour; } })),
         { label: 'Clock stopped', run: () => { h.dayMinutes = 0; } },

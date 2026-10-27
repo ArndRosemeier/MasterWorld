@@ -144,10 +144,6 @@
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the card entrances are shared in KeyWindow.entrances."
   },
   {
-    "key": "same name: masterworld/game/character.ts#save + masterworld/game/trade.ts#save",
-    "reason": "Each pure game object writes its own plain save data (the hero's sheet, the town's merchants); only the name matches."
-  },
-  {
     "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/hydro.ts",
     "reason": "The MinHeap's pop loop (@futuremagic/core) in three different searches: A* over the town's street graph, the priority flood of a tile's water, and A* over 1 m walk cells in the loop check. The heap is shared; the searches are not the same."
   },
@@ -296,15 +292,31 @@
     "reason": "The same seam on purpose: app/roads.ts asks every view built from the land to build again over the squares a new road passes; each view rebuilds its own cells."
   },
   {
-    "key": "same name: masterworld/game/character.ts#save + masterworld/talk/townTalk.ts#save",
-    "reason": "Each class writes its own state for the save (talk evidence and leads vs the hero's skills and kit vs the merchants' stock); only the name matches."
-  },
-  {
     "key": "same name: masterworld/game/trade.ts#save + masterworld/talk/townTalk.ts#save",
     "reason": "Each class writes its own state for the save (talk evidence and leads vs the hero's skills and kit vs the merchants' stock); only the name matches."
   },
   {
     "key": "same name: masterworld/game/evening.ts#log + masterworld/main.ts#log",
     "reason": "Both hand a town core (game/township.ts TownshipContext) the decision log as it grows; one-line closures over each caller's own log, the seam is the interface."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/journalUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/lessonsUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/mapUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
+    "reason": "Rock beds as a sine warped by fbm noise: one line of shaping in each rock field, with its own scales and amplitudes."
   }
 ]

@@ -207,6 +207,8 @@ export interface SkillDef {
   readonly start: number;
   /** How fast use raises it (1 typical). */
   readonly rate: number;
+  /** Everyone can use it from the start (with guilds, D49: other skills wait for a trainer or a past). */
+  readonly open?: boolean;
 }
 
 /** How a blow lands: the engine reads it for armour, sounds and the clip. */
@@ -516,6 +518,63 @@ export interface TrainerDef {
   readonly hours: number;
 }
 
+/**
+ * A skill's ranks (D49): how far use and lessons may raise it once a guild's trainer has opened that rank.
+ * Rank 0 is the opening; each next rank asks the skill to have reached the one before by use (lessons stop
+ * `earn` short of a rank's top), and may ask a trainer's task done or a standing with the guild.
+ */
+export interface SkillRankDef {
+  /** The highest the skill rises at this rank. */
+  readonly upTo: number;
+  /** Copper the trainer asks to open it. */
+  readonly price: number;
+  /** The guild's task must be done first. */
+  readonly task?: boolean;
+  /** Standing with the guild needed (0..100). */
+  readonly standing?: number;
+}
+
+/** A guild's task for a higher rank: clear a place (below a house, or out on the land with `out`). */
+export interface GuildTaskDef {
+  /** What the trainer asks, and says when it is done. */
+  readonly ask: string;
+  readonly done: string;
+  /** Only a place out on the land counts (a barrow, a cave, a tower), not a cellar. */
+  readonly out?: boolean;
+}
+
+/**
+ * A guild house (D49): a trainer who opens a few skills and their ranks, and sells lessons within a rank
+ * (as a TrainerDef, `keeper` is the guild's id). Each town of the listed sizes has one, in a plain house
+ * near what it names; a hidden house is not on the map, and the bard gives its way in.
+ */
+export interface GuildDef extends TrainerDef {
+  /** The house's name ("the Hall of Arms"). */
+  readonly name: string;
+  /** In towns of these sizes ('town' is the start town's). */
+  readonly sizes: readonly ('hamlet' | 'village' | 'town' | 'capital')[];
+  /** Which plain house it takes: the one nearest the smithy, the inn, or on the town's edge. */
+  readonly near: 'smithy' | 'inn' | 'edge';
+  readonly hidden?: boolean;
+  /** For a hidden house: how the bard tells the way in. */
+  readonly way?: string;
+  /** The colour of the round shield over its door ('#rrggbb'; none: no sign, as for a hidden house). */
+  readonly sign?: string;
+  /** What the trainer says on opening a skill or a rank, and when it needs more use (`{skill}`). */
+  readonly opens: string;
+  readonly unearned: string;
+  readonly task: GuildTaskDef;
+}
+
+/** The teller at the inn (D49): "where can I learn …?" names every guild house and marks it on the map. */
+export interface BardDef {
+  readonly topic: string;
+  readonly line: string;
+  /** How he tells of one house (`{house}`, `{skills}`, `{keeper}`; `{way}` for a hidden one). */
+  readonly tells: string;
+  readonly tellsHidden: string;
+}
+
 /** A weapon ability on the belt (plan 11.2; Norgo's recipe format comes with milestone 6). */
 export interface AbilityDef {
   readonly id: string;
@@ -531,6 +590,23 @@ export interface AbilityDef {
   /** What else it does. */
   readonly effect?: 'stagger' | 'heal';
   readonly text: string;
+  /** Its glyph on the action bar and in the ability book. */
+  readonly icon?: string;
+  /**
+   * Not known at the start: a teacher opens it (D49), or the debug menu does. Absent: every hero knows it.
+   */
+  readonly taught?: boolean;
+  /** A change of shape instead of a blow (bird form): what into, and how long the change takes. */
+  readonly shape?: ShapeDef;
+}
+
+/** A change of the hero's shape (an ability's `shape`). */
+export interface ShapeDef {
+  /** The body the hero takes; the engine knows 'bird' (it flies). */
+  readonly into: 'bird';
+  /** Seconds the change takes, and the change back. */
+  readonly change: number;
+  readonly back: number;
 }
 
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */
@@ -766,6 +842,10 @@ export interface SettingModule {
   readonly shops: readonly ShopDef[];
   /** Who teaches what in town (plan 11.4). */
   readonly trainers: readonly TrainerDef[];
+  /** The guild houses (D49), the ranks they open and the bard who knows them; without them every skill rises freely. */
+  readonly guilds?: readonly GuildDef[];
+  readonly skillRanks?: readonly SkillRankDef[];
+  readonly bard?: BardDef;
   readonly abilities: readonly AbilityDef[];
   readonly director: DirectorDef;
   readonly hero: HeroLooksDef;
@@ -929,6 +1009,12 @@ function validateFight(m: SettingModule, where: string): string[] {
     for (const k of t.skills) if (!skills.has(k)) out.push(`${where}: trainer "${t.keeper}" teaches unknown skill "${k}"`);
     if (!(t.price > 0 && t.hours > 0 && t.upTo > 0 && t.upTo <= 100)) out.push(`${where}: trainer "${t.keeper}" needs a price, hours and upTo 1..100`);
   }
+  for (const g of m.guilds ?? []) {
+    for (const k of g.skills) if (!skills.has(k)) out.push(`${where}: guild "${g.keeper}" teaches unknown skill "${k}"`);
+    if (g.hidden && !g.way) out.push(`${where}: hidden guild "${g.keeper}" needs a way in`);
+    if (!m.skillRanks?.length) out.push(`${where}: guilds need skillRanks`);
+  }
+  if (m.skillRanks?.some((r, i, a) => i > 0 && r.upTo <= a[i - 1].upTo)) out.push(`${where}: skill ranks must rise`);
   if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);

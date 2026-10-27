@@ -1,0 +1,47 @@
+/* The action bar (src/app/actionBarUi.ts) in warded brass (plan 17.1): ten brass sockets on a leather strap, always
+   there in play. A cooldown runs as a ward line round its socket, a ready one glints, a used one sinks in. While the
+   ability book is open the strap's ward wakes and the sockets can be dragged, swapped and cleared. */
+@import './brass.css';
+
+#bar { position: fixed; left: 50%; bottom: 18px; z-index: 11; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 8px 14px; border-radius: 30px;
+  background: linear-gradient(#3a2618, #22160e); border: 2px solid var(--brass-lo); box-shadow: 0 6px 20px #000a, inset 0 1px 0 #ffffff14;
+  font-family: 'EB Garamond', Georgia, serif; color: var(--ink); transition: opacity .6s, transform .6s cubic-bezier(.3, 1.4, .5, 1), box-shadow .4s; user-select: none; }
+#bar.hidden { opacity: 0; pointer-events: none; transform: translate(-50%, 30px); }
+#bar.editing { box-shadow: 0 6px 20px #000a, inset 0 1px 0 #ffffff14, 0 0 0 1px var(--ward), 0 0 18px #8fe3ff66; animation: bar-wake 2.4s ease-in-out infinite; }
+#bar.fallen .socket { filter: grayscale(1) brightness(.4); transition: filter 1.2s; }
+@keyframes bar-wake { 50% { box-shadow: 0 6px 20px #000a, inset 0 1px 0 #ffffff14, 0 0 0 1px var(--ward-hot), 0 0 26px #8fe3ffaa; } }
+
+.socket { position: relative; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; cursor: pointer;
+  background: radial-gradient(circle at 35% 30%, var(--leather-hi), #0d0907 70%); box-shadow: 0 0 0 3px var(--brass), 0 0 0 5px var(--brass-dark), inset 0 2px 6px #000; transition: transform .12s; }
+.socket.empty { cursor: default; box-shadow: 0 0 0 2px var(--brass-lo), 0 0 0 4px var(--brass-dark), inset 0 2px 6px #000; opacity: .65; }
+.socket .ring { position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; background: conic-gradient(var(--ward) var(--done, 360deg), transparent 0); -webkit-mask: radial-gradient(circle, transparent 24px, #000 25px); mask: radial-gradient(circle, transparent 24px, #000 25px); opacity: .85; }
+.socket.empty .ring { display: none; }
+.socket .hot { position: absolute; left: -2px; top: -5px; font: 11px 'Marcellus SC', serif; color: var(--brass-hi); text-shadow: 0 1px 2px #000; pointer-events: none; }
+.socket .count { position: absolute; right: 3px; bottom: 1px; font-size: 12px; color: var(--ink); text-shadow: 0 1px 2px #000; pointer-events: none; }
+.socket .tip { position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 13px; color: var(--ink-dim); text-shadow: 0 1px 3px #000; opacity: 0; transition: opacity .25s; pointer-events: none; }
+.socket:hover .tip { opacity: 1; }
+.socket.cooling { filter: saturate(.3) brightness(.7); }
+.socket.on { box-shadow: 0 0 0 3px var(--brass-hi), 0 0 0 5px var(--brass-dark), 0 0 14px var(--ward), inset 0 2px 6px #000; }
+.socket.ready::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(115deg, transparent 40%, #fff8 50%, transparent 60%); background-size: 250% 100%; animation: bar-ready .7s ease-out; }
+.socket.pressed { animation: bar-press .25s ease-out; }
+.socket.over { box-shadow: 0 0 0 3px var(--ward-hot), 0 0 0 5px var(--brass-dark), 0 0 16px var(--ward), inset 0 2px 6px #000; transform: scale(1.08); }
+#bar.editing .socket:not(.empty) { cursor: grab; }
+#bar.editing .socket:not(.empty) span { display: inline-block; animation: bar-jiggle 1.6s ease-in-out infinite; }
+#bar.editing .socket:nth-child(2n) span { animation-delay: -.8s; }
+@keyframes bar-ready { from { background-position: 120% 0; } to { background-position: -60% 0; } }
+@keyframes bar-press { 40% { transform: scale(.88); } 100% { transform: none; } }
+@keyframes bar-jiggle { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+
+/* The ability book: a window high up (the bar stays reachable below it); each ability a card to drag. */
+.shade:has(.panel.book) { align-items: flex-start; padding-top: 8vh; }
+.panel.book { width: min(620px, 100%); }
+.book .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.book .ability { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--brass-lo); background: linear-gradient(#2a1c14, #1a120c); cursor: grab; transition: transform .15s, box-shadow .15s; }
+.book .ability:hover { transform: translateY(-2px); box-shadow: 0 0 12px #8fe3ff55; border-color: var(--ward); }
+.book .ability.on-bar .socket { box-shadow: 0 0 0 3px var(--brass-hi), 0 0 0 5px var(--brass-dark), 0 0 10px var(--ward), inset 0 2px 6px #000; }
+.book .ability .socket { flex: none; cursor: grab; }
+.book .ability b { display: block; font: 16px 'Marcellus SC', Georgia, serif; letter-spacing: .04em; }
+.book .ability small { display: block; color: var(--ink-dim); font-size: 14px; line-height: 1.25; }
+.book .ability .cost { color: var(--brass); font-size: 12px; font-style: italic; }
+
+@media (max-width: 640px) { #bar { gap: 4px; padding: 6px 8px; bottom: 10px; } .socket { width: 30px; height: 30px; font-size: 15px; } .socket .ring { -webkit-mask: radial-gradient(circle, transparent 16px, #000 17px); mask: radial-gradient(circle, transparent 16px, #000 17px); } }

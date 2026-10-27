@@ -35,16 +35,6 @@ export const shops: readonly ShopDef[] = [
 
 export const trainers: readonly TrainerDef[] = [
   {
-    keeper: 'smith', title: '{name}, the smith', topic: 'Can you teach me to fight?',
-    line: 'I can show you how iron wants to be swung. It costs, and it hurts, and it works.',
-    skills: ['blades', 'axes', 'maces', 'shields', 'armour'], upTo: 35, price: 30, hours: 2,
-  },
-  {
-    keeper: 'carter', title: '{name}, once a caravan guard', topic: 'You rode with the caravans?',
-    line: 'Twenty years on the roads before they closed. Spear, feet and stars: that is what kept me alive. I will teach you, for a price.',
-    skills: ['spears', 'dodge', 'unarmed', 'orientation'], upTo: 35, price: 28, hours: 2,
-  },
-  {
     keeper: 'innkeeper', title: '{name}, keeper of the inn', topic: 'How do you hear so much?',
     line: 'You listen more than you talk, and when you talk you make them laugh. Sit down, I will show you.',
     skills: ['speech', 'perception'], upTo: 30, price: 22, hours: 1,

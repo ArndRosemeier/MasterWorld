@@ -86,7 +86,7 @@ Goal: the world grows as you walk. There is more than one place to go, and the p
 | B2 ✓ | **Roads** between settlements, which beat vegetation (section 7 footprints) | Shot: a road leaving town to the hamlet | 7 |
 | B3 ✓ | **Settlement sizes**: hamlet, village and town from one planner; the capital is prepared but not placed | Shots of each size; leads come from every settlement | 7, D41 |
 | B3a ✓ | **Every settlement works like the start town** (Arnd, 2026-10-26): interiors, cellars, shops and fine work, lessons, the inn room, livestock and paddocks, the hailer and talk run per settlement on one shared code path; a settlement differs only by data and small specialties, and nothing is hard-wired to the start town | Tests: each system runs in a generated hamlet and a village through the same functions as in the start town; a guard or test finds no start-town ids or positions in those systems; the loop check spends an evening in a second settlement; shots of a hamlet's shop, inn room and an open house | 7, 9.3, 11.5 |
-| B3b | **Guild houses** (D49): the fighting and craft houses, in town or a short way out and on the map from the start; their trainers open new skills at rank 0 and later ranks once the hero has earned them by use; one trainer's task per guild for a higher rank; standing with each guild; a bard at the inn answers "where can I learn …?" and marks any house on the map, the hidden ones too. The smith's and the carter's lessons move into their houses | Tests: a skill can't rise before a trainer opens it; a rank needs use and, where asked, the task; the loop check opens one new skill; a shot of a guild house | 10, 11.6, D49 |
+| B3b ✓ | **Guild houses** (D49): the fighting and craft houses, in town or a short way out and on the map from the start; their trainers open new skills at rank 0 and later ranks once the hero has earned them by use; one trainer's task per guild for a higher rank; standing with each guild; a bard at the inn answers "where can I learn …?" and marks any house on the map, the hidden ones too. The smith's and the carter's lessons move into their houses | Tests: a skill can't rise before a trainer opens it; a rank needs use and, where asked, the task; the loop check opens one new skill; a shot of a guild house | 10, 11.6, D49 |
 | B4 ✓ | **Peoples and reputation**: each people has a reputation number; it changes greetings, prices, talk and guards; a people's own area (the first: a dwarf hold gate or an orc town); entering it unwelcome is dangerous | Tests: reputation changes prices and greetings; a shot of the people's area | 11.6, D34 |
 | B5 ✓ | **More dungeon kinds**: a natural cave (volumes, 5.6) and a ruined tower, each with its own set pieces and passing the variety check | Variety check per kind; shots | 8, 8.1 |
 
@@ -105,6 +105,8 @@ Goal: magic returns to the world, and growing means more than bigger numbers.
 | C5 | **Rare item-only abilities** on items (D31) | A legendary item with its ability in the F1 pack shot | 11.5 |
 | C6 | **Story events**: a raid on a farm, bandits taking a waystation, a dungeon's dwellers moving out to the land; the town shows what happened | Test: an event's ledger entry changes the world and the leads | 4.2, 11.3 |
 | C7 | **Travel**: horses on roads, fast travel rules, time passing as designed | Test against 5.4's numbers | 5.4, D37 |
+
+Built ahead of phase C (Arnd asked by name, 2026-10-27): **bird form**, a taught change of shape (the hero becomes a pheasant and flies; design section 10), and the **action bar** (ten slots, always shown, arranged in the ability book; 17.1) that C1's abilities will sit on. C3 gives bird form a teacher; until then the debug menu opens it.
 
 Gate C: a fight with magic in the F1 set, the loop check with a mage hero, the review.
 
@@ -145,4 +147,5 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | Companions (animals, elementals, summons) | After magic (C), since summons need it |
 | A hedge witch who teaches | Her cottage is C3 (D49) |
 | Interiors rework (ceiling joists cross the wall tops, dim rooms) | Seen at gate A; looks, not function. Before gate B's shots |
+| Who teaches bird form (built 2026-10-27, opened only by the debug menu) | Its teacher comes with the magic teachers (C3) |
 | Barrow nits: straight slab edges close up, a crease where bank meets mound, a yellowish patch at the foot | Seen at gate A after #149 |

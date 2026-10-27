@@ -56,7 +56,7 @@ import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
 import type { Township } from './game/township';
-import type { TownTalk } from './talk/townTalk';
+import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
@@ -89,6 +89,7 @@ import { release } from './app/release';
 import { Character } from './game/character';
 import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
+import { GuildBook, houseIn, isGuild } from './game/guilds';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -97,6 +98,10 @@ import { writeSlot } from './persist/saves';
 import { acquaintances } from './game/background';
 import { Director } from './vgm/director';
 import { FightHud } from './app/fightHud';
+import { ActionBarUi } from './app/actionBarUi';
+import { AbilityBook } from './app/abilityBook';
+import { POTION } from './game/actionBar';
+import { BirdForm } from './app/birdForm';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
@@ -346,6 +351,8 @@ export async function start(b: Boot): Promise<void> {
     if (params.wear) Object.entries(character.worn).forEach(([slot, it], i) => { if (it) character.worn[slot as keyof typeof character.worn] = { ...it, wear: params.wear * Math.max(0.3, 1 - i * 0.25) }; });
     // How each people stands with the hero (plan 11.6): their own kin start higher.
     const standing = new Standing(setting, save?.looks?.look.race ?? hero.look.race ?? 'human', save?.standing);
+    // The hero's dealings with the guild houses (D49): which gave their task, and when.
+    const guildBook = new GuildBook(save?.guilds);
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
     armHero();
     // Classic or roguelike (plan 11.1): chosen in the creator, kept in the save. What fallen heroes left lies where they fell.
@@ -569,7 +576,7 @@ export async function start(b: Boot): Promise<void> {
     const wild = start && params.wild ? new WildLand({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, seed, director, journal, hud: fightHud, fight: fightHost,
       cue: (c) => sounds?.cue(c),
-      out: () => !visit() && !rooms?.inside && !player.flying,
+      out: () => !visit() && !rooms?.inside && !player.offFoot,
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
     }, terrain, start, {
@@ -585,7 +592,7 @@ export async function start(b: Boot): Promise<void> {
       hold = new HoldGate({
         stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, seed, director, journal, hud: fightHud, fight: fightHost, standing,
         cue: (c) => sounds?.cue(c),
-        out: () => !visit() && !rooms?.inside && !player.flying,
+        out: () => !visit() && !rooms?.inside && !player.offFoot,
         changed: (c) => notes.say(changeLine(c), 6),
       }, holdSite, holdPeople, {
         height: (x, z) => terrain.height(x, z),
@@ -649,8 +656,11 @@ export async function start(b: Boot): Promise<void> {
     const roomTown = params.room === 'cellar' && firstPromise ? towns.get(firstPromise.town) : towns.townAt(player.walker.pos.x, player.walker.pos.z) ?? startTown;
     if (roomTown && params.room !== null) {
       const plan = roomTown.town.plan;
-      const b = params.room === 'cellar' ? house : plan.buildings.find((x) => x.kind === params.room) ?? plan.buildings[Number(params.room)];
-      if (b) await rooms.enter({ town: roomTown, b }, true, params.room === 'cellar'); // the cellar: beside its hatch
+      const guild = params.room === 'guild' || params.room === 'guild-out';
+      const b = params.room === 'cellar' ? house : guild ? roomTown.guilds[0]?.b : plan.buildings.find((x) => x.kind === params.room) ?? plan.buildings[Number(params.room)];
+      // `room=guild-out`: in the street before the guild house, facing its door (the sign over it).
+      if (b && params.room === 'guild-out') player.teleport(b.door[0] - b.vx * 6, undefined, b.door[1] - b.vz * 6, Math.atan2(-b.vx, -b.vz));
+      else if (b) await rooms.enter({ town: roomTown, b }, true, params.room === 'cellar'); // the cellar: beside its hatch
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
 
@@ -704,7 +714,7 @@ export async function start(b: Boot): Promise<void> {
       hour: () => view.sky.hour,
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
       where: () => (visit() ? { place: 'cellar', room: null } : rooms?.door ? { place: 'room', room: rooms.door.b.kind } : { place: 'land', room: null }),
-      inFlight: () => player.flying,
+      inFlight: () => player.offFoot,
       horses: () => player.steeds,
       riding: () => player.riding,
       threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
@@ -757,7 +767,7 @@ export async function start(b: Boot): Promise<void> {
       paused,
       get bindings() { return settings.current.bindings; },
       // Flying, below in a cellar, or still at the title (its fly-over is no place to talk).
-      get away() { return player.flying || !!visit() || !!title?.holding; },
+      get away() { return player.offFoot || !!visit() || !!title?.holding; },
       heard: (lead) => {
         handOver?.give(lead.id);
         // The hero's own first page ("ask at the inn") has done its work.
@@ -810,14 +820,31 @@ export async function start(b: Boot): Promise<void> {
       rang: () => sounds?.rang(),
     });
     for (const id of UPKEEP_SERVICES) services.set(id, (a) => { const t = talkTown(); if (t) upkeep.answer(id, a.person, t.talk.nameOf(a.person.id)); });
-    // Lessons (plan 11.4): the smith, the old caravan guard and the innkeeper teach for coin; one more service.
+    // Lessons (plan 11.4, D49): the guild houses' trainers open skills and ranks and teach, the innkeeper teaches; one more service.
     const lessons = new LessonsUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
       taught: (h) => { const t = hours() + h; view.sky.day = Math.floor(t / 24); view.sky.hour = t - view.sky.day * 24; sounds?.coins(); },
       changed: armHero,
+      book: guildBook,
+      log: () => log,
+      hours,
     });
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id)); });
+    // The bard at the inn (D49): "where can I learn a skill?" names every guild house of the town and puts
+    // it on the map, a hidden one with its way in.
+    const skillNames = (ids: readonly string[]) => ids.map((id) => setting.skills.find((x) => x.id === id)?.name.toLowerCase() ?? id).join(', ');
+    services.set('bard', (a) => {
+      const t = talkTown(), bard = setting.bard;
+      if (!t || !bard) return;
+      const told = t.guilds.map(({ guild: g }) => {
+        const master = t.residents.find((p) => p.trade === g.keeper);
+        if (g.hidden) guildBook.tell(houseIn(t.id, g.keeper));
+        return fill(g.hidden ? bard.tellsHidden : bard.tells, { house: cap(g.name), skills: skillNames(g.skills), keeper: master ? t.talk.nameOf(master.id) : 'the master', way: g.way ?? '' });
+      });
+      notes.say(told.length ? `${told.join(' ')} (Map: ${keyName('map')})` : `${t.talk.nameOf(a.person.id)} knows of no guild house here.`, 12);
+      sounds?.noted();
+    });
     // The peoples in talk (plan 11.6): greetings, refusals and kept news by standing; where a people's hold is, and gifts.
     const peoples = new PeoplesTalk({
       setting, character, standing, journal, holds: terrain.holds,
@@ -838,7 +865,9 @@ export async function start(b: Boot): Promise<void> {
         return [
           ...(shop ? [{ id: 'trade', label: shop.topic, line: shop.line }] : []),
           ...upkeep.services(p),
-          ...(teacher ? [{ id: 'lessons', label: teacher.topic, line: teacher.line }] : []),
+          // A hidden guild house's trainer is a locksmith like any other until the bard told the way in (D49).
+          ...(teacher && !(isGuild(teacher) && !guildBook.onMap(t.id, teacher)) ? [{ id: 'lessons', label: teacher.topic, line: teacher.line }] : []),
+          ...(setting.bard && t.bard?.id === id && t.guilds.length ? [{ id: 'bard', label: setting.bard.topic, line: setting.bard.line }] : []),
           ...peoples.services(p),
         ];
       };
@@ -853,6 +882,45 @@ export async function start(b: Boot): Promise<void> {
       changed: armHero,
       drank: (n) => { if (n > 0) fightHud.healed(); },
     });
+    // The action bar (plan 17.1): always there in play, its keys 1 to 0; the ability book (K) arranges it.
+    const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
+    const leading = () => encounters().find((e) => e.leading) ?? null;
+    const potions = () => character.pack.filter((i) => setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
+    // Bird form (plan 10): the hero becomes a pheasant and flies; the change takes its time and never in a fight.
+    const birdAbility = setting.abilities.find((a) => a.shape?.into === 'bird') ?? null;
+    const birdForm = birdAbility ? new BirdForm(birdAbility, player, world, {
+      stage: view.stage, notes,
+      around: () => ({ fighting: encounters().some((e) => e.pressure.fighting > 0), riding: !!player.riding, swimming: player.walker.mode === 'swim', roofed: !!visit() || !!rooms?.inside }),
+      changed: () => autosave(),
+    }) : null;
+    if (birdForm && birdAbility && character.knows(birdAbility.id)) void birdForm.warm();
+    const actionBar = new ActionBarUi(character, setting, {
+      get bindings() { return settings.current.bindings; },
+      get blocked() { return open > 0; },
+      trigger: (id) => {
+        const e = leading();
+        let said: string | null;
+        if (birdForm && id === birdAbility?.id) said = birdForm.invoke();
+        else if (birdForm?.flying) said = 'A pheasant cannot do that.';
+        else if (e) said = e.use(id);
+        else if (id === POTION) {
+          const r = character.remedy;
+          said = r ? null : 'You have nothing to drink.';
+          if (r && character.consume(r) > 0) fightHud.healed();
+        } else said = 'There is nothing here to fight.';
+        if (said) notes.say(said, 2.5);
+      },
+      state: (id) => {
+        const f = leading()?.fighting ?? null;
+        if (id === POTION) { const n = potions(); return { left: 0, total: 0, dim: n === 0, on: false, count: n }; }
+        if (birdForm && id === birdAbility?.id) { const b = birdForm.state; return { left: b.left, total: birdAbility.cooldown, dim: false, on: b.on }; }
+        const a = setting.abilities.find((x) => x.id === id);
+        if (!a || !f) return { left: 0, total: 0, dim: true, on: false };
+        return { left: f.cooling(id), total: a.cooldown, dim: character.stamina < a.stamina, on: id === 'strike' && f.attacking };
+      },
+      arranged: () => { book.redraw(); },
+    });
+    const book = new AbilityBook(character, setting, actionBar, { paused, get bindings() { return settings.current.bindings; } });
     // How exactly the hero knows where they are (plan 11.7): the map shows it, travel and reading it train it.
     const orientation = new Orientation(seed, character, home);
     // Where the hero believes they are, facing `yaw` (down in a cellar: at its house; in a barrow: at its forecourt).
@@ -867,6 +935,7 @@ export async function start(b: Boot): Promise<void> {
       height: (x, z) => terrain.height(x, z),
       water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
       heroBearing: () => believed(player.walker.yaw),
+      signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ x: h.b.cx, z: h.b.cz, label: cap(h.guild.name) }))),
     }) : null;
     // The compass at the top (plan 17.1): turns with the camera, its needle as true as the orientation skill.
     const compass = new Compass(seed);
@@ -902,6 +971,10 @@ export async function start(b: Boot): Promise<void> {
         ? agents.find((a) => a.person.home === firstPromise?.building && a.person.role !== 'child')
         : params.talk === 'smith'
         ? agents.find((a) => a.person.trade === 'smith' && a.person.role === 'trade')
+        : params.talk === 'guild' // the first guild house's trainer (D49)
+        ? agents.find((a) => a.person.trade === talkIn.guilds[0]?.guild.keeper)
+        : params.talk === 'bard'
+        ? agents.find((a) => a.person === talkIn.bard)
         : agents.find((a) => plan.buildings[a.person.home].kind === 'inn' && a.person.role === 'trade');
       if (pick) {
         await standBefore(pick);
@@ -931,6 +1004,7 @@ export async function start(b: Boot): Promise<void> {
           journal: journal.entries(),
           character: character.save(),
           standing: standing.save(),
+          guilds: guildBook.bookSave(),
           ...(hold?.diff() ? { hold: hold.diff() } : {}),
           looks: { name: heroName, look: hero.look },
           director: director.snapshot(),
@@ -1027,8 +1101,18 @@ export async function start(b: Boot): Promise<void> {
         return kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
       },
       get viewParams() { return player.viewParams; },
+      // Abilities a teacher opens (D49), learned or forgotten here so they can be tried.
+      taught: setting.abilities.filter((a) => a.taught).map((a) => ({ id: a.id, name: a.name })),
+      known: (id) => character.knows(id),
+      learn: (id, on) => {
+        const did = on ? character.learn(id) : character.forget(id);
+        actionBar.draw();
+        book.redraw();
+        if (on && id === birdAbility?.id) void birdForm?.warm();
+        return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
+      },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1111,7 +1195,7 @@ export async function start(b: Boot): Promise<void> {
     const hails = new Hails(setting.talk, journal, {
       get town() { return here(); },
       get heroAt() { return player.walker.pos; },
-      get busy() { return open > 0 || player.flying || !!rooms?.inside || !!title?.holding || !!creator?.showing || !window.__mwReady; },
+      get busy() { return open > 0 || player.offFoot || !!rooms?.inside || !!title?.holding || !!creator?.showing || !window.__mwReady; },
       get open() { return new Set(openPromises(log).map((d) => d.id)); },
       get talkingTo() { return talk?.partner ?? null; },
       say: (text) => notes.say(text, 6),
@@ -1119,7 +1203,7 @@ export async function start(b: Boot): Promise<void> {
     const direct = (dt: number): void => {
       const below = !!visit();
       let fighting = 0, pressure = 0;
-      for (const e of [...(cellars?.encounters ?? []), ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])]) { const p = e.pressure; fighting += p.fighting; pressure += p.pressure; }
+      for (const e of encounters()) { const p = e.pressure; fighting += p.fighting; pressure += p.pressure; }
       director.observe(dt, { fighting, pressure, health: character.health / character.maxHealth, talking: open > 0, underground: below, inTown: !!here() && !below, leads: journal.open.length });
       const m = director.next();
       if (m) notes.say(m, 6);
@@ -1161,7 +1245,7 @@ export async function start(b: Boot): Promise<void> {
           lookWild = null;
           standBeside(seen, 12);
         }
-        if (!visit() && !player.flying) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
+        if (!visit() && !player.offFoot) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
         brooks.near(player.walker.pos.x, player.walker.pos.z);
         // The VGM opens the land ahead (plan 5.5): a region at a time into the log, its place drawn as the hero nears.
         if (regionSites && !visit()) {
@@ -1169,7 +1253,7 @@ export async function start(b: Boot): Promise<void> {
           const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
           if (opened) regionOpened(opened);
         }
-        stepEncounters(dt, [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])], { hero: character, player, hud: fightHud });
+        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }
       if (!visit()) rooms?.update(dt);
@@ -1177,7 +1261,7 @@ export async function start(b: Boot): Promise<void> {
       // Talk follows the hero from town to town (a talk going on stays where it is).
       if (talk) { const t = here(); if (t) talk.place = t; }
       talk?.watch();
-      const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.flying && !visit());
+      const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.offFoot && !visit());
       if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }
       compass.visible = !title?.holding && !creator?.showing && !!window.__mwReady;
       if (compass.visible) {
@@ -1186,6 +1270,9 @@ export async function start(b: Boot): Promise<void> {
       }
       direct(dt);
       notes.update(dt);
+      actionBar.inPlay = playing && !ended && !title?.holding && !creator?.showing;
+      actionBar.dark = !character.alive;
+      actionBar.readSlots();
       // The floating origin steps once the camera strays from it, before anything writes origin-relative data.
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
       view.sky.underwater = sea.submerged(view.camera.position);

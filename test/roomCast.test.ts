@@ -63,3 +63,21 @@ test('room cast: someone stopped out of doors on their way into the inn stays ou
   life.hold(outside, outside.x + 1, outside.z);
   assert.ok(!roomCast(life.agents, life.spots, inn.id, room).some((x) => x.agent === outside), 'not drawn at a spot in the room');
 });
+
+test('room cast: a guild hall\'s master stands by the practice post; nobody sits down to a family table there', () => {
+  const life = new TownLife(plan, 7, 19);
+  for (let s = 0; s < 300; s++) life.step(1, 19);
+  let seen = 0;
+  for (const b of plan.buildings.filter((x) => x.kind === 'house' || x.kind === 'cottage')) {
+    const hall = planInterior(b, { hall: true }), before = roomCast(life.agents, life.spots, b.id, hall);
+    if (!before.length) continue;
+    const master = before[0].agent.person, was = master.work;
+    master.work = b.id;
+    const c = roomCast(life.agents, life.spots, b.id, hall).find((x) => x.agent.person === master)!;
+    master.work = was;
+    assert.equal(hall.spots[c.spot].kind, 'drill');
+    assert.equal(c.act, 'browse');
+    if (++seen >= 5) break;
+  }
+  assert.ok(seen >= 3, `${seen} halls with somebody in`);
+});

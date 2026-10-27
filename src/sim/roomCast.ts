@@ -21,8 +21,10 @@ export interface Cast {
 const ACT: Record<InteriorSpotKind, ActivityKind> = {
   sit: 'sit', drink: 'drink', serve: 'serve', smith: 'smith', stoke: 'stoke', quench: 'quench', craft: 'craft',
   bake: 'bake', sleep: 'sleep', pray: 'pray', tend: 'tend', warm: 'browse',
+  // A hall's master by the practice post, arms folded, watching who comes in.
+  drill: 'browse',
 };
-const WORK: ReadonlySet<InteriorSpotKind> = new Set(['serve', 'smith', 'stoke', 'quench', 'craft', 'bake', 'tend']);
+const WORK: ReadonlySet<InteriorSpotKind> = new Set(['serve', 'smith', 'stoke', 'quench', 'craft', 'bake', 'tend', 'drill']);
 /** Where a visitor or a member of the household goes, likeliest first. */
 const REST: readonly InteriorSpotKind[] = ['drink', 'sit', 'pray', 'warm'];
 

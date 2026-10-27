@@ -9,7 +9,7 @@ export const HERO_CLIPS = [
 
 /** The clip for each one-shot action (the fight's ids); anyone drawn as an Actors person plays these. */
 export const ACTION_CLIPS: Readonly<Record<string, string>> = {
-  swing_1h: 'sword slash A', slam: 'sword slash B', punch: 'punch jab', kick: 'shield bash', flinch: 'hit to chest', drink: 'eat or drink',
+  swing_1h: 'sword slash A', slam: 'sword slash B', punch: 'punch jab', kick: 'shield bash', flinch: 'hit to chest', drink: 'eat or drink', kneel: 'crouch',
 };
 
 /** The ground speed (m/s) each moving clip shows at its own pace. */

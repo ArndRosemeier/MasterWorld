@@ -9,6 +9,7 @@
  */
 import { interiorBlocked, planInterior, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
+import { guildSigns } from '../game/guilds';
 import type { HouseView } from '../render/town/HouseView';
 import type { SkyView } from '../render/sky';
 import type { PointLight } from 'three/webgpu';
@@ -82,7 +83,9 @@ export class InteriorVisit {
   private planOf(door: TownDoor): InteriorPlan {
     const key = houseKey(door.town.id, door.b.id);
     let p = this.plans.get(key);
-    if (!p) this.plans.set(key, (p = planInterior(door.b, { hatch: this.cellars.has(key) })));
+    // A guild house in the open (not a hidden one) is a hall: a weapon rack and a practice post (D49).
+    const g = door.town.guildAt(door.b.id);
+    if (!p) this.plans.set(key, (p = planInterior(door.b, { hatch: this.cellars.has(key), hall: !!g && !g.guild.hidden })));
     return p;
   }
 
@@ -92,7 +95,7 @@ export class InteriorVisit {
     this.shut();
     const b = door.b, plan = this.planOf(door);
     this.open = { door, b, plan, walk: houseWalk(b, plan) };
-    await this.view.drawOpen(b, plan, this.towns.viewOf(door.town.id));
+    await this.view.drawOpen(b, plan, this.towns.viewOf(door.town.id), guildSigns(door.town.guilds).get(b.id));
     return this.open;
   }
 
@@ -114,7 +117,7 @@ export class InteriorVisit {
   }
 
   update(dt: number): void {
-    if (this.player.flying) return;
+    if (this.player.offFoot) return;
     const w = this.player.walker, x = w.pos.x, z = w.pos.z;
     // The nearest door within reach opens (not while one is inside another).
     if (!this.within) {
@@ -169,8 +172,8 @@ export class InteriorVisit {
     this.sky.sheltered = true;
     this.lamp(this.open.walk.storey(this.player.walker.pos.y));
     // A cellar's house: the trapdoor in the floor is the way down (it lies in a dark corner, easy to miss).
-    const b = this.open.b, trapdoor = this.open.plan.fixtures.some((f) => f.kind === 'hatch');
-    this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.${trapdoor ? ' A trapdoor in the floor leads down to the cellar.' : ''}`, trapdoor ? 6 : 3);
+    const b = this.open.b, trapdoor = this.open.plan.fixtures.some((f) => f.kind === 'hatch'), g = this.open.door.town.guildAt(b.id);
+    this.notes.say(`You step into ${g && !g.guild.hidden ? g.guild.name : NAMES[b.kind] ?? 'the house'}.${trapdoor ? ' A trapdoor in the floor leads down to the cellar.' : ''}`, trapdoor ? 6 : 3);
   }
 
   /** Stepping out. */
@@ -231,7 +234,8 @@ export class InteriorVisit {
 
   get roomText(): string {
     if (!this.open) return '';
-    return `${this.within ? 'in' : 'open'} ${this.open.b.kind} #${this.open.b.id} of ${this.open.door.town.id}${this.within ? ` storey ${this.lampOn}` : ''}`;
+    const g = this.open.door.town.guildAt(this.open.b.id);
+    return `${this.within ? 'in' : 'open'} ${this.open.b.kind} #${this.open.b.id}${g ? ` (${g.guild.name})` : ''} of ${this.open.door.town.id}${this.within ? ` storey ${this.lampOn}` : ''}`;
   }
 }
 
