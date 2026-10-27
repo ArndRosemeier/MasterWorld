@@ -6,7 +6,7 @@
 import { Group, type Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { Terrain } from '../world/terrain';
-import { bridgeMesh, bridgesNear } from '../world/bridges';
+import { bridgeMesh, bridgesNear, type Bridge } from '../world/bridges';
 import { buildingMeshAt } from './materials/building';
 
 /** Bridges within this of the hero are drawn, m; they go again past FORGET. */
@@ -16,13 +16,16 @@ const MOVE = 150;
 
 export class BridgeView {
   readonly group = new Group();
-  private readonly drawn = new Map<string, { mesh: Mesh; x: number; z: number }>();
+  private readonly drawn = new Map<string, { mesh: Mesh; x: number; z: number; b: Bridge }>();
   private lastX = Infinity;
   private lastZ = Infinity;
   private known = '';
   private adding: Promise<void> | null = null;
 
   constructor(private readonly stage: Stage, private readonly terrain: Terrain) {}
+
+  /** The bridges drawn now (shots and checks). */
+  get bridges(): Bridge[] { return [...this.drawn.values()].map((d) => d.b); }
 
   /** Each frame or so: the bridges round (x, z). */
   lookAround(x: number, z: number): void {
@@ -38,7 +41,7 @@ export class BridgeView {
     if (!this.group.parent && !this.adding) this.adding = this.stage.add(this.group);
     for (const b of fresh) {
       const mesh = buildingMeshAt(bridgeMesh(b), b.x, 0, b.z, `bridge ${b.id}`);
-      this.drawn.set(b.id, { mesh, x: b.x, z: b.z });
+      this.drawn.set(b.id, { mesh, x: b.x, z: b.z, b });
       // The building shader is the town's, built at load; prepared all the same, so nothing compiles on the render path.
       void this.stage.prepare(mesh).then(() => { if (this.drawn.get(b.id)?.mesh === mesh) this.group.add(mesh); });
     }
