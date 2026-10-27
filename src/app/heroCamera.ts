@@ -29,6 +29,8 @@ const TALK_SHOTS: readonly (readonly [number, number])[] = [[1.3, 0.45], [1.3, -
 
 /** A held shot's distances from what it shows (m; the first the best), and its heights over its floor. */
 const SHOT_OFF = [2.2, 1.8, 2.7, 1.4], SHOT_UP = [1.9, 1.6, 2.2];
+/** A held shot's camera this far from any wall (m); and nothing within SHOT_NEAR of it across its frame (the turns, rad). */
+const SHOT_CLEAR = 0.45, SHOT_NEAR = 1.2, SHOT_EDGES = [-0.55, -0.3, 0.3, 0.55];
 
 /** A scene played out, seen from a held camera (HeroCamera.hold). World coordinates. */
 export interface Shot {
@@ -227,9 +229,18 @@ export class HeroCamera {
     for (const dist of SHOT_OFF) for (const up of SHOT_UP) for (let k = 0; k < 16; k++) {
       const a = (k / 16) * Math.PI * 2, dx = Math.sin(a), dz = Math.cos(a);
       const p = new Vector3(r.x + dx * dist, r.y + up, r.z + dz * dist);
-      if (!open(p.x, p.y, p.z, 0.3) || this.world.wall?.(p.x, p.z, 0.2, r.y)) continue;
+      if (!open(p.x, p.y, p.z, SHOT_CLEAR) || this.world.wall?.(p.x, p.z, SHOT_CLEAR, r.y)) continue;
       let cost = shot.cost?.(dx, dz) ?? 0;
       for (let t = 0.1; t < 0.95; t += 0.1) if (!open(p.x + (aim.x - p.x) * t, p.y + (aim.y - p.y) * t, p.z + (aim.z - p.z) * t, 0.05)) cost += 10;
+      // Nothing close across the frame either (a chimney breast, a wall's corner beside the camera fills a third of it).
+      const ax = aim.x - p.x, az = aim.z - p.z, al = Math.hypot(ax, az) || 1;
+      for (const turn of SHOT_EDGES) {
+        const c = Math.cos(turn), sn = Math.sin(turn), rx = (ax * c - az * sn) / al, rz = (ax * sn + az * c) / al;
+        for (let d = 0.3; d <= SHOT_NEAR; d += 0.3) {
+          const x = p.x + rx * d, z = p.z + rz * d;
+          if (!open(x, p.y - d * 0.4, z, 0.05) || this.world.wall?.(x, z, 0.05, r.y)) { cost += 3; break; }
+        }
+      }
       cost += Math.abs(dist - SHOT_OFF[0]) * 0.5 + Math.abs(up - SHOT_UP[0]);
       if (cost < least) { least = cost; best = p; }
     }

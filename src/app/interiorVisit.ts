@@ -7,7 +7,7 @@
  * lit) and the eye adapts. The sun that comes in is thrown about the room (game/roomLight.ts): its
  * value eases as the sun moves and is gone at night.
  */
-import { interiorBlocked, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
+import { HATCH_RUNG, HATCH_RUNG_IN, HATCH_SHAFT, hatchSides, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { openHouse, type OpenHouse } from '../world/townMesh';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
 import { guildSigns } from '../game/guilds';
@@ -42,12 +42,6 @@ const STUCK_FOR = 2;
 const KEPT = 8;
 /** A hatch is used (E) from this near its middle (m). */
 const HATCH_REACH = 1.6;
-/** Where one stands to get down into a hatch: this far out from its edge (m; LadderClimb stands 0.62 past the rungs). */
-const STAND = 0.5;
-/** The ladder's rungs this far inside the hatch's edge (m). */
-const RUNG_IN = 0.12;
-/** Room kept clear past the lid's hinge, for the open lid leaning back (m). */
-const LEAN = 0.35;
 
 interface Open { door: TownDoor; b: TownBuilding; plan: InteriorPlan; walk: HouseWalk; flow: RoomFlow }
 
@@ -139,8 +133,8 @@ export class InteriorVisit {
     const o = await this.openUp(door), b = door.b;
     const hatch = byHatch ? o.plan.fixtures.find((f) => f.kind === 'hatch') : undefined;
     if (hatch) {
-      const l = this.wayDown(o, hatch, null).ladder;
-      this.player.teleport(l.x + l.nx * 0.62, l.floor, l.z + l.nz * 0.62, Math.atan2(l.nx, l.nz));
+      const l = this.wayDown(o, hatch).ladder;
+      this.player.teleport(l.x + l.nx * 1.1, l.floor, l.z + l.nz * 1.1, Math.atan2(l.nx, l.nz));
     } else {
       const p = o.walk.floorAt(0, o.plan.storeys[0].b0 + 1.0, 0);
       this.player.teleport(p.x, p.y, p.z, Math.atan2(-b.vx, -b.vz));
@@ -190,7 +184,7 @@ export class InteriorVisit {
     if (!hatch || !below || o.walk.storey(w.pos.y) !== hatch.storey) return null;
     const [a, b] = o.walk.frame.toRoom(w.pos.x, w.pos.z);
     if (Math.hypot(a - hatch.a, b - hatch.b) > HATCH_REACH) return null;
-    return { way: this.wayDown(o, hatch, [a, b]), below };
+    return { way: this.wayDown(o, hatch), below };
   }
 
   /**
@@ -202,28 +196,20 @@ export class InteriorVisit {
     const hatch = o.plan.fixtures.find((f) => f.kind === 'hatch');
     if (!hatch) return null;
     this.come();
-    return this.wayDown(o, hatch, null);
+    return this.wayDown(o, hatch);
   }
 
   /**
-   * The way down through a hatch: the ladder just inside its edge on the side one gets on from (`from`: the side
-   * nearest that point, else the first with free floor), facing out of the hole; the lid hinged on the far side.
+   * The way down through a hatch, as the house draws it (@futuremagic/settlement hatchSides): the ladder just inside
+   * its edge on its side, facing out of the hole; the lid hinged on its side.
    */
-  private wayDown(o: Open, f: InteriorFixture, from: [number, number] | null): HatchWay {
-    const sides: [number, number][] = [[0, -1], [1, 0], [-1, 0], [0, 1]];
-    const free = sides.filter(([da, db]) => !interiorBlocked(o.plan, f.a + da * (STAND + f.w / 2), f.b + db * (STAND + f.d / 2), 0.3, f.storey, true));
-    const near = (s: [number, number]) => (from ? -((from[0] - f.a) * s[0] + (from[1] - f.b) * s[1]) : 0);
-    const [da, db] = (free.length ? free : sides).slice().sort((p, q) => near(p) - near(q))[0];
+  private wayDown(o: Open, f: InteriorFixture): HatchWay {
+    const { ladder: [da, db], hinge: hs } = hatchSides(o.plan, f);
     const half = Math.abs(da) * f.w / 2 + Math.abs(db) * f.d / 2, across = Math.abs(db) * f.w / 2 + Math.abs(da) * f.d / 2;
     const fr = o.walk.frame, [cx, cz] = fr.toWorld(f.a, f.b), [ex, ez] = fr.toWorld(f.a + da, f.b + db);
     const nx = ex - cx, nz = ez - cz, floor = o.walk.floorAt(f.a, f.b, f.storey).y;
-    const ladder: Ladder = { x: cx + nx * (half - RUNG_IN), z: cz + nz * (half - RUNG_IN), nx, nz, lo: floor - 2.4, hi: floor, floor, halfWidth: Math.min(0.3, across - 0.12), rim: true };
-    // The lid hinges on the side across from the ladder, else on one beside it: one the open lid leaning back on its
-    // hinge does not run into (a hearth, a wall).
-    const edge = (s: [number, number]) => Math.abs(s[0]) * f.w / 2 + Math.abs(s[1]) * f.d / 2;
-    const roomBehind = (s: [number, number]) => !interiorBlocked(o.plan, f.a + s[0] * (edge(s) + LEAN), f.b + s[1] * (edge(s) + LEAN), 0.12, f.storey, true);
-    const hs = ([[-da, -db], [db, -da], [-db, da]] as [number, number][]).find(roomBehind) ?? [-da, -db];
-    const [hx, hz] = fr.toWorld(f.a + hs[0], f.b + hs[1]), sx = hx - cx, sz = hz - cz, out = edge(hs);
+    const ladder: Ladder = { x: cx + nx * (half - HATCH_RUNG_IN), z: cz + nz * (half - HATCH_RUNG_IN), nx, nz, lo: floor - HATCH_SHAFT, hi: floor, floor, halfWidth: Math.min(0.3, across - 0.12), rung: HATCH_RUNG, rim: true };
+    const [hx, hz] = fr.toWorld(f.a + hs[0], f.b + hs[1]), sx = hx - cx, sz = hz - cz, out = Math.abs(hs[0]) * f.w / 2 + Math.abs(hs[1]) * f.d / 2;
     const view = this.view, hinge = { x: cx + sx * out, y: floor, z: cz + sz * out };
     // Up from the hinge: the lid's free edge rises and swings over towards the hinge.
     const axis = new Vector3(-sx, 0, -sz).cross(new Vector3(0, 1, 0)).normalize();

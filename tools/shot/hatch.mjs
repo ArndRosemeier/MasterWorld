@@ -70,7 +70,7 @@ await page.waitForFunction(() => !window.game.player.puppet, null, { timeout: 30
 const s1 = await state();
 console.log('below', JSON.stringify(s1));
 if (!s1.below) fail('not below after the climb down');
-await look(Math.PI * 0.8, 3.2, -0.15);
+// The game's own camera, as the climb left it.
 await page.waitForTimeout(600);
 await shoot('2-at-the-foot');
 await page.keyboard.press('KeyE');
