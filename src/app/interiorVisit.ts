@@ -46,6 +46,8 @@ const HATCH_REACH = 1.6;
 const STAND = 0.5;
 /** The ladder's rungs this far inside the hatch's edge (m). */
 const RUNG_IN = 0.12;
+/** Room kept clear past the lid's hinge, for the open lid leaning back (m). */
+const LEAN = 0.35;
 
 interface Open { door: TownDoor; b: TownBuilding; plan: InteriorPlan; walk: HouseWalk; flow: RoomFlow }
 
@@ -216,10 +218,16 @@ export class InteriorVisit {
     const fr = o.walk.frame, [cx, cz] = fr.toWorld(f.a, f.b), [ex, ez] = fr.toWorld(f.a + da, f.b + db);
     const nx = ex - cx, nz = ez - cz, floor = o.walk.floorAt(f.a, f.b, f.storey).y;
     const ladder: Ladder = { x: cx + nx * (half - RUNG_IN), z: cz + nz * (half - RUNG_IN), nx, nz, lo: floor - 2.4, hi: floor, floor, halfWidth: Math.min(0.3, across - 0.12), rim: true };
-    const view = this.view, hinge = { x: cx - nx * half, y: floor, z: cz - nz * half };
-    // Up from the hinge: the lid's free edge (on the ladder's side) rises and swings over towards the hinge.
-    const axis = new Vector3(nx, 0, nz).cross(new Vector3(0, 1, 0)).normalize();
-    return { ladder, floor, hole: [cx, cz, half], lid: (angle) => view.swingLid(hinge.x, hinge.y, hinge.z, axis, angle) };
+    // The lid hinges on the side across from the ladder, else on one beside it: one the open lid leaning back on its
+    // hinge does not run into (a hearth, a wall).
+    const edge = (s: [number, number]) => Math.abs(s[0]) * f.w / 2 + Math.abs(s[1]) * f.d / 2;
+    const roomBehind = (s: [number, number]) => !interiorBlocked(o.plan, f.a + s[0] * (edge(s) + LEAN), f.b + s[1] * (edge(s) + LEAN), 0.12, f.storey, true);
+    const hs = ([[-da, -db], [db, -da], [-db, da]] as [number, number][]).find(roomBehind) ?? [-da, -db];
+    const [hx, hz] = fr.toWorld(f.a + hs[0], f.b + hs[1]), sx = hx - cx, sz = hz - cz, out = edge(hs);
+    const view = this.view, hinge = { x: cx + sx * out, y: floor, z: cz + sz * out };
+    // Up from the hinge: the lid's free edge rises and swings over towards the hinge.
+    const axis = new Vector3(-sx, 0, -sz).cross(new Vector3(0, 1, 0)).normalize();
+    return { ladder, floor, hole: [cx, cz, half], hinge: [sx, sz], lid: (angle) => view.swingLid(hinge.x, hinge.y, hinge.z, axis, angle) };
   }
 
   /** Off the flight under (a, b) of storey `k`, if one stands on it: to its top or its foot, whichever one faces. */

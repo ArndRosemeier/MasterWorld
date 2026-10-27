@@ -12,6 +12,7 @@ import { smoothstep } from '@futuremagic/core';
 import { LadderClimb, faceYaw, type ClimbStep, type Climber, type Hole, type Ladder } from '@futuremagic/figure';
 import type { CellarVisit } from './cellarVisit';
 import type { Fade } from './fade';
+import type { Shot } from './heroCamera';
 import type { Player, Puppet } from './player';
 
 /** A house's way down through its hatch (app/interiorVisit.ts): the ladder under it, the floor, the hole, the lid. */
@@ -20,6 +21,8 @@ export interface HatchWay {
   readonly floor: number;
   /** The hole (centre x, z and half its width): walked round, not over. */
   readonly hole: Hole;
+  /** The side of the hole the lid hinges on (unit, x and z): the lid stands there, open. */
+  readonly hinge: readonly [number, number];
   /** Swing the lid up by `angle` (rad; 0 shut). */
   lid(angle: number): void;
 }
@@ -42,24 +45,32 @@ export interface HatchHost {
 
 /** How far the lid swings open (rad): past upright, so it leans back on its hinge. */
 const LID_OPEN = 1.85;
-/** The feet this far under the floor above when the head has gone under it (m). */
-const DEEP = 2.0;
+/** The feet this far further down once the head has gone under the floor above, the screen going dark meanwhile (m). */
+const DEEP = 0.6;
 /** The feet this far up the cellar's ladder where the climb comes into sight below (m). */
 const BELOW_TOP = 1.3;
-/** The camera looks at least this far over the floor while the hero goes down through it (m): never into the hole. */
-const EYE_OVER = 1.0;
+/** The camera looks at least this far over the floor while the hero goes down through it (m): into the hole's mouth. */
+const LOOK_OVER = 0.2;
 
 type Phase = () => ClimbStep[] | null;
 
 export class HatchClimb implements Puppet {
   private readonly climb = new LadderClimb();
-  private readonly eyeAt = new Vector3();
+  private readonly round = new Vector3();
+  private readonly chest = new Vector3();
+  /** The held shot's look: the hero's chest, kept over `over`; and the sides it is seen worse from. */
+  private readonly view: Shot = { round: this.round, at: this.chest, cost: (dx, dz) => this.cost(dx, dz) };
+  /** The ladder climbed (its facing) and the side the lid hinges on (null: no lid), for the shot's best side. */
+  private facing: readonly [number, number] = [0, 1];
+  private hinge: readonly [number, number] | null = null;
   /** The clip played meanwhile (crouched by the lid), else the climb's walk or stand. */
   clip: string | undefined = undefined;
   /** The next part of the climb (null: none), and whether it is ready to go on (its steps, else null: wait in the dark). */
   private next: Phase | null = null;
-  /** The floor the camera keeps above (the house's, while going through it; null: follow the head). */
+  /** The floor the camera looks no lower than (the house's, while going through it; null: follow the chest). */
   private over: number | null = null;
+  /** Seen in a held shot (the house's room, the cellar). */
+  private shown = false;
   private body: Climber = { height: 1.75, hipHeight: 0.9 };
   /** E was pressed by a hatch: the cellar below is being made ready. */
   private starting = false;
@@ -72,10 +83,28 @@ export class HatchClimb implements Puppet {
   get walking(): boolean { return this.climb.walking; }
   get pose(): Puppet['pose'] { return this.climb.pose; }
   get limbs(): Puppet['limbs'] { return this.climb.limbs; }
-  get eye(): Vector3 | null {
-    if (this.over === null) return null;
-    const p = this.climb.pos, head = p.y + this.body.height * 0.92;
-    return this.eyeAt.set(p.x, Math.max(head, this.over + EYE_OVER), p.z);
+  get shot(): Shot | null {
+    if (!this.shown) return null;
+    const p = this.climb.pos, chest = p.y + this.body.height * 0.7;
+    this.chest.set(p.x, this.over === null ? chest : Math.max(chest, this.over + LOOK_OVER), p.z);
+    return this.view;
+  }
+
+  /** The shot round the ladder `l` (the hole above it, or its foot), the lid hinged on `hinge`'s side (null: none). */
+  private film(l: Ladder, x: number, z: number, hinge: readonly [number, number] | null): void {
+    this.round.set(x, l.floor, z);
+    this.facing = [l.nx, l.nz];
+    this.hinge = hinge;
+    this.shown = true;
+  }
+
+  /**
+   * How much worse the climb is seen from the side (dx, dz): from behind the ladder (the wall it leans on), across
+   * the open lid, or square at the hero's back; best from beside it.
+   */
+  private cost(dx: number, dz: number): number {
+    const [nx, nz] = this.facing, back = dx * nx + dz * nz, h = this.hinge;
+    return (back > 0.3 ? 4 : 0) + (back < -0.85 ? 1 : 0) + (h && dx * h[0] + dz * h[1] > 0.5 ? 3 : 0);
   }
 
   /** Climbing now. */
@@ -103,21 +132,25 @@ export class HatchClimb implements Puppet {
     const P = this.host.player;
     const cellar = await below();
     this.begin();
-    const H = way.ladder, C = cellar.ladder, body = this.body;
+    const H = way.ladder, C = cellar.ladder, body = this.body, under = H.floor - body.height;
     this.over = way.floor;
+    this.film(H, way.hole[0], way.hole[1], way.hinge);
     const house: ClimbStep[] = [
       { kind: 'walk', ladder: H, around: way.hole, face: faceYaw(H) + Math.PI },
       { kind: 'hold', dur: 1.3, each: (u) => { this.clip = 'crouch'; way.lid(LID_OPEN * smoothstep(0.25, 0.95, u)); } },
       { kind: 'call', then: () => { this.clip = undefined; } },
       { kind: 'turn', to: faceYaw(H) },
       { kind: 'rim', ladder: H, dir: 'on' },
-      { kind: 'climb', ladder: H, from: this.climb.rimFeet(H, body), to: H.floor - DEEP, fade: 'out' },
+      // Down until the head is under the floor, seen all the way; then on into the dark.
+      { kind: 'climb', ladder: H, from: this.climb.rimFeet(H, body), to: under },
+      { kind: 'climb', ladder: H, from: under, to: under - DEEP, fade: 'out' },
     ];
     this.next = () => {
       // Dark: the house shuts behind and the cellar is there, the hero high on its ladder.
       cellar.arrive();
       this.host.shutHouse();
       this.over = null;
+      this.film(C, C.x, C.z, null);
       return [
         { kind: 'climb', ladder: C, from: C.floor + BELOW_TOP, to: C.floor, fade: 'in' },
         { kind: 'foot', ladder: C, dir: 'off' },
@@ -132,6 +165,7 @@ export class HatchClimb implements Puppet {
     const P = this.host.player, C = v.ladder, body = this.body;
     this.begin();
     let way: HatchWay | null | undefined;
+    this.film(C, C.x, C.z, null);
     const cellar: ClimbStep[] = [
       { kind: 'walk', ladder: C },
       { kind: 'foot', ladder: C, dir: 'on' },
@@ -141,11 +175,14 @@ export class HatchClimb implements Puppet {
     this.next = () => {
       if (way === undefined) return null;
       if (way === null) return [];
-      const H = way.ladder, lid = way.lid;
+      const H = way.ladder, lid = way.lid, under = H.floor - body.height;
       lid(LID_OPEN);
       this.over = way.floor;
+      this.film(H, way.hole[0], way.hole[1], way.hinge);
       return [
-        { kind: 'climb', ladder: H, from: H.floor - DEEP, to: this.climb.rimFeet(H, body), fade: 'in' },
+        // Out of the dark under the floor; then up into the room, seen all the way.
+        { kind: 'climb', ladder: H, from: under - DEEP, to: under, fade: 'in' },
+        { kind: 'climb', ladder: H, from: under, to: this.climb.rimFeet(H, body) },
         { kind: 'rim', ladder: H, dir: 'off' },
         { kind: 'turn', to: faceYaw(H) + Math.PI },
         { kind: 'hold', dur: 1.1, each: (u) => { this.clip = 'crouch'; lid(LID_OPEN * (1 - smoothstep(0.2, 0.85, u))); } },
@@ -161,6 +198,7 @@ export class HatchClimb implements Puppet {
     this.body = { height: hero?.height ?? P.walker.height, hipHeight: hero?.hipHeight ?? 0 };
     this.clip = undefined;
     this.over = null;
+    this.shown = false;
     P.resting = false;
     P.puppet = this;
   }
@@ -189,6 +227,7 @@ export class HatchClimb implements Puppet {
     this.climb.stop();
     this.clip = undefined;
     this.over = null;
+    this.shown = false;
     P.puppet = null;
     this.host.fade.dim(0);
     P.walker.place(p.x, p.z, p.y);

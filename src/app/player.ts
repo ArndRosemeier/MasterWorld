@@ -10,7 +10,7 @@ import { nearestSteed, type Steed } from '../game/horse';
 import type { HeroAction, HeroPuppet, HeroView } from '../render/hero/HeroView';
 import type { HorseView } from '../render/horse/HorseView';
 import { FlyCamera } from './flyCamera';
-import { HeroCamera } from './heroCamera';
+import { HeroCamera, type Shot } from './heroCamera';
 import { lookFromDegrees } from './look';
 
 /** Where a talk's view looks, above the ground (m): a halfling's face behind a counter, an adult's chest. */
@@ -188,7 +188,8 @@ export class Player {
       // The mouse still turns the camera round the hero; the keys do nothing.
       heroCam.intent(dt, walker.yaw);
       this.drawBodies(dt);
-      heroCam.trail(pp.eye ?? this.toHead(), dt);
+      if (pp.shot) heroCam.hold(pp.shot, dt);
+      else { heroCam.release(); heroCam.trail(this.toHead(), dt); }
       return;
     }
     if (riding) {
@@ -203,6 +204,7 @@ export class Player {
       walker.step(intent, dt);
     }
     this.drawBodies(dt);
+    heroCam.release();
     heroCam.trail(this.toHead(), dt);
   }
 
@@ -245,7 +247,8 @@ export class Player {
     } else {
       hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action, rest: this.resting }, dt);
     }
-    hero.visible = this.flying || !this.heroCam.firstPerson;
+    // A scene played out is seen, whatever the zoom.
+    hero.visible = this.flying || !!this.puppet || !this.heroCam.firstPerson;
   }
 
   /** Where the view is, as URL parameters (`pos=x,y,z&look=yaw,pitch`, degrees), to come back to it. */
@@ -277,6 +280,6 @@ export interface Puppet extends HeroPuppet {
   readonly yaw: number;
   readonly vel: readonly [number, number, number];
   readonly walking: boolean;
-  /** Where the camera looks (null: the hero's head). */
-  readonly eye: Vector3 | null;
+  /** The held shot it is seen in (null: the camera trails the hero as ever). */
+  readonly shot: Shot | null;
 }
