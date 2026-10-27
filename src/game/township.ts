@@ -13,6 +13,7 @@ import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
 import { heldBy, takenFrom } from '../vgm/events';
 import type { Decision, DecisionLog, RetreatDecision } from '../world/decisions';
+import { restingAt } from '../vgm/answers';
 import type { Town } from '../world/town';
 import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
 import type { Standing } from './standing';
@@ -89,6 +90,11 @@ export class Township {
     return this.c.log().filter((d): d is RetreatDecision => d.kind === 'retreat' && d.town === this.id);
   }
 
+  /** Where its people stand out on the land now: the teachers' towers, and its traveller resting by the hero's way (C9). */
+  get posts(): readonly { readonly x: number; readonly z: number }[] {
+    return [...this.retreats, ...restingAt(this.c.log(), this.c.hours(), this.id)];
+  }
+
   /** The guild whose house building `id` is (null: a plain building). */
   guildAt(id: number): GuildHouse | null {
     return this.guilds.find((h) => h.b.id === id) ?? null;
@@ -104,6 +110,7 @@ export class Township {
     if (this.lifeOf) {
       const log = this.c.log();
       if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); }
+      this.rest(this.lifeOf);
       return this.lifeOf;
     }
     const life = new TownLife(this.town.plan, this.seed, this.c.hours(), this.c.setting.routines, this.residents);
@@ -118,7 +125,27 @@ export class Township {
       const x = out.x + Math.sin(out.yaw) * WATCH, z = out.z + Math.cos(out.yaw) * WATCH;
       life.station(a, x, z, Math.atan2(this.town.decision.z - z, this.town.decision.x - x));
     }
+    this.rest(life);
     return (this.lifeOf = life);
+  }
+
+  /** The traveller resting by the hero's way (C9) now, if any; the log and the clock (a minute's step) it was looked up for. */
+  private resting: string | null = null;
+  private restKey = '';
+
+  /** Its traveller stands where the VGM met the hero with them while that rest lasts, then is on the road again. */
+  private rest(life: TownLife): void {
+    const log = this.c.log(), hours = this.c.hours(), key = `${log.length}:${Math.floor(hours * 60)}`;
+    if (key === this.restKey) return;
+    this.restKey = key;
+    const d = restingAt(log, hours, this.id).at(-1) ?? null;
+    if ((d?.id ?? null) === this.resting) return;
+    const a = life.agents.find((x) => x.person.role === 'traveller');
+    if (!a) return;
+    // Facing the way the hero came from (the decision's yaw is atan2(x, z); an agent's dir is atan2(z, x)).
+    if (d) life.station(a, d.x, d.z, Math.PI / 2 - d.yaw);
+    else life.unstation(a);
+    this.resting = d?.id ?? null;
   }
 
   /** A VGM order for this town (a gathering, a curfew): into the log by the caller, and its people follow it. */

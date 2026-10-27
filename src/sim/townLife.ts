@@ -210,6 +210,15 @@ export class TownLife {
   }
 
   /**
+   * Their watch is over (a traveller rested by the way, C9): they are on the road again, out of sight, and
+   * come back into town where its road leaves it when their day says so.
+   */
+  unstation(a: Agent): void {
+    const door = this.spots[this.doorOf(a.person.home)], [x, z] = this.roadEnds[0] ?? [door.x, door.z];
+    Object.assign(a, { post: undefined, x, z, act: 'away', next: 'away', task: 'away', hidden: true, path: [], pi: 0, until: this.time + 600 });
+  }
+
+  /**
    * Does a body of radius `r` at (x, z) touch someone out of doors (each about `BODY` wide)? People
    * already touching (ax, az), where the asker stands now, are let through, so one walked into is
    * never stuck.

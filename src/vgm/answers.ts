@@ -3,13 +3,14 @@
  * tools that meet it for their cheapest fitting move (`answerNeed`, the toolbox's `answer`s), here on the
  * hero's way. Discovery: a sight by the way (a ring of standing stones, a waystone, a cairn) a little off
  * the line to where the hero is going, so they come upon it. Reward: a find by the way (something hidden
- * under a stone), placed the same way. Challenge: an ambush, a group of the wild lying in wait ahead. Pure,
- * seeded.
+ * under a stone), placed the same way. Challenge: an ambush, a group of the wild lying in wait ahead. People: a
+ * town's traveller resting by the way. Pure, seeded.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { rollLoot, type Loot } from '../game/items';
 import type { SettingModule, SightDef } from '../setting/contract';
-import type { DecisionLog, SightDecision, WildDecision } from '../world/decisions';
+import type { DecisionLog, SightDecision, TravellerDecision, WildDecision } from '../world/decisions';
+import { buildingOf } from '../sim/people';
 import { woodsOf } from '../world/flora';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
@@ -82,11 +83,39 @@ export function ambushFor(c: NeedContext): WildDecision | null {
   if (!at) return null;
   const home = c.home ?? c.towns[0]?.decision ?? at;
   // Its group belongs to the town nearest it.
-  const town = c.towns.reduce<Town | null>((b, w) => (!b || farFrom(w, at) < farFrom(b, at) ? w : b), null);
+  const town = [...c.towns].sort((a, b) => farFrom(a, at) - farFrom(b, at))[0];
   if (!town) return null;
   const met = encounterFor({ setting: c.setting, seed: s, need: 'challenge', where: at.woods > 0.5 ? 'wood' : 'open', danger: dangerAt({ decision: at }, home) });
   if (!met) return null;
   return { kind: 'wild', id: `ambush-${n}`, town: town.decision.id, group: 'ambush', encounter: met.encounter, x: at.x, z: at.z, r: AMBUSH_R, members: met.members, seed: s, at: c.hours };
+}
+
+/** How long a traveller rests by the way (game hours: a few real minutes). */
+const RESTS = 2;
+
+/** The travellers in the log. */
+export function travellersOf(log: DecisionLog): TravellerDecision[] {
+  return log.filter((d): d is TravellerDecision => d.kind === 'traveller');
+}
+
+/** The travellers resting by the way at game hour `hours` (of town `town`, if given). */
+export function restingAt(log: DecisionLog, hours: number, town?: string): TravellerDecision[] {
+  return travellersOf(log).filter((d) => hours >= d.at && hours < d.until && (town === undefined || d.town === town));
+}
+
+/**
+ * People's answer: a traveller by the hero's way, the one of the nearest town with an inn (who comes and
+ * goes, lodging there: sim/people.ts), resting there a while facing the way the hero comes from. Not while
+ * that one rests by the way already.
+ */
+export function travellerFor(c: NeedContext): TravellerDecision | null {
+  const past = travellersOf(c.log), n = past.length + 1, s = deriveSeed(c.seed, 'traveller', n), r = new Rng(s);
+  const busy = new Set(restingAt(c.log, c.hours).map((d) => d.town));
+  const at = wayside(c, r, []);
+  if (!at) return null;
+  const town = c.towns.filter((w) => !!buildingOf(w.plan, 'inn') && !busy.has(w.decision.id)).sort((a, b) => farFrom(a, at) - farFrom(b, at))[0];
+  if (!town) return null;
+  return { kind: 'traveller', id: `traveller-${n}`, town: town.decision.id, x: at.x, z: at.z, yaw: Math.atan2(c.hero.x - at.x, c.hero.z - at.z), seed: s, at: c.hours, until: c.hours + RESTS };
 }
 
 /**

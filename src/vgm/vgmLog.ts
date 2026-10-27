@@ -47,6 +47,7 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'order': return 'order';
     case 'journey': return 'journey';
     case 'sight': return d.need === 'reward' ? 'cache' : 'sight';
+    case 'traveller': return 'traveller';
   }
 }
 
@@ -69,6 +70,7 @@ export function decisionSays(d: Decision): string {
     case 'order': return `${d.order.kind} in ${d.town}`;
     case 'journey': return `the hero takes the cart from ${d.from} to ${d.to}`;
     case 'sight': return `${d.sight} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
+    case 'traveller': return `the traveller of ${d.town} resting by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
   }
 }
 

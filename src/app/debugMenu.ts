@@ -124,6 +124,7 @@ export class DebugMenu {
         { label: 'Answer Discovery now (a sight)', run: () => h.answerNeed('discovery') },
         { label: 'Answer Reward now (a find)', run: () => h.answerNeed('reward') },
         { label: 'Answer Challenge now (an ambush)', run: () => h.answerNeed('challenge') },
+        { label: 'Answer People now (a traveller)', run: () => h.answerNeed('people') },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },
