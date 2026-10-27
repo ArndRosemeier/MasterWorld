@@ -1,0 +1,94 @@
+{
+  "commit": "9e224848e0829dec313377796764db2af818333b",
+  "dirty": false,
+  "date": "2026-10-27",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": false,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 60.501,
+  "shots": [
+    {
+      "name": "hold",
+      "file": "01-hold.jpg",
+      "query": "title=0&day=0&hour=15&weather=fair&hold=stranger",
+      "loadS": 41.422,
+      "drawnS": 2.246,
+      "settledS": 4.0173000000715255,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 54,
+      "p50": 19.799999999995634,
+      "p95": 150.5,
+      "mean": 37.03703703703704,
+      "shaders": {
+        "warmup": 76,
+        "run": 24,
+        "late": 0,
+        "worstMs": 31.800000071525574,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over 16.7 ms"
+      ]
+    },
+    {
+      "name": "hold-crag",
+      "file": "02-hold-crag.jpg",
+      "query": "title=0&day=0&hour=15&weather=fair&hold=stranger",
+      "loadS": 41.422,
+      "drawnS": 0.111,
+      "settledS": 1.536,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 101,
+      "p50": 12.200000000004366,
+      "p95": 46,
+      "mean": 19.810891089108924,
+      "shaders": {
+        "warmup": 76,
+        "run": 24,
+        "late": 0,
+        "worstMs": 31.800000071525574,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "hold-warden",
+      "file": "03-hold-warden.jpg",
+      "query": "title=0&day=0&hour=15&weather=fair&hold=stranger",
+      "loadS": 41.422,
+      "drawnS": 0.059,
+      "settledS": 1.5166999999284745,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 50,
+      "p50": 14.80000000000291,
+      "p95": 320.29999999999563,
+      "mean": 48.69399999809262,
+      "shaders": {
+        "warmup": 76,
+        "run": 24,
+        "late": 0,
+        "worstMs": 31.800000071525574,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    }
+  ]
+}
