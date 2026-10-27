@@ -8,7 +8,7 @@ import type { SettingModule } from '../setting/contract';
 import { Herds } from '../sim/livestock';
 import { townsfolk, type Person } from '../sim/people';
 import { TownLife, type TownOrder } from '../sim/townLife';
-import { talkCellar, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
+import { talkCellar, talkEvent, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
 import { heldBy, takenFrom } from '../vgm/events';
@@ -41,6 +41,8 @@ export interface TownshipContext {
   hours(): number;
   /** The hero's standing with each people (merchants' prices follow it); none: as with any stranger. */
   readonly standing?: Standing;
+  /** Every town standing (a story event's words name other places: a waystation taken); none: this one alone. */
+  towns?(): readonly Town[];
 }
 
 /** A town's own seed: its decision's, else (the start town) the world's. */
@@ -196,7 +198,7 @@ export class Township {
   get talk(): TownTalk {
     if (this.talkOf) return this.talkOf;
     const log = this.c.log();
-    const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk).talk;
+    const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk, this.c.towns?.() ?? [this.town]).talk;
     // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
     for (const id of keptOf(log)) t.hush(id);
     this.talkOf = t;
@@ -227,11 +229,18 @@ export class Township {
     return this.herdsOf;
   }
 
-  /** A promise the VGM made (already in the log): its people hear of it if it is one of theirs. */
+  /** A promise or a story event the VGM made (already in the log): its people hear of it if it is one of theirs. */
   promised(d: Decision): void {
     if (!this.talkOf) return; // made later, the words read the log
-    const c = talkCellar(d, this.c.setting, this.town, this.residents, this.c.log());
+    const log = this.c.log(), c = talkCellar(d, this.c.setting, this.town, this.residents, log);
     if (c) this.talkOf.add(c);
+    const e = talkEvent(d, this.c.setting, this.town, this.residents, log, this.c.towns?.() ?? [this.town]);
+    if (e) this.talkOf.addEvent(e);
+  }
+
+  /** A story event of this town is over (its band beaten): its people tell how it ended (C11). */
+  ended(id: string): void {
+    this.talkOf?.endEvent(id);
   }
 
   /** What it keeps in a save (nothing if the hero never talked or traded there). */

@@ -236,7 +236,7 @@ export function openBands(log: DecisionLog): Territory[] {
 }
 
 /** How an event is told (its setting's words filled in), and where its lead points. */
-export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): { title: string; news: string; note: string; done: string; label: string } | null {
+export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): { title: string; news: string; note: string; done: string; told: string; label: string } | null {
   const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
   const where = def && town && (def.kind === 'raid' ? farmOf(setting, town, e) : def.kind === 'take' ? heldOf(towns, e) : spillOf(setting, log, towns, e));
   if (!def || !town || !where) return null;
@@ -248,7 +248,7 @@ export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | '
     dir: compass(e.x - town.decision.x, e.z - town.decision.z),
   };
   const told = (s: string) => cap(fill(s, words));
-  return { title: told(def.words.title), news: told(def.words.news), note: told(def.words.note), done: told(def.words.done), label: cap(words.creatures) };
+  return { title: told(def.words.title), news: told(def.words.news), note: told(def.words.note), done: told(def.words.done), told: told(def.words.told ?? def.words.news), label: cap(words.creatures) };
 }
 
 /** The place a spill came out of, named. */
