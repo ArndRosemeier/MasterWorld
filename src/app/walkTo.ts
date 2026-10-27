@@ -11,6 +11,18 @@ const PACE = 1.4;
 /** The held shot looks at the hero's chest, this far over the feet (m). */
 const CHEST = 1.2;
 
+/**
+ * One frame of walking `pos` up to `to` at `pace` (m/s; `vel` set to it): false once there (`vel` zeroed).
+ * Shared by every scene that walks the hero somewhere (WalkTo, SearchKneel).
+ */
+export function walkOn(pos: { x: number; z: number }, vel: [number, number, number], to: { readonly x: number; readonly z: number }, pace: number, dt: number): boolean {
+  const dx = to.x - pos.x, dz = to.z - pos.z, left = Math.hypot(dx, dz), s = Math.min(left, pace * dt);
+  if (left <= 0.02) { vel[0] = 0; vel[1] = 0; vel[2] = 0; return false; }
+  pos.x += (dx / left) * s; pos.z += (dz / left) * s;
+  vel[0] = (dx / left) * pace; vel[1] = 0; vel[2] = (dz / left) * pace;
+  return true;
+}
+
 export class WalkTo implements Puppet {
   readonly pose = null;
   readonly limbs = null;
@@ -18,7 +30,7 @@ export class WalkTo implements Puppet {
   readonly shot: Shot | null;
   readonly clip = undefined;
   readonly pos: { x: number; y: number; z: number };
-  vel: [number, number, number] = [0, 0, 0];
+  readonly vel: [number, number, number] = [0, 0, 0];
   readonly yaw: number;
   walking = true;
   /** It has got there (the puppet can go). */
@@ -44,15 +56,11 @@ export class WalkTo implements Puppet {
 
   step(dt: number): void {
     if (this.done) return;
-    const dx = this.to.x - this.pos.x, dz = this.to.z - this.pos.z, left = Math.hypot(dx, dz), s = Math.min(left, PACE * dt);
-    if (left > 0.02) {
-      this.pos.x += (dx / left) * s; this.pos.z += (dz / left) * s;
+    if (walkOn(this.pos, this.vel, this.to, PACE, dt)) {
       if (this.ground) this.pos.y = this.ground(this.pos.x, this.pos.z);
       this.shot?.at.set(this.pos.x, this.pos.y + CHEST, this.pos.z);
-      this.vel = [(dx / left) * PACE, 0, (dz / left) * PACE];
       return;
     }
-    this.vel = [0, 0, 0];
     this.walking = false;
     this.done = true;
     this.onThere();

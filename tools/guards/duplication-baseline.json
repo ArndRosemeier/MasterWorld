@@ -152,10 +152,6 @@
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   },
   {
-    "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/game/recipe.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
-    "reason": "A heading from one point to another (Math.atan2 of the z and x differences): every moving thing faces where it goes; one line, not a helper."
-  },
-  {
     "key": "idiom: [.range .rng .time .until] in masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/townLife.ts",
     "reason": "Agents waiting a seeded while before their next act (until = time + rng.range(a, b)): the shape of every world-sim agent, not a copy."
   },
@@ -480,10 +476,6 @@
     "reason": "Taking an open house's meshes (lid, ladder, door leaves) out of the stage vs hiding one building of a town's merged mesh."
   },
   {
-    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/app/spellFx/particles.ts#step",
-    "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
-  },
-  {
     "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/lab/spellLab.ts#step",
     "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
   },
@@ -510,5 +502,25 @@
   {
     "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/render/flora/FloraView.ts#add",
     "reason": "Building a cellar's meshes into the stage vs adding trees to the flora: unrelated adds."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#step + masterworld/app/searchKneel.ts#step",
+    "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#step + masterworld/app/walkTo.ts#step",
+    "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/smallLife.ts#step",
+    "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
+  },
+  {
+    "key": "same name: masterworld/app/walkTo.ts#step + masterworld/sim/smallLife.ts#step",
+    "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
   }
 ]
