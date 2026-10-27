@@ -20,7 +20,7 @@ import { dungeonOf, type DecisionLog, type DungeonDecision, type EventDecision }
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
-import { compass, dungeonFor, houseOf, loreOf, placeOf } from './dungeons';
+import { compass, dungeonFor, farFrom, houseOf, loreOf, placeOf } from './dungeons';
 import { dwellersOf, keptOf, openPromises } from './leads';
 import { encounterFor } from './encounters';
 import { cap, fill } from '../talk/folk';
@@ -114,7 +114,7 @@ function takeOver(c: EventsContext, def: StoryEventDef, past: readonly EventDeci
   for (const g of c.wild ?? []) {
     const t = g.territory;
     if (t.kind !== def.by || g.left < 1 || from.has(t.id) || !rested(c, def, past, g.town)) continue;
-    const fromCamp = (w: Town) => Math.hypot(w.decision.x - t.x, w.decision.z - t.z);
+    const fromCamp = (w: Town) => farFrom(w, t);
     const target = c.towns.filter((w) => w.decision.size === def.takes && !held.has(w.decision.id) && fromCamp(w) <= (def.reach ?? Infinity)).sort((a, b) => fromCamp(a) - fromCamp(b))[0];
     if (!target) continue;
     const s = deriveSeed(c.seed, 'vgm', 'event', past.length);

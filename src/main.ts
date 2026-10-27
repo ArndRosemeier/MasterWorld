@@ -51,6 +51,7 @@ import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads'
 import { bandOf, eventTold, gatherFor, openBands } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
 import { PACING, vgmLines } from './vgm/vgmLog';
+import { findIn } from './vgm/answers';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
@@ -1335,7 +1336,7 @@ export async function start(b: Boot): Promise<void> {
     /** The VGM's answer to `need` here and now, whatever the Director says (the debug menu, shots): what it made, or null. */
     const answerNow = (need: Need): Made | null => {
       const at = player.walker.pos;
-      const m = answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null });
+      const m = answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours: hours(), setting, home: start?.decision, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null });
       if (m) applied(m);
       return m;
     };
@@ -1364,6 +1365,10 @@ export async function start(b: Boot): Promise<void> {
         cellars?.sync(log);
         // Its household's town hears of it (every town checks whether it is theirs).
         for (const t of towns?.every ?? []) t.promised(d);
+      } else if (d.kind === 'wild') {
+        // An ambush (Challenge's answer): a group of the wild lying in wait ahead.
+        console.info(`[vgm] ${d.id}: ${d.encounter} (${d.members.length}) at ${d.x.toFixed(0)}, ${d.z.toFixed(0)}`);
+        wild?.add(territoryOf(d));
       } else if (d.kind === 'sight') {
         console.info(`[vgm] sight ${d.id} (${d.sight}) at ${d.x.toFixed(0)}, ${d.z.toFixed(0)}: ${m.reason}`);
         regionSites?.sync(log);
@@ -1415,8 +1420,18 @@ export async function start(b: Boot): Promise<void> {
           if (opened) regionOpened(opened);
           // A place come upon for the first time meets Discovery (C9): a sight in full, with its words; a region's place half.
           const came = player.offFoot ? null : regionSites.cameUpon(player.walker.pos.x, player.walker.pos.z);
-          if (came?.sight) { notes.say(came.sight.seen, 8); director.met('discovery'); }
-          else if (came) director.met('discovery', 0.5);
+          if (came?.sight && came.decision) {
+            notes.say(came.sight.seen, 8);
+            // A find by the way (Reward's answer): into the pack and purse, shown as finds below are.
+            const loot = findIn(setting, came.sight, came.decision, start?.decision ?? home);
+            if (loot) {
+              character.pack.push(...loot.items);
+              character.coins += loot.coins;
+              fightHud.showFinds(loot);
+              sounds?.coins();
+              director.met('reward');
+            } else director.met('discovery');
+          } else if (came) director.met('discovery', 0.5);
         }
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
         const lead = leading();

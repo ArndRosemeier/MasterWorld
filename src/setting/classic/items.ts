@@ -66,6 +66,7 @@ export const items: ItemCatalog = {
     { id: 'web', items: [['silk', 4], ['old-coin', 2], ['dagger', 1], ['boots', 1], ['ring', 1]], count: [1, 2], coins: [0, 20] },
     { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1], ['tome-stone', 0.3]], count: [0, 1], coins: [10, 40] },
     { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1], ['tome-shadows', 0.25]], count: [0, 1], coins: [0, 10] },
+    { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30] },
     { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25] },
     {
       id: 'lair', count: [2, 3], coins: [20, 80],

@@ -41,12 +41,12 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'move-in': return 'promise';
     case 'event': return 'event';
     case 'region': return 'region';
-    case 'wild': return 'wild';
+    case 'wild': return d.group === 'ambush' ? 'ambush' : 'wild';
     case 'kept': return 'keep';
     case 'retake': return 'retake';
     case 'order': return 'order';
     case 'journey': return 'journey';
-    case 'sight': return 'sight';
+    case 'sight': return d.need === 'reward' ? 'cache' : 'sight';
   }
 }
 

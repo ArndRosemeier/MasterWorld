@@ -7,7 +7,7 @@
  */
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
-import { sightFor, type NeedContext } from './answers';
+import { ambushFor, sightFor, type NeedContext } from './answers';
 import { lairFor, nextEvent, type EventsContext } from './events';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 
@@ -62,7 +62,9 @@ export const TOOLS: readonly Tool[] = [
   { id: 'event', name: 'Story event', writes: ['event', 'dungeon'], need: 'challenge', asked: 'turn', next: (c) => lairFor(c) ?? nextEvent(c),
     why: (d) => (d.kind === 'event' ? `${d.event} in ${d.town}: ${d.paddock !== undefined || d.held ? `the raiders of ${d.from} were left alone` : `${d.from} was left open too long`}` : d.kind === 'dungeon' && d.event ? `a ${d.template} for the band of ${d.event} to lie up in` : d.kind) },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
-  { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: sightFor },
+  { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
+  { id: 'cache', name: 'A find by the way', writes: ['sight'], need: 'reward', asked: 'need', answer: (c) => sightFor(c, 'reward') },
+  { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },
@@ -102,7 +104,7 @@ export function answerNeed(need: Need, c: NeedContext): Made | null {
   for (const t of TOOLS) {
     if (t.asked !== 'need' || t.need !== need || !t.answer) continue;
     const d = t.answer(c);
-    if (d) return madeBy(t.id, d, `${need} is overdue: ${d.kind === 'sight' ? d.sight : d.kind} by the hero's way${c.toward ? ` to ${Math.round(c.toward.x)}, ${Math.round(c.toward.z)}` : ''}`, c.hours);
+    if (d) return madeBy(t.id, d, `${need} is overdue: ${d.kind === 'sight' ? d.sight : d.kind === 'wild' ? `${d.encounter} (${d.members.length}) lying in wait` : d.kind} by the hero's way${c.toward ? ` to ${Math.round(c.toward.x)}, ${Math.round(c.toward.z)}` : ''}`, c.hours);
   }
   return null;
 }

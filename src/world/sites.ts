@@ -39,9 +39,9 @@ export const SIGHT_R = 6;
 /** The glade round a sight (m from its middle): no tree stands there, so it is seen from a way off. */
 export const SIGHT_CLEARING = 20;
 
-/** A sight by the way (C9), laid out on the land from its decision: a ring of standing stones, a waystone, a cairn. */
+/** A sight by the way (C9), laid out on the land from its decision: a ring of standing stones, a waystone, a cairn, a stash. */
 export function layOutSight(d: SightDecision, shape: SightShape, height: (x: number, z: number) => number): SiteLayout {
-  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : cairn);
+  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : shape === 'stash' ? stash : cairn);
 }
 
 /** A place's pieces drawn round its middle (`draw`), seeded from it, on the land's heights. */
@@ -249,4 +249,16 @@ function cairn(at: At, k: MeshKit, solids: Solid[]): void {
     }
   }
   solids.push({ x: at.x, z: at.z, r: 1.3 });
+}
+
+/** A stash: a flat stone leant against a boulder, a bundle in oilcloth showing under it. */
+function stash(at: At, k: MeshKit, solids: Solid[]): void {
+  const r = at.rng, y = at.height(at.x, at.z) - at.y0;
+  k.stone(0, y - 0.4, 0, 1.8, 1.4, 1.5, at.yaw, WildMat.Rock, varyTint(r, MOSS, 0.1), r, 0.1, 0.55);
+  // In front of the boulder (towards the way the hero comes from): the slab, and the bundle under it.
+  const front = Math.PI / 2 - at.yaw, [sx, sz] = round(at, front, 1.1), [bx, bz] = round(at, front, 1.4);
+  const fx = sx - at.x, fz = sz - at.z;
+  k.box(bx - at.x, y + 0.05, bz - at.z, 0.55, 0.3, 0.4, at.yaw, CellarMat.Limewash, [92, 84, 62]);
+  k.stone(fx, y - 0.05, fz, 1.2, 0.18, 0.9, at.yaw + 0.3, WildMat.Rock, varyTint(r, ROCK, 0.08), r, 0.04, 0.2);
+  solids.push({ x: at.x, z: at.z, r: 1.1 });
 }

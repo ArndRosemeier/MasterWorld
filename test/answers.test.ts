@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { SIGHT_SHAPES } from '../src/setting/contract';
-import { sightFor, sightsOf, type NeedContext } from '../src/vgm/answers';
+import { findIn, sightFor, sightsOf, type NeedContext } from '../src/vgm/answers';
 import { answerNeed } from '../src/vgm/toolbox';
 import { layOutSight } from '../src/world/sites';
 import { home, seed, terrain, walk, EAST } from './frontierLand';
@@ -37,6 +37,32 @@ test('answers: Discovery overdue puts a sight by the hero\'s way, on dry ground 
   assert.ok(next && Math.hypot(next.x - d.x, next.z - d.z) >= 350, 'apart');
   assert.notEqual(next!.sight, d.sight, 'not the one met last');
   assert.equal(sightsOf([...log, d, next!]).length, 2);
+});
+
+test('answers: Reward overdue hides a find by the way; it holds something worth taking', () => {
+  const m = answerNeed('reward', c());
+  assert.ok(m && m.tool === 'cache' && m.need === 'reward');
+  const d = m.decision;
+  assert.ok(d.kind === 'sight' && d.need === 'reward');
+  if (d.kind !== 'sight') return;
+  const def = classic.sights!.find((x) => x.id === d.sight)!;
+  assert.equal(def.need, 'reward', 'only a find answers Reward');
+  const loot = findIn(classic, def, d, home)!;
+  assert.ok(loot.items.length >= 1 && loot.coins > 0, 'something in it');
+  assert.deepEqual(findIn(classic, def, d, home), loot, 'seeded');
+  assert.equal(findIn(classic, classic.sights!.find((x) => !x.loot)!, d, home), null, 'a sight holds nothing');
+});
+
+test('answers: Challenge overdue puts an ambush of the wild ahead on the way', () => {
+  const m = answerNeed('challenge', c());
+  assert.ok(m && m.tool === 'ambush' && m.need === 'challenge');
+  const d = m.decision;
+  assert.ok(d.kind === 'wild' && d.group === 'ambush');
+  if (d.kind !== 'wild') return;
+  assert.equal(classic.encounters.find((e) => e.id === d.encounter)?.need, 'challenge');
+  assert.ok(d.members.length >= 1);
+  assert.ok(d.x > out.x + 40 && d.x < out.x + 300, `ahead: ${(d.x - out.x).toFixed(0)} m`);
+  assert.equal(answerNeed('challenge', c({ log: [...log, d] }))!.decision.id, 'ambush-2', 'counted');
 });
 
 test('answers: a need with no tool for it, or a setting without sights, gets no answer', () => {
