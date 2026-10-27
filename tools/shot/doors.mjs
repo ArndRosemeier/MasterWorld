@@ -42,6 +42,23 @@ const behind = () => page.evaluate(() => {
   p.heroCam.pitch = -0.3;
   p.heroCam.zoom = 3.4;
 });
+/** The camera before the hero, looking back at them (and the door they walk away from). */
+const ahead = () => page.evaluate(() => {
+  const p = window.game.player;
+  p.heroCam.yaw = p.walker.yaw + Math.PI - 0.35;
+  p.heroCam.pitch = -0.25;
+  p.heroCam.zoom = 4.5;
+});
+/** Who stands within the door's reach, and what they do (when it is open with nobody coming). */
+const nearDoor = () => page.evaluate(() => {
+  const r = window.game.rooms, d = r?.open?.b.door;
+  if (!d) return 'no open house';
+  const near = (x, z) => Math.hypot(x - d[0], z - d[1]) < 3.2;
+  const p = window.game.player.walker.pos;
+  const inside = (r.people() ?? []).filter((q) => near(q.x, q.z)).map((q) => `inside ${q.act}`);
+  const town = r.open.door.town.life.agents.filter((a) => !a.hidden && near(a.x, a.z)).map((a) => `street ${a.act}`);
+  return [near(p.x, p.z) ? 'hero' : '', ...inside, ...town].filter(Boolean).join(', ') || 'nobody';
+});
 /** Walk on (W held, Shift: walking pace) for `ms`, a picture every `every` ms; the widest the door stood open. */
 const walk = async (tag, ms, every) => {
   let widest = 0;
@@ -61,14 +78,14 @@ await behind();
 await page.waitForTimeout(800);
 const d0 = await door();
 console.log('start door', d0.toFixed(2));
-if (d0 > 0.05) fail(`the door stands open before the hero comes (${d0.toFixed(2)})`);
+if (d0 > 0.05) fail(`the door stands open before the hero comes (${d0.toFixed(2)}; near it: ${await nearDoor()})`);
 await shoot('0-before');
 const inWide = await walk('1-in', 5000, 500);
 console.log('in: widest', inWide.toFixed(2));
 if (inWide < 0.95) fail(`the door never opened wide on the way in (${inWide.toFixed(2)})`);
 // Round, and out again.
 await page.evaluate(() => { const p = window.game.player; p.walker.yaw += Math.PI; });
-await behind();
+await ahead();
 await page.waitForTimeout(500);
 const outWide = await walk('2-out', 6500, 500);
 console.log('out: widest', outWide.toFixed(2));
@@ -76,7 +93,7 @@ if (outWide < 0.95) fail(`the door never opened wide on the way out (${outWide.t
 await page.waitForTimeout(1500);
 const d1 = await door();
 console.log('end door', d1.toFixed(2));
-if (d1 > 0.05) fail(`the door stays open behind the hero (${d1.toFixed(2)})`);
+if (d1 > 0.05) fail(`the door stays open behind the hero (${d1.toFixed(2)}; near it: ${await nearDoor()})`);
 await page.evaluate(() => { const p = window.game.player; p.walker.yaw += Math.PI; });
 await behind();
 await page.waitForTimeout(600);

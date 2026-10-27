@@ -190,8 +190,9 @@ export class InteriorVisit {
   /** The door swings open while the hero or one of the house's folk is near it, and shuts again behind them. */
   private swingDoor(o: Open, x: number, z: number, dt: number): void {
     const [dx, dz] = o.b.door, near = (px: number, pz: number) => Math.hypot(px - dx, pz - dz) < DOOR_NEAR;
-    // The hero, the folk inside, and the town's folk out on the doorstep coming or going.
-    const want = near(x, z) || (this.placed?.some((p) => near(p.x, p.z)) ?? false) || o.door.town.life.agents.some((a) => near(a.x, a.z)) ? 1 : 0;
+    // The hero, and folk on their way in or out (not one standing at their work by the door, who would hold it open).
+    const coming = (p: { x: number; z: number; act: string }) => p.act === 'walk' && near(p.x, p.z);
+    const want = near(x, z) || (this.placed?.some(coming) ?? false) || o.door.town.life.agents.some((a) => !a.hidden && coming(a)) ? 1 : 0;
     if (want === this.swing) return;
     this.swing = want > this.swing ? Math.min(1, this.swing + dt / SWING_FOR) : Math.max(0, this.swing - dt / SWING_FOR);
     this.view.swingDoors(smoothstep(0, 1, this.swing));

@@ -58,11 +58,11 @@ export class HouseView {
     if (ladderTop) {
       this.ladderTop = buildingMeshAt(ladderTop, b.cx, -LADDER_SINK, b.cz, `hatch ladder ${b.id}`);
     }
-    // Each leaf hangs on a pivot at its hinge: the mesh placed relative to it (it was drawn for the house's middle).
+    // Each leaf hangs on a pivot at its hinge (drawn relative to the house's middle): the mesh placed relative to the pivot.
     this.doors = doors.map((d, i) => {
-      const pivot = new Group(), lm = buildingMeshAt(d.mesh, b.cx - d.hinge[0], -d.hinge[1], b.cz - d.hinge[2], `door ${b.id}.${i}`);
+      const pivot = new Group(), lm = buildingMeshAt(d.mesh, -d.hinge[0], -d.hinge[1], -d.hinge[2], `door ${b.id}.${i}`);
       pivot.name = 'door leaf';
-      pivot.position.set(d.hinge[0], d.hinge[1], d.hinge[2]);
+      pivot.position.set(b.cx + d.hinge[0], d.hinge[1], b.cz + d.hinge[2]);
       pivot.add(lm);
       return { pivot, mesh: lm, open: d.open };
     });
