@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planTown } from '@futuremagic/settlement';
+import { houseShape, planTown, signPlace } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic';
 import { townsfolk } from '../src/sim/people';
 import { Character } from '../src/game/character';
@@ -98,6 +98,24 @@ test('guilds: every guild house in a village or town has its trainer', () => {
       const folk = townsfolk(plan, seed), hs = guildHouses(plan, size, classic);
       staffGuilds(folk, hs);
       for (const h of hs) assert.equal(folk.filter((p) => p.trade === h.guild.keeper && p.work === h.b.id).length, 1, `${size} ${seed}: ${h.guild.keeper}`);
+    }
+  }
+});
+
+test('guilds: the open houses\' masters dress for their calling; the hidden one\'s keeper looks like anyone', () => {
+  const plan = planTown({ seed: 3, x: 0, z: 0, radius: 72, height: () => 10 });
+  const folk = townsfolk(plan, 3);
+  staffGuilds(folk, guildHouses(plan, 'town', classic));
+  const by = (k: string) => folk.find((p) => p.trade === k)!;
+  assert.equal(by('master-at-arms').dress, 'fighter');
+  assert.equal(by('lodge-master').dress, 'traveller');
+  assert.equal(by('locksmith').dress, undefined);
+});
+
+test('guilds: a guild with a sign takes a house with free front wall for it', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    for (const h of guildHouses(planTown({ seed, x: 0, z: 0, radius: 72, height: () => 10 }), 'town', classic)) {
+      if (h.guild.sign && !h.guild.hidden) assert.ok(signPlace(h.b, houseShape(h.b))?.flat, `seed ${seed}: ${h.guild.keeper}`);
     }
   }
 });
