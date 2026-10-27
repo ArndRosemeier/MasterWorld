@@ -659,14 +659,15 @@ export async function start(b: Boot): Promise<void> {
     if (wardenAt) { const [x, z] = onLand(wardenAt, 0, 12); player.teleport(x, undefined, z, wardenAt.yaw); }
     // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
     const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
-    if (lookAt && start) {
+    const lookForm = lookAt ? setting.dungeons[lookAt]?.form : undefined;
+    if (lookAt && lookForm && start) {
       let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === lookAt) ?? null;
       if (!b) {
-        b = promisePlace(lookAt, seed, terrain, start, log, home, wild?.territories ?? []);
+        b = promisePlace(lookAt, lookForm, seed, terrain, start, log, home, wild?.territories ?? []);
         if (b) { log = [...log, { ...b, at: hours() }]; cellars.sync(log); }
       }
       // Far enough off to see it whole.
-      const off = { barrow: 9, cave: 16, tower: 32 }[lookAt];
+      const off = { hatch: 9, mound: 9, mouth: 16, keep: 32 }[lookForm.shell];
       if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * off, undefined, b.site.z + Math.cos(b.site.yaw) * off, b.site.yaw);
     }
     // `wild=<kind>`: beside its first group (for looking at them).

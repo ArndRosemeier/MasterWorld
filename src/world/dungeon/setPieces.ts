@@ -372,9 +372,9 @@ export const SET_PIECES: readonly SetPieceDef[] = [
   },
 ];
 
-/** The set pieces of a kind of dungeon. */
-export function setPiecesFor(kind: DungeonTemplate): readonly SetPieceDef[] {
-  return SET_PIECES.filter((p) => !p.kinds || p.kinds.includes(kind));
+/** The set pieces of a kind of dungeon (and of the kinds it borrows from, `DungeonForm.pieces`). */
+export function setPiecesFor(kind: DungeonTemplate, also: readonly string[] = []): readonly SetPieceDef[] {
+  return SET_PIECES.filter((p) => !p.kinds || p.kinds.includes(kind) || also.some((k) => p.kinds!.includes(k)));
 }
 
 export function setPieceById(id: string): SetPieceDef {

@@ -11,7 +11,7 @@ import type { DungeonTemplate } from '../src/world/decisions';
 const KINDS: readonly DungeonTemplate[] = ['cellar', 'barrow', 'cave', 'tower'];
 const places: { where: string; c: Cellar }[] = KINDS.flatMap((t) => Array.from({ length: 40 }, (_, i) => ({
   where: `${t} ${i}`,
-  c: outlineCellar(testDecision(i, 7, t), t === 'cellar' ? testHouse(i) : { kind: t, hu: 3, hv: 3, name: `the ${t}` }, classic.dungeons.cellar),
+  c: outlineCellar(testDecision(i, 7, t), t === 'cellar' ? testHouse(i) : { kind: t, hu: 3, hv: 3, name: `the ${t}` }, classic.dungeons[t]!),
 })));
 
 test('cellar dressing: every prop stands on its room floor, clear of every doorway (the way out, if it must, beside one)', () => {

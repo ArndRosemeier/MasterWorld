@@ -5,7 +5,6 @@
  */
 import { DIRS } from '@futuremagic/dungeon';
 import { CELL, STOREY, cellIn, type Cellar } from './cellar';
-import { shapeOf } from './kinds';
 
 export interface TorchSpot {
   /** The flame, in the cellar's frame (metres). */
@@ -25,7 +24,7 @@ export const TORCH_OUT = 0.24;
 
 export function torchSpots(c: Cellar): TorchSpot[] {
   // A natural cave has none: the lantern is all the light there is.
-  if (!shapeOf(c.decision.template).torches) return [];
+  if (!c.form.space.torches) return [];
   const L = c.layout;
   const out: TorchSpot[] = [];
   const opening = new Set<string>();

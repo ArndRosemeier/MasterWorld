@@ -236,7 +236,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       heard.add(lead.id);
       const dungeon = dungeonOf(log, lead);
       if (!dungeon) throw new Broke(`no dungeon for ${lead.id}`);
-      const place = placeOf(dungeon, terrain.towns), house = houseOf(dungeon, terrain.towns);
+      const place = placeOf(dungeon, terrain.towns, setting.dungeons), house = houseOf(dungeon, terrain.towns);
       if (!place || !house) throw new Broke(`${dungeon.id} has no place`);
       const lore = loreOf(setting, dungeon.template);
       const firstCellar = outlineCellar(dungeon, place, lore);

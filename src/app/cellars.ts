@@ -256,7 +256,7 @@ export class Cellars {
   get hudText(): string { return this.downIn?.summary ?? ''; }
 
   private open(d: DungeonDecision): void {
-    const house = houseOf(d, this.towns), place = placeOf(d, this.towns);
+    const house = houseOf(d, this.towns), place = placeOf(d, this.towns, this.host.setting.dungeons);
     if (!house || !place) return;
     const lore = loreOf(this.host.setting, d.template);
     const only = this.host.dweller ? lore.dwellers.filter((w) => w.id === this.host.dweller) : [];
@@ -284,7 +284,9 @@ export class Cellars {
       void h.stage.add(m);
       return m;
     };
-    if (d.template === 'cave') {
+    // What stands over it is its kind's shell (C6c: the form says which builder, not the kind's name).
+    const shell = loreOf(h.setting, d.template).form.shell;
+    if (shell === 'mouth') {
       const seed = deriveSeed(d.seed, 'cave');
       const mound: Mound = { ...site, mesh: null, inShape: () => false, way: MOUTH_WAY_DOWN, out: 3, cool: 0 };
       void (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
@@ -293,7 +295,7 @@ export class Cellars {
       });
       return mound;
     }
-    if (d.template === 'tower') {
+    if (shell === 'keep') {
       const size = towerOf(layout);
       return { ...site, mesh: put(towerMesh(size, deriveSeed(d.seed, 'tower')), 0.02), inShape: (x, z, r) => inTowerShape(size, x, z, r), way: TOWER_WAY_IN, out: 2.4, cool: 0 };
     }
@@ -320,7 +322,7 @@ export class Cellars {
     const view = new CellarView(s.first, { x: at.x, y: -400, z: at.z });
     // A cave: its rock carved round its rooms (a worker's few hundred milliseconds), walked as it is seen.
     let carved: CaveSpace | undefined;
-    if (s.decision.template === 'cave') {
+    if (s.first.form.space.carved) {
       const layout = s.first.layout, seed = deriveSeed(s.decision.seed, 'cave', 'rock');
       const rock = await (h.jobs ? h.jobs.caveRock(layout, seed) : Promise.resolve((() => { const field = caveField(layout, seed); return { field, shell: caveShell(field, layout, seed) }; })()));
       view.rock = rock.shell;
@@ -363,7 +365,7 @@ export class Cellars {
     const arena: Arena = {
       get inside() { return visit.inside; },
       get shown() { return visit.inside; },
-      enclosed: true, place: `this ${s.decision.template === 'tower' ? 'tower' : s.decision.template}`, danger, promise: own,
+      enclosed: true, place: `this ${s.first.form.word}`, danger, promise: own,
       quietLine: fill(words.quiet, { place }),
     };
     b.fight = new Encounter(arena, b.delve, b.creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight, !!mine?.paid || this.kept.has(own));

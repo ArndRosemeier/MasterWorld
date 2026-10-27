@@ -6,8 +6,14 @@
  */
 import type { CellarLore } from '../contract';
 import { who } from './encounters';
+import { CELLAR_SPACE } from './cellar';
 
 export const cave: CellarLore = {
+  // Water and rock: a storey below always (the water went down), the way up to the mouth a rock step with a ladder.
+  form: {
+    stands: 'slope', ring: [700, 1600], called: 'the cave {dir} of the town', word: 'cave', shell: 'mouth', clearing: { back: 6, r: 17 },
+    space: { ...CELLAR_SPACE, maxRooms: 12, depth: [-1, -1], inset: 0.95, entrance: [3, 3], carved: true, torches: false, arriveMid: true },
+  },
   words: {
     enter: 'You duck under the overhang and feel your way down into {place}.',
     quiet: 'Nothing stirs in {place} now. The household who told you of it will want to hear.',

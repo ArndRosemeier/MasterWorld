@@ -441,7 +441,7 @@ export function townTalk(seed: number, setting: SettingModule, town: Town, peopl
 export function talkCellar(d: Decision, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog): TalkCellar | null {
   const dungeon = dungeonOf(log, d);
   if (!dungeon || dungeon.town !== town.decision.id) return null;
-  const house = placeOf(dungeon, [town]);
+  const house = placeOf(dungeon, [town], setting.dungeons);
   if (!house) return null;
   const sketch = sketchCellar(dungeon, house, loreOf(setting, dungeon.template), d.kind === 'move-in' ? d : undefined);
   return { sketch, hint: cellarHint(sketch, people, town.plan) };

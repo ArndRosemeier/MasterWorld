@@ -2,10 +2,14 @@
  * Cellars of the classic setting (plan 8, 12.1): what town houses dig cellars for, what lay beneath the
  * town before it (the old realm, before the Fading), what goes wrong, and who moves in.
  */
-import type { CellarLore } from '../contract';
+import type { CellarLore, DungeonSpace } from '../contract';
 import { who } from './encounters';
 
+/** A cellar's space: down under its house, an older layer a storey below; its entrance the house's footprint. */
+export const CELLAR_SPACE: DungeonSpace = { radius: 16, maxRooms: 11, depth: [0, -1], rise: 0, way: 'ladder', inset: 0.55, entrance: 'footprint', carved: false, torches: true, arriveMid: false, walls: 'rubble' };
+
 export const cellar: CellarLore = {
+  form: { stands: 'house', word: 'cellar', shell: 'hatch', space: CELLAR_SPACE },
   words: {
     enter: 'You climb down into the cellar of {place}.',
     quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',

@@ -11,7 +11,7 @@ import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type 
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
-import { LAND_KINDS, loreOf, placeOf, promiseCellar, promisePlace } from './dungeons';
+import { landKinds, loreOf, placeOf, promiseCellar, promisePlace } from './dungeons';
 
 export const LEADS = {
   /** Open promises the world always has. */
@@ -109,11 +109,11 @@ export function nextPromise(c: LeadsContext): Decision | null {
 function landPlace(c: LeadsContext, s: number, town: Town, always = false): DungeonDecision | null {
   if (!c.terrain || (!always && hash2f(s, 6, 2) >= LAND_SHARE)) return null;
   const open = new Set(openPromises(c.log).flatMap((p) => (p.kind === 'dungeon' ? [p.template] : [])));
-  const kinds = LAND_KINDS.filter((k) => c.dungeons[k] && (always || !open.has(k)));
+  const kinds = landKinds(c.dungeons).filter((k) => always || !open.has(k));
   // One kind by chance; if no ground fits it, the next.
   const first = Math.floor(hash2f(s, 6, 3) * kinds.length);
   for (let i = 0; i < kinds.length; i++) {
-    const d = promisePlace(kinds[(first + i) % kinds.length], c.seed, c.terrain, town, c.log, c.home, c.avoid);
+    const k = kinds[(first + i) % kinds.length], d = promisePlace(k, c.dungeons[k]!.form, c.seed, c.terrain, town, c.log, c.home, c.avoid);
     if (d) return d;
   }
   return null;
@@ -129,14 +129,14 @@ export function moveInto(c: LeadsContext, s: number): MoveInDecision | null {
     const now = occupationOf(c.log, d.id);
     const k = kept.find((x) => x.promise === (now?.id ?? d.id));
     if (!k || c.hours - k.at < LEADS.settle) continue;
-    const house = placeOf(d, c.towns);
+    const house = placeOf(d, c.towns, c.dungeons);
     if (!house) continue;
     const sketch = sketchCellar(d, house, loreOf(c, d.template), now ?? undefined);
     ready.push({ d, was: sketch.dweller.id });
   }
   if (!ready.length) return null;
   const pick = ready[Math.floor(hash2f(s, 2, 7) * ready.length)];
-  const house = placeOf(pick.d, c.towns)!, lore = loreOf(c, pick.d.template);
+  const house = placeOf(pick.d, c.towns, c.dungeons)!, lore = loreOf(c, pick.d.template);
   const layers = sketchCellar(pick.d, house, lore).history.map((h) => h.def.id);
   const fits = lore.dwellers.filter((w) => w.id !== pick.was && w.danger <= (pick.d.danger ?? Infinity) && (!w.with || w.with.some((x) => layers.includes(x))));
   if (!fits.length) return null;

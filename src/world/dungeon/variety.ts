@@ -4,10 +4,9 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { TownBuilding } from '@futuremagic/settlement';
-import type { CellarLore } from '../../setting/contract';
+import type { CellarLore, DungeonForm } from '../../setting/contract';
 import type { DungeonDecision, DungeonTemplate } from '../decisions';
 import { outlineCellar, type Cellar, type DungeonPlace } from './cellar';
-import { shapeOf } from './kinds';
 import { setPiecesFor } from './setPieces';
 
 export interface VarietyReport {
@@ -31,14 +30,14 @@ export function testHouse(i: number): TownBuilding {
   } as unknown as TownBuilding;
 }
 
-export function testDecision(i: number, base = 1, template: DungeonTemplate = 'cellar'): DungeonDecision {
-  const pieces = setPiecesFor(template);
+export function testDecision(i: number, base = 1, template: DungeonTemplate = 'cellar', also?: readonly string[]): DungeonDecision {
+  const pieces = setPiecesFor(template, also);
   return { kind: 'dungeon', id: `${template}-${i}`, template, town: 'town-1', building: i, seed: deriveSeed(base, 'variety', template === 'cellar' ? i : `${template}-${i}`), setPiece: pieces[i % pieces.length].id };
 }
 
-/** A test place: a town house for a cellar, a named barrow. */
-function testPlace(i: number, template: DungeonTemplate): DungeonPlace {
-  return template === 'cellar' ? testHouse(i) : { kind: template, hu: 3, hv: 3, name: `the ${template} on the hill` };
+/** A test place: a town house for a kind under houses, else a named place on the land. */
+function testPlace(i: number, template: DungeonTemplate, form: DungeonForm): DungeonPlace {
+  return form.stands === 'house' ? testHouse(i) : { kind: template, hu: 3, hv: 3, name: `the ${form.word} on the hill` };
 }
 
 /** Limits: the most common value of each aspect may make up at most this share. */
@@ -55,7 +54,7 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
   const aspects: Record<string, string[]> = { layout: [], mainPattern: [], pattern: [], story: [], goalRoom: [], dressing: [], setPiece: [] };
   for (let i = 0; i < count; i++) {
     let c: Cellar;
-    try { c = outlineCellar(testDecision(i, base, template), testPlace(i, template), lore); } catch (e) { problems.push(`${template} ${i}: ${(e as Error).message}`); continue; }
+    try { c = outlineCellar(testDecision(i, base, template, lore.form.pieces), testPlace(i, template, lore.form), lore); } catch (e) { problems.push(`${template} ${i}: ${(e as Error).message}`); continue; }
     const where = `${template} ${i} (${c.signature.split('|')[0]})`;
     if (c.pace.safe < 0) problems.push(`${where}: no safe spot`);
     if (!c.pace.shortcut) problems.push(`${where}: no shortcut out`);
@@ -65,7 +64,7 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
     if (c.pieceLink < 0) problems.push(`${where}: no signature set piece`);
     if (!c.clues.length) problems.push(`${where}: nothing to read`);
     if (!c.spawns.length) problems.push(`${where}: nobody lives there`);
-    if (!c.hatch || c.hatch.kind !== shapeOf(template).way) problems.push(`${where}: no way back out`);
+    if (!c.hatch || c.hatch.kind !== lore.form.space.way) problems.push(`${where}: no way back out`);
     aspects.layout.push(c.signature);
     aspects.mainPattern.push(c.graph.patterns[0]);
     aspects.pattern.push(...c.graph.patterns.filter((p) => p !== 'shortcut' && p !== 'refuge'));
