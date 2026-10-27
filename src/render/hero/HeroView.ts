@@ -7,7 +7,7 @@
  * A new look never builds a shader on the render path: it is put on a second, hidden character, compiled
  * (each garment, hairstyle and shadow) and then swapped in, so the old look shows until the new one is ready.
  */
-import { Group, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Group, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { Character, outfitGarments, randomConfig, type CharacterCatalog, type CharacterConfig, type CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
@@ -17,9 +17,9 @@ import { RIDE } from '@actors/human';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import { buildArm } from './arms';
-import { ACTION_CLIPS, HERO_CLIPS, PACE } from './clips';
+import { ACTION_CLIPS, HERO_CLIPS, PACE, SIT_DOWN, STAND_UP } from './clips';
 import { gripHeld } from './grips';
-import { FADE, castShadows, playClip, preparePeople } from './play';
+import { FADE, castShadows, playClip, preparePeople, seatOf } from './play';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -42,6 +42,8 @@ export interface HeroPose {
   action?: HeroAction;
   /** Riding ('ride'): the saddle's height over `pos` (pos is the point under the saddle), on a horse. */
   seat?: number;
+  /** Sitting on the ground to rest (game/rest.ts); only while the gait is idle. */
+  rest?: boolean;
 }
 
 /** What the setting lets a hero look like (the setting's `hero`): Actors' themes and the peoples. */
@@ -58,6 +60,13 @@ const LEFT_OUT_PRESETS = ['med-nun'];
 
 /** Swimming or treading water, the body is this far (of the height) down in the water: head and shoulders above it. */
 const SWIM_DROP = 0.15;
+/** Seconds a sitter takes to get back up to full height when walking off (about the walk's fade in). */
+const RISE = 0.25;
+/** The seat this far over the ground, m (the cloth under it). */
+const SEAT_LIFT = 0.02;
+const smooth = (t: number) => t * t * (3 - 2 * t);
+const AT = new Vector3(), KNEE = new Vector3(), ANKLE = new Vector3(), SEAT = new Vector3();
+const TURN = new Quaternion(), BENT = new Quaternion(), UP = new Quaternion(), NONE = new Quaternion();
 
 /** The hero's catalog: the setting's themes (filtered by Actors), its peoples, no robots or skeletons. */
 export function heroCatalog(looks: HeroLooks): (c: CharacterCatalog) => CharacterCatalog {
@@ -105,6 +114,8 @@ export class HeroView {
   private wanted: CharacterPatch | null = null;
   private dressing: Promise<void> | null = null;
   private readonly seatAt = new Vector3();
+  /** Resting: sitting (or sitting down), seconds since it began or ended, standing up, how far down (0 standing, 1 sat). */
+  private readonly rest = { on: false, t: 0, rising: false, k: 0 };
   private readonly listeners = new Set<(c: CharacterConfig) => void>();
 
   private constructor(private front: Character, private back: Character, private readonly stage: Stage) {
@@ -205,10 +216,11 @@ export class HeroView {
     o.rotation.y = p.yaw + Math.PI;
     const speed = Math.hypot(p.vel.x, p.vel.z);
     const acting = p.action && this.time - p.action.t0 < p.action.dur ? p.action : null;
-    const clip = p.gait === 'ride' ? 'ride' : acting ? ACTION_CLIPS[acting.id] ?? 'sword slash A' : this.gaitClip(p, speed);
+    const resting = this.stepRest(p, dt);
+    const clip = p.gait === 'ride' ? 'ride' : acting ? ACTION_CLIPS[acting.id] ?? 'sword slash A' : resting ?? this.gaitClip(p, speed);
     if (clip !== this.clip || (acting && acting !== this.actionShown)) {
       this.actionShown = acting;
-      this.startClip(clip, acting?.dur);
+      this.startClip(clip, acting?.dur ?? (clip === 'sit down' ? SIT_DOWN : clip === 'stand up' ? STAND_UP : undefined));
     }
     const action = this.front.actor.currentAction;
     const pace = PACE[clip];
@@ -221,8 +233,52 @@ export class HeroView {
       if (seat) o.position.sub(seat.applyQuaternion(o.quaternion));
     } else {
       o.position.set(p.pos.x, p.pos.y - (clip === 'swim' || clip === 'tread water' ? this.height * SWIM_DROP : 0), p.pos.z);
+      if (this.rest.k > 0) this.sitOnGround(p.pos.y, this.rest.k);
     }
     if (this.held.drawn !== !!p.combat) { this.held.drawn = !!p.combat; this.moveHeld(); }
+  }
+
+  /**
+   * Sitting down to rest and up again: the clip it plays (sitting down, sitting, standing up; null: none of
+   * them), and how far down the body is (rest.k), eased with the clips, and quickly back up when walking off.
+   */
+  private stepRest(p: HeroPose, dt: number): string | null {
+    const r = this.rest, idle = p.gait === 'idle';
+    const want = !!p.rest && idle;
+    r.t += dt;
+    if (want !== r.on) { r.rising = !want && idle && r.k > 0.5; r.on = want; r.t = 0; }
+    if (r.rising && (!idle || r.t >= STAND_UP)) r.rising = false;
+    const target = r.on ? smooth(Math.min(1, r.t / SIT_DOWN)) : r.rising ? 1 - smooth(r.t / STAND_UP) : 0;
+    r.k = r.on || r.rising ? target : Math.max(0, r.k - dt / RISE);
+    return r.on ? (r.t < SIT_DOWN ? 'sit down' : 'sit') : r.rising ? 'stand up' : null;
+  }
+
+  /**
+   * Down on the ground (by `k`, 0 to 1): Actors' sit clips sit on a chair, so the knees straighten (the legs
+   * out in front, along the thighs) and the body comes down until its seat is on the ground at `ground`.
+   */
+  private sitOnGround(ground: number, k: number): void {
+    const actor = this.front.actor, f = actor.fittedSkeleton;
+    if (!f) return;
+    const bone = (n: string) => actor.bones[f.names.indexOf(n)];
+    this.object.updateWorldMatrix(true, true);
+    for (const side of ['l', 'r']) {
+      const thigh = bone(`thigh_${side}`), calf = bone(`calf_${side}`), foot = bone(`foot_${side}`);
+      if (!thigh || !calf?.parent || !foot) continue;
+      thigh.getWorldPosition(AT);
+      calf.getWorldPosition(KNEE);
+      foot.getWorldPosition(ANKLE);
+      const along = AT.subVectors(KNEE, AT).normalize(), shin = ANKLE.sub(KNEE).normalize();
+      // The shin turned in line with the thigh (by k), in world space, then back into the calf's own.
+      TURN.setFromUnitVectors(shin, along);
+      NONE.identity().slerp(TURN, k);
+      calf.getWorldQuaternion(BENT);
+      calf.parent.getWorldQuaternion(UP);
+      calf.quaternion.copy(UP.invert().multiply(NONE.multiply(BENT)));
+    }
+    this.object.updateWorldMatrix(true, true);
+    const seat = seatOf(actor, SEAT);
+    if (seat) this.object.position.y += Math.min(0, ground + SEAT_LIFT - seat.y) * k;
   }
 
   private gaitClip(p: HeroPose, speed: number): string {

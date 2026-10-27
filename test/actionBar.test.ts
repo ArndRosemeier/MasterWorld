@@ -2,15 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { Character } from '../src/game/character';
-import { addToBar, BAR_SLOTS, cleanBar, clearSlot, defaultBar, placeOnBar, POTION, swapOnBar } from '../src/game/actionBar';
+import { addToBar, BAR_SLOTS, cleanBar, clearSlot, defaultBar, placeOnBar, POTION, REST, swapOnBar } from '../src/game/actionBar';
 import { barSlotOf, cleanBindings, DEFAULT_BINDINGS } from '../src/input/controls';
 import type { AbilityDef, SettingModule } from '../src/setting/contract';
 
-test('action bar: ten slots, the known abilities and the potion first, keys 1 to 0', () => {
+test('action bar: ten slots, the known abilities, the potion and resting first, keys 1 to 0', () => {
   const bar = defaultBar(['strike', 'heavy', 'shove', 'breath']);
   assert.equal(bar.length, BAR_SLOTS);
-  assert.deepEqual(bar.slice(0, 5), ['strike', 'heavy', 'shove', 'breath', POTION]);
-  assert.ok(bar.slice(5).every((x) => x === null));
+  assert.deepEqual(bar.slice(0, 6), ['strike', 'heavy', 'shove', 'breath', POTION, REST]);
+  assert.ok(bar.slice(6).every((x) => x === null));
   assert.equal(barSlotOf(DEFAULT_BINDINGS, 'Digit1'), 0);
   assert.equal(barSlotOf(DEFAULT_BINDINGS, 'Digit0'), 9);
   assert.equal(barSlotOf(DEFAULT_BINDINGS, 'KeyW'), -1);
@@ -56,8 +56,8 @@ test('action bar: a taught ability is learned onto the bar and saved with the he
   assert.ok(hero.learn('taught-test'));
   assert.ok(!hero.learn('taught-test'), 'only once');
   assert.ok(hero.knows('taught-test'));
-  assert.equal(hero.bar[5], 'taught-test', 'first free slot after the potion');
-  hero.bar = swapOnBar(hero.bar, 5, 9);
+  assert.equal(hero.bar[6], 'taught-test', 'first free slot after the potion and resting');
+  hero.bar = swapOnBar(hero.bar, 6, 9);
   const again = new Character(setting, JSON.parse(JSON.stringify(hero.save())));
   assert.ok(again.knows('taught-test'));
   assert.equal(again.bar[9], 'taught-test', 'the arrangement is kept');

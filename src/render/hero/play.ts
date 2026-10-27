@@ -3,7 +3,7 @@
  * flinch, a death), optionally stretched to `dur` seconds, blended in over `fade` seconds (0 cuts).
  * Shared by everyone drawn as an Actors person.
  */
-import { LoopOnce, type Mesh, type Object3D } from 'three/webgpu';
+import { LoopOnce, type Mesh, type Object3D, type Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { Character } from '@actors/generator';
 
@@ -51,4 +51,24 @@ export function eachMesh(o: Object3D, fn: (m: Mesh) => void): void {
 /** Every mesh of an Actors person casts a shadow, but the bits in NO_SHADOW. */
 export function castShadows(o: Object3D): void {
   eachMesh(o, (m) => { m.castShadow = !NO_SHADOW.test(m.name); });
+}
+
+/** How far the seat bones are under the hip joints for a body with hips 0.92 m up (Actors' Mount), m. */
+const SEAT_BONES = 0.085;
+
+/**
+ * Where an Actors person's seat is now, in world space (into `out`): under the posed pelvis by what it is in the
+ * bind pose, down to the seat bones. A sit clip lowers the hips by a share of the body's height (Actors keeps root
+ * motion in hip heights), so whoever sits on something puts this point on it. Null before the first shape.
+ */
+export function seatOf(actor: Character['actor'], out: Vector3): Vector3 | null {
+  const f = actor.fittedSkeleton;
+  if (!f) return null;
+  const ip = f.names.indexOf('pelvis'), il = f.names.indexOf('thigh_l'), ir = f.names.indexOf('thigh_r');
+  if (ip < 0 || il < 0 || ir < 0 || !actor.bones[ip]) return null;
+  const hips = (f.heads[il][1] + f.heads[ir][1]) / 2;
+  const drop = f.heads[ip][1] - (hips - SEAT_BONES * Math.max(0.3, hips / 0.92));
+  actor.bones[ip].getWorldPosition(out);
+  out.y -= drop;
+  return out;
 }

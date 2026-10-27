@@ -13,7 +13,7 @@ import type { Agent, TownLife } from '../../sim/townLife';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
-import { castShadows, eachMesh } from '../hero/play';
+import { castShadows, eachMesh, seatOf } from '../hero/play';
 import { SHADOW_ONLY } from '../sky';
 import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
@@ -49,8 +49,6 @@ const REACH = 1.6;
 const RELAYER = 0.5;
 /** Seconds a sitter takes to settle onto the bench (about the clip's fade from walking). */
 const SETTLE = 0.5;
-/** How far the seat bones are under the hip joints for a body with hips 0.92 m up (Actors' Mount), m. */
-const SEAT_BONES = 0.085;
 /**
  * Seconds between two dressings begun. In rain the square empties and fills as people run for shelter, and each
  * dressing runs through every detail level, each of which costs Actors a rebuild of what the clothes hide: begun as
@@ -404,17 +402,12 @@ export class FolkView {
    * the clip fades in from walking.
    */
   private seatOn(s: Slot, x: number, y: number, z: number): void {
-    const actor = s.ch.actor, f = actor.fittedSkeleton;
-    if (!f) return;
-    const ip = f.names.indexOf('pelvis'), il = f.names.indexOf('thigh_l'), ir = f.names.indexOf('thigh_r');
-    if (ip < 0 || il < 0 || ir < 0 || !actor.bones[ip]) return;
-    const hips = (f.heads[il][1] + f.heads[ir][1]) / 2;
-    const drop = f.heads[ip][1] - (hips - SEAT_BONES * Math.max(0.3, hips / 0.92));
-    const w = actor.bones[ip].getWorldPosition(AT);
+    const w = seatOf(s.ch.actor, AT);
+    if (!w) return;
     s.place.parent?.worldToLocal(w);
     const k = Math.min(1, s.since / SETTLE);
     s.place.position.x += (x - w.x) * k;
-    s.place.position.y += (y + drop - w.y) * k;
+    s.place.position.y += (y - w.y) * k;
     s.place.position.z += (z - w.z) * k;
   }
 
