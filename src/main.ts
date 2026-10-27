@@ -144,6 +144,8 @@ export async function start(b: Boot): Promise<void> {
   routePackImages();
   const canvas = document.createElement('canvas');
   document.body.prepend(canvas);
+  // The world's seed, named in a failure (set once known).
+  let failSeed = '';
   try {
     const setting = settingById(params.setting);
     const errors = validateSetting(setting);
@@ -153,6 +155,9 @@ export async function start(b: Boot): Promise<void> {
     const asked = typeof loaded === 'object' ? loaded : null;
     const seedText = asked?.seed ?? params.seed;
     const seed = parseSeed(seedText);
+    // Every start opens a fresh world (params.seed): this line names it, so a problem world can be played again.
+    console.info(`[seed] ${seedText} (again: ?seed=${encodeURIComponent(seedText)})`);
+    failSeed = seedText;
     loading.set('Finding the start');
     // The world worker opens the same world (a second or more of work) while this thread does, so the seas' first
     // masks (asked at 'Filling the seas') do not wait for it: any job opens it, this one a single sample.
@@ -167,7 +172,8 @@ export async function start(b: Boot): Promise<void> {
     // The title's Continue: straight on with a loaded save, or offered when one is kept.
     if (title && save) title.continuing(saveLabel(save, save.heir ? 'a new hero in the same world' : 'where you left off'));
     // Only a save that can go on in this world (not one from before the town moved).
-    else if (title) void latestSave(setting, (s) => !startMoved(s.log, opened.log)).then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
+    // (A save of another seed opens its own world: whether that one moved is checked when it loads.)
+    else if (title) void latestSave(setting, (s) => s.seed !== seedText || !startMoved(s.log, opened.log)).then((s) => { if (s) title.offerContinue(s.label, () => loadAtRestart(s.slot)); });
     const { terrain } = opened;
     // Where the game began: a new hero steps out on its market, the title circles it, the map is drawn round it.
     // Everything else in a town works alike in every town (app/towns.ts, game/township.ts).
@@ -1206,7 +1212,8 @@ export async function start(b: Boot): Promise<void> {
         if (on && id === birdAbility?.id) void birdForm?.warm();
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
-      places: placesFor(params.seed, home),
+      places: placesFor(seedText, home),
+      seed: seedText,
       game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
@@ -1220,6 +1227,7 @@ export async function start(b: Boot): Promise<void> {
     });
     b.menus.menu = new Menu(settings, {
       paused,
+      seed: seedText,
       get hour() { return view.sky.hour; },
       set hour(h) { view.sky.hour = h; },
     });
@@ -1465,7 +1473,7 @@ export async function start(b: Boot): Promise<void> {
       }
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${towns.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
+        hud.textContent = `${view.backend} · seed ${seedText} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${towns.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }
@@ -1485,7 +1493,7 @@ export async function start(b: Boot): Promise<void> {
     await planting;
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    loading.fail(err instanceof GraphicsUnavailable ? 'No graphics' : 'Could not start', detail);
+    loading.fail(err instanceof GraphicsUnavailable ? 'No graphics' : 'Could not start', failSeed ? `${detail} (seed ${failSeed})` : detail);
     throw err;
   }
 }
