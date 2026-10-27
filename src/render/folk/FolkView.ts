@@ -48,6 +48,8 @@ const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3();
  * fast as slots came free, that took half of the main thread. Until dressed, people are plain figures.
  */
 const DRESS_GAP = 0.3;
+/** Resolves at the next frame. */
+const nextFrame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
 
@@ -334,7 +336,10 @@ export class FolkView {
     // Every detail level in turn (each is its own meshes, shown only once chosen: left to 'auto' they
     // built their shaders on the render path), and every caster: a character's shadow shaders are its
     // own (its shape, its garments' fitting).
+    // One level a frame: each switch has Actors work out what the clothes hide (a few ms each), and back to back
+    // with the dressing they held one frame up to 70 ms.
     for (let k = 0; k < s.ch.lods.length && s.agent === id; k++) {
+      await nextFrame();
       s.ch.setLod(k);
       this.adapt(s.place);
       // Hidden meshes too: Actors keeps some it may show later at this level (the body's own crowd
@@ -344,6 +349,7 @@ export class FolkView {
       await this.stage.prepare(s.place, { everyCaster: true });
       for (const m of hidden) m.visible = false;
     }
+    await nextFrame();
     s.ch.setLod('auto');
     s.look = ''; // `detail` sets it again on the next frame
     s.detailed = s.shadow = false;
