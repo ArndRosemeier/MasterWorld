@@ -7,8 +7,11 @@ import { emptyWater, inChannel } from './hydro';
 import type { Terrain } from './terrain';
 
 export const SEA_LEVEL = 0;
-/** Flow speed of rivers, m/s (for ripples and foam drifting downstream). */
-const RIVER_SPEED = 0.9;
+/**
+ * Flow speed of running water, m/s, by its slope (for ripples and foam drifting downstream, white water where it
+ * rushes): a lowland river glides at about 1 m/s, a steep brook tumbles at 3.
+ */
+export const flowSpeed = (slope: number): number => Math.min(3.5, 0.5 + 9 * Math.sqrt(slope));
 /** Pixels a water level is carried onto dry land, so the surface mesh interpolates cleanly to the shore. */
 const DILATE = 3;
 /**
@@ -50,7 +53,7 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
     // where its surface is above the ground: a coarse pixel smeared over the banks would float a sheet of water.
     if (inChannel(w, step / 2) && 2 * w.half >= step && h < w.level + 0.3) {
       // Rivers rush over a fall's lip and away from its foot.
-      const v = RIVER_SPEED * (w.fallAt > -15 ? 1 + 3 * Math.exp(-Math.max(0, w.fallAt) / 25) : 1);
+      const v = flowSpeed(w.slope) + (w.fallAt > -15 ? 2.7 * Math.exp(-Math.max(0, w.fallAt) / 25) : 0);
       level = w.level; fx = w.fx * v; fz = w.fz * v;
     }
     else if (!Number.isNaN(w.lake) && h < w.lake) level = w.lake;

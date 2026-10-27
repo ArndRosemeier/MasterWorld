@@ -4,7 +4,7 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
 import { BROOKS, brookDepth, packRivers } from '../src/world/hydro';
-import { DRY, waterMask } from '../src/world/water';
+import { DRY, flowSpeed, waterMask } from '../src/world/water';
 
 const seed = parseSeed('masterworld');
 // Small river tiles (as the frontier and roads tests), brooks as in the game.
@@ -103,4 +103,21 @@ test('brooks: the mask carries a brook\'s level well onto its banks, under the g
     if (tried >= 8) break;
   }
   assert.ok(carried >= tried * 0.6, `${carried} of ${tried} banks carry the level`);
+});
+
+test('running water: steep brooks rush, lowland rivers glide (speed by slope)', () => {
+  const brook: number[] = [];
+  for (const r of own) for (let k = 0; k < r.level.length; k += 3) {
+    const w = terrain.hydro.brookAt(r.xz[k * 2], r.xz[k * 2 + 1]);
+    if (w.river) brook.push(flowSpeed(w.slope));
+  }
+  const river: number[] = [];
+  terrain.hydro.riverPoints(x0 + side / 2, z0 + side / 2, side, (r, k) => {
+    river.push(flowSpeed(terrain.hydro.riverAt(r.xz[k * 2], r.xz[k * 2 + 1]).slope));
+  }, false);
+  for (const v of [...brook, ...river]) assert.ok(v >= 0.5 && v <= 3.5, `speed ${v}`);
+  const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
+  assert.ok(brook.length > 100 && river.length > 10, `${brook.length} brook, ${river.length} river samples`);
+  assert.ok(mean(brook) > mean(river), `brooks ${mean(brook)} vs rivers ${mean(river)}`);
+  assert.ok(brook.filter((v) => v > 2).length > brook.length * 0.05, 'some brooks rush');
 });
