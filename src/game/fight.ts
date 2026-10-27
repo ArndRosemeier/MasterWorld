@@ -274,6 +274,8 @@ export class Fight implements RecipeWorld {
         const s = e.strike;
         hero.health = Math.max(0, hero.health - s.damage);
         out.push({ kind: 'hurt', by: e.who, strike: s });
+        // Struck with nothing picked: whoever struck is the target now (one picked stays).
+        if (!this.target && hero.alive && e.who.state !== 'dead') this.target = e.who;
         // Blows taken wear the armour; a blow stopped, the shield.
         if (s.outcome === 'block') this.wearOut('off', WEAR.block, out);
         else if (s.outcome !== 'miss') {
