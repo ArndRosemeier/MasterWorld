@@ -122,7 +122,8 @@ export class CellarVisit {
       // Seen walking out of the doorway onto the forecourt (facing `yaw`, away from the place).
       const [x, z, yaw] = this.house.door, fx = -Math.sin(yaw), fz = -Math.cos(yaw), p = this.player;
       p.teleport(x - fx * WALK_OUT, undefined, z - fz * WALK_OUT, yaw);
-      const walk = new WalkTo(p.walker.pos, { x: x + fx * 0.6, z: z + fz * 0.6 }, null, () => { if (p.puppet === walk) p.puppet = null; });
+      const w = p.walker.pos, round = { x, y: w.y, z };
+      const walk = new WalkTo(w, { x: x + fx * 0.6, z: z + fz * 0.6 }, null, () => { if (p.puppet === walk) p.puppet = null; }, { round, front: [fx, fz] });
       p.puppet = walk;
     });
     this.onSwap?.();

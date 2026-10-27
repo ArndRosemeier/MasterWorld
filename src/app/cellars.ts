@@ -187,9 +187,10 @@ export class Cellars {
       const [wx, wz] = onLand(m, m.way.x, m.way.z);
       if (s.ready && !s.ready.visit.inside && m.cool === 0 && !this.host.player.puppet && Math.hypot(x - wx, z - wz) < 0.9) {
         m.cool = 3;
-        // On into the dark of the doorway, seen; then down.
+        // On into the dark of the doorway, seen from out in front; then down (the scene let go once the screen is dark).
         const visit = s.ready.visit, p = this.host.player, [ix, iz] = onLand(m, m.way.x, m.way.z - WALK_IN);
-        p.puppet = new WalkTo(p.walker.pos, { x: ix, z: iz }, null, () => { p.puppet = null; void visit.enter(); });
+        const [ox, oz] = onLand(m, 0, m.out), front = [Math.sin(m.yaw), Math.cos(m.yaw)] as const;
+        p.puppet = new WalkTo(p.walker.pos, { x: ix, z: iz }, null, () => void visit.enter(false, undefined, () => { p.puppet = null; }), { round: { x: ox, y: this.host.ground(ox, oz), z: oz }, front });
       }
     }
   }

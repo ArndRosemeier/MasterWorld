@@ -2,7 +2,7 @@
  * Going into a place on the land and out again, and taking up remains (render it, don't narrate it):
  * `node tools/shot/mouths.mjs [out dir]` after `npm run build` and `npm run packs`, SHOT_GPU=1 on the reference
  * machine. For a barrow, a cave and a tower (`?barrow`, `?cave`, `?tower`: the hero starts before it, facing
- * it) the hero walks up to its doorway and is seen walking on into it before the screen goes dark; inside, the
+ * it, 5 m out) the hero walks up to its doorway and is seen walking on into it before the screen goes dark; inside, the
  * way out is taken and the hero is seen walking out of the doorway onto the forecourt. Then remains laid by the
  * start (`?remains=pack`): the hero steps up and kneels, and they are gone from the ground. A picture every
  * 0.25 s. Checks: the hero walked into each doorway on their own and went in, walked out on their own, knelt to
@@ -53,6 +53,14 @@ const HERO = `(() => { const g = window.game, w = g.player.walker.pos, pp = g.pl
 
 for (const kind of ['barrow', 'cave', 'tower']) {
   await open(kind);
+  // 5 m out from where one comes back out of it (clear of the trees about it), facing its doorway.
+  await page.evaluate((kind) => {
+    const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === kind && x.site), s = d?.site;
+    if (!s) return;
+    const off = { barrow: 2.2, cave: 3, tower: 2.4 }[kind] + 5;
+    g.player.teleport(s.x + Math.sin(s.yaw) * off, undefined, s.z + Math.cos(s.yaw) * off, s.yaw);
+  }, kind);
+  await page.waitForTimeout(800);
   // Up to its doorway at walking pace; once a scene plays the hero, the keys are let go.
   await page.evaluate(() => { const c = window.game.player.heroCam; c.yaw = window.game.player.walker.yaw + 0.35; c.pitch = -0.2; c.zoom = 4; });
   await page.keyboard.down('ShiftLeft');
