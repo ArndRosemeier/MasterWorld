@@ -44,6 +44,12 @@ export const items: ItemCatalog = {
     { id: 'deer-hide', name: 'Deer hide', kind: 'valuable', value: 22, weight: 2 },
     { id: 'boar-tusk', name: 'Boar tusk', kind: 'valuable', value: 14, weight: 0.2 },
     { id: 'venison', name: 'Haunch of venison', kind: 'food', heal: 14, value: 9, weight: 2 },
+    // Writings (C3): rare extra ways to a spell. Read, the spell is yours and the school opens; the page crumbles.
+    { id: 'tome-embers', name: 'Charred primer of embers', kind: 'writing', teaches: 'fireball', value: 140, weight: 1.2, lore: 'Half its pages are ash. The rest still smell of smoke, and teach how to throw a fireball.' },
+    { id: 'scroll-sunlance', name: 'Scroll of the sunlance', kind: 'writing', teaches: 'sunlance', value: 90, weight: 0.1, lore: 'Gold ink that glows faintly in the dark. Reading it once is enough.' },
+    { id: 'tome-shadows', name: 'Book of quiet shadows', kind: 'writing', teaches: 'veil', value: 150, weight: 1, lore: 'Its letters fade when you look straight at them. It teaches the veil.' },
+    { id: 'tome-stone', name: 'Slate-bound tablet', kind: 'writing', teaches: 'stone-skin', value: 130, weight: 3, lore: 'Dwarven runes cut in slate: how skin becomes stone.' },
+    { id: 'scroll-mend', name: 'Scroll of mending', kind: 'writing', teaches: 'mend', value: 70, weight: 0.1, lore: 'A hedge witch wrote it out, with a pressed leaf in the fold.' },
   ],
   uniques: [
     { id: 'lantern-blade', base: 'short-sword', name: "Grundmar's Lantern-Blade", bonuses: { blades: 10, perception: 6 }, danger: 14, lore: 'A dwarf of the old realm forged it to light the deep halls. Since the Fading it has only glinted, until lately.' },
@@ -58,12 +64,12 @@ export const items: ItemCatalog = {
     { id: 'boar', items: [['boar-tusk', 2], ['venison', 1]], count: [1, 2], coins: [0, 0] },
     { id: 'deer', items: [['deer-hide', 1], ['venison', 2]], count: [1, 1], coins: [0, 0] },
     { id: 'web', items: [['silk', 4], ['old-coin', 2], ['dagger', 1], ['boots', 1], ['ring', 1]], count: [1, 2], coins: [0, 20] },
-    { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1]], count: [0, 1], coins: [10, 40] },
-    { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1]], count: [0, 1], coins: [0, 10] },
-    { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2]], count: [1, 2], coins: [3, 25] },
+    { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1], ['tome-stone', 0.3]], count: [0, 1], coins: [10, 40] },
+    { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1], ['tome-shadows', 0.25]], count: [0, 1], coins: [0, 10] },
+    { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25] },
     {
       id: 'lair', count: [2, 3], coins: [20, 80],
-      items: [['minor-potion', 3], ['potion', 1], ['short-sword', 1], ['hatchet', 1], ['spear', 1], ['mace', 1], ['buckler', 1], ['round-shield', 1], ['leather-jerkin', 1], ['mail-shirt', 0.3], ['iron-cap', 0.6], ['boots', 1], ['ring', 1], ['amulet', 1], ['garnet', 1]],
+      items: [['minor-potion', 3], ['potion', 1], ['short-sword', 1], ['hatchet', 1], ['spear', 1], ['mace', 1], ['buckler', 1], ['round-shield', 1], ['leather-jerkin', 1], ['mail-shirt', 0.3], ['iron-cap', 0.6], ['boots', 1], ['ring', 1], ['amulet', 1], ['garnet', 1], ['tome-embers', 0.2], ['scroll-sunlance', 0.25]],
     },
   ],
   affixes: {

@@ -318,6 +318,16 @@ export class Character {
     return this.health - before;
   }
 
+  /** Read a writing from the pack (C3): its ability is learned and the writing crumbles. A line why not, or null. */
+  readWriting(item: Item): string | null {
+    const d = defOf(this.cat, item.def), i = this.pack.indexOf(item);
+    if (!d.teaches || i < 0) return 'There is nothing in it to learn.';
+    if (this.knows(d.teaches)) return 'You know what it teaches already.';
+    this.pack.splice(i, 1);
+    this.learn(d.teaches);
+    return null;
+  }
+
   /** The best healing in the pack (a potion first), for the quick slot. */
   get remedy(): Item | null {
     const heals = this.pack.filter((i) => defOf(this.cat, i.def).kind === 'potion');

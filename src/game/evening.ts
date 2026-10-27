@@ -311,6 +311,11 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (shops && !smith) throw new Broke('no smith in town');
       const finds = hero.pack.filter((it) => defOf(setting.items, it.def).slot || defOf(setting.items, it.def).value > 0);
       say(`brought back ${finds.length} finds and ${hero.coins} copper`);
+      // Writings found below are read before anything is sold (C3: a rare extra way to a spell).
+      for (const it of hero.pack.filter((x) => defOf(setting.items, x.def).teaches)) {
+        const d = defOf(setting.items, it.def);
+        if (!hero.readWriting(it)) say(`read ${d.name}: knows ${d.teaches} now`);
+      }
       const sellAt = (m: Merchant | null) => {
         if (!m) return 0;
         const w = workplace(m);

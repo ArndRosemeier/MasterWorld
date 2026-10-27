@@ -858,13 +858,14 @@ export async function start(b: Boot): Promise<void> {
       rang: () => sounds?.rang(),
     });
     for (const id of UPKEEP_SERVICES) services.set(id, (a) => { const t = talkTown(); if (t) upkeep.answer(id, a.person, t.talk.nameOf(a.person.id)); });
+    /** An ability was learned (a teacher, a writing): the hero redressed, and bird form's body made ready once it is known. */
+    const learnedAbility = () => { armHero(); if (birdAbility && character.knows(birdAbility.id)) void birdForm?.warm(); };
     // Lessons (plan 11.4, D49): the guild houses' trainers open skills and ranks and teach, the innkeeper teaches; one more service.
     const lessons = new LessonsUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
       taught: (h) => { const t = hours() + h; view.sky.day = Math.floor(t / 24); view.sky.hour = t - view.sky.day * 24; sounds?.coins(); },
-      // A spell learned from a teacher; bird form's body is made ready as soon as it is known.
-      changed: () => { armHero(); if (birdAbility && character.knows(birdAbility.id)) void birdForm?.warm(); },
+      changed: learnedAbility,
       book: guildBook,
       log: () => log,
       hours,
@@ -915,6 +916,11 @@ export async function start(b: Boot): Promise<void> {
       get bindings() { return settings.current.bindings; },
       changed: armHero,
       drank: (n) => { if (n > 0) fightHud.healed(); },
+      readOut: (why, id) => {
+        const a = setting.abilities.find((x) => x.id === id);
+        notes.say(why ?? `You read it through, and ${a?.name ?? id} is yours. The page crumbles to dust.`, 7);
+        if (!why) learnedAbility();
+      },
     });
     // The action bar (plan 17.1): always there in play, its keys 1 to 0; the ability book (K) arranges it.
     const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
