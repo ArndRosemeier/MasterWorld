@@ -9,7 +9,7 @@ import type { SettingModule } from '../setting/contract';
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
-import { lairFor, nextEvent, type EventsContext } from './events';
+import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 
@@ -64,6 +64,11 @@ export const TOOLS: readonly Tool[] = [
   { id: 'keep', name: 'Keep a promise', writes: ['kept'], need: 'reward', asked: 'call' },
   { id: 'event', name: 'Story event', writes: ['event', 'dungeon'], need: 'challenge', asked: 'turn', next: (c) => lairFor(c) ?? nextEvent(c),
     why: (d) => (d.kind === 'event' ? `${d.event} in ${d.town}: ${d.paddock !== undefined || d.held ? `the raiders of ${d.from} were left alone` : `${d.from} was left open too long`}` : d.kind === 'dungeon' && d.event ? `a ${d.template} for the band of ${d.event} to lie up in` : d.kind) },
+  { id: 'fade', name: 'An event runs its course', writes: ['kept'], need: null, asked: 'turn', next: fadedFor,
+    why: (d, c) => {
+      const e = d.kind === 'kept' ? c.log.find((x) => x.id === d.promise) : undefined;
+      return e?.kind === 'event' ? `${e.event} in ${e.town} was left alone ${Math.round(c.hours - e.at)} h: it ends without the hero` : d.kind;
+    } },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
   { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
   { id: 'cache', name: 'A find by the way', writes: ['sight'], need: 'reward', asked: 'need', answer: (c) => sightFor(c, 'reward') },

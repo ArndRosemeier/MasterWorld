@@ -42,7 +42,7 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'event': return 'event';
     case 'region': return 'region';
     case 'wild': return d.group === 'ambush' ? 'ambush' : d.group === 'paddock' ? 'paddock-wolves' : 'wild';
-    case 'kept': return 'keep';
+    case 'kept': return d.faded ? 'fade' : 'keep';
     case 'retake': return 'retake';
     case 'order': return 'order';
     case 'journey': return 'journey';
@@ -64,7 +64,7 @@ export function decisionSays(d: Decision): string {
     case 'dungeon': return `a ${d.template} for ${d.town}${d.dwellers ? ` (${d.dwellers})` : ''}`;
     case 'move-in': return `${d.dweller} into ${d.dungeon}`;
     case 'retake': return `${d.dweller} take ${d.dungeon}`;
-    case 'kept': return `${d.promise} kept`;
+    case 'kept': return `${d.promise} ${d.faded ? 'ran its course' : 'kept'}`;
     case 'event': return `${d.event} in ${d.town}`;
     case 'region': return `${d.fill} ${at(d.x, d.z)}${d.site ? '' : ' (open land)'}`;
     case 'wild': return `${d.encounter} round ${d.town} (${d.members.length})`;

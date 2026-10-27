@@ -68,7 +68,7 @@ import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
-import { dungeonOf, type Decision, type DungeonDecision, type RegionDecision, type RoadDecision, type RoadWay } from './world/decisions';
+import { dungeonOf, type Decision, type DungeonDecision, type EventDecision, type RegionDecision, type RoadDecision, type RoadWay } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
 import { HouseView } from './render/town/HouseView';
 import { lookFromDegrees } from './app/look';
@@ -803,6 +803,10 @@ export async function start(b: Boot): Promise<void> {
       const d = dungeonOf(log, log.find((x) => x.id === id));
       return d ? towns?.get(d.town) ?? null : null;
     };
+    /** A story event is over: the people of its town, and of a place it held, tell how it ended (C11). */
+    const eventEnded = (ev: EventDecision): void => {
+      for (const id of [ev.town, ev.held]) if (id) towns?.get(id)?.ended(ev.id);
+    };
     // A place gone quiet: the journal says whom of its household to tell, and the map marks their door.
     quietPlace = (id) => {
       // A story event's band beaten (C6): the lead is done, and its town will hear of it.
@@ -811,7 +815,7 @@ export async function start(b: Boot): Promise<void> {
         const k = keepPromise(log, id, hours());
         if (k) log = [...log, k];
         journal.fulfil(id);
-        towns?.get(ev.town)?.ended(id);
+        eventEnded(ev);
         director.met('purpose');
         const told = eventTold(setting, log, terrain.towns, ev);
         if (told) director.queue(told.done, 2);
@@ -1376,7 +1380,7 @@ export async function start(b: Boot): Promise<void> {
       if (!start) return [];
       const made = vgmTurn({
         seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id),
-        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(),
+        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), hero: { x: player.walker.pos.x, z: player.walker.pos.z },
         // A story event's band needs the wild to roam in.
         tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which,
       });
@@ -1401,6 +1405,15 @@ export async function start(b: Boot): Promise<void> {
         console.info(`[vgm] sight ${d.id} (${d.sight}) at ${d.x.toFixed(0)}, ${d.z.toFixed(0)}: ${m.reason}`);
         regionSites?.sync(log);
         void roadWork.clear(d);
+      } else if (d.kind === 'kept' && d.faded) {
+        // An event left alone ran its course (C11): its band goes, unseen; the town tells how it ended.
+        const ev = log.find((x) => x.id === d.promise);
+        if (ev?.kind !== 'event') return;
+        console.info(`[vgm] ${ev.id} (${ev.event}) ran its course at ${hours().toFixed(1)} h`);
+        wild?.moveOn(ev.id);
+        eventEnded(ev);
+        const told = eventTold(setting, log, terrain.towns, ev);
+        if (told) journal.lapse(ev.id, { text: told.faded, from: 'word in town' });
       } else if (d.kind === 'event') {
         // The world moves on its own (C6): the band onto the land, the town gathers, word reaches the hero.
         console.info(`[vgm] event ${d.id} (${d.event}) from ${d.from} at ${hours().toFixed(1)} h`);

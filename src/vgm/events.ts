@@ -9,19 +9,21 @@
  * animals from its paddock; the band that did it holds them out towards its camp. Beat it and they go home.
  * `take`: such a group takes a settlement near it (classic: a waystation on the road); its folk flee, a band
  * holds it, and the rest lie up in a place the VGM asks for near it (`dungeonFor`: a hideout), a lead of its
- * own. Beat the band and the folk come home.
+ * own. Beat the band and the folk come home; till then they camp by the road outside the band's town (`refugeOf`).
+ * Left alone past its `fades` hours an event runs its course without the hero (`fadedFor`, C11): the band goes,
+ * a raid's beasts with it for good.
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import { farmlandReach } from '@futuremagic/settlement';
 import type { LivestockKind, SettingModule, StoryEventDef } from '../setting/contract';
 import type { Territory } from '../sim/wild';
 import type { TownOrder } from '../sim/townLife';
-import { dungeonOf, type DecisionLog, type DungeonDecision, type EventDecision } from '../world/decisions';
+import { dungeonOf, type DecisionLog, type DungeonDecision, type EventDecision, type KeptDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import { townById, type Town } from '../world/town';
 import { compass, dungeonFor, farFrom, houseOf, loreOf, placeOf } from './dungeons';
-import { dwellersOf, keptOf, openPromises } from './leads';
+import { dwellersOf, keepPromise, keptOf, openPromises } from './leads';
 import { encounterFor } from './encounters';
 import { cap, fill } from '../talk/folk';
 
@@ -45,6 +47,8 @@ export interface EventsContext {
   readonly which?: string;
   /** Where the game started (a lair's danger grows with distance from it, D29; none: the first town). */
   readonly home?: { readonly x: number; readonly z: number };
+  /** Where the hero is (a band never leaves under their eyes); none: far from everything. */
+  readonly hero?: { readonly x: number; readonly z: number };
 }
 
 /** A wild group round a town (sim/wild.ts placeWild) and how many of it still live. */
@@ -129,6 +133,55 @@ function takeOver(c: EventsContext, def: StoryEventDef, past: readonly EventDeci
   return null;
 }
 
+/** How far from the hero a band must be to move on unseen, metres (beyond where the wild is built, app/wildLand.ts). */
+const UNSEEN = 450;
+
+/**
+ * An event left alone runs its course (C11: an ignored promise resolves through an event): the oldest open
+ * one older than its `fades` hours ends without the hero, unseen by them; the log keeps it as kept, faded.
+ */
+export function fadedFor(c: EventsContext): KeptDecision | null {
+  for (const e of openEvents(c.log)) {
+    const def = (c.setting.events ?? []).find((x) => x.id === e.event);
+    if (!def?.fades || (!c.early && c.hours - e.at < def.fades)) continue;
+    if (c.hero && Math.hypot(c.hero.x - e.x, c.hero.z - e.z) < UNSEEN + e.r) continue;
+    const k = keepPromise(c.log, e.id, c.hours);
+    if (k) return { ...k, faded: true };
+  }
+  return null;
+}
+
+/** Whether event `id` ran its course without the hero (it faded). */
+export function fadedOf(log: DecisionLog, id: string): boolean {
+  return log.some((d) => d.kind === 'kept' && d.promise === id && !!d.faded);
+}
+
+/** How far out along the road from the town's edge the folk of a taken place camp, metres (outside the town, app/towns.ts IN). */
+const CAMP_OUT = 90;
+
+/**
+ * Where the folk of the place a take holds wait to go home (C11: a trace in the world): camped by the road
+ * outside the band's town (the news says they ran there), the side the held place lies; null if not a take.
+ */
+export function refugeOf(towns: readonly Town[], e: EventDecision): { readonly x: number; readonly z: number; readonly town: string } | null {
+  const held = e.held ? townById(towns, e.held) : undefined, town = townById(towns, e.town);
+  if (!held || !town) return null;
+  const t = town.decision, [cx, cz] = town.plan.centre;
+  // The road out of the town that leaves it nearest the way to the held place.
+  const wx = held.decision.x - t.x, wz = held.decision.z - t.z;
+  let ax = wx, az = wz, best = -Infinity;
+  for (const st of town.plan.streets) {
+    if (st.kind !== 'road') continue;
+    const n = st.pts.length, first = Math.hypot(st.pts[0] - cx, st.pts[1] - cz) > Math.hypot(st.pts[n - 2] - cx, st.pts[n - 1] - cz);
+    const ex = (first ? st.pts[0] : st.pts[n - 2]) - t.x, ez = (first ? st.pts[1] : st.pts[n - 1]) - t.z;
+    // How well it points the held place's way (the cosine between the two).
+    const fit = (ex * wx + ez * wz) / (Math.hypot(ex, ez) * Math.hypot(wx, wz) || 1);
+    if (fit > best) { best = fit; ax = ex; az = ez; }
+  }
+  const d = Math.hypot(ax, az) || 1, out = t.radius + CAMP_OUT;
+  return { x: t.x + (ax / d) * out, z: t.z + (az / d) * out, town: held.decision.id };
+}
+
 /** How far a band holding a settlement strays from its door, metres. */
 const HOLD = 16;
 
@@ -139,10 +192,13 @@ const rested = (c: EventsContext, def: StoryEventDef, past: readonly EventDecisi
 /** The event's band: of the encounter `of` (a place's dwellers, the raiders), as many as the event says. */
 const bandFrom = (c: EventsContext, def: StoryEventDef, of: string, s: number) => encounterFor({ setting: c.setting, seed: s, of: [of], count: def.count });
 
-/** Animals driven off by raids not dealt with yet, by paddock id, in a town. */
+/**
+ * Animals driven off by raids, by paddock id, in a town: those not dealt with yet, and those whose raiders
+ * moved on with them (a raid that faded: gone for good).
+ */
 export function takenFrom(log: DecisionLog, town: string): Map<number, number> {
-  const out = new Map<number, number>();
-  for (const e of openEvents(log)) if (e.town === town && e.paddock !== undefined) out.set(e.paddock, (out.get(e.paddock) ?? 0) + (e.taken ?? 0));
+  const out = new Map<number, number>(), kept = keptOf(log);
+  for (const e of eventsOf(log)) if ((!kept.has(e.id) || fadedOf(log, e.id)) && e.town === town && e.paddock !== undefined) out.set(e.paddock, (out.get(e.paddock) ?? 0) + (e.taken ?? 0));
   return out;
 }
 
@@ -236,7 +292,7 @@ export function openBands(log: DecisionLog): Territory[] {
 }
 
 /** How an event is told (its setting's words filled in), and where its lead points. */
-export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): { title: string; news: string; note: string; done: string; told: string; label: string } | null {
+export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): { title: string; news: string; note: string; done: string; told: string; faded: string; label: string } | null {
   const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
   const where = def && town && (def.kind === 'raid' ? farmOf(setting, town, e) : def.kind === 'take' ? heldOf(towns, e) : spillOf(setting, log, towns, e));
   if (!def || !town || !where) return null;
@@ -248,7 +304,7 @@ export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | '
     dir: compass(e.x - town.decision.x, e.z - town.decision.z),
   };
   const told = (s: string) => cap(fill(s, words));
-  return { title: told(def.words.title), news: told(def.words.news), note: told(def.words.note), done: told(def.words.done), told: told(def.words.told ?? def.words.news), label: cap(words.creatures) };
+  return { title: told(def.words.title), news: told(def.words.news), note: told(def.words.note), done: told(def.words.done), told: told(def.words.told ?? def.words.news), faded: told(def.words.faded ?? def.words.done), label: cap(words.creatures) };
 }
 
 /** The place a spill came out of, named. */

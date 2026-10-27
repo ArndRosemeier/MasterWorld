@@ -12,7 +12,7 @@ import type { SettingModule, TalkDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import { loreOf, placeOf } from '../vgm/dungeons';
 import { cellarHint, type CellarHint } from '../vgm/hints';
-import { eventTold } from '../vgm/events';
+import { eventTold, fadedOf } from '../vgm/events';
 import { dwellersOf, keptOf } from '../vgm/leads';
 import { dungeonOf, type Decision, type DecisionLog } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
@@ -152,13 +152,13 @@ export class TownTalk {
     this.open(this.session.snapshot());
   }
 
-  /** A story event is over (its band beaten): from now on they tell how it ended. */
-  endEvent(id: string): void {
+  /** A story event is over (its band beaten, or it ran its course: `done` says how): from now on they tell how it ended. */
+  endEvent(id: string, done?: string): void {
     const e = this.events.find((x) => x.id === id);
     if (!e || e.over || this.ended.has(id)) return;
     this.ended.add(id);
     const line = (s: string) => ({ predicate: 'befell', args: { subject: id, line: clause(s) } });
-    this.session.core.applyEvent({ id: `ended/${id}`, changes: [{ atom: { ...line(e.told), polarity: false } }, { atom: { ...line(e.done), polarity: true } }], observers: this.folk.map((f) => pid(f.person.id)), origin: { kind: 'vgm', promise: id } });
+    this.session.core.applyEvent({ id: `ended/${id}`, changes: [{ atom: { ...line(e.told), polarity: false } }, { atom: { ...line(done ?? e.done), polarity: true } }], observers: this.folk.map((f) => pid(f.person.id)), origin: { kind: 'vgm', promise: id } });
   }
 
   /** The household has told some of it around: the inn and a neighbour or two heard that something is wrong. */
@@ -494,15 +494,17 @@ export function townTalk(seed: number, setting: SettingModule, town: Town, peopl
 
 /**
  * A story event as this town's folk know it (C11): one of theirs (an event of this town), named and told as
- * the setting's words have it; a raid's farm household saw it. Null for any other decision.
+ * the setting's words have it; a raid's farm household saw it, and a taken place's folk (they fled it). Over,
+ * they tell how it ended: beaten, or run its course (faded). Null for any other decision.
  */
 export function talkEvent(d: Decision, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog, towns: readonly Town[]): TalkEvent | null {
-  if (d.kind !== 'event' || d.town !== town.decision.id) return null;
+  const id = town.decision.id, fled = d.kind === 'event' && d.held === id;
+  if (d.kind !== 'event' || (d.town !== id && !fled)) return null;
   const told = eventTold(setting, log, towns, d);
   if (!told) return null;
   const pd = d.paddock === undefined ? undefined : town.plan.paddocks[d.paddock], farm = pd && pd.farm >= 0 ? town.plan.farms[pd.farm] : undefined;
-  const witnesses = farm ? people.filter((p) => p.home === farm.house && p.role !== 'child').map((p) => p.id) : [];
-  return { id: d.id, name: told.title, told: told.told, done: told.done, over: keptOf(log).has(d.id), witnesses };
+  const witnesses = people.filter((p) => p.role !== 'child' && (fled || (farm && p.home === farm.house))).map((p) => p.id);
+  return { id: d.id, name: told.title, told: told.told, done: fadedOf(log, d.id) ? told.faded : told.done, over: keptOf(log).has(d.id), witnesses };
 }
 
 /** A promise as the townsfolk know it (a cellar under one of this town's houses, or new dwellers in one); null for any other decision. */

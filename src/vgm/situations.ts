@@ -4,7 +4,8 @@
  * wolves prowl outside a paddock of the town the hero is in (a Builder turn tool: `paddockWolvesFor`); a raided
  * farm's barn smoulders, its smoke seen over the trees from afar (`smokesAt`, from the raid itself). Each has
  * one urgent line, its cry, called out in a speech bubble once the hero is near enough to see what it is
- * about (`criesDue`): shown first, told after. Pure, seeded.
+ * about (`criesDue`): shown first, told after. The folk of a place a band took camp by the road outside the
+ * nearest town (C11, vgm/events.ts `refugeOf`) and cry out to the hero too. Pure, seeded.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { polyCentroid } from '@futuremagic/settlement';
@@ -14,7 +15,7 @@ import type { Terrain } from '../world/terrain';
 import { townById, type Town } from '../world/town';
 import { travellerFor, travellersOf, type NeedContext } from './answers';
 import { encounterFor } from './encounters';
-import { openEvents } from './events';
+import { openEvents, refugeOf } from './events';
 
 /** The setting's situation of a kind (none: it stages none such). */
 export function situationOf(setting: Pick<SettingModule, 'situations'>, kind: SituationKind): SituationDef | undefined {
@@ -166,6 +167,11 @@ export function criesDue(c: CryContext): Cry[] {
   const smoke = situationOf(setting, 'raid-smoke');
   for (const s of smoke ? smokesAt(log, c.towns, setting, hours) : []) {
     if (smoke!.cry && !cried.has(s.event) && Math.hypot(hero.x - s.x, hero.z - s.z) <= smoke!.seen) out.push({ id: s.event, kind: 'raid-smoke', text: smoke!.cry, town: s.town, x: s.x, z: s.z });
+  }
+  const fled = situationOf(setting, 'refugees');
+  for (const e of fled?.cry ? openEvents(log) : []) {
+    const at = refugeOf(c.towns, e);
+    if (at && !cried.has(`${e.id}/fled`) && Math.hypot(hero.x - at.x, hero.z - at.z) <= fled!.seen) out.push({ id: `${e.id}/fled`, kind: 'refugees', text: fled!.cry!, town: at.town, x: at.x, z: at.z });
   }
   for (const d of log) {
     if ((d.kind !== 'traveller' && d.kind !== 'wild') || !d.situation || cried.has(d.id)) continue;

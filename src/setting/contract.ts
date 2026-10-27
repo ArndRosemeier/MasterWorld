@@ -382,7 +382,12 @@ export interface StoryEventDef {
    * the town the band is), and a raid's `{animals}` (the setting's livestock). `told`: how the townsfolk tell
    * it when asked (C11: talk knows events; none: the news).
    */
-  readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string; readonly told?: string };
+  readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string; readonly told?: string; readonly faded?: string };
+  /**
+   * Game hours an event left alone runs (C11: an ignored promise resolves): then it ends without the hero, as
+   * `words.faded` tells it (the band goes, a raid's beasts with it for good). None: it waits for the hero.
+   */
+  readonly fades?: number;
 }
 
 /**
@@ -612,7 +617,7 @@ export interface SightDef {
 }
 
 /** The situations the engine knows how to stage (C10). */
-export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves', 'raid-smoke', 'stray-beast'] as const;
+export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves', 'raid-smoke', 'stray-beast', 'refugees'] as const;
 export type SituationKind = (typeof SITUATION_KINDS)[number];
 
 /**
@@ -622,7 +627,8 @@ export type SituationKind = (typeof SITUATION_KINDS)[number];
  * town every `every` days. `raid-smoke`: smoke rises over the barn of a farm a raid came down on (C6) for
  * `lasts` game hours, seen over the trees from afar. `stray-beast`: in the day `hours`, one of the beasts of
  * a paddock of the town the hero is in gets out and wanders off, and someone of its farm goes after it (once
- * a town every `every` days, for `lasts` hours at most). `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
+ * a town every `every` days, for `lasts` hours at most). `refugees` (C11): the folk of a settlement a band
+ * holds (a take) camp by the road outside the nearest town until it is freed, one of them hurt. `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
  * only a cry for help), and only once the hero is within `seen` metres of what it is about, so the hero sees
  * it before they are told.
  */
@@ -1416,6 +1422,7 @@ function validateFight(m: SettingModule, where: string): string[] {
     if ((e.kind === 'raid' || e.kind === 'take') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
     if (e.kind === 'take' && (!e.takes || !(e.reach! > 0))) out.push(`${where}: take "${e.id}" needs the settlement it takes and a reach`);
     if (e.lair && !Object.values(m.dungeons).some((l) => l?.form.purposes.includes(e.lair!))) out.push(`${where}: event "${e.id}" asks for a ${e.lair}, which no dungeon kind is for`);
+    if (e.fades !== undefined && (!(e.fades > 0) || !e.words.faded)) out.push(`${where}: event "${e.id}" fades: it needs the hours and how it is told (words.faded)`);
   }
   for (const w of m.wild) {
     if (!encounter(w.encounter)?.where.includes(w.habitat)) out.push(`${where}: wild "${w.id}" needs an encounter met in its habitat ("${w.encounter}", ${w.habitat})`);

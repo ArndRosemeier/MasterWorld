@@ -7,18 +7,23 @@
 import type { SettingModule } from '../setting/contract';
 import { Herds } from '../sim/livestock';
 import { townsfolk, type Person } from '../sim/people';
-import { TownLife, type TownOrder } from '../sim/townLife';
+import { TownLife, type Agent, type TownOrder } from '../sim/townLife';
 import { talkCellar, talkEvent, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
-import { heldBy, takenFrom } from '../vgm/events';
+import { heldBy, refugeOf, takenFrom } from '../vgm/events';
 import type { Decision, DecisionLog, RetreatDecision } from '../world/decisions';
 import { restingAt } from '../vgm/answers';
 import { strayAt } from '../vgm/situations';
+import { onCircle } from '../world/sites';
 import type { Town } from '../world/town';
 import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
+
+/** How many of a taken place's folk wait at their camp, and how far round its middle they sit (m). */
+const CAMPED = 5;
+const CAMP_R = 2.4;
 
 /** How far before a teacher's tower door its master stands watch, metres. */
 const WATCH = 3;
@@ -93,9 +98,24 @@ export class Township {
     return this.c.log().filter((d): d is RetreatDecision => d.kind === 'retreat' && d.town === this.id);
   }
 
-  /** Where its people stand out on the land now: the teachers' towers, and its traveller resting by the hero's way (C9). */
+  /**
+   * Where its people stand out on the land now: the teachers' towers, its traveller resting by the hero's way
+   * (C9), and while a band holds the place, its folk's camp outside the town they fled to (C11).
+   */
   get posts(): readonly { readonly x: number; readonly z: number }[] {
-    return [...this.retreats, ...restingAt(this.c.log(), this.c.hours(), this.id)];
+    const log = this.c.log(), camp = this.camp(log);
+    return [...this.retreats, ...restingAt(log, this.c.hours(), this.id), ...(camp ? [camp] : [])];
+  }
+
+  /** Every town standing (or this one alone). */
+  private get world(): readonly Town[] {
+    return this.c.towns?.() ?? [this.town];
+  }
+
+  /** Where its folk camp while a band holds the place (null: it is not held). */
+  private camp(log: DecisionLog): { readonly x: number; readonly z: number } | null {
+    const e = heldBy(log, this.id);
+    return e ? refugeOf(this.world, e) : null;
   }
 
   /** The guild whose house building `id` is (null: a plain building). */
@@ -112,7 +132,7 @@ export class Township {
   get life(): TownLife {
     if (this.lifeOf) {
       const log = this.c.log();
-      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); }
+      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); this.shelter(this.lifeOf); }
       this.rest(this.lifeOf);
       this.chase(this.lifeOf);
       return this.lifeOf;
@@ -122,6 +142,7 @@ export class Township {
     for (const o of ordersOf(this.c.log(), this.id)) life.order(o);
     life.gone = !!heldBy(this.c.log(), this.id);
     this.heldLog = this.c.log().length;
+    this.shelter(life);
     // A master with a place out on the land keeps watch at its door, facing the town.
     for (const { guild, out } of this.guilds) {
       const a = out && life.agents.find((x) => x.person.trade === guild.keeper);
@@ -133,6 +154,27 @@ export class Township {
     this.lifeOf = life;
     this.chase(life);
     return life;
+  }
+
+  /** Who of its folk wait at the camp (C11), and the take they fled. */
+  private fled: { readonly event: string; readonly who: readonly Agent[] } | null = null;
+
+  /**
+   * While a band holds the place (a take), a few of its folk wait at a camp by the road outside the town they
+   * fled to, one of them hurt (C11: a trace in the world, survivors to talk with); freed, they go home.
+   */
+  private shelter(life: TownLife): void {
+    const log = this.c.log(), e = heldBy(log, this.id) ?? null, camp = this.camp(log);
+    if ((e && camp ? e.id : null) === (this.fled?.event ?? null)) return;
+    for (const a of this.fled?.who ?? []) life.unstation(a);
+    this.fled = null;
+    if (!e || !camp) return;
+    const who = [...life.agents.filter((a) => a.person.role !== 'child'), ...life.agents.filter((a) => a.person.role === 'child')].filter((a) => !a.post).slice(0, CAMPED);
+    who.forEach((a, k) => {
+      const t = (k / who.length) * Math.PI * 2, [x, z] = onCircle(camp, t, CAMP_R);
+      life.station(a, x, z, t + Math.PI, k === 0 ? 'hurt' : 'wait');
+    });
+    this.fled = { event: e.id, who };
   }
 
   /** The stray let out (C10), and whether it was caught; the clock (a game minute's step) it was looked at. */
@@ -198,7 +240,7 @@ export class Township {
   get talk(): TownTalk {
     if (this.talkOf) return this.talkOf;
     const log = this.c.log();
-    const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk, this.c.towns?.() ?? [this.town]).talk;
+    const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk, this.world).talk;
     // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
     for (const id of keptOf(log)) t.hush(id);
     this.talkOf = t;
@@ -234,13 +276,15 @@ export class Township {
     if (!this.talkOf) return; // made later, the words read the log
     const log = this.c.log(), c = talkCellar(d, this.c.setting, this.town, this.residents, log);
     if (c) this.talkOf.add(c);
-    const e = talkEvent(d, this.c.setting, this.town, this.residents, log, this.c.towns?.() ?? [this.town]);
+    const e = talkEvent(d, this.c.setting, this.town, this.residents, log, this.world);
     if (e) this.talkOf.addEvent(e);
   }
 
-  /** A story event of this town is over (its band beaten): its people tell how it ended (C11). */
+  /** A story event of this town is over (its band beaten, or it ran its course): its people tell how it ended (C11). */
   ended(id: string): void {
-    this.talkOf?.endEvent(id);
+    const log = this.c.log(), d = log.find((x) => x.id === id);
+    const e = d && this.talkOf ? talkEvent(d, this.c.setting, this.town, this.residents, log, this.world) : null;
+    if (e) this.talkOf?.endEvent(id, e.done);
   }
 
   /** What it keeps in a save (nothing if the hero never talked or traded there). */

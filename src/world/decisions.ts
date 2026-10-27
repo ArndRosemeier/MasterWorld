@@ -73,6 +73,8 @@ export interface KeptDecision {
   readonly promise: string;
   /** Game hours since the world began. */
   readonly at: number;
+  /** It ended without the hero (C11: a story event left alone ran its course; the VGM's 'fade' tool). */
+  readonly faded?: true;
 }
 
 /**
