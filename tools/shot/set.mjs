@@ -121,7 +121,7 @@ const SESSIONS = [
   // Then farther back to see the crag it is cut into, and up to a carved warden.
   { id: 'hold', query: `${still}&hour=15&weather=fair&hold=stranger`, shots: [
     { name: 'hold' },
-    { name: 'hold-crag', act: atHold(-8, 58, 0, 0) },
+    { name: 'hold-crag', act: atHold(-12, 42, 0, 2) },
     { name: 'hold-warden', act: atHold(3, 10, 7.6, 4) },
   ] },
 ];
