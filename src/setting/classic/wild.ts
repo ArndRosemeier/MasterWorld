@@ -6,8 +6,8 @@
 import type { WildDef } from '../contract';
 
 export const wild: readonly WildDef[] = [
-  { id: 'deer', creatures: ['deer'], count: [3, 6], habitat: 'open', ring: [250, 1400], range: 60, groups: 3 },
-  { id: 'boar', creatures: ['boar'], count: [1, 2], habitat: 'wood', ring: [350, 1200], range: 45, groups: 2 },
-  { id: 'wolves', creatures: ['wolf'], count: [3, 4], habitat: 'wood', ring: [700, 1600], range: 80, groups: 1 },
-  { id: 'bandits', creatures: ['highwayman'], count: [2, 3], habitat: 'road', ring: [450, 1000], range: 30, groups: 1 },
+  { id: 'deer', encounter: 'deer', habitat: 'open', ring: [250, 1400], range: 60, groups: 3 },
+  { id: 'boar', encounter: 'boar', habitat: 'wood', ring: [350, 1200], range: 45, groups: 2 },
+  { id: 'wolves', encounter: 'wolves', habitat: 'wood', ring: [700, 1600], range: 80, groups: 1 },
+  { id: 'bandits', encounter: 'highwaymen', habitat: 'road', ring: [450, 1000], range: 30, groups: 1 },
 ];

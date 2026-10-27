@@ -52,7 +52,7 @@
     "reason": "Dressing the hero in clothes vs dressing a dungeon room with a set piece's props; only the word matches."
   },
   {
-    "key": "idiom: [.from Array] in masterworld/render/terrain/groundTextures.ts + masterworld/sim/wild.ts + masterworld/world/flora.ts",
+    "key": "idiom: [.from Array] in masterworld/render/terrain/groundTextures.ts + masterworld/vgm/encounters.ts + masterworld/world/flora.ts",
     "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper."
   },
   {
@@ -162,10 +162,6 @@
   {
     "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/game/recipe.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
     "reason": "A heading from one point to another (Math.atan2 of the z and x differences): every moving thing faces where it goes; one line, not a helper."
-  },
-  {
-    "key": "idiom: [.count .int] in masterworld/game/items.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/events.ts",
-    "reason": "A seeded count from a [min, max] pair in setting data (rng.int(count[0], count[1])): one call, the data shape is the seam."
   },
   {
     "key": "idiom: [.range .rng .time .until] in masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/townLife.ts",

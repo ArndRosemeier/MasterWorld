@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { deriveSeed, parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
-import { OpenGround, Wilds, placeWild, groupDanger, type Land } from '../src/sim/wild';
+import { OpenGround, Wilds, groupDanger, type Land } from '../src/sim/wild';
+import { territoryOf, wildFor } from '../src/vgm/wild';
 import { Den, type Quarry } from '../src/sim/creatures';
 import { Delve, type DelveSave } from '../src/game/delve';
 import { Character } from '../src/game/character';
@@ -14,21 +15,23 @@ const seed = parseSeed('masterworld');
 const { terrain } = openWorld(seed, classic, SMALL);
 const town = terrain.towns[0];
 const land: Land = { height: (x, z) => terrain.height(x, z), waterDepth: (x, z) => terrain.waterDepth(x, z), blocked: (x, z, r) => town.solid(x, z, r) };
-const places = placeWild(seed, terrain, town, classic.wild);
+const placeWild = () => wildFor({ seed, log: [], towns: terrain.towns, terrain, hours: 0, setting: classic }, town).map(territoryOf);
+const places = placeWild();
+const ringOf = (kind: string) => classic.wild.find((w) => w.id === kind)!.ring;
 const guard = { defence: 20, armour: 1, open: false };
 const hero = (x: number, z: number, noise = 0.4): Quarry => ({ x, y: terrain.height(x, z), z, noise, light: 0, alive: true, guard });
 
 test('wild: deer, boar, a wolf pack and bandits live around the town, apart, on dry land, none too strong near it', () => {
-  const kinds = new Set(places.map((t) => t.def.id));
+  const kinds = new Set(places.map((t) => t.kind));
   for (const k of ['deer', 'boar', 'wolves', 'bandits']) assert.ok(kinds.has(k), `${k} live here (${[...kinds].join(', ')})`);
   for (const t of places) {
     const d = Math.hypot(t.x - town.decision.x, t.z - town.decision.z);
-    assert.ok(d >= t.def.ring[0] - 1 && d <= t.def.ring[1] + 1, `${t.id} at ${d.toFixed(0)} m`);
+    assert.ok(d >= ringOf(t.kind)[0] - 1 && d <= ringOf(t.kind)[1] + 1, `${t.id} at ${d.toFixed(0)} m`);
     assert.equal(terrain.waterDepth(t.x, t.z), 0, `${t.id} on dry land`);
     assert.ok(groupDanger(t.members, classic.creatures) <= 18, `${t.id} fits a fresh hero`);
     for (const o of places) if (o !== t) assert.ok(Math.hypot(o.x - t.x, o.z - t.z) > o.r + t.r, `${t.id} and ${o.id} apart`);
   }
-  assert.deepEqual(placeWild(seed, terrain, town, classic.wild), places, 'the same every time');
+  assert.deepEqual(placeWild(), places, 'the same every time');
 });
 
 test('wild: far groups rest; near ones are always busy; deer bolt from a hero, wolves come for them', () => {
@@ -36,7 +39,7 @@ test('wild: far groups rest; near ones are always busy; deer bolt from a hero, w
   // The hero in town: nobody out there is awake.
   wilds.step(0.1, hero(town.decision.x, town.decision.z));
   assert.ok(wilds.bands.every((b) => !b.awake));
-  const deer = wilds.bands.find((b) => b.territory.def.id === 'deer')!;
+  const deer = wilds.bands.find((b) => b.territory.kind === 'deer')!;
   const t = deer.territory;
   // Watching from a distance: they graze and wander, every one of them doing something.
   const far = hero(t.x + t.r + 120, t.z);
@@ -57,7 +60,7 @@ test('wild: far groups rest; near ones are always busy; deer bolt from a hero, w
   assert.ok(fled > 0, 'the deer fled');
   assert.ok(start.length > 0);
   // Wolves: the pack comes for a hero who walks into their woods.
-  const wolves = wilds.bands.find((b) => b.territory.def.id === 'wolves')!;
+  const wolves = wilds.bands.find((b) => b.territory.kind === 'wolves')!;
   const w = wolves.territory;
   let fighting = 0;
   for (let i = 0; i < 300 && !fighting; i++) {
@@ -68,7 +71,7 @@ test('wild: far groups rest; near ones are always busy; deer bolt from a hero, w
 });
 
 test('wild: a band is fought like a cellar (no hoards); its dead stay dead', () => {
-  const bandits = places.find((t) => t.def.id === 'bandits')!;
+  const bandits = places.find((t) => t.kind === 'bandits')!;
   const make = (saved?: DelveSave) => {
     const den = new Den(new OpenGround(land, [bandits]), bandits.members.map((creature) => ({ creature, room: 0 })), classic.creatures, deriveSeed(bandits.seed, 'den'), saved?.dead ?? []);
     return new Delve(null, den, classic, new Character(classic), 7, saved);

@@ -5,6 +5,7 @@
  * storeys of stone going up; the goal is near the top.
  */
 import type { CellarLore } from '../contract';
+import { who } from './encounters';
 
 export const tower: CellarLore = {
   words: {
@@ -65,33 +66,33 @@ export const tower: CellarLore = {
   ],
   dwellers: [
     {
-      id: 'garrison', text: 'The garrison of {place} died at their posts, and since the magic began to come back they keep the watch again.', uses: [], creatures: ['skeleton'], lair: 'lookout', crowd: 1, danger: 19,
+      id: 'garrison', text: 'The garrison of {place} died at their posts, and since the magic began to come back they keep the watch again.', uses: [], ...who('the-dead'), lair: 'lookout', crowd: 1, danger: 19,
       patterns: ['barred-return', 'lock-key', 'ring-hall', 'gallery'], traces: ['bones'],
       signs: ['Lights move along the top of the old tower at night, one after another, like men on a round.', 'A drover sheltered under the tower and heard a horn blown inside it, the old call to arms.'],
     },
     {
-      id: 'highwaymen', text: 'Bandits have made {place} their hold; from the top they see every cart on the road.', uses: ['camp'], creatures: ['highwayman'], lair: 'camp', crowd: 2, danger: 20,
+      id: 'highwaymen', text: 'Bandits have made {place} their hold; from the top they see every cart on the road.', uses: ['camp'], ...who('highwaymen'), lair: 'camp', crowd: 2, danger: 20,
       patterns: ['bolt-hole', 'guarded-short', 'seen-goal', 'false-goal'], traces: ['lantern', 'crate'],
       signs: ['Carts on the old road get stopped within sight of the tower, never out of it.', 'There is smoke from the top of the tower, and someone has hung a new door.'],
     },
     {
-      id: 'goblins', text: 'Goblins swarm in {place} and have gnawed the old hangings into nests.', uses: ['warren'], creatures: ['goblin'], lair: 'warren', crowd: 3, danger: 19,
+      id: 'goblins', text: 'Goblins swarm in {place} and have gnawed the old hangings into nests.', uses: ['warren'], ...who('goblins'), lair: 'warren', crowd: 3, danger: 19,
       patterns: ['ring-hall', 'twin-paths', 'gambit', 'collapsed-way'], traces: ['straw', 'bones'],
       signs: ['Small figures on the broken top of the tower at dusk, throwing stones at the crows.', 'The goats that graze by the tower come back with their ears chewed.'],
       surprise: 'One of the goblins speaks broken Common and begs for mercy.',
     },
     {
-      id: 'rats', text: 'Rats took {place} when the keepers left and grew fat on their stores.', uses: ['burrow'], creatures: ['giant rat', 'rat'], lair: 'rat-nest', crowd: 3, danger: 10,
+      id: 'rats', text: 'Rats took {place} when the keepers left and grew fat on their stores.', uses: ['burrow'], ...who('rats'), lair: 'rat-nest', crowd: 3, danger: 10,
       patterns: ['collapsed-way', 'side-loop', 'low-road', 'bolt-hole'], traces: ['nest', 'bones'],
       signs: ['The owls that nest in the tower are gone, and something has been at their nests.', 'Rats as big as cats run from the tower into the fields at dusk.'],
     },
     {
-      id: 'spiders', text: 'Giant spiders have spun the upper rooms of {place} shut, and the crows keep away.', uses: [], creatures: ['giant spider'], lair: 'web-hall', crowd: 1, danger: 24,
+      id: 'spiders', text: 'Giant spiders have spun the upper rooms of {place} shut, and the crows keep away.', uses: [], ...who('spiders'), lair: 'web-hall', crowd: 1, danger: 24,
       patterns: ['gallery', 'drop-in', 'seen-goal', 'split-descent'], traces: ['web', 'bones'],
       signs: ['The arrow slits of the tower are grey with webs, every one of them.', 'A boy climbed the tower for a dare and came down white and would not say why.'],
     },
     {
-      id: 'ghoul', text: "Something has crawled out of the founders' vault of {place}, and it is hungry.", uses: [], creatures: ['ghoul', 'skeleton'], lair: 'founders-vault', crowd: 1, danger: 26,
+      id: 'ghoul', text: "Something has crawled out of the founders' vault of {place}, and it is hungry.", uses: [], ...who('ghoul-and-bones'), lair: 'founders-vault', crowd: 1, danger: 26,
       patterns: ['gallery', 'lock-key', 'seen-key', 'low-road'], traces: ['bones'], with: ['founders', 'sealed'],
       signs: ['There is a smell from the tower like an opened grave, even from the road.', 'The stones of the founders lie broken by the tower door, and nobody broke them.'],
     },

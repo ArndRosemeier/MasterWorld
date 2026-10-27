@@ -8,7 +8,7 @@
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { nextEvent, type EventsContext } from './events';
-import { nextPromise, type LeadsContext } from './leads';
+import { nextPromise, openPromises, type LeadsContext } from './leads';
 
 /** Who asks a tool: the start of a game, the hero walking, the Builder's turn, or another tool or the game. */
 export type Asked = 'start' | 'walk' | 'turn' | 'call';
@@ -30,15 +30,34 @@ export interface Tool {
   readonly asked: Asked;
   /** A turn tool's move: its next decision, if one is due now. */
   readonly next?: (c: TurnContext) => Decision | null;
+  /** Why it made `d` (one line, for the VGM's log: the debug menu, later the settings, D53). */
+  readonly why?: (d: Decision, c: TurnContext) => string;
+}
+
+/** What a tool made, and why: the VGM's log reads these (C8). */
+export interface Made {
+  readonly decision: Decision;
+  readonly tool: string;
+  readonly need: Need | null;
+  readonly reason: string;
+  /** Game hours. */
+  readonly at: number;
 }
 
 export const TOOLS: readonly Tool[] = [
   { id: 'open-world', name: 'Open the world', writes: ['town', 'volume', 'hold', 'retreat', 'road'], need: null, asked: 'start' },
   { id: 'region', name: 'Open a region', writes: ['region'], need: 'discovery', asked: 'walk' },
   { id: 'road', name: 'Lay a road', writes: ['road'], need: 'discovery', asked: 'call' },
-  { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons }) },
+  { id: 'wild', name: 'Place the wild', writes: ['wild'], need: 'challenge', asked: 'call' },
+  { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons }),
+    why: (d, c) => {
+      const open = openPromises(c.log).length;
+      const what = d.kind === 'move-in' ? `new dwellers into ${d.dungeon}` : d.kind === 'dungeon' ? `a ${d.template} for ${d.town}` : d.kind;
+      return `${what}: ${c.purposeOverdue ? 'Purpose is overdue' : `only ${open} lead${open === 1 ? '' : 's'} open`}${c.near && c.near !== c.towns[0] ? `, the hero is in ${c.near.decision.id}` : ''}`;
+    } },
   { id: 'keep', name: 'Keep a promise', writes: ['kept'], need: 'reward', asked: 'call' },
-  { id: 'event', name: 'Story event', writes: ['event'], need: 'challenge', asked: 'turn', next: nextEvent },
+  { id: 'event', name: 'Story event', writes: ['event'], need: 'challenge', asked: 'turn', next: nextEvent,
+    why: (d) => (d.kind === 'event' ? `${d.event} in ${d.town}: ${d.paddock !== undefined ? `the raiders of ${d.from} were left alone` : `${d.from} was left open too long`}` : d.kind) },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },
 ];
@@ -50,16 +69,21 @@ export function toolOf(id: string): Tool {
   return t;
 }
 
-/** The Builder's turn: each turn tool in order (or those `c.tools` names) makes its move, each seeing the ones before. */
-export function vgmTurn(c: TurnContext): Decision[] {
-  const out: Decision[] = [];
+/** The Builder's turn: each turn tool in order (or those `c.tools` names) makes its move, each seeing the ones before; what each made, and why. */
+export function vgmTurn(c: TurnContext): Made[] {
+  const out: Made[] = [];
   let log = c.log;
   for (const t of TOOLS) {
     if (t.asked !== 'turn' || !t.next || (c.tools && !c.tools.includes(t.id))) continue;
-    const d = t.next({ ...c, log });
+    const at = { ...c, log }, d = t.next(at);
     if (!d) continue;
-    out.push(d);
+    out.push(madeBy(t.id, d, t.why?.(d, at) ?? t.name, c.hours));
     log = [...log, d];
   }
   return out;
+}
+
+/** A tool's decision as the VGM's log keeps it (a tool asked by name says its own reason). */
+export function madeBy(tool: string, decision: Decision, reason: string, at: number): Made {
+  return { decision, tool, need: toolOf(tool).need, reason, at };
 }

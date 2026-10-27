@@ -161,7 +161,8 @@ export interface HistoryDef {
 
 /** Who lives in a dungeon now: the problem the player solves. */
 export interface DwellerDef extends HistoryDef {
-  /** Creatures (the setting's names). */
+  /** Who they are: an encounter met below (its id), and its creatures (the setting's names; the encounter's, as `who` gives them). */
+  readonly encounter: string;
   readonly creatures: readonly string[];
   /** Use of the goal room. */
   readonly lair: string;
@@ -250,16 +251,35 @@ export type CreatureBody =
   /** An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures. `length` nose to rump. */
   | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar'; readonly length: number; readonly color: string };
 
+/** Where an encounter is met: in a place below, under thick trees, on open land, by a road. */
+export type EncounterWhere = 'below' | 'wood' | 'open' | 'road';
+
 /**
- * Who lives on the land around a town (plan 9.3, the world simulation): a kind of group, where its
- * territories lie and how many there are. The simulation places them from the seed; the VGM does not.
+ * An encounter (C6b, docs/design/vgm.md 3): who the hero meets together, how many, and where. The one
+ * definition that a dungeon's dwellers, the wild's groups and a story event's band all come from; the VGM
+ * picks and fills one with `encounterFor` (vgm/encounters.ts).
+ */
+export interface EncounterDef {
+  readonly id: string;
+  /** Who (creature ids): the first leads, the others follow at random. */
+  readonly creatures: readonly string[];
+  /** How many met together, at least and at most. */
+  readonly count: readonly [number, number];
+  /** Where they may be met. */
+  readonly where: readonly EncounterWhere[];
+  /** What meeting them gives the hero (the Director's need it meets): a fight, or a sight. */
+  readonly need: 'challenge' | 'discovery';
+}
+
+/**
+ * Who lives on the land around a town (plan 9.3, the world simulation): a kind of group (an encounter),
+ * where its territories lie and how many there are. The VGM places them from the seed into the log
+ * (vgm/wild.ts `wildFor`).
  */
 export interface WildDef {
   readonly id: string;
-  /** Who lives together (creature ids): the first leads, the others follow at random. */
-  readonly creatures: readonly string[];
-  /** How many in a group, at least and at most. */
-  readonly count: readonly [number, number];
+  /** Who they are and how many (an encounter's id; it is met in this habitat). */
+  readonly encounter: string;
   /** wood: under thick trees; open: meadows and heath; road: by a road out of town. */
   readonly habitat: 'wood' | 'open' | 'road';
   /** Metres from the town's market where their territories lie. */
@@ -1000,6 +1020,8 @@ export interface SettingModule {
   readonly routines: RoutinesDef;
   /** What lives on the land around a town. */
   readonly wild: readonly WildDef[];
+  /** Everyone the hero can meet, in groups (C6b): the dwellers below, the wild's groups and the events' bands are these. */
+  readonly encounters: readonly EncounterDef[];
   /** Story events (plan 4.2, C6): what the world does on its own when the hero leaves it be. None: nothing. */
   readonly events?: readonly StoryEventDef[];
   /** Birds and squirrels about the land; without it the land has none. */
@@ -1195,7 +1217,16 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
-  for (const [kind, lore] of Object.entries(m.dungeons)) for (const d of lore?.dwellers ?? []) for (const c of d.creatures) if (!ids.has(c)) out.push(`${where}: ${kind} dweller "${d.id}" creature "${c}" is unknown`);
+  const encounter = (id: string) => m.encounters.find((e) => e.id === id);
+  for (const e of m.encounters) {
+    for (const c of e.creatures) if (!ids.has(c)) out.push(`${where}: encounter "${e.id}" creature "${c}" is unknown`);
+    if (!e.creatures.length || e.count[0] < 1 || e.count[1] < e.count[0] || !e.where.length) out.push(`${where}: encounter "${e.id}" needs creatures, a count and where it is met`);
+  }
+  for (const [kind, lore] of Object.entries(m.dungeons)) for (const d of lore?.dwellers ?? []) {
+    const e = encounter(d.encounter);
+    if (!e || !e.where.includes('below')) out.push(`${where}: ${kind} dweller "${d.id}" needs an encounter met below ("${d.encounter}")`);
+    else if (e.creatures.join() !== d.creatures.join()) out.push(`${where}: ${kind} dweller "${d.id}" creatures are not its encounter's`);
+  }
   for (const b of m.smallLife?.birds ?? []) {
     if (b.size <= 0 || !b.colours.length || b.count[0] < 1 || b.count[1] < b.count[0] || b.beat <= 0) out.push(`${where}: bird "${b.id}" needs a size, colours, a count and a beat`);
   }
@@ -1204,8 +1235,8 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (e.kind === 'raid' && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: raid "${e.id}" needs its raiders (a wild group's id in by)`);
   }
   for (const w of m.wild) {
-    for (const c of w.creatures) if (!ids.has(c)) out.push(`${where}: wild "${w.id}" creature "${c}" is unknown`);
-    if (!w.creatures.length || w.count[0] < 1 || w.count[1] < w.count[0] || w.ring[1] < w.ring[0] || w.range <= 0) out.push(`${where}: wild "${w.id}" needs creatures, a count, a ring and a range`);
+    if (!encounter(w.encounter)?.where.includes(w.habitat)) out.push(`${where}: wild "${w.id}" needs an encounter met in its habitat ("${w.encounter}", ${w.habitat})`);
+    if (w.ring[1] < w.ring[0] || w.range <= 0) out.push(`${where}: wild "${w.id}" needs a ring and a range`);
   }
   if (!m.abilities.length) out.push(`${where}: no abilities`);
   out.push(...validateAbilities(m, skills, where));

@@ -24,6 +24,7 @@ What the VGM should become, and where it falls short today: [The VGM we want](ht
 | **Open the world** | The start town, the arch, the peoples' holds, the teachers' towers, the first roads | A new game | `town`, `volume`, `hold`, `retreat`, `road` | The start; holds and towers are on the map | Never | `vgm/builder.ts` `openWorld`, `firstDecisions`; tool `open-world` |
 | **Open a region** | An aligned square ahead of the hero, filled from the setting: plain country, a hamlet, a village, a camp, ruins, a barrow field | A point ahead of or around the hero lies in no open region (`FRONTIER`) | `region` (a hamlet or village is a town of its size) | A line in the log, the map | Never | `vgm/frontier.ts` `nextRegion`, asked by `app/regionSites.ts` as the hero walks; tool `region` |
 | **Lay a road** | A path, track or road to a new place, routed once and kept | A place opens (a region's settlement, a promised site) | `road` | Seen on the land and the map | Never | `vgm/roads.ts` `linkRoad`; tool `road` |
+| **Place the wild** | The groups living round a town (classic: deer, boar, a wolf pack, the bandits by a road), each an encounter on its territory | A town's wild is first needed (today: the start town at load; an older save gets the very groups it had) | `wild` | Met on the land | Not yet (the VGM may later drive a group off or add one) | `vgm/wild.ts` `wildFor`, `wildOf`, `territoryOf`; tool `wild` |
 | **Promise a place** | A dungeon: a cellar under a house, or a barrow, cave or ruined tower out on the land; its danger fixed by distance (`dangerAt`) | The Builder's turn: fewer than `LEADS.min` promises open, or Purpose overdue (up to `LEADS.max`), at least `LEADS.gap` hours apart | `dungeon`, `move-in` | The household knows (`hints.ts` `cellarHint`, `TownTalk.add`); asked, they mark the map (D35); the guide sends someone over | `kept` when it is cleared and the household told | `vgm/leads.ts` `nextPromise`; `vgm/dungeons.ts` `promiseCellar`, `promisePlace`; tool `promise` |
 | **Move in** (part of Promise a place) | New dwellers in a cleared dungeon (repopulation, plan 8.1) | A kept dungeon stood empty `LEADS.settle` hours | `move-in` | As a promise | `kept` | `vgm/leads.ts` `moveInto` |
 | **Keep a promise** | A promise or an event marked done | Asked by the game: the household is told a place is quiet, an event's band is beaten | `kept` | The household's thanks, the town's word | Never (a kept place can be moved into) | `vgm/leads.ts` `keepPromise`; tool `keep` |
@@ -38,8 +39,7 @@ What the VGM should become, and where it falls short today: [The VGM we want](ht
 
 | What | Today | Code |
 |---|---|---|
-| Wild groups round a town (deer, boar, wolves, highwaymen) | Placed from the seed when a town loads; not in the log, so the VGM can't add, move or remove one | `sim/wild.ts` `placeWild`, setting `wild` |
-| Who lives in a dungeon | Chosen from the setting's dwellers when the dungeon is sketched (section 4) | `world/dungeon/cellar.ts`, setting `dungeons.*.dwellers` |
+| Who lives in a dungeon | Chosen from the setting's dwellers when the dungeon is sketched (section 4); each dweller names its encounter, but the lore picks it, not `encounterFor` | `world/dungeon/cellar.ts`, setting `dungeons.*.dwellers` |
 | Guild tasks | Handed out by guild masters, kept from the log | `game/guilds.ts` `GuildBook` |
 
 ## 3. Encounters
@@ -50,7 +50,9 @@ An **encounter** is who the hero meets, where and why: a group of creatures or p
 2. **Wild groups**: the setting's `WildDef`s, with a habitat, a ring round the town and a group size.
 3. **Event bands**: an `EventDecision`'s `members`.
 
-**The target (plan step C6b): one encounter tool in `src/vgm/encounters.ts`.**
+**Built (C6b, 2026-10-27).** The setting's `encounters` (`EncounterDef`: `creatures` with the leader first, `count`, `where` it may be met: below, wood, open or road, and the `need` it meets: challenge or discovery) is the one list; classic's is `setting/classic/encounters.ts`. A dweller below names its encounter (`...who('rats')` in the lore), a wild group names its own (`WildDef.encounter`), and `encounterFor` (`vgm/encounters.ts`) fills the wild's groups (`vgm/wild.ts`) and the story events' bands (`EventDecision.encounter`). It keeps to `of` when the caller knows who it wants, to `where` and `need`, comes near the `danger` asked (an encounter whose middling group is off by more than 60 % only when nothing closer fits), and keeps away from the last three met (`recent`). `test/encounters.test.ts` sweeps every place and danger band for misfits and repeats, and checks that every encounter is met somewhere. To design a new encounter, add a line to the setting's list and use it in a dweller, a wild group or an event; the sweep shows where the VGM would pick it. Every tool's move is logged with its need and reason (`Made`, `vgmTurn`; the game keeps the latest 200 as `game.vgmLog`) for the VGM log of D53 (C8).
+
+**The target (plan step C6b): one encounter tool in `src/vgm/encounters.ts`.** Still open from it: temper and the words that tell of an encounter, and road ambushes and guild quarries asking for one.
 
 * **One definition.** An encounter is data in the setting (an `EncounterDef`: who, how many, habitat or room, temper, danger range, the words used to tell of it). Dwellers, wild groups and event bands are all encounters.
 * **One generator.** `encounterFor(need, where, danger, seed)` picks and fills an encounter from the setting. It fits the danger the place already has (D29), keeps away from what the hero has just met (against formula, plan 8.1), and returns plain data that goes into the log.
@@ -128,7 +130,7 @@ A new kind of thing the VGM makes (an encounter kind, an event, a place, a steer
 
 ## 7. Gaps
 
-* **Wild groups are not decisions.** The VGM can't add a wolf pack where Challenge is overdue or remove the highwaymen after the hero drove them off. They become encounters in the log (C6b).
+* **Wild groups are decisions, but nothing moves them yet.** The VGM can't add a wolf pack where Challenge is overdue or remove the highwaymen after the hero drove them off (C9).
 * **The Director orders only one thing.** Only Purpose makes the Builder act. Challenge, Reward, Discovery and People are counted but nothing answers them. The toolbox's `need` field is how it will ask: when a need is overdue, the Director asks the tools that meet it for their cheapest fitting move (plan 4.1).
 * **Story events are not in talk.** Conversations doesn't know of events yet, so townsfolk can't speak of the band.
 * **No traces yet.** Events leave no ruins, refugees or survivors (plan 4.5).

@@ -14,11 +14,10 @@ import { Delve, type DelveSave } from '../game/delve';
 import { CreatureView } from '../render/dungeon/CreatureView';
 import type { SettingModule } from '../setting/contract';
 import { Den } from '../sim/creatures';
-import { OpenGround, awake, groupDanger, placeWild, type Land, type Territory } from '../sim/wild';
+import { OpenGround, awake, groupDanger, type Land, type Territory } from '../sim/wild';
 import type { Journal } from '../talk/journal';
 import type { Director } from '../vgm/director';
 import type { WildGroup } from '../vgm/events';
-import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { Encounter, type Arena, type FightCue, type FightHost } from './encounter';
 import type { FightHud } from './fightHud';
@@ -64,12 +63,12 @@ export class WildLand {
   /** The bands of story events (their territory ids are the events' ids, each a promise). */
   private readonly events = new Set<string>();
 
-  /** `bands`: the open story events' bands (vgm/events.ts openBands). */
   private readonly town: string;
 
-  constructor(private readonly host: WildHost, terrain: Terrain, town: Town, private readonly land: Land, private readonly saved: Readonly<Record<string, DelveSave>> = {}, bands: readonly Territory[] = []) {
+  /** `wild`: the town's wild groups (vgm/wild.ts, from the log); `bands`: the open story events' bands (vgm/events.ts openBands). */
+  constructor(private readonly host: WildHost, town: Town, private readonly land: Land, private readonly saved: Readonly<Record<string, DelveSave>> = {}, wild: readonly Territory[] = [], bands: readonly Territory[] = []) {
     this.town = town.decision.id;
-    this.territories = placeWild(host.seed, terrain, town, host.setting.wild ?? []);
+    this.territories = [...wild];
     this.groups = this.territories.map((territory) => ({ territory, awake: false, built: null, encounter: null, delve: null }));
     for (const b of bands) this.add(b);
   }
@@ -117,7 +116,7 @@ export class WildLand {
 
   /** A living member of the first built group of a kind, where it is now (for `wild=<kind>`: look at them). */
   sight(kind: string): { x: number; y: number; z: number } | null {
-    const g = this.groups.find((g) => g.territory.def.id === kind && g.delve);
+    const g = this.groups.find((g) => g.territory.kind === kind && g.delve);
     const c = g?.delve?.den.creatures.find((c) => c.state !== 'dead');
     return c ? { x: c.x, y: c.y, z: c.z } : null;
   }

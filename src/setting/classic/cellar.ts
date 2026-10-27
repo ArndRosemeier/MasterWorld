@@ -3,6 +3,7 @@
  * town before it (the old realm, before the Fading), what goes wrong, and who moves in.
  */
 import type { CellarLore } from '../contract';
+import { who } from './encounters';
 
 export const cellar: CellarLore = {
   words: {
@@ -62,28 +63,28 @@ export const cellar: CellarLore = {
   ],
   dwellers: [
     {
-      id: 'rats', text: 'Rats came up through the old drains and grew fat and bold; some are as big as dogs.', uses: ['burrow'], creatures: ['giant rat', 'rat'], lair: 'rat-nest', crowd: 3, danger: 10,
+      id: 'rats', text: 'Rats came up through the old drains and grew fat and bold; some are as big as dogs.', uses: ['burrow'], ...who('rats'), lair: 'rat-nest', crowd: 3, danger: 10,
       patterns: ['collapsed-way', 'side-loop', 'low-road', 'bolt-hole'], traces: ['nest', 'bones'],
       signs: ['Something gnaws down there at night, and the dog will not go down any more.', 'The sacks are chewed through, and the bites are too big for a rat.'],
     },
     {
-      id: 'smugglers', text: 'Smugglers found the old ways beneath and use them to move goods past the town gate.', uses: ['bunks', 'lookout'], creatures: ['bandit'], lair: 'smugglers-store', crowd: 1, danger: 17,
+      id: 'smugglers', text: 'Smugglers found the old ways beneath and use them to move goods past the town gate.', uses: ['bunks', 'lookout'], ...who('smugglers'), lair: 'smugglers-store', crowd: 1, danger: 17,
       patterns: ['hidden-shortcut', 'barred-return', 'secret-key', 'false-goal', 'ring-hall'], traces: ['lantern', 'crate'],
       signs: ['There are lights under the floorboards at night, and voices.', 'Wine goes missing, but the lock is never broken.'],
     },
     {
-      id: 'spiders', text: 'Giant spiders crept in from the dark below and spun the lower rooms shut.', uses: [], creatures: ['giant spider'], lair: 'web-hall', crowd: 1, danger: 24,
+      id: 'spiders', text: 'Giant spiders crept in from the dark below and spun the lower rooms shut.', uses: [], ...who('spiders'), lair: 'web-hall', crowd: 1, danger: 24,
       patterns: ['gallery', 'drop-in', 'seen-goal', 'split-descent'], traces: ['web', 'bones'],
       signs: ['The cat came back up covered in silk, and it has not stopped shaking.', 'There are webs on the cellar stairs that come back every morning.'],
     },
     {
-      id: 'goblins', text: 'A handful of goblins came up the old tunnels, hungry, and stayed.', uses: ['burrow'], creatures: ['goblin'], lair: 'hideout', crowd: 2, danger: 15,
+      id: 'goblins', text: 'A handful of goblins came up the old tunnels, hungry, and stayed.', uses: ['burrow'], ...who('goblins'), lair: 'hideout', crowd: 2, danger: 15,
       patterns: ['guarded-short', 'collapsed-way', 'twin-paths', 'bolt-hole', 'gambit'], traces: ['bones', 'straw'],
       signs: ['Bread goes missing, and there are small muddy footprints by the hatch.', 'Someone down there sings at night, badly, in no tongue I know.'],
       surprise: 'One of the goblins speaks broken Common and begs for mercy.',
     },
     {
-      id: 'ghoul', text: 'Something from the filled-in cells woke when the magic began to come back.', uses: [], creatures: ['ghoul', 'skeleton'], lair: 'watch-cells', crowd: 1, danger: 29,
+      id: 'ghoul', text: 'Something from the filled-in cells woke when the magic began to come back.', uses: [], ...who('ghoul-and-bones'), lair: 'watch-cells', crowd: 1, danger: 29,
       patterns: ['gallery', 'lock-key', 'seen-key'], traces: ['bones'], with: ['watch-house'],
       signs: ['It is cold down there, colder than it should be, and it smells of the grave.', 'Scratching from below, slow, like someone counting.'],
     },

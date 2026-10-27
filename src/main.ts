@@ -49,7 +49,8 @@ import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands } from './vgm/events';
-import { vgmTurn } from './vgm/toolbox';
+import { madeBy, vgmTurn, type Made } from './vgm/toolbox';
+import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Cellars } from './app/cellars';
@@ -607,19 +608,32 @@ export async function start(b: Boot): Promise<void> {
       },
     }, terrain.towns, save?.cellars ?? {});
     cellars.sync(log);
-    // The wild on the land around the town: built as the hero comes near (D27, plan 9.3).
+    // What the VGM made and why (D53: never shown in play; the debug menu and, later, the settings read it).
+    const vgmLog: Made[] = [];
+    const noteMade = (m: Made): void => {
+      vgmLog.push(m);
+      if (vgmLog.length > 200) vgmLog.shift();
+    };
+    // The wild on the land around the town: the VGM places its groups into the log (an older save's too, the
+    // same groups it had), built as the hero comes near (D27, plan 9.3, C6b).
+    if (start && params.wild) {
+      for (const d of wildFor({ seed, log, towns: terrain.towns, terrain, hours: hours(), setting }, start)) {
+        log = [...log, d];
+        noteMade(madeBy('wild', d, `${d.encounter} round ${d.town} (${d.members.length})`, hours()));
+      }
+    }
     const wild = start && params.wild ? new WildLand({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, seed, director, journal, hud: fightHud, fight: fightHost,
       cue: (c) => sounds?.cue(c),
       out: () => !visit() && !rooms?.inside && !player.offFoot,
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
-    }, terrain, start, {
+    }, start, {
       height: (x, z) => terrain.height(x, z),
       waterDepth: (x, z) => terrain.waterDepth(x, z),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
-    }, save?.wild ?? {}, openBands(log)) : null;
+    }, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
     // The first people's hold (plan 11.6): its gate and court, its wardens built as the hero comes near.
     const holdSite = log.find((d): d is HoldDecision => d.kind === 'hold') ?? null;
     const holdPeople = holdSite ? setting.peoples.find((p) => p.id === holdSite.people && p.hold) : undefined;
@@ -656,10 +670,10 @@ export async function start(b: Boot): Promise<void> {
       if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * off, undefined, b.site.z + Math.cos(b.site.yaw) * off, b.site.yaw);
     }
     // `wild=<kind>`: beside its first group (for looking at them).
-    const by = params.wildAt ? wild?.territories.find((t) => t.def.id === params.wildAt) : undefined;
+    const by = params.wildAt ? wild?.territories.find((t) => t.kind === params.wildAt) : undefined;
     if (by) player.teleport(by.x + by.r + 20, undefined, by.z, Math.PI / 2);
     // Once that group is built, the hero steps up to one of them (a dozen metres off, facing it).
-    let lookWild = by ? by.def.id : null;
+    let lookWild = by ? by.kind : null;
     // `small=squirrel` / `birds` / `flock`: beside the first that is about (for looking at them).
     let lookSmall = params.smallAt;
     /** With `fly`: the one the free camera follows, and how far off. */
@@ -1185,7 +1199,7 @@ export async function start(b: Boot): Promise<void> {
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), get log() { return log; }, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1291,7 +1305,7 @@ export async function start(b: Boot): Promise<void> {
      * The Builder's turn (D51, vgm/toolbox.ts): its tools decide, the game applies each decision (`applied`).
      * `tools`: only these (the debug menu's story events); `early`: whatever their waits say; `which`: that event.
      */
-    const vgmStep = (o: { tools?: readonly string[]; early?: boolean; which?: string } = {}): Decision[] => {
+    const vgmStep = (o: { tools?: readonly string[]; early?: boolean; which?: string } = {}): Made[] => {
       if (!start) return [];
       const made = vgmTurn({
         seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id),
@@ -1299,12 +1313,14 @@ export async function start(b: Boot): Promise<void> {
         // A story event's band needs the wild to roam in.
         tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which,
       });
-      for (const d of made) applied(d);
+      for (const m of made) applied(m);
       return made;
     };
-    /** A decision of the Builder's turn: into the log, and the game builds, draws and tells it. */
-    const applied = (d: Decision): void => {
+    /** A decision a VGM tool made: into the log (and the VGM's own log, with its reason), and the game builds, draws and tells it. */
+    const applied = (m: Made): void => {
+      const d = m.decision;
       log = [...log, d];
+      noteMade(m);
       if (d.kind === 'dungeon' || d.kind === 'move-in') {
         console.info(`[vgm] ${d.kind} ${d.id}${d.kind === 'move-in' ? ` into ${d.dungeon}` : ''} at ${hours().toFixed(1)} h`);
         cellars?.sync(log);
@@ -1325,7 +1341,7 @@ export async function start(b: Boot): Promise<void> {
     /** A story event now (the debug menu): what the town hears, or why none came. */
     const storyEventNow = (which?: string): string => {
       if (!start || !wild) return 'no wild here';
-      const e = vgmStep({ tools: ['event'], early: true, which }).find((d) => d.kind === 'event');
+      const e = vgmStep({ tools: ['event'], early: true, which }).map((m) => m.decision).find((d) => d.kind === 'event');
       return !e ? 'nothing is due' : (e.kind === 'event' && eventTold(setting, log, terrain.towns, e)?.news) || e.id;
     };
     let last = performance.now(), frame = 0;
