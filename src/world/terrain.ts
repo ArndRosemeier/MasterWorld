@@ -12,6 +12,7 @@ import { holdBare, holdGround } from './hold';
 import { RETREAT_CLEARING, clearingOf, type Clearing } from './dungeon/site';
 import { SIGHT_CLEARING } from './sites';
 import { RoadNet } from './roads';
+import { brookCuts } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
 
@@ -253,10 +254,13 @@ export class Terrain {
     // each blending out to the edge of its own valley, so where two meet the land stays whole.
     const r = this.hydro.riverAt(x, z, this.here);
     level = shapeByWater(this.hydro.brookAt(x, z, this.brook), shapeByWater(r, level));
-    // A road levels its bed and shoulders, over a brook (it runs under the road); a river still cuts its ford.
+    // A road levels its bed and shoulders; a river still cuts its ford, and a brook its channel through the
+    // shoulders and, under the road's bridge, its bed (world/bridges.ts).
     if (!this.roadNet.empty) {
+      const land = level;
       level = this.roadNet.level(x, z, level);
       if (inChannel(r)) level = Math.min(level, shapeByWater(r, level));
+      else if (inChannel(this.brook, 0.5) && brookCuts(this.roadNet, this.hydro, x, z)) level = Math.min(level, land);
     }
     return level;
   }
