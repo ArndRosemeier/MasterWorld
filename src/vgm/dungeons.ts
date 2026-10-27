@@ -18,12 +18,17 @@ import type { Town } from '../world/town';
 /** Houses that dig cellars: lived in, not the temple, the hall or the stable. */
 const CELLARED: readonly TownBuilding['kind'][] = ['house', 'cottage', 'inn', 'bakery', 'workshop', 'smithy'];
 
+/** How far (m) a place (a town, a dungeon: what has a `decision`) lies from `p`. */
+export function farFrom(at: { readonly decision: { readonly x: number; readonly z: number } }, p: { readonly x: number; readonly z: number }): number {
+  return Math.hypot(at.decision.x - p.x, at.decision.z - p.z);
+}
+
 /**
  * The most danger a place may hold (D29): within reach of the start, what a fresh hero can take on
  * (about 18 on the hero's power scale, a fresh hero being about 15); more with every kilometre beyond.
  */
 export function dangerAt(at: { readonly decision: { readonly x: number; readonly z: number } }, home: { readonly x: number; readonly z: number }): number {
-  const km = Math.hypot(at.decision.x - home.x, at.decision.z - home.z) / 1000;
+  const km = farFrom(at, home) / 1000;
   return Math.round(18 + Math.max(0, km - 1) * 6);
 }
 

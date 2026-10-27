@@ -282,6 +282,8 @@ export interface SightDecision {
   readonly id: string;
   /** The setting's sight. */
   readonly sight: string;
+  /** The need it answers, if not Discovery (a find by the way answers Reward). */
+  readonly need?: 'reward';
   readonly x: number;
   readonly z: number;
   readonly yaw: number;

@@ -589,7 +589,7 @@ export interface UpkeepDef {
 }
 
 /** How a sight stands on the land (world/sites.ts `layOutSight`). */
-export const SIGHT_SHAPES = ['stones', 'waystone', 'cairn'] as const;
+export const SIGHT_SHAPES = ['stones', 'waystone', 'cairn', 'stash'] as const;
 export type SightShape = (typeof SIGHT_SHAPES)[number];
 
 /**
@@ -602,6 +602,12 @@ export interface SightDef {
   readonly shape: SightShape;
   readonly seen: string;
   readonly weight?: number;
+  /**
+   * The need it answers (default Discovery). A Reward's sight is a find: something hidden by the way, its
+   * `loot` (a treasure table) the hero takes when they come upon it.
+   */
+  readonly need?: 'discovery' | 'reward';
+  readonly loot?: string;
 }
 
 /**
@@ -1163,6 +1169,7 @@ export function validateSetting(m: SettingModule): string[] {
     sightIds.add(g.id);
     if (!SIGHT_SHAPES.includes(g.shape)) out.push(`${where}: sight "${g.id}" shape "${g.shape}" is unknown`);
     if (!g.seen) out.push(`${where}: sight "${g.id}" has no words`);
+    if (g.need === 'reward' && !m.items.treasure.some((t) => t.id === g.loot)) out.push(`${where}: sight "${g.id}" answers Reward but its loot "${g.loot}" is no treasure table`);
   }
   const tr = m.travel;
   if (tr && !(tr.speed > 0 && tr.road >= 1 && tr.perKm >= 0 && tr.least >= 0 && Number.isInteger(tr.offers) && tr.offers >= 1)) out.push(`${where}: travel needs speed > 0, road >= 1, fares >= 0 and offers >= 1`);

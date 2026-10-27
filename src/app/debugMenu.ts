@@ -122,6 +122,8 @@ export class DebugMenu {
         { label: 'Its last 30 moves', run: () => this.lines(h.vgmLog().slice(-30)) },
         { label: 'Every move', run: () => this.lines(h.vgmLog()) },
         { label: 'Answer Discovery now (a sight)', run: () => h.answerNeed('discovery') },
+        { label: 'Answer Reward now (a find)', run: () => h.answerNeed('reward') },
+        { label: 'Answer Challenge now (an ambush)', run: () => h.answerNeed('challenge') },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },

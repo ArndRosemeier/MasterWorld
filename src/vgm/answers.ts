@@ -2,15 +2,20 @@
  * Answers to an overdue need (plan 4.1, C9): when the Director says a need is overdue, the VGM asks the
  * tools that meet it for their cheapest fitting move (`answerNeed`, the toolbox's `answer`s), here on the
  * hero's way. Discovery: a sight by the way (a ring of standing stones, a waystone, a cairn) a little off
- * the line to where the hero is going, so they come upon it. Pure, seeded.
+ * the line to where the hero is going, so they come upon it. Reward: a find by the way (something hidden
+ * under a stone), placed the same way. Challenge: an ambush, a group of the wild lying in wait ahead. Pure,
+ * seeded.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import type { SettingModule } from '../setting/contract';
-import type { DecisionLog, SightDecision } from '../world/decisions';
+import { rollLoot, type Loot } from '../game/items';
+import type { SettingModule, SightDef } from '../setting/contract';
+import type { DecisionLog, SightDecision, WildDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { regionDecisions } from './frontier';
+import { dangerAt, farFrom } from './dungeons';
+import { encounterFor } from './encounters';
 
 /** What an answer knows: the log, the land, the hero and where they are going. */
 export interface NeedContext {
@@ -19,7 +24,9 @@ export interface NeedContext {
   readonly terrain: Terrain;
   readonly towns: readonly Town[];
   readonly hours: number;
-  readonly setting: Pick<SettingModule, 'sights'>;
+  readonly setting: Pick<SettingModule, 'sights' | 'encounters' | 'creatures'>;
+  /** Where the game began (danger grows with distance from it, D29); none: the first town. */
+  readonly home?: { readonly x: number; readonly z: number };
   readonly hero: { readonly x: number; readonly z: number };
   /** Where the hero is going (a lead's place, a town), if the game knows; else round about them. */
   readonly toward: { readonly x: number; readonly z: number } | null;
@@ -40,14 +47,53 @@ export function sightsOf(log: DecisionLog): SightDecision[] {
   return log.filter((d): d is SightDecision => d.kind === 'sight');
 }
 
-/** Discovery's answer: a sight by the hero's way (null: the setting has none, or no ground fits). */
-export function sightFor(c: NeedContext): SightDecision | null {
-  const defs = c.setting.sights ?? [];
+/**
+ * Discovery's answer, or Reward's (`need`): a sight by the hero's way, or a find (null: the setting has none
+ * for that need, or no ground fits).
+ */
+export function sightFor(c: NeedContext, need: 'discovery' | 'reward' = 'discovery'): SightDecision | null {
+  const defs = (c.setting.sights ?? []).filter((d) => (d.need ?? 'discovery') === need);
   if (!defs.length) return null;
   const past = sightsOf(c.log), n = past.length + 1, s = deriveSeed(c.seed, 'sight', n), r = new Rng(s);
   // Not the one met last, if there is another.
   const last = past.at(-1)?.sight, pool = defs.length > 1 ? defs.filter((d) => d.id !== last) : defs;
   const def = r.weighted(pool, (d) => d.weight ?? 1);
+  const at = wayside(c, r, past);
+  if (!at) return null;
+  // Facing the way the hero comes from.
+  return { kind: 'sight', id: `sight-${n}`, sight: def.id, ...(need === 'reward' ? { need } : {}), x: at.x, z: at.z, yaw: Math.atan2(c.hero.x - at.x, c.hero.z - at.z), seed: s, at: c.hours };
+}
+
+/** What a find holds (its def's `loot` table, at the danger of where it lies, D29); null for a sight that is only seen. */
+export function findIn(setting: Pick<SettingModule, 'items'>, def: SightDef, d: SightDecision, home: { readonly x: number; readonly z: number }): Loot | null {
+  return def.loot ? rollLoot(setting.items, def.loot, dangerAt({ decision: d }, home), new Rng(deriveSeed(d.seed, 'find'))) : null;
+}
+
+/** How far an ambush's group roams round where it lies in wait (m). */
+const AMBUSH_R = 25;
+
+/**
+ * Challenge's answer: an ambush, a group of the wild (an encounter that meets Challenge, of the woods or the
+ * open as the spot is, near the danger the land has there, D29) lying in wait ahead on the hero's way.
+ */
+export function ambushFor(c: NeedContext): WildDecision | null {
+  const n = c.log.filter((d) => d.kind === 'wild' && d.group === 'ambush').length + 1, s = deriveSeed(c.seed, 'ambush', n), r = new Rng(s);
+  const at = wayside(c, r, []);
+  if (!at) return null;
+  const home = c.home ?? c.towns[0]?.decision ?? at;
+  // Its group belongs to the town nearest it.
+  const town = c.towns.reduce<Town | null>((b, w) => (!b || farFrom(w, at) < farFrom(b, at) ? w : b), null);
+  if (!town) return null;
+  const met = encounterFor({ setting: c.setting, seed: s, need: 'challenge', where: at.woods > 0.5 ? 'wood' : 'open', danger: dangerAt({ decision: at }, home) });
+  if (!met) return null;
+  return { kind: 'wild', id: `ambush-${n}`, town: town.decision.id, group: 'ambush', encounter: met.encounter, x: at.x, z: at.z, r: AMBUSH_R, members: met.members, seed: s, at: c.hours };
+}
+
+/**
+ * A spot by the hero's way: ahead on the line to where they are going, a little to its side, on dry gentle
+ * ground off roads, towns, places and `apart` (other sights), the most open of a few that fit.
+ */
+function wayside(c: NeedContext, r: Rng, apart: readonly { readonly x: number; readonly z: number }[]): { x: number; z: number; woods: number } | null {
   const t = c.terrain, places = regionDecisions(c.log).flatMap((d) => (d.site ? [d.site] : []));
   const way = c.toward ? Math.atan2(c.toward.z - c.hero.z, c.toward.x - c.hero.x) : r.range(0, Math.PI * 2);
   const far = c.toward ? Math.hypot(c.toward.x - c.hero.x, c.toward.z - c.hero.z) - 40 : AHEAD[1];
@@ -61,15 +107,12 @@ export function sightFor(c: NeedContext): SightDecision | null {
     const x = c.hero.x + Math.cos(a) * d - Math.sin(a) * side, z = c.hero.z + Math.sin(a) * d + Math.cos(a) * side, h = t.height(x, z);
     if (t.waterDepth(x, z, h) > 0 || h < 2 || t.steepness(x, z, 6, h) > 0.35) continue;
     if (t.roads.fromEdge(x, z) < 4) continue;
-    if (c.towns.some((w) => Math.hypot(w.decision.x - x, w.decision.z - z) < w.decision.radius + OFF_TOWN)) continue;
+    if (c.towns.some((w) => farFrom(w, { x, z }) < w.decision.radius + OFF_TOWN)) continue;
     if (places.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + OFF_PLACE)) continue;
-    if (past.some((p) => Math.hypot(p.x - x, p.z - z) < APART)) continue;
+    if (apart.some((p) => Math.hypot(p.x - x, p.z - z) < APART)) continue;
     fits.push({ x, z, woods: woods(x, z) });
     if (fits.length >= CHOICES) break;
   }
-  // Where it shows best: the most open of the spots that fit (it stands in a glade of its own anyway).
-  const at = fits.sort((a, b) => a.woods - b.woods)[0];
-  if (!at) return null;
-  // Facing the way the hero comes from.
-  return { kind: 'sight', id: `sight-${n}`, sight: def.id, x: at.x, z: at.z, yaw: Math.atan2(c.hero.x - at.x, c.hero.z - at.z), seed: s, at: c.hours };
+  // Where it shows best: the most open of the spots that fit (a sight stands in a glade of its own anyway).
+  return fits.sort((a, b) => a.woods - b.woods)[0] ?? null;
 }
