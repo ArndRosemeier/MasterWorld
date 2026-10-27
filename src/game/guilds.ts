@@ -8,17 +8,25 @@
  */
 import { hexToRgb } from '@futuremagic/core';
 import { fill } from '../talk/folk';
+import { cap } from '../talk/townTalk';
+import { compass } from '../vgm/dungeons';
 import { houseShape, polyCentroid, signPlace, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { AbilityDef, GuildDef, SettingModule, SkillRankDef, TrainerDef } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
-import { dungeonOf, type DecisionLog } from '../world/decisions';
+import { dungeonOf, type DecisionLog, type RetreatDecision } from '../world/decisions';
 import type { Character } from './character';
 
 /** One guild's house in a town. */
 export interface GuildHouse {
   readonly guild: GuildDef;
+  /** Its house (for a master out on the land, `near: 'out'`: where the household lives). */
   readonly b: TownBuilding;
+  /** A master's own place out on the land (C3: the warden's tower), where they stand and teach. */
+  readonly out?: RetreatDecision;
 }
+
+/** Where a guild's master is found: their place out on the land, else the house. */
+export const whereOf = (h: GuildHouse): { readonly x: number; readonly z: number } => h.out ?? { x: h.b.cx, z: h.b.cz };
 
 /** Lessons stop this far below a rank's top: the last points of every rank come by use (D49). */
 export const EARN = 5;
@@ -28,30 +36,34 @@ const STANDING_RANK = 4, STANDING_TASK = 15;
 const APART = 30;
 
 /** The guild houses of a town (none in a town too small for any). */
-export function guildHouses(plan: TownPlan, size: GuildDef['sizes'][number], setting: Pick<SettingModule, 'guilds'>): GuildHouse[] {
-  const taken = new Set<number>(), out: GuildHouse[] = [];
+export function guildHouses(plan: TownPlan, size: GuildDef['sizes'][number], setting: Pick<SettingModule, 'guilds'>, out: readonly RetreatDecision[] = []): GuildHouse[] {
+  const taken = new Set<number>(), houses: GuildHouse[] = [];
   // Plain homes with somebody grown-up in them.
   const homes = plan.buildings.filter((b) => (b.kind === 'house' || b.kind === 'cottage') && !b.trade && b.household >= 2);
   const [mx, mz] = polyCentroid(plan.market);
   for (const guild of setting.guilds ?? []) {
     if (!guild.sizes.includes(size)) continue;
-    const at = anchorOf(plan, guild.near) ?? { x: mx, z: mz };
+    // A master out on the land teaches only where the world gave them their place; the household lives nearest it.
+    const own = guild.near === 'out' ? out.find((r) => r.keeper === guild.keeper) : undefined;
+    if (guild.near === 'out' && !own) continue;
+    const at = own ?? anchorOf(plan, guild.near) ?? { x: mx, z: mz };
     const far = guild.near === 'edge' ? -1 : 1;
     // Not next door to another guild's house (two signs on one corner), unless nothing else is left.
-    const apart = (h: TownBuilding) => out.every((o) => Math.hypot(h.cx - o.b.cx, h.cz - o.b.cz) >= APART);
+    const apart = (h: TownBuilding) => houses.every((o) => Math.hypot(h.cx - o.b.cx, h.cz - o.b.cz) >= APART);
     // A guild with a sign takes a house whose front has wall free for it (the same rule as drawing it).
-    const signed = (h: TownBuilding) => !guild.sign || guild.hidden || !!signPlace(h, houseShape(h))?.flat;
+    const signed = (h: TownBuilding) => !guild.sign || guild.hidden || !!own || !!signPlace(h, houseShape(h))?.flat;
     const free = homes.filter((h) => !taken.has(h.id)), spaced = free.filter(apart);
     const best = [spaced.filter(signed), spaced, free.filter(signed), free].find((l) => l.length) ?? [];
     const b = best.sort((a, c) => far * (Math.hypot(a.cx - at.x, a.cz - at.z) - Math.hypot(c.cx - at.x, c.cz - at.z)) || a.id - c.id)[0];
     if (!b) continue;
     taken.add(b.id);
-    out.push({ guild, b });
+    houses.push({ guild, b, ...(own ? { out: own } : {}) });
   }
-  return out;
+  return houses;
 }
 
 function anchorOf(plan: TownPlan, near: GuildDef['near']): { x: number; z: number } | null {
+  if (near === 'out') return null;
   if (near === 'edge') { const [x, z] = polyCentroid(plan.market); return { x, z }; }
   const b = buildingOf(plan, near);
   return b ? { x: b.cx, z: b.cz } : null;
@@ -60,7 +72,7 @@ function anchorOf(plan: TownPlan, near: GuildDef['near']): { x: number; z: numbe
 /** The shields over the guild houses' doors, by building id (colour 0..255; a hidden house has none). */
 export function guildSigns(houses: readonly GuildHouse[]): Map<number, [number, number, number]> {
   const out = new Map<number, [number, number, number]>();
-  for (const { guild, b } of houses) if (guild.sign && !guild.hidden) out.set(b.id, hexToRgb(parseInt(guild.sign.slice(1), 16)).map((c) => Math.round(c * 255)) as [number, number, number]);
+  for (const { guild, b, out: away } of houses) if (guild.sign && !guild.hidden && !away) out.set(b.id, hexToRgb(parseInt(guild.sign.slice(1), 16)).map((c) => Math.round(c * 255)) as [number, number, number]);
   return out;
 }
 
@@ -230,13 +242,15 @@ export function learnSpell(setting: Pick<SettingModule, 'abilities'>, g: GuildDe
  * one with its way in, which the book now knows (so it goes on the map). `keeperName`: what the house's
  * master is called, if anyone is.
  */
-export function bardTells(setting: Pick<SettingModule, 'bard' | 'skills'>, town: string, houses: readonly GuildHouse[], book: GuildBook, keeperName: (keeper: string) => string | null): string[] {
+export function bardTells(setting: Pick<SettingModule, 'bard' | 'skills'>, town: { readonly id: string; readonly x: number; readonly z: number }, houses: readonly GuildHouse[], book: GuildBook, keeperName: (keeper: string) => string | null): string[] {
   const bard = setting.bard;
   if (!bard) return [];
   const names = (ids: readonly string[]) => ids.map((id) => setting.skills.find((x) => x.id === id)?.name.toLowerCase() ?? id).join(', ');
-  return houses.map(({ guild: g }) => {
-    if (g.hidden) book.tell(houseIn(town, g.keeper));
-    const house = g.name.charAt(0).toUpperCase() + g.name.slice(1);
-    return fill(g.hidden ? bard.tellsHidden : bard.tells, { house, skills: names(g.skills), keeper: keeperName(g.keeper) ?? 'the master', way: g.way ?? '' });
+  return houses.map(({ guild: g, out }) => {
+    if (g.hidden) book.tell(houseIn(town.id, g.keeper));
+    const house = cap(g.name), keeper = keeperName(g.keeper) ?? 'the master';
+    const values = { house, skills: names(g.skills), keeper, way: g.way ?? '', dir: out ? compass(out.x - town.x, out.z - town.z) : '' };
+    if (out && bard.tellsOut) return fill(bard.tellsOut, { ...values, house: g.name, keeper: cap(keeper) });
+    return fill(g.hidden ? bard.tellsHidden : bard.tells, values);
   });
 }

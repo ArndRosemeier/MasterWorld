@@ -204,7 +204,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     const bard = township.bard, inn = buildingOf(town.plan, 'inn');
     if (!bard || !inn) throw new Broke('no bard at an inn to ask where to learn magic');
     walkTo('the inn', ...front(inn));
-    const told = bardTells(setting, town.decision.id, township.guilds, book, (k) => { const m = people.find((p) => p.trade === k); return m ? talk.nameOf(m.id) : null; });
+    const told = bardTells(setting, town.decision, township.guilds, book, (k) => { const m = people.find((p) => p.trade === k); return m ? talk.nameOf(m.id) : null; });
     const h = township.guilds.find(({ guild: g }) => spellsOf(setting, g).length && book.onMap(town.decision.id, g));
     if (!h) throw new Broke(`the bard named no magic teacher (${told.length} houses)`);
     say(`asked the bard where to learn magic: ${told.find((t) => t.toLowerCase().includes(h.guild.name.toLowerCase())) ?? h.guild.name}`);

@@ -555,8 +555,12 @@ export interface GuildDef extends TrainerDef {
   readonly name: string;
   /** In towns of these sizes ('town' is the start town's). */
   readonly sizes: readonly ('hamlet' | 'village' | 'town' | 'capital')[];
-  /** Which plain house it takes: the one nearest the smithy, the inn, or on the town's edge. */
-  readonly near: 'smithy' | 'inn' | 'edge';
+  /**
+   * Which plain house it takes: the one nearest the smithy, the inn, or on the town's edge; `out`: its master
+   * keeps a place of their own out on the land past the fields (a half-ruined tower, C3), and the house
+   * nearest it is only where the household lives.
+   */
+  readonly near: 'smithy' | 'inn' | 'edge' | 'out';
   readonly hidden?: boolean;
   /** For a hidden house: how the bard tells the way in. */
   readonly way?: string;
@@ -589,6 +593,8 @@ export interface BardDef {
   /** How he tells of one house (`{house}`, `{skills}`, `{keeper}`; `{way}` for a hidden one). */
   readonly tells: string;
   readonly tellsHidden: string;
+  /** Of a master out on the land (`near: 'out'`; `{dir}`: which way from the town); none: as `tells`. */
+  readonly tellsOut?: string;
 }
 
 /** A weapon ability on the belt (plan 11.2; Norgo's recipe format comes with milestone 6). */

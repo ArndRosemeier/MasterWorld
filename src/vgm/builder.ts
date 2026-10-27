@@ -5,14 +5,14 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
-import type { Decision, DecisionLog, TownDecision } from '../world/decisions';
+import { sitesIn, type Decision, type DecisionLog, type TownDecision } from '../world/decisions';
 import { findStart, type StartPlace } from '../world/start';
 import { bankSpots, byFreshWater, freshWaterEdge, WATER_REACH } from '../world/freshWater';
 import { Terrain } from '../world/terrain';
 import type { HydroOptions } from '../world/hydro';
 import { holdSite } from '../world/hold';
 import { archNear, type ArchSite } from '../world/volumes';
-import { promiseCellar } from './dungeons';
+import { promiseCellar, retreatSite } from './dungeons';
 
 /** A world ready to build on: the land, the log it was settled with, and where the start is. */
 export interface OpenWorld {
@@ -53,6 +53,12 @@ export function firstDecisions(t: Terrain, home: { x: number; z: number }): Deci
   const people = t.setting.peoples.find((p) => p.hold);
   const hold = town && people ? holdSite(t, town, people.id, people.hold, deriveSeed(t.seed, 'vgm', 'hold', people.id)) : null;
   if (hold) out.push(hold);
+  // The teachers who keep a place of their own past the start town's fields (C3: the warden's tower).
+  for (const g of t.setting.guilds ?? []) {
+    if (!town || g.near !== 'out' || !g.sizes.includes('town')) continue;
+    const r = retreatSite(g.keeper, t.seed, t, town, sitesIn(out, 150));
+    if (r) out.push(r);
+  }
   return out;
 }
 

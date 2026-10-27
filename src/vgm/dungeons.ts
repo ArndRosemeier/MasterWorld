@@ -6,9 +6,9 @@
  * comes from `sketchCellar` (world/dungeon/cellar.ts): hint lines, facts, and who knows them.
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
-import type { TownBuilding } from '@futuremagic/settlement';
+import { farmlandReach, type TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, SettingModule } from '../setting/contract';
-import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate } from '../world/decisions';
+import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate, type RetreatDecision, type TownDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import type { DungeonPlace } from '../world/dungeon/cellar';
 import { setPiecesFor } from '../world/dungeon/setPieces';
@@ -119,17 +119,7 @@ export function promisePlace(kind: LandKind, seed: number, terrain: Terrain, tow
   const n = dungeons.filter((d) => d.template === kind).length + 1;
   const s = deriveSeed(seed, 'vgm', kind, n);
   const { x: tx, z: tz } = town.decision;
-  const away = [...avoid, ...sitesIn(log, 150)];
-  const rule = LAND[kind], [r0, r1] = rule.ring, fit = rule.fit(terrain, s);
-  let best: { x: number; z: number; score: number; yaw?: number } | null = null;
-  for (let k = 0; k < TRIES; k++) {
-    const d = r0 + (r1 - r0) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
-    const x = tx + Math.cos(a) * d, z = tz + Math.sin(a) * d;
-    if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < 3) continue;
-    if (away.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40)) continue;
-    const f = fit(x, z, k);
-    if (f && (!best || f.score > best.score)) best = { x, z, ...f };
-  }
+  const best = spotOnRing(kind, LAND[kind].ring, s, terrain, town.decision, [...avoid, ...sitesIn(log, 150)]);
   if (!best) return null;
   const dx = best.x - tx, dz = best.z - tz;
   // Facing into it is facing away from the town (yaw as the walker's: it faces (−sin, −cos)), unless its ground says otherwise.
@@ -139,6 +129,35 @@ export function promisePlace(kind: LandKind, seed: number, terrain: Terrain, tow
   const knower = houses.reduce((a, b) => (Math.hypot(b.cx - best.x, b.cz - best.z) < Math.hypot(a.cx - best.x, a.cz - best.z) ? b : a));
   const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, kind);
   return { kind: 'dungeon', id: `${kind}-${n}`, template: kind, town: town.decision.id, building: knower.id, site: { x: best.x, z: best.z, yaw }, seed: s, setPiece: piece, danger: dangerAt({ decision: best }, home) };
+}
+
+/**
+ * The best spot for a kind of place on a ring round `at` (metres from it, at least and at most), on dry
+ * ground that fits the kind, away from `avoid`; null if none of the tries fits.
+ */
+function spotOnRing(kind: LandKind, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[]): { x: number; z: number; score: number; yaw?: number } | null {
+  const [r0, r1] = ring, fit = LAND[kind].fit(terrain, s);
+  let best: { x: number; z: number; score: number; yaw?: number } | null = null;
+  for (let k = 0; k < TRIES; k++) {
+    const d = r0 + (r1 - r0) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
+    const x = at.x + Math.cos(a) * d, z = at.z + Math.sin(a) * d;
+    if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < 3) continue;
+    if (avoid.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40)) continue;
+    const f = fit(x, z, k);
+    if (f && (!best || f.score > best.score)) best = { x, z, ...f };
+  }
+  return best;
+}
+
+/**
+ * A teacher's half-ruined tower (C3, D49: a guild with `near: 'out'`): on a rise of level ground a short way
+ * past the town's fields, its door towards the town. Chosen when the world opens, on the bare land.
+ */
+export function retreatSite(keeper: string, seed: number, terrain: Terrain, town: TownDecision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[]): RetreatDecision | null {
+  const fields = town.radius + farmlandReach(town.radius);
+  const best = spotOnRing('tower', [fields + 30, fields + 150], deriveSeed(seed, 'vgm', 'retreat', keeper), terrain, town, avoid);
+  if (!best) return null;
+  return { kind: 'retreat', id: `retreat-${keeper}`, keeper, town: town.id, x: best.x, z: best.z, yaw: Math.atan2(-(best.x - town.x), -(best.z - town.z)) };
 }
 
 /** A barrow promised out on the land near the town (`promisePlace`). */
