@@ -106,6 +106,17 @@ const SESSIONS = [
   ] },
   { id: 'inn', query: `${still}&hour=20&room=inn`, shots: [{ name: 'inn' }] },
   { id: 'talk', query: `${still}&hour=20&talk=inn&topics=news`, shots: [{ name: 'talk' }] },
+  // Out on the land (gate B): a hamlet the VGM opened, then halfway along the longest road, looking along it.
+  { id: 'hamlet', query: `${still}&hour=11&weather=fair&site=hamlet`, shots: [
+    { name: 'hamlet' },
+    { name: 'road', act: (p) => p.evaluate(() => {
+      const g = window.game, roads = g.terrain.roads.roads;
+      const r = roads.reduce((a, b) => (b.pts.length > a.pts.length ? b : a));
+      const i = Math.floor(r.pts.length / 6) * 3, x = r.pts[i], z = r.pts[i + 2], nx = r.pts[i + 3], nz = r.pts[i + 5];
+      g.player.teleport(x, undefined, z, Math.atan2(nx - x, nz - z) + Math.PI);
+    }) },
+  ] },
+  { id: 'village', query: `${still}&hour=16&weather=fair&site=village`, shots: [{ name: 'village' }] },
   // The dwarves' hold (plan 11.6): before its gate as a stranger, the wardens calling out.
   { id: 'hold', query: `${still}&hour=15&weather=fair&hold=stranger`, shots: [{ name: 'hold' }] },
 ];
