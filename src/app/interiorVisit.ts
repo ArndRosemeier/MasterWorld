@@ -7,7 +7,7 @@
  * lit) and the eye adapts. The sun that comes in is thrown about the room (game/roomLight.ts): its
  * value eases as the sun moves and is gone at night.
  */
-import { HATCH_RAILS_UP, HATCH_RUNG, HATCH_RUNG_IN, HATCH_SHAFT, hatchSides, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
+import { hatchLadderHalfWidth, HATCH_RAILS_UP, HATCH_RUNG, HATCH_RUNG_IN, HATCH_SHAFT, hatchSides, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { hatchOf, openHouse, type OpenHouse } from '../world/townMesh';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
 import { guildSigns } from '../game/guilds';
@@ -113,7 +113,7 @@ export class InteriorVisit {
     const b = door.b, plan = house.plan;
     this.open = { door, b, plan, walk: houseWalk(b, plan), flow: new RoomFlow(plan) };
     this.placed = null;
-    await this.view.drawOpen(b, house.mesh, this.towns.viewOf(door.town.id), house.lid);
+    await this.view.drawOpen(b, house.mesh, this.towns.viewOf(door.town.id), house.lid, house.ladderTop);
     return this.open;
   }
 
@@ -205,10 +205,10 @@ export class InteriorVisit {
    */
   private wayDown(o: Open, f: InteriorFixture): HatchWay {
     const { ladder: [da, db], hinge: hs } = hatchSides(o.plan, f);
-    const half = Math.abs(da) * f.w / 2 + Math.abs(db) * f.d / 2, across = Math.abs(db) * f.w / 2 + Math.abs(da) * f.d / 2;
+    const half = Math.abs(da) * f.w / 2 + Math.abs(db) * f.d / 2;
     const fr = o.walk.frame, [cx, cz] = fr.toWorld(f.a, f.b), [ex, ez] = fr.toWorld(f.a + da, f.b + db);
     const nx = ex - cx, nz = ez - cz, floor = o.walk.floorAt(f.a, f.b, f.storey).y;
-    const ladder: Ladder = { x: cx + nx * (half - HATCH_RUNG_IN), z: cz + nz * (half - HATCH_RUNG_IN), nx, nz, lo: floor - HATCH_SHAFT, hi: floor + HATCH_RAILS_UP, floor, halfWidth: Math.min(0.3, across - 0.12), rung: HATCH_RUNG, rim: true };
+    const ladder: Ladder = { x: cx + nx * (half - HATCH_RUNG_IN), z: cz + nz * (half - HATCH_RUNG_IN), nx, nz, lo: floor - HATCH_SHAFT, hi: floor + HATCH_RAILS_UP, floor, halfWidth: hatchLadderHalfWidth(f, [da, db]), rung: HATCH_RUNG, rim: true };
     const [hx, hz] = fr.toWorld(f.a + hs[0], f.b + hs[1]), sx = hx - cx, sz = hz - cz, out = Math.abs(hs[0]) * f.w / 2 + Math.abs(hs[1]) * f.d / 2;
     const view = this.view, hinge = { x: cx + sx * out, y: floor, z: cz + sz * out };
     // Up from the hinge: the lid's free edge rises and swings over towards the hinge.
