@@ -1,0 +1,123 @@
+seed (default): oneway, oneway, oneway (trying 2)
+shots\ways-gpu2\0-oneway-b-00.jpg
+shots\ways-gpu2\0-oneway-b-01.jpg
+shots\ways-gpu2\0-oneway-b-02.jpg
+shots\ways-gpu2\0-oneway-b-03.jpg
+shots\ways-gpu2\0-oneway-b-04.jpg
+shots\ways-gpu2\0-oneway-b-05.jpg
+shots\ways-gpu2\0-oneway-b-06.jpg
+shots\ways-gpu2\0-oneway-b-07.jpg
+shots\ways-gpu2\0-oneway-b-08.jpg
+shots\ways-gpu2\0-oneway-b-09.jpg
+shots\ways-gpu2\0-oneway-b-10.jpg
+shots\ways-gpu2\0-oneway-b-11.jpg
+shots\ways-gpu2\0-oneway-b-12.jpg
+shots\ways-gpu2\0-oneway-b-13.jpg
+shots\ways-gpu2\0-oneway-b-14.jpg
+shots\ways-gpu2\0-oneway-b-15.jpg
+shots\ways-gpu2\0-oneway-b-16.jpg
+way 7 (oneway) from side -1: opened false · turned 0.00 rad · piece 30720.02 -> 30720.02 m along the way · bar moved 0.00 m, ends 1.17 m up, 30720.12 along
+FAIL way 7 (oneway) did not open from either side
+shots\ways-gpu2\1-oneway-a-00.jpg
+shots\ways-gpu2\1-oneway-a-01.jpg
+shots\ways-gpu2\1-oneway-a-02.jpg
+shots\ways-gpu2\1-oneway-a-03.jpg
+shots\ways-gpu2\1-oneway-a-04.jpg
+shots\ways-gpu2\1-oneway-a-05.jpg
+shots\ways-gpu2\1-oneway-a-06.jpg
+shots\ways-gpu2\1-oneway-a-07.jpg
+shots\ways-gpu2\1-oneway-a-08.jpg
+shots\ways-gpu2\1-oneway-a-09.jpg
+shots\ways-gpu2\1-oneway-a-10.jpg
+shots\ways-gpu2\1-oneway-a-11.jpg
+shots\ways-gpu2\1-oneway-a-12.jpg
+shots\ways-gpu2\1-oneway-a-13.jpg
+shots\ways-gpu2\1-oneway-a-14.jpg
+shots\ways-gpu2\1-oneway-a-15.jpg
+shots\ways-gpu2\1-oneway-a-16.jpg
+way 13 (oneway) from side 1: opened true · turned 1.50 rad · piece -30719.98 -> -30720.65 m along the way · bar moved 1.87 m, ends 0.14 m up, -30718.80 along
+seed ways1: oneway, secret, oneway (trying 1)
+shots\ways-gpu2\2-secret-a-00.jpg
+shots\ways-gpu2\2-secret-a-01.jpg
+shots\ways-gpu2\2-secret-a-02.jpg
+shots\ways-gpu2\2-secret-a-03.jpg
+shots\ways-gpu2\2-secret-a-04.jpg
+shots\ways-gpu2\2-secret-a-05.jpg
+shots\ways-gpu2\2-secret-a-06.jpg
+shots\ways-gpu2\2-secret-a-07.jpg
+shots\ways-gpu2\2-secret-a-08.jpg
+shots\ways-gpu2\2-secret-a-09.jpg
+shots\ways-gpu2\2-secret-a-10.jpg
+shots\ways-gpu2\2-secret-a-11.jpg
+shots\ways-gpu2\2-secret-a-12.jpg
+shots\ways-gpu2\2-secret-a-13.jpg
+shots\ways-gpu2\2-secret-a-14.jpg
+shots\ways-gpu2\2-secret-a-15.jpg
+shots\ways-gpu2\2-secret-a-16.jpg
+way 9 (secret) from side 1: opened true · turned 1.50 rad · piece -37120.00 -> -37120.65 m along the way
+seed ways2: oneway (trying 0)
+seed ways3: oneway (trying 0)
+seed ways4: locked, oneway (trying 1)
+shots\ways-gpu2\3-locked-a-00.jpg
+shots\ways-gpu2\3-locked-a-01.jpg
+shots\ways-gpu2\3-locked-a-02.jpg
+shots\ways-gpu2\3-locked-a-03.jpg
+shots\ways-gpu2\3-locked-a-04.jpg
+shots\ways-gpu2\3-locked-a-05.jpg
+shots\ways-gpu2\3-locked-a-06.jpg
+shots\ways-gpu2\3-locked-a-07.jpg
+shots\ways-gpu2\3-locked-a-08.jpg
+shots\ways-gpu2\3-locked-a-09.jpg
+shots\ways-gpu2\3-locked-a-10.jpg
+shots\ways-gpu2\3-locked-a-11.jpg
+shots\ways-gpu2\3-locked-a-12.jpg
+shots\ways-gpu2\3-locked-a-13.jpg
+shots\ways-gpu2\3-locked-a-14.jpg
+shots\ways-gpu2\3-locked-a-15.jpg
+shots\ways-gpu2\3-locked-a-16.jpg
+way 1 (locked) from side 1: opened true · turned 1.50 rad · piece 23040.00 -> 23039.35 m along the way
+FAIL way 1 (locked) opened towards the hero (side 1)
+seed ways5: oneway (trying 0)
+seed ways6: secret, oneway (trying 1)
+shots\ways-gpu2\4-secret-a-00.jpg
+shots\ways-gpu2\4-secret-a-01.jpg
+shots\ways-gpu2\4-secret-a-02.jpg
+shots\ways-gpu2\4-secret-a-03.jpg
+shots\ways-gpu2\4-secret-a-04.jpg
+shots\ways-gpu2\4-secret-a-05.jpg
+shots\ways-gpu2\4-secret-a-06.jpg
+shots\ways-gpu2\4-secret-a-07.jpg
+shots\ways-gpu2\4-secret-a-08.jpg
+shots\ways-gpu2\4-secret-a-09.jpg
+shots\ways-gpu2\4-secret-a-10.jpg
+shots\ways-gpu2\4-secret-a-11.jpg
+shots\ways-gpu2\4-secret-a-12.jpg
+shots\ways-gpu2\4-secret-a-13.jpg
+shots\ways-gpu2\4-secret-a-14.jpg
+shots\ways-gpu2\4-secret-a-15.jpg
+shots\ways-gpu2\4-secret-a-16.jpg
+way 7 (secret) from side 1: opened true · turned 1.50 rad · piece 19200.00 -> 19199.35 m along the way
+FAIL way 7 (secret) opened towards the hero (side 1)
+seed ways7: locked, oneway (trying 1)
+shots\ways-gpu2\5-locked-a-00.jpg
+shots\ways-gpu2\5-locked-a-01.jpg
+shots\ways-gpu2\5-locked-a-02.jpg
+shots\ways-gpu2\5-locked-a-03.jpg
+shots\ways-gpu2\5-locked-a-04.jpg
+shots\ways-gpu2\5-locked-a-05.jpg
+shots\ways-gpu2\5-locked-a-06.jpg
+shots\ways-gpu2\5-locked-a-07.jpg
+shots\ways-gpu2\5-locked-a-08.jpg
+shots\ways-gpu2\5-locked-a-09.jpg
+shots\ways-gpu2\5-locked-a-10.jpg
+shots\ways-gpu2\5-locked-a-11.jpg
+shots\ways-gpu2\5-locked-a-12.jpg
+shots\ways-gpu2\5-locked-a-13.jpg
+shots\ways-gpu2\5-locked-a-14.jpg
+shots\ways-gpu2\5-locked-a-15.jpg
+shots\ways-gpu2\5-locked-a-16.jpg
+way 6 (locked) from side 1: opened true · turned 1.50 rad · piece 11520.00 -> 11519.35 m along the way
+FAIL way 6 (locked) opened towards the hero (side 1)
+kinds tried: oneway ×2, secret ×2, locked ×2
+shaders 88 warm-up + 21 later · worst 10 ms · policy ok
+ways: FAILED
