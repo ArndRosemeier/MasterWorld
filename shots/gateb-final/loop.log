@@ -1,0 +1,499 @@
+
+> masterworld@0.0.0 loop
+> node --import tsx tools/loop/evening.ts
+
+
+== masterworld: 6 evenings
+day 0 08:00  the VGM promises cellar cellar-2
+day 0 08:00  evening 1: power 18.8, 14 copper, 3 in the pack
+day 0 08:00  a new hero on the market: person 61 comes over and tells of cellar-1
+day 0 08:05  walked to the cottage (cellar, smugglers) (68 m, 13 s)
+day 0 08:40  cleared the cottage (cellar, smugglers): 2 killed, 0 spared, 4 searched, 0 potions, health 91%
+day 0 08:40  walked to Orla Ravel's door (0 m, 0 s)
+day 0 08:40  the VGM promises cellar cellar-3
+day 0 08:40  told Orla Ravel that the cottage (cellar, smugglers) is safe: paid 166 copper, and heard a rumour of cellar-3
+day 0 08:40  brought back 9 finds and 320 copper
+day 0 08:50  walked to the smith's (128 m, 25 s)
+day 0 08:50  sold to the smith's for 39 copper
+day 0 08:50  the smith mends 4 things for 5 copper
+day 0 08:56  walked to the trader at the market (77 m, 15 s)
+day 0 08:57  walked to the innkeeper's (15 m, 3 s)
+day 0 09:04  walked to the smith's (91 m, 18 s)
+day 0 09:04  bought Round shield from the smith: power 19.3 -> 23.6
+day 0 09:07  walked to the Hall of Arms (32 m, 6 s)
+day 0 09:07  the Hall of Arms opens shields rank 0 for 40 copper
+day 0 09:07  walked to the master-at-arms's (0 m, 0 s)
+day 0 11:07  a lesson in armour from the master-at-arms for 145 copper: 13
+day 0 11:13  walked to the inn (89 m, 17 s)
+day 0 11:13  took a room for 16 copper; wakes at 7:00 on day 1
+day 1 07:00  evening 2: power 23.6, 72 copper, 5 in the pack
+day 1 07:00  follows the rumour of cellar-3
+day 1 07:07  walked to the smithy (cellar, goblins) (91 m, 18 s)
+day 1 08:09  cleared the smithy (cellar, goblins): 6 killed, 0 spared, 7 searched, 2 potions, health 83%
+day 1 08:09  walked to Harbek Coalbeard's door (0 m, 0 s)
+day 1 08:09  the VGM promises barrow barrow-1
+day 1 08:09  told Harbek Coalbeard that the smithy (cellar, goblins) is safe: paid 190 copper, and heard a rumour of barrow-1
+day 1 08:09  brought back 7 finds and 377 copper
+day 1 08:09  walked to the smith's (0 m, 0 s)
+day 1 08:09  sold to the smith's for 56 copper
+day 1 08:09  the smith mends 5 things for 12 copper
+day 1 08:15  walked to the trader at the market (77 m, 15 s)
+day 1 08:16  walked to the innkeeper's (15 m, 3 s)
+day 1 08:23  walked to the smith's (91 m, 18 s)
+day 1 08:23  bought Arming sword from the smith: power 25.7 -> 26.9
+day 1 08:30  walked to the inn (91 m, 18 s)
+day 1 08:30  took a room for 16 copper; wakes at 7:00 on day 2
+day 2 07:00  evening 3: power 26.9, 116 copper, 6 in the pack
+day 2 07:00  follows the rumour of barrow-1
+day 2 08:26  walked to the barrow south-east of the town (barrow, restless-dead) (1125 m, 216 s)
+day 2 08:55  cleared the barrow south-east of the town (barrow, restless-dead): 4 killed, 0 spared, 6 searched, 2 potions, health 52%
+day 2 10:15  walked to Harbek Coalbeard's door (1035 m, 199 s)
+day 2 10:15  the VGM promises new dwellers in cellar-1
+day 2 10:15  told Harbek Coalbeard that the barrow south-east of the town (barrow, restless-dead) is safe: paid 232 copper, and heard a rumour of move-in-1
+day 2 10:15  brought back 11 finds and 407 copper
+day 2 10:15  walked to the smith's (0 m, 0 s)
+day 2 10:15  sold to the smith's for 51 copper
+day 2 10:15  the smith mends 5 things for 13 copper
+day 2 10:21  walked to the trader at the market (77 m, 15 s)
+day 2 10:21  sold to the trader at the market for 52 copper
+day 2 10:22  walked to the innkeeper's (16 m, 3 s)
+day 2 10:29  walked to the smith's (91 m, 18 s)
+day 2 10:29  bought Mail shirt from the smith: power 28.3 -> 31.3
+day 2 10:36  walked to the inn (91 m, 17 s)
+day 2 10:36  took a room for 16 copper; wakes at 7:00 on day 3
+day 3 07:00  evening 4: power 31.3, 38 copper, 5 in the pack
+day 3 07:00  follows the rumour of move-in-1
+day 3 07:04  walked to the cottage (cellar, rats) (61 m, 12 s)
+day 3 07:36  cleared the cottage (cellar, rats): 5 killed, 0 spared, 6 searched, 0 potions, health 97%
+day 3 07:36  walked to Orla Ravel's door (0 m, 0 s)
+day 3 07:36  the VGM promises new dwellers in cellar-3
+day 3 07:36  told Orla Ravel that the cottage (cellar, rats) is safe: paid 100 copper, and heard a rumour of move-in-2
+day 3 07:36  brought back 11 finds and 219 copper
+day 3 07:46  walked to the smith's (128 m, 25 s)
+day 3 07:46  sold to the smith's for 216 copper
+day 3 07:46  the smith mends 5 things for 10 copper
+day 3 07:52  walked to the trader at the market (77 m, 15 s)
+day 3 07:52  sold to the trader at the market for 3 copper
+day 3 07:53  walked to the innkeeper's (15 m, 3 s)
+day 3 08:00  walked to the smith's (91 m, 18 s)
+day 3 08:00  bought Stout iron cap from the smith: power 31.5 -> 33.1
+day 3 08:07  walked to the inn (91 m, 18 s)
+day 3 08:07  took a room for 16 copper; wakes at 7:00 on day 4
+day 4 07:00  evening 5: power 33.1, 105 copper, 5 in the pack
+day 4 07:00  follows the rumour of move-in-2
+day 4 07:07  walked to the smithy (cellar, rats) (91 m, 18 s)
+day 4 07:52  cleared the smithy (cellar, rats): 8 killed, 0 spared, 8 searched, 0 potions, health 83%
+day 4 07:52  walked to Harbek Coalbeard's door (0 m, 0 s)
+day 4 07:52  the VGM promises new dwellers in barrow-1
+day 4 07:52  told Harbek Coalbeard that the smithy (cellar, rats) is safe: paid 144 copper, and heard a rumour of move-in-3
+day 4 07:52  brought back 11 finds and 311 copper
+day 4 07:52  walked to the smith's (0 m, 0 s)
+day 4 07:52  sold to the smith's for 238 copper
+day 4 07:52  the smith mends 5 things for 40 copper
+day 4 07:58  walked to the trader at the market (77 m, 15 s)
+day 4 07:58  sold to the trader at the market for 32 copper
+day 4 07:59  walked to the innkeeper's (16 m, 3 s)
+day 4 08:06  walked to the Hall of Arms (90 m, 17 s)
+day 4 08:06  the Hall of Arms opens blades rank 1 for 160 copper
+day 4 08:06  walked to the master-at-arms's (0 m, 0 s)
+day 4 10:06  a lesson in armour from the master-at-arms for 252 copper: 20
+day 4 10:13  walked to the inn (89 m, 17 s)
+day 4 10:13  took a room for 16 copper; wakes at 7:00 on day 5
+day 5 07:00  evening 6: power 33.8, 113 copper, 6 in the pack
+day 5 07:00  follows the rumour of move-in-3
+day 5 08:26  walked to the barrow south-east of the town (barrow, grave-robbers) (1125 m, 216 s)
+day 5 08:40  cleared the barrow south-east of the town (barrow, grave-robbers): 2 killed, 0 spared, 5 searched, 0 potions, health 83%
+day 5 09:59  walked to Harbek Coalbeard's door (1035 m, 199 s)
+day 5 09:59  the VGM promises cellar cellar-5
+day 5 09:59  told Harbek Coalbeard that the barrow south-east of the town (barrow, grave-robbers) is safe: paid 166 copper, and heard a rumour of cellar-5
+day 5 09:59  brought back 14 finds and 373 copper
+day 5 09:59  walked to the smith's (0 m, 0 s)
+day 5 09:59  sold to the smith's for 61 copper
+day 5 09:59  the smith mends 5 things for 8 copper
+day 5 10:05  walked to the trader at the market (77 m, 15 s)
+day 5 10:05  sold to the trader at the market for 51 copper
+day 5 10:07  walked to the innkeeper's (16 m, 3 s)
+day 5 10:14  walked to the master-at-arms's (90 m, 17 s)
+day 5 12:14  a lesson in blades from the master-at-arms for 347 copper: 25
+day 5 12:20  walked to the inn (89 m, 17 s)
+day 5 12:20  took a room for 16 copper; wakes at 7:00 on day 6
+day 6 07:00  heard of cellar-2 from person 61 (the innkeeper)
+day 6 07:00  the next lead is cellar-2
+passed: 6 places cleared, 0 falls, 799 copper earned, bought Round shield, Arming sword, Mail shirt, Stout iron cap, lessons armour 13, armour 20, blades 25, opened shields 0, blades 1, spent 266/289/443/307/412/347 a night, purse 114, power 18.8 -> 34.1; 30 min played in 4.6 s
+
+== alpha: 6 evenings
+day 0 08:00  the VGM promises tower tower-1
+day 0 08:00  evening 1: power 18.8, 14 copper, 3 in the pack
+day 0 08:00  a new hero on the market: person 54 comes over and tells of cellar-1
+day 0 08:05  walked to the smithy (cellar, goblins) (67 m, 13 s)
+day 0 08:49  cleared the smithy (cellar, goblins): 4 killed, 0 spared, 5 searched, 0 potions, health 85%
+day 0 08:49  walked to Fargrim Anvilmar's door (0 m, 0 s)
+day 0 08:49  the VGM promises cellar cellar-3
+day 0 08:49  told Fargrim Anvilmar that the smithy (cellar, goblins) is safe: paid 148 copper, and heard a rumour of cellar-3
+day 0 08:49  brought back 7 finds and 229 copper
+day 0 08:49  walked to the smith's (0 m, 0 s)
+day 0 08:49  sold to the smith's for 175 copper
+day 0 08:49  the smith mends 4 things for 6 copper
+day 0 08:55  walked to the trader at the market (72 m, 14 s)
+day 0 08:55  sold to the trader at the market for 2 copper
+day 0 08:57  walked to the innkeeper's (21 m, 4 s)
+day 0 09:03  walked to the smith's (81 m, 16 s)
+day 0 09:03  bought Round shield of the Wall from the smith: power 19.7 -> 24.3
+day 0 09:05  walked to the Hall of Arms (25 m, 5 s)
+day 0 09:05  the Hall of Arms opens shields rank 0 for 40 copper
+day 0 09:10  walked to the inn (71 m, 14 s)
+day 0 09:10  took a room for 16 copper; wakes at 7:00 on day 1
+day 1 07:00  evening 2: power 24.3, 136 copper, 3 in the pack
+day 1 07:00  follows the rumour of cellar-3
+day 1 07:04  walked to the tailor's workshop (cellar, rats) (55 m, 11 s)
+day 1 07:28  cleared the tailor's workshop (cellar, rats): 5 killed, 0 spared, 6 searched, 0 potions, health 83%
+day 1 07:28  walked to Cedric Fallow's door (0 m, 0 s)
+day 1 07:28  the VGM promises cellar cellar-4
+day 1 07:28  told Cedric Fallow that the tailor's workshop (cellar, rats) is safe: paid 100 copper, and heard a rumour of cellar-4
+day 1 07:28  brought back 9 finds and 342 copper
+day 1 07:38  walked to the smith's (122 m, 24 s)
+day 1 07:38  sold to the smith's for 27 copper
+day 1 07:38  the smith mends 5 things for 5 copper
+day 1 07:43  walked to the trader at the market (72 m, 14 s)
+day 1 07:43  sold to the trader at the market for 47 copper
+day 1 07:45  walked to the innkeeper's (21 m, 4 s)
+day 1 07:51  walked to the smith's (81 m, 16 s)
+day 1 07:51  bought Stout iron cap from the smith: power 24.6 -> 26.3
+day 1 07:57  walked to the inn (79 m, 15 s)
+day 1 07:57  took a room for 16 copper; wakes at 7:00 on day 2
+day 2 07:00  evening 3: power 26.3, 68 copper, 5 in the pack
+day 2 07:00  follows the rumour of cellar-4
+day 2 07:05  walked to the cooper's workshop (cellar, smugglers) (74 m, 14 s)
+day 2 07:47  cleared the cooper's workshop (cellar, smugglers): 3 killed, 0 spared, 6 searched, 0 potions, health 93%
+day 2 07:47  walked to Tamsin Tilley's door (0 m, 0 s)
+day 2 07:47  the VGM promises barrow barrow-1
+day 2 07:47  told Tamsin Tilley that the cooper's workshop (cellar, smugglers) is safe: paid 198 copper, and heard a rumour of barrow-1
+day 2 07:47  brought back 14 finds and 397 copper
+day 2 07:48  walked to the smith's (11 m, 2 s)
+day 2 07:48  sold to the smith's for 108 copper
+day 2 07:48  the smith mends 5 things for 8 copper
+day 2 07:53  walked to the trader at the market (72 m, 14 s)
+day 2 07:53  sold to the trader at the market for 47 copper
+day 2 07:55  walked to the innkeeper's (22 m, 4 s)
+day 2 08:01  walked to the smith's (81 m, 16 s)
+day 2 08:01  bought Mail shirt from the smith: power 27 -> 30.1
+day 2 08:07  walked to the inn (79 m, 15 s)
+day 2 08:07  took a room for 16 copper; wakes at 7:00 on day 3
+day 3 07:00  evening 4: power 30.1, 85 copper, 7 in the pack
+day 3 07:00  follows the rumour of barrow-1
+day 3 08:37  walked to the barrow west of the town (barrow, rats) (1254 m, 244 s)
+day 3 09:33  cleared the barrow west of the town (barrow, rats): 5 killed, 0 spared, 8 searched, 0 potions, health 100%
+day 3 11:06  walked to Lorcan Crane's door (1201 m, 234 s)
+day 3 11:06  the VGM promises cave cave-1
+day 3 11:06  told Lorcan Crane that the barrow west of the town (barrow, rats) is safe: paid 109 copper, and heard a rumour of cave-1
+day 3 11:06  brought back 14 finds and 286 copper
+day 3 11:16  walked to the smith's (128 m, 25 s)
+day 3 11:16  sold to the smith's for 117 copper
+day 3 11:16  the smith mends 5 things for 23 copper
+day 3 11:22  walked to the trader at the market (72 m, 14 s)
+day 3 11:22  sold to the trader at the market for 15 copper
+day 3 11:23  walked to the innkeeper's (21 m, 4 s)
+day 3 11:30  walked to the smith's (81 m, 16 s)
+day 3 11:30  bought Arming sword from the smith: power 30.5 -> 31.7
+day 3 11:36  walked to the inn (79 m, 15 s)
+day 3 11:36  took a room for 16 copper; wakes at 7:00 on day 4
+day 4 07:00  evening 5: power 31.7, 78 copper, 9 in the pack
+day 4 07:00  follows the rumour of cave-1
+day 4 08:51  walked to the cave north of the town (cave, rats) (1432 m, 279 s)
+day 4 09:41  cleared the cave north of the town (cave, rats): 5 killed, 0 spared, 5 searched, 0 potions, health 82%
+day 4 11:26  walked to Orla Brook's door (1350 m, 263 s)
+day 4 11:26  the VGM promises barrow barrow-2
+day 4 11:26  told Orla Brook that the cave north of the town (cave, rats) is safe: paid 100 copper, and heard a rumour of barrow-2
+day 4 11:26  brought back 13 finds and 243 copper
+day 4 11:34  walked to the smith's (102 m, 20 s)
+day 4 11:34  sold to the smith's for 127 copper
+day 4 11:34  the smith mends 5 things for 45 copper
+day 4 11:40  walked to the trader at the market (72 m, 14 s)
+day 4 11:41  walked to the innkeeper's (21 m, 4 s)
+day 4 11:48  walked to the smith's (81 m, 16 s)
+day 4 11:48  bought Quiet Stout boots of Shadows from the smith: power 32.5 -> 33.5
+day 4 11:54  walked to the inn (79 m, 15 s)
+day 4 11:54  took a room for 16 copper; wakes at 7:00 on day 5
+day 5 07:00  evening 6: power 33.5, 93 copper, 11 in the pack
+day 5 07:00  follows the rumour of barrow-2
+day 5 08:24  walked to the barrow north-east of the town (barrow, restless-dead) (1078 m, 211 s)
+day 5 09:23  cleared the barrow north-east of the town (barrow, restless-dead): 6 killed, 0 spared, 11 searched, 0 potions, health 63%
+day 5 10:39  walked to Orla Brook's door (976 m, 191 s)
+day 5 10:39  the VGM promises new dwellers in cellar-4
+day 5 10:39  told Orla Brook that the barrow north-east of the town (barrow, restless-dead) is safe: paid 298 copper, and heard a rumour of move-in-1
+day 5 10:39  brought back 23 finds and 515 copper
+day 5 10:47  walked to the smith's (103 m, 20 s)
+day 5 10:47  sold to the smith's for 316 copper
+day 5 10:47  the smith mends 5 things for 49 copper
+day 5 10:53  walked to the trader at the market (72 m, 14 s)
+day 5 10:53  sold to the trader at the market for 84 copper
+day 5 10:55  walked to the innkeeper's (22 m, 4 s)
+day 5 11:00  walked to the Hall of Arms (70 m, 14 s)
+day 5 11:00  the Hall of Arms opens blades rank 1 for 160 copper
+day 5 11:00  walked to the master-at-arms's (0 m, 0 s)
+day 5 13:00  a lesson in blades from the master-at-arms for 368 copper: 26
+day 5 13:00  walked to the master-at-arms's (0 m, 0 s)
+day 5 15:00  a lesson in armour from the master-at-arms for 235 copper: 19
+day 5 15:05  walked to the inn (70 m, 13 s)
+day 5 15:05  took a room for 16 copper; wakes at 7:00 on day 6
+day 6 07:00  heard of tower-1 from person 54 (the innkeeper)
+day 6 07:00  the next lead is tower-1
+passed: 6 places cleared, 0 falls, 1065 copper earned, bought Round shield of the Wall, Stout iron cap, Mail shirt, Arming sword, Quiet Stout boots of Shadows, lessons blades 26, armour 19, opened shields 0, blades 1, spent 248/327/443/301/216/763 a night, purse 87, power 18.8 -> 35.2; 42 min played in 10.3 s
+
+== x4: 6 evenings
+day 0 08:00  the VGM promises barrow barrow-1
+day 0 08:00  evening 1: power 18.8, 14 copper, 3 in the pack
+day 0 08:00  a new hero on the market: person 79 comes over and tells of cellar-1
+day 0 08:07  walked to the cottage (cellar, rats) (94 m, 18 s)
+day 0 08:31  cleared the cottage (cellar, rats): 7 killed, 0 spared, 7 searched, 0 potions, health 84%
+day 0 08:31  walked to Nell Mossop's door (0 m, 0 s)
+day 0 08:31  the VGM promises cellar cellar-3
+day 0 08:31  told Nell Mossop that the cottage (cellar, rats) is safe: paid 97 copper, and heard a rumour of cellar-3
+day 0 08:31  brought back 8 finds and 152 copper
+day 0 08:38  walked to the smith's (92 m, 18 s)
+day 0 08:38  sold to the smith's for 173 copper
+day 0 08:38  the smith mends 4 things for 5 copper
+day 0 08:44  walked to the trader at the market (73 m, 14 s)
+day 0 08:44  sold to the trader at the market for 17 copper
+day 0 08:46  walked to the innkeeper's (24 m, 5 s)
+day 0 08:51  walked to the smith's (72 m, 14 s)
+day 0 08:51  bought Round shield from the smith: power 19.1 -> 23.4
+day 0 08:53  walked to the Hall of Arms (17 m, 3 s)
+day 0 08:53  the Hall of Arms opens shields rank 0 for 40 copper
+day 0 08:53  walked to the master-at-arms's (0 m, 0 s)
+day 0 10:53  a lesson in armour from the master-at-arms for 145 copper: 13
+day 0 10:57  walked to the inn (54 m, 10 s)
+day 0 10:57  took a room for 16 copper; wakes at 7:00 on day 1
+day 1 07:00  evening 2: power 23.4, 55 copper, 4 in the pack
+day 1 07:00  follows the rumour of cellar-3
+day 1 07:08  walked to the cottage (cellar, smugglers) (109 m, 21 s)
+day 1 08:04  cleared the cottage (cellar, smugglers): 3 killed, 0 spared, 5 searched, 0 potions, health 76%
+day 1 08:04  walked to Emeric Hearth's door (0 m, 0 s)
+day 1 08:04  the VGM promises tower tower-1
+day 1 08:04  told Emeric Hearth that the cottage (cellar, smugglers) is safe: paid 198 copper, and heard a rumour of tower-1
+day 1 08:04  brought back 10 finds and 391 copper
+day 1 08:17  walked to the smith's (167 m, 32 s)
+day 1 08:17  sold to the smith's for 548 copper
+day 1 08:17  the smith mends 5 things for 7 copper
+day 1 08:22  walked to the trader at the market (73 m, 14 s)
+day 1 08:22  sold to the trader at the market for 15 copper
+day 1 08:24  walked to the innkeeper's (24 m, 5 s)
+day 1 08:30  walked to the smith's (72 m, 14 s)
+day 1 08:30  bought Mail shirt from the smith: power 24.6 -> 27.6
+day 1 08:31  walked to the master-at-arms's (17 m, 3 s)
+day 1 08:31  walked to the master-at-arms's (0 m, 0 s)
+day 1 10:31  a lesson in armour from the master-at-arms for 173 copper: 15
+day 1 12:31  a lesson in armour from the master-at-arms for 188 copper: 16
+day 1 12:31  walked to the master-at-arms's (0 m, 0 s)
+day 1 14:31  a lesson in shields from the master-at-arms for 97 copper: 9
+day 1 14:35  walked to the inn (54 m, 10 s)
+day 1 14:35  took a room for 16 copper; wakes at 7:00 on day 2
+day 2 07:00  evening 3: power 27.9, 50 copper, 9 in the pack
+day 2 07:00  follows the rumour of tower-1
+day 2 08:33  walked to the old tower east of the town (tower, rats) (1178 m, 234 s)
+day 2 09:24  cleared the old tower east of the town (tower, rats): 8 killed, 0 spared, 10 searched, 0 potions, health 90%
+day 2 10:52  walked to Mirren Stoneway's door (1095 m, 218 s)
+day 2 10:52  the VGM promises cellar cellar-5
+day 2 10:52  told Mirren Stoneway that the old tower east of the town (tower, rats) is safe: paid 113 copper, and heard a rumour of cellar-5
+day 2 10:52  brought back 15 finds and 214 copper
+day 2 10:56  walked to the smith's (61 m, 12 s)
+day 2 10:56  sold to the smith's for 96 copper
+day 2 10:56  the smith mends 5 things for 25 copper
+day 2 11:02  walked to the trader at the market (72 m, 14 s)
+day 2 11:02  sold to the trader at the market for 18 copper
+day 2 11:04  walked to the innkeeper's (24 m, 5 s)
+day 2 11:09  walked to the smith's (72 m, 14 s)
+day 2 11:09  bought Arming sword from the smith: power 28.6 -> 29.8
+day 2 11:15  walked to the inn (72 m, 14 s)
+day 2 11:15  too poor for a room (15 copper)
+day 2 21:15  evening 4: power 29.8, 15 copper, 9 in the pack
+day 2 21:15  follows the rumour of cellar-5
+day 2 21:20  walked to the cottage (cellar, smugglers) (68 m, 13 s)
+day 2 22:09  cleared the cottage (cellar, smugglers): 3 killed, 0 spared, 6 searched, 0 potions, health 85%
+day 2 22:09  walked to Tam Vane's door (0 m, 0 s)
+day 2 22:09  the VGM promises new dwellers in cellar-1
+day 2 22:09  told Tam Vane that the cottage (cellar, smugglers) is safe: paid 198 copper, and heard a rumour of move-in-1
+day 2 22:09  brought back 16 finds and 354 copper
+day 2 22:14  walked to the smith's (74 m, 14 s)
+day 2 22:14  sold to the smith's for 311 copper
+day 2 22:14  the smith mends 5 things for 25 copper
+day 2 22:20  walked to the trader at the market (73 m, 14 s)
+day 2 22:20  sold to the trader at the market for 47 copper
+day 2 22:22  walked to the innkeeper's (24 m, 5 s)
+day 2 22:27  walked to the smith's (72 m, 14 s)
+day 2 22:27  bought Iron cap from the smith: power 30.9 -> 31.9
+day 2 22:29  walked to the master-at-arms's (17 m, 3 s)
+day 2 22:29  walked to the master-at-arms's (0 m, 0 s)
+day 3 00:29  a lesson in armour from the master-at-arms for 235 copper: 19
+day 3 02:29  a lesson in armour from the master-at-arms for 252 copper: 20
+day 3 02:33  walked to the inn (54 m, 10 s)
+day 3 02:33  took a room for 16 copper; wakes at 7:00 on day 3
+day 3 07:00  evening 5: power 32.2, 56 copper, 12 in the pack
+day 3 07:00  follows the rumour of move-in-1
+day 3 07:05  walked to the cottage (cellar, goblins) (72 m, 14 s)
+day 3 07:44  cleared the cottage (cellar, goblins): 5 killed, 0 spared, 6 searched, 0 potions, health 81%
+day 3 07:44  walked to Nell Mossop's door (0 m, 0 s)
+day 3 07:44  the VGM promises cellar cellar-6
+day 3 07:44  told Nell Mossop that the cottage (cellar, goblins) is safe: paid 168 copper, and heard a rumour of cellar-6
+day 3 07:44  brought back 15 finds and 296 copper
+day 3 07:52  walked to the smith's (92 m, 18 s)
+day 3 07:52  sold to the smith's for 44 copper
+day 3 07:52  the smith mends 5 things for 25 copper
+day 3 07:57  walked to the trader at the market (73 m, 14 s)
+day 3 07:59  walked to the innkeeper's (24 m, 5 s)
+day 3 08:05  walked to the smith's (72 m, 14 s)
+day 3 08:05  bought Short sword of the Edge from the smith: power 33 -> 33.5
+day 3 08:10  walked to the inn (72 m, 14 s)
+day 3 08:10  took a room for 16 copper; wakes at 7:00 on day 4
+day 4 07:00  evening 6: power 33.5, 46 copper, 14 in the pack
+day 4 07:00  follows the rumour of cellar-6
+day 4 07:05  walked to the butcher's workshop (cellar, smugglers) (73 m, 14 s)
+day 4 07:54  cleared the butcher's workshop (cellar, smugglers): 3 killed, 0 spared, 5 searched, 0 potions, health 86%
+day 4 07:54  walked to Gwen Stoneway's door (0 m, 0 s)
+day 4 07:54  the VGM promises new dwellers in tower-1
+day 4 07:54  told Gwen Stoneway that the butcher's workshop (cellar, smugglers) is safe: paid 198 copper, and heard a rumour of move-in-2
+day 4 07:54  brought back 19 finds and 378 copper
+day 4 08:05  walked to the smith's (135 m, 26 s)
+day 4 08:05  sold to the smith's for 257 copper
+day 4 08:05  the smith mends 5 things for 18 copper
+day 4 08:10  walked to the trader at the market (73 m, 14 s)
+day 4 08:10  sold to the trader at the market for 14 copper
+day 4 08:12  walked to the innkeeper's (24 m, 5 s)
+day 4 08:14  walked to the trader at the market (23 m, 5 s)
+day 4 08:14  bought Stout boots of the Cat from the trader: power 34.1 -> 34.9
+day 4 08:18  walked to the Hall of Arms (55 m, 11 s)
+day 4 08:18  the Hall of Arms opens blades rank 1 for 160 copper
+day 4 08:18  walked to the master-at-arms's (0 m, 0 s)
+day 4 08:28  walked to the lodge-master's (125 m, 24 s)
+day 4 10:28  a lesson in dodge from the lodge-master for 235 copper: 20
+day 4 10:37  walked to the inn (118 m, 23 s)
+day 4 10:37  took a room for 16 copper; wakes at 7:00 on day 5
+day 5 07:00  heard of barrow-1 from person 79 (the innkeeper)
+day 5 07:00  the next lead is barrow-1
+passed: 6 places cleared, 0 falls, 1540 copper earned, bought Round shield, Mail shirt, Arming sword, Iron cap, Short sword of the Edge, Stout boots of the Cat, lessons armour 13, armour 15, armour 16, shields 9, armour 19, armour 20, dodge 20, opened shields 0, blades 1, spent 266/881/288/615/253/494 a night, purse 121, power 18.8 -> 34.9; 27 min played in 4.3 s
+
+== masterworld: a reckless evening (a fall)
+day 0 08:00  the VGM promises cellar cellar-2
+day 0 08:00  evening 1: power 18.8, 14 copper, 3 in the pack
+day 0 08:00  a new hero on the market: person 61 comes over and tells of cellar-1
+day 0 08:05  walked to the cottage (cellar, smugglers) (68 m, 13 s)
+day 0 08:05  goes down reckless: 7 health, no potions
+day 0 08:11  fell in the cottage (cellar, smugglers) after 0 kills; lost 7 copper, the pack stays below; wakes at the temple
+day 0 18:18  walked to the cottage (cellar, smugglers) (92 m, 18 s)
+day 0 18:18  took up the pack left at the fall (1 thing)
+day 0 19:44  cleared the cottage (cellar, smugglers): 2 killed, 0 spared, 4 searched, 0 potions, health 87%
+day 0 19:44  walked to Orla Ravel's door (0 m, 0 s)
+day 0 19:44  the VGM promises cellar cellar-3
+day 0 19:44  told Orla Ravel that the cottage (cellar, smugglers) is safe: paid 166 copper, and heard a rumour of cellar-3
+day 0 19:44  brought back 6 finds and 319 copper
+day 0 19:53  walked to the smith's (128 m, 25 s)
+day 0 19:53  sold to the smith's for 27 copper
+day 0 19:53  the smith mends 4 things for 7 copper
+day 0 19:59  walked to the trader at the market (77 m, 15 s)
+day 0 20:01  walked to the innkeeper's (15 m, 3 s)
+day 0 20:08  walked to the smith's (91 m, 18 s)
+day 0 20:08  bought Round shield from the smith: power 20.3 -> 24.6
+day 0 20:10  walked to the Hall of Arms (32 m, 6 s)
+day 0 20:10  the Hall of Arms opens shields rank 0 for 40 copper
+day 0 20:20  walked to the lodge-master's (125 m, 24 s)
+day 0 22:20  a lesson in dodge from the lodge-master for 161 copper: 15
+day 0 22:26  walked to the inn (75 m, 15 s)
+day 0 22:26  took a room for 16 copper; wakes at 7:00 on day 1
+day 1 07:00  heard of cellar-2 from person 61 (the innkeeper)
+day 1 07:00  the next lead is cellar-2
+passed: 1 places cleared, 1 falls, 27 copper earned, bought Round shield, lessons dodge 15, opened shields 0, spent 282 a night, purse 41, power 18.8 -> 24.6; 6 min played in 1.1 s
+
+== masterworld: 3 evenings in a village
+day 0 08:00  plays in village region-37, 8421 m from the start (35 buildings)
+day 0 08:00  the VGM promises cellar cellar-2
+day 0 08:00  evening 1: power 18.8, 14 copper, 3 in the pack
+day 0 08:00  a new hero on the market: person 40 comes over and tells of cellar-2
+day 0 08:03  walked to the house (cellar, spiders) (43 m, 8 s)
+day 0 08:29  fell in the house (cellar, spiders) after 1 kills; lost 7 copper, the pack stays below; wakes at the temple
+day 0 18:31  walked to the house (cellar, spiders) (30 m, 6 s)
+day 0 18:58  fell in the house (cellar, spiders) after 1 kills; lost 3 copper, the pack stays below; wakes at the temple
+day 1 05:01  walked to the house (cellar, spiders) (30 m, 6 s)
+day 1 05:01  took up the pack left at the fall (1 thing)
+day 1 05:25  cleared the house (cellar, spiders): 1 killed, 0 spared, 5 searched, 0 potions, health 9%
+day 1 05:25  walked to Piers Hearth's door (0 m, 0 s)
+day 1 05:25  the VGM promises cellar cellar-3
+day 1 05:25  told Piers Hearth that the house (cellar, spiders) is safe: paid 288 copper, and heard a rumour of cellar-3
+day 1 05:25  brought back 10 finds and 415 copper
+day 1 05:29  walked to the smith's (47 m, 9 s)
+day 1 05:29  sold to the smith's for 230 copper
+day 1 05:29  the smith mends 4 things for 11 copper
+day 1 05:34  walked to the trader at the market (66 m, 13 s)
+day 1 05:34  sold to the trader at the market for 85 copper
+day 1 05:36  walked to the innkeeper's (18 m, 4 s)
+day 1 05:39  walked to the smith's (48 m, 9 s)
+day 1 05:39  bought Steady Round shield of the Wall from the smith: power 21.2 -> 27.7
+day 1 05:41  walked to the Hall of Arms (15 m, 3 s)
+day 1 05:41  the Hall of Arms opens shields rank 0 for 40 copper
+day 1 05:43  walked to the inn (33 m, 6 s)
+day 1 05:43  took a room for 16 copper; wakes at 7:00 on day 2
+day 2 07:00  evening 2: power 27.7, 117 copper, 1 in the pack
+day 2 07:00  follows the rumour of cellar-3
+day 2 07:04  walked to the cottage (cellar, spiders) (63 m, 12 s)
+day 2 07:54  cleared the cottage (cellar, spiders): 2 killed, 0 spared, 3 searched, 0 potions, health 83%
+day 2 07:54  walked to Dunstan Harrow's door (0 m, 0 s)
+day 2 07:54  the VGM promises barrow barrow-1
+day 2 07:54  told Dunstan Harrow that the cottage (cellar, spiders) is safe: paid 240 copper, and heard a rumour of barrow-1
+day 2 07:54  brought back 5 finds and 407 copper
+day 2 07:56  walked to the smith's (29 m, 6 s)
+day 2 07:56  sold to the smith's for 133 copper
+day 2 07:56  the smith mends 5 things for 11 copper
+day 2 08:01  walked to the trader at the market (66 m, 13 s)
+day 2 08:01  sold to the trader at the market for 35 copper
+day 2 08:03  walked to the innkeeper's (18 m, 4 s)
+day 2 08:06  walked to the smith's (48 m, 9 s)
+day 2 08:06  bought Mail shirt from the smith: power 28.4 -> 31.6
+day 2 08:10  walked to the inn (47 m, 9 s)
+day 2 08:10  took a room for 16 copper; wakes at 7:00 on day 3
+day 3 07:00  evening 3: power 31.6, 126 copper, 3 in the pack
+day 3 07:00  follows the rumour of barrow-1
+day 3 08:13  walked to the barrow west of the town (barrow, restless-dead) (957 m, 184 s)
+day 3 08:56  cleared the barrow west of the town (barrow, restless-dead): 4 killed, 0 spared, 5 searched, 1 potions, health 71%
+day 3 10:05  walked to Brienne Fallow's door (898 m, 173 s)
+day 3 10:05  the VGM promises cellar cellar-5
+day 3 10:05  told Brienne Fallow that the barrow west of the town (barrow, restless-dead) is safe: paid 232 copper, and heard a rumour of cellar-5
+day 3 10:05  brought back 8 finds and 409 copper
+day 3 10:13  walked to the smith's (95 m, 18 s)
+day 3 10:13  sold to the smith's for 20 copper
+day 3 10:13  the smith mends 5 things for 45 copper
+day 3 10:18  walked to the trader at the market (66 m, 13 s)
+day 3 10:18  sold to the trader at the market for 53 copper
+day 3 10:19  walked to the innkeeper's (19 m, 4 s)
+day 3 10:23  walked to the smith's (48 m, 9 s)
+day 3 10:23  bought Arming sword from the smith: power 33.4 -> 34.5
+day 3 10:27  walked to the inn (47 m, 9 s)
+day 3 10:27  took a room for 16 copper; wakes at 7:00 on day 4
+day 4 07:00  heard of cellar-5 from person 40 (the innkeeper)
+day 4 07:00  the next lead is cellar-5
+passed: 3 places cleared, 2 falls, 556 copper earned, bought Steady Round shield of the Wall, Mail shirt, Arming sword, lessons none, opened shields 0, spent 586/422/301 a night, purse 120, power 18.8 -> 34.5; 16 min played in 1.6 s
+
+== alpha: 2 evenings in a hamlet
+day 0 08:00  plays in hamlet region-42, 8182 m from the start (10 buildings)
+day 0 08:00  the VGM promises tower tower-1
+day 0 08:00  evening 1: power 18.8, 14 copper, 3 in the pack
+day 0 08:00  a new hero on the market: person 14 comes over and tells of tower-1
+day 0 09:12  walked to the old tower east of the town (tower, garrison) (939 m, 181 s)
+day 0 09:56  cleared the old tower east of the town (tower, garrison): 3 killed, 0 spared, 4 searched, 1 potions, health 59%
+day 0 11:08  walked to Dunstan Ravel's door (938 m, 180 s)
+day 0 11:08  the VGM promises cellar cellar-3
+day 0 11:08  told Dunstan Ravel that the old tower east of the town (tower, garrison) is safe: paid 198 copper, and heard a rumour of cellar-3
+day 0 11:08  brought back 6 finds and 305 copper
+day 0 11:08  no inn here: sleeps in a barn
+day 0 21:08  evening 2: power 19.4, 305 copper, 6 in the pack
+day 0 21:08  follows the rumour of cellar-3
+day 0 21:11  walked to the cottage (cellar, rats) (39 m, 7 s)
+day 0 21:38  cleared the cottage (cellar, rats): 5 killed, 0 spared, 6 searched, 0 potions, health 72%
+day 0 21:38  walked to Wat Fallow's door (0 m, 0 s)
+day 0 21:38  the VGM promises cellar cellar-4
+day 0 21:38  told Wat Fallow that the cottage (cellar, rats) is safe: paid 100 copper, and heard a rumour of cellar-4
+day 0 21:38  brought back 12 finds and 511 copper
+day 0 21:38  no inn here: sleeps in a barn
+day 1 07:38  heard of cellar-4 from person 0
+day 1 07:38  the next lead is cellar-4
+passed: 2 places cleared, 0 falls, 0 copper earned, bought nothing, lessons none, opened none, spent 0/0 a night, purse 511, power 18.8 -> 19.4; 9 min played in 1.5 s
+
+all 6 passed in 23.4 s

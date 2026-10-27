@@ -1,0 +1,34 @@
+title: ready in 19.5 s
+01-title.jpg: drawn 0.0 s · settled 2.3 s · p50 12.4 ms · p95 15.9 ms · 0 shader violations
+02-creator.jpg: drawn 0.0 s · settled 1.5 s · p50 9.4 ms · p95 11.3 ms · 0 shader violations
+town: ready in 15.8 s
+03-town-noon.jpg: drawn 0.0 s · settled 1.5 s · p50 9.5 ms · p95 11.7 ms · 0 shader violations
+04-pack.jpg: drawn 0.0 s · settled 1.5 s · p50 5.3 ms · p95 11.4 ms · 0 shader violations
+05-map.jpg: drawn 0.0 s · settled 1.5 s · p50 9.2 ms · p95 11.9 ms · 0 shader violations
+06-town-dusk.jpg: drawn 0.1 s · settled 2.0 s · p50 10.4 ms · p95 14.1 ms · 0 shader violations
+07-town-night.jpg: drawn 0.0 s · settled 1.5 s · p50 10.9 ms · p95 14.4 ms · 0 shader violations
+08-town-rain.jpg: drawn 0.0 s · settled 1.5 s · p50 11.9 ms · p95 16.6 ms · 0 shader violations
+09-paddock.jpg: drawn 0.1 s · settled 1.5 s · p50 7.9 ms · p95 13.1 ms · 0 shader violations
+10-trade.jpg: drawn 0.0 s · settled 1.5 s · p50 9.7 ms · p95 17.0 ms · 0 shader violations
+wet: ready in 15.8 s
+11-town-wet-sun.jpg: drawn 0.0 s · settled 1.5 s · p50 10.1 ms · p95 13.3 ms · 0 shader violations
+cellar: ready in 13.8 s
+12-cellar.jpg: drawn 0.0 s · settled 4.0 s · p50 4.0 ms · p95 11.4 ms · 0 shader violations
+land: ready in 13.7 s
+13-barrow.jpg: drawn 0.1 s · settled 4.0 s · p50 6.1 ms · p95 8.7 ms · 0 shader violations
+14-wild.jpg: drawn 0.1 s · settled 1.7 s · p50 7.0 ms · p95 9.2 ms · 0 shader violations
+15-fight.jpg: drawn 0.0 s · settled 1.5 s · p50 6.0 ms · p95 7.6 ms · 0 shader violations
+inn: ready in 15.0 s
+16-inn.jpg: drawn 0.0 s · settled 1.5 s · p50 8.1 ms · p95 10.0 ms · 0 shader violations
+talk: ready in 15.3 s
+17-talk.jpg: drawn 0.0 s · settled 1.5 s · p50 8.8 ms · p95 11.5 ms · 0 shader violations
+hamlet: ready in 15.5 s
+18-hamlet.jpg: drawn 0.0 s · settled 1.5 s · p50 7.3 ms · p95 20.5 ms · 0 shader violations
+19-road.jpg: drawn 1.1 s · settled 2.8 s · p50 6.6 ms · p95 8.0 ms · 0 shader violations
+village: ready in 14.3 s
+20-village.jpg: drawn 0.1 s · settled 3.6 s · p50 5.9 ms · p95 8.2 ms · 0 shader violations
+hold: ready in 14.3 s
+21-hold.jpg: drawn 0.8 s · settled 4.0 s · p50 6.8 ms · p95 9.1 ms · 0 shader violations
+22-hold-crag.jpg: drawn 0.0 s · settled 1.5 s · p50 6.3 ms · p95 8.9 ms · 0 shader violations
+23-hold-warden.jpg: drawn 0.0 s · settled 1.5 s · p50 7.1 ms · p95 9.5 ms · 0 shader violations
+23 shots in shots\gateb-final\2026-10-27-01ac13b (266 s)
