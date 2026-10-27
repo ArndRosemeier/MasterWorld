@@ -1,0 +1,40 @@
+[
+ {
+  "name": "c2-river-bank-hero",
+  "q": "?pos=-30410,34231&look=55,-15&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 14.2 ms · -30414, 51, 34234 · chunks 282 (+0) · grass 101+401 · 0.19 dense 0.17 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 79 warm-up + 19 later · worst 15 ms · policy ok · wild - (1/7 built) · regions 7 (0 places drawn) · towns 1 (123 folk) · small life 9 squirrels, 62/62 birds (48 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 79 built in warm-up, 19 after (0 drawn late), worst block 15 ms, 0 violations, 0 built again alike",
+  "times": [
+   24939
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 7.7 s: Preparing shaders",
+   "[info] [load] 20.7 s: cellar ready (shaders 65 warm-up + 0 later · worst 15 ms · policy ok)",
+   "[info] [load] 21.4 s: townsfolk ready (shaders 72 warm-up + 0 later · worst 15 ms · policy ok)",
+   "[info] [load] 21.9 s: trees ready (shaders 75 warm-up + 0 later · worst 15 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "m-river-hero",
+  "q": "?pos=-30410,34231&look=55,-15&hour=11&hud&title=0&day=0&weather=clear",
+  "hud": "webgpu · 17.7 ms · -30414, 51, 34234 · chunks 282 (+0) · grass 101+401 · 0.19 dense 0.17 m · folk 0/30\nweather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00\nshaders 78 warm-up + 25 later · worst 34 ms · policy ok · wild - (1/7 built) · regions 7 (0 places drawn) · towns 1 (123 folk) · small life 9 squirrels, 62/62 birds (48 drawn, 1/1 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 78 built in warm-up, 25 after (0 drawn late), worst block 34 ms, 0 violations, 0 built again alike",
+  "times": [
+   25400,
+   25951,
+   26337,
+   26858,
+   27252,
+   27586
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 8.0 s: Preparing shaders",
+   "[info] [load] 21.1 s: cellar ready (shaders 65 warm-up + 0 later · worst 34 ms · policy ok)",
+   "[info] [load] 21.9 s: townsfolk ready (shaders 74 warm-up + 0 later · worst 34 ms · policy ok)",
+   "[info] [load] 22.1 s: trees ready (shaders 74 warm-up + 0 later · worst 34 ms · policy ok)",
+   "[info] [load] 27.4 s: townsfolk, every look ready (shaders 78 warm-up + 25 later · worst 34 ms · policy ok)"
+  ]
+ }
+]

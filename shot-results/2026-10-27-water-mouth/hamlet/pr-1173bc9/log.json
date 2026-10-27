@@ -1,0 +1,53 @@
+[
+ {
+  "name": "18-hamlet",
+  "q": "?title=0&day=0&hour=11&weather=fair&site=hamlet&hud",
+  "hud": "webgpu · 17.4 ms · -28666, 47, 35412 · chunks 291 (+0) · grass 97+323 · 0.90 dense 0.67 m · folk 7/30\nweather cover 0.42 rain 0.00 storm 0.00 mist 0.00 wind 0.30 wet 0.00\nshaders 77 warm-up + 1 later · worst 12 ms · policy ok · wild - (0/7 built) · regions 13 (1 places drawn) · towns 2 (22 folk) · small life 1 squirrels, 54/57 birds (15 drawn, 0/0 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 77 built in warm-up, 1 after (0 drawn late), worst block 12 ms, 0 violations, 0 built again alike",
+  "times": [
+   25438
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 9.8 s: Preparing shaders",
+   "[info] [load] 21.2 s: cellar ready (shaders 65 warm-up + 0 later · worst 12 ms · policy ok)",
+   "[info] [load] 21.9 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 12 ms · policy ok)",
+   "[info] [load] 22.3 s: trees ready (shaders 72 warm-up + 0 later · worst 12 ms · policy ok)",
+   "[info] [load] 24.7 s: townsfolk, every look ready (shaders 77 warm-up + 1 later · worst 12 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "18-hamlet-top30m",
+  "q": "?title=0&day=0&hour=11&weather=fair&site=hamlet&hud",
+  "hud": "webgpu · 21.6 ms · -28670, 75, 35409 · chunks 288 (+0) · grass 101+403 · 0.90 dense 0.67 m · folk 7/30\nweather cover 0.42 rain 0.00 storm 0.00 mist 0.00 wind 0.30 wet 0.00\nshaders 76 warm-up + 2 later · worst 12 ms · policy ok · wild - (0/7 built) · regions 13 (1 places drawn) · towns 2 (22 folk) · small life 1 squirrels, 54/57 birds (18 drawn, 0/0 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 76 built in warm-up, 2 after (0 drawn late), worst block 12 ms, 0 violations, 0 built again alike",
+  "times": [
+   32362
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 12.4 s: Preparing shaders",
+   "[info] [load] 26.1 s: cellar ready (shaders 65 warm-up + 0 later · worst 12 ms · policy ok)",
+   "[info] [load] 26.8 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 12 ms · policy ok)",
+   "[info] [load] 27.2 s: trees ready (shaders 72 warm-up + 0 later · worst 12 ms · policy ok)",
+   "[info] [load] 29.5 s: townsfolk, every look ready (shaders 76 warm-up + 2 later · worst 12 ms · policy ok)"
+  ]
+ },
+ {
+  "name": "18-hamlet-oblique",
+  "q": "?title=0&day=0&hour=11&weather=fair&site=hamlet&hud",
+  "hud": "webgpu · 17.1 ms · -28695, 63, 35434 · chunks 285 (+0) · grass 100+402 · 0.90 dense 0.64 m · folk 7/30\nweather cover 0.42 rain 0.00 storm 0.00 mist 0.00 wind 0.30 wet 0.00\nshaders 75 warm-up + 3 later · worst 10 ms · policy ok · wild - (0/7 built) · regions 17 (2 places drawn) · towns 2 (22 folk) · small life 1 squirrels, 57/60 birds (48 drawn, 0/0 squirrel bodies)\nsound: waiting for a click · mood -",
+  "shaders": "shaders: 75 built in warm-up, 3 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike",
+  "times": [
+   27859
+  ],
+  "console": [
+   "[warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.",
+   "[info] [load] 10.5 s: Preparing shaders",
+   "[info] [load] 21.9 s: cellar ready (shaders 65 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 22.5 s: townsfolk ready (shaders 71 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 22.7 s: trees ready (shaders 71 warm-up + 0 later · worst 10 ms · policy ok)",
+   "[info] [load] 24.7 s: townsfolk, every look ready (shaders 75 warm-up + 3 later · worst 10 ms · policy ok)"
+  ]
+ }
+]
