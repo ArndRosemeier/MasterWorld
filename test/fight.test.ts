@@ -256,3 +256,25 @@ test('fight: a blow that hurts is counted for its jolt; bleeding and a blow for 
   d.den.wound(who, { outcome: 'hit', damage: 1 }, from, 0, false);
   assert.equal(who.blows, 1);
 });
+
+test('fight: struck with no target, the hero targets whoever struck; a target already picked stays', () => {
+  const c = cellars.find((x) => x.dweller.id === 'goblins') ?? cellars[0];
+  const run = (picked: boolean) => {
+    const hero = new Character(classic);
+    hero.health = hero.maxHealth * 50;
+    const d = new Delve(c, openSpace(c), classic, hero, 4);
+    const [first, other] = d.den.creatures;
+    const pose = { x: first.x + 1, y: first.y, z: first.z, yaw: 0, speed: 0 };
+    if (picked && other) d.fight.pick(other);
+    for (let t = 0; t < 30; t += 0.1) {
+      const hurt = d.step(0.1, pose).find((e) => e.kind === 'hurt');
+      if (hurt && hurt.kind === 'hurt') return { by: hurt.by, target: d.fight.target, other };
+    }
+    return null;
+  };
+  const fresh = run(false);
+  assert.ok(fresh, 'struck within 30 s');
+  assert.equal(fresh.target, fresh.by);
+  const kept = run(true);
+  if (kept?.other && kept.by !== kept.other) assert.equal(kept.target, kept.other);
+});
