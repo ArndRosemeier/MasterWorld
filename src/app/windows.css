@@ -3,12 +3,13 @@
 @import './brass.css';
 
 /* The shade behind an open window: a click on it closes the window. */
-.shade { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center; padding: 16px; background: radial-gradient(ellipse at center, #0000 40%, #0007); }
+/* Its bottom keeps clear of the action bar (z-index 11, always there in play). */
+.shade { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center; padding: 16px 16px 92px; background: radial-gradient(ellipse at center, #0000 40%, #0007); }
 .shade.open { display: flex; }
 
 /* The window: leather, a double brass rim, rivets in the corners, the ward inside the rim. */
 .panel {
-  position: relative; width: min(560px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-sizing: border-box;
+  position: relative; width: min(560px, 100%); max-height: calc(100vh - 108px); display: flex; flex-direction: column; box-sizing: border-box;
   font: 15px/1.4 'EB Garamond', Georgia, serif; color: var(--ink);
   background: linear-gradient(170deg, #2e2016, var(--leather) 45%, #170f0b);
   border: 3px solid var(--brass-mid); border-radius: 8px;
