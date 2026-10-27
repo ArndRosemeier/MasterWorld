@@ -58,6 +58,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'keep', name: 'Keep a promise', writes: ['kept'], need: 'reward', asked: 'call' },
   { id: 'event', name: 'Story event', writes: ['event'], need: 'challenge', asked: 'turn', next: nextEvent,
     why: (d) => (d.kind === 'event' ? `${d.event} in ${d.town}: ${d.paddock !== undefined ? `the raiders of ${d.from} were left alone` : `${d.from} was left open too long`}` : d.kind) },
+  { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },
 ];

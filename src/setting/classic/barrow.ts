@@ -9,7 +9,7 @@ import { who } from './encounters';
 import { CELLAR_SPACE } from './cellar';
 
 export const barrow: CellarLore = {
-  form: { stands: 'rise', ring: [550, 1300], called: 'the barrow {dir} of the town', word: 'barrow', shell: 'mound', clearing: { back: 4, r: 13 }, space: CELLAR_SPACE },
+  form: { stands: 'rise', ring: [550, 1300], called: 'the barrow {dir} of the town', word: 'barrow', purposes: ['lead'], shell: 'mound', clearing: { back: 4, r: 13 }, space: CELLAR_SPACE },
   words: {
     enter: 'You stoop under the lintel and go down into {place}.',
     quiet: 'All is still in {place} now. The household who told you of it will want to hear.',

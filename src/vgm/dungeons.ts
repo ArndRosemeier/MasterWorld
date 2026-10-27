@@ -8,7 +8,7 @@
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import { farmlandReach, type TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonForm, SettingModule } from '../setting/contract';
-import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate, type RetreatDecision, type TownDecision } from '../world/decisions';
+import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate, type RetakeDecision, type RetreatDecision, type TownDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import type { DungeonPlace } from '../world/dungeon/cellar';
 import { setPiecesFor } from '../world/dungeon/setPieces';
@@ -28,7 +28,7 @@ export function dangerAt(at: { readonly decision: { readonly x: number; readonly
 }
 
 /** A cellar promised under one of the town's houses (`home`: where the game starts); null if the town has none that fits. */
-export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision): DungeonDecision | null {
+export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, kind: DungeonTemplate = 'cellar', form?: DungeonForm): DungeonDecision | null {
   const dungeons = log.filter((d): d is DungeonDecision => d.kind === 'dungeon');
   const n = dungeons.length + 1;
   const s = deriveSeed(seed, 'vgm', 'cellar', n);
@@ -39,16 +39,75 @@ export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: 
   const [cx, cz] = town.plan.centre;
   const score = (b: TownBuilding) => hash2f(s, b.id, 7) - Math.min(1, Math.hypot(b.cx - cx, b.cz - cz) / (town.decision.radius * 1.2)) * 0.5;
   const house = houses.reduce((a, b) => (score(b) < score(a) ? b : a));
-  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, 'cellar');
-  return { kind: 'dungeon', id: `cellar-${n}`, template: 'cellar', town: town.decision.id, building: house.id, seed: s, setPiece: piece, danger: dangerAt(town, home) };
+  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, kind, form?.pieces);
+  return { kind: 'dungeon', id: `${kind}-${n}`, template: kind, town: town.decision.id, building: house.id, seed: s, setPiece: piece, danger: dangerAt(town, home) };
 }
 
 /** A kind of place promised out on the land, rather than under a house (a key of the setting's `dungeons`). */
 export type LandKind = DungeonTemplate;
 
-/** The setting's kinds that stand out on the land (C6c: whatever their `form` says, not their names). */
-export function landKinds(dungeons: SettingModule['dungeons']): LandKind[] {
-  return Object.entries(dungeons).filter(([, l]) => l && l.form.stands !== 'house').map(([k]) => k);
+/** The setting's kinds that stand out on the land (C6c: whatever their `form` says, not their names), those for `purpose` if given. */
+export function landKinds(dungeons: SettingModule['dungeons'], purpose?: string): LandKind[] {
+  return Object.entries(dungeons).filter(([, l]) => l && l.form.stands !== 'house' && (!purpose || l.form.purposes.includes(purpose))).map(([k]) => k);
+}
+
+/** What the one who asks for a place wants (`dungeonFor`). */
+export interface DungeonAsk {
+  /** What it is for: a kind fits when its form's `purposes` hold it (a lead, a hideout, a den). */
+  readonly purpose: string;
+  /** The town whose people may know of it (the household nearest it), and whose danger it has (D29). */
+  readonly town: Town;
+  /** Near this point (world metres), on `ring` round it; none: on the kind's own ring round the town. */
+  readonly near?: { readonly x: number; readonly z: number; readonly ring: readonly [number, number] };
+  /** Who lives there (an encounter's id): only kinds whose lore has such dwellers. */
+  readonly dwellers?: string;
+  /** Only these kinds, tried in this order (none: those that fit, from a seeded start). */
+  readonly kinds?: readonly string[];
+}
+
+export interface DungeonContext {
+  readonly seed: number;
+  readonly terrain: Terrain;
+  readonly log: DecisionLog;
+  readonly home: { readonly x: number; readonly z: number };
+  readonly dungeons: SettingModule['dungeons'];
+  /** Ground a place on the land keeps away from (the wild's territories, the bands out). */
+  readonly avoid?: readonly { readonly x: number; readonly z: number; readonly r: number }[];
+}
+
+/**
+ * The one request for a place (C6c, D51; docs/design/vgm.md 4): leads, story events and encounters ask for
+ * a purpose near somewhere, and get the decision of a kind that fits, on ground that suits it, or null. A
+ * kind under houses goes under one of the town's; a kind out on the land goes on its ring.
+ */
+export function dungeonFor(a: DungeonAsk, c: DungeonContext): DungeonDecision | null {
+  const fits = Object.keys(c.dungeons).filter((k) => {
+    const l = c.dungeons[k];
+    return !!l && l.form.purposes.includes(a.purpose) && (!a.kinds || a.kinds.includes(k)) && (!a.dwellers || l.dwellers.some((w) => w.encounter === a.dwellers));
+  });
+  const order = a.kinds ? a.kinds.filter((k) => fits.includes(k)) : fits;
+  const first = a.kinds ? 0 : Math.floor(hash2f(deriveSeed(c.seed, 'vgm', 'place-for', a.purpose), c.log.length, 1) * Math.max(1, order.length));
+  for (let i = 0; i < order.length; i++) {
+    const kind = order[(first + i) % order.length], form = c.dungeons[kind]!.form;
+    const d = form.stands === 'house' ? promiseCellar(c.seed, a.town, c.log, c.home, kind, form) : promisePlace(kind, form, c.seed, c.terrain, a.town, c.log, c.home, c.avoid, a.near);
+    if (d) return a.dwellers ? { ...d, dwellers: a.dwellers } : d;
+  }
+  return null;
+}
+
+/**
+ * Others take a place while it stands (C6c: plan 8's story change; D10): who of the kind's dwellers are of
+ * the encounter asked for move in, the layout stays. Null if the place's lore has none such, or they are
+ * there already.
+ */
+export function retakeOf(log: DecisionLog, dungeons: SettingModule['dungeons'], dungeon: string, encounter: string, seed: number, at: number): RetakeDecision | null {
+  const d = log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === dungeon);
+  const lore = d && loreOf({ dungeons }, d.template);
+  const now = d && [...log].reverse().find((x) => (x.kind === 'move-in' || x.kind === 'retake') && x.dungeon === dungeon);
+  const fits = lore?.dwellers.filter((w) => w.encounter === encounter && !(now && 'dweller' in now && now.dweller === w.id)) ?? [];
+  if (!d || !fits.length) return null;
+  const n = log.filter((x) => x.kind === 'retake').length + 1;
+  return { kind: 'retake', id: `retake-${n}`, dungeon, dweller: fits[Math.floor(hash2f(seed, n, 5) * fits.length)].id, seed: deriveSeed(seed, 'retake', n), at };
 }
 
 /** The way from one point to another as people say it ("north-east"); north is −z, east +x. */
@@ -109,13 +168,13 @@ const TRIES = 128;
  * from other places on the land, its doorway facing the town (a cave: going into its hill). The household
  * who knows of it lives on the town's side towards it. Null if no ground fits.
  */
-export function promisePlace(kind: LandKind, form: DungeonForm, seed: number, terrain: Terrain, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[] = []): DungeonDecision | null {
+export function promisePlace(kind: LandKind, form: DungeonForm, seed: number, terrain: Terrain, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[] = [], near?: { readonly x: number; readonly z: number; readonly ring: readonly [number, number] }): DungeonDecision | null {
   if (form.stands === 'house' || !form.ring) return null;
   const dungeons = log.filter((d): d is DungeonDecision => d.kind === 'dungeon');
   const n = dungeons.filter((d) => d.template === kind).length + 1;
   const s = deriveSeed(seed, 'vgm', kind, n);
   const { x: tx, z: tz } = town.decision;
-  const best = spotOnRing(form.stands, form.ring, s, terrain, town.decision, [...avoid, ...sitesIn(log, 150)]);
+  const best = spotOnRing(form.stands, near?.ring ?? form.ring, s, terrain, near ?? town.decision, [...avoid, ...sitesIn(log, 150)]);
   if (!best) return null;
   const dx = best.x - tx, dz = best.z - tz;
   // Facing into it is facing away from the town (yaw as the walker's: it faces (−sin, −cos)), unless its ground says otherwise.
