@@ -50,6 +50,7 @@ test('fight: a fresh hero is about power 15; skills grow by use, slower when hig
   assert.equal(h.health, h.maxHealth);
   const gain = (level: number, challenge: number) => {
     const c = new Character(classic);
+    c.ranks.set('blades', 3); // every rank open (D49): only use counts here
     c.skills.set('blades', level);
     c.practise('blades', challenge);
     return c.skills.get('blades')! - level;
@@ -58,6 +59,7 @@ test('fight: a fresh hero is about power 15; skills grow by use, slower when hig
   assert.ok(gain(40, 1) < gain(40, 20) / 5, 'little from a rat when good');
   // A hundred fights' worth of blows against fitting foes makes a real difference, but no master.
   const c = new Character(classic);
+  c.ranks.set('blades', 3);
   for (let i = 0; i < 400; i++) c.practise('blades', 10 + c.skill('blades') * 0.4);
   assert.ok(c.skills.get('blades')! > 25 && c.skills.get('blades')! < 70, `${c.skills.get('blades')}`);
   assert.ok(c.power > h.power + 3);

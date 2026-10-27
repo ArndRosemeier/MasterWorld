@@ -56,7 +56,7 @@ import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
 import type { Township } from './game/township';
-import type { TownTalk } from './talk/townTalk';
+import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
@@ -89,6 +89,7 @@ import { release } from './app/release';
 import { Character } from './game/character';
 import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
+import { GuildBook, houseIn, isGuild } from './game/guilds';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -346,6 +347,8 @@ export async function start(b: Boot): Promise<void> {
     if (params.wear) Object.entries(character.worn).forEach(([slot, it], i) => { if (it) character.worn[slot as keyof typeof character.worn] = { ...it, wear: params.wear * Math.max(0.3, 1 - i * 0.25) }; });
     // How each people stands with the hero (plan 11.6): their own kin start higher.
     const standing = new Standing(setting, save?.looks?.look.race ?? hero.look.race ?? 'human', save?.standing);
+    // The hero's dealings with the guild houses (D49): which gave their task, and when.
+    const guildBook = new GuildBook(save?.guilds);
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
     armHero();
     // Classic or roguelike (plan 11.1): chosen in the creator, kept in the save. What fallen heroes left lies where they fell.
@@ -649,7 +652,7 @@ export async function start(b: Boot): Promise<void> {
     const roomTown = params.room === 'cellar' && firstPromise ? towns.get(firstPromise.town) : towns.townAt(player.walker.pos.x, player.walker.pos.z) ?? startTown;
     if (roomTown && params.room !== null) {
       const plan = roomTown.town.plan;
-      const b = params.room === 'cellar' ? house : plan.buildings.find((x) => x.kind === params.room) ?? plan.buildings[Number(params.room)];
+      const b = params.room === 'cellar' ? house : params.room === 'guild' ? roomTown.guilds[0]?.b : plan.buildings.find((x) => x.kind === params.room) ?? plan.buildings[Number(params.room)];
       if (b) await rooms.enter({ town: roomTown, b }, true, params.room === 'cellar'); // the cellar: beside its hatch
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
@@ -810,14 +813,31 @@ export async function start(b: Boot): Promise<void> {
       rang: () => sounds?.rang(),
     });
     for (const id of UPKEEP_SERVICES) services.set(id, (a) => { const t = talkTown(); if (t) upkeep.answer(id, a.person, t.talk.nameOf(a.person.id)); });
-    // Lessons (plan 11.4): the smith, the old caravan guard and the innkeeper teach for coin; one more service.
+    // Lessons (plan 11.4, D49): the guild houses' trainers open skills and ranks and teach, the innkeeper teaches; one more service.
     const lessons = new LessonsUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
       taught: (h) => { const t = hours() + h; view.sky.day = Math.floor(t / 24); view.sky.hour = t - view.sky.day * 24; sounds?.coins(); },
       changed: armHero,
+      book: guildBook,
+      log: () => log,
+      hours,
     });
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id)); });
+    // The bard at the inn (D49): "where can I learn a skill?" names every guild house of the town and puts
+    // it on the map, a hidden one with its way in.
+    const skillNames = (ids: readonly string[]) => ids.map((id) => setting.skills.find((x) => x.id === id)?.name.toLowerCase() ?? id).join(', ');
+    services.set('bard', (a) => {
+      const t = talkTown(), bard = setting.bard;
+      if (!t || !bard) return;
+      const told = t.guilds.map(({ guild: g }) => {
+        const master = t.residents.find((p) => p.trade === g.keeper);
+        if (g.hidden) guildBook.tell(houseIn(t.id, g.keeper));
+        return fill(g.hidden ? bard.tellsHidden : bard.tells, { house: cap(g.name), skills: skillNames(g.skills), keeper: master ? t.talk.nameOf(master.id) : 'the master', way: g.way ?? '' });
+      });
+      notes.say(told.length ? `${told.join(' ')} (Map: ${keyName('map')})` : `${t.talk.nameOf(a.person.id)} knows of no guild house here.`, 12);
+      sounds?.noted();
+    });
     // The peoples in talk (plan 11.6): greetings, refusals and kept news by standing; where a people's hold is, and gifts.
     const peoples = new PeoplesTalk({
       setting, character, standing, journal, holds: terrain.holds,
@@ -838,7 +858,9 @@ export async function start(b: Boot): Promise<void> {
         return [
           ...(shop ? [{ id: 'trade', label: shop.topic, line: shop.line }] : []),
           ...upkeep.services(p),
-          ...(teacher ? [{ id: 'lessons', label: teacher.topic, line: teacher.line }] : []),
+          // A hidden guild house's trainer is a locksmith like any other until the bard told the way in (D49).
+          ...(teacher && !(isGuild(teacher) && !guildBook.onMap(t.id, teacher)) ? [{ id: 'lessons', label: teacher.topic, line: teacher.line }] : []),
+          ...(setting.bard && t.bard?.id === id && t.guilds.length ? [{ id: 'bard', label: setting.bard.topic, line: setting.bard.line }] : []),
           ...peoples.services(p),
         ];
       };
@@ -867,6 +889,7 @@ export async function start(b: Boot): Promise<void> {
       height: (x, z) => terrain.height(x, z),
       water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
       heroBearing: () => believed(player.walker.yaw),
+      signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ x: h.b.cx, z: h.b.cz, label: cap(h.guild.name) }))),
     }) : null;
     // The compass at the top (plan 17.1): turns with the camera, its needle as true as the orientation skill.
     const compass = new Compass(seed);
@@ -902,6 +925,10 @@ export async function start(b: Boot): Promise<void> {
         ? agents.find((a) => a.person.home === firstPromise?.building && a.person.role !== 'child')
         : params.talk === 'smith'
         ? agents.find((a) => a.person.trade === 'smith' && a.person.role === 'trade')
+        : params.talk === 'guild' // the first guild house's trainer (D49)
+        ? agents.find((a) => a.person.trade === talkIn.guilds[0]?.guild.keeper)
+        : params.talk === 'bard'
+        ? agents.find((a) => a.person === talkIn.bard)
         : agents.find((a) => plan.buildings[a.person.home].kind === 'inn' && a.person.role === 'trade');
       if (pick) {
         await standBefore(pick);
@@ -931,6 +958,7 @@ export async function start(b: Boot): Promise<void> {
           journal: journal.entries(),
           character: character.save(),
           standing: standing.save(),
+          guilds: guildBook.bookSave(),
           ...(hold?.diff() ? { hold: hold.diff() } : {}),
           looks: { name: heroName, look: hero.look },
           director: director.snapshot(),

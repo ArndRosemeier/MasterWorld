@@ -9,6 +9,7 @@ import type { CharacterSave } from '../game/character';
 import { remainsLead, type GameMode, type Remains } from '../game/death';
 import type { DelveSave } from '../game/delve';
 import type { StandingSave } from '../game/standing';
+import type { GuildBookSave } from '../game/guilds';
 import type { MarketSave } from '../game/trade';
 import type { TownshipSave } from '../game/township';
 import type { DirectorSave } from '../vgm/director';
@@ -68,6 +69,8 @@ export interface SaveData {
   readonly remains: readonly Remains[];
   /** The hero's standing with each people (plan 11.6; none in older saves: as a stranger, kin a little better). */
   readonly standing?: StandingSave;
+  /** The hero's dealings with the guild houses (D49: the tasks given); absent in older saves. */
+  readonly guilds?: GuildBookSave;
   /** A people's hold: who of its wardens fell, was searched (none: all at their posts). */
   readonly hold?: DelveSave;
   /** A roguelike hero fell: the world goes on and the next start makes a new hero in it. */
