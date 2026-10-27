@@ -2,7 +2,7 @@
  * The VGM's answers on the hero's way (implementation plan C9): `node tools/shot/sights.mjs [out dir]` after
  * `npm run build` (and `npm run packs`), SHOT_GPU=1 on the reference machine. The hero stands out on the
  * land east of the start town; the VGM answers Discovery there three times and Reward once (a find, which
- * must go into the pack), each a walk further on, then Challenge (an ambush, seen from 14 m), then People (a traveller resting by the way, from 6 m): the hero steps up to 16 m of each (inside its glade), the game must say what it
+ * must go into the pack), each a walk further on, then Challenge (an ambush, seen from 14 m), then People (a traveller resting by the way, from 6 m), then a situation (a hurt traveller, who cries out once seen): the hero steps up to 16 m of each (inside its glade), the game must say what it
  * is, and it is shot. JPEGs into `<out dir>` (default `shots/sights/<date>-<commit>/`). A slow check (docs/CHECKS.md),
  * well under 5 min.
  */
@@ -100,6 +100,33 @@ else {
   if (with_ !== met.town) failed = true;
   await page.waitForTimeout(2500);
   await shoot(`0${NEEDS.length + 2}-traveller`);
+}
+// A situation (C10): a hurt traveller by the way. Seen from 40 m first (no cry yet), then from 20 m, where
+// they cry out in a speech bubble.
+await page.evaluate(() => {
+  const g = window.game, d = g.towns.every[0].town.decision;
+  g.player.teleport(d.x - d.radius - 260, undefined, d.z - 600, Math.PI / 2);
+});
+await page.waitForTimeout(2500);
+const hurt = await page.evaluate(() => { const m = window.game.situationNow('hurt-traveller'); return m ? { id: m.decision.id, ...m.decision } : null; });
+console.log(`hurt traveller: ${hurt ? hurt.id : 'none'}`);
+if (!hurt) failed = true;
+else {
+  const stand = (d) => page.evaluate(([h, d]) => {
+    const g = window.game, x = h.x + Math.sin(h.yaw) * d, z = h.z + Math.cos(h.yaw) * d;
+    g.player.teleport(x, undefined, z, Math.atan2(x - h.x, z - h.z));
+  }, [hurt, d]);
+  await stand(40);
+  await page.waitForTimeout(1500);
+  const early = await page.evaluate(() => window.game.speech.line);
+  console.log(`from 40 m: ${early ?? 'no cry (seen first)'}`);
+  if (early) failed = true;
+  await stand(20);
+  await page.waitForTimeout(1500);
+  const cry = await page.evaluate(() => window.game.speech.line);
+  console.log(`from 20 m: ${cry ?? 'NO CRY'}`);
+  if (!cry) failed = true;
+  await shoot(`0${NEEDS.length + 3}-hurt-traveller`);
 }
 const sh = await page.evaluate(() => { const m = window.shaders; return m ? m.summary() : null; });
 console.log(`F3: ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}`);

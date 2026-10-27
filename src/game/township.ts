@@ -143,7 +143,7 @@ export class Township {
     const a = life.agents.find((x) => x.person.role === 'traveller');
     if (!a) return;
     // Facing the way the hero came from (the decision's yaw is atan2(x, z); an agent's dir is atan2(z, x)).
-    if (d) life.station(a, d.x, d.z, Math.PI / 2 - d.yaw);
+    if (d) life.station(a, d.x, d.z, Math.PI / 2 - d.yaw, d.situation ? 'hurt' : 'wait');
     else life.unstation(a);
     this.resting = d?.id ?? null;
   }

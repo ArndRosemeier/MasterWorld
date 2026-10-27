@@ -610,6 +610,35 @@ export interface SightDef {
   readonly loot?: string;
 }
 
+/** The situations the engine knows how to stage (C10). */
+export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves'] as const;
+export type SituationKind = (typeof SITUATION_KINDS)[number];
+
+/**
+ * A situation (D52, C10): something the hero walks into and sees, not a quest handed out. `hurt-traveller`:
+ * a town's traveller sits hurt by the hero's way (People's answer, now and then instead of one resting).
+ * `paddock-wolves`: at dusk, `encounter` (wolves) prowl outside a paddock of the town the hero is in, once a
+ * town every `every` days. `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
+ * only a cry for help), and only once the hero is within `seen` metres of what it is about, so the hero sees
+ * it before they are told.
+ */
+export interface SituationDef {
+  readonly id: string;
+  readonly kind: SituationKind;
+  readonly cry: string;
+  /** How near the hero must be (m) to the situation before the cry (they see it first). */
+  readonly seen: number;
+  /** hurt-traveller: the share of People's travellers that are hurt (0..1). */
+  readonly chance?: number;
+  /** paddock-wolves: the encounter, the game hours of the day it may begin in, and the days between two in one town. */
+  readonly encounter?: string;
+  readonly hours?: readonly [number, number];
+  readonly every?: number;
+}
+
+/** How far the hero sees a situation clearly (m): a cry never comes from farther (its `seen` is at most this). */
+export const SEEN_MOST = 60;
+
 /**
  * Fast travel (plan 5.4, D37): a seat on the cart from an inn to the inn of another town the hero has been
  * to. The cart keeps to the roads at `speed` (m/s, the hero's metres: the clock runs on as it would for
@@ -1113,6 +1142,8 @@ export interface SettingModule {
   readonly upkeep: UpkeepDef;
   /** Sights the VGM may put by the hero's way when Discovery is overdue (C9); none: it has no such answer. */
   readonly sights?: readonly SightDef[];
+  /** The situations the VGM stages (C10). */
+  readonly situations?: readonly SituationDef[];
   /** Carts between towns (plan 5.4, C7); without it no cart goes. */
   readonly travel?: TravelDef;
   /** The town's shops (plan 11.5), by who keeps them. */
@@ -1170,6 +1201,13 @@ export function validateSetting(m: SettingModule): string[] {
     if (!SIGHT_SHAPES.includes(g.shape)) out.push(`${where}: sight "${g.id}" shape "${g.shape}" is unknown`);
     if (!g.seen) out.push(`${where}: sight "${g.id}" has no words`);
     if (g.need === 'reward' && !m.items.treasure.some((t) => t.id === g.loot)) out.push(`${where}: sight "${g.id}" answers Reward but its loot "${g.loot}" is no treasure table`);
+  }
+  for (const t of m.situations ?? []) {
+    if (!SITUATION_KINDS.includes(t.kind)) out.push(`${where}: situation "${t.id}" kind "${t.kind}" is unknown`);
+    if (!t.cry || t.cry.length > 60) out.push(`${where}: situation "${t.id}" needs a short cry (a speech bubble, at most 60 letters)`);
+    if (!(t.seen > 0 && t.seen <= SEEN_MOST)) out.push(`${where}: situation "${t.id}" seen must be in 0..${SEEN_MOST} m`);
+    if (t.kind === 'paddock-wolves' && !(m.encounters.some((e) => e.id === t.encounter) && t.hours && t.hours[0] < t.hours[1] && (t.every ?? 0) > 0)) out.push(`${where}: situation "${t.id}" needs an encounter, hours and every`);
+    if (t.kind === 'hurt-traveller' && !(t.chance !== undefined && t.chance >= 0 && t.chance <= 1)) out.push(`${where}: situation "${t.id}" needs a chance in 0..1`);
   }
   const tr = m.travel;
   if (tr && !(tr.speed > 0 && tr.road >= 1 && tr.perKm >= 0 && tr.least >= 0 && Number.isInteger(tr.offers) && tr.offers >= 1)) out.push(`${where}: travel needs speed > 0, road >= 1, fares >= 0 and offers >= 1`);

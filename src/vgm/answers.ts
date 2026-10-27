@@ -25,7 +25,7 @@ export interface NeedContext {
   readonly terrain: Terrain;
   readonly towns: readonly Town[];
   readonly hours: number;
-  readonly setting: Pick<SettingModule, 'sights' | 'encounters' | 'creatures'>;
+  readonly setting: Pick<SettingModule, 'sights' | 'encounters' | 'creatures' | 'situations'>;
   /** Where the game began (danger grows with distance from it, D29); none: the first town. */
   readonly home?: { readonly x: number; readonly z: number };
   readonly hero: { readonly x: number; readonly z: number };

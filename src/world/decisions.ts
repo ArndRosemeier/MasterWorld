@@ -256,6 +256,8 @@ export interface WildDecision {
   readonly seed: number;
   /** Game hours since the world began. */
   readonly at: number;
+  /** A situation it is (C10: the setting's, wolves at a paddock at dusk); none: a group of the wild. */
+  readonly situation?: string;
 }
 
 /**
@@ -307,6 +309,8 @@ export interface TravellerDecision {
   readonly seed: number;
   readonly at: number;
   readonly until: number;
+  /** A situation it is (C10: the setting's, a hurt traveller); none: one resting. */
+  readonly situation?: string;
 }
 
 export type Decision = TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
