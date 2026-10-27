@@ -106,6 +106,8 @@ Goal: magic returns to the world, and growing means more than bigger numbers.
 | C6 | **Story events**: a raid on a farm, bandits taking a waystation, a dungeon's dwellers moving out to the land; the town shows what happened | Test: an event's ledger entry changes the world and the leads | 4.2, 11.3 |
 | C7 | **Travel**: horses on roads, fast travel rules, time passing as designed | Test against 5.4's numbers | 5.4, D37 |
 
+Built ahead of phase C (Arnd asked by name, 2026-10-27): **bird form**, a taught change of shape (the hero becomes a pheasant and flies; design section 10), and the **action bar** (ten slots, always shown, arranged in the ability book; 17.1) that C1's abilities will sit on. C3 gives bird form a teacher; until then the debug menu opens it.
+
 Gate C: a fight with magic in the F1 set, the loop check with a mage hero, the review.
 
 ### Phase D: Seas (milestone 7)
@@ -145,4 +147,5 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | Companions (animals, elementals, summons) | After magic (C), since summons need it |
 | A hedge witch who teaches | Her cottage is C3 (D49) |
 | Interiors rework (ceiling joists cross the wall tops, dim rooms) | Seen at gate A; looks, not function. Before gate B's shots |
+| Who teaches bird form (built 2026-10-27, opened only by the debug menu) | Its teacher comes with the magic teachers (C3) |
 | Barrow nits: straight slab edges close up, a crease where bank meets mound, a yellowish patch at the foot | Seen at gate A after #149 |

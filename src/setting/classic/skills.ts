@@ -24,6 +24,12 @@ export const abilities: readonly AbilityDef[] = [
   { id: 'heavy', icon: '⚒', name: 'Heavy blow', stamina: 25, cooldown: 8, power: 1.9, aim: -0.08, text: 'Put your weight behind one blow: nearly twice the damage, a little harder to land.' },
   { id: 'shove', icon: '✋', name: 'Shove', stamina: 15, cooldown: 10, power: 0.3, aim: 0.15, effect: 'stagger', text: 'Shove your foe off balance; for a moment it cannot strike back.' },
   { id: 'breath', icon: '❂', name: 'Second wind', stamina: 0, cooldown: 90, power: 0, aim: 0, effect: 'heal', text: 'Catch your breath: win back a fifth of your health. Once a minute and a half.' },
+  // Bird form (plan 10, D49): one of the old changes the Fading took, taught again by the hidden teachers. Not a man flying: the hero becomes a bird.
+  {
+    id: 'bird', icon: '🪶', name: 'Bird form', stamina: 0, cooldown: 30, power: 0, aim: 0, taught: true,
+    shape: { into: 'bird', change: 15, back: 6 },
+    text: 'Kneel and become a pheasant: fifteen slow breaths, and never while you fight. Space takes off, W flaps on, X dives. Use it again to land and be yourself.',
+  },
 ];
 
 export const director: DirectorDef = {

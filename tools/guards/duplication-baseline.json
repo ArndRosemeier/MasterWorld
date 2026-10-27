@@ -314,5 +314,9 @@
   {
     "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/repairUi.ts#opened",
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
+    "reason": "Rock beds as a sine warped by fbm noise: one line of shaping in each rock field, with its own scales and amplitudes."
   }
 ]

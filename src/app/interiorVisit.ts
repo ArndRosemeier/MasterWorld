@@ -116,7 +116,7 @@ export class InteriorVisit {
   }
 
   update(dt: number): void {
-    if (this.player.flying) return;
+    if (this.player.offFoot) return;
     const w = this.player.walker, x = w.pos.x, z = w.pos.z;
     // The nearest door within reach opens (not while one is inside another).
     if (!this.within) {

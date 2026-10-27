@@ -101,6 +101,7 @@ import { FightHud } from './app/fightHud';
 import { ActionBarUi } from './app/actionBarUi';
 import { AbilityBook } from './app/abilityBook';
 import { POTION } from './game/actionBar';
+import { BirdForm } from './app/birdForm';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
@@ -575,7 +576,7 @@ export async function start(b: Boot): Promise<void> {
     const wild = start && params.wild ? new WildLand({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, seed, director, journal, hud: fightHud, fight: fightHost,
       cue: (c) => sounds?.cue(c),
-      out: () => !visit() && !rooms?.inside && !player.flying,
+      out: () => !visit() && !rooms?.inside && !player.offFoot,
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
     }, terrain, start, {
@@ -591,7 +592,7 @@ export async function start(b: Boot): Promise<void> {
       hold = new HoldGate({
         stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, seed, director, journal, hud: fightHud, fight: fightHost, standing,
         cue: (c) => sounds?.cue(c),
-        out: () => !visit() && !rooms?.inside && !player.flying,
+        out: () => !visit() && !rooms?.inside && !player.offFoot,
         changed: (c) => notes.say(changeLine(c), 6),
       }, holdSite, holdPeople, {
         height: (x, z) => terrain.height(x, z),
@@ -710,7 +711,7 @@ export async function start(b: Boot): Promise<void> {
       hour: () => view.sky.hour,
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
       where: () => (visit() ? { place: 'cellar', room: null } : rooms?.door ? { place: 'room', room: rooms.door.b.kind } : { place: 'land', room: null }),
-      inFlight: () => player.flying,
+      inFlight: () => player.offFoot,
       horses: () => player.steeds,
       riding: () => player.riding,
       threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
@@ -763,7 +764,7 @@ export async function start(b: Boot): Promise<void> {
       paused,
       get bindings() { return settings.current.bindings; },
       // Flying, below in a cellar, or still at the title (its fly-over is no place to talk).
-      get away() { return player.flying || !!visit() || !!title?.holding; },
+      get away() { return player.offFoot || !!visit() || !!title?.holding; },
       heard: (lead) => {
         handOver?.give(lead.id);
         // The hero's own first page ("ask at the inn") has done its work.
@@ -882,13 +883,23 @@ export async function start(b: Boot): Promise<void> {
     const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
     const leading = () => encounters().find((e) => e.leading) ?? null;
     const potions = () => character.pack.filter((i) => setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
+    // Bird form (plan 10): the hero becomes a pheasant and flies; the change takes its time and never in a fight.
+    const birdAbility = setting.abilities.find((a) => a.shape?.into === 'bird') ?? null;
+    const birdForm = birdAbility ? new BirdForm(birdAbility, player, world, {
+      stage: view.stage, notes,
+      around: () => ({ fighting: encounters().some((e) => e.pressure.fighting > 0), riding: !!player.riding, swimming: player.walker.mode === 'swim', roofed: !!visit() || !!rooms?.inside }),
+      changed: () => autosave(),
+    }) : null;
+    if (birdForm && birdAbility && character.knows(birdAbility.id)) void birdForm.warm();
     const actionBar = new ActionBarUi(character, setting, {
       get bindings() { return settings.current.bindings; },
       get blocked() { return open > 0; },
-      use: (id) => {
+      trigger: (id) => {
         const e = leading();
         let said: string | null;
-        if (e) said = e.use(id);
+        if (birdForm && id === birdAbility?.id) said = birdForm.invoke();
+        else if (birdForm?.flying) said = 'A pheasant cannot do that.';
+        else if (e) said = e.use(id);
         else if (id === POTION) {
           const r = character.remedy;
           said = r ? null : 'You have nothing to drink.';
@@ -899,6 +910,7 @@ export async function start(b: Boot): Promise<void> {
       state: (id) => {
         const f = leading()?.fighting ?? null;
         if (id === POTION) { const n = potions(); return { left: 0, total: 0, dim: n === 0, on: false, count: n }; }
+        if (birdForm && id === birdAbility?.id) { const b = birdForm.state; return { left: b.left, total: birdAbility.cooldown, dim: false, on: b.on }; }
         const a = setting.abilities.find((x) => x.id === id);
         if (!a || !f) return { left: 0, total: 0, dim: true, on: false };
         return { left: f.cooling(id), total: a.cooldown, dim: character.stamina < a.stamina, on: id === 'strike' && f.attacking };
@@ -1086,8 +1098,18 @@ export async function start(b: Boot): Promise<void> {
         return kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
       },
       get viewParams() { return player.viewParams; },
+      // Abilities a teacher opens (D49), learned or forgotten here so they can be tried.
+      taught: setting.abilities.filter((a) => a.taught).map((a) => ({ id: a.id, name: a.name })),
+      known: (id) => character.knows(id),
+      learn: (id, on) => {
+        const did = on ? character.learn(id) : character.forget(id);
+        actionBar.draw();
+        book.redraw();
+        if (on && id === birdAbility?.id) void birdForm?.warm();
+        return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
+      },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1170,7 +1192,7 @@ export async function start(b: Boot): Promise<void> {
     const hails = new Hails(setting.talk, journal, {
       get town() { return here(); },
       get heroAt() { return player.walker.pos; },
-      get busy() { return open > 0 || player.flying || !!rooms?.inside || !!title?.holding || !!creator?.showing || !window.__mwReady; },
+      get busy() { return open > 0 || player.offFoot || !!rooms?.inside || !!title?.holding || !!creator?.showing || !window.__mwReady; },
       get open() { return new Set(openPromises(log).map((d) => d.id)); },
       get talkingTo() { return talk?.partner ?? null; },
       say: (text) => notes.say(text, 6),
@@ -1220,7 +1242,7 @@ export async function start(b: Boot): Promise<void> {
           lookWild = null;
           standBeside(seen, 12);
         }
-        if (!visit() && !player.flying) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
+        if (!visit() && !player.offFoot) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
         brooks.near(player.walker.pos.x, player.walker.pos.z);
         // The VGM opens the land ahead (plan 5.5): a region at a time into the log, its place drawn as the hero nears.
         if (regionSites && !visit()) {
@@ -1236,7 +1258,7 @@ export async function start(b: Boot): Promise<void> {
       // Talk follows the hero from town to town (a talk going on stays where it is).
       if (talk) { const t = here(); if (t) talk.place = t; }
       talk?.watch();
-      const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.flying && !visit());
+      const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.offFoot && !visit());
       if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }
       compass.visible = !title?.holding && !creator?.showing && !!window.__mwReady;
       if (compass.visible) {
