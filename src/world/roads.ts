@@ -3,7 +3,7 @@
  * quickly. A road levels the ground it runs on (its profile, cut and filled, with sloped shoulders), keeps
  * trees and grass off, and the terrain shader draws it from a mask of these distances. Pure: runs in workers.
  */
-import { smoothstep } from '@futuremagic/core';
+import { lerp, smoothstep } from '@futuremagic/core';
 import type { RoadDecision, RoadWay } from './decisions';
 import type { MaskJob } from './water';
 
@@ -15,6 +15,8 @@ export const WAYS: readonly RoadWay[] = ['path', 'track', 'road'];
 export const SHOULDER = 7;
 /** How far from a road's edge anything asks about it, m (the shoulders, the trees' clearance). */
 export const ROAD_REACH = 16;
+/** A walled road side (a bridge): its bed reaches `bed` m past the road's edge, the land is its own from `foot`. */
+export const WALLED = { bed: 0.9, foot: 1.3 } as const;
 /** Index cell, m. */
 const CELL = 32;
 
@@ -106,11 +108,16 @@ export class RoadNet {
 
   private readonly here = emptyRoad();
 
-  /** The ground `h` at a point, levelled to the road beside it (the road's profile, sloping back over the shoulders). */
-  level(x: number, z: number, h: number): number {
+  /**
+   * The ground `h` at a point, levelled to the road beside it (the road's profile, sloping back over the
+   * shoulders). `bank` (0..1) where the road's side is walled (a bridge over a brook, world/bridges.ts): its
+   * bed runs to the wall and the land drops straight away behind it.
+   */
+  level(x: number, z: number, h: number, bank?: () => number): number {
     const r = this.nearest(x, z, this.here);
     if (!r) return h;
-    const w = (1 - smoothstep(0.5, SHOULDER, r.edge)) * r.hold;
+    const k = bank ? bank() : 0;
+    const w = (1 - smoothstep(lerp(0.5, WALLED.bed, k), lerp(SHOULDER, WALLED.foot, k), r.edge)) * r.hold;
     return h + (r.y - h) * w;
   }
 

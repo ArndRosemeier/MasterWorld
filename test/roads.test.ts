@@ -8,7 +8,9 @@ import { linkRoad } from '../src/vgm/roads';
 import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
 import { grassMask } from '../src/world/grass';
-import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
+import { ROAD_REACH, WALLED, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
+import { bridgeMesh, bridgesOn } from '../src/world/bridges';
+import { emptyWater, inChannel } from '../src/world/hydro';
 import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
@@ -97,4 +99,36 @@ test('roads: the mask holds the distances the shader draws from; roads replay fr
   const q = pt(inner[8]), h = terrain.height(q.x, q.z);
   terrain.settle([...log, road]);
   assert.equal(terrain.height(q.x, q.z), h);
+});
+
+test('roads: every brook the track crosses has a bridge, walled to the water, with the road over it', () => {
+  const bridges = bridgesOn(road, terrain.hydro, pt(0).x, pt(0).z, 1e5, () => true);
+  assert.ok(bridges.length >= 1, 'it crosses a brook');
+  const w = emptyWater(), walls = bridges.flatMap((b) => b.walls);
+  const onBridge = (x: number, z: number) => walls.some((wl) => {
+    for (let i = 0; i < wl.pts.length; i += 3) if (Math.hypot(wl.pts[i] - x, wl.pts[i + 1] - z) < WAY_WIDTH.track / 2 + 1) return true;
+    return false;
+  });
+  let wet = 0;
+  for (let k = 20; k + 20 < n; k++) for (let t = 0; t < 1; t += 0.25) {
+    const x = pt(k).x + (pt(k + 1).x - pt(k).x) * t, z = pt(k).z + (pt(k + 1).z - pt(k).z) * t;
+    if (!inChannel(terrain.hydro.brookAt(x, z, w))) continue;
+    wet++;
+    assert.ok(onBridge(x, z), `a brook under the track at ${x.toFixed(0)}, ${z.toFixed(0)} without a bridge`);
+    // The road runs over it, above the water.
+    assert.ok(terrain.height(x, z) > w.level + 0.2, 'the road above the brook');
+  }
+  assert.ok(wet > 0);
+  // Beside each wall, over the water, the land drops to the brook's bed (the water runs to the wall).
+  for (const wl of walls) if (wl.w0 >= 0) {
+    const o = (wl.w0 + wl.w1) >> 1, i = o * 3;
+    let d = 1.6;
+    const at = () => [wl.pts[i] + wl.out[o * 2] * d, wl.pts[i + 1] + wl.out[o * 2 + 1] * d];
+    // Out past the bed's edge (a winding road's other side may be nearer).
+    while (terrain.roads.fromEdge(at()[0], at()[1]) < WALLED.foot && d < 4) d += 0.2;
+    const [x, z] = at();
+    assert.ok(terrain.height(x, z) < wl.level, `land ${(terrain.height(x, z) - wl.level).toFixed(2)} m over the water beside the wall`);
+    assert.ok(wl.pts[i + 2] > wl.level + 0.2 && wl.foot < wl.level, 'the wall stands in the brook and holds the road');
+  }
+  assert.ok(bridgeMesh(bridges[0]).index.length > 0);
 });

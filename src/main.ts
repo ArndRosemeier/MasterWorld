@@ -75,6 +75,7 @@ import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
 import { Notes } from './app/notes';
 import { BrookPrefetch } from './app/brooks';
+import { BridgeView } from './render/bridgeView';
 import { TalkUi } from './app/talkUi';
 import { standingPlace } from './game/standingPlace';
 import { JournalUi } from './app/journalUi';
@@ -392,6 +393,8 @@ export async function start(b: Boot): Promise<void> {
     const remains: Remains[] = [...(save?.remains ?? [])];
     // Drawn where they lie (a pack, a cairn), in the land or down in a cellar.
     const remainsView = new RemainsView(view.stage);
+    // Bridges where roads cross brooks, round the hero.
+    const bridgeView = new BridgeView(view.stage, terrain);
     const drawRemains = () => void remainsView.lay(remains.map((r) => ({ id: r.id, x: r.at.x, y: r.at.y, z: r.at.z, grave: !!r.grave, seed: r.id })));
     if (params.remains && !save) {
       // In front of where the hero stands and a little to the right (out of reach, not hidden behind them), on the ground.
@@ -1374,6 +1377,7 @@ export async function start(b: Boot): Promise<void> {
         }
         if (!visit() && !player.offFoot) cellars.approach(dt, player.walker.pos.x, player.walker.pos.z);
         brooks.near(player.walker.pos.x, player.walker.pos.z);
+        bridgeView.lookAround(player.walker.pos.x, player.walker.pos.z);
         // The VGM opens the land ahead (plan 5.5): a region at a time into the log, its place drawn as the hero nears.
         if (regionSites && !visit()) {
           const asking = !title?.holding && !creator?.showing && !!window.__mwReady;

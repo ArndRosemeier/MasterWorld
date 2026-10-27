@@ -11,6 +11,7 @@ import { settlementOf, type Decision, type DecisionLog, type HoldDecision, type 
 import { holdBare, holdGround } from './hold';
 import { RETREAT_CLEARING, clearingOf, type Clearing } from './dungeon/site';
 import { RoadNet } from './roads';
+import { bridgeBank } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
 
@@ -22,6 +23,7 @@ export class Terrain {
   readonly biomes: SettingModule['world']['biomes'];
   private readonly here: WaterHere = emptyWater();
   private readonly brook: WaterHere = emptyWater();
+  private readonly bank = (): number => bridgeBank(this.brook);
 
   /** `hydro`, `brooks`: tile sizes for drainage (tests use small tiles; null: no brooks). */
   constructor(readonly seed: number, readonly setting: SettingModule, hydro: HydroOptions = HYDRO, brooks: HydroOptions | null = BROOKS) {
@@ -249,9 +251,10 @@ export class Terrain {
     // each blending out to the edge of its own valley, so where two meet the land stays whole.
     const r = this.hydro.riverAt(x, z, this.here);
     level = shapeByWater(this.hydro.brookAt(x, z, this.brook), shapeByWater(r, level));
-    // A road levels its bed and shoulders, over a brook (it runs under the road); a river still cuts its ford.
+    // A road levels its bed and shoulders, over a brook (it runs under the road, walled as a bridge:
+    // world/bridges.ts); a river still cuts its ford.
     if (!this.roadNet.empty) {
-      level = this.roadNet.level(x, z, level);
+      level = this.roadNet.level(x, z, level, this.brook.river ? this.bank : undefined);
       if (inChannel(r)) level = Math.min(level, shapeByWater(r, level));
     }
     return level;

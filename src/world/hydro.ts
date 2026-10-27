@@ -644,6 +644,9 @@ export class Hydrology {
     return this.tileOf(this.tiles, this.o, x, z, () => null);
   }
 
+  /** How many brook tiles are built here (grows as they arrive). */
+  get brookTileCount(): number { return this.brookTiles.size; }
+
   /** Whether the brook tile that owns a point is built here already. */
   hasBrooks(x: number, z: number): boolean {
     const b = this.brooks, side = b ? b.core * b.cell : 1;
