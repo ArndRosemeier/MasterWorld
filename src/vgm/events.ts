@@ -38,7 +38,7 @@ export interface EventsContext {
   /** Now, whatever the waits say (the debug menu's "a story event now"). */
   readonly early?: boolean;
   /** Only this event of the setting's (by id). */
-  readonly only?: string;
+  readonly which?: string;
 }
 
 /** A wild group round a town (sim/wild.ts placeWild) and how many of it still live. */
@@ -66,7 +66,7 @@ export function openEvents(log: DecisionLog): EventDecision[] {
 export function nextEvent(c: EventsContext): EventDecision | null {
   const past = eventsOf(c.log);
   for (const def of c.setting.events ?? []) {
-    if (c.only && def.id !== c.only) continue;
+    if (c.which && def.id !== c.which) continue;
     const e = def.kind === 'raid' ? raid(c, def, past) : spill(c, def, past);
     if (e) return e;
   }
