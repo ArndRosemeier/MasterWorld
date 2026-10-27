@@ -4,6 +4,9 @@
  */
 const PREFIX = 'masterworld.';
 
+/** The save slot to load at the next start (set by Continue and Load just before the page restarts). */
+export const PENDING_LOAD = 'load';
+
 export function loadLocal(key: string): unknown {
   try {
     const s = globalThis.localStorage?.getItem(PREFIX + key);

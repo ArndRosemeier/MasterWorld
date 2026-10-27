@@ -47,7 +47,7 @@ export class TitleScreen {
   private toastEl: HTMLDivElement | null = null;
   private leavingNow = false;
 
-  constructor(private readonly draw: TitleDraw, private readonly host: TitleHost, readonly calm: boolean) {
+  constructor(private readonly draw: TitleDraw, private readonly host: TitleHost, readonly calm: boolean, resuming = false) {
     document.body.classList.add('titled');
     document.getElementById('loading')?.remove();
     const base = import.meta.env.BASE_URL;
@@ -87,12 +87,19 @@ export class TitleScreen {
     name.setAttribute('elementtiming', 'title');
     this.gate = el('div', { className: 't-gate', role: 'button', ariaLabel: 'Press any key to begin' },
       name, this.alpha(), el('div', { className: 'press', textContent: 'Press any key' }));
-    this.root = el('div', { id: 'title', className: calm ? 'calm gated' : 'gated' },
+    // Back for a save (the page restarted for it): no gate (the press was the Continue), the opening already over.
+    this.root = el('div', { id: 'title', className: [calm ? 'calm' : '', resuming ? 'resume' : 'gated'].join(' ').trim() },
       still, svg(dawnSvg(wardLine(draw.seed))), this.toys, el('div', { className: 't-vignette' }),
       logo, panel, peoples, this.crier(), el('div', { className: 't-hint', textContent: HINT }), this.build, this.gate);
     document.body.append(this.root);
     // The SVG's own (SMIL) animations hold too until the press.
     this.root.querySelectorAll('svg').forEach((e) => e.pauseAnimations());
+    if (resuming) {
+      this.gate.remove();
+      this.root.querySelectorAll('svg').forEach((e) => { e.unpauseAnimations(); e.setCurrentTime(30); });
+      this.continuing('');
+      this.build.textContent = 'Getting back to where you left off';
+    }
   }
 
   /** True once the first press woke the title. */
@@ -157,8 +164,20 @@ export class TitleScreen {
     this.resuming = true;
     this.afterBuild = 'then you go on where you left off';
     this.startButton.lastChild!.textContent = 'Continue';
-    this.startButton.title = label;
+    if (label) this.startButton.title = label;
     this.waiting();
+  }
+
+  /** The save could not be loaded after all: New game and the menu are back. */
+  notContinuing(): void {
+    this.resuming = false;
+    this.afterBuild = 'you set off once it is done';
+    this.startButton.lastChild!.textContent = 'New game';
+    this.startButton.title = '';
+    this.startButton.classList.remove('waiting', 'picked');
+    this.build.classList.remove('t-wait');
+    this.root.classList.remove('chosen');
+    this.restartCard();
   }
 
   /**

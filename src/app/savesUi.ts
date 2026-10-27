@@ -3,7 +3,7 @@
  * and a file to import. Loading starts the game again from the save (the world is rebuilt from its seed),
  * so it goes through a reload. Opened from the corner's Saves button.
  */
-import { loadLocal, saveLocal } from '../persist/local';
+import { PENDING_LOAD as PENDING, loadLocal, saveLocal } from '../persist/local';
 import { listSlots, readSlot, writeSlot, type SlotInfo } from '../persist/saves';
 import { button, el } from './dom';
 import { ROGUE_SLOT, checkSave, saveLabel, type SaveData } from './saveGame';
@@ -12,8 +12,6 @@ import { KeyWindow, type WindowHost } from './window';
 
 export const AUTOSAVE = 'autosave';
 const SLOTS = [AUTOSAVE, 'slot 1', 'slot 2', 'slot 3'];
-/** The slot to load at the next start (set before the reload). */
-const PENDING = 'load';
 
 export interface SavesHost extends WindowHost {
   /** The game as it is now, and where the hero is ("in the town"). */

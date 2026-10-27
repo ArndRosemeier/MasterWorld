@@ -57,15 +57,17 @@ export class Title {
     return drawTitle(titleSeed(dayOf(new Date()), n));
   }
 
-  constructor(draw: TitleDraw, private readonly sound: Sound, menus: TitleMenus, readonly calm: boolean) {
+  /** `resuming`: the page restarted to load a save (Continue): no gate, no opening, straight to waiting for it. */
+  constructor(draw: TitleDraw, private readonly sound: Sound, menus: TitleMenus, readonly calm: boolean, resuming = false) {
     this.draw = draw;
     console.info(`[title] ${draw.still}, ${draw.weather}, ${draw.hour.toFixed(1)} h`);
-    this.screen = new TitleScreen(draw, { start: (p) => this.start(p), settings: () => menus.openSettings(), news: () => menus.whatsNew(), toggleSound: () => menus.toggleSound(), sound }, calm);
+    this.screen = new TitleScreen(draw, { start: (p) => this.start(p), settings: () => menus.openSettings(), news: () => menus.whatsNew(), toggleSound: () => menus.toggleSound(), sound }, calm, resuming);
+    if (resuming) { this.wanted = { people: null }; this.continued = true; }
     sound.playMusic('music/title');
     // Sound is allowed after the first press, which also opens the title; the pointer leans the view.
     const firstPress = () => {
-      if (this.screen.begun) return;
       sound.allow();
+      if (this.screen.begun) return;
       this.screen.wake();
       this.goIfAsked();
     };
@@ -89,6 +91,14 @@ export class Title {
     this.wanted = { people: null };
     this.continued = true;
     this.screen.continuing(label);
+  }
+
+  /** The save asked for could not be loaded after all: the menu is back, a new game is chosen there. */
+  notContinuing(): void {
+    if (!this.continued) return;
+    this.wanted = null;
+    this.continued = false;
+    this.screen.notContinuing();
   }
 
   /** True while the title holds the camera. */
