@@ -22,7 +22,7 @@ export const shops: readonly ShopDef[] = [
     keeper: 'trader', name: 'A market stall', topic: 'What are you selling?',
     line: 'A bit of everything, friend. And if you have something to sell, I might take it off your hands.',
     goods: [['torch', 4], ['rope', 2], ['lockpicks', 1], ['minor-potion', 2], ['bread', 3], ['cheese', 2], ['cloak', 1], ['gloves', 1], ['boots', 1], ['leather-cap', 1], ['padded-jack', 1], ['leather-jerkin', 1], ['ring', 1], ['amulet', 1]],
-    buys: ['valuable', 'tool', 'food', 'potion', 'armour', 'weapon', 'shield'], purse: 450, pays: 0.38, asks: 1.3, most: 2, restock: 3,
+    buys: ['valuable', 'tool', 'food', 'potion', 'armour', 'weapon', 'shield', 'writing'], purse: 450, pays: 0.38, asks: 1.3, most: 2, restock: 3,
     fine: { uncommon: 2, rare: 1, danger: 6 },
   },
   {

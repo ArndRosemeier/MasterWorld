@@ -23,6 +23,8 @@ export interface PackHost extends WindowHost {
   changed(): void;
   /** Something was drunk or eaten: the health it gave. */
   drank(amount: number): void;
+  /** A writing was read (C3): why nothing was learned, or null; the ability it teaches. */
+  readOut(why: string | null, ability: string): void;
 }
 
 /** Where a gauge's needle stands for a skill (degrees from pointing left; full at 100). */
@@ -47,13 +49,13 @@ export class PackUi extends BodyWindow {
       return cell;
     });
     const carried = h.pack.map((it) => {
-      const d = defOf(this.setting.items, it.def), use = d.slot ? 'Put it on' : d.heal ? (d.kind === 'potion' ? 'Drink it' : 'Eat it') : '';
+      const d = defOf(this.setting.items, it.def), use = d.slot ? 'Put it on' : d.heal ? (d.kind === 'potion' ? 'Drink it' : 'Eat it') : d.teaches ? 'Read it' : '';
       const c = itemCard(it, this.setting, enter());
       if (use) {
         c.classList.add('use');
         c.title = use;
         c.addEventListener('click', () => {
-          if (d.slot) { h.equip(it); this.packHost.changed(); } else this.packHost.drank(h.consume(it));
+          if (d.slot) { h.equip(it); this.packHost.changed(); } else if (d.teaches) this.packHost.readOut(h.readWriting(it), d.teaches); else this.packHost.drank(h.consume(it));
           this.opened();
         });
       }
@@ -76,7 +78,7 @@ export class PackUi extends BodyWindow {
       el('h3', { textContent: 'Worn' }), el('div', { className: 'worn' }, ...worn),
       el('h3', { textContent: 'Carried' }),
       carried.length ? el('div', { className: 'carried' }, ...carried) : el('p', { className: 'hint', textContent: 'Nothing but lint.' }),
-      el('p', { className: 'hint', textContent: 'Click something carried to put it on, drink or eat it; click something worn to take it off.' }),
+      el('p', { className: 'hint', textContent: 'Click something carried to put it on, drink, eat or read it; click something worn to take it off.' }),
       el('h3', { textContent: 'Skills' }), el('div', { className: 'skills' }, ...skills)],
     [
       el('span', { textContent: `Health ${Math.ceil(h.health)} / ${h.maxHealth} · Stamina ${Math.ceil(h.stamina)} / ${h.maxStamina}` }),

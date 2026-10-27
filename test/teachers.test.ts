@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { planTown } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic';
 import { Character } from '../src/game/character';
+import { plainItem } from '../src/game/items';
 import { bardTells, GuildBook, guildHouses, houseIn, learnSpell, openRank, spellRefusal, spellsOf } from '../src/game/guilds';
 import type { DecisionLog, RetreatDecision } from '../src/world/decisions';
 import { parseSeed } from '@futuremagic/core';
@@ -89,4 +90,17 @@ test('teachers: the warden keeps watch at a half-ruined tower past the start tow
   const hero = new Character(classic);
   assert.equal(openRank(classic, h.guild, hero, 'pyromancy', new GuildBook(), log), null);
   assert.ok(hero.knows('fire-dart'));
+});
+
+test('teachers: a writing found below teaches its spell, opens its school and crumbles; read again it says so', () => {
+  const hero = new Character(classic);
+  const tome = plainItem(classic.items, 'tome-embers');
+  hero.pack.push(tome);
+  assert.equal(hero.readWriting(tome), null);
+  assert.ok(hero.knows('fireball') && hero.opened('pyromancy') && hero.maxMana > 0 && !hero.pack.includes(tome));
+  hero.pack.push(tome);
+  assert.match(hero.readWriting(tome) ?? '', /already/);
+  // Writings lie in the treasure of places below, rarely.
+  const found = new Set(classic.items.treasure.flatMap((t) => t.items.map(([id]) => id)));
+  for (const w of classic.items.items.filter((i) => i.teaches)) assert.ok(found.has(w.id), `${w.id} can be found`);
 });

@@ -380,7 +380,7 @@ export type Slot = (typeof SLOTS)[number];
 export interface ItemDef {
   readonly id: string;
   readonly name: string;
-  readonly kind: 'weapon' | 'shield' | 'armour' | 'potion' | 'food' | 'tool' | 'valuable';
+  readonly kind: 'weapon' | 'shield' | 'armour' | 'potion' | 'food' | 'tool' | 'valuable' | 'writing';
   readonly slot?: Slot;
   /** Weapons: the skill it trains and how it hits. */
   readonly weapon?: { readonly skill: string; readonly damage: readonly [number, number]; readonly kind: DamageKind; readonly time: number; readonly reach: number };
@@ -394,6 +394,8 @@ export interface ItemDef {
   readonly weight: number;
   /** A line of lore on its card. */
   readonly lore?: string;
+  /** Writings (tomes, scrolls; C3, D49): the taught ability read from it (it opens the ability's school too). */
+  readonly teaches?: string;
 }
 
 /** A named legendary item with its place in the canon (plan 11.5). */
@@ -1119,6 +1121,7 @@ function validateFight(m: SettingModule, where: string): string[] {
   }
   if (m.skillRanks?.some((r, i, a) => i > 0 && r.upTo <= a[i - 1].upTo)) out.push(`${where}: skill ranks must rise`);
   if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);
+  for (const it of m.items.items) if (it.teaches && !m.abilities.some((a) => a.id === it.teaches && a.taught)) out.push(`${where}: item "${it.id}" teaches unknown or untaught ability "${it.teaches}"`);
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);
     for (const k of Object.keys(u.bonuses)) if (!skills.has(k)) out.push(`${where}: unique "${u.id}" raises unknown skill "${k}"`);
