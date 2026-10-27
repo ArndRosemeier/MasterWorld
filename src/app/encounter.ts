@@ -188,7 +188,9 @@ export class Encounter {
     if (!l || this.kneel || p.puppet) return null;
     const O = this.creatures.group.position, w = p.walker;
     const lid = l.kind === 'hoard' && l.hoard.prop ? (k: number) => this.onLid(l.hoard.id, k) : null;
-    this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, lid, () => this.found(l));
+    // A chest is opened from its front.
+    const f = l.kind === 'hoard' ? l.hoard.front : undefined;
+    this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, lid, () => this.found(l), f && { x: O.x + f[0], z: O.z + f[1] });
     p.puppet = this.kneel;
     return null;
   }

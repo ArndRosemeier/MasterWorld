@@ -41,12 +41,13 @@ export class SearchKneel implements Puppet {
     private readonly lid: ((k: number) => void) | null,
     /** The hands are in: take what is there. */
     private readonly onFound: () => void,
+    /** Where to kneel (a chest's front); else on the line from the hero to it, KNEEL_AT short of it (where the hero is, if nearer). */
+    kneelAt?: { readonly x: number; readonly z: number },
   ) {
     this.pos = { x: from.x, y: from.y, z: from.z };
     this.yaw = yaw;
-    // Where to kneel: on the line from the hero to it, KNEEL_AT short of it (where the hero is, if nearer).
     const dx = at.x - from.x, dz = at.z - from.z, d = Math.hypot(dx, dz) || 1, k = Math.max(0, d - KNEEL_AT) / d;
-    this.to = { x: from.x + dx * k, z: from.z + dz * k };
+    this.to = kneelAt ? { x: kneelAt.x, z: kneelAt.z } : { x: from.x + dx * k, z: from.z + dz * k };
   }
 
   step(dt: number): void {

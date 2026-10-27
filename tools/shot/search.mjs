@@ -1,8 +1,8 @@
 /**
  * A search played out (render it, don't narrate it): `node tools/shot/search.mjs [out dir]` after `npm run build`
  * and `npm run packs`, SHOT_GPU=1 on the reference machine. Down in the town's cellar (its dwellers at peace, so
- * nothing fights), the hero is put 2 m before a chest, facing it, the camera to the side; G, and a picture every
- * 0.25 s: the hero steps up, kneels, the lid lifts, the finds' cards come, the hero gets up. Checks: the hero
+ * nothing fights), the hero is put 2 m out from a chest, facing it, the camera to the side; G, and a picture every
+ * 0.25 s: the hero steps up to its front, kneels, the lid lifts, the finds' cards come, the hero gets up. Checks: the hero
  * moved up to the chest and knelt, the chest is opened (once), the lid's pivot turned, no note was said, no
  * shader built in play, no page errors. JPEGs into `<out dir>` (default `shots/search/<date>-<commit>/`). A slow
  * check (docs/CHECKS.md).
@@ -42,7 +42,9 @@ await page.addStyleTag({ content: '#loading{display:none!important}' });
 const chest = await page.evaluate(`(() => {
   const f = ${FIGHT};
   if (!f) return null;
+  // Nobody fights meanwhile (the dwellers at peace, and none already roused).
   f.delve.den.peace = true;
+  for (const c of f.delve.den.alive) { c.aware = 0; if (c.state !== 'dead') c.state = 'idle'; }
   const h = f.delve.hoards.find((x) => x.prop && !f.delve.hasOpened(x));
   if (!h) return null;
   // Before it, 2 m out from the wall it stands at (towards the room's middle), facing it.

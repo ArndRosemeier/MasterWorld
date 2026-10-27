@@ -31,3 +31,11 @@ test('search kneel: by a body already in reach it kneels where it stands, no lid
   for (let i = 0; i < 200 && !k.done; i++) k.step(1 / 60);
   assert.ok(k.done && found === 1 && Math.hypot(k.pos.x, k.pos.z) < 1e-9);
 });
+
+test('search kneel: a chest is knelt to at its front, wherever the hero came from', () => {
+  const k = new SearchKneel({ x: 1.5, y: 0, z: 0.4 }, 0, { x: 0, z: 0 }, () => {}, () => {}, { x: 0, z: 0.75 });
+  for (let i = 0; i < 400 && !k.done; i++) k.step(1 / 60);
+  assert.ok(k.done && Math.hypot(k.pos.x, k.pos.z - 0.75) < 0.03);
+  // Facing the chest: forward (-sin, -cos) points to -z.
+  assert.ok(-Math.cos(k.yaw) < -0.99);
+});
