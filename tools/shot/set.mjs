@@ -114,6 +114,8 @@ const SESSIONS = [
       const why = await p.evaluate((id) => window.game.useAbility(id), id);
       if (why) throw new Error(`fight-magic: ${id}: ${why}`);
       await p.waitForFunction(() => { const s = window.game.spellView.shown; return s.shots > 0 || s.flashes > 0; }, null, { timeout: 20000 });
+      // Held still while the set waits for the shaders and measures (the last shot of its page): else it is gone.
+      await p.evaluate(() => { window.game.spellView.frozen = true; });
     } },
   ] },
   { id: 'inn', query: `${still}&hour=20&room=inn`, shots: [{ name: 'inn' }] },
