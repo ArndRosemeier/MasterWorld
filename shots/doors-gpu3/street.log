@@ -1,0 +1,5 @@
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs ?gl&title=0&day=0&hour=10&weather=fair&room=guild-out shots/doors-gpu3/street.png
+
+shots/doors-gpu3/street.png: 
+shaders: 92 built in warm-up, 0 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike
