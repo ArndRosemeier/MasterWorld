@@ -9,6 +9,8 @@ import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
 import { grassMask } from '../src/world/grass';
 import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
+import { archY, bridgeMesh, bridgesOn, deckAt, deckY } from '../src/world/bridges';
+import { emptyWater, inChannel } from '../src/world/hydro';
 import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
@@ -97,4 +99,29 @@ test('roads: the mask holds the distances the shader draws from; roads replay fr
   const q = pt(inner[8]), h = terrain.height(q.x, q.z);
   terrain.settle([...log, road]);
   assert.equal(terrain.height(q.x, q.z), h);
+});
+
+test('roads: every brook the track crosses has a bridge over its open channel', () => {
+  const bridges = bridgesOn(road, terrain.hydro, pt(0).x, pt(0).z, 1e5, () => true);
+  assert.ok(bridges.length >= 1, 'it crosses a brook');
+  const w = emptyWater();
+  let wet = 0;
+  for (let k = 20; k + 20 < n; k++) for (let t = 0; t < 1; t += 0.25) {
+    const x = pt(k).x + (pt(k + 1).x - pt(k).x) * t, z = pt(k).z + (pt(k + 1).z - pt(k).z) * t;
+    if (!inChannel(terrain.hydro.brookAt(x, z, w))) continue;
+    wet++;
+    const on = bridges.map((b) => deckAt(b, x, z)).find((y) => y !== null);
+    assert.ok(on !== undefined, `a brook under the track at ${x.toFixed(0)}, ${z.toFixed(0)} without a bridge`);
+    // The brook runs on under it (its channel open), the deck well over the water.
+    assert.ok(terrain.height(x, z) < w.level, `ground ${(terrain.height(x, z) - w.level).toFixed(2)} m over the water under the bridge`);
+    assert.ok(on! > w.level + 0.9, 'the deck over the water');
+  }
+  assert.ok(wet > 0);
+  for (const b of bridges) {
+    assert.ok(b.arches.length >= 1);
+    for (const [a0, a1] of b.arches) assert.ok(archY(b, (a0 + a1) / 2)! > b.level + 0.4, 'room under the arch');
+    // Its ends meet the road (a lip, no step to climb).
+    assert.ok(Math.abs(deckY(b, 0) - terrain.height(b.x0, b.z0)) < 0.35 && Math.abs(deckY(b, 1) - terrain.height(b.x1, b.z1)) < 0.35, 'the deck meets the road');
+    assert.ok(bridgeMesh(b).index.length > 0);
+  }
 });
