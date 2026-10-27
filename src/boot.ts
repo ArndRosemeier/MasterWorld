@@ -20,10 +20,10 @@ if (params.bake) await import('./app/bake').then((b) => b.bake(params.bake ?? ''
 
 const settings = new SettingsStore();
 const sound = new Sound();
-sound.volume = settings.current.volume;
+settings.watch((s) => sound.mix(s));
 const menus: { menu: Menu | null } = { menu: null };
 const calm = settings.current.calm || !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menus.menu?.showDialog('settings'), whatsNew: () => menus.menu?.showDialog('news') }, calm) : null;
+const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menus.menu?.showDialog('settings'), whatsNew: () => menus.menu?.showDialog('news'), toggleSound: () => settings.set({ muted: !settings.current.muted }) }, calm) : null;
 const loading = title?.screen ?? new LoadingScreen();
 loading.set('Fetching the world');
 // The start's people and animals download beside the game's code (the title already shows).

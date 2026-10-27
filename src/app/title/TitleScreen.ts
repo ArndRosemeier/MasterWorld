@@ -17,6 +17,8 @@ export interface TitleHost {
   start(people: People['id'] | null): void;
   settings(): void;
   news(): void;
+  /** Sound on or off (kept with the settings). */
+  toggleSound(): void;
   readonly sound: Sound;
 }
 
@@ -66,7 +68,7 @@ export class TitleScreen {
       this.button('Settings', () => host.settings()),
       this.button("What's new", () => host.news()),
       el('div', { className: 't-row' },
-        this.button(this.soundLabel(), (b) => { host.sound.volume = host.sound.volume > 0 ? 0 : 0.8; b.lastChild!.textContent = this.soundLabel(); }, 'quiet')),
+        this.button(this.soundLabel(), (b) => { host.toggleSound(); b.lastChild!.textContent = this.soundLabel(); }, 'quiet')),
       el('div', { className: 't-version', textContent: `v${versionLabel}` }),
     );
     menu.querySelectorAll<HTMLElement>(':scope > *').forEach((b, i) => { b.style.animationDelay = `${6.5 + i * 0.12}s`; });
@@ -209,7 +211,7 @@ export class TitleScreen {
   }
 
   private soundLabel(): string {
-    return this.host.sound.volume > 0 ? 'Sound on' : 'Sound off';
+    return this.host.sound.on ? 'Sound on' : 'Sound off';
   }
 
   private button(label: string, onclick: (b: HTMLButtonElement) => void, kind = '', icon = true): HTMLButtonElement {
