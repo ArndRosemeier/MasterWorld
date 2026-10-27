@@ -1,0 +1,125 @@
+seed (default): oneway, oneway, oneway (trying 2)
+shots\ways-gpu4\0-oneway-a-00.jpg
+shots\ways-gpu4\0-oneway-a-01.jpg
+shots\ways-gpu4\0-oneway-a-02.jpg
+shots\ways-gpu4\0-oneway-a-03.jpg
+shots\ways-gpu4\0-oneway-a-04.jpg
+shots\ways-gpu4\0-oneway-a-05.jpg
+shots\ways-gpu4\0-oneway-a-06.jpg
+shots\ways-gpu4\0-oneway-a-07.jpg
+shots\ways-gpu4\0-oneway-a-08.jpg
+shots\ways-gpu4\0-oneway-a-09.jpg
+shots\ways-gpu4\0-oneway-a-10.jpg
+shots\ways-gpu4\0-oneway-a-11.jpg
+shots\ways-gpu4\0-oneway-a-12.jpg
+shots\ways-gpu4\0-oneway-a-13.jpg
+shots\ways-gpu4\0-oneway-a-14.jpg
+shots\ways-gpu4\0-oneway-a-15.jpg
+shots\ways-gpu4\0-oneway-a-16.jpg
+shots\ways-gpu4\0-oneway-a-side.jpg
+way 7 (oneway) from side 1: opened true · turned 1.50 rad · piece 0.02 -> -0.65 m along the way · away -1.00 0.00 · hero 1.46 -> 0.83 along · camera 1.24 along · bar moved 1.87 m, ends 0.14 m up, 1.20 along, 1.64 m from the doorway
+shots\ways-gpu4\1-oneway-a-00.jpg
+shots\ways-gpu4\1-oneway-a-01.jpg
+shots\ways-gpu4\1-oneway-a-02.jpg
+shots\ways-gpu4\1-oneway-a-03.jpg
+shots\ways-gpu4\1-oneway-a-04.jpg
+shots\ways-gpu4\1-oneway-a-05.jpg
+shots\ways-gpu4\1-oneway-a-06.jpg
+shots\ways-gpu4\1-oneway-a-07.jpg
+shots\ways-gpu4\1-oneway-a-08.jpg
+shots\ways-gpu4\1-oneway-a-09.jpg
+shots\ways-gpu4\1-oneway-a-10.jpg
+shots\ways-gpu4\1-oneway-a-11.jpg
+shots\ways-gpu4\1-oneway-a-12.jpg
+shots\ways-gpu4\1-oneway-a-13.jpg
+shots\ways-gpu4\1-oneway-a-14.jpg
+shots\ways-gpu4\1-oneway-a-15.jpg
+shots\ways-gpu4\1-oneway-a-16.jpg
+shots\ways-gpu4\1-oneway-a-side.jpg
+way 13 (oneway) from side 1: opened true · turned 1.50 rad · piece 0.02 -> -0.65 m along the way · away 1.00 0.00 · hero 2.07 -> 0.93 along · camera 0.99 along · bar moved 1.87 m, ends 0.14 m up, 1.20 along, 1.64 m from the doorway
+seed ways1: oneway, secret, oneway (trying 1)
+shots\ways-gpu4\2-secret-a-00.jpg
+shots\ways-gpu4\2-secret-a-01.jpg
+shots\ways-gpu4\2-secret-a-02.jpg
+shots\ways-gpu4\2-secret-a-03.jpg
+shots\ways-gpu4\2-secret-a-04.jpg
+shots\ways-gpu4\2-secret-a-05.jpg
+shots\ways-gpu4\2-secret-a-06.jpg
+shots\ways-gpu4\2-secret-a-07.jpg
+shots\ways-gpu4\2-secret-a-08.jpg
+shots\ways-gpu4\2-secret-a-09.jpg
+shots\ways-gpu4\2-secret-a-10.jpg
+shots\ways-gpu4\2-secret-a-11.jpg
+shots\ways-gpu4\2-secret-a-12.jpg
+shots\ways-gpu4\2-secret-a-13.jpg
+shots\ways-gpu4\2-secret-a-14.jpg
+shots\ways-gpu4\2-secret-a-15.jpg
+shots\ways-gpu4\2-secret-a-16.jpg
+shots\ways-gpu4\2-secret-a-side.jpg
+way 9 (secret) from side 1: opened true · turned 1.50 rad · piece 0.00 -> -0.65 m along the way · away -1.00 0.00 · hero 2.09 -> 0.32 along · camera 0.39 along
+seed ways2: oneway (trying 0)
+seed ways3: oneway (trying 0)
+seed ways4: locked, oneway (trying 1)
+shots\ways-gpu4\3-locked-a-00.jpg
+shots\ways-gpu4\3-locked-a-01.jpg
+shots\ways-gpu4\3-locked-a-02.jpg
+shots\ways-gpu4\3-locked-a-03.jpg
+shots\ways-gpu4\3-locked-a-04.jpg
+shots\ways-gpu4\3-locked-a-05.jpg
+shots\ways-gpu4\3-locked-a-06.jpg
+shots\ways-gpu4\3-locked-a-07.jpg
+shots\ways-gpu4\3-locked-a-08.jpg
+shots\ways-gpu4\3-locked-a-09.jpg
+shots\ways-gpu4\3-locked-a-10.jpg
+shots\ways-gpu4\3-locked-a-11.jpg
+shots\ways-gpu4\3-locked-a-12.jpg
+shots\ways-gpu4\3-locked-a-13.jpg
+shots\ways-gpu4\3-locked-a-14.jpg
+shots\ways-gpu4\3-locked-a-15.jpg
+shots\ways-gpu4\3-locked-a-16.jpg
+shots\ways-gpu4\3-locked-a-side.jpg
+way 1 (locked) from side 1: opened true · turned 1.50 rad · piece 0.00 -> -0.65 m along the way · away 1.00 0.00 · hero 2.04 -> 0.72 along · camera 1.09 along
+seed ways5: oneway (trying 0)
+seed ways6: secret, oneway (trying 1)
+shots\ways-gpu4\4-secret-a-00.jpg
+shots\ways-gpu4\4-secret-a-01.jpg
+shots\ways-gpu4\4-secret-a-02.jpg
+shots\ways-gpu4\4-secret-a-03.jpg
+shots\ways-gpu4\4-secret-a-04.jpg
+shots\ways-gpu4\4-secret-a-05.jpg
+shots\ways-gpu4\4-secret-a-06.jpg
+shots\ways-gpu4\4-secret-a-07.jpg
+shots\ways-gpu4\4-secret-a-08.jpg
+shots\ways-gpu4\4-secret-a-09.jpg
+shots\ways-gpu4\4-secret-a-10.jpg
+shots\ways-gpu4\4-secret-a-11.jpg
+shots\ways-gpu4\4-secret-a-12.jpg
+shots\ways-gpu4\4-secret-a-13.jpg
+shots\ways-gpu4\4-secret-a-14.jpg
+shots\ways-gpu4\4-secret-a-15.jpg
+shots\ways-gpu4\4-secret-a-16.jpg
+shots\ways-gpu4\4-secret-a-side.jpg
+way 7 (secret) from side 1: opened true · turned 1.50 rad · piece 0.00 -> -0.65 m along the way · away 0.00 1.00 · hero 2.06 -> 0.32 along · camera 0.39 along
+seed ways7: locked, oneway (trying 1)
+shots\ways-gpu4\5-locked-a-00.jpg
+shots\ways-gpu4\5-locked-a-01.jpg
+shots\ways-gpu4\5-locked-a-02.jpg
+shots\ways-gpu4\5-locked-a-03.jpg
+shots\ways-gpu4\5-locked-a-04.jpg
+shots\ways-gpu4\5-locked-a-05.jpg
+shots\ways-gpu4\5-locked-a-06.jpg
+shots\ways-gpu4\5-locked-a-07.jpg
+shots\ways-gpu4\5-locked-a-08.jpg
+shots\ways-gpu4\5-locked-a-09.jpg
+shots\ways-gpu4\5-locked-a-10.jpg
+shots\ways-gpu4\5-locked-a-11.jpg
+shots\ways-gpu4\5-locked-a-12.jpg
+shots\ways-gpu4\5-locked-a-13.jpg
+shots\ways-gpu4\5-locked-a-14.jpg
+shots\ways-gpu4\5-locked-a-15.jpg
+shots\ways-gpu4\5-locked-a-16.jpg
+shots\ways-gpu4\5-locked-a-side.jpg
+way 6 (locked) from side 1: opened true · turned 1.50 rad · piece 0.00 -> -0.65 m along the way · away -1.00 0.00 · hero 2.09 -> 0.72 along · camera 0.79 along
+kinds tried: oneway ×2, secret ×2, locked ×2
+shaders 88 warm-up + 24 later · worst 12 ms · policy ok · 1 built again alike (shaders.repeats())
+ways: ok
