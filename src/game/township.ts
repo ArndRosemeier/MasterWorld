@@ -25,6 +25,8 @@ const WATCH = 3;
 export interface TownshipSave {
   readonly talk?: TownTalkSave;
   readonly market?: MarketSave;
+  /** The hero has been here (the carts go to such towns, C7). */
+  readonly been?: boolean;
 }
 
 export interface TownshipContext {
@@ -58,12 +60,15 @@ export class Township {
   /** The log's length when the people last looked whether a band holds the place. */
   private heldLog = -1;
   private housesOf: readonly GuildHouse[] | null = null;
+  /** The hero has been here (C7: the carts go only to towns the hero knows). */
+  been: boolean;
   /** Set on the town's words when they are made (the game: how its people take the hero). */
   onTalk: ((talk: TownTalk) => void) | null = null;
 
   constructor(readonly town: Town, private readonly c: TownshipContext, private readonly saved: TownshipSave = {}) {
     this.id = town.decision.id;
     this.seed = townSeed(town, c.seed);
+    this.been = !!saved.been;
   }
 
   /** Everyone living here (the town is planned when first asked: a far town's plan waits); its guild houses' trainers among them. */
@@ -168,6 +173,6 @@ export class Township {
 
   /** What it keeps in a save (nothing if the hero never talked or traded there). */
   toSave(): TownshipSave {
-    return { ...(this.talkOf ? { talk: this.talkOf.save() } : this.saved.talk ? { talk: this.saved.talk } : {}), ...(this.marketOf ? { market: this.marketOf.save() } : this.saved.market ? { market: this.saved.market } : {}) };
+    return { ...(this.been ? { been: true } : {}), ...(this.talkOf ? { talk: this.talkOf.save() } : this.saved.talk ? { talk: this.saved.talk } : {}), ...(this.marketOf ? { market: this.marketOf.save() } : this.saved.market ? { market: this.saved.market } : {}) };
   }
 }

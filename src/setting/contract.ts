@@ -589,6 +589,30 @@ export interface UpkeepDef {
 }
 
 /**
+ * Fast travel (plan 5.4, D37): a seat on the cart from an inn to the inn of another town the hero has been
+ * to. The cart keeps to the roads at `speed` (m/s, the hero's metres: the clock runs on as it would for
+ * someone walking it), its way `road` times longer than the straight line; the fare is `perKm` copper a
+ * kilometre of that way, at least `least`. The innkeeper offers the `offers` nearest towns.
+ */
+export interface TravelDef {
+  readonly speed: number;
+  readonly road: number;
+  readonly perKm: number;
+  readonly least: number;
+  readonly offers: number;
+  readonly words: {
+    /** The innkeeper's topic (`{place}`: "the hamlet 2 km north", `{price}`), the answer as the seat is taken or the purse is too light. */
+    readonly topic: string;
+    readonly given: string;
+    readonly tooDear: string;
+    /** The screen while the cart goes. */
+    readonly going: string;
+    /** The note on arriving (`{place}`, `{hours}`). */
+    readonly arrived: string;
+  };
+}
+
+/**
  * A kind of shop (plan 11.5): who keeps it, what they keep in stock and buy, and how much coin they hold.
  * Prices follow what the town has: what a shop here makes is cheaper, and the more of a thing the town's
  * merchants already hold, the less they pay for it and ask for it.
@@ -1065,6 +1089,8 @@ export interface SettingModule {
   readonly items: ItemCatalog;
   /** Rooms and mending (plan 11.5). */
   readonly upkeep: UpkeepDef;
+  /** Carts between towns (plan 5.4, C7); without it no cart goes. */
+  readonly travel?: TravelDef;
   /** The town's shops (plan 11.5), by who keeps them. */
   readonly shops: readonly ShopDef[];
   /** Who teaches what in town (plan 11.4). */
@@ -1113,6 +1139,8 @@ export function validateSetting(m: SettingModule): string[] {
   if (m.contractVersion !== CONTRACT_VERSION) out.push(`${where}: contract version ${m.contractVersion}, engine speaks ${CONTRACT_VERSION}`);
   if (!/^[a-z][a-z0-9-]*$/.test(m.id)) out.push(`${where}: id must be a lowercase slug`);
   if (!Number.isInteger(m.version) || m.version < 1) out.push(`${where}: version must be a positive integer`);
+  const tr = m.travel;
+  if (tr && !(tr.speed > 0 && tr.road >= 1 && tr.perKm >= 0 && tr.least >= 0 && Number.isInteger(tr.offers) && tr.offers >= 1)) out.push(`${where}: travel needs speed > 0, road >= 1, fares >= 0 and offers >= 1`);
   const w = m.world;
   const positive: (keyof WorldShape)[] = ['continentSpacing', 'seaDepth', 'mountainHeight', 'rangeSpacing'];
   for (const k of positive) if (!((w[k] as number) > 0)) out.push(`${where}: world.${k} must be > 0`);

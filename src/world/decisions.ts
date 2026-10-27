@@ -258,7 +258,22 @@ export interface WildDecision {
   readonly at: number;
 }
 
-export type Decision = RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/**
+ * The hero takes the cart from one town to another (plan 4.4, 5.4, C7): a journey is a promise too, so the
+ * VGM knows where the hero will be before they get there. Town ids; game hours.
+ */
+export interface JourneyDecision {
+  readonly kind: 'journey';
+  readonly id: string;
+  readonly from: string;
+  readonly to: string;
+  /** Copper paid. */
+  readonly fare: number;
+  readonly at: number;
+  readonly arrive: number;
+}
+
+export type Decision = JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

@@ -111,7 +111,7 @@ Goal: magic returns to the world, and growing means more than bigger numbers.
 | C10 | **Situations, not quests** (D52): the VGM makes situations the hero walks into and sees (a farmer chasing a stray cow, smoke over the trees from a raided farm, a wounded traveller, wolves at the paddock at dusk); an NPC with something urgent to say shows a speech bubble, rarely; a few classic quests only where they make sense | Test: each situation kind is seen before it is told; speech bubbles at most for urgent lines; a GPU shot of one situation | 4, 9, D52 |
 | C11 | **A story that remembers** (plan 4.5): events leave traces (ruins, ash, refugees, rumours, a survivor); ignored promises resolve through an event; the hero's deeds cause events; good events (a market day, a festival); talk knows events (Conversations domain) | Test: an event's traces stand in the world and in talk; an old promise resolves | 4.5 |
 | C12 | **The player model** (plan 4.1, 4.3): playstyle from decayed evidence, hints heard, leads taken; C9 and C10 lean towards what the player enjoys | Test: a mage and a fighter bot get measurably different moves | 4.1, 4.3 |
-| C7 | **Travel**: horses on roads, fast travel rules, time passing as designed | Test against 5.4's numbers | 5.4, D37 |
+| C7 ✓ | **Travel**: horses on roads, fast travel rules, time passing as designed | Test against 5.4's numbers | 5.4, D37 |
 
 Built ahead of phase C (Arnd asked by name, 2026-10-27): **bird form**, a taught change of shape (the hero becomes a pheasant and flies; design section 10), and the **action bar** (ten slots, always shown, arranged in the ability book; 17.1) that C1's abilities will sit on. C3 gives bird form a teacher: the hidden Undercroft (C3 part 1, 2026-10-27).
 

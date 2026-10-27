@@ -880,6 +880,9 @@ export async function start(b: Boot): Promise<void> {
         }
         return best;
       },
+      get towns() { return towns?.every ?? []; },
+      log: () => log,
+      journey: (d) => { log = [...log, d]; },
       hours,
       setClock: (h) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; },
       enter: (door) => rooms?.enter(door, true) ?? Promise.resolve(),
@@ -1383,7 +1386,7 @@ export async function start(b: Boot): Promise<void> {
       if (!visit()) rooms?.update(dt);
       if (rooms?.door) cellars.nearHouse(rooms.door.town.id, rooms.door.b.id);
       // Talk follows the hero from town to town (a talk going on stays where it is).
-      if (talk) { const t = here(); if (t) talk.place = t; }
+      { const t = here(); if (t) { t.been = true; if (talk) talk.place = t; } }
       talk?.watch();
       const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.offFoot && !visit());
       if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }

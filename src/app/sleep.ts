@@ -12,14 +12,14 @@ export class Sleep {
   busy = false;
   private readonly el = overlay('sleep-fade', 'position:fixed;inset:0;z-index:9;background:#050307;opacity:0;pointer-events:none;transition:opacity .7s ease;display:flex;align-items:center;justify-content:center;font:italic 20px "EB Garamond",Georgia,serif;color:#cbb898;letter-spacing:.06em');
 
-  /** Darken, `act` (the clock and the hero move), show the night passing, lighten. */
-  async through(act: () => void | Promise<void>): Promise<void> {
+  /** Darken, `act` (the clock and the hero move), show the night (or the road: `passing`) going by, lighten. */
+  async through(act: () => void | Promise<void>, passing = 'The night passes…'): Promise<void> {
     if (this.busy) return;
     this.busy = true;
     const sky = div('position:relative;width:min(420px,80vw);height:120px',
       div('position:absolute;left:0;right:0;bottom:22px;height:1px;background:linear-gradient(90deg,transparent,#6e4f17,transparent)'),
       moon(),
-      div('position:absolute;left:0;right:0;bottom:0;text-align:center', 'The night passes…'));
+      div('position:absolute;left:0;right:0;bottom:0;text-align:center', passing));
     this.el.replaceChildren(sky);
     this.el.style.opacity = '1';
     await wait(DARK_MS);
