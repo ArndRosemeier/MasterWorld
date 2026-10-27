@@ -8,6 +8,7 @@
  */
 import { existsSync, renameSync, writeFileSync } from 'node:fs';
 import { launch } from './launch.mjs';
+import { profile, report } from './profile.mjs';
 
 // `--record`: the pack files this start fetched become tools/packs/start.json, the start bundle's list
 // (tools/packs/bundle.mjs); the run fetches them one by one, so the bundle is set aside meanwhile.
@@ -24,7 +25,13 @@ const { server, base, browser } = await launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.error(`[page error] ${e.message}`));
 // The game's own loading steps (and pack retries), so a slow start shows where its time goes.
-page.on('console', (m) => { const t = m.text(); if (/^\[(load|packs|title|diag)\]/.test(t)) console.log(`  ${t}`); });
+const steps = [];
+page.on('console', (m) => {
+  const t = m.text();
+  if (/^\[(load|packs|title|diag)\]/.test(t)) console.log(`  ${t}`);
+  const s = /^\[load\] ([\d.]+) s: (.*)$/.exec(t);
+  if (s) steps.push({ at: Number(s[1]) * 1000, name: s[2] });
+});
 
 /** Every finished download: its path under the site and its body bytes; `ready` marks those after the world was playable. */
 const got = [];
@@ -38,6 +45,8 @@ page.on('requestfinished', async (r) => {
 const t0 = Date.now();
 await page.goto(base + (query.startsWith('?') ? query : '?' + query));
 console.log('page loaded', ((Date.now() - t0) / 1000).toFixed(1));
+// `LOAD_PROFILE=1`: where the main thread's time goes in each loading step (profile.mjs), from the page's load on.
+const stopProfile = process.env.LOAD_PROFILE ? await profile(page) : null;
 const seen = await page.waitForSelector('.t-gate', { timeout: 60000 }).then(() => (Date.now() - t0) / 1000).catch(() => null);
 // When the title was first painted: the browser's element timing of the gate's name (`elementtiming="title"`). The
 // probe's own look (`seen`) can come seconds later, as the game's start keeps the page's thread busy meanwhile.
@@ -52,6 +61,7 @@ const came = await page.waitForFunction(() => window.__mwReady === true, null, {
 const playable = came ? (Date.now() - t0) / 1000 : Infinity;
 console.log('playable', playable.toFixed(1));
 ready = true;
+if (stopProfile) report(await stopProfile(), steps, 'dist');
 // A moment in the world: music asked for now is "when first needed", and is listed apart.
 await page.waitForTimeout(Number(process.env.LOAD_AFTER ?? 3000));
 await browser.close();
