@@ -558,6 +558,8 @@ export interface GuildDef extends TrainerDef {
   readonly hidden?: boolean;
   /** For a hidden house: how the bard tells the way in. */
   readonly way?: string;
+  /** The colour of the round shield over its door ('#rrggbb'; none: no sign, as for a hidden house). */
+  readonly sign?: string;
   /** What the trainer says on opening a skill or a rank, and when it needs more use (`{skill}`). */
   readonly opens: string;
   readonly unearned: string;

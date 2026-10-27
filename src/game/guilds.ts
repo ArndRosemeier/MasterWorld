@@ -6,6 +6,7 @@
  * standing. Standing with a guild follows from what the hero did there: ranks opened, its task done. The
  * bard at the inn knows every house. The same for every town, start town or village. Pure.
  */
+import { hexToRgb } from '@futuremagic/core';
 import { polyCentroid, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { GuildDef, SettingModule, SkillRankDef, TrainerDef } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
@@ -50,6 +51,13 @@ function anchorOf(plan: TownPlan, near: GuildDef['near']): { x: number; z: numbe
   if (near === 'edge') { const [x, z] = polyCentroid(plan.market); return { x, z }; }
   const b = buildingOf(plan, near);
   return b ? { x: b.cx, z: b.cz } : null;
+}
+
+/** The shields over the guild houses' doors, by building id (colour 0..255; a hidden house has none). */
+export function guildSigns(houses: readonly GuildHouse[]): Map<number, [number, number, number]> {
+  const out = new Map<number, [number, number, number]>();
+  for (const { guild, b } of houses) if (guild.sign && !guild.hidden) out.set(b.id, hexToRgb(parseInt(guild.sign.slice(1), 16)).map((c) => Math.round(c * 255)) as [number, number, number]);
+  return out;
 }
 
 /** Each house's first grown-up teaches there (not the temple's keeper; a market trader only if nobody else). */
