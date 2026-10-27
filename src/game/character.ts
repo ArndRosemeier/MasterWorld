@@ -157,6 +157,18 @@ export class Character {
     return true;
   }
 
+  /** The debug menu's learn: also lifts the ability's skill to its level (never lowers it), so a new hero can use it at once. */
+  learnToUse(id: string): boolean {
+    if (!this.learn(id)) return false;
+    const a = abilityOf(this.setting, id)!;
+    const need = a.level ?? 0;
+    if (a.skill && (this.skills.get(a.skill) ?? 0) < need) {
+      this.skills.set(a.skill, need);
+      if (this.isMagic(a.skill)) this.mana = this.maxMana;
+    }
+    return true;
+  }
+
   /** A skill opened at its first rank (a trainer, a spell learned); a school of magic fills the mana with it. */
   openSkill(id: string): void {
     this.ranks.set(id, 0);

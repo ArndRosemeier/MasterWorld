@@ -10,12 +10,17 @@ import { onKeyDown, swallow } from '../input/keys';
 import { clock, el } from './dom';
 import { entering, shadeAround } from './window';
 
+/** A level shown in percent. */
+const pct = (v: number): string => `${Math.round(v * 100)}%`;
+
 /** What the menu needs of the running game. */
 export interface MenuHost {
   /** A dialog opened (true) or closed: the game stops taking keys and the mouse meanwhile. */
   paused(open: boolean): void;
   /** The clock, hours 0..24 (not a setting: it only moves the sun now). */
   hour: number;
+  /** The world's seed, shown beside the version (so a picture of a problem names its world). */
+  readonly seed?: string;
 }
 
 type Layout = ReadonlyMap<string, string> | undefined;
@@ -24,19 +29,19 @@ export class Menu {
   private readonly settings: HTMLDivElement;
   private readonly news: HTMLDivElement;
   private readonly body: HTMLDivElement;
-  private tab: 'controls' | 'graphics' | 'game' = 'controls';
+  private tab: 'controls' | 'graphics' | 'sound' | 'game' = 'controls';
   /** The key slot waiting for a key press. */
   private rebinding: { action: Action; slot: 0 | 1 } | null = null;
   private layout: Layout;
 
   constructor(private readonly store: SettingsStore, private readonly host: MenuHost) {
     const corner = el('div', { id: 'corner' },
-      el('span', { className: 'version', textContent: `v${versionLabel}` }),
+      el('span', { className: 'version', textContent: `v${versionLabel}${host.seed ? ` · seed ${host.seed}` : ''}` }),
       el('button', { textContent: "What's new", onclick: () => this.showDialog('news') }),
       el('button', { textContent: 'Settings', title: 'Escape', onclick: () => this.showDialog('settings') }),
     );
     this.body = el('div', { className: 'body' });
-    const tabs = el('div', { className: 'tabs' }, ...(['controls', 'graphics', 'game'] as const).map((t) =>
+    const tabs = el('div', { className: 'tabs' }, ...(['controls', 'graphics', 'sound', 'game'] as const).map((t) =>
       el('button', { className: 'tab', textContent: t[0].toUpperCase() + t.slice(1), onclick: () => { this.tab = t; this.render(); } })));
     this.settings = this.dialog('Settings', 'settings', tabs, this.body, el('div', { className: 'foot' },
       el('button', { textContent: 'Defaults', onclick: () => { this.store.reset(); this.render(); } }),
@@ -92,7 +97,7 @@ export class Menu {
   /** Draw the open tab again from the current settings. */
   private render(): void {
     const s = this.store.current;
-    this.settings.querySelectorAll('.tabs button').forEach((b, i) => b.classList.toggle('on', ['controls', 'graphics', 'game'][i] === this.tab));
+    this.settings.querySelectorAll('.tabs button').forEach((b, i) => b.classList.toggle('on', ['controls', 'graphics', 'sound', 'game'][i] === this.tab));
     const rows: Node[] = [];
     if (this.tab === 'controls') {
       rows.push(
@@ -115,12 +120,23 @@ export class Menu {
     } else if (this.tab === 'graphics') {
       rows.push(
         this.slider('Field of view', 'fov', 1, (v) => `${v.toFixed(0)}°`),
-        this.slider('Resolution', 'renderScale', 0.05, (v) => `${Math.round(v * 100)}%`),
+        this.slider('Resolution', 'renderScale', 0.05, pct),
         el('h3', { textContent: 'At the next start' }),
         this.check('Trees', 'trees'),
         this.check('Grass', 'grass'),
         this.check('WebGL 2 instead of WebGPU', 'webgl'),
         el('button', { className: 'wide', textContent: 'Restart now', onclick: () => location.reload() }),
+      );
+    } else if (this.tab === 'sound') {
+      rows.push(
+        this.check('Sound off', 'muted'),
+        this.slider('All sound', 'volume', 0.05, pct),
+        el('h3', { textContent: 'Each kind' }),
+        this.slider('Music', 'musicVolume', 0.05, pct),
+        this.slider('The world around you', 'worldVolume', 0.05, pct),
+        this.slider('Your steps and blows', 'bodyVolume', 0.05, pct),
+        this.slider('Menus and notes', 'uiVolume', 0.05, pct),
+        el('p', { className: 'hint', textContent: 'The world around you: wind, rain, birds, towns, horses, creatures. Your own: footsteps, swimming, your blows, the doors you open.' }),
       );
     } else {
       const hour = el('input', { type: 'range', min: '0', max: '24', step: '0.25', value: String(this.host.hour) });
@@ -129,7 +145,6 @@ export class Menu {
       rows.push(
         el('label', { className: 'row' }, el('span', { textContent: 'Time of day' }), hour, shown),
         this.slider('Length of a day', 'dayLength', 1, (v) => (v === 0 ? 'clock stopped' : `${v.toFixed(0)} min`)),
-        this.slider('Volume', 'volume', 0.05, (v) => `${Math.round(v * 100)}%`),
         this.check('Calm motion (a still title, no window shows)', 'calm'),
         this.check('Frame time line (HUD)', 'hud'),
         el('h3', { textContent: 'The game master' }),

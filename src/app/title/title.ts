@@ -32,6 +32,8 @@ export interface TitleWorld {
 export interface TitleMenus {
   openSettings(): void;
   whatsNew(): void;
+  /** Sound on or off (the setting; the levels are kept). */
+  toggleSound(): void;
 }
 
 const COUNTER = 'titleCount';
@@ -58,7 +60,7 @@ export class Title {
   constructor(draw: TitleDraw, private readonly sound: Sound, menus: TitleMenus, readonly calm: boolean) {
     this.draw = draw;
     console.info(`[title] ${draw.still}, ${draw.weather}, ${draw.hour.toFixed(1)} h`);
-    this.screen = new TitleScreen(draw, { start: (p) => this.start(p), settings: () => menus.openSettings(), news: () => menus.whatsNew(), sound }, calm);
+    this.screen = new TitleScreen(draw, { start: (p) => this.start(p), settings: () => menus.openSettings(), news: () => menus.whatsNew(), toggleSound: () => menus.toggleSound(), sound }, calm);
     sound.playMusic('music/title');
     // Sound is allowed after the first press, which also opens the title; the pointer leans the view.
     const firstPress = () => {

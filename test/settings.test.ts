@@ -20,3 +20,16 @@ test('settings: a change reaches the watchers; without storage the defaults hold
   assert.deepEqual(seen, [55, 70]);
   assert.deepEqual(store.start, { webgl: false, trees: true, grass: true, dayMinutes: 60 });
 });
+
+test('settings: each kind of sound has its own level, kept; sound off keeps the levels', async () => {
+  const { soundLevels } = await import('../src/app/sound');
+  const s = cleanSettings({ volume: 0.5, musicVolume: 0.2, worldVolume: 3, bodyVolume: 'loud', muted: true });
+  assert.equal(s.musicVolume, 0.2);
+  assert.equal(s.worldVolume, 1);
+  assert.equal(s.bodyVolume, DEFAULT_SETTINGS.bodyVolume);
+  assert.equal(soundLevels(s).master, 0);
+  const on = soundLevels({ ...s, muted: false });
+  assert.equal(on.master, 0.5);
+  assert.ok(on.music < soundLevels({ ...s, muted: false, musicVolume: 1 }).music);
+  assert.equal(soundLevels({ ...s, uiVolume: 0 }).ui, 0);
+});
