@@ -90,3 +90,14 @@ test('guilds: no two guild houses next door to each other where the town has roo
     for (const a of hs) for (const b of hs) if (a !== b) assert.ok(Math.hypot(a.b.cx - b.b.cx, a.b.cz - b.b.cz) >= 30, `seed ${seed}: ${a.guild.keeper} by ${b.guild.keeper}`);
   }
 });
+
+test('guilds: every guild house in a village or town has its trainer', () => {
+  for (const size of ['village', 'town'] as const) {
+    for (let seed = 1; seed <= 8; seed++) {
+      const plan = planTown({ seed, x: 0, z: 0, radius: size === 'village' ? 55 : 72, height: () => 10, size });
+      const folk = townsfolk(plan, seed), hs = guildHouses(plan, size, classic);
+      staffGuilds(folk, hs);
+      for (const h of hs) assert.equal(folk.filter((p) => p.trade === h.guild.keeper && p.work === h.b.id).length, 1, `${size} ${seed}: ${h.guild.keeper}`);
+    }
+  }
+});
