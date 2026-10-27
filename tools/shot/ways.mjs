@@ -109,9 +109,13 @@ for (const seed of [undefined, 'ways1', 'ways2', 'ways3', 'ways4', 'ways5', 'way
       }
       await page.keyboard.up('KeyW');
       await page.keyboard.up('ShiftLeft');
-      if (opened) {
-        // Turned to the side, looking down a little: the leaf beyond and the bar on the floor by the doorway.
-        await page.evaluate(() => { const c = window.game.player.heroCam; c.yaw += 0.9; c.pitch = -0.45; c.zoom = 4.2; });
+      if (opened && w.kind !== 'secret') {
+        // Looking down at where the bar was laid (or to the side, at the leaf beyond, where there is none).
+        await page.evaluate((link) => {
+          const g = window.game, c = g.player.heroCam, d = g.cellar.view.doors.get(link), h = g.player.walker.pos;
+          if (d.bar) { const b = d.bar.position; c.yaw = Math.atan2(-(b.x - h.x), -(b.z - h.z)); c.pitch = -0.6; c.zoom = 3; }
+          else { c.yaw += 0.9; c.pitch = -0.45; c.zoom = 4.2; }
+        }, w.link);
         await page.waitForTimeout(700);
         await shoot(`${tag}-side`);
       }
