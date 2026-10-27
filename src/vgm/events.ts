@@ -18,7 +18,7 @@ import { farmlandReach } from '@futuremagic/settlement';
 import type { LivestockKind, SettingModule, StoryEventDef } from '../setting/contract';
 import type { Territory } from '../sim/wild';
 import type { TownOrder } from '../sim/townLife';
-import { dungeonOf, type DecisionLog, type DungeonDecision, type EventDecision, type KeptDecision } from '../world/decisions';
+import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type EventDecision, type KeptDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import { townById, type Town } from '../world/town';
@@ -294,7 +294,7 @@ export function openBands(log: DecisionLog): Territory[] {
 /** How an event is told (its setting's words filled in), and where its lead points. */
 export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): { title: string; news: string; note: string; done: string; told: string; faded: string; label: string } | null {
   const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
-  const where = def && town && (def.kind === 'raid' ? farmOf(setting, town, e) : def.kind === 'take' ? heldOf(towns, e) : spillOf(setting, log, towns, e));
+  const where = eventWhere(setting, log, towns, e);
   if (!def || !town || !where) return null;
   const lead = setting.creatures.find((x) => x.id === e.members[0]);
   const words: Record<string, string> = {
@@ -309,10 +309,22 @@ export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | '
 
 /** The place a spill came out of, named. */
 function spillOf(setting: Pick<SettingModule, 'dungeons'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): Record<string, string> | null {
-  const from = log.find((x) => x.id === e.from), d = dungeonOf(log, from), place = d && placeOf(d, towns, setting.dungeons);
+  const place = promiseCalled(setting, log, towns, log.find((x) => x.id === e.from));
+  return place ? { place } : null;
+}
+
+/** A promised place as its town calls it ("the barrow on the hill", "the cellar under the smithy"); null if `p` is no place's promise. */
+export function promiseCalled(setting: Pick<SettingModule, 'dungeons'>, log: DecisionLog, towns: readonly Town[], p: Decision | undefined): string | null {
+  const d = dungeonOf(log, p), place = d && placeOf(d, towns, setting.dungeons);
   if (!d || !place) return null;
-  const sketch = sketchCellar(d, place, loreOf(setting, d.template), from && dwellersOf(log, from));
-  return { place: sketch.called ?? `the cellar under ${sketch.house}` };
+  const sketch = sketchCellar(d, place, loreOf(setting, d.template), p && dwellersOf(log, p));
+  return sketch.called ?? `the cellar under ${sketch.house}`;
+}
+
+/** Where an event befell, named as its words have it (`{place}`, a raid's `{animals}`); null if it cannot be told. */
+export function eventWhere(setting: Pick<SettingModule, 'events' | 'dungeons' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): Record<string, string> | null {
+  const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
+  return def && town ? (def.kind === 'raid' ? farmOf(setting, town, e) : def.kind === 'take' ? heldOf(towns, e) : spillOf(setting, log, towns, e)) : null;
 }
 
 /** The settlement a take holds, named ("the waystation"). */
@@ -333,8 +345,14 @@ const HERDS: Readonly<Record<LivestockKind, string>> = { cow: 'cattle', horse: '
 
 /** The town gathers at its market to talk an event over (the setting's `gather` hours), or null. */
 export function gatherFor(setting: Pick<SettingModule, 'events'>, towns: readonly Town[], e: EventDecision): TownOrder | null {
-  const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
-  if (!def?.gather || !town) return null;
+  const def = (setting.events ?? []).find((x) => x.id === e.event);
+  return def?.gather ? gatherAt(towns, e.town, 14, e.at, e.at + def.gather) : null;
+}
+
+/** Everyone awake in town `id` gathers within `radius` of its market's middle from game hour `from` to `to` (null: no such town). */
+export function gatherAt(towns: readonly Town[], id: string, radius: number, from: number, to: number): TownOrder | null {
+  const town = townById(towns, id);
+  if (!town) return null;
   const [x, z] = town.plan.centre;
-  return { kind: 'gather', x, z, radius: 14, from: e.at, to: e.at + def.gather };
+  return { kind: 'gather', x, z, radius, from, to };
 }

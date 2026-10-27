@@ -14,7 +14,7 @@ import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
-import { meet } from './acts.mjs';
+import { meet, standClear } from './acts.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 const EXTRA = process.env.EVENTS_QUERY ?? '';
@@ -99,13 +99,16 @@ else {
       const g = window.game, folk = g.towns.get(town).life.agents.filter((a) => a.post);
       if (!folk.length) return null;
       const x = folk.reduce((s, a) => s + a.x, 0) / folk.length, z = folk.reduce((s, a) => s + a.z, 0) / folk.length;
-      g.player.teleport(x + 12, undefined, z + 4, Math.atan2(12, 4));
-      return { n: folk.length, hurt: folk.filter((a) => a.act === 'hurt').length };
+      g.player.teleport(x + 40, undefined, z, Math.PI / 2);
+      return { x, z, n: folk.length, hurt: folk.filter((a) => a.act === 'hurt').length };
     }, held.town);
     console.log(`refugees: ${camp ? `${camp.n} at their camp, ${camp.hurt} hurt` : 'NONE CAMPED'}`);
     if (!camp) failed = true;
     else {
-      await page.waitForTimeout(5000);
+      // Close, from a side with no trunk between, and shot while the cry still shows.
+      await page.waitForTimeout(3000);
+      await standClear(page, camp, 8);
+      await page.waitForTimeout(1500);
       const cry = await page.evaluate(() => window.game.speech.line);
       console.log(`their cry: ${cry ?? 'NONE'}`);
       if (!cry) failed = true;

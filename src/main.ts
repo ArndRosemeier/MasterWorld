@@ -57,6 +57,7 @@ import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
 import { criesDue, situationOf, smokesAt } from './vgm/situations';
+import { festivitiesOf, festivityOrder, festivityTold } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
@@ -1233,6 +1234,7 @@ export async function start(b: Boot): Promise<void> {
       storyEvent: (id?: string) => storyEventNow(id),
       answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
       situation: (kind) => { const m = situationNow(kind); return m ? `${m.tool}: ${m.reason}` : `no ${kind} here`; },
+      goodDay: () => goodDayNow(),
       vgmLog: () => vgmLines(log, vgmLog),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
@@ -1244,7 +1246,7 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1361,6 +1363,8 @@ export async function start(b: Boot): Promise<void> {
     /** Situations whose cry was called (C10), and the time to the next look for one due. */
     const cried = new Set<string>();
     let cryClock = 0, smokeClock = 0;
+    /** The good days whose towns already tell them as past. */
+    const feasted = new Set<string>();
     const speech = new Speech(view.camera);
     const answerOverdue = (below: boolean): void => {
       const need = director.overdue, now = performance.now() / 1000;
@@ -1408,6 +1412,14 @@ export async function start(b: Boot): Promise<void> {
         console.info(`[vgm] sight ${d.id} (${d.sight}) at ${d.x.toFixed(0)}, ${d.z.toFixed(0)}: ${m.reason}`);
         regionSites?.sync(log);
         void roadWork.clear(d);
+      } else if (d.kind === 'festivity') {
+        // A good day (C11): the town gathers at its market; a feast for the hero's deed is told to them.
+        console.info(`[vgm] ${d.id} (${d.festivity}) in ${d.town}, ${d.from.toFixed(1)} to ${d.to.toFixed(1)} h`);
+        const t = towns?.get(d.town), order = festivityOrder(terrain.towns, d);
+        if (t && order) orderTown(t, order);
+        t?.promised(d);
+        const told = festivityTold(setting, log, terrain.towns, d);
+        if (told && (d.for || here() === t)) notes.say(told.news, 7);
       } else if (d.kind === 'kept' && d.faded) {
         // An event left alone ran its course (C11): its band goes, unseen; the town tells how it ended.
         const ev = log.find((x) => x.id === d.promise);
@@ -1441,6 +1453,8 @@ export async function start(b: Boot): Promise<void> {
       applied(m);
       return m;
     };
+    /** A good day now (the debug menu, shots): what was made, or why none came. */
+    const goodDayNow = (): string => { const m = vgmStep({ tools: ['festivity'], early: true })[0]; return m ? `${m.tool}: ${m.reason}` : 'no good day here'; };
     /** A story event now (the debug menu): what the town hears, or why none came. */
     const storyEventNow = (which?: string): string => {
       if (!start || !wild) return 'no wild here';
@@ -1535,6 +1549,8 @@ export async function start(b: Boot): Promise<void> {
       // Raided farms' barns smoulder (C10): looked up now and then, the puffs rise every frame.
       if ((smokeClock -= dt) <= 0) {
         smokeClock = 1;
+        // Good days over: their towns tell them as past (C11).
+        for (const f of festivitiesOf(log)) if (f.to <= hours() && !feasted.has(f.id)) { feasted.add(f.id); towns?.get(f.town)?.ended(f.id); }
         smoke.burn(smokesAt(log, terrain.towns, setting, hours()).map((s) => ({ x: s.x, y: terrain.height(s.x, s.z) + 2, z: s.z, thick: s.thick })));
       }
       smoke.billow(dt);

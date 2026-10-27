@@ -333,7 +333,23 @@ export interface StrayDecision {
   readonly situation: string;
 }
 
-export type Decision = StrayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/**
+ * A good day in a town (C11): a feast for a deed of the hero's (`for`: the promise they kept), or a market
+ * day. Its people gather at the market from game hour `from` to `to`; logged at `at`.
+ */
+export interface FestivityDecision {
+  readonly kind: 'festivity';
+  readonly id: string;
+  /** The setting's festivity. */
+  readonly festivity: string;
+  readonly town: string;
+  readonly at: number;
+  readonly from: number;
+  readonly to: number;
+  readonly for?: string;
+}
+
+export type Decision = FestivityDecision | StrayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 
