@@ -118,8 +118,22 @@ const SESSIONS = [
   ] },
   { id: 'village', query: `${still}&hour=16&weather=fair&site=village`, shots: [{ name: 'village' }] },
   // The dwarves' hold (plan 11.6): before its gate as a stranger, the wardens calling out.
-  { id: 'hold', query: `${still}&hour=15&weather=fair&hold=stranger`, shots: [{ name: 'hold' }] },
+  // Then from the court's far corner across to the crag it is cut into (clear of the woods), and up to a carved warden.
+  { id: 'hold', query: `${still}&hour=15&weather=fair&hold=stranger`, shots: [
+    { name: 'hold' },
+    { name: 'hold-crag', act: atHold(10, 21, -14, -2) },
+    { name: 'hold-warden', act: atHold(3, 10, 7.6, 4) },
+  ] },
 ];
+
+/** Puts the hero at (u, v) of the hold's gate frame (out of the gate is +v), looking at (lu, lv). */
+function atHold(u, v, lu, lv) {
+  return (p) => p.evaluate(([u, v, lu, lv]) => {
+    const g = window.game, s = g.hold.site, c = Math.cos(s.yaw), n = Math.sin(s.yaw);
+    const du = lu - u, dv = lv - v;
+    g.player.teleport(s.x + u * c + v * n, undefined, s.z - u * n + v * c, Math.atan2(du * c + dv * n, -du * n + dv * c) + Math.PI);
+  }, [u, v, lu, lv]);
+}
 
 const only = process.env.SET_ONLY?.split(',');
 const sessions = only ? SESSIONS.filter((s) => only.includes(s.id)) : SESSIONS;

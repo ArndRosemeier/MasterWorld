@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { CELL, STOREY, outlineCellar } from '../src/world/dungeon/cellar';
 import { CaveSpace, caveField, caveShell } from '../src/world/dungeon/caveRock';
-import { caveMouth, inMouthShape, MOUTH_WAY_DOWN } from '../src/world/dungeon/caveMouth';
+import { caveMouth, MOUTH_WAY_DOWN } from '../src/world/dungeon/caveMouth';
+import { inWalkRaster } from '../src/world/dungeon/rockMesh';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../src/world/dungeon/towerMesh';
 import { inFrame, onLand } from '../src/world/dungeon/site';
 import { torchSpots } from '../src/world/dungeon/torches';
@@ -42,10 +43,10 @@ test('cave mouth: a crag on the hillside, its way in open from the land to the w
   const m = caveMouth(5, slope);
   assert.ok(m.mesh.index.length > 0);
   // Straight in from the front to the way down, a body is never in the rock's way.
-  for (let z = 4; z >= MOUTH_WAY_DOWN.z; z -= 0.25) assert.ok(!inMouthShape(m, 0, z), `blocked at z ${z}`);
+  for (let z = 4; z >= MOUTH_WAY_DOWN.z; z -= 0.25) assert.ok(!inWalkRaster(m.walk, 0, z), `blocked at z ${z}`);
   // Beside the mouth and behind it, the crag is in the way.
-  assert.ok(inMouthShape(m, 3.6, -3) || inMouthShape(m, -3.6, -3), 'flanks of rock');
-  assert.ok(inMouthShape(m, 0, -9), 'rock over the way down');
+  assert.ok(inWalkRaster(m.walk, 3.6, -3) || inWalkRaster(m.walk, -3.6, -3), 'flanks of rock');
+  assert.ok(inWalkRaster(m.walk, 0, -9), 'rock over the way down');
   // Seeded.
   assert.deepEqual(caveMouth(5, slope).mesh.position, m.mesh.position);
 });

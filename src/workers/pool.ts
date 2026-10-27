@@ -115,6 +115,11 @@ export class TerrainJobs {
     return this.job({ kind: 'caveMouth', site, cave });
   }
 
+  /** A people's hold's crag and carved wardens at its site (world/holdRock.ts): most of a second of work. */
+  holdRock(site: import('../world/dungeon/site').Site & { readonly level: number }, rock: number): Promise<import('../world/holdRock').HoldRock> {
+    return this.job({ kind: 'holdRock', site, rock });
+  }
+
   /** The ground masks of the town of this id (world/townMask.ts), `w` × `h` texels each. */
   townMask(id: string, w: number, h: number): Promise<Uint8Array> {
     return this.job({ kind: 'townMask', id, w, h });

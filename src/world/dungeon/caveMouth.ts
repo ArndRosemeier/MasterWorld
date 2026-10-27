@@ -11,7 +11,7 @@
 import { Noise, Rng, deriveSeed, smin, smoothstep } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { WildMat, scaleTint, type Tint } from './meshKit';
-import { meshField, type Field } from './rockMesh';
+import { cragMat, meshField, walkRaster, type Field, type WalkRaster } from './rockMesh';
 import { onLand, type Site } from './site';
 
 /** Where in the mouth the hero goes down (its frame). */
@@ -28,10 +28,8 @@ const RASTER = 0.25;
 /** The rock and its ground, sampled; and where on the ground a body cannot stand. */
 export interface CaveMouth {
   readonly mesh: BuildingMesh;
-  /** Raster over the frame's x −half..half, z back..front: 1 where the rock is in the way of a body. */
-  readonly blocked: Uint8Array;
-  readonly cols: number;
-  readonly rows: number;
+  /** Over the frame's x −half..half, z back..front: where the rock is in the way of a body. */
+  readonly walk: WalkRaster;
 }
 
 /**
@@ -111,16 +109,13 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
   const field: Field = { ox: -EXTENT.half, oy, oz: EXTENT.back, step: STEP, nx, ny, nz, d };
   const look = new Noise(deriveSeed(seed, 'cave', 'mouth-look'));
   const mesh = meshField(field, {
-    // Only the crag and its fillet: the plain ground around and the floor of the way in are the land's own.
-    mat: (x, y, z, up) => {
-      const h = groundUnder(x, z);
-      // Not the field's own edges (where it is cut off).
-      if (Math.abs(x) > EXTENT.half - 0.6 || z < EXTENT.back + 0.6 || z > EXTENT.front - 0.6) return null;
-      if (crag.rock(x, y, z) > 2.4) return null;
-      if (up > 0.6 && y < h + 0.35) return null;
-      // Turf on the knoll's top and flanks, bare rock on its face.
-      return up > 0.45 && (up > 0.75 || y > h + crag.top(x, z) - 0.7) ? WildMat.Grass : WildMat.Rock;
-    },
+    // Only the crag and its fillet (the plain ground around and the floor of the way in are the land's own), not
+    // the field's own edges (where it is cut off); turf on the knoll's top and flanks, bare rock on its face.
+    mat: cragMat(
+      (x, _y, z) => Math.abs(x) < EXTENT.half - 0.6 && z > EXTENT.back + 0.6 && z < EXTENT.front - 0.6,
+      (x, y, z) => crag.rock(x, y, z), groundUnder,
+      (x, y, z, up) => up > 0.45 && (up > 0.75 || y > groundUnder(x, z) + crag.top(x, z) - 0.7),
+    ),
     tint: (x, y, z, m) => {
       // Deeper in the way, darker, until it is black where it goes on down.
       const inside = crag.tunnel(x, y, z) > -0.7 ? smoothstep(0.3, 7.5, -z) : 0;
@@ -134,31 +129,22 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
     mesh.position[3 * v + 1] -= 0.15 * smoothstep(1.2, 2.4, crag.rock(x, y, z));
   }
   // The walk raster: rock at knee or chest height over the ground.
-  const cols = Math.ceil((2 * EXTENT.half) / RASTER), rows = Math.ceil((EXTENT.front - EXTENT.back) / RASTER);
-  const blocked = new Uint8Array(cols * rows);
   const airNear = (x: number, y: number, z: number) => {
     const u = (x + EXTENT.half) / STEP, w = (z - EXTENT.back) / STEP;
     const i = Math.max(0, Math.min(nx - 1, Math.round(u))), k = Math.max(0, Math.min(nz - 1, Math.round(w)));
     return air(i, y, k);
   };
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    const x = -EXTENT.half + (c + 0.5) * RASTER, z = EXTENT.back + (r + 0.5) * RASTER, h = groundUnder(x, z);
-    if (airNear(x, h + 0.8, z) < BODY || airNear(x, h + 1.4, z) < BODY) blocked[r * cols + c] = 1;
-  }
-  return { mesh, blocked, cols, rows };
+  const walk = walkRaster(-EXTENT.half, EXTENT.half, EXTENT.back, EXTENT.front, RASTER, (x, z) => {
+    const h = groundUnder(x, z);
+    return airNear(x, h + 0.8, z) < BODY || airNear(x, h + 1.4, z) < BODY;
+  });
+  return { mesh, walk };
 }
 
 /** The mouth at a site on the land (`height`: the land's height), heights from the ground at the mouth. */
 export function mouthOnLand(height: (x: number, z: number) => number, site: Site, seed: number): CaveMouth {
   const h0 = height(site.x, site.z);
   return caveMouth(seed, (x, z) => { const [wx, wz] = onLand(site, x, z); return height(wx, wz) - h0; });
-}
-
-/** Is a body at (x, z) of the mouth's frame in the rock's way? */
-export function inMouthShape(m: Pick<CaveMouth, 'blocked' | 'cols' | 'rows'>, x: number, z: number): boolean {
-  const c = Math.floor((x + EXTENT.half) / RASTER), r = Math.floor((z - EXTENT.back) / RASTER);
-  if (c < 0 || r < 0 || c >= m.cols || r >= m.rows) return false;
-  return m.blocked[r * m.cols + c] === 1;
 }
 
 /** How far the mouth's rock reaches from its site, metres (for quick tests). */

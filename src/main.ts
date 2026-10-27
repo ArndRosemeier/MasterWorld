@@ -619,6 +619,7 @@ export async function start(b: Boot): Promise<void> {
         cue: (c) => sounds?.cue(c),
         out: () => !visit() && !rooms?.inside && !player.offFoot,
         changed: (c) => notes.say(changeLine(c), 6),
+        jobs: terrainJobs,
       }, holdSite, holdPeople, {
         height: (x, z) => terrain.height(x, z),
         waterDepth: (x, z) => terrain.waterDepth(x, z),

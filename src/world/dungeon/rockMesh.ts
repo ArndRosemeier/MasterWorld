@@ -8,7 +8,7 @@
 import { lerp } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { PAD, surfaceNets, type Grid } from '@futuremagic/volume';
-import type { Tint } from './meshKit';
+import { WildMat, type Tint } from './meshKit';
 
 /** Signed distances on a grid (positive in air). */
 export interface Field {
@@ -97,4 +97,44 @@ export function fieldAt(f: Field, x: number, y: number, z: number, outside = -1)
     lerp(lerp(at(i, j, k + 1), at(i + 1, j, k + 1), a), lerp(at(i, j + 1, k + 1), at(i + 1, j + 1, k + 1), a), b),
     c,
   );
+}
+
+/** Where on the ground a rock is in a body's way: a raster from (x0, z0), `step` a cell, 1 where it is. */
+export interface WalkRaster {
+  readonly blocked: Uint8Array;
+  readonly x0: number;
+  readonly z0: number;
+  readonly step: number;
+  readonly cols: number;
+  readonly rows: number;
+}
+
+/** The raster over x0..x1, z0..z1: `inWay(x, z)` at each cell's middle. */
+export function walkRaster(x0: number, x1: number, z0: number, z1: number, step: number, inWay: (x: number, z: number) => boolean): WalkRaster {
+  const cols = Math.ceil((x1 - x0) / step), rows = Math.ceil((z1 - z0) / step), blocked = new Uint8Array(cols * rows);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (inWay(x0 + (c + 0.5) * step, z0 + (r + 0.5) * step)) blocked[r * cols + c] = 1;
+  return { blocked, x0, z0, step, cols, rows };
+}
+
+/** Is a body at (x, z) in the rock's way? (Off the raster: no.) */
+export function inWalkRaster(w: WalkRaster, x: number, z: number): boolean {
+  const c = Math.floor((x - w.x0) / w.step), r = Math.floor((z - w.z0) / w.step);
+  if (c < 0 || r < 0 || c >= w.cols || r >= w.rows) return false;
+  return w.blocked[r * w.cols + c] === 1;
+}
+
+/**
+ * The faces of a crag standing out of the land (a cave's mouth, a hold's rock): none at the field's cut edges
+ * (`inside` false), none where it is only the ground (far from the rock's own surface, or level and at the
+ * ground), turf where `grass`, bare rock elsewhere.
+ */
+export function cragMat(
+  inside: (x: number, y: number, z: number) => boolean, rock: (x: number, y: number, z: number) => number,
+  ground: (x: number, z: number) => number, grass: (x: number, y: number, z: number, up: number) => boolean,
+): RockLook['mat'] {
+  return (x, y, z, up) => {
+    if (!inside(x, y, z) || rock(x, y, z) > 2.4) return null;
+    if (up > 0.6 && y < ground(x, z) + 0.35) return null;
+    return grass(x, y, z, up) ? WildMat.Grass : WildMat.Rock;
+  };
 }
