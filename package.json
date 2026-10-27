@@ -24,6 +24,7 @@
     "shot:set": "node tools/shot/set.mjs",
     "shot:origin": "node tools/shot/origin.mjs",
     "shot:spells": "node tools/shot/spells.mjs",
+    "shot:rest": "node tools/shot/rest.mjs",
     "shot:events": "node tools/shot/events.mjs",
     "shot:sights": "node tools/shot/sights.mjs",
     "variety": "node --import tsx tools/variety/cellars.ts",

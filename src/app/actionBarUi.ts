@@ -7,7 +7,7 @@
  */
 import './actionBar.css';
 import { abilityOf, type AbilityDef, type SettingModule } from '../setting/contract';
-import { BAR_SLOTS, clearSlot, placeOnBar, POTION, swapOnBar } from '../game/actionBar';
+import { BAR_SLOTS, clearSlot, placeOnBar, POTION, REST, swapOnBar } from '../game/actionBar';
 import type { Character } from '../game/character';
 import { BAR_KEYS, barSlotOf, keyLabel, type Bindings } from '../input/controls';
 import { onKeyDown } from '../input/keys';
@@ -44,10 +44,12 @@ export const DRAG_ID = 'text/x-mw-ability', DRAG_SLOT = 'text/x-mw-slot';
 
 /** The potion's quick slot as the bar and the book show it. */
 export const POTION_LOOK = { icon: '⚱', name: 'Drink a potion', text: 'Drink the best healing draught in your pack.' } as const;
+export const REST_LOOK = { icon: '☾', name: 'Rest', text: 'Sit down on the ground: health, mana and stamina come back faster. Moving, a fight or a wound ends it.' } as const;
 
 /** An ability's (or the potion's) look: glyph, name, words. */
 export function lookOf(setting: SettingModule, id: string): { icon: string; name: string; text: string; def?: AbilityDef } {
   if (id === POTION) return { ...POTION_LOOK };
+  if (id === REST) return { ...REST_LOOK };
   const def = abilityOf(setting, id);
   return { icon: def?.icon ?? '•', name: def?.name ?? id, text: def?.text ?? '', def };
 }

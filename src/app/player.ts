@@ -36,6 +36,8 @@ export class Player {
   shape: { take(dt: number): boolean; readonly aloft: boolean } | null = null;
   /** The hero's own body is not drawn (a bird flies in its place). */
   hideHero = false;
+  /** Sitting on the ground to rest (game/rest.ts): drawn sitting while the hero stands still. */
+  resting = false;
   private paused = false;
   private readonly seat = new Vector3();
   private flyingNow: boolean;
@@ -221,7 +223,7 @@ export class Player {
       // Seated on the saddle: pos is the point under it, the seat its height over the horse's ground.
       hero.animateTo({ pos: { x: ridden.x, y: riding.pos.y, z: ridden.z }, vel: riding.walker.vel, yaw: riding.yaw, gait: 'ride', seat: ridden.y - riding.pos.y }, dt);
     } else {
-      hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action }, dt);
+      hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action, rest: this.resting }, dt);
     }
     hero.visible = this.flying || !this.heroCam.firstPerson;
   }
