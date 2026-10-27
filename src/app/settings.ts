@@ -27,8 +27,15 @@ export interface Settings {
   /** Real minutes per game day; 0 stops the clock. */
   /** Real minutes a game day takes (D37: 60; 0 stops the clock). Was `dayMinutes`, stopped by default: renamed so old saves start with the game's day. */
   dayLength: number;
-  /** Music and sounds, 0..1. */
+  /** All sound, 0..1 (the master volume). */
   volume: number;
+  /** Each kind of sound under the master, 0..1 (the engine's buses: music, the world around, your own body, menus). */
+  musicVolume: number;
+  worldVolume: number;
+  bodyVolume: number;
+  uiVolume: number;
+  /** All sound off, the levels kept (the title's Sound on/off). */
+  muted: boolean;
   /** Calm motion: the title shows its still picture and windows open without their show (plan 17.1). */
   calm: boolean;
   /** How eventful the game master makes the world (D53: the one place the VGM shows; vgm/vgmLog.ts PACING). */
@@ -47,6 +54,11 @@ export const DEFAULT_SETTINGS: Settings = {
   hud: false,
   dayLength: 60,
   volume: 0.8,
+  musicVolume: 1,
+  worldVolume: 1,
+  bodyVolume: 1,
+  uiVolume: 1,
+  muted: false,
   calm: false,
   pacing: 'normal',
 };
@@ -58,6 +70,10 @@ export const RANGES = {
   renderScale: [0.5, 1],
   dayLength: [0, 120],
   volume: [0, 1],
+  musicVolume: [0, 1],
+  worldVolume: [0, 1],
+  bodyVolume: [0, 1],
+  uiVolume: [0, 1],
 } as const satisfies Partial<Record<keyof Settings, readonly [number, number]>>;
 
 /** Settings read back from storage (or anything else): every field checked, the rest from the defaults. */
@@ -67,7 +83,7 @@ export function cleanSettings(raw: unknown): Settings {
     const v = s[k];
     return typeof v === 'number' && Number.isFinite(v) ? clamp(v, RANGES[k][0], RANGES[k][1]) : DEFAULT_SETTINGS[k];
   };
-  const flag = (k: 'invertMouse' | 'trees' | 'grass' | 'webgl' | 'hud' | 'calm'): boolean => (typeof s[k] === 'boolean' ? (s[k] as boolean) : DEFAULT_SETTINGS[k]);
+  const flag = (k: 'invertMouse' | 'trees' | 'grass' | 'webgl' | 'hud' | 'calm' | 'muted'): boolean => (typeof s[k] === 'boolean' ? (s[k] as boolean) : DEFAULT_SETTINGS[k]);
   return {
     mouseSpeed: num('mouseSpeed'),
     invertMouse: flag('invertMouse'),
@@ -80,6 +96,11 @@ export function cleanSettings(raw: unknown): Settings {
     hud: flag('hud'),
     dayLength: num('dayLength'),
     volume: num('volume'),
+    musicVolume: num('musicVolume'),
+    worldVolume: num('worldVolume'),
+    bodyVolume: num('bodyVolume'),
+    uiVolume: num('uiVolume'),
+    muted: flag('muted'),
     calm: flag('calm'),
     pacing: typeof s.pacing === 'string' && s.pacing in PACING ? (s.pacing as Pacing) : DEFAULT_SETTINGS.pacing,
   };

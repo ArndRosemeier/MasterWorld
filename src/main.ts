@@ -755,7 +755,6 @@ export async function start(b: Boot): Promise<void> {
       if (view.camera.fov !== s.fov) { view.camera.fov = s.fov; view.camera.updateProjectionMatrix(); }
       if (scale !== s.renderScale) { scale = s.renderScale; view.renderer.setPixelRatio(pixels * scale); }
       if (params.dayMinutes === null) view.sky.dayMinutes = s.dayLength;
-      sound.volume = s.volume;
       director.pace = PACING[s.pacing];
       showHud = params.hud || s.hud;
       if (hud) hud.style.display = showHud ? '' : 'none';

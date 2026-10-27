@@ -7,14 +7,25 @@
  * steps and music every frame on `engine`.
  */
 import { AudioEngine } from '@futuremagic/audio/web';
+import type { Settings } from './settings';
 
 export type Effect = 'bell' | 'birds' | 'click' | 'dive' | 'dragon' | 'gear' | 'splash' | 'thunder' | 'ward' | 'wind';
 
 /** Loudness of each title effect against the others (the files are levelled alike). */
 const MIX: Record<Effect, number> = { bell: 0.7, birds: 0.6, click: 0.35, dive: 0.6, dragon: 0.8, gear: 0.5, splash: 0.6, thunder: 0.8, ward: 0.5, wind: 0.45 };
 
-/** Loudness of the buses under the master volume. */
+/** Loudness of the buses under the master volume (the player's levels scale these). */
 const BUSES = { music: 0.55, world: 1, body: 0.8, ui: 0.7 } as const;
+
+/** The setting that sets each bus. */
+const LEVEL = { music: 'musicVolume', world: 'worldVolume', body: 'bodyVolume', ui: 'uiVolume' } as const satisfies Record<keyof typeof BUSES, keyof Settings>;
+
+/** The engine's level for every bus and the master, from the player's settings. */
+export function soundLevels(s: Pick<Settings, 'volume' | 'muted' | (typeof LEVEL)[keyof typeof LEVEL]>): Record<keyof typeof BUSES | 'master', number> {
+  const out = { master: s.muted ? 0 : s.volume } as Record<keyof typeof BUSES | 'master', number>;
+  for (const bus of Object.keys(BUSES) as (keyof typeof BUSES)[]) out[bus] = BUSES[bus] * s[LEVEL[bus]];
+  return out;
+}
 
 export class Sound {
   readonly engine: AudioEngine;
@@ -26,11 +37,14 @@ export class Sound {
     this.engine.setVolume('master', this.master);
   }
 
-  /** Master volume, 0..1 (the setting). */
-  get volume(): number { return this.master; }
-  set volume(v: number) {
-    this.master = v;
-    this.engine.setVolume('master', v);
+  /** Whether anything can be heard (the master is above 0). */
+  get on(): boolean { return this.master > 0; }
+
+  /** Sets the master and every bus from the player's settings. */
+  mix(s: Parameters<typeof soundLevels>[0]): void {
+    const levels = soundLevels(s);
+    this.master = levels.master;
+    for (const [bus, v] of Object.entries(levels)) this.engine.setVolume(bus as keyof typeof levels, v);
   }
 
   /** Sound is allowed now (from a press). */
