@@ -51,7 +51,7 @@ export const SPELL_GLOW = defineKind('spell glow', ['position', 'normal', 'uv', 
   const bodyHeat = f4.mul(w[0]).add(glint.mul(0.8).add(pow(rim, 3.0).mul(0.4)).mul(w[1])).add(f3.mul(f3).mul(0.3).mul(w[3])).add(pow(face, 5.0).mul(0.8).mul(w[4]));
   // A mote is a soft dot whatever its motif.
   const mote = step(0.5, role);
-  const bright = mix(body, f2.mul(1.6), mote), heat = clamp(mix(bodyHeat, f4.mul(0.5), mote), 0.0, 1.0);
+  const bright = mix(body, f2.mul(1.6), mote), heat = clamp(mix(bodyHeat, f4.mul(0.15), mote), 0.0, 1.0);
   m.colorNode = mix(tint, vec3(1.0), heat).mul(bright).mul(fade);
   return m;
 }, { cast: false, receive: false });

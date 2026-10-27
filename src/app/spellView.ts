@@ -6,7 +6,7 @@
  * lies as a pulsing disc; a spell on the caster flares round them. Each school's spells shed their own motes
  * (spellMotes.ts): sparks, flakes, grit, seeds of light, glints or wisps.
  */
-import { Color, Group, IcosahedronGeometry, InstancedBufferAttribute, InstancedMesh, Object3D } from 'three/webgpu';
+import { Color, Group, IcosahedronGeometry, InstancedBufferAttribute, InstancedMesh, Object3D, Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import { deriveSeed } from '@futuremagic/core';
 import type { AbilityDef, SettingModule, SpellMotif } from '../setting/contract';
@@ -23,6 +23,9 @@ const BURST = 0.5;
 const FLARE = 0.9;
 /** Motes shed per second: by a spell being cast, behind what flies, per metre of a zone's radius. */
 const GATHER = 14, TRAIL = 45, LINGER = 3;
+/** A bolt is drawn stretched along its flight over this many seconds of it (a fast lance is a streak). */
+const STREAK = 0.035;
+const AHEAD = new Vector3(0, 0, 1);
 
 /** One fight's (or the calm land's) spells, and where its frame sits in the world. */
 export interface SpellFrame {
@@ -51,6 +54,9 @@ export class SpellView {
   private readonly motes = new Motes(deriveSeed(0x5be11, 'motes'), MOTES);
   private t = 0;
   private n = 0;
+  /** Where each bolt was last frame (by its number), for its streak. */
+  private was = new Map<number, Vector3>();
+  private readonly dir = new Vector3();
   /** Held as last drawn (shots of a spell in flight); the spells go on underneath. */
   frozen = false;
   /** What the last frame drew: things flying, bursts or flares, and motes (shots wait for them). */
@@ -103,11 +109,17 @@ export class SpellView {
         this.put(x, y, z, size, size, l, 0, 0.6 + 0.6 * share, 0);
         this.motes.shed(l.motif, l, GATHER * dt, x, y, z, 0.25);
       }
+      const was = new Map<number, Vector3>();
       for (const s of r.shots) {
-        const rad = Math.max(0.14, s.op.radius ?? 0.18), l = this.showingOf(s.ability);
-        this.put(O.x + s.x, O.y + s.y, O.z + s.z, rad, rad, l, 0, 1.2, s.n);
-        this.motes.shed(l.motif, l, TRAIL * dt, O.x + s.x, O.y + s.y, O.z + s.z, rad * 0.6);
+        const rad = Math.max(0.14, s.op.radius ?? 0.18), l = this.showingOf(s.ability), x = O.x + s.x, y = O.y + s.y, z = O.z + s.z;
+        const before = this.was.get(s.n), along = before ? this.dir.set(x, y, z).sub(before) : null;
+        const len = along && dt > 0 ? along.length() : 0;
+        if (along && len > 1e-4) this.o.quaternion.setFromUnitVectors(AHEAD, along.divideScalar(len));
+        this.put(x, y, z, rad, rad, l, 0, 1.2, s.n, Math.max(rad, (len / dt) * STREAK));
+        was.set(s.n, (before ?? new Vector3()).set(x, y, z));
+        this.motes.shed(l.motif, l, TRAIL * dt, x, y, z, rad * 0.6);
       }
+      this.was = was;
       for (const z of r.zones) {
         const fade = Math.min(1, z.left / 0.5), l = this.showingOf(z.ability);
         this.put(O.x + z.x, O.y + z.y + 0.08, O.z + z.z, z.radius, 0.06, l, 0, (0.35 + 0.12 * Math.sin(this.t * 5 + z.n)) * fade, z.n);
@@ -133,12 +145,16 @@ export class SpellView {
     this.spell.needsUpdate = true;
   }
 
-  /** One shape: an orb (sx = sy), a disc or burst (sy < sx), or a mote (role 1); k dims it. */
-  private put(x: number, y: number, z: number, sx: number, sy: number, l: Look, role: number, k: number, seed: number): void {
+  /**
+   * One shape: an orb (sx = sy), a disc or burst (sy < sx), or a mote (role 1); k dims it. `sz`: a streak's
+   * length along the turn set on `o` beforehand (unturned and round without it).
+   */
+  private put(x: number, y: number, z: number, sx: number, sy: number, l: Look, role: number, k: number, seed: number, sz?: number): void {
     const n = this.n;
     if (n >= MAX) return;
+    if (sz === undefined) this.o.quaternion.identity();
     this.o.position.set(x, y, z);
-    this.o.scale.set(sx, sy, sx);
+    this.o.scale.set(sx, sy, sz ?? sx);
     this.o.updateMatrix();
     this.mesh.setMatrixAt(n, this.o.matrix);
     this.tint.setXYZ(n, l.color.r, l.color.g, l.color.b);
