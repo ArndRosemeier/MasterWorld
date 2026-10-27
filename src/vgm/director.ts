@@ -7,6 +7,7 @@
  */
 import type { DirectorDef } from '../setting/contract';
 import { threatOf, type Threat } from '../sim/combat';
+import { PlayerModel, type PlayerModelSave, type Style } from './playerModel';
 
 export const NEEDS = ['discovery', 'challenge', 'reward', 'people', 'purpose'] as const;
 export type Need = (typeof NEEDS)[number];
@@ -37,7 +38,12 @@ export interface Signals {
 export interface DirectorSave {
   readonly needs: Readonly<Record<Need, number>>;
   readonly tension: number;
+  /** The player model (C12; none in older saves). */
+  readonly model?: PlayerModelSave;
 }
+
+/** The playstyle a need met by play shows (a fight won: a fighter; a place found: an explorer). */
+const SHOWS: Partial<Record<Need, Style>> = { challenge: 'fighter', discovery: 'explorer', people: 'socializer' };
 
 interface Queued { readonly text: string; readonly priority: number; readonly at: number }
 
@@ -80,8 +86,11 @@ export class Director {
   strict = false;
   /** The VGM's pacing (the game settings, vgmLog.ts PACING): the needs grow this many times the setting's rates. */
   pace = 1;
+  /** What this player seems to enjoy (C12): the needs it enjoys grow faster. */
+  readonly model: PlayerModel;
 
   constructor(private readonly def: DirectorDef, saved?: DirectorSave) {
+    this.model = new PlayerModel(def, saved?.model);
     this.needs = { discovery: 0, challenge: 0, reward: 0, people: 0, purpose: 0, ...(saved?.needs ?? {}) };
     this.tension = saved?.tension ?? 0;
   }
@@ -94,8 +103,9 @@ export class Director {
       // Purpose is met while there is a lead; People while among them.
       if (n === 'purpose' && s.leads > 0) this.needs.purpose = 0;
       else if (n === 'people' && s.inTown) this.needs.people = Math.max(0, this.needs.people - minutes);
-      else this.needs[n] += this.def.needs[n] * this.pace * minutes;
+      else this.needs[n] += this.def.needs[n] * this.pace * this.model.lean(n) * minutes;
     }
+    this.model.decay(dt);
     // Tension: a fight drives it to the top, nearby danger towards it, and it falls slowly after.
     const goal = s.fighting > 0 ? 0.85 + Math.min(0.15, s.pressure * 0.1) : Math.min(0.7, s.pressure * 0.5 + (s.underground ? 0.2 : 0));
     const rate = goal > this.tension ? 1.5 : 0.08;
@@ -114,6 +124,9 @@ export class Director {
   /** Play met a need (a fight met Challenge, a find met Reward, ...): `amount` 1 meets it in full. */
   met(n: Need, amount = 1): void {
     this.needs[n] = Math.max(0, this.needs[n] - amount);
+    const s = SHOWS[n];
+    if (s) this.model.note(s, amount);
+    if (n === 'challenge' && amount >= 1) this.model.count('fights');
   }
 
   /** The most overdue need, if any is due (score at least 1). */
@@ -153,7 +166,7 @@ export class Director {
   }
 
   snapshot(): DirectorSave {
-    return { needs: { ...this.needs }, tension: this.tension };
+    return { needs: { ...this.needs }, tension: this.tension, model: this.model.asSaved() };
   }
 }
 

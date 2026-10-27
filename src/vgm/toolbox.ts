@@ -22,6 +22,8 @@ export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & Omit<Even
   readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world'>;
   /** Ask only these turn tools (by id); none: all of them. */
   readonly tools?: readonly string[];
+  /** How much this player enjoys a need (C12: the player model); none: no lean. */
+  readonly lean?: (n: Need) => number;
 };
 
 export interface Tool {

@@ -71,6 +71,9 @@ export interface EveningResult {
   readonly seconds: number;
   /** Per need of the Director (plan 4.1, C9): the longest it stood overdue, seconds of play. */
   readonly overdue: Readonly<Record<Need, number>>;
+  /** What the player model made of this play at the end (C12), and how much faster Challenge grew for it. */
+  readonly style: string | null;
+  readonly challengeLean: number;
 }
 
 export interface EveningOptions {
@@ -322,6 +325,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         }
         saved = r.delve.tally();
         spells += r.spells.length;
+        for (let k = 0; k < r.spells.length; k++) director.model.count('casts');
         if (r.won && r.out) {
           say(`cleared ${name}: ${r.kills} killed, ${r.spared} spared, ${r.looted} searched, ${r.potions} potions, health ${(r.health * 100).toFixed(0)}%`);
           break;
@@ -485,9 +489,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells, overdue };
+    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells, overdue };
+  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
 }
 
 /** A point just outside a building's door. */

@@ -155,7 +155,15 @@ console.log(`smoke: ${smokeAt ? `over the barn at ${smokeAt.x.toFixed(0)}, ${smo
 if (!smokeAt) failed = true;
 else {
   await page.waitForTimeout(6000);
+  // What is drawn: the columns the view was given, and whether its mesh is shown and in the scene.
+  const drawn = await page.evaluate(() => { const s = window.game.smoke; return { shown: s.mesh.visible, staged: !!s.mesh.parent, columns: s.columns.length }; });
+  console.log(`smoke drawn: ${drawn.columns} column(s), mesh ${drawn.shown ? 'shown' : 'HIDDEN'}, ${drawn.staged ? 'in the scene' : 'NOT IN THE SCENE'}`);
+  if (!drawn.columns || !drawn.shown || !drawn.staged) failed = true;
   await shoot(`0${NEEDS.length + 4}-raid-smoke`);
+  // And close by, at the barn, to tell a column too faint to see from one not drawn at all.
+  await standClear(page, smokeAt, 25, { pitch: 0.45, zoom: 3 });
+  await page.waitForTimeout(3000);
+  await shoot(`0${NEEDS.length + 5}-raid-smoke-near`);
 }
 const sh = await page.evaluate(() => { const m = window.shaders; return m ? m.summary() : null; });
 console.log(`F3: ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}`);

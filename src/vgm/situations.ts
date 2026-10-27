@@ -15,6 +15,7 @@ import type { Terrain } from '../world/terrain';
 import { townById, type Town } from '../world/town';
 import { travellerFor, travellersOf, type NeedContext } from './answers';
 import { encounterFor } from './encounters';
+import type { Need } from './director';
 import { openEvents, refugeOf } from './events';
 
 /** The setting's situation of a kind (none: it stages none such). */
@@ -25,7 +26,9 @@ export function situationOf(setting: Pick<SettingModule, 'situations'>, kind: Si
 /** People's answer as a situation: the traveller hurt, sitting by the way (the setting's share of travellers). */
 export function hurtTravellerFor(c: NeedContext): TravellerDecision | null {
   const def = situationOf(c.setting, 'hurt-traveller');
-  if (!def || !new Rng(deriveSeed(c.seed, 'hurt', travellersOf(c.log).length + 1)).chance(def.chance ?? 0)) return null;
+  // One who enjoys meeting people meets more of them in need (C12).
+  const chance = Math.min(1, (def?.chance ?? 0) * (c.lean?.('people') ?? 1));
+  if (!def || !new Rng(deriveSeed(c.seed, 'hurt', travellersOf(c.log).length + 1)).chance(chance)) return null;
   const d = travellerFor(c);
   return d && { ...d, situation: def.id };
 }
@@ -39,6 +42,8 @@ export interface PaddockContext {
   readonly setting: Pick<SettingModule, 'situations' | 'encounters' | 'creatures'>;
   /** Now, whatever the hour and the days between (the debug menu). */
   readonly early?: boolean;
+  /** How much this player enjoys a need (C12): a fighter meets wolves at the paddock more often. None: no lean. */
+  readonly lean?: (n: Need) => number;
 }
 
 /** How far the wolves roam round where they prowl (m), and how far outside the paddock's fence they are. */
@@ -58,7 +63,9 @@ export function paddockWolvesFor(c: PaddockContext): WildDecision | null {
   const def = situationOf(c.setting, 'paddock-wolves'), town = c.near;
   if (!def || !town || !town.plan.paddocks.length || !def.hours || !def.encounter) return null;
   const hour = ((c.hours % 24) + 24) % 24, last = stagedOf(c.log, 'wild', town.decision.id).at(-1);
-  if (!c.early && (hour < def.hours[0] || hour >= def.hours[1] || (last && c.hours - last.at < (def.every ?? 1) * 24))) return null;
+  // A fighter meets them more often (C12: the days between shrink with how much they enjoy a fight).
+  const every = ((def.every ?? 1) * 24) / (c.lean?.('challenge') ?? 1);
+  if (!c.early && (hour < def.hours[0] || hour >= def.hours[1] || (last && c.hours - last.at < every))) return null;
   const n = stagedOf(c.log, 'wild').length + 1, s = deriveSeed(c.seed, 'situation', def.id, n), r = new Rng(s);
   const pd = r.pick(town.plan.paddocks), [cx, cz] = polyCentroid(pd.poly);
   let reach = 0;

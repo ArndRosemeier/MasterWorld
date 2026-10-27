@@ -6,6 +6,7 @@
  * under a stone), placed the same way. Challenge: an ambush, a group of the wild lying in wait ahead. People: a
  * town's traveller resting by the way. Pure, seeded.
  */
+import type { Need } from './director';
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { rollLoot, type Loot } from '../game/items';
 import type { SettingModule, SightDef } from '../setting/contract';
@@ -31,6 +32,8 @@ export interface NeedContext {
   readonly hero: { readonly x: number; readonly z: number };
   /** Where the hero is going (a lead's place, a town), if the game knows; else round about them. */
   readonly toward: { readonly x: number; readonly z: number } | null;
+  /** How much this player enjoys a need (C12: the player model's lean, 1 as usual); none: no lean. */
+  readonly lean?: (n: Need) => number;
 }
 
 /** How far ahead on the way a sight stands (m), and how far to the side of it. */

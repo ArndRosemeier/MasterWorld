@@ -343,7 +343,7 @@ export class Cellars {
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
     visit.onDepth = (below) => {
       // The first time down a place meets the Director's Discovery (plan 4.1, C9); a saved visit was found before.
-      if (below && !space && !this.found.has(s.decision.id)) { this.found.add(s.decision.id); h.director.met('discovery'); }
+      if (below && !space && !this.found.has(s.decision.id)) { this.found.add(s.decision.id); h.director.met('discovery'); h.director.model.count('leads'); }
       h.depth(below, [view.group, ...(s.ready ? [s.ready.creatures.group] : [])]);
     };
     visit.onSwap = () => h.swapped();

@@ -943,6 +943,11 @@ export interface EffectDef {
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */
 export interface DirectorDef {
   readonly needs: Readonly<Record<'discovery' | 'challenge' | 'reward' | 'people' | 'purpose', number>>;
+  /**
+   * The player model's leans (C12, vgm/playerModel.ts): for each playstyle, how many times faster a need it
+   * enjoys grows (1: as usual). Mixed by how much of each style the player shows. None: no lean.
+   */
+  readonly styles?: Readonly<Partial<Record<'explorer' | 'fighter' | 'socializer' | 'crafter' | 'mage', Readonly<Partial<Record<'discovery' | 'challenge' | 'reward' | 'people' | 'purpose', number>>>>>>;
 }
 
 /** Names of one people (by Actors' race id): given names and the family names households share. */
