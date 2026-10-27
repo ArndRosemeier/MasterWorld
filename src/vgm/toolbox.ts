@@ -7,7 +7,7 @@
  */
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
-import { ambushFor, sightFor, type NeedContext } from './answers';
+import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
 import { lairFor, nextEvent, type EventsContext } from './events';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 
@@ -65,6 +65,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
   { id: 'cache', name: 'A find by the way', writes: ['sight'], need: 'reward', asked: 'need', answer: (c) => sightFor(c, 'reward') },
   { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },
+  { id: 'traveller', name: 'A traveller by the way', writes: ['traveller'], need: 'people', asked: 'need', answer: travellerFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },

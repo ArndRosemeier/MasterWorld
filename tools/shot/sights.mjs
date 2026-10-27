@@ -2,7 +2,7 @@
  * The VGM's answers on the hero's way (implementation plan C9): `node tools/shot/sights.mjs [out dir]` after
  * `npm run build` (and `npm run packs`), SHOT_GPU=1 on the reference machine. The hero stands out on the
  * land east of the start town; the VGM answers Discovery there three times and Reward once (a find, which
- * must go into the pack), each a walk further on, then Challenge (an ambush, seen from 14 m): the hero steps up to 16 m of each (inside its glade), the game must say what it
+ * must go into the pack), each a walk further on, then Challenge (an ambush, seen from 14 m), then People (a traveller resting by the way, from 6 m): the hero steps up to 16 m of each (inside its glade), the game must say what it
  * is, and it is shot. JPEGs into `<out dir>` (default `shots/sights/<date>-<commit>/`). A slow check (docs/CHECKS.md),
  * well under 5 min.
  */
@@ -79,6 +79,27 @@ else {
   await meet('ambush', 14)(page);
   await page.waitForTimeout(2500);
   await shoot(`0${NEEDS.length + 1}-ambush`);
+}
+// People's answer: a town's traveller resting by the way, seen from 6 m before them; there the hero is
+// with that town's people.
+await page.evaluate(() => {
+  const g = window.game, d = g.towns.every[0].town.decision;
+  g.player.teleport(d.x - d.radius - 260, undefined, d.z + 500, Math.PI / 2);
+});
+await page.waitForTimeout(2500);
+const met = await page.evaluate(() => { const m = window.game.answerNow('people'); return m ? { id: m.decision.id, reason: m.reason, ...m.decision } : null; });
+console.log(`traveller: ${met ? `${met.id}: ${met.reason}` : 'none'}`);
+if (!met) failed = true;
+else {
+  const with_ = await page.evaluate((d) => {
+    const g = window.game, x = d.x + Math.sin(d.yaw) * 6, z = d.z + Math.cos(d.yaw) * 6;
+    g.player.teleport(x, undefined, z, Math.atan2(x - d.x, z - d.z));
+    return g.towns.townAt(x, z)?.id ?? null;
+  }, met);
+  console.log(`with the people of ${with_ ?? 'NOBODY'}`);
+  if (with_ !== met.town) failed = true;
+  await page.waitForTimeout(2500);
+  await shoot(`0${NEEDS.length + 2}-traveller`);
 }
 const sh = await page.evaluate(() => { const m = window.shaders; return m ? m.summary() : null; });
 console.log(`F3: ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}`);

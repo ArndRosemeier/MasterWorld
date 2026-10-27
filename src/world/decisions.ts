@@ -291,7 +291,25 @@ export interface SightDecision {
   readonly at: number;
 }
 
-export type Decision = SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/**
+ * People's answer (C9): a town's traveller (the one who comes and goes, lodging at its inn) met by the
+ * hero's way, resting there facing the way the hero comes from, from game hour `at` until `until`; then on
+ * their way again.
+ */
+export interface TravellerDecision {
+  readonly kind: 'traveller';
+  readonly id: string;
+  /** The town whose traveller it is. */
+  readonly town: string;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  readonly seed: number;
+  readonly at: number;
+  readonly until: number;
+}
+
+export type Decision = TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 
