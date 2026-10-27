@@ -5,6 +5,9 @@
  * way, which opens the school), the mana filled, a wolf picked with Tab and the spell cast; the picture is taken
  * once the spell shows (in flight, bursting or flaring), the spells' drawing held still for it. JPEGs into
  * `<out dir>` (default `shots/spells/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
+ *
+ * F3 in a fight with every school (C4): no shader is built for a spell once play has begun (the spells' one
+ * shader is built behind the loading screen), and the shader monitor counts no violations.
  */
 import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -37,6 +40,8 @@ const firsts = await page.evaluate(() => {
   return magic.map((k) => setting.abilities.find((a) => a.skill === k && (a.level ?? 0) === 0)?.id).filter(Boolean);
 });
 let failed = false;
+const shaders = () => page.evaluate(() => { const m = window.shaders; return m ? { ...m.summary(), lines: m.violations(), built: m.events.filter((e) => e.phase === 'run').map((e) => e.what) } : null; });
+const before = await shaders();
 for (const [i, id] of firsts.entries()) {
   await page.evaluate((id) => {
     const g = window.game, h = g.character;
@@ -59,6 +64,13 @@ for (const [i, id] of firsts.entries()) {
   if (!shown) failed = true;
   await page.evaluate(() => { window.game.spellView.frozen = false; });
   await page.waitForTimeout(1500);
+}
+const after = await shaders();
+if (!after) { failed = true; console.log('F3: no shader monitor'); }
+else {
+  const spellBuilds = after.built.slice(before.built.length).filter((w) => /spell/i.test(w));
+  console.log(`F3: ${after.violations} shader violations · ${after.run - before.run} builds while casting${spellBuilds.length ? ` · spell shaders built in play: ${spellBuilds.join(', ')}` : ''} · worst build ${after.worstMs.toFixed(1)} ms`);
+  if (after.violations || spellBuilds.length) { failed = true; console.log(after.lines.join('\n')); }
 }
 if (errors.length) { failed = true; console.log(errors.join('\n')); }
 await browser.close();

@@ -18,12 +18,12 @@ export const skills: readonly SkillDef[] = [
   { id: 'orientation', name: 'Orientation', group: 'survival', start: 10, rate: 0.6, open: true },
   { id: 'speech', name: 'Speech', group: 'social', start: 12, rate: 0.8, open: true },
   // The six schools that came back after the Fading (plan 10, 12.1): nobody starts with one; a teacher opens it (C3).
-  { id: 'pyromancy', name: 'Pyromancy', group: 'magic', start: 0, rate: 0.9, color: [1, 0.48, 0.14] },
-  { id: 'cryomancy', name: 'Cryomancy', group: 'magic', start: 0, rate: 0.9, color: [0.55, 0.85, 1] },
-  { id: 'geomancy', name: 'Geomancy', group: 'magic', start: 0, rate: 0.9, color: [0.78, 0.6, 0.36] },
-  { id: 'vitae', name: 'Vitae', group: 'magic', start: 0, rate: 0.9, color: [0.45, 1, 0.5] },
-  { id: 'luminism', name: 'Luminism', group: 'magic', start: 0, rate: 0.9, color: [1, 0.9, 0.55] },
-  { id: 'umbramancy', name: 'Umbramancy', group: 'magic', start: 0, rate: 0.9, color: [0.62, 0.38, 1] },
+  { id: 'pyromancy', name: 'Pyromancy', group: 'magic', start: 0, rate: 0.9, color: [1, 0.48, 0.14], motif: 'flame' },
+  { id: 'cryomancy', name: 'Cryomancy', group: 'magic', start: 0, rate: 0.9, color: [0.55, 0.85, 1], motif: 'frost' },
+  { id: 'geomancy', name: 'Geomancy', group: 'magic', start: 0, rate: 0.9, color: [0.78, 0.6, 0.36], motif: 'stone' },
+  { id: 'vitae', name: 'Vitae', group: 'magic', start: 0, rate: 0.9, color: [0.45, 1, 0.5], motif: 'bloom' },
+  { id: 'luminism', name: 'Luminism', group: 'magic', start: 0, rate: 0.9, color: [1, 0.9, 0.55], motif: 'radiance' },
+  { id: 'umbramancy', name: 'Umbramancy', group: 'magic', start: 0, rate: 0.9, color: [0.62, 0.38, 1], motif: 'shade' },
 ];
 
 export const abilities: readonly AbilityDef[] = [

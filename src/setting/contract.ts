@@ -211,7 +211,13 @@ export interface SkillDef {
   readonly open?: boolean;
   /** Its colour (sRGB 0..1): a school of magic's spells glow in it. */
   readonly color?: readonly [number, number, number];
+  /** How a school's spells move and shimmer (C4): one of the engine's motifs; radiance by default. */
+  readonly motif?: SpellMotif;
 }
+
+/** The spell looks the engine draws (C4): flickering tongues, glittering ice, dull grit, pulsing growth, rays, a hollow dark. */
+export const SPELL_MOTIFS = ['flame', 'frost', 'stone', 'bloom', 'radiance', 'shade'] as const;
+export type SpellMotif = (typeof SPELL_MOTIFS)[number];
 
 /** How a blow lands: the engine reads it for armour, sounds and the clip. */
 export const DAMAGE_KINDS = ['cut', 'pierce', 'blunt', 'bite', 'claw', 'cold', 'fire', 'radiant', 'shadow'] as const;
