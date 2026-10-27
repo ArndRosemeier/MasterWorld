@@ -4,7 +4,8 @@
  * stairs, windows one looks out of. One walks in and out with no fade; the building shuts again once one
  * has walked away. Inside, the sky's light comes in through the openings, a lamp burns under the ceiling
  * of the storey one is on (reaching about the room: no shadows, which would build shaders for everyone it
- * lit) and the eye adapts.
+ * lit) and the eye adapts. The sun that comes in is thrown about the room (game/roomLight.ts): its
+ * value eases as the sun moves and is gone at night.
  */
 import { interiorBlocked, planInterior, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
@@ -15,6 +16,8 @@ import type { Placed } from '../render/folk/FolkView';
 import { roomCast } from '../sim/roomCast';
 import type { TownView } from '../render/town/TownView';
 import { houseKey } from '../world/town';
+import { roomBounce, roomSun, type RoomSun } from '../game/roomLight';
+import { ROOM_LIGHT } from '../render/materials/building';
 import type { Notes } from './notes';
 import type { Player } from './player';
 import type { TownDoor } from './towns';
@@ -28,6 +31,8 @@ const SERVE_STEP = 0.3;
 /** A building opens as one comes this near its door (m), and shuts once one is this far from it, outside. */
 const OPEN_AT = 7;
 const SHUT_AT = 14;
+/** How fast the room's thrown-about light follows the sun (per second): the eye takes a moment too. */
+const BOUNCE_EASE = 2;
 /** Pushing this long (s) on a stair without getting anywhere: put off it (a body wedged under a low edge). */
 const STUCK_FOR = 2;
 
@@ -47,6 +52,8 @@ export class InteriorVisit {
   private within = false;
   /** The storey the lamp burns on (-1: out). */
   private lampOn = -1;
+  /** That storey's openings and surfaces, for the sun it throws about (null: out). */
+  private room: RoomSun | null = null;
   private readonly plans = new Map<string, InteriorPlan>();
   /** On the way down to the cellar. */
   private going = false;
@@ -106,7 +113,7 @@ export class InteriorVisit {
     this.come();
   }
 
-  update(_dt: number): void {
+  update(dt: number): void {
     if (this.player.flying) return;
     const w = this.player.walker, x = w.pos.x, z = w.pos.z;
     // The nearest door within reach opens (not while one is inside another).
@@ -128,6 +135,7 @@ export class InteriorVisit {
     // The lamp on the storey one is on.
     const k = o.walk.storey(w.pos.y);
     if (k !== this.lampOn) this.lamp(k);
+    this.bounce(dt);
     const [a, bb] = o.walk.frame.toRoom(x, z);
     // Wedged on a stair for a while, pushing: off it, at the end one was heading for.
     if (w.stuckFor > STUCK_FOR) this.offStair(o, a, bb, k);
@@ -171,6 +179,8 @@ export class InteriorVisit {
     this.within = false;
     this.sky.sheltered = false;
     this.lampOn = -1;
+    this.room = null;
+    ROOM_LIGHT.bounce.value.setRGB(0, 0, 0);
     this.light.intensity = 0;
     this.light.distance = 14; // the lantern's own
   }
@@ -185,6 +195,18 @@ export class InteriorVisit {
     this.light.intensity = 10 * big;
     this.light.distance = Math.hypot(s.a1 - s.a0, s.b1 - s.b0) * 0.6 + 1.5;
     this.lampOn = k;
+    const fresh = !this.room;
+    this.room = roomSun(o.b, o.plan, k);
+    // Stepping in: the room's light is there at once (the eye adapts with the exposure meanwhile).
+    if (fresh) this.bounce(Infinity);
+  }
+
+  /** Eases the sun thrown about the room towards what comes in now (sky.ts sets the sun first). */
+  private bounce(dt: number): void {
+    if (!this.room) return;
+    const e = roomBounce(this.room, this.sky.sunDir, 1), sun = this.sky.sunColor, v = ROOM_LIGHT.bounce.value;
+    const k = Math.min(1, dt * BOUNCE_EASE);
+    v.setRGB(v.r + (sun.r * e - v.r) * k, v.g + (sun.g * e - v.g) * k, v.b + (sun.b * e - v.b) * k);
   }
 
   /** The people its town has in the open building now, placed on its spots (null: none open). */
