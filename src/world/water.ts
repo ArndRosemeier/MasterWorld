@@ -71,22 +71,24 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
     for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
       const p = j * res + i;
       if (wet[p]) continue;
-      let sum = 0, cnt = 0;
+      let sum = 0, cnt = 0, fx = 0, fz = 0;
       for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
         const a = i + di, b = j + dj;
         if (a < 0 || b < 0 || a >= res || b >= res) continue;
         const q = b * res + a;
-        if (wet[q]) { sum += out[q * 4]; cnt++; }
+        if (wet[q]) { sum += out[q * 4]; fx += out[q * 4 + 2]; fz += out[q * 4 + 3]; cnt++; }
       }
       if (!cnt) continue;
       const level = sum / cnt;
       // The true (negative) depth where the ground stands above the carried level, so the surface runs out
-      // right at the waterline on a gentle beach instead of a pixel short of it; well dry where the ground
-      // lies below it (a river's coarse pixel beside its bed), so no sheet floats over the bank.
+      // right at the waterline on a gentle beach instead of a pixel short of it. Where the ground lies below it
+      // (beside a river's bed, a dip by a brook) the surface sinks under that ground, so no sheet of still
+      // water floats over the land there. Its flow comes along, so a river's edge runs with it.
       const d = level - ground[p];
       if (pass >= DILATE && d > 0) continue;
-      out[p * 4] = level; out[p * 4 + 1] = d <= 0 ? d : DRY / 3;
-      next[p] = 2;
+      out[p * 4] = d <= 0 ? level : ground[p] + DRY / 3; out[p * 4 + 1] = d <= 0 ? d : DRY / 3;
+      out[p * 4 + 2] = fx / cnt; out[p * 4 + 3] = fz / cnt;
+      if (d <= 0) next[p] = 2;
     }
     wet.set(next);
   }
