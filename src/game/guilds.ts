@@ -7,7 +7,7 @@
  * bard at the inn knows every house. The same for every town, start town or village. Pure.
  */
 import { hexToRgb } from '@futuremagic/core';
-import { polyCentroid, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
+import { houseShape, polyCentroid, signPlace, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { GuildDef, SettingModule, SkillRankDef, TrainerDef } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
 import { dungeonOf, type DecisionLog } from '../world/decisions';
@@ -38,8 +38,11 @@ export function guildHouses(plan: TownPlan, size: GuildDef['sizes'][number], set
     const far = guild.near === 'edge' ? -1 : 1;
     // Not next door to another guild's house (two signs on one corner), unless nothing else is left.
     const apart = (h: TownBuilding) => out.every((o) => Math.hypot(h.cx - o.b.cx, h.cz - o.b.cz) >= APART);
+    // A guild with a sign takes a house whose front has wall free for it (the same rule as drawing it).
+    const signed = (h: TownBuilding) => !guild.sign || guild.hidden || !!signPlace(h, houseShape(h))?.flat;
     const free = homes.filter((h) => !taken.has(h.id)), spaced = free.filter(apart);
-    const b = (spaced.length ? spaced : free).sort((a, c) => far * (Math.hypot(a.cx - at.x, a.cz - at.z) - Math.hypot(c.cx - at.x, c.cz - at.z)) || a.id - c.id)[0];
+    const best = [spaced.filter(signed), spaced, free.filter(signed), free].find((l) => l.length) ?? [];
+    const b = best.sort((a, c) => far * (Math.hypot(a.cx - at.x, a.cz - at.z) - Math.hypot(c.cx - at.x, c.cz - at.z)) || a.id - c.id)[0];
     if (!b) continue;
     taken.add(b.id);
     out.push({ guild, b });
@@ -70,6 +73,7 @@ export function staffGuilds(people: readonly Person[], houses: readonly GuildHou
     p.role = 'trade';
     p.trade = guild.keeper;
     p.work = b.id;
+    if (guild.dress && !guild.hidden) p.dress = guild.dress;
   }
 }
 

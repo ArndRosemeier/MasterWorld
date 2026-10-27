@@ -147,6 +147,10 @@ export async function start(b: Boot): Promise<void> {
     const seedText = asked?.seed ?? params.seed;
     const seed = parseSeed(seedText);
     loading.set('Finding the start');
+    // The world worker opens the same world (a second or more of work) while this thread does, so the seas' first
+    // masks (asked at 'Filling the seas') do not wait for it: any job opens it, this one a single sample.
+    const worldPool = createWorldPool();
+    void worldPool.run({ kind: 'mask', seed, setting: setting.id, x0: 0, z0: 0, size: 1, res: 1 }).catch(() => {});
     // The VGM's first decisions: the start town (and the arch outside it) stand on the land.
     const opened = openWorld(seed, setting);
     // A save whose start town stood elsewhere (before D50 moved it to its river) belongs to a world that is
@@ -302,9 +306,25 @@ export async function start(b: Boot): Promise<void> {
     const hours = () => view.sky.day * 24 + view.sky.hour;
     wx.apply(0, view.camera.position, hours(), view.sky);
     view.sky.update(0, view.camera);
+    // The shaders build from the moment their parts exist (plan A7): the GPU compiles them while the seas, the
+    // hero, the town and the woods load on the main thread, which left it waiting for seconds at 'Preparing
+    // shaders'. The material kinds go first, once the ground's textures (which the land's shader reads) are made.
+    const capShare = view.stage.cap.share;
+    const kindsWarm = painted.then(() => view.stage.warmUp()).then(() => {
+      // While the loading screen (or the title's painted still) still covers the view, the land, trees and
+      // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
+      view.stage.cap.share = 1;
+      view.stage.monitor.phase = 'warmup';
+    });
+    // Each part compiles as soon as it is made (its shadow shaders once the kinds are warm: 'Preparing shaders').
+    const compiling: Promise<unknown>[] = [kindsWarm];
+    const compileEarly = (objs: readonly Object3D[]) => {
+      for (const o of objs) compiling.push(view.stage.prepare(o).catch((e: unknown) => console.error('[load] an early compile failed', e)));
+    };
+    compileEarly([wx.precip]);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
-    const jobs = new WorldJobs(createWorldPool(), seed, setting.id);
+    const jobs = new WorldJobs(worldPool, seed, setting.id);
     // Brook tiles ahead of the hero come from the world worker (D50).
     const brooks = new BrookPrefetch(terrain.hydro, jobs);
     // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
@@ -326,13 +346,15 @@ export async function start(b: Boot): Promise<void> {
     const startTown = towns.start;
     const sea = new WaterView(jobs);
     water = sea;
-    await sea.prime(view.camera.position);
-    // In the water from the start (now that the water is known), and the hero's body built.
-    player.resettle();
-    title?.run(0);
+    // The seas' masks come from the world worker while the hero is made here.
+    const seas = sea.prime(view.camera.position);
     loading.set('Dressing the hero');
     // In the look the player made (a save's), or a new hero of the setting drawn from the seed.
     const hero = await HeroView.load(view.stage, view.renderer, setting.hero, save?.looks?.look ?? null, seed);
+    await seas;
+    // In the water from the start (now that the water is known), and the hero's body built.
+    player.resettle();
+    title?.run(0);
     player.walker.height = hero.height;
     hero.onLook(() => { player.walker.height = hero.height; });
     player.hero = hero;
@@ -355,6 +377,7 @@ export async function start(b: Boot): Promise<void> {
     const guildBook = new GuildBook(save?.guilds);
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
     armHero();
+    compileEarly([hero.object]);
     // Classic or roguelike (plan 11.1): chosen in the creator, kept in the save. What fallen heroes left lies where they fell.
     let mode: GameMode = save?.mode ?? 'classic';
     const remains: Remains[] = [...(save?.remains ?? [])];
@@ -441,6 +464,7 @@ export async function start(b: Boot): Promise<void> {
         return s;
       });
       player.horses = horses;
+      compileEarly(horses.warmObjects());
       if (params.ride && player.steeds[0]) player.mount(player.steeds[0]);
     }
     // The farms' animals in every town's paddocks (the setting says which): bodies for the nearest.
@@ -460,6 +484,8 @@ export async function start(b: Boot): Promise<void> {
       blocked: (x, z, r) => !!towns?.solid(x, z, r),
     }, setting.smallLife) : null;
     const smallView = small ? new SmallLifeView(small, view.stage, view.renderer) : null;
+    if (stock) compileEarly(stock.toWarm());
+    if (smallView) compileEarly(smallView.toWarm());
     let folk: FolkView | null = null;
     if (startTown && params.folk > 0) {
       loading.set('Waking the town');
@@ -486,12 +512,11 @@ export async function start(b: Boot): Promise<void> {
     const raised = towns.standing(view.camera.position);
     const landReady = ground.ready(view.camera);
     loading.set('Preparing shaders');
-    await view.stage.warmUp([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm]);
-    // While the loading screen (or the title's painted still) still covers the view, the land, trees and
-    // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
-    const capShare = view.stage.cap.share;
-    view.stage.cap.share = 1;
-    view.stage.monitor.phase = 'warmup';
+    compileEarly([...(grass ? [grass.group] : []), ...folkWarm]);
+    // What is still compiling; then, the kinds warm, every part again: a cache hit for its shaders (or the build of
+    // what changed since, such as the hero's arms), and its shadow casters drawn once (Stage.prepare).
+    await Promise.all(compiling);
+    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
     let hurried = false;
     const shown = () => { view.stage.cap.share = hurried && !window.__mwReady ? 1 : capShare; view.stage.monitor.phase = hurried && !window.__mwReady ? 'warmup' : 'run'; };
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };

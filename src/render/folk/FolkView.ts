@@ -47,6 +47,10 @@ const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3(), BALL = 
 const REACH = 1.6;
 /** Seconds between two checks of every character's layers, for meshes Actors made since (a merged crowd mesh). */
 const RELAYER = 0.5;
+/** Seconds a sitter takes to settle onto the bench (about the clip's fade from walking). */
+const SETTLE = 0.5;
+/** How far the seat bones are under the hip joints for a body with hips 0.92 m up (Actors' Mount), m. */
+const SEAT_BONES = 0.085;
 /**
  * Seconds between two dressings begun. In rain the square empties and fills as people run for shelter, and each
  * dressing runs through every detail level, each of which costs Actors a rebuild of what the clothes hide: begun as
@@ -57,6 +61,11 @@ const DRESS_GAP = 0.3;
 const nextFrame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
+/**
+ * Before the game begins (`focus` set: the title covers the town): more at once. Each dressing steps a detail level
+ * a frame, and the title's frames are long while the start loads, so two at a time held the start for seconds.
+ */
+const DRESSING_EARLY = 5;
 
 /** Someone indoors, where the room has them (the app places them: render knows no rooms). */
 export interface Placed {
@@ -67,6 +76,8 @@ export interface Placed {
   /** Facing (radians, xz atan2, as the agents'). */
   dir: number;
   act: ActivityKind;
+  /** Sitting on a bench: the height of its top (the sitter's seat goes there, whatever their size). */
+  seat?: number;
 }
 
 interface Slot {
@@ -92,6 +103,8 @@ interface Slot {
   used: boolean;
   /** In the camera's view as its layers were set last (null: set them on the next frame). */
   seen: boolean | null;
+  /** Seconds since the clip began (a sitter settles onto the bench as the clip fades in). */
+  since: number;
 }
 
 export class FolkView {
@@ -112,7 +125,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null };
+      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0 };
       this.slots.push(slot);
     }
   }
@@ -254,7 +267,7 @@ export class FolkView {
     // Dress free characters for the nearest people without one.
     this.dressWait = Math.max(0, this.dressWait - dt);
     for (const [, a] of near) {
-      if (this.dressing >= DRESSING || !want.size || this.dressWait > 0) break;
+      if (this.dressing >= (this.focus ? DRESSING_EARLY : DRESSING) || !want.size || this.dressWait > 0) break;
       if (!want.has(a) || this.shown.has(a)) continue;
       const s = this.slots.find((x) => !x.agent && !x.busy);
       if (!s) break;
@@ -284,9 +297,11 @@ export class FolkView {
       const clip = clipOf(p ? p.act : a.act, a.person.id);
       if (clip !== s.clip) {
         s.clip = clip;
+        s.since = 0;
         void s.ch.play(clip);
-      }
+      } else s.since += dt;
       s.ch.update(dt);
+      if (p?.seat !== undefined && clip.startsWith('sit')) this.seatOn(s, p.x, p.seat, p.z);
     }
     // The rest (and those whose character is still being dressed) as plain figures.
     const pending = near.filter(([, a]) => !this.shown.get(a)?.ready);
@@ -324,6 +339,7 @@ export class FolkView {
     s.agent = a;
     s.ready = false;
     s.clip = clipOf(a.act, a.person.id);
+    s.since = SETTLE; // dressed already in the clip (no fade)
     this.shown.set(a, s);
     this.dressing++;
     s.busy = true;
@@ -380,6 +396,27 @@ export class FolkView {
     eachMesh(s.place, (m) => { m.layers.mask = mask; });
   }
   private relayer = 0;
+
+  /**
+   * Puts a sitter's seat on the bench top at (x, y, z): the sit clip lowers the hips by a share of their height (Actors
+   * keeps root motion in hip heights), so a halfling sank into the bench and a tall man hovered over it. The seat is
+   * under the pelvis by what it is in the bind pose (down to the seat bones, as Actors' Mount has it); eased in while
+   * the clip fades in from walking.
+   */
+  private seatOn(s: Slot, x: number, y: number, z: number): void {
+    const actor = s.ch.actor, f = actor.fittedSkeleton;
+    if (!f) return;
+    const ip = f.names.indexOf('pelvis'), il = f.names.indexOf('thigh_l'), ir = f.names.indexOf('thigh_r');
+    if (ip < 0 || il < 0 || ir < 0 || !actor.bones[ip]) return;
+    const hips = (f.heads[il][1] + f.heads[ir][1]) / 2;
+    const drop = f.heads[ip][1] - (hips - SEAT_BONES * Math.max(0.3, hips / 0.92));
+    const w = actor.bones[ip].getWorldPosition(AT);
+    s.place.parent?.worldToLocal(w);
+    const k = Math.min(1, s.since / SETTLE);
+    s.place.position.x += (x - w.x) * k;
+    s.place.position.y += (y + drop - w.y) * k;
+    s.place.position.z += (z - w.z) * k;
+  }
 
   /** What never shows casts no shadow (Actors flips its garments' polygon offsets for reversed depth itself). */
   private adapt(o: Object3D): void {

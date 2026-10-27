@@ -28,14 +28,6 @@
     "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
   },
   {
-    "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/app/interiorVisit.ts#update",
-    "reason": "Two spaces behind a way in (the cellar's dungeon space under its hatch, a building's room behind its door), each going in, out and checking its exits; the fade they share is app/fade.ts, the notes app/notes.ts. Different spaces, different checks."
-  },
-  {
-    "key": "same name: masterworld/app/interiorVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (going in and out of rooms vs chunk selection); only the name matches."
-  },
-  {
     "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",
     "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   },
@@ -318,5 +310,9 @@
   {
     "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
     "reason": "Rock beds as a sine warped by fbm noise: one line of shaping in each rock field, with its own scales and amplitudes."
+  },
+  {
+    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
   }
 ]
