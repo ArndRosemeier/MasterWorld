@@ -1,0 +1,21 @@
+[page warning] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead.
+walk 5 km at 25 m/s, direction 0: 11979 frames in 200.0 s
+frame ms: mean 16.70 · p50 16.70 · p95 16.80 · p99 16.80 · max 100.0
+main thread per frame (ms): {"frontier":0.005,"ground":0.139,"towns":0.003,"flora":0.569,"render":8.424}
+frames over 33 ms: 12; long tasks: 3
+  slow at 0.1 s: 33.3 ms (0.00 km · regions 6 (1 places drawn) · towns 1 (123 folk))
+  slow at 11.5 s: 33.4 ms (0.29 km · regions 13 (1 places drawn) · towns 1 (123 folk))
+  slow at 11.9 s: 33.3 ms (0.30 km · regions 13 (1 places drawn) · towns 1 (123 folk))
+  slow at 19.9 s: 50.1 ms (0.50 km · regions 15 (1 places drawn) · towns 1 (123 folk))
+  slow at 20.4 s: 100.0 ms (0.51 km · regions 15 (1 places drawn) · towns 1 (123 folk))
+  slow at 23.4 s: 49.9 ms (0.58 km · regions 15 (1 places drawn) · towns 1 (123 folk))
+  slow at 28.8 s: 83.3 ms (0.72 km · regions 15 (1 places drawn) · towns 1 (123 folk))
+  slow at 35.1 s: 33.3 ms (0.88 km · regions 15 (1 places drawn) · towns 1 (123 folk))
+  slow at 62.1 s: 33.2 ms (1.55 km · regions 19 (1 places drawn) · towns 1 (123 folk))
+  slow at 104.1 s: 33.4 ms (2.60 km · regions 23 (1 places drawn) · towns 1 (123 folk))
+  slow at 106.7 s: 50.0 ms (2.67 km · regions 23 (1 places drawn) · towns 1 (123 folk))
+  slow at 175.8 s: 33.4 ms (4.39 km · regions 32 (2 places drawn) · towns 2 (123 folk))
+  long task 97 ms at 52.7 s
+  long task 85 ms at 44.2 s
+  long task 56 ms at 47.3 s
+end: 5.00 km · regions 35 (3 places drawn) · towns 2 (123 folk)

@@ -1,0 +1,45 @@
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs
+
+  [title] dawn, clear, 10.9 h
+  [load] 0.0 s: Fetching the world
+page loaded 0.1
+  [load] 0.5 s: Finding the start
+  [load] 1.5 s: Starting the renderer
+title 0.41 (first paint; the probe saw it at 1.54)
+  [load] 1.8 s: Painting the ground
+  [load] 1.8 s: Filling the seas
+  [load] 1.8 s: Dressing the hero
+  [load] 5.3 s: Saddling the horses
+  [load] 5.4 s: Turning out the herds
+  [load] 5.6 s: Waking the town
+  [load] 6.9 s: Growing the woods
+  [load] 8.2 s: Dressing the townsfolk
+  [load] 8.3 s: Preparing shaders
+  [load] 17.7 s: Raising the land
+  [load] 19.6 s: Waking the cellar
+  [load] 20.1 s: Planting the trees
+  [load] 20.5 s: cellar ready (shaders 69 warm-up + 0 later · worst 12 ms · policy ok)
+  [load] 21.0 s: townsfolk ready (shaders 76 warm-up + 0 later · worst 12 ms · policy ok)
+  [load] 21.5 s: trees ready (shaders 82 warm-up + 0 later · worst 12 ms · policy ok)
+  [load] 21.5 s: Waking the townsfolk
+  [load] 23.2 s: townsfolk round the hero dressed
+playable 23.2
+  [load] 25.0 s: townsfolk, every look ready (shaders 86 warm-up + 5 later · worst 12 ms · policy ok)
+title 0.41 s · playable 23.2 s · start download 95.6 MB
+  packs/start-1-bdf6e502555f.bin     1 files    15.19 MB
+  packs/start-2-6e406f006acb.bin     1 files    15.19 MB
+  packs/start-3-e131a24531bd.bin     1 files    15.09 MB
+  packs/start-4-d1fc59464949.bin     1 files    14.38 MB
+  packs/start-0-7f0c2a8f156c.bin     1 files    13.22 MB
+  wildmesh3d                       5 files    10.55 MB
+  packs/start-5-a21ca89b2d6f.bin     1 files     7.72 MB
+  sound/music                      1 files     1.63 MB
+  assets                          37 files     0.98 MB
+  title                            4 files     0.51 MB
+  props                            1 files     0.51 MB
+  sound/title                      4 files     0.24 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: FAIL
+FAIL playable after 23.2 s (limit 20 s)

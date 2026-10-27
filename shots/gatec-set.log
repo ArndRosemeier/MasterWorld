@@ -1,0 +1,39 @@
+
+> masterworld@0.0.0 shot:set
+> node tools/shot/set.mjs shots/gatec
+
+title: ready in 48.7 s
+01-title.jpg: drawn 0.0 s · settled 1.5 s · p50 12.6 ms · p95 28.9 ms · 0 shader violations
+02-creator.jpg: drawn 0.0 s · settled 1.5 s · p50 9.8 ms · p95 11.9 ms · 0 shader violations
+town: ready in 17.0 s
+03-town-noon.jpg: drawn 0.0 s · settled 1.5 s · p50 9.6 ms · p95 13.1 ms · 0 shader violations
+04-pack.jpg: drawn 0.0 s · settled 1.5 s · p50 10.6 ms · p95 21.1 ms · 0 shader violations
+05-map.jpg: drawn 0.0 s · settled 1.5 s · p50 9.1 ms · p95 15.8 ms · 0 shader violations
+06-town-dusk.jpg: drawn 0.0 s · settled 1.5 s · p50 11.6 ms · p95 28.0 ms · 0 shader violations
+07-town-night.jpg: drawn 0.0 s · settled 1.5 s · p50 11.5 ms · p95 25.5 ms · 0 shader violations
+08-town-rain.jpg: drawn 0.0 s · settled 1.5 s · p50 11.8 ms · p95 29.5 ms · 0 shader violations
+09-paddock.jpg: drawn 0.1 s · settled 1.5 s · p50 9.6 ms · p95 12.3 ms · 0 shader violations
+10-trade.jpg: drawn 0.0 s · settled 1.5 s · p50 10.1 ms · p95 21.8 ms · 0 shader violations
+wet: ready in 14.9 s
+11-town-wet-sun.jpg: drawn 0.1 s · settled 1.5 s · p50 10.8 ms · p95 15.9 ms · 0 shader violations
+cellar: ready in 14.1 s
+12-cellar.jpg: drawn 0.0 s · settled 4.0 s · p50 4.5 ms · p95 11.6 ms · 0 shader violations
+land: ready in 13.6 s
+13-barrow.jpg: drawn 0.0 s · settled 4.0 s · p50 9.0 ms · p95 22.9 ms · 0 shader violations
+14-wild.jpg: drawn 0.4 s · settled 1.9 s · p50 8.2 ms · p95 9.6 ms · 0 shader violations
+15-fight.jpg: drawn 0.0 s · settled 1.5 s · p50 8.0 ms · p95 9.1 ms · 0 shader violations
+16-fight-magic.jpg: drawn 0.0 s · settled 1.5 s · p50 8.0 ms · p95 9.7 ms · 0 shader violations · 1 errors
+inn: ready in 14.0 s
+17-inn.jpg: drawn 0.0 s · settled 1.5 s · p50 9.0 ms · p95 12.2 ms · 0 shader violations
+talk: ready in 13.8 s
+18-talk.jpg: drawn 0.0 s · settled 2.8 s · p50 14.0 ms · p95 31.2 ms · 0 shader violations
+hamlet: ready in 12.9 s
+19-hamlet.jpg: drawn 0.1 s · settled 4.0 s · p50 10.4 ms · p95 25.3 ms · 0 shader violations
+20-road.jpg: drawn 0.4 s · settled 1.5 s · p50 11.4 ms · p95 13.2 ms · 0 shader violations
+village: ready in 12.5 s
+21-village.jpg: drawn 0.1 s · settled 4.0 s · p50 8.8 ms · p95 23.5 ms · 0 shader violations
+hold: ready in 15.9 s
+22-hold.jpg: drawn 4.2 s · settled 4.0 s · p50 15.0 ms · p95 29.8 ms · 0 shader violations
+23-hold-crag.jpg: drawn 0.1 s · settled 1.8 s · p50 10.3 ms · p95 16.0 ms · 0 shader violations
+24-hold-warden.jpg: drawn 0.2 s · settled 1.5 s · p50 13.0 ms · p95 31.0 ms · 0 shader violations
+24 shots in shots\gatec\2026-10-27-b847113 (305 s) · over the 5 min slow-check limit
