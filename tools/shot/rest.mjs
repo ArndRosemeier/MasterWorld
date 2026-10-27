@@ -40,16 +40,21 @@ const shoot = async (name) => {
   await page.screenshot({ path: file, type: 'jpeg', quality: 90, timeout: TIMEOUT });
   console.log(file);
 };
-/** Health regained over `secs` s from half health. */
+const health = () => page.evaluate(() => window.game.character.health);
+/** Down to half health (not while resting: a lower health reads as a wound, which stands the hero up). */
+const hurt = () => page.evaluate(() => { const h = window.game.character; h.health = Math.round(h.maxHealth / 2); });
+/** Health regained over `secs` s. */
 const regain = async (secs) => {
-  const from = await page.evaluate(() => { const h = window.game.character; h.health = Math.round(h.maxHealth / 2); return h.health; });
+  const from = await health();
   await page.waitForTimeout(secs * 1000);
-  return (await page.evaluate(() => window.game.character.health)) - from;
+  return (await health()) - from;
 };
 const resting = () => page.evaluate(() => window.game.character.resting);
 
 await look(Math.PI * 0.55);
+await hurt();
 const stood = await regain(5);
+await hurt();
 await page.keyboard.press('KeyX');
 if (!(await resting())) fail('the rest key did not sit the hero down');
 await page.waitForTimeout(600);
@@ -57,6 +62,7 @@ await shoot('1-sitting-down');
 await page.waitForTimeout(1500);
 await shoot('2-sat-side');
 const sat = await regain(5);
+if (!(await resting())) fail('resting ended by itself');
 await look(Math.PI * 0.95, 3.6);
 await page.waitForTimeout(400);
 await shoot('3-sat-front');
