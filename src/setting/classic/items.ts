@@ -3,7 +3,7 @@
  * of armour, potions, food, tools and valuables; a few legendary pieces with their history; what places
  * and creatures of some danger hold. Rarity and the skill bonuses are rolled when an item is found.
  */
-import type { ItemCatalog, UpkeepDef } from '../contract';
+import type { ItemCatalog, TravelDef, UpkeepDef } from '../contract';
 
 export const items: ItemCatalog = {
   items: [
@@ -85,6 +85,26 @@ export const items: ItemCatalog = {
     stealth: { prefix: 'Quiet', suffix: 'of Shadows' },
     orientation: { prefix: "Wayfinder's", suffix: 'of the Road' },
     speech: { prefix: 'Silver', suffix: 'of the Market' },
+  },
+};
+
+/**
+ * The carts between the inns (plan 5.4, C7): the carter's pair keeps a brisk trot on the roads, so the
+ * longer way by road still takes less time than running it straight; a few coppers a kilometre, about a
+ * room's price for a day's ride.
+ */
+export const travel: TravelDef = {
+  speed: 8,
+  road: 1.3,
+  perKm: 6,
+  least: 8,
+  offers: 4,
+  words: {
+    topic: 'A seat on the cart to {place} ({price})',
+    given: '{price}, and the carter leaves from the yard as soon as you are up on the bench.',
+    tooDear: 'The cart is {price}, friend, and your purse says otherwise. Your legs are free.',
+    going: 'The road goes by…',
+    arrived: 'The cart sets you down at the inn of {place}, {hours} on the road.',
   },
 };
 

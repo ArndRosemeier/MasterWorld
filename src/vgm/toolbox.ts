@@ -59,6 +59,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'event', name: 'Story event', writes: ['event', 'dungeon'], need: 'challenge', asked: 'turn', next: (c) => lairFor(c) ?? nextEvent(c),
     why: (d) => (d.kind === 'event' ? `${d.event} in ${d.town}: ${d.paddock !== undefined || d.held ? `the raiders of ${d.from} were left alone` : `${d.from} was left open too long`}` : d.kind === 'dungeon' && d.event ? `a ${d.template} for the band of ${d.event} to lie up in` : d.kind) },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
+  { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },
 ];

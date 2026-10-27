@@ -10,7 +10,7 @@ import type { Decision } from '../src/world/decisions';
 import { SMALL } from './small';
 
 /** Every kind of decision the log can hold (the compiler checks the list is whole). */
-const KINDS = { retake: 1, wild: 1, event: 1, town: 1, volume: 1, dungeon: 1, order: 1, kept: 1, 'move-in': 1, road: 1, region: 1, hold: 1, retreat: 1 } satisfies Record<Decision['kind'], 1>;
+const KINDS = { journey: 1, retake: 1, wild: 1, event: 1, town: 1, volume: 1, dungeon: 1, order: 1, kept: 1, 'move-in': 1, road: 1, region: 1, hold: 1, retreat: 1 } satisfies Record<Decision['kind'], 1>;
 
 test('toolbox: every decision in the log is some tool\'s, and every tool is well formed', () => {
   const written = new Set(TOOLS.flatMap((t) => t.writes));
