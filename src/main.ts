@@ -85,6 +85,7 @@ import { LessonsUi } from './app/lessonsUi';
 import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
 import { Orientation, mastery } from './game/orientation';
+import { HOME_SIGHT, KnownLand } from './game/knownLand';
 import { Compass, type SkyGlyph } from './app/compass';
 import { fill } from './talk/folk';
 import { Journal } from './talk/journal';
@@ -565,6 +566,10 @@ export async function start(b: Boot): Promise<void> {
     director.strict = save?.mode === 'roguelike';
     const fightHud = new FightHud(setting, () => settings.current.bindings);
     const journal = new Journal(save?.journal);
+    // The land the hero knows (plan 11.7): a new hero knows the town where the game begins; the rest is seen on the way or told of.
+    const known = new KnownLand(save?.map);
+    if (!save?.map) known.see(home.x, home.z, HOME_SIGHT);
+    let seenAt: [number, number] | null = null;
     // Every cellar the VGM promised under the town's houses: the first is built now, the others when the hero steps into the house above.
     const firstPromise = firstDungeon(log);
     const house = firstPromise ? houseOf(firstPromise, terrain.towns) : null;
@@ -1034,6 +1039,8 @@ export async function start(b: Boot): Promise<void> {
       height: (x, z) => terrain.height(x, z),
       water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
       heroBearing: () => believed(player.walker.yaw),
+      known,
+      roadLines: () => terrain.roads.roads,
       signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) }))),
     }) : null;
     // The compass at the top (plan 17.1): turns with the camera, its needle as true as the orientation skill.
@@ -1101,6 +1108,7 @@ export async function start(b: Boot): Promise<void> {
           talk: null,
           towns: towns?.toSave() ?? {},
           journal: journal.entries(),
+          map: known.landSave(),
           character: character.save(),
           standing: standing.save(),
           guilds: guildBook.bookSave(),
@@ -1218,7 +1226,7 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, journal, known, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1445,6 +1453,9 @@ export async function start(b: Boot): Promise<void> {
       talk?.watch();
       const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.offFoot && !visit());
       if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }
+      // The map fills in: the land round the hero as they go (not below ground), and a sketch of the way to each new mark.
+      if (!visit() && (!seenAt || Math.hypot(at.x - seenAt[0], at.z - seenAt[1]) > 16)) { seenAt = [at.x, at.z]; known.see(at.x, at.z); }
+      for (const l of journal.open) if (!known.told(l.id)) known.tell(l.id, rooms?.outside ? [rooms.outside.x, rooms.outside.z] : [at.x, at.z], [l.mark.x, l.mark.z]);
       compass.visible = !title?.holding && !creator?.showing && !!window.__mwReady;
       if (compass.visible) {
         const look = player.flying ? player.fly.yaw : player.heroCam.yaw;

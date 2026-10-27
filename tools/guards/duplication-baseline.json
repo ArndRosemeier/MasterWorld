@@ -152,10 +152,6 @@
     "reason": "Both fill LeadsContext.inside (vgm/leads.ts) for nextPromise: the game asks its cellars, the loop check is never below while the VGM thinks."
   },
   {
-    "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/mapUi.ts#opened",
-    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
-  },
-  {
     "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/repairUi.ts#opened",
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   },
