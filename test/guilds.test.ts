@@ -83,3 +83,10 @@ test('guilds: houses in towns and villages, none in a hamlet; trainers and a bar
   const hamlet = planTown({ seed: 5, x: 0, z: 0, radius: 45, height: () => 10, size: 'hamlet' });
   assert.deepEqual(guildHouses(hamlet, 'hamlet', classic), []);
 });
+
+test('guilds: no two guild houses next door to each other where the town has room', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const hs = guildHouses(planTown({ seed, x: 0, z: 0, radius: 72, height: () => 10 }), 'town', classic);
+    for (const a of hs) for (const b of hs) if (a !== b) assert.ok(Math.hypot(a.b.cx - b.b.cx, a.b.cz - b.b.cz) >= 30, `seed ${seed}: ${a.guild.keeper} by ${b.guild.keeper}`);
+  }
+});
