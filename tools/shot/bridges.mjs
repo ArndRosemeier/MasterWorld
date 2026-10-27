@@ -36,22 +36,29 @@ for (let k = 0; k < pts.length / 3 && shown < 3; k += 40) {
   await page.evaluate(([x, z]) => window.game.player.teleport(x, undefined, z, 0), [pts[k * 3], pts[k * 3 + 2]]);
   await page.waitForTimeout(1500);
   const list = await page.evaluate(() => window.game.bridges.bridges.map((b) => {
-    const w = b.walls.find((wl) => wl.w0 >= 0) ?? b.walls[0], m = (w.w0 >= 0 ? (w.w0 + w.w1) >> 1 : 0);
-    const n = w.pts.length / 3, a = Math.max(0, m - 1), c = Math.min(n - 1, m + 1);
-    return { id: b.id, x: w.pts[m * 3], z: w.pts[m * 3 + 1], ox: w.out[m * 2], oz: w.out[m * 2 + 1], dx: w.pts[c * 3] - w.pts[a * 3], dz: w.pts[c * 3 + 1] - w.pts[a * 3 + 1] };
+    const dx = b.x1 - b.x0, dz = b.z1 - b.z0, l = Math.hypot(dx, dz);
+    return { id: b.id, x: b.x, z: b.z, ax: dx / l, az: dz / l, len: l };
   }));
   for (const b of list) {
     if (shown >= 3 || seen.has(b.id)) continue;
     seen.add(b.id);
     shown++;
-    // From the brook, 9 m out, looking back at the arch.
-    await page.evaluate(([b]) => { const x = b.x + b.ox * 9, z = b.z + b.oz * 9; window.game.player.teleport(x, undefined, z, Math.atan2(x - b.x, z - b.z)); }, [b]);
-    await page.waitForTimeout(5000);
-    await shoot(`${shown}a-${b.id.replace(/[^\w@-]/g, '_')}-brook`);
-    // From the road, 14 m before it.
-    await page.evaluate(([b]) => { const l = Math.hypot(b.dx, b.dz) || 1, x = b.x - b.ox * 1.5 - b.dx / l * 14, z = b.z - b.oz * 1.5 - b.dz / l * 14; window.game.player.teleport(x, undefined, z, Math.atan2(x - b.x, z - b.z)); }, [b]);
-    await page.waitForTimeout(4000);
-    await shoot(`${shown}b-${b.id.replace(/[^\w@-]/g, '_')}-road`);
+    // From the brook on either side, 11 m out, looking back at the arches; then from the road before it.
+    for (const [tag, ox, oz, back] of [['brook', -b.az, b.ax, 11], ['brook2', b.az, -b.ax, 11], ['road', -b.ax, -b.az, b.len / 2 + 12]]) {
+      await page.evaluate(([b, ox, oz, back]) => {
+        const x = b.x + ox * back, z = b.z + oz * back;
+        window.game.player.teleport(x, undefined, z, Math.atan2(x - b.x, z - b.z));
+      }, [b, ox, oz, back]);
+      await page.waitForTimeout(4000);
+      await shoot(`${shown}-${tag}-${b.id.replace(/[^\w@-]/g, '_')}`);
+    }
+    // Standing on its middle: on the deck, not down in the brook.
+    const stand = await page.evaluate(([b]) => {
+      const g = window.game;
+      g.player.teleport(b.x, undefined, b.z, 0);
+      return { y: g.player.walker.pos.y, deck: g.bridges.deck(b.x, b.z), ground: g.terrain.height(b.x, b.z) };
+    }, [b]);
+    console.log(b.id, 'stand', stand);
   }
 }
 console.log(`${shown} bridges shown`);

@@ -2,11 +2,12 @@
  * Bridges where roads cross brooks (world/bridges.ts), drawn round the hero in the town's building shader
  * (no compiles of their own). Found again as the hero moves on, a road is laid or a brook tile arrives:
  * only where the brooks are known here (BrookPrefetch), so finding them never traces a tile on the main thread.
+ * Their decks are floors the hero walks on (`deck`).
  */
 import { Group, type Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { Terrain } from '../world/terrain';
-import { bridgeMesh, bridgesNear, type Bridge } from '../world/bridges';
+import { bridgeMesh, bridgesNear, deckAt, type Bridge } from '../world/bridges';
 import { buildingMeshAt } from './materials/building';
 
 /** Bridges within this of the hero are drawn, m; they go again past FORGET. */
@@ -26,6 +27,16 @@ export class BridgeView {
 
   /** The bridges drawn now (shots and checks). */
   get bridges(): Bridge[] { return [...this.drawn.values()].map((d) => d.b); }
+
+  /** The top of a bridge's deck at (x, z), or null off every bridge (the hero's floor). */
+  deck(x: number, z: number): number | null {
+    for (const d of this.drawn.values()) {
+      if (Math.abs(d.x - x) > 40 || Math.abs(d.z - z) > 40) continue;
+      const y = deckAt(d.b, x, z);
+      if (y !== null) return y;
+    }
+    return null;
+  }
 
   /** Each frame or so: the bridges round (x, z). */
   lookAround(x: number, z: number): void {

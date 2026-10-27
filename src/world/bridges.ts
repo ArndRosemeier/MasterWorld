@@ -1,64 +1,101 @@
 /**
- * Bridges where a road crosses a brook (D50). A brook runs under the road through a culvert (the road's bed
- * is levelled over it, terrain.ts), so walking stays on the land. Here its sides are walled in stone from
- * the brook's bed to a low parapet, with the dark mouth of the arch over the water, and the land beside
- * the walls drops straight to the brook (RoadNet.level with `bridgeBank`). Rivers keep their fords. Pure.
+ * Bridges where a road crosses a brook (D50). The brook cuts its channel through the road's bed (terrain.ts,
+ * as a river cuts its ford) and a stone bridge spans it: a deck at the road's height (a little humped where
+ * the road runs low over the water), parapets, and one arch or more over the water, its feet in the bank.
+ * The hero walks on the deck (`deckAt`, a floor). Rivers keep their fords. Pure.
  */
-import { smoothstep } from '@futuremagic/core';
+import { lerp } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
-import type { Hydrology, WaterHere } from './hydro';
-import { emptyWater, inChannel } from './hydro';
-import { WALLED, WAY_WIDTH, type RoadNet } from './roads';
+import { emptyWater, inChannel, type Hydrology } from './hydro';
+import { WAY_WIDTH, emptyRoad, type RoadNet } from './roads';
 import type { RoadDecision } from './decisions';
 import { BuildingMat as M, MeshKit, type Tint } from './dungeon/meshKit';
 
-/** Past a brook's edge the road's side is walled out to this, m. */
-export const BRIDGE_REACH = 3;
+/** A road's centre within this of a brook's edge is bridged, m. */
+export const BRIDGE_REACH = 1;
 /** Sampling step along the road, m. */
 const STEP = 1;
+/** The deck runs this far onto the road past the channel at either end, m. */
+const PAD = 2.5;
+/** Parapets: height over the deck, thickness; the deck's thickness at the crown; longest single arch, m. */
+const PARAPET = 0.75, PARAPET_T = 0.32, DECK_T = 0.45, ARCH_MAX = 7;
+/** The deck's ends stand this much proud of the road (no flicker between the deck and the road under it). */
+const LIP = 0.1;
+
+const here = emptyRoad(), centreWater = emptyWater();
 
 /**
- * How much of a bridge's walled side a road point beside brook `w` is (0 none .. 1 walled). Roads often
- * follow a valley and cross its brook at a slant: a long bridge then, never a gap.
+ * Whether a brook's channel at (x, z) cuts the road's levelled ground: off the road's bed always (its
+ * shoulders never dam a brook), on the bed where the road's centre line beside it runs within BRIDGE_REACH
+ * of the brook: under a bridge.
  */
-export function bridgeBank(w: WaterHere): number {
-  if (!w.brook || !w.river) return 0;
-  return 1 - smoothstep(w.half + 1, w.half + BRIDGE_REACH, w.dist);
-}
-
-/** One walled side of a bridge, along the road's edge. */
-export interface BridgeWall {
-  /** Its points along the road's edge every STEP m: x, z and the road's height there. */
-  readonly pts: readonly number[];
-  /** Outward (away from the road) unit direction at each point: x, z. */
-  readonly out: readonly number[];
-  /** Its foot (below the brook's bed). */
-  readonly foot: number;
-  /** The brook's level, and the points over its water (first, last index). */
-  readonly level: number;
-  readonly w0: number;
-  readonly w1: number;
+export function brookCuts(net: RoadNet, hydro: Hydrology, x: number, z: number): boolean {
+  const r = net.nearest(x, z, here);
+  if (!r || r.edge > 0) return true;
+  // Back across to the centre line (`across` is positive on the left, along (-dz, dx)).
+  const cx = x + r.dz * r.across, cz = z - r.dx * r.across;
+  return inChannel(hydro.brookAt(cx, cz, centreWater), BRIDGE_REACH) && centreWater.brook;
 }
 
 export interface Bridge {
   /** The road's id and the metres along it where the bridge starts. */
   readonly id: string;
+  /** Its middle (the mesh's place). */
   readonly x: number;
   readonly z: number;
-  readonly walls: readonly BridgeWall[];
+  /** The deck's ends on the road's centre line, and the road's height there. */
+  readonly x0: number;
+  readonly z0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly z1: number;
+  readonly y1: number;
+  /** Half the deck's width, parapets and all. */
+  readonly half: number;
+  /** How much the deck rises in the middle over a straight line between its ends. */
+  readonly hump: number;
+  /** The arches: [from, to] as fractions of the deck's length. */
+  readonly arches: readonly (readonly [number, number])[];
+  /** The brook's level (the arches spring from just over it) and the walls' foot (under its bed). */
+  readonly level: number;
+  readonly foot: number;
 }
 
-/** A road's centre line sampled every STEP m: x, y, z, and its unit direction dx, dz. */
+/** The deck's top at `t` (0..1) along it. */
+export const deckY = (b: Bridge, t: number): number => lerp(b.y0, b.y1, t) + LIP + b.hump * Math.sin(Math.PI * t);
+
+/** Under the deck at `t`: the arch's underside over the water, else null (solid down to the foot). */
+export function archY(b: Bridge, t: number): number | null {
+  for (const [a0, a1] of b.arches) {
+    if (t <= a0 || t >= a1) continue;
+    const m = (a0 + a1) / 2, r = (a1 - a0) / 2, spring = b.level - 0.05;
+    const crown = deckY(b, m) - DECK_T;
+    return spring + (crown - spring) * Math.sqrt(Math.max(0, 1 - ((t - m) / r) ** 2));
+  }
+  return null;
+}
+
+/** The deck's top at (x, z) if that is on bridge `b` (between its parapets), else null. */
+export function deckAt(b: Bridge, x: number, z: number): number | null {
+  const dx = b.x1 - b.x0, dz = b.z1 - b.z0, L2 = dx * dx + dz * dz;
+  const t = ((x - b.x0) * dx + (z - b.z0) * dz) / L2;
+  if (t < 0 || t > 1) return null;
+  const across = Math.abs((x - b.x0) * dz - (z - b.z0) * dx) / Math.sqrt(L2);
+  return across < b.half ? deckY(b, t) : null;
+}
+
+/** A road's centre line sampled every STEP m: x, y, z, metres along. */
 function samples(d: RoadDecision): number[][] {
   const p = d.pts, n = p.length / 3, out: number[][] = [];
-  let carry = 0;
+  let s0 = 0, next = 0;
   for (let k = 0; k + 1 < n; k++) {
     const ax = p[k * 3], ay = p[k * 3 + 1], az = p[k * 3 + 2], dx = p[k * 3 + 3] - ax, dy = p[k * 3 + 4] - ay, dz = p[k * 3 + 5] - az;
     const L = Math.hypot(dx, dz);
-    if (L < 1e-6) continue;
-    for (let s = carry; s < L; s += STEP) out.push([ax + dx * s / L, ay + dy * s / L, az + dz * s / L, dx / L, dz / L]);
-    carry = (carry - L) % STEP;
-    if (carry < 0) carry += STEP;
+    for (; next < s0 + L; next += STEP) {
+      const f = (next - s0) / L;
+      out.push([ax + dx * f, ay + dy * f, az + dz * f, next]);
+    }
+    s0 += L;
   }
   return out;
 }
@@ -69,52 +106,36 @@ function samples(d: RoadDecision): number[][] {
  * for a later ask, so a bridge is always whole.
  */
 export function bridgesOn(d: RoadDecision, hydro: Hydrology, x: number, z: number, reach: number, ready: (x: number, z: number) => boolean): Bridge[] {
-  const s = samples(d), half = WAY_WIDTH[d.way] / 2, w = emptyWater();
+  const s = samples(d), w = emptyWater(), half = WAY_WIDTH[d.way] / 2 + 0.35;
   const near = s.map(([px, , pz]) => Math.hypot(px - x, pz - z) < reach && ready(px, pz));
-  // Walled where a point beside the road (at its wall) is: out = +1 on the left, -1 on the right.
-  const walled = (i: number, side: number, past: number): WaterHere | null => {
-    const [px, , pz, dx, dz] = s[i];
-    const o = half + 0.5;
-    hydro.brookAt(px - dz * o * side, pz + dx * o * side, w);
-    return bridgeBank(w) > 0 && inChannel(w, past) ? w : null;
-  };
-  const centre = (i: number): boolean => {
-    hydro.brookAt(s[i][0], s[i][2], w);
-    return bridgeBank(w) > 0;
-  };
+  const wet = (i: number): boolean => inChannel(hydro.brookAt(s[i][0], s[i][2], w), BRIDGE_REACH) && w.brook;
+  const pad = Math.ceil(PAD / STEP) + 1;
   const out: Bridge[] = [];
   for (let i = 0; i < s.length; i++) {
-    if (!near[i] || !centre(i)) continue;
-    let j = i;
-    while (j + 1 < s.length && near[j + 1] && centre(j + 1)) j++;
-    const a = i, b = j;
-    i = j;
-    // Cut off by the edge of what is known (or the road's ends): asked again later.
-    const pad = Math.ceil((BRIDGE_REACH + 6) / STEP);
-    if (a - pad < 0 || b + pad >= s.length || !near[a - pad] || !near[b + pad]) continue;
-    const walls: BridgeWall[] = [];
-    for (const side of [1, -1]) {
-      let first = -1, last = -1, w0 = -1, w1 = -1, foot = Infinity, level = -Infinity;
-      for (let k = a - pad; k <= b + pad; k++) {
-        const h = walled(k, side, BRIDGE_REACH);
-        if (!h) continue;
-        if (first < 0) first = k;
-        last = k;
-        foot = Math.min(foot, h.level - h.depth - 0.4);
-        if (inChannel(h, 0.3)) { if (w0 < 0) w0 = k; w1 = k; level = Math.max(level, h.level); }
-      }
-      if (first < 0) continue;
-      const pts: number[] = [], dir: number[] = [];
-      for (let k = first; k <= last + 1 && k < s.length; k++) {
-        const [px, py, pz, dx, dz] = s[k];
-        pts.push(px - dz * half * side, pz + dx * half * side, py);
-        dir.push(-dz * side, dx * side);
-      }
-      walls.push({ pts, out: dir, foot, level: w0 < 0 ? foot : level, w0: w0 < 0 ? -1 : w0 - first, w1: w0 < 0 ? -1 : w1 - first });
+    if (!near[i] || !wet(i)) continue;
+    let j = i, level = -Infinity, bed = Infinity;
+    for (; ; j++) {
+      hydro.brookAt(s[j][0], s[j][2], w);
+      level = Math.max(level, w.level);
+      bed = Math.min(bed, w.level - w.depth);
+      if (!(j + 1 < s.length && near[j + 1] && wet(j + 1))) break;
     }
-    if (!walls.length) continue;
-    const m = (a + b) >> 1;
-    out.push({ id: `${d.id}@${Math.round(a * STEP)}`, x: s[m][0], z: s[m][2], walls });
+    const a = i, b = j;
+    i = j + 1;
+    // Cut off by the edge of what is known (or the road's ends): asked again later.
+    if (a - pad < 0 || b + pad >= s.length || !near[a - pad] || !near[b + pad]) continue;
+    const p0 = s[a - pad + 1], p1 = s[b + pad - 1], L = p1[3] - p0[3];
+    // The water's stretch (the channel, a little wide), in arches of up to ARCH_MAX m with piers between.
+    const w0 = (s[a][3] - 0.6 - p0[3]) / L, w1 = (s[b][3] + 0.6 - p0[3]) / L;
+    const n = Math.max(1, Math.ceil((w1 - w0) * L / ARCH_MAX)), pier = 0.8 / L, each = (w1 - w0 - pier * (n - 1)) / n;
+    const arches: [number, number][] = [];
+    for (let k = 0; k < n; k++) arches.push([w0 + k * (each + pier), w0 + k * (each + pier) + each]);
+    // Humped where the road would run too low over the water for an arch.
+    const mid = (p0[1] + p1[1]) / 2 + LIP, hump = Math.max(0, level + 0.55 + DECK_T - mid);
+    out.push({
+      id: `${d.id}@${Math.round(p0[3])}`, x: (p0[0] + p1[0]) / 2, z: (p0[2] + p1[2]) / 2,
+      x0: p0[0], z0: p0[2], y0: p0[1], x1: p1[0], z1: p1[2], y1: p1[1], half, hump, arches, level, foot: bed - 0.5,
+    });
   }
   return out;
 }
@@ -124,36 +145,54 @@ export function bridgesNear(net: RoadNet, hydro: Hydrology, x: number, z: number
   return net.roads.flatMap((d) => bridgesOn(d, hydro, x, z, reach, ready));
 }
 
-const STONE: Tint = [132, 126, 116];
-const DARK: Tint = [14, 14, 16];
-/** Wall thickness (to the road's walled bed), parapet height and thickness, m. */
-const WALL = WALLED.bed + 0.1, PARAPET = 0.8, PARAPET_T = 0.4;
+const STONE: Tint = [136, 129, 118], DECK: Tint = [120, 112, 100], UNDER: Tint = [84, 82, 78];
+/** Pieces along the deck, m. */
+const PIECE = 0.5;
 
-/** A bridge's walls as a building mesh (the town's one building shader), around (x, 0, z) = (b.x, 0, b.z). */
+/** Bridge `b` as a building mesh (the town's one building shader), around (b.x, 0, b.z). */
 export function bridgeMesh(b: Bridge): BuildingMesh {
   const k = new MeshKit();
-  for (const wl of b.walls) {
-    const p = wl.pts, o = wl.out, n = p.length / 3;
-    for (let i = 0; i + 1 < n; i++) {
-      const ax = p[i * 3] - b.x, az = p[i * 3 + 1] - b.z, bx = p[i * 3 + 3] - b.x, bz = p[i * 3 + 4] - b.z;
-      const y = Math.max(p[i * 3 + 2], p[i * 3 + 5]);
-      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) + 0.06, yaw = Math.atan2(dx, dz);
-      const ox = o[i * 2], oz = o[i * 2 + 1], mx = (ax + bx) / 2, mz = (az + bz) / 2;
-      // The side (from its foot to the road's height, under the bed's edge) and the parapet on it.
-      const c = WALL / 2 - 0.05, q = PARAPET_T / 2 + 0.05;
-      k.box(mx + ox * c, wl.foot, mz + oz * c, WALL, y + 0.12 - wl.foot, L, yaw, M.Rubble, STONE);
-      k.box(mx + ox * q, y, mz + oz * q, PARAPET_T, PARAPET, L, yaw, M.Ashlar, STONE);
-      // The arch's dark mouth over the water, just proud of the side.
-      if (wl.w0 < 0 || i < wl.w0 || i >= wl.w1 + 1) continue;
-      const span = wl.w1 + 1 - wl.w0, rise = Math.max(0.25, Math.min(y - 0.35 - wl.level, span / 2));
-      const top = (t: number) => wl.level + rise * Math.sqrt(Math.max(0, 1 - (2 * t / span - 1) ** 2));
-      const f = WALL - 0.04, t0 = top(i - wl.w0), t1 = top(i + 1 - wl.w0);
-      const A = [ax + ox * f, wl.foot, az + oz * f], B = [bx + ox * f, wl.foot, bz + oz * f];
-      // Seen from outside: counter-clockwise from that side.
-      const quad = [A, B, [B[0], t1, B[2]], [A[0], t0, A[2]]];
-      const facing = (B[0] - A[0]) * oz - (B[2] - A[2]) * ox > 0;
-      const [q0, q1, q2, q3] = facing ? quad : [quad[1], quad[0], quad[3], quad[2]];
-      k.quad(q0, q1, q2, q3, [[0, 0], [1, 0], [1, 1], [0, 1]], M.Rubble, DARK);
+  const dx = b.x1 - b.x0, dz = b.z1 - b.z0, L = Math.hypot(dx, dz), ax = dx / L, az = dz / L;
+  // Across: to the left of the way along.
+  const nx = -az, nz = ax;
+  const onDeck = (t: number, u: number, y: number) => [b.x0 - b.x + dx * t + nx * u, y, b.z0 - b.z + dz * t + nz * u];
+  /** A quad facing `want` (x, y, z): the corners are turned round if they face the other way. */
+  const face = (q: number[][], uv: number[][], want: number[], mat: number, tint: Tint) => {
+    const [a, bb, c, d] = q;
+    const e1 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]], e2 = [d[0] - bb[0], d[1] - bb[1], d[2] - bb[2]];
+    const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    if (n[0] * want[0] + n[1] * want[1] + n[2] * want[2] >= 0) k.quad(a, bb, c, d, uv, mat, tint);
+    else k.quad(a, d, c, bb, [uv[0], uv[3], uv[2], uv[1]], mat, tint);
+  };
+  const steps = Math.max(2, Math.ceil(L / PIECE)), h = b.half, hi = h - PARAPET_T;
+  const under = (t: number) => archY(b, t) ?? b.foot;
+  for (let i = 0; i < steps; i++) {
+    const t0 = i / steps, t1 = (i + 1) / steps, s0 = t0 * L, s1 = t1 * L;
+    const y0 = deckY(b, t0), y1 = deckY(b, t1);
+    // The road over it.
+    face([onDeck(t0, -hi, y0), onDeck(t1, -hi, y1), onDeck(t1, hi, y1), onDeck(t0, hi, y0)], [[s0, -hi], [s1, -hi], [s1, hi], [s0, hi]], [0, 1, 0], M.Ashlar, DECK);
+    // Under an arch: its curved underside.
+    const tm = (t0 + t1) / 2;
+    if (archY(b, tm) !== null) {
+      const u0 = under(t0), u1 = under(t1);
+      face([onDeck(t0, -h, u0), onDeck(t1, -h, u1), onDeck(t1, h, u1), onDeck(t0, h, u0)], [[s0, -h], [s1, -h], [s1, h], [s0, h]], [0, -1, 0], M.Rubble, UNDER);
+    }
+    for (const side of [1, -1]) {
+      const out = [nx * side, 0, nz * side], inn = [-nx * side, 0, -nz * side];
+      // The face, from the arch (or the foot) to the parapet's top.
+      const b0 = under(t0), b1 = under(t1), top0 = y0 + PARAPET, top1 = y1 + PARAPET;
+      face([onDeck(t0, h * side, b0), onDeck(t1, h * side, b1), onDeck(t1, h * side, top1), onDeck(t0, h * side, top0)], [[s0, b0], [s1, b1], [s1, top1], [s0, top0]], out, M.Rubble, STONE);
+      // The parapet's inside and its coping.
+      face([onDeck(t0, hi * side, y0), onDeck(t1, hi * side, y1), onDeck(t1, hi * side, top1), onDeck(t0, hi * side, top0)], [[s0, y0], [s1, y1], [s1, top1], [s0, top0]], inn, M.Rubble, STONE);
+      face([onDeck(t0, hi * side, top0), onDeck(t1, hi * side, top1), onDeck(t1, h * side, top1), onDeck(t0, h * side, top0)], [[s0, 0], [s1, 0], [s1, PARAPET_T], [s0, PARAPET_T]], [0, 1, 0], M.Ashlar, STONE);
+    }
+  }
+  // The ends: the deck's lip, and the parapets' ends.
+  for (const [t, dir] of [[0, -1], [1, 1]] as const) {
+    const y = deckY(b, t), want = [ax * dir, 0, az * dir];
+    face([onDeck(t, -h, y - 0.6), onDeck(t, h, y - 0.6), onDeck(t, h, y), onDeck(t, -h, y)], [[-h, y - 0.6], [h, y - 0.6], [h, y], [-h, y]], want, M.Rubble, STONE);
+    for (const side of [1, -1]) {
+      face([onDeck(t, hi * side, y), onDeck(t, h * side, y), onDeck(t, h * side, y + PARAPET), onDeck(t, hi * side, y + PARAPET)], [[0, y], [PARAPET_T, y], [PARAPET_T, y + PARAPET], [0, y + PARAPET]], want, M.Rubble, STONE);
     }
   }
   return k.mesh();

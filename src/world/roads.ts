@@ -3,7 +3,7 @@
  * quickly. A road levels the ground it runs on (its profile, cut and filled, with sloped shoulders), keeps
  * trees and grass off, and the terrain shader draws it from a mask of these distances. Pure: runs in workers.
  */
-import { lerp, smoothstep } from '@futuremagic/core';
+import { smoothstep } from '@futuremagic/core';
 import type { RoadDecision, RoadWay } from './decisions';
 import type { MaskJob } from './water';
 
@@ -15,8 +15,6 @@ export const WAYS: readonly RoadWay[] = ['path', 'track', 'road'];
 export const SHOULDER = 7;
 /** How far from a road's edge anything asks about it, m (the shoulders, the trees' clearance). */
 export const ROAD_REACH = 16;
-/** A walled road side (a bridge): its bed reaches `bed` m past the road's edge, the land is its own from `foot`. */
-export const WALLED = { bed: 0.9, foot: 1.3 } as const;
 /** Index cell, m. */
 const CELL = 32;
 
@@ -36,9 +34,12 @@ export interface RoadHere {
   along: number;
   /** 1 on the road, easing to 0 over the first and last 20 m (where it meets the land or a town's road). */
   hold: number;
+  /** Unit direction of the road here (x, z). */
+  dx: number;
+  dz: number;
 }
 
-export const emptyRoad = (): RoadHere => ({ across: 0, edge: Infinity, half: 0, y: 0, way: 0, along: 0, hold: 0 });
+export const emptyRoad = (): RoadHere => ({ across: 0, edge: Infinity, half: 0, y: 0, way: 0, along: 0, hold: 0, dx: 0, dz: 1 });
 
 interface Road {
   readonly d: RoadDecision;
@@ -102,22 +103,19 @@ export class RoadNet {
       out.way = r.way;
       out.along = along;
       out.hold = smoothstep(0, 20, Math.min(along, total - along));
+      out.dx = dx / L;
+      out.dz = dz / L;
     }
     return found ? out : null;
   }
 
   private readonly here = emptyRoad();
 
-  /**
-   * The ground `h` at a point, levelled to the road beside it (the road's profile, sloping back over the
-   * shoulders). `bank` (0..1) where the road's side is walled (a bridge over a brook, world/bridges.ts): its
-   * bed runs to the wall and the land drops straight away behind it.
-   */
-  level(x: number, z: number, h: number, bank?: () => number): number {
+  /** The ground `h` at a point, levelled to the road beside it (the road's profile, sloping back over the shoulders). */
+  level(x: number, z: number, h: number): number {
     const r = this.nearest(x, z, this.here);
     if (!r) return h;
-    const k = bank ? bank() : 0;
-    const w = (1 - smoothstep(lerp(0.5, WALLED.bed, k), lerp(SHOULDER, WALLED.foot, k), r.edge)) * r.hold;
+    const w = (1 - smoothstep(0.5, SHOULDER, r.edge)) * r.hold;
     return h + (r.y - h) * w;
   }
 

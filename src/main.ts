@@ -229,10 +229,12 @@ export async function start(b: Boot): Promise<void> {
       const t = terrain.rockSurface(x, y, z), h = openHouse()?.rockSurface(x, y, z, shut) ?? null;
       return t === null ? h : h === null ? t : Math.min(t, h);
     };
+    // Bridges where roads cross brooks, round the hero: their decks are floors.
+    const bridgeView = new BridgeView(view.stage, terrain);
     const world: WalkWorld = {
       // Out of doors also the steps and porches before the doors (as floors: climbed a step at a time).
       height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
-      floor: (x, z) => (below() ? null : towns?.stand(x, z) ?? null),
+      floor: (x, z) => (below() ? null : towns?.stand(x, z) ?? bridgeView.deck(x, z)),
       rockSurface: (x, y, z) => surfaceAt(x, y, z, false),
       // In a building the camera stays in the room (its doorway shut to it).
       sightSurface: (x, y, z) => surfaceAt(x, y, z, !!rooms?.inside),
@@ -393,8 +395,6 @@ export async function start(b: Boot): Promise<void> {
     const remains: Remains[] = [...(save?.remains ?? [])];
     // Drawn where they lie (a pack, a cairn), in the land or down in a cellar.
     const remainsView = new RemainsView(view.stage);
-    // Bridges where roads cross brooks, round the hero.
-    const bridgeView = new BridgeView(view.stage, terrain);
     const drawRemains = () => void remainsView.lay(remains.map((r) => ({ id: r.id, x: r.at.x, y: r.at.y, z: r.at.z, grave: !!r.grave, seed: r.id })));
     if (params.remains && !save) {
       // In front of where the hero stands and a little to the right (out of reach, not hidden behind them), on the ground.

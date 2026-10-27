@@ -8,8 +8,8 @@ import { linkRoad } from '../src/vgm/roads';
 import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
 import { grassMask } from '../src/world/grass';
-import { ROAD_REACH, WALLED, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
-import { bridgeMesh, bridgesOn } from '../src/world/bridges';
+import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
+import { archY, bridgeMesh, bridgesOn, deckAt, deckY } from '../src/world/bridges';
 import { emptyWater, inChannel } from '../src/world/hydro';
 import { SMALL } from './small';
 
@@ -101,34 +101,27 @@ test('roads: the mask holds the distances the shader draws from; roads replay fr
   assert.equal(terrain.height(q.x, q.z), h);
 });
 
-test('roads: every brook the track crosses has a bridge, walled to the water, with the road over it', () => {
+test('roads: every brook the track crosses has a bridge over its open channel', () => {
   const bridges = bridgesOn(road, terrain.hydro, pt(0).x, pt(0).z, 1e5, () => true);
   assert.ok(bridges.length >= 1, 'it crosses a brook');
-  const w = emptyWater(), walls = bridges.flatMap((b) => b.walls);
-  const onBridge = (x: number, z: number) => walls.some((wl) => {
-    for (let i = 0; i < wl.pts.length; i += 3) if (Math.hypot(wl.pts[i] - x, wl.pts[i + 1] - z) < WAY_WIDTH.track / 2 + 1) return true;
-    return false;
-  });
+  const w = emptyWater();
   let wet = 0;
   for (let k = 20; k + 20 < n; k++) for (let t = 0; t < 1; t += 0.25) {
     const x = pt(k).x + (pt(k + 1).x - pt(k).x) * t, z = pt(k).z + (pt(k + 1).z - pt(k).z) * t;
     if (!inChannel(terrain.hydro.brookAt(x, z, w))) continue;
     wet++;
-    assert.ok(onBridge(x, z), `a brook under the track at ${x.toFixed(0)}, ${z.toFixed(0)} without a bridge`);
-    // The road runs over it, above the water.
-    assert.ok(terrain.height(x, z) > w.level + 0.2, 'the road above the brook');
+    const on = bridges.map((b) => deckAt(b, x, z)).find((y) => y !== null);
+    assert.ok(on !== undefined, `a brook under the track at ${x.toFixed(0)}, ${z.toFixed(0)} without a bridge`);
+    // The brook runs on under it (its channel open), the deck well over the water.
+    assert.ok(terrain.height(x, z) < w.level, `ground ${(terrain.height(x, z) - w.level).toFixed(2)} m over the water under the bridge`);
+    assert.ok(on! > w.level + 0.9, 'the deck over the water');
   }
   assert.ok(wet > 0);
-  // Beside each wall, over the water, the land drops to the brook's bed (the water runs to the wall).
-  for (const wl of walls) if (wl.w0 >= 0) {
-    const o = (wl.w0 + wl.w1) >> 1, i = o * 3;
-    let d = 1.6;
-    const at = () => [wl.pts[i] + wl.out[o * 2] * d, wl.pts[i + 1] + wl.out[o * 2 + 1] * d];
-    // Out past the bed's edge (a winding road's other side may be nearer).
-    while (terrain.roads.fromEdge(at()[0], at()[1]) < WALLED.foot && d < 4) d += 0.2;
-    const [x, z] = at();
-    assert.ok(terrain.height(x, z) < wl.level, `land ${(terrain.height(x, z) - wl.level).toFixed(2)} m over the water beside the wall`);
-    assert.ok(wl.pts[i + 2] > wl.level + 0.2 && wl.foot < wl.level, 'the wall stands in the brook and holds the road');
+  for (const b of bridges) {
+    assert.ok(b.arches.length >= 1);
+    for (const [a0, a1] of b.arches) assert.ok(archY(b, (a0 + a1) / 2)! > b.level + 0.4, 'room under the arch');
+    // Its ends meet the road (a lip, no step to climb).
+    assert.ok(Math.abs(deckY(b, 0) - terrain.height(b.x0, b.z0)) < 0.35 && Math.abs(deckY(b, 1) - terrain.height(b.x1, b.z1)) < 0.35, 'the deck meets the road');
+    assert.ok(bridgeMesh(b).index.length > 0);
   }
-  assert.ok(bridgeMesh(bridges[0]).index.length > 0);
 });
