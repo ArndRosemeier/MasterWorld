@@ -53,11 +53,11 @@ serve<TerrainJob, TerrainResult>((job) => {
   }
   if (job.kind === 'caveMouth') {
     const t = terrain, mouth = mouthOnLand((x, z) => t.height(x, z), job.site, job.cave);
-    return { result: mouth, transfer: [mouth.blocked.buffer, ...meshBuffers(mouth.mesh)] };
+    return { result: mouth, transfer: [mouth.walk.blocked.buffer, ...meshBuffers(mouth.mesh)] };
   }
   if (job.kind === 'holdRock') {
     const t = terrain, rock = holdRockOnLand((x, z) => t.height(x, z), job.site, job.rock);
-    return { result: rock, transfer: [rock.blocked.buffer, ...meshBuffers(rock.mesh)] };
+    return { result: rock, transfer: [rock.walk.blocked.buffer, ...meshBuffers(rock.mesh)] };
   }
   if (job.kind === 'horizon') {
     const t = terrain;

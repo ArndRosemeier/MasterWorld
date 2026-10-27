@@ -7,7 +7,8 @@ import type { Quarry } from '../src/sim/creatures';
 import type { Land } from '../src/sim/wild';
 import { COURT, FACE, POSTS, holdBare, holdGround, holdSite, inHoldShape } from '../src/world/hold';
 import { holdMesh } from '../src/world/holdMesh';
-import { holdRock, inHoldRock } from '../src/world/holdRock';
+import { holdRock } from '../src/world/holdRock';
+import { inWalkRaster } from '../src/world/dungeon/rockMesh';
 import { onLand } from '../src/world/dungeon/site';
 
 const dwarves = classic.peoples.find((p) => p.id === 'dwarf')!;
@@ -61,8 +62,8 @@ test('hold: the gate is cut into a crag that rises over it and bars the hill bes
   }
   assert.ok(top > FACE.h, `the crag rises over the gate (${top.toFixed(1)} m)`);
   assert.ok(statue > 50, 'a warden stands on each plinth, taller than the front\'s plinth course');
-  assert.ok(inHoldRock(rock, 18, -2) && inHoldRock(rock, -18, -2), 'the crag beside the gate');
-  for (const [u, v] of [[0, 4], [-9, 12], [9, 20], [0, -1]]) assert.ok(!inHoldRock(rock, u, v), `the court is open at ${u}, ${v}`);
+  assert.ok(inWalkRaster(rock.walk, 18, -2) && inWalkRaster(rock.walk, -18, -2), 'the crag beside the gate');
+  for (const [u, v] of [[0, 4], [-9, 12], [9, 20], [0, -1]]) assert.ok(!inWalkRaster(rock.walk, u, v), `the court is open at ${u}, ${v}`);
 });
 
 /** The wardens at their posts on level ground; the hero walks in from the town. */

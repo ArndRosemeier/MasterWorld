@@ -306,5 +306,17 @@
   {
     "key": "same name: masterworld/game/evening.ts#log + masterworld/main.ts#log",
     "reason": "Both hand a town core (game/township.ts TownshipContext) the decision log as it grows; one-line closures over each caller's own log, the seam is the interface."
+  },
+  {
+    "key": "same name: masterworld/app/holdGate.ts#warming + masterworld/app/wildLand.ts#warming",
+    "reason": "Both answer main's undrawn list (what is still being built near the hero): the wild's groups that are not warm, and the hold's wardens and crag; each counts its own things."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/caveMouth.ts#tint + masterworld/world/holdRock.ts#tint",
+    "reason": "Both implement RockLook.tint (world/dungeon/rockMesh.ts): each rock colours its own faces; the shared meshing lives in meshField and the shared faces in cragMat."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/caveRock.ts#tint + masterworld/world/holdRock.ts#tint",
+    "reason": "Both implement RockLook.tint (world/dungeon/rockMesh.ts): each rock colours its own faces; the shared meshing already lives in meshField."
   }
 ]

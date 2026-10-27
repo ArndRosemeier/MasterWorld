@@ -13,7 +13,7 @@
 import { Noise, deriveSeed, smin, smoothstep } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { MeshKit, WildMat, scaleTint, type Tint } from './dungeon/meshKit';
-import { fieldAt, meshField, type Field } from './dungeon/rockMesh';
+import { cragMat, fieldAt, meshField, walkRaster, type Field, type WalkRaster } from './dungeon/rockMesh';
 import { onLand, type Site } from './dungeon/site';
 import { FACE, GATE, WARDENS } from './hold';
 
@@ -36,10 +36,8 @@ const GRASS: Tint = [196, 196, 168];
 /** The rock and the wardens as one mesh in the gate's frame; and where on the ground the crag is in a body's way. */
 export interface HoldRock {
   readonly mesh: BuildingMesh;
-  /** Raster over u −half..half, v back..front: 1 where the crag is in the way of a body. */
-  readonly blocked: Uint8Array;
-  readonly cols: number;
-  readonly rows: number;
+  /** Over u −half..half, v back..front: where the crag is in the way of a body. */
+  readonly walk: WalkRaster;
 }
 
 /** A smooth function of two coordinates sampled once on a grid and read back bilinearly (clamped at its edges). */
@@ -54,7 +52,7 @@ class Table {
   }
   /** The lowest sample. */
   get low(): number { return this.d.reduce((m, v) => Math.min(m, v), Infinity); }
-  at(a: number, b: number): number {
+  read(a: number, b: number): number {
     const u = Math.max(0, Math.min(this.nx - 1.001, (a - this.a0) / this.step)), v = Math.max(0, Math.min(this.ny - 1.001, (b - this.b0) / this.step));
     const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j, d = this.d, k = j * this.nx + i;
     return (d[k] * (1 - fu) + d[k + 1] * fu) * (1 - fv) + (d[k + this.nx] * (1 - fu) + d[k + this.nx + 1] * fu) * fv;
@@ -80,10 +78,10 @@ class Crag {
     }, -EXTENT.half - 1, EXTENT.half + 1, EXTENT.back - 1, EXTENT.front + 1, 0.5);
   }
 
-  front(u: number, y: number): number { return this.frontT.at(u, y); }
-  top(u: number, v: number): number { return this.topT.at(u, v); }
+  front(u: number, y: number): number { return this.frontT.read(u, y); }
+  top(u: number, v: number): number { return this.topT.read(u, v); }
 
-  rock(u: number, y: number, v: number): number {
+  stoneAt(u: number, y: number, v: number): number {
     const d = Math.max((v - this.front(u, y)) * 0.8, y - this.top(u, v));
     // Clear of the gate's front, which stands in a cut of its own.
     const cut = Math.min(FRONT.half - Math.abs(u), FRONT.top - y, v - FRONT.back);
@@ -105,7 +103,7 @@ export function holdRock(seed: number, ground: (u: number, v: number) => number)
   k.append(crag.mesh.position, crag.mesh.normal, crag.mesh.uv, crag.mesh.mat, crag.mesh.tint, crag.mesh.index);
   const w = warden();
   for (const side of [-1, 1]) placeWarden(k, w, side);
-  return { mesh: k.mesh(), blocked: crag.blocked, cols: crag.cols, rows: crag.rows };
+  return { mesh: k.mesh(), walk: crag.walk };
 }
 
 /** The rock at a site on the land (`height`: the land's height; `level`: the court's). */
@@ -116,23 +114,20 @@ export function holdRockOnLand(height: (x: number, z: number) => number, site: S
 function cragMesh(seed: number, ground: (u: number, v: number) => number): HoldRock {
   const nx = Math.ceil((2 * EXTENT.half) / STEP) + 1, nz = Math.ceil((EXTENT.front - EXTENT.back) / STEP) + 1;
   const land = new Table(ground, -EXTENT.half, EXTENT.half, EXTENT.back, EXTENT.front, STEP);
-  const groundUnder = (u: number, v: number) => land.at(u, v);
+  const groundUnder = (u: number, v: number) => land.read(u, v);
   const crag = new Crag(seed);
   const oy = Math.min(0, land.low) - 2, ny = Math.ceil((EXTENT.top - oy) / STEP) + 1;
-  const air = (u: number, y: number, v: number) => smin(crag.rock(u, y, v), y - groundUnder(u, v), 1.6);
+  const air = (u: number, y: number, v: number) => smin(crag.stoneAt(u, y, v), y - groundUnder(u, v), 1.6);
   const d = new Float32Array(nx * ny * nz);
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) d[i + nx * (j + ny * k)] = air(-EXTENT.half + i * STEP, oy + j * STEP, EXTENT.back + k * STEP);
   const field: Field = { ox: -EXTENT.half, oy, oz: EXTENT.back, step: STEP, nx, ny, nz, d };
   const look = new Noise(deriveSeed(seed, 'hold', 'crag-look'));
   const mesh = meshField(field, {
-    // Only the crag and its fillet: the ground around is the land's own, and the field's cut edges are left out.
-    mat: (u, y, v, up) => {
-      if (Math.abs(u) > EXTENT.half - 0.8 || v < EXTENT.back + 0.8 || v > EXTENT.front - 0.8 || y > EXTENT.top - 0.8) return null;
-      const h = groundUnder(u, v);
-      if (crag.rock(u, y, v) > 2.2) return null;
-      if (up > 0.6 && y < h + 0.35) return null;
-      return up > 0.72 ? WildMat.Grass : WildMat.Rock;
-    },
+    // Only the crag and its fillet (the ground around is the land's own), not the field's cut edges; turf on its ledges.
+    mat: cragMat(
+      (u, y, v) => Math.abs(u) < EXTENT.half - 0.8 && v > EXTENT.back + 0.8 && v < EXTENT.front - 0.8 && y < EXTENT.top - 0.8,
+      (u, y, v) => crag.stoneAt(u, y, v), groundUnder, (_u, _y, _v, up) => up > 0.72,
+    ),
     tint: (u, y, v, m) => {
       // Streaks of weather down the face, darker where water runs, a little paler up high.
       const streak = look.fbm3(u / 1.6, y / 14, v / 1.6, 2), patch = look.fbm3(u / 5, y / 5, v / 5, 2);
@@ -141,20 +136,11 @@ function cragMesh(seed: number, ground: (u: number, v: number) => number): HoldR
     },
   });
   // The walk raster: rock at knee or chest height over the ground.
-  const cols = Math.ceil((2 * EXTENT.half) / RASTER), rows = Math.ceil((EXTENT.front - EXTENT.back) / RASTER);
-  const blocked = new Uint8Array(cols * rows);
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    const u = -EXTENT.half + (c + 0.5) * RASTER, v = EXTENT.back + (r + 0.5) * RASTER, h = groundUnder(u, v);
-    if (fieldAt(field, u, h + 0.8, v, 1) < BODY || fieldAt(field, u, h + 1.4, v, 1) < BODY) blocked[r * cols + c] = 1;
-  }
-  return { mesh, blocked, cols, rows };
-}
-
-/** Is a body at (u, v) of the gate's frame in the crag's way? */
-export function inHoldRock(m: Pick<HoldRock, 'blocked' | 'cols' | 'rows'>, u: number, v: number): boolean {
-  const c = Math.floor((u + EXTENT.half) / RASTER), r = Math.floor((v - EXTENT.back) / RASTER);
-  if (c < 0 || r < 0 || c >= m.cols || r >= m.rows) return false;
-  return m.blocked[r * m.cols + c] === 1;
+  const walk = walkRaster(-EXTENT.half, EXTENT.half, EXTENT.back, EXTENT.front, RASTER, (u, v) => {
+    const h = groundUnder(u, v);
+    return fieldAt(field, u, h + 0.8, v, 1) < BODY || fieldAt(field, u, h + 1.4, v, 1) < BODY;
+  });
+  return { mesh, walk };
 }
 
 // ——— The wardens: one carved dwarf in its own frame (feet on the plinth at y 0, facing +z, axe at +x). ———

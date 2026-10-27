@@ -27,7 +27,8 @@ import { occupationOf } from '../vgm/leads';
 import type { DecisionLog, DungeonDecision, MoveInDecision } from '../world/decisions';
 import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh';
 import { CaveSpace, caveField, caveShell } from '../world/dungeon/caveRock';
-import { inMouthShape, MOUTH_WAY_DOWN, mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
+import { MOUTH_WAY_DOWN, mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
+import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
 import { CELL } from '../world/dungeon/cellar';
@@ -288,7 +289,7 @@ export class Cellars {
       const mound: Mound = { ...site, mesh: null, inShape: () => false, way: MOUTH_WAY_DOWN, out: 3, cool: 0 };
       void (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
         mound.mesh = put(mouth.mesh, 0);
-        mound.inShape = (x, z) => inMouthShape(mouth, x, z);
+        mound.inShape = (x, z) => inWalkRaster(mouth.walk, x, z);
       });
       return mound;
     }

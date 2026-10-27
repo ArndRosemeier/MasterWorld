@@ -18,7 +18,8 @@ import type { HoldDecision } from '../world/decisions';
 import { inHoldShape } from '../world/hold';
 import { inFrame } from '../world/dungeon/site';
 import { holdMesh } from '../world/holdMesh';
-import { holdRockOnLand, inHoldRock, type HoldRock } from '../world/holdRock';
+import { holdRockOnLand, type HoldRock } from '../world/holdRock';
+import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { Encounter, type Arena } from './encounter';
 import type { WildHost } from './wildLand';
 
@@ -77,7 +78,7 @@ export class HoldGate {
   solid(x: number, z: number, r: number): boolean {
     if (Math.abs(x - this.site.x) > 50 || Math.abs(z - this.site.z) > 50) return false;
     const [u, v] = inFrame(this.site, x, z);
-    return inHoldShape(u, v, r) || (!!this.rock && inHoldRock(this.rock, u, v));
+    return inHoldShape(u, v, r) || (!!this.rock && inWalkRaster(this.rock.walk, u, v));
   }
 
   /** The wardens' encounter once they stand (app/encounter.ts plays it while the hero is near). */
