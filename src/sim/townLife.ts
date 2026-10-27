@@ -53,6 +53,11 @@ export interface Agent {
   rng: Rng;
   /** Stopped for a talk with the player: stands, faces them, and goes on with the day when let go. */
   held?: boolean;
+  /**
+   * Still crossing a room drawn open on the way out (sim seconds): they set off from its doorstep once the time
+   * passes this (app/interiorVisit keeps it ahead while they walk to the door).
+   */
+  stay?: number;
   /** Sent over by the VGM (plan D27): walks up to (x, z), then waits there facing `face` until let go or `until`. */
   seek?: { x: number; z: number; face: { x: number; z: number } };
 }
@@ -140,6 +145,10 @@ export class TownLife {
     this.weather = weather;
     for (const a of this.agents) {
       if (a.held) continue;
+      if (a.stay !== undefined) {
+        if (this.time < a.stay) continue;
+        a.stay = undefined;
+      }
       if (a.act === 'walk') this.walk(a, dt);
       else if (a.seek && this.time < a.until) continue;
       else if (this.time >= a.until || this.taskOf(a) !== a.task) this.choose(a, false);
@@ -170,6 +179,11 @@ export class TownLife {
     a.pi = 0;
     a.act = 'walk';
     a.hidden = false;
+  }
+
+  /** Keeps `a` at their doorstep `secs` longer: they are still walking out through the room (drawn open). */
+  linger(a: Agent, secs: number): void {
+    a.stay = this.time + secs;
   }
 
   /** The talk is over: they pick up their day from here. */

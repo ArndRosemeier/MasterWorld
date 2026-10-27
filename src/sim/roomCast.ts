@@ -6,7 +6,7 @@
  * offering are drawn inside while the player is (the room is where one would look for them). Sleepers are
  * abed upstairs and not cast. Pure.
  */
-import type { InteriorPlan, InteriorSpotKind } from '@futuremagic/settlement';
+import type { InteriorFixture, InteriorPlan, InteriorSpot, InteriorSpotKind } from '@futuremagic/settlement';
 import type { ActivityKind } from './spots';
 import type { Agent } from './townLife';
 
@@ -28,8 +28,16 @@ const WORK: ReadonlySet<InteriorSpotKind> = new Set(['serve', 'smith', 'stoke', 
 /** Where a visitor or a member of the household goes, likeliest first. */
 const REST: readonly InteriorSpotKind[] = ['drink', 'sit', 'pray', 'warm'];
 
-/** The cast of `building`'s room, in a stable order (by person). */
-export function roomCast(agents: readonly Agent[], spots: readonly { building: number; door?: boolean }[], building: number, plan: InteriorPlan): Cast[] {
+/** The bench a spot is on (people sit there, on its top), if any. */
+export function benchUnder(plan: InteriorPlan, s: InteriorSpot): InteriorFixture | undefined {
+  return plan.fixtures.find((f) => f.kind === 'bench' && f.storey === s.storey && Math.abs(s.a - f.a) <= f.w / 2 && Math.abs(s.b - f.b) <= f.d / 2);
+}
+
+/**
+ * The cast of `building`'s room, in a stable order (by person). `kept`: the spot each had before (while the room is
+ * drawn): they keep it while it is theirs to keep, so one coming in or going does not send the rest to other seats.
+ */
+export function roomCast(agents: readonly Agent[], spots: readonly { building: number; door?: boolean }[], building: number, plan: InteriorPlan, kept?: ReadonlyMap<Agent, number>): Cast[] {
   const inside = agents.filter((a) => {
     const s = a.spot >= 0 ? spots[a.spot] : null;
     if (!s || s.building !== building) return false;
@@ -37,11 +45,16 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
     return s.door ? (a.hidden || !!a.held) && a.act !== 'sleep' : (a.act === 'drink' || a.act === 'pray' || !!a.held);
   });
   const free = plan.spots.map((s, i) => ({ kind: s.kind, i })).filter((s) => s.kind !== 'sleep');
-  const take = (ok: (k: InteriorSpotKind) => boolean, id: number): number => {
+  const held = new Map<number, Agent>();
+  for (const a of inside) { const i = kept?.get(a); if (i !== undefined) held.set(i, a); }
+  const take = (ok: (k: InteriorSpotKind) => boolean, a: Agent): number => {
     const left = free.filter((s) => ok(s.kind));
     if (!left.length) return -1;
     // Spread people over the room's spots by who they are, not first come first served.
-    const s = left[id % left.length];
+    const mine = left.find((x) => x.i === kept?.get(a));
+    // Not a place someone else in the room had (they keep it), while there are others.
+    const open = left.filter((x) => (held.get(x.i) ?? a) === a);
+    const s = mine ?? (open.length ? open : left)[a.person.id % (open.length || left.length)];
     free.splice(free.indexOf(s), 1);
     return s.i;
   };
@@ -49,18 +62,20 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
   // Drinking at a table is drinking seated on its bench (standing on the bench showed their legs under it).
   const actAt = (i: number): ActivityKind => {
     const s = plan.spots[i], act = ACT[s.kind];
-    return act === 'drink' && plan.fixtures.some((f) => f.kind === 'bench' && Math.abs(s.a - f.a) <= f.w / 2 && Math.abs(s.b - f.b) <= f.d / 2) ? 'sit' : act;
+    return act === 'drink' && benchUnder(plan, s) ? 'sit' : act;
   };
   // Workers first, so the counter is never taken by a guest.
   const workers = inside.filter((a) => a.person.work === building), rest = inside.filter((a) => a.person.work !== building);
   for (const a of workers) {
-    const i = take((k) => WORK.has(k) || (a.person.role === 'keeper' && k === 'pray'), a.person.id);
+    const ok = (k: InteriorSpotKind) => WORK.has(k) || (a.person.role === 'keeper' && k === 'pray');
+    const i = take(ok, a);
     if (i >= 0) out.push({ agent: a, spot: i, act: actAt(i) });
     else rest.push(a);
   }
   for (const a of rest) {
-    let i = -1;
-    for (const k of REST) if ((i = take((x) => x === k, a.person.id)) >= 0) break;
+    // The place they had, whatever kind of rest it is; else the likeliest free one.
+    let i = kept?.has(a) && free.some((s) => s.i === kept.get(a) && REST.includes(s.kind)) ? take((x) => REST.includes(x), a) : -1;
+    if (i < 0) for (const k of REST) if ((i = take((x) => x === k, a)) >= 0) break;
     if (i >= 0) out.push({ agent: a, spot: i, act: actAt(i) });
   }
   return out.sort((x, y) => x.agent.person.id - y.agent.person.id);
