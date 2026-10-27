@@ -150,6 +150,9 @@ body.titled .shade { z-index: 25; }
 #title .t-blackout { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 1.2s; pointer-events: none; }
 #title.gone { opacity: 0; transition: opacity 1.2s; }
 
+/* Back for a save (Continue restarted the page): every entrance has played already, the loops go on. */
+#title.resume :is(.t-dawn, .t-logo, .t-panel) :is(*, *::before, *::after), #title.resume :is(.t-logo, .t-panel, .t-peoples, .t-crier, .t-hint) { animation-delay: -60s !important; }
+
 /* Calm motion (the setting or the system's reduced motion): the still picture, everything in place at once. */
 #title.calm *, #title.calm *::before { animation: none !important; }
 #title.calm .t-dawn { display: none; }

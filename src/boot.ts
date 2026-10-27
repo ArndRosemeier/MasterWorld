@@ -10,6 +10,7 @@ import { Sound } from './app/sound';
 import { Title } from './app/title/title';
 import type { Menu } from './app/menu';
 import { installPackFetch } from './workers/packFetch';
+import { PENDING_LOAD, loadLocal } from './persist/local';
 
 // The people's and animals' packs: the start's files come as one bundle and stay in the browser's cache; the rest
 // come one by one, queued and retried (a static host answers a burst with 503s). See workers/packStore.ts.
@@ -23,7 +24,9 @@ const sound = new Sound();
 settings.watch((s) => sound.mix(s));
 const menus: { menu: Menu | null } = { menu: null };
 const calm = settings.current.calm || !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menus.menu?.showDialog('settings'), whatsNew: () => menus.menu?.showDialog('news'), toggleSound: () => settings.set({ muted: !settings.current.muted }) }, calm) : null;
+// Continue (or Load) restarted the page: the title opens as it was left, not with its opening again.
+const resuming = typeof loadLocal(PENDING_LOAD) === 'string';
+const title = params.title ? new Title(Title.drawToday(), sound, { openSettings: () => menus.menu?.showDialog('settings'), whatsNew: () => menus.menu?.showDialog('news'), toggleSound: () => settings.set({ muted: !settings.current.muted }) }, calm, resuming) : null;
 const loading = title?.screen ?? new LoadingScreen();
 loading.set('Fetching the world');
 // The start's people and animals download beside the game's code (the title already shows).
