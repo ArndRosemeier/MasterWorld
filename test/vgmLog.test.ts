@@ -28,6 +28,7 @@ test('vgm log: every decision a tool writes has a line, with that tool and its n
     { kind: 'order', id: 'order-1', town: home.id, order: { kind: 'stayIn', from: 10, to: 12 } },
     { kind: 'journey', id: 'journey-1', from: home.id, to: 'region-2', fare: 20, at: 11, arrive: 13 },
     { kind: 'sight', id: 'sight-1', sight: 'cairn', x: 10, z: 10, yaw: 0, seed: 6, at: 12 },
+    { kind: 'stray', id: 'stray-1', town: home.id, paddock: 0, x: 30, z: 10, seed: 8, at: 12.6, until: 14, situation: 'stray-beast' },
     { kind: 'traveller', id: 'traveller-1', town: home.id, x: 20, z: 10, yaw: 0, seed: 7, at: 12.5, until: 14.5 },
   ];
   const log = [road('road-1'), ...walked, ...turn.map((m) => m.decision), ...asked];

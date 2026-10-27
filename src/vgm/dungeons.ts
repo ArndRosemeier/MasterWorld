@@ -13,7 +13,7 @@ import { woodsOf } from '../world/flora';
 import type { DungeonPlace } from '../world/dungeon/cellar';
 import { setPiecesFor } from '../world/dungeon/setPieces';
 import type { Terrain } from '../world/terrain';
-import type { Town } from '../world/town';
+import { townById, type Town } from '../world/town';
 
 /** Houses that dig cellars: lived in, not the temple, the hall or the stable. */
 const CELLARED: readonly TownBuilding['kind'][] = ['house', 'cottage', 'inn', 'bakery', 'workshop', 'smithy'];
@@ -224,7 +224,7 @@ export function retreatSite(keeper: string, seed: number, terrain: Terrain, town
 export function placeOf(d: DungeonDecision, towns: readonly Town[], dungeons: SettingModule['dungeons']): DungeonPlace | null {
   const form = loreOf({ dungeons }, d.template).form;
   if (!d.site) return form.stands === 'house' ? houseOf(d, towns) : null;
-  const town = towns.find((t) => t.decision.id === d.town);
+  const town = townById(towns, d.town);
   if (!town) return null;
   const called = form.called ?? `the ${form.word} {dir} of the town`;
   return { kind: d.template, hu: 3, hv: 3, name: called.replace('{dir}', compass(d.site.x - town.decision.x, d.site.z - town.decision.z)) };
@@ -246,7 +246,7 @@ export function nextSetPiece(used: readonly string[], seed: number, kind: Dungeo
 
 /** The house a dungeon decision lies under (a cellar), or whose household knows of it (a barrow). */
 export function houseOf(d: DungeonDecision, towns: readonly Town[]): TownBuilding | null {
-  const town = towns.find((t) => t.decision.id === d.town);
+  const town = townById(towns, d.town);
   return town?.plan.buildings.find((b) => b.id === d.building) ?? null;
 }
 

@@ -5,7 +5,7 @@
  * business. Deterministic for a seed and a sequence of steps. Pure.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { pointInPoly, polyBounds, type Paddock, type TownPlan } from '@futuremagic/settlement';
+import { pointInPoly, polyBounds, polyCentroid, type Paddock, type TownPlan } from '@futuremagic/settlement';
 
 /** What an animal is doing (a renderer maps it to a clip). */
 export type GrazerAct = 'eat' | 'idle' | 'walk';
@@ -26,10 +26,16 @@ export interface Grazer {
   /** When the current act ends (sim seconds). */
   until: number;
   rng: Rng;
+  /** Out of its paddock (a stray, C10): it grazes round where it got to, not kept in by the fence. */
+  loose?: { x: number; z: number };
+  /** Points to pass on its walk first (x, z pairs): its paddock's gate, out or in. */
+  way?: number[];
 }
 
 /** Walking pace (m/s), how close it keeps to the fence (m) and to another animal. */
 const PACE = 0.9, FENCE = 1.6, APART = 2.6;
+/** A beast out of its paddock trots off (m/s). */
+const TROT = 1.7;
 
 export class Herds {
   /** The animals in their paddocks now (those driven off are not). */
@@ -57,23 +63,55 @@ export class Herds {
     });
   }
 
+  /** The beast out of its paddock now (C10), if any. */
+  get straying(): Grazer | null {
+    return this.animals.find((a) => a.loose) ?? null;
+  }
+
+  /**
+   * One beast of paddock `paddock` gets out through its gate and wanders to `to` (a stray, C10); `to` null:
+   * the one out (caught, or the stray over) goes back in through the gate.
+   */
+  loose(paddock: number, to: { x: number; z: number } | null): void {
+    const pd = this.plan.paddocks[paddock];
+    if (!pd) return;
+    const [cx, cz] = polyCentroid(pd.poly), [gx, gz] = pd.gate, l = Math.hypot(cx - gx, cz - gz) || 1;
+    const inX = gx + ((cx - gx) / l) * 3, inZ = gz + ((cz - gz) / l) * 3, outX = gx - ((cx - gx) / l) * 3, outZ = gz - ((cz - gz) / l) * 3;
+    if (to) {
+      const a = this.animals.find((x) => x.paddock === paddock && !x.loose);
+      if (!a) return;
+      Object.assign(a, { loose: { ...to }, way: [inX, inZ, outX, outZ], tx: to.x, tz: to.z, act: 'walk', until: this.time + 600 });
+      return;
+    }
+    for (const a of this.animals) {
+      if (a.paddock !== paddock || !a.loose) continue;
+      const [x, z] = this.grassIn(pd, a.rng);
+      Object.assign(a, { loose: undefined, way: [outX, outZ, inX, inZ], tx: x, tz: z, act: 'walk', until: this.time + 600 });
+    }
+  }
+
   /** Advance `dt` seconds. */
   step(dt: number): void {
     this.time += dt;
     for (const a of this.animals) {
       if (a.act === 'walk') {
-        const dx = a.tx - a.x, dz = a.tz - a.z, d = Math.hypot(dx, dz);
-        if (d < 0.1 || this.time >= a.until) { this.settle(a); continue; }
+        // Through the gate first, if it has a way to go.
+        const wx = a.way?.length ? a.way[0] : a.tx, wz = a.way?.length ? a.way[1] : a.tz;
+        if (a.way?.length && Math.hypot(wx - a.x, wz - a.z) < 0.8) { a.way.splice(0, 2); continue; }
+        const dx = wx - a.x, dz = wz - a.z, d = Math.hypot(dx, dz);
+        if ((d < 0.1 && !a.way?.length) || this.time >= a.until) { a.way = undefined; this.settle(a); continue; }
         // Turn towards the goal, then step (no turning on the spot).
         const want = Math.atan2(dz, dx);
         let turn = want - a.dir;
         turn = Math.atan2(Math.sin(turn), Math.cos(turn));
         a.dir += Math.max(-1.2 * dt, Math.min(1.2 * dt, turn));
-        const v = PACE * Math.max(0.2, Math.cos(turn));
+        // Out, it trots.
+        const v = (a.loose ? TROT : PACE) * Math.max(0.2, Math.cos(turn));
         const nx = a.x + Math.cos(a.dir) * v * dt, nz = a.z + Math.sin(a.dir) * v * dt;
-        if (!this.roomAt(a, nx, nz)) { this.settle(a); continue; }
+        // On its way through the gate, or out, the fence keeps it in no more.
+        if (!a.way?.length && !a.loose && !this.roomAt(a, nx, nz)) { this.settle(a); continue; }
         a.x = nx; a.z = nz; a.speed = v;
-      } else if (this.time >= a.until) this.choose(a);
+      } else if (this.time >= a.until) this.wander(a);
     }
   }
 
@@ -85,8 +123,14 @@ export class Herds {
   }
 
   /** On to fresh grass a few metres off (or stay put a while longer). */
-  private choose(a: Grazer): void {
+  private wander(a: Grazer): void {
     const pd = this.plan.paddocks[a.paddock];
+    // Out: a few steps round where it got to.
+    if (a.loose) {
+      const ang = a.rng.range(-Math.PI, Math.PI), d = a.rng.range(1, 4);
+      Object.assign(a, { tx: a.loose.x + Math.cos(ang) * d, tz: a.loose.z + Math.sin(ang) * d, act: 'walk', until: this.time + 12 });
+      return;
+    }
     if (a.rng.chance(0.35)) { this.settle(a); return; }
     for (let k = 0; k < 8; k++) {
       const d = a.rng.range(2, 9), ang = a.dir + a.rng.range(-1.6, 1.6);
