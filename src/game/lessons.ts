@@ -8,11 +8,23 @@
 import type { SettingModule, TrainerDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import type { Character } from './character';
+import { EARN } from './guilds';
 import { keeperOf } from './trade';
 
-/** What a townsperson teaches, if anything: their own trade's teaching, or by role (a market trader, the temple keeper). */
+/** What a townsperson teaches, if anything: their own trade's teaching, by role, or their guild's (D49). */
 export function teacherOf(setting: SettingModule, p: Person): TrainerDef | null {
-  return setting.trainers.find((t) => t.keeper === keeperOf(p)) ?? null;
+  const k = keeperOf(p);
+  return setting.trainers.find((t) => t.keeper === k) ?? setting.guilds?.find((g) => g.keeper === k) ?? null;
+}
+
+/**
+ * How far this teacher's lessons take a skill now: their own knowledge, and in a skill with ranks (D49) the
+ * rank opened, less what only use teaches; nothing in a skill not opened yet.
+ */
+export function lessonTop(t: TrainerDef, hero: Character, skill: string): number {
+  const r = hero.rankOf(skill);
+  if (r === null) return t.upTo;
+  return r < 0 ? 0 : Math.min(t.upTo, hero.capOf(skill) - EARN);
 }
 
 /** Copper for the next point of a skill now at `level` (whole points). */
@@ -28,6 +40,8 @@ export interface Lesson {
   readonly level: number;
   /** Copper for the next point; null when the teacher has taught all they know of it. */
   readonly price: number | null;
+  /** How far lessons go now (the rank's top less what use must earn, or the teacher's knowledge); 0: not opened. */
+  readonly top: number;
 }
 
 /** The lessons a teacher offers this hero, in the teacher's order. */
@@ -35,18 +49,20 @@ export function lessonsFor(setting: SettingModule, t: TrainerDef, hero: Characte
   return t.skills.map((id) => {
     const level = Math.floor(hero.skills.get(id) ?? 0);
     const name = setting.skills.find((s) => s.id === id)?.name ?? id;
-    return { skill: id, name, level, price: level >= t.upTo ? null : lessonPrice(t, level) };
+    const top = lessonTop(t, hero, id);
+    return { skill: id, name, level, top, price: level >= top ? null : lessonPrice(t, level) };
   });
 }
 
 /** Why a lesson did not happen (null: it did). */
-export type LessonRefusal = 'coin' | 'taught-out' | 'not-taught' | null;
+export type LessonRefusal = 'coin' | 'taught-out' | 'not-taught' | 'closed' | null;
 
 /** Take one lesson: the coin goes, the skill rises to its next whole point. */
 export function takeLesson(hero: Character, t: TrainerDef, skill: string): LessonRefusal {
   if (!t.skills.includes(skill)) return 'not-taught';
   const v = hero.skills.get(skill) ?? 0;
-  if (Math.floor(v) >= t.upTo) return 'taught-out';
+  if (hero.rankOf(skill) === -1) return 'closed';
+  if (Math.floor(v) >= lessonTop(t, hero, skill)) return 'taught-out';
   const price = lessonPrice(t, v);
   if (hero.coins < price) return 'coin';
   hero.coins -= price;

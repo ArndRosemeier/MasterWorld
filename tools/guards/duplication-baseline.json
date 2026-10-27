@@ -296,10 +296,6 @@
     "reason": "The same seam on purpose: app/roads.ts asks every view built from the land to build again over the squares a new road passes; each view rebuilds its own cells."
   },
   {
-    "key": "same name: masterworld/game/character.ts#save + masterworld/talk/townTalk.ts#save",
-    "reason": "Each class writes its own state for the save (talk evidence and leads vs the hero's skills and kit vs the merchants' stock); only the name matches."
-  },
-  {
     "key": "same name: masterworld/game/trade.ts#save + masterworld/talk/townTalk.ts#save",
     "reason": "Each class writes its own state for the save (talk evidence and leads vs the hero's skills and kit vs the merchants' stock); only the name matches."
   },

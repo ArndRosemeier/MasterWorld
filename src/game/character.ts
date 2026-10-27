@@ -19,6 +19,8 @@ export interface CharacterSave {
   readonly background?: string;
   /** The inn where the hero last took a room: where they wake after a fall (absent: none yet). */
   readonly lodging?: Lodging;
+  /** The rank opened in each skill a guild teaches (D49; absent in older saves: what they had, opened). */
+  readonly ranks?: Readonly<Record<string, number>>;
 }
 
 /** A skill rose to a new whole point. */
@@ -41,6 +43,11 @@ const FISTS: WeaponStats = { skill: 'unarmed', damage: [1, 3], kind: 'blunt', ti
 
 export class Character {
   readonly skills = new Map<string, number>();
+  /**
+   * The rank opened in each skill a guild teaches (D49): use and lessons raise it only up to that rank's
+   * top, and not at all before a trainer (or the hero's past) opened it. Skills no guild teaches rise freely.
+   */
+  readonly ranks = new Map<string, number>();
   health: number;
   stamina: number;
   readonly worn: Partial<Record<Slot | 'ring2', Item>> = {};
@@ -61,6 +68,7 @@ export class Character {
       this.coins = saved.coins;
       this.background = saved.background ?? '';
       this.lodging = saved.lodging ?? null;
+      for (const id of this.rankedSkills()) this.ranks.set(id, saved.ranks?.[id] ?? this.rankFor(this.skills.get(id) ?? 0));
     } else this.beginAs(setting.backgrounds[0]);
     this.health = Math.min(saved?.health ?? Infinity, this.maxHealth);
     this.stamina = Math.min(saved?.stamina ?? Infinity, this.maxStamina);
@@ -71,6 +79,9 @@ export class Character {
     this.background = bg.id;
     this.lodging = null;
     for (const s of this.setting.skills) this.skills.set(s.id, s.start + (bg.skills[s.id] ?? 0));
+    // What everyone can do, and what this past taught, is open; the rest waits for a guild's trainer.
+    this.ranks.clear();
+    for (const id of this.rankedSkills()) this.ranks.set(id, this.setting.skills.find((s) => s.id === id)?.open || bg.skills[id] ? 0 : -1);
     for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) delete this.worn[k];
     this.pack.length = 0;
     const p = (id: string) => plainItem(this.cat, id);
@@ -79,6 +90,31 @@ export class Character {
     this.coins = bg.kit.coins;
     this.health = this.maxHealth;
     this.stamina = this.maxStamina;
+  }
+
+  /** Skills some guild teaches (they have ranks). */
+  private rankedSkills(): string[] {
+    const g = new Set((this.setting.guilds ?? []).flatMap((x) => x.skills));
+    return this.setting.skills.map((s) => s.id).filter((id) => g.has(id));
+  }
+
+  /** The rank whose span holds a skill level (an older save's skills open as far as they had come). */
+  private rankFor(v: number): number {
+    const r = this.setting.skillRanks ?? [];
+    const i = r.findIndex((x) => x.upTo > v);
+    return i < 0 ? r.length - 1 : i;
+  }
+
+  /** The rank opened in a skill (-1: not opened; null: no guild teaches it, it has no ranks). */
+  rankOf(id: string): number | null {
+    return this.ranks.get(id) ?? null;
+  }
+
+  /** How high use and lessons may raise a skill now (its rank's top; where it is, before it is opened). */
+  capOf(id: string): number {
+    const r = this.ranks.get(id);
+    if (r === undefined) return 100;
+    return r < 0 ? this.skills.get(id) ?? 0 : this.setting.skillRanks?.[r]?.upTo ?? 100;
   }
 
   /** A skill with what is worn added. */
@@ -144,10 +180,11 @@ export class Character {
   practise(id: string, challenge: number, amount = 1): SkillUp | null {
     const def = this.setting.skills.find((s) => s.id === id);
     const v = this.skills.get(id);
-    if (!def || v === undefined || v >= 100) return null;
+    const cap = this.capOf(id);
+    if (!def || v === undefined || v >= cap) return null;
     const fit = Math.min(1.6, Math.max(0.05, challenge / Math.max(4, v * 0.45)));
     const gain = (0.16 * def.rate * fit * amount) / (1 + v / 18);
-    const next = Math.min(100, v + gain);
+    const next = Math.min(cap, v + gain);
     this.skills.set(id, next);
     return Math.floor(next) > Math.floor(v) ? { skill: id, name: def.name, level: Math.floor(next) } : null;
   }
@@ -218,6 +255,6 @@ export class Character {
   }
 
   save(): CharacterSave {
-    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}) };
+    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), ...(this.ranks.size ? { ranks: Object.fromEntries(this.ranks) } : {}) };
   }
 }

@@ -30,6 +30,7 @@ import { itemWorth, type Merchant } from './trade';
 import { Township } from './township';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
 import { lessonPrice, takeLesson, teacherOf } from './lessons';
+import { GuildBook, isGuild, nextRank, openRank, rankRefusal } from './guilds';
 import { WALK, Walker, type WalkWorld } from './walker';
 import type { Terrain } from '../world/terrain';
 
@@ -53,6 +54,8 @@ export interface EveningResult {
   readonly bought: readonly string[];
   /** Lessons taken ("blades 13"). */
   readonly lessons: readonly string[];
+  /** Skills and ranks opened at a guild house ("shields 0"). */
+  readonly opened: readonly string[];
   /** Per evening: copper spent on gear and lessons (the coin sink, plan A2b). */
   readonly spent: readonly number[];
   /** The purse at the end. */
@@ -116,7 +119,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const home = marketStart(town.plan);
   land.walker.place(home.x, home.z);
   const power0 = hero.power;
-  const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
+  const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [], opened: string[] = [];
+  const book = new GuildBook();
   let falls = 0, earned = 0, seconds = 0;
   const pass = (s: number) => { seconds += s; hours += s * HOURS_PER_SECOND; };
 
@@ -311,7 +315,22 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       }
       // Lessons with what is left above a night's room and a mending (the weapon's skill first, then guarding).
       const reserve = setting.upkeep.room + LESSON_RESERVE;
-      for (const skill of [hero.weapon.skill, 'armour', 'dodge', 'shields']) {
+      const wanted = [hero.weapon.skill, 'armour', 'dodge', 'shields'];
+      // First what a guild house must open (D49): a skill never learned, or a rank use has earned.
+      for (const skill of wanted) {
+        const by = teachers.find(({ t }) => t.skills.includes(skill) && isGuild(t));
+        const next = nextRank(setting, hero, skill);
+        if (!by || !next || hero.coins - next.def.price < reserve) continue;
+        const g = setting.guilds!.find((x) => x.keeper === by.t.keeper)!;
+        if (rankRefusal(setting, g, hero, skill, book, log)) continue;
+        walkTo(g.name, ...front(town.plan.buildings[by.p.work]));
+        const before = hero.coins;
+        openRank(setting, g, hero, skill, book, log);
+        paid += before - hero.coins;
+        opened.push(`${skill} ${next.rank}`);
+        say(`${g.name} opens ${skill} rank ${next.rank} for ${before - hero.coins} copper`);
+      }
+      for (const skill of wanted) {
         const by = teachers.find(({ t }) => t.skills.includes(skill));
         if (!by) continue;
         let walked = false;
@@ -341,6 +360,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       promiseDue();
     }
     if (opts.reckless && !falls) throw new Broke('went down reckless and did not fall');
+    if (setting.guilds?.length && township.guilds.length && !opened.length) throw new Broke(`opened no skill or rank at a guild house in ${evenings} evenings`);
     if (shops && !bought.length) throw new Broke(`bought no upgrade in ${evenings} evenings (${hero.coins} copper left)`);
     if (shops && hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
     // The next lead: someone has news of a place not yet visited.
@@ -349,9 +369,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], seconds };
+    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], seconds };
+  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds };
 }
 
 /** A point just outside a building's door. */
