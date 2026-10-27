@@ -338,10 +338,9 @@ export class Encounter {
         }
         break;
       case 'heal': this.hud.healed(); this.act('drink', 1.1); break;
-      case 'notice': if (e.who.def.temper !== 'skittish') this.director.queue(cap(`${name(e.who)} has seen you.`), 0.5); break;
-      case 'flee': this.notes.say(cap(`${name(e.who)} flees.`), 2.5); break;
+      // Noticed, fleeing, slinking off spared: all seen on the creature, so nothing is said.
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
-      case 'spared': this.notes.say(cap(`${name(e.who)} slinks away into the dark, alive.`), 4); this.director.met('people', 0.5); break;
+      case 'spared': this.director.met('people', 0.5); break;
       case 'killed': if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
       case 'skill': this.director.queue(`Your ${e.up.name} rises to ${e.up.level}.`, 1); break;
       case 'refused': this.notes.say(e.text, 2.5); break;

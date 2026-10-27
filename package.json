@@ -35,7 +35,8 @@
     "shot:hatch": "node tools/shot/hatch.mjs",
     "shot:doors": "node tools/shot/doors.mjs",
     "shot:search": "node tools/shot/search.mjs",
-    "shot:ways": "node tools/shot/ways.mjs"
+    "shot:ways": "node tools/shot/ways.mjs",
+    "shot:mouths": "node tools/shot/mouths.mjs"
   },
   "dependencies": {
     "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.3/actors-animal-0.19.3.tgz",

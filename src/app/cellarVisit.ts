@@ -16,6 +16,7 @@ import { torchSpots } from '../world/dungeon/torches';
 import { CELL, STOREY, type Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace, keySpot, type SpaceEvent } from '../world/dungeon/space';
 import { SearchKneel } from './searchKneel';
+import { WalkTo } from './walkTo';
 import { Fade } from './fade';
 import type { Notes } from './notes';
 import type { CellarDiff } from './saveGame';
@@ -36,8 +37,6 @@ export class CellarVisit {
   onDepth: ((below: boolean) => void) | null = null;
   /** The house above, whose hatch the ladder climbs up to (null: a barrow's way out, walked to). */
   above: { readonly town: string; readonly house: TownBuilding } | null = null;
-  /** The note on the way down (a barrow's). */
-  entering: string;
 
   constructor(
     readonly cellar: Cellar,
@@ -54,7 +53,6 @@ export class CellarVisit {
   ) {
     this.space = space ?? new DungeonSpace(cellar.layout);
     this.world = dungeonWorld(this.space, view.origin);
-    this.entering = `You climb down into the cellar of ${cellar.house}.`;
   }
 
   /** Go down (now: at once, no fade); `room` to stand in the middle of that room instead of at the ladder. */
@@ -70,7 +68,6 @@ export class CellarVisit {
         const r = this.cellar.layout.rooms[room];
         this.player.teleport(O.x + (r.x + r.w / 2) * CELL, O.y + r.level * STOREY, O.z + (r.z + r.d / 2) * CELL, h.yaw);
       } else this.player.teleport(O.x + h.x - fx * 1.0, O.y + h.y, O.z + h.z - fz * 1.0, h.yaw);
-      if (!this.above) this.notes.say(this.entering);
     });
     if (!now) this.onSwap?.();
   }
@@ -122,8 +119,11 @@ export class CellarVisit {
   async leave(): Promise<void> {
     await this.fade.swap(false, async () => {
       this.goOut();
-      const [x, z, yaw] = this.house.door;
-      this.player.teleport(x - Math.sin(yaw) * 0.6, undefined, z - Math.cos(yaw) * 0.6, yaw);
+      // Seen walking out of the doorway onto the forecourt (facing `yaw`, away from the place).
+      const [x, z, yaw] = this.house.door, fx = -Math.sin(yaw), fz = -Math.cos(yaw), p = this.player;
+      p.teleport(x - fx * WALK_OUT, undefined, z - fz * WALK_OUT, yaw);
+      const walk = new WalkTo(p.walker.pos, { x: x + fx * 0.6, z: z + fz * 0.6 }, null, () => { if (p.puppet === walk) p.puppet = null; });
+      p.puppet = walk;
     });
     this.onSwap?.();
   }
@@ -192,3 +192,6 @@ export class CellarVisit {
   /** The hero kneeling to pick up a key (null: not). */
   private kneel: SearchKneel | null = null;
 }
+
+/** A place on the land is walked out of from this far inside its doorway, metres. */
+const WALK_OUT = 1.0;

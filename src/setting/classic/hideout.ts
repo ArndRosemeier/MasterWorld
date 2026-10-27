@@ -14,7 +14,6 @@ export const hideout: CellarLore = {
     space: { ...CELLAR_SPACE, entrance: [3, 3], arriveMid: true },
   },
   words: {
-    enter: 'You push past the brush that hides the door and go down into {place}.',
     quiet: 'Nobody is left in {place}. Whoever they robbed will want to know.',
     thanks: '{place} is empty? Then we can drive the road again. Take {coins}, and our thanks.',
   },

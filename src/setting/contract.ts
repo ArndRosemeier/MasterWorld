@@ -177,10 +177,8 @@ export interface DwellerDef extends HistoryDef {
   readonly surprise?: string;
 }
 
-/** How a kind of dungeon is spoken of as the hero goes in and out; `{place}` is what it is called. */
+/** How a kind of dungeon is spoken of once it is quiet; `{place}` is what it is called (going in is seen, not told). */
 export interface DungeonWords {
-  /** Going down ("You climb down into the cellar of {place}."). */
-  readonly enter: string;
   /** The Director's line when it has gone quiet. */
   readonly quiet: string;
   /** What the household says when told it is quiet (the promise kept); `{coins}` the reward, `{place}` the place. */

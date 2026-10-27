@@ -11,7 +11,6 @@ export const CELLAR_SPACE: DungeonSpace = { radius: 16, maxRooms: 11, depth: [0,
 export const cellar: CellarLore = {
   form: { stands: 'house', word: 'cellar', purposes: ['lead'], shell: 'hatch', space: CELLAR_SPACE },
   words: {
-    enter: 'You climb down into the cellar of {place}.',
     quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',
     thanks: 'Quiet down there at last? Then we sleep tonight. Here, {coins}; you have earned every one.',
   },

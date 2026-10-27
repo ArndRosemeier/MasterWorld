@@ -104,9 +104,10 @@ import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
 import { bardTells, GuildBook, isGuild, whereOf } from './game/guilds';
 import { coinText, uniqueItem } from './game/items';
-import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
+import { epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
 import { RemainsView } from './render/remainsView';
+import { SearchKneel } from './app/searchKneel';
 import { writeSlot } from './persist/saves';
 import { acquaintances } from './game/background';
 import { Director, type Need } from './vgm/director';
@@ -1184,18 +1185,29 @@ export async function start(b: Boot): Promise<void> {
       justLeft = r;
       drawRemains();
     };
+    // Taken up in sight (render it, don't narrate it): the hero steps up to the remains and kneels; once the
+    // hands are in, they are gone from the ground and what they held shows as finds do.
+    let gathering: SearchKneel | null = null;
     const gatherNear = () => {
-      if (!remains.length || !character.alive) return;
+      if (gathering) {
+        if (gathering.done || player.puppet !== gathering) { if (player.puppet === gathering) player.puppet = null; gathering = null; }
+        return;
+      }
+      if (!remains.length || !character.alive || player.puppet) return;
       const v = visit(), w = player.walker.pos, below = v ? v.cellar.decision.id : null;
       if (justLeft && (justLeft.at.below !== below || Math.hypot(justLeft.at.x - w.x, justLeft.at.z - w.z) > 8)) justLeft = null;
       const r = remainsNear(remains, below, w.x, w.y, w.z);
       if (!r || r === justLeft) return;
-      gather(character, r);
-      remains.splice(remains.indexOf(r), 1);
-      journal.fulfil(r.id);
-      drawRemains();
-      notes.say(gatheredLine(r), 6);
-      sounds?.cue({ kind: 'found', loot: { items: [...r.items], coins: r.coins } });
+      gathering = new SearchKneel(w, player.walker.yaw, { x: r.at.x, z: r.at.z }, null, () => {
+        if (!remains.includes(r)) return;
+        gather(character, r);
+        remains.splice(remains.indexOf(r), 1);
+        journal.fulfil(r.id);
+        drawRemains();
+        fightHud.showFinds({ items: [...r.items], coins: r.coins });
+        sounds?.cue({ kind: 'found', loot: { items: [...r.items], coins: r.coins } });
+      });
+      player.puppet = gathering;
     };
     // `?open=tale`: the end of a roguelike tale as it shows (for the standard shots), without ending anything.
     const showTale = () => { paused(true); new TalesEnd().show(heroName || 'Wenna Stonehelm', epitaph(heroName || 'Wenna Stonehelm', view.sky.day, { x: 0, y: 0, z: 0, below: null, mark: { x: 0, z: 0 }, label: 'out on the land' }), () => location.reload()); };
@@ -1276,7 +1288,7 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];

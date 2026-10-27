@@ -15,7 +15,6 @@ export const cave: CellarLore = {
     space: { ...CELLAR_SPACE, maxRooms: 12, depth: [-1, -1], inset: 0.95, entrance: [3, 3], carved: true, torches: false, arriveMid: true },
   },
   words: {
-    enter: 'You duck under the overhang and feel your way down into {place}.',
     quiet: 'Nothing stirs in {place} now. The household who told you of it will want to hear.',
     thanks: '{place} is quiet? Then the hill road is safe again. Take {coins}, with our thanks.',
   },

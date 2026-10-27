@@ -104,14 +104,6 @@ export function remainsLead(r: Remains): { readonly title: string; readonly text
   };
 }
 
-/** The line when remains are taken up. */
-export function gatheredLine(r: Remains): string {
-  const n = r.items.length, what = n === 1 ? r.items[0].name : `${n} things`;
-  return r.grave
-    ? `You find what is left of ${r.grave}, and take up ${what}${r.coins ? ' and their purse' : ''}.`
-    : `Your pack lies where you fell. You take up ${what} again.`;
-}
-
 /** The roguelike end: the line over the fallen hero. */
 export function epitaph(name: string, day: number, at: FallPlace): string {
   return `Here ends the tale of ${name}, who fell ${at.label} on day ${day + 1}.`;

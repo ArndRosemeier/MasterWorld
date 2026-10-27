@@ -45,6 +45,7 @@ import { CellarVisit } from './cellarVisit';
 import type { FightHud } from './fightHud';
 import type { Notes } from './notes';
 import type { Player } from './player';
+import { WalkTo } from './walkTo';
 import type { CellarDiff } from './saveGame';
 
 export interface CellarsHost {
@@ -100,6 +101,8 @@ interface Mound extends LandSite {
 
 /** A place on the land is built (rooms, dwellers) once the hero is this near, metres. */
 const BARROW_NEAR = 250;
+/** How far past its way point the hero walks on into a place's doorway before going in, metres. */
+const WALK_IN = 0.9;
 /** How far a place's piece reaches from its site, metres (for quick tests). */
 const MOUND_REACH = 24;
 
@@ -182,9 +185,11 @@ export class Cellars {
       if (Math.hypot(x - m.x, z - m.z) > BARROW_NEAR) continue;
       if (!s.built) void this.ensure(s);
       const [wx, wz] = onLand(m, m.way.x, m.way.z);
-      if (s.ready && !s.ready.visit.inside && m.cool === 0 && Math.hypot(x - wx, z - wz) < 0.9) {
+      if (s.ready && !s.ready.visit.inside && m.cool === 0 && !this.host.player.puppet && Math.hypot(x - wx, z - wz) < 0.9) {
         m.cool = 3;
-        void s.ready.visit.enter();
+        // On into the dark of the doorway, seen; then down.
+        const visit = s.ready.visit, p = this.host.player, [ix, iz] = onLand(m, m.way.x, m.way.z - WALK_IN);
+        p.puppet = new WalkTo(p.walker.pos, { x: ix, z: iz }, null, () => { p.puppet = null; void visit.enter(); });
       }
     }
   }
@@ -332,8 +337,6 @@ export class Cellars {
     // A place on the land: back out in front of its doorway, facing away from it.
     const out = m ? { door: [...onLand(m, 0, m.out), m.yaw + Math.PI] as const } : s.house;
     const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, carved);
-    const words = loreOf(h.setting, s.decision.template).words;
-    if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
     if (!m) visit.above = { town: s.decision.town, house: s.house };
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
     visit.onDepth = (below) => {
@@ -387,7 +390,6 @@ export class Cellars {
 
 /** How a cellar is spoken of when the setting gives no words of its own. */
 const CELLAR_WORDS = {
-  enter: 'You climb down into the cellar of {place}.',
   quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',
   thanks: 'Quiet down there at last? Here, {coins}, and our thanks.',
 };
