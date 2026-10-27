@@ -7,7 +7,7 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { distToPoly, ensureCCW, pointInPoly, rect, type BuildingMesh, type Poly } from '@futuremagic/settlement';
 import type { RegionFillDef } from '../setting/contract';
-import type { RegionDecision } from './decisions';
+import { settles, type RegionDecision } from './decisions';
 import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
 import { onLand } from './dungeon/site';
 import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type Tint } from './dungeon/meshKit';
@@ -30,7 +30,7 @@ export type Place = RegionFillDef['place'];
  */
 export function layOutSite(d: RegionDecision, place: Place, height: (x: number, z: number) => number): SiteLayout | null {
   const s = d.site;
-  if (!s || place === 'none' || place === 'hamlet' || place === 'village') return null;
+  if (!s || place === 'none' || settles(place)) return null;
   const origin: [number, number, number] = [s.x, height(s.x, s.z), s.z];
   const at: At = { x: s.x, z: s.z, yaw: s.yaw, r: s.r, y0: origin[1], height, rng: new Rng(deriveSeed(d.seed, 'site')), seed: d.seed };
   const k = new MeshKit(), solids: Solid[] = [];

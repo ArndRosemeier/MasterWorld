@@ -161,7 +161,7 @@ export class Town {
     const p = this.plan;
     // The farmland first: open ground, the fields on it, the farmsteads' grounds and yards. Round a hamlet
     // or village all of it is cleared, not only the furlongs (its few fields would stand in the wood).
-    const small = this.decision.size === 'hamlet' || this.decision.size === 'village';
+    const small = this.decision.size === 'waystation' || this.decision.size === 'hamlet' || this.decision.size === 'village';
     if (small) this.fill(p.farmEdge, TownGround.Farmland);
     for (const f of p.furlongs) this.fill(f, TownGround.Farmland);
     for (const fm of p.farms) {
@@ -245,7 +245,7 @@ function hull(pts: number[], grow: number): number[] {
 
 /** A town's plan (AG settlement planTown, the one planner for every size), on the land as settled. */
 export function townPlanOf(d: TownDecision, t: Terrain): TownPlan {
-  return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t) });
+  return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t), farmland: d.size !== 'waystation' });
 }
 
 /** A building's key among every town's (building ids count from 0 in each town). */

@@ -7,6 +7,7 @@
  */
 
 import type { GradeKey } from '@futuremagic/stage';
+import type { SettlementSize } from '@futuremagic/settlement';
 
 export const CONTRACT_VERSION = 10;
 
@@ -356,10 +357,17 @@ export interface StoryEventDef {
   /**
    * `spill`: a place promised and never cleared spills its dwellers onto the land near it. `raid`: a wild
    * group (`by`) still living near a town comes down on a farm and drives off animals from its paddock.
+   * `take`: a wild group (`by`) takes a settlement of the size `takes` near it; its folk flee, the band
+   * holds it, and the rest of the group lies up in a place asked for (`lair`) near it.
    */
-  readonly kind: 'spill' | 'raid';
-  /** A raid's raiders: the setting's wild group (WildDef id) that comes down on the farms while any of it lives. */
+  readonly kind: 'spill' | 'raid' | 'take';
+  /** A raid's or take's raiders: the setting's wild group (WildDef id) that comes down while any of it lives. */
   readonly by?: string;
+  /** A take's: the size of settlement taken (classic: a waystation), within `reach` metres of the raiders' ground. */
+  readonly takes?: SettlementSize;
+  readonly reach?: number;
+  /** A take's: what the raiders' place near it is asked for (`dungeonFor`'s purpose; classic: a hideout). */
+  readonly lair?: string;
   /** Game hours first: a spill's place must have stood open that long, raiders bide that long after the world began. */
   readonly after: number;
   /** Least game hours between two events in one town. */
@@ -370,7 +378,7 @@ export interface StoryEventDef {
   readonly gather?: number;
   /**
    * How it is told: the lead's title, the news as it reaches the hero, the journal's note, and the line when
-   * it is over. `{creatures}` (the plural), `{place}` (a raid's: the farm), `{town}`, `{dir}` (which way from
+   * it is over. `{creatures}` (the plural), `{place}` (a raid's: the farm; a take's: the settlement), `{town}`, `{dir}` (which way from
    * the town the band is), and a raid's `{animals}` (the setting's livestock).
    */
   readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string };
@@ -390,7 +398,7 @@ export interface RegionFillDef {
   /** How often, against the other fills that fit. */
   readonly weight: number;
   /** What stands there (none: plain country, nothing placed). */
-  readonly place: 'none' | 'hamlet' | 'village' | 'camp' | 'ruin' | 'barrows';
+  readonly place: 'none' | 'waystation' | 'hamlet' | 'village' | 'camp' | 'ruin' | 'barrows';
   /** Footprint radius of the place, metres (trees keep out of it); a hamlet's or village's outline radius (its fields reach farther). */
   readonly radius?: number;
   /** How much farther round the footprint the trees keep off, metres (fields and gardens cleared, firewood cut). */
@@ -670,7 +678,7 @@ export interface GuildDef extends TrainerDef {
   /** The house's name ("the Hall of Arms"). */
   readonly name: string;
   /** In towns of these sizes ('town' is the start town's). */
-  readonly sizes: readonly ('hamlet' | 'village' | 'town' | 'capital')[];
+  readonly sizes: readonly SettlementSize[];
   /**
    * Which plain house it takes: the one nearest the smithy, the inn, or on the town's edge; `out`: its master
    * keeps a place of their own out on the land past the fields (a half-ruined tower, C3), and the house
@@ -1293,7 +1301,9 @@ function validateFight(m: SettingModule, where: string): string[] {
   }
   for (const e of m.events ?? []) {
     if (!(e.after >= 0) || !(e.cooldown >= 0) || e.count[0] < 1 || e.count[1] < e.count[0]) out.push(`${where}: event "${e.id}" needs after, cooldown and a count`);
-    if (e.kind === 'raid' && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: raid "${e.id}" needs its raiders (a wild group's id in by)`);
+    if ((e.kind === 'raid' || e.kind === 'take') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
+    if (e.kind === 'take' && (!e.takes || !(e.reach! > 0))) out.push(`${where}: take "${e.id}" needs the settlement it takes and a reach`);
+    if (e.lair && !Object.values(m.dungeons).some((l) => l?.form.purposes.includes(e.lair!))) out.push(`${where}: event "${e.id}" asks for a ${e.lair}, which no dungeon kind is for`);
   }
   for (const w of m.wild) {
     if (!encounter(w.encounter)?.where.includes(w.habitat)) out.push(`${where}: wild "${w.id}" needs an encounter met in its habitat ("${w.encounter}", ${w.habitat})`);

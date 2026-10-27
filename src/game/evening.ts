@@ -17,7 +17,7 @@ import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
 import { hailer } from '../vgm/guide';
-import { dungeonOf, settlementOf, type Decision, type DungeonDecision } from '../world/decisions';
+import { dungeonOf, settlementOf, type Decision, type DungeonDecision, type RegionDecision } from '../world/decisions';
 import { moveIn, outlineCellar, type Cellar } from '../world/dungeon/cellar';
 import { marketStart, type Town } from '../world/town';
 import { Character } from './character';
@@ -80,7 +80,7 @@ export interface EveningOptions {
   readonly reckless?: boolean;
   /**
    * Play in a settlement of this size the VGM founds out on the land (plan B3a: every town runs the same code),
-   * found by walking out from the start; none: the start town.
+   * the nearest a walk out from the start finds, as if the game began there; none: the start town.
    */
   readonly settlement?: SettlementSize;
   /**
@@ -143,7 +143,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     }
   };
   // In a settlement the VGM promises from there (vgm/leads.ts `near`), as the game does while the hero is in one.
-  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: start.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain, near: town === start ? null : town });
+  // Its danger counts from there too, as for a hero whose game began there: a fresh hero is the check's, and
+  // danger by distance from the start (D29) would make any settlement a few km out a check of luck in a fight.
+  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain, near: town === start ? null : town });
 
   const walkTo = (what: string, x: number, z: number) => {
     const s = land.go(x, z);
@@ -437,13 +439,18 @@ function front(b: TownBuilding): [number, number] {
 function settlementOut(seed: number, setting: SettingModule, terrain: Terrain, start: Town, size: SettlementSize, opened: (walked: Decision[]) => void): Town {
   const regions = setting.regions;
   if (!regions) throw new Error('the setting opens no regions: no settlement to play in');
+  // The nearest one a walk out finds, whichever way (danger grows with distance, D29).
+  let best: { walked: RegionDecision[]; found: RegionDecision; d: number } | null = null;
   for (let dir = 0; dir < 8; dir++) {
     const walked = walkFrontier({ seed, log: [start.decision], terrain, regions, home: start.decision }, (dir * Math.PI) / 4, 8, (d) => settlementOf(d, regions.fills)?.size === size);
     const found = regionDecisions(walked).find((d) => settlementOf(d, regions.fills)?.size === size);
-    if (!found) continue;
-    opened(walked);
-    terrain.settleMore(walked);
-    const town = terrain.town(found.id);
+    const d = found?.site ? Math.hypot(found.site.x - start.decision.x, found.site.z - start.decision.z) : Infinity;
+    if (found && (!best || d < best.d)) best = { walked, found, d };
+  }
+  if (best) {
+    opened(best.walked);
+    terrain.settleMore(best.walked);
+    const town = terrain.town(best.found.id);
     if (town) return town;
   }
   throw new Error(`no ${size} found within 8 km of the start`);

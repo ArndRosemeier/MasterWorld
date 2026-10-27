@@ -149,17 +149,17 @@ function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number 
 }
 
 /** The places people live in, which stand by fresh water (D50): their squares' banks are tried too. */
-const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, hamlet: true, village: true, camp: false, ruin: false, barrows: false };
+const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, waystation: true, hamlet: true, village: true, camp: false, ruin: false, barrows: false };
 
 
 const woods = new WeakMap<Terrain, (x: number, z: number) => number>();
 
 /** How steep the ground may be round a place of each kind (rise per metre over its radius). */
-const STEEP: Record<RegionFillDef['place'], number> = { none: 1, hamlet: 0.12, village: 0.1, camp: 0.16, ruin: 0.25, barrows: 0.16 };
+const STEEP: Record<RegionFillDef['place'], number> = { none: 1, waystation: 0.14, hamlet: 0.12, village: 0.1, camp: 0.16, ruin: 0.25, barrows: 0.16 };
 /** Ground this wooded or less (woodsOf, 0..1) round a place counts as open. */
 export const OPEN_GROUND = 0.3;
 /** How much a place of each kind keeps out of thick woods (ruins do not mind: the wood grew round them). */
-const OPEN: Record<RegionFillDef['place'], number> = { none: 0, hamlet: 1.2, village: 1.2, camp: 0.3, ruin: 0, barrows: 0.8 };
+const OPEN: Record<RegionFillDef['place'], number> = { none: 0, waystation: 1, hamlet: 1.2, village: 1.2, camp: 0.3, ruin: 0, barrows: 0.8 };
 
 /**
  * Where in the square a place stands: dry, gentle ground with room for its footprint, away from towns and

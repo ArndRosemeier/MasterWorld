@@ -20,7 +20,7 @@ const town = terrain.towns[0];
 // The first hamlet the VGM founds on a walk east from the start (plan B1).
 const regions = classic.regions!;
 const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, 0, 5, (d) => d.fill === 'hamlet' && !!d.site);
-const hamlet = settlementsOf(walked, regions)[0];
+const hamlet = settlementsOf(walked, regions).find((t) => walked.some((d) => d.id === t.id && d.kind === 'region' && d.fill === 'hamlet'))!;
 // As the world worker routes it (WorldJobs.linkRoad): from the roads already decided alone.
 const road = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'track')!;
 const pt = (k: number) => ({ x: road.pts[k * 3], y: road.pts[k * 3 + 1], z: road.pts[k * 3 + 2] });

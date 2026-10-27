@@ -22,4 +22,13 @@ export const events: readonly StoryEventDef[] = [
       done: 'The {creatures} who raided {place} are beaten, and its {animals} are home again.',
     },
   },
+  {
+    id: 'waystation-taken', kind: 'take', by: 'bandits', takes: 'waystation', reach: 3500, lair: 'hideout', after: 48, cooldown: 48, count: [2, 3], gather: 1.5,
+    words: {
+      title: '{place}',
+      news: 'Word runs through {town}: {creatures} have taken {place} on the road {dir} of the town. Its folk ran here with nothing but what they wore.',
+      note: 'Nobody went after the {creatures} by the road, so they took {place}. They hold it now and its folk have fled. Beat them and the folk can go home; the rest of the band lies up somewhere near it.',
+      done: 'The {creatures} who held {place} are beaten. Its folk can go home.',
+    },
+  },
 ];

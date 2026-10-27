@@ -93,6 +93,8 @@ export class TownLife {
   /** Where detail matters (the player). */
   focus = { x: 0, z: 0 };
   private readonly orders: TownOrder[] = [];
+  /** Everyone has fled (a band holds the place, vgm/events.ts take): all are away until it is false again. */
+  gone = false;
   private readonly market: [number, number];
   /** Where each road out leaves the town (travellers come and go there). */
   private readonly roadEnds: [number, number][] = [];
@@ -238,7 +240,7 @@ export class TownLife {
 
   /** What they should be about now (today's plan is made on the day's first ask). */
   taskOf(a: Agent): Task {
-    if (away(a.person, this.hours)) return 'away';
+    if (this.gone || away(a.person, this.hours)) return 'away';
     const day = Math.floor(this.hours / 24);
     if (a.plan.day !== day) a.plan = dayPlan(this.routines, a.person, day);
     const t = taskAt(a.plan, this.hour);
