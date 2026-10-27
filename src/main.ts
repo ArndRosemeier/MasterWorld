@@ -1161,7 +1161,10 @@ export async function start(b: Boot): Promise<void> {
           remains: [...remains],
         };
         const v = visit();
-        return { data, where: v ? `in ${v.cellar.house}'s cellar` : 'in the town' };
+        // Where the hero is, for the save's label (the title's Continue shows it).
+        const t = towns?.townAt(w.x, w.z), size = t?.town.decision.size ?? 'town';
+        const out = !t ? 'out on the land' : t === startTown ? 'in the town' : size === 'waystation' ? 'at a waystation' : `in a ${size}`;
+        return { data, where: v ? `in ${v.cellar.house}'s cellar` : out };
       },
     };
     const saves = new SavesUi(savesHost);
