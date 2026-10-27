@@ -6,6 +6,9 @@
  * Plan 4.4/D: horses at about 12 m/s (milestone 5 travel). Yaw as the walker's: 0 faces north (−z).
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
+import { distToLine } from '@futuremagic/settlement';
+import { woodsOf } from '../world/flora';
+import type { Terrain } from '../world/terrain';
 import { Walker, type WalkIntent, type WalkSpec, type WalkWorld } from './walker';
 
 /** A horse's body: gallop 12 m/s, walk 1.8 m/s; slow to speed up and to stop (it has weight). */
@@ -37,6 +40,24 @@ export function horseGait(speed: number): HorseGait {
   return speed < 0.2 ? 'idle' : speed < 2.6 ? 'walk' : speed < 6.5 ? 'trot' : 'gallop';
 }
 
+/**
+ * How fast the ground lets a horse go (plan 5.4, C7: horses on roads), as a share of its gallop: all of
+ * it on a road or in a town, less over open country (tussocks, ditches), little in the woods.
+ */
+export const GROUND_PACE = { road: 1, open: 0.7, woods: 0.3 } as const;
+
+/** The pace a horse can make at (x, z) on this land (GROUND_PACE). */
+export function groundPace(t: Terrain): (x: number, z: number) => number {
+  const woods = woodsOf(t);
+  // A town's own roads run out through its fields to where the roads laid since begin.
+  const onStreet = (x: number, z: number) => t.towns.some((w) => w.near(x, z, 0) && (Math.hypot(x - w.decision.x, z - w.decision.z) < w.decision.radius
+    || w.plan.streets.some((s) => s.kind === 'road' && distToLine(s.pts, x, z) <= s.width / 2 + 0.5)));
+  return (x, z) => {
+    if (t.roads.fromEdge(x, z) <= 0.5 || onStreet(x, z)) return GROUND_PACE.road;
+    return GROUND_PACE.open + (GROUND_PACE.woods - GROUND_PACE.open) * Math.min(1, woods(x, z));
+  };
+}
+
 /** Whether (x, z) has room for a body of radius r (no wall, no water to swim in). */
 export type FreeFn = (x: number, z: number, r: number) => boolean;
 
@@ -46,6 +67,9 @@ export class Steed {
   ridden = false;
   /** What it does standing (seeded): grazing or waiting. */
   readonly rest: 'idle' | 'eat';
+
+  /** How fast the ground lets it go where it stands (groundPace; none: always at full pace). */
+  ground: ((x: number, z: number) => number) | null = null;
 
   constructor(world: WalkWorld, readonly id: number, seed: number) {
     this.walker = new Walker(world, HORSE);
@@ -80,7 +104,8 @@ export class Steed {
     let d = Math.atan2(Math.sin(want - w.yaw), Math.cos(want - w.yaw));
     d = Math.max(-rate * dt, Math.min(rate * dt, d));
     w.yaw += d;
-    w.step({ forward: intent.forward, strafe: 0, heading: w.yaw, walk: intent.walk, up: false, down: false }, dt);
+    const pace = this.ground ? this.ground(w.pos.x, w.pos.z) : 1;
+    w.step({ forward: intent.forward, strafe: 0, heading: w.yaw, walk: intent.walk, up: false, down: false, pace }, dt);
   }
 
   /** Where the rider stands after getting off: on the left, else the right, behind or in front. */

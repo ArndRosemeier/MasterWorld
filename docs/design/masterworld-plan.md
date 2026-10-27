@@ -215,6 +215,7 @@ The skeleton is unbounded and fixed. The VGM decides **what stands on it** and *
 
 * **One game day takes 60 real minutes** (the clock runs 24 times faster); night is about 12 minutes of it. The player moves at real speed: running is 5.2 m/s, so 1 km takes about 3 real minutes and a 4 km region about 13.
 * **Travel**: on foot first; horses (from Actors) in milestone 5 at about 12 m/s; fast travel as a paid cart between known towns, which is a journey promise (4.4). Magic waystones may come later.
+* **Built (2026-10-27, C7 part 1): horses keep to the roads.** A horse gallops its 12 m/s on a road, a town's streets and roads out (`game/horse.ts` `groundPace`), 70 % of it over open country and as little as 30 % in thick woods (`GROUND_PACE`; the walker's `pace`). Checks: `test/travel.test.ts` (the 5.4 numbers).
 * **Seasons** (milestone 5): four seasons of 7 game days each. They change snow, fields, festivals and the date.
 * View distance several km, with the far horizon drawn from the skeleton alone.
 * The skeleton is big enough for several continents and oceans between them.
