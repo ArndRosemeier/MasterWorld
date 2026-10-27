@@ -1,5 +1,5 @@
 /**
- * The fight's HUD (plan 17.1, D45): health and stamina vials, the target plate with its threat ward, the
+ * The fight's HUD (plan 17.1, D45): health, stamina and mana vials, the target plate with its threat ward, the
  * cards of what was found and what can be searched near by (the abilities are on the action bar,
  * actionBarUi.ts). Plain DOM in warded brass (hud.css); it reads the fight each frame and is told of the moments
  * (a hit, a heal, a find) to animate them.
@@ -24,7 +24,7 @@ const STATE: Partial<Record<Creature['state'], string>> = { alert: 'wary', fight
 
 export class FightHud {
   private readonly root = el('div', { id: 'fight', className: 'hidden' });
-  private readonly vials: Record<'health' | 'stamina', { box: HTMLElement; liquid: HTMLElement; text: HTMLElement; was: number }>;
+  private readonly vials: Record<'health' | 'stamina' | 'mana', { box: HTMLElement; liquid: HTMLElement; text: HTMLElement; was: number }>;
   private readonly target = el('div', { className: 'target plate' });
   private readonly tName = el('div', { className: 'name' });
   private readonly tState = el('div', { className: 'state' });
@@ -37,14 +37,14 @@ export class FightHud {
   private searchShown: string | null = null;
 
   constructor(private readonly setting: SettingModule, private readonly bindings: () => Bindings) {
-    const vial = (kind: 'health' | 'stamina') => {
+    const vial = (kind: 'health' | 'stamina' | 'mana') => {
       const liquid = el('div', { className: 'liquid' }), text = el('div', { className: 'text' });
       const box = el('div', { className: `vial ${kind}` }, liquid, text);
       return { box, liquid, text, was: -1 };
     };
-    this.vials = { health: vial('health'), stamina: vial('stamina') };
+    this.vials = { health: vial('health'), stamina: vial('stamina'), mana: vial('mana') };
     this.target.append(el('div', { className: 'ward' }), this.tName, this.tState, el('div', { className: 'bar' }, this.tBar));
-    this.root.append(this.hurtEdge, el('div', { className: 'gauges plate' }, this.vials.health.box, this.vials.stamina.box), this.target, this.prompt, this.finds, this.dark);
+    this.root.append(this.hurtEdge, el('div', { className: 'gauges plate' }, this.vials.health.box, this.vials.stamina.box, this.vials.mana.box), this.target, this.prompt, this.finds, this.dark);
     document.body.append(this.root);
   }
 
@@ -54,6 +54,7 @@ export class FightHud {
   calm(hero: Character): void {
     this.vial('health', hero.health, hero.maxHealth);
     this.vial('stamina', hero.stamina, hero.maxStamina);
+    this.vial('mana', hero.mana, hero.maxMana);
     if (this.shownFor) { this.shownFor = null; this.target.classList.remove('shown'); }
     this.prompt.classList.remove('shown');
   }
@@ -62,6 +63,7 @@ export class FightHud {
   follow(fight: Fight, hero: Character, search: string | null): void {
     this.vial('health', hero.health, hero.maxHealth);
     this.vial('stamina', hero.stamina, hero.maxStamina);
+    this.vial('mana', hero.mana, hero.maxMana);
     const t = fight.target;
     if (t !== this.shownFor) {
       this.shownFor = t;
@@ -118,8 +120,11 @@ export class FightHud {
     this.dark.textContent = text;
   }
 
-  private vial(k: 'health' | 'stamina', v: number, max: number): void {
-    const g = this.vials[k], f = Math.max(0, v / Math.max(1, max));
+  /** A gauge; mana only once the hero has any (a school of magic opened). */
+  private vial(k: 'health' | 'stamina' | 'mana', v: number, max: number): void {
+    const g = this.vials[k];
+    g.box.classList.toggle('hidden', max <= 0);
+    const f = Math.max(0, v / Math.max(1, max));
     // Only what changed: the HUD is read every frame, and every write costs a style pass.
     const text = `${Math.ceil(v)} / ${max}`;
     if (Math.abs(f - g.was) > 0.002) { g.liquid.style.width = `${(f * 100).toFixed(1)}%`; g.was = f; }

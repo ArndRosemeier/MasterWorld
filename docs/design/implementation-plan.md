@@ -98,7 +98,7 @@ Goal: magic returns to the world, and growing means more than bigger numbers.
 
 | Step | Delivers | Done when | Design |
 |---|---|---|---|
-| C1 | **The ability recipe format** ported from Norgo (ops: projectile, area, zone, effect, terrain edit), with mana, stamina and health costs, cooldowns and cast times | Tests on the recipe runner | 10 |
+| C1 ✓ | **The ability recipe format** ported from Norgo (ops: projectile, area, zone, effect, terrain edit), with mana, stamina and health costs, cooldowns and cast times | Tests on the recipe runner | 10 |
 | C2 | **Six schools** (pyromancy, cryomancy, geomancy, vitae, luminism, umbramancy), with a few abilities each at the start | Each school has a shot of its first spell | 10 |
 | C3 | **Unlock sources** (D49): the magic teachers open a school at rank 0 and its abilities by rank, like the guild houses; the hedge witch's cottage and the warden of the half-ruined tower teach, and a hidden house underground that the hero must find (D49); tomes, scrolls, items and deeds are rare extra ways to an ability | Tests per source; a fresh hero with no magic asks the bard, finds a teacher and casts a first spell on the first evening; the loop check with a mage hero | 10, D11, D49 |
 | C4 | **Spell effects** within the shader budget (F3), compiled before first use | F3 passes in a fight with every school | SHADERS.md |

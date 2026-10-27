@@ -6,11 +6,12 @@
  * are the dungeon's own frame. Pure: the game turns the events into notes, sounds and the HUD.
  */
 import { Rng, angleDiff, deriveSeed } from '@futuremagic/core';
-import type { AbilityDef, SettingModule } from '../setting/contract';
-import { strike, threatOf, type Strike, type Threat } from '../sim/combat';
+import type { AbilityDef, DamageKind, SettingModule } from '../setting/contract';
+import { strike, threatOf, type Blow, type Strike, type Threat } from '../sim/combat';
 import { radiusOf, type Creature, type Den, type DenEvent, type Quarry } from '../sim/creatures';
 import type { Character, SkillUp } from './character';
 import { defOf, rollLoot, type Item, type Loot } from './items';
+import { blowOf, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
 import { WEAR, type WearState } from './upkeep';
 
 export interface HeroPose {
@@ -24,7 +25,8 @@ export interface HeroPose {
 }
 
 export type FightEvent =
-  | { readonly kind: 'struck'; readonly who: Creature; readonly strike: Strike; readonly ability: string }
+  /** The hero's blow (or spell: `spell`) landed on a creature. */
+  | { readonly kind: 'struck'; readonly who: Creature; readonly strike: Strike; readonly ability: string; readonly spell?: boolean }
   | { readonly kind: 'hurt'; readonly by: Creature; readonly strike: Strike }
   | { readonly kind: 'swing'; readonly who: Creature }
   | { readonly kind: 'notice'; readonly who: Creature }
@@ -37,7 +39,9 @@ export type FightEvent =
   | { readonly kind: 'fallen' }
   /** Something worn looks different now (worn, battered, broken): the smith can mend it. */
   | { readonly kind: 'worn'; readonly item: Item; readonly state: WearState }
-  | { readonly kind: 'refused'; readonly text: string };
+  | { readonly kind: 'refused'; readonly text: string }
+  /** What the hero's abilities did (casts, things loosed, areas, effects): for the eye and the ear. */
+  | { readonly kind: 'recipe'; readonly event: RecipeEvent };
 
 /** Hero body radius, metres. */
 const HERO_R = 0.35;
@@ -49,12 +53,15 @@ const TAB_RANGE = 22;
 /** The hero's facing as an xz direction angle (atan2(dz, dx)) from the walker's yaw. */
 export const yawToDir = (yaw: number): number => Math.atan2(-Math.cos(yaw), -Math.sin(yaw));
 
-export class Fight {
+export class Fight implements RecipeWorld {
   target: Creature | null = null;
   /** Swinging again and again at the target (Strike toggles it). */
   attacking = false;
   private swing = 0;
-  private readonly cooldown = new Map<string, number>();
+  /** The hero's abilities: costs, cooldowns, casts and what they set going (game/recipe.ts). */
+  readonly recipes: Recipes;
+  /** Where the hero stood at the last step. */
+  private at: HeroPose = { x: 0, y: 0, z: 0, yaw: 0, speed: 0 };
   /** An ability waiting for the next swing. */
   private queued: AbilityDef | null = null;
   private readonly rng: Rng;
@@ -68,6 +75,7 @@ export class Fight {
   /** `light`: how far off the hero is seen, metres (the lantern below; daylight out on the land). */
   constructor(readonly hero: Character, readonly den: Den, private readonly setting: SettingModule, seed: number, public light = 9) {
     this.rng = new Rng(deriveSeed(seed, 'fight'));
+    this.recipes = new Recipes(hero, this, setting.effects ?? [], deriveSeed(seed, 'recipes'));
   }
 
   /** The den's view of the hero now. */
@@ -75,7 +83,8 @@ export class Fight {
     const stealth = this.hero.skill('stealth');
     const moving = p.speed > 3.5 ? 1 : p.speed > 0.5 ? 0.4 : 0.08;
     const noise = Math.max(this.quiet < 3 ? 1 : 0, moving * (1 - stealth / 160));
-    return { x: p.x, y: p.y, z: p.z, noise, light: this.light, alive: this.hero.alive, guard: this.hero.guard(this.hero.stamina <= 0) };
+    const g = this.hero.guard(this.hero.stamina <= 0 || this.recipes.held(SELF));
+    return { x: p.x, y: p.y, z: p.z, noise, light: this.light, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) } };
   }
 
   /**
@@ -87,9 +96,6 @@ export class Fight {
     const danger = c.def.danger + others.reduce((a, o) => a + o.def.danger, 0);
     return { threat: threatOf(danger, this.hero.power), together: others.length > 0 };
   }
-
-  /** Seconds before an ability can be used again (0: ready). */
-  cooling(id: string): number { return this.cooldown.get(id) ?? 0; }
 
   /** Seconds left of the current swing (0: the next blow can start). */
   get swingLeft(): number { return this.swing; }
@@ -118,22 +124,17 @@ export class Fight {
     this.target = c && c.state !== 'dead' ? c : null;
   }
 
-  /** Use an ability from the belt; a line why not if it cannot be used now. */
+  /** Use an ability from the action bar; a line why not if it cannot be used now. */
   use(id: string): string | null {
     const a = this.setting.abilities.find((x) => x.id === id);
     if (!a) return 'No such ability.';
-    if (this.cooling(id) > 0) return `${a.name} is not ready yet.`;
-    if (this.hero.stamina < a.stamina) return 'You are out of breath.';
-    if (a.effect === 'heal') {
-      this.hero.stamina -= a.stamina;
-      this.cooldown.set(id, a.cooldown);
-      const before = this.hero.health;
-      this.hero.health = Math.min(this.hero.maxHealth, this.hero.health + this.hero.maxHealth * 0.2);
-      this.pending.push({ kind: 'heal', amount: Math.round(this.hero.health - before) });
-      return null;
-    }
-    if (!this.target || this.target.state === 'dead') return 'You have no target.';
-    if (a.id === 'strike') { this.attacking = !this.attacking; return null; }
+    const target = this.target && this.target.state !== 'dead' ? this.target.id : null;
+    const b = blowOf(a);
+    // Spells and the like: the recipe runner casts them.
+    if (!b) return this.recipes.begin(a, target, this.at);
+    const why = this.recipes.check(a, target, this.at);
+    if (why) return why;
+    if (b.again) { this.attacking = !this.attacking; return null; }
     this.queued = a;
     this.attacking = true;
     return null;
@@ -167,18 +168,79 @@ export class Fight {
 
   /** `breathe`: the hero recovers here (false for a second fight at once: one recovery a frame). */
   advance(dt: number, p: HeroPose, breathe = true): FightEvent[] {
-    const out: FightEvent[] = this.pending.splice(0);
-    const hero = this.hero;
+    const hero = this.hero, out = this.pending;
+    this.at = p;
     this.quiet += dt;
     this.swing = Math.max(0, this.swing - dt);
-    for (const [k, v] of this.cooldown) this.cooldown.set(k, Math.max(0, v - dt));
+    // Spells on the den: slowed, held fast.
+    for (const c of this.den.alive) {
+      c.slow = this.recipes.slowOf(c.id);
+      c.stagger = Math.max(c.stagger, this.recipes.heldFor(c.id));
+    }
     for (const e of this.den.step(dt, this.quarry(p))) this.denEvent(e, out);
+    for (const e of this.recipes.elapse(dt, p, p.speed)) this.recipeEvent(e, out);
     const t = this.target;
     if (t && t.state === 'dead') { this.target = null; this.attacking = false; }
-    if (hero.alive && this.attacking && this.target && this.swing === 0) this.blow(this.target, p, out);
+    if (hero.alive && this.attacking && this.target && this.swing === 0 && !this.recipes.held(SELF) && !this.recipes.casting) this.blow(this.target, p, out);
     this.still = p.speed < 0.3 ? this.still + dt : 0;
     if (breathe) hero.recover(dt, this.den.fighting.length > 0 || this.quiet < 6, this.still);
+    return out.splice(0);
+  }
+
+  // The recipe runner's world (game/recipe.ts): the hero and the den.
+
+  marks(): readonly Mark[] {
+    const p = this.at, out: Mark[] = this.hero.alive ? [{ id: SELF, x: p.x, y: p.y, z: p.z, radius: HERO_R, foe: false }] : [];
+    for (const c of this.den.alive) out.push({ id: c.id, x: c.x, y: c.y, z: c.z, radius: radiusOf(c.def), foe: true });
     return out;
+  }
+
+  hit(id: number, blow: Blow, ability: AbilityDef): void {
+    this.quiet = 0;
+    if (id === SELF) { this.hurtHero(strike(blow, this.hero.guard(), this.rng).damage); return; }
+    const c = this.creature(id);
+    if (!c) return;
+    const s = strike(blow, this.den.guardOf(c), this.rng);
+    this.pending.push({ kind: 'struck', who: c, strike: s, ability: ability.id, spell: true });
+    this.train(ability.skill ?? this.hero.weapon.skill, c.def.danger, s.outcome === 'miss' ? 0.5 : 1, this.pending);
+    for (const e of this.den.wound(c, s, this.at)) this.denEvent(e, this.pending);
+  }
+
+  harm(id: number, amount: number, _kind: DamageKind): void {
+    if (id === SELF) { this.hurtHero(amount); return; }
+    const c = this.creature(id);
+    if (c) for (const e of this.den.wound(c, { outcome: 'hit', damage: amount }, this.at, 0, false)) this.denEvent(e, this.pending);
+  }
+
+  heal(id: number, amount: number): number {
+    if (id !== SELF) return 0;
+    const before = this.hero.health;
+    this.hero.health = Math.min(this.hero.maxHealth, this.hero.health + amount);
+    return this.hero.health - before;
+  }
+
+  /** The land below does not change yet (geomancy builds on volumes, C2). */
+  terrain(_edit: TerrainEdit): boolean { return false; }
+
+  shape(): string | null { return 'Not while you fight.'; }
+
+  clear(at: { x: number; y: number; z: number }): boolean {
+    return this.den.ground.clearance(at.x, at.y - 0.5, at.z) > 0;
+  }
+
+  private creature(id: number): Creature | undefined { return this.den.alive.find((c) => c.id === id); }
+
+  private hurtHero(amount: number): void {
+    if (amount <= 0 || !this.hero.alive) return;
+    this.hero.health = Math.max(0, this.hero.health - amount);
+    if (!this.hero.alive) { this.attacking = false; this.pending.push({ kind: 'fallen' }); }
+  }
+
+  private recipeEvent(e: RecipeEvent, out: FightEvent[]): void {
+    if (e.kind === 'healed' && e.on === SELF && !e.over) out.push({ kind: 'heal', amount: Math.round(e.amount) });
+    else if (e.kind === 'refused' || e.kind === 'broken') out.push({ kind: 'refused', text: e.kind === 'broken' ? e.why : e.text });
+    if (e.kind === 'went' || e.kind === 'cast') this.quiet = Math.min(this.quiet, 2);
+    out.push({ kind: 'recipe', event: e });
   }
 
   /** How far from a creature's middle the hero's weapon still lands, metres. */
@@ -191,16 +253,19 @@ export class Fight {
     const d = Math.hypot(t.x - p.x, t.z - p.z), reach = this.reach(t);
     if (d > reach || Math.abs(t.y - p.y) > 1.3) return;
     if (Math.abs(angleDiff(Math.atan2(t.z - p.z, t.x - p.x), yawToDir(p.yaw))) > FACING) return;
-    const a = this.queued ?? this.setting.abilities.find((x) => x.id === 'strike')!;
+    const a = this.queued ?? this.setting.abilities.find((x) => blowOf(x)?.again)!;
+    const b = blowOf(a)!;
     this.queued = null;
-    if (a.stamina) { this.hero.stamina -= a.stamina; this.cooldown.set(a.id, a.cooldown); }
-    this.swing = w.time * (a.power > 1.5 ? 1.25 : 1);
+    this.recipes.spend(a);
+    this.swing = w.time * (b.power > 1.5 ? 1.25 : 1);
     this.quiet = 0;
-    const s = strike(this.hero.blow(a), this.den.guardOf(t), this.rng);
+    const s = strike(this.hero.blow(b), this.den.guardOf(t), this.rng);
     out.push({ kind: 'struck', who: t, strike: s, ability: a.id });
     this.wearOut('main', WEAR.blow * (s.outcome === 'miss' ? 1 / 3 : 1), out);
     this.train(w.skill, t.def.danger, s.outcome === 'miss' ? 0.5 : 1, out);
-    for (const e of this.den.wound(t, s, p, a.effect === 'stagger' ? 1.6 : 0)) this.denEvent(e, out);
+    for (const e of this.den.wound(t, s, p, b.stagger ?? 0)) this.denEvent(e, out);
+    // The rest of its recipe (a bleeding cut…) follows a blow that landed.
+    if (s.outcome !== 'miss' && a.ops.length > 1) this.recipes.playRest(a, t.id, p);
   }
 
   private denEvent(e: DenEvent, out: FightEvent[]): void {

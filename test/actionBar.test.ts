@@ -4,7 +4,7 @@ import { classic } from '../src/setting/classic/index';
 import { Character } from '../src/game/character';
 import { addToBar, BAR_SLOTS, cleanBar, clearSlot, defaultBar, placeOnBar, POTION, swapOnBar } from '../src/game/actionBar';
 import { barSlotOf, cleanBindings, DEFAULT_BINDINGS } from '../src/input/controls';
-import type { SettingModule } from '../src/setting/contract';
+import type { AbilityDef, SettingModule } from '../src/setting/contract';
 
 test('action bar: ten slots, the known abilities and the potion first, keys 1 to 0', () => {
   const bar = defaultBar(['strike', 'heavy', 'shove', 'breath']);
@@ -48,7 +48,7 @@ test('action bar: old key bindings (strike … potion) give way to the bar keys'
 });
 
 test('action bar: a taught ability is learned onto the bar and saved with the hero', () => {
-  const taught = { id: 'taught-test', icon: '✦', name: 'Test', stamina: 0, cooldown: 0, power: 0, aim: 0, text: '', taught: true };
+  const taught: AbilityDef = { id: 'taught-test', icon: '✦', name: 'Test', cooldown: 0, ops: [{ op: 'look', look: 'test' }], text: '', taught: true };
   const setting: SettingModule = { ...classic, abilities: [...classic.abilities, taught] };
   const hero = new Character(setting);
   assert.ok(!hero.knows('taught-test'), 'not known at the start');

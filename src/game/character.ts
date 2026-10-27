@@ -3,7 +3,7 @@
  * and stamina that grow with the skills that use them, what is worn and carried, and the one "power"
  * number the VGM reads wherever it needs a level. Pure: saved as plain data.
  */
-import type { AbilityDef, BackgroundDef, DamageKind, ItemCatalog, SettingModule, Slot } from '../setting/contract';
+import type { BackgroundDef, DamageKind, ItemCatalog, SettingModule, Slot } from '../setting/contract';
 import type { Blow, Guard } from '../sim/combat';
 import { addToBar, cleanBar, defaultBar, type Bar } from './actionBar';
 import { defOf, plainItem, type Item } from './items';
@@ -13,6 +13,8 @@ export interface CharacterSave {
   readonly skills: Readonly<Record<string, number>>;
   readonly health: number;
   readonly stamina: number;
+  /** Absent in saves from before magic (C1): full. */
+  readonly mana?: number;
   readonly worn: Partial<Record<Slot | 'ring2', Item>>;
   readonly pack: readonly Item[];
   readonly coins: number;
@@ -55,6 +57,8 @@ export class Character {
   readonly ranks = new Map<string, number>();
   health: number;
   stamina: number;
+  /** For spells (plan 10); none until a school of magic is opened. */
+  mana: number;
   readonly worn: Partial<Record<Slot | 'ring2', Item>> = {};
   readonly pack: Item[] = [];
   coins = 0;
@@ -83,6 +87,7 @@ export class Character {
     this.bar = saved ? cleanBar(saved.bar, this.known) : defaultBar(this.known);
     this.health = Math.min(saved?.health ?? Infinity, this.maxHealth);
     this.stamina = Math.min(saved?.stamina ?? Infinity, this.maxStamina);
+    this.mana = Math.min(saved?.mana ?? Infinity, this.maxMana);
   }
 
   /** Starts a new hero's life with this past: its skills over the starts, its kit and coins, fully rested. */
@@ -101,6 +106,7 @@ export class Character {
     this.coins = bg.kit.coins;
     this.health = this.maxHealth;
     this.stamina = this.maxStamina;
+    this.mana = this.maxMana;
     this.learned.clear();
     this.bar = defaultBar(this.known);
   }
@@ -162,6 +168,24 @@ export class Character {
   /** Health grows with the skills that take blows. */
   get maxHealth(): number { return Math.round(55 + (this.base('armour') + this.base('shields')) * 0.35 + this.bestWeapon() * 0.25); }
   get maxStamina(): number { return Math.round(60 + (this.base('dodge') + this.bestWeapon()) * 0.3); }
+  /** Mana grows with the schools of magic opened: the best one most (none opened: none). */
+  get maxMana(): number {
+    let best = -1, all = 0;
+    for (const s of this.setting.skills) {
+      if (s.group !== 'magic' || !this.opened(s.id)) continue;
+      const v = this.base(s.id);
+      best = Math.max(best, v);
+      all += v;
+    }
+    return best < 0 ? 0 : Math.round(20 + best * 0.6 + all * 0.2);
+  }
+
+  /** A skill the hero may use: opened by a trainer or the past, or open to all where no guild teaches it. */
+  opened(id: string): boolean {
+    const r = this.ranks.get(id);
+    return r === undefined ? !!this.setting.skills.find((s) => s.id === id)?.open : r >= 0;
+  }
+
   get alive(): boolean { return this.health > 0; }
 
   private base(id: string): number { return this.skills.get(id) ?? 0; }
@@ -188,10 +212,10 @@ export class Character {
     return b ? Math.min(0.6, b * (1 + this.skill('shields') / 80)) : 0;
   }
 
-  /** The blow an ability throws now. */
-  blow(ability?: AbilityDef): Blow {
+  /** The blow a weapon ability's `blow` step throws now. */
+  blow(step?: { readonly power: number; readonly aim?: number }): Blow {
     const w = this.weapon;
-    return { damage: w.damage, kind: w.kind, skill: this.skill(w.skill), power: ability?.power ?? 1, aim: ability?.aim ?? 0 };
+    return { damage: w.damage, kind: w.kind, skill: this.skill(w.skill), power: step?.power ?? 1, aim: step?.aim ?? 0 };
   }
 
   guard(open = false): Guard {
@@ -280,6 +304,7 @@ export class Character {
   /** Breathe: stamina comes back fast; health only out of a fight, and faster when resting (`still` s). */
   recover(dt: number, fighting: boolean, still = 0): void {
     this.stamina = Math.min(this.maxStamina, this.stamina + dt * (fighting ? 4 : 12));
+    this.mana = Math.min(this.maxMana, this.mana + dt * (fighting ? 0.5 : 2));
     if (!fighting && this.alive) this.health = Math.min(this.maxHealth, this.health + dt * (still > 4 ? 1.2 : 0.3));
   }
 
@@ -290,6 +315,6 @@ export class Character {
   }
 
   save(): CharacterSave {
-    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), ...(this.ranks.size ? { ranks: Object.fromEntries(this.ranks) } : {}), learned: [...this.learned], bar: [...this.bar] };
+    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, mana: this.mana, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), ...(this.ranks.size ? { ranks: Object.fromEntries(this.ranks) } : {}), learned: [...this.learned], bar: [...this.bar] };
   }
 }

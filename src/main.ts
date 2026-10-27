@@ -102,6 +102,7 @@ import { ActionBarUi } from './app/actionBarUi';
 import { AbilityBook } from './app/abilityBook';
 import { POTION } from './game/actionBar';
 import { BirdForm } from './app/birdForm';
+import { blowOf, shapeOf } from './game/recipe';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
@@ -913,7 +914,7 @@ export async function start(b: Boot): Promise<void> {
     const leading = () => encounters().find((e) => e.leading) ?? null;
     const potions = () => character.pack.filter((i) => setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
     // Bird form (plan 10): the hero becomes a pheasant and flies; the change takes its time and never in a fight.
-    const birdAbility = setting.abilities.find((a) => a.shape?.into === 'bird') ?? null;
+    const birdAbility = setting.abilities.find((a) => shapeOf(a)?.into === 'bird') ?? null;
     const birdForm = birdAbility ? new BirdForm(birdAbility, player, world, {
       stage: view.stage, notes,
       around: () => ({ fighting: encounters().some((e) => e.pressure.fighting > 0), riding: !!player.riding, swimming: player.walker.mode === 'swim', roofed: !!visit() || !!rooms?.inside }),
@@ -942,7 +943,7 @@ export async function start(b: Boot): Promise<void> {
         if (birdForm && id === birdAbility?.id) { const b = birdForm.state; return { left: b.left, total: birdAbility.cooldown, dim: false, on: b.on }; }
         const a = setting.abilities.find((x) => x.id === id);
         if (!a || !f) return { left: 0, total: 0, dim: true, on: false };
-        return { left: f.cooling(id), total: a.cooldown, dim: character.stamina < a.stamina, on: id === 'strike' && f.attacking };
+        return { left: f.recipes.cooling(id), total: a.cooldown, dim: character.stamina < (a.cost?.stamina ?? 0) || character.mana < (a.cost?.mana ?? 0), on: (!!blowOf(a)?.again && f.attacking) || f.recipes.casting?.def === a };
       },
       arranged: () => { book.redraw(); },
     });

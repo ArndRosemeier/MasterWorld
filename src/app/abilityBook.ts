@@ -6,6 +6,7 @@
  */
 import type { SettingModule } from '../setting/contract';
 import { POTION } from '../game/actionBar';
+import { costText } from '../game/recipe';
 import type { Character } from '../game/character';
 import { el } from './dom';
 import { DRAG_ID, lookOf, socketFor, type ActionBarUi } from './actionBarUi';
@@ -23,7 +24,7 @@ export class AbilityBook extends BodyWindow {
     this.bar.editing = true;
     const cards = [...this.hero.known, POTION].map((id) => {
       const look = lookOf(this.setting, id), d = look.def;
-      const cost = d ? [d.stamina ? `${d.stamina} stamina` : '', d.cooldown ? `ready again after ${d.cooldown} s` : ''].filter(Boolean).join(' · ') : 'potions in your pack';
+      const cost = d ? [costText(d), d.cast ? `${d.cast} s to cast` : '', d.cooldown ? `ready again after ${d.cooldown} s` : ''].filter(Boolean).join(' · ') : 'potions in your pack';
       const card = el('div', { className: `ability${this.hero.bar.includes(id) ? ' on-bar' : ''}`, draggable: true, title: 'Drag it onto the action bar' },
         socketFor(this.setting, id), el('div', {}, el('b', {}, look.name), el('small', {}, look.text), el('span', { className: 'cost' }, cost)));
       card.addEventListener('dragstart', (e) => {

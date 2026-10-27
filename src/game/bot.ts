@@ -147,7 +147,7 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
     if (fight.target !== foe) fight.pick(foe);
     if (!opts.rash) {
       if (hero.health < hero.maxHealth * 0.35 && hero.remedy) { fight.drink(); potions++; }
-      if (hero.health < hero.maxHealth * 0.55 && fight.cooling('breath') === 0) fight.use('breath');
+      if (hero.health < hero.maxHealth * 0.55 && fight.recipes.cooling('breath') === 0) fight.use('breath');
       // Catch one's breath between fights.
       if (!den.fighting.length && hero.health < hero.maxHealth * 0.8 && fight.quiet > 2) { speed = 0; continue; }
     }
@@ -157,8 +157,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       speed = 0;
       yaw = Math.atan2(-(foe.x - x), -(foe.z - z));
       if (!fight.attacking) fight.use('strike');
-      if (fight.cooling('heavy') === 0 && hero.stamina > 40) fight.use('heavy');
-      else if (fight.cooling('shove') === 0 && hero.stamina > 20 && den.fighting.length > 1) fight.use('shove');
+      if (fight.recipes.cooling('heavy') === 0 && hero.stamina > 40) fight.use('heavy');
+      else if (fight.recipes.cooling('shove') === 0 && hero.stamina > 20 && den.fighting.length > 1) fight.use('shove');
       continue;
     }
     towards(foe, foe);
