@@ -32,15 +32,29 @@ export interface Grazer {
 const PACE = 0.9, FENCE = 1.6, APART = 2.6;
 
 export class Herds {
-  readonly animals: Grazer[] = [];
+  /** The animals in their paddocks now (those driven off are not). */
+  animals: Grazer[] = [];
+  /** Every animal, home or not. */
+  private readonly every: Grazer[] = [];
   time = 0;
 
   constructor(readonly plan: TownPlan, seed: number) {
     for (const pd of plan.paddocks) for (let k = 0; k < pd.animals; k++) {
-      const id = this.animals.length, rng = new Rng(deriveSeed(seed, 'grazer', id));
+      const id = this.every.length, rng = new Rng(deriveSeed(seed, 'grazer', id));
       const [x, z] = this.grassIn(pd, rng);
-      this.animals.push({ id, paddock: pd.id, x, z, dir: rng.range(-Math.PI, Math.PI), act: 'eat', speed: 0, tx: x, tz: z, until: rng.range(0, 30), rng });
+      this.every.push({ id, paddock: pd.id, x, z, dir: rng.range(-Math.PI, Math.PI), act: 'eat', speed: 0, tx: x, tz: z, until: rng.range(0, 30), rng });
     }
+    this.animals = [...this.every];
+  }
+
+  /** Raiders drove off `taken` animals of a paddock (by paddock id; vgm/events.ts takenFrom); the rest, or all once they are back, graze there. */
+  driven(taken: ReadonlyMap<number, number>): void {
+    const seen = new Map<number, number>();
+    this.animals = this.every.filter((a) => {
+      const k = seen.get(a.paddock) ?? 0;
+      seen.set(a.paddock, k + 1);
+      return k >= (taken.get(a.paddock) ?? 0);
+    });
   }
 
   /** Advance `dt` seconds. */

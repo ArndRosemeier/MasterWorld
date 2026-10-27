@@ -196,8 +196,11 @@ export interface EventDecision {
   readonly event: string;
   /** The town whose people it concerns. */
   readonly town: string;
-  /** The promise it grew from (a dungeon's or a move-in's id). */
+  /** What it grew from: a spill's promise (a dungeon's or a move-in's id), a raid's raiders (their territory id). */
   readonly from: string;
+  /** A raid's: the paddock (its id in the town's plan) and how many animals were driven off. */
+  readonly paddock?: number;
+  readonly taken?: number;
   readonly x: number;
   readonly z: number;
   readonly r: number;

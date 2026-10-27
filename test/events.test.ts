@@ -4,8 +4,9 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
 import { keepPromise, nextPromise, openPromises } from '../src/vgm/leads';
-import { eventTold, gatherFor, nextEvent, openBands, openEvents } from '../src/vgm/events';
-import { Wilds } from '../src/sim/wild';
+import { eventTold, gatherFor, nextEvent, openBands, openEvents, takenFrom } from '../src/vgm/events';
+import { Wilds, placeWild } from '../src/sim/wild';
+import { Herds } from '../src/sim/livestock';
 import type { Decision } from '../src/world/decisions';
 import { SMALL } from './small';
 
@@ -58,4 +59,32 @@ test('events: a place left alone too long spills its dwellers onto the land: the
 test('events: the same ledger gives the same event (a save replays it)', () => {
   const log = leftAlone();
   assert.deepEqual(nextEvent(ctx(log, after + 1)), nextEvent(ctx(log, after + 1)));
+});
+
+test('events: bandits left alone raid a farm: animals leave its paddock, a band holds them, and they come home once it is beaten', () => {
+  const town = towns.reduce((a, b) => (Math.hypot(b.decision.x - home.x, b.decision.z - home.z) < Math.hypot(a.decision.x - home.x, a.decision.z - home.z) ? b : a));
+  const raid = classic.events!.find((e) => e.kind === 'raid')!;
+  const groups = (left: (n: number) => number) => placeWild(seed, terrain, town, classic.wild).map((territory) => ({ town: town.decision.id, territory, left: left(territory.members.length) }));
+  const at = (log: Decision[], hours: number, left = (n: number) => n) => ({ ...ctx(log, hours), wild: groups(left), only: raid.id });
+  assert.ok(town.plan.paddocks.some((p) => p.animals > 0), 'the start town has animals');
+  assert.equal(nextEvent(at(first as Decision[], raid.after - 1)), null, 'not before its time');
+  assert.equal(nextEvent(at(first as Decision[], raid.after + 1, () => 0)), null, 'not once the bandits are dead');
+  const e = nextEvent(at(first as Decision[], raid.after + 1))!;
+  assert.ok(e && e.paddock !== undefined && e.taken! >= 1, 'a raid on a paddock');
+  assert.ok(groups((n) => n).some((g) => g.territory.id === e.from && g.territory.def.id === raid.by), 'by the bandits');
+  const now = [...first, e];
+  // The farm: fewer animals in its paddock while the band holds them.
+  const herds = new Herds(town.plan, seed), all = herds.animals.length;
+  herds.driven(takenFrom(now, town.decision.id));
+  assert.equal(herds.animals.length, all - e.taken!);
+  assert.ok(herds.animals.filter((a) => a.paddock === e.paddock).length === town.plan.paddocks[e.paddock!].animals - e.taken!);
+  // The leads: told with the farm and its cattle; the band on the land; one raid at a time from that camp.
+  const told = eventTold(classic, now, towns, e)!;
+  assert.ok(told && /cattle/.test(told.news) && /farm/.test(told.news) && !/\{/.test(told.news + told.note + told.done), told?.news);
+  assert.equal(openBands(now).length, 1);
+  assert.equal(nextEvent({ ...at(now, raid.after + 2), early: true }), null, 'that camp has a band out already');
+  // Beaten: the cattle are home again.
+  const kept = keepPromise(now, e.id, raid.after + 3)!;
+  herds.driven(takenFrom([...now, kept], town.decision.id));
+  assert.equal(herds.animals.length, all);
 });

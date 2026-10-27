@@ -1173,7 +1173,8 @@ export async function start(b: Boot): Promise<void> {
       taught: setting.abilities.filter((a) => a.taught).map((a) => ({ id: a.id, name: a.name })),
       known: (id) => character.knows(id),
       legends: setting.items.uniques.map((u) => ({ id: u.id, name: u.name })),
-      storyEvent: () => eventDue(true),
+      events: setting.events ?? [],
+      storyEvent: (id?: string) => eventDue(true, id),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
         const did = on ? character.learn(id) : character.forget(id);
@@ -1183,7 +1184,7 @@ export async function start(b: Boot): Promise<void> {
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: () => eventDue(true), setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => eventDue(true, id), get log() { return log; }, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1301,9 +1302,9 @@ export async function start(b: Boot): Promise<void> {
      * The world moves on its own (C6): a story event, if one is due, into the log; its band onto the land,
      * its town gathers to talk it over, and word of it reaches the hero (a lead in the journal).
      */
-    const eventDue = (early = false): string => {
+    const eventDue = (early = false, only?: string): string => {
       if (!start || !wild) return 'no wild here';
-      const e = nextEvent({ seed, log, towns: terrain.towns, terrain, hours: hours(), setting, inside: (id) => !!cellars?.isInside(id), avoid: wild.territories, early });
+      const e = nextEvent({ seed, log, towns: terrain.towns, terrain, hours: hours(), setting, inside: (id) => !!cellars?.isInside(id), avoid: wild.territories, wild: wild.groupsLeft(), early, only });
       if (!e) return 'nothing is due';
       console.info(`[vgm] event ${e.id} (${e.event}) from ${e.from} at ${hours().toFixed(1)} h`);
       log = [...log, e];

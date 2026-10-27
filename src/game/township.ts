@@ -11,6 +11,7 @@ import { TownLife, type TownOrder } from '../sim/townLife';
 import { talkCellar, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
+import { takenFrom } from '../vgm/events';
 import type { Decision, DecisionLog, RetreatDecision } from '../world/decisions';
 import type { Town } from '../world/town';
 import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
@@ -52,6 +53,8 @@ export class Township {
   private talkOf: TownTalk | null = null;
   private marketOf: Market | null = null;
   private herdsOf: Herds | null | undefined;
+  /** The log's length when the herds last read it. */
+  private herdsLog = -1;
   private housesOf: readonly GuildHouse[] | null = null;
   /** Set on the town's words when they are made (the game: how its people take the hero). */
   onTalk: ((talk: TownTalk) => void) | null = null;
@@ -139,6 +142,12 @@ export class Township {
   /** The animals in its paddocks (null: it has none). */
   get herds(): Herds | null {
     if (this.herdsOf === undefined) this.herdsOf = this.town.plan.paddocks.length ? new Herds(this.town.plan, this.seed) : null;
+    // Raiders drove some off, or they are home again (vgm/events.ts): the herds follow the log.
+    const log = this.c.log();
+    if (this.herdsOf && log.length !== this.herdsLog) {
+      this.herdsLog = log.length;
+      this.herdsOf.driven(takenFrom(log, this.id));
+    }
     return this.herdsOf;
   }
 

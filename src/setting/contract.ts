@@ -277,8 +277,14 @@ export interface WildDef {
  */
 export interface StoryEventDef {
   readonly id: string;
-  readonly kind: 'spill';
-  /** Game hours the place must have stood open (promised, not cleared) first. */
+  /**
+   * `spill`: a place promised and never cleared spills its dwellers onto the land near it. `raid`: a wild
+   * group (`by`) still living near a town comes down on a farm and drives off animals from its paddock.
+   */
+  readonly kind: 'spill' | 'raid';
+  /** A raid's raiders: the setting's wild group (WildDef id) that comes down on the farms while any of it lives. */
+  readonly by?: string;
+  /** Game hours first: a spill's place must have stood open that long, raiders bide that long after the world began. */
   readonly after: number;
   /** Least game hours between two events in one town. */
   readonly cooldown: number;
@@ -288,7 +294,8 @@ export interface StoryEventDef {
   readonly gather?: number;
   /**
    * How it is told: the lead's title, the news as it reaches the hero, the journal's note, and the line when
-   * it is over. `{creatures}` (the plural), `{place}`, `{town}`, `{dir}` (which way from the town).
+   * it is over. `{creatures}` (the plural), `{place}` (a raid's: the farm), `{town}`, `{dir}` (which way from
+   * the town the band is), and a raid's `{animals}` (the setting's livestock).
    */
   readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string };
 }
@@ -1194,6 +1201,7 @@ function validateFight(m: SettingModule, where: string): string[] {
   }
   for (const e of m.events ?? []) {
     if (!(e.after >= 0) || !(e.cooldown >= 0) || e.count[0] < 1 || e.count[1] < e.count[0]) out.push(`${where}: event "${e.id}" needs after, cooldown and a count`);
+    if (e.kind === 'raid' && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: raid "${e.id}" needs its raiders (a wild group's id in by)`);
   }
   for (const w of m.wild) {
     for (const c of w.creatures) if (!ids.has(c)) out.push(`${where}: wild "${w.id}" creature "${c}" is unknown`);

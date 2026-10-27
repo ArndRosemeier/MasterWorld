@@ -17,6 +17,7 @@ import { Den } from '../sim/creatures';
 import { OpenGround, awake, groupDanger, placeWild, type Land, type Territory } from '../sim/wild';
 import type { Journal } from '../talk/journal';
 import type { Director } from '../vgm/director';
+import type { WildGroup } from '../vgm/events';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { Encounter, type Arena, type FightCue, type FightHost } from './encounter';
@@ -64,7 +65,10 @@ export class WildLand {
   private readonly events = new Set<string>();
 
   /** `bands`: the open story events' bands (vgm/events.ts openBands). */
+  private readonly town: string;
+
   constructor(private readonly host: WildHost, terrain: Terrain, town: Town, private readonly land: Land, private readonly saved: Readonly<Record<string, DelveSave>> = {}, bands: readonly Territory[] = []) {
+    this.town = town.decision.id;
     this.territories = placeWild(host.seed, terrain, town, host.setting.wild ?? []);
     this.groups = this.territories.map((territory) => ({ territory, awake: false, built: null, encounter: null, delve: null }));
     for (const b of bands) this.add(b);
@@ -87,6 +91,14 @@ export class WildLand {
       g.awake = awake(g.awake, d);
       if (g.delve) g.delve.fight.light = light;
     }
+  }
+
+  /** The wild's own groups (not the events' bands) and how many of each still live (raiders come from these). */
+  groupsLeft(): WildGroup[] {
+    return this.groups.filter((g) => !this.events.has(g.territory.id)).map((g) => {
+      const dead = g.delve ? g.delve.den.dead : this.saved[g.territory.id]?.dead ?? [];
+      return { town: this.town, territory: g.territory, left: g.territory.members.length - dead.length };
+    });
   }
 
   /** The encounters standing (app/encounter.ts plays those the hero is near). */
