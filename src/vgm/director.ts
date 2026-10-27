@@ -43,7 +43,7 @@ export interface DirectorSave {
 }
 
 /** The playstyle a need met by play shows (a fight won: a fighter; a place found: an explorer). */
-const SHOWS: Partial<Record<Need, Style>> = { challenge: 'fighter', discovery: 'explorer', people: 'socializer' };
+const SHOWS: Partial<Record<Need, Style>> = { discovery: 'explorer', people: 'socializer' };
 
 interface Queued { readonly text: string; readonly priority: number; readonly at: number }
 
@@ -124,7 +124,8 @@ export class Director {
   /** Play met a need (a fight met Challenge, a find met Reward, ...): `amount` 1 meets it in full. */
   met(n: Need, amount = 1): void {
     this.needs[n] = Math.max(0, this.needs[n] - amount);
-    const s = SHOWS[n];
+    // A fight shows a fighter, or a mage when spells were cast in it.
+    const s = n === 'challenge' ? this.model.fought() : SHOWS[n];
     if (s) this.model.note(s, amount);
     if (n === 'challenge' && amount >= 1) this.model.count('fights');
   }
