@@ -1,0 +1,30 @@
+start {"climbing":false,"below":false,"inside":true,"x":-30246.7316469619,"y":39.02100443015088,"z":34232.320217579196,"built":1}
+shots\hatch-gpu3\0-by-the-hatch.jpg
+shots\hatch-gpu3\1-down-00.jpg
+shots\hatch-gpu3\1-down-01.jpg
+shots\hatch-gpu3\1-down-02.jpg
+shots\hatch-gpu3\1-down-03.jpg
+shots\hatch-gpu3\1-down-04.jpg
+shots\hatch-gpu3\1-down-05.jpg
+shots\hatch-gpu3\1-down-06.jpg
+shots\hatch-gpu3\1-down-07.jpg
+shots\hatch-gpu3\1-down-08.jpg
+shots\hatch-gpu3\1-down-09.jpg
+shots\hatch-gpu3\1-down-10.jpg
+below {"climbing":false,"below":true,"inside":false,"x":-30244.829056204857,"y":-400,"z":34233.74324406722,"built":1}
+shots\hatch-gpu3\2-at-the-foot.jpg
+shots\hatch-gpu3\3-up-00.jpg
+shots\hatch-gpu3\3-up-01.jpg
+shots\hatch-gpu3\3-up-02.jpg
+shots\hatch-gpu3\3-up-03.jpg
+shots\hatch-gpu3\3-up-04.jpg
+shots\hatch-gpu3\3-up-05.jpg
+shots\hatch-gpu3\3-up-06.jpg
+shots\hatch-gpu3\3-up-07.jpg
+shots\hatch-gpu3\3-up-08.jpg
+shots\hatch-gpu3\3-up-09.jpg
+shots\hatch-gpu3\3-up-10.jpg
+above {"climbing":false,"below":false,"inside":true,"x":-30246.272254723088,"y":39.02100443015088,"z":34232.459353379476,"built":5}
+shots\hatch-gpu3\4-out-again.jpg
+shaders 86 warm-up + 5 later · worst 14 ms · policy ok
+hatch: ok
