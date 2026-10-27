@@ -78,6 +78,8 @@ export class Director {
   private urged = false;
   /** One life (roguelike): stricter fairness. */
   strict = false;
+  /** The VGM's pacing (the game settings, vgmLog.ts PACING): the needs grow this many times the setting's rates. */
+  pace = 1;
 
   constructor(private readonly def: DirectorDef, saved?: DirectorSave) {
     this.needs = { discovery: 0, challenge: 0, reward: 0, people: 0, purpose: 0, ...(saved?.needs ?? {}) };
@@ -92,7 +94,7 @@ export class Director {
       // Purpose is met while there is a lead; People while among them.
       if (n === 'purpose' && s.leads > 0) this.needs.purpose = 0;
       else if (n === 'people' && s.inTown) this.needs.people = Math.max(0, this.needs.people - minutes);
-      else this.needs[n] += this.def.needs[n] * minutes;
+      else this.needs[n] += this.def.needs[n] * this.pace * minutes;
     }
     // Tension: a fight drives it to the top, nearby danger towards it, and it falls slowly after.
     const goal = s.fighting > 0 ? 0.85 + Math.min(0.15, s.pressure * 0.1) : Math.min(0.7, s.pressure * 0.5 + (s.underground ? 0.2 : 0));

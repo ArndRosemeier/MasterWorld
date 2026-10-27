@@ -6,6 +6,8 @@
  */
 import { loadLocal, saveLocal } from '../persist/local';
 import { onKeyDown, swallow } from '../input/keys';
+import type { VgmLine } from '../vgm/vgmLog';
+import { clock } from './dom';
 
 /** What the debug menu reaches in the running game. */
 export interface DebugHost {
@@ -37,6 +39,8 @@ export interface DebugHost {
   readonly events: readonly { readonly id: string; readonly kind: string }[];
   /** A story event now (C6), whatever its wait (one of `events` by id, or the first that can): what the town hears, or why none came. */
   storyEvent(id?: string): string;
+  /** The VGM's log (D53, C8): its moves, oldest first (the tool, the need, why). */
+  vgmLog(): readonly VgmLine[];
   /** Places worth a look in this world. */
   readonly places: readonly Place[];
   /** Everything, for the command line. */
@@ -106,6 +110,10 @@ export class DebugMenu {
         ...h.events.map((e) => ({ label: `Story event: ${e.kind} (${e.id})`, run: () => h.storyEvent(e.id) })),
         { label: 'Curfew', run: () => h.town('stayIn') },
       ]],
+      ['VGM', [
+        { label: 'Its last 30 moves', run: () => this.lines(h.vgmLog().slice(-30)) },
+        { label: 'Every move', run: () => this.lines(h.vgmLog()) },
+      ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },
         ...h.weatherKinds.map((k) => ({ label: k[0].toUpperCase() + k.slice(1), run: () => h.weather(k) })),
@@ -153,6 +161,12 @@ export class DebugMenu {
     else this.input.blur();
   }
 
+  /** The VGM's moves into the log, one line each: when, the tool, its need, why (what was printed: how many). */
+  private lines(lines: readonly VgmLine[]): string {
+    for (const l of lines) this.print(`${l.at === undefined ? 'start' : `day ${Math.floor(l.at / 24) + 1} ${clock(l.at % 24)}`} · ${l.name}${l.need ? ` (${l.need})` : ''}: ${l.reason}`);
+    return `${lines.length} line${lines.length === 1 ? '' : 's'}`;
+  }
+
   private copyLink(): string {
     const q = new URLSearchParams(location.search);
     for (const k of ['pos', 'look', 'fly', 'hour']) q.delete(k);
@@ -187,7 +201,7 @@ export class DebugMenu {
     line.textContent = text;
     if (bad) line.className = 'bad';
     this.log.append(line);
-    while (this.log.children.length > 60) this.log.firstElementChild!.remove();
+    while (this.log.children.length > 400) this.log.firstElementChild!.remove();
     this.log.scrollTop = this.log.scrollHeight;
   }
 }

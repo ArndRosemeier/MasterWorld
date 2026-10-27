@@ -13,6 +13,8 @@ It steers the people and creatures of the world simulation only through orders a
 
 **Invisible, and showing rather than telling.** In play the VGM never shows its hand (D53). The game settings show it and its pacing, and the debug menu keeps a log of each move and why (plan step C8). What it makes, the hero should mostly come upon and see: situations that arise naturally, not quests handed out (D52, step C10). A speech bubble is for the rare urgent line, such as a cry for help.
 
+**Built (C8, 2026-10-27): the VGM's log and its pacing.** `vgm/vgmLog.ts` `vgmLines` gives every decision in the log one line: the tool that wrote it (`toolFor`: the toolbox's `writes`; an event's lair is the event's, roads laid before the first region are the world's first), the tool's need, and why (the reason the tool gave as a `Made`, which says what it read; otherwise what the decision says of itself, `decisionSays`). It reads the decision log, so a loaded game shows its whole history. The debug menu's VGM section prints the last 30 moves or all of them. The game settings (Game tab, "The game master") show the VGM in one sentence and its pacing: calm, normal or eventful (`PACING`: the Director's needs grow at 0.6, 1 or 1.6 times the setting's rates). Checks: `test/vgmLog.test.ts`.
+
 What the VGM should become, and where it falls short today: [The VGM we want](https://claude.ai/artifact/Y9YgAzHphg24tFXZQ3m9Hx).
 
 **One toolbox (D51).** Everything the VGM can make lives in `src/vgm` (pure: no three.js, so it runs in workers, tests and the loop bot). Each kind of thing is a **tool** with the same shape (section 6). The game (`src/app`, `src/main.ts`) only *applies* what a tool decided: it builds, draws and tells it. It never decides on its own what the world gets.

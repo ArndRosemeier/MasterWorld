@@ -132,6 +132,9 @@ export class Menu {
         this.slider('Volume', 'volume', 0.05, (v) => `${Math.round(v * 100)}%`),
         this.check('Calm motion (a still title, no window shows)', 'calm'),
         this.check('Frame time line (HUD)', 'hud'),
+        el('h3', { textContent: 'The game master' }),
+        el('p', { className: 'hint', textContent: 'Out of sight, a game master decides what the land holds and what happens in it: places to find, bands on the roads, trouble in the towns. Calm leaves more time between happenings, eventful less.' }),
+        this.pacing(),
       );
     }
     this.body.replaceChildren(...rows);
@@ -143,6 +146,17 @@ export class Menu {
     const value = el('span', { className: 'value', textContent: show(this.store.current[key]) });
     input.oninput = () => { this.store.set({ [key]: Number(input.value) }); value.textContent = show(this.store.current[key]); };
     return el('label', { className: 'row' }, el('span', { textContent: label }), input, value);
+  }
+
+  /** The game master's pacing: three buttons, the chosen one lit. */
+  private pacing(): HTMLElement {
+    const now = this.store.current.pacing;
+    return el('div', { className: 'row keys' }, el('span', { textContent: 'Pacing' }),
+      ...(['calm', 'normal', 'eventful'] as const).map((p) => el('button', {
+        className: `key${p === now ? ' waiting' : ''}`,
+        textContent: p[0].toUpperCase() + p.slice(1),
+        onclick: () => { this.store.set({ pacing: p }); this.render(); },
+      })));
   }
 
   private check(label: string, key: { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings]): HTMLElement {
