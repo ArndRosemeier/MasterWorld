@@ -46,8 +46,9 @@ const PLACE = `((link) => {
   const inv = P.matrixWorld.clone().invert();
   const local = (c) => { const q = c.clone().applyMatrix4(inv); return [q.x - O.x, q.y - O.y, q.z - O.z]; };
   const mid = (gr) => { const m = gr.children[0]; m.geometry.computeBoundingSphere(); return local(m.geometry.boundingSphere.center.clone().applyMatrix4(m.matrixWorld)); };
-  const q = d.pivot.quaternion, w = g.player.walker.pos, cam = g.view.camera.getWorldPosition(g.view.camera.position.clone());
-  return { turn: 2 * Math.acos(Math.min(1, Math.abs(q.w))), piece: mid(d.pivot), bar: d.bar ? mid(d.bar) : null, away: d.away, hero: [w.x - O.x, w.y - O.y, w.z - O.z], cam: local(cam) };
+  // The game's camera and the walker are in world coordinates (only the drawn scene is origin-relative).
+  const q = d.pivot.quaternion, w = g.player.walker.pos, cam = g.view.camera.position;
+  return { turn: 2 * Math.acos(Math.min(1, Math.abs(q.w))), piece: mid(d.pivot), bar: d.bar ? mid(d.bar) : null, away: d.away, hero: [w.x - O.x, w.y - O.y, w.z - O.z], cam: [cam.x - O.x, cam.y - O.y, cam.z - O.z] };
 })`;
 const seen = new Map();
 let tried = 0, n = 0;
@@ -72,14 +73,16 @@ for (const seed of [undefined, 'ways1', 'ways2', 'ways3', 'ways4', 'ways5', 'way
     tried++;
     const i = n++;
     // From either side in turn (a bar opens only from its far side): 2.4 m before it, facing it; a key for a lock.
-    let opened = false, from = 0, before = null, after = null;
+    let opened = false, from = 0, before = null, after = null, start = null;
     for (const side of [1, -1]) {
       const placed = await page.evaluate(({ w, side }) => {
         const g = window.game, v = g.cellar, O = v.view.origin, sp = v.space, p = g.player;
         const link = sp.layout.links.find((pl) => pl.link.id === w.link).link;
         if (link.key !== undefined) sp.keys.add(link.key);
-        const x = w.at[0] + w.through[0] * side * 2.4, z = w.at[2] + w.through[1] * side * 2.4;
-        if (sp.floorAt(x, z, w.at[1] + 0.5) === null) return false;
+        // 2.4 m out, or nearer where the room beyond is small.
+        const out = [2.4, 1.8, 1.3].find((r) => sp.floorAt(w.at[0] + w.through[0] * side * r, w.at[2] + w.through[1] * side * r, w.at[1] + 0.5) !== null);
+        if (out === undefined) return false;
+        const x = w.at[0] + w.through[0] * side * out, z = w.at[2] + w.through[1] * side * out;
         p.teleport(O.x + x, O.y + w.at[1], O.z + z, Math.atan2(w.through[0] * side, w.through[1] * side));
         p.heroCam.yaw = p.walker.yaw + 0.5;
         p.heroCam.pitch = -0.25;
@@ -95,14 +98,23 @@ for (const seed of [undefined, 'ways1', 'ways2', 'ways3', 'ways4', 'ways5', 'way
       // Up to it at walking pace, then lingering (a hidden way is found by looking closely).
       await page.keyboard.down('ShiftLeft');
       await page.keyboard.down('KeyW');
+      // The hero stops once it opens (staying on this side, to see it go away from them), else after 1.75 s.
+      let walking = true;
       for (let k = 1; k <= 16; k++) {
         await page.waitForTimeout(250);
-        if (k === 7) { await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft'); }
         opened ||= await page.evaluate((link) => window.game.cellar.space.open.has(link), w.link);
+        if (walking && (k === 7 || opened)) { await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft'); walking = false; }
+        if (k === 1) start = await page.evaluate(`${PLACE}(${w.link})`);
         await shoot(`${tag}-${String(k).padStart(2, '0')}`);
       }
       await page.keyboard.up('KeyW');
       await page.keyboard.up('ShiftLeft');
+      if (opened) {
+        // Turned to the side, looking down a little: the leaf beyond and the bar on the floor by the doorway.
+        await page.evaluate(() => { const c = window.game.player.heroCam; c.yaw += 0.9; c.pitch = -0.45; c.zoom = 4.2; });
+        await page.waitForTimeout(700);
+        await shoot(`${tag}-side`);
+      }
       after = await page.evaluate(`${PLACE}(${w.link})`);
       from = side;
       if (opened) break;
@@ -113,10 +125,10 @@ for (const seed of [undefined, 'ways1', 'ways2', 'ways3', 'ways4', 'ways5', 'way
     const moved = along(after.piece) - along(before.piece);
     const barMoved = before.bar && after.bar ? Math.hypot(after.bar[0] - before.bar[0], after.bar[1] - before.bar[1], after.bar[2] - before.bar[2]) : 0;
     const f = (q) => q.map((x) => x.toFixed(2)).join(' ');
-    console.log(`way ${w.link} (${w.kind}) from side ${from}: opened ${opened} · turned ${after.turn.toFixed(2)} rad · piece ${along(before.piece).toFixed(2)} -> ${along(after.piece).toFixed(2)} m along the way · away ${f(after.away)} · hero ${along(after.hero).toFixed(2)} along · camera ${along(after.cam).toFixed(2)} along${before.bar ? ` · bar moved ${barMoved.toFixed(2)} m, ends ${after.bar[1].toFixed(2)} m up at ${f(after.bar)}` : ''}`);
+    console.log(`way ${w.link} (${w.kind}) from side ${from}: opened ${opened} · turned ${after.turn.toFixed(2)} rad · piece ${along(before.piece).toFixed(2)} -> ${along(after.piece).toFixed(2)} m along the way · away ${f(after.away)} · hero ${along(start.hero).toFixed(2)} -> ${along(after.hero).toFixed(2)} along · camera ${along(after.cam).toFixed(2)} along${before.bar ? ` · bar moved ${barMoved.toFixed(2)} m, ends ${after.bar[1].toFixed(2)} m up, ${along(after.bar).toFixed(2)} along, ${Math.hypot(after.bar[0] - w.at[0], after.bar[2] - w.at[2]).toFixed(2)} m from the doorway` : ''}`);
     if (!opened) { fail(`way ${w.link} (${w.kind}) did not open from either side`); continue; }
     if (after.turn < 1) fail(`way ${w.link} (${w.kind}) opened but was not seen to (${after.turn.toFixed(2)} rad)`);
-    if (Math.sign(moved) === from || Math.sign(along(after.piece)) === Math.sign(along(after.hero))) fail(`way ${w.link} (${w.kind}) opened towards the hero (side ${from})`);
+    if (Math.sign(moved) === Math.sign(along(start.hero))) fail(`way ${w.link} (${w.kind}) opened towards the hero (side ${from}, hero ${along(start.hero).toFixed(2)} along, piece moved ${moved.toFixed(2)})`);
     if (before.bar && (barMoved < 0.5 || after.bar[1] > 0.3)) fail(`way ${w.link}: its bar was not set down (moved ${barMoved.toFixed(2)} m, ${after.bar[1].toFixed(2)} m up)`);
   }
   if (tried >= 8) break;
