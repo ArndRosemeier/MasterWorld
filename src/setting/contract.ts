@@ -568,6 +568,18 @@ export interface GuildDef extends TrainerDef {
   readonly opens: string;
   readonly unearned: string;
   readonly task: GuildTaskDef;
+  /**
+   * A magic teacher (plan 10, C3): copper for one of its schools' spells (the taught abilities of its skills),
+   * at a spell's level 0; dearer by a tenth per level. Opening a school gives its first spells; the others
+   * are taught once the school has reached their level. None: the house teaches no abilities.
+   */
+  readonly spellPrice?: number;
+  /** Copper to open a skill here, instead of its first rank's price (a magic teacher asks little: a fresh hero can start). */
+  readonly openPrice?: number;
+  /** Further taught abilities of no school it teaches as well, at `spellPrice` (bird form). */
+  readonly abilities?: readonly string[];
+  /** What the teacher says on teaching a spell (`{spell}`). */
+  readonly teachesSpell?: string;
 }
 
 /** The teller at the inn (D49): "where can I learn …?" names every guild house and marks it on the map. */
@@ -1096,6 +1108,8 @@ function validateFight(m: SettingModule, where: string): string[] {
     for (const k of g.skills) if (!skills.has(k)) out.push(`${where}: guild "${g.keeper}" teaches unknown skill "${k}"`);
     if (g.hidden && !g.way) out.push(`${where}: hidden guild "${g.keeper}" needs a way in`);
     if (!m.skillRanks?.length) out.push(`${where}: guilds need skillRanks`);
+    for (const id of g.abilities ?? []) if (!m.abilities.some((a) => a.id === id && a.taught)) out.push(`${where}: guild "${g.keeper}" teaches unknown or untaught ability "${id}"`);
+    if ((g.abilities?.length || g.teachesSpell) && !(g.spellPrice! > 0)) out.push(`${where}: guild "${g.keeper}" teaches abilities but has no spellPrice`);
   }
   if (m.skillRanks?.some((r, i, a) => i > 0 && r.upTo <= a[i - 1].upTo)) out.push(`${where}: skill ranks must rise`);
   if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);

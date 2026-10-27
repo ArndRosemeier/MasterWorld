@@ -1,6 +1,6 @@
 /**
  * The loop check (plan A6): a scripted hero plays evenings headless (game/evening.ts) in a few worlds, and
- * once goes down reckless to check a fall; then evenings in a village and a hamlet (plan B3a). `npm run loop [-- evenings seed...]`. A slow check (at most
+ * once goes down reckless to check a fall; then evenings in a village and a hamlet (plan B3a), and a mage (C3). `npm run loop [-- evenings seed...]`. A slow check (at most
  * 5 min), run in CI beside npm test and before every phase gate. Prints each step; exits 1 if an evening broke.
  * The runs play side by side, one process each (as many at once as there are cores); their logs print in order.
  */
@@ -19,6 +19,8 @@ const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   // A second town (plan B3a): the same game in a village out on the land, through the same code.
   { seed: seeds[0], opts: { evenings: 3, settlement: 'village' }, what: '3 evenings in a village' },
   { seed: seeds[1] ?? seeds[0], opts: { evenings: 2, settlement: 'hamlet' }, what: '2 evenings in a hamlet' },
+  // A mage (plan C3): asks the bard, opens a school at its teacher and casts in the first place.
+  { seed: seeds[2] ?? seeds[0], opts: { evenings: 3, mage: true }, what: '3 evenings as a mage' },
 ];
 
 /** Play one run here; true if it passed. */
@@ -27,7 +29,7 @@ function play(i: number): boolean {
   console.log(`\n== ${seed}: ${what}`);
   const t0 = performance.now();
   const r = playEvening(parseSeed(seed), classic, { ...opts, log: (s) => console.log(`${clock(s.hour)}  ${s.what}`) });
-  console.log(`${r.ok ? 'passed' : 'FAILED'}: ${r.cleared.length} places cleared, ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, lessons ${r.lessons.join(', ') || 'none'}, opened ${r.opened.join(', ') || 'none'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+  console.log(`${r.ok ? 'passed' : 'FAILED'}: ${r.cleared.length} places cleared, ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, lessons ${r.lessons.join(', ') || 'none'}, opened ${r.opened.join(', ') || 'none'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}${r.spells ? `, ${r.spells} spells cast` : ''}; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   return r.ok;
 }
 

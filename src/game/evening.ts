@@ -10,7 +10,7 @@
  */
 import { MinHeap, deriveSeed } from '@futuremagic/core';
 import { polyCentroid, type SettlementSize, type TownBuilding } from '@futuremagic/settlement';
-import type { SettingModule } from '../setting/contract';
+import type { GuildDef, SettingModule } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
 import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
@@ -24,13 +24,14 @@ import { Character } from './character';
 import { fallClassic, gather, remainsId, type Remains } from './death';
 import type { DelveSave } from './delve';
 import { fightBot } from './bot';
+import { aimsAtFoe } from './recipe';
 import { defOf, type Item } from './items';
 import { rewardFor } from './reward';
 import { itemWorth, type Merchant } from './trade';
 import { Township } from './township';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
 import { lessonPrice, takeLesson, teacherOf } from './lessons';
-import { GuildBook, isGuild, nextRank, openRank, rankRefusal } from './guilds';
+import { bardTells, GuildBook, isGuild, learnSpell, nextRank, openRank, rankRefusal, spellRefusal, spellsOf } from './guilds';
 import { WALK, Walker, type WalkWorld } from './walker';
 import type { Terrain } from '../world/terrain';
 
@@ -60,6 +61,8 @@ export interface EveningResult {
   readonly spent: readonly number[];
   /** The purse at the end. */
   readonly purse: number;
+  /** Spells that went off below (each time). */
+  readonly spells: number;
   /** The hero's power at the start and at the end. */
   readonly power: readonly [number, number];
   /** Simulated seconds walking and fighting. */
@@ -80,6 +83,11 @@ export interface EveningOptions {
    * found by walking out from the start; none: the start town.
    */
   readonly settlement?: SettlementSize;
+  /**
+   * A mage (plan C3): before the first evening the hero asks the bard where to learn, opens a school of magic
+   * at a teacher the bard names and casts it in the first place; later evenings it learns that school's spells.
+   */
+  readonly mage?: boolean;
 }
 
 /** One game day takes 60 real minutes (D37): game hours per second played. */
@@ -121,7 +129,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const power0 = hero.power;
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [], opened: string[] = [];
   const book = new GuildBook();
-  let falls = 0, earned = 0, seconds = 0;
+  let falls = 0, earned = 0, seconds = 0, spells = 0;
+  /** The mage's school, and its teacher's house. */
+  let school: { skill: string; house: TownBuilding; guild: GuildDef } | null = null;
   const pass = (s: number) => { seconds += s; hours += s * HOURS_PER_SECOND; };
 
   /** The Builder at work (as the game's VGM tick): new promises as they come due, told to the town. */
@@ -189,11 +199,32 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     return lead;
   };
 
+  /** The mage asks the bard at the inn where to learn magic, walks to the first teacher named and opens a school. */
+  const becomeMage = (): { skill: string; house: TownBuilding; guild: GuildDef } => {
+    const bard = township.bard, inn = buildingOf(town.plan, 'inn');
+    if (!bard || !inn) throw new Broke('no bard at an inn to ask where to learn magic');
+    walkTo('the inn', ...front(inn));
+    const told = bardTells(setting, town.decision.id, township.guilds, book, (k) => { const m = people.find((p) => p.trade === k); return m ? talk.nameOf(m.id) : null; });
+    const h = township.guilds.find(({ guild: g }) => spellsOf(setting, g).length && book.onMap(town.decision.id, g));
+    if (!h) throw new Broke(`the bard named no magic teacher (${told.length} houses)`);
+    say(`asked the bard where to learn magic: ${told.find((t) => t.toLowerCase().includes(h.guild.name.toLowerCase())) ?? h.guild.name}`);
+    walkTo(h.guild.name, ...front(h.b));
+    // A school whose first spell strikes a foe, if the teacher has one (it shows magic in a fight).
+    const skill = h.guild.skills.find((k) => spellsOf(setting, h.guild).some((x) => x.skill === k && !(x.level ?? 0) && aimsAtFoe(x))) ?? h.guild.skills[0], before = hero.coins;
+    const no = openRank(setting, h.guild, hero, skill, book, log);
+    if (no) throw new Broke(`${h.guild.name} would not open ${skill}: ${no} (${hero.coins} copper)`);
+    if (!hero.maxMana) throw new Broke(`opened ${skill} but has no mana`);
+    opened.push(`${skill} 0`);
+    say(`${h.guild.name} opens ${skill} for ${before - hero.coins} copper: knows ${spellsOf(setting, h.guild).filter((a) => hero.knows(a.id)).map((a) => a.name).join(', ')}; ${hero.maxMana} mana`);
+    return { skill, house: h.b, guild: h.guild };
+  };
+
   const heard = new Set<string>();
   /** The next lead a household passed on when told their place was safe. */
   let rumour: ReturnType<typeof openPromises>[number] | null = null;
   try {
     promiseDue();
+    if (opts.mage) school = becomeMage();
     const evenings = opts.evenings ?? 1;
     for (let e = 0; e < evenings; e++) {
       say(`evening ${e + 1}: power ${hero.power}, ${hero.coins} copper, ${hero.pack.length} in the pack`);
@@ -229,6 +260,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0 });
         pass(r.seconds);
         saved = r.delve.tally();
+        spells += r.spells.length;
         if (r.won && r.out) {
           say(`cleared ${name}: ${r.kills} killed, ${r.spared} spared, ${r.looted} searched, ${r.potions} potions, health ${(r.health * 100).toFixed(0)}%`);
           break;
@@ -253,6 +285,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         goDown();
       }
       if (left) throw new Broke(`cleared ${name} but never found the pack left at the fall`);
+      if (school && e === 0 && !spells) throw new Broke(`the mage cast no spell in ${name}`);
+      if (school) say(`${spells} spells cast so far; ${school.skill} ${Math.floor(hero.skills.get(school.skill) ?? 0)}`);
       // Quiet, and the hero gone: back to its household to tell them (plan 4.2). They pay, the promise is
       // kept, and with the next lead already about they pass on its rumour.
       if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
@@ -315,7 +349,19 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       }
       // Lessons with what is left above a night's room and a mending (the weapon's skill first, then guarding).
       const reserve = setting.upkeep.room + LESSON_RESERVE;
-      const wanted = [hero.weapon.skill, 'armour', 'dodge', 'shields'];
+      const wanted = [...(school ? [school.skill] : []), hero.weapon.skill, 'armour', 'dodge', 'shields'];
+      // The mage's next spells first, at the teacher's (once the school has reached their level).
+      if (school) {
+        const g = school.guild;
+        for (const a of spellsOf(setting, g).filter((x) => x.skill === school!.skill)) {
+          if (spellRefusal(setting, g, hero, a) || hero.coins < reserve + 40) continue;
+          walkTo(g.name, ...front(school.house));
+          const before = hero.coins;
+          learnSpell(setting, g, hero, a);
+          paid += before - hero.coins;
+          say(`${g.name} teaches ${a.name} for ${before - hero.coins} copper`);
+        }
+      }
       // First what a guild house must open (D49): a skill never learned, or a rank use has earned.
       for (const skill of wanted) {
         const by = teachers.find(({ t }) => t.skills.includes(skill) && isGuild(t));
@@ -369,9 +415,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds };
+    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds };
+  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells };
 }
 
 /** A point just outside a building's door. */

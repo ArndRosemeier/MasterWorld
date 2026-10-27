@@ -5,10 +5,11 @@
  * skill is a brass rule with a ward line up to the hero's level and a notch where the teacher's knowledge
  * ends; a lesson taken lights the next mark, the number turns over and the line runs up to it.
  * At a guild house (D49) the trainer also opens a skill never learned and its next ranks: such a row shows
- * the rank's price and opens it on a click; the guild's task is asked for at the foot.
+ * the rank's price and opens it on a click; the guild's task is asked for at the foot. A magic teacher (C3)
+ * also teaches spells: a row each, with its school's level and price, learned on a click.
  */
-import type { GuildDef, SettingModule, TrainerDef } from '../setting/contract';
-import { isGuild, nextRank, openRank, rankRefusal, type GuildBook, type RankRefusal } from '../game/guilds';
+import type { AbilityDef, GuildDef, SettingModule, TrainerDef } from '../setting/contract';
+import { isGuild, learnSpell, nextRank, openRank, rankPrice, rankRefusal, spellPrice, spellRefusal, spellsOf, type GuildBook, type RankRefusal, type SpellRefusal } from '../game/guilds';
 import type { DecisionLog } from '../world/decisions';
 import type { Character } from '../game/character';
 import { coinText } from '../game/items';
@@ -71,13 +72,14 @@ export class LessonsUi extends BodyWindow {
     this.fill([
       el('p', { className: 'says', textContent: this.said }),
       el('div', { className: 'rules' }, ...rows),
+      ...(g && spellsOf(this.setting, g).length ? [el('div', { className: 'rules spells' }, ...spellsOf(this.setting, g).map((a) => this.spellRow(g, a)))] : []),
       el('p', { className: 'hint', textContent: hint })], foot);
   }
 
   private lessonRow(t: TrainerDef, l: Lesson): HTMLElement {
     // Nothing more to learn here now, but a rank to open (D49): the row opens it.
     const g = this.guild, rank = g && l.price === null ? nextRank(this.setting, this.hero, l.skill) : null;
-    if (g && rank) return this.rankRow(g, l, rank.rank, rank.def.price);
+    if (g && rank) return this.rankRow(g, l, rank.rank, rankPrice(g, rank));
     const dear = l.price !== null && l.price > this.hero.coins;
     const rule = el('div', { className: 'rule' }, el('i', { className: 'line' }), el('i', { className: 'cap' }));
     rule.style.setProperty('--v', String(Math.min(1, l.level / 100)));
@@ -106,6 +108,33 @@ export class LessonsUi extends BodyWindow {
       el('div', { className: 'price', textContent: label }));
     r.addEventListener('click', () => this.open(g, l));
     return r;
+  }
+
+  /** A spell this teacher teaches: known, not yet (its school's level), or its price. */
+  private spellRow(g: GuildDef, a: AbilityDef): HTMLElement {
+    const no = spellRefusal(this.setting, g, this.hero, a);
+    const label = no === 'known' ? 'known' : no === 'closed' ? 'open the school' : no === 'unearned' ? `at ${a.level}` : coinText(spellPrice(g, a));
+    const r = el('div', { className: `lesson spell${no && no !== 'coin' ? ' done' : ''}${no === 'coin' ? ' dear' : ''}`, title: a.text },
+      el('div', { className: 'name', textContent: `${a.icon ? `${a.icon} ` : ''}${a.name}` }),
+      el('div', { className: 'level' }, el('b', { textContent: String(a.level ?? 0) })),
+      el('div', { className: 'rule' }),
+      el('div', { className: 'price', textContent: label }));
+    r.addEventListener('click', () => this.teachSpell(g, a));
+    return r;
+  }
+
+  /** Learn a spell here (by click, or from the console). */
+  teachSpell(g: GuildDef, a: AbilityDef): SpellRefusal {
+    const no = learnSpell(this.setting, g, this.hero, a);
+    const school = this.setting.skills.find((x) => x.id === a.skill)?.name.toLowerCase() ?? '';
+    this.said = no === null ? `“${fill(g.teachesSpell ?? '{spell} is yours now.', { spell: a.name })}”`
+      : no === 'closed' ? `“First let me open ${school} for you.”`
+      : no === 'unearned' ? `“Not yet. Your ${school} must reach ${a.level} first.”`
+      : no === 'coin' ? '“Come back when your purse is heavier.”'
+      : no === 'known' ? '“You know that one already.”' : '“That is not mine to teach.”';
+    if (no === null) this.lessonsHost.changed();
+    this.opened();
+    return no;
   }
 
   /** Open a skill or its next rank at this guild house (by click, or from the console). */

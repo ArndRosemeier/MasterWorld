@@ -89,7 +89,7 @@ import { release } from './app/release';
 import { Character } from './game/character';
 import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
-import { GuildBook, houseIn, isGuild } from './game/guilds';
+import { bardTells, GuildBook, isGuild } from './game/guilds';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -856,7 +856,8 @@ export async function start(b: Boot): Promise<void> {
       paused,
       get bindings() { return settings.current.bindings; },
       taught: (h) => { const t = hours() + h; view.sky.day = Math.floor(t / 24); view.sky.hour = t - view.sky.day * 24; sounds?.coins(); },
-      changed: armHero,
+      // A spell learned from a teacher; bird form's body is made ready as soon as it is known.
+      changed: () => { armHero(); if (birdAbility && character.knows(birdAbility.id)) void birdForm?.warm(); },
       book: guildBook,
       log: () => log,
       hours,
@@ -864,15 +865,10 @@ export async function start(b: Boot): Promise<void> {
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id)); });
     // The bard at the inn (D49): "where can I learn a skill?" names every guild house of the town and puts
     // it on the map, a hidden one with its way in.
-    const skillNames = (ids: readonly string[]) => ids.map((id) => setting.skills.find((x) => x.id === id)?.name.toLowerCase() ?? id).join(', ');
     services.set('bard', (a) => {
-      const t = talkTown(), bard = setting.bard;
-      if (!t || !bard) return;
-      const told = t.guilds.map(({ guild: g }) => {
-        const master = t.residents.find((p) => p.trade === g.keeper);
-        if (g.hidden) guildBook.tell(houseIn(t.id, g.keeper));
-        return fill(g.hidden ? bard.tellsHidden : bard.tells, { house: cap(g.name), skills: skillNames(g.skills), keeper: master ? t.talk.nameOf(master.id) : 'the master', way: g.way ?? '' });
-      });
+      const t = talkTown();
+      if (!t || !setting.bard) return;
+      const told = bardTells(setting, t.id, t.guilds, guildBook, (k) => { const m = t.residents.find((p) => p.trade === k); return m ? t.talk.nameOf(m.id) : null; });
       notes.say(told.length ? `${told.join(' ')} (Map: ${keyName('map')})` : `${t.talk.nameOf(a.person.id)} knows of no guild house here.`, 12);
       sounds?.noted();
     });

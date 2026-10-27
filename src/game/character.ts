@@ -86,7 +86,9 @@ export class Character {
       this.coins = saved.coins;
       this.background = saved.background ?? '';
       this.lodging = saved.lodging ?? null;
-      for (const id of this.rankedSkills()) this.ranks.set(id, saved.ranks?.[id] ?? this.rankFor(this.skills.get(id) ?? 0));
+      // A save from before the ranks opens what the hero had, as far as it had come; magic never opens so,
+      // nor does a skill a guild began to teach after the save (a school of magic: C3).
+      for (const id of this.rankedSkills()) this.ranks.set(id, saved.ranks?.[id] ?? (saved.ranks || this.isMagic(id) ? this.freshRank(id) : this.rankFor(this.skills.get(id) ?? 0)));
       // A school of magic opened by a spell learned (no guild teaches it yet) keeps its rank too.
       for (const [id, r] of Object.entries(saved.ranks ?? {})) if (!this.ranks.has(id) && this.skills.has(id)) this.ranks.set(id, r);
       for (const id of saved.learned ?? []) if (setting.abilities.some((a) => a.id === id && a.taught)) this.learned.add(id);
@@ -131,9 +133,15 @@ export class Character {
     if (this.knows(id) || !a) return false;
     this.learned.add(id);
     // A spell opens its school (at its first rank) if nothing opened it before.
-    if (a.skill && !this.opened(a.skill)) { this.ranks.set(a.skill, 0); this.mana = this.maxMana; }
+    if (a.skill && !this.opened(a.skill)) this.openSkill(a.skill);
     this.bar = addToBar(this.bar, id);
     return true;
+  }
+
+  /** A skill opened at its first rank (a trainer, a spell learned); a school of magic fills the mana with it. */
+  openSkill(id: string): void {
+    this.ranks.set(id, 0);
+    if (this.isMagic(id)) this.mana = this.maxMana;
   }
 
   /** A learned ability forgotten (the debug menu): off the bar too. */
@@ -148,6 +156,11 @@ export class Character {
     const g = new Set((this.setting.guilds ?? []).flatMap((x) => x.skills));
     return this.setting.skills.map((s) => s.id).filter((id) => g.has(id));
   }
+
+  private isMagic(id: string): boolean { return this.setting.skills.find((s) => s.id === id)?.group === 'magic'; }
+
+  /** A ranked skill's rank for a new hero with no past: open to all at 0, else not opened. */
+  private freshRank(id: string): number { return this.setting.skills.find((s) => s.id === id)?.open ? 0 : -1; }
 
   /** The rank whose span holds a skill level (an older save's skills open as far as they had come). */
   private rankFor(v: number): number {
