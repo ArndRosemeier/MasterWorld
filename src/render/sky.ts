@@ -188,6 +188,8 @@ export class SkyView {
 
   /** Toward the sun (or the moon at night), as lit last frame. */
   get lightDirection(): Vector3 { return this.lightDir.value; }
+  /** The sun's light as it falls outside: its colour times its strength (the moon's at night: check `sunDir` for that). */
+  get sunColor(): Color { return this.sunLight.value; }
 
   /** The hills' shadows beyond the shadow map: main feeds it the camera and the terrain workers. */
   readonly horizon = new HorizonShadow();

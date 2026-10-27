@@ -5,7 +5,7 @@
  * layer of the town texture array; `tint` (sRGB) colours it: lime washes, timber stains, glass. Texture
  * coordinates are in metres and scaled per layer. Rain darkens and wets the walls and roofs.
  */
-import { BufferAttribute, BufferGeometry, MeshPhysicalNodeMaterial, type Mesh } from 'three/webgpu';
+import { BufferAttribute, BufferGeometry, Color, MeshPhysicalNodeMaterial, type Mesh } from 'three/webgpu';
 import { attribute, dot, float, floor, fract, int, mix, normalMap, pow, round, sin, step, texture, uniform, uniformArray, varying, vec3 } from 'three/tsl';
 import { WORLD } from '../origin';
 import { BuildingMat, INSIDE_LEVELS, INSIDE_LIGHT, type BuildingMesh } from '@futuremagic/settlement';
@@ -23,9 +23,11 @@ export const WINDOWS = { glow: uniform(0), share: uniform(0.7) };
 /**
  * The sky's light inside an open building (@futuremagic/settlement INSIDE_LIGHT): its inside faces get the
  * share their windows and door let in, times `gain`, plus `fill` (light thrown about by the room and its
- * lamps). The sun's comes in through the openings by itself (the walls cast shadows).
+ * lamps). The sun's comes in through the openings by itself (the walls cast shadows); `bounce` is what
+ * it throws about the room one is in (game/roomLight.ts: irradiance, coloured as the sun; black at night
+ * and outdoors), lighting every inside face a little.
  */
-export const ROOM_LIGHT = { gain: uniform(1), fill: uniform(0.05) };
+export const ROOM_LIGHT = { gain: uniform(1), fill: uniform(0.05), bounce: uniform(new Color(0, 0, 0)) };
 
 export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat', 'tint'], () => {
   const { albedo: A, normal: N } = townTextures();
@@ -55,7 +57,9 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   const roll = fract(sin(dot(room, vec3(12.9898, 78.233, 37.719))).mul(43758.5453));
   const glass = float(1).sub(step(0.5, layer.sub(BuildingMat.Glass).abs().toFloat()));
   const warm = mix(vec3(1.0, 0.42, 0.13), vec3(1.0, 0.55, 0.22), fract(roll.mul(7.3)));
-  m.emissiveNode = warm.mul(glass).mul(step(roll, WINDOWS.share)).mul(WINDOWS.glow).mul(0.12);
+  // The sun thrown about the room, on its inside faces (Lambert: albedo x irradiance / pi).
+  const bounce = m.colorNode.mul(ROOM_LIGHT.bounce).mul(n.a).mul(inside).mul(1 / Math.PI);
+  m.emissiveNode = warm.mul(glass).mul(step(roll, WINDOWS.share)).mul(WINDOWS.glow).mul(0.12).add(bounce);
   return m;
 });
 
