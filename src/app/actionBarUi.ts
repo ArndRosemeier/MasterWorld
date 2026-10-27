@@ -32,7 +32,7 @@ export interface BarHost {
   /** A dialog has the keys. */
   readonly blocked: boolean;
   /** Use an ability (or the potion's quick slot). */
-  use(id: string): void;
+  trigger(id: string): void;
   /** How it stands now. */
   state(id: string): SlotState;
   /** The bar was arranged anew. */
@@ -93,7 +93,7 @@ export class ActionBarUi {
     const s = this.shownSlots[slot];
     if (!s?.id) return;
     replay(s.el, 'pressed');
-    this.host.use(s.id);
+    this.host.trigger(s.id);
   }
 
   /** Draw the sockets again from the hero's bar (it was arranged, or an ability was learned). */
