@@ -24,6 +24,7 @@ test('vgm log: every decision a tool writes has a line, with that tool and its n
     { kind: 'move-in', id: 'move-in-1', dungeon: promise.id, dweller: 'rats', seed: 5, at: 8.5 },
     road('road-9', 8.7),
     { kind: 'kept', id: 'kept-1', promise: promise.id, at: 9 },
+    { kind: 'kept', id: 'kept-2', promise: 'event-1', at: 9.5, faded: true },
     { kind: 'retake', id: 'retake-1', dungeon: promise.id, dweller: 'rats', seed: 4, at: 10 },
     { kind: 'order', id: 'order-1', town: home.id, order: { kind: 'stayIn', from: 10, to: 12 } },
     { kind: 'journey', id: 'journey-1', from: home.id, to: 'region-2', fare: 20, at: 11, arrive: 13 },

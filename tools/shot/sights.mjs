@@ -2,7 +2,7 @@
  * The VGM's answers on the hero's way (implementation plan C9): `node tools/shot/sights.mjs [out dir]` after
  * `npm run build` (and `npm run packs`), SHOT_GPU=1 on the reference machine. The hero stands out on the
  * land east of the start town; the VGM answers Discovery there three times and Reward once (a find, which
- * must go into the pack), each a walk further on, then Challenge (an ambush, seen from 14 m), then People (a traveller resting by the way, from 6 m), then situations (a hurt traveller, who cries out once seen; a raided farm's smoke from 250 m): the hero steps up to 16 m of each (inside its glade), the game must say what it
+ * must go into the pack), each a walk further on, then Challenge (an ambush, seen from 14 m), then People (a traveller resting by the way, from 6 m), then situations (a hurt traveller, who cries out once seen; a raided farm's smoke from up to 150 m): the hero steps up to 16 m of each (inside its glade), the game must say what it
  * is, and it is shot. JPEGs into `<out dir>` (default `shots/sights/<date>-<commit>/`). A slow check (docs/CHECKS.md),
  * well under 5 min.
  */
@@ -86,7 +86,8 @@ await page.evaluate(() => {
   const g = window.game, d = g.towns.every[0].town.decision;
   g.player.teleport(d.x - d.radius - 260, undefined, d.z + 500, Math.PI / 2);
 });
-await page.waitForTimeout(2500);
+// Long enough for the fight's last words to fade.
+await page.waitForTimeout(7000);
 const met = await page.evaluate(() => { const m = window.game.answerNow('people'); return m ? { id: m.decision.id, reason: m.reason, ...m.decision } : null; });
 console.log(`traveller: ${met ? `${met.id}: ${met.reason}` : 'none'}`);
 if (!met) failed = true;
@@ -126,9 +127,12 @@ else {
   const cry = await page.evaluate(() => window.game.speech.line);
   console.log(`from 20 m: ${cry ?? 'NO CRY'}`);
   if (!cry) failed = true;
+  // Up close for the picture: woods between could hide them at 20 m.
+  await stand(6);
+  await page.waitForTimeout(1500);
   await shoot(`0${NEEDS.length + 3}-hurt-traveller`);
 }
-// A situation seen from afar (C10): a farm raided, its barn smoking over the trees, shot from 250 m off.
+// A situation seen from afar (C10): a farm raided, its barn smoking over the trees, shot from up to 150 m off across the fields.
 const raid = await page.evaluate(() => window.game.storyEvent('farm-raid'));
 console.log(`raid: ${raid}`);
 await page.waitForTimeout(1500);
@@ -136,7 +140,9 @@ const smokeAt = await page.evaluate(() => {
   const g = window.game, e = g.log.filter((d) => d.kind === 'event' && d.paddock !== undefined).at(-1);
   if (!e) return null;
   const t = g.towns.get(e.town).town, pd = t.plan.paddocks[e.paddock], b = t.plan.buildings[t.plan.farms[pd.farm].barn];
-  const a = Math.atan2(b.cz - t.decision.z, b.cx - t.decision.x), x = b.cx + Math.cos(a) * 250, z = b.cz + Math.sin(a) * 250;
+  // From the town's side, across its open fields (from the woods outside, near crowns hide the sky).
+  const [cx, cz] = t.plan.centre, l = Math.max(1, Math.hypot(cx - b.cx, cz - b.cz)), far = Math.min(150, l);
+  const x = b.cx + ((cx - b.cx) / l) * far, z = b.cz + ((cz - b.cz) / l) * far;
   g.player.teleport(x, undefined, z, Math.atan2(x - b.cx, z - b.cz));
   return { x: b.cx, z: b.cz };
 });

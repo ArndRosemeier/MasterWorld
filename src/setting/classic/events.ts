@@ -12,7 +12,9 @@ export const events: readonly StoryEventDef[] = [
       note: 'Nobody went down after them, so the {creatures} came up out of {place}. They roam {dir} of the town now, and folk want them gone.',
       done: 'The {creatures} that came out of {place} are dead. {town} will sleep easier.',
       told: '{creatures} came up out of {place} and roam the land {dir} of the town',
+      faded: 'The {creatures} went back down into {place} in the end. Nobody has seen them since, but nobody goes near it either.',
     },
+    fades: 72,
   },
   {
     id: 'farm-raid', kind: 'raid', by: 'bandits', after: 36, cooldown: 48, count: [2, 3], gather: 1.5,
@@ -22,7 +24,9 @@ export const events: readonly StoryEventDef[] = [
       note: 'Nobody went after the {creatures} by the road, so they raided {place} and drove off its {animals}. They hold the beasts {dir} of the town. Beat them and the {animals} can go home.',
       done: 'The {creatures} who raided {place} are beaten, and its {animals} are home again.',
       told: '{creatures} came down on {place} in the night, fired the barn and drove off the {animals}; they hold them {dir} of here',
+      faded: 'The {creatures} moved on with the {animals} of {place}. Nobody went after them, and the beasts are gone for good.',
     },
+    fades: 60,
   },
   {
     id: 'waystation-taken', kind: 'take', by: 'bandits', takes: 'waystation', reach: 3500, lair: 'hideout', after: 48, cooldown: 48, count: [2, 3], gather: 1.5,

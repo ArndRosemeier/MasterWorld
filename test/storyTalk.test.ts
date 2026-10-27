@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { Township } from '../src/game/township';
 import { keepPromise } from '../src/vgm/leads';
+import { fadedFor, openEvents, takenFrom } from '../src/vgm/events';
 import type { Decision } from '../src/world/decisions';
 import { seed, terrain, walk, EAST } from './frontierLand';
 
@@ -31,4 +32,28 @@ test('story talk: the town knows its story events; a raided farm\'s household sa
   // A town made after it ended knows it ended.
   const later = new Township(town, { seed, setting: classic, log: () => log, hours: () => 45, towns: () => terrain.towns });
   assert.match(later.talk.ask(other.id, 'event:event-1').text, /beaten|home again/i);
+});
+
+test('story talk: an event left alone runs its course unseen; the raiders keep the beasts, and the town tells how it ended', () => {
+  const def = classic.events!.find((e) => e.id === 'farm-raid')!;
+  let log: Decision[] = [...walk(1, EAST), raid];
+  const ctx = (hours: number, hero?: { x: number; z: number }) => ({ seed, log, towns: terrain.towns, terrain, hours, setting: classic, inside: () => false, ...(hero ? { hero } : {}) });
+  assert.ok(def.fades, 'a raid runs its course');
+  assert.equal(fadedFor(ctx(raid.at + def.fades! - 1)), null, 'not before its time');
+  assert.equal(fadedFor(ctx(raid.at + def.fades! + 1, { x: raid.x + 50, z: raid.z })), null, 'never under the hero\'s eyes');
+  const k = fadedFor(ctx(raid.at + def.fades! + 1, { x: raid.x + 2000, z: raid.z }))!;
+  assert.ok(k && k.kind === 'kept' && k.faded && k.promise === raid.id);
+  const t = new Township(town, { seed, setting: classic, log: () => log, hours: () => raid.at + 1, towns: () => terrain.towns });
+  const other = t.residents.find((p) => p.home !== town.plan.farms[pd.farm].house && p.role !== 'child')!;
+  t.talk.ask(other.id, 'event:event-1');
+  log = [...log, k];
+  assert.equal(openEvents(log).length, 0, 'over');
+  assert.equal(takenFrom(log, town.decision.id).get(pd.id), 2, 'the beasts are gone for good');
+  assert.equal(fadedFor(ctx(raid.at + def.fades! + 2)), null, 'once');
+  t.ended(raid.id);
+  const after = t.talk.ask(other.id, 'event:event-1').text;
+  assert.match(after, /moved on|gone for good/i, after);
+  // Beaten instead: home again.
+  const beaten = [...log.slice(0, -1), keepPromise(log.slice(0, -1), raid.id, 50)!];
+  assert.equal(takenFrom(beaten, town.decision.id).size, 0);
 });
