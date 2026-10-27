@@ -104,7 +104,8 @@ import { Director, type Need } from './vgm/director';
 import { FightHud } from './app/fightHud';
 import { ActionBarUi } from './app/actionBarUi';
 import { AbilityBook } from './app/abilityBook';
-import { POTION } from './game/actionBar';
+import { POTION, REST } from './game/actionBar';
+import { Rest, type RestWatch } from './game/rest';
 import { BirdForm } from './app/birdForm';
 import { Alone, blowOf, Recipes, shapeOf, type RecipeEvent } from './game/recipe';
 import { SpellView } from './app/spellView';
@@ -990,8 +991,17 @@ export async function start(b: Boot): Promise<void> {
       changed: () => autosave(),
     }) : null;
     if (birdForm && birdAbility && character.knows(birdAbility.id)) void birdForm.warm();
-    /** An ability from the action bar (or a shot): bird form, the fight's, the hero's own out of a fight, the potion. A line why not, or null. */
+    // Sitting down to rest (the rest key or the bar): faster healing, ended by moving, a fight or a wound.
+    const rest = new Rest(character);
+    const restWatch = (): RestWatch => ({
+      moving: player.walker.gait !== 'idle',
+      fighting: encounters().some((e) => e.pressure.fighting > 0),
+      afoot: !player.riding && !player.offFoot && !player.hideHero && !birdForm?.flying && player.walker.mode === 'ground',
+    });
+    /** An ability from the action bar (or a shot): resting, bird form, the fight's, the hero's own out of a fight, the potion. A line why not, or null. */
     const useAbility = (id: string): string | null => {
+      if (id === REST) return rest.toggle(restWatch());
+      if (id !== POTION) rest.stand();
       const e = leading();
       if (birdForm && id === birdAbility?.id) return birdForm.invoke();
       if (birdForm?.flying) return 'A pheasant cannot do that.';
@@ -1010,6 +1020,7 @@ export async function start(b: Boot): Promise<void> {
       state: (id) => {
         const f = leading()?.fighting ?? null;
         if (id === POTION) { const n = potions(); return { left: 0, total: 0, dim: n === 0, on: false, count: n }; }
+        if (id === REST) return { left: 0, total: 0, dim: false, on: rest.sitting };
         if (birdForm && id === birdAbility?.id) { const b = birdForm.state; return { left: b.left, total: birdAbility.cooldown, dim: false, on: b.on }; }
         const a = abilityOf(setting, id);
         if (!a) return { left: 0, total: 0, dim: true, on: false };
@@ -1288,11 +1299,16 @@ export async function start(b: Boot): Promise<void> {
       else void create(people ? PEOPLE_RACE[people] : null);
     };
     if (!title && ((params.create && !save) || save?.heir)) { paused(true); void create(null); }
-    // F flies, H gets on or off a horse (the keys are in the settings).
+    // F flies, H gets on or off a horse, X sits down to rest on the ground (dives in the water) (the keys are in the settings).
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
-      if (settings.current.bindings.fly.includes(e.code)) player.flying = !player.flying;
-      else if (settings.current.bindings.mount.includes(e.code)) player.toggleMount();
+      const b = settings.current.bindings;
+      if (b.fly.includes(e.code)) player.flying = !player.flying;
+      else if (b.mount.includes(e.code)) player.toggleMount();
+      else if (b.dive.includes(e.code) && playing && player.walker.mode === 'ground' && !player.flying) {
+        const said = useAbility(REST);
+        if (said) notes.say(said, 2.5);
+      }
     });
     // The Director's turn every frame; the Builder's every few seconds: a new promise when one is due
     // (plan 4.1, 4.2: always a few open leads), which the cellars and the townsfolk learn of at once.
@@ -1437,6 +1453,8 @@ export async function start(b: Boot): Promise<void> {
       }
       direct(dt);
       notes.update(dt);
+      rest.watch(restWatch());
+      player.resting = rest.sitting;
       actionBar.inPlay = playing && !ended && !title?.holding && !creator?.showing;
       actionBar.dark = !character.alive;
       actionBar.readSlots();

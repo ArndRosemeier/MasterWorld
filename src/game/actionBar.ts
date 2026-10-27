@@ -10,12 +10,18 @@ export const BAR_SLOTS = 10;
 /** The potion's quick slot: not an ability, but on the bar like one. */
 export const POTION = 'potion';
 
+/** Sit down to rest (or stand up again): not an ability either, but on the bar like one. */
+export const REST = 'rest';
+
+/** What every hero can put on the bar besides their abilities, in the bar's order. */
+export const BAR_EXTRAS: readonly string[] = [POTION, REST];
+
 /** What each slot holds (null: empty), always BAR_SLOTS long. */
 export type Bar = readonly (string | null)[];
 
-/** A fresh hero's bar: what they know, in order, the potion after the abilities. */
+/** A fresh hero's bar: what they know, in order, the potion and resting after the abilities. */
 export function defaultBar(known: readonly string[]): Bar {
-  const out: (string | null)[] = [...known.filter((id) => id !== POTION), POTION].slice(0, BAR_SLOTS);
+  const out: (string | null)[] = [...known.filter((id) => !BAR_EXTRAS.includes(id)), ...BAR_EXTRAS].slice(0, BAR_SLOTS);
   while (out.length < BAR_SLOTS) out.push(null);
   return out;
 }
@@ -26,7 +32,7 @@ export function defaultBar(known: readonly string[]): Bar {
  */
 export function cleanBar(raw: unknown, known: readonly string[]): Bar {
   if (!Array.isArray(raw)) return defaultBar(known);
-  const ok = new Set([...known, POTION]), seen = new Set<string>();
+  const ok = new Set([...known, ...BAR_EXTRAS]), seen = new Set<string>();
   const out: (string | null)[] = [];
   for (let i = 0; i < BAR_SLOTS; i++) {
     const v = raw[i];
