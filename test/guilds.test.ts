@@ -101,3 +101,13 @@ test('guilds: every guild house in a village or town has its trainer', () => {
     }
   }
 });
+
+test('guilds: the open houses\' masters dress for their calling; the hidden one\'s keeper looks like anyone', () => {
+  const plan = planTown({ seed: 3, x: 0, z: 0, radius: 72, height: () => 10 });
+  const folk = townsfolk(plan, 3);
+  staffGuilds(folk, guildHouses(plan, 'town', classic));
+  const by = (k: string) => folk.find((p) => p.trade === k)!;
+  assert.equal(by('master-at-arms').dress, 'fighter');
+  assert.equal(by('lodge-master').dress, 'traveller');
+  assert.equal(by('locksmith').dress, undefined);
+});

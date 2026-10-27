@@ -70,6 +70,7 @@ export function staffGuilds(people: readonly Person[], houses: readonly GuildHou
     p.role = 'trade';
     p.trade = guild.keeper;
     p.work = b.id;
+    if (guild.dress && !guild.hidden) p.dress = guild.dress;
   }
 }
 
