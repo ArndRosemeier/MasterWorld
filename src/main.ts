@@ -1409,7 +1409,7 @@ export async function start(b: Boot): Promise<void> {
     };
     let last = performance.now(), frame = 0;
     view.renderer.setAnimationLoop(() => {
-      const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
+      const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000) / params.slow;
       title?.run(dt);
       if (giant && orbit && title) {
         if (title.holding) giant.view.frame(dt, giantPose(orbit, title.draw.seed, (giant.t += dt)));
