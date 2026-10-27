@@ -31,6 +31,10 @@ export class TitleScreen {
   private readonly build: HTMLDivElement;
   private readonly gate: HTMLDivElement;
   private readonly continueButton: HTMLButtonElement;
+  /** A save is being loaded (continuing): the build line speaks of where the game left off. */
+  private resuming = false;
+  /** What follows the build line once a choice waits for the world. */
+  private afterBuild = 'you set off once it is done';
   private resume: (() => void) | null = null;
   private readonly startButton: HTMLButtonElement;
   private readonly card: HTMLDivElement;
@@ -107,12 +111,12 @@ export class TitleScreen {
 
   // The loading screen's part (main.ts calls these while the world is built).
   set(step: string): void {
-    if (!this.root.classList.contains('awake')) this.build.textContent = this.root.classList.contains('chosen') ? `${step} · you set off once it is done` : step;
+    if (!this.root.classList.contains('awake')) this.build.textContent = this.root.classList.contains('chosen') ? `${step} · ${this.afterBuild}` : step;
     console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: ${step}`);
   }
 
   done(): void {
-    this.build.textContent = 'The world is awake';
+    this.build.textContent = this.resuming ? 'Where you left off is ready' : 'The world is awake';
     this.root.classList.add('awake');
     this.startButton.classList.remove('waiting');
   }
@@ -147,6 +151,9 @@ export class TitleScreen {
 
   /** A save was loaded for this start: the title goes straight on to it once the world is built. */
   continuing(label: string): void {
+    // The world is readied round the saved spot first; the line says so, so the wait is not taken for a new start.
+    this.resuming = true;
+    this.afterBuild = 'then you go on where you left off';
     this.startButton.lastChild!.textContent = 'Continue';
     this.startButton.title = label;
     this.waiting();
@@ -165,7 +172,7 @@ export class TitleScreen {
     const button = people ? this.card.querySelector<HTMLButtonElement>('.nav .t-btn:not(.arrow)') : this.startButton;
     (button ?? this.startButton).classList.add('waiting', 'picked');
     this.build.classList.add('t-wait');
-    if (!this.root.classList.contains('awake')) this.build.textContent = `${this.build.textContent} · you set off once it is done`;
+    if (!this.root.classList.contains('awake')) this.build.textContent = `${this.build.textContent} · ${this.afterBuild}`;
   }
 
   get leaving(): boolean { return this.leavingNow; }
