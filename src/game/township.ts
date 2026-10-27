@@ -14,6 +14,7 @@ import { ordersOf } from '../vgm/orders';
 import { heldBy, takenFrom } from '../vgm/events';
 import type { Decision, DecisionLog, RetreatDecision } from '../world/decisions';
 import { restingAt } from '../vgm/answers';
+import { strayAt } from '../vgm/situations';
 import type { Town } from '../world/town';
 import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
 import type { Standing } from './standing';
@@ -111,6 +112,7 @@ export class Township {
       const log = this.c.log();
       if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); }
       this.rest(this.lifeOf);
+      this.chase(this.lifeOf);
       return this.lifeOf;
     }
     const life = new TownLife(this.town.plan, this.seed, this.c.hours(), this.c.setting.routines, this.residents);
@@ -126,7 +128,41 @@ export class Township {
       life.station(a, x, z, Math.atan2(this.town.decision.z - z, this.town.decision.x - x));
     }
     this.rest(life);
-    return (this.lifeOf = life);
+    this.lifeOf = life;
+    this.chase(life);
+    return life;
+  }
+
+  /** The stray let out (C10), and whether it was caught; the clock (a game minute's step) it was looked at. */
+  private strayed: string | null = null;
+  private caught: string | null = null;
+  private chaseKey = -1;
+
+  /**
+   * A beast out of its paddock (C10, vgm/situations.ts strayBeastFor): it wanders off, and someone of its
+   * farm goes after it; once they have it, it goes back in through the gate and they go on with their day.
+   */
+  private chase(life: TownLife): void {
+    const hours = this.c.hours(), key = Math.floor(hours * 60);
+    if (key === this.chaseKey) return;
+    this.chaseKey = key;
+    const herds = this.herds, d = strayAt(this.c.log(), this.id, hours);
+    if (!herds) return;
+    const now = d && d.id !== this.caught ? d.id : null;
+    if (now !== this.strayed) {
+      const was = this.strayed ? this.c.log().find((x) => x.id === this.strayed) : undefined;
+      if (was?.kind === 'stray') herds.loose(was.paddock, null);
+      if (d && now) herds.loose(d.paddock, { x: d.x, z: d.z });
+      this.strayed = now;
+    }
+    const beast = now ? herds.straying : null;
+    if (!d || !beast) return;
+    const pd = this.town.plan.paddocks[d.paddock], house = pd ? this.town.plan.farms[pd.farm]?.house : undefined;
+    const farmer = life.agents.filter((a) => a.person.home === house && a.person.role !== 'child' && !a.held && !a.post)[0];
+    if (!farmer) return;
+    // Caught once it has got where it was going: they have it by the halter.
+    if (Math.hypot(farmer.x - beast.x, farmer.z - beast.z) < 2.2 && Math.hypot(beast.x - d.x, beast.z - d.z) < 6) { this.caught = d.id; return; }
+    life.seek(farmer, beast.x - Math.cos(beast.dir) * 1.2, beast.z - Math.sin(beast.dir) * 1.2, { x: beast.x, z: beast.z }, 8);
   }
 
   /** The traveller resting by the hero's way (C9) now, if any; the log and the clock (a minute's step) it was looked up for. */

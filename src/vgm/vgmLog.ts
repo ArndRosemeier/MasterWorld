@@ -48,6 +48,7 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'journey': return 'journey';
     case 'sight': return d.need === 'reward' ? 'cache' : 'sight';
     case 'traveller': return d.situation ? 'hurt-traveller' : 'traveller';
+    case 'stray': return 'stray-beast';
   }
 }
 
@@ -70,6 +71,7 @@ export function decisionSays(d: Decision): string {
     case 'order': return `${d.order.kind} in ${d.town}`;
     case 'journey': return `the hero takes the cart from ${d.from} to ${d.to}`;
     case 'sight': return `${d.sight} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
+    case 'stray': return `a beast out of its paddock in ${d.town}, wandering to ${Math.round(d.x)}, ${Math.round(d.z)}`;
     case 'traveller': return `the traveller of ${d.town} ${d.situation ? 'hurt' : 'resting'} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
   }
 }

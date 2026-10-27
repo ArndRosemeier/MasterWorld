@@ -190,11 +190,15 @@ export function shaded(coat: Record<string, unknown>, k: number, hue = 1): Recor
   return out;
 }
 
-/** A frame of an animal: where it stands, facing `yaw` (−z turned), what it does, how fast it goes. */
-export function poseAnimal(b: AnimalBody, x: number, y: number, z: number, yaw: number, doing: AnimalDoing, speed: number, dt: number): void {
+/**
+ * A frame of an animal: where it stands, facing `yaw` (−z turned), what it does, how fast it goes; `again`: a
+ * one-shot (a second flinch) starts over though it is already playing.
+ */
+export function poseAnimal(b: AnimalBody, x: number, y: number, z: number, yaw: number, doing: AnimalDoing, speed: number, dt: number, again = false): void {
   b.place.position.set(x, y, z);
   // The den's yaw turns −z; the animals face +z.
-  b.place.rotation.y = yaw + Math.PI;
+  b.place.rotation.set(0, yaw + Math.PI, 0);
+  if (again && ONCE.includes(doing)) b.doing = '';
   if (b.lib) { poseLibrary(b, b.lib, doing, speed, dt); return; }
   const actor = b.actor!;
   // (A doing without a clip of its own, a wolf's flinch, keeps the clip playing.)
@@ -216,7 +220,9 @@ function poseLibrary(b: AnimalBody, lib: LibraryAnimal, doing: AnimalDoing, spee
   const name = doing !== b.doing ? libraryClip(lib, b.def.library!, doing) : undefined;
   if (name) {
     b.doing = doing;
-    lib.play(name, { fade: !lib.currentAction ? 0 : doing === 'dead' ? 0.1 : 0.25, loop: !ONCE.includes(doing) });
+    const a = lib.play(name, { fade: !lib.currentAction ? 0 : doing === 'dead' ? 0.1 : 0.25, loop: !ONCE.includes(doing) });
+    // The same one-shot again (already running, so not restarted by play): from its start.
+    if (a && ONCE.includes(doing)) a.time = 0;
   }
   // The gait at its own pace when the ground speed is the clip's (its scale counted), within half to 1.6 times.
   const a = lib.currentAction;

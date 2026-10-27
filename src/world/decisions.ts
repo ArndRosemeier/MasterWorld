@@ -313,7 +313,25 @@ export interface TravellerDecision {
   readonly situation?: string;
 }
 
-export type Decision = TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/**
+ * A situation (C10): one of a town's beasts got out of its paddock (`paddock`, its id in the town's plan) and
+ * wanders to (x, z); someone of its farm goes after it. From game hour `at` until `until` at most.
+ */
+export interface StrayDecision {
+  readonly kind: 'stray';
+  readonly id: string;
+  readonly town: string;
+  readonly paddock: number;
+  readonly x: number;
+  readonly z: number;
+  readonly seed: number;
+  readonly at: number;
+  readonly until: number;
+  /** The setting's situation. */
+  readonly situation: string;
+}
+
+export type Decision = StrayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

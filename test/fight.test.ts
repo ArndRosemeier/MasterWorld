@@ -245,3 +245,14 @@ test('fight: the target plate reads all who fight the hero at once, not the one 
   const all = [one, ...rest].reduce((a, o) => a + o.def.danger, 0);
   assert.deepEqual(d.fight.threat(one), { threat: threatOf(all, d.fight.hero.power), together: rest.length > 0 });
 });
+
+test('fight: a blow that hurts is counted for its jolt; bleeding and a blow for nothing are not', () => {
+  const c = cellars.find((x) => x.dweller.id === 'goblins') ?? cellars[0];
+  const d = new Delve(c, openSpace(c), classic, new Character(classic), 4);
+  const who = d.den.creatures[0];
+  const from = { x: who.x + 1, y: who.y, z: who.z };
+  d.den.wound(who, { outcome: 'hit', damage: 1 }, from);
+  d.den.wound(who, { outcome: 'miss', damage: 0 }, from);
+  d.den.wound(who, { outcome: 'hit', damage: 1 }, from, 0, false);
+  assert.equal(who.blows, 1);
+});
