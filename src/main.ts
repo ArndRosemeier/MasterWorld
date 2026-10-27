@@ -98,6 +98,9 @@ import { writeSlot } from './persist/saves';
 import { acquaintances } from './game/background';
 import { Director } from './vgm/director';
 import { FightHud } from './app/fightHud';
+import { ActionBarUi } from './app/actionBarUi';
+import { AbilityBook } from './app/abilityBook';
+import { POTION } from './game/actionBar';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
@@ -875,6 +878,34 @@ export async function start(b: Boot): Promise<void> {
       changed: armHero,
       drank: (n) => { if (n > 0) fightHud.healed(); },
     });
+    // The action bar (plan 17.1): always there in play, its keys 1 to 0; the ability book (K) arranges it.
+    const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
+    const leading = () => encounters().find((e) => e.leading) ?? null;
+    const potions = () => character.pack.filter((i) => setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
+    const actionBar = new ActionBarUi(character, setting, {
+      get bindings() { return settings.current.bindings; },
+      get blocked() { return open > 0; },
+      use: (id) => {
+        const e = leading();
+        let said: string | null;
+        if (e) said = e.use(id);
+        else if (id === POTION) {
+          const r = character.remedy;
+          said = r ? null : 'You have nothing to drink.';
+          if (r && character.consume(r) > 0) fightHud.healed();
+        } else said = 'There is nothing here to fight.';
+        if (said) notes.say(said, 2.5);
+      },
+      state: (id) => {
+        const f = leading()?.fighting ?? null;
+        if (id === POTION) { const n = potions(); return { left: 0, total: 0, dim: n === 0, on: false, count: n }; }
+        const a = setting.abilities.find((x) => x.id === id);
+        if (!a || !f) return { left: 0, total: 0, dim: true, on: false };
+        return { left: f.cooling(id), total: a.cooldown, dim: character.stamina < a.stamina, on: id === 'strike' && f.attacking };
+      },
+      arranged: () => { book.redraw(); },
+    });
+    const book = new AbilityBook(character, setting, actionBar, { paused, get bindings() { return settings.current.bindings; } });
     // How exactly the hero knows where they are (plan 11.7): the map shows it, travel and reading it train it.
     const orientation = new Orientation(seed, character, home);
     // Where the hero believes they are, facing `yaw` (down in a cellar: at its house; in a barrow: at its forecourt).
@@ -1147,7 +1178,7 @@ export async function start(b: Boot): Promise<void> {
     const direct = (dt: number): void => {
       const below = !!visit();
       let fighting = 0, pressure = 0;
-      for (const e of [...(cellars?.encounters ?? []), ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])]) { const p = e.pressure; fighting += p.fighting; pressure += p.pressure; }
+      for (const e of encounters()) { const p = e.pressure; fighting += p.fighting; pressure += p.pressure; }
       director.observe(dt, { fighting, pressure, health: character.health / character.maxHealth, talking: open > 0, underground: below, inTown: !!here() && !below, leads: journal.open.length });
       const m = director.next();
       if (m) notes.say(m, 6);
@@ -1197,7 +1228,7 @@ export async function start(b: Boot): Promise<void> {
           const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
           if (opened) regionOpened(opened);
         }
-        stepEncounters(dt, [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])], { hero: character, player, hud: fightHud });
+        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }
       if (!visit()) rooms?.update(dt);
@@ -1214,6 +1245,9 @@ export async function start(b: Boot): Promise<void> {
       }
       direct(dt);
       notes.update(dt);
+      actionBar.inPlay = playing && !ended && !title?.holding && !creator?.showing;
+      actionBar.dark = !character.alive;
+      actionBar.readSlots();
       // The floating origin steps once the camera strays from it, before anything writes origin-relative data.
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
       view.sky.underwater = sea.submerged(view.camera.position);

@@ -588,6 +588,12 @@ export interface AbilityDef {
   /** What else it does. */
   readonly effect?: 'stagger' | 'heal';
   readonly text: string;
+  /** Its glyph on the action bar and in the ability book. */
+  readonly icon?: string;
+  /**
+   * Not known at the start: a teacher opens it (D49), or the debug menu does. Absent: every hero knows it.
+   */
+  readonly taught?: boolean;
 }
 
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */

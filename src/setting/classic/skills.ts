@@ -20,10 +20,10 @@ export const skills: readonly SkillDef[] = [
 ];
 
 export const abilities: readonly AbilityDef[] = [
-  { id: 'strike', name: 'Strike', stamina: 0, cooldown: 0, power: 1, aim: 0, text: 'Attack your target with what you hold, again and again until you stop.' },
-  { id: 'heavy', name: 'Heavy blow', stamina: 25, cooldown: 8, power: 1.9, aim: -0.08, text: 'Put your weight behind one blow: nearly twice the damage, a little harder to land.' },
-  { id: 'shove', name: 'Shove', stamina: 15, cooldown: 10, power: 0.3, aim: 0.15, effect: 'stagger', text: 'Shove your foe off balance; for a moment it cannot strike back.' },
-  { id: 'breath', name: 'Second wind', stamina: 0, cooldown: 90, power: 0, aim: 0, effect: 'heal', text: 'Catch your breath: win back a fifth of your health. Once a minute and a half.' },
+  { id: 'strike', icon: '⚔', name: 'Strike', stamina: 0, cooldown: 0, power: 1, aim: 0, text: 'Attack your target with what you hold, again and again until you stop.' },
+  { id: 'heavy', icon: '⚒', name: 'Heavy blow', stamina: 25, cooldown: 8, power: 1.9, aim: -0.08, text: 'Put your weight behind one blow: nearly twice the damage, a little harder to land.' },
+  { id: 'shove', icon: '✋', name: 'Shove', stamina: 15, cooldown: 10, power: 0.3, aim: 0.15, effect: 'stagger', text: 'Shove your foe off balance; for a moment it cannot strike back.' },
+  { id: 'breath', icon: '❂', name: 'Second wind', stamina: 0, cooldown: 90, power: 0, aim: 0, effect: 'heal', text: 'Catch your breath: win back a fifth of your health. Once a minute and a half.' },
 ];
 
 export const director: DirectorDef = {
