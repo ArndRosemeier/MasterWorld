@@ -3,7 +3,7 @@
  * building (and each fence and haystack of its farmland), and those of one square cell are merged into
  * one mesh near and one far (fewer draws).
  */
-import { buildingMesh, propMesh, type BuildingMesh, type TownBuilding, type TownProp } from '@futuremagic/settlement';
+import { buildingMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
 import type { Town } from './town';
 
 /** Side of a merge cell, metres. */
@@ -72,4 +72,16 @@ export function mergeMeshes(parts: readonly BuildingMesh[]): BuildingMesh {
     v += p.position.length / 3; k += p.index.length;
   }
   return out;
+}
+
+/** A building drawn open (D38): its rooms' plan, and its outside with the door open and every storey inside, as one mesh. */
+export interface OpenHouse { readonly plan: InteriorPlan; readonly mesh: BuildingMesh }
+
+/**
+ * `b` planned inside and drawn open round its middle (`hatch`: a cellar's trapdoor; `hall`: a guild's hall; `sign`:
+ * the shield over its door). Tens of milliseconds for a big house: a terrain worker does it (floor F2).
+ */
+export function openHouse(b: TownBuilding, opts: { readonly hatch: boolean; readonly hall: boolean }, sign?: [number, number, number]): OpenHouse {
+  const plan = planInterior(b, opts), at: [number, number, number] = [b.cx, 0, b.cz];
+  return { plan, mesh: mergeMeshes([buildingMesh(b, at, true, { open: true, sign }), interiorMesh(plan, b, at)]) };
 }

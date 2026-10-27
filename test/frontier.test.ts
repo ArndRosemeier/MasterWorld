@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FRONTIER, nextRegion, regionDecisions, regionLine, regionMapOf, settlementsOf } from '../src/vgm/frontier';
+import { FRONTIER, nextRegion, regionDecisions, regionLine, regionMapOf, settlementsOf, wantsRegion } from '../src/vgm/frontier';
 import { keyId, sizeOf } from '../src/world/regions';
 import { settlementOf, type Decision } from '../src/world/decisions';
 import { layOutSite } from '../src/world/sites';
@@ -48,8 +48,10 @@ test('frontier: regions never overlap, and places stand on dry, gentle land insi
 
 test('frontier: standing still opens nothing more; waystations, hamlets and villages count as settlements', () => {
   let log: Decision[] = [...first];
+  // The cheap check (asked each time before a worker looks for a place) agrees with nextRegion.
   for (let i = 0; i < 40; i++) {
     const d = nextRegion({ seed, log, terrain, regions, home, hero: home, heading: null, hours: 0 });
+    assert.equal(wantsRegion(log, regionMapOf(log, regions.country), home, null), !!d);
     if (!d) break;
     log = [...log, d];
   }

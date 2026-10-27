@@ -458,7 +458,7 @@ export async function start(b: Boot): Promise<void> {
     };
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {
-      regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights }, log);
+      regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights, jobs: { frontier: (a) => jobs.frontier(a), site: (j) => terrainJobs.site(j) } }, log);
       for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
       // `site=<place>`: walk out from the start until one opens, then stand before it.
       const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
@@ -729,7 +729,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     // Every door of every town opens on its room; a cellar's house has the hatch down.
-    rooms = new InteriorVisit(towns, cellars.down, new HouseView(view.stage), player, view.lantern, view.sky, notes);
+    rooms = new InteriorVisit(towns, cellars.down, new HouseView(view.stage), player, view.lantern, view.sky, notes, (b, hatch, hall, sign) => terrainJobs.house(b, hatch, hall, sign));
     // `room=<kind|number|cellar>`: in that building of the town the hero is in (the cellar: the first promise's house).
     const roomTown = params.room === 'cellar' && firstPromise ? towns.get(firstPromise.town) : towns.townAt(player.walker.pos.x, player.walker.pos.z) ?? startTown;
     if (roomTown && params.room !== null) {

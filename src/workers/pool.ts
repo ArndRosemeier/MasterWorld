@@ -120,6 +120,16 @@ export class TerrainJobs {
     return this.job({ kind: 'holdRock', site, rock });
   }
 
+  /** A region's place or a sight laid out on the land (world/sites.ts). */
+  site(site: import('../world/sites').SiteJob): Promise<import('../world/sites').SiteLayout | null> {
+    return this.job({ kind: 'site', site });
+  }
+
+  /** A building planned inside and drawn open (world/townMesh.ts openHouse). */
+  house(b: import('@futuremagic/settlement').TownBuilding, hatch: boolean, hall: boolean, sign?: [number, number, number]): Promise<import('../world/townMesh').OpenHouse> {
+    return this.job({ kind: 'house', b, hatch, hall, sign });
+  }
+
   /** The ground masks of the town of this id (world/townMask.ts), `w` × `h` texels each. */
   townMask(id: string, w: number, h: number): Promise<Uint8Array> {
     return this.job({ kind: 'townMask', id, w, h });
@@ -134,6 +144,10 @@ export class TerrainJobs {
 /** The world worker's jobs for one world (seed and setting): masks and plant positions around the camera. */
 export class WorldJobs {
   constructor(private readonly pool: WorldPool, readonly seed: number, readonly setting: string) {}
+
+  private job<T>(job: DistributiveOmit<import('./world.worker').WorldJob, 'seed' | 'setting'>): Promise<T> {
+    return this.pool.run({ ...job, seed: this.seed, setting: this.setting } as import('./world.worker').WorldJob) as Promise<T>;
+  }
 
   /** A water (`mask`) or grass mask over a square: `res` samples a side. */
   mask(kind: 'mask' | 'grass', x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
@@ -165,7 +179,12 @@ export class WorldJobs {
    * hundred milliseconds. `roads`: the roads already decided (the worker's land has them laid).
    */
   linkRoad(roads: readonly import('../world/decisions').RoadDecision[], place: import('../vgm/roads').Place, way: import('../world/decisions').RoadWay, at?: number): Promise<import('../world/decisions').RoadDecision | null> {
-    return this.pool.run({ kind: 'link', seed: this.seed, setting: this.setting, roads, place, way, at }) as Promise<import('../world/decisions').RoadDecision | null>;
+    return this.job({ kind: 'link', roads, place, way, at });
+  }
+
+  /** The next region the frontier opens (vgm/frontier.ts nextRegion), looked for in the world worker. */
+  frontier(ask: import('../vgm/frontier').FrontierAsk): Promise<import('../world/decisions').RegionDecision | null> {
+    return this.job({ kind: 'frontier', ask });
   }
 }
 

@@ -64,6 +64,14 @@ export interface FrontierContext {
   readonly map?: RegionMap<RegionData>;
 }
 
+/** What a worker needs to look for the next region (it has the land, the setting and the seed). */
+export type FrontierAsk = Omit<FrontierContext, 'seed' | 'terrain' | 'regions' | 'map'>;
+
+/** Does the land round the hero want a region opened now (nextRegion would answer one)? Cheap: no place is looked for. */
+export function wantsRegion(log: DecisionLog, map: RegionMap<RegionData>, hero: { x: number; z: number }, heading?: { x: number; z: number } | null): boolean {
+  return !regionDecisions(log).length || wantedPoints(hero, heading).some((p) => !map.at(p.x, p.z));
+}
+
 /** The points that should lie in open regions, most wanted first: under the hero, close round, then ahead. */
 export function wantedPoints(hero: { x: number; z: number }, heading?: { x: number; z: number } | null): { x: number; z: number }[] {
   const out = [{ x: hero.x, z: hero.z }];
