@@ -39,9 +39,9 @@ export const SIGHT_R = 6;
 /** The glade round a sight (m from its middle): no tree stands there, so it is seen from a way off. */
 export const SIGHT_CLEARING = 20;
 
-/** A sight by the way (C9), laid out on the land from its decision: a ring of standing stones, a waystone, a cairn. */
+/** A sight by the way (C9), laid out on the land from its decision: a ring of standing stones, a waystone, a cairn, a stash. */
 export function layOutSight(d: SightDecision, shape: SightShape, height: (x: number, z: number) => number): SiteLayout {
-  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : cairn);
+  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : shape === 'stash' ? stash : cairn);
 }
 
 /** A place's pieces drawn round its middle (`draw`), seeded from it, on the land's heights. */
@@ -73,8 +73,8 @@ interface At {
   readonly seed: number;
 }
 
-/** A point `d` metres from the middle at angle `a` (radians, atan2(z, x)). */
-const round = (at: At, a: number, d: number): [number, number] => [at.x + Math.cos(a) * d, at.z + Math.sin(a) * d];
+/** A point `d` metres from `at` at angle `a` (radians, atan2(z, x)). */
+export const onCircle = (at: { readonly x: number; readonly z: number }, a: number, d: number): [number, number] => [at.x + Math.cos(a) * d, at.z + Math.sin(a) * d];
 
 /** Triangles of `m` into the kit, turned by `yaw` about +y, scaled, and moved to (x, y, z). */
 function appendAt(k: MeshKit, m: BuildingMesh, x: number, y: number, z: number, yaw = 0, scale = 1): void {
@@ -119,15 +119,15 @@ function camp(at: At, k: MeshKit, solids: Solid[]): void {
   solids.push({ x: at.x, z: at.z, r: 0.9 });
   // Logs to sit on, between the tents.
   for (let i = 0; i < n; i++) {
-    const a = ((i + 0.5) / n) * Math.PI * 2 + at.yaw, [lx, lz] = round(at, a, 2);
+    const a = ((i + 0.5) / n) * Math.PI * 2 + at.yaw, [lx, lz] = onCircle(at, a, 2);
     k.box(lx - at.x, at.height(lx, lz) - at.y0 - 0.08, lz - at.z, 1.6, 0.36, 0.36, -a + Math.PI / 2, BuildingMat.Oak, varyTint(r, [128, 100, 76], 0.1));
   }
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + at.yaw + r.range(-0.2, 0.2), [tx, tz] = round(at, a, r.range(4.8, 5.8));
+    const a = (i / n) * Math.PI * 2 + at.yaw + r.range(-0.2, 0.2), [tx, tz] = onCircle(at, a, r.range(4.8, 5.8));
     tent(at, k, tx, tz, a, r.range(2.4, 3), r.range(1.9, 2.3), r.range(1.4, 1.7));
     solids.push({ x: tx, z: tz, r: 1.5 });
   }
-  const [wx, wz] = round(at, at.yaw + Math.PI + 0.6, 7.5);
+  const [wx, wz] = onCircle(at, at.yaw + Math.PI + 0.6, 7.5);
   stack(at, k, wx, wz, at.yaw);
 }
 
@@ -196,7 +196,7 @@ function ruin(at: At, k: MeshKit, solids: Solid[]): void {
   solids.push({ x: tx, z: tz, r: 1.7 });
   // Blocks fallen from the walls, half in the grass.
   for (let i = 0; i < 14; i++) {
-    const a = r.range(0, Math.PI * 2), d = r.range(2, at.r - 2), [x, z] = round(at, a, d);
+    const a = r.range(0, Math.PI * 2), d = r.range(2, at.r - 2), [x, z] = onCircle(at, a, d);
     const sz = r.range(0.4, 0.9);
     k.stone(x - at.x, at.height(x, z) - at.y0 - sz * 0.35, z - at.z, sz * 1.4, sz, sz, r.range(0, 3), BuildingMat.Ashlar, varyTint(r, MOSS, 0.1), r, 0.08, 0.3);
   }
@@ -207,7 +207,7 @@ function barrows(at: At, k: MeshKit, solids: Solid[]): void {
   const r = at.rng, n = r.int(3, 5), placed: { x: number; z: number; R: number }[] = [];
   for (let i = 0; i < n * 6 && placed.length < n; i++) {
     const scale = r.range(0.7, 1.15), R = MOUND.r * scale;
-    const [x, z] = placed.length ? round(at, r.range(0, Math.PI * 2), r.range(R + 2, at.r - R)) : [at.x, at.z];
+    const [x, z] = placed.length ? onCircle(at, r.range(0, Math.PI * 2), r.range(R + 2, at.r - R)) : [at.x, at.z];
     if (placed.some((p) => Math.hypot(p.x - x, p.z - z) < p.R + R + 3)) continue;
     placed.push({ x, z, R });
     appendAt(k, sealedBarrowMesh(deriveSeed(at.seed, 'mound', i)), x - at.x, at.height(x, z) - at.y0 - 0.05, z - at.z, r.range(0, Math.PI * 2), scale);
@@ -221,7 +221,7 @@ const OLD_STONE: Tint = [150, 150, 140];
 function stoneRing(at: At, k: MeshKit, solids: Solid[]): void {
   const r = at.rng, n = r.int(7, 9), R = r.range(3.6, 4.6), fallen = r.int(0, n - 1);
   for (let i = 0; i < n; i++) {
-    const a = at.yaw + (i / n) * Math.PI * 2 + r.range(-0.08, 0.08), [x, z] = round(at, a, R);
+    const a = at.yaw + (i / n) * Math.PI * 2 + r.range(-0.08, 0.08), [x, z] = onCircle(at, a, R);
     const y = at.height(x, z) - at.y0, tint = varyTint(r, r.chance(0.4) ? MOSS : OLD_STONE, 0.08);
     if (i === fallen) { k.stone(x - at.x, y - 0.2, z - at.z, 0.7, 0.5, r.range(2, 2.6), -a, WildMat.Rock, tint, r, 0.08, 0.35); continue; }
     k.stone(x - at.x, y - 0.3, z - at.z, r.range(0.6, 0.9), r.range(1.8, 2.8), r.range(0.35, 0.5), -a + Math.PI / 2, WildMat.Rock, tint, r, 0.08, 0.25);
@@ -249,4 +249,16 @@ function cairn(at: At, k: MeshKit, solids: Solid[]): void {
     }
   }
   solids.push({ x: at.x, z: at.z, r: 1.3 });
+}
+
+/** A stash: a flat stone leant against a boulder, a bundle in oilcloth showing under it. */
+function stash(at: At, k: MeshKit, solids: Solid[]): void {
+  const r = at.rng, y = at.height(at.x, at.z) - at.y0;
+  k.stone(0, y - 0.4, 0, 1.8, 1.4, 1.5, at.yaw, WildMat.Rock, varyTint(r, MOSS, 0.1), r, 0.1, 0.55);
+  // In front of the boulder (towards the way the hero comes from): the slab, and the bundle under it.
+  const front = Math.PI / 2 - at.yaw, [sx, sz] = onCircle(at, front, 1.1), [bx, bz] = onCircle(at, front, 1.4);
+  const fx = sx - at.x, fz = sz - at.z;
+  k.box(bx - at.x, y + 0.05, bz - at.z, 0.55, 0.3, 0.4, at.yaw, CellarMat.Limewash, [92, 84, 62]);
+  k.stone(fx, y - 0.05, fz, 1.2, 0.18, 0.9, at.yaw + 0.3, WildMat.Rock, varyTint(r, ROCK, 0.08), r, 0.04, 0.2);
+  solids.push({ x: at.x, z: at.z, r: 1.1 });
 }

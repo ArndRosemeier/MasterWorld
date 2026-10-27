@@ -9,7 +9,7 @@
 import type { Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { RegionsDef, SightDef } from '../setting/contract';
-import { settlementOf, type DecisionLog, type RegionDecision } from '../world/decisions';
+import { settlementOf, type DecisionLog, type RegionDecision, type SightDecision } from '../world/decisions';
 import { SIGHT_R, hitsSolid, layOutSight, layOutSite, type SiteLayout } from '../world/sites';
 import { sightsOf } from '../vgm/answers';
 import type { RegionMap } from '../world/regions';
@@ -30,8 +30,9 @@ interface Site {
   readonly make: () => SiteLayout | null;
   layout: SiteLayout | null;
   mesh: Mesh | null;
-  /** A sight's words, until the hero has come upon it (null: said, or a region's place). */
+  /** A sight's words, until the hero has come upon it (null: said, or a region's place), and its decision. */
   sight: SightDef | null;
+  readonly decision?: SightDecision;
   /** The hero has stood by it (Discovery is met the first time). */
   found: boolean;
 }
@@ -88,7 +89,7 @@ export class RegionSites {
       const def = this.host.sights?.find((x) => x.id === d.sight);
       if (!def) continue;
       // A loaded game's sights were come upon before.
-      this.sites.push({ at: { x: d.x, z: d.z, r: SIGHT_R }, label: `${d.sight} ${d.id}`, make: () => layOutSight(d, def.shape, this.heightAt), layout: null, mesh: null, sight: this.synced ? def : null, found: !this.synced });
+      this.sites.push({ at: { x: d.x, z: d.z, r: SIGHT_R }, label: `${d.sight} ${d.id}`, make: () => layOutSight(d, def.shape, this.heightAt), layout: null, mesh: null, sight: this.synced ? def : null, decision: d, found: !this.synced });
     }
     this.sightsSeen = sights.length;
     this.synced = true;
@@ -99,15 +100,15 @@ export class RegionSites {
 
   /**
    * The place the hero at (x, z) has just come upon for the first time (Discovery, C9): a sight with its
-   * words, or a region's place (`sight` null); null if none.
+   * words and decision, or a region's place (`sight` null); null if none.
    */
-  cameUpon(x: number, z: number): { readonly sight: SightDef | null } | null {
+  cameUpon(x: number, z: number): { readonly sight: SightDef | null; readonly decision?: SightDecision } | null {
     for (const s of this.sites) {
       if (s.found || Math.hypot(s.at.x - x, s.at.z - z) > s.at.r + CAME_UPON) continue;
       s.found = true;
       const sight = s.sight;
       s.sight = null;
-      return { sight };
+      return { sight, decision: s.decision };
     }
     return null;
   }

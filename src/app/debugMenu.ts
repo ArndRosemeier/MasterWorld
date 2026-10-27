@@ -41,6 +41,8 @@ export interface DebugHost {
   storyEvent(id?: string): string;
   /** The VGM's answer to a need here and now (C9), whatever the Director says: what it made, or why nothing. */
   answerNeed(need: 'discovery' | 'challenge' | 'reward' | 'people' | 'purpose'): string;
+  /** A situation of this kind now (C10), whatever the hour: what was made, or why not. */
+  situation(kind: 'hurt-traveller' | 'paddock-wolves' | 'stray-beast'): string;
   /** The VGM's log (D53, C8): its moves, oldest first (the tool, the need, why). */
   vgmLog(): readonly VgmLine[];
   /** The world's seed (a fresh one each start unless `?seed=` names it). */
@@ -122,6 +124,12 @@ export class DebugMenu {
         { label: 'Its last 30 moves', run: () => this.lines(h.vgmLog().slice(-30)) },
         { label: 'Every move', run: () => this.lines(h.vgmLog()) },
         { label: 'Answer Discovery now (a sight)', run: () => h.answerNeed('discovery') },
+        { label: 'Answer Reward now (a find)', run: () => h.answerNeed('reward') },
+        { label: 'Answer Challenge now (an ambush)', run: () => h.answerNeed('challenge') },
+        { label: 'Answer People now (a traveller)', run: () => h.answerNeed('people') },
+        { label: 'Situation now: a hurt traveller', run: () => h.situation('hurt-traveller') },
+        { label: 'Situation now: wolves at the paddock (in a town)', run: () => h.situation('paddock-wolves') },
+        { label: 'Situation now: a beast got out (in a town)', run: () => h.situation('stray-beast') },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },

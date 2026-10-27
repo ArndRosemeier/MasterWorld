@@ -81,6 +81,15 @@ export class WildLand {
     this.groups.push({ territory: t, awake: false, built: null, encounter: null, delve: null });
   }
 
+  /** An event's band moves on (its event ran its course unseen, vgm/events.ts fadedFor): it is gone from the land. */
+  moveOn(id: string): void {
+    const i = this.groups.findIndex((x) => x.territory.id === id);
+    if (i < 0) return;
+    const [g] = this.groups.splice(i, 1);
+    g.awake = false;
+    this.territories.splice(this.territories.indexOf(g.territory), 1);
+  }
+
   /** Every frame, where the hero is: groups coming near are built, near ones wake, far ones rest. */
   near(x: number, z: number): void {
     const light = this.host.light();

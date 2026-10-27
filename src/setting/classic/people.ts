@@ -50,6 +50,7 @@ export const talk: TalkDef = {
   cellar: 'the cellar under {house}',
   troubled: 'something is wrong in {subject}',
   ownHouse: 'our own house',
+  happened: { saw: 'my own eyes, I was there', heard: 'the whole town, everyone is talking of it' },
   ownCellar: 'our cellar',
   lead: 'Something is wrong in {cellar}.',
   marked: '{name} marks {house} on your map.',

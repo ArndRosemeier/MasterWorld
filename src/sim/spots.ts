@@ -12,7 +12,9 @@ export type ActivityKind =
   | 'fetchWater' | 'fetchWood' | 'chop' | 'garden' | 'washing' | 'feedHens'
   | 'browse' | 'sit' | 'chat' | 'drink' | 'pray' | 'mourn' | 'play' | 'stroll' | 'gather'
   /** Farm work: in the fields by what grows there, with the animals in the paddock, hay and dung in the stable. */
-  | 'plough' | 'sow' | 'hoe' | 'reap' | 'tendStock' | 'muckOut';
+  | 'plough' | 'sow' | 'hoe' | 'reap' | 'tendStock' | 'muckOut'
+  /** Hurt, sitting on the ground (a situation, C10). */
+  | 'hurt';
 
 /** Who may use a spot: its building's workers, its household, the market's traders, or anyone. */
 export type SpotUse = 'work' | 'home' | 'trade' | 'any';

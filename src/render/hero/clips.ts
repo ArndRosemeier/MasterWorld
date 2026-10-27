@@ -5,8 +5,12 @@
 export const HERO_CLIPS = [
   'idle', 'walk', 'jog', 'sprint', 'swim', 'tread water', 'jump', 'crouch', 'fight stance', 'sword idle',
   'sword slash A', 'sword slash B', 'sword slash C', 'punch jab', 'punch cross', 'shield bash', 'hit to chest', 'eat or drink', 'death',
-  'spell ready', 'throw',
+  'sit down', 'sit', 'stand up', 'spell ready', 'throw',
 ];
+
+/** How long sitting down and standing up again take (s): the clips' own lengths (40 and 32 frames at 30 fps). */
+export const SIT_DOWN = 40 / 30;
+export const STAND_UP = 32 / 30;
 
 /** The clip for each one-shot action (the fight's ids); anyone drawn as an Actors person plays these. */
 export const ACTION_CLIPS: Readonly<Record<string, string>> = {

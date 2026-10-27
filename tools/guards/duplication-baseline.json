@@ -180,10 +180,6 @@
     "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
   },
   {
-    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/smallLife.ts#step",
-    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
-  },
-  {
     "key": "clone: masterworld/world/dungeon/barrowMesh.ts#barrowMesh + masterworld/world/holdMesh.ts#holdMesh",
     "reason": "Both are the MeshKit's usual opening (a kit and a seeded Rng, a few part builders, k.mesh()); the parts they build share nothing."
   },
@@ -304,10 +300,6 @@
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   },
   {
-    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/townLife.ts#step",
-    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
-  },
-  {
     "key": "same name: masterworld/game/fight.ts#heal + masterworld/game/recipe.ts#heal",
     "reason": "Fight (in a fight) and Alone (out of one) are the two worlds a spell plays in; both implement the RecipeWorld interface (game/recipe.ts), so they share its method names; the shared part (mendCaster) is one helper."
   },
@@ -334,46 +326,6 @@
   {
     "key": "clone: masterworld/app/spellFx/particles.ts#hold + masterworld/app/spellFx/particles.ts#holdSolid",
     "reason": "One pushes a sprite record, the other a solid record (shape, stuff, way, roll); the records differ, only the push-one-record shape matches."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/building.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (x.mul(a).add(b)) in shaders is the language of node materials, not a copied helper; spells (C4) added a sixth material that scales and offsets values."
   },
   {
     "key": "same name: masterworld/app/spellFx/looks.ts#area + masterworld/game/recipe.ts#area",
@@ -434,5 +386,13 @@
   {
     "key": "clone: masterworld/app/spellFx/looks.ts#zoneStart",
     "reason": "Fire's and light's zone start are one streak each (a scorch, a circle of light) with their own picture and colours; the one-call shape is all they share."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/looks.ts#hit + masterworld/render/jolt.ts#hit",
+    "reason": "Only the name matches: the spell drawing's own hit (app/spellFx) and an unrelated system's."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/particles.ts#step + masterworld/sim/livestock.ts#step",
+    "reason": "Only the name matches: the spell drawing's own step (app/spellFx) and an unrelated system's."
   }
 ]

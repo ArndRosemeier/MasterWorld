@@ -60,6 +60,8 @@ export class Character {
   stamina: number;
   /** For spells (plan 10); none until a school of magic is opened. */
   mana: number;
+  /** Sitting down to rest (game/rest.ts): health, mana and stamina come back faster. Not saved. */
+  resting = false;
   readonly worn: Partial<Record<Slot | 'ring2', Item>> = {};
   readonly pack: Item[] = [];
   coins = 0;
@@ -368,11 +370,15 @@ export class Character {
     return heals.sort((a, b) => (defOf(this.cat, a.def).heal ?? 0) - (defOf(this.cat, b.def).heal ?? 0))[0] ?? null;
   }
 
-  /** Breathe: stamina comes back fast; health only out of a fight, and faster when resting (`still` s). */
+  /**
+   * Breathe: stamina comes back fast; health only out of a fight, and faster when standing still (`still` s);
+   * sitting down to rest (`resting`) brings all three back faster still.
+   */
   recover(dt: number, fighting: boolean, still = 0): void {
-    this.stamina = Math.min(this.maxStamina, this.stamina + dt * (fighting ? 4 : 12));
-    this.mana = Math.min(this.maxMana, this.mana + dt * (fighting ? 0.5 : 2));
-    if (!fighting && this.alive) this.health = Math.min(this.maxHealth, this.health + dt * (still > 4 ? 1.2 : 0.3));
+    const sat = this.resting && !fighting;
+    this.stamina = Math.min(this.maxStamina, this.stamina + dt * (fighting ? 4 : sat ? 30 : 12));
+    this.mana = Math.min(this.maxMana, this.mana + dt * (fighting ? 0.5 : sat ? 6 : 2));
+    if (!fighting && this.alive) this.health = Math.min(this.maxHealth, this.health + dt * (sat ? 3.5 : still > 4 ? 1.2 : 0.3));
   }
 
   get carried(): number {

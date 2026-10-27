@@ -61,6 +61,12 @@ export class Journal {
     if (l) l.done = true;
   }
 
+  /** A lead that ran its course without the hero (C11): how it ended, and it is closed. Nothing for one never heard of. */
+  lapse(id: string, note: LeadNote): void {
+    const l = this.leads.find((x) => x.id === id);
+    if (l) { this.quiet(id, note, l.mark); this.fulfil(id); }
+  }
+
   get open(): Lead[] { return this.leads.filter((l) => !l.done); }
 
   /** For the save. */

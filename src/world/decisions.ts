@@ -73,6 +73,8 @@ export interface KeptDecision {
   readonly promise: string;
   /** Game hours since the world began. */
   readonly at: number;
+  /** It ended without the hero (C11: a story event left alone ran its course; the VGM's 'fade' tool). */
+  readonly faded?: true;
 }
 
 /**
@@ -256,6 +258,8 @@ export interface WildDecision {
   readonly seed: number;
   /** Game hours since the world began. */
   readonly at: number;
+  /** A situation it is (C10: the setting's, wolves at a paddock at dusk); none: a group of the wild. */
+  readonly situation?: string;
 }
 
 /**
@@ -282,6 +286,8 @@ export interface SightDecision {
   readonly id: string;
   /** The setting's sight. */
   readonly sight: string;
+  /** The need it answers, if not Discovery (a find by the way answers Reward). */
+  readonly need?: 'reward';
   readonly x: number;
   readonly z: number;
   readonly yaw: number;
@@ -289,7 +295,45 @@ export interface SightDecision {
   readonly at: number;
 }
 
-export type Decision = SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/**
+ * People's answer (C9): a town's traveller (the one who comes and goes, lodging at its inn) met by the
+ * hero's way, resting there facing the way the hero comes from, from game hour `at` until `until`; then on
+ * their way again.
+ */
+export interface TravellerDecision {
+  readonly kind: 'traveller';
+  readonly id: string;
+  /** The town whose traveller it is. */
+  readonly town: string;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  readonly seed: number;
+  readonly at: number;
+  readonly until: number;
+  /** A situation it is (C10: the setting's, a hurt traveller); none: one resting. */
+  readonly situation?: string;
+}
+
+/**
+ * A situation (C10): one of a town's beasts got out of its paddock (`paddock`, its id in the town's plan) and
+ * wanders to (x, z); someone of its farm goes after it. From game hour `at` until `until` at most.
+ */
+export interface StrayDecision {
+  readonly kind: 'stray';
+  readonly id: string;
+  readonly town: string;
+  readonly paddock: number;
+  readonly x: number;
+  readonly z: number;
+  readonly seed: number;
+  readonly at: number;
+  readonly until: number;
+  /** The setting's situation. */
+  readonly situation: string;
+}
+
+export type Decision = StrayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

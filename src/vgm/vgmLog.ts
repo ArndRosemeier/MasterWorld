@@ -41,12 +41,14 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'move-in': return 'promise';
     case 'event': return 'event';
     case 'region': return 'region';
-    case 'wild': return 'wild';
-    case 'kept': return 'keep';
+    case 'wild': return d.group === 'ambush' ? 'ambush' : d.group === 'paddock' ? 'paddock-wolves' : 'wild';
+    case 'kept': return d.faded ? 'fade' : 'keep';
     case 'retake': return 'retake';
     case 'order': return 'order';
     case 'journey': return 'journey';
-    case 'sight': return 'sight';
+    case 'sight': return d.need === 'reward' ? 'cache' : 'sight';
+    case 'traveller': return d.situation ? 'hurt-traveller' : 'traveller';
+    case 'stray': return 'stray-beast';
   }
 }
 
@@ -62,13 +64,15 @@ export function decisionSays(d: Decision): string {
     case 'dungeon': return `a ${d.template} for ${d.town}${d.dwellers ? ` (${d.dwellers})` : ''}`;
     case 'move-in': return `${d.dweller} into ${d.dungeon}`;
     case 'retake': return `${d.dweller} take ${d.dungeon}`;
-    case 'kept': return `${d.promise} kept`;
+    case 'kept': return `${d.promise} ${d.faded ? 'ran its course' : 'kept'}`;
     case 'event': return `${d.event} in ${d.town}`;
     case 'region': return `${d.fill} ${at(d.x, d.z)}${d.site ? '' : ' (open land)'}`;
     case 'wild': return `${d.encounter} round ${d.town} (${d.members.length})`;
     case 'order': return `${d.order.kind} in ${d.town}`;
     case 'journey': return `the hero takes the cart from ${d.from} to ${d.to}`;
     case 'sight': return `${d.sight} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
+    case 'stray': return `a beast out of its paddock in ${d.town}, wandering to ${Math.round(d.x)}, ${Math.round(d.z)}`;
+    case 'traveller': return `the traveller of ${d.town} ${d.situation ? 'hurt' : 'resting'} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
   }
 }
 
