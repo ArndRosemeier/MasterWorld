@@ -3,7 +3,8 @@
  * (sim/wild.ts), each a den on open ground with its bodies and its encounter (app/encounter.ts). A group
  * is built once the hero comes within a few hundred metres (its bodies warm in the Stage's frame slots and
  * show once warm), lives while the hero is near and rests (unstepped, at home) when they are far. Who of
- * them died, was spared or searched goes into the save by territory id.
+ * them died, was spared or searched goes into the save by territory id. Bands a story event put on the land
+ * (vgm/events.ts, C6) are groups too: a lead of their own, which the game hears of once they are beaten.
  */
 import type { PerspectiveCamera, WebGPURenderer } from 'three/webgpu';
 import { deriveSeed } from '@futuremagic/core';
@@ -57,12 +58,24 @@ interface Group {
 }
 
 export class WildLand {
-  readonly territories: readonly Territory[];
+  readonly territories: Territory[];
   private readonly groups: Group[];
+  /** The bands of story events (their territory ids are the events' ids, each a promise). */
+  private readonly events = new Set<string>();
 
-  constructor(private readonly host: WildHost, terrain: Terrain, town: Town, private readonly land: Land, private readonly saved: Readonly<Record<string, DelveSave>> = {}) {
+  /** `bands`: the open story events' bands (vgm/events.ts openBands). */
+  constructor(private readonly host: WildHost, terrain: Terrain, town: Town, private readonly land: Land, private readonly saved: Readonly<Record<string, DelveSave>> = {}, bands: readonly Territory[] = []) {
     this.territories = placeWild(host.seed, terrain, town, host.setting.wild ?? []);
     this.groups = this.territories.map((territory) => ({ territory, awake: false, built: null, encounter: null, delve: null }));
+    for (const b of bands) this.add(b);
+  }
+
+  /** A band a story event put on the land (built as the hero comes near, like the others). */
+  add(t: Territory): void {
+    if (this.events.has(t.id)) return;
+    this.events.add(t.id);
+    this.territories.push(t);
+    this.groups.push({ territory: t, awake: false, built: null, encounter: null, delve: null });
   }
 
   /** Every frame, where the hero is: groups coming near are built, near ones wake, far ones rest. */
@@ -121,7 +134,8 @@ export class WildLand {
       enclosed: false,
       place: `the ${def?.plural ?? 'creatures'} about here`,
       danger: groupDanger(t.members, h.setting.creatures),
-      promise: null,
+      // An event's band is a lead: once it is beaten and the hero moves on, the game takes it in.
+      promise: this.events.has(t.id) ? t.id : null,
       quietLine: null,
     };
     const e = new Encounter(arena, delve, creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight);

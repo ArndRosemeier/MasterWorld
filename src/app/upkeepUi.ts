@@ -10,7 +10,7 @@ import type { Character } from '../game/character';
 import { coinText, type Item } from '../game/items';
 import { takeRoom, wakePlace } from '../game/upkeep';
 import type { Person } from '../sim/people';
-import { fill } from '../talk/folk';
+import { cap, fill } from '../talk/folk';
 import type { Service } from '../talk/townTalk';
 import { RepairUi } from './repairUi';
 import { Sleep } from './sleep';
@@ -53,7 +53,7 @@ export class UpkeepUi {
     if (p.role !== 'trade') return [];
     if (p.trade === 'innkeeper') {
       const price = coinText(up.room);
-      return [{ id: 'room', label: fill(w.roomTopic, { price }), line: this.hero.coins >= up.room ? fill(w.roomGiven, { price: price.charAt(0).toUpperCase() + price.slice(1) }) : fill(w.roomTooDear, { price }) }];
+      return [{ id: 'room', label: fill(w.roomTopic, { price }), line: this.hero.coins >= up.room ? fill(w.roomGiven, { price: cap(price) }) : fill(w.roomTooDear, { price }) }];
     }
     if (p.trade === 'smith') return [{ id: 'repair', label: w.repairTopic, line: w.repairLine }];
     return [];

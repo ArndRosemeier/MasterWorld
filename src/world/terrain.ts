@@ -209,6 +209,11 @@ export class Terrain {
     return out;
   }
 
+  /** How steep the ground is at (x, z), roughly: the larger rise per metre over `d` metres east or south (`h`: its height, when known). */
+  steepness(x: number, z: number, d: number, h = this.height(x, z)): number {
+    return Math.max(Math.abs(this.height(x + d, z) - h), Math.abs(this.height(x, z + d) - h)) / d;
+  }
+
   /** Ground height above the sea surface, metres: the land's own, as the holds shape it. */
   height(x: number, z: number): number {
     let h = this.landHeight(x, z);

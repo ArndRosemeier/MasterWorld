@@ -15,7 +15,7 @@ import { cellarHint, type CellarHint } from '../vgm/hints';
 import { dungeonOf, type Decision, type DecisionLog } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
-import { fill, nameFolk, type Folk } from './folk';
+import { cap, fill, nameFolk, type Folk } from './folk';
 
 /** A promised cellar as the townsfolk know it. */
 export interface TalkCellar {
@@ -69,8 +69,7 @@ const TEMPERAMENTS = ['warm', 'reserved', 'curious', 'dry', 'lively'] as const;
 const pid = (id: number) => `p${id}`;
 /** Lines arrive as sentences; the realizer adds its own capital and full stop (and quotes them mid-sentence). */
 const clause = (s: string) => s.charAt(0).toLowerCase() + s.slice(1).replace(/[.!]\s*$/, '');
-/** The first letter upper case. */
-export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+export { cap };
 
 export class TownTalk {
   private session!: SettingSession;
