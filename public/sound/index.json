@@ -907,6 +907,123 @@
     150.3
    ]
   },
+  "spell/bloom-hit": {
+   "kind": "call",
+   "files": [
+    "spell/bloom-hit.mp3"
+   ],
+   "seconds": [
+    1.5
+   ]
+  },
+  "spell/bloom-loose": {
+   "kind": "call",
+   "files": [
+    "spell/bloom-loose.mp3"
+   ],
+   "seconds": [
+    1.2
+   ]
+  },
+  "spell/flame-hit": {
+   "kind": "call",
+   "files": [
+    "spell/flame-hit.mp3"
+   ],
+   "seconds": [
+    1.5
+   ]
+  },
+  "spell/flame-loose": {
+   "kind": "call",
+   "files": [
+    "spell/flame-loose.mp3"
+   ],
+   "seconds": [
+    1.2
+   ]
+  },
+  "spell/frost-hit": {
+   "kind": "call",
+   "files": [
+    "spell/frost-hit.mp3"
+   ],
+   "seconds": [
+    1.5
+   ]
+  },
+  "spell/frost-loose": {
+   "kind": "call",
+   "files": [
+    "spell/frost-loose.mp3"
+   ],
+   "seconds": [
+    1.2
+   ]
+  },
+  "spell/gather": {
+   "kind": "call",
+   "files": [
+    "spell/gather.mp3"
+   ],
+   "seconds": [
+    1.6
+   ]
+  },
+  "spell/radiance-hit": {
+   "kind": "call",
+   "files": [
+    "spell/radiance-hit.mp3"
+   ],
+   "seconds": [
+    1.5
+   ]
+  },
+  "spell/radiance-loose": {
+   "kind": "call",
+   "files": [
+    "spell/radiance-loose.mp3"
+   ],
+   "seconds": [
+    1.2
+   ]
+  },
+  "spell/shade-hit": {
+   "kind": "call",
+   "files": [
+    "spell/shade-hit.mp3"
+   ],
+   "seconds": [
+    1.5
+   ]
+  },
+  "spell/shade-loose": {
+   "kind": "call",
+   "files": [
+    "spell/shade-loose.mp3"
+   ],
+   "seconds": [
+    1.2
+   ]
+  },
+  "spell/stone-hit": {
+   "kind": "call",
+   "files": [
+    "spell/stone-hit.mp3"
+   ],
+   "seconds": [
+    1.5
+   ]
+  },
+  "spell/stone-loose": {
+   "kind": "call",
+   "files": [
+    "spell/stone-loose.mp3"
+   ],
+   "seconds": [
+    1.2
+   ]
+  },
   "step/boards": {
    "kind": "steps",
    "files": [

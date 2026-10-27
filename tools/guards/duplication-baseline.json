@@ -308,10 +308,6 @@
     "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
   },
   {
-    "key": "idiom: [.blending] in masterworld/render/materials/feathers.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spells.ts",
-    "reason": "Setting a material's blending is one three.js property; each material picks its own (flames and spells add light, feathers blend)."
-  },
-  {
     "key": "same name: masterworld/game/fight.ts#heal + masterworld/game/recipe.ts#heal",
     "reason": "Fight (in a fight) and Alone (out of one) are the two worlds a spell plays in; both implement the RecipeWorld interface (game/recipe.ts), so they share its method names; the shared part (mendCaster) is one helper."
   },

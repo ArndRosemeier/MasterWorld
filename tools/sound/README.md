@@ -19,3 +19,5 @@ NODE_USE_ENV_PROXY=1 node vendor/assetgenerator/packages/audio/tools/make.mjs --
   and (with a transcriber) that it did not turn into speech. Listen before a new take goes in.
 
 What plays when is decided in `src/game/soundscape.ts` (pure, tested) and played by `src/app/soundDirector.ts`.
+- 2026-10-27: 13 spell takes (`spell/gather`, and `spell/<motif>-loose` / `-hit` for each school's motif) for a few
+  cents. Seed Audio's moderation refused "magic gathering in a raised hand"; the gather prompt is a singing bowl.

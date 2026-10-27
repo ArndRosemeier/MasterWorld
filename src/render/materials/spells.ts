@@ -1,6 +1,9 @@
 // @ts-nocheck -- TSL node math; checked by rendering it (npm run shot).
 /**
- * Spells as the eye sees them (plan 10, C2, C4): glowing shapes added to what is behind them (no shadows).
+ * Spells as the eye sees them (plan 10, C2, C4): glowing shapes over what is behind them (no shadows). Blended as
+ * premultiplied light (one, one minus alpha): the glow adds as before, and each shape also covers some of what is
+ * behind it, so a school's colour still reads against a sunlit meadow (pure additive washed out to white there),
+ * and shade's hollow middle is dark.
  * One shader for every spell of every school: each instance is a sphere scaled into an orb, a burst, a flat
  * ring or a mote, and its instance attributes say the rest. `tint` is the school's colour; `spell` is
  * (motif, seed, role, fade): the motif (SPELL_MOTIFS order) picks the pattern, the seed puts it out of step
@@ -11,13 +14,13 @@
  * shade glows only at its rim round a dark middle, swirling. All six are worked out and the motif's
  * weight picks one, so there is no branch and no second shader.
  */
-import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial } from 'three/webgpu';
-import { abs, atan, attribute, clamp, dot, float, floor, fract, mix, normalView, pow, positionGeometry, sin, step, time, vec3 } from 'three/tsl';
+import { AddEquation, CustomBlending, DoubleSide, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor } from 'three/webgpu';
+import { abs, atan, attribute, clamp, dot, float, floor, fract, mix, normalView, pow, positionGeometry, sin, step, time, vec3, vec4 } from 'three/tsl';
 import { defineKind } from '../materials';
 
 export const SPELL_GLOW = defineKind('spell glow', ['position', 'normal', 'uv', 'tint', 'spell'], () => {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide, fog: false });
-  m.blending = AdditiveBlending;
+  Object.assign(m, { blending: CustomBlending, blendEquation: AddEquation, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor, blendSrcAlpha: OneFactor, blendDstAlpha: OneMinusSrcAlphaFactor });
   const s = attribute('spell', 'vec4'), tint = attribute('tint', 'vec3');
   const motif = s.x, seed = s.y, role = s.z, fade = s.w;
   const p = positionGeometry;
@@ -52,6 +55,9 @@ export const SPELL_GLOW = defineKind('spell glow', ['position', 'normal', 'uv', 
   // A mote is a soft dot whatever its motif.
   const mote = step(0.5, role);
   const bright = mix(body, f2.mul(1.6), mote), heat = clamp(mix(bodyHeat, f4.mul(0.15), mote), 0.0, 1.0);
-  m.colorNode = mix(tint, vec3(1.0), heat).mul(bright).mul(fade);
+  // Light given (premultiplied) and how much of what is behind it is covered: some for every glow, shade's
+  // hollow more (its middle stays dark), a mote little.
+  const cover = clamp(bright.mul(0.45).add(face.mul(0.55).mul(w[5]).mul(float(1.0).sub(mote))).mul(fade), 0.0, 0.85);
+  m.colorNode = vec4(mix(tint, vec3(1.0), heat).mul(bright).mul(fade).mul(1.3), cover);
   return m;
 }, { cast: false, receive: false });

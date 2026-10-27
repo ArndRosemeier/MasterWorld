@@ -5,12 +5,17 @@
  * at the caster's hand; what flies is an orb with a trail; an area bursts out to its radius and fades; a zone
  * lies as a pulsing disc; a spell on the caster flares round them. Each school's spells shed their own motes
  * (spellMotes.ts): sparks, flakes, grit, seeds of light, glints or wisps.
+ *
+ * Made to be seen in daylight from behind the hero: while a spell gathers, a ring of its colour turns at the
+ * caster's feet and the orb swells before their raised hands; on release the hands flash; what flies is a big orb
+ * with a tail of fading ghosts; whatever it hits bursts. It also tells its listener (main.ts) when to raise and
+ * throw the hands (the hero's cast clips) and which sound to play (soundDirector.ts `spell`).
  */
 import { Color, Group, IcosahedronGeometry, InstancedBufferAttribute, InstancedMesh, Object3D, Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import { deriveSeed } from '@futuremagic/core';
 import type { AbilityDef, SettingModule, SpellMotif } from '../setting/contract';
-import type { RecipeEvent, Recipes, Spot } from '../game/recipe';
+import { blowOf, shapeOf, type RecipeEvent, type Recipes, type Spot } from '../game/recipe';
 import { SPELL_GLOW } from '../render/materials/spells';
 import { Motes, motifIndex } from './spellMotes';
 
@@ -25,6 +30,12 @@ const FLARE = 0.9;
 const GATHER = 14, TRAIL = 45, LINGER = 3;
 /** A bolt is drawn stretched along its flight over this many seconds of it (a fast lance is a streak). */
 const STREAK = 0.035;
+/** The ghosts behind what flies: how many, and how far apart along its flight (s of it). */
+const GHOSTS = 5, GHOST_GAP = 0.018;
+/** Where the gathering orb hangs: in front of the caster (m) and over the feet (m). */
+const HANDS_AHEAD = 0.5, HANDS_UP = 1.45;
+/** Smallest orb drawn for what flies (m): a dart must show from behind the hero across a clearing. */
+const BOLT_MIN = 0.26;
 const AHEAD = new Vector3(0, 0, 1);
 
 /** One fight's (or the calm land's) spells, and where its frame sits in the world. */
@@ -34,11 +45,24 @@ export interface SpellFrame {
   readonly offset: Spot;
   /** Where the caster stands, in the frame. */
   readonly me: Spot;
+  /** Which way the caster faces (the walker's yaw: 0 faces −z). */
+  readonly yaw: number;
   /** What happened since the last frame. */
   readonly cues: readonly RecipeEvent[];
 }
 
 interface Flash { x: number; y: number; z: number; radius: number; look: Look; age: number; life: number; grow: boolean }
+
+/** What a spell's sound is: gathering in the hands, let go, or striking. */
+export type SpellSound = 'gather' | 'loose' | 'hit';
+
+/** Who hears the spells: the hero's hands (cast clips) and the sound. */
+export interface SpellListener {
+  /** The hero raises the hands for `dur` s (a spell gathering), throws them (released), or lowers them (broken off). */
+  hands(what: 'charge' | 'release' | 'stop', dur: number): void;
+  /** A spell's sound, from a point in the world. */
+  sound(what: SpellSound, motif: SpellMotif, at: readonly [number, number, number]): void;
+}
 
 /** How an ability shows: its school's colour and motif. */
 interface Look { readonly color: Color; readonly motif: SpellMotif; readonly n: number }
@@ -61,6 +85,8 @@ export class SpellView {
   frozen = false;
   /** What the last frame drew: things flying, bursts or flares, and motes (shots wait for them). */
   shown = { shots: 0, flashes: 0, motes: 0 };
+  /** Hears casts, releases and hits (main.ts: the hero's clips and the sounds). */
+  listener: SpellListener | null = null;
 
   constructor(private readonly setting: SettingModule) {
     const g = new IcosahedronGeometry(1, 2);
@@ -99,23 +125,32 @@ export class SpellView {
   show(dt: number, f: SpellFrame | null): void {
     if (this.frozen) return;
     this.t += dt;
-    if (f) for (const e of f.cues) this.hear(e, f);
+    if (f) for (const e of f.cues) this.took(e, f);
     this.n = 0;
     if (f) {
       const O = f.offset, r = f.recipes;
       const cast = r.casting, share = r.castShare;
       if (cast && share !== null) {
-        const l = this.showingOf(cast.def), x = O.x + f.me.x, y = O.y + f.me.y + 1.35, z = O.z + f.me.z, size = 0.06 + 0.16 * share;
-        this.put(x, y, z, size, size, l, 0, 0.6 + 0.6 * share, 0);
-        this.motes.shed(l.motif, l, GATHER * dt, x, y, z, 0.25);
+        const l = this.showingOf(cast.def), h = this.handsAt(f), size = 0.1 + 0.22 * share;
+        this.put(h.x, h.y, h.z, size, size, l, 0, 0.9 + 0.8 * share, 0);
+        this.motes.shed(l.motif, l, GATHER * dt, h.x, h.y, h.z, 0.3);
+        // A ring of the school's colour turning at the caster's feet, widening as the spell gathers.
+        const ring = 0.55 + 0.45 * share, fx = O.x + f.me.x, fy = O.y + f.me.y + 0.05, fz = O.z + f.me.z;
+        this.put(fx, fy, fz, ring, 0.03, l, 0, 0.5 + 0.4 * share + 0.1 * Math.sin(this.t * 9), 7);
+        this.motes.shed(l.motif, l, GATHER * 0.6 * dt, fx, fy + 0.1, fz, ring);
       }
       const was = new Map<number, Vector3>();
       for (const s of r.shots) {
-        const rad = Math.max(0.14, s.op.radius ?? 0.18), l = this.showingOf(s.ability), x = O.x + s.x, y = O.y + s.y, z = O.z + s.z;
+        const rad = Math.max(BOLT_MIN, (s.op.radius ?? 0.18) * 1.4), l = this.showingOf(s.ability), x = O.x + s.x, y = O.y + s.y, z = O.z + s.z;
         const before = this.was.get(s.n), along = before ? this.dir.set(x, y, z).sub(before) : null;
-        const len = along && dt > 0 ? along.length() : 0;
+        const len = along && dt > 0 ? along.length() : 0, speed = len > 1e-4 ? len / dt : 0;
         if (along && len > 1e-4) this.o.quaternion.setFromUnitVectors(AHEAD, along.divideScalar(len));
-        this.put(x, y, z, rad, rad, l, 0, 1.2, s.n, Math.max(rad, (len / dt) * STREAK));
+        // The tail first (the turn on `o` is the bolt's): ghosts behind it along its flight, smaller and dimmer.
+        if (len > 1e-4) for (let g = 1; g <= GHOSTS; g++) {
+          const back = speed * GHOST_GAP * g, k = 1 - g / (GHOSTS + 1), r = rad * (0.35 + 0.55 * k);
+          this.put(x - this.dir.x * back, y - this.dir.y * back, z - this.dir.z * back, r, r, l, 0, 1.1 * k, s.n + g, Math.max(r, speed * STREAK * 0.6));
+        }
+        this.put(x, y, z, rad, rad, l, 0, 1.8, s.n, Math.max(rad, speed * STREAK));
         was.set(s.n, (before ?? new Vector3()).set(x, y, z));
         this.motes.shed(l.motif, l, TRAIL * dt, x, y, z, rad * 0.6);
       }
@@ -162,7 +197,19 @@ export class SpellView {
     this.n = n + 1;
   }
 
-  private hear(e: RecipeEvent, f: SpellFrame): void {
+  /** A spell (a school's, or an item's glow): cast with the hands. Not a weapon's blow, a change of shape or a breath. */
+  private isSpell(def: AbilityDef): boolean {
+    if (blowOf(def) || shapeOf(def)) return false;
+    return !!def.glow || this.setting.skills.find((s) => s.id === def.skill)?.group === 'magic';
+  }
+
+  /** Where the caster's hands hold a spell, in the world. */
+  private handsAt(f: SpellFrame): Spot {
+    const O = f.offset;
+    return { x: O.x + f.me.x - Math.sin(f.yaw) * HANDS_AHEAD, y: O.y + f.me.y + HANDS_UP, z: O.z + f.me.z - Math.cos(f.yaw) * HANDS_AHEAD };
+  }
+
+  private took(e: RecipeEvent, f: SpellFrame): void {
     const O = f.offset;
     const flash = (at: Spot, radius: number, def: AbilityDef, life: number, grow: boolean, motes: number) => {
       const look = this.showingOf(def), x = O.x + at.x, y = O.y + at.y + (grow ? 0.3 : 1), z = O.z + at.z;
@@ -170,10 +217,39 @@ export class SpellView {
       // A burst throws its motes out across its radius; a flare sheds them round the body.
       this.motes.shed(look.motif, look, motes, x, y, z, grow ? radius * 0.3 : radius * 0.7, grow ? radius * 1.5 : 0);
     };
+    const say = (what: SpellSound, def: AbilityDef, x: number, y: number, z: number) => this.listener?.sound(what, this.showingOf(def).motif, [x, y, z]);
     switch (e.kind) {
-      case 'area': flash(e.at, e.radius, e.ability, BURST, true, 10 + 6 * e.radius); break;
-      case 'landed': if (!e.shot.op.onHit) flash({ x: e.shot.x, y: e.shot.y - 1, z: e.shot.z }, 0.5, e.shot.ability, 0.3, true, 10); break;
-      case 'look': flash(e.at, 0.9, e.ability, FLARE, false, 18); break;
+      case 'cast': {
+        if (!this.isSpell(e.ability)) break;
+        this.listener?.hands('charge', e.time);
+        say('gather', e.ability, O.x + f.me.x, O.y + f.me.y + HANDS_UP, O.z + f.me.z);
+        break;
+      }
+      case 'went': {
+        if (!this.isSpell(e.ability)) break;
+        // Released: the hands throw and flash (a spell on the caster flares by its own look).
+        this.listener?.hands('release', 0.55);
+        const h = this.handsAt(f), look = this.showingOf(e.ability);
+        this.flashes.push({ x: h.x, y: h.y, z: h.z, radius: 0.45, look, age: 0, life: 0.25, grow: true });
+        this.motes.shed(look.motif, look, 12, h.x, h.y, h.z, 0.15, 1.2);
+        say('loose', e.ability, h.x, h.y, h.z);
+        break;
+      }
+      case 'broken': this.listener?.hands('stop', 0); break;
+      case 'area': flash(e.at, e.radius, e.ability, BURST, true, 10 + 6 * e.radius); if (e.look) say('hit', e.ability, O.x + e.at.x, O.y + e.at.y + 0.5, O.z + e.at.z); break;
+      case 'landed': {
+        // Whatever it strikes bursts (a bolt that bursts into an area shows that area too, smaller here).
+        const at = { x: e.shot.x, y: e.shot.y - 0.3, z: e.shot.z }, big = e.shot.op.onHit ? 0.6 : 1;
+        flash(at, 0.9 * big, e.shot.ability, 0.45, true, 22 * big);
+        if (!e.shot.op.onHit) say('hit', e.shot.ability, O.x + e.shot.x, O.y + e.shot.y, O.z + e.shot.z);
+        break;
+      }
+      case 'look': {
+        flash(e.at, 0.9, e.ability, FLARE, false, 18);
+        // A look on a foe strikes there; one on the caster was heard as they let it go.
+        if (Math.hypot(e.at.x - f.me.x, e.at.z - f.me.z) > 1.5) say('hit', e.ability, O.x + e.at.x, O.y + e.at.y + 1, O.z + e.at.z);
+        break;
+      }
       default: break;
     }
   }

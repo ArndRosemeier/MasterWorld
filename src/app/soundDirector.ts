@@ -21,6 +21,8 @@ import { canopySampler, type Canopy } from '../world/canopy';
 import { emptyWater } from '../world/hydro';
 import type { WeatherState } from '../world/weather';
 import type { FightCue } from './encounter';
+import type { SpellSound } from './spellView';
+import type { SpellMotif } from '../setting/contract';
 
 export interface SoundHost {
   readonly engine: AudioEngine;
@@ -50,6 +52,9 @@ export interface SoundHost {
   /** The title, the hero's making or the loading still holds the screen: the game is silent (and its music not fetched). */
   titleHolds(): boolean;
 }
+
+/** The gathering hum, pitched by school: fire and light high, earth and shadow low. */
+const GATHER_PITCH: Readonly<Record<SpellMotif, number>> = { flame: 1.1, frost: 1.2, stone: 0.75, bloom: 1, radiance: 1.25, shade: 0.8 };
 
 /** The sounds of each creature (by its setting id) and how they are pitched. */
 const CRIES: Record<string, { cry: string; pitch: number; small?: boolean; bones?: boolean }> = {
@@ -136,6 +141,12 @@ export class SoundDirector {
     this.wildlife();
   }
 
+  /** A spell's sound (app/spellView.ts): gathering in the hands, let go, or striking, in its school's voice. */
+  spell(what: SpellSound, motif: SpellMotif, at: readonly [number, number, number]): void {
+    const id = what === 'gather' ? 'spell/gather' : `spell/${motif}-${what}`;
+    this.host.engine.play(id, { at: [at[0], at[1], at[2]], gain: what === 'gather' ? 0.7 : 1, pitch: what === 'gather' ? GATHER_PITCH[motif] : 1 });
+  }
+
   /** Small birds taking wing (sim/smallLife.ts): a flurry from where they rose, fuller the more they are. */
   wings(e: LifeEvent): void {
     this.host.engine.play('title/birds', { at: [e.x, e.y + 0.5, e.z], gain: Math.min(0.9, 0.3 + e.count * 0.04), pitch: e.count > 12 ? 0.9 : 1.15 });
@@ -147,6 +158,8 @@ export class SoundDirector {
     switch (c.kind) {
       case 'struck': {
         const k = CRIES[c.who.def.id], o = c.strike.outcome;
+        // A spell's strike is heard as the spell's own hit (spell()); the creature still cries out.
+        if (c.spell) { if (o !== 'miss' && k && !k.bones) e.play(k.cry, { at: spotOf(c.who), pitch: k.pitch * 1.1, gain: 0.6, delay: 0.12 }); break; }
         if (o === 'miss') e.play('fight/swing', { at: spotOf(c.who) });
         else if (o === 'block') e.play('fight/block', { at: spotOf(c.who) });
         else e.play(k?.bones ? 'fight/bone' : 'fight/hit', { at: spotOf(c.who), gain: o === 'crit' ? 1.2 : 1 });
