@@ -1,0 +1,378 @@
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs
+
+  [title] dawn, clear, 10.9 h
+  [load] 0.0 s: Fetching the world
+page loaded 0.1
+  [load] 0.5 s: Finding the start
+  [load] 1.4 s: Starting the renderer
+title 0.36 (first paint; the probe saw it at 0.45)
+  [load] 1.6 s: Painting the ground
+  [load] 1.6 s: Filling the seas
+  [load] 1.6 s: Dressing the hero
+  [load] 4.6 s: Saddling the horses
+  [load] 4.7 s: Turning out the herds
+  [load] 5.1 s: Waking the town
+  [load] 6.1 s: Growing the woods
+  [load] 7.2 s: Dressing the townsfolk
+  [load] 7.3 s: Preparing shaders
+  [load] 12.8 s: Raising the land
+  [load] 12.9 s: Waking the cellar
+  [load] 13.4 s: Planting the trees
+  [load] 13.9 s: cellar ready (shaders 62 warm-up + 0 later · worst 11 ms · policy ok)
+  [load] 14.5 s: townsfolk ready (shaders 72 warm-up + 0 later · worst 11 ms · policy ok)
+  [load] 15.0 s: trees ready (shaders 75 warm-up + 0 later · worst 11 ms · policy ok)
+  [load] 15.0 s: Waking the townsfolk
+  [load] 16.9 s: townsfolk round the hero dressed
+playable 16.9
+
+[profile] 0.0 s Fetching the world: 0.50 s, main thread busy 0.43 s (86 %)
+  by the game code that asked:
+     183 ms  (anonymous) src/workers/packStore.ts:125
+     172 ms  (no game frame)
+      29 ms  P src/workers/packStore.ts:154
+      13 ms  By src/render/materials/masks.ts:15
+      13 ms  n2 ag/core/src/noise.ts:49
+       3 ms  url src/workers/packStore.ts:74
+       3 ms  ridged2 ag/core/src/noise.ts:227
+       3 ms  r src/workers/packStore.ts:119
+  by function (self time):
+     183 ms  put
+     149 ms  (program)
+      19 ms  P src/workers/packStore.ts:154
+      13 ms  By src/render/materials/masks.ts:15
+      13 ms  n2 vendor/assetgenerator/packages/core/src/noise.ts:49
+      11 ms  Response
+       6 ms  (garbage collector)
+       3 ms  ridged2 vendor/assetgenerator/packages/core/src/noise.ts:227
+
+[profile] 0.5 s Finding the start: 0.90 s, main thread busy 0.90 s (100 %)
+  by the game code that asked:
+     330 ms  n2 ag/core/src/noise.ts:49
+      79 ms  ridgedTerrain2 ag/core/src/noise.ts:248
+      69 ms  query src/world/hydro.ts:507
+      56 ms  fbm2 ag/core/src/noise.ts:204
+      49 ms  ridged2 ag/core/src/noise.ts:227
+      35 ms  pop ag/core/src/heap.ts:37
+      33 ms  shape src/world/hydro.ts:368
+      32 ms  My src/world/hydro.ts:176
+  by function (self time):
+     330 ms  n2 vendor/assetgenerator/packages/core/src/noise.ts:49
+      79 ms  ridgedTerrain2 vendor/assetgenerator/packages/core/src/noise.ts:248
+      69 ms  query src/world/hydro.ts:507
+      56 ms  fbm2 vendor/assetgenerator/packages/core/src/noise.ts:204
+      49 ms  ridged2 vendor/assetgenerator/packages/core/src/noise.ts:227
+      35 ms  pop vendor/assetgenerator/packages/core/src/heap.ts:37
+      33 ms  shape src/world/hydro.ts:368
+      32 ms  My src/world/hydro.ts:176
+
+[profile] 1.4 s Starting the renderer: 0.20 s, main thread busy 0.19 s (97 %)
+  by the game code that asked:
+      52 ms  unlock ag/audio/src/web.ts:140
+      44 ms  (no game frame)
+      44 ms  Il src/render/sky.ts:126
+       9 ms  Hm ag/settlement/src/clip.ts:27
+       4 ms  Nc ag/stage/src/renderer.ts:36
+       4 ms  query src/world/hydro.ts:507
+       3 ms  rasterise src/world/town.ts:160
+       2 ms  fill src/world/town.ts:194
+  by function (self time):
+      52 ms  unlock vendor/assetgenerator/packages/audio/src/web.ts:140
+      41 ms  (program)
+       4 ms  build three/build/three.webgpu.js:2511
+       4 ms  query src/world/hydro.ts:507
+       3 ms  rasterise src/world/town.ts:160
+       2 ms  fill src/world/town.ts:194
+       2 ms  e.ClipperBase.AddPath clipper-lib/clipper.js:2877
+       2 ms  getContext
+
+[profile] 1.6 s Dressing the hero: 3.00 s, main thread busy 0.89 s (30 %)
+  by the game code that asked:
+     721 ms  (no game frame)
+      36 ms  (anonymous) ag/stage/src/patches.ts:54
+      36 ms  qv src/world/townMask.ts:24
+      31 ms  (anonymous) ag/stage/src/patches.ts:52
+       6 ms  Kv src/world/townMask.ts:17
+       6 ms  g ag/stage/src/patches.ts:85
+       6 ms  (anonymous) src/render/terrain/groundTextures.ts:36
+       5 ms  (anonymous) src/render/packImages.ts:21
+  by function (self time):
+     155 ms  (program)
+      80 ms  Vn @actors/core/dist/index.js:342
+      70 ms  (anonymous) @actors/core/dist/index.js:468
+      50 ms  _copyBufferToTexture three/build/three.webgpu.js:80375
+      38 ms  (garbage collector)
+      36 ms  qv src/world/townMask.ts:24
+      21 ms  Rn @actors/core/dist/index.js:255
+      19 ms  zn @actors/core/dist/index.js:308
+
+[profile] 4.6 s Saddling the horses: 0.10 s, main thread busy 0.06 s (61 %)
+  by the game code that asked:
+      29 ms  (no game frame)
+      11 ms  (anonymous) ag/stage/src/patches.ts:54
+       7 ms  jc src/render/furAnimal.ts:12
+       6 ms  (anonymous) ag/stage/src/stage.ts:291
+       1 ms  query src/world/hydro.ts:507
+       1 ms  set src/app/title/TitleScreen.ts:113
+       1 ms  box src/world/dungeon/meshKit.ts:86
+       1 ms  t._update ag/stage/src/patches.ts:136
+  by function (self time):
+       6 ms  (program)
+       5 ms  build three/build/three.webgpu.js:2511
+       4 ms  ensureMesh @actors/three/dist/shared/chunk-CCHDBNLT.js:2939
+       4 ms  (garbage collector)
+       3 ms  buildMesh @actors/core/dist/index.js:674
+       2 ms  addMeshes @actors/three/dist/shared/chunk-CCHDBNLT.js:2905
+       2 ms  _getChildren three/build/three.webgpu.js:2033
+       1 ms  analyze three/build/three.webgpu.js:2396
+
+[profile] 4.7 s Turning out the herds: 0.40 s, main thread busy 0.39 s (96 %)
+  by the game code that asked:
+     185 ms  (no game frame)
+      86 ms  t._update ag/stage/src/patches.ts:136
+      82 ms  (anonymous) ag/stage/src/patches.ts:54
+      17 ms  jc src/render/furAnimal.ts:12
+      10 ms  (anonymous) ag/stage/src/stage.ts:291
+       2 ms  Yi.e.setup ag/stage/src/patches.ts:156
+       1 ms  j_ ag/creatures/src/node.ts:99
+       1 ms  (anonymous) ag/sky/src/node.ts:33
+  by function (self time):
+      82 ms  _copyImageToTexture three/build/three.webgpu.js:80276
+      22 ms  (program)
+      17 ms  (garbage collector)
+      13 ms  build three/build/three.webgpu.js:2511
+      11 ms  Jr @actors/three/dist/shared/chunk-CCHDBNLT.js:369
+      10 ms  multiplyMatrices three/build/three.core.js:10570
+       9 ms  qr @actors/three/dist/shared/chunk-CCHDBNLT.js:347
+       8 ms  getDataFromNode three/build/three.webgpu.js:54613
+
+[profile] 5.1 s Waking the town: 1.00 s, main thread busy 0.68 s (68 %)
+  by the game code that asked:
+     505 ms  (no game frame)
+     107 ms  (anonymous) ag/stage/src/patches.ts:54
+      49 ms  l src/render/folk/FolkView.ts:133
+      10 ms  t._update ag/stage/src/patches.ts:136
+       2 ms  (anonymous) ag/stage/src/patches.ts:187
+       1 ms  Li ag/stage/src/monitor.ts:18
+       1 ms  n.createRenderPipelineAsync ag/stage/src/patches.ts:194
+       1 ms  (anonymous) ag/sky/src/node.ts:38
+  by function (self time):
+     100 ms  zn @actors/core/dist/index.js:308
+      58 ms  (program)
+      39 ms  build three/build/three.webgpu.js:2511
+      37 ms  updateHiddenSkin @actors/three/dist/shared/chunk-CCHDBNLT.js:3597
+      35 ms  (garbage collector)
+      26 ms  Xn @actors/core/dist/index.js:622
+      19 ms  getDataFromNode three/build/three.webgpu.js:54613
+      19 ms  _getChildren three/build/three.webgpu.js:2033
+
+[profile] 6.1 s Growing the woods: 1.10 s, main thread busy 0.80 s (73 %)
+  by the game code that asked:
+     153 ms  (no game frame)
+     143 ms  wx ag/vegetation/src/textures.ts:436
+      52 ms  e ag/core/src/rng.ts:10
+      48 ms  n ag/core/src/rng.ts:24
+      45 ms  (anonymous) ag/stage/src/patches.ts:54
+      43 ms  i ag/core/src/rng.ts:33
+      29 ms  ix ag/vegetation/src/textures.ts:13
+      28 ms  ox ag/vegetation/src/textures.ts:24
+  by function (self time):
+     143 ms  wx vendor/assetgenerator/packages/vegetation/src/textures.ts:436
+      52 ms  e vendor/assetgenerator/packages/core/src/rng.ts:10
+      48 ms  n vendor/assetgenerator/packages/core/src/rng.ts:24
+      43 ms  i vendor/assetgenerator/packages/core/src/rng.ts:33
+      35 ms  (garbage collector)
+      34 ms  (program)
+      29 ms  ix vendor/assetgenerator/packages/vegetation/src/textures.ts:13
+      28 ms  ox vendor/assetgenerator/packages/vegetation/src/textures.ts:24
+
+[profile] 7.2 s Dressing the townsfolk: 0.10 s, main thread busy 0.08 s (76 %)
+  by the game code that asked:
+      55 ms  (no game frame)
+      10 ms  (anonymous) ag/stage/src/patches.ts:54
+       4 ms  (anonymous) ag/stage/src/stage.ts:291
+       1 ms  update src/render/terrain/TerrainView.ts:43
+       1 ms  job src/workers/pool.ts:86
+       1 ms  (anonymous) src/render/packImages.ts:21
+       1 ms  set src/app/title/TitleScreen.ts:113
+       1 ms  t._update ag/stage/src/patches.ts:136
+  by function (self time):
+       7 ms  (program)
+       5 ms  _copyImageToTexture three/build/three.webgpu.js:80276
+       5 ms  zn @actors/core/dist/index.js:308
+       4 ms  innerHeights @actors/three/dist/shared/chunk-CCHDBNLT.js:3405
+       4 ms  updateHiddenSkin @actors/three/dist/shared/chunk-CCHDBNLT.js:3597
+       3 ms  getDataFromNode three/build/three.webgpu.js:54613
+       2 ms  liftOf @actors/three/dist/shared/chunk-CCHDBNLT.js:3345
+       2 ms  (garbage collector)
+
+[profile] 7.3 s Preparing shaders: 5.50 s, main thread busy 0.82 s (15 %)
+  by the game code that asked:
+     519 ms  (no game frame)
+      83 ms  (anonymous) ag/stage/src/patches.ts:54
+      52 ms  t._update ag/stage/src/patches.ts:136
+      44 ms  Eu src/render/terrain/TerrainView.ts:144
+      36 ms  TS src/render/materials/building.ts:67
+      26 ms  g ag/stage/src/patches.ts:85
+      14 ms  (anonymous) ag/stage/src/stage.ts:291
+      12 ms  (anonymous) ag/stage/src/patches.ts:52
+  by function (self time):
+     296 ms  (program)
+      39 ms  createAttribute three/build/three.webgpu.js:84173
+      38 ms  _copyImageToTexture three/build/three.webgpu.js:80276
+      27 ms  TS src/render/materials/building.ts:67
+      22 ms  build three/build/three.webgpu.js:2511
+      21 ms  _getChildren three/build/three.webgpu.js:2033
+      16 ms  (garbage collector)
+      16 ms  fromBufferAttribute three/build/three.core.js:5997
+
+[profile] 12.8 s Raising the land: 0.10 s, main thread busy 0.08 s (78 %)
+  by the game code that asked:
+      22 ms  (no game frame)
+       7 ms  hh src/world/dungeon/propModels.ts:50
+       5 ms  append src/world/dungeon/meshKit.ts:71
+       4 ms  (anonymous) ag/stage/src/stage.ts:291
+       3 ms  Zh ag/props/src/index.ts:30
+       3 ms  v src/world/dungeon/meshKit.ts:101
+       3 ms  TS src/render/materials/building.ts:67
+       2 ms  (anonymous) src/world/dungeon/meshKit.ts:35
+  by function (self time):
+      14 ms  (program)
+       7 ms  hh src/world/dungeon/propModels.ts:50
+       5 ms  append src/world/dungeon/meshKit.ts:71
+       3 ms  Zh vendor/assetgenerator/packages/props/src/index.ts:30
+       3 ms  v src/world/dungeon/meshKit.ts:101
+       2 ms  (anonymous) src/world/dungeon/meshKit.ts:35
+       2 ms  TS src/render/materials/building.ts:67
+       2 ms  (anonymous) src/world/dungeon/meshKit.ts:109
+
+[profile] 12.9 s Waking the cellar: 0.50 s, main thread busy 0.23 s (47 %)
+  by the game code that asked:
+     102 ms  (no game frame)
+      44 ms  hh src/world/dungeon/propModels.ts:50
+      43 ms  TS src/render/materials/building.ts:67
+      17 ms  append src/world/dungeon/meshKit.ts:71
+       5 ms  p src/world/dungeon/cellarMesh.ts:349
+       3 ms  mesh src/world/dungeon/meshKit.ts:200
+       3 ms  (anonymous) src/render/materials/building.ts:74
+       2 ms  l src/render/dungeon/CreatureView.ts:101
+  by function (self time):
+      44 ms  hh src/world/dungeon/propModels.ts:50
+      34 ms  (garbage collector)
+      31 ms  (program)
+      29 ms  TS src/render/materials/building.ts:67
+      17 ms  append src/world/dungeon/meshKit.ts:71
+       7 ms  updateHiddenSkin @actors/three/dist/shared/chunk-CCHDBNLT.js:3597
+       6 ms  zn @actors/core/dist/index.js:308
+       5 ms  Rn @actors/core/dist/index.js:255
+
+[profile] 13.4 s Planting the trees: 0.50 s, main thread busy 0.49 s (98 %)
+  by the game code that asked:
+     161 ms  (no game frame)
+      85 ms  t._update ag/stage/src/patches.ts:136
+      36 ms  g ag/stage/src/patches.ts:85
+      30 ms  (anonymous) ag/stage/src/patches.ts:52
+      28 ms  (anonymous) ag/stage/src/patches.ts:54
+      21 ms  warmAll src/render/folk/FolkView.ts:171
+      20 ms  (anonymous) ag/stage/src/stage.ts:291
+       8 ms  B.r.fetch src/workers/packFetch.ts:85
+  by function (self time):
+      52 ms  (program)
+      50 ms  _copyImageToTexture three/build/three.webgpu.js:80276
+      14 ms  (garbage collector)
+      13 ms  build three/build/three.webgpu.js:2511
+      12 ms  updateHiddenSkin @actors/three/dist/shared/chunk-CCHDBNLT.js:3597
+       8 ms  getDataFromNode three/build/three.webgpu.js:54613
+       7 ms  setFromBufferAttribute three/build/three.core.js:15989
+       7 ms  _getChildren three/build/three.webgpu.js:2033
+
+[profile] 13.9 s cellar ready (shaders 62 warm-up + 0 later · worst 11 ms · policy ok): 0.60 s, main thread busy 0.58 s (97 %)
+  by the game code that asked:
+     363 ms  (no game frame)
+      55 ms  (anonymous) ag/stage/src/patches.ts:54
+      49 ms  g ag/stage/src/patches.ts:85
+      36 ms  t._update ag/stage/src/patches.ts:136
+      14 ms  draw ag/stage/src/post.ts:88
+      12 ms  Ui.a._renderObjectDirect ag/stage/src/patches.ts:84
+       5 ms  dress src/render/folk/FolkView.ts:319
+       5 ms  Ki.t.updateForRender ag/stage/src/patches.ts:117
+  by function (self time):
+      66 ms  multiplyMatrices three/build/three.core.js:10570
+      40 ms  (program)
+      27 ms  updateMatrixWorld three/build/three.core.js:13067
+      22 ms  build three/build/three.webgpu.js:2511
+      19 ms  compose three/build/three.core.js:11030
+      13 ms  setFromRotationMatrix three/build/three.core.js:11523
+      12 ms  _getChildren three/build/three.webgpu.js:2033
+      12 ms  (garbage collector)
+
+[profile] 14.5 s townsfolk ready (shaders 72 warm-up + 0 later · worst 11 ms · policy ok): 0.50 s, main thread busy 0.50 s (100 %)
+  by the game code that asked:
+     295 ms  (no game frame)
+      38 ms  t._update ag/stage/src/patches.ts:136
+      32 ms  g ag/stage/src/patches.ts:85
+      26 ms  prepareSlot src/render/folk/FolkView.ts:336
+      22 ms  (anonymous) ag/stage/src/stage.ts:291
+      14 ms  (anonymous) ag/stage/src/patches.ts:54
+      12 ms  draw ag/stage/src/post.ts:88
+      11 ms  Ui.a._renderObjectDirect ag/stage/src/patches.ts:84
+  by function (self time):
+      47 ms  updateHiddenSkin @actors/three/dist/shared/chunk-CCHDBNLT.js:3597
+      33 ms  Ui @actors/three/dist/shared/chunk-CCHDBNLT.js:1135
+      29 ms  (program)
+      22 ms  zn @actors/core/dist/index.js:308
+      14 ms  (garbage collector)
+      14 ms  _copyImageToTexture three/build/three.webgpu.js:80276
+      13 ms  r @actors/core/dist/index.js:945
+       8 ms  Rn @actors/core/dist/index.js:255
+
+[profile] 15.0 s Waking the townsfolk: 1.90 s, main thread busy 1.90 s (100 %)
+  by the game code that asked:
+     729 ms  (no game frame)
+     268 ms  prepareSlot src/render/folk/FolkView.ts:336
+     240 ms  t._update ag/stage/src/patches.ts:136
+     196 ms  g ag/stage/src/patches.ts:85
+     142 ms  (anonymous) ag/stage/src/stage.ts:291
+      59 ms  draw ag/stage/src/post.ts:88
+      55 ms  Ui.a._renderObjectDirect ag/stage/src/patches.ts:84
+      32 ms  follow src/render/folk/FolkView.ts:223
+  by function (self time):
+     260 ms  updateHiddenSkin @actors/three/dist/shared/chunk-CCHDBNLT.js:3597
+      92 ms  (program)
+      90 ms  _copyImageToTexture three/build/three.webgpu.js:80276
+      77 ms  zn @actors/core/dist/index.js:308
+      58 ms  multiplyMatrices three/build/three.core.js:10570
+      51 ms  setFromBufferAttribute three/build/three.core.js:15989
+      46 ms  createAttribute three/build/three.webgpu.js:84173
+      45 ms  (garbage collector)
+
+[profile] 16.9 s townsfolk round the hero dressed: 0.01 s, main thread busy 0.00 s (85 %)
+  by the game code that asked:
+       3 ms  g ag/stage/src/patches.ts:85
+       1 ms  (no game frame)
+       1 ms  t._update ag/stage/src/patches.ts:136
+  by function (self time):
+       2 ms  _draw three/build/three.webgpu.js:88975
+       1 ms  updateForRender three/build/three.webgpu.js:32064
+       1 ms  updateBinding three/build/three.webgpu.js:84857
+       1 ms  (program)
+       1 ms  (anonymous)
+       1 ms  multiplyMatrices three/build/three.core.js:10570
+       1 ms  _renderObjectDirect three/build/three.webgpu.js:65514
+  [load] 18.5 s: townsfolk, every look ready (shaders 79 warm-up + 5 later · worst 11 ms · policy ok)
+title 0.36 s · playable 16.9 s · start download 95.8 MB
+  packs/start-1-bdf6e502555f.bin     1 files    15.19 MB
+  packs/start-2-6e406f006acb.bin     1 files    15.19 MB
+  packs/start-3-e131a24531bd.bin     1 files    15.09 MB
+  packs/start-4-d1fc59464949.bin     1 files    14.38 MB
+  packs/start-0-67e40221570d.bin     1 files    13.22 MB
+  wildmesh3d                       5 files    10.55 MB
+  packs/start-5-a21ca89b2d6f.bin     1 files     7.72 MB
+  sound/music                      1 files     1.63 MB
+  assets                          34 files     0.91 MB
+  title                            4 files     0.51 MB
+  props                            1 files     0.51 MB
+  packs/human                      3 files     0.28 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: ok
