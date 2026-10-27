@@ -1,7 +1,7 @@
 /**
  * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
- * title, the creator, the town at noon, dusk, night, in rain and wet toward the afternoon sun, a cellar, a barrow, the wild, a fight, the pack,
+ * title, the creator, the town at noon, dusk, night, in rain and wet toward the afternoon sun, a cellar, a barrow, the wild, a fight, a fight with magic, the pack,
  * the map, the trade window, talk, a people's hold) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
  * writes `index.md` and `index.json` there. Before each shot it waits until everything near the hero is drawn
  * as itself (`game.undrawn` empty: townsfolk dressed, creatures warm; at most SET_DRAWN ms, default 15000; it ends as soon as all are drawn) and
@@ -95,6 +95,26 @@ const SESSIONS = [
     { name: 'barrow' },
     { name: 'wild', act: meet('deer', 25) },
     { name: 'fight', act: async (p) => { await meet('wolves', 12)(p); await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
+    // Gate C: a fight with magic. The hero learns the first spell of the first school (the debug menu's way),
+    // picks a wolf and casts; the picture is taken once the spell shows.
+    { name: 'fight-magic', act: async (p) => {
+      const id = await p.evaluate(() => {
+        const g = window.game, setting = g.setting, h = g.character;
+        const school = setting.skills.find((s) => s.group === 'magic')?.id;
+        const spell = setting.abilities.find((a) => a.skill === school && (a.level ?? 0) === 0)?.id;
+        if (!spell) return null;
+        h.learn(spell);
+        h.mana = h.maxMana;
+        h.health = h.maxHealth;
+        h.cooldowns.clear();
+        return spell;
+      });
+      if (!id) throw new Error('fight-magic: no spell in the setting');
+      await p.keyboard.press('Tab');
+      const why = await p.evaluate((id) => window.game.useAbility(id), id);
+      if (why) throw new Error(`fight-magic: ${id}: ${why}`);
+      await p.waitForFunction(() => { const s = window.game.spellView.shown; return s.shots > 0 || s.flashes > 0; }, null, { timeout: 20000 });
+    } },
   ] },
   { id: 'inn', query: `${still}&hour=20&room=inn`, shots: [{ name: 'inn' }] },
   { id: 'talk', query: `${still}&hour=20&talk=inn&topics=news`, shots: [{ name: 'talk' }] },

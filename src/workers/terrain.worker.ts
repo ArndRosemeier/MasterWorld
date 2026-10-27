@@ -2,7 +2,7 @@
 /** Terrain meshes: height field chunks, and the rock volumes standing on the land. */
 import { buildChunk, type ChunkSpec, type ChunkMesh } from '../world/chunkMesh';
 import { archMesh, type VolumeMesh } from '../world/volumes';
-import { townMeshBuffers, townMeshes, type TownCellMesh } from '../world/townMesh';
+import { openHouse, townMeshBuffers, townMeshes, type OpenHouse, type TownCellMesh } from '../world/townMesh';
 import { guildHouses, guildSigns } from '../game/guilds';
 import type { Terrain } from '../world/terrain';
 import { openWorld } from '../vgm/builder';
@@ -12,14 +12,15 @@ import { serve } from './serve';
 import { townMaskData } from '../world/townMask';
 import type { Decision } from '../world/decisions';
 import type { DungeonLayout } from '@futuremagic/dungeon';
-import type { BuildingMesh, TownPlan } from '@futuremagic/settlement';
+import type { BuildingMesh, TownBuilding, TownPlan } from '@futuremagic/settlement';
 import { caveField, caveShell, type CaveField } from '../world/dungeon/caveRock';
 import { mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
 import type { Site } from '../world/dungeon/site';
 import { holdRockOnLand, type HoldRock } from '../world/holdRock';
+import { layOut, type SiteJob, type SiteLayout } from '../world/sites';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'decisions'; decisions: readonly Decision[] });
-export type TerrainResult = ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth | HoldRock;
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] });
+export type TerrainResult = ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth | HoldRock | SiteLayout | OpenHouse | null;
 
 /** A town's buildings merged per cell, and its plan when asked for (a settlement founded while playing is planned here). */
 export interface TownMeshes { readonly cells: TownCellMesh[]; readonly plan: TownPlan | null }
@@ -59,6 +60,16 @@ serve<TerrainJob, TerrainResult>((job) => {
   if (job.kind === 'holdRock') {
     const t = terrain, rock = holdRockOnLand((x, z) => t.height(x, z), job.site, job.rock);
     return { result: rock, transfer: [rock.walk.blocked.buffer, ...meshBuffers(rock.mesh)] };
+  }
+  // A region's place or a sight by the way (tens of milliseconds for a barrow): here, off the main thread (floor F2).
+  if (job.kind === 'site') {
+    const t = terrain, laid = layOut(job.site, (x, z) => t.height(x, z));
+    return { result: laid, transfer: laid ? meshBuffers(laid.mesh) : [] };
+  }
+  // A building drawn open (D38) as one comes up to its door: its plan and mesh, off the main thread (floor F2).
+  if (job.kind === 'house') {
+    const house = openHouse(job.b, { hatch: job.hatch, hall: job.hall }, job.sign);
+    return { result: house, transfer: meshBuffers(house.mesh) };
   }
   if (job.kind === 'horizon') {
     const t = terrain;

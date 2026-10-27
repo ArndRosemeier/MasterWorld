@@ -7,7 +7,8 @@
  * lit) and the eye adapts. The sun that comes in is thrown about the room (game/roomLight.ts): its
  * value eases as the sun moves and is gone at night.
  */
-import { interiorBlocked, planInterior, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
+import { interiorBlocked, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
+import { openHouse, type OpenHouse } from '../world/townMesh';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
 import { guildSigns } from '../game/guilds';
 import type { HouseView } from '../render/town/HouseView';
@@ -37,6 +38,8 @@ const SHUT_AT = 14;
 const BOUNCE_EASE = 2;
 /** Pushing this long (s) on a stair without getting anywhere: put off it (a body wedged under a low edge). */
 const STUCK_FOR = 2;
+/** Houses kept planned and drawn (their meshes) after they shut, for coming back to them. */
+const KEPT = 8;
 
 interface Open { door: TownDoor; b: TownBuilding; plan: InteriorPlan; walk: HouseWalk; flow: RoomFlow }
 
@@ -56,7 +59,8 @@ export class InteriorVisit {
   private lampOn = -1;
   /** That storey's openings and surfaces, for the sun it throws about (null: out). */
   private room: RoomSun | null = null;
-  private readonly plans = new Map<string, InteriorPlan>();
+  /** Houses planned and drawn open (by houseKey), the latest last: being made in a worker, or made. */
+  private readonly houses = new Map<string, Promise<OpenHouse>>();
   /** On the way down to the cellar. */
   private going = false;
 
@@ -70,6 +74,9 @@ export class InteriorVisit {
     private readonly light: PointLight,
     private readonly sky: SkyView,
     private readonly notes: Notes,
+    /** Plans a house and draws it open (`b`, its cellar's hatch, a guild's hall, the sign): a terrain worker's job. */
+    private readonly lay: (b: TownBuilding, hatch: boolean, hall: boolean, sign?: [number, number, number]) => Promise<OpenHouse> =
+      async (b, hatch, hall, sign) => openHouse(b, { hatch, hall }, sign),
   ) {}
 
   /** The player is inside a building. */
@@ -81,23 +88,33 @@ export class InteriorVisit {
   /** The building the player is in, and its town (null: outside). */
   get door(): TownDoor | null { return this.within ? this.open!.door : null; }
 
-  private planOf(door: TownDoor): InteriorPlan {
+  /** The door's house planned and drawn open: made once (in a worker), kept for the last few houses. */
+  private houseOf(door: TownDoor): Promise<OpenHouse> {
     const key = houseKey(door.town.id, door.b.id);
-    let p = this.plans.get(key);
-    // A guild house in the open (not a hidden one) is a hall: a weapon rack and a practice post (D49).
-    const g = door.town.guildAt(door.b.id);
-    if (!p) this.plans.set(key, (p = planInterior(door.b, { hatch: this.cellars.has(key), hall: !!g && !g.guild.hidden })));
-    return p;
+    let h = this.houses.get(key);
+    if (h) this.houses.delete(key);
+    else {
+      // A guild house in the open (not a hidden one) is a hall: a weapon rack and a practice post (D49).
+      const g = door.town.guildAt(door.b.id);
+      h = this.lay(door.b, this.cellars.has(key), !!g && !g.guild.hidden, guildSigns(door.town.guilds).get(door.b.id));
+      h.catch(() => this.houses.delete(key));
+    }
+    this.houses.set(key, h);
+    if (this.houses.size > KEPT) this.houses.delete(this.houses.keys().next().value!);
+    return h;
   }
 
-  /** Draws the door's building open (shutting the last). */
+  /** Draws the door's building open (shutting the last) once a worker has made it. */
   private async openUp(door: TownDoor): Promise<Open> {
     if (this.open && same(this.open.door, door)) return this.open;
+    const house = await this.houseOf(door);
+    // Asked again while it was being made (each frame by the door): opened by the first answer.
+    if (this.open && same(this.open.door, door)) return this.open;
     this.shut();
-    const b = door.b, plan = this.planOf(door);
+    const b = door.b, plan = house.plan;
     this.open = { door, b, plan, walk: houseWalk(b, plan), flow: new RoomFlow(plan) };
     this.placed = null;
-    await this.view.drawOpen(b, plan, this.towns.viewOf(door.town.id), guildSigns(door.town.guilds).get(b.id));
+    await this.view.drawOpen(b, house.mesh, this.towns.viewOf(door.town.id));
     return this.open;
   }
 

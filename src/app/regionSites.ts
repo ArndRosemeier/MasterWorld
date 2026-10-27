@@ -4,16 +4,17 @@
  * once the hero comes within a walk of them, with the town's building shader (nothing new to build).
  * The walker cannot go through them, and trees keep out of their footprints. Hamlets and villages are
  * towns of their size: app/settlements.ts draws those. The sights the VGM puts by the hero's way (C9) are
- * drawn the same way, and say what they are when the hero comes upon them.
+ * drawn the same way, and say what they are when the hero comes upon them. Looking for a region's place and
+ * laying a place out take up to a tenth of a second: both are done in workers (`jobs`), off the frame (F2).
  */
 import type { Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { RegionsDef, SightDef } from '../setting/contract';
 import { settlementOf, type DecisionLog, type RegionDecision, type SightDecision } from '../world/decisions';
-import { SIGHT_R, hitsSolid, layOutSight, layOutSite, type SiteLayout } from '../world/sites';
+import { SIGHT_R, hitsSolid, layOut, type SiteJob, type SiteLayout } from '../world/sites';
 import { sightsOf } from '../vgm/answers';
 import type { RegionMap } from '../world/regions';
-import { fillOf, keyOf, nextRegion, regionDecisions, regionLine, regionMapOf, type FrontierContext, type RegionData } from '../vgm/frontier';
+import { fillOf, keyOf, nextRegion, regionDecisions, regionLine, regionMapOf, wantsRegion, type FrontierAsk, type FrontierContext, type RegionData } from '../vgm/frontier';
 import { buildingMeshAt } from '../render/materials/building';
 import type { Terrain } from '../world/terrain';
 
@@ -27,8 +28,10 @@ interface Site {
   /** Its middle and reach (m). */
   readonly at: { readonly x: number; readonly z: number; readonly r: number };
   readonly label: string;
-  readonly make: () => SiteLayout | null;
-  layout: SiteLayout | null;
+  readonly job: SiteJob;
+  /** Laid out (null: nothing stands there; undefined: not yet, `laying` while a worker lays it out). */
+  layout: SiteLayout | null | undefined;
+  laying: boolean;
   mesh: Mesh | null;
   /** A sight's words, until the hero has come upon it (null: said, or a region's place), and its decision. */
   sight: SightDef | null;
@@ -48,6 +51,11 @@ export interface RegionSitesHost {
   readonly home: { readonly x: number; readonly z: number };
   /** The setting's sights (C9). */
   readonly sights?: readonly SightDef[];
+  /** The workers that look for the next region and lay places out (none: here, in the frame, as tests do). */
+  readonly jobs?: {
+    frontier(ask: FrontierAsk): Promise<RegionDecision | null>;
+    site(job: SiteJob): Promise<SiteLayout | null>;
+  };
 }
 
 export class RegionSites {
@@ -80,7 +88,7 @@ export class RegionSites {
       // Hamlets and villages are towns of their size (app/settlements.ts draws them).
       const site = d.site;
       if (site && place !== 'none' && !settlementOf(d, this.host.regions.fills)) {
-        this.sites.push({ at: site, label: `${place} ${d.id}`, make: () => layOutSite(d, place, this.heightAt), layout: null, mesh: null, sight: null, found: !this.synced });
+        this.sites.push({ at: site, label: `${place} ${d.id}`, job: { region: d, place }, layout: undefined, laying: false, mesh: null, sight: null, found: !this.synced });
       }
     }
     this.seen = all.length;
@@ -89,7 +97,7 @@ export class RegionSites {
       const def = this.host.sights?.find((x) => x.id === d.sight);
       if (!def) continue;
       // A loaded game's sights were come upon before.
-      this.sites.push({ at: { x: d.x, z: d.z, r: SIGHT_R }, label: `${d.sight} ${d.id}`, make: () => layOutSight(d, def.shape, this.heightAt), layout: null, mesh: null, sight: this.synced ? def : null, decision: d, found: !this.synced });
+      this.sites.push({ at: { x: d.x, z: d.z, r: SIGHT_R }, label: `${d.sight} ${d.id}`, job: { sight: d, shape: def.shape }, layout: undefined, laying: false, mesh: null, sight: this.synced ? def : null, decision: d, found: !this.synced });
     }
     this.sightsSeen = sights.length;
     this.synced = true;
@@ -97,6 +105,9 @@ export class RegionSites {
 
   private synced = false;
   private readonly heightAt = (x: number, z: number) => this.host.terrain.height(x, z);
+  /** A frontier ask is out with the workers; the region it found, until the next frame takes it. */
+  private asking = false;
+  private found: RegionDecision | null = null;
 
   /**
    * The place the hero at (x, z) has just come upon for the first time (Discovery, C9): a sight with its
@@ -121,7 +132,8 @@ export class RegionSites {
 
   /**
    * Every frame out on the land (`dt`): the hero's way is followed, the frontier asked now and then (a new
-   * region is returned for the log), and the places near the hero drawn (one a frame), far ones let go.
+   * region the workers found is returned for the log, a frame or more later), and the places near the hero
+   * drawn (one a frame, laid out by a worker first), far ones let go.
    */
   heroAt(dt: number, hero: { x: number; z: number }, ask: (() => Omit<FrontierContext, 'terrain' | 'regions' | 'home' | 'hero' | 'heading' | 'map' | 'seed'>) | null): RegionDecision | null {
     if (this.last) {
@@ -132,13 +144,22 @@ export class RegionSites {
     this.last = { x: hero.x, z: hero.z };
     this.drawNear(hero);
     this.clock += dt;
-    if (!ask || this.clock < ASK) return null;
+    const h = this.host, d = this.found;
+    this.found = null;
+    // Found for the log as it was: a region opened since (a load, a walk to a place) makes it stale.
+    if (d && d.id === `region-${this.seen + 1}`) {
+      console.info(`[vgm] region ${regionLine(d, h.regions, h.home)}`);
+      return d;
+    }
+    if (!ask || this.clock < ASK || this.asking) return null;
     this.clock = 0;
     const moving = Math.hypot(this.heading.x, this.heading.z) > dt * 0.3;
-    const h = this.host;
-    const d = nextRegion({ ...ask(), seed: h.seed, terrain: h.terrain, regions: h.regions, home: h.home, hero, heading: moving ? this.heading : null, map: this.map });
-    if (d) console.info(`[vgm] region ${regionLine(d, h.regions, h.home)}`);
-    return d;
+    const a: FrontierAsk = { ...ask(), home: h.home, hero: { x: hero.x, z: hero.z }, heading: moving ? { ...this.heading } : null };
+    if (!wantsRegion(a.log, this.map, a.hero, a.heading)) return null;
+    this.asking = true;
+    const found = h.jobs ? h.jobs.frontier(a) : Promise.resolve(nextRegion({ ...a, seed: h.seed, terrain: h.terrain, regions: h.regions, map: this.map }));
+    void found.then((r) => { this.found = r; }, (e: unknown) => console.warn('the frontier:', e)).finally(() => { this.asking = false; });
+    return null;
   }
 
   private drawNear(hero: { x: number; z: number }): void {
@@ -149,9 +170,14 @@ export class RegionSites {
         this.host.stage.remove(s.mesh);
         s.mesh.geometry.dispose();
         s.mesh = null;
-      } else if (!s.mesh && !built && d < BUILD) {
+      } else if (!s.mesh && !built && !s.laying && d < BUILD) {
         built = true;
-        s.layout ??= s.make();
+        if (s.layout === undefined) {
+          s.laying = true;
+          const laid = this.host.jobs ? this.host.jobs.site(s.job) : Promise.resolve(layOut(s.job, this.heightAt));
+          void laid.then((l) => { s.layout = l; }, (e: unknown) => { s.layout = null; console.warn(`laying out ${s.label}:`, e); }).finally(() => { s.laying = false; });
+          continue;
+        }
         if (!s.layout) continue;
         const [x, y, z] = s.layout.origin;
         s.mesh = buildingMeshAt(s.layout.mesh, x, y, z, s.label);

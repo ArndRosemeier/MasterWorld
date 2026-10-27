@@ -29,19 +29,20 @@ export function createSmokeMaterial(): MeshBasicNodeMaterial {
   const col = SMOKE.columns.element(int(puff.w)), thick = col.w;
   const t = fract(SMOKE.time.mul(RISE / HIGH).add(puff.x));
   // Rising, spreading and leaning with the wind more the higher it gets.
-  const spread = t.mul(14).add(1.2);
+  const spread = t.mul(7).add(1);
   const lean = vec3(WEATHER.windDir.x, 0, WEATHER.windDir.y).mul(WEATHER.wind.mul(30).add(4).mul(t.mul(t)));
   const centre = col.xyz.add(vec3(puff.y.sub(0.5).mul(spread), t.mul(HIGH), puff.z.sub(0.5).mul(spread))).add(lean);
-  const size = t.mul(11).add(2.2).mul(thick.min(1).sign());
+  const size = t.mul(7).add(2.5).mul(thick.min(1).sign());
   // Turned to face the camera.
   const toCam = normalize(cameraPosition.sub(centre));
   const side = normalize(cross(vec3(0, 1, 0), toCam)), up = cross(toCam, side);
   m.positionNode = centre.add(side.mul(positionGeometry.x.mul(size))).add(up.mul(positionGeometry.y.mul(size)));
-  // A soft round puff: in quickly, thinning as it rises; dark at the fire, greyer above.
+  // A soft round puff: in quickly, thinning as it rises; charcoal at the fire, a brown-grey above. Daylight
+  // checks (C12) found a pale, thin column read as cloud: it is dark and dense enough to read as fire smoke.
   const r2 = positionGeometry.x.mul(positionGeometry.x).add(positionGeometry.y.mul(positionGeometry.y));
   const soft = smoothstep(1.0, 0.15, r2);
-  const a = soft.mul(smoothstep(0, 0.06, t)).mul(pow(float(1).sub(t), 1.6)).mul(thick.min(1)).mul(0.5);
-  m.colorNode = vec4(WEATHER.light.mul(mix(float(0.28), float(0.75), t)), 1);
+  const a = soft.mul(smoothstep(0, 0.06, t)).mul(pow(float(1).sub(t), 1.1)).mul(thick.min(1)).mul(0.85);
+  m.colorNode = vec4(WEATHER.light.mul(vec3(1, 0.93, 0.85)).mul(mix(float(0.1), float(0.42), t.sqrt())), 1);
   m.opacityNode = a;
   return m;
 }

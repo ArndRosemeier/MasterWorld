@@ -44,6 +44,14 @@ export function layOutSight(d: SightDecision, shape: SightShape, height: (x: num
   return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : shape === 'stash' ? stash : cairn);
 }
 
+/** What to lay out (a region's place or a sight), for a terrain worker: laying out a barrow takes tens of milliseconds. */
+export type SiteJob = { readonly region: RegionDecision; readonly place: Place } | { readonly sight: SightDecision; readonly shape: SightShape };
+
+/** A region's place or a sight laid out (null: nothing stands there). */
+export function layOut(job: SiteJob, height: (x: number, z: number) => number): SiteLayout | null {
+  return 'region' in job ? layOutSite(job.region, job.place, height) : layOutSight(job.sight, job.shape, height);
+}
+
 /** A place's pieces drawn round its middle (`draw`), seeded from it, on the land's heights. */
 function laidOut(p: { x: number; z: number; yaw: number; r: number; seed: number }, salt: string, height: (x: number, z: number) => number, draw: (at: At, k: MeshKit, solids: Solid[]) => void): SiteLayout {
   const origin: [number, number, number] = [p.x, height(p.x, p.z), p.z];

@@ -155,7 +155,7 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | A hedge witch who teaches | Her cottage is C3 (D49) |
 | Interiors rework (ceiling joists cross the wall tops, dim rooms) | Seen at gate A; looks, not function. Before gate B's shots |
 | Who teaches bird form (built 2026-10-27, opened only by the debug menu) | Its teacher comes with the magic teachers (C3) |
-| Rare one-frame hitches: a region opening (7–47 ms), the first time a door opens a building (16–22 ms) | Seen at gate B; p95 holds at 18 ms. Move to a worker or spread over frames before gate C |
+| Rare one-frame hitches: a region opening (7–47 ms), the first time a door opens a building (16–22 ms) | Seen at gate B; p95 holds at 18 ms. Moved to workers before gate C (2026-10-27): the frontier's look for a place (world worker), laying out places and sights, and a house's plan and open mesh (terrain workers); to be confirmed in the gate C walk |
 | Talk framing outdoors: the camera looks down at a house wall with the speaker small in the frame | Seen at gate B after #203; the speaker is now in the shot |
 | The horse reads coarse (flat body, flat white saddle pad) | Seen at gate B; looks, not function |
 | Leaf litter has bright green blotches like texture splats | Seen at gate B |
