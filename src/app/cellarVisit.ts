@@ -3,7 +3,8 @@
  * down through the hatch in its room and up the ladder again (app/hatchClimb.ts: the hero is seen on the
  * rungs, the screen dark only while the head passes through the floor); a barrow is walked into, its way
  * out walked to (a short fade). Inside, the walker walks the cellar's space, the sky is off and the hero's
- * lantern is lit; keys, bars, hidden doors and the things worth reading speak through short notes.
+ * lantern is lit; doors, bars and hidden ways are seen opening (CellarView), and a key found and the things worth
+ * reading speak through short notes.
  */
 import type { PointLight } from 'three/webgpu';
 import { dungeonWorld } from '../game/dungeonWorld';
@@ -132,6 +133,7 @@ export class CellarVisit {
     const w = this.player.walker, O = this.view.origin;
     // The way down is the hatch in the house's room (InteriorVisit).
     if (!this.inside) return;
+    this.view.step(dt);
     // The lantern, held up and a little ahead.
     this.lantern.intensity = 8;
     this.lantern.position.set(w.pos.x - Math.sin(w.yaw) * 0.4, w.pos.y + 1.9, w.pos.z - Math.cos(w.yaw) * 0.4);
@@ -173,14 +175,9 @@ export class CellarVisit {
   }
 
   private event(e: SpaceEvent): void {
-    this.view.opened(e.link);
-    const own = e.link === this.cellar.pieceLink ? this.cellar.setPiece.found : undefined;
-    const said = this.cellar.form.space.carved ? CARVED_SAYS : BUILT_SAYS;
-    const text = own && (e.kind === 'found' || e.kind === 'unbarred') ? own : said[e.kind];
-    this.notes.say(text);
+    // A way that opens is seen opening (CellarView), away from the hero: no line says so.
+    const w = this.player.walker.pos, O = this.view.origin;
+    if (e.kind !== 'key') { this.view.opened(e.link, [w.x - O.x, w.z - O.z]); return; }
+    this.notes.say(this.cellar.form.space.carved ? 'You find a key wedged in a crack of the rock.' : 'You find a key on a nail by the door.');
   }
 }
-
-/** What the hero notices as a way opens, in built rooms and in a natural cave's rock. */
-const BUILT_SAYS = { key: 'You find a key on a nail by the door.', unlocked: 'The key turns, stiffly. The door gives.', unbarred: 'You lift the bar from its brackets. The way back is open.', found: 'A draught from the wall: a hidden door.' } as const;
-const CARVED_SAYS = { key: 'You find a key wedged in a crack of the rock.', unlocked: 'The key turns, stiffly. The grate swings back on its pins.', unbarred: 'You lever the wedged boulder out of the gap. The way back is open.', found: 'A draught through stacked stones: a way hidden behind them.' } as const;

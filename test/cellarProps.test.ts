@@ -62,6 +62,22 @@ test('cellar chests: one lid apart per chest, on top of the body, its hinge alon
   assert.ok(seen > 0, 'some test cellar has a chest');
 });
 
+test('cellar doors: each opens in sight; a swinging one on a hinge at its post, a barred one with its bar apart', () => {
+  let n = 0;
+  for (const c of cellars) for (const d of cellarMeshes(c, models).doors) {
+    n++;
+    assert.ok(Math.abs(Math.hypot(d.through[0], d.through[1]) - 1) < 1e-9);
+    if (d.opens === 'swing') {
+      assert.ok(d.hinge, `${d.kind} swings on a hinge`);
+      const ax = d.at[0] - d.hinge[0], az = d.at[2] - d.hinge[2];
+      // Along the wall (across the way), at least half the doorway from its middle.
+      assert.ok(Math.abs(ax * d.through[0] + az * d.through[1]) < 1e-9 && Math.hypot(ax, az) >= 0.6);
+    }
+    if (d.kind === 'oneway' && !c.form.space.carved) assert.ok(d.bar && d.bar.index.length > 0, 'the bar is drawn apart');
+  }
+  assert.ok(n > 0, 'some test cellar has a door with a state');
+});
+
 test('cellar props: layer means match the textures they divide by', () => {
   const lin = (v: number) => Math.pow(v / 255, 2.2);
   const layers = { [M.Plaster]: generateFacadeLayer(6, 64), [M.Oak]: generateMedievalLayer(MEDIEVAL_NAMES.indexOf('oak'), 64), [M.Thatch]: generateMedievalLayer(MEDIEVAL_NAMES.indexOf('thatch'), 64) };
