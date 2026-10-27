@@ -43,7 +43,7 @@ else {
   await shoot('02-journal');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(600);
-  const kind = await page.evaluate(() => window.game.wild.territories.at(-1).def.id);
+  const kind = await page.evaluate(() => window.game.wild.territories.at(-1).kind);
   await meet(kind, 13)(page);
   await page.waitForTimeout(2500);
   await shoot('03-band');
