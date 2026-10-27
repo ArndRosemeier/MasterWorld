@@ -52,9 +52,9 @@ export const items: ItemCatalog = {
     { id: 'scroll-mend', name: 'Scroll of mending', kind: 'writing', teaches: 'mend', value: 70, weight: 0.1, lore: 'A hedge witch wrote it out, with a pressed leaf in the fold.' },
   ],
   uniques: [
-    { id: 'lantern-blade', base: 'short-sword', name: "Grundmar's Lantern-Blade", bonuses: { blades: 10, perception: 6 }, danger: 14, lore: 'A dwarf of the old realm forged it to light the deep halls. Since the Fading it has only glinted, until lately.' },
-    { id: 'threshold', base: 'round-shield', name: 'Threshold', bonuses: { shields: 10, armour: 5 }, danger: 18, lore: 'Its rim bears the open door of the Threshold. The temple keeper would give a great deal to see it.' },
-    { id: 'watch-mace', base: 'mace', name: 'Coldiron of the Watch', bonuses: { maces: 9, dodge: 4 }, danger: 18, lore: 'The valley watch carried it when the watch-house still stood. It is cold to the touch in any weather.' },
+    { id: 'lantern-blade', base: 'short-sword', name: "Grundmar's Lantern-Blade", bonuses: { blades: 10, perception: 6 }, danger: 14, grants: 'deeplight', lore: 'A dwarf of the old realm forged it to light the deep halls. Since the Fading it has only glinted, until lately.' },
+    { id: 'threshold', base: 'round-shield', name: 'Threshold', bonuses: { shields: 10, armour: 5 }, danger: 18, grants: 'hold-door', lore: 'Its rim bears the open door of the Threshold. The temple keeper would give a great deal to see it.' },
+    { id: 'watch-mace', base: 'mace', name: 'Coldiron of the Watch', bonuses: { maces: 9, dodge: 4 }, danger: 18, grants: 'watch-cold', lore: 'The valley watch carried it when the watch-house still stood. It is cold to the touch in any weather.' },
   ],
   treasure: [
     { id: 'vermin', items: [['trinket', 3], ['old-coin', 1], ['ring', 1]], count: [0, 1], coins: [0, 4] },

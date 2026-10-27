@@ -59,7 +59,11 @@ const SESSIONS = [
   ] },
   { id: 'town', query: `${still}&hour=12&weather=clear`, shots: [
     { name: 'town-noon' },
-    { name: 'pack', act: (p) => p.keyboard.press('KeyI') },
+    // The pack with a legendary piece worn, its card saying the ability it gives (C5).
+    { name: 'pack', act: async (p) => {
+      await p.evaluate(() => { const g = window.game; g.wearLegend(g.setting.items.uniques[0].id); });
+      await p.keyboard.press('KeyI');
+    } },
     { name: 'map', act: async (p) => { await close(p); await p.keyboard.press('KeyM'); } },
     { name: 'town-dusk', act: async (p) => { await close(p); await turn(18.3, 'fair')(p); } },
     { name: 'town-night', act: turn(23, 'clear') },

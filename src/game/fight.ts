@@ -6,7 +6,7 @@
  * are the dungeon's own frame. Pure: the game turns the events into notes, sounds and the HUD.
  */
 import { Rng, angleDiff, deriveSeed } from '@futuremagic/core';
-import type { AbilityDef, DamageKind, SettingModule } from '../setting/contract';
+import { abilityOf, type AbilityDef, type DamageKind, type SettingModule } from '../setting/contract';
 import { strike, threatOf, type Blow, type Strike, type Threat } from '../sim/combat';
 import { radiusOf, type Creature, type Den, type DenEvent, type Quarry } from '../sim/creatures';
 import type { Character, SkillUp } from './character';
@@ -128,7 +128,7 @@ export class Fight implements RecipeWorld {
 
   /** Use an ability from the action bar; a line why not if it cannot be used now. */
   use(id: string): string | null {
-    const a = this.setting.abilities.find((x) => x.id === id);
+    const a = abilityOf(this.setting, id);
     if (!a) return 'No such ability.';
     const target = this.target && this.target.state !== 'dead' ? this.target.id : null;
     const b = blowOf(a);

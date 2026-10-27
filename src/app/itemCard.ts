@@ -5,7 +5,7 @@
  * stars. Shown fresh, the rarity sets the entrance and the lines rise one by one. The fight HUD shows finds
  * with it, the pack window what is worn and carried (styles in brass.css).
  */
-import type { Rarity, SettingModule } from '../setting/contract';
+import { abilityOf, type Rarity, type SettingModule } from '../setting/contract';
 import type { Item } from '../game/items';
 import { condition, wearState } from '../game/upkeep';
 import { el } from './dom';
@@ -19,10 +19,16 @@ export function itemLines(i: Item, setting: SettingModule): string[] {
   if (d?.armour) lines.unshift(`armour ${d.armour}`);
   if (d?.block) lines.unshift(`blocks ${Math.round(d.block * 100)}%`);
   if (d?.heal) lines.unshift(`restores ${d.heal} health`);
+  // An ability only items give (D31, C5): the hero has it while wearing this.
+  const a = abilityOf(setting, i.grants);
+  if (a) lines.push(`${GRANTS}${a.name}: ${a.text}`);
   // Worn gear says how worn (game/upkeep.ts): it strikes and guards less well until a smith mends it.
   if (i.wear) { const s = wearState(i), pct = `${Math.round(condition(i) * 100)}% sound`; lines.push(s === 'new' ? pct : `${s}: ${pct}`); }
   return lines;
 }
+
+/** How a card's line about the ability an item gives begins. */
+const GRANTS = 'Worn, it gives ';
 
 /** How each rarity's ward is dressed. */
 const DRESS: Record<Rarity, { sparks: number; gear: boolean }> = {
@@ -31,7 +37,7 @@ const DRESS: Record<Rarity, { sparks: number; gear: boolean }> = {
 
 /** The card; with `enter` (seconds) it makes its entrance after that delay and its lines rise one by one. */
 export function itemCard(i: Item, setting: SettingModule, enter: number | null = null): HTMLElement {
-  const lines = itemLines(i, setting).map((l) => el('div', { className: `line${l.startsWith('+') ? ' bonus' : l.endsWith('% sound') ? ' wear' : ''}` }, l));
+  const lines = itemLines(i, setting).map((l) => el('div', { className: `line${l.startsWith('+') ? ' bonus' : l.endsWith('% sound') ? ' wear' : l.startsWith(GRANTS) ? ' grants' : ''}` }, l));
   if (i.lore) lines.push(el('div', { className: 'line lore' }, i.lore));
   const head = el('div', { className: 'rarity' }, i.rarity, ...(i.rarity === 'legendary' ? [' ', twinkles()] : []));
   const c = el('div', { className: `card plate ${i.rarity}` }, head, el('div', { className: 'name' }, i.name), ...lines);

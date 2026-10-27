@@ -82,13 +82,13 @@ export class SpellView {
     this.mesh.count = 0;
   }
 
-  /** How an ability shows: its skill's (a school's) colour and motif, else a pale gold radiance. */
+  /** How an ability shows: its own glow (an item's), else its skill's (a school's) colour and motif, else a pale gold radiance. */
   showingOf(def: AbilityDef): Look {
-    const id = def.skill ?? '';
+    const id = def.glow ? `ability:${def.id}` : def.skill ?? '';
     let l = this.looks.get(id);
     if (!l) {
-      const k = this.setting.skills.find((s) => s.id === id);
-      const c = k?.color ?? [1, 0.92, 0.7], motif = k?.motif ?? 'radiance';
+      const k = this.setting.skills.find((s) => s.id === def.skill);
+      const c = def.glow?.color ?? k?.color ?? [1, 0.92, 0.7], motif = def.glow?.motif ?? k?.motif ?? 'radiance';
       l = { color: new Color().setRGB(c[0], c[1], c[2]), motif, n: motifIndex(motif) };
       this.looks.set(id, l);
     }
