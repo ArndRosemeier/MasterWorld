@@ -7,6 +7,7 @@ import type { Quarry } from '../src/sim/creatures';
 import type { Land } from '../src/sim/wild';
 import { COURT, FACE, POSTS, holdBare, holdGround, holdSite, inHoldShape } from '../src/world/hold';
 import { holdMesh } from '../src/world/holdMesh';
+import { holdRock, inHoldRock } from '../src/world/holdRock';
 import { onLand } from '../src/world/dungeon/site';
 
 const dwarves = classic.peoples.find((p) => p.id === 'dwarf')!;
@@ -44,6 +45,24 @@ test('hold: the gate is solid but for its doorway\'s recess; the court is open; 
   const m = holdMesh(3);
   assert.ok(m.index.length > 1000 && m.index.length % 3 === 0);
   for (const v of m.normal) assert.ok(Number.isFinite(v));
+});
+
+test('hold: the gate is cut into a crag that rises over it and bars the hill beside it; the court stays open; the wardens are carved', () => {
+  // The land as the hold shapes it on the test's hillside, from the court.
+  const ground = (u: number, v: number) => { const [x, z] = onLand(site, u, v); return holdGround(site, x, z, hill.height(x, z)) - site.level; };
+  const rock = holdRock(3, ground), m = rock.mesh;
+  assert.ok(m.index.length % 3 === 0 && m.index.length / 3 > 20000, `${m.index.length / 3} triangles`);
+  for (const v of m.normal) assert.ok(Number.isFinite(v));
+  let top = -Infinity, statue = 0;
+  for (let i = 0; i < m.position.length; i += 3) {
+    const u = m.position[i], y = m.position[i + 1], v = m.position[i + 2];
+    if (Math.abs(u) < 6 && v < 0) top = Math.max(top, y);
+    if (Math.hypot(u - 7.6, v - 2.6) < 1.2 && y > 4.5) statue++;
+  }
+  assert.ok(top > FACE.h, `the crag rises over the gate (${top.toFixed(1)} m)`);
+  assert.ok(statue > 50, 'a warden stands on each plinth, taller than the front\'s plinth course');
+  assert.ok(inHoldRock(rock, 18, -2) && inHoldRock(rock, -18, -2), 'the crag beside the gate');
+  for (const [u, v] of [[0, 4], [-9, 12], [9, 20], [0, -1]]) assert.ok(!inHoldRock(rock, u, v), `the court is open at ${u}, ${v}`);
 });
 
 /** The wardens at their posts on level ground; the hero walks in from the town. */

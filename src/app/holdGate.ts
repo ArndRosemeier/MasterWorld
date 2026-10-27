@@ -18,6 +18,7 @@ import type { HoldDecision } from '../world/decisions';
 import { inHoldShape } from '../world/hold';
 import { inFrame } from '../world/dungeon/site';
 import { holdMesh } from '../world/holdMesh';
+import { holdRockOnLand, inHoldRock, type HoldRock } from '../world/holdRock';
 import { Encounter, type Arena } from './encounter';
 import type { WildHost } from './wildLand';
 
@@ -26,10 +27,14 @@ export interface HoldHost extends Omit<WildHost, 'light'> {
   readonly standing: Standing;
   /** Standing with a people changed. */
   changed(c: StandingChange): void;
+  /** The terrain workers, for the crag and the carved wardens (none: carved here, a stall of most of a second). */
+  readonly jobs?: { holdRock(site: HoldDecision, rock: number): Promise<HoldRock> };
 }
 
 /** The wardens are built once the hero is this near the gate, metres. */
 const BUILD = 420;
+/** The crag and the carved wardens are carved once the hero is this near, metres (farther off the gate's front alone reads). */
+const CARVE = 900;
 
 export class HoldGate {
   readonly mesh: Mesh;
@@ -38,6 +43,8 @@ export class HoldGate {
   private watch: HoldWatch | null = null;
   private encounter: Encounter | null = null;
   private delve: Delve | null = null;
+  private carved: Promise<void> | null = null;
+  private rock: HoldRock | null = null;
 
   constructor(private readonly host: HoldHost, readonly site: HoldDecision, readonly people: PeopleDef, private readonly land: Land, private readonly saved?: DelveSave) {
     this.mesh = buildingMeshAt(holdMesh(deriveSeed(host.seed, 'hold', site.id)), site.x, site.level, site.z, 'hold', site.yaw);
@@ -52,6 +59,7 @@ export class HoldGate {
   /** Every frame, after the fights have stepped: the wardens built as the hero comes, and what they make of them. */
   tend(dt: number, x: number, z: number): void {
     const off = this.off(x, z);
+    if (!this.carved && off < CARVE) this.carved = this.carve();
     if (!this.built && off < BUILD) this.built = this.build();
     this.awake = awake(this.awake, off);
     const w = this.watch;
@@ -67,9 +75,9 @@ export class HoldGate {
 
   /** Is a body of radius `r` at (x, z) in the gate's stone or the court's walls? */
   solid(x: number, z: number, r: number): boolean {
-    if (Math.abs(x - this.site.x) > 40 || Math.abs(z - this.site.z) > 40) return false;
+    if (Math.abs(x - this.site.x) > 50 || Math.abs(z - this.site.z) > 50) return false;
     const [u, v] = inFrame(this.site, x, z);
-    return inHoldShape(u, v, r);
+    return inHoldShape(u, v, r) || (!!this.rock && inHoldRock(this.rock, u, v));
   }
 
   /** The wardens' encounter once they stand (app/encounter.ts plays it while the hero is near). */
@@ -79,7 +87,15 @@ export class HoldGate {
   diff(): DelveSave | undefined { return this.delve?.tally() ?? this.saved; }
 
   /** Their bodies not drawn yet, though the hero is near (for screenshots). */
-  get warming(): boolean { return this.awake && !!this.built && !this.encounter; }
+  get warming(): boolean { return this.awake && ((!!this.built && !this.encounter) || (!!this.carved && !this.rock)); }
+
+  /** The crag the gate is cut into and the carved wardens, from a worker; drawn as the gate is. */
+  private async carve(): Promise<void> {
+    const h = this.host, seed = deriveSeed(h.seed, 'hold', this.site.id, 'rock');
+    const rock = await (h.jobs ? h.jobs.holdRock(this.site, seed) : Promise.resolve(holdRockOnLand((x, z) => this.land.height(x, z), this.site, seed)));
+    void h.stage.add(buildingMeshAt(rock.mesh, this.site.x, this.site.level, this.site.z, 'hold-rock', this.site.yaw));
+    this.rock = rock;
+  }
 
   private async build(): Promise<void> {
     const h = this.host, hold = this.people.hold!;

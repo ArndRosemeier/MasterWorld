@@ -23,6 +23,8 @@ export const FACE = { h: 17, foot: 3, run: 12, half: 26, back: 40 } as const;
 
 /** The gate's front (m): its half width and height, and the doorway's half width, height and recess. */
 export const GATE = { half: 11, h: 13.5, door: 2.6, doorH: 6.6, recess: 2.2 } as const;
+/** Where the carved wardens stand (gate frame): either side of the pillars, a little out, on plinths this high, turned in a little; how wide they are (m). */
+export const WARDENS = { x: 7.6, z: 2.6, plinth: 1.35, turn: -0.25, r: 1.1 } as const;
 /** The low walls along the court's sides: how far out they run and how high they stand (m). */
 export const WALLS = { out: 18, h: 1.3, thick: 0.6 } as const;
 
@@ -57,11 +59,11 @@ export function holdGround(d: HoldDecision, x: number, z: number, h: number): nu
   return g;
 }
 
-/** The court and the gate itself (in the gate's frame): nothing grows there. */
+/** The court, the gate itself and the crag it is cut into (holdRock.ts): nothing grows there. */
 export function holdBare(d: HoldDecision, x: number, z: number): boolean {
   if (Math.abs(x - d.x) > HOLD_REACH || Math.abs(z - d.z) > HOLD_REACH) return false;
   const [u, v] = inFrame(d, x, z);
-  return outsideCourt(u, v) < 4 || (v < 0 && v > -FACE.foot - FACE.run - 2 && Math.abs(u) < FACE.half);
+  return outsideCourt(u, v) < 4 || (v < 1 && v > -FACE.back + 14 && Math.abs(u) < FACE.half + 12);
 }
 
 /** Is a body of radius `r` at (u, v) of the gate's frame in the gate's stone or the court's walls? */
@@ -74,7 +76,7 @@ export function inHoldShape(u: number, v: number, r: number): boolean {
   // The pillars by the door and the statues before them.
   for (const side of [-1, 1]) {
     if (Math.abs(u - side * 4.4) < 1.2 + r && v < 1.6 + r) return true;
-    if (Math.hypot(u - side * 7.6, v - 2.6) < 1.1 + r) return true;
+    if (Math.hypot(u - side * WARDENS.x, v - WARDENS.z) < WARDENS.r + r) return true;
   }
   // The side walls and the braziers at their ends.
   if (Math.abs(Math.abs(u) - COURT.half - WALLS.thick / 2) < WALLS.thick / 2 + r && v > -0.5 && v < WALLS.out + 0.5 + r) return true;

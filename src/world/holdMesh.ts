@@ -1,14 +1,14 @@
 /**
  * A hold's gate as it stands on the land (pure): a front of dressed stone cut into the hill, a tall doorway
  * with its two great doors banded in iron, square pillars under a heavy lintel, a ward-band of runes, two
- * carved wardens on plinths, and a paved court walled at its sides with braziers at the walls' ends. In the
+ * plinths for the carved wardens (holdRock.ts), and a paved court walled at its sides with braziers at the walls' ends. In the
  * building mesh format, so it draws with the town's one building shader (nothing new to compile). Its own
  * frame (world/hold.ts): the doorway's middle at the origin, out of the gate towards +z, the court at y 0.
  */
 import { Rng } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type Tint } from './dungeon/meshKit';
-import { COURT, GATE, WALLS } from './hold';
+import { COURT, GATE, WALLS, WARDENS } from './hold';
 
 /** Dwarf-dressed granite, warm grey; the rune band paler; the doors' oak dark with age; iron nearly black. */
 const STONE: Tint = [184, 178, 168];
@@ -25,7 +25,7 @@ export function holdMesh(seed = 1): BuildingMesh {
   front(k, rng);
   doorway(k);
   pillars(k, rng);
-  wardens(k, rng);
+  plinths(k, rng);
   court(k, rng);
   return k.mesh();
 }
@@ -99,30 +99,13 @@ function pillars(k: MeshKit, rng: Rng): void {
   k.box(0, GATE.doorH + 1.5, 0.75, 2 * 4.4 + 0.4, 0.5, 1.6, 0, BuildingMat.Ashlar, DARKER);
 }
 
-/**
- * Two carved wardens on plinths before the pillars, a little over twice a dwarf's height: broad robed
- * bodies, folded arms over a beard to the belt, a helm, a great axe upright before them.
- */
-function wardens(k: MeshKit, rng: Rng): void {
+/** The wardens' plinths before the pillars (the wardens themselves are carved by holdRock.ts, in a worker). */
+function plinths(k: MeshKit, rng: Rng): void {
   for (const side of [-1, 1]) {
-    const x = side * 7.6, z = 2.6, tone = (v: number) => varyTint(rng, STONE, v);
-    const turn = side * -0.25;
-    k.box(x, 0, z, 1.9, 1.1, 1.9, turn, BuildingMat.Ashlar, tone(0.03));
-    k.box(x, 1.1, z, 1.6, 0.25, 1.6, turn, BuildingMat.Ashlar, DARKER);
-    // Robe, wider at the foot; the chest; the shoulders.
-    k.stone(x, 1.35, z, 1.45, 1.6, 1.15, turn, BuildingMat.Ashlar, tone(0.03), rng, 0.02, 0.15);
-    k.stone(x, 2.9, z, 1.3, 1.1, 1.0, turn, BuildingMat.Ashlar, tone(0.03), rng, 0.02, 0.15);
-    k.stone(x, 3.9, z, 1.6, 0.45, 0.95, turn, BuildingMat.Ashlar, tone(0.03), rng, 0.02, 0.25);
-    // The beard falls over the folded arms, the head under its helm.
-    const fx = Math.sin(turn), fz = Math.cos(turn);
-    k.stone(x + fx * 0.48, 2.6, z + fz * 0.48, 0.7, 1.55, 0.3, turn, BuildingMat.Ashlar, tone(0.02), rng, 0.03, 0.3);
-    k.stone(x + fx * 0.42, 3.05, z + fz * 0.42, 1.25, 0.32, 0.32, turn, BuildingMat.Ashlar, tone(0.02), rng, 0.02, 0.3);
-    k.stone(x, 4.3, z, 0.7, 0.75, 0.75, turn, BuildingMat.Ashlar, tone(0.02), rng, 0.02, 0.35);
-    k.stone(x, 4.85, z, 0.9, 0.45, 0.9, turn, BuildingMat.Ashlar, DARKER, rng, 0.02, 0.55);
-    // The axe: a haft from the plinth to the chin, its head beside the face.
-    const ax = x + fx * 0.95, az = z + fz * 0.95;
-    k.box(ax, 1.35, az, 0.14, 3.4, 0.14, turn, BuildingMat.Ashlar, DARKER);
-    k.box(ax + Math.cos(turn) * side * 0.3, 4.0, az - Math.sin(turn) * side * 0.3, 0.6, 0.85, 0.1, turn, BuildingMat.Ashlar, DARKER);
+    const x = side * WARDENS.x, z = WARDENS.z, turn = side * WARDENS.turn;
+    k.box(x, 0, z, 1.9, 0.18, 1.9, turn, BuildingMat.Ashlar, DARKER);
+    k.box(x, 0.18, z, 1.75, WARDENS.plinth - 0.43, 1.75, turn, BuildingMat.Ashlar, varyTint(rng, STONE, 0.03));
+    k.box(x, WARDENS.plinth - 0.25, z, 1.95, 0.25, 1.95, turn, BuildingMat.Ashlar, DARKER);
   }
 }
 

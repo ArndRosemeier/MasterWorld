@@ -15,9 +15,10 @@ import type { BuildingMesh, TownPlan } from '@futuremagic/settlement';
 import { caveField, caveShell, type CaveField } from '../world/dungeon/caveRock';
 import { mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
 import type { Site } from '../world/dungeon/site';
+import { holdRockOnLand, type HoldRock } from '../world/holdRock';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'decisions'; decisions: readonly Decision[] });
-export type TerrainResult = ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth;
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'decisions'; decisions: readonly Decision[] });
+export type TerrainResult = ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth | HoldRock;
 
 /** A town's buildings merged per cell, and its plan when asked for (a settlement founded while playing is planned here). */
 export interface TownMeshes { readonly cells: TownCellMesh[]; readonly plan: TownPlan | null }
@@ -53,6 +54,10 @@ serve<TerrainJob, TerrainResult>((job) => {
   if (job.kind === 'caveMouth') {
     const t = terrain, mouth = mouthOnLand((x, z) => t.height(x, z), job.site, job.cave);
     return { result: mouth, transfer: [mouth.blocked.buffer, ...meshBuffers(mouth.mesh)] };
+  }
+  if (job.kind === 'holdRock') {
+    const t = terrain, rock = holdRockOnLand((x, z) => t.height(x, z), job.site, job.rock);
+    return { result: rock, transfer: [rock.blocked.buffer, ...meshBuffers(rock.mesh)] };
   }
   if (job.kind === 'horizon') {
     const t = terrain;

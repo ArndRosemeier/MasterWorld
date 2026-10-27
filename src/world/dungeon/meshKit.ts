@@ -131,11 +131,12 @@ export class MeshKit {
     const U = (a: number, b: number) => [[o, o], [o, o + b], [o + a, o + b], [o + a, o]];
     const side = [lo, hi, hi, lo];
     this.quad(v[4], v[7], v[6], v[5], U(sx, sz), mat, hi); // top
-    this.quad(v[0], v[1], v[2], v[3], U(sx, sz), mat, lo); // bottom
-    this.quad(v[0], v[4], v[5], v[1], U(sy, sx), mat, side); // -z
-    this.quad(v[2], v[6], v[7], v[3], U(sy, sx), mat, side); // +z
-    this.quad(v[3], v[7], v[4], v[0], U(sy, sz), mat, side); // -x
-    this.quad(v[1], v[5], v[6], v[2], U(sy, sz), mat, side); // +x
+    this.quad(v[0], v[1], v[2], v[3], U(sz, sx), mat, lo); // bottom
+    // The sides: u along the face, v up it (a wall's courses run level, a beam's grain along it).
+    this.quad(v[0], v[4], v[5], v[1], U(sx, sy), mat, side); // -z
+    this.quad(v[2], v[6], v[7], v[3], U(sx, sy), mat, side); // +z
+    this.quad(v[3], v[7], v[4], v[0], U(sz, sy), mat, side); // -x
+    this.quad(v[1], v[5], v[6], v[2], U(sz, sy), mat, side); // +x
   }
 
   /** An upright cylinder (a barrel, a vat, a candle), `bulge` widens its middle. */
