@@ -104,7 +104,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     };
     // Faster water is rougher. (Blended, not branched: an If here turned rivers opaque on WebGPU, the refraction
     // read below lost its view of the bed.)
-    const choppy = mix(float(1), float(1.8), smoothstep(1.0, 3.0, speed));
+    const choppy = mix(float(1.4), float(2.2), smoothstep(1.0, 3.0, speed));
     const runSlope = mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(choppy);
     const rippled = mix(slopeOf(hStill), runSlope, running);
     // Raindrops ring the surface near the camera.
@@ -160,7 +160,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       const down = along.sub(carried(ph));
       const streak = mx_noise_float(vec3(down.mul(0.12).add(seed), sideways.mul(1.1), t.mul(0.2))).mul(0.5).add(0.5);
       const churn = mx_noise_float(vec3(down.mul(0.45).add(seed), sideways.mul(1.3), t.mul(0.5))).mul(0.5).add(0.5);
-      return smoothstep(0.69, 0.92, streak).mul(0.38).add(rush.mul(smoothstep(0.55, 0.85, churn.mul(0.7).add(streak.mul(0.4)))).mul(0.7));
+      // Seen from the bank the reflected sky drowns the ripples: the streaks carry the current there.
+      return smoothstep(0.69, 0.92, streak).mul(mix(float(0.6), float(0.38), smoothstep(8.0, 60.0, camDist))).add(rush.mul(smoothstep(0.55, 0.85, churn.mul(0.7).add(streak.mul(0.4)))).mul(0.7));
     };
     const runningFoam = mix(runFoam(phaseA, 0), runFoam(phaseB, 7.1), layerB).mul(running);
     // The falling sheet: streaks stretched down the fall, rushing.

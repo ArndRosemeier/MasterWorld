@@ -134,3 +134,16 @@ test('water mask: the sea surface reaches the shoreline on a gentle beach (no gr
   }
   assert.ok(checked > 3, `${checked} shore crossings`);
 });
+
+test('hydro: a river ends at the shore, at the sea\'s level (it never runs on over the sea floor)', () => {
+  const sk = new Skeleton(seed, classic.world);
+  let mouths = 0;
+  for (const r of tile.rivers) {
+    const n = r.level.length;
+    if (sk.elevation(r.xz[(n - 1) * 2], r.xz[(n - 1) * 2 + 1]) >= 0) continue;
+    mouths++;
+    assert.ok(r.level[n - 1] <= 0, `ends at ${r.level[n - 1]} m`);
+    assert.ok(sk.elevation(r.xz[(n - 2) * 2], r.xz[(n - 2) * 2 + 1]) >= 0, 'one point past the shore, no more');
+  }
+  assert.ok(mouths > 0, 'no river reaches the sea');
+});
