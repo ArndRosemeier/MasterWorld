@@ -3,9 +3,9 @@
  * and stamina that grow with the skills that use them, what is worn and carried, and the one "power"
  * number the VGM reads wherever it needs a level. Pure: saved as plain data.
  */
-import type { BackgroundDef, DamageKind, ItemCatalog, SettingModule, Slot } from '../setting/contract';
+import { abilityOf, type BackgroundDef, type DamageKind, type ItemCatalog, type SettingModule, type Slot } from '../setting/contract';
 import type { Blow, Guard } from '../sim/combat';
-import { addToBar, cleanBar, defaultBar, type Bar } from './actionBar';
+import { addToBar, cleanBar, clearSlot, defaultBar, type Bar } from './actionBar';
 import type { Worn } from './recipe';
 import { defOf, plainItem, type Item } from './items';
 import { strengthOf, wearState, wornBy, type Lodging, type WearState } from './upkeep';
@@ -82,7 +82,8 @@ export class Character {
     for (const s of setting.skills) this.skills.set(s.id, saved?.skills[s.id] ?? s.start);
     if (saved) {
       Object.assign(this.worn, saved.worn);
-      this.pack.push(...saved.pack);
+      for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) this.worn[k] = this.granting(this.worn[k]!);
+      this.pack.push(...saved.pack.map((it) => this.granting(it)));
       this.coins = saved.coins;
       this.background = saved.background ?? '';
       this.lodging = saved.lodging ?? null;
@@ -120,17 +121,35 @@ export class Character {
     this.bar = defaultBar(this.known);
   }
 
-  /** The abilities this hero can use, in the setting's order: every untaught one and those learned. */
+  /**
+   * The abilities this hero can use, in the setting's order: every untaught one, those learned, and those a
+   * worn item gives (D31, C5).
+   */
   get known(): string[] {
-    return this.setting.abilities.filter((a) => !a.taught || this.learned.has(a.id)).map((a) => a.id);
+    const given = new Set(Object.values(this.worn).map((it) => it?.grants));
+    return this.setting.abilities.filter((a) => (a.item ? given.has(a.id) : !a.taught || this.learned.has(a.id))).map((a) => a.id);
+  }
+
+  /** A legendary item from a save older than item abilities (C5), with what its canon's piece gives. */
+  private granting(it: Item): Item {
+    if (it.rarity !== 'legendary' || it.grants) return it;
+    const u = this.cat.uniques.find((x) => x.name === it.name && x.base === it.def);
+    return u?.grants ? { ...it, grants: u.grants } : it;
+  }
+
+  /** After putting something on or off: what a worn item gives goes onto the bar, what is no longer given off it. */
+  private regrant(had: readonly string[]): void {
+    const now = this.known;
+    for (const id of now) if (!had.includes(id)) this.bar = addToBar(this.bar, id);
+    for (const id of had) if (!now.includes(id)) { const i = this.bar.indexOf(id); if (i >= 0) this.bar = clearSlot(this.bar, i); }
   }
 
   knows(id: string): boolean { return this.known.includes(id); }
 
   /** A taught ability learned (from a teacher, or the debug menu): onto the bar's first free slot. False if there is no such ability or it is known already. */
   learn(id: string): boolean {
-    const a = this.setting.abilities.find((x) => x.id === id);
-    if (this.knows(id) || !a) return false;
+    const a = abilityOf(this.setting, id);
+    if (this.knows(id) || !a || a.item) return false;
     this.learned.add(id);
     // A spell opens its school (at its first rank) if nothing opened it before.
     if (a.skill && !this.opened(a.skill)) this.openSkill(a.skill);
@@ -289,21 +308,24 @@ export class Character {
     const d = defOf(this.cat, item.def);
     if (!d.slot) return;
     const slot: Slot | 'ring2' = d.slot === 'ring' && this.worn.ring ? 'ring2' : d.slot;
-    const i = this.pack.indexOf(item);
+    const had = this.known, i = this.pack.indexOf(item);
     if (i >= 0) this.pack.splice(i, 1);
     const old = this.worn[slot];
     if (old) this.pack.push(old);
     this.worn[slot] = item;
     this.health = Math.min(this.health, this.maxHealth);
+    this.regrant(had);
   }
 
   /** Take off what is worn in `slot`, into the pack. */
   unequip(slot: Slot | 'ring2'): void {
     const it = this.worn[slot];
     if (!it) return;
+    const had = this.known;
     delete this.worn[slot];
     this.pack.push(it);
     this.health = Math.min(this.health, this.maxHealth);
+    this.regrant(had);
   }
 
   /** Drink or eat something from the pack: the health it gave. */

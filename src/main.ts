@@ -38,7 +38,7 @@ import { WINDOWS } from './render/materials/building';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg } from '@futuremagic/settlement';
-import { validateSetting, type BackgroundDef } from './setting/contract';
+import { abilityOf, validateSetting, type BackgroundDef } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -90,7 +90,7 @@ import { Character } from './game/character';
 import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
 import { bardTells, GuildBook, isGuild, whereOf } from './game/guilds';
-import { coinText } from './game/items';
+import { coinText, uniqueItem } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
 import { RemainsView } from './render/remainsView';
@@ -859,7 +859,18 @@ export async function start(b: Boot): Promise<void> {
     });
     for (const id of UPKEEP_SERVICES) services.set(id, (a) => { const t = talkTown(); if (t) upkeep.answer(id, a.person, t.talk.nameOf(a.person.id)); });
     /** An ability was learned (a teacher, a writing): the hero redressed, and bird form's body made ready once it is known. */
-    const learnedAbility = () => { armHero(); if (birdAbility && character.knows(birdAbility.id)) void birdForm?.warm(); };
+    // What the hero can do changed (a spell learned, an item that gives an ability put on or off): the bar and book show it.
+    const learnedAbility = () => { armHero(); actionBar.draw(); book.redraw(); if (birdAbility && character.knows(birdAbility.id)) void birdForm?.warm(); };
+    /** One of the canon's legendary items (C5) into the pack and on, to try the ability it gives (debug menu, shots). */
+    const wearLegend = (id: string): string => {
+      const u = setting.items.uniques.find((x) => x.id === id);
+      if (!u) return `no legendary item "${id}"`;
+      const it = uniqueItem(u);
+      character.pack.push(it);
+      character.equip(it);
+      learnedAbility();
+      return `${u.name} worn${it.grants ? `: ${abilityOf(setting, it.grants)?.name ?? it.grants} on the action bar` : ''}`;
+    };
     // Lessons (plan 11.4, D49): the guild houses' trainers open skills and ranks and teach, the innkeeper teaches; one more service.
     const lessons = new LessonsUi(character, setting, {
       paused,
@@ -914,10 +925,10 @@ export async function start(b: Boot): Promise<void> {
     const pack = new PackUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
-      changed: armHero,
+      changed: learnedAbility,
       drank: (n) => { if (n > 0) fightHud.healed(); },
       readOut: (why, id) => {
-        const a = setting.abilities.find((x) => x.id === id);
+        const a = abilityOf(setting, id);
         notes.say(why ?? `You read it through, and ${a?.name ?? id} is yours. The page crumbles to dust.`, 7);
         if (!why) learnedAbility();
       },
@@ -943,7 +954,7 @@ export async function start(b: Boot): Promise<void> {
       if (birdForm && id === birdAbility?.id) return birdForm.invoke();
       if (birdForm?.flying) return 'A pheasant cannot do that.';
       if (e) return e.use(id);
-      const a = setting.abilities.find((x) => x.id === id);
+      const a = abilityOf(setting, id);
       if (a && !blowOf(a)) return alone.begin(a, null, player.walker.pos);
       if (id !== POTION) return 'There is nothing here to fight.';
       const r = character.remedy;
@@ -958,7 +969,7 @@ export async function start(b: Boot): Promise<void> {
         const f = leading()?.fighting ?? null;
         if (id === POTION) { const n = potions(); return { left: 0, total: 0, dim: n === 0, on: false, count: n }; }
         if (birdForm && id === birdAbility?.id) { const b = birdForm.state; return { left: b.left, total: birdAbility.cooldown, dim: false, on: b.on }; }
-        const a = setting.abilities.find((x) => x.id === id);
+        const a = abilityOf(setting, id);
         if (!a) return { left: 0, total: 0, dim: true, on: false };
         if (!f) return { left: alone.cooling(id), total: a.cooldown, dim: !!blowOf(a) || character.mana < (a.cost?.mana ?? 0), on: alone.casting?.def === a };
         return { left: f.recipes.cooling(id), total: a.cooldown, dim: character.stamina < (a.cost?.stamina ?? 0) || character.mana < (a.cost?.mana ?? 0), on: (!!blowOf(a)?.again && f.attacking) || f.recipes.casting?.def === a };
@@ -1149,6 +1160,8 @@ export async function start(b: Boot): Promise<void> {
       // Abilities a teacher opens (D49), learned or forgotten here so they can be tried.
       taught: setting.abilities.filter((a) => a.taught).map((a) => ({ id: a.id, name: a.name })),
       known: (id) => character.knows(id),
+      legends: setting.items.uniques.map((u) => ({ id: u.id, name: u.name })),
+      wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
         const did = on ? character.learn(id) : character.forget(id);
         actionBar.draw();
@@ -1157,7 +1170,7 @@ export async function start(b: Boot): Promise<void> {
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(params.seed, home),
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];

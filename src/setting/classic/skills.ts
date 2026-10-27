@@ -38,6 +38,28 @@ export const abilities: readonly AbilityDef[] = [
     text: 'Kneel and become a pheasant: fifteen slow breaths, and never while you fight. Space takes off, W flaps on, X dives. Use it again to land and be yourself.',
   },
   ...spells(),
+  // Abilities only items give (D31, C5): each legendary piece of the canon carries one, the hero has it while wearing it.
+  {
+    id: 'deeplight', icon: '☀', name: 'Deeplight', aim: 'self', skill: 'blades', item: true, cost: { stamina: 18 }, cooldown: 40,
+    glow: { color: [1, 0.95, 0.72], motif: 'radiance' },
+    ops: [{ op: 'area', radius: 5, at: 'self', damage: 6, kind: 'radiant', effect: { id: 'feared', magnitude: 1, duration: 3 }, look: 'deeplight' }],
+    text: 'Raise the blade and let the old light of the deep halls blaze out: it burns what stands near, and what lives in the dark shrinks from it.',
+  },
+  {
+    id: 'hold-door', icon: '⛨', name: 'Hold the Door', aim: 'self', skill: 'shields', item: true, cost: { stamina: 20 }, cooldown: 45,
+    glow: { color: [1, 0.72, 0.32], motif: 'radiance' },
+    ops: [
+      { op: 'effect', to: 'self', effect: { id: 'warded', magnitude: 10, duration: 8 } },
+      { op: 'area', radius: 3, at: 'self', effect: { id: 'held', magnitude: 1, duration: 1.5 }, look: 'threshold' },
+    ],
+    text: 'Plant the shield as the Threshold\'s keepers did: blows glance off you for a while, and what is close cannot get past.',
+  },
+  {
+    id: 'watch-cold', icon: '❄', name: 'Cold of the Watch', skill: 'maces', item: true, range: 3, cost: { stamina: 15 }, cooldown: 20,
+    glow: { color: [0.72, 0.86, 1], motif: 'frost' },
+    ops: [{ op: 'area', radius: 1.5, at: 'target', damage: 5, kind: 'cold', effect: { id: 'frozen', magnitude: 1, duration: 1.5 }, look: 'watch frost' }],
+    text: 'The old iron bites with the cold it keeps: your foe is frozen where it stands for a breath.',
+  },
 ];
 
 /**

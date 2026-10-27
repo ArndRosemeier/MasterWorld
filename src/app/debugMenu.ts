@@ -30,6 +30,9 @@ export interface DebugHost {
   readonly taught: readonly { readonly id: string; readonly name: string }[];
   known(id: string): boolean;
   learn(id: string, on: boolean): string;
+  /** The canon's legendary items (C5), each to put on here and try the ability it gives. */
+  readonly legends: readonly { readonly id: string; readonly name: string }[];
+  wearLegend(id: string): string;
   /** Places worth a look in this world. */
   readonly places: readonly Place[];
   /** Everything, for the command line. */
@@ -85,6 +88,7 @@ export class DebugMenu {
         { label: 'Where am I', run: () => h.viewParams },
       ]],
       ['Abilities', h.taught.map(({ id, name }) => ({ label: `Learn / forget ${name}`, run: () => { const on = !h.known(id); return h.learn(id, on); } }))],
+      ['Legendary items', h.legends.map(({ id, name }) => ({ label: `Put on ${name}`, run: () => h.wearLegend(id) }))],
       ['Time', [
         ...([['Dawn', 6], ['Morning', 9], ['Noon', 12], ['Afternoon', 15], ['Evening', 18.5], ['Night', 23]] as const).map(([label, hour]) => ({ label, run: () => { h.hour = hour; } })),
         { label: 'Clock stopped', run: () => { h.dayMinutes = 0; } },

@@ -413,6 +413,8 @@ export interface UniqueDef {
   readonly lore: string;
   /** Least danger of a place that may hold it. */
   readonly danger: number;
+  /** An ability only items give (D31, C5): the hero has it while wearing this. */
+  readonly grants?: string;
 }
 
 /** What a place or creature of some danger holds. */
@@ -621,6 +623,10 @@ export interface AbilityDef {
    * Not known at the start: a teacher opens it (D49), or the debug menu does. Absent: every hero knows it.
    */
   readonly taught?: boolean;
+  /** Only an item gives it (D31, C5): known while a worn item grants it, never taught. */
+  readonly item?: boolean;
+  /** How its spell shows when not as its skill's school does (an item's ability): colour (sRGB 0..1) and motif. */
+  readonly glow?: { readonly color: readonly [number, number, number]; readonly motif: SpellMotif };
   /** The skill that powers it and that its use trains (absent: the weapon's). */
   readonly skill?: string;
   /** How good at its skill the hero must be to use it (absent: 0); a teacher opens it by rank (C3). */
@@ -978,6 +984,11 @@ export interface LookDef {
 }
 
 /** Authoring errors, one line each (empty: the module is valid). */
+/** The setting's ability of this id, if there is one. */
+export function abilityOf(m: Pick<SettingModule, 'abilities'>, id: string | undefined): AbilityDef | undefined {
+  return id === undefined ? undefined : m.abilities.find((a) => a.id === id);
+}
+
 export function validateSetting(m: SettingModule): string[] {
   const out: string[] = [];
   const where = `setting "${m.id}"`;
@@ -1131,6 +1142,7 @@ function validateFight(m: SettingModule, where: string): string[] {
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);
     for (const k of Object.keys(u.bonuses)) if (!skills.has(k)) out.push(`${where}: unique "${u.id}" raises unknown skill "${k}"`);
+    if (u.grants && !m.abilities.some((a) => a.id === u.grants && a.item)) out.push(`${where}: unique "${u.id}" grants unknown or not item-only ability "${u.grants}"`);
   }
   for (const b of m.backgrounds) {
     for (const k of Object.keys(b.skills)) if (!skills.has(k)) out.push(`${where}: background "${b.id}" raises unknown skill "${k}"`);
@@ -1175,6 +1187,7 @@ function validateAbilities(m: SettingModule, skills: ReadonlySet<string>, where:
     if (ids.has(a.id)) out.push(`${at} defined twice`);
     ids.add(a.id);
     if (a.skill && !skills.has(a.skill)) out.push(`${at} trains unknown skill "${a.skill}"`);
+    if (a.item && a.taught) out.push(`${at} is item-only and cannot be taught too`);
     if (a.level !== undefined && (!a.skill || !(a.level >= 0 && a.level <= 100))) out.push(`${at} needs a skill for its level, and a level 0..100`);
     if (!(a.cooldown >= 0) || !((a.cast ?? 0) >= 0) || Object.values(a.cost ?? {}).some((v) => !(v >= 0))) out.push(`${at} needs cooldown, cast and costs of 0 or more`);
     if (!a.ops.length) out.push(`${at} has no steps`);

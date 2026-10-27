@@ -3,27 +3,10 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { Character } from '../src/game/character';
 import { Alone, Recipes, SELF } from '../src/game/recipe';
-import { Delve } from '../src/game/delve';
-import { outlineCellar, type Cellar } from '../src/world/dungeon/cellar';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
-import { DungeonSpace } from '../src/world/dungeon/space';
+import { cellarFight } from './fightKit';
 
 const SCHOOLS = ['pyromancy', 'cryomancy', 'geomancy', 'vitae', 'luminism', 'umbramancy'];
 const spellsOf = (k: string) => classic.abilities.filter((a) => a.skill === k);
-
-function cellarFight(seed: number) {
-  const c: Cellar = Array.from({ length: 24 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar)).find((x) => x.dweller.id === 'goblins')!;
-  const space = new DungeonSpace(c.layout);
-  for (const pl of c.layout.links) space.open.add(pl.link.id);
-  const hero = new Character(classic);
-  const d = new Delve(c, space, classic, hero, seed);
-  const foe = d.den.creatures[0];
-  // A free spot 2.5 m from it, with a clear line to it.
-  const free = Array.from({ length: 16 }, (_, k) => (k / 16) * Math.PI * 2).map((a) => ({ x: foe.x + Math.cos(a) * 2.5, y: foe.y, z: foe.z + Math.sin(a) * 2.5 }))
-    .find((p) => d.den.ground.clearance(p.x, p.y + 0.8, p.z) > 0.4 && d.den.ground.sees(p.x, p.y, p.z, foe.x, foe.y, foe.z, 1.2))!;
-  const pose = { ...free, yaw: 0, speed: 0 };
-  return { d, hero, foe, pose };
-}
 
 test('schools: six schools of magic, each with a first spell at level 0 and more above it', () => {
   for (const k of SCHOOLS) {

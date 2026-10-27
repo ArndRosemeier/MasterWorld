@@ -15,6 +15,8 @@ export interface Item {
   /** Skill id → points while worn. */
   readonly bonuses: Readonly<Record<string, number>>;
   readonly lore?: string;
+  /** An item-only ability it gives while worn (D31, C5). */
+  readonly grants?: string;
   /** How worn it is (game/upkeep.ts): 0 new .. 1 broken; absent: new. */
   readonly wear?: number;
 }
@@ -53,6 +55,11 @@ function bonusSkills(d: ItemDef): string[] {
   return ['armour', 'dodge', 'perception'];
 }
 
+/** A named legendary item (plan 11.5) as found, with the ability it gives (C5). */
+export function uniqueItem(u: UniqueDef): Item {
+  return { def: u.base, rarity: 'legendary', name: u.name, bonuses: { ...u.bonuses }, lore: u.lore, ...(u.grants ? { grants: u.grants } : {}) };
+}
+
 /** One item of kind `id` found at `danger`. */
 export function rollItem(cat: ItemCatalog, id: string, danger: number, rng: Rng): Item {
   const d = defOf(cat, id);
@@ -60,8 +67,7 @@ export function rollItem(cat: ItemCatalog, id: string, danger: number, rng: Rng)
   const odds = rarityOdds(danger), x = rng.float();
   const unique = cat.uniques.filter((u: UniqueDef) => u.danger <= danger);
   if (x < odds.legendary && unique.length) {
-    const u = rng.pick(unique);
-    return { def: u.base, rarity: 'legendary', name: u.name, bonuses: { ...u.bonuses }, lore: u.lore };
+    return uniqueItem(rng.pick(unique));
   }
   const rarity: Rarity = x < odds.legendary + odds.rare ? 'rare' : x < odds.legendary + odds.rare + odds.uncommon ? 'uncommon' : 'common';
   return itemAs(cat, id, rarity, danger, rng);

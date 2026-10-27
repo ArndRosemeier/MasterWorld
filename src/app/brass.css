@@ -72,6 +72,7 @@
 .card .line { font-size: 13px; color: var(--ink-dim); }
 .card .line.bonus { color: #a9e38f; }
 .card .line.wear { color: #d08a3a; font-style: italic; }
+.card .line.grants { color: #ffcf6a; max-width: 30ch; text-shadow: 0 0 6px #ffb34066; }
 .card .lore { font-style: italic; font-size: 12px; }
 .card.common { --ward-colour: var(--common); }
 .card.uncommon { --ward-colour: var(--uncommon); border-color: #a07a2e; }

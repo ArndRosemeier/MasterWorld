@@ -6,7 +6,7 @@
  * dragged off the bar is cleared.
  */
 import './actionBar.css';
-import type { AbilityDef, SettingModule } from '../setting/contract';
+import { abilityOf, type AbilityDef, type SettingModule } from '../setting/contract';
 import { BAR_SLOTS, clearSlot, placeOnBar, POTION, swapOnBar } from '../game/actionBar';
 import type { Character } from '../game/character';
 import { BAR_KEYS, barSlotOf, keyLabel, type Bindings } from '../input/controls';
@@ -48,7 +48,7 @@ export const POTION_LOOK = { icon: '⚱', name: 'Drink a potion', text: 'Drink t
 /** An ability's (or the potion's) look: glyph, name, words. */
 export function lookOf(setting: SettingModule, id: string): { icon: string; name: string; text: string; def?: AbilityDef } {
   if (id === POTION) return { ...POTION_LOOK };
-  const def = setting.abilities.find((a) => a.id === id);
+  const def = abilityOf(setting, id);
   return { icon: def?.icon ?? '•', name: def?.name ?? id, text: def?.text ?? '', def };
 }
 
