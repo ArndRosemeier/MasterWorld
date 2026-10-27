@@ -498,5 +498,17 @@
   {
     "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/world/dungeon/rockMesh.ts#add",
     "reason": "Building a cellar's meshes into the stage (lids on pivots now) vs adding a piece to a rock mesh."
+  },
+  {
+    "key": "same name: masterworld/app/birdForm.ts#event + masterworld/app/cellarVisit.ts#event",
+    "reason": "Each handles its own events (a change of shape; a way opening, a key found)."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/app/player.ts#update",
+    "reason": "Per-frame updates of different things: the cellar visit (lantern, ways, key) and the player."
+  },
+  {
+    "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/render/flora/FloraView.ts#add",
+    "reason": "Building a cellar's meshes into the stage vs adding trees to the flora: unrelated adds."
   }
 ]
