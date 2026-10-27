@@ -3,7 +3,7 @@
  * building (and each fence and haystack of its farmland), and those of one square cell are merged into
  * one mesh near and one far (fewer draws).
  */
-import { buildingMesh, hatchLadderTopMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type InteriorFixture, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
+import { buildingMesh, doorLeaves, hatchLadderTopMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type DoorLeaf, type InteriorFixture, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
 import type { Town } from './town';
 
 /** Side of a merge cell, metres. */
@@ -75,11 +75,18 @@ export function mergeMeshes(parts: readonly BuildingMesh[]): BuildingMesh {
 }
 
 /**
- * A building drawn open (D38): its rooms' plan, and its outside with the door open and every storey inside, as one
- * mesh; a cellar's hatch has its lid apart (`lid`, null: none), to swing open (app/hatchClimb.ts), and its ladder's
- * top (`ladderTop`), to rise out of the hole as the lid opens.
+ * A building drawn open (D38): its rooms' plan, and its outside with the doorway open and every storey inside, as one
+ * mesh; its door's leaves apart (`doors`), to swing as one comes and goes; a cellar's hatch has its lid apart (`lid`,
+ * null: none), to swing open (app/hatchClimb.ts), and its ladder's top (`ladderTop`), to rise out of the hole as the
+ * lid opens.
  */
-export interface OpenHouse { readonly plan: InteriorPlan; readonly mesh: BuildingMesh; readonly lid: BuildingMesh | null; readonly ladderTop: BuildingMesh | null }
+export interface OpenHouse {
+  readonly plan: InteriorPlan;
+  readonly mesh: BuildingMesh;
+  readonly lid: BuildingMesh | null;
+  readonly ladderTop: BuildingMesh | null;
+  readonly doors: readonly DoorLeaf[];
+}
 
 /**
  * `b` planned inside and drawn open round its middle (`hatch`: a cellar's trapdoor; `hall`: a guild's hall; `sign`:
@@ -93,5 +100,8 @@ export function openHouse(b: TownBuilding, opts: { readonly hatch: boolean; read
   // A hatch on the ground floor: the plinth's top open over it (its shaft shows through).
   const f = hatchOf(plan);
   const hole = f && f.storey === 0 ? { a0: f.a - f.w / 2, a1: f.a + f.w / 2, b0: f.b - f.d / 2, b1: f.b + f.d / 2 } : undefined;
-  return { plan, mesh: mergeMeshes([buildingMesh(b, at, true, { open: true, sign, hole }), interiorMesh(plan, b, at, { lid: false })]), lid: hatchLidMesh(plan, b, at), ladderTop: hatchLadderTopMesh(plan, b, at) };
+  return {
+    plan, mesh: mergeMeshes([buildingMesh(b, at, true, { open: true, sign, hole }), interiorMesh(plan, b, at, { lid: false, doors: false })]),
+    lid: hatchLidMesh(plan, b, at), ladderTop: hatchLadderTopMesh(plan, b, at), doors: doorLeaves(plan, b, at),
+  };
 }

@@ -21,6 +21,7 @@ import type { TownView } from '../render/town/TownView';
 import { houseKey } from '../world/town';
 import { roomBounce, roomSun, type RoomSun } from '../game/roomLight';
 import { ROOM_LIGHT } from '../render/materials/building';
+import { smoothstep } from '@futuremagic/core';
 import type { Player } from './player';
 import type { TownDoor } from './towns';
 import type { CellarVisit } from './cellarVisit';
@@ -34,6 +35,8 @@ const SERVE_STEP = 0.3;
 /** A building opens as one comes this near its door (m), and shuts once one is this far from it, outside. */
 const OPEN_AT = 7;
 const SHUT_AT = 14;
+/** The door swings open as someone comes within this of it (m), and shuts behind them; a swing takes SWING_FOR (s). */
+const DOOR_NEAR = 3.2, SWING_FOR = 0.45;
 /** How fast the room's thrown-about light follows the sun (per second): the eye takes a moment too. */
 const BOUNCE_EASE = 2;
 /** Pushing this long (s) on a stair without getting anywhere: put off it (a body wedged under a low edge). */
@@ -113,7 +116,8 @@ export class InteriorVisit {
     const b = door.b, plan = house.plan;
     this.open = { door, b, plan, walk: houseWalk(b, plan), flow: new RoomFlow(plan) };
     this.placed = null;
-    await this.view.drawOpen(b, house.mesh, this.towns.viewOf(door.town.id), house.lid, house.ladderTop);
+    this.swing = 0;
+    await this.view.drawOpen(b, house, this.towns.viewOf(door.town.id));
     return this.open;
   }
 
@@ -163,6 +167,7 @@ export class InteriorVisit {
     }
     const o = this.open;
     if (!o) return;
+    this.swingDoor(o, x, z, dt);
     const inNow = o.walk.within(x, z);
     if (inNow && !this.within) this.come();
     else if (!inNow && this.within) this.out();
@@ -174,6 +179,22 @@ export class InteriorVisit {
     const [a, bb] = o.walk.frame.toRoom(x, z);
     // Wedged on a stair for a while, pushing: off it, at the end one was heading for.
     if (w.stuckFor > STUCK_FOR && !this.player.puppet) this.offStair(o, a, bb, k);
+  }
+
+  /** How far the open house's door stands open (0 shut, 1 wide), eased. */
+  private swing = 0;
+
+  /** How far the open house's door stands open (0 shut, 1 wide; for checks). */
+  get doorOpen(): number { return this.swing; }
+
+  /** The door swings open while the hero or one of the house's folk is near it, and shuts again behind them. */
+  private swingDoor(o: Open, x: number, z: number, dt: number): void {
+    const [dx, dz] = o.b.door, near = (px: number, pz: number) => Math.hypot(px - dx, pz - dz) < DOOR_NEAR;
+    // The hero, the folk inside, and the town's folk out on the doorstep coming or going.
+    const want = near(x, z) || (this.placed?.some((p) => near(p.x, p.z)) ?? false) || o.door.town.life.agents.some((a) => near(a.x, a.z)) ? 1 : 0;
+    if (want === this.swing) return;
+    this.swing = want > this.swing ? Math.min(1, this.swing + dt / SWING_FOR) : Math.max(0, this.swing - dt / SWING_FOR);
+    this.view.swingDoors(smoothstep(0, 1, this.swing));
   }
 
   /** The hatch in the room the hero stands by (within reach, on its storey), with a cellar under it; else null. */
