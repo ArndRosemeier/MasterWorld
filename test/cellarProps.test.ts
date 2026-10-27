@@ -15,6 +15,8 @@ import { TOWN_LAYERS } from '../src/render/terrain/groundTextures';
 const models = decodePack(readFileSync(new URL('../public/props/cellar.fmpk', import.meta.url)));
 const spec = JSON.parse(readFileSync(new URL('../tools/props/models.json', import.meta.url), 'utf8')) as { specs: string[] };
 const cellars: Cellar[] = Array.from({ length: 10 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar));
+/** Each cellar's meshes with the models and with the kit alone, built once for all the tests. */
+const built = cellars.map((c) => ({ c, m: cellarMeshes(c, models), bare: cellarMeshes(c) }));
 
 test('cellar props: the pack holds every listed model, with material slots', () => {
   assert.deepEqual([...models.keys()].sort(), [...spec.specs].sort());
@@ -28,8 +30,7 @@ test('cellar props: the pack holds every listed model, with material slots', () 
 });
 
 test('cellar props: meshes with the models are sound and use only the town array\'s layers', () => {
-  for (const c of cellars) {
-    const m = cellarMeshes(c, models), bare = cellarMeshes(c);
+  for (const { m, bare } of built) {
     for (const b of [m.shell, m.props, ...m.doors.map((d) => d.mesh)]) {
       const n = b.position.length / 3;
       assert.ok(n > 0 && b.normal.length === n * 3 && b.uv.length === n * 2 && b.mat.length === n && b.tint.length === n * 3);
@@ -43,7 +44,7 @@ test('cellar props: meshes with the models are sound and use only the town array
 
 test('cellar chests: one lid apart per chest, on top of the body, its hinge along the back\'s top edge', () => {
   let seen = 0;
-  for (const c of cellars) for (const set of [cellarMeshes(c, models), cellarMeshes(c)]) {
+  for (const { c, m, bare } of built) for (const set of [m, bare]) {
     const chests = c.props.filter((p) => p.kind === 'chest');
     assert.equal(set.lids.length, chests.length);
     set.lids.forEach((l, i) => {
@@ -64,7 +65,7 @@ test('cellar chests: one lid apart per chest, on top of the body, its hinge alon
 
 test('cellar doors: each opens in sight; a swinging one on a hinge at its post, a barred one with its bar apart', () => {
   let n = 0;
-  for (const c of cellars) for (const d of cellarMeshes(c, models).doors) {
+  for (const { c, m } of built) for (const d of m.doors) {
     n++;
     assert.ok(Math.abs(Math.hypot(d.through[0], d.through[1]) - 1) < 1e-9);
     if (d.opens === 'swing') {
