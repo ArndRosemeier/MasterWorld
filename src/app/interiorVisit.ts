@@ -9,6 +9,7 @@
  */
 import { interiorBlocked, planInterior, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
+import { guildSigns } from '../game/guilds';
 import type { HouseView } from '../render/town/HouseView';
 import type { SkyView } from '../render/sky';
 import type { PointLight } from 'three/webgpu';
@@ -94,7 +95,7 @@ export class InteriorVisit {
     this.shut();
     const b = door.b, plan = this.planOf(door);
     this.open = { door, b, plan, walk: houseWalk(b, plan) };
-    await this.view.drawOpen(b, plan, this.towns.viewOf(door.town.id));
+    await this.view.drawOpen(b, plan, this.towns.viewOf(door.town.id), guildSigns(door.town.guilds).get(b.id));
     return this.open;
   }
 

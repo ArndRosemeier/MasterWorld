@@ -656,8 +656,11 @@ export async function start(b: Boot): Promise<void> {
     const roomTown = params.room === 'cellar' && firstPromise ? towns.get(firstPromise.town) : towns.townAt(player.walker.pos.x, player.walker.pos.z) ?? startTown;
     if (roomTown && params.room !== null) {
       const plan = roomTown.town.plan;
-      const b = params.room === 'cellar' ? house : params.room === 'guild' ? roomTown.guilds[0]?.b : plan.buildings.find((x) => x.kind === params.room) ?? plan.buildings[Number(params.room)];
-      if (b) await rooms.enter({ town: roomTown, b }, true, params.room === 'cellar'); // the cellar: beside its hatch
+      const guild = params.room === 'guild' || params.room === 'guild-out';
+      const b = params.room === 'cellar' ? house : guild ? roomTown.guilds[0]?.b : plan.buildings.find((x) => x.kind === params.room) ?? plan.buildings[Number(params.room)];
+      // `room=guild-out`: in the street before the guild house, facing its door (the sign over it).
+      if (b && params.room === 'guild-out') player.teleport(b.door[0] - b.vx * 6, undefined, b.door[1] - b.vz * 6, Math.atan2(-b.vx, -b.vz));
+      else if (b) await rooms.enter({ town: roomTown, b }, true, params.room === 'cellar'); // the cellar: beside its hatch
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
 
