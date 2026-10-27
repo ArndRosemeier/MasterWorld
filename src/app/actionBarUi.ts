@@ -54,9 +54,9 @@ export function lookOf(setting: SettingModule, id: string): { icon: string; name
 
 /** A brass socket showing `id` (for the bar and the book). */
 export function socketFor(setting: SettingModule, id: string | null): HTMLElement {
-  if (!id) return el('div', { className: 'socket empty' }, el('div', { className: 'ring' }), el('span'), el('div', { className: 'key' }), el('div', { className: 'count' }));
+  if (!id) return el('div', { className: 'socket empty' }, el('div', { className: 'ring' }), el('span'), el('div', { className: 'hot' }), el('div', { className: 'count' }));
   const look = lookOf(setting, id);
-  return el('div', { className: 'socket' }, el('div', { className: 'ring' }), el('span', {}, look.icon), el('div', { className: 'key' }), el('div', { className: 'count' }), el('div', { className: 'tip' }, look.name));
+  return el('div', { className: 'socket' }, el('div', { className: 'ring' }), el('span', {}, look.icon), el('div', { className: 'hot' }), el('div', { className: 'count' }), el('div', { className: 'tip' }, look.name));
 }
 
 interface Shown { id: string | null; readonly el: HTMLElement; was: number; done: string; key: string; count: string }
@@ -142,7 +142,7 @@ export class ActionBarUi {
     const b = this.host.bindings;
     this.shownSlots.forEach((s, i) => {
       const key = keyLabel(b[BAR_KEYS[i]][0]);
-      if (s.key !== key) { (s.el.querySelector('.key') as HTMLElement).textContent = key; s.key = key; }
+      if (s.key !== key) { (s.el.querySelector('.hot') as HTMLElement).textContent = key; s.key = key; }
       if (!s.id) return;
       const st = this.host.state(s.id);
       const frac = st.total > 0 ? 1 - st.left / st.total : 1, done = `${Math.round(frac * 360)}deg`;

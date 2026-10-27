@@ -123,7 +123,8 @@ export function changeLook(p: number): { hero: number; bird: number; glow: numbe
     hero: 1 - smooth(0.15, 0.82, p) ** 1.5,
     bird: smooth(0.74, 0.97, p),
     glow: gather * (1 - burst),
-    radius: (1.1 - 0.7 * smooth(0.2, 0.82, p)) + burst * 2.2,
+    // Tightest as the hero is gone; it opens again as the bird grows, so the bird is seen inside it.
+    radius: (1.1 - 0.7 * smooth(0.2, 0.7, p)) + smooth(0.72, 0.9, p) * 0.6 + burst * 2.2,
     height: 2 - 1.4 * smooth(0.3, 0.85, p),
     pace: smooth(0.1, 0.85, p),
     burst,
