@@ -10,13 +10,13 @@ export const creatures: readonly CreatureDef[] = [
     id: 'rat', name: 'rat', plural: 'rats', body: { kind: 'rat', length: 0.35, color: '#5a4c40' },
     health: 5, armour: 0, defence: 22, speed: 4.2, senses: { sight: 5, hearing: 14 }, temper: 'skittish', morale: 0.5, pack: true, role: 'swarm', danger: 1.5,
     attacks: [{ name: 'bite', damage: [1, 3], kind: 'bite', reach: 0.45, time: 1.1, skill: 18 }],
-    loot: 'vermin', tell: 'Claws skitter on stone, somewhere ahead.',
+    tell: 'Claws skitter on stone, somewhere ahead.',
   },
   {
     id: 'giant rat', name: 'giant rat', plural: 'giant rats', body: { kind: 'rat', length: 0.95, color: '#4a3e34' },
     health: 18, armour: 0, defence: 16, speed: 4.6, senses: { sight: 6, hearing: 16 }, temper: 'hostile', morale: 0.65, pack: true, role: 'melee', danger: 5,
     attacks: [{ name: 'bite', damage: [2, 6], kind: 'bite', reach: 0.6, time: 1.4, skill: 24 }],
-    loot: 'vermin', tell: 'A smell of wet fur and old meat, and something big breathing.',
+    loot: 'giant-rat', tell: 'A smell of wet fur and old meat, and something big breathing.',
   },
   {
     id: 'goblin', name: 'goblin', plural: 'goblins', body: { kind: 'humanoid', race: 'goblin', height: 1.25, outfit: 'rags', held: 'knife' },

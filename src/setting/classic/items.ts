@@ -42,6 +42,8 @@ export const items: ItemCatalog = {
     { id: 'silk', name: 'Bundle of spider silk', kind: 'valuable', value: 45, weight: 0.3, lore: 'Weavers in the city pay well for it, and ask no questions.' },
     { id: 'wolf-pelt', name: 'Wolf pelt', kind: 'valuable', value: 35, weight: 2.5, lore: 'Thick grey fur. The furrier in town pays well for it before winter.' },
     { id: 'deer-hide', name: 'Deer hide', kind: 'valuable', value: 22, weight: 2 },
+    { id: 'rat-hide', name: 'Giant rat hide', kind: 'valuable', value: 6, weight: 0.6, lore: 'Coarse and greasy. The tanner takes it, for gloves nobody admits to wearing.' },
+    { id: 'venom-sac', name: 'Spider venom sac', kind: 'valuable', value: 30, weight: 0.1, lore: 'Handle it gently. The hedge witch makes a numbing salve of it.' },
     { id: 'boar-tusk', name: 'Boar tusk', kind: 'valuable', value: 14, weight: 0.2 },
     { id: 'venison', name: 'Haunch of venison', kind: 'food', heal: 14, value: 9, weight: 2 },
     // Writings (C3): rare extra ways to a spell. Read, the spell is yours and the school opens; the page crumbles.
@@ -57,15 +59,17 @@ export const items: ItemCatalog = {
     { id: 'watch-mace', base: 'mace', name: 'Coldiron of the Watch', bonuses: { maces: 9, dodge: 4 }, danger: 18, grants: 'watch-cold', lore: 'The valley watch carried it when the watch-house still stood. It is cold to the touch in any weather.' },
   ],
   treasure: [
-    { id: 'vermin', items: [['trinket', 3], ['old-coin', 1], ['ring', 1]], count: [0, 1], coins: [0, 4] },
+    // What a creature carries fits what it is: animals only their own hide, fangs or silk (rats nothing at all),
+    // people coin and gear, the dead their grave goods. Coin a beast's victims dropped lies in its lair's hoard.
+    { id: 'giant-rat', items: [['rat-hide', 1]], count: [0, 1], coins: [0, 0] },
     { id: 'goblin', items: [['trinket', 4], ['knife', 2], ['bread', 2], ['old-coin', 1], ['amulet', 1]], count: [0, 1], coins: [1, 12] },
     { id: 'bandit', items: [['dagger', 2], ['short-sword', 1], ['minor-potion', 2], ['leather-cap', 1], ['gloves', 1], ['cheese', 1]], count: [0, 1], coins: [8, 35] },
     { id: 'wolf', items: [['wolf-pelt', 1]], count: [1, 1], coins: [0, 0] },
     { id: 'boar', items: [['boar-tusk', 2], ['venison', 1]], count: [1, 2], coins: [0, 0] },
     { id: 'deer', items: [['deer-hide', 1], ['venison', 2]], count: [1, 1], coins: [0, 0] },
-    { id: 'web', items: [['silk', 4], ['old-coin', 2], ['dagger', 1], ['boots', 1], ['ring', 1]], count: [1, 2], coins: [0, 20] },
+    { id: 'web', items: [['silk', 3], ['venom-sac', 2]], count: [1, 2], coins: [0, 0] },
     { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1], ['tome-stone', 0.3]], count: [0, 1], coins: [10, 40] },
-    { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1], ['tome-shadows', 0.25]], count: [0, 1], coins: [0, 10] },
+    { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1], ['tome-shadows', 0.25]], count: [0, 1], coins: [0, 0] },
     { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30] },
     { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25] },
     {
