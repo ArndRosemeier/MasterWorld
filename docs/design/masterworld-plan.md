@@ -73,6 +73,7 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 | D48 | **Buildings open in place:** as one comes to a door, that one building is swapped for a hollow version where it stands (every storey, stairs, windows one looks out of, the hearth under the chimney), read from the same house shape as its outside; no fade; it shuts again once one walks away. | Arnd, 2026-10-26 (windows and a second storey seen outside but not inside). Section 7. |
 | D49 | **Skills are learned at guild houses.** Every skill set has a house with trainers, in town or a short way out and already on the map. A trainer opens a new skill (its rank 0) and later ranks and abilities, but only once the hero has earned them by use; some ranks ask for a trainer's task first. Lessons stay a paid speed-up. Tomes, items and deeds stay rare extra ways to an ability. Each guild is a faction with standing. Magic stays rare: its houses are small and a little out of the way (the hedge witch's cottage, the warden of the half-ruined tower), not a grand hall. Skills not for the public eye (magic, stealth, lockpicking) may have hidden houses, often underground (under the town, a cellar, a cave), not on the map. A teller at the inn (a bard) answers "where can I learn …?" from the first evening and marks the way on the map, the hidden houses too, so a hero can start in any direction without first earning a hint with another skill. | Arnd, 2026-10-26 (how does a hero start pyromancy?). Sections 10, 11.6. |
 | D50 | **Every settlement stands by fresh water.** The start town sits on the bank of the river nearest the setting's start place; villages, hamlets and later cities stand by a brook, river or lake. The sea does not count. One rule for all (`src/world/freshWater.ts`): fresh water within 120 m of the settlement's edge. **Brooks** run across the land so that the rule leaves room for places: a finer drainage network that feeds the rivers. | Arnd, 2026-10-26 (towns need a water source; brooks chosen over fewer villages or wells). Sections 5.2, 6, 7. |
+| D51 | **One VGM toolbox.** Everything the VGM can make (places and dungeons, encounters, story events, orders, regions, roads) lives in `src/vgm` as tools of one shape, so the Director, story events and later the LLM hook all reach the same set. Encounters are one definition and one generator. Dungeons are built on the fly from kinds that are data, by one request that names a purpose. [vgm.md](vgm.md) lists what the VGM can do today. | Arnd, 2026-10-27 (encounter design and its machinery belong in the VGM's tool set; the VGM should construct dungeons on the fly). Sections 4, 8; [vgm.md](vgm.md). |
 
 ---
 
@@ -92,7 +93,7 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 
 ## 4. The VGM
 
-The VGM has two halves that share one view of the player.
+The VGM has two halves that share one view of the player. What it can do today, tool by tool, is in [vgm.md](vgm.md) (D51).
 
 ### 4.1 Director: making it feel good
 
