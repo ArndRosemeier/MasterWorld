@@ -594,6 +594,17 @@ export interface AbilityDef {
    * Not known at the start: a teacher opens it (D49), or the debug menu does. Absent: every hero knows it.
    */
   readonly taught?: boolean;
+  /** A change of shape instead of a blow (bird form): what into, and how long the change takes. */
+  readonly shape?: ShapeDef;
+}
+
+/** A change of the hero's shape (an ability's `shape`). */
+export interface ShapeDef {
+  /** The body the hero takes; the engine knows 'bird' (it flies). */
+  readonly into: 'bird';
+  /** Seconds the change takes, and the change back. */
+  readonly change: number;
+  readonly back: number;
 }
 
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */

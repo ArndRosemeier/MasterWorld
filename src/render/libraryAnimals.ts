@@ -4,6 +4,8 @@
  * so tests check it against Actors' catalogue (@actors/animal/library) and tools/packs/library.mjs reads the ids.
  */
 
+import type { BirdDoing } from '../sim/birdFlight';
+
 /** What a wild animal does this frame (from its den state). */
 export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 'hurt' | 'dead' | 'flick';
 
@@ -39,7 +41,18 @@ export const LIBRARY_KINDS = {
     ids: ['red-deer-male', 'female-deer', 'female-deer'],
     clips: { idle: ['Idle'], alert: ['Idle_2', 'Idle_Idle_02', 'Idle_Breathing_01'], feed: ['Idle_Eating', 'Idle_Eating_01'], walk: ['Walk'], run: ['Sprint', 'Run'], hurt: ['Hit_Stand_L01'], dead: ['Death_Stand_R01'] },
   },
+  pheasant: {
+    // The hero's bird form (game/birdForm.ts): a cock pheasant, with flight of its own (BIRD_CLIPS).
+    ids: ['pheasant'],
+    clips: { idle: ['Idle', 'Idle_Breathing'], feed: ['StandGrazingA'], walk: ['WalkMedium_NoRootMotion'], run: ['RunFast_NoRootMotion'] },
+  },
 } satisfies Record<string, LibraryKind>;
+
+/** The pheasant's clip for each thing the hero's bird does (game/birdForm.ts BirdDoing). */
+export const BIRD_CLIPS: Readonly<Record<BirdDoing, string>> = {
+  idle: 'Idle', walk: 'WalkMedium_NoRootMotion', run: 'RunFast_NoRootMotion',
+  takeoff: 'TakeOf_BounceOff', flap: 'FlyFlapping_NoRootMotion', glide: 'FlyGliding_NoRootMotion', dive: 'FlyGliding_NoRootMotion', land: 'Landing_Touch',
+};
 
 /** What a doing asks of `clipFor` when the kind names no clip for it. */
 const MOTION: Partial<Record<AnimalDoing, 'idle' | 'walk' | 'run' | 'eat' | 'attack' | 'hit' | 'death'>> = {

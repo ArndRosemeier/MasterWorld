@@ -336,9 +336,11 @@ export class Encounter {
  */
 export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly hero: Character; readonly player: Player; readonly hud: FightHud }): void {
   let best: Encounter | null = null;
-  for (const e of all) if (e.stir >= 0 && (!best || e.stir > best.stir)) best = e;
+  // A bird in the hero's place (bird form) is nothing the dwellers fight: every encounter rests meanwhile.
+  const flown = !!calm.player.shape?.aloft;
+  for (const e of all) if (!flown && e.stir >= 0 && (!best || e.stir > best.stir)) best = e;
   for (const e of all) {
-    if (e.stir < 0) e.rest();
+    if (flown || e.stir < 0) e.rest();
     else e.play(dt, e === best);
   }
   if (best) return;

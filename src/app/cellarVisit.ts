@@ -96,7 +96,7 @@ export class CellarVisit {
 
   update(dt: number): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
-    if (this.fade.busy || this.player.flying) return;
+    if (this.fade.busy || this.player.offFoot) return;
     const w = this.player.walker, O = this.view.origin;
     // The way down is the hatch in the house's room (InteriorVisit).
     if (!this.inside) return;
