@@ -157,6 +157,9 @@ export async function start(b: Boot): Promise<void> {
     // Everything else in a town works alike in every town (app/towns.ts, game/township.ts).
     const start = terrain.towns[0];
     const home = start ? marketStart(start.plan) : opened.home;
+    // A loaded game goes on where it was saved: the land, the trees and the people are readied round that spot
+    // (the title circles it), so play does not open on the start's market and jump there afterwards.
+    const resume = save && !save.heir ? save.hero : null;
 
     // The world as saved: the seed's own decisions, then what the VGM decided while the game was played.
     // (By id: a newer version may open the world with more decisions, such as a people's hold, plan 11.6.)
@@ -227,7 +230,7 @@ export async function start(b: Boot): Promise<void> {
       },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
-    player.goTo(params.pos ?? [home.x, home.z], params.look);
+    player.goTo(params.pos ?? (resume ? [resume.x, resume.z] : [home.x, home.z]), params.look);
     // The floating origin starts where the camera does (everything drawn is relative to it: render/origin.ts).
     if (params.origin) ORIGIN.moveTo(view.camera.position.x, view.camera.position.z);
     // Off (`origin=0`, or from the debug console: game.followOrigin) the origin stays where it is.
@@ -257,8 +260,8 @@ export async function start(b: Boot): Promise<void> {
     let orbit: Orbit | null = null;
     if (title) {
       paused(true);
-      // The fly-over circles the market, where the game starts.
-      const middle = { x: home.x, z: home.z, r: start ? (Math.max(start.nx, start.nz) * TOWN_RASTER) / 2 : 0 };
+      // The fly-over circles the market, where the game starts (or where a loaded game goes on).
+      const middle = { x: resume?.x ?? home.x, z: resume?.z ?? home.z, r: start ? (Math.max(start.nx, start.nz) * TOWN_RASTER) / 2 : 0 };
       orbit = { centre: [middle.x, terrain.height(middle.x, middle.z), middle.z], turn: title.draw.turn, angle: title.draw.angle, ground: (x, z) => terrain.height(x, z) };
       await title.attach({
         camera: view.camera,
@@ -270,7 +273,7 @@ export async function start(b: Boot): Promise<void> {
           hour: () => view.sky.hour,
         },
         heroView: () => player.heroView(),
-        begin: (people) => { if (onBegin) onBegin(people); else paused(false); },
+        begin: (people) => { if (onBegin) onBegin(people); else { playing = true; paused(false); } },
         chose: (people) => { chosen = { people }; hurry(); onChose?.(people); },
       });
     }
@@ -360,6 +363,9 @@ export async function start(b: Boot): Promise<void> {
     drawRemains();
     // A roguelike hero fell: the heir's save is written and nothing saves over it.
     let ended = false;
+    // The hero is in play (the title and the creator are behind them): before that nothing is autosaved, or a
+    // page left on the title would save a fresh start over the game Continue should bring back.
+    let playing = !title && !((params.create && !save) || save?.heir);
     // The VGM's decisions so far (the towns' orders among them: each town's people follow theirs, game/township.ts).
     let log: readonly Decision[] = [...opened.log, ...later];
     // `moved`: the first cellar was cleared long ago, and new dwellers have moved in since.
@@ -620,12 +626,17 @@ export async function start(b: Boot): Promise<void> {
     // A save from before kept promises were logged: the cellars its household paid for are kept.
     for (const id of Object.keys(save?.cellars ?? {})) if (save?.cellars[id].paid && !keptOf(log).has(id)) { const k = keepPromise(log, id, hours()); if (k) log = [...log, k]; }
     let dwellers: Promise<void> | null = null;
+    // A game saved below goes on in its cellar: built and entered (its people warmed) before the world is ready.
+    if (resume?.below) loading.set('Opening the cellar where you left off');
+    const savedBelow = resume?.below ? await cellars.build(resume.cellar ?? firstPromise?.id ?? '') : null;
+    const belowWarm = cellars.warming;
+    if (savedBelow) await savedBelow.enter(true);
     if (firstPromise) {
       loading.set('Waking the cellar');
       const v = await cellars.build(firstPromise.id);
       // Its people's shaders (each one's shadow casters too) build in the Stage's frame slots once the loop runs; loading waits for them below.
       dwellers = cellars.warming;
-      if (v && params.cellar) {
+      if (v && params.cellar && !savedBelow) {
         await v.enter(true, params.cellarRoom);
         if (params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
         player.walker.yaw = player.heroCam.yaw;
@@ -662,7 +673,7 @@ export async function start(b: Boot): Promise<void> {
     void survive('cellar', dwellers?.then(took('cellar')));
     void survive('giant', giantReady);
     let plantedAt = 0, dressedAt = 0;
-    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folkLooks?.shown.then(took('townsfolk'))), params.cellar ? survive('cellar', dwellers) : null]).then(() => { planted = true; plantedAt = performance.now(); });
+    const planting = Promise.all([survive('trees', trees), survive('townsfolk', folkLooks?.shown.then(took('townsfolk'))), params.cellar || savedBelow ? survive('cellar', savedBelow ? belowWarm : dwellers) : null]).then(() => { planted = true; plantedAt = performance.now(); });
     const hud = document.getElementById('hud');
     // The settings that apply while playing (the URL's day= holds the clock's speed for this session).
     let showHud = params.hud;
@@ -932,7 +943,7 @@ export async function start(b: Boot): Promise<void> {
     };
     const saves = new SavesUi(savesHost);
     // A classic game autosaves every 5 minutes; a roguelike one keeps its one save every minute and as the page goes.
-    const autosave = () => { if (!ended) void saveNow(savesHost, mode === 'roguelike' ? ROGUE_SLOT : AUTOSAVE); };
+    const autosave = () => { if (playing && !ended) void saveNow(savesHost, mode === 'roguelike' ? ROGUE_SLOT : AUTOSAVE); };
     let minutes = 0;
     setInterval(() => { if (mode === 'roguelike' || ++minutes % 5 === 0) autosave(); }, 60 * 1000);
     addEventListener('pagehide', () => { if (mode === 'roguelike' && heroName) autosave(); });
@@ -971,7 +982,8 @@ export async function start(b: Boot): Promise<void> {
     if (save) {
       // Lay the save over the fresh world (each cellar takes its changes as it is built), then the hero where they were.
       const h = save.hero;
-      const down = h.below ? await cellars.build(h.cellar ?? firstPromise?.id ?? '') : null;
+      // (A hero saved below is in their cellar already.)
+      const down = h.below && !savedBelow ? await cellars.build(h.cellar ?? firstPromise?.id ?? '') : null;
       if (down) await down.enter(true);
       player.teleport(h.x, h.below ? h.y : undefined, h.z, h.yaw);
       if (!save.heir) notes.say(`Loaded: ${save.journal.length ? `${save.journal.filter((l) => !l.done).length} open lead(s) in your journal` : 'your game'}.`);
@@ -1067,6 +1079,7 @@ export async function start(b: Boot): Promise<void> {
       // A roguelike tale has its one save from the first step.
       mode = made.mode;
       director.strict = mode === 'roguelike';
+      playing = true;
       if (mode === 'roguelike') autosave();
       meetOldFriends();
       // A new hero's own first page: where to ask for work (the inn's door is marked on the map).
@@ -1081,7 +1094,7 @@ export async function start(b: Boot): Promise<void> {
       notes.say(`${made.name} steps out onto the market square.${friends.length ? ` ${friends.join(' and ')} will know you.` : ''}${page}`, 8);
     };
     onBegin = (people) => {
-      if (save && !save.heir) paused(false);
+      if (save && !save.heir) { playing = true; paused(false); }
       else void create(people ? PEOPLE_RACE[people] : null);
     };
     if (!title && ((params.create && !save) || save?.heir)) { paused(true); void create(null); }
