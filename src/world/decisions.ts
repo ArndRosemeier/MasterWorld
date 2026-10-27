@@ -167,16 +167,35 @@ export function settlementOf(d: RegionDecision, fills: readonly RegionFillDef[])
   return { kind: 'town', id: d.id, x: d.site.x, z: d.site.z, radius: d.site.r, size: f.place, seed: d.seed };
 }
 
-export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision;
+/**
+ * A teacher's own place out on the land (plan 10, C3, D49): a guild whose master keeps a half-ruined tower
+ * past a town's fields (`near: 'out'`). Chosen when the world opens; the master stands watch at its door.
+ */
+export interface RetreatDecision {
+  readonly kind: 'retreat';
+  readonly id: string;
+  /** The guild's keeper id. */
+  readonly keeper: string;
+  /** The town whose people the master counts among. */
+  readonly town: string;
+  readonly x: number;
+  readonly z: number;
+  /** Its door faces the town (the walker's yaw). */
+  readonly yaw: number;
+}
+
+export type Decision = TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 
 /** How far other places keep from a people's hold, metres. */
 const HOLD_KEEP = 90;
+/** How far other places keep from a teacher's tower, metres. */
+const RETREAT_KEEP = 40;
 
 /**
  * Ground the log has put something on out on the land: barrows (`dungeonR` metres round each), the places
- * in opened regions (their own footprint) and the peoples' holds. New places keep away from it.
+ * in opened regions (their own footprint), the peoples' holds and the teachers' towers. New places keep away from it.
  */
 export function sitesIn(log: DecisionLog, dungeonR: number): { x: number; z: number; r: number }[] {
   const out: { x: number; z: number; r: number }[] = [];
@@ -184,6 +203,7 @@ export function sitesIn(log: DecisionLog, dungeonR: number): { x: number; z: num
     if (d.kind === 'dungeon' && d.site) out.push({ x: d.site.x, z: d.site.z, r: dungeonR });
     else if (d.kind === 'region' && d.site) out.push({ x: d.site.x, z: d.site.z, r: d.site.r });
     else if (d.kind === 'hold') out.push({ x: d.x, z: d.z, r: HOLD_KEEP });
+    else if (d.kind === 'retreat') out.push({ x: d.x, z: d.z, r: RETREAT_KEEP });
   }
   return out;
 }

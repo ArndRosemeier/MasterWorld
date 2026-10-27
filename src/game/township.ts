@@ -11,11 +11,14 @@ import { TownLife, type TownOrder } from '../sim/townLife';
 import { talkCellar, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
-import type { Decision, DecisionLog } from '../world/decisions';
+import type { Decision, DecisionLog, RetreatDecision } from '../world/decisions';
 import type { Town } from '../world/town';
 import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
+
+/** How far before a teacher's tower door its master stands watch, metres. */
+const WATCH = 3;
 
 /** What a town keeps in a save. */
 export interface TownshipSave {
@@ -68,7 +71,12 @@ export class Township {
 
   /** Its guild houses (D49; none in a town too small for any guild). */
   get guilds(): readonly GuildHouse[] {
-    return (this.housesOf ??= guildHouses(this.town.plan, this.town.decision.size ?? 'town', this.c.setting));
+    return (this.housesOf ??= guildHouses(this.town.plan, this.town.decision.size ?? 'town', this.c.setting, this.retreats));
+  }
+
+  /** The teachers' places out on the land that belong to this town (C3: the warden's tower). */
+  get retreats(): readonly RetreatDecision[] {
+    return this.c.log().filter((d): d is RetreatDecision => d.kind === 'retreat' && d.town === this.id);
   }
 
   /** The guild whose house building `id` is (null: a plain building). */
@@ -87,6 +95,13 @@ export class Township {
     const life = new TownLife(this.town.plan, this.seed, this.c.hours(), this.c.setting.routines, this.residents);
     // The VGM's orders to this town so far (logged; a save replays them).
     for (const o of ordersOf(this.c.log(), this.id)) life.order(o);
+    // A master with a place out on the land keeps watch at its door, facing the town.
+    for (const { guild, out } of this.guilds) {
+      const a = out && life.agents.find((x) => x.person.trade === guild.keeper);
+      if (!a || !out) continue;
+      const x = out.x + Math.sin(out.yaw) * WATCH, z = out.z + Math.cos(out.yaw) * WATCH;
+      life.station(a, x, z, Math.atan2(this.town.decision.z - z, this.town.decision.x - x));
+    }
     return (this.lifeOf = life);
   }
 

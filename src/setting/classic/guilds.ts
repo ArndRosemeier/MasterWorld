@@ -1,7 +1,7 @@
 /**
  * The classic world's guild houses (D49): where a hero opens a skill and its ranks. The fighting houses
  * first (the smith's and the old caravan guard's lessons moved into them); the hidden house teaches what
- * is not for the public eye. The magic teachers (C3): the hedge witch on the town's edge, the hidden Undercroft. The bard at the inn knows them all.
+ * is not for the public eye. The magic teachers (C3): the hedge witch on the town's edge, the hidden Undercroft, the warden of the half-ruined tower past the fields. The bard at the inn knows them all.
  */
 import type { BardDef, GuildDef, SkillRankDef } from '../contract';
 
@@ -64,11 +64,22 @@ export const guilds: readonly GuildDef[] = [
     task: { ask: 'There is a place below a house where something ugly has made its nest. Empty it, quietly.', done: 'Quietly done. The Undercroft remembers.' },
     spellPrice: 66, openPrice: 10, abilities: ['bird'], teachesSpell: 'Like that. {spell} is yours now. It was old before the Fading.',
   },
+  {
+    keeper: 'tower-warden', name: 'the half-ruined tower', title: '{name}, warden of the half-ruined tower', topic: 'Do you still keep the old fire?',
+    line: 'Someone has to keep watch. The beacon went dark with the Fading; the fire and the light did not, not quite.',
+    skills: ['pyromancy', 'luminism'], upTo: 100, price: 42, hours: 2,
+    sizes: ['town'], near: 'out', sign: '#b0662a', dress: 'traveller',
+    opens: 'Look into the flame and do not blink. There. {skill} answers you now; keep it fed.',
+    unearned: 'The fire in you is still a spark. Use your {skill} out there until it is more.',
+    task: { ask: 'Something nests in a place out on the land that was never meant for it. Burn it out, then come back.', done: 'I saw the smoke from up here. Well done. Come up.', out: true },
+    spellPrice: 64, openPrice: 9, teachesSpell: 'Hold it, shape it, let it go. {spell} is yours. Mind the thatch in town.',
+  },
 ];
 
 export const bard: BardDef = {
   topic: 'Where can I learn a skill?',
   line: 'Every house that teaches anything, I know. Give me your map.',
   tells: '{house} teaches {skills}; ask for {keeper}.',
+  tellsOut: '{keeper} keeps watch at {house} {dir} of the town, past the fields, and teaches {skills}.',
   tellsHidden: '{house} teaches {skills}, though nobody will say so: {way}.',
 };

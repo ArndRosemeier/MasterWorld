@@ -4,7 +4,11 @@ import { planTown } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic';
 import { Character } from '../src/game/character';
 import { bardTells, GuildBook, guildHouses, houseIn, learnSpell, openRank, spellRefusal, spellsOf } from '../src/game/guilds';
-import type { DecisionLog } from '../src/world/decisions';
+import type { DecisionLog, RetreatDecision } from '../src/world/decisions';
+import { parseSeed } from '@futuremagic/core';
+import { openWorld } from '../src/vgm/builder';
+import { Township } from '../src/game/township';
+import { SMALL } from './small';
 
 const witch = classic.guilds!.find((g) => g.keeper === 'hedge-witch')!;
 const under = classic.guilds!.find((g) => g.keeper === 'undercroft-keeper')!;
@@ -44,7 +48,7 @@ test('teachers: the hidden Undercroft teaches shadow, frost and bird form; the b
   const town = planTown({ seed: 3, x: 0, z: 0, radius: 72, height: () => 10 });
   const houses = guildHouses(town, 'town', classic);
   assert.ok(!book.onMap('town-1', under));
-  const told = bardTells(classic, 'town-1', houses, book, () => 'Nell');
+  const told = bardTells(classic, { id: 'town-1', x: 0, z: 0 }, houses, book, () => 'Nell');
   assert.ok(told.some((t) => t.includes('Undercroft') && t.includes(under.way!)));
   assert.ok(told.some((t) => t.includes('hedge witch') && t.includes('vitae')));
   assert.ok(book.onMap('town-1', under) && houseIn('town-1', under.keeper));
@@ -63,4 +67,26 @@ test('teachers: a save made before the teachers never opens magic; one after kee
   openRank(classic, witch, hero, 'vitae', new GuildBook(), log);
   const again = new Character(classic, JSON.parse(JSON.stringify(hero.save())));
   assert.ok(again.opened('vitae') && again.knows('mend') && !again.opened('geomancy'));
+});
+
+test('teachers: the warden keeps watch at a half-ruined tower past the start town’s fields and teaches fire and light', () => {
+  const { terrain, log } = openWorld(parseSeed('masterworld'), classic, SMALL);
+  const town = terrain.towns[0], d = town.decision;
+  const r = log.find((x): x is RetreatDecision => x.kind === 'retreat')!;
+  assert.ok(r && r.keeper === 'tower-warden' && r.town === d.id);
+  const far = Math.hypot(r.x - d.x, r.z - d.z);
+  assert.ok(far > d.radius + 100 && far < d.radius + 800, `${far.toFixed(0)} m out`);
+  assert.equal(terrain.waterDepth(r.x, r.z), 0);
+  const t = new Township(town, { seed: parseSeed('masterworld'), setting: classic, log: () => log, hours: () => 10 });
+  const h = t.guilds.find((x) => x.guild.keeper === 'tower-warden')!;
+  assert.ok(h && h.out === r, 'the warden belongs to the start town');
+  const a = t.life.agents.find((x) => x.person.trade === 'tower-warden')!;
+  assert.ok(a && Math.hypot(a.x - r.x, a.z - r.z) < 6 && !a.hidden, 'at the door');
+  for (let i = 0; i < 50; i++) t.life.step(60, 10 + i);
+  assert.ok(Math.hypot(a.x - r.x, a.z - r.z) < 6, 'and stays there day and night');
+  const told = bardTells(classic, d, t.guilds, new GuildBook(), () => 'Odo');
+  assert.ok(told.some((x) => x.includes('half-ruined tower') && x.includes('pyromancy') && /(north|south|east|west)/.test(x)), told.join(' | '));
+  const hero = new Character(classic);
+  assert.equal(openRank(classic, h.guild, hero, 'pyromancy', new GuildBook(), log), null);
+  assert.ok(hero.knows('fire-dart'));
 });

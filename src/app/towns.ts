@@ -46,6 +46,8 @@ export interface TownDoor {
 const LIVE = 400;
 /** The hero is in a town (talks there, hears its leads) within this of its edge (m). */
 const IN = 60;
+/** The hero at a teacher's tower out on the land is with that town's people within this of it (m). */
+const OUTPOST = 40;
 /** Seconds between two looks for the nearest town. */
 const LOOK = 1;
 
@@ -121,7 +123,10 @@ export class Towns {
   /** The town the hero at (x, z) is in (within IN of its edge, the nearest), else null. */
   townAt(x: number, z: number): Township | null {
     const t = this.nearest(x, z), d = t?.town.decision;
-    return t && d && Math.hypot(x - d.x, z - d.z) - d.radius < IN ? t : null;
+    if (t && d && Math.hypot(x - d.x, z - d.z) - d.radius < IN) return t;
+    // At a teacher's tower out on the land (C3) the hero talks with that town's people (its warden).
+    for (const c of this.cores.values()) if (c.retreats.some((r) => Math.hypot(x - r.x, z - r.z) < OUTPOST)) return c;
+    return null;
   }
 
   /** The town nearest (x, z), however far (null: no town stands). */

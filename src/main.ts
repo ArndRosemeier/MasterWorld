@@ -89,7 +89,7 @@ import { release } from './app/release';
 import { Character } from './game/character';
 import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
-import { bardTells, GuildBook, isGuild } from './game/guilds';
+import { bardTells, GuildBook, isGuild, whereOf } from './game/guilds';
 import { coinText } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, gatheredLine, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -106,6 +106,7 @@ import { Alone, blowOf, Recipes, shapeOf, type RecipeEvent } from './game/recipe
 import { SpellView } from './app/spellView';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
+import { Retreats } from './app/retreats';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
 import { Standing, changeLine, householdOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
@@ -200,6 +201,8 @@ export async function start(b: Boot): Promise<void> {
     let cellars: Cellars | null = null;
     // A people's hold on the land (plan 11.6): its gate and the court's walls stand in the way.
     let hold: HoldGate | null = null;
+    // The teachers' towers out on the land (C3): their walls too.
+    let retreats: Retreats | null = null;
     const visit = () => cellars?.downIn ?? null;
     // Behind a door the walker walks the room.
     let rooms: InteriorVisit | null = null;
@@ -237,7 +240,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
@@ -634,6 +637,10 @@ export async function start(b: Boot): Promise<void> {
       if (params.holdTier) standing.change(holdSite.people, tierFloor(params.holdTier) + 1 - standing.value(holdSite.people));
       if (params.hold) { const [x, z] = onLand(holdSite, 0, COURT.depth + 4); player.teleport(x, undefined, z, holdSite.yaw); }
     }
+    retreats = new Retreats(view.stage, log, (x, z) => terrain.height(x, z), seed);
+    // `warden`: before the warden's tower, looking at its door and the warden at it.
+    const wardenAt = params.warden ? retreats.sites[0] : undefined;
+    if (wardenAt) { const [x, z] = onLand(wardenAt, 0, 12); player.teleport(x, undefined, z, wardenAt.yaw); }
     // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
     const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
     if (lookAt && start) {
@@ -868,7 +875,7 @@ export async function start(b: Boot): Promise<void> {
     services.set('bard', (a) => {
       const t = talkTown();
       if (!t || !setting.bard) return;
-      const told = bardTells(setting, t.id, t.guilds, guildBook, (k) => { const m = t.residents.find((p) => p.trade === k); return m ? t.talk.nameOf(m.id) : null; });
+      const told = bardTells(setting, t.town.decision, t.guilds, guildBook, (k) => { const m = t.residents.find((p) => p.trade === k); return m ? t.talk.nameOf(m.id) : null; });
       notes.say(told.length ? `${told.join(' ')} (Map: ${keyName('map')})` : `${t.talk.nameOf(a.person.id)} knows of no guild house here.`, 12);
       sounds?.noted();
     });
@@ -967,7 +974,7 @@ export async function start(b: Boot): Promise<void> {
       height: (x, z) => terrain.height(x, z),
       water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
       heroBearing: () => believed(player.walker.yaw),
-      signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ x: h.b.cx, z: h.b.cz, label: cap(h.guild.name) }))),
+      signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) }))),
     }) : null;
     // The compass at the top (plan 17.1): turns with the camera, its needle as true as the orientation skill.
     const compass = new Compass(seed);

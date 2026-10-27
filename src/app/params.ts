@@ -73,6 +73,8 @@ export const params = {
    * tier: hated, unwelcome, stranger, honoured) sets the hero's standing with that people to it.
    */
   hold: q.has('hold'),
+  // Before the warden's tower (C3), looking at its door.
+  warden: q.has('warden'),
   holdTier: (['hated', 'unwelcome', 'stranger', 'friend', 'honoured'] as const).find((k) => k === q.get('hold')) ?? null,
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),

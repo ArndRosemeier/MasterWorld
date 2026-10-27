@@ -63,6 +63,8 @@ export interface Agent {
   heldIn?: boolean;
   /** Sent over by the VGM (plan D27): walks up to (x, z), then waits there facing `face` until let go or `until`. */
   seek?: { x: number; z: number; face: { x: number; z: number } };
+  /** Keeps watch at a place of their own out on the land (C3: the warden at the tower's door), day and night. */
+  post?: { x: number; z: number; dir: number };
 }
 
 export interface TownWeather {
@@ -147,7 +149,7 @@ export class TownLife {
     this.hour = ((hours % 24) + 24) % 24;
     this.weather = weather;
     for (const a of this.agents) {
-      if (a.held) continue;
+      if (a.held || a.post) continue;
       if (a.stay !== undefined) {
         if (this.time < a.stay) continue;
         a.stay = undefined;
@@ -174,6 +176,7 @@ export class TownLife {
    * day. Sent again while on the way, they turn towards the new point.
    */
   seek(a: Agent, x: number, z: number, face: { x: number; z: number }, secs: number): void {
+    if (a.post) return;
     const was = a.spot >= 0 ? this.spots[a.spot] : null;
     this.freeSpot(a);
     a.spot = -1;
@@ -194,7 +197,14 @@ export class TownLife {
   /** The talk is over: they pick up their day from here. */
   letGo(a: Agent): void {
     a.held = false;
-    this.choose(a, false);
+    if (a.post) this.station(a, a.post.x, a.post.z, a.post.dir);
+    else this.choose(a, false);
+  }
+
+  /** Someone keeps watch at (x, z) from now on, facing `dir` (as `Agent.dir`): they stand there and never walk the town. */
+  station(a: Agent, x: number, z: number, dir: number): void {
+    this.freeSpot(a);
+    Object.assign(a, { post: { x, z, dir }, x, z, dir, spot: -1, act: 'wait', next: 'wait', hidden: false, path: [], pi: 0, seek: undefined });
   }
 
   /**
