@@ -28,14 +28,6 @@
     "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
   },
   {
-    "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/app/interiorVisit.ts#update",
-    "reason": "Two spaces behind a way in (the cellar's dungeon space under its hatch, a building's room behind its door), each going in, out and checking its exits; the fade they share is app/fade.ts, the notes app/notes.ts. Different spaces, different checks."
-  },
-  {
-    "key": "same name: masterworld/app/interiorVisit.ts#update + masterworld/render/terrain/TerrainView.ts#update",
-    "reason": "Per-frame update methods of unrelated systems (going in and out of rooms vs chunk selection); only the name matches."
-  },
-  {
     "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",
     "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   },
@@ -142,10 +134,6 @@
   {
     "key": "same name: masterworld/app/packUi.ts#opened + masterworld/app/tradeUi.ts#opened",
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the card entrances are shared in KeyWindow.entrances."
-  },
-  {
-    "key": "same name: masterworld/game/character.ts#save + masterworld/game/trade.ts#save",
-    "reason": "Each pure game object writes its own plain save data (the hero's sheet, the town's merchants); only the name matches."
   },
   {
     "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/hydro.ts",
@@ -296,10 +284,6 @@
     "reason": "The same seam on purpose: app/roads.ts asks every view built from the land to build again over the squares a new road passes; each view rebuilds its own cells."
   },
   {
-    "key": "same name: masterworld/game/character.ts#save + masterworld/talk/townTalk.ts#save",
-    "reason": "Each class writes its own state for the save (talk evidence and leads vs the hero's skills and kit vs the merchants' stock); only the name matches."
-  },
-  {
     "key": "same name: masterworld/game/trade.ts#save + masterworld/talk/townTalk.ts#save",
     "reason": "Each class writes its own state for the save (talk evidence and leads vs the hero's skills and kit vs the merchants' stock); only the name matches."
   },
@@ -318,5 +302,25 @@
   {
     "key": "same name: masterworld/world/dungeon/caveRock.ts#tint + masterworld/world/holdRock.ts#tint",
     "reason": "Both implement RockLook.tint (world/dungeon/rockMesh.ts): each rock colours its own faces; the shared meshing already lives in meshField."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/journalUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/lessonsUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/mapUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
   }
 ]

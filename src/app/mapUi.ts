@@ -18,6 +18,15 @@ export interface MapHost extends WindowHost {
   water(x: number, z: number): number;
   /** Where the hero believes they are and face (yaw as the walker's: 0 north), by their orientation. */
   heroBearing(): Bearing;
+  /** Named houses drawn on the sheet from the start (the guild houses, D49; a hidden one once the bard told of it). */
+  signs?(): readonly MapSign[];
+}
+
+/** A named house on the map. */
+export interface MapSign {
+  readonly x: number;
+  readonly z: number;
+  readonly label: string;
 }
 
 /** Metres across the whole parchment, and its raster (samples per side). */
@@ -151,6 +160,14 @@ export class MapUi extends KeyWindow {
         g.fillStyle = b.kind === 'temple' || b.kind === 'hall' || b.kind === 'inn' ? '#5a3a24' : ink;
         g.fill();
       }
+    }
+    // The guild houses: a small shield of brown ink and the house's name.
+    for (const sg of this.map.signs?.() ?? []) {
+      const x = X(sg.x), z = Z(sg.z), k = 6 * Math.max(1, u);
+      g.fillStyle = '#5a3a24';
+      g.beginPath(); g.moveTo(x - k, z - k); g.lineTo(x + k, z - k); g.lineTo(x + k, z); g.quadraticCurveTo(x + k, z + k, x, z + k * 1.5); g.quadraticCurveTo(x - k, z + k, x - k, z); g.closePath(); g.fill();
+      g.font = `${Math.round(13 * Math.max(1, u))}px Georgia, serif`; g.textAlign = 'left';
+      g.fillText(sg.label, x + k + 4, z + 4);
     }
     // The marks: a ring of red ink and the place's name.
     for (const l of this.journal.open) {

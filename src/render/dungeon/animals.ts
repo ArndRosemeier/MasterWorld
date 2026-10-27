@@ -143,6 +143,11 @@ export function libraryShelf(): Promise<ReadonlySet<string>> {
   return shelf;
 }
 
+/** A library animal by id, loaded, or null when this build does not have it. */
+export async function shelvedAnimal(id: string): Promise<LibraryAnimal | null> {
+  return (await libraryShelf()).has(id) ? loadLibraryAnimal(id, { baseUrl: LIBRARY }) : null;
+}
+
 /** One animal of a species (`wolf`, `deer`); a little bigger or smaller by `seed`; `preset` over the kind's own. */
 export async function animalBody(species: string, seed: number, renderer: WebGPURenderer, preset?: string): Promise<AnimalBody | null> {
   const def = ANIMAL_KINDS[species];
@@ -151,8 +156,8 @@ export async function animalBody(species: string, seed: number, renderer: WebGPU
   if (def.library && !preset) {
     const ids = def.library.ids;
     const id = ids[Math.floor(hash2f(seed, 2, 9) * ids.length) % ids.length];
-    if ((await libraryShelf()).has(id)) {
-      const lib = await loadLibraryAnimal(id, { baseUrl: LIBRARY });
+    const lib = await shelvedAnimal(id);
+    if (lib) {
       const place = new Group();
       place.name = species;
       place.add(lib.object);

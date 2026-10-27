@@ -23,7 +23,7 @@ for (const { seed, opts, what } of runs) {
   console.log(`\n== ${seed}: ${what}`);
   const t0 = performance.now();
   const r = playEvening(parseSeed(seed), classic, { ...opts, log: (s) => console.log(`${clock(s.hour)}  ${s.what}`) });
-  console.log(`${r.ok ? 'passed' : 'FAILED'}: ${r.cleared.length} places cleared, ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, lessons ${r.lessons.join(', ') || 'none'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+  console.log(`${r.ok ? 'passed' : 'FAILED'}: ${r.cleared.length} places cleared, ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, lessons ${r.lessons.join(', ') || 'none'}, opened ${r.opened.join(', ') || 'none'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   if (!r.ok) failed++;
 }
 console.log(`\n${failed ? `${failed} of ${runs.length} FAILED` : `all ${runs.length} passed`} in ${((performance.now() - all) / 1000).toFixed(1)} s`);

@@ -9,11 +9,13 @@
  */
 import { interiorBlocked, planInterior, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
+import { guildSigns } from '../game/guilds';
 import type { HouseView } from '../render/town/HouseView';
 import type { SkyView } from '../render/sky';
 import type { PointLight } from 'three/webgpu';
 import type { Placed } from '../render/folk/FolkView';
 import { roomCast } from '../sim/roomCast';
+import { RoomFlow } from '../sim/roomFlow';
 import type { TownView } from '../render/town/TownView';
 import { houseKey } from '../world/town';
 import { roomBounce, roomSun, type RoomSun } from '../game/roomLight';
@@ -36,7 +38,7 @@ const BOUNCE_EASE = 2;
 /** Pushing this long (s) on a stair without getting anywhere: put off it (a body wedged under a low edge). */
 const STUCK_FOR = 2;
 
-interface Open { door: TownDoor; b: TownBuilding; plan: InteriorPlan; walk: HouseWalk }
+interface Open { door: TownDoor; b: TownBuilding; plan: InteriorPlan; walk: HouseWalk; flow: RoomFlow }
 
 /** The towns, as the doors see them: every town's buildings open alike (plan B3a). */
 export interface InteriorTowns {
@@ -82,7 +84,9 @@ export class InteriorVisit {
   private planOf(door: TownDoor): InteriorPlan {
     const key = houseKey(door.town.id, door.b.id);
     let p = this.plans.get(key);
-    if (!p) this.plans.set(key, (p = planInterior(door.b, { hatch: this.cellars.has(key) })));
+    // A guild house in the open (not a hidden one) is a hall: a weapon rack and a practice post (D49).
+    const g = door.town.guildAt(door.b.id);
+    if (!p) this.plans.set(key, (p = planInterior(door.b, { hatch: this.cellars.has(key), hall: !!g && !g.guild.hidden })));
     return p;
   }
 
@@ -91,8 +95,9 @@ export class InteriorVisit {
     if (this.open && same(this.open.door, door)) return this.open;
     this.shut();
     const b = door.b, plan = this.planOf(door);
-    this.open = { door, b, plan, walk: houseWalk(b, plan) };
-    await this.view.drawOpen(b, plan, this.towns.viewOf(door.town.id));
+    this.open = { door, b, plan, walk: houseWalk(b, plan), flow: new RoomFlow(plan) };
+    this.placed = null;
+    await this.view.drawOpen(b, plan, this.towns.viewOf(door.town.id), guildSigns(door.town.guilds).get(b.id));
     return this.open;
   }
 
@@ -114,7 +119,12 @@ export class InteriorVisit {
   }
 
   update(dt: number): void {
-    if (this.player.flying) return;
+    this.doors(dt);
+    this.stepPeople(dt);
+  }
+
+  private doors(dt: number): void {
+    if (this.player.offFoot) return;
     const w = this.player.walker, x = w.pos.x, z = w.pos.z;
     // The nearest door within reach opens (not while one is inside another).
     if (!this.within) {
@@ -169,8 +179,8 @@ export class InteriorVisit {
     this.sky.sheltered = true;
     this.lamp(this.open.walk.storey(this.player.walker.pos.y));
     // A cellar's house: the trapdoor in the floor is the way down (it lies in a dark corner, easy to miss).
-    const b = this.open.b, trapdoor = this.open.plan.fixtures.some((f) => f.kind === 'hatch');
-    this.notes.say(`You step into ${NAMES[b.kind] ?? 'the house'}.${trapdoor ? ' A trapdoor in the floor leads down to the cellar.' : ''}`, trapdoor ? 6 : 3);
+    const b = this.open.b, trapdoor = this.open.plan.fixtures.some((f) => f.kind === 'hatch'), g = this.open.door.town.guildAt(b.id);
+    this.notes.say(`You step into ${g && !g.guild.hidden ? g.guild.name : NAMES[b.kind] ?? 'the house'}.${trapdoor ? ' A trapdoor in the floor leads down to the cellar.' : ''}`, trapdoor ? 6 : 3);
   }
 
   /** Stepping out. */
@@ -209,17 +219,27 @@ export class InteriorVisit {
     v.setRGB(v.r + (sun.r * e - v.r) * k, v.g + (sun.g * e - v.g) * k, v.b + (sun.b * e - v.b) * k);
   }
 
-  /** The people its town has in the open building now, placed on its spots (null: none open). */
+  /** The people its town has in the open building now, on their spots or on their way (null: none open). */
   people(): Placed[] | null {
+    return this.open ? this.placed ?? [] : null;
+  }
+  private placed: Placed[] | null = null;
+
+  /** Who is in the open building this frame, and where (walking in, sitting down, walking out). */
+  private stepPeople(dt: number): void {
     const o = this.open;
-    if (!o) return null;
+    if (!o) { this.placed = null; return; }
     const life = o.door.town.life;
     // Only those drawn (Actors makes adults): a child would hold a seat and show nobody.
-    return roomCast(life.agents, life.spots, o.b.id, o.plan).map(({ agent, spot, act }) => {
-      const s = o.plan.spots[spot], p = o.walk.floorAt(s.a, s.b, s.storey);
+    const cast = roomCast(life.agents, life.spots, o.b.id, o.plan, o.flow.kept);
+    const places = o.flow.frame(cast, dt);
+    // Those walking out wait on the doorstep until they reach it (else they would be in the street already).
+    for (const a of o.flow.leaving) life.linger(a, 0.25);
+    this.placed = places.map(({ agent, a, b, storey, yaw, act, seat }) => {
+      const p = o.walk.floorAt(a, b, storey);
       // The small folk serve from a step behind the counter (unseen behind it): else only their hair shows.
-      const step = s.kind === 'serve' && SMALL.has(agent.person.race) ? SERVE_STEP : 0;
-      return { agent, x: p.x, y: p.y + step, z: p.z, dir: o.walk.frame.dirOf(s.yaw), act };
+      const step = act === 'serve' && SMALL.has(agent.person.race) ? SERVE_STEP : 0;
+      return { agent, x: p.x, y: p.y + step, z: p.z, dir: o.walk.frame.dirOf(yaw), act, ...(seat !== undefined ? { seat: p.y + seat } : {}) };
     });
   }
 
@@ -231,7 +251,8 @@ export class InteriorVisit {
 
   get roomText(): string {
     if (!this.open) return '';
-    return `${this.within ? 'in' : 'open'} ${this.open.b.kind} #${this.open.b.id} of ${this.open.door.town.id}${this.within ? ` storey ${this.lampOn}` : ''}`;
+    const g = this.open.door.town.guildAt(this.open.b.id);
+    return `${this.within ? 'in' : 'open'} ${this.open.b.kind} #${this.open.b.id}${g ? ` (${g.guild.name})` : ''} of ${this.open.door.town.id}${this.within ? ` storey ${this.lampOn}` : ''}`;
   }
 }
 

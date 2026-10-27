@@ -3,6 +3,7 @@
 import { buildChunk, type ChunkSpec, type ChunkMesh } from '../world/chunkMesh';
 import { archMesh, type VolumeMesh } from '../world/volumes';
 import { townMeshBuffers, townMeshes, type TownCellMesh } from '../world/townMesh';
+import { guildHouses, guildSigns } from '../game/guilds';
 import type { Terrain } from '../world/terrain';
 import { openWorld } from '../vgm/builder';
 import { settingById } from '../setting/index';
@@ -40,7 +41,7 @@ serve<TerrainJob, TerrainResult>((job) => {
   }
   if (job.kind === 'town') {
     const town = terrain.town(job.id);
-    const cells = town ? townMeshes(town) : [];
+    const cells = town ? townMeshes(town, guildSigns(guildHouses(town.plan, town.decision.size ?? 'town', terrain.setting))) : [];
     return { result: { cells, plan: job.plan && town ? town.plan : null }, transfer: townMeshBuffers(cells) };
   }
   if (job.kind === 'townMask') {
