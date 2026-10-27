@@ -28,6 +28,12 @@ const WORK: ReadonlySet<InteriorSpotKind> = new Set(['serve', 'smith', 'stoke', 
 /** Where a visitor or a member of the household goes, likeliest first. */
 const REST: readonly InteriorSpotKind[] = ['drink', 'sit', 'pray', 'warm'];
 
+/** Is `a`, at spot `s`, in that spot's building's room (indoors there, or drinking or praying at its tables)? */
+export function inRoom(a: Agent, s: { building: number; door?: boolean }): boolean {
+  if (s.building < 0) return false;
+  return s.door ? a.hidden && a.act !== 'sleep' : a.act === 'drink' || a.act === 'pray';
+}
+
 /** The bench a spot is on (people sit there, on its top), if any. */
 export function benchUnder(plan: InteriorPlan, s: InteriorSpot): InteriorFixture | undefined {
   return plan.fixtures.find((f) => f.kind === 'bench' && f.storey === s.storey && Math.abs(s.a - f.a) <= f.w / 2 && Math.abs(s.b - f.b) <= f.d / 2);
@@ -40,9 +46,9 @@ export function benchUnder(plan: InteriorPlan, s: InteriorSpot): InteriorFixture
 export function roomCast(agents: readonly Agent[], spots: readonly { building: number; door?: boolean }[], building: number, plan: InteriorPlan, kept?: ReadonlyMap<Agent, number>): Cast[] {
   const inside = agents.filter((a) => {
     const s = a.spot >= 0 ? spots[a.spot] : null;
-    if (!s || s.building !== building) return false;
-    // Someone held for a talk in the room stays in it (holding shows them, as out of doors).
-    return s.door ? (a.hidden || !!a.held) && a.act !== 'sleep' : (a.act === 'drink' || a.act === 'pray' || !!a.held);
+    // Someone held for a talk in the room stays in it (holding shows them, as out of doors); someone stopped
+    // out of doors on the way in stays out there with the hero.
+    return !!s && s.building === building && (a.held ? !!a.heldIn : inRoom(a, s));
   });
   const free = plan.spots.map((s, i) => ({ kind: s.kind, i })).filter((s) => s.kind !== 'sleep');
   const held = new Map<number, Agent>();
