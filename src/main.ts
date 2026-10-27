@@ -1200,7 +1200,7 @@ export async function start(b: Boot): Promise<void> {
       vgmLog: () => vgmLines(log, vgmLog),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
-        const did = on ? character.learn(id) : character.forget(id);
+        const did = on ? character.learnToUse(id) : character.forget(id);
         actionBar.draw();
         book.redraw();
         if (on && id === birdAbility?.id) void birdForm?.warm();
