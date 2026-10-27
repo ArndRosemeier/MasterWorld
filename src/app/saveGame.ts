@@ -9,6 +9,7 @@ import type { CharacterSave } from '../game/character';
 import { remainsLead, type GameMode, type Remains } from '../game/death';
 import type { DelveSave } from '../game/delve';
 import type { StandingSave } from '../game/standing';
+import type { KnownLandSave } from '../game/knownLand';
 import type { GuildBookSave } from '../game/guilds';
 import type { MarketSave } from '../game/trade';
 import type { TownshipSave } from '../game/township';
@@ -55,6 +56,8 @@ export interface SaveData {
   /** What every town keeps (its people's words, its merchants), by town id (plan B3a; older saves: `talk`, `market`, `talks`). */
   readonly towns?: Readonly<Record<string, TownshipSave>>;
   readonly journal: readonly Lead[];
+  /** The land the hero knows, as the map shows it (none in older saves: the land round the start town). */
+  readonly map?: KnownLandSave;
   /** The hero's skills, health, gear and purse (version 2; none: a fresh hero). */
   readonly character: CharacterSave | null;
   /** The Director's needs and tension (version 2). */
@@ -123,8 +126,10 @@ export function remainsEntry(r: Remains): Lead {
  * fell. The next hero starts at `start` knowing only one thing: where the last one fell.
  */
 export function heirSave(s: SaveData, grave: Remains, start: SaveData['hero']): SaveData {
+  // The next hero knows the land only as a new hero does (the map key is left out).
+  const { map: _known, ...world } = s;
   return {
-    ...s, mode: 'roguelike', heir: true, hero: start, character: null, looks: null,
+    ...world, mode: 'roguelike', heir: true, hero: start, character: null, looks: null,
     remains: [...s.remains, grave], journal: [remainsEntry(grave)],
   };
 }
