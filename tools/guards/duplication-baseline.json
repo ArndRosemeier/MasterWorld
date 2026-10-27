@@ -144,10 +144,6 @@
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the card entrances are shared in KeyWindow.entrances."
   },
   {
-    "key": "same name: masterworld/game/character.ts#save + masterworld/game/trade.ts#save",
-    "reason": "Each pure game object writes its own plain save data (the hero's sheet, the town's merchants); only the name matches."
-  },
-  {
     "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/hydro.ts",
     "reason": "The MinHeap's pop loop (@futuremagic/core) in three different searches: A* over the town's street graph, the priority flood of a tile's water, and A* over 1 m walk cells in the loop check. The heap is shared; the searches are not the same."
   },
