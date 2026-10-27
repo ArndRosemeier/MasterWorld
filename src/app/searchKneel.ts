@@ -5,6 +5,7 @@
  */
 import { smoothstep } from '@futuremagic/core';
 import type { Puppet } from './player';
+import { walkOn } from './walkTo';
 
 /** The hero kneels this far from what they search (m): a body's middle, a chest's front. */
 const KNEEL_AT = 0.75;
@@ -22,7 +23,7 @@ export class SearchKneel implements Puppet {
   readonly limbs = null;
   readonly shot = null;
   readonly pos: { x: number; y: number; z: number };
-  vel: [number, number, number] = [0, 0, 0];
+  readonly vel: [number, number, number] = [0, 0, 0];
   yaw: number;
   walking = true;
   clip: string | undefined = undefined;
@@ -58,15 +59,9 @@ export class SearchKneel implements Puppet {
     this.yaw += Math.sign(d) * Math.min(Math.abs(d), TURN * dt);
     if (this.t < 0) {
       // Up to it at walking pace.
-      const dx = this.to.x - this.pos.x, dz = this.to.z - this.pos.z, left = Math.hypot(dx, dz), s = Math.min(left, STEP * dt);
-      if (left > 0.02) {
-        this.pos.x += (dx / left) * s; this.pos.z += (dz / left) * s;
-        this.vel = [(dx / left) * STEP, 0, (dz / left) * STEP];
-        return;
-      }
+      if (walkOn(this.pos, this.vel, this.to, STEP, dt)) return;
       this.t = 0;
       this.walking = false;
-      this.vel = [0, 0, 0];
       this.clip = 'crouch';
     }
     this.t += dt;

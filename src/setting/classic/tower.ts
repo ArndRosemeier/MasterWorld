@@ -15,7 +15,6 @@ export const tower: CellarLore = {
     space: { ...CELLAR_SPACE, radius: 7, maxRooms: 10, depth: [-1, -1], rise: 2, way: 'door', entrance: [3, 3], arriveMid: true, walls: 'dressed' },
   },
   words: {
-    enter: 'You push past the broken door and step into {place}.',
     quiet: 'Nothing moves in {place} now. The household who told you of it will want to hear.',
     thanks: 'Nothing left alive in {place}? Then we can look up at it without fear. Here, {coins}, and well earned.',
   },

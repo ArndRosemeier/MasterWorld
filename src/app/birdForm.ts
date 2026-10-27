@@ -84,23 +84,25 @@ export class BirdForm {
       case 'began':
         this.zoomWas = p.heroCam.zoom;
         p.dismount();
-        n.say('You kneel and call up the bird in you. (Use it again to stop.)', 5);
+        // The kneel and the change are seen; only the key is said.
+        n.say('(Bird form again to stop.)', 4);
         break;
-      case 'stopped': this.selfAgain(); n.say('You let the change go and stand up.', 3); break;
-      case 'broken': this.selfAgain(); n.say('The fight tears the change apart: you are yourself again.', 4); break;
+      case 'stopped': this.selfAgain(); break;
+      case 'broken': this.selfAgain(); break;
       case 'became':
         this.flight.perch(w.pos.x, w.pos.z, w.yaw);
         this.view?.cry();
-        n.say('You are a pheasant. Space takes off and climbs, W flaps on, X dives; use Bird form again to land and be yourself.', 8);
+        // The keys, which cannot be shown.
+        n.say('Space takes off and climbs, W flaps on, X dives; Bird form again to land.', 8);
         break;
-      case 'landing': n.say('You glide down to land.', 3); break;
+      case 'landing': break;
       case 'returning': {
         const f = this.flight.pos;
         w.place(f.x, f.z);
         w.yaw = this.flight.yaw;
         break;
       }
-      case 'returned': this.selfAgain(); n.say('You are yourself again.', 3); this.host.changed?.(); break;
+      case 'returned': this.selfAgain(); this.host.changed?.(); break;
     }
   }
 
