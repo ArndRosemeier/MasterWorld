@@ -7,6 +7,7 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
 import type { DecisionLog, SightDecision } from '../world/decisions';
+import { woodsOf } from '../world/flora';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { regionDecisions } from './frontier';
@@ -31,6 +32,8 @@ const ASIDE: readonly [number, number] = [8, 22];
 const APART = 350;
 const OFF_TOWN = 80;
 const OFF_PLACE = 40;
+/** Spots that fit to choose the most open of. */
+const CHOICES = 6;
 
 /** The sights in the log. */
 export function sightsOf(log: DecisionLog): SightDecision[] {
@@ -48,11 +51,12 @@ export function sightFor(c: NeedContext): SightDecision | null {
   const t = c.terrain, places = regionDecisions(c.log).flatMap((d) => (d.site ? [d.site] : []));
   const way = c.toward ? Math.atan2(c.toward.z - c.hero.z, c.toward.x - c.hero.x) : r.range(0, Math.PI * 2);
   const far = c.toward ? Math.hypot(c.toward.x - c.hero.x, c.toward.z - c.hero.z) - 40 : AHEAD[1];
+  const woods = woodsOf(t), fits: { x: number; z: number; woods: number }[] = [];
   for (let k = 0; k < 40; k++) {
     // On the way while it can be; later tries swing wider round the hero.
     const a = way + (k < 20 ? 0 : r.range(-1, 1) * Math.min(Math.PI, (k - 19) * 0.2));
     const d = Math.min(far, r.range(AHEAD[0], AHEAD[1]));
-    if (d < AHEAD[0] * 0.6) break;
+    if (d < AHEAD[0] * 0.6) continue;
     const side = r.range(ASIDE[0], ASIDE[1]) * (r.chance(0.5) ? 1 : -1);
     const x = c.hero.x + Math.cos(a) * d - Math.sin(a) * side, z = c.hero.z + Math.sin(a) * d + Math.cos(a) * side, h = t.height(x, z);
     if (t.waterDepth(x, z, h) > 0 || h < 2 || t.steepness(x, z, 6, h) > 0.35) continue;
@@ -60,8 +64,12 @@ export function sightFor(c: NeedContext): SightDecision | null {
     if (c.towns.some((w) => Math.hypot(w.decision.x - x, w.decision.z - z) < w.decision.radius + OFF_TOWN)) continue;
     if (places.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + OFF_PLACE)) continue;
     if (past.some((p) => Math.hypot(p.x - x, p.z - z) < APART)) continue;
-    // Facing the way the hero comes from.
-    return { kind: 'sight', id: `sight-${n}`, sight: def.id, x, z, yaw: Math.atan2(c.hero.x - x, c.hero.z - z), seed: s, at: c.hours };
+    fits.push({ x, z, woods: woods(x, z) });
+    if (fits.length >= CHOICES) break;
   }
-  return null;
+  // Where it shows best: the most open of the spots that fit (it stands in a glade of its own anyway).
+  const at = fits.sort((a, b) => a.woods - b.woods)[0];
+  if (!at) return null;
+  // Facing the way the hero comes from.
+  return { kind: 'sight', id: `sight-${n}`, sight: def.id, x: at.x, z: at.z, yaw: Math.atan2(c.hero.x - at.x, c.hero.z - at.z), seed: s, at: c.hours };
 }

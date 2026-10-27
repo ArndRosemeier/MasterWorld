@@ -448,7 +448,7 @@ export async function start(b: Boot): Promise<void> {
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights }, log);
-      for (const d of log) if (d.kind === 'region' && d.site) void roadWork.clear(d);
+      for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
       // `site=<place>`: walk out from the start until one opens, then stand before it.
       const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
       for (let dir = 0; kind && dir < 8; dir++) {
@@ -1367,6 +1367,7 @@ export async function start(b: Boot): Promise<void> {
       } else if (d.kind === 'sight') {
         console.info(`[vgm] sight ${d.id} (${d.sight}) at ${d.x.toFixed(0)}, ${d.z.toFixed(0)}: ${m.reason}`);
         regionSites?.sync(log);
+        void roadWork.clear(d);
       } else if (d.kind === 'event') {
         // The world moves on its own (C6): the band onto the land, the town gathers, word reaches the hero.
         console.info(`[vgm] event ${d.id} (${d.event}) from ${d.from} at ${hours().toFixed(1)} h`);

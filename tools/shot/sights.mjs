@@ -2,8 +2,8 @@
  * Sights by the way (implementation plan C9): `node tools/shot/sights.mjs [out dir]` after `npm run build`
  * (and `npm run packs`), SHOT_GPU=1 on the reference machine. The hero stands out on the land east of the
  * start town; the VGM answers Discovery there three times (the debug menu's "answer Discovery now"), each
- * sight a walk further on: each is shot from 22 m, then the hero steps up to it and the game must say what
- * it is. JPEGs into `<out dir>` (default `shots/sights/<date>-<commit>/`). A slow check (docs/CHECKS.md),
+ * sight a walk further on: the hero steps up to 16 m of each (inside its glade), the game must say what it
+ * is, and it is shot. JPEGs into `<out dir>` (default `shots/sights/<date>-<commit>/`). A slow check (docs/CHECKS.md),
  * well under 5 min.
  */
 import { execSync } from 'node:child_process';
@@ -42,22 +42,20 @@ for (let i = 0; i < 3; i++) {
   });
   console.log(`answer ${i + 1}: ${made ? `${made.sight} ${made.id} (${made.reason})` : 'none'}`);
   if (!made) { failed = true; continue; }
-  // From 22 m off, looking at it.
+  // From 16 m off, looking at it, inside its glade: the hero has come upon it, so the game says what it is.
   await page.evaluate(({ x, z }) => {
     const g = window.game, p = g.player.walker.pos, l = Math.max(1, Math.hypot(p.x - x, p.z - z));
-    const hx = x + ((p.x - x) / l) * 22, hz = z + ((p.z - z) / l) * 22;
+    const hx = x + ((p.x - x) / l) * 16, hz = z + ((p.z - z) / l) * 16;
     g.player.teleport(hx, undefined, hz, Math.atan2(hx - x, hz - z));
-  }, made);
-  await page.waitForTimeout(3500);
-  await shoot(`0${i + 1}-${made.sight}`);
-  // Up to it: the game says what it is.
-  await page.evaluate(({ x, z }) => {
-    const g = window.game, p = g.player.walker.pos, l = Math.max(1, Math.hypot(p.x - x, p.z - z));
-    g.player.teleport(x + ((p.x - x) / l) * 9, undefined, z + ((p.z - z) / l) * 9, Math.atan2(p.x - x, p.z - z));
   }, made);
   const said = await page.waitForFunction((seen) => document.body.innerText.includes(seen.slice(0, 30)), made.seen, { timeout: 8000 }).then(() => true, () => false);
   console.log(`came upon ${made.sight}: ${said ? 'said' : 'NOT SAID'}`);
   if (!said) failed = true;
+  // The trees round it are gone once the workers have the glade.
+  await page.waitForTimeout(3500);
+  await shoot(`0${i + 1}-${made.sight}`);
+  // Its words fade before the next one.
+  await page.waitForTimeout(6000);
 }
 const sh = await page.evaluate(() => { const m = window.shaders; return m ? m.summary() : null; });
 console.log(`F3: ${sh ? `${sh.violations} shader violations` : 'no shader monitor'}`);

@@ -29,6 +29,9 @@ test('answers: Discovery overdue puts a sight by the hero\'s way, on dry ground 
   assert.equal(terrain.waterDepth(d.x, d.z, h), 0);
   for (const t of terrain.towns) assert.ok(Math.hypot(t.decision.x - d.x, t.decision.z - d.z) > t.decision.radius + 60);
   assert.deepEqual(sightFor(c()), d, 'seeded');
+  // It stands in a glade of its own: the trees keep off it.
+  terrain.settleMore([d]);
+  assert.ok(terrain.fromClearing(d.x, d.z) < -10, 'in a glade');
   // The next keeps away from it and is another sight.
   const next = sightFor(c({ log: [...log, d], hero: { x: d.x + 400, z: d.z }, toward: { x: d.x + 1200, z: d.z } }));
   assert.ok(next && Math.hypot(next.x - d.x, next.z - d.z) >= 350, 'apart');

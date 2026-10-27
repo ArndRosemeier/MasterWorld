@@ -36,6 +36,8 @@ export function layOutSite(d: RegionDecision, place: Place, height: (x: number, 
 
 /** How far a sight reaches from its middle (m): what it stands on, and what keeps clear of it. */
 export const SIGHT_R = 6;
+/** The glade round a sight (m from its middle): no tree stands there, so it is seen from a way off. */
+export const SIGHT_CLEARING = 20;
 
 /** A sight by the way (C9), laid out on the land from its decision: a ring of standing stones, a waystone, a cairn. */
 export function layOutSight(d: SightDecision, shape: SightShape, height: (x: number, z: number) => number): SiteLayout {
