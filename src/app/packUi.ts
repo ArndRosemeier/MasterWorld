@@ -59,7 +59,7 @@ export class PackUi extends BodyWindow {
       }
       return c;
     });
-    const skills = [...this.setting.skills].sort((a, b) => h.skill(b.id) - h.skill(a.id)).map((s, i) => {
+    const skills = this.setting.skills.filter((s) => s.group !== 'magic' || h.opened(s.id)).sort((a, b) => h.skill(b.id) - h.skill(a.id)).map((s, i) => {
       const base = Math.floor(h.skills.get(s.id) ?? 0), all = Math.floor(h.skill(s.id)), plus = all - base;
       const needle = el('div', { className: 'needle' });
       needle.style.animationDelay = `${(0.6 + i * 0.05).toFixed(2)}s`;

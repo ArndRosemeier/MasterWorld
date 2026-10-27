@@ -6,6 +6,7 @@
 import type { BackgroundDef, DamageKind, ItemCatalog, SettingModule, Slot } from '../setting/contract';
 import type { Blow, Guard } from '../sim/combat';
 import { addToBar, cleanBar, defaultBar, type Bar } from './actionBar';
+import type { Worn } from './recipe';
 import { defOf, plainItem, type Item } from './items';
 import { strengthOf, wearState, wornBy, type Lodging, type WearState } from './upkeep';
 
@@ -70,6 +71,10 @@ export class Character {
   readonly learned = new Set<string>();
   /** The action bar (game/actionBar.ts): ten slots of ability ids. */
   bar: Bar;
+  /** Seconds before each ability is ready again (not saved): the same in a fight and out of one. */
+  readonly cooldowns = new Map<string, number>();
+  /** Status effects on the hero (not saved; game/recipe.ts): the same in a fight and out of one. */
+  readonly effectsOn: Worn[] = [];
   private readonly cat: ItemCatalog;
 
   constructor(private readonly setting: SettingModule, saved?: CharacterSave) {
@@ -82,6 +87,8 @@ export class Character {
       this.background = saved.background ?? '';
       this.lodging = saved.lodging ?? null;
       for (const id of this.rankedSkills()) this.ranks.set(id, saved.ranks?.[id] ?? this.rankFor(this.skills.get(id) ?? 0));
+      // A school of magic opened by a spell learned (no guild teaches it yet) keeps its rank too.
+      for (const [id, r] of Object.entries(saved.ranks ?? {})) if (!this.ranks.has(id) && this.skills.has(id)) this.ranks.set(id, r);
       for (const id of saved.learned ?? []) if (setting.abilities.some((a) => a.id === id && a.taught)) this.learned.add(id);
     } else this.beginAs(setting.backgrounds[0]);
     this.bar = saved ? cleanBar(saved.bar, this.known) : defaultBar(this.known);
@@ -120,8 +127,11 @@ export class Character {
 
   /** A taught ability learned (from a teacher, or the debug menu): onto the bar's first free slot. False if there is no such ability or it is known already. */
   learn(id: string): boolean {
-    if (this.knows(id) || !this.setting.abilities.some((x) => x.id === id)) return false;
+    const a = this.setting.abilities.find((x) => x.id === id);
+    if (this.knows(id) || !a) return false;
     this.learned.add(id);
+    // A spell opens its school (at its first rank) if nothing opened it before.
+    if (a.skill && !this.opened(a.skill)) { this.ranks.set(a.skill, 0); this.mana = this.maxMana; }
     this.bar = addToBar(this.bar, id);
     return true;
   }
@@ -168,7 +178,7 @@ export class Character {
   /** Health grows with the skills that take blows. */
   get maxHealth(): number { return Math.round(55 + (this.base('armour') + this.base('shields')) * 0.35 + this.bestWeapon() * 0.25); }
   get maxStamina(): number { return Math.round(60 + (this.base('dodge') + this.bestWeapon()) * 0.3); }
-  /** Mana grows with the schools of magic opened: the best one most (none opened: none). */
+  /** Mana grows with the schools of magic opened: 30, and the best one most (none opened: none). */
   get maxMana(): number {
     let best = -1, all = 0;
     for (const s of this.setting.skills) {
@@ -177,7 +187,7 @@ export class Character {
       best = Math.max(best, v);
       all += v;
     }
-    return best < 0 ? 0 : Math.round(20 + best * 0.6 + all * 0.2);
+    return best < 0 ? 0 : Math.round(30 + best * 0.6 + all * 0.2);
   }
 
   /** A skill the hero may use: opened by a trainer or the past, or open to all where no guild teaches it. */

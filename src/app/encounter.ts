@@ -16,6 +16,8 @@ import type { Delve, Lootable } from '../game/delve';
 import type { Fight, FightEvent, HeroPose } from '../game/fight';
 import { POTION } from '../game/actionBar';
 import type { Character } from '../game/character';
+import type { RecipeEvent, Recipes } from '../game/recipe';
+import type { SpellFrame } from './spellView';
 import { coinText, defOf, type Item, type Loot } from '../game/items';
 import type { Bindings } from '../input/controls';
 import { onKeyDown } from '../input/keys';
@@ -96,6 +98,8 @@ export class Encounter {
   private wasFighting = 0;
   private near: Lootable | null = null;
   private readonly ray = new Vector3();
+  /** What the hero's spells did since they were last drawn. */
+  private readonly spellCues: RecipeEvent[] = [];
 
   constructor(
     readonly arena: Arena,
@@ -145,6 +149,12 @@ export class Encounter {
     else if (is('search')) said = this.search();
     else return;
     if (said) this.notes.say(said, 2.5);
+  }
+
+  /** Its spells for drawing (app/spellView.ts): the runner, the den's frame, the hero in it, what happened. */
+  spellFrame(): SpellFrame {
+    const O = this.creatures.group.position;
+    return { recipes: this.fight.recipes, offset: { x: O.x, y: O.y, z: O.z }, me: this.heroPose(), cues: this.spellCues.splice(0) };
   }
 
   /** It owns the keys and the HUD now (the one playing). */
@@ -307,6 +317,7 @@ export class Encounter {
       case 'killed': if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
       case 'skill': this.director.queue(`Your ${e.up.name} rises to ${e.up.level}.`, 1); break;
       case 'refused': this.notes.say(e.text, 2.5); break;
+      case 'recipe': if (this.active) this.spellCues.push(e.event); break;
       case 'worn': if (e.state !== 'new') this.director.queue(fill(this.setting.upkeep.words[e.state], { item: e.item.name.toLowerCase() }), 1); break;
       case 'fallen':
         this.fallenFor = 0;
@@ -335,7 +346,7 @@ export class Encounter {
  * One frame of every encounter: those the hero is in play (the most stirred leads), the others rest;
  * with none, the hero catches breath and the HUD shows only while they are hurt.
  */
-export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly hero: Character; readonly player: Player; readonly hud: FightHud }): void {
+export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[] }): void {
   let best: Encounter | null = null;
   // A bird in the hero's place (bird form) is nothing the dwellers fight: every encounter rests meanwhile.
   const flown = !!calm.player.shape?.aloft;
@@ -346,6 +357,12 @@ export function stepEncounters(dt: number, all: readonly Encounter[], calm: { re
   }
   if (best) return;
   calm.player.stance = { combat: false };
+  const w = calm.player.walker;
+  for (const e of calm.alone?.elapse(dt, w.pos, w.groundSpeed) ?? []) {
+    calm.cues?.push(e);
+    if (e.kind === 'refused' || e.kind === 'broken') calm.notes?.say(e.kind === 'broken' ? e.why : e.text, 2.5);
+    else if (e.kind === 'healed' && !e.over) calm.hud.healed();
+  }
   calm.hero.recover(dt, false, 0);
   calm.hud.shown = calm.hero.health < calm.hero.maxHealth;
   calm.hud.calm(calm.hero);
