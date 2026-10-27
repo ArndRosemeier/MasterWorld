@@ -40,7 +40,7 @@ export const SPELL_GLOW = defineKind('spell glow', ['position', 'normal', 'uv', 
   const frost = rim.mul(rim).mul(1.4).add(f3.mul(0.5)).add(glint.mul(1.5));
   // stone: dull, mottled grit.
   const mott = sin(p.x.mul(7.0).add(seed.mul(9.0))).mul(sin(p.y.mul(9.0))).mul(sin(p.z.mul(8.0))).mul(0.5).add(0.5);
-  const stone = face.mul(mott.mul(0.55).add(0.35));
+  const stone = face.mul(mott.mul(0.7).add(0.5));
   // bloom: rings rising through petals.
   const bloom = pow(face, 1.5).mul(0.8).add(wave(p.y.mul(9.0).sub(t.mul(4.0))).mul(wave(ang.mul(6.0).add(t))).mul(face).mul(0.7));
   // radiance: rays from a white core, turning slowly.

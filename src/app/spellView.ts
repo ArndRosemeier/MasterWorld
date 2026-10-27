@@ -25,6 +25,8 @@ const MAX = 320;
 const MOTES = 220;
 /** How long an area's burst and a flare last (s). */
 const BURST = 0.5;
+/** How long earth's spikes stand (s). */
+const SPIKES = 0.9;
 const FLARE = 0.9;
 /** Motes shed per second: by a spell being cast, behind what flies, per metre of a zone's radius. */
 const GATHER = 14, TRAIL = 45, LINGER = 3;
@@ -180,7 +182,8 @@ export class SpellView {
       fl.age += dt;
       if (fl.age >= fl.life) { this.flashes.splice(i, 1); continue; }
       const a = fl.age / fl.life, rad = fl.grow ? fl.radius * (0.3 + 0.7 * a) : fl.radius;
-      this.put(fl.x, fl.y, fl.z, rad, fl.grow ? rad * 0.6 : rad, fl.look, 0, (1 - a) * (fl.grow ? 0.9 : 0.6), i);
+      if (fl.grow && fl.look.motif === 'stone' && fl.radius > 0.7) this.spikes(fl, a, i);
+      else this.put(fl.x, fl.y, fl.z, rad, fl.grow ? rad * 0.6 : rad, fl.look, 0, (1 - a) * (fl.grow ? 0.9 : 0.6), i);
     }
     this.motes.drift(dt);
     for (const m of this.motes.list) {
@@ -233,6 +236,19 @@ export class SpellView {
     this.motes.shed(l.motif, l, TRAIL * dt, x, y, z, rad * 0.6);
   }
 
+  /**
+   * Earth bursts as spikes, not a dome: a tall one in the middle and three smaller round it shoot up out of the
+   * ground in the first third of the burst, stand, then sink and fade.
+   */
+  private spikes(fl: Flash, a: number, i: number): void {
+    const up = Math.min(1, a * 3), k = (a < 0.6 ? 1 : (1 - a) / 0.4) * 1.3, ground = fl.y - 0.3;
+    for (let j = 0; j < 4; j++) {
+      const ang = j * 2.1 + i, off = j === 0 ? 0 : fl.radius * 0.45, big = j === 0 ? 1 : 0.6;
+      const w = fl.radius * 0.22 * big, h = fl.radius * 1.3 * big * up;
+      this.put(fl.x + Math.cos(ang) * off, ground + h * 0.5, fl.z + Math.sin(ang) * off, w, Math.max(0.01, h * 0.5), fl.look, 0, k, i * 4 + j);
+    }
+  }
+
   /** Where the caster's hands hold a spell, in the world. */
   private handsAt(f: SpellFrame): Spot {
     const O = f.offset;
@@ -268,7 +284,7 @@ export class SpellView {
       case 'broken': this.listener?.hands('stop', 0); break;
       case 'loosed': this.born.set(e.shot.n, this.t); break;
       case 'area': {
-        const burst = () => { flash(e.at, e.radius, e.ability, BURST, true, 10 + 6 * e.radius); if (e.look) say('hit', e.ability, O.x + e.at.x, O.y + e.at.y + 0.5, O.z + e.at.z); };
+        const burst = () => { flash(e.at, e.radius, e.ability, this.showingOf(e.ability).motif === 'stone' ? SPIKES : BURST, true, 10 + 6 * e.radius); if (e.look) say('hit', e.ability, O.x + e.at.x, O.y + e.at.y + 0.5, O.z + e.at.z); };
         // A bolt that bursts into an area (a fireball) still drawn flying: the area bursts when it gets there.
         const flying = this.tracers.find((t) => t.age === 0 && t.look === this.showingOf(e.ability));
         if (flying) flying.land.push(burst); else burst();
