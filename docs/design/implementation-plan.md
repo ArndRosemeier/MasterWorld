@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Current phase: B.**
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Current phase: C.**
 
 ---
 
@@ -148,4 +148,9 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | A hedge witch who teaches | Her cottage is C3 (D49) |
 | Interiors rework (ceiling joists cross the wall tops, dim rooms) | Seen at gate A; looks, not function. Before gate B's shots |
 | Who teaches bird form (built 2026-10-27, opened only by the debug menu) | Its teacher comes with the magic teachers (C3) |
+| Rare one-frame hitches: a region opening (7–47 ms), the first time a door opens a building (16–22 ms) | Seen at gate B; p95 holds at 18 ms. Move to a worker or spread over frames before gate C |
+| Talk framing outdoors: the camera looks down at a house wall with the speaker small in the frame | Seen at gate B after #203; the speaker is now in the shot |
+| The horse reads coarse (flat body, flat white saddle pad) | Seen at gate B; looks, not function |
+| Leaf litter has bright green blotches like texture splats | Seen at gate B |
+| Loop check: the hamlet summary says "0 copper earned" though the purse ends at 511 | Seen at gate B; a counting bug in the summary only |
 | Barrow nits: straight slab edges close up, a crease where bank meets mound, a yellowish patch at the foot | Seen at gate A after #149 |
