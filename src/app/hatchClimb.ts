@@ -41,6 +41,8 @@ export interface HatchHost {
   openAbove(v: CellarVisit): Promise<HatchWay | null>;
   /** After coming down or up (the game autosaves). */
   swapped(): void;
+  /** Sink the ground round (x, z) out of sight under a house's hatch (null: back as it was). */
+  sink(at: { x: number; z: number } | null): void;
 }
 
 /** How far the lid swings open (rad): past upright, so it leans back on its hinge. */
@@ -96,6 +98,8 @@ export class HatchClimb implements Puppet {
     this.facing = [l.nx, l.nz];
     this.hinge = hinge;
     this.shown = true;
+    // In the house the shaft under the hatch is seen to its bottom.
+    this.host.sink(hinge ? { x, z } : null);
   }
 
   /**
@@ -228,6 +232,7 @@ export class HatchClimb implements Puppet {
     this.clip = undefined;
     this.over = null;
     this.shown = false;
+    this.host.sink(null);
     P.puppet = null;
     this.host.fade.dim(0);
     P.walker.place(p.x, p.z, p.y);

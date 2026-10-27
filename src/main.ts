@@ -35,7 +35,7 @@ import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
 import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
-import { useGroundTextures } from './render/materials';
+import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg } from '@futuremagic/settlement';
 import { abilityOf, validateSetting, type BackgroundDef, type SituationKind } from './setting/contract';
@@ -138,6 +138,8 @@ declare global {
 const DRESS_WAIT = 15000;
 /** Seconds after the VGM answered an overdue need before it answers again (C9): time to come upon the first. */
 const ANSWER_GAP = 90;
+/** The ground sunk under a hatch while one climbs through it: this far round it, this deep (m; render/materials GROUND_DIP). */
+const SINK_REACH = 2.4, SINK_DEPTH = 4;
 
 /** What the first, small script (boot.ts) made before the game's code arrived. */
 export interface Boot {
@@ -1356,6 +1358,8 @@ export async function start(b: Boot): Promise<void> {
         return t && v.above && rooms ? rooms.arriveAbove({ town: t, b: v.above.house }) : null;
       },
       swapped: () => autosave(),
+      // The ground's vertices lie a couple of metres apart: sunk well round the hatch, all of them under it go.
+      sink: (at) => { if (at) GROUND_DIP.value.set(at.x, at.z, SINK_REACH, SINK_DEPTH); else GROUND_DIP.value.w = 0; },
     });
     // F flies, H gets on or off a horse, X sits down to rest on the ground (dives in the water), E climbs a hatch's
     // ladder (the keys are in the settings).

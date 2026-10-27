@@ -8,7 +8,7 @@
  * value eases as the sun moves and is gone at night.
  */
 import { HATCH_RUNG, HATCH_RUNG_IN, HATCH_SHAFT, hatchSides, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
-import { openHouse, type OpenHouse } from '../world/townMesh';
+import { hatchOf, openHouse, type OpenHouse } from '../world/townMesh';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
 import { guildSigns } from '../game/guilds';
 import type { HouseView } from '../render/town/HouseView';
@@ -131,7 +131,7 @@ export class InteriorVisit {
    */
   async enter(door: TownDoor, _now = true, byHatch = false): Promise<void> {
     const o = await this.openUp(door), b = door.b;
-    const hatch = byHatch ? o.plan.fixtures.find((f) => f.kind === 'hatch') : undefined;
+    const hatch = byHatch ? hatchOf(o.plan) : undefined;
     if (hatch) {
       const l = this.wayDown(o, hatch).ladder;
       this.player.teleport(l.x + l.nx * 1.1, l.floor, l.z + l.nz * 1.1, Math.atan2(l.nx, l.nz));
@@ -180,7 +180,7 @@ export class InteriorVisit {
   hatchNear(): { way: HatchWay; below: () => Promise<CellarVisit> } | null {
     const o = this.open, w = this.player.walker;
     if (!o || !this.within) return null;
-    const hatch = o.plan.fixtures.find((f) => f.kind === 'hatch'), below = this.cellars.get(houseKey(o.door.town.id, o.b.id));
+    const hatch = hatchOf(o.plan), below = this.cellars.get(houseKey(o.door.town.id, o.b.id));
     if (!hatch || !below || o.walk.storey(w.pos.y) !== hatch.storey) return null;
     const [a, b] = o.walk.frame.toRoom(w.pos.x, w.pos.z);
     if (Math.hypot(a - hatch.a, b - hatch.b) > HATCH_REACH) return null;
@@ -193,7 +193,7 @@ export class InteriorVisit {
    */
   async arriveAbove(door: TownDoor): Promise<HatchWay | null> {
     const o = await this.openUp(door);
-    const hatch = o.plan.fixtures.find((f) => f.kind === 'hatch');
+    const hatch = hatchOf(o.plan);
     if (!hatch) return null;
     this.come();
     return this.wayDown(o, hatch);

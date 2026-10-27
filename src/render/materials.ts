@@ -6,7 +6,7 @@
  * Every mesh of a kind shares the kind's one material, so a kind is one shader; variation goes into
  * vertex attributes or uniforms, never into a new material.
  */
-import { DoubleSide, Mesh, MeshPhysicalNodeMaterial, Vector2, type BufferGeometry, type Material } from 'three/webgpu';
+import { DoubleSide, Mesh, MeshPhysicalNodeMaterial, Vector2, Vector4, type BufferGeometry, type Material } from 'three/webgpu';
 import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, sin, cos, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
@@ -91,6 +91,12 @@ const CROWN_BROAD = vec3(0.02, 0.048, 0.012), CROWN_CONIFER = vec3(0.012, 0.03, 
 /** Past the sun's shadow box (sky.ts), the floor under the woods keeps this share of its light (the crowns' shade on average). */
 const UNDER_CROWNS = 0.15;
 
+/**
+ * The ground sunk round a world point while a hero climbs through a house's hatch there (app/hatchClimb.ts): x, z,
+ * the radius (m) and how deep (m; 0: not at all). The ground under a plinth is never seen otherwise.
+ */
+export const GROUND_DIP = uniform(new Vector4(0, 0, 0, 0));
+
 export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level', 'canopy'], () => {
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');
   const { albedo: A, normal: N } = ground;
@@ -103,7 +109,10 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const cn = attribute('canopy', 'vec4');
   const placed = modelWorldMatrix.mul(vec4(positionLocal, 1)).xyz;
   const far0 = smoothstep(WOODS.band.x, WOODS.band.y, length(placed.xz.sub(cameraPosition.xz)));
-  m.positionNode = positionLocal.add(vec3(0, cn.y.mul(smoothstep(0.05, 0.7, cn.x)).mul(0.8).mul(far0), 0));
+  // Sunk under a house's open hatch while one climbs through it (GROUND_DIP): the shaft under the floor is seen
+  // to its bottom, not cut off by the ground under the plinth.
+  const dip = GROUND_DIP.w.mul(float(1).sub(smoothstep(GROUND_DIP.z.mul(0.7), GROUND_DIP.z, length(placed.xz.add(ORIGIN.node.xz).sub(GROUND_DIP.xy)))));
+  m.positionNode = positionLocal.add(vec3(0, cn.y.mul(smoothstep(0.05, 0.7, cn.x)).mul(0.8).mul(far0).sub(dip), 0));
   // The world point (patterns, masks); distances to the camera from the origin-relative positionWorld.
   const p = WORLD, n = normalWorldGeometry, up = n.y;
   // How level the ground is, smoothed over a few metres per vertex: what rock and sand follow, so their

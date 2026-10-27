@@ -3,7 +3,7 @@
  * building (and each fence and haystack of its farmland), and those of one square cell are merged into
  * one mesh near and one far (fewer draws).
  */
-import { buildingMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
+import { buildingMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type InteriorFixture, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
 import type { Town } from './town';
 
 /** Side of a merge cell, metres. */
@@ -84,7 +84,13 @@ export interface OpenHouse { readonly plan: InteriorPlan; readonly mesh: Buildin
  * `b` planned inside and drawn open round its middle (`hatch`: a cellar's trapdoor; `hall`: a guild's hall; `sign`:
  * the shield over its door). Tens of milliseconds for a big house: a terrain worker does it (floor F2).
  */
+/** The plan's hatch down to its cellar (undefined: none). */
+export const hatchOf = (plan: InteriorPlan): InteriorFixture | undefined => plan.fixtures.find((f) => f.kind === 'hatch');
+
 export function openHouse(b: TownBuilding, opts: { readonly hatch: boolean; readonly hall: boolean }, sign?: [number, number, number]): OpenHouse {
   const plan = planInterior(b, opts), at: [number, number, number] = [b.cx, 0, b.cz];
-  return { plan, mesh: mergeMeshes([buildingMesh(b, at, true, { open: true, sign }), interiorMesh(plan, b, at, { lid: false })]), lid: hatchLidMesh(plan, b, at) };
+  // A hatch on the ground floor: the plinth's top open over it (its shaft shows through).
+  const f = hatchOf(plan);
+  const hole = f && f.storey === 0 ? { a0: f.a - f.w / 2, a1: f.a + f.w / 2, b0: f.b - f.d / 2, b1: f.b + f.d / 2 } : undefined;
+  return { plan, mesh: mergeMeshes([buildingMesh(b, at, true, { open: true, sign, hole }), interiorMesh(plan, b, at, { lid: false })]), lid: hatchLidMesh(plan, b, at) };
 }
