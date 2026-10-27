@@ -855,7 +855,7 @@ export async function start(b: Boot): Promise<void> {
     /** Talk here: the town of whoever the hero talks with (or would, at the talk key). */
     const talkTown = (): Township | null => talk?.place ?? null;
     const nameHere = (id: number): string => talkTown()?.talk.nameOf(id) ?? '';
-    services.set('trade', (a) => { const t = talkTown(), m = t?.market.of(a.person.id); if (t && m) trade.show(t.market, m, t.talk.nameOf(a.person.id)); });
+    services.set('trade', (a) => { const t = talkTown(), m = t?.market.of(a.person.id); if (t && m) { director.model.note('crafter', 0.5); trade.show(t.market, m, t.talk.nameOf(a.person.id)); } });
     // Talk: in the town the hero is in (it follows them from town to town, below).
     const talk: TalkUi | null = startTown ? new TalkUi(startTown, setting.talk, journal, player, {
       paused,
@@ -864,6 +864,7 @@ export async function start(b: Boot): Promise<void> {
       get away() { return player.offFoot || !!visit() || !!title?.holding; },
       heard: (lead) => {
         handOver?.give(lead.id);
+        director.model.count('hints');
         // The hero's own first page ("ask at the inn") has done its work.
         journal.fulfil(ARRIVAL);
         notes.say(`${lead.note} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 6);
@@ -1021,9 +1022,10 @@ export async function start(b: Boot): Promise<void> {
       const e = leading();
       if (birdForm && id === birdAbility?.id) return birdForm.invoke();
       if (birdForm?.flying) return 'A pheasant cannot do that.';
-      if (e) return e.use(id);
-      const a = abilityOf(setting, id);
-      if (a && !blowOf(a)) return alone.begin(a, null, player.walker.pos);
+      const a = abilityOf(setting, id), spell = !!a && !blowOf(a);
+      // A spell cast is a mage's evidence (C12: the player model).
+      if (e) { const no = e.use(id); if (!no && spell) director.model.count('casts'); return no; }
+      if (a && spell) { const no = alone.begin(a, null, player.walker.pos); if (!no) director.model.count('casts'); return no; }
       if (id !== POTION) return 'There is nothing here to fight.';
       const r = character.remedy;
       if (r && character.consume(r) > 0) fightHud.healed();
@@ -1246,7 +1248,7 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1375,7 +1377,7 @@ export async function start(b: Boot): Promise<void> {
     /** The VGM's answer to `need` here and now, whatever the Director says (the debug menu, shots): what it made, or null. */
     const answerNow = (need: Need): Made | null => {
       const at = player.walker.pos;
-      const m = answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours: hours(), setting, home: start?.decision, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null });
+      const m = answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours: hours(), setting, home: start?.decision, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null, lean: (n) => director.model.lean(n) });
       if (m) applied(m);
       return m;
     };
@@ -1387,7 +1389,7 @@ export async function start(b: Boot): Promise<void> {
       if (!start) return [];
       const made = vgmTurn({
         seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id),
-        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), hero: { x: player.walker.pos.x, z: player.walker.pos.z },
+        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), hero: { x: player.walker.pos.x, z: player.walker.pos.z }, lean: (n) => director.model.lean(n),
         // A story event's band needs the wild to roam in.
         tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which,
       });
