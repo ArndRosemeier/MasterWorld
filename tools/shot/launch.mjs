@@ -30,6 +30,9 @@ export function stalePacks(dist = join(root, 'dist')) {
   return have === want ? '' : `dist/packs are from Actors ${have}, installed is ${want}`;
 }
 
+/** Every check runs muted (Arnd, 2026-10-27: tests on his PC make no sound); the game's sound still plays, unheard. */
+export const MUTE = '--mute-audio';
+
 export async function launch({ headed = false, args: extra = [] } = {}) {
   const missing = missingPacks();
   if (missing.length) throw new Error(`dist/packs has no ${missing.join(', ')}: run \`npm run packs\` and \`npm run build\` first`);
@@ -44,7 +47,7 @@ export async function launch({ headed = false, args: extra = [] } = {}) {
     channel: gpu ? 'chromium' : undefined,
     args: [...(gpu
       ? ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist']
-      : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist']), ...extra],
+      : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist']), MUTE, ...extra],
   });
   pinSeed(browser);
   return { server, base, browser };
