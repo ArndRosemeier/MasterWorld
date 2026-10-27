@@ -8,7 +8,7 @@ import { townPlanOf } from '../src/world/town';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement, woodsOf } from '../src/world/flora';
 import { EAST, SOUTH, WEST, along, first, home, regions, seed, terrain } from './frontierLand';
 
-test('frontier: hamlets and villages are towns of their size from the one planner, settled from the log', () => {
+test('frontier: waystations, hamlets and villages are towns of their size from the one planner, settled from the log', () => {
   const founded = [along(EAST), along(SOUTH), along(WEST)].flatMap((log) => regionDecisions(log).filter((d) => settlementOf(d, regions.fills)));
   const sizes = new Set<string>();
   for (const d of founded) {
@@ -20,12 +20,13 @@ test('frontier: hamlets and villages are towns of their size from the one planne
     assert.ok(town, `${t.size} settled`);
     const kinds = new Set(town.plan.buildings.map((b) => b.kind));
     if (t.size === 'hamlet') assert.ok(town.plan.buildings.length >= 5 && !kinds.has('temple') && !kinds.has('inn'), `hamlet: ${town.plan.buildings.length} buildings`);
+    else if (t.size === 'waystation') assert.deepEqual([...kinds].sort(), ['inn', 'stable'], 'a waystation: an inn and a stable');
     else for (const k of ['temple', 'inn', 'smithy']) assert.ok(kinds.has(k as never), `village without a ${k}`);
     // Planned once: a worker's plan and the main thread's agree.
     assert.deepEqual(townPlanOf(t, terrain).buildings.map((b) => b.cx), town.plan.buildings.map((b) => b.cx));
     for (const b of town.plan.buildings) assert.ok(terrain.waterDepth(b.cx, b.cz) <= 0, `${t.size}: a house in the water`);
   }
-  assert.deepEqual([...sizes].sort(), ['hamlet', 'village']);
+  assert.deepEqual([...sizes].sort(), ['hamlet', 'village', 'waystation']);
   // Every one stands by fresh water (D50): a brook, river or lake within reach of its edge.
   for (const d of founded) {
     const t = settlementOf(d, regions.fills)!;

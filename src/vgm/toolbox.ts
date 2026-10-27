@@ -7,7 +7,7 @@
  */
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
-import { nextEvent, type EventsContext } from './events';
+import { lairFor, nextEvent, type EventsContext } from './events';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 
 /** Who asks a tool: the start of a game, the hero walking, the Builder's turn, or another tool or the game. */
@@ -56,8 +56,8 @@ export const TOOLS: readonly Tool[] = [
       return `${what}: ${c.purposeOverdue ? 'Purpose is overdue' : `only ${open} lead${open === 1 ? '' : 's'} open`}${c.near && c.near !== c.towns[0] ? `, the hero is in ${c.near.decision.id}` : ''}`;
     } },
   { id: 'keep', name: 'Keep a promise', writes: ['kept'], need: 'reward', asked: 'call' },
-  { id: 'event', name: 'Story event', writes: ['event'], need: 'challenge', asked: 'turn', next: nextEvent,
-    why: (d) => (d.kind === 'event' ? `${d.event} in ${d.town}: ${d.paddock !== undefined ? `the raiders of ${d.from} were left alone` : `${d.from} was left open too long`}` : d.kind) },
+  { id: 'event', name: 'Story event', writes: ['event', 'dungeon'], need: 'challenge', asked: 'turn', next: (c) => lairFor(c) ?? nextEvent(c),
+    why: (d) => (d.kind === 'event' ? `${d.event} in ${d.town}: ${d.paddock !== undefined || d.held ? `the raiders of ${d.from} were left alone` : `${d.from} was left open too long`}` : d.kind === 'dungeon' && d.event ? `a ${d.template} for the band of ${d.event} to lie up in` : d.kind) },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },

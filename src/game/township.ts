@@ -11,7 +11,7 @@ import { TownLife, type TownOrder } from '../sim/townLife';
 import { talkCellar, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
-import { takenFrom } from '../vgm/events';
+import { heldBy, takenFrom } from '../vgm/events';
 import type { Decision, DecisionLog, RetreatDecision } from '../world/decisions';
 import type { Town } from '../world/town';
 import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
@@ -55,6 +55,8 @@ export class Township {
   private herdsOf: Herds | null | undefined;
   /** The log's length when the herds last read it. */
   private herdsLog = -1;
+  /** The log's length when the people last looked whether a band holds the place. */
+  private heldLog = -1;
   private housesOf: readonly GuildHouse[] | null = null;
   /** Set on the town's words when they are made (the game: how its people take the hero). */
   onTalk: ((talk: TownTalk) => void) | null = null;
@@ -92,12 +94,18 @@ export class Township {
     return bardOf(this.residents, this.town.plan);
   }
 
-  /** Its people's days (the world simulation), made when first asked for. */
+  /** Its people's days (the world simulation), made when first asked for; while a band holds the place its folk are gone. */
   get life(): TownLife {
-    if (this.lifeOf) return this.lifeOf;
+    if (this.lifeOf) {
+      const log = this.c.log();
+      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); }
+      return this.lifeOf;
+    }
     const life = new TownLife(this.town.plan, this.seed, this.c.hours(), this.c.setting.routines, this.residents);
     // The VGM's orders to this town so far (logged; a save replays them).
     for (const o of ordersOf(this.c.log(), this.id)) life.order(o);
+    life.gone = !!heldBy(this.c.log(), this.id);
+    this.heldLog = this.c.log().length;
     // A master with a place out on the land keeps watch at its door, facing the town.
     for (const { guild, out } of this.guilds) {
       const a = out && life.agents.find((x) => x.person.trade === guild.keeper);

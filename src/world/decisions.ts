@@ -59,6 +59,8 @@ export interface DungeonDecision {
   readonly at?: number;
   /** Who lives there, when the one who asked for it said (an encounter's id, `dungeonFor`); else the lore picks. */
   readonly dwellers?: string;
+  /** The story event whose band lies up here (a take's lair), if any. */
+  readonly event?: string;
 }
 
 /**
@@ -177,13 +179,16 @@ export interface RoadDecision {
   readonly at?: number;
 }
 
+/** A region place that is a settlement, planned as a town of its size (a waystation, a hamlet, a village). */
+export const settles = (place: RegionFillDef['place']): place is 'waystation' | 'hamlet' | 'village' => place === 'waystation' || place === 'hamlet' || place === 'village';
+
 /**
  * The settlement a region's place is (plan B3: hamlets and villages are planned like towns, by the one
  * planner), or null for other places. `fills`: the setting's region fills.
  */
 export function settlementOf(d: RegionDecision, fills: readonly RegionFillDef[]): TownDecision | null {
   const f = d.site ? fills.find((x) => x.id === d.fill) : undefined;
-  if (!f || !d.site || (f.place !== 'hamlet' && f.place !== 'village')) return null;
+  if (!f || !d.site || !settles(f.place)) return null;
   return { kind: 'town', id: d.id, x: d.site.x, z: d.site.z, radius: d.site.r, size: f.place, seed: d.seed };
 }
 
@@ -218,6 +223,8 @@ export interface EventDecision {
   readonly town: string;
   /** What it grew from: a spill's promise (a dungeon's or a move-in's id), a raid's raiders (their territory id). */
   readonly from: string;
+  /** A take's: the settlement the band holds (a town's id); its folk have fled. */
+  readonly held?: string;
   /** A raid's: the paddock (its id in the town's plan) and how many animals were driven off. */
   readonly paddock?: number;
   readonly taken?: number;

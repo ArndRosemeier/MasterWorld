@@ -4,7 +4,9 @@
  * places, the debug menu's "a story event now" makes the dwellers of one come out onto the land; then the
  * journal with its new lead, the band roaming where the lead points, and the town's people gathering at the
  * market to talk it over. EVENT=<id> asks for that event of the setting's (EVENT=farm-raid: bandits raid a
- * farm; then also its paddock, short of the animals they drove off). JPEGs into `<out dir>` (default
+ * farm; then also its paddock, short of the animals they drove off; EVENT=waystation-taken with
+ * EVENTS_QUERY=&site=waystation: bandits take the waystation the hero stands before; then also the place
+ * held, its folk gone, and the hideout the rest of the band lies up in). JPEGs into `<out dir>` (default
  * `shots/events/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  */
 import { execSync } from 'node:child_process';
@@ -70,6 +72,26 @@ else {
     if (pen.grazing !== pen.left) failed = true;
     await page.waitForTimeout(4000);
     await shoot('05-paddock');
+  }
+  // A take's settlement: from the road before it, the band round its door and none of its folk about; and
+  // the hideout the VGM asked for near it (a turn or two later).
+  const held = await page.evaluate(() => {
+    const g = window.game, e = g.log.findLast((d) => d.kind === 'event');
+    if (!e?.held) return null;
+    const t = g.towns.get(e.held), d = t.town.decision, l = Math.max(1, Math.hypot(e.x - d.x, e.z - d.z));
+    const x = e.x + ((e.x - d.x) / l) * 22, z = e.z + ((e.z - d.z) / l) * 22;
+    g.player.teleport(x, undefined, z, Math.atan2(x - e.x, z - e.z));
+    return { id: e.id, town: e.held };
+  });
+  if (held) {
+    await page.waitForTimeout(8000);
+    const st = await page.evaluate(({ id, town }) => {
+      const g = window.game, t = g.towns.get(town), lair = g.log.find((d) => d.kind === 'dungeon' && d.event === id);
+      return { gone: t.life.gone, about: t.life.agents.filter((a) => !a.hidden).length, lair: lair ? `${lair.template} ${lair.id} (${lair.dwellers})` : null };
+    }, held);
+    console.log(`held: folk gone ${st.gone}, ${st.about} about; lair ${st.lair}`);
+    if (!st.gone || !st.lair) failed = true;
+    await shoot('05-held');
   }
 }
 const sh = await page.evaluate(() => { const m = window.shaders; return m ? m.summary() : null; });

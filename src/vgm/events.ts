@@ -7,17 +7,20 @@
  * cellar's into the fields past the town, a barrow's, cave's or tower's round its door).
  * `raid`: a wild group left to live near a town (bandits by a road out) comes down on a farm and drives off
  * animals from its paddock; the band that did it holds them out towards its camp. Beat it and they go home.
+ * `take`: such a group takes a settlement near it (classic: a waystation on the road); its folk flee, a band
+ * holds it, and the rest lie up in a place the VGM asks for near it (`dungeonFor`: a hideout), a lead of its
+ * own. Beat the band and the folk come home.
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import { farmlandReach } from '@futuremagic/settlement';
 import type { LivestockKind, SettingModule, StoryEventDef } from '../setting/contract';
 import type { Territory } from '../sim/wild';
 import type { TownOrder } from '../sim/townLife';
-import { dungeonOf, type DecisionLog, type EventDecision } from '../world/decisions';
+import { dungeonOf, type DecisionLog, type DungeonDecision, type EventDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
-import { compass, houseOf, loreOf, placeOf } from './dungeons';
+import { compass, dungeonFor, houseOf, loreOf, placeOf } from './dungeons';
 import { dwellersOf, keptOf, openPromises } from './leads';
 import { encounterFor } from './encounters';
 import { cap, fill } from '../talk/folk';
@@ -40,6 +43,8 @@ export interface EventsContext {
   readonly early?: boolean;
   /** Only this event of the setting's (by id). */
   readonly which?: string;
+  /** Where the game started (a lair's danger grows with distance from it, D29; none: the first town). */
+  readonly home?: { readonly x: number; readonly z: number };
 }
 
 /** A wild group round a town (sim/wild.ts placeWild) and how many of it still live. */
@@ -68,11 +73,64 @@ export function nextEvent(c: EventsContext): EventDecision | null {
   const past = eventsOf(c.log);
   for (const def of c.setting.events ?? []) {
     if (c.which && def.id !== c.which) continue;
-    const e = def.kind === 'raid' ? raid(c, def, past) : spill(c, def, past);
+    const e = def.kind === 'raid' ? raid(c, def, past) : def.kind === 'take' ? takeOver(c, def, past) : spill(c, def, past);
     if (e) return e;
   }
   return null;
 }
+
+/** The settlement an open take holds (its folk fled), by the town's id; undefined if none does. */
+export function heldBy(log: DecisionLog, town: string): EventDecision | undefined {
+  return openEvents(log).find((e) => e.held === town);
+}
+
+/** How far from a held settlement the band's lair lies, metres. */
+const LAIR_RING: readonly [number, number] = [180, 600];
+
+/**
+ * The lair an open event's band asked for (a take's: the rest of the raiders lie up near the place they
+ * hold): a place of a kind for the event's `lair` purpose, of the band's own encounter, near it. Known in
+ * the band's town; a lead of its own.
+ */
+export function lairFor(c: EventsContext): DungeonDecision | null {
+  const lairs = new Set(c.log.filter((d): d is DungeonDecision => d.kind === 'dungeon').map((d) => d.event));
+  for (const e of openEvents(c.log)) {
+    const def = (c.setting.events ?? []).find((x) => x.id === e.event), town = c.towns.find((t) => t.decision.id === e.town);
+    if (!def?.lair || lairs.has(e.id) || !town) continue;
+    const ask = { purpose: def.lair, town, near: { x: e.x, z: e.z, ring: LAIR_RING }, ...(e.encounter ? { dwellers: e.encounter } : {}) };
+    const d = dungeonFor(ask, { seed: c.seed, terrain: c.terrain, log: c.log, home: c.home ?? town.decision, dungeons: c.setting.dungeons, ...(c.avoid ? { avoid: c.avoid } : {}) });
+    if (d) return { ...d, event: e.id, at: c.hours };
+  }
+  return null;
+}
+
+/**
+ * Raiders still living near a town, left alone long enough, take the settlement of the event's size
+ * nearest their ground (none held already); its folk flee and a band of them holds it, round its door.
+ */
+function takeOver(c: EventsContext, def: StoryEventDef, past: readonly EventDecision[]): EventDecision | null {
+  if ((!c.early && c.hours < def.after) || !def.takes) return null;
+  const open = openEvents(c.log), from = new Set(open.map((e) => e.from)), held = new Set(open.flatMap((e) => (e.held ? [e.held] : [])));
+  for (const g of c.wild ?? []) {
+    const t = g.territory;
+    if (t.kind !== def.by || g.left < 1 || from.has(t.id) || !rested(c, def, past, g.town)) continue;
+    const fromCamp = (w: Town) => Math.hypot(w.decision.x - t.x, w.decision.z - t.z);
+    const target = c.towns.filter((w) => w.decision.size === def.takes && !held.has(w.decision.id) && fromCamp(w) <= (def.reach ?? Infinity)).sort((a, b) => fromCamp(a) - fromCamp(b))[0];
+    if (!target) continue;
+    const s = deriveSeed(c.seed, 'vgm', 'event', past.length);
+    // Round its biggest door (the inn's): the band lounges where the folk were.
+    const door = [...target.plan.buildings].sort((a, b) => b.hu * b.hv - a.hu * a.hv)[0]?.door ?? [target.decision.x, target.decision.z];
+    const at = dryNear({ ...c, avoid: [] }, door[0], door[1], s);
+    if (!at) continue;
+    const met = bandFrom(c, def, t.encounter, s);
+    if (!met) continue;
+    return { kind: 'event', id: `event-${past.length + 1}`, event: def.id, town: g.town, from: t.id, held: target.decision.id, x: at.x, z: at.z, r: HOLD, ...met, seed: s, at: c.hours };
+  }
+  return null;
+}
+
+/** How far a band holding a settlement strays from its door, metres. */
+const HOLD = 16;
 
 /** No event in this town lately (the def's cooldown), unless asked for now. */
 const rested = (c: EventsContext, def: StoryEventDef, past: readonly EventDecision[], town: string): boolean =>
@@ -180,7 +238,7 @@ export function openBands(log: DecisionLog): Territory[] {
 /** How an event is told (its setting's words filled in), and where its lead points. */
 export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): { title: string; news: string; note: string; done: string; label: string } | null {
   const def = (setting.events ?? []).find((x) => x.id === e.event), town = towns.find((t) => t.decision.id === e.town);
-  const where = def && town && (def.kind === 'raid' ? farmOf(setting, town, e) : spillOf(setting, log, towns, e));
+  const where = def && town && (def.kind === 'raid' ? farmOf(setting, town, e) : def.kind === 'take' ? heldOf(towns, e) : spillOf(setting, log, towns, e));
   if (!def || !town || !where) return null;
   const lead = setting.creatures.find((x) => x.id === e.members[0]);
   const words: Record<string, string> = {
@@ -199,6 +257,12 @@ function spillOf(setting: Pick<SettingModule, 'dungeons'>, log: DecisionLog, tow
   if (!d || !place) return null;
   const sketch = sketchCellar(d, place, loreOf(setting, d.template), from && dwellersOf(log, from));
   return { place: sketch.called ?? `the cellar under ${sketch.house}` };
+}
+
+/** The settlement a take holds, named ("the waystation"). */
+function heldOf(towns: readonly Town[], e: EventDecision): Record<string, string> | null {
+  const w = towns.find((t) => t.decision.id === e.held);
+  return w ? { place: `the ${w.decision.size ?? 'town'}` } : null;
 }
 
 /** The farm a raid came down on, and its animals, named. */
