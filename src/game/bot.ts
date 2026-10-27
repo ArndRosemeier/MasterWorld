@@ -11,7 +11,8 @@ import type { Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace } from '../world/dungeon/space';
 import { Character } from './character';
 import { Delve, type DelveSave } from './delve';
-import type { HeroPose } from './fight';
+import type { Fight, HeroPose } from './fight';
+import { aimsAtFoe } from './recipe';
 import type { Creature } from '../sim/creatures';
 
 export interface BotResult {
@@ -51,6 +52,22 @@ export interface DelveRun extends BotResult {
   readonly out: boolean;
   /** Where the hero stood at the end (cellar frame): where they fell, if they did. */
   readonly at: { readonly x: number; readonly y: number; readonly z: number };
+  /** The spells that went off (ability ids, each time). */
+  readonly spells: readonly string[];
+}
+
+/**
+ * A known spell to cast now, tried until the fight takes one: the hero's own (a heal, a ward) when hurt,
+ * else one at the foe (the fight refuses it out of range or sight). Null: none fits.
+ */
+function castNow(hero: Character, setting: SettingModule, fight: Fight): string | null {
+  for (const a of setting.abilities) {
+    const mana = a.cost?.mana ?? 0;
+    if (!mana || mana > hero.mana || !hero.knows(a.id) || fight.recipes.cooling(a.id) > 0) continue;
+    if (!aimsAtFoe(a) && hero.health > hero.maxHealth * 0.7) continue;
+    if (fight.use(a.id) === null) return a.id;
+  }
+  return null;
 }
 
 /** How near a spot counts as there, metres. */
@@ -75,7 +92,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   let aim: { x: number; y: number; z: number } | null = null;
   /** The foe being walked to (kept until it falls or a fight starts). */
   let chase: Creature | null = null;
-  const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z } });
+  const spells: string[] = [];
+  const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z }, spells });
   /** One step along the nav towards a point (`key`: what is being walked to, so a new goal is routed at once). */
   const towards = (to: { x: number; y: number; z: number }, key: object): void => {
     repath -= dt;
@@ -111,6 +129,7 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       if (e.kind === 'killed') kills++;
       if (e.kind === 'spared') spared++;
       if (e.kind === 'fallen') return run(false, t);
+      if (e.kind === 'recipe' && e.event.kind === 'went' && e.event.ability.cost?.mana) spells.push(e.event.ability.id);
     }
     if (den.beaten) {
       if (!opts.loot) return run(true, t);
@@ -153,6 +172,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       // Catch one's breath between fights.
       if (!den.fighting.length && hero.health < hero.maxHealth * 0.8 && fight.quiet > 2) { speed = 0; continue; }
     }
+    // A mage stands still while a spell gathers, and casts what fits before closing in.
+    if (fight.recipes.casting || castNow(hero, setting, fight)) { speed = 0; continue; }
     // Close enough that the blade lands (else step in: a foe can stand just outside it and still strike).
     const d = Math.hypot(foe.x - x, foe.z - z);
     if (d < Math.min(1.6, fight.reach(foe) - 0.05) && Math.abs(foe.y - y) < 1.2) {

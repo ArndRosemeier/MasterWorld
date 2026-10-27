@@ -71,8 +71,8 @@ test('guilds: a rank needs the one before earned by use, and the third the guild
 test('guilds: houses in towns and villages, none in a hamlet; trainers and a bard', () => {
   const town = planTown({ seed: 3, x: 0, z: 0, radius: 72, height: () => 10 });
   const houses = guildHouses(town, 'town', classic);
-  assert.deepEqual(houses.map((h) => h.guild.keeper), ['master-at-arms', 'lodge-master', 'locksmith']);
-  assert.equal(new Set(houses.map((h) => h.b.id)).size, 3, 'each in its own house');
+  assert.deepEqual(houses.map((h) => h.guild.keeper), ['master-at-arms', 'lodge-master', 'locksmith', 'hedge-witch', 'undercroft-keeper']);
+  assert.equal(new Set(houses.map((h) => h.b.id)).size, 5, 'each in its own house');
   assert.ok(houses.find((h) => h.guild.keeper === 'locksmith')!.guild.hidden);
   const folk = townsfolk(town, 3);
   staffGuilds(folk, houses);

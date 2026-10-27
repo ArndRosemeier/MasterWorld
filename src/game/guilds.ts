@@ -7,8 +7,9 @@
  * bard at the inn knows every house. The same for every town, start town or village. Pure.
  */
 import { hexToRgb } from '@futuremagic/core';
+import { fill } from '../talk/folk';
 import { houseShape, polyCentroid, signPlace, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
-import type { GuildDef, SettingModule, SkillRankDef, TrainerDef } from '../setting/contract';
+import type { AbilityDef, GuildDef, SettingModule, SkillRankDef, TrainerDef } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
 import { dungeonOf, type DecisionLog } from '../world/decisions';
 import type { Character } from './character';
@@ -160,6 +161,10 @@ export function nextRank(setting: Pick<SettingModule, 'skillRanks'>, hero: Chara
   return def ? { rank: r + 1, def } : null;
 }
 
+/** Copper this guild asks to open a rank (the opening may be its own price). */
+export const rankPrice = (g: GuildDef, next: { readonly rank: number; readonly def: SkillRankDef }): number =>
+  next.rank === 0 && g.openPrice !== undefined ? g.openPrice : next.def.price;
+
 /** What stands between the hero and a skill's next rank at this guild (null: nothing). */
 export function rankRefusal(setting: Pick<SettingModule, 'skillRanks'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
   if (!g.skills.includes(skill)) return 'not-taught';
@@ -169,16 +174,69 @@ export function rankRefusal(setting: Pick<SettingModule, 'skillRanks'>, g: Guild
   if (next.rank > 0 && Math.floor(hero.skills.get(skill) ?? 0) < hero.capOf(skill) - 1) return 'unearned';
   if (next.def.task && !book.taskDone(g, log)) return 'task';
   if (next.def.standing && book.standing(g, hero, log) < next.def.standing) return 'standing';
-  if (hero.coins < next.def.price) return 'coin';
+  if (hero.coins < rankPrice(g, next)) return 'coin';
   return null;
 }
 
 /** Open a skill's next rank at this guild: the coin goes, the skill may grow to the new rank's top. */
-export function openRank(setting: Pick<SettingModule, 'skillRanks'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
+export function openRank(setting: Pick<SettingModule, 'skillRanks' | 'abilities'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
   const no = rankRefusal(setting, g, hero, skill, book, log);
   if (no) return no;
   const next = nextRank(setting, hero, skill)!;
-  hero.coins -= next.def.price;
-  hero.ranks.set(skill, next.rank);
+  hero.coins -= rankPrice(g, next);
+  if (next.rank > 0) hero.ranks.set(skill, next.rank);
+  else {
+    // Opening a school of magic (C3) gives its first spells with it, so the hero can cast at once.
+    hero.openSkill(skill);
+    for (const a of spellsOf(setting, g)) if (a.skill === skill && (a.level ?? 0) === 0) hero.learn(a.id);
+  }
   return null;
+}
+
+/** The spells (taught abilities) a magic teacher teaches: its schools', lowest level first, then its others. */
+export function spellsOf(setting: Pick<SettingModule, 'abilities'>, g: GuildDef): AbilityDef[] {
+  if (!g.spellPrice) return [];
+  const own = setting.abilities.filter((a) => a.taught && a.skill && g.skills.includes(a.skill));
+  own.sort((a, b) => (a.level ?? 0) - (b.level ?? 0) || g.skills.indexOf(a.skill!) - g.skills.indexOf(b.skill!));
+  return [...own, ...setting.abilities.filter((a) => g.abilities?.includes(a.id))];
+}
+
+/** Copper for a spell at this teacher. */
+export const spellPrice = (g: GuildDef, a: AbilityDef): number => Math.round((g.spellPrice ?? 0) * (1 + (a.level ?? 0) / 10));
+
+/** Why a spell was not taught (null: it was): known already, its school not opened, not yet its level, the purse. */
+export type SpellRefusal = 'not-taught' | 'known' | 'closed' | 'unearned' | 'coin' | null;
+
+export function spellRefusal(setting: Pick<SettingModule, 'abilities'>, g: GuildDef, hero: Character, a: AbilityDef): SpellRefusal {
+  if (!spellsOf(setting, g).includes(a)) return 'not-taught';
+  if (hero.knows(a.id)) return 'known';
+  if (a.skill && !hero.opened(a.skill)) return 'closed';
+  if (a.skill && Math.floor(hero.skills.get(a.skill) ?? 0) < (a.level ?? 0)) return 'unearned';
+  if (hero.coins < spellPrice(g, a)) return 'coin';
+  return null;
+}
+
+/** Learn a spell from this teacher: the coin goes, the spell goes onto the action bar. */
+export function learnSpell(setting: Pick<SettingModule, 'abilities'>, g: GuildDef, hero: Character, a: AbilityDef): SpellRefusal {
+  const no = spellRefusal(setting, g, hero, a);
+  if (no) return no;
+  hero.coins -= spellPrice(g, a);
+  hero.learn(a.id);
+  return null;
+}
+
+/**
+ * The bard's answer to "where can I learn a skill?" (D49): a line for each guild house of the town, a hidden
+ * one with its way in, which the book now knows (so it goes on the map). `keeperName`: what the house's
+ * master is called, if anyone is.
+ */
+export function bardTells(setting: Pick<SettingModule, 'bard' | 'skills'>, town: string, houses: readonly GuildHouse[], book: GuildBook, keeperName: (keeper: string) => string | null): string[] {
+  const bard = setting.bard;
+  if (!bard) return [];
+  const names = (ids: readonly string[]) => ids.map((id) => setting.skills.find((x) => x.id === id)?.name.toLowerCase() ?? id).join(', ');
+  return houses.map(({ guild: g }) => {
+    if (g.hidden) book.tell(houseIn(town, g.keeper));
+    const house = g.name.charAt(0).toUpperCase() + g.name.slice(1);
+    return fill(g.hidden ? bard.tellsHidden : bard.tells, { house, skills: names(g.skills), keeper: keeperName(g.keeper) ?? 'the master', way: g.way ?? '' });
+  });
 }
