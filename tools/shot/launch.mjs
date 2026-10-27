@@ -46,5 +46,29 @@ export async function launch({ headed = false, args: extra = [] } = {}) {
       ? ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist']
       : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist']), ...extra],
   });
+  pinSeed(browser);
   return { server, base, browser };
+}
+
+/**
+ * The game draws a fresh world each start (src/app/params.ts); the checks keep to one, so their shots and
+ * numbers stay comparable from run to run: every page starts in `masterworld` (`SHOT_SEED=<seed>` another,
+ * `SHOT_SEED=fresh` a new one each load). A `?seed=` in the query still wins.
+ */
+export function pinSeed(browser, seed = process.env.SHOT_SEED ?? 'masterworld') {
+  if (seed === 'fresh') return;
+  const script = `window.__mwSeed = ${JSON.stringify(seed)};`;
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (options) => {
+    const context = await newContext(options);
+    await context.addInitScript(script);
+    return context;
+  };
+  // A page of its own context, as Playwright's browser.newPage makes it (closing the page closes it).
+  browser.newPage = async (options) => {
+    const context = await browser.newContext(options);
+    const page = await context.newPage();
+    page.on('close', () => void context.close().catch(() => undefined));
+    return page;
+  };
 }
