@@ -5,6 +5,7 @@
  */
 import type { AbilityDef, BackgroundDef, DamageKind, ItemCatalog, SettingModule, Slot } from '../setting/contract';
 import type { Blow, Guard } from '../sim/combat';
+import { addToBar, cleanBar, defaultBar, type Bar } from './actionBar';
 import { defOf, plainItem, type Item } from './items';
 import { strengthOf, wearState, wornBy, type Lodging, type WearState } from './upkeep';
 
@@ -21,6 +22,10 @@ export interface CharacterSave {
   readonly lodging?: Lodging;
   /** The rank opened in each skill a guild teaches (D49; absent in older saves: what they had, opened). */
   readonly ranks?: Readonly<Record<string, number>>;
+  /** Abilities a teacher (or the debug menu) opened (absent: none). */
+  readonly learned?: readonly string[];
+  /** The action bar as arranged (absent in older saves: the default bar). */
+  readonly bar?: Bar;
 }
 
 /** A skill rose to a new whole point. */
@@ -57,6 +62,10 @@ export class Character {
   background = '';
   /** The inn where the hero last took a room (plan 11.2: where they wake after a fall); null: none yet. */
   lodging: Lodging | null = null;
+  /** Taught abilities the hero has learned (setting abilities with `taught`). */
+  readonly learned = new Set<string>();
+  /** The action bar (game/actionBar.ts): ten slots of ability ids. */
+  bar: Bar;
   private readonly cat: ItemCatalog;
 
   constructor(private readonly setting: SettingModule, saved?: CharacterSave) {
@@ -69,7 +78,9 @@ export class Character {
       this.background = saved.background ?? '';
       this.lodging = saved.lodging ?? null;
       for (const id of this.rankedSkills()) this.ranks.set(id, saved.ranks?.[id] ?? this.rankFor(this.skills.get(id) ?? 0));
+      for (const id of saved.learned ?? []) if (setting.abilities.some((a) => a.id === id && a.taught)) this.learned.add(id);
     } else this.beginAs(setting.backgrounds[0]);
+    this.bar = saved ? cleanBar(saved.bar, this.known) : defaultBar(this.known);
     this.health = Math.min(saved?.health ?? Infinity, this.maxHealth);
     this.stamina = Math.min(saved?.stamina ?? Infinity, this.maxStamina);
   }
@@ -90,6 +101,30 @@ export class Character {
     this.coins = bg.kit.coins;
     this.health = this.maxHealth;
     this.stamina = this.maxStamina;
+    this.learned.clear();
+    this.bar = defaultBar(this.known);
+  }
+
+  /** The abilities this hero can use, in the setting's order: every untaught one and those learned. */
+  get known(): string[] {
+    return this.setting.abilities.filter((a) => !a.taught || this.learned.has(a.id)).map((a) => a.id);
+  }
+
+  knows(id: string): boolean { return this.known.includes(id); }
+
+  /** A taught ability learned (from a teacher, or the debug menu): onto the bar's first free slot. False if there is no such ability or it is known already. */
+  learn(id: string): boolean {
+    if (this.knows(id) || !this.setting.abilities.some((x) => x.id === id)) return false;
+    this.learned.add(id);
+    this.bar = addToBar(this.bar, id);
+    return true;
+  }
+
+  /** A learned ability forgotten (the debug menu): off the bar too. */
+  forget(id: string): boolean {
+    if (!this.learned.delete(id)) return false;
+    this.bar = this.bar.map((x) => (x === id ? null : x));
+    return true;
   }
 
   /** Skills some guild teaches (they have ranks). */
@@ -255,6 +290,6 @@ export class Character {
   }
 
   save(): CharacterSave {
-    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), ...(this.ranks.size ? { ranks: Object.fromEntries(this.ranks) } : {}) };
+    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), ...(this.ranks.size ? { ranks: Object.fromEntries(this.ranks) } : {}), learned: [...this.learned], bar: [...this.bar] };
   }
 }

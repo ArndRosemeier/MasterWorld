@@ -1,8 +1,8 @@
 /**
  * A fight where the hero is (plan 11.2, D13): down in a cellar, or out on the land with a band of the
  * wild (sim/wild.ts); its `Arena` says which. Each frame the hero's pose goes to the delve, its events
- * become notes, the HUD's moments and the hero's blows; Tab, a click and the belt's keys pick a target
- * and use abilities; G searches the fallen and opens chests. The Director (vgm/director.ts) watches it
+ * become notes, the HUD's moments and the hero's blows; Tab and a click pick a target, the action bar's
+ * keys use abilities; G searches the fallen and opens chests. The Director (vgm/director.ts) watches it
  * all, warns at the door of a place too hard, and its messages come one at a time. Falling ends as the
  * game's mode says (game/death.ts): waking at the inn without the pack, or the hero's end. A place gone
  * quiet that was promised is reported to the game once the hero leaves it: its household waits to be told
@@ -13,7 +13,8 @@ import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import type { SettingModule } from '../setting/contract';
 import type { Creature } from '../sim/creatures';
 import type { Delve, Lootable } from '../game/delve';
-import type { FightEvent, HeroPose } from '../game/fight';
+import type { Fight, FightEvent, HeroPose } from '../game/fight';
+import { POTION } from '../game/actionBar';
 import type { Character } from '../game/character';
 import { coinText, defOf, type Item, type Loot } from '../game/items';
 import type { Bindings } from '../input/controls';
@@ -141,14 +142,21 @@ export class Encounter {
     const b = this.host.bindings, is = (a: keyof Bindings) => b[a].includes(e.code);
     let said: string | null = null;
     if (is('target')) { e.preventDefault(); if (!this.fight.tab(this.heroPose())) said = 'Nothing in sight to fight.'; }
-    else if (is('strike')) said = this.fight.use('strike');
-    else if (is('heavy')) said = this.fight.use('heavy');
-    else if (is('shove')) said = this.fight.use('shove');
-    else if (is('breath')) said = this.fight.use('breath');
-    else if (is('potion')) said = this.fight.drink();
     else if (is('search')) said = this.search();
     else return;
     if (said) this.notes.say(said, 2.5);
+  }
+
+  /** It owns the keys and the HUD now (the one playing). */
+  get leading(): boolean { return this.active; }
+
+  /** The fight, for the action bar's cooldowns. */
+  get fighting(): Fight { return this.fight; }
+
+  /** An ability from the action bar (or the potion's quick slot): a line why not if it cannot be used now. */
+  use(id: string): string | null {
+    if (!this.hero.alive) return null;
+    return id === POTION ? this.fight.drink() : this.fight.use(id);
   }
 
   private click(x: number, y: number, canvas: HTMLElement): void {
@@ -252,7 +260,7 @@ export class Encounter {
     const stance = this.player.stance;
     const swinging = stance.action && this.player.hero ? this.player.hero.clock - stance.action.t0 < stance.action.dur : false;
     this.player.stance = { combat: fighting > 0 || this.fight.attacking, action: swinging ? stance.action : undefined };
-    this.hud.show(this.fight, this.hero, this.near ? `Search ${this.near.name}` : null);
+    this.hud.follow(this.fight, this.hero, this.near ? `Search ${this.near.name}` : null);
   }
 
   /** What the Director watches (plan 4.3): who fights the hero, and how much danger knows of them. */

@@ -302,5 +302,21 @@
   {
     "key": "same name: masterworld/game/evening.ts#log + masterworld/main.ts#log",
     "reason": "Both hand a town core (game/township.ts TownshipContext) the decision log as it grows; one-line closures over each caller's own log, the seam is the interface."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/journalUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/lessonsUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/mapUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/repairUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   }
 ]
