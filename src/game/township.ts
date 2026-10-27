@@ -71,6 +71,11 @@ export class Township {
     return (this.housesOf ??= guildHouses(this.town.plan, this.town.decision.size ?? 'town', this.c.setting));
   }
 
+  /** The guild whose house building `id` is (null: a plain building). */
+  guildAt(id: number): GuildHouse | null {
+    return this.guilds.find((h) => h.b.id === id) ?? null;
+  }
+
   /** The bard at its inn, who knows every guild house (null: no inn). */
   get bard(): Person | null {
     return bardOf(this.residents, this.town.plan);

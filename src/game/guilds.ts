@@ -22,6 +22,8 @@ export interface GuildHouse {
 export const EARN = 5;
 /** Standing a rank opened and the guild's task done bring (0..100). */
 const STANDING_RANK = 4, STANDING_TASK = 15;
+/** Two guilds' houses stand at least this far apart where the town has room (m). */
+const APART = 30;
 
 /** The guild houses of a town (none in a town too small for any). */
 export function guildHouses(plan: TownPlan, size: GuildDef['sizes'][number], setting: Pick<SettingModule, 'guilds'>): GuildHouse[] {
@@ -33,7 +35,10 @@ export function guildHouses(plan: TownPlan, size: GuildDef['sizes'][number], set
     if (!guild.sizes.includes(size)) continue;
     const at = anchorOf(plan, guild.near) ?? { x: mx, z: mz };
     const far = guild.near === 'edge' ? -1 : 1;
-    const b = homes.filter((h) => !taken.has(h.id)).sort((a, c) => far * (Math.hypot(a.cx - at.x, a.cz - at.z) - Math.hypot(c.cx - at.x, c.cz - at.z)) || a.id - c.id)[0];
+    // Not next door to another guild's house (two signs on one corner), unless nothing else is left.
+    const apart = (h: TownBuilding) => out.every((o) => Math.hypot(h.cx - o.b.cx, h.cz - o.b.cz) >= APART);
+    const free = homes.filter((h) => !taken.has(h.id)), spaced = free.filter(apart);
+    const b = (spaced.length ? spaced : free).sort((a, c) => far * (Math.hypot(a.cx - at.x, a.cz - at.z) - Math.hypot(c.cx - at.x, c.cz - at.z)) || a.id - c.id)[0];
     if (!b) continue;
     taken.add(b.id);
     out.push({ guild, b });
