@@ -4,7 +4,7 @@
  * the shape worker) and shown once ready; until then, and everyone farther off, is a plain figure
  * (FarFolk). Characters far off draw their "Crowd" level (one draw call plus the hair).
  */
-import { Frustum, Group, Matrix4, Vector3, type Camera, type Mesh, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Frustum, Group, Matrix4, Sphere, Vector3, type Camera, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
@@ -13,7 +13,8 @@ import type { Agent, TownLife } from '../../sim/townLife';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
-import { castShadows } from '../hero/play';
+import { castShadows, eachMesh } from '../hero/play';
+import { SHADOW_ONLY } from '../sky';
 import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
@@ -41,7 +42,11 @@ const STICK = 4;
 const SHADOW_RANGE = 35;
 /** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
 const CLOSE = 40;
-const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3();
+const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3(), BALL = new Sphere();
+/** Round a person's middle, the sphere that tells whether they are in view (m: arms, a carried load, a clip's reach). */
+const REACH = 1.6;
+/** Seconds between two checks of every character's layers, for meshes Actors made since (a merged crowd mesh). */
+const RELAYER = 0.5;
 /**
  * Seconds between two dressings begun. In rain the square empties and fills as people run for shelter, and each
  * dressing runs through every detail level, each of which costs Actors a rebuild of what the clothes hide: begun as
@@ -85,6 +90,8 @@ interface Slot {
   shadow: boolean;
   /** Dressed for somebody before (a new dressing takes it over: DRESS_GAP). */
   used: boolean;
+  /** In the camera's view as its layers were set last (null: set them on the next frame). */
+  seen: boolean | null;
 }
 
 export class FolkView {
@@ -105,7 +112,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false };
+      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null };
       this.slots.push(slot);
     }
   }
@@ -217,6 +224,10 @@ export class FolkView {
   /** Each frame: who is drawn, where and doing what. */
   follow(dt: number, cam: Camera): void {
     if (!this.warm) return;
+    VIEW.setFromProjectionMatrix(SCRATCH.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    this.relayer -= dt;
+    const relayer = this.relayer <= 0;
+    if (relayer) this.relayer = RELAYER;
     const cx = this.focus?.x ?? cam.position.x, cz = this.focus?.z ?? cam.position.z;
     // The nearest people out of doors (or those in the room).
     const near: [number, Agent][] = [];
@@ -269,6 +280,7 @@ export class FolkView {
       else o.position.set(a.x, this.height(a.x, a.z), a.z);
       // Agents face `dir` (atan2 in x, z); a character faces +z.
       o.rotation.y = Math.PI / 2 - (p ? p.dir : a.dir);
+      this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
       const clip = clipOf(p ? p.act : a.act, a.person.id);
       if (clip !== s.clip) {
         s.clip = clip;
@@ -281,7 +293,6 @@ export class FolkView {
     // (Those in the open building wait for a character: a plain figure stands on the ground, not on its floor.)
     this.far.place(pending.filter(([, a]) => !placed.has(a)).map(([, a]) => a), this.height);
     // How many of those (or of the room's people), close in view, wait for a character (beyond the characters' count they stay plain).
-    VIEW.setFromProjectionMatrix(SCRATCH.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     let waiting = 0;
     // In a room too (nobody there is a plain figure: the undressed are not drawn at all).
     for (const [d, a] of pending) {
@@ -300,15 +311,13 @@ export class FolkView {
     const look = `${detailed}${shadow}`;
     if (look === s.look) return;
     s.look = look;
+    s.seen = null;
     s.detailed = detailed;
     s.shadow = shadow;
     const crowd = s.ch.lods.length - 1;
     s.ch.setLod(detailed ? 'auto' : crowd);
     castShadows(s.place);
-    s.place.traverse((m) => {
-      if (!(m as Mesh).isMesh) return;
-      if (!shadow || (!detailed && m.name !== 'crowd')) m.castShadow = false;
-    });
+    eachMesh(s.place, (m) => { if (!shadow || (!detailed && m.name !== 'crowd')) m.castShadow = false; });
   }
 
   private dress(s: Slot, a: Agent): void {
@@ -345,18 +354,32 @@ export class FolkView {
       // Hidden meshes too: Actors keeps some it may show later at this level (the body's own crowd
       // mesh beside the merged one), and compileAsync skips hidden objects.
       const hidden: Object3D[] = [];
-      s.place.traverse((m) => { if (!m.visible && (m as Mesh).isMesh) { hidden.push(m); m.visible = true; } });
+      eachMesh(s.place, (m) => { if (!m.visible) { hidden.push(m); m.visible = true; } });
       await this.stage.prepare(s.place, { everyCaster: true });
       for (const m of hidden) m.visible = false;
     }
     await nextFrame();
     s.ch.setLod('auto');
     s.look = ''; // `detail` sets it again on the next frame
+    s.seen = null;
     s.detailed = s.shadow = false;
     if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
     this.stage.scene.add(s.place);
     s.ready = true;
   }
+
+  /**
+   * Out of view, a character is drawn into the sun's shadow map only (its shadow may fall into the view): Actors'
+   * meshes are never frustum culled (skinned, their bounds do not follow the pose), so everyone round the camera,
+   * behind it too, cost the view a dozen draws a head.
+   */
+  private inView(s: Slot, seen: boolean, again: boolean): void {
+    if (seen === s.seen && !again) return;
+    s.seen = seen;
+    const mask = seen ? 1 : 1 << SHADOW_ONLY;
+    eachMesh(s.place, (m) => { m.layers.mask = mask; });
+  }
+  private relayer = 0;
 
   /** What never shows casts no shadow (Actors flips its garments' polygon offsets for reversed depth itself). */
   private adapt(o: Object3D): void {

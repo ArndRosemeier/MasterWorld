@@ -3,7 +3,7 @@
  * flinch, a death), optionally stretched to `dur` seconds, blended in over `fade` seconds (0 cuts).
  * Shared by everyone drawn as an Actors person.
  */
-import { LoopOnce, type Object3D } from 'three/webgpu';
+import { LoopOnce, type Mesh, type Object3D } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { Character } from '@actors/generator';
 
@@ -43,7 +43,12 @@ export async function preparePeople(stage: Stage, obj: Object3D): Promise<void> 
  */
 const NO_SHADOW = /^(genitals|eyes|eyelashes|brows|teeth|tongue)/;
 
+/** `fn` for every mesh in `o` (itself included). */
+export function eachMesh(o: Object3D, fn: (m: Mesh) => void): void {
+  o.traverse((m) => { if ((m as Mesh).isMesh) fn(m as Mesh); });
+}
+
 /** Every mesh of an Actors person casts a shadow, but the bits in NO_SHADOW. */
 export function castShadows(o: Object3D): void {
-  o.traverse((m) => { if ((m as { isMesh?: boolean }).isMesh) m.castShadow = !NO_SHADOW.test(m.name); });
+  eachMesh(o, (m) => { m.castShadow = !NO_SHADOW.test(m.name); });
 }

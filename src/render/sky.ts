@@ -21,6 +21,12 @@ const SHADOW_MAP = 4096;
 /** Metres the shadow box may move between two draws of the map before it is drawn at once (a teleport). */
 const SHADOW_JUMP = 4;
 /**
+ * The layer of what is drawn into the sun's shadow map but not into the view (three draws an object for a camera that
+ * shares a layer with it; the shadow camera takes this one and the view's): casters out of view whose shadows may
+ * fall into it (FolkView). Not the Stage's warm-up layer (7).
+ */
+export const SHADOW_ONLY = 6;
+/**
  * Scale's rig is tuned for its bright city materials; the land is darker (physical albedos), so the lights
  * are stronger here, while the exposure (and so the sky) stays Scale's.
  */
@@ -173,6 +179,7 @@ export class SkyView {
 
     sun.castShadow = true;
     sun.shadow.autoUpdate = false; // drawn when `update` says (shadowEvery)
+    sun.shadow.camera.layers.enable(SHADOW_ONLY);
     sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
     sun.shadow.bias = -0.0004;
     const sc = sun.shadow.camera as OrthographicCamera;
