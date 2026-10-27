@@ -482,5 +482,25 @@
   {
     "key": "same name: masterworld/render/town/HouseView.ts#hide + masterworld/render/town/TownView.ts#hide",
     "reason": "Taking an open house's meshes (lid, ladder, door leaves) out of the stage vs hiding one building of a town's merged mesh."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/app/spellFx/particles.ts#step",
+    "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/lab/spellLab.ts#step",
+    "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/creatures.ts#step",
+    "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/livestock.ts#step",
+    "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
+  },
+  {
+    "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/world/dungeon/rockMesh.ts#add",
+    "reason": "Building a cellar's meshes into the stage (lids on pivots now) vs adding a piece to a rock mesh."
   }
 ]

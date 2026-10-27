@@ -41,6 +41,26 @@ test('cellar props: meshes with the models are sound and use only the town array
   }
 });
 
+test('cellar chests: one lid apart per chest, on top of the body, its hinge along the back\'s top edge', () => {
+  let seen = 0;
+  for (const c of cellars) for (const set of [cellarMeshes(c, models), cellarMeshes(c)]) {
+    const chests = c.props.filter((p) => p.kind === 'chest');
+    assert.equal(set.lids.length, chests.length);
+    set.lids.forEach((l, i) => {
+      const p = chests[i], used = new Set(l.mesh.index);
+      assert.ok(used.size > 0);
+      for (const v of used) assert.ok(l.mesh.position[3 * v + 1] >= l.hinge[1] - 0.005, 'the lid lies over its seam');
+      // The hinge is behind the chest's middle, at the seam; its line runs level along the chest's width.
+      assert.ok(Math.abs(Math.hypot(l.hinge[0] - p.x, l.hinge[2] - p.z) - 0.25) < 1e-6 && Math.abs(Math.hypot(l.axis[0], l.axis[1]) - 1) < 1e-6);
+      // Turned up about it, the lid's front (towards the chest's facing) rises.
+      const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw), up = l.axis[1] * fx - l.axis[0] * fz;
+      assert.ok(up > 0.99, `the front comes up (${up.toFixed(2)})`);
+      seen++;
+    });
+  }
+  assert.ok(seen > 0, 'some test cellar has a chest');
+});
+
 test('cellar props: layer means match the textures they divide by', () => {
   const lin = (v: number) => Math.pow(v / 255, 2.2);
   const layers = { [M.Plaster]: generateFacadeLayer(6, 64), [M.Oak]: generateMedievalLayer(MEDIEVAL_NAMES.indexOf('oak'), 64), [M.Thatch]: generateMedievalLayer(MEDIEVAL_NAMES.indexOf('thatch'), 64) };
