@@ -251,7 +251,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Past the near trees (FloraView FULL, 60 m) the floor under the woods goes into the crowns' shade on average:
   // the far trees' hulls are lumps whose shadows leave most of the floor lit, so a wood seen from outside read
   // as sunlit ground under a row of grey posts. Past the shadow box (110-150 m) no tree shades it at all.
-  const unshaded = smoothstep(60, 150, length(positionWorld.sub(cameraPosition))).mul(cover).mul(float(1).sub(woods));
+  const unshaded = smoothstep(60, 120, length(positionWorld.sub(cameraPosition))).mul(smoothstep(0.02, 0.3, cover)).mul(float(1).sub(woods));
   col = col.mul(mix(float(1), float(UNDER_CROWNS), unshaded));
   const afar = woodsFromAfar(col, crown, cover, varying(cn.z, 'vWoodsSpacing'), p);
   col = mix(col, afar.color, woods);
