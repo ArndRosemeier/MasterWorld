@@ -38,6 +38,8 @@ export interface WalkIntent {
   up: boolean;
   /** Dive while swimming. */
   down: boolean;
+  /** How much of its speed the ground lets it make (0..1; a horse off the road). Default 1. */
+  pace?: number;
 }
 
 export type WalkMode = 'ground' | 'air' | 'swim';
@@ -153,7 +155,7 @@ export class Walker {
     let fx = -sh * intent.forward + ch * intent.strafe, fz = -ch * intent.forward - sh * intent.strafe;
     const len = Math.hypot(fx, fz);
     if (len > 1) { fx /= len; fz /= len; }
-    const speed = (swim ? (intent.walk ? this.spec.swimSlow : this.spec.swim) : intent.walk ? this.spec.walk : this.spec.run) * (intent.forward < 0 ? this.spec.back : 1);
+    const speed = (swim ? (intent.walk ? this.spec.swimSlow : this.spec.swim) : intent.walk ? this.spec.walk : this.spec.run) * (intent.forward < 0 ? this.spec.back : 1) * (intent.pace ?? 1);
     // Quick to answer on the ground, slow to change course in the air, smooth in the water.
     const a = damp(this.mode === 'ground' ? this.spec.grip : swim ? 3.5 : 1.2, dt);
     v.x += (fx * speed - v.x) * a;

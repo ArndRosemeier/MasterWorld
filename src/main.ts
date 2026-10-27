@@ -20,7 +20,7 @@ import { GIANT_SPEED, giantPose, type Orbit } from './app/title/route';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
 import { StockView } from './render/livestock/StockView';
-import { Steed, horseSpots } from './game/horse';
+import { Steed, groundPace, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import type { Agent, TownOrder } from './sim/townLife';
 import { createView } from './render/view';
@@ -465,8 +465,10 @@ export async function start(b: Boot): Promise<void> {
       const by = player.walker.pos;
       const spots = horseSpots(by.x, by.z, player.walker.yaw, params.horses, free);
       horses = await HorseView.make(view.renderer, spots.length);
+      const pace = groundPace(terrain);
       player.steeds = spots.map((p, i) => {
         const s = new Steed(world, i, seed);
+        s.ground = pace;
         s.walker.place(p.x, p.z);
         s.walker.yaw = p.yaw;
         return s;
