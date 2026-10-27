@@ -52,8 +52,9 @@ test('cellar chests: one lid apart per chest, on top of the body, its hinge alon
       for (const v of used) assert.ok(l.mesh.position[3 * v + 1] >= l.hinge[1] - 0.005, 'the lid lies over its seam');
       // The hinge is behind the chest's middle, at the seam; its line runs level along the chest's width.
       assert.ok(Math.abs(Math.hypot(l.hinge[0] - p.x, l.hinge[2] - p.z) - 0.25) < 1e-6 && Math.abs(Math.hypot(l.axis[0], l.axis[1]) - 1) < 1e-6);
-      // Turned up about it, the lid's front (towards the chest's facing) rises.
-      const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw), up = l.axis[1] * fx - l.axis[0] * fz;
+      // Turned up about it, the lid's front (towards the room: a prop's yaw points to its wall) rises; the hinge is on the wall's side.
+      const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), up = l.axis[1] * fx - l.axis[0] * fz;
+      assert.ok((l.hinge[0] - p.x) * fx + (l.hinge[2] - p.z) * fz < -0.24, 'hinged at the back, by the wall');
       assert.ok(up > 0.99, `the front comes up (${up.toFixed(2)})`);
       seen++;
     });

@@ -325,7 +325,9 @@ const chestParts = new WeakMap<PropModel, { readonly body: PropModel; readonly l
 
 /** A chest: its body into `body`, its lid apart. */
 function chest(body: MeshKit, p: Prop, models: PropModels | undefined): ChestLid {
-  const { x, y, z, yaw } = p, lid = new MeshKit();
+  // A prop's yaw turns the model's +z to the wall it stands at: the chest's front (its lock, where it is opened
+  // from) faces the room, so it is turned round.
+  const { x, y, z } = p, yaw = p.yaw + Math.PI, lid = new MeshKit();
   const rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), p.kind));
   const m = models?.get('furn_chest');
   if (m) {
