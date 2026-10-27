@@ -721,6 +721,84 @@
    "kind": "call",
    "prompt": "The sound of gentle mountain wind blowing over an empty valley before dawn, soft and airy, no other sounds",
    "most": 16
+  },
+  {
+   "id": "spell/gather",
+   "kind": "call",
+   "most": 1.6,
+   "prompt": "The sound of a glass singing bowl and soft chimes swelling into a rising airy shimmer, getting louder and higher for one second, with tiny sparkling crackles, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/flame-loose",
+   "kind": "call",
+   "most": 1.2,
+   "prompt": "The sound of a small dart of fire flung through the air, a quick roaring whoosh of flame rushing away, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/flame-hit",
+   "kind": "call",
+   "most": 1.5,
+   "prompt": "The sound of a ball of fire striking and bursting, a sharp fiery thump and crackling flames that die away, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/frost-loose",
+   "kind": "call",
+   "most": 1.2,
+   "prompt": "The sound of a shard of ice flung through cold air, a crisp glassy whistle and a frosty hiss, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/frost-hit",
+   "kind": "call",
+   "most": 1.5,
+   "prompt": "The sound of an ice shard shattering on impact, a bright crack and tinkling breaking ice crystals, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/stone-loose",
+   "kind": "call",
+   "most": 1.2,
+   "prompt": "The sound of rock wrenched up out of the ground, a deep grinding rumble and a heavy crack, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/stone-hit",
+   "kind": "call",
+   "most": 1.5,
+   "prompt": "The sound of a heavy stone spike bursting up from the earth and striking, a hard crunching smash with pebbles and dirt falling, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/bloom-loose",
+   "kind": "call",
+   "most": 1.2,
+   "prompt": "The sound of a gentle healing spell, a warm soft chime with rustling leaves and a breathy rising shimmer, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/bloom-hit",
+   "kind": "call",
+   "most": 1.5,
+   "prompt": "The sound of living vines and roots bursting and wrapping, a soft woody creak, rustling leaves and a warm chime, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/radiance-loose",
+   "kind": "call",
+   "most": 1.2,
+   "prompt": "The sound of a lance of bright holy light shooting out, a clear ringing shimmer and a fast bright whoosh, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/radiance-hit",
+   "kind": "call",
+   "most": 1.5,
+   "prompt": "The sound of a beam of radiant light striking, a bright sizzling flash and a ringing chord that fades, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/shade-loose",
+   "kind": "call",
+   "most": 1.2,
+   "prompt": "The sound of a bolt of shadow flung out, a low hollow whoosh with a dark ghostly whisper of wind, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
+   "id": "spell/shade-hit",
+   "kind": "call",
+   "most": 1.5,
+   "prompt": "The sound of a shadow bolt striking, a deep muffled hollow thud and a dark fading hiss, close-up, no voices, no talking, no music, no other sounds"
   }
  ],
  "music": [

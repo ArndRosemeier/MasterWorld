@@ -19,6 +19,7 @@ import type { Stage } from '@futuremagic/stage';
 import { buildArm } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE, SIT_DOWN, STAND_UP } from './clips';
 import { gripHeld } from './grips';
+import { ORIGIN } from '../origin';
 import { FADE, castShadows, playClip, preparePeople, seatOf } from './play';
 import { Jolt, joltRoot, joltSpine } from '../jolt';
 
@@ -206,6 +207,13 @@ export class HeroView {
   /** The body's clock (actions are timed by it). */
   get clock(): number { return this.time; }
 
+  /** Where a hand is in the world (`out`), null before the body has loaded. */
+  handAt(side: 'l' | 'r', out: Vector3): Vector3 | null {
+    const bone = this.front.actor.bones.find((b) => b.name === `hand_${side}`);
+    if (!bone) return null;
+    return ORIGIN.toWorld(bone.getWorldPosition(out));
+  }
+
   /** Shown or not (first person hides it). */
   set visible(v: boolean) { this.object.visible = v; }
 
@@ -247,7 +255,9 @@ export class HeroView {
       const f = this.front.actor.fittedSkeleton;
       if (f) joltSpine(this.front.actor.bones, f.names, this.jolt, 0.4);
     }
-    if (this.held.drawn !== !!p.combat) { this.held.drawn = !!p.combat; this.moveHeld(); }
+    // A spell is cast with empty hands: the weapon goes away while it gathers and is thrown.
+    const drawn = !!p.combat && !acting?.id.startsWith('spell_');
+    if (this.held.drawn !== drawn) { this.held.drawn = drawn; this.moveHeld(); }
   }
 
   /**

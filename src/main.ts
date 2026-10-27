@@ -1005,6 +1005,16 @@ export async function start(b: Boot): Promise<void> {
     // Out of a fight the hero's own spells still work (healing, wards): the recipe runner with nobody else about.
     const alone = new Recipes(character, new Alone(character, () => player.walker.pos), setting.effects ?? [], deriveSeed(seed, 'alone'));
     const aloneCues: RecipeEvent[] = [];
+    // A spell is cast with the hands (the hero raises them while it gathers and throws them on release) and heard.
+    // Spells gather in the hand the cast clip holds up (the left).
+    spellView.handOf = (out) => player.hero?.handAt('l', out) ?? null;
+    spellView.listener = {
+      hands: (what, dur) => {
+        const h = player.hero;
+        if (h) player.stance = { ...player.stance, action: what === 'stop' ? undefined : { id: what === 'charge' ? 'spell_charge' : 'spell_release', t0: h.clock, dur } };
+      },
+      sound: (what, motif, at) => sounds?.spell(what, motif, at),
+    };
     // Bird form (plan 10): the hero becomes a pheasant and flies; the change takes its time and never in a fight.
     const birdAbility = setting.abilities.find((a) => shapeOf(a)?.into === 'bird') ?? null;
     const birdForm = birdAbility ? new BirdForm(birdAbility, player, world, {
@@ -1530,7 +1540,7 @@ export async function start(b: Boot): Promise<void> {
         speech.hover(dt);
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
         const lead = leading();
-        spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, cues: aloneCues.splice(0) });
+        spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }
       if (!visit()) rooms?.update(dt);

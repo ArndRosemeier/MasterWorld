@@ -54,7 +54,13 @@ for (const [i, id] of firsts.entries()) {
   // Tab picks a wolf (the fight on the land leads once the hero is near the band).
   await page.waitForFunction(() => window.game.wild.encounters.some((e) => e.leading), null, { timeout: TIMEOUT });
   await page.keyboard.press('Tab');
-  const why = await page.evaluate((id) => window.game.useAbility(id), id);
+  // A spell on oneself (mend) may still be gathering from the last turn: wait for it to finish.
+  let why = null;
+  for (let tries = 0; tries < 40; tries++) {
+    why = await page.evaluate((id) => window.game.useAbility(id), id);
+    if (!why?.startsWith('You are casting')) break;
+    await page.waitForTimeout(250);
+  }
   if (why) { console.log(`${id}: ${why}`); failed = true; continue; }
   const shown = await page.waitForFunction(() => { const s = window.game.spellView.shown; return s.shots > 0 || s.flashes > 0; }, null, { timeout: 20000 }).then(() => true, () => false);
   await page.evaluate(() => { window.game.spellView.frozen = true; });

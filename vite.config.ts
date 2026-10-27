@@ -16,6 +16,7 @@ export default defineConfig({
     sourcemap: true,
     chunkSizeWarningLimit: 2000,
     // three.js in a chunk of its own: it changes only on an upgrade, so the browser keeps it cached.
-    rolldownOptions: { output: { codeSplitting: { groups: [{ name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/ }] } } },
+    // The game, and the spell lab (spell-lab.html: every spell on a meadow, for looking at them).
+    rolldownOptions: { input: { main: 'index.html', lab: 'spell-lab.html' }, output: { codeSplitting: { groups: [{ name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/ }] } } },
   },
 });

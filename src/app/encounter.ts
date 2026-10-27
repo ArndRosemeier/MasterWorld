@@ -154,8 +154,8 @@ export class Encounter {
 
   /** Its spells for drawing (app/spellView.ts): the runner, the den's frame, the hero in it, what happened. */
   spellFrame(): SpellFrame {
-    const O = this.creatures.group.position;
-    return { recipes: this.fight.recipes, offset: { x: O.x, y: O.y, z: O.z }, me: this.heroPose(), cues: this.spellCues.splice(0) };
+    const O = this.creatures.group.position, me = this.heroPose();
+    return { recipes: this.fight.recipes, offset: { x: O.x, y: O.y, z: O.z }, me, yaw: me.yaw, cues: this.spellCues.splice(0) };
   }
 
   /** It owns the keys and the HUD now (the one playing). */
@@ -360,7 +360,9 @@ export function stepEncounters(dt: number, all: readonly Encounter[], calm: { re
     else e.play(dt, e === best);
   }
   if (best) return;
-  calm.player.stance = { combat: false };
+  // Out of a fight: no fighting stance, but a spell's hands (or any action) play out.
+  const act = calm.player.stance.action, h = calm.player.hero;
+  calm.player.stance = { combat: false, action: act && h && h.clock - act.t0 < act.dur ? act : undefined };
   const w = calm.player.walker;
   for (const e of calm.alone?.elapse(dt, w.pos, w.groundSpeed) ?? []) {
     calm.cues?.push(e);
