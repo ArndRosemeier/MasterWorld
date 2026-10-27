@@ -348,6 +348,22 @@ export interface WildDef {
 }
 
 /**
+ * A good day in a town (C11, plan 4.5): `feast`: the town the hero did a deed for (a promise kept: a place
+ * cleared, a band beaten) feasts them the next evening; `market`: every `every` days the town holds a market
+ * day. Its people gather at the market in the day's `hours`. The words: `title`, the `news` the hero hears in
+ * town, `told` how its people tell it while it is to come or on, `done` once it is over; `{place}` (a
+ * feast's: what the hero cleared) and `{town}`.
+ */
+export interface FestivityDef {
+  readonly id: string;
+  readonly kind: 'feast' | 'market';
+  readonly hours: readonly [number, number];
+  /** market: days between two. */
+  readonly every?: number;
+  readonly words: { readonly title: string; readonly news: string; readonly told: string; readonly done: string };
+}
+
+/**
  * A story event (plan 4.2, C6): the world moves on its own when a thing is left alone, it goes into the
  * ledger, the land changes and the town hears of it, and there is something new to do.
  * `spill`: the dwellers of a place promised long ago and never cleared come out and roam the land near it.
@@ -379,9 +395,15 @@ export interface StoryEventDef {
   /**
    * How it is told: the lead's title, the news as it reaches the hero, the journal's note, and the line when
    * it is over. `{creatures}` (the plural), `{place}` (a raid's: the farm; a take's: the settlement), `{town}`, `{dir}` (which way from
-   * the town the band is), and a raid's `{animals}` (the setting's livestock).
+   * the town the band is), and a raid's `{animals}` (the setting's livestock). `told`: how the townsfolk tell
+   * it when asked (C11: talk knows events; none: the news).
    */
-  readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string };
+  readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string; readonly told?: string; readonly faded?: string };
+  /**
+   * Game hours an event left alone runs (C11: an ignored promise resolves): then it ends without the hero, as
+   * `words.faded` tells it (the band goes, a raid's beasts with it for good). None: it waits for the hero.
+   */
+  readonly fades?: number;
 }
 
 /**
@@ -609,6 +631,42 @@ export interface SightDef {
   readonly need?: 'discovery' | 'reward';
   readonly loot?: string;
 }
+
+/** The situations the engine knows how to stage (C10). */
+export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves', 'raid-smoke', 'stray-beast', 'refugees'] as const;
+export type SituationKind = (typeof SITUATION_KINDS)[number];
+
+/**
+ * A situation (D52, C10): something the hero walks into and sees, not a quest handed out. `hurt-traveller`:
+ * a town's traveller sits hurt by the hero's way (People's answer, now and then instead of one resting).
+ * `paddock-wolves`: at dusk, `encounter` (wolves) prowl outside a paddock of the town the hero is in, once a
+ * town every `every` days. `raid-smoke`: smoke rises over the barn of a farm a raid came down on (C6) for
+ * `lasts` game hours, seen over the trees from afar. `stray-beast`: in the day `hours`, one of the beasts of
+ * a paddock of the town the hero is in gets out and wanders off, and someone of its farm goes after it (once
+ * a town every `every` days, for `lasts` hours at most). `refugees` (C11): the folk of a settlement a band
+ * holds (a take) camp by the road outside the nearest town until it is freed, one of them hurt. `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
+ * only a cry for help), and only once the hero is within `seen` metres of what it is about, so the hero sees
+ * it before they are told.
+ */
+export interface SituationDef {
+  readonly id: string;
+  readonly kind: SituationKind;
+  /** None: nobody cries out (it is no emergency). */
+  readonly cry?: string;
+  /** How near the hero must be (m) to the situation before the cry (they see it first). */
+  readonly seen: number;
+  /** hurt-traveller: the share of People's travellers that are hurt (0..1). */
+  readonly chance?: number;
+  /** paddock-wolves: the encounter, the game hours of the day it may begin in, and the days between two in one town. */
+  readonly encounter?: string;
+  readonly hours?: readonly [number, number];
+  readonly every?: number;
+  /** raid-smoke: how long the barn smoulders (game hours). */
+  readonly lasts?: number;
+}
+
+/** How far the hero sees a situation clearly (m): a cry never comes from farther (its `seen` is at most this). */
+export const SEEN_MOST = 60;
 
 /**
  * Fast travel (plan 5.4, D37): a seat on the cart from an inn to the inn of another town the hero has been
@@ -885,6 +943,11 @@ export interface EffectDef {
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */
 export interface DirectorDef {
   readonly needs: Readonly<Record<'discovery' | 'challenge' | 'reward' | 'people' | 'purpose', number>>;
+  /**
+   * The player model's leans (C12, vgm/playerModel.ts): for each playstyle, how many times faster a need it
+   * enjoys grows (1: as usual). Mixed by how much of each style the player shows. None: no lean.
+   */
+  readonly styles?: Readonly<Partial<Record<'explorer' | 'fighter' | 'socializer' | 'crafter' | 'mage', Readonly<Partial<Record<'discovery' | 'challenge' | 'reward' | 'people' | 'purpose', number>>>>>>;
 }
 
 /** Names of one people (by Actors' race id): given names and the family names households share. */
@@ -931,6 +994,11 @@ export interface TalkDef {
    * (`{name}` who to tell, `{house}` where they live), and the words before a rumour of the next lead.
    */
   readonly cleared: { readonly topic: string; readonly yours: string; readonly note: string; readonly rumour: string };
+  /**
+   * Story events in talk (C11): where the townsfolk have it from, as in "I know it from {source}": those who
+   * saw it themselves (a raided farm's household), and everyone else.
+   */
+  readonly happened?: { readonly saw: string; readonly heard: string };
   /** The hero's own first journal page in a new game (`{inn}`: the inn as it is called): where to ask. */
   readonly arrival: { readonly title: string; readonly text: string; readonly from: string };
 }
@@ -1113,6 +1181,8 @@ export interface SettingModule {
   readonly upkeep: UpkeepDef;
   /** Sights the VGM may put by the hero's way when Discovery is overdue (C9); none: it has no such answer. */
   readonly sights?: readonly SightDef[];
+  /** The situations the VGM stages (C10). */
+  readonly situations?: readonly SituationDef[];
   /** Carts between towns (plan 5.4, C7); without it no cart goes. */
   readonly travel?: TravelDef;
   /** The town's shops (plan 11.5), by who keeps them. */
@@ -1138,6 +1208,8 @@ export interface SettingModule {
   readonly encounters: readonly EncounterDef[];
   /** Story events (plan 4.2, C6): what the world does on its own when the hero leaves it be. None: nothing. */
   readonly events?: readonly StoryEventDef[];
+  /** Good days in the towns (C11): feasts for the hero's deeds, market days. None: no such days. */
+  readonly festivities?: readonly FestivityDef[];
   /** Birds and squirrels about the land; without it the land has none. */
   readonly smallLife?: SmallLifeDef;
   /** What fills the regions the VGM opens as the hero walks; without it no regions open beyond the start. */
@@ -1170,6 +1242,15 @@ export function validateSetting(m: SettingModule): string[] {
     if (!SIGHT_SHAPES.includes(g.shape)) out.push(`${where}: sight "${g.id}" shape "${g.shape}" is unknown`);
     if (!g.seen) out.push(`${where}: sight "${g.id}" has no words`);
     if (g.need === 'reward' && !m.items.treasure.some((t) => t.id === g.loot)) out.push(`${where}: sight "${g.id}" answers Reward but its loot "${g.loot}" is no treasure table`);
+  }
+  for (const t of m.situations ?? []) {
+    if (!SITUATION_KINDS.includes(t.kind)) out.push(`${where}: situation "${t.id}" kind "${t.kind}" is unknown`);
+    if (t.cry !== undefined && (!t.cry || t.cry.length > 60)) out.push(`${where}: situation "${t.id}" cry must be short (a speech bubble, at most 60 letters)`);
+    if (!(t.seen > 0 && t.seen <= SEEN_MOST)) out.push(`${where}: situation "${t.id}" seen must be in 0..${SEEN_MOST} m`);
+    if (t.kind === 'stray-beast' && !(t.hours && t.hours[0] < t.hours[1] && (t.every ?? 0) > 0 && (t.lasts ?? 0) > 0)) out.push(`${where}: situation "${t.id}" needs hours, every and lasts`);
+    if (t.kind === 'paddock-wolves' && !(m.encounters.some((e) => e.id === t.encounter) && t.hours && t.hours[0] < t.hours[1] && (t.every ?? 0) > 0)) out.push(`${where}: situation "${t.id}" needs an encounter, hours and every`);
+    if (t.kind === 'raid-smoke' && !((t.lasts ?? 0) > 0)) out.push(`${where}: situation "${t.id}" needs lasts > 0`);
+    if (t.kind === 'hurt-traveller' && !(t.chance !== undefined && t.chance >= 0 && t.chance <= 1)) out.push(`${where}: situation "${t.id}" needs a chance in 0..1`);
   }
   const tr = m.travel;
   if (tr && !(tr.speed > 0 && tr.road >= 1 && tr.perKm >= 0 && tr.least >= 0 && Number.isInteger(tr.offers) && tr.offers >= 1)) out.push(`${where}: travel needs speed > 0, road >= 1, fares >= 0 and offers >= 1`);
@@ -1364,6 +1445,10 @@ function validateFight(m: SettingModule, where: string): string[] {
     if ((e.kind === 'raid' || e.kind === 'take') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
     if (e.kind === 'take' && (!e.takes || !(e.reach! > 0))) out.push(`${where}: take "${e.id}" needs the settlement it takes and a reach`);
     if (e.lair && !Object.values(m.dungeons).some((l) => l?.form.purposes.includes(e.lair!))) out.push(`${where}: event "${e.id}" asks for a ${e.lair}, which no dungeon kind is for`);
+    if (e.fades !== undefined && (!(e.fades > 0) || !e.words.faded)) out.push(`${where}: event "${e.id}" fades: it needs the hours and how it is told (words.faded)`);
+  }
+  for (const f of m.festivities ?? []) {
+    if (!(f.hours[1] > f.hours[0]) || (f.kind === 'market' && !(f.every! >= 1))) out.push(`${where}: festivity "${f.id}" needs its hours (and a market its days between)`);
   }
   for (const w of m.wild) {
     if (!encounter(w.encounter)?.where.includes(w.habitat)) out.push(`${where}: wild "${w.id}" needs an encounter met in its habitat ("${w.encounter}", ${w.habitat})`);

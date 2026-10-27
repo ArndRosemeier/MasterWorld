@@ -6,14 +6,15 @@
  * market to talk it over. EVENT=<id> asks for that event of the setting's (EVENT=farm-raid: bandits raid a
  * farm; then also its paddock, short of the animals they drove off; EVENT=waystation-taken with
  * EVENTS_QUERY=&site=waystation: bandits take the waystation the hero stands before; then also the place
- * held, its folk gone, and the hideout the rest of the band lies up in). JPEGs into `<out dir>` (default
+ * held, its folk gone, and the hideout the rest of the band lies up in; and its folk camped outside the town
+ * they fled to, crying out once the hero is near, C11). JPEGs into `<out dir>` (default
  * `shots/events/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  */
 import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
-import { meet } from './acts.mjs';
+import { meet, standClear } from './acts.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 const EXTRA = process.env.EVENTS_QUERY ?? '';
@@ -87,11 +88,32 @@ else {
     await page.waitForTimeout(8000);
     const st = await page.evaluate(({ id, town }) => {
       const g = window.game, t = g.towns.get(town), lair = g.log.find((d) => d.kind === 'dungeon' && d.event === id);
-      return { gone: t.life.gone, about: t.life.agents.filter((a) => !a.hidden).length, lair: lair ? `${lair.template} ${lair.id} (${lair.dwellers})` : null };
+      const home = t.town.decision, about = t.life.agents.filter((a) => !a.hidden && Math.hypot(a.x - home.x, a.z - home.z) < home.radius + 30);
+      return { gone: t.life.gone, about: about.length, lair: lair ? `${lair.template} ${lair.id} (${lair.dwellers})` : null };
     }, held);
     console.log(`held: folk gone ${st.gone}, ${st.about} about; lair ${st.lair}`);
     if (!st.gone || !st.lair) failed = true;
     await shoot('05-held');
+    // Its folk (C11): camped by the road outside the town they fled to, one of them hurt; from 12 m they cry out.
+    const camp = await page.evaluate((town) => {
+      const g = window.game, folk = g.towns.get(town).life.agents.filter((a) => a.post);
+      if (!folk.length) return null;
+      const x = folk.reduce((s, a) => s + a.x, 0) / folk.length, z = folk.reduce((s, a) => s + a.z, 0) / folk.length;
+      g.player.teleport(x + 40, undefined, z, Math.PI / 2);
+      return { x, z, n: folk.length, hurt: folk.filter((a) => a.act === 'hurt').length };
+    }, held.town);
+    console.log(`refugees: ${camp ? `${camp.n} at their camp, ${camp.hurt} hurt` : 'NONE CAMPED'}`);
+    if (!camp) failed = true;
+    else {
+      // Close, from a side with no trunk between, and shot while the cry still shows.
+      await page.waitForTimeout(3000);
+      await standClear(page, camp, 8);
+      await page.waitForTimeout(1500);
+      const cry = await page.evaluate(() => window.game.speech.line);
+      console.log(`their cry: ${cry ?? 'NONE'}`);
+      if (!cry) failed = true;
+      await shoot('06-refugees');
+    }
   }
 }
 const sh = await page.evaluate(() => { const m = window.shaders; return m ? m.summary() : null; });

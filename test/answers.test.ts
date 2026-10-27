@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { SIGHT_SHAPES } from '../src/setting/contract';
-import { findIn, sightFor, sightsOf, type NeedContext } from '../src/vgm/answers';
+import { findIn, restingAt, sightFor, sightsOf, type NeedContext } from '../src/vgm/answers';
+import { Township } from '../src/game/township';
 import { answerNeed } from '../src/vgm/toolbox';
 import { layOutSight } from '../src/world/sites';
 import { home, seed, terrain, walk, EAST } from './frontierLand';
@@ -65,8 +66,31 @@ test('answers: Challenge overdue puts an ambush of the wild ahead on the way', (
   assert.equal(answerNeed('challenge', c({ log: [...log, d] }))!.decision.id, 'ambush-2', 'counted');
 });
 
+test('answers: People overdue brings a town\'s traveller to rest by the way; they stand there, then go on', () => {
+  const m = answerNeed('people', c());
+  assert.ok(m && m.tool === 'traveller' && m.need === 'people');
+  const d = m.decision;
+  assert.ok(d.kind === 'traveller');
+  if (d.kind !== 'traveller') return;
+  assert.ok(d.x > out.x + 40 && d.x < out.x + 300, `ahead: ${(d.x - out.x).toFixed(0)} m`);
+  assert.ok(d.until > d.at);
+  const withIt = [...log, d];
+  assert.equal(answerNeed('people', c({ log: withIt })), null, 'the one town with an inn has its traveller out already');
+  let hours = d.at + 0.5;
+  const town = terrain.towns.find((t) => t.decision.id === d.town)!;
+  const t = new Township(town, { seed, setting: classic, log: () => withIt, hours: () => hours });
+  const a = t.life.agents.find((x) => x.person.role === 'traveller')!;
+  assert.ok(!a.hidden && Math.hypot(a.x - d.x, a.z - d.z) < 0.01, 'resting where the VGM met the hero with them');
+  assert.ok(t.posts.some((p) => p.x === d.x && p.z === d.z), 'the hero there is with that town\'s people');
+  assert.equal(restingAt(withIt, hours).length, 1);
+  hours = d.until + 0.1;
+  void t.life;
+  assert.ok(a.hidden && !a.post, 'on the road again');
+  assert.equal(t.posts.length, t.retreats.length);
+});
+
 test('answers: a need with no tool for it, or a setting without sights, gets no answer', () => {
-  assert.equal(answerNeed('people', c()), null);
+  assert.equal(answerNeed('purpose', c()), null);
   assert.equal(answerNeed('discovery', c({ setting: { ...classic, sights: [] } })), null);
 });
 

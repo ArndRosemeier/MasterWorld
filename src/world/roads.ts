@@ -34,9 +34,12 @@ export interface RoadHere {
   along: number;
   /** 1 on the road, easing to 0 over the first and last 20 m (where it meets the land or a town's road). */
   hold: number;
+  /** Unit direction of the road here (x, z). */
+  dx: number;
+  dz: number;
 }
 
-export const emptyRoad = (): RoadHere => ({ across: 0, edge: Infinity, half: 0, y: 0, way: 0, along: 0, hold: 0 });
+export const emptyRoad = (): RoadHere => ({ across: 0, edge: Infinity, half: 0, y: 0, way: 0, along: 0, hold: 0, dx: 0, dz: 1 });
 
 interface Road {
   readonly d: RoadDecision;
@@ -100,6 +103,8 @@ export class RoadNet {
       out.way = r.way;
       out.along = along;
       out.hold = smoothstep(0, 20, Math.min(along, total - along));
+      out.dx = dx / L;
+      out.dz = dz / L;
     }
     return found ? out : null;
   }

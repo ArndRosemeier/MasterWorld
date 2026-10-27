@@ -59,6 +59,8 @@ export interface Creature {
   repath: number;
   /** Plea lines said so far. */
   pleas: number;
+  /** Blows that hurt it and staggered it (bleeding does not), counted: each one shows as a jolt. */
+  blows: number;
   rng: Rng;
 }
 
@@ -120,7 +122,7 @@ export class Den {
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
         aware: 0, leader: id === 0 && def.pack, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
-        repath: 0, pleas: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
+        repath: 0, pleas: 0, blows: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
       this.creatures.push(c);
@@ -349,7 +351,7 @@ export class Den {
     c.aware = 1;
     c.seen = { ...from };
     c.lost = 0;
-    if (s.damage > 0 && flinch) { c.stagger = Math.max(c.stagger, stagger, s.outcome === 'crit' ? 0.5 : 0.18); c.windup = 0; }
+    if (s.damage > 0 && flinch) { c.stagger = Math.max(c.stagger, stagger, s.outcome === 'crit' ? 0.5 : 0.18); c.windup = 0; c.blows++; }
     if (c.health <= 0) {
       c.health = 0;
       c.state = 'dead';

@@ -188,4 +188,12 @@ export const effects: readonly EffectDef[] = [
 export const director: DirectorDef = {
   // Per real minute: Purpose grows fastest (always have a lead), People slowest.
   needs: { discovery: 0.15, challenge: 0.12, reward: 0.1, people: 0.07, purpose: 0.2 },
+  // What each playstyle enjoys more of (C12): a mage the old places and their finds, a fighter the fights.
+  styles: {
+    explorer: { discovery: 1.6, challenge: 0.85 },
+    fighter: { challenge: 1.7, reward: 1.15, discovery: 0.8 },
+    socializer: { people: 1.8, challenge: 0.8 },
+    crafter: { reward: 1.5, people: 1.2 },
+    mage: { discovery: 1.4, reward: 1.25, challenge: 0.7 },
+  },
 };

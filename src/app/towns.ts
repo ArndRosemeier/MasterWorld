@@ -124,8 +124,9 @@ export class Towns {
   townAt(x: number, z: number): Township | null {
     const t = this.nearest(x, z), d = t?.town.decision;
     if (t && d && Math.hypot(x - d.x, z - d.z) - d.radius < IN) return t;
-    // At a teacher's tower out on the land (C3) the hero talks with that town's people (its warden).
-    for (const c of this.cores.values()) if (c.retreats.some((r) => Math.hypot(x - r.x, z - r.z) < OUTPOST)) return c;
+    // At a teacher's tower out on the land (C3), or by a traveller resting by the way (C9), the hero talks
+    // with that town's people (its warden, its traveller).
+    for (const c of this.cores.values()) if (c.posts.some((r) => Math.hypot(x - r.x, z - r.z) < OUTPOST)) return c;
     return null;
   }
 
@@ -180,7 +181,9 @@ export class Towns {
   /** Every town's people near `focus`, living (detail where `focus` is); those are drawn. */
   live(dt: number, focus: { x: number; z: number }, weather: TownWeather): TownLife[] {
     const out: TownLife[] = [];
-    for (const t of this.near(focus.x, focus.z, LIVE)) {
+    for (const t of this.cores.values()) {
+      // Its own ground near, or one of its people out on the land (a traveller far from home, C9).
+      if (!t.town.near(focus.x, focus.z, LIVE) && !t.posts.some((p) => Math.hypot(p.x - focus.x, p.z - focus.z) < LIVE)) continue;
       const life = t.life;
       life.focus = focus;
       life.step(dt, this.h.hours(), weather);

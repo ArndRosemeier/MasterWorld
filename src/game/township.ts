@@ -7,16 +7,23 @@
 import type { SettingModule } from '../setting/contract';
 import { Herds } from '../sim/livestock';
 import { townsfolk, type Person } from '../sim/people';
-import { TownLife, type TownOrder } from '../sim/townLife';
-import { talkCellar, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
+import { TownLife, type Agent, type TownOrder } from '../sim/townLife';
+import { talkCellar, talkEvent, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
-import { heldBy, takenFrom } from '../vgm/events';
+import { heldBy, refugeOf, takenFrom } from '../vgm/events';
 import type { Decision, DecisionLog, RetreatDecision } from '../world/decisions';
+import { restingAt } from '../vgm/answers';
+import { strayAt } from '../vgm/situations';
+import { onCircle } from '../world/sites';
 import type { Town } from '../world/town';
 import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
+
+/** How many of a taken place's folk wait at their camp, and how far round its middle they sit (m). */
+const CAMPED = 5;
+const CAMP_R = 2.4;
 
 /** How far before a teacher's tower door its master stands watch, metres. */
 const WATCH = 3;
@@ -39,6 +46,8 @@ export interface TownshipContext {
   hours(): number;
   /** The hero's standing with each people (merchants' prices follow it); none: as with any stranger. */
   readonly standing?: Standing;
+  /** Every town standing (a story event's words name other places: a waystation taken); none: this one alone. */
+  towns?(): readonly Town[];
 }
 
 /** A town's own seed: its decision's, else (the start town) the world's. */
@@ -89,6 +98,26 @@ export class Township {
     return this.c.log().filter((d): d is RetreatDecision => d.kind === 'retreat' && d.town === this.id);
   }
 
+  /**
+   * Where its people stand out on the land now: the teachers' towers, its traveller resting by the hero's way
+   * (C9), and while a band holds the place, its folk's camp outside the town they fled to (C11).
+   */
+  get posts(): readonly { readonly x: number; readonly z: number }[] {
+    const log = this.c.log(), camp = this.camp(log);
+    return [...this.retreats, ...restingAt(log, this.c.hours(), this.id), ...(camp ? [camp] : [])];
+  }
+
+  /** Every town standing (or this one alone). */
+  private get world(): readonly Town[] {
+    return this.c.towns?.() ?? [this.town];
+  }
+
+  /** Where its folk camp while a band holds the place (null: it is not held). */
+  private camp(log: DecisionLog): { readonly x: number; readonly z: number } | null {
+    const e = heldBy(log, this.id);
+    return e ? refugeOf(this.world, e) : null;
+  }
+
   /** The guild whose house building `id` is (null: a plain building). */
   guildAt(id: number): GuildHouse | null {
     return this.guilds.find((h) => h.b.id === id) ?? null;
@@ -103,7 +132,9 @@ export class Township {
   get life(): TownLife {
     if (this.lifeOf) {
       const log = this.c.log();
-      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); }
+      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); this.shelter(this.lifeOf); }
+      this.rest(this.lifeOf);
+      this.chase(this.lifeOf);
       return this.lifeOf;
     }
     const life = new TownLife(this.town.plan, this.seed, this.c.hours(), this.c.setting.routines, this.residents);
@@ -111,6 +142,7 @@ export class Township {
     for (const o of ordersOf(this.c.log(), this.id)) life.order(o);
     life.gone = !!heldBy(this.c.log(), this.id);
     this.heldLog = this.c.log().length;
+    this.shelter(life);
     // A master with a place out on the land keeps watch at its door, facing the town.
     for (const { guild, out } of this.guilds) {
       const a = out && life.agents.find((x) => x.person.trade === guild.keeper);
@@ -118,7 +150,82 @@ export class Township {
       const x = out.x + Math.sin(out.yaw) * WATCH, z = out.z + Math.cos(out.yaw) * WATCH;
       life.station(a, x, z, Math.atan2(this.town.decision.z - z, this.town.decision.x - x));
     }
-    return (this.lifeOf = life);
+    this.rest(life);
+    this.lifeOf = life;
+    this.chase(life);
+    return life;
+  }
+
+  /** Who of its folk wait at the camp (C11), and the take they fled. */
+  private fled: { readonly event: string; readonly who: readonly Agent[] } | null = null;
+
+  /**
+   * While a band holds the place (a take), a few of its folk wait at a camp by the road outside the town they
+   * fled to, one of them hurt (C11: a trace in the world, survivors to talk with); freed, they go home.
+   */
+  private shelter(life: TownLife): void {
+    const log = this.c.log(), e = heldBy(log, this.id) ?? null, camp = this.camp(log);
+    if ((e && camp ? e.id : null) === (this.fled?.event ?? null)) return;
+    for (const a of this.fled?.who ?? []) life.unstation(a);
+    this.fled = null;
+    if (!e || !camp) return;
+    const who = [...life.agents.filter((a) => a.person.role !== 'child'), ...life.agents.filter((a) => a.person.role === 'child')].filter((a) => !a.post).slice(0, CAMPED);
+    who.forEach((a, k) => {
+      const t = (k / who.length) * Math.PI * 2, [x, z] = onCircle(camp, t, CAMP_R);
+      life.station(a, x, z, t + Math.PI, k === 0 ? 'hurt' : 'wait');
+    });
+    this.fled = { event: e.id, who };
+  }
+
+  /** The stray let out (C10), and whether it was caught; the clock (a game minute's step) it was looked at. */
+  private strayed: string | null = null;
+  private caught: string | null = null;
+  private chaseKey = -1;
+
+  /**
+   * A beast out of its paddock (C10, vgm/situations.ts strayBeastFor): it wanders off, and someone of its
+   * farm goes after it; once they have it, it goes back in through the gate and they go on with their day.
+   */
+  private chase(life: TownLife): void {
+    const hours = this.c.hours(), key = Math.floor(hours * 60);
+    if (key === this.chaseKey) return;
+    this.chaseKey = key;
+    const herds = this.herds, d = strayAt(this.c.log(), this.id, hours);
+    if (!herds) return;
+    const now = d && d.id !== this.caught ? d.id : null;
+    if (now !== this.strayed) {
+      const was = this.strayed ? this.c.log().find((x) => x.id === this.strayed) : undefined;
+      if (was?.kind === 'stray') herds.loose(was.paddock, null);
+      if (d && now) herds.loose(d.paddock, { x: d.x, z: d.z });
+      this.strayed = now;
+    }
+    const beast = now ? herds.straying : null;
+    if (!d || !beast) return;
+    const pd = this.town.plan.paddocks[d.paddock], house = pd ? this.town.plan.farms[pd.farm]?.house : undefined;
+    const farmer = life.agents.filter((a) => a.person.home === house && a.person.role !== 'child' && !a.held && !a.post)[0];
+    if (!farmer) return;
+    // Caught once it has got where it was going: they have it by the halter.
+    if (Math.hypot(farmer.x - beast.x, farmer.z - beast.z) < 2.2 && Math.hypot(beast.x - d.x, beast.z - d.z) < 6) { this.caught = d.id; return; }
+    life.seek(farmer, beast.x - Math.cos(beast.dir) * 1.2, beast.z - Math.sin(beast.dir) * 1.2, { x: beast.x, z: beast.z }, 8);
+  }
+
+  /** The traveller resting by the hero's way (C9) now, if any; the log and the clock (a minute's step) it was looked up for. */
+  private resting: string | null = null;
+  private restKey = '';
+
+  /** Its traveller stands where the VGM met the hero with them while that rest lasts, then is on the road again. */
+  private rest(life: TownLife): void {
+    const log = this.c.log(), hours = this.c.hours(), key = `${log.length}:${Math.floor(hours * 60)}`;
+    if (key === this.restKey) return;
+    this.restKey = key;
+    const d = restingAt(log, hours, this.id).at(-1) ?? null;
+    if ((d?.id ?? null) === this.resting) return;
+    const a = life.agents.find((x) => x.person.role === 'traveller');
+    if (!a) return;
+    // Facing the way the hero came from (the decision's yaw is atan2(x, z); an agent's dir is atan2(z, x)).
+    if (d) life.station(a, d.x, d.z, Math.PI / 2 - d.yaw, d.situation ? 'hurt' : 'wait');
+    else life.unstation(a);
+    this.resting = d?.id ?? null;
   }
 
   /** A VGM order for this town (a gathering, a curfew): into the log by the caller, and its people follow it. */
@@ -133,7 +240,7 @@ export class Township {
   get talk(): TownTalk {
     if (this.talkOf) return this.talkOf;
     const log = this.c.log();
-    const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk).talk;
+    const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk, this.world, this.c.hours()).talk;
     // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
     for (const id of keptOf(log)) t.hush(id);
     this.talkOf = t;
@@ -164,11 +271,20 @@ export class Township {
     return this.herdsOf;
   }
 
-  /** A promise the VGM made (already in the log): its people hear of it if it is one of theirs. */
+  /** A promise or a story event the VGM made (already in the log): its people hear of it if it is one of theirs. */
   promised(d: Decision): void {
     if (!this.talkOf) return; // made later, the words read the log
-    const c = talkCellar(d, this.c.setting, this.town, this.residents, this.c.log());
+    const log = this.c.log(), c = talkCellar(d, this.c.setting, this.town, this.residents, log);
     if (c) this.talkOf.add(c);
+    const e = talkEvent(d, this.c.setting, this.town, this.residents, log, this.world, this.c.hours());
+    if (e) this.talkOf.addEvent(e);
+  }
+
+  /** A story event of this town is over (its band beaten, or it ran its course): its people tell how it ended (C11). */
+  ended(id: string): void {
+    const log = this.c.log(), d = log.find((x) => x.id === id);
+    const e = d && this.talkOf ? talkEvent(d, this.c.setting, this.town, this.residents, log, this.world, this.c.hours()) : null;
+    if (e) this.talkOf?.endEvent(id, e.done);
   }
 
   /** What it keeps in a save (nothing if the hero never talked or traded there). */
