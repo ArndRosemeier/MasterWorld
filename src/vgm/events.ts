@@ -19,7 +19,7 @@ import type { TownOrder } from '../sim/townLife';
 import { dungeonOf, type DecisionLog, type DungeonDecision, type EventDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
-import type { Town } from '../world/town';
+import { townById, type Town } from '../world/town';
 import { compass, dungeonFor, farFrom, houseOf, loreOf, placeOf } from './dungeons';
 import { dwellersOf, keptOf, openPromises } from './leads';
 import { encounterFor } from './encounters';
@@ -95,7 +95,7 @@ const LAIR_RING: readonly [number, number] = [180, 600];
 export function lairFor(c: EventsContext): DungeonDecision | null {
   const lairs = new Set(c.log.filter((d): d is DungeonDecision => d.kind === 'dungeon').map((d) => d.event));
   for (const e of openEvents(c.log)) {
-    const def = (c.setting.events ?? []).find((x) => x.id === e.event), town = c.towns.find((t) => t.decision.id === e.town);
+    const def = (c.setting.events ?? []).find((x) => x.id === e.event), town = townById(c.towns, e.town);
     if (!def?.lair || lairs.has(e.id) || !town) continue;
     const ask = { purpose: def.lair, town, near: { x: e.x, z: e.z, ring: LAIR_RING }, ...(e.encounter ? { dwellers: e.encounter } : {}) };
     const d = dungeonFor(ask, { seed: c.seed, terrain: c.terrain, log: c.log, home: c.home ?? town.decision, dungeons: c.setting.dungeons, ...(c.avoid ? { avoid: c.avoid } : {}) });
@@ -154,7 +154,7 @@ function raid(c: EventsContext, def: StoryEventDef, past: readonly EventDecision
   if (!c.early && c.hours < def.after) return null;
   const open = new Set(openEvents(c.log).map((e) => e.from));
   for (const g of c.wild ?? []) {
-    const t = g.territory, town = c.towns.find((x) => x.decision.id === g.town);
+    const t = g.territory, town = townById(c.towns, g.town);
     if (t.kind !== def.by || g.left < 1 || open.has(t.id) || !town || !rested(c, def, past, g.town)) continue;
     const taken = takenFrom(c.log, g.town), gate = (p: { gate: readonly number[] }) => Math.hypot(p.gate[0] - t.x, p.gate[1] - t.z);
     const pd = town.plan.paddocks.filter((p) => p.animals > (taken.get(p.id) ?? 0)).sort((a, b) => gate(a) - gate(b))[0];
@@ -176,7 +176,7 @@ function spill(c: EventsContext, def: StoryEventDef, past: readonly EventDecisio
   const spilled = new Set(past.map((e) => e.from));
   for (const p of openPromises(c.log)) {
     if ((!c.early && c.hours - (p.at ?? 0) < def.after) || spilled.has(p.id)) continue;
-    const d = dungeonOf(c.log, p), town = d && c.towns.find((t) => t.decision.id === d.town);
+    const d = dungeonOf(c.log, p), town = d && townById(c.towns, d.town);
     if (!d || !town || c.inside(d.id)) continue;
     if (!rested(c, def, past, d.town)) continue;
     const place = placeOf(d, c.towns, c.setting.dungeons);
@@ -237,7 +237,7 @@ export function openBands(log: DecisionLog): Territory[] {
 
 /** How an event is told (its setting's words filled in), and where its lead points. */
 export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | 'creatures' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): { title: string; news: string; note: string; done: string; label: string } | null {
-  const def = (setting.events ?? []).find((x) => x.id === e.event), town = towns.find((t) => t.decision.id === e.town);
+  const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
   const where = def && town && (def.kind === 'raid' ? farmOf(setting, town, e) : def.kind === 'take' ? heldOf(towns, e) : spillOf(setting, log, towns, e));
   if (!def || !town || !where) return null;
   const lead = setting.creatures.find((x) => x.id === e.members[0]);
@@ -261,7 +261,7 @@ function spillOf(setting: Pick<SettingModule, 'dungeons'>, log: DecisionLog, tow
 
 /** The settlement a take holds, named ("the waystation"). */
 function heldOf(towns: readonly Town[], e: EventDecision): Record<string, string> | null {
-  const w = towns.find((t) => t.decision.id === e.held);
+  const w = e.held ? townById(towns, e.held) : undefined;
   return w ? { place: `the ${w.decision.size ?? 'town'}` } : null;
 }
 
@@ -277,7 +277,7 @@ const HERDS: Readonly<Record<LivestockKind, string>> = { cow: 'cattle', horse: '
 
 /** The town gathers at its market to talk an event over (the setting's `gather` hours), or null. */
 export function gatherFor(setting: Pick<SettingModule, 'events'>, towns: readonly Town[], e: EventDecision): TownOrder | null {
-  const def = (setting.events ?? []).find((x) => x.id === e.event), town = towns.find((t) => t.decision.id === e.town);
+  const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
   if (!def?.gather || !town) return null;
   const [x, z] = town.plan.centre;
   return { kind: 'gather', x, z, radius: 14, from: e.at, to: e.at + def.gather };

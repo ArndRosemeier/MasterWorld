@@ -10,7 +10,7 @@ import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
 import { lairFor, nextEvent, type EventsContext } from './events';
-import { hurtTravellerFor, paddockWolvesFor } from './situations';
+import { hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 
 /** Who asks a tool: the start of a game, the hero walking, the Builder's turn, an overdue need (C9), or another tool or the game. */
@@ -70,6 +70,8 @@ export const TOOLS: readonly Tool[] = [
   { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },
   { id: 'paddock-wolves', name: 'Wolves at the paddock', writes: ['wild'], need: 'challenge', asked: 'turn', next: paddockWolvesFor,
     why: (d) => (d.kind === 'wild' ? `dusk in ${d.town}: ${d.encounter} (${d.members.length}) at a paddock` : d.kind) },
+  { id: 'stray-beast', name: 'A beast got out', writes: ['stray'], need: 'people', asked: 'turn', next: strayBeastFor,
+    why: (d) => (d.kind === 'stray' ? `a day in ${d.town}: a beast out of its paddock, its farm after it` : d.kind) },
   { id: 'hurt-traveller', name: 'A hurt traveller', writes: ['traveller'], need: 'people', asked: 'need', answer: hurtTravellerFor },
   { id: 'traveller', name: 'A traveller by the way', writes: ['traveller'], need: 'people', asked: 'need', answer: travellerFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },

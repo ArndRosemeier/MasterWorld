@@ -56,7 +56,8 @@ import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
-import { criesDue, situationOf } from './vgm/situations';
+import { criesDue, situationOf, smokesAt } from './vgm/situations';
+import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
@@ -342,7 +343,9 @@ export async function start(b: Boot): Promise<void> {
     const compileEarly = (objs: readonly Object3D[]) => {
       for (const o of objs) compiling.push(view.stage.prepare(o).catch((e: unknown) => console.error('[load] an early compile failed', e)));
     };
-    compileEarly([wx.precip]);
+    // Smoke over a raided farm (C10): one shader, built with the rain's.
+    const smoke = new SmokeView(deriveSeed(seed, 'smoke'));
+    compileEarly([wx.precip, smoke.mesh]);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
     const jobs = new WorldJobs(worldPool, seed, setting.id);
@@ -539,7 +542,7 @@ export async function start(b: Boot): Promise<void> {
     // What is still compiling; then, the kinds warm, every part again: a cache hit for its shaders (or the build of
     // what changed since, such as the hero's arms), and its shadow casters drawn once (Stage.prepare).
     await Promise.all(compiling);
-    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
+    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, smoke.mesh, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
     let hurried = false;
     const shown = () => { view.stage.cap.share = hurried && !window.__mwReady ? 1 : capShare; view.stage.monitor.phase = hurried && !window.__mwReady ? 'warmup' : 'run'; };
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
@@ -556,6 +559,7 @@ export async function start(b: Boot): Promise<void> {
     await stock?.enter(view.stage);
     await smallView?.addBirds();
     await view.stage.add(wx.precip);
+    await view.stage.add(smoke.mesh);
     // Spells (plan 10): one shader, built now behind the loading screen.
     const spellView = new SpellView(setting);
     await spellView.enter(view.stage);
@@ -1348,7 +1352,7 @@ export async function start(b: Boot): Promise<void> {
     let answered = -Infinity;
     /** Situations whose cry was called (C10), and the time to the next look for one due. */
     const cried = new Set<string>();
-    let cryClock = 0;
+    let cryClock = 0, smokeClock = 0;
     const speech = new Speech(view.camera);
     const answerOverdue = (below: boolean): void => {
       const need = director.overdue, now = performance.now() / 1000;
@@ -1411,7 +1415,7 @@ export async function start(b: Boot): Promise<void> {
     /** A story event now (the debug menu): what the town hears, or why none came. */
     /** A situation now, whatever the hour or the odds (the debug menu, shots): what was made, or null. */
     const situationNow = (kind: SituationKind): Made | null => {
-      if (kind === 'paddock-wolves') return vgmStep({ tools: ['paddock-wolves'], early: true })[0] ?? null;
+      if (kind === 'paddock-wolves' || kind === 'stray-beast') return vgmStep({ tools: [kind], early: true })[0] ?? null;
       const at = player.walker.pos, def = situationOf(setting, kind);
       const d = def && travellerFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null });
       if (!d || !def) return null;
@@ -1470,10 +1474,10 @@ export async function start(b: Boot): Promise<void> {
         if (!visit() && !player.offFoot && (cryClock -= dt) <= 0) {
           cryClock = 0.25;
           const p = player.walker.pos, left = wild?.groupsLeft() ?? [];
-          for (const c of criesDue(log, setting, p, hours(), cried, (id) => (left.find((g) => g.territory.id === id)?.left ?? 1) > 0)) {
+          for (const c of criesDue({ log, setting, towns: terrain.towns, hero: p, hours: hours(), cried, living: (id) => (left.find((g) => g.territory.id === id)?.left ?? 1) > 0 })) {
             cried.add(c.id);
             const t = towns?.get(c.town), folk = t?.living ? t.life.agents.filter((a) => !a.hidden && !a.held) : [];
-            // The traveller themselves; at a paddock whoever of the town stands nearest it (nobody near: no cry).
+            // The traveller themselves; at a paddock or a burning barn whoever of the town stands nearest it (nobody near: no cry).
             const who = c.kind === 'hurt-traveller' ? folk.find((a) => a.person.role === 'traveller')
               : folk.filter((a) => Math.hypot(a.x - c.x, a.z - c.z) < 90).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
             if (who) speech.say(c.text, () => (who.hidden ? null : { x: who.x, y: terrain.height(who.x, who.z), z: who.z }));
@@ -1508,6 +1512,12 @@ export async function start(b: Boot): Promise<void> {
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
       view.sky.underwater = sea.submerged(view.camera.position);
       wx.apply(dt, view.camera.position, hours(), view.sky);
+      // Raided farms' barns smoulder (C10): looked up now and then, the puffs rise every frame.
+      if ((smokeClock -= dt) <= 0) {
+        smokeClock = 1;
+        smoke.burn(smokesAt(log, terrain.towns, setting, hours()).map((s) => ({ x: s.x, y: terrain.height(s.x, s.z) + 2, z: s.z, thick: s.thick })));
+      }
+      smoke.billow(dt);
       view.sky.update(dt, view.camera);
       // Down in the cellar the land above is out of the frame (visit.onDepth): its updates wait.
       const above = !visit();

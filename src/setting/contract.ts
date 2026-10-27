@@ -611,21 +611,25 @@ export interface SightDef {
 }
 
 /** The situations the engine knows how to stage (C10). */
-export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves'] as const;
+export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves', 'raid-smoke', 'stray-beast'] as const;
 export type SituationKind = (typeof SITUATION_KINDS)[number];
 
 /**
  * A situation (D52, C10): something the hero walks into and sees, not a quest handed out. `hurt-traveller`:
  * a town's traveller sits hurt by the hero's way (People's answer, now and then instead of one resting).
  * `paddock-wolves`: at dusk, `encounter` (wolves) prowl outside a paddock of the town the hero is in, once a
- * town every `every` days. `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
+ * town every `every` days. `raid-smoke`: smoke rises over the barn of a farm a raid came down on (C6) for
+ * `lasts` game hours, seen over the trees from afar. `stray-beast`: in the day `hours`, one of the beasts of
+ * a paddock of the town the hero is in gets out and wanders off, and someone of its farm goes after it (once
+ * a town every `every` days, for `lasts` hours at most). `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
  * only a cry for help), and only once the hero is within `seen` metres of what it is about, so the hero sees
  * it before they are told.
  */
 export interface SituationDef {
   readonly id: string;
   readonly kind: SituationKind;
-  readonly cry: string;
+  /** None: nobody cries out (it is no emergency). */
+  readonly cry?: string;
   /** How near the hero must be (m) to the situation before the cry (they see it first). */
   readonly seen: number;
   /** hurt-traveller: the share of People's travellers that are hurt (0..1). */
@@ -634,6 +638,8 @@ export interface SituationDef {
   readonly encounter?: string;
   readonly hours?: readonly [number, number];
   readonly every?: number;
+  /** raid-smoke: how long the barn smoulders (game hours). */
+  readonly lasts?: number;
 }
 
 /** How far the hero sees a situation clearly (m): a cry never comes from farther (its `seen` is at most this). */
@@ -1204,9 +1210,11 @@ export function validateSetting(m: SettingModule): string[] {
   }
   for (const t of m.situations ?? []) {
     if (!SITUATION_KINDS.includes(t.kind)) out.push(`${where}: situation "${t.id}" kind "${t.kind}" is unknown`);
-    if (!t.cry || t.cry.length > 60) out.push(`${where}: situation "${t.id}" needs a short cry (a speech bubble, at most 60 letters)`);
+    if (t.cry !== undefined && (!t.cry || t.cry.length > 60)) out.push(`${where}: situation "${t.id}" cry must be short (a speech bubble, at most 60 letters)`);
     if (!(t.seen > 0 && t.seen <= SEEN_MOST)) out.push(`${where}: situation "${t.id}" seen must be in 0..${SEEN_MOST} m`);
+    if (t.kind === 'stray-beast' && !(t.hours && t.hours[0] < t.hours[1] && (t.every ?? 0) > 0 && (t.lasts ?? 0) > 0)) out.push(`${where}: situation "${t.id}" needs hours, every and lasts`);
     if (t.kind === 'paddock-wolves' && !(m.encounters.some((e) => e.id === t.encounter) && t.hours && t.hours[0] < t.hours[1] && (t.every ?? 0) > 0)) out.push(`${where}: situation "${t.id}" needs an encounter, hours and every`);
+    if (t.kind === 'raid-smoke' && !((t.lasts ?? 0) > 0)) out.push(`${where}: situation "${t.id}" needs lasts > 0`);
     if (t.kind === 'hurt-traveller' && !(t.chance !== undefined && t.chance >= 0 && t.chance <= 1)) out.push(`${where}: situation "${t.id}" needs a chance in 0..1`);
   }
   const tr = m.travel;
