@@ -49,7 +49,7 @@ import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands } from './vgm/events';
-import { madeBy, vgmTurn, type Made } from './vgm/toolbox';
+import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
 import { PACING, vgmLines } from './vgm/vgmLog';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
@@ -100,7 +100,7 @@ import { TalesEnd } from './app/talesEnd';
 import { RemainsView } from './render/remainsView';
 import { writeSlot } from './persist/saves';
 import { acquaintances } from './game/background';
-import { Director } from './vgm/director';
+import { Director, type Need } from './vgm/director';
 import { FightHud } from './app/fightHud';
 import { ActionBarUi } from './app/actionBarUi';
 import { AbilityBook } from './app/abilityBook';
@@ -126,6 +126,8 @@ declare global {
 
 /** The longest the start waits for the people round the hero to be dressed (ms). */
 const DRESS_WAIT = 15000;
+/** Seconds after the VGM answered an overdue need before it answers again (C9): time to come upon the first. */
+const ANSWER_GAP = 90;
 
 /** What the first, small script (boot.ts) made before the game's code arrived. */
 export interface Boot {
@@ -445,8 +447,8 @@ export async function start(b: Boot): Promise<void> {
     };
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {
-      regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home }, log);
-      for (const d of log) if (d.kind === 'region' && d.site) void roadWork.clear(d);
+      regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights }, log);
+      for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
       // `site=<place>`: walk out from the start until one opens, then stand before it.
       const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
       for (let dir = 0; kind && dir < 8; dir++) {
@@ -1203,6 +1205,7 @@ export async function start(b: Boot): Promise<void> {
       legends: setting.items.uniques.map((u) => ({ id: u.id, name: u.name })),
       events: setting.events ?? [],
       storyEvent: (id?: string) => storyEventNow(id),
+      answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
       vgmLog: () => vgmLines(log, vgmLog),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
@@ -1214,7 +1217,7 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1316,6 +1319,25 @@ export async function start(b: Boot): Promise<void> {
       if (builderClock < 3 || title?.holding || creator?.showing) return;
       builderClock = 0;
       vgmStep();
+      answerOverdue(below);
+    };
+    /**
+     * An overdue need asks the tools that meet it for their cheapest fitting move (C9, vgm/toolbox.ts
+     * `answerNeed`): out on the land, on foot, when the world may press the hero; on the way they are going.
+     */
+    let answered = -Infinity;
+    const answerOverdue = (below: boolean): void => {
+      const need = director.overdue, now = performance.now() / 1000;
+      // One answer at a time: the hero gets a while to come upon it before another is put out.
+      if (!need || below || here() || player.offFoot || !director.fair || now - answered < ANSWER_GAP) return;
+      if (answerNow(need)) answered = now;
+    };
+    /** The VGM's answer to `need` here and now, whatever the Director says (the debug menu, shots): what it made, or null. */
+    const answerNow = (need: Need): Made | null => {
+      const at = player.walker.pos;
+      const m = answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null });
+      if (m) applied(m);
+      return m;
     };
     /**
      * The Builder's turn (D51, vgm/toolbox.ts): its tools decide, the game applies each decision (`applied`).
@@ -1342,6 +1364,10 @@ export async function start(b: Boot): Promise<void> {
         cellars?.sync(log);
         // Its household's town hears of it (every town checks whether it is theirs).
         for (const t of towns?.every ?? []) t.promised(d);
+      } else if (d.kind === 'sight') {
+        console.info(`[vgm] sight ${d.id} (${d.sight}) at ${d.x.toFixed(0)}, ${d.z.toFixed(0)}: ${m.reason}`);
+        regionSites?.sync(log);
+        void roadWork.clear(d);
       } else if (d.kind === 'event') {
         // The world moves on its own (C6): the band onto the land, the town gathers, word reaches the hero.
         console.info(`[vgm] event ${d.id} (${d.event}) from ${d.from} at ${hours().toFixed(1)} h`);
@@ -1387,6 +1413,10 @@ export async function start(b: Boot): Promise<void> {
           const asking = !title?.holding && !creator?.showing && !!window.__mwReady;
           const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
           if (opened) regionOpened(opened);
+          // A place come upon for the first time meets Discovery (C9): a sight in full, with its words; a region's place half.
+          const came = player.offFoot ? null : regionSites.cameUpon(player.walker.pos.x, player.walker.pos.z);
+          if (came?.sight) { notes.say(came.sight.seen, 8); director.met('discovery'); }
+          else if (came) director.met('discovery', 0.5);
         }
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
         const lead = leading();
@@ -1396,7 +1426,7 @@ export async function start(b: Boot): Promise<void> {
       if (!visit()) rooms?.update(dt);
       if (rooms?.door) cellars.nearHouse(rooms.door.town.id, rooms.door.b.id);
       // Talk follows the hero from town to town (a talk going on stays where it is).
-      { const t = here(); if (t) { t.been = true; if (talk) talk.place = t; } }
+      { const t = here(); if (t) { if (!t.been) director.met('discovery'); t.been = true; if (talk) talk.place = t; } }
       talk?.watch();
       const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.offFoot && !visit());
       if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }

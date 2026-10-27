@@ -7,11 +7,12 @@
  */
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
+import { sightFor, type NeedContext } from './answers';
 import { lairFor, nextEvent, type EventsContext } from './events';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 
-/** Who asks a tool: the start of a game, the hero walking, the Builder's turn, or another tool or the game. */
-export type Asked = 'start' | 'walk' | 'turn' | 'call';
+/** Who asks a tool: the start of a game, the hero walking, the Builder's turn, an overdue need (C9), or another tool or the game. */
+export type Asked = 'start' | 'walk' | 'turn' | 'need' | 'call';
 
 /** What the Builder's turn knows: the log, the land and towns, the hours, the hero and the setting. */
 export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & EventsContext & {
@@ -30,6 +31,8 @@ export interface Tool {
   readonly asked: Asked;
   /** A turn tool's move: its next decision, if one is due now. */
   readonly next?: (c: TurnContext) => Decision | null;
+  /** A need tool's answer when its need is overdue (C9): its cheapest fitting move, if one fits now. */
+  readonly answer?: (c: NeedContext) => Decision | null;
   /** Why it made `d` (one line, for the VGM's log: the debug menu, later the settings, D53). */
   readonly why?: (d: Decision, c: TurnContext) => string;
 }
@@ -59,6 +62,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'event', name: 'Story event', writes: ['event', 'dungeon'], need: 'challenge', asked: 'turn', next: (c) => lairFor(c) ?? nextEvent(c),
     why: (d) => (d.kind === 'event' ? `${d.event} in ${d.town}: ${d.paddock !== undefined || d.held ? `the raiders of ${d.from} were left alone` : `${d.from} was left open too long`}` : d.kind === 'dungeon' && d.event ? `a ${d.template} for the band of ${d.event} to lie up in` : d.kind) },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
+  { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: sightFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },
@@ -88,4 +92,17 @@ export function vgmTurn(c: TurnContext): Made[] {
 /** A tool's decision as the VGM's log keeps it (a tool asked by name says its own reason). */
 export function madeBy(tool: string, decision: Decision, reason: string, at: number): Made {
   return { decision, tool, need: toolOf(tool).need, reason, at };
+}
+
+/**
+ * An overdue need asks the tools that meet it (C9), in the toolbox's order (cheapest first), for a move:
+ * the first that fits, and why; null if none does now.
+ */
+export function answerNeed(need: Need, c: NeedContext): Made | null {
+  for (const t of TOOLS) {
+    if (t.asked !== 'need' || t.need !== need || !t.answer) continue;
+    const d = t.answer(c);
+    if (d) return madeBy(t.id, d, `${need} is overdue: ${d.kind === 'sight' ? d.sight : d.kind} by the hero's way${c.toward ? ` to ${Math.round(c.toward.x)}, ${Math.round(c.toward.z)}` : ''}`, c.hours);
+  }
+  return null;
 }

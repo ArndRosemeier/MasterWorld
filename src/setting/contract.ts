@@ -588,6 +588,22 @@ export interface UpkeepDef {
   };
 }
 
+/** How a sight stands on the land (world/sites.ts `layOutSight`). */
+export const SIGHT_SHAPES = ['stones', 'waystone', 'cairn'] as const;
+export type SightShape = (typeof SIGHT_SHAPES)[number];
+
+/**
+ * A sight by the way (plan 4.1, C9): the VGM's cheapest answer to an overdue Discovery, something old or
+ * strange the hero comes upon (a ring of standing stones, a carved waystone of the old realm, a cairn).
+ * `seen`: the line as the hero comes upon it.
+ */
+export interface SightDef {
+  readonly id: string;
+  readonly shape: SightShape;
+  readonly seen: string;
+  readonly weight?: number;
+}
+
 /**
  * Fast travel (plan 5.4, D37): a seat on the cart from an inn to the inn of another town the hero has been
  * to. The cart keeps to the roads at `speed` (m/s, the hero's metres: the clock runs on as it would for
@@ -1089,6 +1105,8 @@ export interface SettingModule {
   readonly items: ItemCatalog;
   /** Rooms and mending (plan 11.5). */
   readonly upkeep: UpkeepDef;
+  /** Sights the VGM may put by the hero's way when Discovery is overdue (C9); none: it has no such answer. */
+  readonly sights?: readonly SightDef[];
   /** Carts between towns (plan 5.4, C7); without it no cart goes. */
   readonly travel?: TravelDef;
   /** The town's shops (plan 11.5), by who keeps them. */
@@ -1139,6 +1157,13 @@ export function validateSetting(m: SettingModule): string[] {
   if (m.contractVersion !== CONTRACT_VERSION) out.push(`${where}: contract version ${m.contractVersion}, engine speaks ${CONTRACT_VERSION}`);
   if (!/^[a-z][a-z0-9-]*$/.test(m.id)) out.push(`${where}: id must be a lowercase slug`);
   if (!Number.isInteger(m.version) || m.version < 1) out.push(`${where}: version must be a positive integer`);
+  const sightIds = new Set<string>();
+  for (const g of m.sights ?? []) {
+    if (sightIds.has(g.id)) out.push(`${where}: sight "${g.id}" defined twice`);
+    sightIds.add(g.id);
+    if (!SIGHT_SHAPES.includes(g.shape)) out.push(`${where}: sight "${g.id}" shape "${g.shape}" is unknown`);
+    if (!g.seen) out.push(`${where}: sight "${g.id}" has no words`);
+  }
   const tr = m.travel;
   if (tr && !(tr.speed > 0 && tr.road >= 1 && tr.perKm >= 0 && tr.least >= 0 && Number.isInteger(tr.offers) && tr.offers >= 1)) out.push(`${where}: travel needs speed > 0, road >= 1, fares >= 0 and offers >= 1`);
   const w = m.world;

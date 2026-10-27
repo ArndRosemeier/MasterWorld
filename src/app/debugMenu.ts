@@ -39,6 +39,8 @@ export interface DebugHost {
   readonly events: readonly { readonly id: string; readonly kind: string }[];
   /** A story event now (C6), whatever its wait (one of `events` by id, or the first that can): what the town hears, or why none came. */
   storyEvent(id?: string): string;
+  /** The VGM's answer to a need here and now (C9), whatever the Director says: what it made, or why nothing. */
+  answerNeed(need: 'discovery' | 'challenge' | 'reward' | 'people' | 'purpose'): string;
   /** The VGM's log (D53, C8): its moves, oldest first (the tool, the need, why). */
   vgmLog(): readonly VgmLine[];
   /** The world's seed (a fresh one each start unless `?seed=` names it). */
@@ -119,6 +121,7 @@ export class DebugMenu {
       ['VGM', [
         { label: 'Its last 30 moves', run: () => this.lines(h.vgmLog().slice(-30)) },
         { label: 'Every move', run: () => this.lines(h.vgmLog()) },
+        { label: 'Answer Discovery now (a sight)', run: () => h.answerNeed('discovery') },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },

@@ -10,6 +10,7 @@ import { ArchField, BLEND } from './volumes';
 import { settlementOf, type Decision, type DecisionLog, type HoldDecision, type RoadDecision, type TownDecision } from './decisions';
 import { holdBare, holdGround } from './hold';
 import { RETREAT_CLEARING, clearingOf, type Clearing } from './dungeon/site';
+import { SIGHT_CLEARING } from './sites';
 import { RoadNet } from './roads';
 import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
@@ -73,7 +74,7 @@ export class Terrain {
   /**
    * Decisions made while the game runs that change the land, in workers as on the main thread (they reach
    * the workers as a `decisions` job): roads, and the clearings round places out on the land (dungeons, the
-   * teachers' towers and the places of opened regions). Others leave
+   * teachers' towers, the places of opened regions and the sights by the way). Others leave
    * the land as it is.
    */
   settleMore(ds: readonly Decision[]): void {
@@ -86,6 +87,9 @@ export class Terrain {
         // A teacher's tower (C3) stands in the open like a ruined tower's.
         const c = clearingOf(RETREAT_CLEARING, d);
         if (c) this.clearingMap.set(d.id, c);
+      } else if (d.kind === 'sight') {
+        // A sight by the way (C9) stands in a glade of its own.
+        this.clearingMap.set(d.id, { x: d.x, z: d.z, r: SIGHT_CLEARING });
       } else if (d.kind === 'region' && d.site) {
         // A place the VGM opened as the hero walked: a settlement is a town of its size (its fields clear
         // the wood); another place keeps its footprint and what was cleared round it free of trees.

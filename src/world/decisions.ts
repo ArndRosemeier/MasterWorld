@@ -273,7 +273,23 @@ export interface JourneyDecision {
   readonly arrive: number;
 }
 
-export type Decision = JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/**
+ * A sight by the hero's way (plan 4.1, C9): the VGM's answer to an overdue Discovery. It stands at (x, z),
+ * facing `yaw`, from game hour `at` on.
+ */
+export interface SightDecision {
+  readonly kind: 'sight';
+  readonly id: string;
+  /** The setting's sight. */
+  readonly sight: string;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  readonly seed: number;
+  readonly at: number;
+}
+
+export type Decision = SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 
