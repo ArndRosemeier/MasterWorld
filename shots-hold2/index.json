@@ -1,0 +1,88 @@
+{
+  "commit": "fe8681fe40dcfb2871864f57dcdab24b3c1fa23b",
+  "dirty": false,
+  "date": "2026-10-27",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": false,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 30.65,
+  "shots": [
+    {
+      "name": "hold",
+      "file": "01-hold.jpg",
+      "query": "title=0&day=0&hour=15&weather=fair&hold=stranger",
+      "loadS": 15.757,
+      "drawnS": 0.922,
+      "settledS": 4.008900000095368,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 251,
+      "p50": 7.700000000000728,
+      "p95": 12.100000000002183,
+      "mean": 7.982071713432376,
+      "shaders": {
+        "warmup": 75,
+        "run": 25,
+        "late": 0,
+        "worstMs": 12.799999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "hold-crag",
+      "file": "02-hold-crag.jpg",
+      "query": "title=0&day=0&hour=15&weather=fair&hold=stranger",
+      "loadS": 15.757,
+      "drawnS": 0.024,
+      "settledS": 1.5056000000238419,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 256,
+      "p50": 7.5,
+      "p95": 11.299999999999272,
+      "mean": 7.821875000279391,
+      "shaders": {
+        "warmup": 75,
+        "run": 25,
+        "late": 0,
+        "worstMs": 12.799999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "hold-warden",
+      "file": "03-hold-warden.jpg",
+      "query": "title=0&day=0&hour=15&weather=fair&hold=stranger",
+      "loadS": 15.757,
+      "drawnS": 0.025,
+      "settledS": 1.5156999999284744,
+      "missing": [],
+      "backend": "webgpu",
+      "frames": 252,
+      "p50": 8,
+      "p95": 12,
+      "mean": 7.946031746126354,
+      "shaders": {
+        "warmup": 75,
+        "run": 25,
+        "late": 0,
+        "worstMs": 12.799999952316284,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    }
+  ]
+}
