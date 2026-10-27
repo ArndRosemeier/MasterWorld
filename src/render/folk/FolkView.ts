@@ -52,6 +52,11 @@ const DRESS_GAP = 0.3;
 const nextFrame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
 /** Characters dressed at once (each takes the worker some tens of milliseconds). */
 const DRESSING = 2;
+/**
+ * Before the game begins (`focus` set: the title covers the town): more at once. Each dressing steps a detail level
+ * a frame, and the title's frames are long while the start loads, so two at a time held the start for seconds.
+ */
+const DRESSING_EARLY = 5;
 
 /** Someone indoors, where the room has them (the app places them: render knows no rooms). */
 export interface Placed {
@@ -243,7 +248,7 @@ export class FolkView {
     // Dress free characters for the nearest people without one.
     this.dressWait = Math.max(0, this.dressWait - dt);
     for (const [, a] of near) {
-      if (this.dressing >= DRESSING || !want.size || this.dressWait > 0) break;
+      if (this.dressing >= (this.focus ? DRESSING_EARLY : DRESSING) || !want.size || this.dressWait > 0) break;
       if (!want.has(a) || this.shown.has(a)) continue;
       const s = this.slots.find((x) => !x.agent && !x.busy);
       if (!s) break;

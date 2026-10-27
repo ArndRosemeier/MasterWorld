@@ -142,6 +142,10 @@ export async function start(b: Boot): Promise<void> {
     const seedText = asked?.seed ?? params.seed;
     const seed = parseSeed(seedText);
     loading.set('Finding the start');
+    // The world worker opens the same world (a second or more of work) while this thread does, so the seas' first
+    // masks (asked at 'Filling the seas') do not wait for it: any job opens it, this one a single sample.
+    const worldPool = createWorldPool();
+    void worldPool.run({ kind: 'mask', seed, setting: setting.id, x0: 0, z0: 0, size: 1, res: 1 }).catch(() => {});
     // The VGM's first decisions: the start town (and the arch outside it) stand on the land.
     const opened = openWorld(seed, setting);
     // A save whose start town stood elsewhere (before D50 moved it to its river) belongs to a world that is
@@ -315,7 +319,7 @@ export async function start(b: Boot): Promise<void> {
     compileEarly([wx.precip]);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
-    const jobs = new WorldJobs(createWorldPool(), seed, setting.id);
+    const jobs = new WorldJobs(worldPool, seed, setting.id);
     // Brook tiles ahead of the hero come from the world worker (D50).
     const brooks = new BrookPrefetch(terrain.hydro, jobs);
     // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
@@ -337,13 +341,15 @@ export async function start(b: Boot): Promise<void> {
     const startTown = towns.start;
     const sea = new WaterView(jobs);
     water = sea;
-    await sea.prime(view.camera.position);
-    // In the water from the start (now that the water is known), and the hero's body built.
-    player.resettle();
-    title?.run(0);
+    // The seas' masks come from the world worker while the hero is made here.
+    const seas = sea.prime(view.camera.position);
     loading.set('Dressing the hero');
     // In the look the player made (a save's), or a new hero of the setting drawn from the seed.
     const hero = await HeroView.load(view.stage, view.renderer, setting.hero, save?.looks?.look ?? null, seed);
+    await seas;
+    // In the water from the start (now that the water is known), and the hero's body built.
+    player.resettle();
+    title?.run(0);
     player.walker.height = hero.height;
     hero.onLook(() => { player.walker.height = hero.height; });
     player.hero = hero;
