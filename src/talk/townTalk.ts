@@ -13,8 +13,9 @@ import type { Person } from '../sim/people';
 import { loreOf, placeOf } from '../vgm/dungeons';
 import { cellarHint, type CellarHint } from '../vgm/hints';
 import { eventTold, fadedOf } from '../vgm/events';
+import { festivityTold } from '../vgm/festivities';
 import { dwellersOf, keptOf } from '../vgm/leads';
-import { dungeonOf, type Decision, type DecisionLog } from '../world/decisions';
+import { dungeonOf, type Decision, type DecisionLog, type FestivityDecision } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
 import { cap, fill, nameFolk, type Folk } from './folk';
@@ -480,13 +481,13 @@ function cellarsIn(plan: Plan): string[] {
 }
 
 /** The talk of a town: its folk named, and the cellars promised under its houses told to them. */
-export function townTalk(seed: number, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog, saved?: TownTalkSave, towns: readonly Town[] = [town]): { talk: TownTalk; folk: Folk[] } {
+export function townTalk(seed: number, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog, saved?: TownTalkSave, towns: readonly Town[] = [town], hours = Infinity): { talk: TownTalk; folk: Folk[] } {
   const folk = nameFolk(people, town.plan, setting.names, setting.talk, seed);
   const cellars: TalkCellar[] = [], events: TalkEvent[] = [];
   for (const d of log) {
     const c = talkCellar(d, setting, town, people, log);
     if (c) cellars.push(c);
-    const e = talkEvent(d, setting, town, people, log, towns);
+    const e = talkEvent(d, setting, town, people, log, towns, hours);
     if (e) events.push(e);
   }
   return { talk: new TownTalk(folk, setting.talk, cellars, saved, events), folk };
@@ -497,7 +498,8 @@ export function townTalk(seed: number, setting: SettingModule, town: Town, peopl
  * the setting's words have it; a raid's farm household saw it, and a taken place's folk (they fled it). Over,
  * they tell how it ended: beaten, or run its course (faded). Null for any other decision.
  */
-export function talkEvent(d: Decision, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog, towns: readonly Town[]): TalkEvent | null {
+export function talkEvent(d: Decision, setting: SettingModule, town: Town, people: readonly Person[], log: DecisionLog, towns: readonly Town[], hours = Infinity): TalkEvent | null {
+  if (d.kind === 'festivity') return talkFeast(d, setting, town, log, towns, hours);
   const id = town.decision.id, fled = d.kind === 'event' && d.held === id;
   if (d.kind !== 'event' || (d.town !== id && !fled)) return null;
   const told = eventTold(setting, log, towns, d);
@@ -505,6 +507,13 @@ export function talkEvent(d: Decision, setting: SettingModule, town: Town, peopl
   const pd = d.paddock === undefined ? undefined : town.plan.paddocks[d.paddock], farm = pd && pd.farm >= 0 ? town.plan.farms[pd.farm] : undefined;
   const witnesses = people.filter((p) => p.role !== 'child' && (fled || (farm && p.home === farm.house))).map((p) => p.id);
   return { id: d.id, name: told.title, told: told.told, done: fadedOf(log, d.id) ? told.faded : told.done, over: keptOf(log).has(d.id), witnesses };
+}
+
+/** A feast as its town knows it (C11: a good day for a deed of the hero's): to come, or over once its hours are past. Market days are not talked of. */
+function talkFeast(d: FestivityDecision, setting: SettingModule, town: Town, log: DecisionLog, towns: readonly Town[], hours: number): TalkEvent | null {
+  if (d.town !== town.decision.id || !d.for) return null;
+  const told = festivityTold(setting, log, towns, d);
+  return told && { id: d.id, name: told.title, told: told.told, done: told.done, over: hours >= d.to, witnesses: [] };
 }
 
 /** A promise as the townsfolk know it (a cellar under one of this town's houses, or new dwellers in one); null for any other decision. */

@@ -348,6 +348,22 @@ export interface WildDef {
 }
 
 /**
+ * A good day in a town (C11, plan 4.5): `feast`: the town the hero did a deed for (a promise kept: a place
+ * cleared, a band beaten) feasts them the next evening; `market`: every `every` days the town holds a market
+ * day. Its people gather at the market in the day's `hours`. The words: `title`, the `news` the hero hears in
+ * town, `told` how its people tell it while it is to come or on, `done` once it is over; `{place}` (a
+ * feast's: what the hero cleared) and `{town}`.
+ */
+export interface FestivityDef {
+  readonly id: string;
+  readonly kind: 'feast' | 'market';
+  readonly hours: readonly [number, number];
+  /** market: days between two. */
+  readonly every?: number;
+  readonly words: { readonly title: string; readonly news: string; readonly told: string; readonly done: string };
+}
+
+/**
  * A story event (plan 4.2, C6): the world moves on its own when a thing is left alone, it goes into the
  * ledger, the land changes and the town hears of it, and there is something new to do.
  * `spill`: the dwellers of a place promised long ago and never cleared come out and roam the land near it.
@@ -1187,6 +1203,8 @@ export interface SettingModule {
   readonly encounters: readonly EncounterDef[];
   /** Story events (plan 4.2, C6): what the world does on its own when the hero leaves it be. None: nothing. */
   readonly events?: readonly StoryEventDef[];
+  /** Good days in the towns (C11): feasts for the hero's deeds, market days. None: no such days. */
+  readonly festivities?: readonly FestivityDef[];
   /** Birds and squirrels about the land; without it the land has none. */
   readonly smallLife?: SmallLifeDef;
   /** What fills the regions the VGM opens as the hero walks; without it no regions open beyond the start. */
@@ -1423,6 +1441,9 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (e.kind === 'take' && (!e.takes || !(e.reach! > 0))) out.push(`${where}: take "${e.id}" needs the settlement it takes and a reach`);
     if (e.lair && !Object.values(m.dungeons).some((l) => l?.form.purposes.includes(e.lair!))) out.push(`${where}: event "${e.id}" asks for a ${e.lair}, which no dungeon kind is for`);
     if (e.fades !== undefined && (!(e.fades > 0) || !e.words.faded)) out.push(`${where}: event "${e.id}" fades: it needs the hours and how it is told (words.faded)`);
+  }
+  for (const f of m.festivities ?? []) {
+    if (!(f.hours[1] > f.hours[0]) || (f.kind === 'market' && !(f.every! >= 1))) out.push(`${where}: festivity "${f.id}" needs its hours (and a market its days between)`);
   }
   for (const w of m.wild) {
     if (!encounter(w.encounter)?.where.includes(w.habitat)) out.push(`${where}: wild "${w.id}" needs an encounter met in its habitat ("${w.encounter}", ${w.habitat})`);
