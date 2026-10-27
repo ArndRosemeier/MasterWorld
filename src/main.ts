@@ -38,7 +38,7 @@ import { WINDOWS } from './render/materials/building';
 import { useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg } from '@futuremagic/settlement';
-import { abilityOf, validateSetting, type BackgroundDef } from './setting/contract';
+import { abilityOf, validateSetting, type BackgroundDef, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -51,10 +51,12 @@ import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads'
 import { bandOf, eventTold, gatherFor, openBands } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
 import { PACING, vgmLines } from './vgm/vgmLog';
-import { findIn } from './vgm/answers';
+import { findIn, travellerFor } from './vgm/answers';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
+import { Speech } from './app/speech';
+import { criesDue, situationOf } from './vgm/situations';
 import { Cellars } from './app/cellars';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
@@ -1218,6 +1220,7 @@ export async function start(b: Boot): Promise<void> {
       events: setting.events ?? [],
       storyEvent: (id?: string) => storyEventNow(id),
       answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
+      situation: (kind) => { const m = situationNow(kind); return m ? `${m.tool}: ${m.reason}` : `no ${kind} here`; },
       vgmLog: () => vgmLines(log, vgmLog),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
@@ -1229,7 +1232,7 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, roads: roadWork, layRoad, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];
@@ -1343,6 +1346,10 @@ export async function start(b: Boot): Promise<void> {
      * `answerNeed`): out on the land, on foot, when the world may press the hero; on the way they are going.
      */
     let answered = -Infinity;
+    /** Situations whose cry was called (C10), and the time to the next look for one due. */
+    const cried = new Set<string>();
+    let cryClock = 0;
+    const speech = new Speech(view.camera);
     const answerOverdue = (below: boolean): void => {
       const need = director.overdue, now = performance.now() / 1000;
       // One answer at a time: the hero gets a while to come upon it before another is put out.
@@ -1402,6 +1409,16 @@ export async function start(b: Boot): Promise<void> {
       }
     };
     /** A story event now (the debug menu): what the town hears, or why none came. */
+    /** A situation now, whatever the hour or the odds (the debug menu, shots): what was made, or null. */
+    const situationNow = (kind: SituationKind): Made | null => {
+      if (kind === 'paddock-wolves') return vgmStep({ tools: ['paddock-wolves'], early: true })[0] ?? null;
+      const at = player.walker.pos, def = situationOf(setting, kind);
+      const d = def && travellerFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null });
+      if (!d || !def) return null;
+      const m = madeBy('hurt-traveller', { ...d, situation: def.id }, 'asked for now', hours());
+      applied(m);
+      return m;
+    };
     const storyEventNow = (which?: string): string => {
       if (!start || !wild) return 'no wild here';
       const e = vgmStep({ tools: ['event'], early: true, which }).map((m) => m.decision).find((d) => d.kind === 'event');
@@ -1449,6 +1466,20 @@ export async function start(b: Boot): Promise<void> {
             } else director.met('discovery');
           } else if (came) director.met('discovery', 0.5);
         }
+        // A situation's cry (C10): once the hero is near enough to see what it is about, someone there calls out.
+        if (!visit() && !player.offFoot && (cryClock -= dt) <= 0) {
+          cryClock = 0.25;
+          const p = player.walker.pos, left = wild?.groupsLeft() ?? [];
+          for (const c of criesDue(log, setting, p, hours(), cried, (id) => (left.find((g) => g.territory.id === id)?.left ?? 1) > 0)) {
+            cried.add(c.id);
+            const t = towns?.get(c.town), folk = t?.living ? t.life.agents.filter((a) => !a.hidden && !a.held) : [];
+            // The traveller themselves; at a paddock whoever of the town stands nearest it (nobody near: no cry).
+            const who = c.kind === 'hurt-traveller' ? folk.find((a) => a.person.role === 'traveller')
+              : folk.filter((a) => Math.hypot(a.x - c.x, a.z - c.z) < 90).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
+            if (who) speech.say(c.text, () => (who.hidden ? null : { x: who.x, y: terrain.height(who.x, who.z), z: who.z }));
+          }
+        }
+        speech.hover(dt);
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
         const lead = leading();
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, cues: aloneCues.splice(0) });

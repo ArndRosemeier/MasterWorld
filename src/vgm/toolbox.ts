@@ -5,17 +5,20 @@
  * calling it. The Builder's turn asks its tools in order (`vgmTurn`); the game only applies what they decided
  * (keyed by decision kind), it never decides on its own what the world gets. Pure.
  */
+import type { SettingModule } from '../setting/contract';
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
 import { lairFor, nextEvent, type EventsContext } from './events';
+import { hurtTravellerFor, paddockWolvesFor } from './situations';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 
 /** Who asks a tool: the start of a game, the hero walking, the Builder's turn, an overdue need (C9), or another tool or the game. */
 export type Asked = 'start' | 'walk' | 'turn' | 'need' | 'call';
 
 /** What the Builder's turn knows: the log, the land and towns, the hours, the hero and the setting. */
-export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & EventsContext & {
+export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & Omit<EventsContext, 'setting'> & {
+  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations'>;
   /** Ask only these turn tools (by id); none: all of them. */
   readonly tools?: readonly string[];
 };
@@ -65,6 +68,9 @@ export const TOOLS: readonly Tool[] = [
   { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
   { id: 'cache', name: 'A find by the way', writes: ['sight'], need: 'reward', asked: 'need', answer: (c) => sightFor(c, 'reward') },
   { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },
+  { id: 'paddock-wolves', name: 'Wolves at the paddock', writes: ['wild'], need: 'challenge', asked: 'turn', next: paddockWolvesFor,
+    why: (d) => (d.kind === 'wild' ? `dusk in ${d.town}: ${d.encounter} (${d.members.length}) at a paddock` : d.kind) },
+  { id: 'hurt-traveller', name: 'A hurt traveller', writes: ['traveller'], need: 'people', asked: 'need', answer: hurtTravellerFor },
   { id: 'traveller', name: 'A traveller by the way', writes: ['traveller'], need: 'people', asked: 'need', answer: travellerFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
