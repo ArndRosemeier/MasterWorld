@@ -17,6 +17,8 @@ import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
 import { hailer } from '../vgm/guide';
+import { Director, NEEDS, type Need } from '../vgm/director';
+import { answerNeed } from '../vgm/toolbox';
 import { dungeonOf, settlementOf, type Decision, type DungeonDecision, type RegionDecision } from '../world/decisions';
 import { moveIn, outlineCellar, type Cellar } from '../world/dungeon/cellar';
 import { marketStart, type Town } from '../world/town';
@@ -67,6 +69,8 @@ export interface EveningResult {
   readonly power: readonly [number, number];
   /** Simulated seconds walking and fighting. */
   readonly seconds: number;
+  /** Per need of the Director (plan 4.1, C9): the longest it stood overdue, seconds of play. */
+  readonly overdue: Readonly<Record<Need, number>>;
 }
 
 export interface EveningOptions {
@@ -106,6 +110,9 @@ const LESSONS_A_DAY = 2;
 /** A purse above this at the end means coin piles up with nothing to buy (plan A2b). */
 const SENSIBLE_PURSE = 400;
 
+/** The longest any need of the Director may stand overdue in an evening's play, seconds (gate C, C9). */
+const OVERDUE_MOST = 300;
+
 /** A failure of the evening: thrown inside, returned as `failed`. */
 class Broke extends Error {}
 
@@ -132,7 +139,26 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   let falls = 0, earned = 0, seconds = 0, spells = 0;
   /** The mage's school, and its teacher's house. */
   let school: { skill: string; house: TownBuilding; guild: GuildDef } | null = null;
-  const pass = (s: number) => { seconds += s; hours += s * HOURS_PER_SECOND; };
+  // The Director watches the evening as it would a player's (plan 4.1): where the hero is, whether they
+  // have a lead to follow; play meets its needs (a fight Challenge, finds Reward, a new place Discovery,
+  // the townsfolk People). How long each stands overdue is the check of C9.
+  const director = new Director(setting.director);
+  const watch = { where: 'town' as 'town' | 'land' | 'below', leads: 0, fighting: false };
+  const overdueNow = Object.fromEntries(NEEDS.map((n) => [n, 0])) as Record<Need, number>;
+  const overdue = { ...overdueNow };
+  const observe = (s: number) => {
+    for (let left = s; left > 0; left -= 5) {
+      const dt = Math.min(5, left);
+      director.observe(dt, { fighting: watch.fighting ? 1 : 0, pressure: 0, health: 1, talking: false, underground: watch.where === 'below', inTown: watch.where === 'town', leads: watch.leads });
+      for (const n of NEEDS) {
+        overdueNow[n] = director.needs[n] >= 1 ? overdueNow[n] + dt : 0;
+        overdue[n] = Math.max(overdue[n], overdueNow[n]);
+      }
+    }
+  };
+  const pass = (s: number) => { seconds += s; hours += s * HOURS_PER_SECOND; observe(s); };
+  /** The places the hero has stood before (a new one meets Discovery). */
+  const seen = new Set<string>();
 
   /** The Builder at work (as the game's VGM tick): new promises as they come due, told to the town. */
   const promiseDue = () => {
@@ -148,10 +174,29 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain, near: town === start ? null : town });
 
   const walkTo = (what: string, x: number, z: number) => {
+    watch.where = Math.hypot(x - town.decision.x, z - town.decision.z) < town.decision.radius + 60 ? 'town' : 'land';
+    if (watch.where === 'land') byTheWay(x, z);
     const s = land.go(x, z);
     pass(s.seconds);
     if (!s.arrived) throw new Broke(`stuck on the way to ${what}: ${s.left.toFixed(0)} m short at (${land.walker.pos.x.toFixed(0)}, ${land.walker.pos.z.toFixed(0)})`);
     say(`walked to ${what} (${s.metres.toFixed(0)} m, ${s.seconds.toFixed(0)} s)`);
+  };
+  /**
+   * Out on the land the VGM answers an overdue need on the way (C9): it knows where the hero is going (plan
+   * 4.4), so when Discovery will fall due before they get there it puts a sight by the way, and they come upon it.
+   */
+  const byTheWay = (x: number, z: number) => {
+    const p = land.walker.pos, eta = Math.hypot(x - p.x, z - p.z) / WALK.run / 60;
+    if (director.needs.discovery + setting.director.needs.discovery * director.pace * eta < 1) return;
+    const m = answerNeed('discovery', { seed, log, terrain, towns: terrain.towns, hours, setting, hero: { x: p.x, z: p.z }, toward: { x, z } });
+    if (!m || m.decision.kind !== 'sight') return;
+    const d = m.decision;
+    log = [...log, d];
+    const s = land.go(d.x + Math.sin(d.yaw) * 4, d.z + Math.cos(d.yaw) * 4);
+    pass(s.seconds);
+    if (!s.arrived) throw new Broke(`stuck on the way to ${d.sight} (${d.id}): ${s.left.toFixed(0)} m short`);
+    director.met('discovery');
+    say(`came upon ${d.sight} (${d.id}) on the way (${s.metres.toFixed(0)} m, ${s.seconds.toFixed(0)} s): ${m.reason}`);
   };
   const workplace = (m: Merchant): { at: [number, number]; name: string } => workOf(people[m.person], m.shop.keeper);
   const workOf = (p: Person, keeper: string): { at: [number, number]; name: string } => {
@@ -236,6 +281,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const lead = e === 0 ? hailed() : fromRumour ?? hearLead(heard);
       rumour = null;
       heard.add(lead.id);
+      watch.leads = 1;
+      director.met('purpose');
       const dungeon = dungeonOf(log, lead);
       if (!dungeon) throw new Broke(`no dungeon for ${lead.id}`);
       const place = placeOf(dungeon, terrain.towns, setting.dungeons), house = houseOf(dungeon, terrain.towns);
@@ -246,7 +293,12 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const cellar: Cellar = moved ? moveIn(firstCellar, moved, place, lore) : firstCellar;
       const name = `${cellar.house} (${dungeon.template}, ${cellar.dweller.id})`;
       // Out to the door above, or the barrow's mouth.
-      const goDown = () => (dungeon.site ? walkTo(name, dungeon.site.x - Math.sin(dungeon.site.yaw) * 2, dungeon.site.z - Math.cos(dungeon.site.yaw) * 2) : walkTo(name, ...front(house)));
+      const goDown = () => {
+        if (dungeon.site) walkTo(name, dungeon.site.x - Math.sin(dungeon.site.yaw) * 2, dungeon.site.z - Math.cos(dungeon.site.yaw) * 2);
+        else walkTo(name, ...front(house));
+        // A new place meets Discovery; one known but changed (new dwellers moved in) half of it.
+        if (!seen.has(lead.id)) { director.met('discovery', seen.has(dungeon.id) ? 0.5 : 1); seen.add(lead.id); seen.add(dungeon.id); }
+      };
       goDown();
       if (opts.reckless && e === 0) {
         const kept = hero.pack.filter((it) => defOf(setting.items, it.def).kind !== 'potion');
@@ -260,7 +312,14 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       for (;;) {
         const spots = left ? [{ ...left.at, reached: () => { gather(hero, left!); say(`took up the pack left at the fall (${left!.items.length} ${left!.items.length === 1 ? 'thing' : 'things'})`); left = null; } }] : [];
         const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0 });
-        pass(r.seconds);
+        // Below: the fights and the searching spread over the visit, each meeting its need as it ends.
+        watch.where = 'below';
+        const parts = r.kills + r.looted + 1;
+        for (let k = 0; k < parts; k++) {
+          pass(r.seconds / parts);
+          if (k < r.kills) director.met('challenge');
+          else if (k < parts - 1) director.met('reward', 0.4);
+        }
         saved = r.delve.tally();
         spells += r.spells.length;
         if (r.won && r.out) {
@@ -301,6 +360,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const kept = keepPromise(log, lead.id, hours);
       if (kept) log = [...log, kept];
       cleared.push(lead.id);
+      watch.leads = 0;
+      director.met('reward');
       promiseDue();
       const told = talk.toldSafe(to.id, lead.id, `paid ${reward}`);
       rumour = openPromises(log).find((o) => told.heard.includes(o.id) && !heard.has(o.id)) ?? null;
@@ -416,15 +477,17 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     if (setting.guilds?.length && township.guilds.length && !opened.length) throw new Broke(`opened no skill or rank at a guild house in ${evenings} evenings`);
     if (shops && !bought.length) throw new Broke(`bought no upgrade in ${evenings} evenings (${hero.coins} copper left)`);
     if (shops && hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
+    // Gate C (C9): the VGM answers every need; none stands overdue longer than OVERDUE_MOST.
+    for (const n of NEEDS) if (overdue[n] > OVERDUE_MOST) throw new Broke(`${n} stood overdue ${(overdue[n] / 60).toFixed(1)} min (at most ${OVERDUE_MOST / 60})`);
     // The next lead: someone has news of a place not yet visited.
     const next = hearLead(heard);
     say(`the next lead is ${next.id}`);
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells };
+    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells, overdue };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells };
+  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells, overdue };
 }
 
 /** A point just outside a building's door. */

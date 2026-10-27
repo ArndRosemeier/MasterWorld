@@ -22,6 +22,7 @@ import { coinText, defOf, type Item, type Loot } from '../game/items';
 import type { Bindings } from '../input/controls';
 import { onKeyDown } from '../input/keys';
 import type { CreatureView } from '../render/dungeon/CreatureView';
+import { joltOf } from '../render/jolt';
 import { warning, type Director } from '../vgm/director';
 import { cap } from '../talk/townTalk';
 import { fill } from '../talk/folk';
@@ -306,6 +307,9 @@ export class Encounter {
       case 'hurt':
         if (e.strike.outcome !== 'miss') {
           this.hud.hurt();
+          // Knocked back from the blow at once; the whole flinch when not busy with a blow of its own.
+          const me = this.heroPose();
+          this.player.hero?.struck(me.x - e.by.x, me.z - e.by.z, joltOf(e.strike.outcome));
           if (!this.player.stance.action) this.act('flinch', 0.45);
         }
         break;

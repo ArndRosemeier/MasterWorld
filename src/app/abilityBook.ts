@@ -5,7 +5,7 @@
  * after another, and the ones already on the bar glow.
  */
 import type { SettingModule } from '../setting/contract';
-import { POTION } from '../game/actionBar';
+import { BAR_EXTRAS, POTION } from '../game/actionBar';
 import { costText } from '../game/recipe';
 import type { Character } from '../game/character';
 import { el } from './dom';
@@ -22,9 +22,9 @@ export class AbilityBook extends BodyWindow {
 
   protected opened(): void {
     this.bar.editing = true;
-    const cards = [...this.hero.known, POTION].map((id) => {
+    const cards = [...this.hero.known, ...BAR_EXTRAS].map((id) => {
       const look = lookOf(this.setting, id), d = look.def;
-      const cost = d ? [costText(d), d.cast ? `${d.cast} s to cast` : '', d.cooldown ? `ready again after ${d.cooldown} s` : ''].filter(Boolean).join(' · ') : 'potions in your pack';
+      const cost = d ? [costText(d), d.cast ? `${d.cast} s to cast` : '', d.cooldown ? `ready again after ${d.cooldown} s` : ''].filter(Boolean).join(' · ') : id === POTION ? 'potions in your pack' : 'out of a fight';
       const card = el('div', { className: `ability${this.hero.bar.includes(id) ? ' on-bar' : ''}`, draggable: true, title: 'Drag it onto the action bar' },
         socketFor(this.setting, id), el('div', {}, el('b', {}, look.name), el('small', {}, look.text), el('span', { className: 'cost' }, cost)));
       card.addEventListener('dragstart', (e) => {

@@ -1,9 +1,22 @@
 /** URL parameters: the one place that reads `location.search`. */
 const q = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
 
+/**
+ * A new world for every start: a short seed drawn once from the browser's crypto (everything after it comes
+ * from this seed, so a problem world is played again with `?seed=`). The checks pin theirs (`window.__mwSeed`,
+ * tools/shot/launch.mjs), so their pictures and numbers stay comparable.
+ */
+export function startSeed(): string {
+  const pinned = (globalThis as { __mwSeed?: unknown }).__mwSeed;
+  if (typeof pinned === 'string' && pinned) return pinned;
+  const bytes = new Uint8Array(6);
+  globalThis.crypto?.getRandomValues(bytes);
+  return Array.from(bytes, (b) => '0123456789abcdefghijklmnopqrstuvwxyz'[b % 36]).join('');
+}
+
 export const params = {
-  /** World seed: any text or number. */
-  seed: q.get('seed') ?? 'masterworld',
+  /** World seed: any text or number (`seed=masterworld` the world the docs and places were found in); without it a fresh one each start. */
+  seed: q.get('seed') ?? startSeed(),
   /** Draw with WebGL 2 even where WebGPU exists. */
   gl: q.has('gl'),
   /** Show the HUD line (shader policy, frame time), whatever the settings say. */
@@ -85,6 +98,8 @@ export const params = {
   /** Start in the town's cellar: `cellar` at the ladder, `cellar=3` in room 3. */
   cellar: q.has('cellar'),
   cellarRoom: q.get('cellar') ? Number(q.get('cellar')) : undefined,
+  /** Slow motion for watching a blow land (tools/shot/hits.mjs): `slow=8` runs everything eight times slower. */
+  slow: Math.max(1, Number(q.get('slow') ?? 1) || 1),
   /** Who lives in the town's cellar (for looking at them): a cellar dweller's id, `dweller=goblins`. */
   dweller: q.get('dweller'),
   /** The first cellar was cleared long ago and others have moved in (`moved`, with `cellar` to look at them). */

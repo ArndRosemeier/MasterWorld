@@ -134,6 +134,8 @@ export class Cellars {
   /** Houses with a cellar (by houseKey: every town's), and the way down (the rooms read it). */
   readonly down = new Map<string, (before: () => void) => Promise<void>>();
   private log: DecisionLog = [];
+  /** Places the hero has been down in (Discovery is met the first time). */
+  private readonly found = new Set<string>();
 
   constructor(private readonly host: CellarsHost, private readonly towns: readonly Town[], private readonly saved: Readonly<Record<string, CellarDiff>> = {}) {}
 
@@ -339,7 +341,11 @@ export class Cellars {
     if (words) visit.entering = fill(words.enter, { place: s.cellar.house });
     if (!m) visit.up = () => h.up(s.decision.town, s.house);
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
-    visit.onDepth = (below) => h.depth(below, [view.group, ...(s.ready ? [s.ready.creatures.group] : [])]);
+    visit.onDepth = (below) => {
+      // The first time down a place meets the Director's Discovery (plan 4.1, C9); a saved visit was found before.
+      if (below && !space && !this.found.has(s.decision.id)) { this.found.add(s.decision.id); h.director.met('discovery'); }
+      h.depth(below, [view.group, ...(s.ready ? [s.ready.creatures.group] : [])]);
+    };
     visit.onSwap = () => h.swapped();
     const space = this.saved[s.decision.id];
     if (space) visit.restore(space);

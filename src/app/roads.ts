@@ -6,7 +6,7 @@
  * founded while playing calms its ground and opens its fields so too.
  */
 import type { Vector3 } from 'three/webgpu';
-import { settlementOf, type Decision, type DungeonDecision, type RegionDecision, type RoadDecision } from '../world/decisions';
+import { settlementOf, type Decision, type DungeonDecision, type RegionDecision, type RoadDecision, type SightDecision } from '../world/decisions';
 import type { TownPlan } from '@futuremagic/settlement';
 import type { Terrain } from '../world/terrain';
 import type { Trunks } from '../world/trunks';
@@ -75,7 +75,7 @@ export class RoadWork {
   }
 
   /** A place out on the land (already in the log): the trees go from its clearing, and the plants and trunks near it are placed anew. */
-  async clear(d: DungeonDecision | RegionDecision): Promise<void> {
+  async clear(d: DungeonDecision | RegionDecision | SightDecision): Promise<void> {
     if (this.sent.has(d.id) || (d.kind === 'region' && settlementOf(d, this.terrain.setting.regions?.fills ?? []))) return;
     this.sent.add(d.id);
     this.terrain.settleMore([d]);

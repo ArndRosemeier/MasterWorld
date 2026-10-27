@@ -244,6 +244,11 @@ function hull(pts: number[], grow: number): number[] {
 }
 
 /** A town's plan (AG settlement planTown, the one planner for every size), on the land as settled. */
+/** The town of this id among `towns` (undefined: none). */
+export function townById(towns: readonly Town[], id: string): Town | undefined {
+  return towns.find((t) => t.decision.id === id);
+}
+
 export function townPlanOf(d: TownDecision, t: Terrain): TownPlan {
   return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t), farmland: d.size !== 'waystation' });
 }

@@ -24,6 +24,7 @@ import { FADE, castShadows, playClip, preparePeople } from '../hero/play';
 import { foeClip, foeLook, type FoeDoing } from './foes';
 import type { Stage } from '@futuremagic/stage';
 import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from './animals';
+import { Jolt, joltRoot, joltSpine } from '../jolt';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -56,6 +57,9 @@ interface Shown {
   variant: number;
   /** Metres walked (a modelled body's stride). */
   walked: number;
+  /** Blows taken so far (the den's count), and the last one's jolt. */
+  blows: number;
+  readonly jolt: Jolt;
 }
 
 const yawOf = (dir: number) => Math.atan2(-Math.cos(dir), -Math.sin(dir));
@@ -149,7 +153,7 @@ export class CreatureView {
         v.group.add(fig.root);
         body = { kind: 'critter', fig, scale };
       }
-      v.shown.push({ c, body, px: c.x, pz: c.z, blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0 });
+      v.shown.push({ c, body, px: c.x, pz: c.z, blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0, blows: c.blows, jolt: new Jolt() });
     }
     v.pose(0);
     return v;
@@ -168,10 +172,19 @@ export class CreatureView {
       s.px = c.x; s.pz = c.z;
       if (c.act === 'swing' && s.act !== 'swing') { s.blowAt = t; s.variant++; }
       if (c.health < s.health) s.hurtAt = t;
+      s.jolt.step(dt);
+      if (c.blows > s.blows) {
+        // Knocked back from whoever struck (where it last knew the hero to be), harder the more it took.
+        const from = c.seen, took = (s.health - c.health) / Math.max(1, c.def.health);
+        s.jolt.hit(from ? c.x - from.x : -Math.cos(c.dir), from ? c.z - from.z : -Math.sin(c.dir), Math.min(1.6, 0.8 + took * 2.5));
+      }
+      s.blows = c.blows;
       s.health = c.health;
       s.act = c.act;
-      const blowT = (t - s.blowAt) / BLOW, hurtT = (t - s.hurtAt) / FLINCH;
+      // A blow struck into its wind-up stops it (the den's stagger): the flinch shows, not the blow.
+      const hurtT = (t - s.hurtAt) / FLINCH, blowT = s.hurtAt > s.blowAt && hurtT < 1 ? 1 : (t - s.blowAt) / BLOW;
       const dead = c.state === 'dead';
+      const fresh = hurtT < 1 && hurtT * FLINCH < dt + 1e-6;
       const yaw = yawOf(c.dir);
       const watching = !dead && (c.state === 'alert' || c.state === 'fight' || c.state === 'beg') && eye ? eye : null;
       if (s.body.kind === 'modelled') {
@@ -180,19 +193,23 @@ export class CreatureView {
         f.root.position.set(c.x, c.y, c.z);
         f.root.rotation.set(0, yaw + Math.PI, 0);
         f.root.scale.setScalar(k);
+        joltRoot(f.root, s.jolt, c.def.body.kind === 'rat' ? c.def.body.length * 0.35 : 0.06, 0.25);
         const clip = dead ? 'Die' : blowT < 1 ? 'Bite' : c.state === 'alert' ? 'Rear' : speed > 2.2 ? 'Run' : speed > 0.2 ? 'Scurry' : c.act === 'gnaw' || c.act === 'rummage' ? 'Graze' : 'Sniff';
         f.play(clip);
         f.pace(s.walked / k);
-        if (hurtT < 1 && hurtT * FLINCH < dt + 1e-6 && !dead) f.hurt();
+        if (fresh && !dead) f.hurt();
         f.advance(dt);
       } else if (s.body.kind === 'animal') {
         const speed = Math.hypot(vx, vz);
         const doing: AnimalDoing = dead ? 'dead' : blowT < 1 ? 'blow' : hurtT < 1 ? 'hurt' : speed > 2.2 ? 'run' : speed > 0.2 ? 'walk'
           : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
-        poseAnimal(s.body, c.x, c.y, c.z, yaw, doing, speed, dt);
+        poseAnimal(s.body, c.x, c.y, c.z, yaw, doing, speed, dt, fresh);
+        if (!dead) joltRoot(s.body.place, s.jolt, 0.14, 0.14);
       } else if (s.body.kind === 'critter') {
         const i = this.input;
-        i.x = c.x; i.y = c.y; i.z = c.z; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
+        // Its body pushed back from the blow, the feet planted where they stand.
+        const push = s.jolt.amount * (c.def.body.kind === 'spider' ? c.def.body.length * 0.3 : 0.05);
+        i.x = c.x + s.jolt.dx * push; i.y = c.y; i.z = c.z + s.jolt.dz * push; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
         i.running = c.act === 'run' || c.state === 'fight' || c.state === 'flee';
         i.pose = c.act === 'gnaw' || c.act === 'sniff' || c.act === 'rummage' || c.act === 'spin' ? 'feed' : '';
         const O = this.group.position;
@@ -214,8 +231,8 @@ export class CreatureView {
         };
         const clip = foeClip(c.def, doing);
         // A blow or flinch starts again when a new one comes, even of the same clip.
-        const fresh = (doing.action === 'flinch' && hurtT * FLINCH < dt + 1e-6) || (doing.action && doing.action !== 'flinch' && blowT * BLOW < dt + 1e-6);
-        if (clip !== p.clip || fresh) {
+        const again = (doing.action === 'flinch' && fresh) || (doing.action && doing.action !== 'flinch' && blowT * BLOW < dt + 1e-6);
+        if (clip !== p.clip || again) {
           // Blended, but cut in when it first shows and when it falls dead.
           const fade = !p.clip || dead ? 0 : doing.action ? FADE.once : FADE.loop;
           p.clip = clip;
@@ -226,7 +243,12 @@ export class CreatureView {
         p.ch.update(dt);
         p.place.position.set(c.x, c.y, c.z);
         // The den's yaw turns −z; Actors' people face +z.
-        p.place.rotation.y = yaw + Math.PI;
+        p.place.rotation.set(0, yaw + Math.PI, 0);
+        if (!dead) {
+          joltRoot(p.place, s.jolt, 0.08);
+          const f = p.ch.actor.fittedSkeleton;
+          if (f) joltSpine(p.ch.actor.bones, f.names, s.jolt, 0.45);
+        }
       }
     }
   }

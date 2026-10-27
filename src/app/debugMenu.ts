@@ -1,6 +1,6 @@
 /**
  * The hidden debug menu (Ctrl+Shift+F12, as in Arnd's other games, e.g. Scale's admin console): buttons to
- * go to places worth a look, fly, set the clock, copy a link to the view, and a command line that runs
+ * go to places worth a look, fly, set the clock, copy a link to the view or the world (its seed), and a command line that runs
  * any JavaScript with `game` in scope (Up / Down for history). `game` is also `window.game` for the
  * browser console. While open, the game gets no keyboard input. Styles in index.html.
  */
@@ -39,8 +39,14 @@ export interface DebugHost {
   readonly events: readonly { readonly id: string; readonly kind: string }[];
   /** A story event now (C6), whatever its wait (one of `events` by id, or the first that can): what the town hears, or why none came. */
   storyEvent(id?: string): string;
+  /** The VGM's answer to a need here and now (C9), whatever the Director says: what it made, or why nothing. */
+  answerNeed(need: 'discovery' | 'challenge' | 'reward' | 'people' | 'purpose'): string;
+  /** A situation of this kind now (C10), whatever the hour: what was made, or why not. */
+  situation(kind: 'hurt-traveller' | 'paddock-wolves' | 'stray-beast'): string;
   /** The VGM's log (D53, C8): its moves, oldest first (the tool, the need, why). */
   vgmLog(): readonly VgmLine[];
+  /** The world's seed (a fresh one each start unless `?seed=` names it). */
+  readonly seed: string;
   /** Places worth a look in this world. */
   readonly places: readonly Place[];
   /** Everything, for the command line. */
@@ -90,6 +96,10 @@ export class DebugMenu {
           return `${p.pos.join(', ')}`;
         },
       }))],
+      ['World', [
+        { label: `Seed: ${h.seed}`, run: () => h.seed },
+        { label: 'Copy link to this world', run: () => this.copy(this.worldLink()) },
+      ]],
       ['Player', [
         { label: 'Fly on / off (F)', run: () => { h.freeCamera = !h.freeCamera; return h.freeCamera ? 'flying' : 'walking'; } },
         { label: 'Copy link to this view', run: () => this.copyLink() },
@@ -113,6 +123,13 @@ export class DebugMenu {
       ['VGM', [
         { label: 'Its last 30 moves', run: () => this.lines(h.vgmLog().slice(-30)) },
         { label: 'Every move', run: () => this.lines(h.vgmLog()) },
+        { label: 'Answer Discovery now (a sight)', run: () => h.answerNeed('discovery') },
+        { label: 'Answer Reward now (a find)', run: () => h.answerNeed('reward') },
+        { label: 'Answer Challenge now (an ambush)', run: () => h.answerNeed('challenge') },
+        { label: 'Answer People now (a traveller)', run: () => h.answerNeed('people') },
+        { label: 'Situation now: a hurt traveller', run: () => h.situation('hurt-traveller') },
+        { label: 'Situation now: wolves at the paddock (in a town)', run: () => h.situation('paddock-wolves') },
+        { label: 'Situation now: a beast got out (in a town)', run: () => h.situation('stray-beast') },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },
@@ -167,10 +184,19 @@ export class DebugMenu {
     return `${lines.length} line${lines.length === 1 ? '' : 's'}`;
   }
 
-  private copyLink(): string {
+  /** This page's URL with this world's seed (any other parameters kept). */
+  private worldLink(drop: readonly string[] = []): string {
     const q = new URLSearchParams(location.search);
-    for (const k of ['pos', 'look', 'fly', 'hour']) q.delete(k);
-    const link = `${location.origin}${location.pathname}?${[q.toString(), this.host.viewParams, `hour=${this.host.hour.toFixed(1)}`].filter(Boolean).join('&')}`;
+    for (const k of drop) q.delete(k);
+    q.set('seed', this.host.seed);
+    return `${location.origin}${location.pathname}?${q.toString()}`;
+  }
+
+  private copyLink(): string {
+    return this.copy([this.worldLink(['pos', 'look', 'fly', 'hour']), this.host.viewParams, `hour=${this.host.hour.toFixed(1)}`].filter(Boolean).join('&'));
+  }
+
+  private copy(link: string): string {
     navigator.clipboard?.writeText(link).catch(() => undefined);
     return link;
   }

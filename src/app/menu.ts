@@ -19,6 +19,8 @@ export interface MenuHost {
   paused(open: boolean): void;
   /** The clock, hours 0..24 (not a setting: it only moves the sun now). */
   hour: number;
+  /** The world's seed, shown beside the version (so a picture of a problem names its world). */
+  readonly seed?: string;
 }
 
 type Layout = ReadonlyMap<string, string> | undefined;
@@ -34,7 +36,7 @@ export class Menu {
 
   constructor(private readonly store: SettingsStore, private readonly host: MenuHost) {
     const corner = el('div', { id: 'corner' },
-      el('span', { className: 'version', textContent: `v${versionLabel}` }),
+      el('span', { className: 'version', textContent: `v${versionLabel}${host.seed ? ` · seed ${host.seed}` : ''}` }),
       el('button', { textContent: "What's new", onclick: () => this.showDialog('news') }),
       el('button', { textContent: 'Settings', title: 'Escape', onclick: () => this.showDialog('settings') }),
     );

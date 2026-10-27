@@ -16,7 +16,7 @@ export const ACTIONS = [
   { id: 'autorun', label: 'Autorun' },
   { id: 'walk', label: 'Walk (hold)' },
   { id: 'jump', label: 'Jump / swim up' },
-  { id: 'dive', label: 'Dive' },
+  { id: 'dive', label: 'Sit down to rest / dive' },
   { id: 'mount', label: 'Mount / dismount' },
   { id: 'fly', label: 'Fly (free camera)' },
   { id: 'talk', label: 'Talk to someone' },
