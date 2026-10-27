@@ -13,9 +13,9 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { cyclicGraph, layoutDungeon, pace, PATTERNS, DIRS, type DungeonGraph, type DungeonLayout, type Pace, type Room } from '@futuremagic/dungeon';
-import type { CellarLore, DungeonProp, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
+import type { CellarLore, DungeonForm, DungeonProp, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
 import type { DungeonDecision, MoveInDecision } from '../decisions';
-import { shapeOf } from './kinds';
+import { depthOf, entranceOf } from './kinds';
 import { setPieceById, type SetPieceDef } from './setPieces';
 
 /** Metres per layout cell, per storey, and stairs per storey (cells). */
@@ -88,6 +88,8 @@ export type Fact = readonly [subject: string, predicate: string, object: string]
 
 export interface CellarSketch {
   readonly decision: DungeonDecision;
+  /** How its kind takes shape and stands (the lore's). */
+  readonly form: DungeonForm;
   /** Oldest first: what lay there before, who built the cellar, what went wrong, who is there now. */
   readonly history: HistoryEntry[];
   readonly dweller: DwellerDef;
@@ -208,7 +210,7 @@ export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: Cell
   ];
   if (older) facts.push([d.id, 'lies over', older.id]);
   if (moved) facts.push([moved.id, 'moved into', d.id], [moved.id, 'is', dweller.id]);
-  return { decision: d, history, dweller, setPiece: piece, hints, facts, knownBy: { town: d.town, building: d.building }, house: name, ...(house.name ? { called: name } : {}), ...(d.site ? { site: d.site } : {}), ...(moved ? { occupation: { id: moved.id, seed: moved.seed } } : {}) };
+  return { decision: d, form: lore.form, history, dweller, setPiece: piece, hints, facts, knownBy: { town: d.town, building: d.building }, house: name, ...(house.name ? { called: name } : {}), ...(d.site ? { site: d.site } : {}), ...(moved ? { occupation: { id: moved.id, seed: moved.seed } } : {}) };
 }
 
 /** A sketch's history layer of a kind, if it has one. */
@@ -221,8 +223,8 @@ const SIZE: Record<Room['size'], readonly [number, number]> = { nook: [2, 2], sm
 /** The outline: everything but the meshes. Throws if no layout fits (the variety test keeps that from happening). */
 export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: CellarLore): Cellar {
   const sketch = sketchCellar(d, house, lore);
-  const shape = shapeOf(d.template);
-  const minLevel = shape.depth(!!layerOf(sketch, 'older'));
+  const shape = sketch.form.space;
+  const minLevel = depthOf(shape, !!layerOf(sketch, 'older'));
   // Patterns: what the history's layers suggest; the set piece's own for the main cycle when it has one.
   const told = sketch.history.flatMap((h) => h.def.patterns ?? []);
   const known = new Set(PATTERNS.map((p) => p.id));
@@ -232,7 +234,7 @@ export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: Cel
   const inserts = fitting([...new Set([...told, ...prefer, 'twin-paths', 'side-loop', 'barred-return', 'hidden-shortcut'])]);
   const weight = (id: string) => 0.3 + told.filter((t) => t === id).length + (prefer.includes(id) ? 2 : 0);
   // Entrance: under a house, the house's cellar under its footprint.
-  const [ew, ed] = shape.entrance(house);
+  const [ew, ed] = entranceOf(shape, house);
   for (let attempt = 0; attempt < 40; attempt++) {
     const seed = deriveSeed(d.seed, 'cellar', 'outline', attempt);
     const graph = cyclicGraph({ main: main.length ? main : fitting(['twin-paths']), inserts, insertCount: [1, 2], maxRooms: shape.maxRooms, minLevel, weight }, seed);
@@ -297,7 +299,7 @@ function climb(graph: DungeonGraph, walk: Pace, rise: number, older: boolean): b
 }
 
 function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayout, pieceLink: number, rng: Rng, lore: CellarLore): Cellar {
-  const shape = shapeOf(sketch.decision.template);
+  const shape = sketch.form.space;
   const p = pace(graph);
   const useById = new Map(lore.uses.map((u) => [u.id, u]));
   const use = (id: string) => useById.get(id)!;

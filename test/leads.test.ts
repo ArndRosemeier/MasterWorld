@@ -49,9 +49,9 @@ test('leads: a hero who keeps every promise always finds new ones; cleared cella
   for (const m of moved) {
     const d = log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === (m as { dungeon: string }).dungeon)!;
     const lore = loreOf(classic, d.template);
-    const c = outlineCellar(d, placeOf(d, terrain.towns)!, lore);
+    const c = outlineCellar(d, placeOf(d, terrain.towns, classic.dungeons)!, lore);
     const mm = m as Extract<Decision, { kind: 'move-in' }>;
-    const now = moveIn(c, mm, placeOf(d, terrain.towns)!, lore);
+    const now = moveIn(c, mm, placeOf(d, terrain.towns, classic.dungeons)!, lore);
     assert.equal(now.dweller.id, mm.dweller);
     assert.equal(occupantId(now), mm.id);
     assert.deepEqual(now.layout, c.layout, 'the layout stays');
@@ -90,7 +90,7 @@ test('leads: now and then the new place is out on the land (a barrow, a cave, a 
     const far = Math.hypot(b.site!.x - town.decision.x, b.site!.z - town.decision.z);
     assert.ok(far > 500 && far < 1700, `${b.id} at ${far.toFixed(0)} m`);
     assert.equal(terrain.waterDepth(b.site!.x, b.site!.z), 0);
-    const c = outlineCellar(b, placeOf(b, terrain.towns)!, loreOf(classic, kind));
+    const c = outlineCellar(b, placeOf(b, terrain.towns, classic.dungeons)!, loreOf(classic, kind));
     assert.ok(classic.dungeons[kind]!.dwellers.some((w) => w.id === c.dweller.id), `a ${kind} dweller`);
     assert.ok(!c.setPiece.kinds || c.setPiece.kinds.includes(kind), `${c.setPiece.id} fits a ${kind}`);
     assert.match(c.house, new RegExp(`^${NAMES[kind]} (north|south|east|west)`));

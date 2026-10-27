@@ -4,7 +4,6 @@
  * walker). Everything that stands on a site is made in this frame and turned onto the land with these.
  */
 
-import type { DungeonTemplate } from '../decisions';
 
 export interface Site { readonly x: number; readonly z: number; readonly yaw: number }
 
@@ -23,19 +22,14 @@ export function inFrame(s: Site, x: number, z: number): [number, number] {
 /** Ground kept free of trees round a place on the land (a circle, metres): its piece stands in the open, seen from afar. */
 export interface Clearing { readonly x: number; readonly z: number; readonly r: number }
 
-/**
- * Each kind's clearing in its own frame: its middle (behind the doorway, where the piece stands) and how
- * far the trees keep off. A tower is a landmark and stands widest in the open.
- */
-const CLEARINGS: Partial<Record<DungeonTemplate, { readonly back: number; readonly r: number }>> = {
-  tower: { back: 9, r: 24 },
-  cave: { back: 6, r: 17 },
-  barrow: { back: 4, r: 13 },
-};
+/** A teacher's tower stands in the open like a ruined tower: a landmark, widest in the open. */
+export const RETREAT_CLEARING = { back: 9, r: 24 } as const;
 
-/** The clearing round a place of this kind at its site, none for kinds that do not stand out on the land. */
-export function clearingOf(kind: DungeonTemplate, s: Site): Clearing | null {
-  const c = CLEARINGS[kind];
+/**
+ * The clearing round a place at its site, from its kind's (`DungeonForm.clearing`: its middle behind the
+ * doorway, where the piece stands, and how far the trees keep off); none for kinds that do not stand out.
+ */
+export function clearingOf(c: { readonly back: number; readonly r: number } | undefined, s: Site): Clearing | null {
   if (!c) return null;
   const [x, z] = onLand(s, 0, -c.back);
   return { x, z, r: c.r };

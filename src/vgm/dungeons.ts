@@ -7,7 +7,7 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import { farmlandReach, type TownBuilding } from '@futuremagic/settlement';
-import type { CellarLore, SettingModule } from '../setting/contract';
+import type { CellarLore, DungeonForm, SettingModule } from '../setting/contract';
 import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate, type RetreatDecision, type TownDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import type { DungeonPlace } from '../world/dungeon/cellar';
@@ -43,9 +43,13 @@ export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: 
   return { kind: 'dungeon', id: `cellar-${n}`, template: 'cellar', town: town.decision.id, building: house.id, seed: s, setPiece: piece, danger: dangerAt(town, home) };
 }
 
-/** The kinds of place promised out on the land, rather than under a house. */
-export type LandKind = Exclude<DungeonTemplate, 'cellar'>;
-export const LAND_KINDS: readonly LandKind[] = ['barrow', 'cave', 'tower'];
+/** A kind of place promised out on the land, rather than under a house (a key of the setting's `dungeons`). */
+export type LandKind = DungeonTemplate;
+
+/** The setting's kinds that stand out on the land (C6c: whatever their `form` says, not their names). */
+export function landKinds(dungeons: SettingModule['dungeons']): LandKind[] {
+  return Object.entries(dungeons).filter(([, l]) => l && l.form.stands !== 'house').map(([k]) => k);
+}
 
 /** The way from one point to another as people say it ("north-east"); north is −z, east +x. */
 export function compass(dx: number, dz: number): string {
@@ -58,24 +62,19 @@ export function compass(dx: number, dz: number): string {
 type Fit = (x: number, z: number, k: number) => { score: number; yaw?: number } | null;
 
 /**
- * Where each kind lies (metres from the town's market, at least and at most) and what ground it wants:
- * a barrow on a rise; a cave's mouth at the foot of a slope, going into the hill; a tower on a rise of
- * level ground, its door towards the town. Caves and towers keep out of the woods.
+ * What ground a place wants, by how its kind stands (`DungeonForm.stands`): on a rise (a barrow); at the
+ * foot of a slope, going into the hill (a cave's mouth); on a rise of level ground, its door towards the
+ * town (a tower). Places in slopes and on level ground keep out of the woods.
  */
-const LAND: Readonly<Record<LandKind, { readonly ring: readonly [number, number]; fit(t: Terrain, s: number): Fit }>> = {
-  barrow: {
-    ring: [550, 1300],
-    fit: (t, s) => (x, z, k) => {
+const GROUND: Readonly<Record<Exclude<DungeonForm['stands'], 'house'>, (t: Terrain, s: number) => Fit>> = {
+  rise: (t, s) => (x, z, k) => {
       const h = t.height(x, z), slope = t.steepness(x, z, 10, h);
       if (slope > 0.3) return null;
       // A barrow stands on a rise: higher than the ground around it scores better.
       const rise = h - (t.height(x + 40, z) + t.height(x - 40, z) + t.height(x, z + 40) + t.height(x, z - 40)) / 4;
       return { score: Math.max(-1, Math.min(1, rise / 6)) - slope + hash2f(s, k, 3) * 0.3 };
-    },
   },
-  cave: {
-    ring: [700, 1600],
-    fit: (t, s) => {
+  slope: (t, s) => {
       const woods = woodsOf(t);
       return (x, z, k) => {
         const gx = (t.height(x + 6, z) - t.height(x - 6, z)) / 12, gz = (t.height(x, z + 6) - t.height(x, z - 6)) / 12, slope = Math.hypot(gx, gz);
@@ -86,11 +85,8 @@ const LAND: Readonly<Record<LandKind, { readonly ring: readonly [number, number]
         if (rise < 3) return null;
         return { score: Math.min(1.5, rise / 8) - woods(x, z) - Math.max(0, slope - 0.35) + hash2f(s, k, 3) * 0.3, yaw: Math.atan2(-ix, -iz) };
       };
-    },
   },
-  tower: {
-    ring: [700, 1500],
-    fit: (t, s) => {
+  level: (t, s) => {
       const woods = woodsOf(t);
       return (x, z, k) => {
         const h = t.height(x, z);
@@ -101,7 +97,6 @@ const LAND: Readonly<Record<LandKind, { readonly ring: readonly [number, number]
         const rise = h - (t.height(x + 60, z) + t.height(x - 60, z) + t.height(x, z + 60) + t.height(x, z - 60)) / 4;
         return { score: Math.max(-1, Math.min(1, rise / 8)) - worst * 0.2 - woods(x, z) * 1.5 + hash2f(s, k, 3) * 0.3 };
       };
-    },
   },
 };
 
@@ -114,12 +109,13 @@ const TRIES = 128;
  * from other places on the land, its doorway facing the town (a cave: going into its hill). The household
  * who knows of it lives on the town's side towards it. Null if no ground fits.
  */
-export function promisePlace(kind: LandKind, seed: number, terrain: Terrain, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[] = []): DungeonDecision | null {
+export function promisePlace(kind: LandKind, form: DungeonForm, seed: number, terrain: Terrain, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[] = []): DungeonDecision | null {
+  if (form.stands === 'house' || !form.ring) return null;
   const dungeons = log.filter((d): d is DungeonDecision => d.kind === 'dungeon');
   const n = dungeons.filter((d) => d.template === kind).length + 1;
   const s = deriveSeed(seed, 'vgm', kind, n);
   const { x: tx, z: tz } = town.decision;
-  const best = spotOnRing(kind, LAND[kind].ring, s, terrain, town.decision, [...avoid, ...sitesIn(log, 150)]);
+  const best = spotOnRing(form.stands, form.ring, s, terrain, town.decision, [...avoid, ...sitesIn(log, 150)]);
   if (!best) return null;
   const dx = best.x - tx, dz = best.z - tz;
   // Facing into it is facing away from the town (yaw as the walker's: it faces (−sin, −cos)), unless its ground says otherwise.
@@ -127,7 +123,7 @@ export function promisePlace(kind: LandKind, seed: number, terrain: Terrain, tow
   const houses = town.plan.buildings.filter((b) => CELLARED.includes(b.kind) && b.household > 0);
   if (!houses.length) return null;
   const knower = houses.reduce((a, b) => (Math.hypot(b.cx - best.x, b.cz - best.z) < Math.hypot(a.cx - best.x, a.cz - best.z) ? b : a));
-  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, kind);
+  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, kind, form.pieces);
   return { kind: 'dungeon', id: `${kind}-${n}`, template: kind, town: town.decision.id, building: knower.id, site: { x: best.x, z: best.z, yaw }, seed: s, setPiece: piece, danger: dangerAt({ decision: best }, home) };
 }
 
@@ -135,8 +131,8 @@ export function promisePlace(kind: LandKind, seed: number, terrain: Terrain, tow
  * The best spot for a kind of place on a ring round `at` (metres from it, at least and at most), on dry
  * ground that fits the kind, away from `avoid`; null if none of the tries fits.
  */
-function spotOnRing(kind: LandKind, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[]): { x: number; z: number; score: number; yaw?: number } | null {
-  const [r0, r1] = ring, fit = LAND[kind].fit(terrain, s);
+function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[]): { x: number; z: number; score: number; yaw?: number } | null {
+  const [r0, r1] = ring, fit = GROUND[stands](terrain, s);
   let best: { x: number; z: number; score: number; yaw?: number } | null = null;
   for (let k = 0; k < TRIES; k++) {
     const d = r0 + (r1 - r0) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
@@ -155,25 +151,19 @@ function spotOnRing(kind: LandKind, ring: readonly [number, number], s: number, 
  */
 export function retreatSite(keeper: string, seed: number, terrain: Terrain, town: TownDecision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[]): RetreatDecision | null {
   const fields = town.radius + farmlandReach(town.radius);
-  const best = spotOnRing('tower', [fields + 30, fields + 150], deriveSeed(seed, 'vgm', 'retreat', keeper), terrain, town, avoid);
+  const best = spotOnRing('level', [fields + 30, fields + 150], deriveSeed(seed, 'vgm', 'retreat', keeper), terrain, town, avoid);
   if (!best) return null;
   return { kind: 'retreat', id: `retreat-${keeper}`, keeper, town: town.id, x: best.x, z: best.z, yaw: Math.atan2(-(best.x - town.x), -(best.z - town.z)) };
 }
 
-/** A barrow promised out on the land near the town (`promisePlace`). */
-export function promiseBarrow(seed: number, terrain: Terrain, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[] = []): DungeonDecision | null {
-  return promisePlace('barrow', seed, terrain, town, log, home, avoid);
-}
-
-/** What people call a place on the land, by its kind and the way to it from the town. */
-const LAND_NAMES: Readonly<Record<LandKind, string>> = { barrow: 'the barrow {dir} of the town', cave: 'the cave {dir} of the town', tower: 'the old tower {dir} of the town' };
-
-/** What a dungeon's making knows of where it lies: the house above a cellar, the name of a place on the land. */
-export function placeOf(d: DungeonDecision, towns: readonly Town[]): DungeonPlace | null {
-  if (d.template === 'cellar') return houseOf(d, towns);
+/** What a dungeon's making knows of where it lies: the house above a cellar, the name of a place on the land (its kind's `called`). */
+export function placeOf(d: DungeonDecision, towns: readonly Town[], dungeons: SettingModule['dungeons']): DungeonPlace | null {
+  const form = loreOf({ dungeons }, d.template).form;
+  if (!d.site) return form.stands === 'house' ? houseOf(d, towns) : null;
   const town = towns.find((t) => t.decision.id === d.town);
-  if (!town || !d.site) return null;
-  return { kind: d.template, hu: 3, hv: 3, name: LAND_NAMES[d.template].replace('{dir}', compass(d.site.x - town.decision.x, d.site.z - town.decision.z)) };
+  if (!town) return null;
+  const called = form.called ?? `the ${form.word} {dir} of the town`;
+  return { kind: d.template, hu: 3, hv: 3, name: called.replace('{dir}', compass(d.site.x - town.decision.x, d.site.z - town.decision.z)) };
 }
 
 /** The setting's lore for a kind of dungeon (the cellar's when the setting has none of its own). */
@@ -182,8 +172,8 @@ export function loreOf(setting: Pick<SettingModule, 'dungeons'>, kind: DungeonTe
 }
 
 /** The set piece for the next dungeon of a kind: one used least so far in this world (plan 8.1: none repeats until the library is used through). */
-export function nextSetPiece(used: readonly string[], seed: number, kind: DungeonTemplate = 'cellar'): string {
-  const pieces = setPiecesFor(kind);
+export function nextSetPiece(used: readonly string[], seed: number, kind: DungeonTemplate = 'cellar', also?: readonly string[]): string {
+  const pieces = setPiecesFor(kind, also);
   const times = (id: string) => used.filter((u) => u === id).length;
   const fewest = Math.min(...pieces.map((p) => times(p.id)));
   const fresh = pieces.filter((p) => times(p.id) === fewest);

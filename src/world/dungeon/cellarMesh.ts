@@ -12,7 +12,6 @@ import { DIRS, type Door, type PathCell, type PlacedLink } from '@futuremagic/du
 import type { BuildingMesh } from '@futuremagic/settlement';
 import type { DungeonProp } from '../../setting/contract';
 import { CELL, STOREY, cellIn, type Cellar, type Prop } from './cellar';
-import { shapeOf } from './kinds';
 import { BuildingMat as M, CellarMat as C, MeshKit, WildMat, scaleTint, varyTint, type Tint } from './meshKit';
 import { stampModel, type PropModels, type Stamp } from './propModels';
 import { DOOR_W, DungeonSpace, PASSAGE_H, isFeature, stairDrop } from './space';
@@ -107,7 +106,7 @@ const ASHLAR: Tint = [196, 186, 170];
 export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
   const shell = new MeshKit(), propKit = new MeshKit();
   const L = c.layout;
-  const shape = shapeOf(c.decision.template), carved = shape.carved, tower = c.decision.template === 'tower';
+  const shape = c.form.space, carved = shape.carved, tower = shape.walls === 'dressed';
   const space = new DungeonSpace(L);
   const owner = (i: number, j: number, l: number) => {
     for (const r of L.rooms) if (cellIn(r, i, j) && l >= r.level && l < r.level + r.height) return r.id;

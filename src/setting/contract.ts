@@ -187,7 +187,61 @@ export interface DungeonWords {
 }
 
 /** The setting's material for a kind of dungeon (plan 8: cellars in milestone 3, barrows after). */
+/**
+ * How a kind of dungeon takes shape inside (plan 8: "each kind has its own space rules"): how big it may
+ * grow, which way it goes (a cellar down under its house, a tower up), how its way out looks, whether its
+ * rock is carved (a natural cave) or built, and how its walls look.
+ */
+export interface DungeonSpace {
+  /** Half extent of the layout grid, cells (a tower stands on a small foot). */
+  readonly radius: number;
+  /** Most rooms in all. */
+  readonly maxRooms: number;
+  /** Deepest storey the graph may reach: without an older layer below, and with one. */
+  readonly depth: readonly [number, number];
+  /** Storeys the rooms climb as the way goes on (a tower: the goal near the top); 0: they stay where the graph put them. */
+  readonly rise: number;
+  /** The way back out, standing in the entrance room (a ladder up to a hatch, a tower's door). */
+  readonly way: DungeonProp;
+  /** How far props stand in from a wall's line, metres (a cave's rock bulges into the room). */
+  readonly inset: number;
+  /** The entrance room's size, cells: the house's footprint above it, or fixed. */
+  readonly entrance: 'footprint' | readonly [number, number];
+  /** Its rock is carved (a signed distance field meshed with surface nets), not built of walls and floors. */
+  readonly carved: boolean;
+  /** Wall torches by its doors (a natural cave has none: the lantern is all the light there is). */
+  readonly torches: boolean;
+  /** The hero comes in standing in the middle of the entrance room (a tower's door, a cave's rock step), else by the way out. */
+  readonly arriveMid: boolean;
+  /** Its built walls: rubble and brick (a cellar), or dressed stone with boarded upper floors (a tower). */
+  readonly walls: 'rubble' | 'dressed';
+}
+
+/**
+ * A kind of dungeon as the engine reads it (C6c, D51): where it stands, what stands on the land over it,
+ * and its space. The code reads this, never the kind's name, so a new kind is data (and at most a new shell).
+ */
+export interface DungeonForm {
+  /** Under a house of a town; out on the land on a rise, at the foot of a slope going into its hill, or on level raised ground. */
+  readonly stands: 'house' | 'rise' | 'slope' | 'level';
+  /** Metres from the town's market it lies, at least and at most (out on the land). */
+  readonly ring?: readonly [number, number];
+  /** What people call one out on the land, `{dir}` the way from the town ("the barrow {dir} of the town"). */
+  readonly called?: string;
+  /** One word for it ("this cave"). */
+  readonly word: string;
+  /** What stands on the land over it, an engine builder by name: a hatch in a house, a mound, a mouth in a crag, a keep. */
+  readonly shell: 'hatch' | 'mound' | 'mouth' | 'keep';
+  /** Trees keep off it: the clearing's middle this far behind its door, and its radius (metres). */
+  readonly clearing?: { readonly back: number; readonly r: number };
+  /** Set pieces made for these other kinds fit it too. */
+  readonly pieces?: readonly string[];
+  readonly space: DungeonSpace;
+}
+
 export interface CellarLore {
+  /** How the kind takes shape and stands (C6c). */
+  readonly form: DungeonForm;
   readonly words?: DungeonWords;
   readonly uses: readonly RoomUseDef[];
   /** Who dug the cellar and why. */
@@ -988,8 +1042,8 @@ export interface SettingModule {
   readonly title: string;
   readonly world: WorldShape;
   readonly start: StartSpec;
-  /** Material for dungeons, per kind (plan 8). */
-  readonly dungeons: { readonly cellar: CellarLore; readonly barrow?: CellarLore; readonly cave?: CellarLore; readonly tower?: CellarLore };
+  /** The kinds of dungeon, by id (plan 8, C6c): each its lore and its form. A cellar is the fallback. */
+  readonly dungeons: { readonly cellar: CellarLore; readonly [kind: string]: CellarLore | undefined };
   /** Names of the peoples, by Actors' race id (human, dwarf, halfling, elf). */
   readonly names: Readonly<Record<string, NamesDef>>;
   /** The peoples as factions (plan 11.6, D34), and what changes the hero's standing with them. */
@@ -1094,6 +1148,11 @@ export function validateSetting(m: SettingModule): string[] {
   }
   for (const [kind, c] of Object.entries(m.dungeons) as [string, CellarLore | undefined][]) {
     if (!c) continue;
+    const f = c.form, sp = f.space;
+    // A kind stands under a house (its hatch) or out on the land at a distance (a shell of its own).
+    if ((f.stands === 'house') !== (f.shell === 'hatch') || (f.stands !== 'house' && !(f.ring && f.ring[0] > 0 && f.ring[1] >= f.ring[0]))) out.push(`${where}: ${kind} form needs a hatch under a house, or a ring and a shell out on the land`);
+    if (!(sp.radius > 2 && sp.maxRooms >= 3 && sp.depth[1] <= sp.depth[0] && sp.inset >= 0) || !DUNGEON_PROPS.includes(sp.way)) out.push(`${where}: ${kind} space needs a radius, rooms, depths (older not above) and a known way out`);
+    for (const k of f.pieces ?? []) if (!m.dungeons[k]) out.push(`${where}: ${kind} borrows set pieces of unknown kind "${k}"`);
     const uses = new Set(c.uses.map((u) => u.id));
     for (const u of c.uses) for (const p of u.props) if (!DUNGEON_PROPS.includes(p)) out.push(`${where}: ${kind} use "${u.id}" prop "${p}" is unknown`);
     // The engine's own rooms (the safe spot, a dug burrow) must exist in every kind.

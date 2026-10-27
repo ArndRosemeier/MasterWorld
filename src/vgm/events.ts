@@ -121,7 +121,7 @@ function spill(c: EventsContext, def: StoryEventDef, past: readonly EventDecisio
     const d = dungeonOf(c.log, p), town = d && c.towns.find((t) => t.decision.id === d.town);
     if (!d || !town || c.inside(d.id)) continue;
     if (!rested(c, def, past, d.town)) continue;
-    const place = placeOf(d, c.towns);
+    const place = placeOf(d, c.towns, c.setting.dungeons);
     if (!place) continue;
     const sketch = sketchCellar(d, place, loreOf(c.setting, d.template), p.kind === 'move-in' ? p : undefined);
     const s = deriveSeed(c.seed, 'vgm', 'event', past.length);
@@ -195,7 +195,7 @@ export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | '
 
 /** The place a spill came out of, named. */
 function spillOf(setting: Pick<SettingModule, 'dungeons'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): Record<string, string> | null {
-  const from = log.find((x) => x.id === e.from), d = dungeonOf(log, from), place = d && placeOf(d, towns);
+  const from = log.find((x) => x.id === e.from), d = dungeonOf(log, from), place = d && placeOf(d, towns, setting.dungeons);
   if (!d || !place) return null;
   const sketch = sketchCellar(d, place, loreOf(setting, d.template), from?.kind === 'move-in' ? from : undefined);
   return { place: sketch.called ?? `the cellar under ${sketch.house}` };

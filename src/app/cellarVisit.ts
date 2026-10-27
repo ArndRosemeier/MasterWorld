@@ -14,7 +14,6 @@ import type { WarmLights } from '../render/warmLights';
 import { torchSpots } from '../world/dungeon/torches';
 import { CELL, STOREY, type Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace, type SpaceEvent } from '../world/dungeon/space';
-import { shapeOf } from '../world/dungeon/kinds';
 import { Fade } from './fade';
 import type { Notes } from './notes';
 import type { CellarDiff } from './saveGame';
@@ -67,7 +66,7 @@ export class CellarVisit {
       const O = this.view.origin, h = this.cellar.hatch;
       const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
       // Some kinds bring the hero in the middle of the entrance room (world/dungeon/kinds.ts).
-      if (room === undefined && shapeOf(this.cellar.decision.template).arriveMid) room = this.cellar.graph.entrance;
+      if (room === undefined && this.cellar.form.space.arriveMid) room = this.cellar.graph.entrance;
       if (room !== undefined && this.cellar.layout.rooms[room]) {
         const r = this.cellar.layout.rooms[room];
         this.player.teleport(O.x + (r.x + r.w / 2) * CELL, O.y + r.level * STOREY, O.z + (r.z + r.d / 2) * CELL, h.yaw);
@@ -142,7 +141,7 @@ export class CellarVisit {
   private event(e: SpaceEvent): void {
     this.view.opened(e.link);
     const own = e.link === this.cellar.pieceLink ? this.cellar.setPiece.found : undefined;
-    const said = shapeOf(this.cellar.decision.template).carved ? CARVED_SAYS : BUILT_SAYS;
+    const said = this.cellar.form.space.carved ? CARVED_SAYS : BUILT_SAYS;
     const text = own && (e.kind === 'found' || e.kind === 'unbarred') ? own : said[e.kind];
     this.notes.say(text);
   }

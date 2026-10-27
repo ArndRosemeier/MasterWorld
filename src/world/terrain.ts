@@ -9,7 +9,7 @@ import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
 import { settlementOf, type Decision, type DecisionLog, type HoldDecision, type RoadDecision, type TownDecision } from './decisions';
 import { holdBare, holdGround } from './hold';
-import { clearingOf, type Clearing } from './dungeon/site';
+import { RETREAT_CLEARING, clearingOf, type Clearing } from './dungeon/site';
 import { RoadNet } from './roads';
 import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
@@ -80,11 +80,11 @@ export class Terrain {
     for (const d of ds) {
       if (d.kind === 'road') this.addRoad(d);
       else if (d.kind === 'dungeon' && d.site) {
-        const c = clearingOf(d.template, d.site);
+        const c = clearingOf(this.setting.dungeons[d.template]?.form.clearing, d.site);
         if (c) this.clearingMap.set(d.id, c);
       } else if (d.kind === 'retreat') {
         // A teacher's tower (C3) stands in the open like a ruined tower's.
-        const c = clearingOf('tower', d);
+        const c = clearingOf(RETREAT_CLEARING, d);
         if (c) this.clearingMap.set(d.id, c);
       } else if (d.kind === 'region' && d.site) {
         // A place the VGM opened as the hero walked: a settlement is a town of its size (its fields clear
