@@ -36,12 +36,18 @@ const WAYS = `(() => {
   const v = window.game.cellar?.view;
   return v ? [...v.doors.values()].filter((d) => d.piece.opens !== 'gone').map((d) => ({ link: d.piece.link, kind: d.piece.kind, at: d.piece.at, through: d.piece.through })) : [];
 })()`;
-/** Where a way's moving piece (the leaf, the stones) is now, and the bar's, in the cellar frame (their drawn middles). */
+/**
+ * Where a way's moving piece (the leaf, the stones) is now, the bar's, the hero's and the camera's, in the cellar frame
+ * (the pivots' parent's own frame less the cellar's origin: the floating origin's shift is in the parent's matrix).
+ */
 const PLACE = `((link) => {
-  const v = window.game.cellar.view, d = v.doors.get(link), O = v.origin;
-  const mid = (g) => { g.updateMatrixWorld(true); const m = g.children[0]; m.geometry.computeBoundingSphere(); const c = m.geometry.boundingSphere.center.clone().applyMatrix4(m.matrixWorld); return [c.x - O.x, c.y - O.y, c.z - O.z]; };
-  const q = d.pivot.quaternion;
-  return { turn: 2 * Math.acos(Math.min(1, Math.abs(q.w))), piece: mid(d.pivot), bar: d.bar ? mid(d.bar) : null };
+  const g = window.game, v = g.cellar.view, d = v.doors.get(link), O = v.origin, P = d.pivot.parent;
+  P.updateMatrixWorld(true);
+  const inv = P.matrixWorld.clone().invert();
+  const local = (c) => { const q = c.clone().applyMatrix4(inv); return [q.x - O.x, q.y - O.y, q.z - O.z]; };
+  const mid = (gr) => { const m = gr.children[0]; m.geometry.computeBoundingSphere(); return local(m.geometry.boundingSphere.center.clone().applyMatrix4(m.matrixWorld)); };
+  const q = d.pivot.quaternion, w = g.player.walker.pos, cam = g.view.camera.getWorldPosition(g.view.camera.position.clone());
+  return { turn: 2 * Math.acos(Math.min(1, Math.abs(q.w))), piece: mid(d.pivot), bar: d.bar ? mid(d.bar) : null, away: d.away, hero: [w.x - O.x, w.y - O.y, w.z - O.z], cam: local(cam) };
 })`;
 const seen = new Map();
 let tried = 0, n = 0;
@@ -102,13 +108,15 @@ for (const seed of [undefined, 'ways1', 'ways2', 'ways3', 'ways4', 'ways5', 'way
       if (opened) break;
     }
     if (!before) { fail(`way ${w.link} (${w.kind}): no floor before it`); continue; }
-    // Which side of the doorway (along the way through) the piece ended on, against the side the hero opened it from.
+    // Which way along the way through the piece moved, against the side the hero opened it from (both in the cellar frame).
     const along = (q) => (q[0] - w.at[0]) * w.through[0] + (q[2] - w.at[2]) * w.through[1];
+    const moved = along(after.piece) - along(before.piece);
     const barMoved = before.bar && after.bar ? Math.hypot(after.bar[0] - before.bar[0], after.bar[1] - before.bar[1], after.bar[2] - before.bar[2]) : 0;
-    console.log(`way ${w.link} (${w.kind}) from side ${from}: opened ${opened} · turned ${after.turn.toFixed(2)} rad · piece ${along(before.piece).toFixed(2)} -> ${along(after.piece).toFixed(2)} m along the way${before.bar ? ` · bar moved ${barMoved.toFixed(2)} m, ends ${after.bar[1].toFixed(2)} m up, ${along(after.bar).toFixed(2)} along` : ''}`);
+    const f = (q) => q.map((x) => x.toFixed(2)).join(' ');
+    console.log(`way ${w.link} (${w.kind}) from side ${from}: opened ${opened} · turned ${after.turn.toFixed(2)} rad · piece ${along(before.piece).toFixed(2)} -> ${along(after.piece).toFixed(2)} m along the way · away ${f(after.away)} · hero ${along(after.hero).toFixed(2)} along · camera ${along(after.cam).toFixed(2)} along${before.bar ? ` · bar moved ${barMoved.toFixed(2)} m, ends ${after.bar[1].toFixed(2)} m up at ${f(after.bar)}` : ''}`);
     if (!opened) { fail(`way ${w.link} (${w.kind}) did not open from either side`); continue; }
     if (after.turn < 1) fail(`way ${w.link} (${w.kind}) opened but was not seen to (${after.turn.toFixed(2)} rad)`);
-    if (Math.sign(along(after.piece)) === from) fail(`way ${w.link} (${w.kind}) opened towards the hero (side ${from})`);
+    if (Math.sign(moved) === from || Math.sign(along(after.piece)) === Math.sign(along(after.hero))) fail(`way ${w.link} (${w.kind}) opened towards the hero (side ${from})`);
     if (before.bar && (barMoved < 0.5 || after.bar[1] > 0.3)) fail(`way ${w.link}: its bar was not set down (moved ${barMoved.toFixed(2)} m, ${after.bar[1].toFixed(2)} m up)`);
   }
   if (tried >= 8) break;
