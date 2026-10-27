@@ -50,6 +50,7 @@ import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeo
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands } from './vgm/events';
 import { madeBy, vgmTurn, type Made } from './vgm/toolbox';
+import { PACING, vgmLines } from './vgm/vgmLog';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
@@ -755,6 +756,7 @@ export async function start(b: Boot): Promise<void> {
       if (scale !== s.renderScale) { scale = s.renderScale; view.renderer.setPixelRatio(pixels * scale); }
       if (params.dayMinutes === null) view.sky.dayMinutes = s.dayLength;
       sound.volume = s.volume;
+      director.pace = PACING[s.pacing];
       showHud = params.hud || s.hud;
       if (hud) hud.style.display = showHud ? '' : 'none';
     });
@@ -1196,6 +1198,7 @@ export async function start(b: Boot): Promise<void> {
       legends: setting.items.uniques.map((u) => ({ id: u.id, name: u.name })),
       events: setting.events ?? [],
       storyEvent: (id?: string) => storyEventNow(id),
+      vgmLog: () => vgmLines(log, vgmLog),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
         const did = on ? character.learn(id) : character.forget(id);

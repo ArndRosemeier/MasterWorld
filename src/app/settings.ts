@@ -6,6 +6,7 @@ import { clamp } from '@futuremagic/core';
 import { cleanBindings, DEFAULT_BINDINGS, type Bindings } from '../input/controls';
 import { loadLocal, saveLocal } from '../persist/local';
 import { params } from './params';
+import { PACING, type Pacing } from '../vgm/vgmLog';
 
 export interface Settings {
   /** Mouse look speed, times the default. */
@@ -30,6 +31,8 @@ export interface Settings {
   volume: number;
   /** Calm motion: the title shows its still picture and windows open without their show (plan 17.1). */
   calm: boolean;
+  /** How eventful the game master makes the world (D53: the one place the VGM shows; vgm/vgmLog.ts PACING). */
+  pacing: Pacing;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -45,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dayLength: 60,
   volume: 0.8,
   calm: false,
+  pacing: 'normal',
 };
 
 /** The ranges the dialog offers (and stored values are held to). */
@@ -77,6 +81,7 @@ export function cleanSettings(raw: unknown): Settings {
     dayLength: num('dayLength'),
     volume: num('volume'),
     calm: flag('calm'),
+    pacing: typeof s.pacing === 'string' && s.pacing in PACING ? (s.pacing as Pacing) : DEFAULT_SETTINGS.pacing,
   };
 }
 
