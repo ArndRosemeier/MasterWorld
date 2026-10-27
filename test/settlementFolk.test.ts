@@ -13,10 +13,11 @@ import { townSaves, type SaveData } from '../src/app/saveGame';
 import { houseKey } from '../src/world/town';
 import { Terrain } from '../src/world/terrain';
 import { settlementOf, type Decision, type DecisionLog } from '../src/world/decisions';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
 // The start's land with small drainage tiles (as the frontier test): the same town, faster.
-const terrain = new Terrain(seed, classic, { cell: 2000, core: 96, margin: 32, minArea: 120 });
+const terrain = new Terrain(seed, classic, SMALL);
 const first = firstDecisions(terrain, startPlace(terrain));
 terrain.settle(first);
 const home = terrain.towns[0].decision;

@@ -7,10 +7,9 @@ import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/
 import { Trunks } from '../src/world/trunks';
 import { Walker, type WalkWorld } from '../src/game/walker';
 import { HORSE } from '../src/game/horse';
-import type { HydroOptions } from '../src/world/hydro';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
-const SMALL: HydroOptions = { cell: 2000, core: 96, margin: 32, minArea: 120 };
 const terrain = new Terrain(seed, classic, SMALL);
 const plants = floraPlacement(terrain, { seed, setting: classic.id, x0: -32000, z0: 32000, size: 128, spacing: NEAR_SPACING });
 const all = Array.from({ length: plants.length / FLORA_STRIDE }, (_, k) => plants.subarray(k * FLORA_STRIDE, (k + 1) * FLORA_STRIDE));

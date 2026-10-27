@@ -8,6 +8,7 @@ import { TownLife } from '../src/sim/townLife';
 import { townTalk } from '../src/talk/townTalk';
 import { marketStart } from '../src/world/town';
 import { ARRIVAL, Guide, HAIL, arrivalEntry, hailer, besideHero } from '../src/vgm/guide';
+import { SMALL } from './small';
 
 test('guide: the first hail soon after arrival, then each one waits longer; a lead stops it, none left starts it over', () => {
   const g = new Guide();
@@ -48,7 +49,7 @@ test('guide: the nearest awake person who knows comes, a fresh face next time; n
 
 test('guide: from a fresh start, someone near the market comes over, waits by the hero, and their news is a lead', () => {
   const seed = parseSeed('masterworld');
-  const { terrain, log } = openWorld(seed, classic);
+  const { terrain, log } = openWorld(seed, classic, SMALL);
   const town = terrain.towns[0];
   const life = new TownLife(town.plan, seed, 8);
   const { talk } = townTalk(seed, classic, town, life.agents.map((a) => a.person), log);

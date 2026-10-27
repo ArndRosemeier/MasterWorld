@@ -5,10 +5,9 @@ import { Terrain } from '../src/world/terrain';
 import { startPlace } from '../src/vgm/builder';
 import { classic } from '../src/setting/classic/index';
 import { grassMask } from '../src/world/grass';
-import type { HydroOptions } from '../src/world/hydro';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
-const SMALL: HydroOptions = { cell: 2000, core: 96, margin: 32, minArea: 120 };
 const terrain = new Terrain(seed, classic, SMALL);
 const home = startPlace(terrain);
 const job = (x0: number, z0: number, size: number, res: number) => ({ seed, setting: classic.id, x0, z0, size, res });

@@ -5,8 +5,9 @@ import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
 import { townMeshes } from '../src/world/townMesh';
 import { marketStart } from '../src/world/town';
+import { SMALL } from './small';
 
-const { terrain } = openWorld(parseSeed('masterworld'), classic);
+const { terrain } = openWorld(parseSeed('masterworld'), classic, SMALL);
 
 test('town: its buildings are meshed per cell and their walls stop the walker', () => {
   const town = terrain.towns[0];

@@ -8,9 +8,10 @@ import { Den, type Quarry } from '../src/sim/creatures';
 import { Delve, type DelveSave } from '../src/game/delve';
 import { Character } from '../src/game/character';
 import { onLand } from '../src/world/dungeon/site';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
-const { terrain } = openWorld(seed, classic);
+const { terrain } = openWorld(seed, classic, SMALL);
 const town = terrain.towns[0];
 const land: Land = { height: (x, z) => terrain.height(x, z), waterDepth: (x, z) => terrain.waterDepth(x, z), blocked: (x, z, r) => town.solid(x, z, r) };
 const places = placeWild(seed, terrain, town, classic.wild);

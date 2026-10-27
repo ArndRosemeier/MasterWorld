@@ -9,9 +9,10 @@ import { townsfolk } from '../src/sim/people';
 import { talkCellar, townTalk } from '../src/talk/townTalk';
 import { moveIn, occupantId, outlineCellar } from '../src/world/dungeon/cellar';
 import type { Decision, DecisionLog, DungeonDecision } from '../src/world/decisions';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
-const { terrain, log: first, home } = openWorld(seed, classic);
+const { terrain, log: first, home } = openWorld(seed, classic, SMALL);
 const town = terrain.towns[0];
 const ctx = (log: DecisionLog, hours: number, purposeOverdue = false) => ({ seed, log, towns: terrain.towns, home, hours, purposeOverdue, inside: () => false, dungeons: classic.dungeons, terrain });
 

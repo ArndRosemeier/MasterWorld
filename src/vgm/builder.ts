@@ -9,6 +9,7 @@ import type { Decision, DecisionLog, TownDecision } from '../world/decisions';
 import { findStart, type StartPlace } from '../world/start';
 import { bankSpots, byFreshWater, freshWaterEdge, WATER_REACH } from '../world/freshWater';
 import { Terrain } from '../world/terrain';
+import type { HydroOptions } from '../world/hydro';
 import { holdSite } from '../world/hold';
 import { archNear, type ArchSite } from '../world/volumes';
 import { promiseCellar } from './dungeons';
@@ -20,9 +21,12 @@ export interface OpenWorld {
   home: StartPlace;
 }
 
-/** The land of a seed and setting with the start's decisions built on it (main thread and every worker alike). */
-export function openWorld(seed: number, setting: SettingModule): OpenWorld {
-  const terrain = new Terrain(seed, setting);
+/**
+ * The land of a seed and setting with the start's decisions built on it (main thread and every worker alike).
+ * `hydro`: the rivers' grid; tests pass a small one (test/small.ts), the game the default.
+ */
+export function openWorld(seed: number, setting: SettingModule, hydro?: HydroOptions): OpenWorld {
+  const terrain = new Terrain(seed, setting, hydro);
   const home = startPlace(terrain);
   const log = firstDecisions(terrain, home);
   terrain.settle(log);
@@ -70,7 +74,7 @@ export function waterside(t: Terrain, start: StartPlace): StartPlace {
     let best: StartPlace | null = null, bestScore = Infinity;
     for (const s of bankSpots(t, start.x, start.z, within, START_R, 2, false)) {
       const h = t.height(s.x, s.z);
-      if (h < Math.max(4, want.elevation[0] * 0.5) || h > want.elevation[1] || t.waterDepth(s.x, s.z) > 0) continue;
+      if (h < Math.max(4, want.elevation[0] * 0.5) || h > want.elevation[1] || t.waterDepth(s.x, s.z, h) > 0) continue;
       let steep = 0;
       for (let a = 0; a < 8; a++) {
         const px = s.x + Math.cos((a * Math.PI) / 4) * START_R * 0.8, pz = s.z + Math.sin((a * Math.PI) / 4) * START_R * 0.8;

@@ -6,6 +6,7 @@ import { TREE_SHAPE, canopySampler, meanTree } from '../src/world/canopy';
 import { Terrain } from '../src/world/terrain';
 import { settingById } from '../src/setting/index';
 import { parseSeed } from '@futuremagic/core';
+import { SMALL } from './small';
 
 test('canopy: tree shapes match the vegetation models', () => {
   for (const s of TREES) {
@@ -18,7 +19,7 @@ test('canopy: tree shapes match the vegetation models', () => {
 
 test('canopy: a forest is covered, the sea is not; a pine wood is all conifer', () => {
   const setting = settingById('classic');
-  const t = new Terrain(parseSeed('masterworld'), setting);
+  const t = new Terrain(parseSeed('masterworld'), setting, SMALL);
   const at = canopySampler(t), c = { cover: 0, height: 0, spacing: 0, conifer: 0 };
   // The start is in broadleaf forest; the sea lies north-east of it.
   let most = 0;

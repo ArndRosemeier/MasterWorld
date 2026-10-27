@@ -7,10 +7,11 @@ import { Terrain } from '../src/world/terrain';
 import { findStart } from '../src/world/start';
 import { WATER_REACH, bankSpots, byFreshWater, freshWaterEdge } from '../src/world/freshWater';
 import { startMoved } from '../src/app/saveGame';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
 // Small drainage tiles (as the frontier and roads tests): the same rivers round the start, faster.
-const terrain = new Terrain(seed, classic, { cell: 2000, core: 96, margin: 32, minArea: 120 });
+const terrain = new Terrain(seed, classic, SMALL);
 const home = startPlace(terrain);
 const first = firstDecisions(terrain, home);
 const town = first.find((d) => d.kind === 'town')!;

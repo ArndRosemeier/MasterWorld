@@ -4,16 +4,15 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { firstDecisions, startPlace } from '../src/vgm/builder';
 import { Terrain } from '../src/world/terrain';
-import type { HydroOptions } from '../src/world/hydro';
 import { linkRoad } from '../src/vgm/roads';
 import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
 import { grassMask } from '../src/world/grass';
 import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
 // The start's land with small drainage tiles (as the flora and water tests): the same town, a quarter of the time.
-const SMALL: HydroOptions = { cell: 2000, core: 96, margin: 32, minArea: 120 };
 const terrain = new Terrain(seed, classic, SMALL);
 const log = firstDecisions(terrain, startPlace(terrain));
 terrain.settle(log);
