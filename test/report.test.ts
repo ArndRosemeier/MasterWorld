@@ -9,9 +9,10 @@ import { Journal } from '../src/talk/journal';
 import { firstDungeon } from '../src/vgm/dungeons';
 import { nextPromise } from '../src/vgm/leads';
 import type { Decision } from '../src/world/decisions';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
-const { terrain, log: first, home } = openWorld(seed, classic);
+const { terrain, log: first, home } = openWorld(seed, classic, SMALL);
 const town = terrain.towns[0];
 const people = townsfolk(town.plan, seed);
 const cellar = firstDungeon(first)!;

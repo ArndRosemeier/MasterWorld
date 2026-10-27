@@ -8,8 +8,9 @@ import { openWorld } from '../src/vgm/builder';
 import { TownGround } from '../src/world/town';
 import { floraPlacement, FLORA_STRIDE } from '../src/world/flora';
 import { Walker, type WalkWorld } from '../src/game/walker';
+import { SMALL } from './small';
 
-const { terrain, log, home } = openWorld(parseSeed('masterworld'), classic);
+const { terrain, log, home } = openWorld(parseSeed('masterworld'), classic, SMALL);
 
 test('town: the VGM founds the start town near the start, on dry land, clear of the arch', () => {
   const d = log.find((x) => x.kind === 'town');

@@ -5,9 +5,10 @@ import { firstDecisions, startPlace } from '../src/vgm/builder';
 import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
 import { ArchField, archMesh } from '../src/world/volumes';
+import { SMALL } from './small';
 
 // The start's decisions without the town planned (nothing here needs it, and planning it costs time).
-const terrain = new Terrain(parseSeed('masterworld'), classic);
+const terrain = new Terrain(parseSeed('masterworld'), classic, SMALL);
 terrain.settle(firstDecisions(terrain, startPlace(terrain)));
 
 test('volumes: an arch stands near the start, rock at its feet and air under its crown', () => {

@@ -5,16 +5,19 @@ on:
     branches: [main]
   pull_request:
 
+# Three jobs side by side; CI takes as long as the longest. Every step has a time budget (tools/guards/budget.mjs:
+# warn seconds, fail seconds), so a slow step shows as a warning on the run's page long before it fails (docs/CHECKS.md).
 jobs:
-  check:
+  test:
+    name: Tests and guards
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          # The whole history: the version counts the commits on main (tools/release).
-          fetch-depth: 0
+          # The pin guard compares with the commit before HEAD on a push to main.
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -23,14 +26,53 @@ jobs:
         run: node tools/guards/pins.mjs
       - run: npm ci
       - name: Tests and guards
-        run: npm test
+        run: node tools/guards/budget.mjs 50 60 -- npm test
+
+  sims:
+    name: Dungeon variety and the evening loop
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - name: Dungeon variety
-        run: npm run variety
+        run: node tools/guards/budget.mjs 30 300 -- npm run variety
       - name: The evening loop
-        run: npm run loop
+        run: node tools/guards/budget.mjs 60 300 -- npm run loop
+
+  build:
+    name: Build and WebGL 2 texture units
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      # The runner's own Chrome: no Playwright browser download (about 25 s).
+      CHROMIUM_PATH: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - name: Typecheck and build
-        run: npm run build
-      - name: Chromium for the WebGL 2 check
-        run: npx playwright install --with-deps chromium
+        run: node tools/guards/budget.mjs 30 300 -- npm run build
       - name: Texture units on WebGL 2 (every material at most 16)
-        run: npm run check:units
+        run: node tools/guards/budget.mjs 60 300 -- npm run check:units
+
+  # The one status that says CI passed (the name the merge rule waits for).
+  check:
+    needs: [test, sims, build]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: All jobs passed
+        run: test "${{ needs.test.result }}" = success && test "${{ needs.sims.result }}" = success && test "${{ needs.build.result }}" = success

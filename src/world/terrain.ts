@@ -171,9 +171,8 @@ export class Terrain {
     return null;
   }
 
-  /** Depth of open water at a point (> 0: sea, lake or river), roughly: for keeping things out of it. */
-  waterDepth(x: number, z: number): number {
-    const h = this.height(x, z);
+  /** Depth of open water at a point (> 0: sea, lake or river), roughly: for keeping things out of it. `h`: its height, when known. */
+  waterDepth(x: number, z: number, h = this.height(x, z)): number {
     if (h < 0.3) return 0.3 - h;
     const w = this.clearOfWater(x, z, h, this.wet);
     return Math.max(-w.river, 0.3 - w.lake, 0);

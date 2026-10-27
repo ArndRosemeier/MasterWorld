@@ -4,11 +4,10 @@ import { parseSeed } from '@futuremagic/core';
 import { Terrain } from '../src/world/terrain';
 import { classic } from '../src/setting/classic/index';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
-import type { HydroOptions } from '../src/world/hydro';
 import type { Decision } from '../src/world/decisions';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
-const SMALL: HydroOptions = { cell: 2000, core: 96, margin: 32, minArea: 120 };
 const terrain = new Terrain(seed, classic, SMALL);
 const job = (x0: number, z0: number, size: number, spacing = NEAR_SPACING) => ({ seed, setting: classic.id, x0, z0, size, spacing });
 

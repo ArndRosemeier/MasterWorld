@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { Terrain } from '../src/world/terrain';
 import { Skeleton } from '../src/world/skeleton';
-import { HydroTile, riverDepth, type HydroOptions } from '../src/world/hydro';
+import { HydroTile, riverDepth } from '../src/world/hydro';
 import { classic } from '../src/setting/classic/index';
 import { DRY, SEA_LEVEL, waterMask } from '../src/world/water';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
-const SMALL: HydroOptions = { cell: 2000, core: 96, margin: 32, minArea: 120 };
 const tile = new HydroTile(new Skeleton(seed, classic.world), -1, 0, SMALL);
 // Rivers alone: these tests look at rivers all over the tile, and a brook tile for each would take seconds
 // (brooks have their own tests, test/brooks.test.ts).

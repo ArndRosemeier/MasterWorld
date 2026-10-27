@@ -5,10 +5,11 @@ import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
 import { BROOKS, brookDepth, packRivers } from '../src/world/hydro';
 import { DRY, flowSpeed, waterMask } from '../src/world/water';
+import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
 // Small river tiles (as the frontier and roads tests), brooks as in the game.
-const terrain = new Terrain(seed, classic, { cell: 2000, core: 96, margin: 32, minArea: 120 });
+const terrain = new Terrain(seed, classic, SMALL);
 const tile = terrain.hydro.brookTileAt(-30000, 34000)!;
 const side = BROOKS.core * BROOKS.cell, x0 = tile.tx * side, z0 = tile.tz * side;
 /** Brooks whose last point lies in the tile's own square (the margin's brooks belong to the tiles round it). */
@@ -77,7 +78,7 @@ test('brooks: they lie in their beds, banks stay dry, and the near water mask dr
 });
 
 test('brooks: a tile traced in a worker and handed over answers as one traced here', () => {
-  const other = new Terrain(seed, classic, { cell: 2000, core: 96, margin: 32, minArea: 120 });
+  const other = new Terrain(seed, classic, SMALL);
   other.hydro.adoptBrooks(tile.tx, tile.tz, packRivers(tile.rivers));
   assert.ok(other.hydro.hasBrooks(-30000, 34000));
   for (let i = 0; i < 200; i++) {

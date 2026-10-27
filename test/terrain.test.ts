@@ -5,8 +5,9 @@ import { Terrain } from '../src/world/terrain';
 import { buildChunk, chunkIndex, vertexCount } from '../src/world/chunkMesh';
 import { selectChunks, chunkSize, CHUNK0 } from '../src/render/terrain/lod';
 import { classic } from '../src/setting/classic/index';
+import { SMALL } from './small';
 
-const terrain = new Terrain(parseSeed('masterworld'), classic);
+const terrain = new Terrain(parseSeed('masterworld'), classic, SMALL);
 
 test('chunk: vertices match the terrain, indices stay in range, normals point up-ish', () => {
   const segs = 16, spec = { x0: -32000, z0: 32000, size: 256, segs };
@@ -41,7 +42,7 @@ test('lod: leaves tile the roots without overlap, fine near the camera, coarse f
 });
 
 test('chunk mesh: surface weights sum to 1 on every vertex', () => {
-  const m = buildChunk(new Terrain(7, classic), { x0: 1000, z0: -3000, size: 4096, segs: 16 });
+  const m = buildChunk(new Terrain(7, classic, SMALL), { x0: 1000, z0: -3000, size: 4096, segs: 16 });
   for (let v = 0; v < m.surface.length / 4; v++) {
     const s = m.surface[v * 4] + m.surface[v * 4 + 1] + m.surface[v * 4 + 2] + m.surface[v * 4 + 3];
     assert.ok(Math.abs(s - 1) < 1e-5, `vertex ${v}: ${s}`);

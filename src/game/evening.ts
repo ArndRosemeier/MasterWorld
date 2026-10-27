@@ -406,7 +406,7 @@ class LandWalk {
       height: (x, z) => terrain.height(x, z),
       floor: (x, z) => standAt(terrain, x, z),
       rockSurface: (x, y, z) => terrain.rockSurface(x, y, z),
-      waterLevel: (x, z) => { const d = terrain.waterDepth(x, z); return d > 0.4 ? terrain.height(x, z) + d : null; },
+      waterLevel: (x, z) => { const h = terrain.height(x, z), d = terrain.waterDepth(x, z, h); return d > 0.4 ? h + d : null; },
       wall: (x, z, r) => solidAt(terrain, x, z, r),
     };
     this.walker = new Walker(world);
@@ -458,7 +458,7 @@ class LandWalk {
       if (kind[c]) return;
       const [x, z] = cellCentre(c);
       hs[c] = terrain.height(x, z);
-      kind[c] = solidAt(terrain, x, z, WALK.radius + 0.25) ? 2 : terrain.waterDepth(x, z) > 0.4 ? 3 : 1;
+      kind[c] = solidAt(terrain, x, z, WALK.radius + 0.25) ? 2 : terrain.waterDepth(x, z, hs[c]) > 0.4 ? 3 : 1;
     };
     const cell = (x: number, z: number) => Math.floor(x - x0) + Math.floor(z - z0) * nx;
     const a = cell(ax, az), b = cell(bx, bz);
