@@ -104,11 +104,13 @@ Goal: magic returns to the world, and growing means more than bigger numbers.
 | C4 ✓ | **Spell effects** within the shader budget (F3), compiled before first use | F3 passes in a fight with every school | SHADERS.md |
 | C5 ✓ | **Rare item-only abilities** on items (D31) | A legendary item with its ability in the F1 pack shot | 11.5 |
 | C6 | **Story events**: a raid on a farm, bandits taking a waystation, a dungeon's dwellers moving out to the land; the town shows what happened | Test: an event's ledger entry changes the world and the leads | 4.2, 11.3 |
+| C6b | **The VGM toolbox** (D51): every Builder tool in `src/vgm/toolbox.ts` with one shape (id, decision kinds, the need it meets, `next`), one VGM step instead of `main.ts`'s `promiseDue`/`eventDue`; **encounters** as one `EncounterDef` in the setting and one generator `encounterFor(need, where, danger, seed)` that dungeon dwellers, wild groups and event bands all come from; wild groups become decisions | Tests: every tool is in the toolbox and in [vgm.md](vgm.md); an encounter sweep fails on repeats and misfits; the loop check unchanged | [vgm.md](vgm.md) 2, 3 |
+| C6c | **Dungeon kinds as data** (D51): a `DungeonKindDef` per kind (lore, space rules, outside shell, where it stands, light, sound), no `template === '…'` in code; one request `dungeonFor({ purpose, near, danger, dwellers? })` that leads, events and encounters ask; places not tied to a town house; a `retake` decision (new dwellers or history, same layout); one new kind (the bandit hideout, for the waystation) added as data to prove it | Tests: the variety sweep runs over every kind in the setting; the waystation's band gets its hideout from `dungeonFor` | [vgm.md](vgm.md) 4, plan 8 |
 | C7 | **Travel**: horses on roads, fast travel rules, time passing as designed | Test against 5.4's numbers | 5.4, D37 |
 
 Built ahead of phase C (Arnd asked by name, 2026-10-27): **bird form**, a taught change of shape (the hero becomes a pheasant and flies; design section 10), and the **action bar** (ten slots, always shown, arranged in the ability book; 17.1) that C1's abilities will sit on. C3 gives bird form a teacher: the hidden Undercroft (C3 part 1, 2026-10-27).
 
-Gate C: a fight with magic in the F1 set, the loop check with a mage hero, the review.
+Gate C: a fight with magic in the F1 set, the loop check with a mage hero, every VGM tool in the toolbox and in vgm.md (C6b, C6c), the review.
 
 ### Phase D: Seas (milestone 7)
 
