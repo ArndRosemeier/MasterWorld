@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planTown } from '@futuremagic/settlement';
+import { houseShape, planTown, signPlace } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic';
 import { townsfolk } from '../src/sim/people';
 import { Character } from '../src/game/character';
@@ -110,4 +110,12 @@ test('guilds: the open houses\' masters dress for their calling; the hidden one\
   assert.equal(by('master-at-arms').dress, 'fighter');
   assert.equal(by('lodge-master').dress, 'traveller');
   assert.equal(by('locksmith').dress, undefined);
+});
+
+test('guilds: a guild with a sign takes a house with free front wall for it', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    for (const h of guildHouses(planTown({ seed, x: 0, z: 0, radius: 72, height: () => 10 }), 'town', classic)) {
+      if (h.guild.sign && !h.guild.hidden) assert.ok(signPlace(h.b, houseShape(h.b))?.flat, `seed ${seed}: ${h.guild.keeper}`);
+    }
+  }
 });
