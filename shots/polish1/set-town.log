@@ -1,0 +1,19 @@
+title: ready in 29.9 s
+01-title.jpg: drawn 0.1 s · settled 4.0 s · p50 21.3 ms · p95 33.3 ms · 0 shader violations
+02-creator.jpg: drawn 0.0 s · settled 1.5 s · p50 11.9 ms · p95 28.7 ms · 0 shader violations
+town: ready in 18.9 s
+03-town-noon.jpg: drawn 0.1 s · settled 3.8 s · p50 10.0 ms · p95 13.3 ms · 0 shader violations
+04-pack.jpg: drawn 0.0 s · settled 1.5 s · p50 3.6 ms · p95 14.7 ms · 0 shader violations
+05-map.jpg: drawn 0.0 s · settled 1.9 s · p50 3.3 ms · p95 13.2 ms · 0 shader violations
+06-town-dusk.jpg: drawn 0.0 s · settled 1.5 s · p50 13.3 ms · p95 30.1 ms · 0 shader violations
+07-town-night.jpg: drawn 0.0 s · settled 1.5 s · p50 11.7 ms · p95 26.6 ms · 0 shader violations
+08-town-rain.jpg: drawn 0.0 s · settled 1.5 s · p50 14.0 ms · p95 31.6 ms · 0 shader violations
+09-paddock.jpg: drawn 0.1 s · settled 1.5 s · p50 9.6 ms · p95 12.1 ms · 0 shader violations
+10-trade.jpg: drawn 0.0 s · settled 1.5 s · p50 10.0 ms · p95 16.5 ms · 0 shader violations
+wet: ready in 15.6 s
+11-town-wet-sun.jpg: drawn 0.1 s · settled 4.0 s · p50 12.3 ms · p95 15.1 ms · 0 shader violations
+inn: ready in 16.0 s
+17-inn.jpg: drawn 0.0 s · settled 3.9 s · p50 9.4 ms · p95 11.3 ms · 0 shader violations
+talk: ready in 13.9 s
+18-talk.jpg: drawn 0.1 s · settled 4.0 s · p50 11.6 ms · p95 13.6 ms · 0 shader violations
+town: 13 shots in shots\polish1\set\2026-10-28-ff3e61d (166 s)
