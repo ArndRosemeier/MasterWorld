@@ -385,15 +385,11 @@ export async function start(b: Boot): Promise<void> {
     // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.
     let tieTalk: ((t: Township, words: TownTalk) => void) | null = null;
     const lit: Township[] = [];
-    // Towns the hero comes near: the townsfolk try on what their people wear, once they stand (FolkView.tryOn).
-    const neared: Township[] = [];
-    let tryOn: ((t: Township) => void) | null = null;
     towns = new Towns({
       stage: view.stage, terrain, land: terrainJobs, roads: roadWork, masks: !!start && params.town, drawn: params.town,
       setting, seed, hours, log: () => log, get standing() { return standing; }, towns: () => terrain.towns,
       saved: townSaves(save, start?.decision.id ?? null),
       made: (t) => { t.onTalk = (words) => tieTalk?.(t, words); },
-      nearing: (t) => { if (tryOn) tryOn(t); else neared.push(t); },
       raised: (t) => { lit.push(t); view.warm.atDoors(lit.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z), lit.flatMap((x) => x.town.plan.wall ?? [])); },
     });
     const startTown = towns.start;
@@ -547,9 +543,6 @@ export async function start(b: Boot): Promise<void> {
       // One pool of characters for every town's people, warmed in the start town's clothes (the one wardrobe).
       folk = await FolkView.create(view.stage, view.renderer, startTown.residents, outdoors, params.folk);
       folk.camera = view.camera;
-      const f = folk;
-      tryOn = (t) => { if (t !== startTown) f.tryOn(t.residents); };
-      for (const t of neared.splice(0)) tryOn(t);
     }
     loading.set('Growing the woods');
     const flora = new FloraView(view.stage, jobs, view.sun, { leafDepth: params.leafDepth, shadows: params.treeShadows });

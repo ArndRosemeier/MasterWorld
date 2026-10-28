@@ -36,8 +36,6 @@ export interface TownsHost extends TownshipContext {
   made?(t: Township): void;
   /** A town's buildings stand (their doors light at night). */
   raised?(t: Township): void;
-  /** The hero comes near a town: its people are made from now on (what they wear can be tried on ahead). */
-  nearing?(t: Township): void;
 }
 
 /** A building of a town, as the game opens it. */
@@ -199,12 +197,9 @@ export class Towns {
    * A town's people are made a few milliseconds a frame as the hero comes near (a capital's 2700 in one go held a
    * frame for a tenth of a second), before they must live (LIVE): one town at a time.
    */
-  private readonly neared = new WeakSet<Township>();
-
   private warmPeople(cam: Vector3): void {
     for (const t of this.cores.values()) {
       if (t.living || !t.town.near(cam.x, cam.z, LIVE + WARM_AHEAD)) continue;
-      if (!this.neared.has(t)) { this.neared.add(t); this.h.nearing?.(t); }
       t.warm(WARM_MS);
       return;
     }
