@@ -498,6 +498,11 @@ export interface CreatureDef {
   readonly senses: { readonly sight: number; readonly hearing: number };
   /** skittish: keeps away unless cornered or many; hostile: attacks on sight. */
   readonly temper: 'skittish' | 'hostile';
+  /**
+   * A shy beast's flight distance, metres (deer): farther off it only lifts its head and watches the hero,
+   * nearer it bolts, and it runs until twice this far before it grazes again, never back towards the hero.
+   */
+  readonly wary?: number;
   /** 0..1: how much of its health it loses before it runs (1 never runs). */
   readonly morale: number;
   /** Calls the others of its den when it sees the hero. */
