@@ -1,7 +1,8 @@
 /**
  * A search played out, not told (render it, don't narrate it): G by the fallen or a chest, and the hero
  * steps up to it, turns to it and kneels; a chest's lid lifts meanwhile. What was found comes once the
- * hands are in (its cards), and the hero gets up again. The keys move nothing meanwhile (Player.puppet).
+ * hands are in (its cards), and the hero gets up again. The keys move nothing meanwhile (Player.puppet). The
+ * same kneel, longer, sees to a hurt traveller's wound out on the land.
  */
 import { smoothstep } from '@futuremagic/core';
 import type { Puppet } from './player';
@@ -44,6 +45,8 @@ export class SearchKneel implements Puppet {
     private readonly onFound: () => void,
     /** Where to kneel (a chest's front); else on the line from the hero to it, KNEEL_AT short of it (where the hero is, if nearer). */
     kneelAt?: { readonly x: number; readonly z: number },
+    /** How long the hands are busy (s; none: a search's quick look), and the ground out on the land (none: a level floor). */
+    private readonly o: { readonly busy?: number; readonly ground?: (x: number, z: number) => number; readonly up?: () => void } = {},
   ) {
     this.pos = { x: from.x, y: from.y, z: from.z };
     this.yaw = yaw;
@@ -59,14 +62,17 @@ export class SearchKneel implements Puppet {
     this.yaw += Math.sign(d) * Math.min(Math.abs(d), TURN * dt);
     if (this.t < 0) {
       // Up to it at walking pace.
-      if (walkOn(this.pos, this.vel, this.to, STEP, dt)) return;
+      const on = walkOn(this.pos, this.vel, this.to, STEP, dt);
+      if (this.o.ground) this.pos.y = this.o.ground(this.pos.x, this.pos.z);
+      if (on) return;
       this.t = 0;
       this.walking = false;
       this.clip = 'crouch';
     }
     this.t += dt;
     this.lid?.(smoothstep(LID_FROM, LID_TO, this.t));
-    if (!this.found && this.t >= FOUND_AT) { this.found = true; this.onFound(); }
-    if (this.t >= KNEEL_FOR) { this.clip = undefined; this.done = true; }
+    const busy = this.o.busy ?? KNEEL_FOR;
+    if (!this.found && this.t >= busy - (KNEEL_FOR - FOUND_AT)) { this.found = true; this.onFound(); }
+    if (this.t >= busy) { this.clip = undefined; this.done = true; this.o.up?.(); }
   }
 }

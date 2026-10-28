@@ -12,7 +12,7 @@ import { talkCellar, talkEvent, townTalk, type TownTalk, type TownTalkSave } fro
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
 import { heldBy, refugeOf, takenFrom } from '../vgm/events';
-import type { Decision, DecisionLog, RetreatDecision } from '../world/decisions';
+import type { Decision, DecisionLog, RetreatDecision, TravellerDecision } from '../world/decisions';
 import { restingAt } from '../vgm/answers';
 import { strayAt } from '../vgm/situations';
 import { onCircle } from '../world/sites';
@@ -213,19 +213,27 @@ export class Township {
   private resting: string | null = null;
   private restKey = '';
 
+  /** The hurt traveller of this town resting by the way now, not yet tended (C10): their decision, or null. */
+  hurtNow(): TravellerDecision | null {
+    const log = this.c.log(), d = restingAt(log, this.c.hours(), this.id).at(-1);
+    return d?.situation && !keptOf(log).has(d.id) ? d : null;
+  }
+
   /** Its traveller stands where the VGM met the hero with them while that rest lasts, then is on the road again. */
   private rest(life: TownLife): void {
     const log = this.c.log(), hours = this.c.hours(), key = `${log.length}:${Math.floor(hours * 60)}`;
     if (key === this.restKey) return;
     this.restKey = key;
     const d = restingAt(log, hours, this.id).at(-1) ?? null;
-    if ((d?.id ?? null) === this.resting) return;
+    // A hurt one tended (kept) gets up and rests like any traveller.
+    const hurt = !!d?.situation && !keptOf(log).has(d.id), now = d ? `${d.id}:${hurt}` : null;
+    if (now === this.resting) return;
     const a = life.agents.find((x) => x.person.role === 'traveller');
     if (!a) return;
     // Facing the way the hero came from (the decision's yaw is atan2(x, z); an agent's dir is atan2(z, x)).
-    if (d) life.station(a, d.x, d.z, Math.PI / 2 - d.yaw, d.situation ? 'hurt' : 'wait');
+    if (d) life.station(a, d.x, d.z, Math.PI / 2 - d.yaw, hurt ? 'hurt' : 'wait');
     else life.unstation(a);
-    this.resting = d?.id ?? null;
+    this.resting = now;
   }
 
   /** A VGM order for this town (a gathering, a curfew): into the log by the caller, and its people follow it. */

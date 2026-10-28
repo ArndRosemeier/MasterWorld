@@ -212,7 +212,7 @@
     "reason": "Both supply TownTalk.services (talk/townTalk.ts) with their own topics: a people's hold and gifts, rooms and mending."
   },
   {
-    "key": "same name: masterworld/app/savesUi.ts#save + masterworld/game/standing.ts#save",
+    "key": "same name: masterworld/game/character.ts#save + masterworld/game/standing.ts#save",
     "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
   },
   {
@@ -245,7 +245,7 @@
   },
   {
     "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/townLife.ts + masterworld/world/sites.ts",
-    "reason": "A point at an angle and distance round a centre (x + cos\u00b7d, z + sin\u00b7d): plain trigonometry for three different things (rain's low ground, where townsfolk gather, a place's houses and tents)."
+    "reason": "A point at an angle and distance round a centre (x + cos·d, z + sin·d): plain trigonometry for three different things (rain's low ground, where townsfolk gather, a place's houses and tents)."
   },
   {
     "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/terrain/TerrainView.ts#refresh",
@@ -508,7 +508,7 @@
     "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
   },
   {
-    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/smallLife.ts#step",
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/app/spellFx/particles.ts#step",
     "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
   },
   {
@@ -520,11 +520,19 @@
     "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
   },
   {
-    "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/tradeUi.ts#opened",
-    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
-  },
-  {
     "key": "same name: masterworld/app/spellFx/looks.ts#hit + masterworld/game/fight.ts#hit",
     "reason": "Unrelated: the fight's recipe host lands a blow on a creature (rules); the spell looks draw where a spell struck (pictures). Only the name matches."
+  },
+  {
+    "key": "clone: masterworld/game/guilds.ts#bookSave + masterworld/game/standing.ts#save",
+    "reason": "Both write a small state as plain data with its optional lists left out when empty; the states are unrelated (the guild book, the hero's standing)."
+  },
+  {
+    "key": "idiom: [.atan2 .x .z Math] in masterworld/app/encounter.ts + masterworld/app/walkTo.ts + masterworld/vgm/dungeons.ts",
+    "reason": "Math.atan2 of a dx, dz: the language idiom for the way from one point to another (a facing, a bearing), not a copied helper; it crossed the info floor when vgm/quests.ts grew the corpus."
+  },
+  {
+    "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/game/recipe.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
+    "reason": "Math.atan2 of a dx, dz: the language idiom for the way from one point to another (a facing, a bearing), not a copied helper; it crossed the info floor when vgm/quests.ts grew the corpus."
   }
 ]

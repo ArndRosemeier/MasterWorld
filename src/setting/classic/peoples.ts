@@ -72,6 +72,7 @@ export const peoples: readonly PeopleDef[] = [
 export const standing: StandingDef = {
   kept: 10,
   task: 8,
+  help: 5,
   gift: { price: 60, raise: 5, upTo: 15, topic: 'Accept a gift for your people ({coins}).', line: 'A gift? Hm. Then you know how things are done. I will see it reaches the hold.' },
   trespass: -6,
   struck: -20,
