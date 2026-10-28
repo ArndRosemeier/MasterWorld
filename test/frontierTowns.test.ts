@@ -6,7 +6,9 @@ import { byFreshWater } from '../src/world/freshWater';
 import { settlementOf } from '../src/world/decisions';
 import { townPlanOf } from '../src/world/town';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement, woodsOf } from '../src/world/flora';
-import { EAST, SOUTH, WEST, along, first, home, regions, seed, terrain } from './frontierLand';
+import { EAST, SOUTH, WEST, frontierLand } from './frontierLand';
+
+const { along, first, home, regions, seed, terrain } = frontierLand();
 
 test('frontier: waystations, hamlets and villages are towns of their size from the one planner, settled from the log', () => {
   const founded = [along(EAST), along(SOUTH), along(WEST)].flatMap((log) => regionDecisions(log).filter((d) => settlementOf(d, regions.fills)));

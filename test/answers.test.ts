@@ -6,7 +6,9 @@ import { findIn, restingAt, sightFor, sightsOf, type NeedContext } from '../src/
 import { Township } from '../src/game/township';
 import { answerNeed } from '../src/vgm/toolbox';
 import { layOutSight } from '../src/world/sites';
-import { home, seed, terrain, walk, EAST } from './frontierLand';
+import { EAST, frontierLand } from './frontierLand';
+
+const { home, seed, terrain, walk } = frontierLand();
 
 // C9: an overdue need asks the tools that meet it for their cheapest fitting move, on the hero's way.
 
