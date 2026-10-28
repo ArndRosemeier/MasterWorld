@@ -24,6 +24,9 @@ export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & Omit<Even
   readonly tools?: readonly string[];
   /** How much this player enjoys a need (C12: the player model); none: no lean. */
   readonly lean?: (n: Need) => number;
+  /** Told how long each tool took (the hitch log): its id and ms, by `timeNow`. */
+  readonly spent?: (tool: string, ms: number) => void;
+  readonly timeNow?: () => number;
 };
 
 export interface Tool {
@@ -103,7 +106,8 @@ export function vgmTurn(c: TurnContext): Made[] {
   let log = c.log;
   for (const t of TOOLS) {
     if (t.asked !== 'turn' || !t.next || (c.tools && !c.tools.includes(t.id))) continue;
-    const at = { ...c, log }, d = t.next(at);
+    const t0 = c.timeNow?.() ?? 0, at = { ...c, log }, d = t.next(at);
+    if (c.spent && c.timeNow) c.spent(t.id, c.timeNow() - t0);
     if (!d) continue;
     out.push(madeBy(t.id, d, t.why?.(d, at) ?? t.name, c.hours));
     log = [...log, d];
@@ -123,7 +127,8 @@ export function madeBy(tool: string, decision: Decision, reason: string, at: num
 export function answerNeed(need: Need, c: NeedContext): Made | null {
   for (const t of TOOLS) {
     if (t.asked !== 'need' || t.need !== need || !t.answer) continue;
-    const d = t.answer(c);
+    const t0 = c.timeNow?.() ?? 0, d = t.answer(c);
+    if (c.spent && c.timeNow) c.spent(t.id, c.timeNow() - t0);
     if (d) return madeBy(t.id, d, `${need} is overdue: ${d.kind === 'sight' ? d.sight : d.kind === 'wild' ? `${d.encounter} (${d.members.length}) lying in wait` : d.kind} by the hero's way${c.toward ? ` to ${Math.round(c.toward.x)}, ${Math.round(c.toward.z)}` : ''}`, c.hours);
   }
   return null;
