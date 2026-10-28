@@ -16,7 +16,8 @@ const KEEP = 400;
 const MOVE = 16;
 
 export class TerrainView {
-  private readonly index = new BufferAttribute(chunkIndex(SEGS), 1);
+  /** The triangle lists by segments (shared by every chunk of that many; brook chunks come finer). */
+  private readonly indices = new Map<number, BufferAttribute>();
   private readonly built = new Map<string, Mesh>();
   private readonly building = new Set<string>();
   private shown = new Set<string>();
@@ -104,7 +105,9 @@ export class TerrainView {
 
   private mesh(k: ChunkKey, m: ChunkMesh): Mesh {
     const size = chunkSize(k.level);
-    const mesh = groundMesh(m, this.index, k.x * size, k.z * size);
+    let index = this.indices.get(m.segs);
+    if (!index) this.indices.set(m.segs, (index = new BufferAttribute(chunkIndex(m.segs), 1)));
+    const mesh = groundMesh(m, index, k.x * size, k.z * size);
     mesh.name = `terrain ${chunkId(k)}`;
     return mesh;
   }

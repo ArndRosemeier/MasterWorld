@@ -7,6 +7,7 @@ import { SURFACES } from '../setting/contract';
 import type { Terrain } from './terrain';
 import { canopySampler, type Canopy } from './canopy';
 import { TownGround } from './town';
+import { emptyWater, inChannel } from './hydro';
 
 export interface ChunkSpec {
   /** World position of the chunk's minimum corner. */
@@ -32,9 +33,31 @@ export interface ChunkMesh {
    * neighbours), so rock, sand and grass meet along smooth lines instead of the mesh's triangles.
    */
   level: Float32Array;
+  /** Quads per side it was built with (the worker may build finer than asked: `finerFor`). */
+  segs: number;
   minY: number;
   maxY: number;
 }
+
+/** Brooks are drawn finer: a chunk this size or smaller with a brook's channel in it is built at twice the segments asked. */
+export const BROOK_FINE_SIZE = 128;
+/** Sampling step when looking for a brook's channel in a chunk, m (the narrowest channel is 2 m wide). */
+const BROOK_LOOK = 2;
+
+/**
+ * The segments chunk `spec` is built with: twice those asked where a brook's channel crosses a near chunk.
+ * A brook is only 2 to 7 m wide, so on the near chunks' 2 m grid its channel came out as a chain of big
+ * triangles (the water fills only the cells whose corners dip in); 1 m vertices follow its banks.
+ */
+export function finerFor(t: Terrain, spec: ChunkSpec): number {
+  if (spec.size > BROOK_FINE_SIZE) return spec.segs;
+  const w = emptyWater(), n = Math.ceil(spec.size / BROOK_LOOK);
+  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+    if (inChannel(t.hydro.brookAt(spec.x0 + i * BROOK_LOOK, spec.z0 + j * BROOK_LOOK, w), BROOK_LOOK) && w.brook) return spec.segs * 2;
+  }
+  return spec.segs;
+}
+
 
 export const vertexCount = (segs: number): number => (segs + 1) * (segs + 1) + 4 * segs;
 
@@ -147,7 +170,7 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     for (let c = 0; c < 4; c++) { surface[v * 4 + c] = surface[g * 4 + c]; canopy[v * 4 + c] = canopy[g * 4 + c]; }
     level[v] = level[g];
   }
-  return { position, normal, color, surface, level, canopy, minY: minY - drop, maxY };
+  return { position, normal, color, surface, level, canopy, segs, minY: minY - drop, maxY };
 }
 
 /** Moves world-space vertices (x, y, z triples) to be relative to their middle (whole metres, xz); returns it. */

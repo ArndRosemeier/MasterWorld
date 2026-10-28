@@ -5,6 +5,7 @@ import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
 import { BROOKS, brookDepth, packRivers } from '../src/world/hydro';
 import { DRY, flowSpeed, waterMask } from '../src/world/water';
+import { finerFor } from '../src/world/chunkMesh';
 import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
@@ -138,4 +139,14 @@ test('water mask: off the water the surface lies under the ground (no sheet floa
     }
   }
   assert.ok(checked > 1000, `${checked} dry samples`);
+});
+
+test('brooks: a near terrain chunk with a brook in it is built at 1 m, others at the 2 m asked', () => {
+  const r = own[0], k = Math.floor(r.level.length / 2), bx = r.xz[k * 2], bz = r.xz[k * 2 + 1];
+  const at = (x: number, z: number, size = 128) => ({ x0: Math.floor(x / size) * size, z0: Math.floor(z / size) * size, size, segs: 64 });
+  assert.equal(finerFor(terrain, at(bx, bz)), 128, 'the brook chunk');
+  assert.equal(finerFor(terrain, at(bx, bz, 256)), 64, 'farther chunks stay as asked');
+  // Not every near chunk: some round it have no brook.
+  const round = [...Array(25).keys()].map((i) => at(bx + ((i % 5) - 2) * 128, bz + (Math.floor(i / 5) - 2) * 128));
+  assert.ok(round.some((s) => finerFor(terrain, s) === 64), 'chunks without a brook stay at 2 m');
 });

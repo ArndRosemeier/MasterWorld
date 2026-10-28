@@ -11,6 +11,7 @@ import { grassMask } from '../src/world/grass';
 import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
 import { archY, bridgeMesh, bridgeSideAt, bridgesOn, deckAt, deckY } from '../src/world/bridges';
 import { emptyWater, inChannel } from '../src/world/hydro';
+import { Walker } from '../src/game/walker';
 import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
@@ -132,5 +133,32 @@ test('roads: every brook the track crosses has a bridge over its open channel', 
     assert.equal(bridgeSideAt(b, ...side(b.half - 0.2), 0.3, y + 1), false, 'not over the parapet');
     assert.equal(bridgeSideAt(b, b.x0 - dx / L * 2, b.z0 - dz / L * 2, 0.3, y), false, 'the road before it is open');
     assert.ok(Math.abs(deckAt(b, ...side(0))! - y) < 1e-6, 'the deck is the ground between its parapets');
+  }
+});
+
+test('roads: the hero walks over every bridge both ways, no jump over the steep banks under the deck', () => {
+  const bridges = bridgesOn(road, terrain.hydro, pt(0).x, pt(0).z, 1e5, () => true);
+  const deck = (x: number, z: number) => bridges.map((b) => deckAt(b, x, z)).find((y) => y !== null) ?? null;
+  const world = {
+    height: (x: number, z: number) => terrain.height(x, z),
+    floor: deck,
+    rockSurface: () => null,
+    waterLevel: () => null,
+    wall: (x: number, z: number, r: number, y?: number) => bridges.some((b) => bridgeSideAt(b, x, z, r, y)),
+  };
+  for (const b of bridges) for (const dir of [1, -1]) {
+    const L = Math.hypot(b.x1 - b.x0, b.z1 - b.z0), ux = ((b.x1 - b.x0) / L) * dir, uz = ((b.z1 - b.z0) / L) * dir;
+    const [sx, sz] = dir > 0 ? [b.x0 - ux * 5, b.z0 - uz * 5] : [b.x1 - ux * 5, b.z1 - uz * 5];
+    const w = new Walker(world);
+    w.place(sx, sz);
+    let lowest = Infinity;
+    for (let k = 0; k < 60 * 6; k++) {
+      w.step({ forward: 1, strafe: 0, heading: Math.atan2(-ux, -uz), walk: false, up: false, down: false }, 1 / 60);
+      const d = deck(w.pos.x, w.pos.z);
+      if (d !== null) lowest = Math.min(lowest, w.pos.y - d);
+    }
+    const made = (w.pos.x - sx) * ux + (w.pos.z - sz) * uz;
+    assert.ok(made > L + 10, `${b.id} ${dir > 0 ? 'forth' : 'back'}: stopped ${made.toFixed(1)} m in, of ${(L + 10).toFixed(1)}`);
+    assert.ok(lowest > -0.05, `${b.id}: on the deck all the way (${lowest.toFixed(2)})`);
   }
 });
