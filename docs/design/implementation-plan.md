@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Current phase: D** (to be planned in detail, section 4).
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Current phase: D** (steps drafted in section 4, waiting for Arnd).
 
 ---
 
@@ -119,7 +119,29 @@ Gate C: a fight with magic in the F1 set, the loop check with a mage hero, every
 
 ### Phase D: Seas (milestone 7)
 
-Coasts, boats and islands as section 13 describes. This is planned in detail when phase C closes.
+Goal: the sea becomes a place to go. Harbours, boats and islands beyond the fog are the VGM's largest frontier (13).
+
+**Draft (2026-10-28), waiting for Arnd's decision.** Nothing here is to be built until Arnd accepts it. The steps are named S1–S8 (for seas), so they don't clash with the design plan's decisions D1–D53. PR lines read `PLAN: S2 boats`.
+
+What is already there: coasts in the skeleton, Gerstner-wave seas with swell and shore foam, swimming and diving, and the underwater view (D25).
+
+| Step | Delivers | Done when | Design |
+|---|---|---|---|
+| S1 | **The sea in the floor**: the coast, a beach, a cliff and an underwater look added to the F1 land run; any gaps against D25 (foam, depth colour, the waterline at the camera) fixed first | F1 coast and underwater shots within F2 and F3 | 13, D25 |
+| S2 | **Harbour towns**: settlements where a river meets the sea (D50 still holds: the river is the fresh water), with a quay, piers, moored boats, a fish market and fisherfolk routines, all on the one township core (B3a). Regions opened towards the coast can make one | Test: a region by a river mouth gets a harbour town; the loop check runs an evening in one | 6, 13, D50 |
+| S3 | **Boats**: a rowing boat the hero can take and row on the swell (hero-class look, the boat rides the waves); fishing boats go out and come back in the world simulation | Shot: the hero rowing along the coast; F2 holds with boats on the water | 9.3, 13, D25 |
+| S4 | **Sea travel**: a ship between harbours as a journey promise (5.4, 4.4). The Builder outlines and builds the far harbour before the ship arrives, the way the cart between inns works (C7), and time passes as designed | Test against 5.4's numbers; the far side is built before arrival | 4.4, 5.4, 13 |
+| S5 | **Islands as promises**: islands across the sea in the skeleton, opened as regions when the VGM promises one ("sailors talk of an island beyond the fog"). Told in a harbour (D52: a sailor's talk, a wreck washed up), reached by ship or boat, with a place on it from `dungeonFor` | Test: an island is promised, told and reached, and the log replays it | 4.2, 5.5, 13 |
+| S6 | **Places by and under the sea**: sea caves, wrecks and sunken ruins as dungeon kinds added as data (C6c), reached on foot at low water, by boat or by diving, with breath while under | The variety sweep covers the new kinds; an underwater shot inside one | 8, 13 |
+| S7 | **Sea life and encounters**: gulls, seals and fish (small life); sea creatures, smugglers' coves and pirates as encounters (`encounterFor`); situations at sea (D52: a boat in trouble, a cry from the water) | The encounter sweep includes the sea; a situation at sea in a shot | 4, 9.3, D52 |
+| S8 | **Sea weather and sound**: storms at sea with swell and wind (D26), surf and gulls; a storm makes a crossing dangerous and the VGM can delay a ship | A storm at sea in the F1 set within F2; a crossing in a storm is delayed | 5.8, 16, D26 |
+
+Gate D: an evening in a harbour town in the loop check, a sea crossing to a promised island, a shot of an underwater place in the F1 set, F1–F8, and the review.
+
+Questions for Arnd before phase D starts:
+- Does the hero only row a boat and ride on ships as a passenger, or also sail one and own one?
+- Fights at sea: are they in phase D or later (boarding, a sea creature attacking a boat)?
+- Should islands have peoples and towns of their own in phase D, or only places to explore?
 
 ### Later (milestone 8)
 
