@@ -4,7 +4,9 @@ import { classic } from '../src/setting/classic/index';
 import { Director, NEEDS, type Need } from '../src/vgm/director';
 import { PlayerModel } from '../src/vgm/playerModel';
 import { paddockWolvesFor } from '../src/vgm/situations';
-import { seed, terrain, walk, EAST } from './frontierLand';
+import { EAST, frontierLand } from './frontierLand';
+
+const { seed, terrain, walk } = frontierLand();
 
 /**
  * A bot plays 90 minutes. Whenever a need is overdue the VGM makes a move for it (counted, by need), which

@@ -14,10 +14,17 @@ The slow checks today: `npm run variety` (every kind of dungeon, 1000 each) and 
 
 Tests use seeds, fake clocks and small fixtures, never wall-clock waits.
 
-`--test-timeout` holds for a whole test file too, setup at its top included, and files run three or four at
-once, so a file needs to finish well inside 5 s alone (about 3.5 s). The land's big rivers' grid costs about 2 s to
-build: a test that makes a `Terrain` or calls `openWorld` passes `SMALL` (test/small.ts) unless it needs the
-game's own rivers.
+`npm test` is `node tools/test/run.mjs`: the test files run in one process per core, side by side, and each process
+runs its share of the files one after the other (`--test-isolation=none`), so the code is loaded and compiled once per
+process, not once per file (MW: 47 s down to about 24 s on 4 cores). The shares are balanced by each file's tests' time
+in `tools/test/times.json` (`npm test -- --save-times` writes it anew; a new file counts as 1 s until then).
+`npm test -- test/town.test.ts` runs the files given, `TEST_PROCS=n npm test` with n processes.
+
+Because files share a process, a test file never changes what another one sees: a fixture a file settles more on is
+its own (`frontierLand()` in test/frontierLand.ts builds one land per file), and module-level state in `src` holds
+only caches. `--test-timeout` holds for each test; setup at a file's top is not timed, so keep it small. The land's
+big rivers' grid costs about 2 s to build: a test that makes a `Terrain` or calls `openWorld` passes `SMALL`
+(test/small.ts) unless it needs the game's own rivers.
 
 ## CI time
 
@@ -30,7 +37,7 @@ before it fails. When a warning shows up, find the cause then, not when it fails
 
 | Step | Time (Oct 2026) | Warn | Fail |
 |---|---|---|---|
-| `npm test` | ~40 s | 50 s | 60 s |
+| `npm test` | ~30 s | 50 s | 60 s |
 | `npm run variety` | ~12 s | 30 s | 5 min |
 | `npm run loop` (its runs side by side, one process each) | ~30 s | 60 s | 5 min |
 | `npm run build` | ~10 s | 30 s | 5 min |

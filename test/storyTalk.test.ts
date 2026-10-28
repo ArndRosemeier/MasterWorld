@@ -5,7 +5,9 @@ import { Township } from '../src/game/township';
 import { keepPromise } from '../src/vgm/leads';
 import { fadedFor, openEvents, takenFrom } from '../src/vgm/events';
 import type { Decision } from '../src/world/decisions';
-import { seed, terrain, walk, EAST } from './frontierLand';
+import { EAST, frontierLand } from './frontierLand';
+
+const { seed, terrain, walk } = frontierLand();
 
 const town = terrain.towns[0];
 const pd = town.plan.paddocks.find((p) => p.farm >= 0)!;
