@@ -23,6 +23,8 @@ import { hurtTraveller, meet, raidFarm, standClear } from './acts.mjs';
 import { fileURLToPath } from 'node:url';
 
 const TIMEOUT = 120000;
+/** What a shot's act hands to its `last` (run after the frames are measured, just before the picture). */
+const shotOf = {};
 const SETTLE = Number(process.env.SET_SETTLE ?? 4000);
 const MEASURE = Number(process.env.SET_MEASURE ?? 2000);
 // Dressing the town's 30 characters takes about 6 s after the page is ready (two at a time, about 1 s each, some 4 s):
@@ -150,14 +152,22 @@ const SESSIONS = [
     { name: 'hurt-traveller', act: async (p) => {
       const h = await hurtTraveller(p);
       if (!h) throw new Error('hurt-traveller: none was made');
-      await standClear(p, h, 6);
+      // Measured from 40 m (out of the reach of their cry): they cry out once, and the bubble lasts seconds.
+      await standClear(p, h, 40, { zoom: 3.2, pitch: -0.3, side: 0.5 });
       await p.waitForTimeout(1500);
+      shotOf.hurt = h;
+    },
+    // Then up to them for the picture: they see the hero and cry out.
+    last: async (p) => {
+      await standClear(p, shotOf.hurt, 5, { zoom: 3.2, pitch: -0.3, side: 0.5 });
+      await p.waitForFunction(() => !!window.game.speech.line, null, { timeout: 5000 }).catch(() => console.log('hurt-traveller: NO CRY'));
+      await p.waitForTimeout(800);
     } },
     { name: 'raided-farm', act: async (p) => {
       const { barn } = await raidFarm(p);
       if (!barn) throw new Error('raided-farm: no farm was raided');
       await p.waitForFunction(() => !!window.game.smoke.mesh.parent, null, { timeout: TIMEOUT });
-      await standClear(p, barn, 32, { pitch: 0.3, zoom: 3 });
+      await standClear(p, barn, 24, { pitch: 0.2, zoom: 5, side: 0.25, avoid: barn.avoid });
       await p.waitForTimeout(4000);
     } },
   ] },
@@ -226,6 +236,7 @@ for (const s of sessions) {
     const d0 = Date.now(), missing = await drawnNear(page, DRAWN), drawnS = (Date.now() - d0) / 1000;
     const settled = await shadersQuiet(page, SETTLE);
     const ft = await measureFrames(page, MEASURE);
+    if (shot.last) await shot.last(page);
     const file = `${String(ordinal.get(shot.name)).padStart(2, '0')}-${shot.name}.jpg`;
     await page.screenshot({ path: join(dir, file), type: 'jpeg', quality: 92, timeout: TIMEOUT });
     const sh = await page.evaluate(() => {

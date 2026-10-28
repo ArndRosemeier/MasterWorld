@@ -203,7 +203,7 @@ export const SPELL_SPRITE = defineKind('spell sprite', ['position', 'uv'], () =>
     return vec4(light.mul(edge), clamp(cover.mul(edge), 0.0, 1.0));
   })();
   return m;
-}, { cast: false, receive: false });
+}, { cast: false, receive: false }, true);
 
 /** The solids' per-instance stuff: (stuff, seed, glow, unused). */
 export const SOLID_ATTR = 'fx' as const;
@@ -237,4 +237,4 @@ export const SPELL_SOLID = defineKind('spell solid', ['position', 'normal', SOLI
   const litE = vec3(2.2, 1.9, 1.2).mul(rimF.mul(0.6).add(0.8)).mul(glow.add(0.6));
   m.emissiveNode = iceE.mul(ice).add(rockE.mul(rock)).add(leafE.mul(leaf)).add(litE.mul(lit));
   return m;
-}, { cast: false, receive: true });
+}, { cast: false, receive: true }, true);

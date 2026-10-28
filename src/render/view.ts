@@ -5,7 +5,7 @@ import { PerspectiveCamera, PCFSoftShadowMap, Scene, DirectionalLight, Hemispher
 import { SkyView } from './sky';
 import { GRADE, Stage, createPost, createRenderer, type Post } from '@futuremagic/stage';
 import { Float32BufferAttribute, type BufferGeometry } from 'three/webgpu';
-import { allKinds } from './materials';
+import { warmKinds } from './materials';
 import { WarmLights } from './warmLights';
 import './materials/flame';
 import { ORIGIN } from './origin';
@@ -81,7 +81,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
     }
     post.draw();
   };
-  const stage = new Stage(renderer, scene, drawn, { kinds: allKinds, attribute: standInAttribute, target: post ? post.target : undefined, draw });
+  const stage = new Stage(renderer, scene, drawn, { kinds: warmKinds, attribute: standInAttribute, target: post ? post.target : undefined, draw });
   const fit = (): void => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);

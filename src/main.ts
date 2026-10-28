@@ -353,11 +353,17 @@ export async function start(b: Boot): Promise<void> {
       view.stage.monitor.phase = 'warmup';
     });
     // Each part compiles as soon as it is made (its shadow shaders once the kinds are warm: 'Preparing shaders').
-    const compiling: Promise<unknown>[] = [kindsWarm];
+    const compiling: Promise<unknown>[] = [kindsWarm.then(() => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: compiled the kinds (warm-up)`))];
     const compileEarly = (objs: readonly Object3D[]) => {
-      for (const o of objs) compiling.push(view.stage.prepare(o).catch((e: unknown) => console.error('[load] an early compile failed', e)));
+      // Each says when it is done and how long it took (load.mjs prints it: what 'Preparing shaders' waits for).
+      for (const o of objs) {
+        const t0 = performance.now();
+        compiling.push(view.stage.prepare(o).then(
+          () => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: compiled ${o.name || o.type} (${((performance.now() - t0) / 1000).toFixed(1)} s)`),
+          (e: unknown) => console.error('[load] an early compile failed', e)));
+      }
     };
-    // Smoke over a raided farm (C10): one shader, built with the rain's.
+    // Smoke over a raided farm (C10): one shader, built once the game is playable (warmLater).
     const smoke = new SmokeView(deriveSeed(seed, 'smoke'));
     compileEarly([wx.precip]);
     loading.set('Filling the seas');
@@ -556,6 +562,7 @@ export async function start(b: Boot): Promise<void> {
     // What is still compiling; then, the kinds warm, every part again: a cache hit for its shaders (or the build of
     // what changed since, such as the hero's arms), and its shadow casters drawn once (Stage.prepare).
     await Promise.all(compiling);
+    console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: every early compile done; their shadows next`);
     await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
     let hurried = false;
     const shown = () => { view.stage.cap.share = hurried && !window.__mwReady ? 1 : capShare; view.stage.monitor.phase = hurried && !window.__mwReady ? 'warmup' : 'run'; };

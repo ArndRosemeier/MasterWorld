@@ -152,7 +152,7 @@ else {
   if (!drawn.columns || !drawn.shown || !drawn.staged) failed = true;
   await shoot(`0${NEEDS.length + 4}-raid-smoke`);
   // And close by, at the barn, to tell a column too faint to see from one not drawn at all.
-  await standClear(page, smokeAt, 25, { pitch: 0.45, zoom: 3 });
+  await standClear(page, smokeAt, 25, { pitch: 0.45, zoom: 3, avoid: smokeAt.avoid });
   await page.waitForTimeout(3000);
   await shoot(`0${NEEDS.length + 5}-raid-smoke-near`);
 }

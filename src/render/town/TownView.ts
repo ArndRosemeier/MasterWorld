@@ -3,6 +3,7 @@
  * far: the far one (no frames, shutters or sills) takes over past FAR metres. Drawn with the building
  * shader (materials/building.ts).
  */
+import { hash3f } from '@futuremagic/core';
 import { Group, type BufferAttribute, type Mesh, type Vector3 } from 'three/webgpu';
 import type { BuildingMesh, TownPlan } from '@futuremagic/settlement';
 import type { Stage } from '@futuremagic/stage';
@@ -14,8 +15,15 @@ import { buildingMeshAt } from '../materials/building';
 const FAR = 200;
 /** Switch back a little nearer, so a camera on the line does not flicker between the two. */
 const HYSTERESIS = 12;
-/** How much of its colour a burnt building keeps (soot over wood and thatch). */
-const CHAR = 0.22;
+/** A burnt building's colours: soot grey (this much of its own hue left), darkest up under the roof, in patches. */
+const CHAR = { hue: 0.25, foot: 0.11, top: 0.02, patch: 0.8 };
+
+/** A tint (0..1 sRGB) charred: `h` how high up the building (0 its foot, 1 its top), `n` a patch value 0..1. */
+export function charred(r: number, g: number, b: number, h: number, n: number): [number, number, number] {
+  const grey = 0.3 * r + 0.59 * g + 0.11 * b;
+  const f = (CHAR.foot + (CHAR.top - CHAR.foot) * Math.min(1, Math.max(0, h))) * (1 - CHAR.patch / 2 + CHAR.patch * n);
+  return [r, g, b].map((c) => (grey + (c - grey) * CHAR.hue) * f) as [number, number, number];
+}
 
 interface Cell { x: number; z: number; near: Mesh; far: Mesh; nearRanges: MeshRange[]; farRanges: MeshRange[] }
 
@@ -100,7 +108,15 @@ export class TownView {
         const index = mesh.geometry.index!.array as Uint32Array, tint = mesh.geometry.getAttribute('tint') as BufferAttribute, arr = tint.array as Float32Array;
         const at = Uint32Array.from(new Set(index.subarray(r[1], r[1] + r[2])));
         const saved = new Float32Array(at.length * 3);
-        at.forEach((v, k) => { saved.set(arr.subarray(v * 3, v * 3 + 3), k * 3); for (let j = 0; j < 3; j++) arr[v * 3 + j] *= CHAR; });
+        const pos = mesh.geometry.getAttribute('position');
+        let lo = Infinity, hi = -Infinity;
+        for (const v of at) { const y = pos.getY(v); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+        at.forEach((v, k) => {
+          saved.set(arr.subarray(v * 3, v * 3 + 3), k * 3);
+          // Soot patches: a hash of where the vertex stands (the same on every vertex there, half a metre apart).
+          const n = hash3f(id, Math.round(pos.getX(v) * 2), Math.round(pos.getY(v) * 2), Math.round(pos.getZ(v) * 2));
+          arr.set(charred(arr[v * 3], arr[v * 3 + 1], arr[v * 3 + 2], (pos.getY(v) - lo) / Math.max(1e-3, hi - lo), n), v * 3);
+        });
         tint.needsUpdate = true;
         out.push({ tint, at, saved });
       }
