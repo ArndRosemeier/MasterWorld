@@ -77,6 +77,9 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 | D52 | **Show, don't tell: situations, not quests.** The VGM makes situations that arise naturally and that the hero walks into and sees (a farmer chasing a stray cow, smoke over the trees, a wounded traveller, wolves at the paddock). Classic quests are a small part, only where they make sense; never a quest hub. NPCs get a speech bubble rarely, only when they have something important to say (a cry for help). | Arnd, 2026-10-27. Sections 4, 9; implementation plan C10. |
 | D53 | **The VGM is invisible in game.** Nothing in play names it or shows its hand. It is visible only in the game settings (its pacing) and in the debug menu, which keeps a log of its moves and why. | Arnd, 2026-10-27. Implementation plan C8. |
 | D54 | **Skills rise only through trainers: coin and standing.** Nothing rises by use, so nothing can be trained by repeating an action (casting at nothing, swinging at air), and skills that need a target are no harder to raise than those that don't. Every rank is bought from a trainer and paid in coin. The trainer teaches it only when the hero's standing is high enough, and higher for dangerous skills (fire, poison, stealth). ~~Standing is the one reputation the game already has, with the trainer's people (B4)~~ Since 2026-10-28: it is the hero's **reputation**, one number for the whole world (not per guild, not per people), so a travelling hero carries it from town to town; the peoples' standing (B4) stays a faction layer on top (prices, greetings, holds). Every good deed raises it, once: places cleared, promises kept, bands beaten, people helped (a hurt traveller tended, wolves beaten off a paddock), guild tasks. Tomes, rare items and deeds stay rare extra ways to a single ability. | Arnd, 2026-10-28 (skill spamming is not playing the game; per-guild standing is too complicated; a small gain by use would bring spamming back; reputation for skills global, every good deed gives it). Replaces growth by use in D30; changes D49. Sections 10, 11.4. |
+| D55 | **The land has shape at every scale: landforms and landscape kinds.** Big plains and forests stay, but they are not all there is. (1) **Landforms**: small, recognisable features 30–800 m across (knolls and tors with rock breaking through, dells and hollows, some with a pond, gullies and small ravines cut by brooks, rocky ridges and scarps, boulder fields and lone erratics, sinkholes, dry valleys, old banks and sunken lanes), a mix per biome as data in the setting, placed per cell from the seed like flora, blended into the height field; a middle band of relief (200–600 m) gives broken country between the plains. (2) **Rock meshes** scattered by rules (5.6 layer 3), so outcrops, boulders and scree stand on the land and block the hero. (3) **Landscape kinds**: the skeleton gives each stretch of country (5–20 km) a kind, as data in the setting, each with its own shapes and landforms: **mesa country** first (flat-topped plateaus with cliff walls, talus at their feet, valleys and canyons between, passes up gullies and ramps), then others (rolling downs, moor with tors, karst, badlands, glacial valleys …). The VGM may place a special landform as a decision (D10): a lone standing rock that becomes a landmark. | Arnd, 2026-10-28 (the land is well made but all big and without micro-topography; such areas should exist, but not only them). Sections 5.6, 5.9. |
+| D56 | **The start lies in a valley in mesa country**, by default: the start town on its river (D50) on the valley floor, plateaus all round, **reachable by climbing or by passes**. The hero **climbs** rock where it can be climbed (cracks, ledges, broken faces), seen climbing hand over hand (rule 11), at a cost in stamina; sheer and overhanging faces cannot be climbed. Passes are found on foot: a gully, a ramp of fallen rock, a stair cut long ago. | Arnd, 2026-10-28. Sections 5.9, 6. |
+| D57 | **Real caves.** Natural caves are big and run deep into the rock, entered from mouths in cliff faces and mesa walls (5.6 layer 2): caverns tens of metres high, several chambers, ways that climb and drop, water. Not every cave holds dwellers; some are sights to explore. The small cave of B5 is the least of them. | Arnd, 2026-10-28 (the cave he visited was very small and disappointing; he wants real caves, inside cliffs). Sections 5.6, 8. |
 
 ---
 
@@ -250,6 +253,16 @@ A pure height field stores one height per point, so overhangs, arches and natura
 
 The voxel cost is paid only where it is worth it. Geomancy (section 10) can edit volumes and spawn rock pieces; it does not dig through the height field.
 
+### 5.9 Landforms and landscape kinds (D55, D56)
+
+The height field alone made big, smooth country: shapes at 1.5, 5 and 12 km and a couple of metres of bumps over 70 m, nothing between. Walking it, one stretch looks like the next. Three things add the scales between:
+
+* **Landforms.** A closed set of small features, each a shape with its own rule (how big, how steep, where it sits: a dell in a hollow, a tor on a crest, a gully down a slope, an erratic on open ground), its rock and its plants. Each biome and each landscape kind names its mix in the setting (D14). A landform is placed per cell from the seed, like flora, so it never moves, and blended into the height field (`Terrain`), so roads, towns, rivers and places see it. Rock that the height field cannot hold (an overhang, a split boulder, a cave mouth) is a volume (layer 2) or a rock mesh (layer 3).
+* **Rock meshes.** Outcrops, boulders, scree and slabs from AssetGenerator (shared package, D23), scattered by the same rules, with collision. Within the shader budget: a few rock materials, instanced (F3).
+* **Landscape kinds.** The skeleton gives each stretch of country a kind, changing over 5–20 km with a believable border (a scarp, a river). A kind sets the big shapes and the landforms. **Mesa country**: flat-topped plateaus 40–200 m high (dramatic, D18) with cliff walls (the sea cliff's profile, layered), talus and fallen blocks at their feet, broad valleys and narrow canyons between, plateau tops with their own small landforms; every plateau has at least one pass (a gully, a ramp of fallen rock, an old cut stair) and climbable stretches of wall. More kinds follow as data: rolling downs, moor with tors, karst, badlands, glacial valleys.
+
+**Climbing (D56).** The hero climbs rock that offers holds (the climbable stretches a landform or wall marks), seen climbing (rule 11), with stamina; a fall hurts. The walker and the loop bot know the climbable places and the passes, so routes up a plateau are found, not guessed.
+
 ### 5.7 Hero-class graphics (D17)
 
 * Every asset and material aims for hero quality from the first milestone. Placeholders are allowed only behind a flag, never as the shipped default.
@@ -273,7 +286,7 @@ Weather is part of the world model (`src/world/weather.ts`), pure and determinis
 
 ## 6. The start
 
-* One small town on a river bank (D50; a crossing is best, that is where real towns grow), in a temperate region. The setting names the kind of place to start; the start moves from there to the bank of the nearest river (seed `masterworld`: 2.8 km north-east, by the waterfall), and the arch, the hold and the first places are sited round it.
+* One small town on a river bank in a valley of mesa country (D56; D50; a crossing is best, that is where real towns grow), in a temperate region. The setting names the kind of place to start; the start moves from there to the bank of the nearest river (seed `masterworld`: 2.8 km north-east, by the waterfall), and the arch, the hold and the first places are sited round it.
 * The town's region is open (about 1 km), the land around it is sketched.
 * This start is the default **setting module** (D14, section 12). Another module can start somewhere else entirely.
 * Three or four promises are already planted in townsfolk: a cellar with a problem, a nearby ruin, a road with trouble, something farther away.
@@ -705,9 +718,10 @@ StarLord's title is the bar: the game's own world, alive, playful, new every sta
 4. **The Director**: needs, tension curve, the first combat, items and rewards, music.
 5. **The frontier**: opening regions as the player walks, story events (raids, takeovers), more dungeon kinds, more settlement sizes.
 6. **Skills and magic.**
+6b. **The land at every scale**: landforms, rock, landscape kinds with mesa country first, the start in a mesa valley, climbing, real caves (D55–D57; phase L).
 7. **Seas.**
 8. Later: the LLM hook, multiplayer, crafting.
 
-The order of the work, its steps and their done-checks are in [implementation-plan.md](implementation-plan.md). Milestones 3–4 are finished there as phase A (trading, upkeep, death and roguelike mode, the loop check), 5 is phase B, 6 is phase C and 7 is phase D.
+The order of the work, its steps and their done-checks are in [implementation-plan.md](implementation-plan.md). Milestones 3–4 are finished there as phase A (trading, upkeep, death and roguelike mode, the loop check), 5 is phase B, 6 is phase C, 6b is phase L and 7 is phase D.
 
 Alongside, from now on: the interface's design language (O17) and the title animation (O18), because both shape how the game feels from the first second.
