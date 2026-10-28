@@ -13,9 +13,7 @@ const BANK_GAPS = [25, 60];
 const LAKE_RING = 30;
 const LAKE_DIRS = 12;
 
-type Land = Pick<Terrain, 'hydro' | 'height' | 'clearOfWater'>;
-
-const wet = { river: 0, lake: 0 };
+type Land = Pick<Terrain, 'hydro' | 'height'>;
 
 /**
  * Metres from (x, z) to the nearest fresh water (a brook's or river's edge, or a lake's surface), if any lies
@@ -28,7 +26,9 @@ export function freshWaterEdge(t: Land, x: number, z: number, within: number, br
     const dirs = d === 0 ? 1 : LAKE_DIRS;
     for (let a = 0; a < dirs; a++) {
       const px = x + Math.cos((a / dirs) * Math.PI * 2) * d, pz = z + Math.sin((a / dirs) * Math.PI * 2) * d;
-      if (t.clearOfWater(px, pz, t.height(px, pz), wet).lake < 0) return Math.min(best, d);
+      // Where no lake lies (most of the land) the ground's height need not be asked.
+      const level = t.hydro.lakeLevel(px, pz);
+      if (!Number.isNaN(level) && t.height(px, pz) < level) return Math.min(best, d);
     }
   }
   return best;

@@ -64,25 +64,62 @@ else {
     const p = window.game.player.walker.pos;
     return gates.reduce((b, x) => (Math.hypot(x.x - p.x, x.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? x : b));
   }, cap.gates);
+  // What each frame of the ride spends its time on (the parts that can spike), to name what a slow frame did.
+  await page.evaluate(() => {
+    const g = window.game, S = (window.__span = {});
+    const span = (o, name, label) => {
+      const fn = o?.[name];
+      if (typeof fn !== 'function') return;
+      o[name] = function (...a) { const t = performance.now(); try { return fn.apply(this, a); } finally { S[label] = (S[label] ?? 0) + performance.now() - t; } };
+    };
+    span(g.flora, 'update', 'trees');
+    span(g.grass, 'update', 'grass');
+    span(g.ground, 'update', 'ground');
+    span(g.towns, 'tick', 'towns tick');
+    span(g.towns, 'live', 'town life');
+    span(g.roads, 'follow', 'roads');
+    span(g.sea, 'update', 'sea');
+    span(g.view.sky, 'update', 'sky');
+    span(g.view.sky.horizon, 'track', 'horizon');
+    span(g.origin, 'follow', 'origin');
+    span(g.folk, 'follow', 'folk');
+    span(g.view.stage, 'frame', 'stage frame');
+    span(g.view.stage, 'prepare', 'stage prepare');
+    span(g.view.renderer, 'render', 'render');
+  });
   const way = await page.evaluate(([g, m, pace]) => new Promise((done) => {
     const game = window.game, p = game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;
     // To a point 34 m out before the gate, along its road's line.
     const tx = g.x + ux * s * 34, tz = g.z + uz * s * 34, from = { ...p.walker.pos }, L = Math.hypot(tx - from.x, tz - from.z);
     const town = game.towns.every.find((x) => x.town.decision.size === 'capital');
-    let last = performance.now(), worst = 0, worstAt = 0, slow = 0, made = -1, gone = 0;
+    let last = performance.now(), worst = 0, worstAt = 0, slow = 0, made = -1, gone = 0, n0 = window.shaders?.events.length ?? 0;
+    const S = window.__span, frames = [];
     const step = (now) => {
       const dt = now - last; last = now;
-      if (gone > 0.5) { if (dt > worst) { worst = dt; worstAt = Math.round(L - gone); } if (dt > 25) slow++; }
+      const ev = window.shaders?.events.slice(n0) ?? []; n0 += ev.length;
+      if (gone > 0.5) {
+        if (dt > worst) { worst = dt; worstAt = Math.round(L - gone); }
+        if (dt > 25) { slow++; frames.push({ dt, at: Math.round(L - gone), spans: { ...S }, builds: ev.map((e) => `${e.kind} ${e.ms.toFixed(1)} ${e.what}`) }); }
+      }
+      for (const k in S) S[k] = 0;
       gone = Math.min(L, gone + (pace * Math.min(dt, 50)) / 1000);
       if (made < 0 && town?.living) made = Math.round(L - gone);
       const k = gone / L, x = from.x + (tx - from.x) * k, z = from.z + (tz - from.z) * k;
       p.teleport(x, undefined, z, Math.atan2(x - tx, z - tz));
-      if (gone < L) requestAnimationFrame(step); else done({ worst, worstAt, slow, made, L: Math.round(L) });
+      if (gone < L) requestAnimationFrame(step); else done({ worst, worstAt, slow, made, L: Math.round(L), frames });
     };
     requestAnimationFrame(step);
   }), [g, cap.market, PACE]);
   console.log(`the way in (${way.L} m at ${PACE} m/s): worst frame ${way.worst.toFixed(0)} ms ${way.worstAt} m from the gate, ${way.slow} frames over 25 ms; its people lived from ${way.made} m out`);
-  rows.way = way;
+  // Where the slow frames fall (100 m bins, counted from the gate), and what the slowest spent their time on.
+  const bins = {};
+  for (const f of way.frames) { const b = Math.floor(f.at / 100) * 100; bins[b] = (bins[b] ?? 0) + 1; }
+  console.log(`slow frames by distance from the gate: ${Object.entries(bins).sort((a, b) => b[0] - a[0]).map(([b, n]) => `${b}-${Number(b) + 100} m: ${n}`).join(', ')}`);
+  for (const f of [...way.frames].sort((a, b) => b.dt - a.dt).slice(0, 10)) {
+    const known = Object.values(f.spans).reduce((n, v) => n + v, 0);
+    console.log(`  ${f.dt.toFixed(0)} ms at ${f.at} m (outside these: ${(f.dt - known).toFixed(0)}): ${Object.entries(f.spans).filter(([, v]) => v >= 0.5).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')}${f.builds.length ? ' | ' + f.builds.join('; ') : ''}`);
+  }
+  rows.way = { ...way, frames: undefined };
   // Before the gate, outside, looking back in through the gateway.
   await page.evaluate(([g, m]) => {
     const p = window.game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;

@@ -6,7 +6,7 @@
  */
 import { PointLight, type Scene, type Vector3 } from 'three/webgpu';
 import { hash32, hashToFloat } from '@futuremagic/core';
-import type { TownBuilding } from '@futuremagic/settlement';
+import type { TownBuilding, TownWall } from '@futuremagic/settlement';
 import { ORIGIN } from './origin';
 
 /** Plain point lights in the pool (the shadow torch is one more). */
@@ -16,6 +16,8 @@ const HAND_OVER = 6;
 /** Candela: a lit doorway, a torch. */
 const DOOR = 6;
 const TORCH = 9;
+/** A gate's lanterns: this far out before the wall's face and in behind its leaves (m), this high over the road. */
+const GATE_OUT = 0.5, GATE_IN = 1.6, GATE_UP = 3.4;
 /** Candela of the soft fill in a room, and how far it reaches (m). */
 const FILL = 3;
 const FILL_REACH = 7;
@@ -57,12 +59,20 @@ export class WarmLights {
     scene.add(s);
   }
 
-  /** The doors: in front of each building's street side, a little above the lintel. */
-  atDoors(buildings: readonly TownBuilding[], groundAt: (x: number, z: number) => number): void {
+  /**
+   * The doors: in front of each building's street side, a little above the lintel. And a walled town's gates
+   * (`walls`): a lantern before each gateway and one behind its leaves, always lit at night, so a shut gate's
+   * oak and iron are seen.
+   */
+  atDoors(buildings: readonly TownBuilding[], groundAt: (x: number, z: number) => number, walls: readonly TownWall[] = []): void {
     this.doors = buildings.map((b) => {
       const x = b.cx - b.vx * (b.hv + 0.9), z = b.cz - b.vz * (b.hv + 0.9);
       return { x, y: groundAt(x, z) + 2.4, z, roll: hashToFloat(hash32(b.id * 7919 + 17)) };
     });
+    for (const w of walls) for (const g of w.gates) {
+      // The road's way out is `angle`: out before the wall's face, in behind the leaves.
+      for (const d of [w.thick / 2 + GATE_OUT, -(w.thick / 2 + 0.6 + GATE_IN)]) this.doors.push({ x: g.x + d * Math.cos(g.angle), y: g.y + GATE_UP, z: g.z + d * Math.sin(g.angle), roll: -1 });
+    }
   }
 
   /** Underground: the torches (world positions), or null on the way up again. */
