@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 10;
+export const CONTRACT_VERSION = 11;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -254,15 +254,18 @@ export interface CellarLore {
   readonly dwellers: readonly DwellerDef[];
 }
 
-/** The skills a character can grow by use (plan 10, 11.4, D30): no classes, no XP. */
+/** The skills a character can learn from trainers (plan 10, 11.4, D30, D54): no classes, no XP. */
 export interface SkillDef {
   readonly id: string;
   readonly name: string;
   readonly group: 'combat' | 'magic' | 'utility' | 'survival' | 'social';
   /** Where a fresh character starts (0..100). */
   readonly start: number;
-  /** How fast use raises it (1 typical). */
-  readonly rate: number;
+  /**
+   * A dangerous skill (fire, shadow, stealth; D54): the standing with a trainer's people it asks on top of
+   * each rank's, the opening too. None: as any other.
+   */
+  readonly danger?: number;
   /** Everyone can use it from the start (with guilds, D49: other skills wait for a trainer or a past). */
   readonly open?: boolean;
   /** Its colour (sRGB 0..1): a school of magic's spells glow in it. */
@@ -741,16 +744,16 @@ export interface TrainerDef {
   readonly line: string;
   readonly skills: readonly string[];
   readonly upTo: number;
-  /** Copper for a lesson at skill 0; it grows with the square of (1 + skill / 10). */
+  /** Copper for a lesson at skill 0; it grows with the square of (1 + skill / 20). */
   readonly price: number;
   /** Game hours one lesson takes. */
   readonly hours: number;
 }
 
 /**
- * A skill's ranks (D49): how far use and lessons may raise it once a guild's trainer has opened that rank.
- * Rank 0 is the opening; each next rank asks the skill to have reached the one before by use (lessons stop
- * `earn` short of a rank's top), and may ask a trainer's task done or a standing with the guild.
+ * A skill's ranks (D49, D54): how far lessons may raise it once a guild's trainer has opened that rank. Rank
+ * 0 is the opening. Each rank is paid in coin, and may ask the guild's task done and a standing with the
+ * trainer's people (more for a dangerous skill: SkillDef.danger). Nothing rises by use.
  */
 export interface SkillRankDef {
   /** The highest the skill rises at this rank. */
@@ -759,7 +762,7 @@ export interface SkillRankDef {
   readonly price: number;
   /** The guild's task must be done first. */
   readonly task?: boolean;
-  /** Standing with the guild needed (0..100). */
+  /** Standing with the trainer's people needed (−100..100, plan 11.6). */
   readonly standing?: number;
 }
 
@@ -795,9 +798,9 @@ export interface GuildDef extends TrainerDef {
   readonly dress?: 'fighter' | 'traveller';
   /** The colour of the round shield over its door ('#rrggbb'; none: no sign, as for a hidden house). */
   readonly sign?: string;
-  /** What the trainer says on opening a skill or a rank, and when it needs more use (`{skill}`). */
+  /** What the trainer says on opening a skill or a rank, and when they do not trust the hero enough for it yet (`{skill}`). */
   readonly opens: string;
-  readonly unearned: string;
+  readonly distrust: string;
   readonly task: GuildTaskDef;
   /**
    * A magic teacher (plan 10, C3): copper for one of its schools' spells (the taught abilities of its skills),
@@ -1141,12 +1144,13 @@ export interface HoldDef {
 }
 
 /**
- * What changes the hero's standing (plan 11.6): a promise kept for one of a people's households (the
- * other peoples in town hear of it too, a third as much), a gift, walking into a hold unwelcome,
- * striking its guards, killing one.
+ * What changes the hero's standing (plan 11.6, D54): a promise kept for one of a people's households (the
+ * other peoples in town hear of it too, a third as much), a guild's task done (with its trainer's people),
+ * a gift, walking into a hold unwelcome, striking its guards, killing one. Each deed counts once.
  */
 export interface StandingDef {
   readonly kept: number;
+  readonly task: number;
   /** A gift: what it costs (copper; each gift to the same people costs this much more) and how much it raises standing, up to `giftsUpTo`. */
   readonly gift: { readonly price: number; readonly raise: number; readonly upTo: number; readonly topic: string; readonly line: string };
   readonly trespass: number;
@@ -1226,6 +1230,11 @@ export interface LookDef {
 /** The setting's ability of this id, if there is one. */
 export function abilityOf(m: Pick<SettingModule, 'abilities'>, id: string | undefined): AbilityDef | undefined {
   return id === undefined ? undefined : m.abilities.find((a) => a.id === id);
+}
+
+/** A skill of the setting by id (undefined: none such). */
+export function skillOf(m: Pick<SettingModule, 'skills'>, id: string | undefined): SkillDef | undefined {
+  return id === undefined ? undefined : m.skills.find((s) => s.id === id);
 }
 
 export function validateSetting(m: SettingModule): string[] {
@@ -1372,7 +1381,7 @@ function validateFight(m: SettingModule, where: string): string[] {
   const out: string[] = [];
   const skills = new Set(m.skills.map((s) => s.id));
   if (skills.size !== m.skills.length) out.push(`${where}: a skill is defined twice`);
-  for (const s of m.skills) if (!(s.start >= 0 && s.start <= 100) || !(s.rate > 0)) out.push(`${where}: skill "${s.id}" needs start 0..100 and rate > 0`);
+  for (const s of m.skills) if (!(s.start >= 0 && s.start <= 100) || !((s.danger ?? 0) >= 0)) out.push(`${where}: skill "${s.id}" needs start 0..100 and no negative danger`);
   for (const k of ['dodge', 'armour', 'shields', 'unarmed']) if (!skills.has(k)) out.push(`${where}: skill "${k}" is missing (the engine trains it)`);
   const items = new Map(m.items.items.map((i) => [i.id, i]));
   const tables = new Set(m.items.treasure.map((t) => t.id));

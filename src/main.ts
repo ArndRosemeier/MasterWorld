@@ -38,7 +38,7 @@ import { WINDOWS } from './render/materials/building';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg } from '@futuremagic/settlement';
-import { abilityOf, validateSetting, type BackgroundDef, type SituationKind } from './setting/contract';
+import { abilityOf, skillOf, validateSetting, type BackgroundDef, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -966,8 +966,9 @@ export async function start(b: Boot): Promise<void> {
       book: guildBook,
       log: () => log,
       hours,
+      standing,
     });
-    services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id)); });
+    services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id), a.person.race); });
     // The bard at the inn (D49): "where can I learn a skill?" names every guild house of the town and puts
     // it on the map, a hidden one with its way in.
     services.set('bard', (a) => {
@@ -1085,7 +1086,7 @@ export async function start(b: Boot): Promise<void> {
     });
     const book = new AbilityBook(character, setting, actionBar, { paused, get bindings() { return settings.current.bindings; } });
     // How exactly the hero knows where they are (plan 11.7): the map shows it, travel and reading it train it.
-    const orientation = new Orientation(seed, character, home);
+    const orientation = new Orientation(seed, character);
     // Where the hero believes they are, facing `yaw` (down in a cellar: at its house; in a barrow: at its forecourt).
     const believed = (yaw: number) => {
       const h = visit()?.houseDoor ?? null, w = player.walker;
@@ -1325,7 +1326,7 @@ export async function start(b: Boot): Promise<void> {
       camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
       nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
       backgrounds: setting.backgrounds,
-      skillName: (id) => setting.skills.find((k) => k.id === id)?.name ?? id,
+      skillName: (id) => skillOf(setting, id)?.name ?? id,
       itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
       knownBy: (bg) => (startTown ? friendsOf(bg).map((a) => `${startTown.talk.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
       click: () => sound.play('click'),
@@ -1630,8 +1631,7 @@ export async function start(b: Boot): Promise<void> {
       // Talk follows the hero from town to town (a talk going on stays where it is).
       { const t = here(); if (t) { if (!t.been) director.met('discovery'); t.been = true; if (talk) talk.place = t; } }
       talk?.watch();
-      const at = player.walker.pos, up = orientation.train(dt, at.x, at.z, !!map?.isOpen, !player.offFoot && !visit());
-      if (up) { notes.say(`Your ${up.name} rises to ${up.level}.`, 4); sounds?.cue({ kind: 'skill', up }); }
+      const at = player.walker.pos;
       // The map fills in: the land round the hero as they go (not below ground), and a sketch of the way to each new mark.
       if (!visit() && (!seenAt || Math.hypot(at.x - seenAt[0], at.z - seenAt[1]) > 16)) { seenAt = [at.x, at.z]; known.see(at.x, at.z); }
       for (const l of journal.open) if (!known.told(l.id)) known.tell(l.id, rooms?.outside ? [rooms.outside.x, rooms.outside.z] : [at.x, at.z], [l.mark.x, l.mark.z]);

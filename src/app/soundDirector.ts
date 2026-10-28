@@ -187,7 +187,6 @@ export class SoundDirector {
       }
       case 'fallen': e.play('fight/fall'); break;
       case 'found': case 'paid': e.play('fight/coins', { bus: 'ui' }); break;
-      case 'skill': e.play('title/ward', { bus: 'ui', gain: 0.5 }); break;
       default: break;
     }
   }

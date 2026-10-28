@@ -13,7 +13,7 @@
 import { Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import { deriveSeed } from '@futuremagic/core';
-import type { AbilityDef, SettingModule, SpellMotif } from '../setting/contract';
+import { skillOf, type AbilityDef, type SettingModule, type SpellMotif } from '../setting/contract';
 import { blowOf, shapeOf, type RecipeEvent, type Recipes, type Spot } from '../game/recipe';
 import { SpellBits, type Vec3 } from './spellFx/particles';
 import { lookOf, type Caster, type FxLook } from './spellFx/looks';
@@ -98,7 +98,7 @@ export class SpellView {
     const id = def.glow ? `ability:${def.id}` : def.skill ?? '';
     let s = this.showings.get(id);
     if (!s) {
-      const k = this.setting.skills.find((x) => x.id === def.skill);
+      const k = skillOf(this.setting, def.skill);
       const motif = def.glow?.motif ?? k?.motif ?? 'radiance';
       s = { fx: lookOf(motif), motif };
       this.showings.set(id, s);
@@ -167,7 +167,7 @@ export class SpellView {
   /** A spell (a school's, or an item's glow): cast with the hands. Not a weapon's blow, a change of shape or a breath. */
   private isSpell(def: AbilityDef): boolean {
     if (blowOf(def) || shapeOf(def)) return false;
-    return !!def.glow || this.setting.skills.find((s) => s.id === def.skill)?.group === 'magic';
+    return !!def.glow || skillOf(this.setting, def.skill)?.group === 'magic';
   }
 
   private took(e: RecipeEvent, f: SpellFrame): void {

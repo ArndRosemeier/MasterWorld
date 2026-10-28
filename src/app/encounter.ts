@@ -342,7 +342,6 @@ export class Encounter {
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
       case 'spared': this.director.met('people', 0.5); break;
       case 'killed': if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
-      case 'skill': this.director.queue(`Your ${e.up.name} rises to ${e.up.level}.`, 1); break;
       case 'refused': this.notes.say(e.text, 2.5); break;
       case 'recipe': if (this.active) this.spellCues.push(e.event); break;
       case 'worn': if (e.state !== 'new') this.director.queue(fill(this.setting.upkeep.words[e.state], { item: e.item.name.toLowerCase() }), 1); break;

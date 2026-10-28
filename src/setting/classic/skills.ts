@@ -1,29 +1,29 @@
 /**
  * Skills, weapon abilities and the Director's pacing for the classic setting (plan 4.1, 10, 11.4). Skills
- * grow by use (D30); this is the first, fighting-heavy cut of Norgo's forty, the rest come with magic.
+ * are taught by trainers (D54); this is the first, fighting-heavy cut of Norgo's forty, the rest come with magic.
  */
 import type { AbilityDef, DirectorDef, EffectDef, SkillDef } from '../contract';
 
 export const skills: readonly SkillDef[] = [
-  { id: 'blades', name: 'Blades', group: 'combat', start: 12, rate: 1 },
-  { id: 'axes', name: 'Axes', group: 'combat', start: 8, rate: 1 },
-  { id: 'maces', name: 'Maces and clubs', group: 'combat', start: 8, rate: 1 },
-  { id: 'spears', name: 'Spears', group: 'combat', start: 8, rate: 1 },
-  { id: 'unarmed', name: 'Fists', group: 'combat', start: 8, rate: 1.2, open: true },
-  { id: 'shields', name: 'Shields', group: 'combat', start: 8, rate: 1 },
-  { id: 'armour', name: 'Armour', group: 'combat', start: 8, rate: 0.8 },
-  { id: 'dodge', name: 'Dodging', group: 'combat', start: 10, rate: 1, open: true },
-  { id: 'perception', name: 'Perception', group: 'utility', start: 15, rate: 0.8, open: true },
-  { id: 'stealth', name: 'Stealth', group: 'utility', start: 8, rate: 1 },
-  { id: 'orientation', name: 'Orientation', group: 'survival', start: 10, rate: 0.6, open: true },
-  { id: 'speech', name: 'Speech', group: 'social', start: 12, rate: 0.8, open: true },
+  { id: 'blades', name: 'Blades', group: 'combat', start: 12 },
+  { id: 'axes', name: 'Axes', group: 'combat', start: 8 },
+  { id: 'maces', name: 'Maces and clubs', group: 'combat', start: 8 },
+  { id: 'spears', name: 'Spears', group: 'combat', start: 8 },
+  { id: 'unarmed', name: 'Fists', group: 'combat', start: 8, open: true },
+  { id: 'shields', name: 'Shields', group: 'combat', start: 8 },
+  { id: 'armour', name: 'Armour', group: 'combat', start: 8 },
+  { id: 'dodge', name: 'Dodging', group: 'combat', start: 10, open: true },
+  { id: 'perception', name: 'Perception', group: 'utility', start: 15, open: true },
+  { id: 'stealth', name: 'Stealth', group: 'utility', start: 8, danger: 10 },
+  { id: 'orientation', name: 'Orientation', group: 'survival', start: 10, open: true },
+  { id: 'speech', name: 'Speech', group: 'social', start: 12, open: true },
   // The six schools that came back after the Fading (plan 10, 12.1): nobody starts with one; a teacher opens it (C3).
-  { id: 'pyromancy', name: 'Pyromancy', group: 'magic', start: 0, rate: 0.9, color: [1, 0.48, 0.14], motif: 'flame' },
-  { id: 'cryomancy', name: 'Cryomancy', group: 'magic', start: 0, rate: 0.9, color: [0.55, 0.85, 1], motif: 'frost' },
-  { id: 'geomancy', name: 'Geomancy', group: 'magic', start: 0, rate: 0.9, color: [0.78, 0.6, 0.36], motif: 'stone' },
-  { id: 'vitae', name: 'Vitae', group: 'magic', start: 0, rate: 0.9, color: [0.45, 1, 0.5], motif: 'bloom' },
-  { id: 'luminism', name: 'Luminism', group: 'magic', start: 0, rate: 0.9, color: [1, 0.9, 0.55], motif: 'radiance' },
-  { id: 'umbramancy', name: 'Umbramancy', group: 'magic', start: 0, rate: 0.9, color: [0.62, 0.38, 1], motif: 'shade' },
+  { id: 'pyromancy', name: 'Pyromancy', group: 'magic', start: 0, danger: 15, color: [1, 0.48, 0.14], motif: 'flame' },
+  { id: 'cryomancy', name: 'Cryomancy', group: 'magic', start: 0, color: [0.55, 0.85, 1], motif: 'frost' },
+  { id: 'geomancy', name: 'Geomancy', group: 'magic', start: 0, color: [0.78, 0.6, 0.36], motif: 'stone' },
+  { id: 'vitae', name: 'Vitae', group: 'magic', start: 0, color: [0.45, 1, 0.5], motif: 'bloom' },
+  { id: 'luminism', name: 'Luminism', group: 'magic', start: 0, color: [1, 0.9, 0.55], motif: 'radiance' },
+  { id: 'umbramancy', name: 'Umbramancy', group: 'magic', start: 0, danger: 10, color: [0.62, 0.38, 1], motif: 'shade' },
 ];
 
 export const abilities: readonly AbilityDef[] = [

@@ -174,13 +174,12 @@ export class Market {
     return this.hand(hero, m, item, hero.pack, m.stock, price);
   }
 
-  /** The thing goes across the counter and the coin the other way (`gain`: the hero's), and speech is trained. */
+  /** The thing goes across the counter and the coin the other way (`gain`: the hero's). */
   private hand(hero: Character, m: Merchant, item: Item, from: Item[], to: Item[], gain: number): null {
     from.splice(from.indexOf(item), 1);
     to.push(item);
     hero.coins += gain;
     m.coins -= gain;
-    hero.practise('speech', bargain(Math.abs(gain)));
     return null;
   }
 
@@ -227,5 +226,3 @@ export function shopOf(setting: SettingModule, p: Person): ShopDef | null {
   return setting.shops.find((s) => s.keeper === keeperOf(p)) ?? null;
 }
 
-/** How hard a bargain of this size trains speech (a skill level's worth of challenge). */
-const bargain = (price: number) => 6 + Math.log2(1 + price) * 2;

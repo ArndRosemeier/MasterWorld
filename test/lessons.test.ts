@@ -35,9 +35,10 @@ test('lessons: a lesson is one point for coin, dearer as the skill rises, none p
   assert.equal(hero.skills.get('blades'), blades + 1);
   // Rising: each point costs more than the one before.
   for (let l = 0; l < 40; l++) assert.ok(lessonPrice(arms, l + 1) > lessonPrice(arms, l));
-  // Lessons stop short of the rank's top (the rest only use teaches, D49).
+  // Lessons go up to the rank's top, and no further before the next rank is opened (D54).
   hero.coins = 1e6;
-  hero.skills.set('blades', 20);
+  hero.skills.set('blades', 24);
+  assert.equal(takeLesson(hero, arms, 'blades'), null);
   assert.equal(takeLesson(hero, arms, 'blades'), 'taught-out');
   assert.equal(lessonsFor(classic, arms, hero).find((l) => l.skill === 'blades')!.price, null);
   // A skill not opened yet takes no lessons (the caravan guard never learned shields).

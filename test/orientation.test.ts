@@ -8,7 +8,7 @@ import { cardAt, HAND_OVER_SECONDS } from '../src/app/handOver';
 const at = (skill: number) => {
   const hero = new Character(classic);
   hero.skills.set('orientation', skill);
-  return { hero, o: new Orientation(7, hero, { x: 0, z: 0 }) };
+  return { hero, o: new Orientation(7, hero) };
 };
 
 test('orientation: a novice sees a wide area and no arrow, a master the exact arrow', () => {
@@ -34,22 +34,6 @@ test('orientation: the hero is always inside the area, and the guess holds still
   // It drifts, so the middle does not simply follow the hero.
   const { o } = at(NOVICE), a = o.bearing(0, 0, 0), b = o.bearing(400, 0, 0);
   assert.ok(Math.abs((a.x - 0) - (b.x - 400)) > 1);
-});
-
-test('orientation: travelling and reading the map train it; jumps and flying do not', () => {
-  const walk = at(NOVICE);
-  for (let i = 0; i <= 2000; i++) walk.o.train(0.5, i, 0, false);
-  assert.ok(walk.hero.skills.get('orientation')! > NOVICE);
-  const jump = at(NOVICE);
-  for (let i = 0; i <= 50; i++) jump.o.train(0.5, i * 100, 0, false);
-  for (let i = 0; i <= 2000; i++) jump.o.train(0.5, i, 0, false, false);
-  assert.equal(jump.hero.skills.get('orientation'), NOVICE);
-  const read = at(NOVICE);
-  read.o.train(5, 0, 0, true);
-  const once = read.hero.skills.get('orientation')!;
-  assert.ok(once > NOVICE);
-  read.o.train(5, 0, 0, true);
-  assert.equal(read.hero.skills.get('orientation'), once, 'not again straight away');
 });
 
 test('hand-over: the card rises from the hand, the mark is drawn while it is held, and it goes back', () => {
