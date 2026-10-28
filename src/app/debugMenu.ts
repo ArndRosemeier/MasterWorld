@@ -146,6 +146,7 @@ export class DebugMenu {
       ['Show', [
         { label: 'HUD on / off', run: () => { h.hud = !h.hud; } },
         { label: 'Hitch log (slow frames, what took their time)', run: () => this.printReport(HITCHES.report(40)) },
+        { label: 'Hitch log: copy (to paste in a message)', run: () => { this.copy(`${HITCHES.report()}\n${this.worldLink()}&${this.host.viewParams}`); return 'copied'; } },
         { label: 'Hitch log: clear', run: () => { HITCHES.clear(); return 'cleared'; } },
         { label: 'Shader report', run: () => (window as unknown as { shaders?: { report?: () => string } }).shaders?.report?.() ?? 'no shader monitor' },
       ]],
