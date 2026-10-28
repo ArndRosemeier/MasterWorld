@@ -82,7 +82,7 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     id: 'deer', name: 'deer', plural: 'deer', body: { kind: 'beast', species: 'deer', length: 1.5, color: '#8a6a48' },
-    health: 22, armour: 0, defence: 30, speed: 9, senses: { sight: 34, hearing: 40 }, temper: 'skittish', morale: 0.2, pack: true, role: 'swarm', danger: 2,
+    health: 22, armour: 0, defence: 30, speed: 9, senses: { sight: 34, hearing: 40 }, temper: 'skittish', wary: 22, morale: 0.2, pack: true, role: 'swarm', danger: 2,
     attacks: [{ name: 'kick', damage: [2, 5], kind: 'blunt', reach: 0.7, time: 1.6, skill: 18 }],
     loot: 'deer', tell: 'Hoof-prints in the soft ground, and the white of a tail between the trees.',
   },

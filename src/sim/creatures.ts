@@ -216,7 +216,7 @@ export class Den {
       this.sense(c, q, dt, out);
       if (c.hop) { this.hopping(c, dt); continue; }
       switch (c.state) {
-        case 'idle': if (this.peace && c.aware > 0.35) this.watch(c, q, dt); else this.idle(c, dt); break;
+        case 'idle': if (this.peace && c.aware > 0.35) this.watch(c, q, dt); else this.idle(c, q, dt); break;
         case 'alert': this.alert(c, q, dt); break;
         case 'fight': this.fight(c, q, dt, out); break;
         case 'flee': this.flee(c, q, dt, out); break;
@@ -260,7 +260,7 @@ export class Den {
     if (this.peace) { if (c.state === 'alert') c.state = 'idle'; return; }
     // Left a hero it could not reach: it keeps to itself a while.
     if (c.spurn > 0 && c.state === 'idle') return;
-    if ((c.state === 'idle' || c.state === 'alert') && c.aware >= 1) this.notice(c, q, out);
+    if ((c.state === 'idle' || c.state === 'alert') && c.aware >= 1 && !this.keepsOff(c, q)) this.notice(c, q, out);
     else if (c.state === 'idle' && c.aware > 0.35) { c.state = 'alert'; c.path = []; }
   }
 
@@ -271,6 +271,12 @@ export class Den {
     c.state = 'fight';
     c.path = [];
     if (c.def.pack) this.call(c, out);
+  }
+
+  /** A shy one (def.wary) farther off than its flight distance only watches (a loud hero is fled sooner). */
+  private keepsOff(c: Creature, q: Quarry): boolean {
+    const w = c.def.wary;
+    return !!w && c.def.temper === 'skittish' && Math.hypot(q.x - c.x, q.z - c.z) > w * (0.75 + 0.5 * Math.min(1, q.noise));
   }
 
   /** A skittish one stands its ground with friends around, or when cornered. */
@@ -300,13 +306,13 @@ export class Den {
   }
 
   /** Always doing something: roam the home room, stop and sniff or gnaw or keep watch, roam again. */
-  private idle(c: Creature, dt: number): void {
+  private idle(c: Creature, q: Quarry, dt: number): void {
     if (this.move(c, dt, 0.32)) return;
     c.until -= dt;
     if (c.until > 0) return;
     const r = c.rng;
-    if (r.chance(0.55)) {
-      const p = this.ground.spot(c.home, r);
+    const p = r.chance(0.55) ? this.ground.spot(c.home, r) : null;
+    if (p && !this.towards(c, q, p)) {
       c.path = [p];
       c.pi = 0;
       c.act = 'walk';
@@ -323,6 +329,14 @@ export class Den {
     }
   }
 
+  /** Would this walk take a shy one back near the hero it keeps away from? */
+  private towards(c: Creature, q: Quarry, p: { x: number; z: number }): boolean {
+    const w = c.def.wary;
+    if (!w || !q.alive) return false;
+    const there = Math.hypot(q.x - p.x, q.z - p.z);
+    return there < w * 2 && there < Math.hypot(q.x - c.x, q.z - c.z);
+  }
+
   /** At peace and someone there: back to its post, and it turns to keep them in sight. */
   private watch(c: Creature, q: Quarry, dt: number): void {
     if (this.move(c, dt, 0.32)) return;
@@ -333,6 +347,8 @@ export class Den {
   /** Something is there: it turns towards it and creeps closer. */
   private alert(c: Creature, q: Quarry, dt: number): void {
     if (c.aware < 0.2) { c.state = 'idle'; c.until = 0; return; }
+    // A shy beast never creeps closer: head up, it keeps the hero in sight.
+    if (c.def.wary) { if (!this.move(c, dt, 0.32)) { c.act = 'watch'; c.dir = Math.atan2(q.z - c.z, q.x - c.x); } return; }
     if (c.seen && c.repath === 0) { this.headTo(c, c.seen); c.repath = 1.5; }
     if (!this.move(c, dt, 0.35)) { c.act = 'watch'; c.dir = Math.atan2(q.z - c.z, q.x - c.x); }
   }
@@ -392,7 +408,7 @@ export class Den {
   private flee(c: Creature, q: Quarry, dt: number, out: DenEvent[]): void {
     if (this.move(c, dt, 1)) return;
     const d = Math.hypot(q.x - c.x, q.z - c.z);
-    if (d > 10 || !q.alive) { c.state = c.surprise ? 'meek' : 'idle'; c.aware = 0.3; c.until = 0; out.push({ kind: 'home', who: c }); return; }
+    if (d > (c.def.wary ? c.def.wary * 2 : 10) || !q.alive) { c.state = c.surprise ? 'meek' : 'idle'; c.aware = 0.3; c.until = 0; out.push({ kind: 'home', who: c }); return; }
     if (c.repath === 0) {
       this.runFrom(c, q);
       c.repath = 2;
@@ -426,7 +442,7 @@ export class Den {
   private meek(c: Creature, q: Quarry, dt: number): void {
     const d = Math.hypot(q.x - c.x, q.z - c.z);
     if (d < 3 && c.repath === 0) { this.runFrom(c, q); c.repath = 3; }
-    if (!this.move(c, dt, 0.6)) this.idle(c, dt);
+    if (!this.move(c, dt, 0.6)) this.idle(c, q, dt);
   }
 
   /**
