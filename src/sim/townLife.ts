@@ -127,6 +127,8 @@ const DETAIL = 260;
 export class TownLife {
   readonly nav: NavGraph;
   readonly spots: Spot[];
+  /** The spots (no doors) by `building:use`, and the town's own (no building) by their activity. */
+  private readonly spotsBy = new Map<string, Spot[]>();
   readonly agents: Agent[] = [];
   /** People still to come in (`grow`: a big town is made over several frames), and the seed their days come from. */
   private readonly waiting: readonly Person[];
@@ -158,6 +160,12 @@ export class TownLife {
   constructor(readonly plan: TownPlan, seed: number, hour: number, readonly routines: RoutinesDef = classicRoutines, people: readonly Person[] = townsfolk(plan, seed), parts: { nav?: NavGraph; spots?: Spot[]; later?: boolean } = {}) {
     this.nav = parts.nav ?? new NavGraph(plan);
     this.spots = parts.spots ?? townSpots(plan);
+    // The spots by building and use, and the town's own by activity (looked up at every choice).
+    const by = (k: string, sp: Spot) => { let l = this.spotsBy.get(k); if (!l) this.spotsBy.set(k, (l = [])); l.push(sp); };
+    for (const sp of this.spots) {
+      if (sp.building === -1) by(sp.activity, sp);
+      if (!sp.door) by(`${sp.building}:${sp.use}`, sp);
+    }
     this.seed = seed;
     this.waiting = people;
     this.market = polyCentroid(plan.market) as [number, number];
@@ -449,7 +457,7 @@ export class TownLife {
       const far = work >= 0 && Math.hypot(this.spots[home].x - this.spots[work].x, this.spots[home].z - this.spots[work].z) > 60;
       // Market folk, and some who work far from home, eat on the market by day (a pie from a stall, standing about).
       if (!dark && rain < 0.4 && (p.role === 'trader' || far) && r.chance(p.role === 'trader' ? 0.7 : 0.4)) {
-        const free = this.spots.filter((s) => s.activity === 'chat' && s.users < s.cap);
+        const free = (this.spotsBy.get('chat') ?? []).filter((s) => s.users < s.cap);
         if (free.length) return at(r.pick(free).id, 'drink', [240, 600]);
       }
       return inside(far ? work : home);
@@ -475,8 +483,8 @@ export class TownLife {
       const again = spot === a.spot ? (s.door || s.use === 'work' || s.use === 'trade' ? 1 : 0.3) : 1;
       if (w > 0 && (s.users < s.cap || spot === a.spot)) options.push([spot, (again * w * (s.outside ? 1 - rain * 0.7 : 1 + rain * 2)) / far]);
     };
-    const mine = (building: number, use: 'work' | 'home') => this.spots.filter((s) => s.building === building && s.use === use && !s.door);
-    const town = (activity: ActivityKind) => this.spots.filter((s) => s.building === -1 && s.activity === activity);
+    const mine = (building: number, use: 'work' | 'home') => this.spotsBy.get(`${building}:${use}`) ?? [];
+    const town = (activity: ActivityKind) => this.spotsBy.get(activity) ?? [];
     const each = (activity: ActivityKind, w: number) => { for (const s of this.spots) if (s.activity === activity) offer(s.id, w); };
     const homeWork = p.role === 'homemaker' || p.role === 'child' || p.role === 'traveller';
     if (task === 'work' && homeWork) task = 'chores';

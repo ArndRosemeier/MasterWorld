@@ -2,7 +2,7 @@
  * The map hand-over (plan 9.1, D35): when someone tells of a place, the hero holds out their map, the
  * teller takes it and draws the mark in with a quill, and hands it back. It is played in the world
  * (`HandOverScene`: the hero's hand, the sheet, the teller marking it), and a card of the real map (around
- * the mark) rises from the hero's side to the middle of the view, where the person stands, is marked
+ * the mark) rises from the hero's side to the upper left of the view, beside the two of them, is marked
  * there and goes back down: the mark close up. Several marks at once are handed over one after another.
  */
 import { lerp, smoothstep } from '@futuremagic/core';
@@ -21,13 +21,15 @@ export interface HandOverStage {
   handedBack(): void;
 }
 const SIDE = 320;
+/** Where the close-up is held while marked (a share of the view's width and height), turned and scaled. */
+export const CARD_HELD = { x: 0.15, y: 0.3, turn: 0.04, scale: 0.85 };
 
 /** Where the card is and how it turns, `t` seconds into a hand-over (pure, for the check). */
 export function cardAt(t: number): { x: number; y: number; turn: number; scale: number; alpha: number; mark: number } {
   const ease = (k: number) => k * k * (3 - 2 * k);
   const marking = UP + WAIT, back = marking + MARK + LOOK;
-  // From the hero's hand (low left), to the middle of the view (where the teller stands), and back.
-  const held = { x: 0.42, y: 0.46, turn: 0.04, scale: 1 }, hand = { x: 0.22, y: 1.05, turn: -0.35, scale: 0.55 };
+  // From below the view's left edge up to a close-up in its upper left (not over the teller, who marks the sheet in the world), and back.
+  const held = CARD_HELD, hand = { x: 0.22, y: 1.05, turn: -0.35, scale: 0.55 };
   const k = t < UP ? ease(t / UP) : t < back ? 1 : 1 - ease(Math.min(1, (t - back) / BACK));
   // While it is marked it tips a little, as if held and written on.
   const tip = t > marking && t < back ? Math.sin((t - marking) * 5) * 0.015 : 0;

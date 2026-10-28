@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { Character } from '../src/game/character';
 import { MASTER, NOVICE, Orientation } from '../src/game/orientation';
-import { cardAt, HAND_OVER_SECONDS, heroReach, MARKED, sheetHeldBy } from '../src/app/handOver';
+import { CARD_HELD, cardAt, HAND_OVER_SECONDS, heroReach, MARKED, sheetHeldBy } from '../src/app/handOver';
 
 const at = (skill: number) => {
   const hero = new Character(classic);
@@ -44,7 +44,7 @@ test('hand-over: the card rises from the hand, the mark is drawn while it is hel
   for (let t = 0; t <= HAND_OVER_SECONDS; t += 0.05) {
     const c = cardAt(t);
     assert.ok(c.mark >= last); last = c.mark;
-    if (c.mark > 0 && c.mark < 1) { held = true; assert.ok(Math.abs(c.x - 0.42) < 0.01 && c.alpha === 1); }
+    if (c.mark > 0 && c.mark < 1) { held = true; assert.ok(Math.abs(c.x - CARD_HELD.x) < 0.01 && c.alpha === 1); }
   }
   assert.ok(held);
 });
