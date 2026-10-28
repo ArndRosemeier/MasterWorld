@@ -17,7 +17,7 @@ import { DungeonGround, type DenGround, type DungeonNav } from './dungeonNav';
 export type CreatureState = 'idle' | 'alert' | 'fight' | 'flee' | 'beg' | 'meek' | 'dead';
 
 /** What the body shows (the renderer picks a clip or a pose for it). */
-export type CreatureAct = 'stand' | 'walk' | 'run' | 'sniff' | 'gnaw' | 'graze' | 'watch' | 'rummage' | 'spin' | 'swing' | 'hurt' | 'beg' | 'die' | 'dead';
+export type CreatureAct = 'stand' | 'walk' | 'run' | 'sniff' | 'gnaw' | 'graze' | 'watch' | 'rummage' | 'spin' | 'swing' | 'hurt' | 'beg' | 'die' | 'dead' | 'leap';
 
 export interface Creature {
   /** Index in the den (stable: saves name the dead by it). */
@@ -63,7 +63,29 @@ export interface Creature {
   blows: number;
   /** Seconds since it was last hurt (it heals only once the fight has left it alone a while). */
   calm: number;
+  /** In reach of the hero and standing to fight (it steps in again only once the hero is clearly out of reach). */
+  close: boolean;
+  /** Metres made good towards where it walks since it last got PROGRESS on, and seconds it has wanted to move since. */
+  made: number;
+  pushing: number;
+  /** This step it tried to walk; seconds left of a balked walk still counting as wanting to. */
+  wants: boolean;
+  balked: number;
+  /** Seconds until it may hop free again (once a minute, Arnd 2026-10-28), and the hop under way. */
+  hopIn: number;
+  hop: Hop | null;
+  /** Seconds left that it leaves a hero it could not reach alone (it went home). */
+  spurn: number;
   rng: Rng;
+}
+
+/** A hop free of where it was stuck: from, to, how long it takes and how far it has got (seconds). */
+export interface Hop {
+  readonly from: { x: number; y: number; z: number };
+  readonly to: { x: number; y: number; z: number };
+  readonly dur: number;
+  readonly high: number;
+  t: number;
 }
 
 /** The hero as the den sees them. */
@@ -101,6 +123,18 @@ const HERO_R = 0.35;
 const WINDUP = 0.4;
 /** Lost this long, it gives up the hunt. */
 const GIVE_UP = 9;
+/** In reach, it keeps standing until the hero is this much farther (m): no stepping in and out at the edge. */
+const HOLD = 0.25;
+/** How far (m) it must get towards where it walks for a walk to count as getting somewhere. */
+const PROGRESS = 1;
+/**
+ * Stuck (Arnd 2026-10-28): wanting to move this long (s) without getting anywhere, it hops free if it may, else
+ * a hunter gives up on a hero it cannot reach after `giveUp` and leaves them alone for `spurn`. A balked walk
+ * counts as wanting to for `balk` seconds.
+ */
+const STUCK = { time: 2.5, giveUp: 6, spurn: 20, balk: 1.5 } as const;
+/** It hops free once a minute at most (Arnd 2026-10-28); with nowhere to hop, it looks again after `retry` s. */
+const HOP_EVERY = { gap: 60, retry: 3 } as const;
 
 /**
  * A wound slows it (Arnd 2026-10-28: a badly hurt one that runs can be caught): at full pace down to this
@@ -143,7 +177,7 @@ export class Den {
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
         aware: 0, leader: id === 0 && def.pack, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
-        repath: 0, pleas: 0, blows: 0, calm: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
+        repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
       this.creatures.push(c);
@@ -175,8 +209,12 @@ export class Den {
       c.stagger = Math.max(0, c.stagger - dt);
       c.ready = Math.max(0, c.ready - dt);
       c.repath = Math.max(0, c.repath - dt);
+      c.hopIn = Math.max(0, c.hopIn - dt);
+      c.spurn = Math.max(0, c.spurn - dt);
+      c.wants = false;
       this.heal(c, dt);
       this.sense(c, q, dt, out);
+      if (c.hop) { this.hopping(c, dt); continue; }
       switch (c.state) {
         case 'idle': if (this.peace && c.aware > 0.35) this.watch(c, q, dt); else this.idle(c, dt); break;
         case 'alert': this.alert(c, q, dt); break;
@@ -185,6 +223,7 @@ export class Den {
         case 'beg': this.beg(c, q, dt, out); break;
         case 'meek': this.meek(c, q, dt); break;
       }
+      this.progress(c, dt);
     }
     this.spread();
     return out;
@@ -219,6 +258,8 @@ export class Den {
       c.lost += dt;
     }
     if (this.peace) { if (c.state === 'alert') c.state = 'idle'; return; }
+    // Left a hero it could not reach: it keeps to itself a while.
+    if (c.spurn > 0 && c.state === 'idle') return;
     if ((c.state === 'idle' || c.state === 'alert') && c.aware >= 1) this.notice(c, q, out);
     else if (c.state === 'idle' && c.aware > 0.35) { c.state = 'alert'; c.path = []; }
   }
@@ -312,21 +353,39 @@ export class Den {
       }
       return;
     }
-    if (d < reach && dy < 1.2) {
+    if (d < (c.close ? reach + HOLD : reach) && dy < 1.2) {
+      c.close = true;
       c.path = [];
       c.dir = Math.atan2(dz, dx);
       if (c.ready === 0) { c.windup = WINDUP; c.act = 'swing'; out.push({ kind: 'swing', who: c }); }
       else c.act = 'stand';
       return;
     }
+    c.close = false;
     // Close in: straight when it sees the hero near, else along the way.
     const target = c.lost < 0.5 ? { x: q.x, y: q.y, z: q.z } : c.seen;
     if (!target) return;
     if (c.lost < 0.5 && d < 4 && dy < 0.8) {
-      c.path = [{ x: q.x - (dx / d) * reach * 0.8, y: q.y, z: q.z - (dz / d) * reach * 0.8 }];
+      c.path = [this.slot(c, q, reach * 0.8)];
       c.pi = 0;
     } else if (c.repath === 0 || c.pi >= c.path.length) { this.headTo(c, target); c.repath = 0.6; }
     if (!this.move(c, dt, 1)) c.act = 'stand';
+    // It cannot get to the hero (across a river, up a cliff) and has no hop left: it gives up and goes home.
+    if (this.ground.hop && c.pushing > STUCK.giveUp && !c.hop) { this.goHome(c, out); c.spurn = STUCK.spurn; c.pushing = 0; }
+  }
+
+  /**
+   * Where it stands to fight the hero: on its own side of them, at `ring`, turned round them to a place no other
+   * of the den takes already (two never fight from the same spot).
+   */
+  private slot(c: Creature, q: Quarry, ring: number): { x: number; y: number; z: number } {
+    const base = Math.atan2(c.z - q.z, c.x - q.x), r = radiusOf(c.def);
+    for (const turn of [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8]) {
+      const x = q.x + Math.cos(base + turn) * ring, z = q.z + Math.sin(base + turn) * ring;
+      const taken = this.creatures.some((o) => o !== c && o.state !== 'dead' && Math.hypot(o.x - x, o.z - z) < r + radiusOf(o.def) + 0.1);
+      if (!taken) return { x, y: q.y, z };
+    }
+    return { x: q.x + Math.cos(base) * ring, y: q.y, z: q.z + Math.sin(base) * ring };
   }
 
   /** Off to the room farthest from the hero; cornered there, it fights. */
@@ -455,6 +514,7 @@ export class Den {
   /** Walk the path at a share of its speed; false when there is nowhere to go. */
   private move(c: Creature, dt: number, pace: number): boolean {
     if (c.pi >= c.path.length) return false;
+    c.wants = true;
     let left = c.def.speed * pace * paceOf(c) * (1 - c.slow) * dt;
     const r = radiusOf(c.def);
     for (let n = 0; left > 1e-4 && c.pi < c.path.length && n < 8; n++) {
@@ -464,8 +524,10 @@ export class Den {
       left -= d * k;
       // Along the walls, never through them; stuck, it looks for another way.
       const to = this.ground.slide(c.x, c.y, c.z, dx * k, dz * k, r);
-      if (!to) { c.pi = c.path.length; c.repath = 0; return false; }
+      if (!to) { c.pi = c.path.length; c.repath = 0; c.balked = STUCK.balk; return false; }
       c.dir = Math.atan2(dz, dx);
+      // Made good towards the point (sliding along a river bank, away from it, is not getting anywhere).
+      c.made += ((to.x - c.x) * dx + (to.z - c.z) * dz) / d;
       const reached = k === 1 && to.x === c.x + dx && to.z === c.z + dz;
       c.x = to.x; c.z = to.z;
       // The feet follow the floor (stairs), never jump to a point's storey.
@@ -478,21 +540,85 @@ export class Den {
     return true;
   }
 
-  /** Bodies keep apart (a few at most share a room, so all pairs are cheap). */
-  private spread(): void {
-    const live = this.creatures.filter((c) => c.state !== 'dead');
-    for (let a = 0; a < live.length; a++) for (let b = a + 1; b < live.length; b++) {
-      const A = live[a], B = live[b];
-      const dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz), min = radiusOf(A.def) + radiusOf(B.def);
-      if (d >= min || d < 1e-4 || Math.abs(A.y - B.y) > 1) continue;
-      const push = (min - d) / 2, ux = dx / d, uz = dz / d;
-      this.nudge(A, -ux * push, -uz * push);
-      this.nudge(B, ux * push, uz * push);
-    }
+  /**
+   * Is it getting anywhere? Wanting to move (walking, or balked a moment ago) and not a metre on in STUCK.time, it
+   * hops free: a short, seen leap to ground it can walk on (never a jump cut, CLAUDE.md rule 11).
+   */
+  private progress(c: Creature, dt: number): void {
+    if (c.state === 'dead') return;
+    if (c.made >= PROGRESS) { c.made = 0; c.pushing = 0; return; }
+    c.balked = Math.max(0, c.balked - dt);
+    if (c.wants || c.balked > 0) c.pushing += dt;
+    else c.pushing = Math.max(0, c.pushing - dt * 0.25);
+    if (c.pushing < STUCK.time || c.hopIn > 0 || c.stagger > 0 || c.windup > 0 || !this.ground.hop) return;
+    const goal = c.path.length ? c.path[c.path.length - 1] : c.state === 'fight' ? c.seen : null;
+    const to = this.ground.hop(c, goal, radiusOf(c.def));
+    if (!to) { c.hopIn = HOP_EVERY.retry; return; }
+    const len = Math.hypot(to.x - c.x, to.z - c.z);
+    c.hop = { from: { x: c.x, y: c.y, z: c.z }, to, dur: 0.35 + len * 0.08, high: 0.3 + len * 0.12 + Math.max(0, to.y - c.y), t: 0 };
+    c.hopIn = HOP_EVERY.gap;
+    c.dir = Math.atan2(to.z - c.z, to.x - c.x);
+    c.act = 'leap';
   }
 
-  private nudge(c: Creature, dx: number, dz: number): void {
+  /** In the air: an arc from where it was to where it lands; there it walks on (a new way, from the new spot). */
+  private hopping(c: Creature, dt: number): void {
+    const h = c.hop!;
+    h.t = Math.min(h.dur, h.t + dt);
+    const k = h.t / h.dur;
+    c.x = h.from.x + (h.to.x - h.from.x) * k;
+    c.z = h.from.z + (h.to.z - h.from.z) * k;
+    c.y = h.from.y + (h.to.y - h.from.y) * k + 4 * h.high * k * (1 - k);
+    c.act = 'leap';
+    if (k < 1) return;
+    c.hop = null;
+    c.y = this.ground.floorAt(c.x, c.z, h.to.y + 0.6) ?? h.to.y;
+    c.made = 0;
+    c.pushing = 0;
+    c.balked = 0;
+    c.path = [];
+    c.pi = 0;
+    c.repath = 0;
+    c.until = 0;
+    c.act = 'stand';
+  }
+
+  /** Bodies keep apart (a few at most share a room, so all pairs are cheap). */
+  private spread(): void {
+    const live = this.creatures.filter((c) => c.state !== 'dead' && !c.hop);
+    for (let a = 0; a < live.length; a++) for (let b = a + 1; b < live.length; b++) apart(this, live[a], this, live[b]);
+  }
+
+  /** Pushed by (dx, dz), if there is room there (bodies apart: never into a wall). */
+  nudge(c: Creature, dx: number, dz: number): void {
     const x = c.x + dx, z = c.z + dz;
     if (this.ground.clearance(x, c.y, z) > radiusOf(c.def) * 0.5) { c.x = x; c.z = z; }
+  }
+}
+
+/** Two bodies that overlap are pushed apart, each half the way (one that cannot move leaves the other the rest). */
+function apart(da: Den, A: Creature, db: Den, B: Creature): void {
+  let dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz);
+  const min = radiusOf(A.def) + radiusOf(B.def);
+  if (d >= min || Math.abs(A.y - B.y) > 1) return;
+  // On the very same spot: apart along a way of their own (seeded by who they are, never random).
+  if (d < 1e-4) { const a = (A.id * 2.399 + B.id * 1.13) % (Math.PI * 2); dx = Math.cos(a); dz = Math.sin(a); d = 1; }
+  const ux = dx / d, uz = dz / d, push = (min - Math.min(d, min)) / 2;
+  const ax = A.x, az = A.z;
+  da.nudge(A, -ux * push, -uz * push);
+  const stuck = A.x === ax && A.z === az;
+  db.nudge(B, ux * push * (stuck ? 2 : 1), uz * push * (stuck ? 2 : 1));
+}
+
+/**
+ * Bodies of different dens on the same ground (the wild's groups, a hold's wardens: all in the world's frame)
+ * keep apart too, as those of one den do.
+ */
+export function keepApart(dens: readonly Den[]): void {
+  for (let i = 0; i < dens.length; i++) for (let j = i + 1; j < dens.length; j++) {
+    for (const A of dens[i].creatures) {
+      if (A.state === 'dead' || A.hop) continue;
+      for (const B of dens[j].creatures) if (B.state !== 'dead' && !B.hop) apart(dens[i], A, dens[j], B);
+    }
   }
 }
