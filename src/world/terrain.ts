@@ -260,7 +260,10 @@ export class Terrain {
       const land = level;
       level = this.roadNet.level(x, z, level);
       if (inChannel(r)) level = Math.min(level, shapeByWater(r, level));
-      else if (inChannel(this.brook, 0.5) && brookCuts(this.roadNet, this.hydro, x, z)) level = Math.min(level, land);
+      // (Eased back to the road over a metre and a half: a step there fell between the ground mesh's vertices.)
+      else if (inChannel(this.brook, 2) && brookCuts(this.roadNet, this.hydro, x, z)) {
+        level = Math.min(level, lerp(land, level, smoothstep(this.brook.half + 0.5, this.brook.half + 2, this.brook.dist)));
+      }
     }
     return level;
   }
