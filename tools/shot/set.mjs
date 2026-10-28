@@ -150,14 +150,14 @@ const SESSIONS = [
     { name: 'hurt-traveller', act: async (p) => {
       const h = await hurtTraveller(p);
       if (!h) throw new Error('hurt-traveller: none was made');
-      await standClear(p, h, 6);
+      await standClear(p, h, 5, { zoom: 3.2, pitch: -0.3, side: 0.5 });
       await p.waitForTimeout(1500);
     } },
     { name: 'raided-farm', act: async (p) => {
       const { barn } = await raidFarm(p);
       if (!barn) throw new Error('raided-farm: no farm was raided');
       await p.waitForFunction(() => !!window.game.smoke.mesh.parent, null, { timeout: TIMEOUT });
-      await standClear(p, barn, 32, { pitch: 0.3, zoom: 3 });
+      await standClear(p, barn, 32, { pitch: 0.3, zoom: 3, avoid: barn.avoid });
       await p.waitForTimeout(4000);
     } },
   ] },

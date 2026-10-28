@@ -19,25 +19,36 @@ export const meet = (kind, d) => async (page) => {
 
 /**
  * The hero `d` metres from (x, z), facing it, on the side where no tree trunk stands between the camera
- * (`zoom` m behind the hero) and it; the camera close behind, looking `pitch` up. Wait first for the trunks
- * round there to be known (a teleport near, a moment).
+ * (`zoom` m behind the hero) and it; the camera close behind, looking `pitch` up, turned `side` rad off the
+ * hero's back (so the hero does not hide what lies before them). `avoid`: what else must not stand in the
+ * way (circles {x, z, r}: other buildings) or right by the hero and the camera (fences: closed lines, flat x, z, x, z, ...).
+ * Wait first for the trunks round there to be known (a teleport near, a moment).
  */
-export const standClear = (page, at, d, { zoom = 2.2, pitch = -0.08 } = {}) => page.evaluate(([at, d, zoom, pitch]) => {
-  const g = window.game, trunks = g.trunks;
+export const standClear = (page, at, d, { zoom = 2.2, pitch = -0.08, side = 0, avoid = {} } = {}) => page.evaluate(([at, d, zoom, pitch, side, avoid]) => {
+  const g = window.game, trunks = g.trunks, circles = avoid.circles ?? [], fences = avoid.fences ?? [];
+  const nearFence = (x, z) => fences.some((f) => f.some((_, i) => {
+    if (i % 2) return false;
+    const ax = f[i], az = f[i + 1], bx = f[(i + 2) % f.length], bz = f[(i + 3) % f.length], ux = bx - ax, uz = bz - az, l = ux * ux + uz * uz || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * ux + (z - az) * uz) / l));
+    return Math.hypot(x - ax - ux * t, z - az - uz * t) < 2;
+  }));
   const clear = (a) => {
-    for (let s = 0; s <= d + zoom; s += 0.5) if (trunks?.blocks(at.x + Math.cos(a) * s, at.z + Math.sin(a) * s, 0.5)) return false;
-    return true;
+    for (let s = 0; s <= d + zoom; s += 0.5) {
+      const x = at.x + Math.cos(a) * s, z = at.z + Math.sin(a) * s;
+      if (trunks?.blocks(x, z, 0.5) || circles.some((c) => Math.hypot(x - c.x, z - c.z) < c.r)) return false;
+    }
+    return !nearFence(at.x + Math.cos(a) * d, at.z + Math.sin(a) * d) && !nearFence(at.x + Math.cos(a) * (d + zoom), at.z + Math.sin(a) * (d + zoom));
   };
   let a = 0;
-  for (let k = 0; k < 16; k++) if (clear((k / 16) * Math.PI * 2)) { a = (k / 16) * Math.PI * 2; break; }
+  for (let k = 0; k < 32; k++) if (clear((k / 32) * Math.PI * 2)) { a = (k / 32) * Math.PI * 2; break; }
   const x = at.x + Math.cos(a) * d, z = at.z + Math.sin(a) * d;
   g.player.teleport(x, undefined, z, Math.atan2(x - at.x, z - at.z));
   const cam = g.player.heroCam;
-  cam.yaw = g.player.walker.yaw;
+  cam.yaw = g.player.walker.yaw + side;
   cam.pitch = pitch;
   cam.zoom = zoom;
   return { x, z };
-}, [at, d, zoom, pitch]);
+}, [at, d, zoom, pitch, side, avoid]);
 
 /** A hurt traveller (C10) made by the hero's way out west of the start town: its decision, or null. */
 export const hurtTraveller = async (page) => {
@@ -49,7 +60,7 @@ export const hurtTraveller = async (page) => {
   return page.evaluate(() => { const m = window.game.situationNow('hurt-traveller'); return m ? { id: m.decision.id, ...m.decision } : null; });
 };
 
-/** A farm raided now (C6, C10): what the debug menu says, and its barn (where the smoke rises), or null. */
+/** A farm raided now (C6, C10): what the debug menu says, and its barn (where the smoke rises; what could hide it), or null. */
 export const raidFarm = async (page) => {
   const said = await page.evaluate(() => window.game.storyEvent('farm-raid'));
   const barn = await page.evaluate(() => {
@@ -57,7 +68,10 @@ export const raidFarm = async (page) => {
     if (!e) return null;
     const t = g.towns.get(e.town).town, pd = t.plan.paddocks[e.paddock], b = t.plan.buildings[t.plan.farms[pd.farm].barn];
     const [cx, cz] = t.plan.centre;
-    return { x: b.cx, z: b.cz, centre: { x: cx, z: cz } };
+    // What could hide the barn (the farm's other buildings, any near) and the fences not to stand in.
+    const circles = t.plan.buildings.filter((o) => o.id !== b.id && Math.hypot(o.cx - b.cx, o.cz - b.cz) < 80).map((o) => ({ x: o.cx, z: o.cz, r: Math.hypot(o.hu, o.hv) + 1 }));
+    const fences = t.plan.paddocks.filter((p) => Math.hypot(p.poly[0] - b.cx, p.poly[1] - b.cz) < 150).map((p) => p.poly);
+    return { x: b.cx, z: b.cz, centre: { x: cx, z: cz }, avoid: { circles, fences } };
   });
   return { said, barn };
 };

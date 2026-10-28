@@ -61,6 +61,16 @@ const came = await page.waitForFunction(() => window.__mwReady === true, null, {
 const playable = came ? (Date.now() - t0) / 1000 : Infinity;
 console.log('playable', playable.toFixed(1));
 ready = true;
+// The shader builds before play (the monitor's warm-up), the costliest first: what 'Preparing shaders' spends.
+const builds = came ? await page.evaluate(() => {
+  const by = new Map();
+  for (const e of window.shaders?.events ?? []) if (e.phase === 'warmup') { const b = by.get(e.what) ?? { what: e.what, n: 0, ms: 0 }; b.n++; b.ms += e.ms; by.set(e.what, b); }
+  return [...by.values()].sort((a, b) => b.ms - a.ms);
+}) : [];
+if (builds.length) {
+  console.log(`shader builds before play: ${builds.reduce((n, b) => n + b.n, 0)}, ${builds.reduce((n, b) => n + b.ms, 0).toFixed(0)} ms in all; the costliest:`);
+  for (const b of builds.slice(0, 15)) console.log(`  ${b.ms.toFixed(0).padStart(6)} ms ${String(b.n).padStart(3)}x ${b.what}`);
+}
 if (stopProfile) report(await stopProfile(), steps, 'dist');
 // A moment in the world: music asked for now is "when first needed", and is listed apart.
 await page.waitForTimeout(Number(process.env.LOAD_AFTER ?? 3000));
