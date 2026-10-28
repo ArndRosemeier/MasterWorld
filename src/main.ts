@@ -131,6 +131,7 @@ import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/s
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
 import { bridgesNear } from './world/bridges';
+import { emptyWater, inChannel } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
 declare global {
@@ -268,7 +269,7 @@ export async function start(b: Boot): Promise<void> {
       floor: (x, z) => (below() ? null : towns?.stand(x, z) ?? bridgeView.deck(x, z)),
       rockSurface: (x, y, z) => surfaceAt(x, y, z, false),
       // In a building the camera stays in the room (its doorway shut to it).
-      sightSurface: (x, y, z) => surfaceAt(x, y, z, !!rooms?.inside),
+      sightSurface: (x, y, z) => { const b = below(); return b?.sightSurface ? b.sightSurface(x, y, z) : surfaceAt(x, y, z, !!rooms?.inside); },
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
       // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
@@ -1344,20 +1345,27 @@ export async function start(b: Boot): Promise<void> {
       const again = () => { player.heroCam.yaw = player.walker.yaw = yaw; player.heroCam.release(); if (--n > 0) requestAnimationFrame(again); };
       requestAnimationFrame(again);
     };
+    const brookHere = emptyWater();
     const spots = goSpots({
       setting,
       log: () => log,
       hours,
       heroPos: () => player.walker.pos,
       towns: () => towns?.every ?? [],
-      stand: async (s, pick) => { await outside(); const p = pick ? pick(s) : s; player.teleport(p.x, undefined, p.z, p.yaw); keepFacing(); return p; },
+      stand: async (s, pick) => { await outside(); const p = pick ? pick(s) : s; player.teleport(p.x, undefined, p.z, p.yaw); if (p.pitch !== undefined) player.heroCam.pitch = p.pitch; keepFacing(); return p; },
       // The hero's spot and the camera's behind them (about where it trails): no wall, no trunk, no water; and no
       // trunk across the view to what they look at (up to 60 m, short of it, which may stand among trees itself).
       clear: (x, z, yaw, at) => {
-        const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && (world.waterLevel(px, pz) ?? -Infinity) < terrain.height(px, pz) + 0.05;
+        const wet = (px: number, pz: number) => (world.waterLevel(px, pz) ?? -Infinity) >= terrain.height(px, pz) + 0.05 || inChannel(terrain.hydro.brookAt(px, pz, brookHere), 1.5);
+        // A crop field's grain stands as high as the camera.
+        const inCrop = (px: number, pz: number) => { const f = towns?.nearest(px, pz)?.town.fieldAt(px, pz); return !!f && f.paddock < 0; };
+        const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && !wet(px, pz) && !inCrop(px, pz);
         if (!standsFree(x, z, 1.2) || ![3.5, 6].every((d) => standsFree(x + Math.sin(yaw) * d, z + Math.cos(yaw) * d, 2.5))) return false;
-        const d = at ? Math.min(60, Math.hypot(at.x - x, at.z - z) - 6) : 0;
-        for (let t = 3; t < d; t += 3) if (trunks.blocks(x - Math.sin(yaw) * t, z - Math.cos(yaw) * t, 0.6)) return false;
+        // Across the view a tree's crown, not only its trunk, is in the way (but near what it looks at, trees may stand).
+        // Only for a place a stone's throw off (a cave's mouth): someone met close is seen anyway, and far off a stand
+        // turned round its target lands somewhere else entirely.
+        const off = at ? Math.hypot(at.x - x, at.z - z) : 0, d = off >= 12 && off <= 40 ? off - 4 : 0;
+        for (let t = 3; t < d; t += 2) if (trunks.blocks(x - Math.sin(yaw) * t, z - Math.cos(yaw) * t, t < 8 ? 1.2 : 2.2)) return false;
         return true;
       },
       enter: async (id, b) => { const t = towns?.get(id); if (!t || !rooms) return; await outside(); await rooms.enter({ town: t, b }, true); },
