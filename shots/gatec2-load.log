@@ -1,0 +1,90 @@
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs
+
+  [title] dawn, clear, 9.3 h
+  [load] 0.0 s: Fetching the world
+page loaded 0.1
+  [load] 0.5 s: Finding the start
+  [load] 1.4 s: Starting the renderer
+title 0.40 (first paint; the probe saw it at 0.09)
+  [load] 1.6 s: Painting the ground
+  [load] 1.6 s: Filling the seas
+  [load] 1.6 s: Dressing the hero
+  [load] 4.8 s: Saddling the horses
+  [load] 4.8 s: Turning out the herds
+  [load] 5.0 s: Waking the town
+  [load] 6.0 s: Growing the woods
+  [load] 7.0 s: Dressing the townsfolk
+  [load] 7.1 s: Preparing shaders
+  [load] 15.2 s: Raising the land
+  [load] 16.8 s: Waking the cellar
+  [load] 17.4 s: Planting the trees
+  [load] 17.8 s: cellar ready (shaders 69 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 18.4 s: townsfolk ready (shaders 75 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 18.7 s: trees ready (shaders 81 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 18.7 s: Waking the townsfolk
+  [load] 20.6 s: townsfolk round the hero dressed
+playable 20.6
+  [load] 22.2 s: townsfolk, every look ready (shaders 86 warm-up + 5 later · worst 10 ms · policy ok)
+title 0.40 s · playable 20.6 s · start download 96.0 MB
+  packs/start-1-bdf6e502555f.bin     1 files    15.19 MB
+  packs/start-2-6e406f006acb.bin     1 files    15.19 MB
+  packs/start-3-e131a24531bd.bin     1 files    15.09 MB
+  packs/start-4-d1fc59464949.bin     1 files    14.38 MB
+  packs/start-0-7f0c2a8f156c.bin     1 files    13.22 MB
+  wildmesh3d                       5 files    10.55 MB
+  packs/start-5-a21ca89b2d6f.bin     1 files     7.72 MB
+  sound/music                      1 files     1.63 MB
+  assets                          37 files     0.99 MB
+  title                            4 files     0.53 MB
+  props                            1 files     0.51 MB
+  packs/human                      4 files     0.39 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: FAIL
+FAIL playable after 20.6 s (limit 20 s)
+=== load run 2
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs
+
+  [title] dawn, clear, 9.3 h
+  [load] 0.0 s: Fetching the world
+page loaded 0.1
+  [load] 0.5 s: Finding the start
+  [load] 1.4 s: Starting the renderer
+title 0.38 (first paint; the probe saw it at 0.09)
+  [load] 1.5 s: Painting the ground
+  [load] 1.5 s: Filling the seas
+  [load] 1.5 s: Dressing the hero
+  [load] 4.7 s: Saddling the horses
+  [load] 4.8 s: Turning out the herds
+  [load] 5.0 s: Waking the town
+  [load] 6.0 s: Growing the woods
+  [load] 7.2 s: Dressing the townsfolk
+  [load] 7.2 s: Preparing shaders
+  [load] 13.9 s: Raising the land
+  [load] 15.6 s: Waking the cellar
+  [load] 16.1 s: Planting the trees
+  [load] 16.5 s: cellar ready (shaders 69 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 17.2 s: townsfolk ready (shaders 79 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 17.5 s: trees ready (shaders 81 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 17.5 s: Waking the townsfolk
+  [load] 19.4 s: townsfolk round the hero dressed
+playable 19.5
+  [load] 21.2 s: townsfolk, every look ready (shaders 85 warm-up + 6 later · worst 10 ms · policy ok)
+title 0.38 s · playable 19.5 s · start download 96.0 MB
+  packs/start-1-bdf6e502555f.bin     1 files    15.19 MB
+  packs/start-2-6e406f006acb.bin     1 files    15.19 MB
+  packs/start-3-e131a24531bd.bin     1 files    15.09 MB
+  packs/start-4-d1fc59464949.bin     1 files    14.38 MB
+  packs/start-0-7f0c2a8f156c.bin     1 files    13.22 MB
+  wildmesh3d                       5 files    10.55 MB
+  packs/start-5-a21ca89b2d6f.bin     1 files     7.72 MB
+  sound/music                      1 files     1.63 MB
+  assets                          37 files     0.99 MB
+  title                            4 files     0.53 MB
+  props                            1 files     0.51 MB
+  packs/human                      4 files     0.39 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: ok
