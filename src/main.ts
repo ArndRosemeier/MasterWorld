@@ -5,7 +5,8 @@ import { LoadingScreen } from './app/loading';
 import { params } from './app/params';
 import { DebugMenu } from './app/debugMenu';
 import { Menu } from './app/menu';
-import { placesFor } from './app/places';
+import { atDoor, placesFor } from './app/places';
+import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
@@ -129,6 +130,7 @@ import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
 import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
+import { bridgesNear } from './world/bridges';
 import { onLand } from './world/dungeon/site';
 
 declare global {
@@ -768,7 +770,7 @@ export async function start(b: Boot): Promise<void> {
       const guild = params.room === 'guild' || params.room === 'guild-out';
       const b = params.room === 'cellar' ? house : guild ? roomTown.guilds[0]?.b : plan.buildings.find((x) => x.kind === params.room) ?? plan.buildings[Number(params.room)];
       // `room=guild-out`: in the street before the guild house, facing its door (the sign over it).
-      if (b && params.room === 'guild-out') player.teleport(b.door[0] - b.vx * 6, undefined, b.door[1] - b.vz * 6, Math.atan2(-b.vx, -b.vz));
+      if (b && params.room === 'guild-out') { const s = atDoor(b); player.teleport(s.x, undefined, s.z, s.yaw); }
       else if (b) await rooms.enter({ town: roomTown, b }, true, params.room === 'cellar'); // the cellar: beside its hatch
       if (b && params.look) ({ yaw: player.heroCam.yaw, pitch: player.heroCam.pitch } = lookFromDegrees(params.look[0], params.look[1] ?? -10));
     }
@@ -1326,6 +1328,74 @@ export async function start(b: Boot): Promise<void> {
     };
     if (params.trade) await tradeAt(params.trade);
     if (params.open) { talk?.close(); if (params.open === 'journal') journalUi.setOpen(true); else if (params.open === 'saves') saves.setOpen(true); else if (params.open === 'pack') pack.setOpen(true); else if (params.open === 'tale') showTale(); else map?.setOpen(true); }
+    // The debug menu's go-to for every kind of place (out of any cellar or room first; a place made if none stands).
+    const outside = async (): Promise<void> => {
+      const v = visit();
+      if (v) await v.leave();
+      rooms?.shut();
+      player.flying = false;
+      player.puppet = null;
+    };
+    // The camera kept facing the way the hero was put down for a few frames (a shot played before, such as a
+    // walk out of a dungeon's door, can leave its own look behind; in a small room that is outside its walls).
+    const keepFacing = (): void => {
+      const yaw = player.walker.yaw;
+      let n = 10;
+      const again = () => { player.heroCam.yaw = player.walker.yaw = yaw; player.heroCam.release(); if (--n > 0) requestAnimationFrame(again); };
+      requestAnimationFrame(again);
+    };
+    const spots = goSpots({
+      setting,
+      log: () => log,
+      hours,
+      heroPos: () => player.walker.pos,
+      towns: () => towns?.every ?? [],
+      stand: async (s, pick) => { await outside(); const p = pick ? pick(s) : s; player.teleport(p.x, undefined, p.z, p.yaw); keepFacing(); return p; },
+      // The hero's spot and the camera's behind them (about where it trails): no wall, no trunk, no water; and no
+      // trunk across the view to what they look at (up to 60 m, short of it, which may stand among trees itself).
+      clear: (x, z, yaw, at) => {
+        const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && (world.waterLevel(px, pz) ?? -Infinity) < terrain.height(px, pz) + 0.05;
+        if (!standsFree(x, z, 1.2) || ![3.5, 6].every((d) => standsFree(x + Math.sin(yaw) * d, z + Math.cos(yaw) * d, 2.5))) return false;
+        const d = at ? Math.min(60, Math.hypot(at.x - x, at.z - z) - 6) : 0;
+        for (let t = 3; t < d; t += 3) if (trunks.blocks(x - Math.sin(yaw) * t, z - Math.cos(yaw) * t, 0.6)) return false;
+        return true;
+      },
+      enter: async (id, b) => { const t = towns?.get(id); if (!t || !rooms) return; await outside(); await rooms.enter({ town: t, b }, true); },
+      below: async (id) => {
+        const v = await cellars.build(id);
+        if (!v) return false;
+        await outside();
+        await v.enter(true);
+        // Put down mid-room (a tower's gate hall is 6 m across): facing the way in, the camera trails into the room, not into its door.
+        if (v.cellar.form.space.arriveMid) player.walker.yaw = player.heroCam.yaw = player.walker.yaw + Math.PI;
+        keepFacing();
+        return true;
+      },
+      open: async (place) => {
+        if (!setting.regions || !regionSites) return null;
+        const ids = new Set(setting.regions.fills.filter((f) => f.place === place).map((f) => f.id));
+        for (let dir = 0; dir < 8; dir++) {
+          const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: start?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
+          const found = walked.at(-1);
+          if (!found?.site || !ids.has(found.fill)) continue;
+          for (const d of walked) regionOpened(d);
+          await roading;
+          return found;
+        }
+        return null;
+      },
+      promise: (kind) => {
+        const form = setting.dungeons[kind]?.form;
+        const d = form && start ? promisePlace(kind as LandKind, form, seed, terrain, start, log, home, wild?.territories ?? []) : null;
+        if (d) { log = [...log, { ...d, at: hours() }]; cellars.sync(log); for (const t of towns?.every ?? []) t.promised(d); }
+        return d;
+      },
+      situation: (kind) => situationNow(kind),
+      answerFor: (need) => answerNow(need),
+      event: (id) => storyEventNow(id),
+      goodDay: () => goodDayNow(),
+      bridges: (x, z) => bridgesNear(terrain.roads, terrain.hydro, x, z, 4000, (px, pz) => terrain.hydro.hasBrooks(px, pz)),
+    });
     new DebugMenu({
       paused,
       get freeCamera() { return player.flying; },
@@ -1370,8 +1440,9 @@ export async function start(b: Boot): Promise<void> {
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(seedText, home),
+      spots,
       seed: seedText,
-      game: { player, view, origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */

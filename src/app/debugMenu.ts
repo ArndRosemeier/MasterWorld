@@ -8,6 +8,7 @@ import { loadLocal, saveLocal } from '../persist/local';
 import { onKeyDown, swallow } from '../input/keys';
 import type { VgmLine } from '../vgm/vgmLog';
 import { clock } from './dom';
+import type { GoSpot } from './goPlaces';
 
 /** What the debug menu reaches in the running game. */
 export interface DebugHost {
@@ -51,6 +52,8 @@ export interface DebugHost {
   readonly seed: string;
   /** Places worth a look in this world. */
   readonly places: readonly Place[];
+  /** Every kind of place the world has, found (or made) when chosen, grouped. */
+  readonly spots: readonly GoSpot[];
   /** Everything, for the command line. */
   readonly game: Record<string, unknown>;
 }
@@ -98,6 +101,7 @@ export class DebugMenu {
           return `${p.pos.join(', ')}`;
         },
       }))],
+      ...[...new Set(h.spots.map((s) => s.group))].map((g): [string, Btn[]] => [g, h.spots.filter((s) => s.group === g).map((s) => ({ label: s.label, run: () => s.go() }))]),
       ['World', [
         { label: `Seed: ${h.seed}`, run: () => h.seed },
         { label: 'Copy link to this world', run: () => this.copy(this.worldLink()) },
