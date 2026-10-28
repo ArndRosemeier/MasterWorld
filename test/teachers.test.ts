@@ -11,6 +11,8 @@ import { openWorld } from '../src/vgm/builder';
 import { Township } from '../src/game/township';
 import { SMALL } from './small';
 
+/** A human hero's standing with human trainers at the start (classic: kin 15). */
+const KIN = 15;
 const witch = classic.guilds!.find((g) => g.keeper === 'hedge-witch')!;
 const under = classic.guilds!.find((g) => g.keeper === 'undercroft-keeper')!;
 const ability = (id: string) => classic.abilities.find((a) => a.id === id)!;
@@ -19,7 +21,7 @@ const log: DecisionLog = [];
 test('teachers: the hedge witch opens a school for a fresh hero’s coin, with its first spell and mana', () => {
   const hero = new Character(classic);
   assert.ok(hero.coins >= witch.openPrice! && hero.maxMana === 0);
-  assert.equal(openRank(classic, witch, hero, 'vitae', new GuildBook(), log), null);
+  assert.equal(openRank(classic, witch, hero, 'vitae', new GuildBook(), log, KIN), null);
   assert.ok(hero.opened('vitae') && hero.knows('mend') && hero.mana === hero.maxMana && hero.maxMana > 0);
   assert.ok(!hero.knows('regrowth'), 'only the first spell comes with the school');
   assert.ok(hero.bar.includes('mend'), 'onto the action bar');
@@ -28,7 +30,7 @@ test('teachers: the hedge witch opens a school for a fresh hero’s coin, with i
 test('teachers: further spells wait for the school’s level and cost coin; other schools wait to be opened', () => {
   const hero = new Character(classic), book = new GuildBook();
   hero.coins = 1000;
-  openRank(classic, witch, hero, 'geomancy', book, log);
+  openRank(classic, witch, hero, 'geomancy', book, log, KIN);
   const skin = ability('stone-skin');
   assert.equal(spellRefusal(classic, witch, hero, skin), 'unearned');
   hero.skills.set('geomancy', skin.level!);
@@ -65,7 +67,7 @@ test('teachers: a save made before the teachers never opens magic; one after kee
   const back = new Character(classic, old);
   for (const k of ['vitae', 'geomancy', 'umbramancy', 'cryomancy']) assert.ok(!back.opened(k), k);
   hero.coins = 100;
-  openRank(classic, witch, hero, 'vitae', new GuildBook(), log);
+  openRank(classic, witch, hero, 'vitae', new GuildBook(), log, KIN);
   const again = new Character(classic, JSON.parse(JSON.stringify(hero.save())));
   assert.ok(again.opened('vitae') && again.knows('mend') && !again.opened('geomancy'));
 });
@@ -88,7 +90,7 @@ test('teachers: the warden keeps watch at a half-ruined tower past the start tow
   const told = bardTells(classic, d, t.guilds, new GuildBook(), () => 'Odo');
   assert.ok(told.some((x) => x.includes('half-ruined tower') && x.includes('pyromancy') && /(north|south|east|west)/.test(x)), told.join(' | '));
   const hero = new Character(classic);
-  assert.equal(openRank(classic, h.guild, hero, 'pyromancy', new GuildBook(), log), null);
+  assert.equal(openRank(classic, h.guild, hero, 'pyromancy', new GuildBook(), log, KIN), null);
   assert.ok(hero.knows('fire-dart'));
 });
 

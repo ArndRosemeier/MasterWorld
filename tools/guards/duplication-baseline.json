@@ -245,7 +245,7 @@
   },
   {
     "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/townLife.ts + masterworld/world/sites.ts",
-    "reason": "A point at an angle and distance round a centre (x + cos·d, z + sin·d): plain trigonometry for three different things (rain's low ground, where townsfolk gather, a place's houses and tents)."
+    "reason": "A point at an angle and distance round a centre (x + cos\u00b7d, z + sin\u00b7d): plain trigonometry for three different things (rain's low ground, where townsfolk gather, a place's houses and tents)."
   },
   {
     "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/terrain/TerrainView.ts#refresh",
@@ -338,10 +338,6 @@
   {
     "key": "same name: masterworld/app/spellFx/particles.ts#spot + masterworld/sim/wild.ts#spot",
     "reason": "Only the name matches: the spell drawing's own spot (app/spellFx, spell lab) and an unrelated system's."
-  },
-  {
-    "key": "same name: masterworld/app/spellFx/particles.ts#standing + masterworld/game/guilds.ts#standing",
-    "reason": "Only the name matches: the spell drawing's own standing (app/spellFx, spell lab) and an unrelated system's."
   },
   {
     "key": "same name: masterworld/app/spellFx/particles.ts#step + masterworld/lab/spellLab.ts#step",
@@ -522,5 +518,13 @@
   {
     "key": "same name: masterworld/app/walkTo.ts#step + masterworld/sim/smallLife.ts#step",
     "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
+  },
+  {
+    "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/tradeUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/looks.ts#hit + masterworld/game/fight.ts#hit",
+    "reason": "Unrelated: the fight's recipe host lands a blow on a creature (rules); the spell looks draw where a spell struck (pictures). Only the name matches."
   }
 ]

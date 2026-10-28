@@ -5,7 +5,7 @@
  * stars. Shown fresh, the rarity sets the entrance and the lines rise one by one. The fight HUD shows finds
  * with it, the pack window what is worn and carried (styles in brass.css).
  */
-import { abilityOf, type Rarity, type SettingModule } from '../setting/contract';
+import { abilityOf, skillOf, type Rarity, type SettingModule } from '../setting/contract';
 import type { Item } from '../game/items';
 import { condition, wearState } from '../game/upkeep';
 import { el } from './dom';
@@ -14,7 +14,7 @@ import { twinkles, wardRim } from './ward';
 /** The lines under an item's name: damage or armour, then its bonuses. */
 export function itemLines(i: Item, setting: SettingModule): string[] {
   const d = setting.items.items.find((x) => x.id === i.def);
-  const lines = Object.entries(i.bonuses).map(([k, v]) => `+${v} ${setting.skills.find((s) => s.id === k)?.name ?? k}`);
+  const lines = Object.entries(i.bonuses).map(([k, v]) => `+${v} ${skillOf(setting, k)?.name ?? k}`);
   if (d?.weapon) lines.unshift(`${d.weapon.damage[0]}–${d.weapon.damage[1]} damage`);
   if (d?.armour) lines.unshift(`armour ${d.armour}`);
   if (d?.block) lines.unshift(`blocks ${Math.round(d.block * 100)}%`);

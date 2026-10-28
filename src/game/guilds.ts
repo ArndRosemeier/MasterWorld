@@ -1,17 +1,17 @@
 /**
  * Guild houses (plan 10, D49): where a hero opens a skill and its ranks. Every town of a guild's sizes has
  * its house: a plain house near what the guild names (the smithy, the inn, the edge), whose first grown-up
- * becomes its trainer. A trainer opens a skill at rank 0, and each next rank once use has raised the skill
- * to the top of the one before (lessons stop short of it), some only after the guild's task or with enough
- * standing. Standing with a guild follows from what the hero did there: ranks opened, its task done. The
- * bard at the inn knows every house. The same for every town, start town or village. Pure.
+ * becomes its trainer. A trainer opens a skill at rank 0 and each next rank for coin (D54: nothing rises by
+ * use), once the hero's standing with the trainer's people (plan 11.6) is high enough, higher for a dangerous
+ * skill; the third rank also asks the guild's task. The task done raises that standing, once. The bard at
+ * the inn knows every house. The same for every town, start town or village. Pure.
  */
 import { hexToRgb } from '@futuremagic/core';
 import { fill } from '../talk/folk';
 import { cap } from '../talk/townTalk';
 import { compass } from '../vgm/dungeons';
 import { houseShape, polyCentroid, signPlace, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
-import type { AbilityDef, GuildDef, SettingModule, SkillRankDef, TrainerDef } from '../setting/contract';
+import { skillOf, type AbilityDef, type GuildDef, type SettingModule, type SkillRankDef, type TrainerDef } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
 import { dungeonOf, type DecisionLog, type RetreatDecision } from '../world/decisions';
 import type { Character } from './character';
@@ -28,10 +28,6 @@ export interface GuildHouse {
 /** Where a guild's master is found: their place out on the land, else the house. */
 export const whereOf = (h: GuildHouse): { readonly x: number; readonly z: number } => h.out ?? { x: h.b.cx, z: h.b.cz };
 
-/** Lessons stop this far below a rank's top: the last points of every rank come by use (D49). */
-export const EARN = 5;
-/** Standing a rank opened and the guild's task done bring (0..100). */
-const STANDING_RANK = 4, STANDING_TASK = 15;
 /** Two guilds' houses stand at least this far apart where the town has room (m). */
 const APART = 30;
 
@@ -105,10 +101,14 @@ export function guildFor(setting: Pick<SettingModule, 'guilds'>, skill: string):
   return setting.guilds?.find((g) => g.skills.includes(skill)) ?? null;
 }
 
-/** The hero's dealings with the guilds: when each gave its task (game hours), and the hidden houses the bard told of. Plain data. */
+/**
+ * The hero's dealings with the guilds: when each gave its task (game hours), the hidden houses the bard told
+ * of, and the tasks whose thanks (standing) were given. Plain data.
+ */
 export interface GuildBookSave {
   readonly given: Readonly<Record<string, number>>;
   readonly told?: readonly string[];
+  readonly thanked?: readonly string[];
 }
 
 /** One house in one town, as the book keeps it. */
@@ -117,10 +117,12 @@ export const houseIn = (town: string, guild: string): string => `${town}:${guild
 export class GuildBook {
   private readonly given = new Map<string, number>();
   private readonly told = new Set<string>();
+  private readonly thanked = new Set<string>();
 
   constructor(saved?: GuildBookSave) {
     for (const k in saved?.given ?? {}) this.given.set(k, saved!.given[k]);
     for (const k of saved?.told ?? []) this.told.add(k);
+    for (const k of saved?.thanked ?? []) this.thanked.add(k);
   }
 
   /** The bard told the way into a hidden house (`houseIn`): it goes on the map. */
@@ -150,20 +152,23 @@ export class GuildBook {
     return false;
   }
 
-  /** Standing with a guild (0..100): the ranks it opened, and its task done. */
-  standing(g: GuildDef, hero: Character, log: DecisionLog): number {
-    let n = 0;
-    for (const s of g.skills) n += Math.max(0, hero.rankOf(s) ?? 0) + ((hero.rankOf(s) ?? -1) >= 0 ? 1 : 0);
-    return Math.min(100, n * STANDING_RANK + (this.taskDone(g, log) ? STANDING_TASK : 0));
+  /**
+   * The guild's task done and not yet thanked for: true once (the trainer's people think better of the hero
+   * for it: a deed counts once, D54), false ever after.
+   */
+  thank(g: GuildDef, log: DecisionLog): boolean {
+    if (this.thanked.has(g.keeper) || !this.taskDone(g, log)) return false;
+    this.thanked.add(g.keeper);
+    return true;
   }
 
   bookSave(): GuildBookSave {
-    return { given: Object.fromEntries(this.given), ...(this.told.size ? { told: [...this.told] } : {}) };
+    return { given: Object.fromEntries(this.given), ...(this.told.size ? { told: [...this.told] } : {}), ...(this.thanked.size ? { thanked: [...this.thanked] } : {}) };
   }
 }
 
 /** Why a rank was not opened (null: it was). */
-export type RankRefusal = 'not-taught' | 'top' | 'unearned' | 'task' | 'standing' | 'coin' | null;
+export type RankRefusal = 'not-taught' | 'top' | 'task' | 'standing' | 'coin' | null;
 
 /** The next rank of a skill and what it asks (null: it has none, or the hero has them all). */
 export function nextRank(setting: Pick<SettingModule, 'skillRanks'>, hero: Character, skill: string): { readonly rank: number; readonly def: SkillRankDef } | null {
@@ -177,22 +182,28 @@ export function nextRank(setting: Pick<SettingModule, 'skillRanks'>, hero: Chara
 export const rankPrice = (g: GuildDef, next: { readonly rank: number; readonly def: SkillRankDef }): number =>
   next.rank === 0 && g.openPrice !== undefined ? g.openPrice : next.def.price;
 
-/** What stands between the hero and a skill's next rank at this guild (null: nothing). */
-export function rankRefusal(setting: Pick<SettingModule, 'skillRanks'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
+/** The standing with a trainer's people a skill's rank asks (D54): the rank's, and more for a dangerous skill. */
+export function standingFor(setting: Pick<SettingModule, 'skillRanks' | 'skills'>, skill: string, rank: number): number {
+  return (setting.skillRanks?.[rank]?.standing ?? 0) + (skillOf(setting, skill)?.danger ?? 0);
+}
+
+/**
+ * What stands between the hero and a skill's next rank at this guild (null: nothing). `standing`: the hero's
+ * standing with the trainer's people (Standing.value of the trainer's race).
+ */
+export function rankRefusal(setting: Pick<SettingModule, 'skillRanks' | 'skills'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog, standing: number): RankRefusal {
   if (!g.skills.includes(skill)) return 'not-taught';
   const next = nextRank(setting, hero, skill);
   if (!next) return 'top';
-  // A next rank needs the one before reached: by use, since lessons stop short of its top.
-  if (next.rank > 0 && Math.floor(hero.skills.get(skill) ?? 0) < hero.capOf(skill) - 1) return 'unearned';
   if (next.def.task && !book.taskDone(g, log)) return 'task';
-  if (next.def.standing && book.standing(g, hero, log) < next.def.standing) return 'standing';
+  if (standing < standingFor(setting, skill, next.rank)) return 'standing';
   if (hero.coins < rankPrice(g, next)) return 'coin';
   return null;
 }
 
-/** Open a skill's next rank at this guild: the coin goes, the skill may grow to the new rank's top. */
-export function openRank(setting: Pick<SettingModule, 'skillRanks' | 'abilities'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
-  const no = rankRefusal(setting, g, hero, skill, book, log);
+/** Open a skill's next rank at this guild: the coin goes, lessons may raise the skill to the new rank's top. */
+export function openRank(setting: Pick<SettingModule, 'skillRanks' | 'skills' | 'abilities'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog, standing: number): RankRefusal {
+  const no = rankRefusal(setting, g, hero, skill, book, log, standing);
   if (no) return no;
   const next = nextRank(setting, hero, skill)!;
   hero.coins -= rankPrice(g, next);
@@ -245,7 +256,7 @@ export function learnSpell(setting: Pick<SettingModule, 'abilities'>, g: GuildDe
 export function bardTells(setting: Pick<SettingModule, 'bard' | 'skills'>, town: { readonly id: string; readonly x: number; readonly z: number }, houses: readonly GuildHouse[], book: GuildBook, keeperName: (keeper: string) => string | null): string[] {
   const bard = setting.bard;
   if (!bard) return [];
-  const names = (ids: readonly string[]) => ids.map((id) => setting.skills.find((x) => x.id === id)?.name.toLowerCase() ?? id).join(', ');
+  const names = (ids: readonly string[]) => ids.map((id) => skillOf(setting, id)?.name.toLowerCase() ?? id).join(', ');
   return houses.map(({ guild: g, out }) => {
     if (g.hidden) book.tell(houseIn(town.id, g.keeper));
     const house = cap(g.name), keeper = keeperName(g.keeper) ?? 'the master';

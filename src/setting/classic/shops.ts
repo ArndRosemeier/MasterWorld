@@ -37,6 +37,6 @@ export const trainers: readonly TrainerDef[] = [
   {
     keeper: 'innkeeper', title: '{name}, keeper of the inn', topic: 'How do you hear so much?',
     line: 'You listen more than you talk, and when you talk you make them laugh. Sit down, I will show you.',
-    skills: ['speech', 'perception'], upTo: 30, price: 22, hours: 1,
+    skills: ['speech', 'perception'], upTo: 30, price: 11, hours: 1,
   },
 ];

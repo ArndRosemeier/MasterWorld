@@ -34,6 +34,7 @@ import { Township } from './township';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
 import { lessonPrice, takeLesson, teacherOf } from './lessons';
 import { bardTells, GuildBook, isGuild, learnSpell, nextRank, openRank, rankRefusal, spellRefusal, spellsOf } from './guilds';
+import { Standing } from './standing';
 import { WALK, Walker, type WalkWorld } from './walker';
 import type { Terrain } from '../world/terrain';
 
@@ -109,7 +110,7 @@ const DELVE_LIMIT = 1200;
 /** Copper kept back from lessons (with the room): a mending or two. */
 const LESSON_RESERVE = 40;
 /** Lessons in one skill an evening, at most. */
-const LESSONS_A_DAY = 2;
+const LESSONS_A_DAY = 4;
 /** A purse above this at the end means coin piles up with nothing to buy (plan A2b). */
 const SENSIBLE_PURSE = 400;
 
@@ -139,6 +140,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const power0 = hero.power;
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [], opened: string[] = [];
   const book = new GuildBook();
+  // A human hero (the creator's first people): trainers open ranks by their own people's standing (D54).
+  const standing = new Standing(setting, 'human');
+  const trust = (p: Person | undefined) => standing.value(p?.race ?? 'human');
   let falls = 0, earned = 0, seconds = 0, spells = 0;
   /** The mage's school, and its teacher's house. */
   let school: { skill: string; house: TownBuilding; guild: GuildDef } | null = null;
@@ -177,8 +181,11 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain, near: town === start ? null : town });
 
   const walkTo = (what: string, x: number, z: number) => {
-    watch.where = Math.hypot(x - town.decision.x, z - town.decision.z) < town.decision.radius + 60 ? 'town' : 'land';
-    if (watch.where === 'land') byTheWay(x, z);
+    const inTown = (px: number, pz: number) => Math.hypot(px - town.decision.x, pz - town.decision.z) < town.decision.radius + 60;
+    const from = land.walker.pos, out = !inTown(from.x, from.z);
+    watch.where = inTown(x, z) ? 'town' : 'land';
+    // Out on the land on the way, whether going out or coming home from out there.
+    if (watch.where === 'land' || out) byTheWay(x, z);
     const s = land.go(x, z);
     pass(s.seconds);
     if (!s.arrived) throw new Broke(`stuck on the way to ${what}: ${s.left.toFixed(0)} m short at (${land.walker.pos.x.toFixed(0)}, ${land.walker.pos.z.toFixed(0)})`);
@@ -261,7 +268,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     walkTo(h.guild.name, ...front(h.b));
     // A school whose first spell strikes a foe, if the teacher has one (it shows magic in a fight).
     const skill = h.guild.skills.find((k) => spellsOf(setting, h.guild).some((x) => x.skill === k && !(x.level ?? 0) && aimsAtFoe(x))) ?? h.guild.skills[0], before = hero.coins;
-    const no = openRank(setting, h.guild, hero, skill, book, log);
+    const no = openRank(setting, h.guild, hero, skill, book, log, trust(people.find((p) => p.trade === h.guild.keeper)));
     if (no) throw new Broke(`${h.guild.name} would not open ${skill}: ${no} (${hero.coins} copper)`);
     if (!hero.maxMana) throw new Broke(`opened ${skill} but has no mana`);
     opened.push(`${skill} 0`);
@@ -367,6 +374,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       hero.coins += reward;
       const kept = keepPromise(log, lead.id, hours);
       if (kept) log = [...log, kept];
+      // The household's people think better of the hero for it, once (D54).
+      if (kept) standing.keptFor(to.race);
       cleared.push(lead.id);
       watch.leads = 0;
       director.met('reward');
@@ -444,10 +453,11 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         const next = nextRank(setting, hero, skill);
         if (!by || !next || hero.coins - next.def.price < reserve) continue;
         const g = setting.guilds!.find((x) => x.keeper === by.t.keeper)!;
-        if (rankRefusal(setting, g, hero, skill, book, log)) continue;
+        if (book.thank(g, log)) standing.change(by.p.race, setting.standing.task);
+        if (rankRefusal(setting, g, hero, skill, book, log, trust(by.p))) continue;
         walkTo(g.name, ...front(town.plan.buildings[by.p.work]));
         const before = hero.coins;
-        openRank(setting, g, hero, skill, book, log);
+        openRank(setting, g, hero, skill, book, log, trust(by.p));
         paid += before - hero.coins;
         opened.push(`${skill} ${next.rank}`);
         say(`${g.name} opens ${skill} rank ${next.rank} for ${before - hero.coins} copper`);

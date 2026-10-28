@@ -44,25 +44,13 @@ test('fight: blows land by skill against dodging, armour takes its share, never 
   assert.equal(threatOf(40, 15), 'deadly');
 });
 
-test('fight: a fresh hero is about power 15; skills grow by use, slower when high, hardly against the trivial', () => {
+test('fight: a fresh hero is about power 15; nothing rises by use (D54), however long the hero fights', () => {
   const h = new Character(classic);
   assert.ok(h.power > 11 && h.power < 19, `power ${h.power}`);
   assert.equal(h.health, h.maxHealth);
-  const gain = (level: number, challenge: number) => {
-    const c = new Character(classic);
-    c.ranks.set('blades', 3); // every rank open (D49): only use counts here
-    c.skills.set('blades', level);
-    c.practise('blades', challenge);
-    return c.skills.get('blades')! - level;
-  };
-  assert.ok(gain(10, 8) > gain(60, 30) * 2, 'slower when high');
-  assert.ok(gain(40, 1) < gain(40, 20) / 5, 'little from a rat when good');
-  // A hundred fights' worth of blows against fitting foes makes a real difference, but no master.
-  const c = new Character(classic);
-  c.ranks.set('blades', 3);
-  for (let i = 0; i < 400; i++) c.practise('blades', 10 + c.skill('blades') * 0.4);
-  assert.ok(c.skills.get('blades')! > 25 && c.skills.get('blades')! < 70, `${c.skills.get('blades')}`);
-  assert.ok(c.power > h.power + 3);
+  const hero = new Character(classic), before = JSON.stringify([...hero.skills]);
+  for (const [i, c] of cellars.slice(0, 4).entries()) fightBot(c, classic, i, hero, 400);
+  assert.equal(JSON.stringify([...hero.skills]), before, 'blows struck, dodged, blocked and taken leave every skill where it was');
 });
 
 test('fight: finds have rarities by danger, legendary only where it is dangerous', () => {

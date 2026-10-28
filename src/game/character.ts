@@ -1,9 +1,9 @@
 /**
- * The hero as numbers (plan 11.4, 11.5, D29, D30): skills that grow by use (no classes, no XP), health
- * and stamina that grow with the skills that use them, what is worn and carried, and the one "power"
- * number the VGM reads wherever it needs a level. Pure: saved as plain data.
+ * The hero as numbers (plan 11.4, 11.5, D29, D30, D54): skills taught by trainers (no classes, no XP, and
+ * nothing rises by use), health and stamina that grow with the skills that use them, what is worn and
+ * carried, and the one "power" number the VGM reads wherever it needs a level. Pure: saved as plain data.
  */
-import { abilityOf, type BackgroundDef, type DamageKind, type ItemCatalog, type SettingModule, type Slot } from '../setting/contract';
+import { abilityOf, skillOf, type BackgroundDef, type DamageKind, type ItemCatalog, type SettingModule, type Slot } from '../setting/contract';
 import type { Blow, Guard } from '../sim/combat';
 import { addToBar, cleanBar, clearSlot, defaultBar, type Bar } from './actionBar';
 import type { Worn } from './recipe';
@@ -31,13 +31,6 @@ export interface CharacterSave {
   readonly bar?: Bar;
 }
 
-/** A skill rose to a new whole point. */
-export interface SkillUp {
-  readonly skill: string;
-  readonly name: string;
-  readonly level: number;
-}
-
 export interface WeaponStats {
   readonly skill: string;
   readonly damage: readonly [number, number];
@@ -52,8 +45,8 @@ const FISTS: WeaponStats = { skill: 'unarmed', damage: [1, 3], kind: 'blunt', ti
 export class Character {
   readonly skills = new Map<string, number>();
   /**
-   * The rank opened in each skill a guild teaches (D49): use and lessons raise it only up to that rank's
-   * top, and not at all before a trainer (or the hero's past) opened it. Skills no guild teaches rise freely.
+   * The rank opened in each skill a guild teaches (D49, D54): lessons raise it only up to that rank's top,
+   * and not at all before a trainer (or the hero's past) opened it. Skills no guild teaches have no ranks.
    */
   readonly ranks = new Map<string, number>();
   health: number;
@@ -109,7 +102,7 @@ export class Character {
     for (const s of this.setting.skills) this.skills.set(s.id, s.start + (bg.skills[s.id] ?? 0));
     // What everyone can do, and what this past taught, is open; the rest waits for a guild's trainer.
     this.ranks.clear();
-    for (const id of this.rankedSkills()) this.ranks.set(id, this.setting.skills.find((s) => s.id === id)?.open || bg.skills[id] ? 0 : -1);
+    for (const id of this.rankedSkills()) this.ranks.set(id, skillOf(this.setting, id)?.open || bg.skills[id] ? 0 : -1);
     for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) delete this.worn[k];
     this.pack.length = 0;
     const p = (id: string) => plainItem(this.cat, id);
@@ -190,10 +183,10 @@ export class Character {
     return this.setting.skills.map((s) => s.id).filter((id) => g.has(id));
   }
 
-  private isMagic(id: string): boolean { return this.setting.skills.find((s) => s.id === id)?.group === 'magic'; }
+  private isMagic(id: string): boolean { return skillOf(this.setting, id)?.group === 'magic'; }
 
   /** A ranked skill's rank for a new hero with no past: open to all at 0, else not opened. */
-  private freshRank(id: string): number { return this.setting.skills.find((s) => s.id === id)?.open ? 0 : -1; }
+  private freshRank(id: string): number { return skillOf(this.setting, id)?.open ? 0 : -1; }
 
   /** The rank whose span holds a skill level (an older save's skills open as far as they had come). */
   private rankFor(v: number): number {
@@ -207,7 +200,7 @@ export class Character {
     return this.ranks.get(id) ?? null;
   }
 
-  /** How high use and lessons may raise a skill now (its rank's top; where it is, before it is opened). */
+  /** How high lessons may raise a skill now (its rank's top; where it is, before it is opened). */
   capOf(id: string): number {
     const r = this.ranks.get(id);
     if (r === undefined) return 100;
@@ -239,7 +232,7 @@ export class Character {
   /** A skill the hero may use: opened by a trainer or the past, or open to all where no guild teaches it. */
   opened(id: string): boolean {
     const r = this.ranks.get(id);
-    return r === undefined ? !!this.setting.skills.find((s) => s.id === id)?.open : r >= 0;
+    return r === undefined ? !!skillOf(this.setting, id)?.open : r >= 0;
   }
 
   get alive(): boolean { return this.health > 0; }
@@ -286,22 +279,6 @@ export class Character {
     const w = this.weapon, avg = (w.damage[0] + w.damage[1]) / 2;
     const skill = (this.skill(w.skill) + this.skill('dodge') + this.skill('armour') * 0.5 + (this.worn.off ? this.skill('shields') * 0.5 : 0)) / 5;
     return Math.round((skill + avg * (1 + this.skill(w.skill) / 220) / w.time * 2.2 + this.armour * 0.9 + this.blockChance * 8 + (this.maxHealth - 55) * 0.08) * 10) / 10;
-  }
-
-  /**
-   * A skill was used against something of `challenge` (a foe's danger, or a skill level for a task).
-   * Use raises it, more slowly the higher it is and hardly at all against what is far too easy (D30).
-   */
-  practise(id: string, challenge: number, amount = 1): SkillUp | null {
-    const def = this.setting.skills.find((s) => s.id === id);
-    const v = this.skills.get(id);
-    const cap = this.capOf(id);
-    if (!def || v === undefined || v >= cap) return null;
-    const fit = Math.min(1.6, Math.max(0.05, challenge / Math.max(4, v * 0.45)));
-    const gain = (0.16 * def.rate * fit * amount) / (1 + v / 18);
-    const next = Math.min(cap, v + gain);
-    this.skills.set(id, next);
-    return Math.floor(next) > Math.floor(v) ? { skill: id, name: def.name, level: Math.floor(next) } : null;
   }
 
   /**

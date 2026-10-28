@@ -9,7 +9,7 @@ import { Rng, angleDiff, deriveSeed } from '@futuremagic/core';
 import { abilityOf, type AbilityDef, type DamageKind, type SettingModule } from '../setting/contract';
 import { strike, threatOf, type Blow, type Strike, type Threat } from '../sim/combat';
 import { radiusOf, type Creature, type Den, type DenEvent, type Quarry } from '../sim/creatures';
-import type { Character, SkillUp } from './character';
+import type { Character } from './character';
 import { defOf, rollLoot, type Item, type Loot } from './items';
 import { blowOf, mendCaster, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
 import { WEAR, type WearState } from './upkeep';
@@ -34,7 +34,6 @@ export type FightEvent =
   | { readonly kind: 'flee'; readonly who: Creature }
   | { readonly kind: 'plea'; readonly who: Creature; readonly text: string }
   | { readonly kind: 'spared'; readonly who: Creature }
-  | { readonly kind: 'skill'; readonly up: SkillUp }
   | { readonly kind: 'heal'; readonly amount: number }
   | { readonly kind: 'fallen' }
   /** Something worn looks different now (worn, battered, broken): the smith can mend it. */
@@ -205,7 +204,6 @@ export class Fight implements RecipeWorld {
     if (!c) return;
     const s = strike(blow, this.den.guardOf(c), this.rng);
     this.pending.push({ kind: 'struck', who: c, strike: s, ability: ability.id, spell: true });
-    this.train(ability.skill ?? this.hero.weapon.skill, c.def.danger, s.outcome === 'miss' ? 0.5 : 1, this.pending);
     for (const e of this.den.wound(c, s, this.at)) this.denEvent(e, this.pending);
   }
 
@@ -260,7 +258,6 @@ export class Fight implements RecipeWorld {
     const s = strike(this.hero.blow(b), this.den.guardOf(t), this.rng);
     out.push({ kind: 'struck', who: t, strike: s, ability: a.id });
     this.wearOut('main', WEAR.blow * (s.outcome === 'miss' ? 1 / 3 : 1), out);
-    this.train(w.skill, t.def.danger, s.outcome === 'miss' ? 0.5 : 1, out);
     for (const e of this.den.wound(t, s, p, b.stagger ?? 0)) this.denEvent(e, out);
     // The rest of its recipe (a bleeding cut…) follows a blow that landed.
     if (s.outcome !== 'miss' && a.ops.length > 1) this.recipes.playRest(a, t.id, p);
@@ -281,10 +278,6 @@ export class Fight implements RecipeWorld {
         else if (s.outcome !== 'miss') {
           for (const [slot, it] of Object.entries(hero.worn)) if (it && defOf(this.setting.items, it.def).kind === 'armour') this.wearOut(slot as keyof typeof hero.worn, WEAR.hit, out);
         }
-        // Dodging a blow trains dodging; a block, the shield; taking one, the armour.
-        if (s.outcome === 'miss') this.train('dodge', e.who.def.danger, 1, out);
-        else if (s.outcome === 'block') this.train('shields', e.who.def.danger, 1, out);
-        else if (hero.armour > 0) this.train('armour', e.who.def.danger, 0.7, out);
         if (!hero.alive) { this.attacking = false; out.push({ kind: 'fallen' }); }
         break;
       }
@@ -301,10 +294,5 @@ export class Fight implements RecipeWorld {
   private wearOut(slot: keyof Character['worn'], amount: number, out: FightEvent[]): void {
     const w = this.hero.wear(slot, amount);
     if (w) out.push({ kind: 'worn', item: w.item, state: w.state });
-  }
-
-  private train(skill: string, challenge: number, amount: number, out: FightEvent[]): void {
-    const up = this.hero.practise(skill, challenge, amount);
-    if (up) out.push({ kind: 'skill', up });
   }
 }
