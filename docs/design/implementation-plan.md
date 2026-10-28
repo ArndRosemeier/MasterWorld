@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). Phase D is next, once Arnd has decided on its steps.
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Phase L (the land at every scale) comes next** (Arnd, 2026-10-28), then phase D.
 
 ---
 
@@ -122,6 +122,24 @@ C15 built 2026-10-28 (AG #126/#127, MW #270/#271): the classic region fill `capi
 Built ahead of phase C (Arnd asked by name, 2026-10-27): **bird form**, a taught change of shape (the hero becomes a pheasant and flies; design section 10), and the **action bar** (ten slots, always shown, arranged in the ability book; 17.1) that C1's abilities will sit on. C3 gives bird form a teacher: the hidden Undercroft (C3 part 1, 2026-10-27).
 
 Gate C (passed 2026-10-28; passed again after C13–C15 on 2026-10-28): a fight with magic in the F1 set, the loop check with a mage hero, every VGM tool in the toolbox and in vgm.md (C6b, C6c), no need overdue more than 5 minutes in the loop check (C9), the review.
+
+### Phase L: The land at every scale (Arnd, 2026-10-28; before phase D)
+
+Goal: the land has something to look at every minute of a walk, and not every stretch of country is the same. The start lies in a mesa valley, the plateaus round it are reached by climbing or by passes, and caves are big.
+
+This phase moves the ground that everything else stands on. The start moves, so old saves start a new game (as `startMoved` does since D50), and tests that name positions are checked again.
+
+| Step | Delivers | Done when | Design |
+|---|---|---|---|
+| L1 | **Landforms** (D55): the landform shapes as data in the setting, a mix per biome, placed per cell from the seed and blended into `Terrain` (knoll, tor, dell with or without a pond, gully, ravine, ridge, scarp, sinkhole, dry valley, bank and sunken lane); the middle band of relief (200–600 m); towns, roads, rivers and places still sit right on it | Test: a 1 km walk in each lowland biome passes at least five landforms of three shapes, none in a town or a road bed; F4 holds (terrain worker time) | 5.9 |
+| L2 | **Rock on the land** (D55, 5.6 layer 3): outcrops, boulders, erratics, scree and slabs as rock meshes from a shared AssetGenerator package, scattered by the landforms' rules, with collision for the walker | F2 and F3 hold in a GPU shot of a tor and a boulder field; the walker cannot walk through a boulder | 5.6, 5.9 |
+| L3 | **Landscape kinds and mesa country** (D55): a kind per stretch of country in the skeleton, as data; mesa country with plateaus 40–200 m high, cliff walls, talus, valleys and canyons, at least one pass per plateau | Tests: every plateau has a pass a walker can take; kinds change at believable borders; GPU shots of a mesa valley at noon and at dusk | 5.9 |
+| L4 | **Climbing** (D56): the hero climbs where rock has holds, seen climbing (rule 11), with stamina and falls; the walker and the loop bot know climbable stretches and passes | Test: a bot reaches a plateau top once by a pass and once by climbing; a GPU shot of the climb | 5.9, 11.2 |
+| L5 | **The start in a mesa valley** (D56): the setting asks for a mesa valley with a river; the start town, the arch, the hold and the first places are sited there; the title fly-over still works | Test: the start town stands on a valley floor by fresh water with plateaus in view; the F1 set and the loop check pass on the new start | 6, D50 |
+| L6 | **Real caves** (D57): cave dungeons that are big (caverns tens of metres high, several chambers, ways that climb and drop, water), with mouths in cliff faces and mesa walls as volumes; some caves are sights without dwellers; the B5 cave grows | Test: a cave's main cavern is over 20 m high and its ways over 200 m long; the variety sweep covers it; a GPU shot inside a cavern and of a mouth in a cliff | 5.6, 8, D57 |
+| L7 | **More landscape kinds** as data (rolling downs, moor with tors, karst, badlands …), each with its landform mix | Test: each kind is found on a long walk; a GPU shot of each | 5.9 |
+
+Gate L: the F1 set adds the mesa valley, a plateau top, a climb, a tor with boulders and a cavern; a walk trace shows a landform at least every minute of walking; F2 and F4 hold; the loop check passes on the new start; the review.
 
 ### Phase D: Seas (milestone 7)
 
