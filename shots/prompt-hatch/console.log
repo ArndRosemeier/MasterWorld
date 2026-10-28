@@ -1,0 +1,30 @@
+start {"climbing":false,"below":false,"inside":true,"x":-30247.018767111156,"y":39.02100443015088,"z":34232.23325770402,"built":7}
+shots\prompt-hatch\0-by-the-hatch.jpg
+prompt by the hatch: "E Climb down"
+shots\prompt-hatch\1-down-00.jpg
+shots\prompt-hatch\1-down-01.jpg
+shots\prompt-hatch\1-down-02.jpg
+shots\prompt-hatch\1-down-03.jpg
+shots\prompt-hatch\1-down-04.jpg
+shots\prompt-hatch\1-down-05.jpg
+shots\prompt-hatch\1-down-06.jpg
+shots\prompt-hatch\1-down-07.jpg
+shots\prompt-hatch\1-down-08.jpg
+shots\prompt-hatch\1-down-09.jpg
+below {"climbing":false,"below":true,"inside":false,"x":-30244.829056204857,"y":-400,"z":34233.74324406722,"built":7}
+shots\prompt-hatch\2-at-the-foot.jpg
+prompt at the ladder: "E Climb up"
+shots\prompt-hatch\3-up-00.jpg
+shots\prompt-hatch\3-up-01.jpg
+shots\prompt-hatch\3-up-02.jpg
+shots\prompt-hatch\3-up-03.jpg
+shots\prompt-hatch\3-up-04.jpg
+shots\prompt-hatch\3-up-05.jpg
+shots\prompt-hatch\3-up-06.jpg
+shots\prompt-hatch\3-up-07.jpg
+shots\prompt-hatch\3-up-08.jpg
+shots\prompt-hatch\3-up-09.jpg
+above {"climbing":false,"below":false,"inside":true,"x":-30246.272254723088,"y":39.02100443015088,"z":34232.459353379476,"built":11}
+shots\prompt-hatch\4-out-again.jpg
+shaders 77 warm-up + 11 later · worst 14 ms · policy ok
+hatch: ok
