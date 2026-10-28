@@ -4,12 +4,14 @@
  */
 
 export class WorkerPool<Job, Result> {
+  /** Told of every answer as it reaches the main thread (the hitch log): the pool's name and the job's kind. */
+  static heard: ((what: string) => void) | null = null;
   private readonly workers: Worker[] = [];
   private readonly busy: number[] = [];
-  private readonly waiting = new Map<number, { resolve: (r: Result) => void; reject: (e: Error) => void; worker: number }>();
+  private readonly waiting = new Map<number, { resolve: (r: Result) => void; reject: (e: Error) => void; worker: number; kind: string }>();
   private nextId = 1;
 
-  constructor(make: () => Worker, size = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1))) {
+  constructor(make: () => Worker, private readonly name = 'worker', size = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1))) {
     for (let w = 0; w < size; w++) {
       const worker = make();
       worker.onmessage = (e: MessageEvent<{ id: number; result?: Result; error?: string }>) => {
@@ -17,6 +19,7 @@ export class WorkerPool<Job, Result> {
         if (!p) return;
         this.waiting.delete(e.data.id);
         this.busy[p.worker]--;
+        WorkerPool.heard?.(`${this.name}:${p.kind}`);
         if (e.data.error !== undefined) p.reject(new Error(e.data.error));
         else p.resolve(e.data.result as Result);
       };
@@ -33,7 +36,7 @@ export class WorkerPool<Job, Result> {
     const id = this.nextId++;
     this.busy[w]++;
     return new Promise((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject, worker: w });
+      this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job) });
       this.workers[w].postMessage({ id, job }, transfer);
     });
   }
@@ -44,7 +47,7 @@ export class WorkerPool<Job, Result> {
       const id = this.nextId++;
       this.busy[w]++;
       return new Promise<Result>((resolve, reject) => {
-        this.waiting.set(id, { resolve, reject, worker: w });
+        this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job) });
         worker.postMessage({ id, job });
       });
     }));
@@ -57,25 +60,31 @@ export class WorkerPool<Job, Result> {
   }
 }
 
+/** A job's kind for the hitch log (`{ kind: 'chunk' }` → chunk). */
+function kindOf(job: unknown): string {
+  const k = (job as { kind?: unknown } | null)?.kind;
+  return typeof k === 'string' ? k : 'job';
+}
+
 export type TerrainPool = WorkerPool<import('./terrain.worker').TerrainJob, import('./terrain.worker').TerrainResult>;
 
 /** Terrain chunks are built off the main thread. */
 export function createTerrainPool(size?: number): TerrainPool {
-  return new WorkerPool(() => new Worker(new URL('./terrain.worker.ts', import.meta.url), { type: 'module' }), size);
+  return new WorkerPool(() => new Worker(new URL('./terrain.worker.ts', import.meta.url), { type: 'module' }), 'terrain', size);
 }
 
 export type TexturePool = WorkerPool<import('./texture.worker').TextureJob, import('@futuremagic/texgen').TexLayer>;
 
 /** Ground texture layers are generated off the main thread at load. */
 export function createTexturePool(size?: number): TexturePool {
-  return new WorkerPool(() => new Worker(new URL('./texture.worker.ts', import.meta.url), { type: 'module' }), size);
+  return new WorkerPool(() => new Worker(new URL('./texture.worker.ts', import.meta.url), { type: 'module' }), 'texture', size);
 }
 
 export type WorldPool = WorkerPool<import('./world.worker').WorldJob, import('./world.worker').WorldResult>;
 
 /** Water masks and plant positions around the camera (one worker: a job now and then). */
 export function createWorldPool(): WorldPool {
-  return new WorkerPool(() => new Worker(new URL('./world.worker.ts', import.meta.url), { type: 'module' }), 1);
+  return new WorkerPool(() => new Worker(new URL('./world.worker.ts', import.meta.url), { type: 'module' }), 'world', 1);
 }
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 
