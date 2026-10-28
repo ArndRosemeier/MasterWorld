@@ -3,7 +3,7 @@
  * [out dir]` after `npm run build` and `npm run packs`, SHOT_GPU=1 on the reference machine. The hero starts by the
  * hatch of the first cellar's house (`room=cellar`), presses E and is seen lifting the lid, getting onto the ladder
  * and climbing down; below, E at the ladder climbs back up and out, the lid let down. Checks: E starts each climb,
- * the hero ends below and then back in the house, never moved while not climbing, no shader built in play, no
+ * the key prompt offers each climb ("E Climb down", "E Climb up") and is gone while climbing, the hero ends below and then back in the house, never moved while not climbing, no shader built in play, no
  * page errors. JPEGs into `<out dir>` (default `shots/hatch/<date>-<commit>/`). A slow check (docs/CHECKS.md).
  */
 import { execSync } from 'node:child_process';
@@ -56,13 +56,19 @@ const film = async (tag, every, n) => {
   return n;
 };
 
+/** The key prompt shown now ('' when none). */
+const prompt = () => page.evaluate(() => { const p = document.getElementById('use-prompt'); if (!p?.classList.contains('on')) return ''; const k = p.querySelector('kbd')?.textContent ?? ''; return `${k} ${p.textContent.slice(k.length).trim()}`.trim(); });
+const offered = async (want, where) => { const got = await prompt(); console.log(`prompt ${where}: "${got}"`); if (got !== want) fail(`${where} the prompt is "${got}", not "${want}"`); };
 const s0 = await state();
 console.log('start', JSON.stringify(s0));
 if (!s0.inside) fail('room=cellar did not start in the house');
 await look();
 await page.waitForTimeout(500);
 await shoot('0-by-the-hatch');
+await offered('E Climb down', 'by the hatch');
 await page.keyboard.press('KeyE');
+await page.waitForTimeout(300);
+if (await prompt()) fail(`the key prompt stays up while climbing ("${await prompt()}")`);
 await page.waitForTimeout(100);
 if (!(await state()).climbing) fail('E by the hatch did not start a climb');
 await film('1-down', 700, 16);
@@ -73,6 +79,7 @@ if (!s1.below) fail('not below after the climb down');
 // The game's own camera, as the climb left it.
 await page.waitForTimeout(600);
 await shoot('2-at-the-foot');
+await offered('E Climb up', 'at the ladder');
 await page.keyboard.press('KeyE');
 await page.waitForTimeout(100);
 if (!(await state()).climbing) fail('E at the ladder did not start a climb');
