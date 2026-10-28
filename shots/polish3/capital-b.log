@@ -1,0 +1,26 @@
+
+> masterworld@0.0.0 shot:capital
+> node tools/shot/capital.mjs shots/polish3/capital-b
+
+region-24: 695 buildings, 2646 people, 5 gates; playable in 15.0 s
+the way in (1101 m at 16 m/s): worst frame 72 ms 1063 m from the gate, 109 frames over 25 ms; its people lived from 980 m out
+slow frames by distance from the gate: 1100-1200 m: 1, 1000-1100 m: 55, 800-900 m: 1, 700-800 m: 1, 600-700 m: 1, 500-600 m: 1, 400-500 m: 1, 300-400 m: 3, 200-300 m: 8, 100-200 m: 14, 0-100 m: 23
+  72 ms at 1063 m (outside these: 64): render 8.0
+  61 ms at 1075 m (outside these: 50): render 10.7
+  61 ms at 1069 m (outside these: 45): render 15.0
+  58 ms at 1033 m (outside these: 50): render 8.0
+  58 ms at 1030 m (outside these: 45): render 12.7
+  58 ms at 1036 m (outside these: 44): render 13.1
+  58 ms at 1027 m (outside these: 45): render 11.8
+  56 ms at 1024 m (outside these: 47): render 9.1
+  47 ms at 1096 m (outside these: 38): render 9.1
+  47 ms at 1099 m (outside these: 36): render 10.3 | node-async 21.1 MeshStandardNodeMaterial; gpu-module 0.0 createShaderModule; gpu-module 0.2 createShaderModule
+01-gate.jpg: p50 10.2 ms, p95 12.3 ms
+worst frame coming in: 47 ms
+02-market.jpg: p50 11.6 ms, p95 14.3 ms
+03-seat.jpg: p50 11.6 ms, p95 16.8 ms
+04-gate-night.jpg: p50 11.1 ms, p95 13.2 ms
+05-gate-opening.jpg
+06-gate-open.jpg
+the gate at night: 0.00 with nobody by it, 0.50 as the hero comes up, 1.00 once there
+F3: 0 shader violations
