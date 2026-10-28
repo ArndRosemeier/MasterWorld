@@ -171,7 +171,9 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       // Seen from the bank the reflected sky drowns the ripples: the streaks carry the current there.
       return smoothstep(0.69, 0.92, streak).mul(mix(float(0.6), float(0.38), smoothstep(8.0, 60.0, camDist))).add(rush.mul(smoothstep(0.55, 0.85, churn.mul(0.7).add(streak.mul(0.4)))).mul(0.7));
     };
-    const runFoam = (ph: Node<'float'>, seed: number) => mix(runFoamAlong(dirAt(turn0), ph, seed), runFoamAlong(dirAt(turn0.add(1)), ph, seed + 3.3), turnW);
+    // (One seed for both: a direction's streaks must be the same whichever side of the blend it is on, or they
+    // jump where the current turns past one of the fixed directions.)
+    const runFoam = (ph: Node<'float'>, seed: number) => mix(runFoamAlong(dirAt(turn0), ph, seed), runFoamAlong(dirAt(turn0.add(1)), ph, seed), turnW);
     const runningFoam = mix(runFoam(phaseA, 0), runFoam(phaseB, 7.1), layerB).mul(running);
     // The falling sheet: streaks stretched down the fall, rushing.
     const sheet = mx_noise_float(vec3(sideways.mul(1.4), p.y.mul(0.18).add(t.mul(3.0)), t.mul(0.4))).mul(0.35)
