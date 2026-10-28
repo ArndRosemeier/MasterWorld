@@ -12,6 +12,8 @@ import { Player } from './app/player';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
+import { Rocks } from './world/rocks';
+import { RockView } from './render/rocks/RockView';
 import { woodsOf } from './world/flora';
 import { daylight } from './game/soundscape';
 import { HeroView } from './render/hero/HeroView';
@@ -253,6 +255,8 @@ export async function start(b: Boot): Promise<void> {
     const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), towns?.stand(x, z) ?? -Infinity);
     // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
     const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
+    // Rocks one walks round (D55), asked ahead the same way.
+    const rocks = new Rocks(terrain, (x0, z0, size) => jobs.rocks(x0, z0, size));
     const below = () => visit()?.world ?? null;
     // The building drawn open (its storeys, stairs and furniture where it stands).
     const openHouse = () => (visit() ? null : rooms?.walk ?? null);
@@ -281,7 +285,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
@@ -552,6 +556,8 @@ export async function start(b: Boot): Promise<void> {
     loading.set('Growing the woods');
     const flora = new FloraView(view.stage, jobs, view.sun, { leafDepth: params.leafDepth, shadows: params.treeShadows });
     if (boot.trees) await flora.placeStart(view.camera.position);
+    const rockView = new RockView(view.stage, jobs, view.sun);
+    await rockView.placeStart(view.camera.position);
     const grass = boot.grass ? new GrassView(jobs) : null;
     await grass?.sow(view.camera.position);
     sea.update(0, view.camera.position, view.sky.light, view.sky.gain);
@@ -561,9 +567,9 @@ export async function start(b: Boot): Promise<void> {
     await painted;
     // The land, its rock and the town's houses are built in workers meanwhile; their shaders compile with the rest.
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
-    roadWork.rebuilds({ ground, flora, grass, trunks });
+    roadWork.rebuilds({ ground, flora, grass, trunks, rocks, rockView });
     await roadWork.mask.start(view.camera.position);
-    const rock = new VolumeView(view.stage, terrainJobs).raise();
+    const rock = Promise.all([new VolumeView(view.stage, terrainJobs).raise(), rockView.raise()]);
     // Every town that stands (the start's; a loaded game's settlements too), drawn alike.
     const raised = towns.standing(view.camera.position);
     const landReady = ground.ready(view.camera);
@@ -1452,7 +1458,7 @@ export async function start(b: Boot): Promise<void> {
       places: placesFor(seedText, home),
       spots,
       seed: seedText,
-      game: { player, view, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
@@ -1908,6 +1914,8 @@ export async function start(b: Boot): Promise<void> {
         if (boot.trees) flora.update(dt, view.camera);
         part('trunks+grass');
         trunks.around(player.walker.pos.x, player.walker.pos.z);
+        rocks.around(player.walker.pos.x, player.walker.pos.z);
+        rockView.tend(view.camera);
         grass?.tend(dt, view.camera);
       }
       // Behind an open window the land is only glimpsed: it is drawn every other frame, which leaves the main

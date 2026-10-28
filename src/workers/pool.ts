@@ -183,6 +183,11 @@ export class WorldJobs {
     return this.pool.run({ kind: 'flora', seed: this.seed, setting: this.setting, x0, z0, size, spacing }) as Promise<Float32Array>;
   }
 
+  /** The rocks of the landforms whose middle lies in a square (world/rocks.ts rockPlacement). */
+  rocks(x0: number, z0: number, size: number): Promise<Float32Array> {
+    return this.job({ kind: 'rocks', x0, z0, size });
+  }
+
   /**
    * A road from `place` to the network (vgm/roads.ts linkRoad), routed in the world worker: it takes a few
    * hundred milliseconds. `roads`: the roads already decided (the worker's land has them laid).

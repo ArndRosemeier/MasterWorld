@@ -8,6 +8,7 @@ import { openWorld } from '../vgm/builder';
 import { waterMask, type MaskJob } from '../world/water';
 import { floraPlacement, type FloraJob } from '../world/flora';
 import { grassMask } from '../world/grass';
+import { rockPlacement } from '../world/rocks';
 import { settingById } from '../setting/index';
 import { roadMask } from '../world/roads';
 import type { Decision, RegionDecision, RoadDecision, RoadWay } from '../world/decisions';
@@ -16,7 +17,7 @@ import { serve } from './serve';
 import { packRivers } from '../world/hydro';
 import { nextRegion, type FrontierAsk } from '../vgm/frontier';
 
-export type WorldJob = ({ kind: 'mask' } & MaskJob) | ({ kind: 'grass' } & MaskJob) | ({ kind: 'roads' } & MaskJob) | ({ kind: 'flora' } & FloraJob) | { kind: 'decisions'; seed: number; setting: string; decisions: readonly Decision[] }
+export type WorldJob = ({ kind: 'mask' } & MaskJob) | ({ kind: 'grass' } & MaskJob) | ({ kind: 'roads' } & MaskJob) | ({ kind: 'flora' } & FloraJob) | { kind: 'rocks'; seed: number; setting: string; x0: number; z0: number; size: number } | { kind: 'decisions'; seed: number; setting: string; decisions: readonly Decision[] }
   | { kind: 'link'; seed: number; setting: string; roads: readonly RoadDecision[]; place: Place; way: RoadWay; at?: number }
   | { kind: 'brooks'; seed: number; setting: string; tx: number; tz: number }
   | { kind: 'frontier'; seed: number; setting: string; ask: FrontierAsk };
@@ -39,6 +40,6 @@ serve<WorldJob, WorldResult>((job) => {
     const packed = packRivers(terrain.hydro.brookTileAt((job.tx + 0.5) * side, (job.tz + 0.5) * side)!.rivers);
     return { result: packed, transfer: [packed.buffer] };
   }
-  const out = job.kind === 'mask' ? waterMask(terrain, job) : job.kind === 'grass' ? grassMask(terrain, job) : job.kind === 'roads' ? roadMask(terrain.roads, job) : floraPlacement(terrain, job);
+  const out = job.kind === 'mask' ? waterMask(terrain, job) : job.kind === 'grass' ? grassMask(terrain, job) : job.kind === 'roads' ? roadMask(terrain.roads, job) : job.kind === 'rocks' ? rockPlacement(terrain, job.x0, job.z0, job.size) : floraPlacement(terrain, job);
   return { result: out, transfer: [out.buffer] };
 });

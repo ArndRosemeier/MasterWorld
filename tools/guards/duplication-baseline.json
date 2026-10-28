@@ -52,10 +52,6 @@
     "reason": "Dressing the hero in clothes vs dressing a dungeon room with a set piece's props; only the word matches."
   },
   {
-    "key": "idiom: [.from Array] in masterworld/render/terrain/groundTextures.ts + masterworld/vgm/encounters.ts + masterworld/world/flora.ts",
-    "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper."
-  },
-  {
     "key": "same name: masterworld/app/cellars.ts#encounters + masterworld/app/wildLand.ts#encounters",
     "reason": "Both hand their built encounters to stepEncounters (app/encounter.ts): one role, two owners (cellars, the wild)."
   },
@@ -238,14 +234,6 @@
   {
     "key": "same name: masterworld/world/dungeon/caveRock.ts#sdf + masterworld/world/dungeon/space.ts#sdf",
     "reason": "CaveSpace.sdf overrides DungeonSpace.sdf: the layout's distance with the carved rock over it (it calls super.sdf)."
-  },
-  {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/spots.ts + masterworld/sim/townLife.ts + masterworld/world/sites.ts",
-    "reason": "A point at an angle and distance round a centre (x + cos\u00b7d, z + sin\u00b7d): plain trigonometry for three different things (rain's low ground, where townsfolk gather, a place's houses and tents). (spots.ts: a chat's places on a ring round its middle.)"
-  },
-  {
-    "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/terrain/TerrainView.ts#refresh",
-    "reason": "The same seam on purpose: app/roads.ts asks every view built from the land to build again over the squares a new road passes; each view rebuilds its own cells."
   },
   {
     "key": "same name: masterworld/game/trade.ts#save + masterworld/talk/townTalk.ts#save",
@@ -526,5 +514,33 @@
   {
     "key": "same name: masterworld/app/heroCamera.ts#hold + masterworld/sim/townLife.ts#hold",
     "reason": "Unrelated: the camera holds a scene's shot; a townsperson is held for a talk (and comes round their work first). Only the name matches."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/spots.ts + masterworld/sim/townLife.ts + masterworld/world/rocks.ts + masterworld/world/sites.ts",
+    "reason": "A point at an angle and a distance from a middle (x + cos a * r, z + sin a * r): plain trigonometry, each placing its own things; rocks.ts added a fifth use (rocks round a tor's crown)."
+  },
+  {
+    "key": "idiom: [.from Array] in masterworld/render/terrain/groundTextures.ts + masterworld/vgm/encounters.ts + masterworld/world/flora.ts + masterworld/world/rocks.ts",
+    "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper (rocks.ts: the rock models, variants of each shape)."
+  },
+  {
+    "key": "same name: masterworld/render/flora/FloraView.ts#placeStart + masterworld/render/rocks/RockView.ts#placeStart",
+    "reason": "Both views placed before the first frame (main.ts): the same step of the load on purpose; the cell keeping they share is render/cameraCells.ts."
+  },
+  {
+    "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/rocks/RockView.ts#refresh",
+    "reason": "The same seam on purpose: app/roads.ts RoadViews has every view built from the land placed anew near a road; the cell keeping they share is render/cameraCells.ts."
+  },
+  {
+    "key": "same name: masterworld/world/rocks.ts#around + masterworld/world/trunks.ts#around",
+    "reason": "The same obstacle seam on purpose (asked ahead each frame, main.ts); both keep their cells in world/fetchedCells.ts."
+  },
+  {
+    "key": "same name: masterworld/world/rocks.ts#blocks + masterworld/world/trunks.ts#blocks",
+    "reason": "The same obstacle seam on purpose (the walker's wall, main.ts): trunks are circles, rocks circles with a top one can stand over; both keep their cells in world/fetchedCells.ts."
+  },
+  {
+    "key": "same name: masterworld/world/rocks.ts#forgetOver + masterworld/world/trunks.ts#forgetOver",
+    "reason": "The same seam on purpose: app/roads.ts RoadViews drops both kinds of obstacle cells near a new road; both keep their cells in world/fetchedCells.ts."
   }
 ]

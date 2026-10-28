@@ -10,6 +10,8 @@ import { settlementOf, type Decision, type DungeonDecision, type RegionDecision,
 import type { TownPlan } from '@futuremagic/settlement';
 import type { Terrain } from '../world/terrain';
 import type { Trunks } from '../world/trunks';
+import type { Rocks } from '../world/rocks';
+import type { RockView } from '../render/rocks/RockView';
 import type { TerrainJobs, WorldJobs } from '../workers/pool';
 import { FollowedMask } from '../render/followedMask';
 import { ROAD } from '../render/materials/roads';
@@ -23,6 +25,8 @@ export interface RoadViews {
   flora: FloraView;
   grass: GrassView | null;
   trunks: Trunks;
+  rocks: Rocks;
+  rockView: RockView;
 }
 
 export class RoadWork {
@@ -70,6 +74,8 @@ export class RoadWork {
     this.views?.ground.refresh(touches);
     this.views?.flora.refresh(touches);
     this.views?.trunks.forgetOver(touches);
+    this.views?.rocks.forgetOver(touches);
+    this.views?.rockView.refresh(touches);
     this.views?.grass?.invalidate(touches);
     this.mask.invalidate(touches);
   }
@@ -114,6 +120,8 @@ export class RoadWork {
     this.views?.ground.refresh(touches);
     this.views?.flora.refresh(touches);
     this.views?.trunks.forgetOver(touches);
+    this.views?.rocks.forgetOver(touches);
+    this.views?.rockView.refresh(touches);
     this.views?.grass?.invalidate(touches);
   }
 
