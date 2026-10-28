@@ -282,13 +282,13 @@ export function goSpots(h: GoHost): GoSpot[] {
     });
   };
   const now = (x: { at: number; until: number }) => h.hours() < x.until;
-  situation('hurt-traveller', 'Hurt traveller', () => decisionsOf(h.log(), 'traveller').filter((x) => x.situation && now(x)).at(-1), 6);
+  situation('hurt-traveller', 'Hurt traveller', () => decisionsOf(h.log(), 'traveller').filter((x) => x.situation && now(x)).at(-1), 10);
   situation('paddock-wolves', 'Wolves at a paddock', () => decisionsOf(h.log(), 'wild').filter((x) => x.situation).at(-1), 30);
   situation('stray-beast', 'A beast got out', () => decisionsOf(h.log(), 'stray').filter(now).at(-1), 12);
   add(W, 'Traveller resting by the way', async () => {
     let d = decisionsOf(h.log(), 'traveller').filter((x) => !x.situation && now(x)).at(-1);
     if (!d) { const m = h.answerFor('people'); d = m?.decision.kind === 'traveller' ? m.decision : undefined; }
-    return at(d ? beside(d, h.heroPos(), 6) : null, 'traveller');
+    return at(d ? beside(d, h.heroPos(), 10) : null, 'traveller');
   });
   add(W, 'Ambush', async () => {
     let d = decisionsOf(h.log(), 'wild').filter((x) => x.group === 'ambush').at(-1);

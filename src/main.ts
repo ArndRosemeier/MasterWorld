@@ -1357,7 +1357,9 @@ export async function start(b: Boot): Promise<void> {
       // trunk across the view to what they look at (up to 60 m, short of it, which may stand among trees itself).
       clear: (x, z, yaw, at) => {
         const wet = (px: number, pz: number) => (world.waterLevel(px, pz) ?? -Infinity) >= terrain.height(px, pz) + 0.05 || inChannel(terrain.hydro.brookAt(px, pz, brookHere), 1.5);
-        const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && !wet(px, pz);
+        // A crop field's grain stands as high as the camera.
+        const inCrop = (px: number, pz: number) => { const f = towns?.nearest(px, pz)?.town.fieldAt(px, pz); return !!f && f.paddock < 0; };
+        const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && !wet(px, pz) && !inCrop(px, pz);
         if (!standsFree(x, z, 1.2) || ![3.5, 6].every((d) => standsFree(x + Math.sin(yaw) * d, z + Math.cos(yaw) * d, 2.5))) return false;
         // Across the view a tree's crown, not only its trunk, is in the way (but near what it looks at, trees may stand).
         // Only for a place a stone's throw off (a cave's mouth): someone met close is seen anyway, and far off a stand
