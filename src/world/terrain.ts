@@ -253,7 +253,11 @@ export class Terrain {
     // Rivers shape their valleys, then brooks theirs in the land the rivers left (their levels come from it, D50),
     // each blending out to the edge of its own valley, so where two meet the land stays whole.
     const r = this.hydro.riverAt(x, z, this.here);
-    level = shapeByWater(this.hydro.brookAt(x, z, this.brook), shapeByWater(r, level));
+    const byRiver = shapeByWater(r, level);
+    level = shapeByWater(this.hydro.brookAt(x, z, this.brook), byRiver);
+    // A brook coming down into a river's gorge never banks the land up in the river's bed: from the river's edge it
+    // may raise it at most as steeply as it rises away from it (else it dams the river).
+    if (r.river && level > byRiver) level = Math.min(level, byRiver + Math.max(0, r.dist - r.half - 1));
     // A road levels its bed and shoulders; a river still cuts its ford, and a brook its channel through the
     // shoulders and, under the road's bridge, its bed (world/bridges.ts).
     if (!this.roadNet.empty) {

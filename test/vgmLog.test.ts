@@ -5,7 +5,9 @@ import { Director } from '../src/vgm/director';
 import { TOOLS, toolOf, vgmTurn } from '../src/vgm/toolbox';
 import { PACING, toolFor, vgmLines } from '../src/vgm/vgmLog';
 import type { Decision, DungeonDecision } from '../src/world/decisions';
-import { EAST, home, seed, terrain, walk } from './frontierLand';
+import { EAST, frontierLand } from './frontierLand';
+
+const { home, seed, terrain, walk } = frontierLand();
 
 // The VGM's log (D53, C8): every move has its line, with the tool, its need and why.
 

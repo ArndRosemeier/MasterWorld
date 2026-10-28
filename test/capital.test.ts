@@ -5,7 +5,9 @@ import { regionDecisions, settlementsOf, walkFrontier } from '../src/vgm/frontie
 import { settlementOf } from '../src/world/decisions';
 import { townsfolk } from '../src/sim/people';
 import { guildHouses } from '../src/game/guilds';
-import { EAST, first, home, regions, seed, terrain } from './frontierLand';
+import { EAST, frontierLand } from './frontierLand';
+
+const { first, home, regions, seed, terrain } = frontierLand();
 
 /** The capital (C15, D41): the VGM founds one a few km out as the hero walks, and it replays from the log. */
 test('capital: one, a few km out, a decision in the log; walled, with its ruler, guild halls and shops', () => {

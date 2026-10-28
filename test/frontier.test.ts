@@ -5,7 +5,9 @@ import { keyId, sizeOf } from '../src/world/regions';
 import { settlementOf, type Decision } from '../src/world/decisions';
 import { layOutSite } from '../src/world/sites';
 import { TOWN_LAYERS } from '../src/render/terrain/groundTextures';
-import { EAST, SOUTH, WEST, along, first, home, regions, seed, terrain, walk } from './frontierLand';
+import { EAST, SOUTH, WEST, frontierLand } from './frontierLand';
+
+const { along, first, home, regions, seed, terrain, walk } = frontierLand();
 
 test('frontier: walking 5 km opens the start region first, then regions ahead, all in the log', () => {
   const opened = regionDecisions(along(EAST));

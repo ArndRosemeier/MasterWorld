@@ -5,7 +5,9 @@ import { goSpots, type GoHost } from '../src/app/goPlaces';
 import { atDoor, before, beside, clearStand, outsideGate, type Stand } from '../src/app/places';
 import { guildHouses } from '../src/game/guilds';
 import type { DecisionLog, DungeonDecision } from '../src/world/decisions';
-import { first, terrain } from './frontierLand';
+import { frontierLand } from './frontierLand';
+
+const { first, terrain } = frontierLand();
 
 /** The way a stand faces (the walker's yaw: 0 faces −z), as a unit vector. */
 const facing = (s: Stand) => ({ x: -Math.sin(s.yaw), z: -Math.cos(s.yaw) });

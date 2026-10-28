@@ -3,7 +3,7 @@
  * mouth, a tower's door) at the origin, the way in towards −z, turned by the site's yaw (0 faces −z, as the
  * walker). Everything that stands on a site is made in this frame and turned onto the land with these.
  */
-
+import type { Ground } from '@futuremagic/core';
 
 export interface Site { readonly x: number; readonly z: number; readonly yaw: number }
 
@@ -11,6 +11,11 @@ export interface Site { readonly x: number; readonly z: number; readonly yaw: nu
 export function onLand(s: Site, x: number, z: number): [number, number] {
   const c = Math.cos(s.yaw), n = Math.sin(s.yaw);
   return [s.x + x * c + z * n, s.z - x * n + z * c];
+}
+
+/** The land's `height` in the site's frame, `y0` its y 0: what a piece made in that frame is set on (MeshKit.onGround). */
+export function groundIn(s: Site, height: Ground, y0: number): Ground {
+  return (fx, fz) => { const [x, z] = onLand(s, fx, fz); return height(x, z) - y0; };
 }
 
 /** A point of the land in the site's frame (the inverse of `onLand`). */

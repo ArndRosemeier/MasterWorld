@@ -10,7 +10,9 @@ import { criesDue, paddockWolvesFor, smokesAt, strayBeastFor, type PaddockContex
 import { pointInPoly } from '@futuremagic/settlement';
 import { answerNeed } from '../src/vgm/toolbox';
 import type { Decision } from '../src/world/decisions';
-import { home, seed, terrain, walk, EAST } from './frontierLand';
+import { EAST, frontierLand } from './frontierLand';
+
+const { home, seed, terrain, walk } = frontierLand();
 
 const log = walk(2, EAST);
 const town = terrain.towns[0];

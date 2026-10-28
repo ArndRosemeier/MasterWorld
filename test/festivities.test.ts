@@ -6,7 +6,9 @@ import { Township } from '../src/game/township';
 import { festivityFor, festivityOrder, festivityTold, isMarketDay, type FestivityContext } from '../src/vgm/festivities';
 import { keepPromise, nextPromise } from '../src/vgm/leads';
 import type { Decision } from '../src/world/decisions';
-import { home, seed, terrain, walk, EAST } from './frontierLand';
+import { EAST, frontierLand } from './frontierLand';
+
+const { home, seed, terrain, walk } = frontierLand();
 
 const town = terrain.towns[0];
 const base = walk(1, EAST);

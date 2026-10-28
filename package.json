@@ -15,7 +15,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test --test-timeout=5000 \"test/**/*.test.ts\" \"tools/**/*.test.mjs\"",
+    "test": "node tools/test/run.mjs",
     "guards": "node tools/guards/guards.mjs",
     "dup": "node tools/duplicate-candidates/find-duplicate-candidates.mjs",
     "repeated": "node tools/repeated-code/find-repeated-code.mjs",
@@ -44,6 +44,7 @@
     "shot:quest": "node tools/shot/quest.mjs",
     "shot:handover": "node tools/shot/handover.mjs",
     "shot:goto": "node tools/shot/goto.mjs",
+    "shot:grounded": "node tools/shot/grounded.mjs",
     "shot:hitches": "node tools/shot/hitches.mjs"
   },
   "dependencies": {

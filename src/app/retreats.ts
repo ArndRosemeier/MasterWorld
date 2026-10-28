@@ -9,7 +9,7 @@ import { deriveSeed } from '@futuremagic/core';
 import type { Stage } from '@futuremagic/stage';
 import { buildingMeshAt } from '../render/materials/building';
 import type { DecisionLog, RetreatDecision } from '../world/decisions';
-import { inFrame } from '../world/dungeon/site';
+import { groundIn, inFrame } from '../world/dungeon/site';
 import { inTowerShape, towerMesh, type TowerSize } from '../world/dungeon/towerMesh';
 
 /** A warden's keep: smaller than a tower dungeon's, three storeys, broken off at the top. */
@@ -22,7 +22,9 @@ export class Retreats {
   constructor(stage: Stage, log: DecisionLog, ground: (x: number, z: number) => number, seed: number) {
     this.sites = log.filter((d): d is RetreatDecision => d.kind === 'retreat');
     for (const s of this.sites) {
-      const m = buildingMeshAt(towerMesh(KEEP, deriveSeed(seed, 'retreat', s.keeper)), s.x, ground(s.x, s.z) - 0.02, s.z, 'retreat', s.yaw);
+      const y = ground(s.x, s.z);
+      // Set on the land round it (in the keep's own frame): its walls go down where the land falls away, its fallen stones lie on it.
+      const m = buildingMeshAt(towerMesh(KEEP, deriveSeed(seed, 'retreat', s.keeper), groundIn(s, ground, y)), s.x, y - 0.02, s.z, 'retreat', s.yaw);
       this.meshes.push(m);
       void stage.add(m);
     }

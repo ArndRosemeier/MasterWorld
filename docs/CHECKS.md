@@ -10,14 +10,21 @@ Tests are only useful if people run them all the time, so they must stay fast.
 | The whole of `npm test` | **60 s** | CI fails past 60 s and warns past 50 s (`tools/guards/budget.mjs`). Keep `npm test` free of browsers, network and big worlds. |
 | A slow check (browser, screenshots, shader check, long simulation) | **5 min** each | Own script, never inside `npm test`. Run on demand and after changes to what it covers. |
 
-The slow checks today: `npm run variety` (every kind of dungeon, 1000 each) and `npm run loop` (whole evenings played headless, plan A6) run in CI after `npm test`, and so does `npm run check:units` (every material kind warmed up on WebGL 2 in headless Chromium; it fails when a fragment shader reads more than WebGL 2's 16 textures, as the land did after the roads, MW #155); `npm run shot:set` (the standard shots, F1, in two runs of under 5 min each: `-- --part=town` and `-- --part=land`; without a part both run one after the other), `npm run shot:spells` (each school's first spell, C2), `npm run shot:rest` (the hero sits down to rest), `npm run shot:hatch` (down through a cellar's hatch and up its ladder, played out), `npm run shot:doors` (a house's door swings open as the hero comes and shuts behind them), `npm run shot:search` (the hero steps up to a chest, kneels and its lid lifts), `npm run shot:ways` (a cellar's locked, barred and hidden ways seen opening), `npm run shot:mouths` (walked into a barrow, cave and tower and out again, and remains knelt to and taken up), `npm run shot:hits` (every kind of foe and the hero struck, in slow motion) and `npm run shot:origin` (the floating origin at 32 km and 300 km from zero and across a step, plan B0) run on the reference GPU.
+The slow checks today: `npm run variety` (every kind of dungeon, 1000 each) and `npm run loop` (whole evenings played headless, plan A6) run in CI after `npm test`, and so does `npm run check:units` (every material kind warmed up on WebGL 2 in headless Chromium; it fails when a fragment shader reads more than WebGL 2's 16 textures, as the land did after the roads, MW #155); `npm run shot:set` (the standard shots, F1, in two runs of under 5 min each: `-- --part=town` and `-- --part=land`; without a part both run one after the other), `npm run shot:spells` (each school's first spell, C2), `npm run shot:rest` (the hero sits down to rest), `npm run shot:hatch` (down through a cellar's hatch and up its ladder, played out), `npm run shot:doors` (a house's door swings open as the hero comes and shuts behind them), `npm run shot:search` (the hero steps up to a chest, kneels and its lid lifts), `npm run shot:ways` (a cellar's locked, barred and hidden ways seen opening), `npm run shot:mouths` (walked into a barrow, cave and tower and out again, and remains knelt to and taken up), `npm run shot:grounded` (a ruined tower and the warden's keep from four sides: their fallen stones and wall feet on the land, none floating), `npm run shot:hits` (every kind of foe and the hero struck, in slow motion) and `npm run shot:origin` (the floating origin at 32 km and 300 km from zero and across a step, plan B0) run on the reference GPU.
 
 Tests use seeds, fake clocks and small fixtures, never wall-clock waits.
 
-`--test-timeout` holds for a whole test file too, setup at its top included, and files run three or four at
-once, so a file needs to finish well inside 5 s alone (about 3.5 s). The land's big rivers' grid costs about 2 s to
-build: a test that makes a `Terrain` or calls `openWorld` passes `SMALL` (test/small.ts) unless it needs the
-game's own rivers.
+`npm test` is `node tools/test/run.mjs`: the test files run in one process per core, side by side, and each process
+runs its share of the files one after the other (`--test-isolation=none`), so the code is loaded and compiled once per
+process, not once per file (MW: 47 s down to about 24 s on 4 cores). The shares are balanced by each file's tests' time
+in `tools/test/times.json` (`npm test -- --save-times` writes it anew; a new file counts as 1 s until then).
+`npm test -- test/town.test.ts` runs the files given, `TEST_PROCS=n npm test` with n processes.
+
+Because files share a process, a test file never changes what another one sees: a fixture a file settles more on is
+its own (`frontierLand()` in test/frontierLand.ts builds one land per file), and module-level state in `src` holds
+only caches. `--test-timeout` holds for each test; setup at a file's top is not timed, so keep it small. The land's
+big rivers' grid costs about 2 s to build: a test that makes a `Terrain` or calls `openWorld` passes `SMALL`
+(test/small.ts) unless it needs the game's own rivers.
 
 ## CI time
 
@@ -30,7 +37,7 @@ before it fails. When a warning shows up, find the cause then, not when it fails
 
 | Step | Time (Oct 2026) | Warn | Fail |
 |---|---|---|---|
-| `npm test` | ~40 s | 50 s | 60 s |
+| `npm test` | ~30 s | 50 s | 60 s |
 | `npm run variety` | ~12 s | 30 s | 5 min |
 | `npm run loop` (its runs side by side, one process each) | ~30 s | 60 s | 5 min |
 | `npm run build` | ~10 s | 30 s | 5 min |
