@@ -13,6 +13,8 @@ import { FlyCamera } from './flyCamera';
 import { HeroCamera, type Shot } from './heroCamera';
 import { lookFromDegrees } from './look';
 
+/** Leaving the free camera lands at most this far under it (m); farther down it is no open ground but a cellar's floor of the world. */
+const LAND_BELOW = 800;
 /** Where a talk's view looks, above the ground (m): a halfling's face behind a counter, an adult's chest. */
 const TALK_AIM = 1.1;
 
@@ -68,15 +70,31 @@ export class Player {
       this.fly.place(this.camera.position.x, this.camera.position.z, this.camera.position.y, true);
       this.fly.takeOver();
     } else {
-      // Land under the camera, looking the way it looked.
-      const p = this.camera.position;
+      // Land under the camera, looking the way it looked; where there is no open ground under it (a cellar's
+      // rock, a building's roof), the hero stays where they were and the camera comes back to them.
+      const p = this.camera.position, w = this.walker.pos, was = { x: w.x, y: w.y, z: w.z };
       this.walker.place(p.x, p.z);
+      if (!this.landsWell(p.y)) this.walker.place(was.x, was.z, was.y);
       this.heroCam.yaw = this.walker.yaw = this.fly.yaw;
       this.heroCam.pitch = Math.min(this.fly.pitch, 0.3);
       this.heroCam.trail(this.toHead(), 0);
     }
     this.flyingNow = on;
     this.applyInput();
+  }
+
+  /**
+   * The walker just placed under a camera at `camY` stands well: not above it, not far below it, and with its
+   * body out of rock. A camera flown out of a cellar has nothing but rock (or the cellar's block top) under it.
+   */
+  private landsWell(camY: number): boolean {
+    const w = this.walker.pos;
+    if (!(w.y <= camY + 0.5 && w.y > camY - LAND_BELOW)) return false;
+    for (const k of [0.75, 1.3]) {
+      const d = this.world.rockSurface(w.x, w.y + k, w.z);
+      if (d !== null && d < 0.2) return false;
+    }
+    return true;
   }
 
   /** A dialog is open: no keys or mouse for the game meanwhile. */

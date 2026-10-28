@@ -18,7 +18,7 @@ export const ACTIONS = [
   { id: 'jump', label: 'Jump / swim up' },
   { id: 'dive', label: 'Sit down to rest / dive' },
   { id: 'mount', label: 'Mount / dismount' },
-  { id: 'fly', label: 'Fly (free camera)' },
+  { id: 'fly', label: 'Fly (free camera, debug: ?fly or the debug menu)' },
   { id: 'talk', label: 'Talk to someone' },
   { id: 'journal', label: 'Journal' },
   { id: 'map', label: 'Map' },
