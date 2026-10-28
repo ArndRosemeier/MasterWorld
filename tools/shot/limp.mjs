@@ -2,7 +2,8 @@
  * Wounded foes limp and slow (sim/creatures.ts paceOf, render/limp.ts): `node tools/shot/limp.mjs [out dir]`
  * after `npm run packs` and `npm run build`, SHOT_GPU=1 on the reference machine. For wolves and bandits out
  * on the land and goblins and rats in the town's cellar, the nearest one is brought to a fifth of its health
- * and turned to run; a strip of pictures follows it limping off, and its measured pace is printed beside its
+ * and turned to run, the others sent out of the way; the hero is kept beside it and a strip of pictures (about
+ * two seconds) follows it limping along from the side, and its measured pace is printed beside its
  * whole one (it must be slower than the hero's run, 5.2 m/s). JPEGs into `<out dir>` (default
  * `shots/limp/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  */
@@ -52,14 +53,36 @@ for (const s of SCENES.filter((x) => !only || only.includes(x.id))) {
     f.delve.den.frighten(c);
     window.__limper = c;
   })()`);
+  // The others sent far off, out of the picture; the hero kept beside the runner, the camera on it.
+  await page.evaluate(`(() => {
+    const f = ${FIGHT}, c = window.__limper;
+    for (const o of f.delve.den.alive) if (o !== c) { o.x += 80; o.z += 80; o.path = []; }
+  })()`);
+  const beside = () => page.evaluate(`(() => {
+    const g = window.game, f = ${FIGHT}, O = f.spellFrame().offset, c = window.__limper;
+    const off = c.def.body.kind === 'rat' ? 1.6 : 3.2, side = c.dir + Math.PI / 2;
+    const cx = c.x + O.x, cz = c.z + O.z, x = cx + Math.cos(side) * off, z = cz + Math.sin(side) * off;
+    g.player.teleport(x, c.y + O.y, z, Math.atan2(x - cx, z - cz));
+    const cam = g.player.heroCam;
+    cam.yaw = Math.atan2(x - cx, z - cz) + 0.5;
+    cam.pitch = -0.2;
+    cam.zoom = c.def.body.kind === 'rat' ? 2 : 3;
+  })()`);
+  await beside();
   await page.waitForTimeout(400);
   const from = await page.evaluate(() => { const c = window.__limper; return { x: c.x, z: c.z, t: performance.now() }; });
-  for (let i = 0; i < 6; i++) {
-    await page.screenshot({ path: join(dir, `${s.id}-${i}.jpg`), type: 'jpeg', quality: 85 });
-    await page.waitForTimeout(120);
+  // About two seconds: several strides, its pace over all of them (the hero's moves follow it, never push it).
+  let walked = 0, last = from;
+  for (let i = 0; i < 12; i++) {
+    await page.screenshot({ path: join(dir, `${s.id}-${String(i).padStart(2, '0')}.jpg`), type: 'jpeg', quality: 85 });
+    await page.waitForTimeout(100);
+    const at = await page.evaluate(() => { const c = window.__limper; return { x: c.x, z: c.z }; });
+    walked += Math.hypot(at.x - last.x, at.z - last.z);
+    last = at;
+    await beside();
   }
-  const to = await page.evaluate(() => { const c = window.__limper; return { x: c.x, z: c.z, t: performance.now(), whole: c.def.speed, state: c.state }; });
-  const pace = Math.hypot(to.x - from.x, to.z - from.z) / ((to.t - from.t) / 1000);
+  const to = await page.evaluate(() => { const c = window.__limper; return { t: performance.now(), whole: c.def.speed, state: c.state }; });
+  const pace = walked / ((to.t - from.t) / 1000);
   console.log(`${s.id}: at a fifth of its health it went ${pace.toFixed(1)} m/s (whole ${to.whole} m/s), ${to.state}`);
   if (pace >= 5.2) { console.log(`${s.id}: outruns the hero`); failed = true; }
   await page.close();
