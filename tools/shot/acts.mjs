@@ -19,7 +19,7 @@ export const meet = (kind, d) => async (page) => {
 
 /**
  * The hero `d` metres from (x, z), facing it, on the side where no tree trunk stands between the camera
- * (`zoom` m behind the hero) and it; the camera close behind, looking `pitch` up, turned `side` rad off the
+ * (`zoom` m behind the hero) and it (or its edge, `r` m out); the camera close behind, looking `pitch` up, turned `side` rad off the
  * hero's back (so the hero does not hide what lies before them). `avoid`: what else must not stand in the
  * way (circles {x, z, r}: other buildings) or right by the hero and the camera (fences: closed lines, flat x, z, x, z, ...).
  * Wait first for the trunks round there to be known (a teleport near, a moment).
@@ -32,15 +32,19 @@ export const standClear = (page, at, d, { zoom = 2.2, pitch = -0.08, side = 0, a
     const t = Math.max(0, Math.min(1, ((x - ax) * ux + (z - az) * uz) / l));
     return Math.hypot(x - ax - ux * t, z - az - uz * t) < 2;
   }));
-  const clear = (a) => {
-    for (let s = 0; s <= d + zoom; s += 0.5) {
+  // How much stands in the way looking from angle `a` (0: nothing), from the edge of what is looked at (`at.r`).
+  const blocked = (a) => {
+    let n = 0;
+    for (let s = at.r ?? 0; s <= d + zoom; s += 0.5) {
       const x = at.x + Math.cos(a) * s, z = at.z + Math.sin(a) * s;
-      if (trunks?.blocks(x, z, 0.5) || circles.some((c) => Math.hypot(x - c.x, z - c.z) < c.r)) return false;
+      if (trunks?.blocks(x, z, 0.5) || circles.some((c) => Math.hypot(x - c.x, z - c.z) < c.r)) n++;
     }
-    return !nearFence(at.x + Math.cos(a) * d, at.z + Math.sin(a) * d) && !nearFence(at.x + Math.cos(a) * (d + zoom), at.z + Math.sin(a) * (d + zoom));
+    if (nearFence(at.x + Math.cos(a) * d, at.z + Math.sin(a) * d) || nearFence(at.x + Math.cos(a) * (d + zoom), at.z + Math.sin(a) * (d + zoom))) n += 100;
+    return n;
   };
-  let a = 0;
-  for (let k = 0; k < 32; k++) if (clear((k / 32) * Math.PI * 2)) { a = (k / 32) * Math.PI * 2; break; }
+  // The first clear side; none clear: the least blocked.
+  let a = 0, least = Infinity;
+  for (let k = 0; k < 32 && least > 0; k++) { const b = blocked((k / 32) * Math.PI * 2); if (b < least) { least = b; a = (k / 32) * Math.PI * 2; } }
   const x = at.x + Math.cos(a) * d, z = at.z + Math.sin(a) * d;
   g.player.teleport(x, undefined, z, Math.atan2(x - at.x, z - at.z));
   const cam = g.player.heroCam;
@@ -71,7 +75,7 @@ export const raidFarm = async (page) => {
     // What could hide the barn (the farm's other buildings, any near) and the fences not to stand in.
     const circles = t.plan.buildings.filter((o) => o.id !== b.id && Math.hypot(o.cx - b.cx, o.cz - b.cz) < 80).map((o) => ({ x: o.cx, z: o.cz, r: Math.hypot(o.hu, o.hv) + 1 }));
     const fences = t.plan.paddocks.filter((p) => Math.hypot(p.poly[0] - b.cx, p.poly[1] - b.cz) < 150).map((p) => p.poly);
-    return { x: b.cx, z: b.cz, centre: { x: cx, z: cz }, avoid: { circles, fences } };
+    return { x: b.cx, z: b.cz, r: Math.hypot(b.hu, b.hv), centre: { x: cx, z: cz }, avoid: { circles, fences } };
   });
   return { said, barn };
 };
