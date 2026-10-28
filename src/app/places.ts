@@ -19,8 +19,8 @@ export function placesFor(seed: string, start: { x: number; z: number }): Place[
 
 interface At { readonly x: number; readonly z: number }
 
-/** Where the hero stands, and the way they face (the walker's yaw: 0 faces −z); `at`: what they look at. */
-export interface Stand { readonly x: number; readonly z: number; readonly yaw: number; readonly at?: At }
+/** Where the hero stands, and the way they face (the walker's yaw: 0 faces −z); `at`: what they look at; `pitch`: the camera's (rad, up positive). */
+export interface Stand { readonly x: number; readonly z: number; readonly yaw: number; readonly at?: At; readonly pitch?: number }
 
 /** The way that faces `at` from (x, z). */
 const toward = (x: number, z: number, at: At): number => Math.atan2(x - at.x, z - at.z);
@@ -53,7 +53,7 @@ export function clearStand(s: Stand, clear: (x: number, z: number, yaw: number, 
     for (let k = 1; k <= 12; k++) {
       const t = a0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 12) * 2;
       const x = a.x + Math.sin(t) * d, z = a.z + Math.cos(t) * d, yaw = toward(x, z, a);
-      if (clear(x, z, yaw, a)) return { x, z, yaw, at: a };
+      if (clear(x, z, yaw, a)) return { ...s, x, z, yaw };
     }
   }
   return s;

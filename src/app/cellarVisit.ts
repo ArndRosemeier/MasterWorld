@@ -52,7 +52,7 @@ export class CellarVisit {
     space?: DungeonSpace,
   ) {
     this.space = space ?? new DungeonSpace(cellar.layout);
-    this.world = dungeonWorld(this.space, view.origin);
+    this.world = dungeonWorld(this.space, view.origin, cellar.hatch);
   }
 
   /** Go down (now: at once, no fade); `room` to stand in the middle of that room instead of at the ladder. */

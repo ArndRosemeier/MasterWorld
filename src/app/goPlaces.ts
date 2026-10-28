@@ -103,8 +103,11 @@ export function goSpots(h: GoHost): GoSpot[] {
     return 'inside the inn';
   });
   add(T, 'Farm yard', async () => {
-    const f = townWith((t) => { const farm = t.plan.farms[0]; return farm ? t.plan.buildings[farm.house] : null; });
-    return at(f && atDoor(f.it, 8), 'farmhouse');
+    // In the middle of the yard (open ground between the house, the barn and the stable), facing the house's door.
+    const f = townWith((t) => { const farm = t.plan.farms[0]; return farm ? { house: t.plan.buildings[farm.house], yard: polyCentroid(farm.yard) } : null; });
+    if (!f) return 'no farm';
+    const [yx, yz] = f.it.yard, door = { x: f.it.house.door[0], z: f.it.house.door[1] };
+    return at(beside(door, { x: yx, z: yz }, Math.max(6, Math.hypot(yx - door.x, yz - door.z))), 'farm yard');
   });
   add(T, 'Paddock gate', async () => {
     const f = townWith((t) => t.plan.paddocks[0]);
@@ -176,10 +179,10 @@ export function goSpots(h: GoHost): GoSpot[] {
   add(L, 'Stone arch', async () => {
     const v = decisionsOf(h.log(), 'volume')[0];
     if (!v) return 'no arch in this world';
-    const { a, b } = v.site, mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, span = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    // Square to its span, looking through it.
-    const nx = -(b[1] - a[1]) / span, nz = (b[0] - a[0]) / span;
-    return at(beside({ x: mx, z: mz }, { x: mx + nx, z: mz + nz }, span + 15), 'the arch');
+    // It was set across the way from the start town (world/volumes.ts archNear): seen from that side, 70 m off, looking up a little.
+    const { a, b } = v.site, mid = { x: (a[0] + b[0]) / 2, z: (a[1] + b[1]) / 2 };
+    const home = nearestTo(h.towns().map((x) => x.town.decision), mid) ?? h.heroPos();
+    return at({ ...beside(mid, home, 70), pitch: 0.14 }, 'the arch');
   });
   for (const s of h.setting.sights ?? []) {
     add(L, `Sight: ${s.id.replace(/-/g, ' ')}`, async () => {
