@@ -278,9 +278,11 @@ export function goSpots(h: GoHost): GoSpot[] {
         why = m ? '' : ': none could be made here';
         s = find();
       }
-      return s ? at(beside(s, h.heroPos(), d), label.toLowerCase()) : `no ${kind}${why}`;
+      return s ? at(aside(beside(s, h.heroPos(), d)), label.toLowerCase()) : `no ${kind}${why}`;
     });
   };
+  /** Turned a little off someone met close by, so the trailing camera sees them past the hero, not behind them. */
+  const aside = (s: Stand): Stand => ({ ...s, yaw: s.yaw + 0.35 });
   const now = (x: { at: number; until: number }) => h.hours() < x.until;
   situation('hurt-traveller', 'Hurt traveller', () => decisionsOf(h.log(), 'traveller').filter((x) => x.situation && now(x)).at(-1), 10);
   situation('paddock-wolves', 'Wolves at a paddock', () => decisionsOf(h.log(), 'wild').filter((x) => x.situation).at(-1), 30);
@@ -288,7 +290,7 @@ export function goSpots(h: GoHost): GoSpot[] {
   add(W, 'Traveller resting by the way', async () => {
     let d = decisionsOf(h.log(), 'traveller').filter((x) => !x.situation && now(x)).at(-1);
     if (!d) { const m = h.answerFor('people'); d = m?.decision.kind === 'traveller' ? m.decision : undefined; }
-    return at(d ? beside(d, h.heroPos(), 10) : null, 'traveller');
+    return at(d ? aside(beside(d, h.heroPos(), 10)) : null, 'traveller');
   });
   add(W, 'Ambush', async () => {
     let d = decisionsOf(h.log(), 'wild').filter((x) => x.group === 'ambush').at(-1);
