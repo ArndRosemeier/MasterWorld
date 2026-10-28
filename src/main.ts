@@ -390,7 +390,7 @@ export async function start(b: Boot): Promise<void> {
       setting, seed, hours, log: () => log, get standing() { return standing; }, towns: () => terrain.towns,
       saved: townSaves(save, start?.decision.id ?? null),
       made: (t) => { t.onTalk = (words) => tieTalk?.(t, words); },
-      raised: (t) => { lit.push(t); view.warm.atDoors(lit.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z)); },
+      raised: (t) => { lit.push(t); view.warm.atDoors(lit.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z), lit.flatMap((x) => x.town.plan.wall ?? [])); },
     });
     const startTown = towns.start;
     const sea = new WaterView(jobs);

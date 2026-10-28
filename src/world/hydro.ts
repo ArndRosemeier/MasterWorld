@@ -568,9 +568,14 @@ export class HydroTile {
         out.fallAt = pl / 2 + t * l; out.fallDrop = r.fall[k - 1]; out.fallBase = r.level[k];
       }
     }
-    const i = Math.floor((x - this.x0) / this.o.cell), j = Math.floor((z - this.z0) / this.o.cell);
-    if (i >= 0 && j >= 0 && i < this.n && j < this.n) out.lake = this.lake[j * this.n + i];
+    out.lake = this.lakeLevel(x, z);
     return out;
+  }
+
+  /** The level of the lake at (x, z), NaN where there is none. */
+  lakeLevel(x: number, z: number): number {
+    const i = Math.floor((x - this.x0) / this.o.cell), j = Math.floor((z - this.z0) / this.o.cell);
+    return i >= 0 && j >= 0 && i < this.n && j < this.n ? this.lake[j * this.n + i] : NaN;
   }
 }
 
@@ -692,6 +697,11 @@ export class Hydrology {
       out.fallAt = Infinity; out.fallDrop = 0; out.fallBase = 0; out.slope = f.slope;
     }
     return out;
+  }
+
+  /** The level of the lake at (x, z), NaN where there is none (as `query` gives it, without the rivers). */
+  lakeLevel(x: number, z: number): number {
+    return this.tileAt(x, z).lakeLevel(x, z);
   }
 
   /** The nearest river alone (no brooks) at (x, z), and the lake here. */

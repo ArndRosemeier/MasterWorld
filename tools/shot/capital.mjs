@@ -64,25 +64,101 @@ else {
     const p = window.game.player.walker.pos;
     return gates.reduce((b, x) => (Math.hypot(x.x - p.x, x.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? x : b));
   }, cap.gates);
+  // What each frame of the ride spends its time on (the parts that can spike), to name what a slow frame did.
+  await page.evaluate(() => {
+    const g = window.game, S = (window.__span = {});
+    const span = (o, name, label) => {
+      const fn = o?.[name];
+      if (typeof fn !== 'function') return;
+      o[name] = function (...a) { const t = performance.now(); try { return fn.apply(this, a); } finally { S[label] = (S[label] ?? 0) + performance.now() - t; } };
+    };
+    span(g.flora, 'update', 'trees');
+    span(g.grass, 'update', 'grass');
+    span(g.ground, 'update', 'ground');
+    span(g.towns, 'tick', 'towns tick');
+    span(g.towns, 'live', 'town life');
+    span(g.roads, 'follow', 'roads');
+    span(g.sea, 'update', 'sea');
+    span(g.view.sky, 'update', 'sky');
+    span(g.view.sky.horizon, 'track', 'horizon');
+    span(g.origin, 'follow', 'origin');
+    span(g.folk, 'follow', 'folk');
+    span(g.view.stage, 'frame', 'stage frame');
+    span(g.view.stage, 'prepare', 'stage prepare');
+    span(g.view.renderer, 'render', 'render');
+  });
+  // CAPITAL_PROFILE=1: a CPU profile of the ride's first seconds (where its slow frames bunch); build with
+  // `npx vite build --minify false` for readable names.
+  // The ride waits till the work that runs behind play after loading (the townsfolk's looks and the late kinds
+  // tried on) is over: its first seconds are slow wherever the hero is (shots/polish5: 44 slow frames in the
+  // first 100 m riding at once, 5 after a 25 s stand), and the ride measures the capital. CAPITAL_RIDE_AT_ONCE=1:
+  // ride at once (the start's own slow seconds).
+  if (process.env.CAPITAL_RIDE_AT_ONCE !== '1') {
+    const calm = await page.evaluate((most) => new Promise((done) => {
+      const t0 = performance.now(), win = [];
+      let last = t0;
+      const step = (now) => {
+        win.push(now - last); last = now;
+        if (win.length > 180) win.shift();
+        const slow = win.filter((d) => d > 25).length;
+        if ((win.length === 180 && slow === 0) || now - t0 > most) done({ s: (now - t0) / 1000, slow }); else requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }), 45000);
+    console.log(`calm behind play after ${calm.s.toFixed(1)} s more${calm.slow ? ` (still ${calm.slow} slow frames in the last 180)` : ''}`);
+  }
+  const profiling = process.env.CAPITAL_PROFILE === '1' ? rideProfile(Number(process.env.CAPITAL_PROFILE_MS ?? 7000)) : null;
   const way = await page.evaluate(([g, m, pace]) => new Promise((done) => {
     const game = window.game, p = game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;
     // To a point 34 m out before the gate, along its road's line.
     const tx = g.x + ux * s * 34, tz = g.z + uz * s * 34, from = { ...p.walker.pos }, L = Math.hypot(tx - from.x, tz - from.z);
     const town = game.towns.every.find((x) => x.town.decision.size === 'capital');
-    let last = performance.now(), worst = 0, worstAt = 0, slow = 0, made = -1, gone = 0;
+    let last = performance.now(), worst = 0, worstAt = 0, slow = 0, made = -1, gone = 0, n0 = window.shaders?.events.length ?? 0;
+    const S = window.__span, frames = [], r = game.view.renderer, scene = game.view.scene;
+    let seen = 0;
+    // What the frame drew: draw calls, triangles, geometries held, and visible meshes under each part of the scene.
+    const drawn = (all) => {
+      const parts = {};
+      // By the scene's parts, and a level down (the floating origin's root holds most of the world).
+      const count = (o, key) => { if (!o.visible) return; if (o.isMesh) parts[key] = (parts[key] ?? 0) + 1; for (const c of o.children) count(c, key); };
+      if (all) for (const c of scene.children) for (const cc of c.children.length ? c.children : [c]) count(cc, `${c.name || c.type}/${cc.name || cc.type}`);
+      return { calls: r.info.render.drawCalls, tris: r.info.render.triangles, geos: r.info.memory.geometries, parts };
+    };
     const step = (now) => {
       const dt = now - last; last = now;
-      if (gone > 0.5) { if (dt > worst) { worst = dt; worstAt = Math.round(L - gone); } if (dt > 25) slow++; }
+      const ev = window.shaders?.events.slice(n0) ?? []; n0 += ev.length;
+      if (gone > 0.5) {
+        if (dt > worst) { worst = dt; worstAt = Math.round(L - gone); }
+        const at = Math.round(L - gone);
+        // Counting the meshes takes a moment of its own: only every 60th frame (a slow one gets the renderer's counts).
+        const every = ++seen % 60 === 0;
+        if (dt > 25 || every) frames.push({ dt, at, slow: dt > 25, spans: { ...S }, builds: ev.map((e) => `${e.kind} ${e.ms.toFixed(1)} ${e.what}`), ...drawn(every) });
+        if (dt > 25) slow++;
+      }
+      for (const k in S) S[k] = 0;
       gone = Math.min(L, gone + (pace * Math.min(dt, 50)) / 1000);
       if (made < 0 && town?.living) made = Math.round(L - gone);
       const k = gone / L, x = from.x + (tx - from.x) * k, z = from.z + (tz - from.z) * k;
       p.teleport(x, undefined, z, Math.atan2(x - tx, z - tz));
-      if (gone < L) requestAnimationFrame(step); else done({ worst, worstAt, slow, made, L: Math.round(L) });
+      if (gone < L) requestAnimationFrame(step); else done({ worst, worstAt, slow, made, L: Math.round(L), frames });
     };
     requestAnimationFrame(step);
   }), [g, cap.market, PACE]);
   console.log(`the way in (${way.L} m at ${PACE} m/s): worst frame ${way.worst.toFixed(0)} ms ${way.worstAt} m from the gate, ${way.slow} frames over 25 ms; its people lived from ${way.made} m out`);
-  rows.way = way;
+  // Where the slow frames fall (100 m bins, counted from the gate), and what the slowest spent their time on.
+  const bins = {};
+  const slowOnes = way.frames.filter((f) => f.slow);
+  for (const f of slowOnes) { const b = Math.floor(f.at / 100) * 100; bins[b] = (bins[b] ?? 0) + 1; }
+  console.log(`slow frames by distance from the gate: ${Object.entries(bins).sort((a, b) => b[0] - a[0]).map(([b, n]) => `${b}-${Number(b) + 100} m: ${n}`).join(', ')}`);
+  // What was drawn along the way (every 60th frame and every slow one): draw calls, triangles, geometries, meshes by part.
+  const row = (f) => `${f.at} m ${f.dt.toFixed(0)} ms${f.slow ? ' SLOW' : ''}: ${f.calls} calls, ${(f.tris / 1e6).toFixed(2)} M tris, ${f.geos} geometries; ${Object.entries(f.parts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${k} ${n}`).join(', ')}`;
+  console.log('drawn along the way:\n' + [...way.frames].sort((a, b) => b.at - a.at).map((f) => '  ' + row(f)).join('\n'));
+  for (const f of [...slowOnes].sort((a, b) => b.dt - a.dt).slice(0, 10)) {
+    const known = Object.values(f.spans).reduce((n, v) => n + v, 0);
+    console.log(`  ${f.dt.toFixed(0)} ms at ${f.at} m (outside these: ${(f.dt - known).toFixed(0)}): ${Object.entries(f.spans).filter(([, v]) => v >= 0.5).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')}${f.builds.length ? ' | ' + f.builds.join('; ') : ''}`);
+  }
+  rows.way = { ...way, frames: undefined };
+  if (profiling) await profiling;
   // Before the gate, outside, looking back in through the gateway.
   await page.evaluate(([g, m]) => {
     const p = window.game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;
@@ -160,3 +236,30 @@ writeFileSync(join(dir, 'index.md'), [
 await browser.close();
 await server.close();
 process.exit(failed ? 1 : 0);
+
+/** A CPU profile of the main thread for `ms`: self time and time with callees, by function (the game's own and the libraries'). */
+async function rideProfile(ms) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+  await cdp.send('Profiler.start');
+  await new Promise((r) => setTimeout(r, ms));
+  const { profile: prof } = await cdp.send('Profiler.stop');
+  await cdp.detach();
+  const self = new Map(), parent = new Map(), byId = new Map(prof.nodes.map((n) => [n.id, n]));
+  for (let i = 0; i < prof.samples.length; i++) self.set(prof.samples[i], (self.get(prof.samples[i]) ?? 0) + (prof.timeDeltas[i] ?? 0) / 1000);
+  for (const n of prof.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
+  const name = (n) => { const f = n.callFrame; return `${f.functionName || '(anonymous)'} ${(f.url.split('/').pop() || '(native)').replace(/-[\w-]{8}\.js$/, '.js')}:${f.lineNumber + 1}`; };
+  const own = new Map(), all = new Map();
+  let total = 0;
+  for (const [id, t] of self) {
+    const n = byId.get(id);
+    if (n.callFrame.functionName === '(idle)') continue;
+    total += t;
+    own.set(name(n), (own.get(name(n)) ?? 0) + t);
+    const seen = new Set();
+    for (let x = id; x !== undefined; x = parent.get(x)) { const k = name(byId.get(x)); if (!seen.has(k)) { seen.add(k); all.set(k, (all.get(k) ?? 0) + t); } }
+  }
+  const top = (m, n) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, t]) => `  ${t.toFixed(0).padStart(6)} ms  ${k}`).join('\n');
+  console.log(`ride CPU profile, first ${ms / 1000} s: ${total.toFixed(0)} ms busy\nself time:\n${top(own, 30)}\nwith callees:\n${top(all, 40)}`);
+}
