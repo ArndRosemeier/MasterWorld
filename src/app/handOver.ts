@@ -1,17 +1,25 @@
 /**
  * The map hand-over (plan 9.1, D35): when someone tells of a place, the hero holds out their map, the
- * teller takes it and draws the mark in with a quill, and hands it back. A card of the real map (around
+ * teller takes it and draws the mark in with a quill, and hands it back. It is played in the world
+ * (`HandOverScene`: the hero's hand, the sheet, the teller marking it), and a card of the real map (around
  * the mark) rises from the hero's side to the middle of the view, where the person stands, is marked
- * there and goes back down. Several marks at once are handed over one after another.
+ * there and goes back down: the mark close up. Several marks at once are handed over one after another.
  */
-import { lerp } from '@futuremagic/core';
+import { lerp, smoothstep } from '@futuremagic/core';
 import { el } from './dom';
 
 /** What the hand-over draws on: the map around a lead's mark, the mark drawn in to `t` (0..1). */
 export type MarkPainter = (id: string, canvas: HTMLCanvasElement, t: number) => void;
 
 /** The phases, in seconds: up to the teller, a moment, the mark drawn, a look at it, back. */
-const UP = 0.7, WAIT = 0.25, MARK = 1.4, LOOK = 0.7, BACK = 0.6;
+export const UP = 0.7, WAIT = 0.25, MARK = 1.4, LOOK = 0.7, BACK = 0.6;
+
+/** What plays the hand-over in the world: each frame `t` seconds into it (0 .. HAND_OVER_SECONDS), then `handedBack`. */
+export interface HandOverStage {
+  handOut(id: string): void;
+  handing(t: number): void;
+  handedBack(): void;
+}
 const SIDE = 320;
 
 /** Where the card is and how it turns, `t` seconds into a hand-over (pure, for the check). */
@@ -31,11 +39,37 @@ export function cardAt(t: number): { x: number; y: number; turn: number; scale: 
 
 export const HAND_OVER_SECONDS = UP + WAIT + MARK + LOOK + BACK;
 
+/** When things happen, s into the hand-over: held out, taken, marked, held out again, back in the pack. */
+const TAKEN = UP + WAIT * 0.5, GIVE_BACK = UP + WAIT + MARK + LOOK * 0.7;
+export const MARKED = UP + WAIT;
+const STOWED = HAND_OVER_SECONDS - 0.2;
+
+/** How far the hero's hand is held out, `t` s into the hand-over (0 down, 1 held out): out, down while it is marked, out again, down. */
+export function heroReach(t: number): number {
+  const lowered = MARKED + 0.4, again = MARKED + MARK, back = again + LOOK;
+  if (t < UP) return smoothstep(0, 1, t / UP);
+  if (t < MARKED) return 1;
+  if (t < lowered) return 1 - smoothstep(0, 1, (t - MARKED) / 0.4);
+  if (t < again) return 0;
+  if (t < back) return smoothstep(0, 1, (t - again) / LOOK);
+  return 1 - smoothstep(0, 1, Math.min(1, (t - back) / BACK));
+}
+
+/** Who holds the sheet `t` s into the hand-over (null: it is in the pack). */
+export function sheetHeldBy(t: number): 'hero' | 'teller' | null {
+  if (t >= STOWED) return null;
+  return t < TAKEN || t >= GIVE_BACK ? 'hero' : 'teller';
+}
+
+
 export class HandOver {
   private readonly canvas = el('canvas', { width: SIDE, height: SIDE });
   private readonly card = el('div', { className: 'handover' }, this.canvas);
   private readonly queue: string[] = [];
   private playing = false;
+
+  /** `world`: the hand-over played in the world too (the game sets it once the hero's body stands). */
+  world: HandOverStage | null = null;
 
   constructor(private readonly paint: MarkPainter, private readonly quill: () => void) {
     this.card.style.opacity = '0';
@@ -52,10 +86,12 @@ export class HandOver {
     const id = this.queue.shift();
     if (id === undefined) { this.playing = false; return; }
     this.playing = true;
-    const t0 = performance.now();
+    const t0 = performance.now(), world = this.world;
     let scratched = false;
+    world?.handOut(id);
     const animate = () => {
       const t = (performance.now() - t0) / 1000;
+      world?.handing(Math.min(t, HAND_OVER_SECONDS));
       const c = cardAt(Math.min(t, HAND_OVER_SECONDS));
       if (c.mark > 0 && !scratched) { scratched = true; this.quill(); }
       this.paint(id, this.canvas, c.mark);
@@ -64,7 +100,7 @@ export class HandOver {
       this.card.style.transform = `translate(${c.x * innerWidth - w / 2}px, ${c.y * innerHeight - h / 2}px) rotate(${c.turn}rad) scale(${c.scale})`;
       this.card.style.opacity = String(c.alpha);
       if (t < HAND_OVER_SECONDS) requestAnimationFrame(animate);
-      else { this.card.style.opacity = '0'; this.next(); }
+      else { this.card.style.opacity = '0'; world?.handedBack(); this.next(); }
     };
     animate();
   }

@@ -187,8 +187,7 @@ export class TalkUi {
       const at = this.talk.siteOf(id) ?? { x: b.door[0], z: b.door[1] };
       const lead = this.journal.hear(id, title, { text: r.text, from }, { x: at.x, z: at.z, label: this.talk.houseCalled(id) });
       if (!lead) continue;
-      this.lines.append(el('p', { className: 'act', textContent: fill(this.words.handOver, { name: from }) }));
-      this.lines.scrollTop = this.lines.scrollHeight;
+      // The map is handed over in the world (app/handOverScene.ts), not told in the talk.
       this.host.heard({ id, title, note: fill(this.words.marked, { name: from, house: this.talk.houseCalled(id) }) });
     }
     if (r.opens) { const id = r.opens; this.topicList.replaceChildren(); setTimeout(() => { this.close(); this.host.serve(id, a); }, 600); return; }

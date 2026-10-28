@@ -8,6 +8,7 @@ import type { SettingModule } from '../setting/contract';
 import { Herds } from '../sim/livestock';
 import { townsfolk, type Person } from '../sim/people';
 import { TownLife, type Agent, type TownOrder } from '../sim/townLife';
+import { NavGraph } from '../sim/nav';
 import { talkCellar, talkEvent, townTalk, type TownTalk, type TownTalkSave } from '../talk/townTalk';
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
@@ -137,7 +138,33 @@ export class Township {
       this.chase(this.lifeOf);
       return this.lifeOf;
     }
-    const life = new TownLife(this.town.plan, this.seed, this.c.hours(), this.c.setting.routines, this.residents);
+    // Being made over frames (`warm`): the rest at once now.
+    while (!this.warm(Infinity));
+    return this.life;
+  }
+
+  /** Its people's days while they are made over several frames (`warm`): the street graph, then the town with its people coming in. */
+  private making: { nav: NavGraph | null; life: TownLife | null } | null = null;
+
+  /**
+   * Makes its people's days a step at a time, about `ms` milliseconds a call (a capital's 2700 people took a tenth
+   * of a second in one frame): who lives here, the street graph, the spots, then its people in batches. True once
+   * they live (`life` is ready).
+   */
+  warm(ms: number): boolean {
+    if (this.lifeOf) return true;
+    const m = (this.making ??= { nav: null, life: null });
+    if (!this.peopleOf) { void this.residents; if (ms !== Infinity) return false; }
+    if (!m.nav) { m.nav = new NavGraph(this.town.plan); if (ms !== Infinity) return false; }
+    if (!m.life) { m.life = new TownLife(this.town.plan, this.seed, this.c.hours(), this.c.setting.routines, this.residents, { nav: m.nav, later: true }); if (ms !== Infinity) return false; }
+    if (!m.life.grow(ms)) return false;
+    this.making = null;
+    this.startDays(m.life);
+    return true;
+  }
+
+  /** Its people's days begin: the VGM's orders so far, its folk gone or sheltering, its masters at their posts. */
+  private startDays(life: TownLife): void {
     // The VGM's orders to this town so far (logged; a save replays them).
     for (const o of ordersOf(this.c.log(), this.id)) life.order(o);
     life.gone = !!heldBy(this.c.log(), this.id);
@@ -153,7 +180,6 @@ export class Township {
     this.rest(life);
     this.lifeOf = life;
     this.chase(life);
-    return life;
   }
 
   /** Who of its folk wait at the camp (C11), and the take they fled. */

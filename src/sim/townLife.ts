@@ -14,7 +14,7 @@ import type { DayTask, RoutinesDef } from '../setting/contract';
 import { routines as classicRoutines } from '../setting/classic/routines';
 import { away, buildingOf, townsfolk, type Person } from './people';
 import { dayPlan, taskAt, type DayPlan } from './routines';
-import { seatAt, townSpots, type ActivityKind, type Spot } from './spots';
+import { seatAt, seatDir, townSpots, type ActivityKind, type Spot } from './spots';
 import { inRoom } from './roomCast';
 
 /** What someone is about: their plan's task, a VGM order, or out of town. */
@@ -75,11 +75,33 @@ export interface TownWeather {
 /** The facing (as `Agent.dir`) from `a` towards (x, z). */
 const facing = (a: Agent, x: number, z: number): number => Math.atan2(z - a.z, x - a.x);
 
+/** Work done facing a thing that stands between the worker and whoever comes up to them (the thing 0.9 m before them). */
+const AT_A_THING = new Set<ActivityKind>(['smith', 'stoke', 'quench', 'bake', 'craft', 'tend', 'serve']);
+
+/**
+ * The way round the thing someone at spot `s` works at, to stand by it on the side of (x, z) (who wants to talk),
+ * or null if it is not in between: a step to the side, then out beside it.
+ */
+export function roundTheWork(s: Spot, a: { x: number; z: number }, x: number, z: number): number[] | null {
+  if (!AT_A_THING.has(s.activity) || s.door) return null;
+  const fx = s.x + Math.cos(s.dir) * 0.9, fz = s.z + Math.sin(s.dir) * 0.9;
+  const dx = x - a.x, dz = z - a.z, l2 = dx * dx + dz * dz;
+  const t = l2 ? Math.max(0, Math.min(1, ((fx - a.x) * dx + (fz - a.z) * dz) / l2)) : 0;
+  if (Math.hypot(a.x + dx * t - fx, a.z + dz * t - fz) > 0.75) return null;
+  // Across the way they face: to whichever side the other stands.
+  const px = -Math.sin(s.dir), pz = Math.cos(s.dir), side = (x - fx) * px + (z - fz) * pz >= 0 ? 1 : -1;
+  const hx = x - fx, hz = z - fz, hl = Math.hypot(hx, hz) || 1;
+  return [a.x + px * side * 1.1, a.z + pz * side * 1.1, fx + px * side * 1.1 + (hx / hl) * 0.5, fz + pz * side * 1.1 + (hz / hl) * 0.5];
+}
+
 /** A townsperson's radius as an obstacle (m). */
 const BODY = 0.28;
 
 /** Trades one goes into on an errand (to buy bread, have shoes mended ...). */
 const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'potter', 'weaver', 'cooper', 'smith', 'miller', 'fletcher', 'bowyer', 'armourer', 'jeweller', 'bookbinder', 'glazier']);
+
+/** Market spots weigh as if this many metres away per step of 1 (25 for the rest): the market draws from all over the town. */
+const MARKET_REACH = 110;
 
 /** Agents farther than this from the focus skip their walks (m). */
 const DETAIL = 260;
@@ -87,7 +109,10 @@ const DETAIL = 260;
 export class TownLife {
   readonly nav: NavGraph;
   readonly spots: Spot[];
-  readonly agents: Agent[];
+  readonly agents: Agent[] = [];
+  /** People still to come in (`grow`: a big town is made over several frames), and the seed their days come from. */
+  private readonly waiting: readonly Person[];
+  private readonly seed: number;
   /** Sim seconds. */
   time = 0;
   /** Where detail matters (the player). */
@@ -111,9 +136,12 @@ export class TownLife {
 
   /** `routines`: the setting's (the classic one by default); every town of a setting lives by them. */
   /** `people`: who lives here (townsfolk(plan, seed) unless given: the town's core passes its own). */
-  constructor(readonly plan: TownPlan, seed: number, hour: number, readonly routines: RoutinesDef = classicRoutines, people: readonly Person[] = townsfolk(plan, seed)) {
-    this.nav = new NavGraph(plan);
-    this.spots = townSpots(plan);
+  /** `parts`: its street graph and spots if made already; `later`, its people come in by `grow` (none at first). */
+  constructor(readonly plan: TownPlan, seed: number, hour: number, readonly routines: RoutinesDef = classicRoutines, people: readonly Person[] = townsfolk(plan, seed), parts: { nav?: NavGraph; spots?: Spot[]; later?: boolean } = {}) {
+    this.nav = parts.nav ?? new NavGraph(plan);
+    this.spots = parts.spots ?? townSpots(plan);
+    this.seed = seed;
+    this.waiting = people;
     this.market = polyCentroid(plan.market) as [number, number];
     this.focus = { x: this.market[0], z: this.market[1] };
     for (const st of plan.streets) {
@@ -128,14 +156,27 @@ export class TownLife {
     this.inn = doorOfKind('inn');
     this.temple = doorOfKind('temple');
     this.shops = plan.buildings.filter((b) => SHOPS.has(b.trade)).map((b) => this.doorOf(b.id));
-    this.agents = people.map((p) => {
-      const d = plan.buildings[p.home].door;
-      const a: Agent = { person: p, x: d[0], z: d[1], dir: d[2], act: 'wait', next: 'wait', spot: -1, seat: 0, hidden: false, until: 0, path: [], pi: 0, task: 'sleep', plan: { day: NaN, rest: false, at: [0], task: ['sleep'] }, rng: new Rng(deriveSeed(seed, 'life', p.id)) };
-      // Start in the middle of something, already there.
+    if (!parts.later) this.grow(Infinity);
+  }
+
+  /** Whether everyone has come in (`grow`). */
+  get ready(): boolean { return this.agents.length === this.waiting.length; }
+
+  /**
+   * Brings in the people still to come, for about `ms` milliseconds (a capital's 2700 take a tenth of a second:
+   * spread over frames); true once everyone is in. Each starts in the middle of something, already there.
+   */
+  grow(ms: number): boolean {
+    const t0 = performance.now();
+    while (this.agents.length < this.waiting.length) {
+      const p = this.waiting[this.agents.length], d = this.plan.buildings[p.home].door;
+      const a: Agent = { person: p, x: d[0], z: d[1], dir: d[2], act: 'wait', next: 'wait', spot: -1, seat: 0, hidden: false, until: 0, path: [], pi: 0, task: 'sleep', plan: { day: NaN, rest: false, at: [0], task: ['sleep'] }, rng: new Rng(deriveSeed(this.seed, 'life', p.id)) };
       this.choose(a, true);
       a.until = this.time + a.rng.range(0, 1) * (a.until - this.time);
-      return a;
-    });
+      this.agents.push(a);
+      if ((this.agents.length & 31) === 0 && performance.now() - t0 > ms) break;
+    }
+    return this.ready;
   }
 
   /** Everyone living here (the agents' persons, in their order). */
@@ -151,7 +192,9 @@ export class TownLife {
     this.hour = ((hours % 24) + 24) % 24;
     this.weather = weather;
     for (const a of this.agents) {
-      if (a.held || a.post) continue;
+      // Held for a talk, one coming round their work walks on (`hold`).
+      if (a.held) { if (a.act === 'walk') this.walk(a, dt); continue; }
+      if (a.post) continue;
       if (a.stay !== undefined) {
         if (this.time < a.stay) continue;
         a.stay = undefined;
@@ -162,7 +205,10 @@ export class TownLife {
     }
   }
 
-  /** Stop someone for a talk: they stand where they are and turn to (x, z). */
+  /**
+   * Stop someone for a talk: they turn to (x, z) where they stand; one at their work behind a barrel, an anvil or
+   * an oven (the thing between them and the one talking) first comes round it, and is seen walking there.
+   */
   hold(a: Agent, x: number, z: number): void {
     const s = a.spot >= 0 ? this.spots[a.spot] : null;
     a.heldIn = !!s && inRoom(a, s);
@@ -170,6 +216,13 @@ export class TownLife {
     a.act = 'chat';
     a.hidden = false;
     a.dir = facing(a, x, z);
+    const way = s && !a.heldIn && a.path.length === 0 ? roundTheWork(s, a, x, z) : null;
+    if (!way) return;
+    a.path = way;
+    a.pi = 0;
+    a.act = 'walk';
+    a.next = 'chat';
+    a.seek = { x: way[way.length - 2], z: way[way.length - 1], face: { x, z } };
   }
 
   /**
@@ -285,7 +338,7 @@ export class TownLife {
     a.next = pick.act;
     a.until = this.time + a.rng.range(pick.secs[0], pick.secs[1]) * (s?.outside && (this.weather.rain > 0.5 || this.dark) ? 0.5 : 1);
     if (here || (s && s === was) || (Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > DETAIL && Math.hypot(tx - this.focus.x, tz - this.focus.z) > DETAIL)) {
-      this.arrive(a, tx, tz, s ? s.dir : a.dir);
+      this.arrive(a, tx, tz, s ? seatDir(s, a.seat) : a.dir);
       return;
     }
     a.path = this.wayTo(a, was, tx, tz, s);
@@ -321,7 +374,7 @@ export class TownLife {
       // The turn starts on arrival: its length counts from now.
       const length = a.until - this.time;
       const f = a.seek?.face;
-      this.arrive(a, a.x, a.z, f ? facing(a, f.x, f.z) : s ? s.dir : a.dir);
+      this.arrive(a, a.x, a.z, f ? facing(a, f.x, f.z) : s ? seatDir(s, a.seat) : a.dir);
       a.until = this.time + Math.max(length, 5);
     }
   }
@@ -376,6 +429,11 @@ export class TownLife {
       if (p.role === 'traveller') return inside(this.inn >= 0 ? this.inn : home);
       const work = p.work >= 0 && p.work !== p.home ? this.doorOf(p.work) : -1;
       const far = work >= 0 && Math.hypot(this.spots[home].x - this.spots[work].x, this.spots[home].z - this.spots[work].z) > 60;
+      // Market folk, and some who work far from home, eat on the market by day (a pie from a stall, standing about).
+      if (!dark && rain < 0.4 && (p.role === 'trader' || far) && r.chance(p.role === 'trader' ? 0.7 : 0.4)) {
+        const free = this.spots.filter((s) => s.activity === 'chat' && s.users < s.cap);
+        if (free.length) return at(r.pick(free).id, 'drink', [240, 600]);
+      }
       return inside(far ? work : home);
     }
     if (task === 'temple') {
@@ -393,8 +451,8 @@ export class TownLife {
     const offer = (spot: number, w: number) => {
       if (spot < 0) return;
       const s = this.spots[spot];
-      // Nearer is likelier: nobody crosses the town for a bench.
-      const far = 1 + Math.hypot(s.x - a.x, s.z - a.z) / 25;
+      // Nearer is likelier: nobody crosses the town for a bench (but they do for the market).
+      const far = 1 + Math.hypot(s.x - a.x, s.z - a.z) / (s.market ? MARKET_REACH : 25);
       // Another turn at the same spot is fine indoors and at one's own work, rarer elsewhere.
       const again = spot === a.spot ? (s.door || s.use === 'work' || s.use === 'trade' ? 1 : 0.3) : 1;
       if (w > 0 && (s.users < s.cap || spot === a.spot)) options.push([spot, (again * w * (s.outside ? 1 - rain * 0.7 : 1 + rain * 2)) / far]);
@@ -447,6 +505,7 @@ export class TownLife {
       // The well, the stalls and the shops, nearer ones first; a prayer on the way for the pious.
       for (const s of town('fetchWater')) offer(s.id, 2);
       for (const s of town('browse')) offer(s.id, 2.5);
+      for (const s of town('chat')) offer(s.id, 1.2 + p.social);
       for (const d of this.shops) if (this.spots[d].building !== p.home && this.spots[d].building !== p.work) offer(d, 1.5);
       each('pray', 0.5 * p.pious);
     } else if (task === 'leisure' || task === 'inn' || task === 'temple') {
@@ -457,6 +516,7 @@ export class TownLife {
         else if (inn) continue;
         else if (s.activity === 'sit') offer(s.id, 1 + p.social * 2);
         else if (s.activity === 'browse') offer(s.id, 1);
+        else if (s.activity === 'chat') offer(s.id, 0.8 + p.social * 1.6);
         else if (s.activity === 'pray') offer(s.id, task === 'temple' ? 4 : 1.2 * p.pious);
         else if (s.activity === 'mourn') offer(s.id, 0.1 * p.pious);
       }

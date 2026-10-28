@@ -13,11 +13,24 @@ export const CROP_STEP = 20;
 /** The farmland at a cell: whether it is a track, and the field there (crop index, rows), if any. */
 type FieldCell = { path: boolean; crop: number; rows: number } | null;
 
-/** The town's masks, `w` × `h` texels each from its raster's corner (cut there if the town is bigger). */
-export function townMaskData(town: Town, w: number, h: number): Uint8Array {
+/**
+ * The town's masks, `w` × `h` texels each from cell (i0, j0) of its raster (`maskWindow`). A window that holds
+ * only part of the town (a capital is bigger than the masks) leaves its outermost texels empty: the shader's
+ * reads past the window repeat them, so the ground beyond is the land's own, not the window's edge drawn on.
+ */
+export function townMaskData(town: Town, w: number, h: number, i0 = 0, j0 = 0): Uint8Array {
   const data = new Uint8Array(w * 2 * h * 4);
-  bakeMasks(data, w, h, Math.min(town.nx, w), Math.min(town.nz, h), ...townCells(town));
+  const [ground, field] = townCells(town);
+  const part = i0 > 0 || j0 > 0 || town.nx - i0 > w || town.nz - j0 > h;
+  const [a, b] = part ? [1, 1] : [0, 0];
+  bakeMasks(data, w, h, Math.min(town.nx - i0, w - a), Math.min(town.nz - j0, h - b), (i, j) => (part && (i < a || j < b) ? 0 : ground(i + i0, j + j0)), (i, j) => (part && (i < a || j < b) ? null : field(i + i0, j + j0)));
   return data;
+}
+
+/** Where a town's masks (`w` × `h` texels) start in its raster to show the ground round (x, z): its corner if it fits, else a window centred there (snapped to `snap` cells). */
+export function maskWindow(town: Town, w: number, h: number, x: number, z: number, snap = 16): [number, number] {
+  const start = (n: number, size: number, c: number) => (n <= size ? 0 : Math.max(0, Math.min(n - size, Math.round((c / TOWN_RASTER - size / 2) / snap) * snap)));
+  return [start(town.nx, w, x - town.x0), start(town.nz, h, z - town.z0)];
 }
 
 /** The two masks (each `w` × `h` texels, side by side) over the first `nx` × `nz` cells. */
@@ -64,4 +77,16 @@ function townCells(town: Town): [(i: number, j: number) => number, (i: number, j
       return f || path ? { path, crop: f ? CROPS.indexOf(f.crop) : -1, rows: f?.rows ?? 0 } : null;
     },
   ];
+}
+
+/** Nearer than this (m) to an edge of a window beyond which the town goes on, the window moves (`inWindow`). */
+const WINDOW_MARGIN = 150;
+
+/** Whether (x, z) is still well inside the window from cell `at` (`maskWindow`): not near an edge with more town beyond it. */
+export function inWindow(town: Town, at: readonly [number, number], w: number, h: number, x: number, z: number): boolean {
+  const keeps = (c: number, i0: number, size: number, n: number) => {
+    const lo = i0 * TOWN_RASTER, hi = (i0 + size) * TOWN_RASTER;
+    return (i0 === 0 || c - lo > WINDOW_MARGIN) && (i0 + size >= n || hi - c > WINDOW_MARGIN);
+  };
+  return keeps(x - town.x0, at[0], w, town.nx) && keeps(z - town.z0, at[1], h, town.nz);
 }

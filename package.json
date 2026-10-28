@@ -40,7 +40,8 @@
     "shot:ways": "node tools/shot/ways.mjs",
     "shot:mouths": "node tools/shot/mouths.mjs",
     "shot:capital": "node tools/shot/capital.mjs",
-    "shot:quest": "node tools/shot/quest.mjs"
+    "shot:quest": "node tools/shot/quest.mjs",
+    "shot:handover": "node tools/shot/handover.mjs"
   },
   "dependencies": {
     "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.3/actors-animal-0.19.3.tgz",

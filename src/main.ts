@@ -92,6 +92,8 @@ import { TradeUi } from './app/tradeUi';
 import { LessonsUi } from './app/lessonsUi';
 import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
+import { HandOverScene } from './app/handOverScene';
+import { MapSheet } from './render/hero/MapSheet';
 import { Orientation, mastery } from './game/orientation';
 import { HOME_SIGHT, KnownLand } from './game/knownLand';
 import { Compass, type SkyGlyph } from './app/compass';
@@ -486,7 +488,7 @@ export async function start(b: Boot): Promise<void> {
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
         for (const d of walked) regionOpened(d);
-        const s = found.site, d = s.r + (kind === 'capital' ? 60 : 14); // a capital's wall stands out past its houses
+        const s = found.site, d = s.r + (params.siteAt ?? (kind === 'capital' ? 60 : 14)); // a capital's wall stands out past its houses
         player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
         break;
       }
@@ -1167,6 +1169,17 @@ export async function start(b: Boot): Promise<void> {
     };
     // Telling of a place: the hero hands the map over and the teller marks it.
     const handOver = map ? new HandOver((id, c, t) => map.markIn(id, c, t), () => sounds?.noted()) : null;
+    // Played in the world as well (rule 11): the hero holds the map out, the teller marks it and hands it back.
+    if (handOver) {
+      const scene: HandOverScene = new HandOverScene({
+        hero: () => ({ ...player.walker.pos, yaw: player.walker.yaw }),
+        teller: () => talk?.partner ?? null,
+        heroHand: (out) => player.hero?.handAt('r', out) ?? null,
+        tellerHand: (a, side, out) => folk?.agentHand(a, side, out) ?? null,
+        puppet: (p) => { if (p) { if (!player.puppet) player.puppet = p; } else if (player.puppet === scene) player.puppet = null; },
+      }, new MapSheet(view.stage));
+      handOver.world = scene;
+    }
     /**
      * The hero in front of `a` (for `?talk`, `?trade` and the shot set): in their room when they are
      * indoors (out in the town an indoor person stands inside the building's walls, seen from within),
@@ -1358,7 +1371,7 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */

@@ -41,7 +41,7 @@ export const routines: RoutinesDef = {
     hand: { workday: [
       { at: 0, do: 'sleep' }, { at: 5.5, do: 'rise' }, { at: 6.25, do: 'meal' }, { at: 6.75, do: 'work' },
       { at: 10, do: 'errands' }, { at: 10.75, do: 'work' }, { at: 12, do: 'meal' }, { at: 13, do: 'work' },
-      { at: 17, do: 'chores' }, ...evening(18, 0.4, 22.25),
+      { at: 14.75, do: 'errands', or: { do: 'work', chance: 0.4 } }, { at: 15.5, do: 'work' }, { at: 17, do: 'chores' }, ...evening(18, 0.4, 22.25),
     ] },
     // Market folk set up early and pack up before the evening.
     trader: { workday: [
@@ -62,8 +62,8 @@ export const routines: RoutinesDef = {
     // Keeping house: water in the morning, the garden and the washing, the market, the cooking.
     homemaker: { workday: [
       { at: 0, do: 'sleep' }, { at: 5.5, do: 'rise' }, { at: 6.5, do: 'meal' }, { at: 7, do: 'chores' },
-      { at: 9, do: 'chores', or: { do: 'errands', chance: 0.5 } }, { at: 10.25, do: 'chores' }, { at: 12, do: 'meal' }, { at: 13, do: 'chores' },
-      { at: 15, do: 'chores', or: { do: 'leisure', chance: 0.25, trait: 'social' } }, { at: 16, do: 'chores', or: { do: 'errands', chance: 0.35 } },
+      { at: 9, do: 'chores', or: { do: 'errands', chance: 0.5 } }, { at: 10.25, do: 'chores' }, { at: 12, do: 'meal' }, { at: 13, do: 'chores', or: { do: 'errands', chance: 0.4 } },
+      { at: 14.25, do: 'chores' }, { at: 15, do: 'chores', or: { do: 'leisure', chance: 0.25, trait: 'social' } }, { at: 16, do: 'chores', or: { do: 'errands', chance: 0.35 } },
       ...evening(18, 0.15, 21.5),
     ] },
     // Children help at home in the morning, play by day and are in bed soon after dark.

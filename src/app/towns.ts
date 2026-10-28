@@ -13,11 +13,13 @@ import type { Herds } from '../sim/livestock';
 import { Township, type TownshipContext, type TownshipSave } from '../game/township';
 import type { RegionDecision } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
-import type { Town } from '../world/town';
+import { TOWN_RASTER, type Town } from '../world/town';
 import type { TerrainJobs } from '../workers/pool';
 import type { RoadWork } from './roads';
 import { TownView } from '../render/town/TownView';
+import { GateView } from '../render/town/GateView';
 import { moveTownMasks, townMaskSize } from '../render/materials/townGround';
+import { inWindow, maskWindow } from '../world/townMask';
 
 export interface TownsHost extends TownshipContext {
   readonly stage: Stage;
@@ -48,8 +50,12 @@ const LIVE = 400;
 const IN = 60;
 /** The hero at a teacher's tower out on the land is with that town's people within this of it (m). */
 const OUTPOST = 40;
+/** A town's people begin to be made this much farther out than they live (m), this many milliseconds a frame. */
+const WARM_AHEAD = 300, WARM_MS = 4;
 /** Seconds between two looks for the nearest town. */
 const LOOK = 1;
+/** A walled town's gates are drawn while the camera is within this of its edge (m). */
+const GATES_SEEN = 600;
 
 export class Towns {
   private readonly cores = new Map<string, Township>();
@@ -57,6 +63,8 @@ export class Towns {
   /** The town whose masks the terrain shader reads. */
   private masked: string | null;
   private moving = false;
+  /** The window of the masked town's raster in the masks (null: the whole town fits). */
+  private maskedAt: [number, number] | null = null;
   private clock = 0;
 
   constructor(private readonly h: TownsHost) {
@@ -158,9 +166,11 @@ export class Towns {
     }
   }
 
-  /** Each frame: near or far meshes, and now and then the masks move to the nearest town. */
+  /** Each frame: near or far meshes, the gates swung, and now and then the masks move to the nearest town. */
   tick(dt: number, cam: Vector3): void {
     for (const v of this.views.values()) v.update(cam);
+    this.swingGates(dt, cam);
+    this.warmPeople(cam);
     if ((this.clock += dt) < LOOK || !this.h.masks || this.moving) return;
     this.clock = 0;
     let best: Town | null = null, low = Infinity;
@@ -169,14 +179,53 @@ export class Towns {
       const d = Math.hypot(cam.x - t.decision.x, cam.z - t.decision.z) - t.decision.radius;
       if (d < low) { low = d; best = t; }
     }
-    if (!best || best.decision.id === this.masked) return;
+    if (!best) return;
     const t = best, [w, h] = townMaskSize();
+    // A town bigger than the masks (a capital) shows a window of its ground round the camera, moved on as the camera nears its edge.
+    const win = this.maskedAt;
+    if (t.decision.id === this.masked && (!win || inWindow(t, win, w, h, cam.x, cam.z))) return;
+    const [i0, j0] = maskWindow(t, w, h, cam.x, cam.z);
     this.moving = true;
-    void this.h.land.townMask(t.decision.id, w, h).then((data) => {
-      moveTownMasks(t.x0, t.z0, data);
+    void this.h.land.townMask(t.decision.id, w, h, i0, j0).then((data) => {
+      moveTownMasks(t.x0 + i0 * TOWN_RASTER, t.z0 + j0 * TOWN_RASTER, data);
       this.masked = t.decision.id;
+      this.maskedAt = t.nx > w || t.nz > h ? [i0, j0] : null;
     }).finally(() => { this.moving = false; });
   }
+
+  /**
+   * A town's people are made a few milliseconds a frame as the hero comes near (a capital's 2700 in one go held a
+   * frame for a tenth of a second), before they must live (LIVE): one town at a time.
+   */
+  private warmPeople(cam: Vector3): void {
+    for (const t of this.cores.values()) {
+      if (t.living || !t.town.near(cam.x, cam.z, LIVE + WARM_AHEAD)) continue;
+      t.warm(WARM_MS);
+      return;
+    }
+  }
+
+  /** Each walled town's gates (a capital's), drawn while the camera is near it. */
+  private readonly gates = new Map<string, GateView>();
+
+  /** The gates of walled towns near the camera: open by day; at night opened for the hero and anyone walking through. */
+  private swingGates(dt: number, cam: Vector3): void {
+    const [dusk, dawn] = this.h.setting.routines.dark, hour = ((this.h.hours() % 24) + 24) % 24;
+    const day = dusk > dawn ? hour < dusk && hour >= dawn : hour < dawn || hour >= dusk;
+    for (const id of this.views.keys()) {
+      const town = this.h.terrain.town(id), wall = town?.plan.wall;
+      if (!town || !wall) continue;
+      const d = town.decision, near = Math.hypot(cam.x - d.x, cam.z - d.z) < d.radius + GATES_SEEN;
+      let g = this.gates.get(id);
+      if (!near) { if (g) { g.clear(); this.gates.delete(id); } continue; }
+      if (!g) { g = new GateView(this.h.stage, wall, id, day); this.gates.set(id, g); void g.place(); }
+      const t = this.cores.get(id), folk = t?.living ? t.life.agents : [];
+      g.swing(dt, day, (x, z, r) => Math.hypot(cam.x - x, cam.z - z) < r || folk.some((a) => !a.hidden && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r));
+    }
+  }
+
+  /** The gates' leaves of the town of this id, how far open each gate stands (none: not drawn). */
+  gatesOf(id: string): number[] | null { return this.gates.get(id)?.open ?? null; }
 
   /** Every town's people near `focus`, living (detail where `focus` is); those are drawn. */
   live(dt: number, focus: { x: number; z: number }, weather: TownWeather): TownLife[] {

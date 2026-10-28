@@ -76,6 +76,8 @@ export const params = {
   regions: q.get('regions') !== '0',
   /** Start beside a place the VGM opens out on the land: `site=waystation`, `hamlet`, `village`, `camp`, `ruin` or `barrows` (the first a walk finds). */
   site: q.get('site'),
+  /** With `site`: stand this far (m) outside its edge (default 14; a capital's 60, outside its wall). */
+  siteAt: q.has('siteAt') ? Number(q.get('siteAt')) : null,
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
   /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */

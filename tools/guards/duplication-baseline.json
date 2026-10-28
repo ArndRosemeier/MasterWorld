@@ -244,8 +244,8 @@
     "reason": "CaveSpace.sdf overrides DungeonSpace.sdf: the layout's distance with the carved rock over it (it calls super.sdf)."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/townLife.ts + masterworld/world/sites.ts",
-    "reason": "A point at an angle and distance round a centre (x + cos·d, z + sin·d): plain trigonometry for three different things (rain's low ground, where townsfolk gather, a place's houses and tents)."
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/spots.ts + masterworld/sim/townLife.ts + masterworld/world/sites.ts",
+    "reason": "A point at an angle and distance round a centre (x + cos\u00b7d, z + sin\u00b7d): plain trigonometry for three different things (rain's low ground, where townsfolk gather, a place's houses and tents). (spots.ts: a chat's places on a ring round its middle.)"
   },
   {
     "key": "same name: masterworld/render/flora/FloraView.ts#refresh + masterworld/render/terrain/TerrainView.ts#refresh",
@@ -528,11 +528,7 @@
     "reason": "Both write a small state as plain data with its optional lists left out when empty; the states are unrelated (the guild book, the hero's standing)."
   },
   {
-    "key": "idiom: [.atan2 .x .z Math] in masterworld/app/encounter.ts + masterworld/app/walkTo.ts + masterworld/vgm/dungeons.ts",
-    "reason": "Math.atan2 of a dx, dz: the language idiom for the way from one point to another (a facing, a bearing), not a copied helper; it crossed the info floor when vgm/quests.ts grew the corpus."
-  },
-  {
-    "key": "idiom: [.atan2 .x .z Math] in masterworld/game/fight.ts + masterworld/game/recipe.ts + masterworld/sim/creatures.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts",
-    "reason": "Math.atan2 of a dx, dz: the language idiom for the way from one point to another (a facing, a bearing), not a copied helper; it crossed the info floor when vgm/quests.ts grew the corpus."
+    "key": "same name: masterworld/app/heroCamera.ts#hold + masterworld/sim/townLife.ts#hold",
+    "reason": "Unrelated: the camera holds a scene's shot; a townsperson is held for a talk (and comes round their work first). Only the name matches."
   }
 ]
