@@ -48,6 +48,8 @@ const OFF_TOWN = 80;
 const OFF_PLACE = 40;
 /** Spots that fit to choose the most open of. */
 const CHOICES = 6;
+/** Steps along the straight way to a spot by the way (m), and the steepest it may climb between two. */
+const WAY_STEP = 4, WAY_STEEP = 1;
 
 /** The sights in the log. */
 export function sightsOf(log: DecisionLog): SightDecision[] {
@@ -128,6 +130,18 @@ export function travellerFor(c: NeedContext): TravellerDecision | null {
  * A spot by the hero's way: ahead on the line to where they are going, a little to its side, on dry gentle
  * ground off roads, towns, places and `apart` (other sights), the most open of a few that fit.
  */
+/** Can one walk straight from (ax, az) to (bx, bz): no step or wall on the way (a mesa's, D56) steeper than this? */
+function straightWay(t: Terrain, ax: number, az: number, bx: number, bz: number): boolean {
+  const n = Math.ceil(Math.hypot(bx - ax, bz - az) / WAY_STEP);
+  let h = t.height(ax, az);
+  for (let i = 1; i <= n; i++) {
+    const g = t.height(ax + ((bx - ax) * i) / n, az + ((bz - az) * i) / n);
+    if (Math.abs(g - h) > WAY_STEP * WAY_STEEP) return false;
+    h = g;
+  }
+  return true;
+}
+
 function wayside(c: NeedContext, r: Rng, apart: readonly { readonly x: number; readonly z: number }[]): { x: number; z: number; woods: number } | null {
   const t = c.terrain, places = regionDecisions(c.log).flatMap((d) => (d.site ? [d.site] : []));
   const way = c.toward ? Math.atan2(c.toward.z - c.hero.z, c.toward.x - c.hero.x) : r.range(0, Math.PI * 2);
@@ -142,6 +156,7 @@ function wayside(c: NeedContext, r: Rng, apart: readonly { readonly x: number; r
     const x = c.hero.x + Math.cos(a) * d - Math.sin(a) * side, z = c.hero.z + Math.sin(a) * d + Math.cos(a) * side, h = t.height(x, z);
     if (t.waterDepth(x, z, h) > 0 || h < 2 || t.steepness(x, z, 6, h) > 0.35) continue;
     if (t.roads.fromEdge(x, z) < 4) continue;
+    if (!straightWay(t, c.hero.x, c.hero.z, x, z)) continue;
     if (c.towns.some((w) => farFrom(w, { x, z }) < w.decision.radius + OFF_TOWN)) continue;
     if (places.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + OFF_PLACE)) continue;
     if (apart.some((p) => Math.hypot(p.x - x, p.z - z) < APART)) continue;
