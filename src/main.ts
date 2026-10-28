@@ -1361,7 +1361,16 @@ export async function start(b: Boot): Promise<void> {
         return true;
       },
       enter: async (id, b) => { const t = towns?.get(id); if (!t || !rooms) return; await outside(); await rooms.enter({ town: t, b }, true); },
-      below: async (id) => { const v = await cellars.build(id); if (!v) return false; await outside(); await v.enter(true); keepFacing(); return true; },
+      below: async (id) => {
+        const v = await cellars.build(id);
+        if (!v) return false;
+        await outside();
+        await v.enter(true);
+        // Put down mid-room (a tower's gate hall is 6 m across): facing the way in, the camera trails into the room, not into its door.
+        if (v.cellar.form.space.arriveMid) player.walker.yaw = player.heroCam.yaw = player.walker.yaw + Math.PI;
+        keepFacing();
+        return true;
+      },
       open: async (place) => {
         if (!setting.regions || !regionSites) return null;
         const ids = new Set(setting.regions.fills.filter((f) => f.place === place).map((f) => f.id));
