@@ -1,8 +1,9 @@
 /**
  * The hero's standing with each people (plan 11.6, D34): one number per people, −100 .. 100, starting at
  * what they think of a stranger (or of their own kin, for the hero's own people). The game reads it for
- * greetings, prices, who will talk and whether a hold's guards let the hero in; deeds move it (a promise
- * kept for a household, a gift, trespass, striking or killing a guard). Pure: saved as plain data.
+ * greetings, prices, who will talk and whether a hold's guards let the hero in; deeds move it (every good
+ * deed once, D54: a promise kept, a band beaten, a hurt traveller tended; a gift; trespass, striking or
+ * killing a guard). Pure: saved as plain data.
  */
 import { hash2f } from '@futuremagic/core';
 import { TIERS, type PeopleDef, type SettingModule, type StandingDef, type Tier } from '../setting/contract';
@@ -33,6 +34,10 @@ export interface StandingSave {
   /** Standing by people id, and gifts given to each. */
   readonly of: Readonly<Record<string, number>>;
   readonly gifts: Readonly<Record<string, number>>;
+  /** The good deeds already counted (D54: each once), by key. */
+  readonly deeds?: readonly string[];
+  /** The hero's name for good deeds, wherever done (D54); none: 0. */
+  readonly renown?: number;
 }
 
 /** A change of standing, as the game tells it. */
@@ -47,6 +52,12 @@ export interface StandingChange {
 export class Standing {
   private readonly of = new Map<string, number>();
   private readonly gifts = new Map<string, number>();
+  private readonly deeds = new Set<string>();
+  /**
+   * The hero's reputation (D54): one number for the whole world, 0 .. 100, raised by every good deed wherever
+   * it was done (a travelling hero carries it along). Trainers read it; the peoples' standing is on top.
+   */
+  private fame = 0;
   private readonly rules: StandingDef;
   private readonly peoples: readonly PeopleDef[];
   race: string;
@@ -57,7 +68,12 @@ export class Standing {
     this.race = saved?.race ?? race;
     for (const p of this.peoples) this.of.set(p.id, saved?.of[p.id] ?? this.first(p));
     for (const [k, v] of Object.entries(saved?.gifts ?? {})) this.gifts.set(k, v);
+    for (const k of saved?.deeds ?? []) this.deeds.add(k);
+    this.fame = saved?.renown ?? 0;
   }
+
+  /** The hero's reputation, the same everywhere (D54). */
+  get renown(): number { return this.fame; }
 
   private first(p: PeopleDef): number { return p.id === this.race ? p.kin : p.regard; }
 
@@ -65,6 +81,8 @@ export class Standing {
   begin(race: string): void {
     this.race = race;
     this.gifts.clear();
+    this.deeds.clear();
+    this.fame = 0;
     for (const p of this.peoples) this.of.set(p.id, this.first(p));
   }
 
@@ -86,16 +104,28 @@ export class Standing {
   }
 
   /**
-   * A promise kept for a household of `id`: their people think better of the hero, and word gets round
-   * the others (a third as much).
+   * A good deed for one of people `id` (D54), counted once by its `key` (a second time: nothing): the hero's
+   * reputation rises by `by`, and that people think `by` better of them; `told`: word gets round the other
+   * peoples too, a third as much.
    */
-  keptFor(id: string): StandingChange[] {
+  deed(key: string, id: string, by: number, told = false): StandingChange[] {
+    if (this.deeds.has(key) || !this.people(id)) return [];
+    this.deeds.add(key);
+    this.fame = Math.min(100, Math.round(this.fame + by));
     const out: StandingChange[] = [];
     for (const p of this.peoples) {
-      const c = this.change(p.id, p.id === id ? this.rules.kept : this.rules.kept / 3);
+      const c = p.id === id ? this.change(p.id, by) : told ? this.change(p.id, by / 3) : null;
       if (c) out.push(c);
     }
     return out;
+  }
+
+  /** Whether a deed was counted already. */
+  did(key: string): boolean { return this.deeds.has(key); }
+
+  /** Promise `promise` kept for a household of `id`: a deed their people and, by word, the others count. */
+  keptFor(id: string, promise: string): StandingChange[] {
+    return this.deed(`kept:${promise}`, id, this.rules.kept, true);
   }
 
   /** What a gift to a people costs now (null: gifts no longer raise their standing). */
@@ -144,7 +174,7 @@ export class Standing {
   }
 
   save(): StandingSave {
-    return { race: this.race, of: Object.fromEntries(this.of), gifts: Object.fromEntries(this.gifts) };
+    return { race: this.race, of: Object.fromEntries(this.of), gifts: Object.fromEntries(this.gifts), ...(this.deeds.size ? { deeds: [...this.deeds] } : {}), ...(this.fame ? { renown: this.fame } : {}) };
   }
 }
 
@@ -160,6 +190,13 @@ export function changeLine(c: StandingChange): string {
 
 /** The tiers in words. */
 export const TIER_WORDS: Readonly<Record<Tier, string>> = { hated: 'hated', unwelcome: 'unwelcome', stranger: 'a stranger', friend: 'a friend', honoured: 'honoured' };
+
+/** The people most of a town's grown-ups are (whom a deed for the whole town is done for); null: nobody lives there. */
+export function peopleOf(residents: readonly Person[]): string | null {
+  const n = new Map<string, number>();
+  for (const p of residents) if (p.role !== 'child' && p.role !== 'traveller') n.set(p.race, (n.get(p.race) ?? 0) + 1);
+  return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+}
 
 /**
  * Whose promise it was (plan 11.6): a grown-up of the household it was made to (a dungeon's building, or

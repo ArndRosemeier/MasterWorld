@@ -11,8 +11,8 @@ import { openWorld } from '../src/vgm/builder';
 import { Township } from '../src/game/township';
 import { SMALL } from './small';
 
-/** A human hero's standing with human trainers at the start (classic: kin 15). */
-const KIN = 15;
+/** The hero's reputation after a couple of good deeds (enough to open even fire). */
+const KIN = 20;
 const witch = classic.guilds!.find((g) => g.keeper === 'hedge-witch')!;
 const under = classic.guilds!.find((g) => g.keeper === 'undercroft-keeper')!;
 const ability = (id: string) => classic.abilities.find((a) => a.id === id)!;
@@ -42,12 +42,10 @@ test('teachers: further spells wait for the school’s level and cost coin; othe
   assert.equal(spellRefusal(classic, witch, hero, ability('fire-dart')), 'not-taught');
 });
 
-test('teachers: the hidden Undercroft teaches shadow, frost and bird form; the bard tells its way in', () => {
-  assert.deepEqual(spellsOf(classic, under).filter((a) => !a.skill).map((a) => a.id), ['bird']);
-  const hero = new Character(classic), book = new GuildBook();
-  hero.coins = 1000;
-  assert.equal(learnSpell(classic, under, hero, ability('bird')), null);
-  assert.ok(hero.knows('bird'));
+test('teachers: the hidden Undercroft teaches shadow and frost, but sells no bird form; the bard tells its way in', () => {
+  assert.deepEqual(spellsOf(classic, under).filter((a) => !a.skill).map((a) => a.id), []);
+  for (const g of classic.guilds!) assert.equal(spellRefusal(classic, g, new Character(classic), ability('bird')), 'not-taught', `${g.keeper} does not sell it`);
+  const book = new GuildBook();
   const town = planTown({ seed: 3, x: 0, z: 0, radius: 72, height: () => 10 });
   const houses = guildHouses(town, 'town', classic);
   assert.ok(!book.onMap('town-1', under));

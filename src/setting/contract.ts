@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 11;
+export const CONTRACT_VERSION = 12;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -262,7 +262,7 @@ export interface SkillDef {
   /** Where a fresh character starts (0..100). */
   readonly start: number;
   /**
-   * A dangerous skill (fire, shadow, stealth; D54): the standing with a trainer's people it asks on top of
+   * A dangerous skill (fire, shadow, stealth; D54): the reputation it asks on top of
    * each rank's, the opening too. None: as any other.
    */
   readonly danger?: number;
@@ -659,6 +659,11 @@ export interface SituationDef {
   readonly seen: number;
   /** hurt-traveller: the share of People's travellers that are hurt (0..1). */
   readonly chance?: number;
+  /**
+   * hurt-traveller: the talk topic to see to the hurt one, and what they say to it. Chosen, the hero kneels by
+   * them and binds the wound, and they get up again (a good deed, D54).
+   */
+  readonly tend?: { readonly topic: string; readonly line: string };
   /** paddock-wolves: the encounter, the game hours of the day it may begin in, and the days between two in one town. */
   readonly encounter?: string;
   readonly hours?: readonly [number, number];
@@ -752,8 +757,8 @@ export interface TrainerDef {
 
 /**
  * A skill's ranks (D49, D54): how far lessons may raise it once a guild's trainer has opened that rank. Rank
- * 0 is the opening. Each rank is paid in coin, and may ask the guild's task done and a standing with the
- * trainer's people (more for a dangerous skill: SkillDef.danger). Nothing rises by use.
+ * 0 is the opening. Each rank is paid in coin, and may ask the guild's task done and the hero's reputation (one
+ * for the whole world, raised by good deeds; more for a dangerous skill: SkillDef.danger). Nothing rises by use.
  */
 export interface SkillRankDef {
   /** The highest the skill rises at this rank. */
@@ -762,8 +767,8 @@ export interface SkillRankDef {
   readonly price: number;
   /** The guild's task must be done first. */
   readonly task?: boolean;
-  /** Standing with the trainer's people needed (−100..100, plan 11.6). */
-  readonly standing?: number;
+  /** The reputation needed (0..100, game/standing.ts `renown`). */
+  readonly renown?: number;
 }
 
 /** A guild's task for a higher rank: clear a place (below a house, or out on the land with `out`). */
@@ -773,6 +778,24 @@ export interface GuildTaskDef {
   readonly done: string;
   /** Only a place out on the land counts (a barrow, a cave, a tower), not a cellar. */
   readonly out?: boolean;
+}
+
+/**
+ * A deed a guild's master asks once, for what no trainer sells (C14, D52): once the hero has opened one of
+ * the house's skills and its people trust them enough, the master speaks of a place the VGM makes for it
+ * (vgm/quests.ts); cleared and told back to the master's household, its reward is the master's gift.
+ */
+export interface GuildQuestDef {
+  /** The taught ability given for it (classic: bird form); no guild sells it. */
+  readonly reward: string;
+  /** The dungeon kinds the place may be, tried in this order (each a lead's kind). */
+  readonly kinds: readonly string[];
+  /** The hero's reputation before the master speaks of it (0..100). */
+  readonly renown: number;
+  /** What the master says of it (`{place}`: what the place is called, "the old tower north of the town"). */
+  readonly ask: string;
+  /** What the master says when told it is done, and gives the reward. */
+  readonly done: string;
 }
 
 /**
@@ -810,10 +833,12 @@ export interface GuildDef extends TrainerDef {
   readonly spellPrice?: number;
   /** Copper to open a skill here, instead of its first rank's price (a magic teacher asks little: a fresh hero can start). */
   readonly openPrice?: number;
-  /** Further taught abilities of no school it teaches as well, at `spellPrice` (bird form). */
+  /** Further taught abilities of no school it teaches as well, at `spellPrice`. */
   readonly abilities?: readonly string[];
   /** What the teacher says on teaching a spell (`{spell}`). */
   readonly teachesSpell?: string;
+  /** Its master's one deed for a gift no trainer sells (C14). */
+  readonly quest?: GuildQuestDef;
 }
 
 /** The teller at the inn (D49): "where can I learn …?" names every guild house and marks it on the map. */
@@ -1144,13 +1169,16 @@ export interface HoldDef {
 }
 
 /**
- * What changes the hero's standing (plan 11.6, D54): a promise kept for one of a people's households (the
- * other peoples in town hear of it too, a third as much), a guild's task done (with its trainer's people),
- * a gift, walking into a hold unwelcome, striking its guards, killing one. Each deed counts once.
+ * What changes the hero's standing (plan 11.6, D54): every good deed, once. A promise kept for one of a
+ * people's households, or a town freed of a story event's band (`kept`; the other peoples in town hear of it
+ * too, a third as much); a guild's task done (with its trainer's people); a smaller help (`help`: a hurt
+ * traveller tended, wolves beaten off a paddock, with the people helped); a gift. And the bad: walking into a
+ * hold unwelcome, striking its guards, killing one.
  */
 export interface StandingDef {
   readonly kept: number;
   readonly task: number;
+  readonly help: number;
   /** A gift: what it costs (copper; each gift to the same people costs this much more) and how much it raises standing, up to `giftsUpTo`. */
   readonly gift: { readonly price: number; readonly raise: number; readonly upTo: number; readonly topic: string; readonly line: string };
   readonly trespass: number;
@@ -1235,6 +1263,11 @@ export function abilityOf(m: Pick<SettingModule, 'abilities'>, id: string | unde
 /** A skill of the setting by id (undefined: none such). */
 export function skillOf(m: Pick<SettingModule, 'skills'>, id: string | undefined): SkillDef | undefined {
   return id === undefined ? undefined : m.skills.find((s) => s.id === id);
+}
+
+/** A guild by its keeper's id (none: the setting has no such guild). */
+export function guildOf(m: Pick<SettingModule, 'guilds'>, keeper: string | undefined): GuildDef | undefined {
+  return keeper === undefined ? undefined : m.guilds?.find((g) => g.keeper === keeper);
 }
 
 export function validateSetting(m: SettingModule): string[] {
@@ -1373,6 +1406,7 @@ function validatePeoples(m: SettingModule, where: string): string[] {
   const s = m.standing;
   if (!(s.prices[0] > 1 && s.prices[1] > 0 && s.prices[1] < 1)) out.push(`${where}: standing.prices must be above 1 when hated and below 1 when honoured`);
   if (!(s.gift.price > 0 && s.gift.raise > 0)) out.push(`${where}: standing.gift needs a price and a raise`);
+  if (!(s.kept > 0 && s.task > 0 && s.help > 0)) out.push(`${where}: standing.kept, task and help must raise standing`);
   return out;
 }
 
@@ -1407,6 +1441,12 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (!m.skillRanks?.length) out.push(`${where}: guilds need skillRanks`);
     for (const id of g.abilities ?? []) if (!m.abilities.some((a) => a.id === id && a.taught)) out.push(`${where}: guild "${g.keeper}" teaches unknown or untaught ability "${id}"`);
     if ((g.abilities?.length || g.teachesSpell) && !(g.spellPrice! > 0)) out.push(`${where}: guild "${g.keeper}" teaches abilities but has no spellPrice`);
+    const q = g.quest;
+    if (q) {
+      if (!m.abilities.some((a) => a.id === q.reward && a.taught)) out.push(`${where}: guild "${g.keeper}" quest rewards unknown or untaught ability "${q.reward}"`);
+      if (m.guilds!.some((o) => o.abilities?.includes(q.reward))) out.push(`${where}: quest reward "${q.reward}" is sold by a guild too`);
+      if (!q.kinds.length || q.kinds.some((k) => !m.dungeons[k]?.form.purposes.includes('lead'))) out.push(`${where}: guild "${g.keeper}" quest asks for a place no lead kind is`);
+    }
   }
   if (m.skillRanks?.some((r, i, a) => i > 0 && r.upTo <= a[i - 1].upTo)) out.push(`${where}: skill ranks must rise`);
   if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);

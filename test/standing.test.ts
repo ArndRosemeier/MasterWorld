@@ -75,7 +75,8 @@ test('standing: reputation changes greetings: a friend is welcomed, the unwelcom
 
 test('standing: deeds: a kept promise raises the household\'s people most, gifts cost more each time and stop at their limit', () => {
   const s = new Standing(classic, 'human');
-  const changes = s.keptFor('dwarf');
+  const changes = s.keptFor('dwarf', 'cellar-1');
+  assert.deepEqual(s.keptFor('dwarf', 'cellar-1'), [], 'a deed counts once');
   const own = changes.find((c) => c.people.id === 'dwarf')!, other = changes.find((c) => c.people.id === 'elf')!;
   assert.equal(own.to - own.from, classic.standing.kept);
   assert.ok(other.to - other.from < own.to - own.from && other.to > other.from, 'word gets round the others');

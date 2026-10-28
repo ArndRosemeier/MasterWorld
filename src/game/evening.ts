@@ -10,7 +10,7 @@
  */
 import { MinHeap, deriveSeed } from '@futuremagic/core';
 import { polyCentroid, type SettlementSize, type TownBuilding } from '@futuremagic/settlement';
-import type { GuildDef, SettingModule } from '../setting/contract';
+import { guildOf, type GuildDef, type SettingModule } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
 import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
@@ -140,9 +140,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const power0 = hero.power;
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [], opened: string[] = [];
   const book = new GuildBook();
-  // A human hero (the creator's first people): trainers open ranks by their own people's standing (D54).
+  // A human hero (the creator's first people): trainers open ranks by the hero's reputation (D54).
   const standing = new Standing(setting, 'human');
-  const trust = (p: Person | undefined) => standing.value(p?.race ?? 'human');
   let falls = 0, earned = 0, seconds = 0, spells = 0;
   /** The mage's school, and its teacher's house. */
   let school: { skill: string; house: TownBuilding; guild: GuildDef } | null = null;
@@ -268,7 +267,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     walkTo(h.guild.name, ...front(h.b));
     // A school whose first spell strikes a foe, if the teacher has one (it shows magic in a fight).
     const skill = h.guild.skills.find((k) => spellsOf(setting, h.guild).some((x) => x.skill === k && !(x.level ?? 0) && aimsAtFoe(x))) ?? h.guild.skills[0], before = hero.coins;
-    const no = openRank(setting, h.guild, hero, skill, book, log, trust(people.find((p) => p.trade === h.guild.keeper)));
+    const no = openRank(setting, h.guild, hero, skill, book, log, standing.renown);
     if (no) throw new Broke(`${h.guild.name} would not open ${skill}: ${no} (${hero.coins} copper)`);
     if (!hero.maxMana) throw new Broke(`opened ${skill} but has no mana`);
     opened.push(`${skill} 0`);
@@ -375,7 +374,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const kept = keepPromise(log, lead.id, hours);
       if (kept) log = [...log, kept];
       // The household's people think better of the hero for it, once (D54).
-      if (kept) standing.keptFor(to.race);
+      if (kept) standing.keptFor(to.race, lead.id);
       cleared.push(lead.id);
       watch.leads = 0;
       director.met('reward');
@@ -452,12 +451,12 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         const by = teachers.find(({ t }) => t.skills.includes(skill) && isGuild(t));
         const next = nextRank(setting, hero, skill);
         if (!by || !next || hero.coins - next.def.price < reserve) continue;
-        const g = setting.guilds!.find((x) => x.keeper === by.t.keeper)!;
-        if (book.thank(g, log)) standing.change(by.p.race, setting.standing.task);
-        if (rankRefusal(setting, g, hero, skill, book, log, trust(by.p))) continue;
+        const g = guildOf(setting, by.t.keeper)!;
+        if (book.thank(g, log)) standing.deed(`task:${g.keeper}`, by.p.race, setting.standing.task);
+        if (rankRefusal(setting, g, hero, skill, book, log, standing.renown)) continue;
         walkTo(g.name, ...front(town.plan.buildings[by.p.work]));
         const before = hero.coins;
-        openRank(setting, g, hero, skill, book, log, trust(by.p));
+        openRank(setting, g, hero, skill, book, log, standing.renown);
         paid += before - hero.coins;
         opened.push(`${skill} ${next.rank}`);
         say(`${g.name} opens ${skill} rank ${next.rank} for ${before - hero.coins} copper`);

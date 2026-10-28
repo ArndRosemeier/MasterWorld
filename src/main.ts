@@ -46,7 +46,8 @@ import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
-import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
+import { firstDungeon, houseOf, placeOf, promisePlace, type LandKind } from './vgm/dungeons';
+import { questFor, questGuild } from './vgm/quests';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
@@ -102,7 +103,7 @@ import { release } from './app/release';
 import { Character } from './game/character';
 import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
-import { bardTells, GuildBook, isGuild, whereOf } from './game/guilds';
+import { bardTells, GuildBook, isGuild, questGift, whereOf } from './game/guilds';
 import { coinText, uniqueItem } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -123,7 +124,7 @@ import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { Retreats } from './app/retreats';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
-import { Standing, changeLine, householdOf, tierFloor } from './game/standing';
+import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
 import { onLand } from './world/dungeon/site';
@@ -141,6 +142,8 @@ const DRESS_WAIT = 15000;
 const ANSWER_GAP = 90;
 /** The ground sunk under a hatch while one climbs through it: this far round it, this deep (m; render/materials GROUND_DIP). */
 const SINK_REACH = 2.4, SINK_DEPTH = 4;
+/** Seeing to a hurt traveller: the hero kneels this far from them (m), hands busy this long (s). */
+const TEND_AT = 1.0, TEND_FOR = 4.5;
 
 /** What the first, small script (boot.ts) made before the game's code arrived. */
 export interface Boot {
@@ -837,6 +840,12 @@ export async function start(b: Boot): Promise<void> {
     const eventEnded = (ev: EventDecision): void => {
       for (const id of [ev.town, ev.held]) if (id) towns?.get(id)?.ended(ev.id);
     };
+    /** A good deed for a town's people (D54, once by `key`): how they take it is said, as for a promise kept. */
+    const deedFor = (key: string, t: Township | null | undefined, by: number, told = false): void => {
+      const people = t ? peopleOf(t.residents) : null;
+      const own = people ? standing.deed(key, people, by, told).find((c) => c.people.id === people) : undefined;
+      if (own) notes.say(changeLine(own), 5);
+    };
     // A place gone quiet: the journal says whom of its household to tell, and the map marks their door.
     quietPlace = (id) => {
       // A story event's band beaten (C6): the lead is done, and its town will hear of it.
@@ -846,9 +855,18 @@ export async function start(b: Boot): Promise<void> {
         if (k) log = [...log, k];
         journal.fulfil(id);
         eventEnded(ev);
+        // A good deed (D54): the town freed of the band (a held place's own folk most) thinks better of the hero.
+        deedFor(`band:${id}`, towns?.get(ev.held ?? ev.town), setting.standing.kept, true);
         director.met('purpose');
         const told = eventTold(setting, log, terrain.towns, ev);
         if (told) director.queue(told.done, 2);
+        return true;
+      }
+      // Wolves beaten off a paddock (C10): its farm's people think better of the hero, once.
+      if (ev?.kind === 'wild' && ev.situation) {
+        const k = keepPromise(log, id, hours());
+        if (k) log = [...log, k];
+        deedFor(`wolves:${id}`, towns?.get(ev.town), setting.standing.help);
         return true;
       }
       const t = townOfPromise(id);
@@ -858,6 +876,21 @@ export async function start(b: Boot): Promise<void> {
       const name = words.nameOf(p.id), house = words.homeCalled(p.id), door = t.town.plan.buildings[p.home].door;
       journal.quiet(id, { text: fill(setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
       return true;
+    };
+    /**
+     * Promise `id` kept, its household in town `t` told: into the log and the journal, a good deed with the
+     * household's people (and the hero's name), a master's gift if it was their deed (C14), and the VGM's next lead.
+     */
+    const keptNow = (id: string, t: Township): void => {
+      const k = keepPromise(log, id, hours());
+      if (k) log = [...log, k];
+      journal.fulfil(id);
+      director.met('purpose');
+      const who = householdOf(log, id, t.residents);
+      const own = who ? standing.keptFor(who.race, id).find((c) => c.people.id === who.race) : undefined;
+      if (own) notes.say(changeLine(own), 5);
+      vgmStep({ tools: ['promise'] });
+      if (questGift(setting, log, id, character)) learnedAbility();
     };
     // Who knows the hero from before (plan 11.4): people of the town the game began in; their greeting names them.
     const friendsOf = (bg: BackgroundDef | undefined) => (bg && startTown ? acquaintances(bg, startTown.residents) : []);
@@ -881,6 +914,20 @@ export async function start(b: Boot): Promise<void> {
     /** Talk here: the town of whoever the hero talks with (or would, at the talk key). */
     const talkTown = (): Township | null => talk?.place ?? null;
     const nameHere = (id: number): string => talkTown()?.talk.nameOf(id) ?? '';
+    // A hurt traveller seen to (C10, D54): the hero kneels by them and binds the wound, and they get up again.
+    services.set('tend', (a) => {
+      const t = talkTown(), d = t?.hurtNow();
+      if (!t || !d || player.puppet) return;
+      const w = player.walker.pos, dx = w.x - a.x, dz = w.z - a.z, k = TEND_AT / (Math.hypot(dx, dz) || 1);
+      const kneel: SearchKneel = new SearchKneel(w, player.walker.yaw, { x: a.x, z: a.z }, null, () => {
+        const kept = keepPromise(log, d.id, hours());
+        if (kept) log = [...log, kept];
+        director.met('people');
+        const own = standing.deed(`tend:${d.id}`, a.person.race, setting.standing.help).find((c) => c.people.id === a.person.race);
+        if (own) notes.say(changeLine(own), 5);
+      }, { x: a.x + dx * k, z: a.z + dz * k }, { busy: TEND_FOR, ground: (x, z) => terrain.height(x, z), up: () => { if (player.puppet === kneel) player.puppet = null; } });
+      player.puppet = kneel;
+    });
     services.set('trade', (a) => { const t = talkTown(), m = t?.market.of(a.person.id); if (t && m) { director.model.note('crafter', 0.5); trade.show(t.market, m, t.talk.nameOf(a.person.id)); } });
     // Talk: in the town the hero is in (it follows them from town to town, below).
     const talk: TalkUi | null = startTown ? new TalkUi(startTown, setting.talk, journal, player, {
@@ -899,20 +946,14 @@ export async function start(b: Boot): Promise<void> {
       report: (id, a) => {
         // The household hears it is safe again: they pay, the promise is kept, and the VGM's next lead may come up in the same breath.
         const due = cellars.keep(id);
-        const coins = due?.coins ?? 0;
+        // A master's deed (C14) pays in their gift, not coin.
+        const deed = questGuild(setting, log, id);
+        const coins = deed ? 0 : due?.coins ?? 0;
         character.coins += coins;
         if (coins) sounds?.cue({ kind: 'paid', coins });
-        const k = keepPromise(log, id, hours());
-        if (k) log = [...log, k];
-        journal.fulfil(id);
-        director.met('purpose');
-        // The household's people think better of the hero (and the others hear of it).
         const t = talk!.place;
-        const who = householdOf(log, id, t.residents);
-        const own = who ? standing.keptFor(who.race).find((c) => c.people.id === who.race) : undefined;
-        if (own) notes.say(changeLine(own), 5);
-        vgmStep({ tools: ['promise'] });
-        return t.talk.toldSafe(a.person.id, id, due ? due.thanks(coinText(coins)) : '');
+        keptNow(id, t);
+        return t.talk.toldSafe(a.person.id, id, deed?.quest ? deed.quest.done : due ? due.thanks(coinText(coins)) : '');
       },
       get roomPeople() { return rooms?.inside ? rooms.people() : null; },
     }) : null;
@@ -967,6 +1008,18 @@ export async function start(b: Boot): Promise<void> {
       log: () => log,
       hours,
       standing,
+      // A master's one deed (C14): the VGM makes its place, the master's household will be told; it goes in the journal and on the map.
+      quest: (g) => {
+        const t = talkTown(), house = t?.guilds.find((h) => h.guild.keeper === g.keeper);
+        if (!t || !house || !start || !g.quest) return null;
+        const d = questFor({ guild: g, town: t.town, building: house.b.id, hours: hours() }, { seed, terrain, log, home: start.decision, dungeons: setting.dungeons, avoid: wild?.territories ?? [] });
+        const place = d && placeOf(d, terrain.towns, setting.dungeons)?.name;
+        if (!d?.site || !place) return null;
+        applied(madeBy('quest', d, `${g.keeper}'s deed, for ${g.quest.reward}: the hero is a student and known well enough`, hours()));
+        const from = t.talk.nameOf(t.residents.find((p) => p.trade === g.keeper)?.id ?? -1) || g.name;
+        journal.hear(d.id, fill(setting.talk.lead, { cellar: place }), { text: fill(g.quest.ask, { place }), from }, { x: d.site.x, z: d.site.z, label: place });
+        return place;
+      },
     });
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id), a.person.race); });
     // The bard at the inn (D49): "where can I learn a skill?" names every guild house of the town and puts
@@ -989,6 +1042,7 @@ export async function start(b: Boot): Promise<void> {
     for (const id of PEOPLE_SERVICES) services.set(id, (a) => peoples.serve(id, a.person));
     // Every town's words, tied in as they are made: how its people take the hero, and what each offers
     // besides talk (their shop, a room, mending, lessons, the peoples' services). The same for every town.
+    const tend = situationOf(setting, 'hurt-traveller')?.tend;
     tieTalk = (t, words) => {
       words.manner = (p) => standing.manner(p.race, p.seed);
       words.services = (id) => {
@@ -1002,6 +1056,8 @@ export async function start(b: Boot): Promise<void> {
           ...(teacher && !(isGuild(teacher) && !guildBook.onMap(t.id, teacher)) ? [{ id: 'lessons', label: teacher.topic, line: teacher.line }] : []),
           ...(setting.bard && t.bard?.id === id && t.guilds.length ? [{ id: 'bard', label: setting.bard.topic, line: setting.bard.line }] : []),
           ...peoples.services(p),
+          // The hurt traveller by the way (C10): the hero may see to them.
+          ...(tend && p.role === 'traveller' && t.hurtNow() ? [{ id: 'tend', label: tend.topic, line: tend.line }] : []),
         ];
       };
     };
@@ -1302,7 +1358,9 @@ export async function start(b: Boot): Promise<void> {
       },
       places: placesFor(seedText, home),
       seed: seedText,
-      game: { player, view, origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; },
+      game: { player, view, origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, compass, standing, get hold() { return hold; }, lessons, services,
+        /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
+        questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
         get undrawn() {
           const out: string[] = [];

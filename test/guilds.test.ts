@@ -4,7 +4,7 @@ import { houseShape, planTown, signPlace } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic';
 import { townsfolk } from '../src/sim/people';
 import { Character } from '../src/game/character';
-import { GuildBook, bardOf, guildHouses, openRank, rankRefusal, staffGuilds, standingFor } from '../src/game/guilds';
+import { GuildBook, bardOf, guildHouses, openRank, rankRefusal, staffGuilds, renownFor } from '../src/game/guilds';
 import { Standing } from '../src/game/standing';
 import { takeLesson } from '../src/game/lessons';
 import type { Decision, DecisionLog } from '../src/world/decisions';
@@ -12,8 +12,8 @@ import type { Decision, DecisionLog } from '../src/world/decisions';
 const arms = classic.guilds!.find((g) => g.keeper === 'master-at-arms')!;
 const lodge = classic.guilds!.find((g) => g.keeper === 'lodge-master')!;
 
-/** A human hero's standing with human trainers at the start (classic: kin 15), and after a promise kept (+10). */
-const KIN = 15, KEPT = 25;
+/** The hero's reputation after one promise kept (classic +10), and after a few deeds more. */
+const KIN = 10, KEPT = 25;
 
 test('guilds: a skill cannot rise before a trainer opens it; then lessons raise it up to its rank', () => {
   const hero = new Character(classic); // the caravan guard: blades open, shields not
@@ -34,20 +34,20 @@ test('guilds: a skill cannot rise before a trainer opens it; then lessons raise 
   assert.equal(openRank(classic, lodge, hero, 'blades', book, log, KIN), 'not-taught');
 });
 
-test('guilds: a rank needs coin and standing with the trainer\'s people (more for a dangerous skill), the third the guild\'s task', () => {
+test('guilds: a rank needs coin and reputation (more for a dangerous skill), the third the guild\'s task', () => {
   const hero = new Character(classic), book = new GuildBook();
   let log: Decision[] = [];
   hero.coins = 1e6;
-  // The next rank is not a matter of use: a stranger's standing is not enough for it.
-  assert.equal(rankRefusal(classic, arms, hero, 'blades', book, log, 5), 'standing');
-  assert.equal(standingFor(classic, 'blades', 1), classic.skillRanks![1].standing);
+  // The next rank is not a matter of use: a hero nobody has heard of does not get it.
+  assert.equal(rankRefusal(classic, arms, hero, 'blades', book, log, 5), 'renown');
+  assert.equal(renownFor(classic, 'blades', 1), classic.skillRanks![1].renown);
   assert.equal(openRank(classic, arms, hero, 'blades', book, log, KIN), null);
   assert.equal(hero.rankOf('blades'), 1);
   assert.equal(rankRefusal(classic, arms, hero, 'blades', book, log, KEPT), 'task');
-  // A dangerous skill asks more: stealth's opening already wants more than a stranger's standing.
+  // A dangerous skill asks more: stealth's opening already wants a name.
   const quiet = classic.guilds!.find((g) => g.keeper === 'locksmith')!;
-  assert.ok(standingFor(classic, 'stealth', 0) > 0);
-  assert.equal(rankRefusal(classic, quiet, hero, 'stealth', book, log, 0), 'standing');
+  assert.ok(renownFor(classic, 'stealth', 0) > 0);
+  assert.equal(rankRefusal(classic, quiet, hero, 'stealth', book, log, 0), 'renown');
   // The task: a place cleared after the trainer asked.
   const place: Decision = { kind: 'dungeon', id: 'cellar-1', template: 'cellar', town: 'town-1', building: 3, seed: 1, setPiece: 'x' };
   log = [place, { kind: 'kept', id: 'kept-1', promise: 'cellar-1', at: 5 }];
@@ -75,16 +75,22 @@ test('guilds: a rank needs coin and standing with the trainer\'s people (more fo
   assert.equal(new Character(classic, old).skills.get('axes'), 30);
 });
 
-test('guilds: repeating a deed adds no standing', () => {
+test('guilds: repeating a deed adds nothing; the reputation is one for the whole world', () => {
   const standing = new Standing(classic, 'human'), log: DecisionLog = [];
   const book = new GuildBook();
   book.assign('master-at-arms', 0);
   const done: DecisionLog = [{ kind: 'dungeon', id: 'c', template: 'cellar', town: 't', building: 1, seed: 1, setPiece: 'x' }, { kind: 'kept', id: 'k', promise: 'c', at: 1 }];
-  let n = 0;
-  for (let i = 0; i < 5; i++) if (book.thank(arms, done)) { standing.change('human', classic.standing.task); n++; }
-  assert.equal(n, 1);
+  for (let i = 0; i < 5; i++) if (book.thank(arms, done)) standing.deed(`task:${arms.keeper}`, 'human', classic.standing.task);
+  for (let i = 0; i < 5; i++) standing.deed(`task:${arms.keeper}`, 'human', classic.standing.task);
+  assert.equal(standing.renown, classic.standing.task, 'the task counted once');
   assert.equal(standing.value('human'), classic.peoples.find((p) => p.id === 'human')!.kin + classic.standing.task);
   assert.equal(book.thank(arms, log), false);
+  // Deeds for other peoples, far apart, raise the same name: every trainer reads it.
+  standing.keptFor('dwarf', 'cave-1');
+  standing.deed('tend:traveller-1', 'elf', classic.standing.help);
+  assert.equal(standing.renown, classic.standing.task + classic.standing.kept + classic.standing.help);
+  assert.equal(new Standing(classic, 'human', JSON.parse(JSON.stringify(standing.save()))).renown, standing.renown, 'a save keeps it');
+  assert.deepEqual(new Standing(classic, 'human', JSON.parse(JSON.stringify(standing.save()))).keptFor('dwarf', 'cave-1'), [], 'and the deeds done');
 });
 
 test('guilds: houses in towns and villages, none in a hamlet; trainers and a bard', () => {

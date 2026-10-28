@@ -61,6 +61,8 @@ export interface DungeonDecision {
   readonly dwellers?: string;
   /** The story event whose band lies up here (a take's lair), if any. */
   readonly event?: string;
+  /** The guild whose master asked for it, as their one deed (C14: a keeper's id); its household is the master's. */
+  readonly quest?: string;
 }
 
 /**

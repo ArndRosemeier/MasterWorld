@@ -5,12 +5,12 @@
  */
 import type { BardDef, GuildDef, SkillRankDef } from '../contract';
 
-/** Rank 0 is the opening; each rank is bought, and asks standing with the trainer's people (D54); the third also the guild's task. */
+/** Rank 0 is the opening; each rank is bought, and asks the hero's reputation (D54, one for the whole world); the third also the guild's task. */
 export const skillRanks: readonly SkillRankDef[] = [
   { upTo: 25, price: 40 },
-  { upTo: 50, price: 160, standing: 10 },
-  { upTo: 75, price: 600, task: true, standing: 20 },
-  { upTo: 100, price: 2000, standing: 35 },
+  { upTo: 50, price: 160, renown: 10 },
+  { upTo: 75, price: 600, task: true, renown: 20 },
+  { upTo: 100, price: 2000, renown: 35 },
 ];
 
 export const guilds: readonly GuildDef[] = [
@@ -62,7 +62,13 @@ export const guilds: readonly GuildDef[] = [
     opens: 'Breathe out, and do not breathe in again until I say. Feel it? {skill} is yours now. Tell no one.',
     distrust: 'You are a stranger still. Strangers do not learn {skill} down here.',
     task: { ask: 'There is a place below a house where something ugly has made its nest. Empty it, quietly.', done: 'Quietly done. The Undercroft remembers.' },
-    spellPrice: 66, openPrice: 10, abilities: ['bird'], teachesSpell: 'Like that. {spell} is yours now. It was old before the Fading.',
+    spellPrice: 66, openPrice: 10, teachesSpell: 'Like that. {spell} is yours now. It was old before the Fading.',
+    // Bird form is sold nowhere (C14): the keeper gives it for one deed, to a student folk here trust.
+    quest: {
+      reward: 'bird', kinds: ['tower', 'barrow'], renown: 25,
+      ask: 'You have been patient. There is an older thing than frost: the shape of a bird, kept in {place} before the Fading. Something has nested there since. Clear it and come back, and I will show you how the shape is worn.',
+      done: 'Then it is clean again. Come here. Breathe out, all of it, and think of wind under feathers. There: the shape knows you now. Go up under the open sky before you try it.',
+    },
   },
   {
     keeper: 'tower-warden', name: 'the half-ruined tower', title: '{name}, warden of the half-ruined tower', topic: 'Do you still keep the old fire?',

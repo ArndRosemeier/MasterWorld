@@ -4,7 +4,7 @@
  * what the teacher knows (`upTo`) there is nothing more to learn from them. Prices are the teacher's,
  * never scaled to the hero's power (D29). Lessons are the only way a skill rises (D54). Pure.
  */
-import { skillOf, type SettingModule, type TrainerDef } from '../setting/contract';
+import { guildOf, skillOf, type SettingModule, type TrainerDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import type { Character } from './character';
 import { keeperOf } from './trade';
@@ -12,7 +12,7 @@ import { keeperOf } from './trade';
 /** What a townsperson teaches, if anything: their own trade's teaching, by role, or their guild's (D49). */
 export function teacherOf(setting: SettingModule, p: Person): TrainerDef | null {
   const k = keeperOf(p);
-  return setting.trainers.find((t) => t.keeper === k) ?? setting.guilds?.find((g) => g.keeper === k) ?? null;
+  return setting.trainers.find((t) => t.keeper === k) ?? guildOf(setting, k) ?? null;
 }
 
 /**
