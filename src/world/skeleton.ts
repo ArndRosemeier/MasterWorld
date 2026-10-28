@@ -143,6 +143,12 @@ export class Skeleton {
     return best;
   }
 
+  /** How much of the kind of country `id` is at (x, z), 0..1 (0 for a kind the setting does not have). */
+  kindShare(id: string, x: number, z: number): number {
+    const k = this.kinds.findIndex((d) => d.id === id);
+    return k < 0 ? 0 : this.kindWeights(x, z)[k];
+  }
+
   /** How much of mesa country is at (x, z), 0..1. */
   mesaWeight(x: number, z: number): number {
     if (!this.mesa) return 0;

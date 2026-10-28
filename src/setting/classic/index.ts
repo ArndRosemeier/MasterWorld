@@ -66,6 +66,7 @@ export const classic: SettingModule = {
     elevation: [15, 400],
     maxSlope: 0.12,
     vista: 220,
+    kind: 'mesa',
   },
   dungeons: { cellar, barrow, cave, tower, hideout },
   names,

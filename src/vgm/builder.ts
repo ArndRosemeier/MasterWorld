@@ -6,7 +6,7 @@
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
 import { sitesIn, type Decision, type DecisionLog, type TownDecision } from '../world/decisions';
-import { findStart, type StartPlace } from '../world/start';
+import { findStart, startGround, type StartPlace } from '../world/start';
 import { bankSpots, byFreshWater, freshWaterEdge, WATER_REACH } from '../world/freshWater';
 import { Terrain } from '../world/terrain';
 import type { HydroOptions } from '../world/hydro';
@@ -74,13 +74,14 @@ const START_R = 75;
  * nearest gentle, dry bank spot, preferring level ground. The start place itself when no river is near.
  */
 export function waterside(t: Terrain, start: StartPlace): StartPlace {
-  if (byFreshWater(t, start.x, start.z, START_R, false)) return start;
   const want = t.setting.start;
+  if (byFreshWater(t, start.x, start.z, START_R, false)) return start;
   for (const within of BANK_SEARCH) {
     let best: StartPlace | null = null, bestScore = Infinity;
     for (const s of bankSpots(t, start.x, start.z, within, START_R, 2, false)) {
       const h = t.height(s.x, s.z);
       if (h < Math.max(4, want.elevation[0] * 0.5) || h > want.elevation[1] || t.waterDepth(s.x, s.z, h) > 0) continue;
+      if (!startGround(t.skeleton, want, s.x, s.z)) continue;
       let steep = 0;
       for (let a = 0; a < 8; a++) {
         const px = s.x + Math.cos((a * Math.PI) / 4) * START_R * 0.8, pz = s.z + Math.sin((a * Math.PI) / 4) * START_R * 0.8;
@@ -116,7 +117,7 @@ export function startTown(t: Terrain, home: { x: number; z: number }, arch: Arch
     const x = home.x + gx, z = home.z + gz;
     if (arch && Math.hypot(x - (arch.a[0] + arch.b[0]) / 2, z - (arch.a[1] + arch.b[1]) / 2) < R + 90) continue;
     const h0 = t.height(x, z);
-    if (h0 < 4) continue;
+    if (h0 < 4 || !startGround(t.skeleton, t.setting.start, x, z)) continue;
     const water = needWater ? freshWaterEdge(t, x, z, R + WATER_REACH, false) : Infinity;
     if (needWater && water > R + WATER_REACH) continue;
     // Dry and gentle within the inner town, mostly so out to its edge.
