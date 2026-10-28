@@ -1,8 +1,8 @@
 /**
  * The compass, always on (plan 17.1, D35, D45): a brass ring at the top of the screen that turns with the
- * camera, with no needle: the lubber mark on top shows where the hero looks, and the big letters read at a
- * glance. A compass needs no skill, so it always points true; the orientation skill only sharpens where the
- * map puts the hero (src/game/orientation.ts). The places marked on the map ride on the rim as glowing studs.
+ * camera, with no needle: the lubber mark on top shows where the hero looks, and the letters stay upright
+ * as the ring turns. A compass needs no skill, so it always points true; the orientation skill only sharpens
+ * where the map puts the hero (src/game/orientation.ts). The places marked on the map ride on the rim as glowing studs.
  * Beside it a tiny orrery: sun and moon turn with the hour, and a cloud, raindrop or snowflake rides along
  * with the weather. Plain DOM (hud.css); every frame only transforms change, and only when they moved.
  */
@@ -34,8 +34,8 @@ const DIAL = `<svg viewBox="0 0 100 100" aria-hidden="true">
 <circle cx="50" cy="50" r="40" fill="none" stroke="#6e4f17" stroke-width="1"/>
 <circle class="ward" cx="50" cy="50" r="43.5" fill="none" stroke="#8fe3ff" stroke-width="1" pathLength="100"/>
 ${Array.from({ length: 36 }, (_, i) => `<line x1="50" y1="${i % 9 === 0 ? 9 : 10.5}" x2="50" y2="14" stroke="${i % 9 === 0 ? '#e2bd68' : '#8a6726'}" stroke-width="${i % 9 === 0 ? 1.6 : 0.8}" transform="rotate(${i * 10} 50 50)"/>`).join('')}
-<g class="letters" font-family="'Marcellus SC', Georgia, serif" font-size="20" font-weight="700" text-anchor="middle" stroke="#120c08" stroke-width="2.2" paint-order="stroke" stroke-linejoin="round">
-<text x="50" y="32" fill="#ff8a5c">N</text><text x="75" y="57" fill="#ffe6a6">E</text><text x="50" y="82" fill="#ffe6a6">S</text><text x="25" y="57" fill="#ffe6a6">W</text>
+<g class="letters" font-family="'Marcellus SC', Georgia, serif" font-size="13.5" font-weight="700" text-anchor="middle" dominant-baseline="central" stroke="#120c08" stroke-width="1.6" paint-order="stroke" stroke-linejoin="round">
+<text x="50" y="26" fill="#ff8a5c">N</text><text x="74" y="50" fill="#ffe6a6">E</text><text x="50" y="74" fill="#ffe6a6">S</text><text x="26" y="50" fill="#ffe6a6">W</text>
 </g></svg>`;
 const GLYPH: Record<SkyGlyph, string> = {
   clear: '',
@@ -80,7 +80,7 @@ export class Compass {
   read(r: CompassReading): void {
     // The ring turns with the camera, always true.
     const dial = r.look * DEG;
-    if (!(Math.abs(dial - this.dialDeg) < 0.15)) { this.dialDeg = dial; this.dial.style.transform = `rotate(${dial.toFixed(2)}deg)`; }
+    if (!(Math.abs(dial - this.dialDeg) < 0.15)) { this.dialDeg = dial; this.dial.style.transform = `rotate(${dial.toFixed(2)}deg)`; this.dial.style.setProperty('--up', `${(-dial).toFixed(2)}deg`); }
     this.marks(r);
     // The orrery: the sun on top at noon, the moon at midnight.
     const arm = (r.hour - 12) * 15;
