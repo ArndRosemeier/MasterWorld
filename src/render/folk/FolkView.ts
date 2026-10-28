@@ -17,6 +17,7 @@ import { FAR, FarFolk } from './FarFolk';
 import { castShadows, eachMesh, handOf, seatOf } from '../hero/play';
 import { SHADOW_ONLY } from '../sky';
 import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
+import { Held, Steady } from '../steady';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -104,6 +105,9 @@ interface Slot {
   seen: boolean | null;
   /** Seconds since the clip began (a sitter settles onto the bench as the clip fades in). */
   since: number;
+  /** What is drawn follows the agent smoothly, and its clip changes only once wanted a moment (render/steady.ts). */
+  st: Steady;
+  held: Held<string>;
 }
 
 export class FolkView {
@@ -124,7 +128,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0 };
+      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0, st: new Steady(), held: new Held('') };
       this.slots.push(slot);
     }
   }
@@ -294,12 +298,12 @@ export class FolkView {
       if (!s.ready) continue;
       const a = s.agent!, p = placed.get(a);
       const o = s.place;
-      if (p) o.position.set(p.x, p.y, p.z);
-      else o.position.set(a.x, this.height(a.x, a.z), a.z);
       // Agents face `dir` (atan2 in x, z); a character faces +z.
-      o.rotation.y = Math.PI / 2 - (p ? p.dir : a.dir);
+      const st = p ? s.st.ease(dt, p.x, p.y, p.z, Math.PI / 2 - p.dir) : s.st.ease(dt, a.x, this.height(a.x, a.z), a.z, Math.PI / 2 - a.dir);
+      o.position.set(st.x, st.y, st.z);
+      o.rotation.y = st.yaw;
       this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
-      const clip = clipOf(p ? p.act : a.act, a.person.id);
+      const clip = s.held.pick(dt, clipOf(p ? p.act : a.act, a.person.id));
       if (clip !== s.clip) {
         s.clip = clip;
         s.since = 0;
@@ -346,6 +350,8 @@ export class FolkView {
     s.agent = a;
     s.ready = false;
     s.clip = clipOf(a.act, a.person.id);
+    s.st = new Steady();
+    s.held = new Held(s.clip);
     s.since = SETTLE; // dressed already in the clip (no fade)
     this.shown.set(a, s);
     this.dressing++;

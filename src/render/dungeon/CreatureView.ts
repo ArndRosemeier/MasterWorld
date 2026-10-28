@@ -27,6 +27,7 @@ import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from './ani
 import { Jolt, joltRoot, joltSpine } from '../jolt';
 import { limp, limpOf } from '../limp';
 import { PACE } from '../hero/clips';
+import { Held, Steady } from '../steady';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -49,8 +50,9 @@ type Body =
 interface Shown {
   readonly c: Creature;
   readonly body: Body;
-  px: number;
-  pz: number;
+  /** What is drawn follows the den smoothly (render/steady.ts), and its loop clip changes only once wanted a moment. */
+  readonly st: Steady;
+  readonly look: Held<string>;
   /** When its current blow began, the health it had last frame, when it was last hurt. */
   blowAt: number;
   health: number;
@@ -155,7 +157,7 @@ export class CreatureView {
         v.group.add(fig.root);
         body = { kind: 'critter', fig, scale };
       }
-      v.shown.push({ c, body, px: c.x, pz: c.z, blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0, blows: c.blows, jolt: new Jolt() });
+      v.shown.push({ c, body, st: new Steady().ease(0, c.x, c.y, c.z, yawOf(c.dir)), look: new Held(''), blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0, blows: c.blows, jolt: new Jolt() });
     }
     v.pose(0);
     return v;
@@ -170,8 +172,8 @@ export class CreatureView {
     const t = this.time;
     for (const s of this.shown) {
       const c = s.c;
-      const vx = dt > 0 ? (c.x - s.px) / dt : 0, vz = dt > 0 ? (c.z - s.pz) / dt : 0;
-      s.px = c.x; s.pz = c.z;
+      const st = s.st.ease(dt, c.x, c.y, c.z, yawOf(c.dir));
+      const vx = st.vx, vz = st.vz, X = st.x, Y = st.y, Z = st.z;
       s.walked += Math.hypot(vx, vz) * dt;
       // Badly hurt, it limps as it goes (the den slows it too).
       const lame = c.state === 'dead' ? 0 : limpOf(woundOf(c)), moving = Math.hypot(vx, vz) > 0.2;
@@ -190,38 +192,39 @@ export class CreatureView {
       const hurtT = (t - s.hurtAt) / FLINCH, blowT = s.hurtAt > s.blowAt && hurtT < 1 ? 1 : (t - s.blowAt) / BLOW;
       const dead = c.state === 'dead';
       const fresh = hurtT < 1 && hurtT * FLINCH < dt + 1e-6;
-      const yaw = yawOf(c.dir);
+      const yaw = st.yaw;
       const watching = !dead && (c.state === 'alert' || c.state === 'fight' || c.state === 'beg') && eye ? eye : null;
       if (s.body.kind === 'modelled') {
         const f = s.body.fig, k = s.body.scale, speed = Math.hypot(vx, vz) / k;
-        f.root.position.set(c.x, c.y, c.z);
+        f.root.position.set(X, Y, Z);
         f.root.rotation.set(0, yaw + Math.PI, 0);
         f.root.scale.setScalar(k);
         joltRoot(f.root, s.jolt, c.def.body.kind === 'rat' ? c.def.body.length * 0.35 : 0.06, 0.25);
         if (c.def.body.kind === 'rat') limp(f.root, lame, s.walked, c.def.body.length * 0.9, c.def.body.length * 0.5, moving);
         const clip = dead ? 'Die' : blowT < 1 ? 'Bite' : c.state === 'alert' ? 'Rear' : speed > 2.2 ? 'Run' : speed > 0.2 ? 'Scurry' : c.act === 'gnaw' || c.act === 'rummage' ? 'Graze' : 'Sniff';
-        f.play(clip);
+        f.play(s.look.pick(dt, clip, dead || blowT < 1));
         f.pace(s.walked / k);
         if (fresh && !dead) f.hurt();
         f.advance(dt);
       } else if (s.body.kind === 'animal') {
         const speed = Math.hypot(vx, vz);
-        const doing: AnimalDoing = dead ? 'dead' : blowT < 1 ? 'blow' : hurtT < 1 ? 'hurt' : speed > 2.2 ? 'run' : speed > 0.2 ? 'walk'
+        const want: AnimalDoing = dead ? 'dead' : blowT < 1 ? 'blow' : hurtT < 1 ? 'hurt' : speed > 2.2 ? 'run' : speed > 0.2 ? 'walk'
           : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
-        poseAnimal(s.body, c.x, c.y, c.z, yaw, doing, speed, dt, fresh);
+        const doing = s.look.pick(dt, want, dead || blowT < 1 || hurtT < 1) as AnimalDoing;
+        poseAnimal(s.body, X, Y, Z, yaw, doing, speed, dt, fresh);
         if (!dead) joltRoot(s.body.place, s.jolt, 0.14, 0.14);
         if (!dead) limp(s.body.place, lame, s.walked, 1.3, 1, moving);
       } else if (s.body.kind === 'critter') {
         const i = this.input;
         // Its body pushed back from the blow, the feet planted where they stand.
         const push = s.jolt.amount * (c.def.body.kind === 'spider' ? c.def.body.length * 0.3 : 0.05);
-        i.x = c.x + s.jolt.dx * push; i.y = c.y; i.z = c.z + s.jolt.dz * push; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
+        i.x = X + s.jolt.dx * push; i.y = Y; i.z = Z + s.jolt.dz * push; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
         i.running = c.act === 'run' || c.state === 'fight' || c.state === 'flee';
         i.pose = c.act === 'gnaw' || c.act === 'sniff' || c.act === 'rummage' || c.act === 'spin' ? 'feed' : '';
         const O = this.group.position;
         if (watching) { this.eyeWorld[0] = watching[0] + O.x; this.eyeWorld[1] = watching[1] + O.y; this.eyeWorld[2] = watching[2] + O.z; }
         i.lookAt = watching ? this.eyeWorld : null;
-        this.near = c.y;
+        this.near = Y;
         if (blowT < 1 && !dead) { i.action = c.def.body.kind === 'spider' ? 'lunge' : 'bite'; i.actionT = blowT; }
         else if (hurtT < 1 && !dead) { i.action = 'flinch'; i.actionT = hurtT; }
         else { i.action = ''; i.actionT = 0; }
@@ -235,7 +238,7 @@ export class CreatureView {
           action: dead ? null : blowT < 1 ? (c.def.body.kind === 'humanoid' && c.def.body.held === 'knife' ? 'stab' : c.def.body.kind === 'humanoid' && c.def.body.held ? 'swing_1h' : 'slam') : hurtT < 1 ? 'flinch' : null,
           variant: s.variant,
         };
-        const clip = foeClip(c.def, doing);
+        const clip = s.look.pick(dt, foeClip(c.def, doing), dead || !!doing.action);
         // A blow or flinch starts again when a new one comes, even of the same clip.
         const again = (doing.action === 'flinch' && fresh) || (doing.action && doing.action !== 'flinch' && blowT * BLOW < dt + 1e-6);
         if (clip !== p.clip || again) {
@@ -250,7 +253,7 @@ export class CreatureView {
         const gait = p.ch.actor.currentAction, pace = doing.action || dead ? 0 : PACE[clip === 'zombie walk' ? 'walk' : clip];
         if (gait && pace) gait.timeScale = Math.min(1.8, Math.max(0.5, doing.speed / pace));
         p.ch.update(dt);
-        p.place.position.set(c.x, c.y, c.z);
+        p.place.position.set(X, Y, Z);
         // The den's yaw turns −z; Actors' people face +z.
         p.place.rotation.set(0, yaw + Math.PI, 0);
         if (!dead) {

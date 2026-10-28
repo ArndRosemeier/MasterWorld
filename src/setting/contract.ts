@@ -819,6 +819,8 @@ export interface GuildDef extends TrainerDef {
    * nearest it is only where the household lives.
    */
   readonly near: 'smithy' | 'inn' | 'edge' | 'out';
+  /** Fighting is taught in it: its ground floor is a hall (weapon racks, a practice post); else it is furnished as a home. */
+  readonly hall?: boolean;
   readonly hidden?: boolean;
   /** For a hidden house: how the bard tells the way in. */
   readonly way?: string;

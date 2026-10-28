@@ -126,11 +126,13 @@ export function goSpots(h: GoHost): GoSpot[] {
     const name = g.name.replace(/^the /, '');
     add(G, cap(name), async () => {
       const p = h.heroPos();
-      const houses = h.towns().flatMap((x) => x.guilds.filter((k) => k.guild.keeper === g.keeper)).map((k) => ({ k, ...whereOf(k) }));
-      const k = nearestTo(houses, p)?.k;
-      if (!k) return `no ${g.name} in a town planned yet${g.sizes.includes('capital') ? ' (try the capital)' : ''}`;
+      const houses = h.towns().flatMap((x) => x.guilds.filter((k) => k.guild.keeper === g.keeper).map((k) => ({ k, town: x.town, ...whereOf(k) })));
+      const near = nearestTo(houses, p), k = near?.k;
+      if (!near || !k) return `no ${g.name} in a town planned yet${g.sizes.includes('capital') ? ' (try the capital)' : ''}`;
       if (k.out) { const [x, z] = onLand(k.out, 0, 12); return at({ x, z, yaw: k.out.yaw, at: k.out }, g.name); }
-      return at(atDoor(k.b), g.name);
+      // Just inside its door, where the teacher is by day (outside, a side wall can hide which house it is).
+      await h.enter(near.town.decision.id, k.b);
+      return `inside ${g.name}`;
     });
   }
 
