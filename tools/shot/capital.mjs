@@ -96,13 +96,26 @@ else {
     const tx = g.x + ux * s * 34, tz = g.z + uz * s * 34, from = { ...p.walker.pos }, L = Math.hypot(tx - from.x, tz - from.z);
     const town = game.towns.every.find((x) => x.town.decision.size === 'capital');
     let last = performance.now(), worst = 0, worstAt = 0, slow = 0, made = -1, gone = 0, n0 = window.shaders?.events.length ?? 0;
-    const S = window.__span, frames = [];
+    const S = window.__span, frames = [], r = game.view.renderer, scene = game.view.scene;
+    let seen = 0;
+    // What the frame drew: draw calls, triangles, geometries held, and visible meshes under each part of the scene.
+    const drawn = (all) => {
+      const parts = {};
+      // By the scene's parts, and a level down (the floating origin's root holds most of the world).
+      const count = (o, key) => { if (!o.visible) return; if (o.isMesh) parts[key] = (parts[key] ?? 0) + 1; for (const c of o.children) count(c, key); };
+      if (all) for (const c of scene.children) for (const cc of c.children.length ? c.children : [c]) count(cc, `${c.name || c.type}/${cc.name || cc.type}`);
+      return { calls: r.info.render.drawCalls, tris: r.info.render.triangles, geos: r.info.memory.geometries, parts };
+    };
     const step = (now) => {
       const dt = now - last; last = now;
       const ev = window.shaders?.events.slice(n0) ?? []; n0 += ev.length;
       if (gone > 0.5) {
         if (dt > worst) { worst = dt; worstAt = Math.round(L - gone); }
-        if (dt > 25) { slow++; frames.push({ dt, at: Math.round(L - gone), spans: { ...S }, builds: ev.map((e) => `${e.kind} ${e.ms.toFixed(1)} ${e.what}`) }); }
+        const at = Math.round(L - gone);
+        // Counting the meshes takes a moment of its own: only every 60th frame (a slow one gets the renderer's counts).
+        const every = ++seen % 60 === 0;
+        if (dt > 25 || every) frames.push({ dt, at, slow: dt > 25, spans: { ...S }, builds: ev.map((e) => `${e.kind} ${e.ms.toFixed(1)} ${e.what}`), ...drawn(every) });
+        if (dt > 25) slow++;
       }
       for (const k in S) S[k] = 0;
       gone = Math.min(L, gone + (pace * Math.min(dt, 50)) / 1000);
@@ -116,9 +129,13 @@ else {
   console.log(`the way in (${way.L} m at ${PACE} m/s): worst frame ${way.worst.toFixed(0)} ms ${way.worstAt} m from the gate, ${way.slow} frames over 25 ms; its people lived from ${way.made} m out`);
   // Where the slow frames fall (100 m bins, counted from the gate), and what the slowest spent their time on.
   const bins = {};
-  for (const f of way.frames) { const b = Math.floor(f.at / 100) * 100; bins[b] = (bins[b] ?? 0) + 1; }
+  const slowOnes = way.frames.filter((f) => f.slow);
+  for (const f of slowOnes) { const b = Math.floor(f.at / 100) * 100; bins[b] = (bins[b] ?? 0) + 1; }
   console.log(`slow frames by distance from the gate: ${Object.entries(bins).sort((a, b) => b[0] - a[0]).map(([b, n]) => `${b}-${Number(b) + 100} m: ${n}`).join(', ')}`);
-  for (const f of [...way.frames].sort((a, b) => b.dt - a.dt).slice(0, 10)) {
+  // What was drawn along the way (every 60th frame and every slow one): draw calls, triangles, geometries, meshes by part.
+  const row = (f) => `${f.at} m ${f.dt.toFixed(0)} ms${f.slow ? ' SLOW' : ''}: ${f.calls} calls, ${(f.tris / 1e6).toFixed(2)} M tris, ${f.geos} geometries; ${Object.entries(f.parts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${k} ${n}`).join(', ')}`;
+  console.log('drawn along the way:\n' + [...way.frames].sort((a, b) => b.at - a.at).map((f) => '  ' + row(f)).join('\n'));
+  for (const f of [...slowOnes].sort((a, b) => b.dt - a.dt).slice(0, 10)) {
     const known = Object.values(f.spans).reduce((n, v) => n + v, 0);
     console.log(`  ${f.dt.toFixed(0)} ms at ${f.at} m (outside these: ${(f.dt - known).toFixed(0)}): ${Object.entries(f.spans).filter(([, v]) => v >= 0.5).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')}${f.builds.length ? ' | ' + f.builds.join('; ') : ''}`);
   }
