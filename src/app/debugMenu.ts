@@ -9,6 +9,7 @@ import { onKeyDown, swallow } from '../input/keys';
 import type { VgmLine } from '../vgm/vgmLog';
 import { clock } from './dom';
 import type { GoSpot } from './goPlaces';
+import { HITCHES } from './hitchLog';
 
 /** What the debug menu reaches in the running game. */
 export interface DebugHost {
@@ -144,6 +145,9 @@ export class DebugMenu {
       ]],
       ['Show', [
         { label: 'HUD on / off', run: () => { h.hud = !h.hud; } },
+        { label: 'Hitch log (slow frames, what took their time)', run: () => this.printReport(HITCHES.report(40)) },
+        { label: 'Hitch log: copy (to paste in a message)', run: () => { this.copy(`${HITCHES.report()}\n${this.worldLink()}&${this.host.viewParams}`); return 'copied'; } },
+        { label: 'Hitch log: clear', run: () => { HITCHES.clear(); return 'cleared'; } },
         { label: 'Shader report', run: () => (window as unknown as { shaders?: { report?: () => string } }).shaders?.report?.() ?? 'no shader monitor' },
       ]],
     ];
@@ -189,6 +193,13 @@ export class DebugMenu {
   private lines(lines: readonly VgmLine[]): string {
     for (const l of lines) this.print(`${l.at === undefined ? 'start' : `day ${Math.floor(l.at / 24) + 1} ${clock(l.at % 24)}`} · ${l.name}${l.need ? ` (${l.need})` : ''}: ${l.reason}`);
     return `${lines.length} line${lines.length === 1 ? '' : 's'}`;
+  }
+
+  /** A many-line report into the log, a line each (its first line the answer). */
+  private printReport(text: string): string {
+    const [head, ...rest] = text.split('\n');
+    for (const l of rest) this.print(l);
+    return head;
   }
 
   /** This page's URL with this world's seed (any other parameters kept). */
