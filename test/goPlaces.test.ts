@@ -30,13 +30,19 @@ test('places: every way of standing faces what it stands before', () => {
   const c = clearStand(b, (x) => x < site.x);
   assert.ok(c.x < site.x && Math.abs(Math.hypot(c.x - site.x, c.z - site.z) - 20) < 1e-6 && looksAt(c, site.x, site.z));
   assert.equal(clearStand(b, () => false), b);
+  // Before a door: never swung round to a side wall (the door out of sight), only up to 60° off its front.
+  const off = (x: Stand) => Math.abs(Math.atan2(Math.sin(x.yaw - d.yaw), Math.cos(x.yaw - d.yaw)));
+  const front = clearStand(d, (x, z) => Math.hypot(x - d.x, z - d.z) > 3 && off({ x, z, yaw: Math.atan2(x - house.door[0], z - house.door[1]) }) > 1.5);
+  assert.equal(front, d, 'no side stand: it stays before the door');
+  const turned = clearStand(d, (x, z) => Math.hypot(x - d.x, z - d.z) > 1);
+  assert.ok(off(turned) <= Math.PI / 3 + 1e-6 && looksAt(turned, house.door[0], house.door[1]), 'a clear stand within the arc');
 });
 
 test('places: the debug go-to has every kind of place the setting has, and finds or makes each', async () => {
   const town = terrain.towns[0];
   let log: DecisionLog = first;
   let stood: Stand | null = null;
-  const promised: string[] = [];
+  const promised: string[] = [], entered: string[] = [];
   const host: GoHost = {
     setting: classic,
     log: () => log,
@@ -45,7 +51,7 @@ test('places: the debug go-to has every kind of place the setting has, and finds
     towns: () => [{ town, guilds: guildHouses(town.plan, 'town', classic, log.filter((x) => x.kind === 'retreat')) }],
     stand: async (s, pick) => { stood = pick ? pick(s) : s; return stood; },
     clear: () => true,
-    enter: async () => undefined,
+    enter: async (id, b) => { entered.push(`${id}:${b.id}`); },
     below: async () => true,
     open: async () => null,
     promise: (kind) => {
@@ -72,6 +78,10 @@ test('places: the debug go-to has every kind of place the setting has, and finds
   assert.match(await inn.go(), /^inn: /);
   const b = town.plan.buildings.find((x) => x.kind === 'inn')!;
   assert.ok(stood && looksAt(stood, b.door[0], b.door[1]));
+  // A guild house: stepped inside it, where its teacher is (not left outside by a side wall).
+  const witch = guildHouses(town.plan, 'town', classic).find((x) => x.guild.keeper === 'hedge-witch')!;
+  assert.match(await spots.find((s) => s.label === "Hedge witch's cottage")!.go(), /^inside the hedge witch's cottage/);
+  assert.deepEqual(entered, [`${town.decision.id}:${witch.b.id}`]);
   // A land place with none in the log: one is promised, then the hero stands before it.
   const cave = spots.find((s) => s.label === 'Cave')!;
   assert.match(await cave.go(), /^cave test-cave/);

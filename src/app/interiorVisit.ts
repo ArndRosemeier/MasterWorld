@@ -96,9 +96,9 @@ export class InteriorVisit {
     let h = this.houses.get(key);
     if (h) this.houses.delete(key);
     else {
-      // A guild house in the open (not a hidden one) is a hall: a weapon rack and a practice post (D49).
+      // A house where fighting is taught is a hall: a weapon rack and a practice post (D49); the witch keeps a home.
       const g = door.town.guildAt(door.b.id);
-      h = this.lay(door.b, this.cellars.has(key), !!g && !g.guild.hidden, guildSigns(door.town.guilds).get(door.b.id));
+      h = this.lay(door.b, this.cellars.has(key), !!g?.guild.hall && !g.out, guildSigns(door.town.guilds).get(door.b.id));
       h.catch(() => this.houses.delete(key));
     }
     this.houses.set(key, h);
