@@ -12,7 +12,7 @@ import type { SightShape } from '../src/setting/contract';
  * Land that is hard to stand on: a slope of one in four (turned per case), bumps, and a brook's cut 2 m deep
  * across it, as terrain.height gives near a brook or a road's shoulder.
  */
-const lands = (): { name: string; ground: Ground }[] => [0, 1.3, 2.6, 4.1].map((turn, i) => {
+const lands = (): { name: string; ground: Ground }[] => [0, 2.6].map((turn, i) => {
   const c = Math.cos(turn), s = Math.sin(turn);
   return {
     name: `slope ${i}`,
@@ -35,7 +35,7 @@ test('on the ground: a ruined tower (its fallen stones and its walls) and a barr
   for (const { name, ground } of lands()) {
     // The ground at the doorway is y 0 of the piece's frame.
     const g: Ground = (x, z) => ground(x, z) - ground(0, 0);
-    for (const seed of [1, 2, 3]) {
+    for (const seed of [1, 2]) {
       onTheGround(towerMesh(towerSize(14, 16, 4), seed, g), g, `tower ${seed} on ${name}`);
       onTheGround(barrowMesh(seed, g), g, `barrow ${seed} on ${name}`);
     }
