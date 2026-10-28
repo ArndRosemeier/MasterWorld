@@ -89,6 +89,8 @@ else {
   });
   // CAPITAL_PROFILE=1: a CPU profile of the ride's first seconds (where its slow frames bunch); build with
   // `npx vite build --minify false` for readable names.
+  // CAPITAL_WAIT_MS: stand this long before riding (does the work still running behind play make the first frames slow?).
+  if (process.env.CAPITAL_WAIT_MS) await page.waitForTimeout(Number(process.env.CAPITAL_WAIT_MS));
   const profiling = process.env.CAPITAL_PROFILE === '1' ? rideProfile(Number(process.env.CAPITAL_PROFILE_MS ?? 7000)) : null;
   const way = await page.evaluate(([g, m, pace]) => new Promise((done) => {
     const game = window.game, p = game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;
