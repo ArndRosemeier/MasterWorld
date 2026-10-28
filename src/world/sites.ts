@@ -4,13 +4,13 @@
  * towns of their size). Each is laid out from its region decision alone (seeded), in the building mesh format so
  * it draws with the town's one building shader, with the shapes the walker cannot go through. Pure.
  */
-import { Rng, deriveSeed } from '@futuremagic/core';
+import { Rng, deriveSeed, type Ground } from '@futuremagic/core';
 import { distToPoly, ensureCCW, pointInPoly, rect, type BuildingMesh, type Poly } from '@futuremagic/settlement';
 import type { RegionFillDef, SightShape } from '../setting/contract';
 import { settles, type RegionDecision, type SightDecision } from './decisions';
 import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
 import { onLand } from './dungeon/site';
-import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type Tint } from './dungeon/meshKit';
+import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type PlacedMesh, type Tint } from './dungeon/meshKit';
 
 /** What the walker cannot go through: a circle or a polygon (x, z pairs). */
 export type Solid = { readonly x: number; readonly z: number; readonly r: number } | { readonly poly: Poly };
@@ -18,7 +18,7 @@ export type Solid = { readonly x: number; readonly z: number; readonly r: number
 export interface SiteLayout {
   /** The site's middle and its ground height: mesh positions are relative to it. */
   readonly origin: readonly [number, number, number];
-  readonly mesh: BuildingMesh;
+  readonly mesh: PlacedMesh;
   readonly solids: readonly Solid[];
 }
 
@@ -56,7 +56,8 @@ export function layOut(job: SiteJob, height: (x: number, z: number) => number): 
 function laidOut(p: { x: number; z: number; yaw: number; r: number; seed: number }, salt: string, height: (x: number, z: number) => number, draw: (at: At, k: MeshKit, solids: Solid[]) => void): SiteLayout {
   const origin: [number, number, number] = [p.x, height(p.x, p.z), p.z];
   const k = new MeshKit(), solids: Solid[] = [];
-  draw({ x: p.x, z: p.z, yaw: p.yaw, r: p.r, y0: origin[1], height, rng: new Rng(deriveSeed(p.seed, salt)), seed: p.seed }, k, solids);
+  const local: Ground = (lx, lz) => height(lx + p.x, lz + p.z) - origin[1];
+  draw({ x: p.x, z: p.z, yaw: p.yaw, r: p.r, y0: origin[1], height, ground: local, rng: new Rng(deriveSeed(p.seed, salt)), seed: p.seed }, k, solids);
   return { origin, mesh: k.mesh(), solids };
 }
 
@@ -77,6 +78,8 @@ interface At {
   /** The ground at the middle (mesh y 0). */
   readonly y0: number;
   readonly height: (x: number, z: number) => number;
+  /** The ground in the mesh's frame (relative to the middle and y0): what each piece is set on (MeshKit.onGround). */
+  readonly ground: Ground;
   readonly rng: Rng;
   readonly seed: number;
 }
@@ -103,11 +106,13 @@ function appendAt(k: MeshKit, m: BuildingMesh, x: number, y: number, z: number, 
  */
 /** Split logs stacked against a wall: a few rows of rounds, ends out. */
 function stack(at: At, k: MeshKit, x: number, z: number, yaw: number): void {
-  const y = at.height(x, z) - at.y0, lx = x - at.x, lz = z - at.z;
-  for (let row = 0; row < 3; row++) for (let i = 0; i < 5 - row; i++) {
-    const u = (i - (4 - row) / 2) * 0.32;
-    k.box(lx + Math.cos(yaw) * u, y + row * 0.28, lz - Math.sin(yaw) * u, 0.3, 0.28, 0.9, yaw, BuildingMat.Oak, varyTint(at.rng, [150, 118, 86], 0.12));
-  }
+  const lx = x - at.x, lz = z - at.z;
+  k.onGround(at.ground, () => {
+    for (let row = 0; row < 3; row++) for (let i = 0; i < 5 - row; i++) {
+      const u = (i - (4 - row) / 2) * 0.32;
+      k.box(lx + Math.cos(yaw) * u, row * 0.28, lz - Math.sin(yaw) * u, 0.3, 0.28, 0.9, yaw, BuildingMat.Oak, varyTint(at.rng, [150, 118, 86], 0.12));
+    }
+  }, 0.02);
 }
 
 const CANVAS: Tint = [214, 198, 160];
@@ -121,18 +126,18 @@ function camp(at: At, k: MeshKit, solids: Solid[]): void {
   // The fire: a ring of stones round ash.
   for (let i = 0; i < 9; i++) {
     const a = (i / 9) * Math.PI * 2 + r.range(-0.1, 0.1);
-    k.stone(Math.cos(a) * 0.7, fy - 0.12, Math.sin(a) * 0.7, r.range(0.25, 0.38), r.range(0.18, 0.28), r.range(0.22, 0.32), -a, WildMat.Rock, varyTint(r, ROCK, 0.1), r, 0.03, 0.6);
+    k.onGround(at.ground, () => k.stone(Math.cos(a) * 0.7, 0, Math.sin(a) * 0.7, r.range(0.25, 0.38), r.range(0.18, 0.28), r.range(0.22, 0.32), -a, WildMat.Rock, varyTint(r, ROCK, 0.1), r, 0.03, 0.6), 0.12);
   }
   k.flat(-0.5, -0.5, 0.5, 0.5, fy + 0.03, true, CellarMat.Earth, [40, 36, 32]);
   solids.push({ x: at.x, z: at.z, r: 0.9 });
   // Logs to sit on, between the tents.
   for (let i = 0; i < n; i++) {
     const a = ((i + 0.5) / n) * Math.PI * 2 + at.yaw, [lx, lz] = onCircle(at, a, 2);
-    k.box(lx - at.x, at.height(lx, lz) - at.y0 - 0.08, lz - at.z, 1.6, 0.36, 0.36, -a + Math.PI / 2, BuildingMat.Oak, varyTint(r, [128, 100, 76], 0.1));
+    k.onGround(at.ground, () => k.box(lx - at.x, 0, lz - at.z, 1.6, 0.36, 0.36, -a + Math.PI / 2, BuildingMat.Oak, varyTint(r, [128, 100, 76], 0.1)), 0.08);
   }
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + at.yaw + r.range(-0.2, 0.2), [tx, tz] = onCircle(at, a, r.range(4.8, 5.8));
-    tent(at, k, tx, tz, a, r.range(2.4, 3), r.range(1.9, 2.3), r.range(1.4, 1.7));
+    k.onGround(at.ground, () => tent(at, k, tx, tz, a, r.range(2.4, 3), r.range(1.9, 2.3), r.range(1.4, 1.7)), 0.05);
     solids.push({ x: tx, z: tz, r: 1.5 });
   }
   const [wx, wz] = onCircle(at, at.yaw + Math.PI + 0.6, 7.5);
@@ -146,7 +151,8 @@ function camp(at: At, k: MeshKit, solids: Solid[]): void {
 function tent(at: At, k: MeshKit, x: number, z: number, a: number, len: number, wide: number, high: number): void {
   // Along the ridge: from the opening (towards the middle) to the back.
   const ax = -Math.cos(a), az = -Math.sin(a), bx = -az, bz = ax;
-  const y = Math.min(...[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => at.height(x + ax * s * len / 2 + bx * t * wide / 2, z + az * s * len / 2 + bz * t * wide / 2))) - at.y0 - 0.05;
+  // Drawn on y 0: the camp sets it on the ground (MeshKit.onGround).
+  const y = 0;
   const onTent = (s: number, t: number, h: number) => [x - at.x + ax * s + bx * t, y + h, z - at.z + az * s + bz * t];
   const L = len / 2, W = wide / 2, tint = varyTint(at.rng, CANVAS, 0.08);
   const shade: Tint = [Math.round(tint[0] * 0.8), Math.round(tint[1] * 0.8), Math.round(tint[2] * 0.8)];
@@ -190,9 +196,9 @@ function ruin(at: At, k: MeshKit, solids: Solid[]): void {
       if (v0 === -D && v1 === -D && Math.abs(u) < 0.9) continue;
       const h = Math.max(0, 0.4 + 2.6 * (0.5 + 0.5 * Math.sin(along / 5.5 + phase)) * r.range(0.6, 1.1) - (r.chance(0.15) ? 2 : 0));
       if (h < 0.25) continue;
-      const [x, z] = inHall(u, v), y = at.height(x, z) - at.y0;
+      const [x, z] = inHall(u, v);
       const yaw = at.yaw + Math.atan2(-(v1 - v0), u1 - u0);
-      k.stone(x - at.x, y - 0.4, z - at.z, len / n + 0.04, h + 0.4, thick, yaw, BuildingMat.Ashlar, varyTint(r, h < 1 ? MOSS : WALL, 0.06), r, 0.04, 0.06);
+      k.onGround(at.ground, () => k.stone(x - at.x, 0, z - at.z, len / n + 0.04, h + 0.4, thick, yaw, BuildingMat.Ashlar, varyTint(r, h < 1 ? MOSS : WALL, 0.06), r, 0.04, 0.06), 0.4);
       const hx = (len / n) / 2, hz = thick / 2, cy = Math.cos(yaw), sy = Math.sin(yaw);
       solids.push({ poly: ensureCCW(rect(x - hx * cy - hz * sy, z + hx * sy - hz * cy, cy, -sy, sy, cy, hx * 2, hz * 2)) });
     }
@@ -200,13 +206,13 @@ function ruin(at: At, k: MeshKit, solids: Solid[]): void {
   }
   // The stump of a round tower at a back corner.
   const [tx, tz] = inHall(r.chance(0.5) ? W : -W, D);
-  k.cylinder(tx - at.x, at.height(tx, tz) - at.y0 - 0.5, tz - at.z, 1.7, r.range(3.5, 5.5), 12, BuildingMat.Rubble, varyTint(r, WALL, 0.05));
+  k.onGround(at.ground, () => k.cylinder(tx - at.x, 0, tz - at.z, 1.7, r.range(3.5, 5.5), 12, BuildingMat.Rubble, varyTint(r, WALL, 0.05)), 0.5);
   solids.push({ x: tx, z: tz, r: 1.7 });
   // Blocks fallen from the walls, half in the grass.
   for (let i = 0; i < 14; i++) {
     const a = r.range(0, Math.PI * 2), d = r.range(2, at.r - 2), [x, z] = onCircle(at, a, d);
     const sz = r.range(0.4, 0.9);
-    k.stone(x - at.x, at.height(x, z) - at.y0 - sz * 0.35, z - at.z, sz * 1.4, sz, sz, r.range(0, 3), BuildingMat.Ashlar, varyTint(r, MOSS, 0.1), r, 0.08, 0.3);
+    k.onGround(at.ground, () => k.stone(x - at.x, 0, z - at.z, sz * 1.4, sz, sz, r.range(0, 3), BuildingMat.Ashlar, varyTint(r, MOSS, 0.1), r, 0.08, 0.3), sz * 0.35);
   }
 }
 
@@ -218,7 +224,10 @@ function barrows(at: At, k: MeshKit, solids: Solid[]): void {
     const [x, z] = placed.length ? onCircle(at, r.range(0, Math.PI * 2), r.range(R + 2, at.r - R)) : [at.x, at.z];
     if (placed.some((p) => Math.hypot(p.x - x, p.z - z) < p.R + R + 3)) continue;
     placed.push({ x, z, R });
-    appendAt(k, sealedBarrowMesh(deriveSeed(at.seed, 'mound', i)), x - at.x, at.height(x, z) - at.y0 - 0.05, z - at.z, r.range(0, Math.PI * 2), scale);
+    // The mound is made in its own frame (turned, scaled), on the land as it lies there: its skirt and kerbstones go down into it.
+    const turn = r.range(0, Math.PI * 2), y = at.height(x, z) - at.y0 - 0.05, c = Math.cos(turn), sn = Math.sin(turn);
+    const own: Ground = (mx, mz) => (at.ground(x - at.x + (mx * c + mz * sn) * scale, z - at.z + (-mx * sn + mz * c) * scale) - y) / scale;
+    k.footed(() => appendAt(k, sealedBarrowMesh(deriveSeed(at.seed, 'mound', i), own), x - at.x, y, z - at.z, turn, scale));
     solids.push({ x, z, r: R * 0.95 });
   }
 }
@@ -230,43 +239,52 @@ function stoneRing(at: At, k: MeshKit, solids: Solid[]): void {
   const r = at.rng, n = r.int(7, 9), R = r.range(3.6, 4.6), fallen = r.int(0, n - 1);
   for (let i = 0; i < n; i++) {
     const a = at.yaw + (i / n) * Math.PI * 2 + r.range(-0.08, 0.08), [x, z] = onCircle(at, a, R);
-    const y = at.height(x, z) - at.y0, tint = varyTint(r, r.chance(0.4) ? MOSS : OLD_STONE, 0.08);
-    if (i === fallen) { k.stone(x - at.x, y - 0.2, z - at.z, 0.7, 0.5, r.range(2, 2.6), -a, WildMat.Rock, tint, r, 0.08, 0.35); continue; }
-    k.stone(x - at.x, y - 0.3, z - at.z, r.range(0.6, 0.9), r.range(1.8, 2.8), r.range(0.35, 0.5), -a + Math.PI / 2, WildMat.Rock, tint, r, 0.08, 0.25);
+    const tint = varyTint(r, r.chance(0.4) ? MOSS : OLD_STONE, 0.08);
+    if (i === fallen) { k.onGround(at.ground, () => k.stone(x - at.x, 0, z - at.z, 0.7, 0.5, r.range(2, 2.6), -a, WildMat.Rock, tint, r, 0.08, 0.35), 0.2); continue; }
+    k.onGround(at.ground, () => k.stone(x - at.x, 0, z - at.z, r.range(0.6, 0.9), r.range(1.8, 2.8), r.range(0.35, 0.5), -a + Math.PI / 2, WildMat.Rock, tint, r, 0.08, 0.25), 0.3);
     solids.push({ x, z, r: 0.45 });
   }
 }
 
 /** A tall carved waystone on a footing block, where an old road once ran. */
 function waystone(at: At, k: MeshKit, solids: Solid[]): void {
-  const r = at.rng, y = at.height(at.x, at.z) - at.y0;
-  k.stone(0, y - 0.3, 0, 1.4, 0.6, 1.4, at.yaw, BuildingMat.Ashlar, varyTint(r, MOSS, 0.08), r, 0.05, 0.15);
-  k.stone(0, y + 0.25, 0, 0.6, r.range(2.2, 2.8), 0.45, at.yaw, BuildingMat.Ashlar, varyTint(r, OLD_STONE, 0.06), r, 0.03, 0.12);
+  const r = at.rng;
+  // The stone on its footing, set on the ground as one.
+  k.onGround(at.ground, () => {
+    k.stone(0, -0.3, 0, 1.4, 0.6, 1.4, at.yaw, BuildingMat.Ashlar, varyTint(r, MOSS, 0.08), r, 0.05, 0.15);
+    k.stone(0, 0.25, 0, 0.6, r.range(2.2, 2.8), 0.45, at.yaw, BuildingMat.Ashlar, varyTint(r, OLD_STONE, 0.06), r, 0.03, 0.12);
+  }, 0.3);
   solids.push({ x: at.x, z: at.z, r: 0.8 });
 }
 
 /** A cairn: a heap of field stones, piled to a point. */
 function cairn(at: At, k: MeshKit, solids: Solid[]): void {
-  const r = at.rng, y = at.height(at.x, at.z) - at.y0;
-  for (let layer = 0; layer < 5; layer++) {
-    const ring = Math.max(1, 7 - layer * 2), R = 1.1 - layer * 0.25;
-    for (let i = 0; i < ring; i++) {
-      const a = (i / ring) * Math.PI * 2 + layer * 0.7 + r.range(-0.2, 0.2), sz = r.range(0.35, 0.55) - layer * 0.04;
-      // Laid round the heap, long side along it.
-      k.stone(Math.cos(a) * R, y - 0.1 + layer * 0.32, Math.sin(a) * R, sz * 1.3, sz, sz, Math.PI / 2 - a, WildMat.Rock, varyTint(r, ROCK, 0.12), r, 0.08, 0.5);
+  const r = at.rng;
+  // The heap set on the ground as one.
+  k.onGround(at.ground, () => {
+    for (let layer = 0; layer < 5; layer++) {
+      const ring = Math.max(1, 7 - layer * 2), R = 1.1 - layer * 0.25;
+      for (let i = 0; i < ring; i++) {
+        const a = (i / ring) * Math.PI * 2 + layer * 0.7 + r.range(-0.2, 0.2), sz = r.range(0.35, 0.55) - layer * 0.04;
+        // Laid round the heap, long side along it.
+        k.stone(Math.cos(a) * R, -0.1 + layer * 0.32, Math.sin(a) * R, sz * 1.3, sz, sz, Math.PI / 2 - a, WildMat.Rock, varyTint(r, ROCK, 0.12), r, 0.08, 0.5);
+      }
     }
-  }
+  }, 0.1);
   solids.push({ x: at.x, z: at.z, r: 1.3 });
 }
 
 /** A stash: a flat stone leant against a boulder, a bundle in oilcloth showing under it. */
 function stash(at: At, k: MeshKit, solids: Solid[]): void {
-  const r = at.rng, y = at.height(at.x, at.z) - at.y0;
-  k.stone(0, y - 0.4, 0, 1.8, 1.4, 1.5, at.yaw, WildMat.Rock, varyTint(r, MOSS, 0.1), r, 0.1, 0.55);
+  const r = at.rng;
+  k.onGround(at.ground, () => k.stone(0, 0, 0, 1.8, 1.4, 1.5, at.yaw, WildMat.Rock, varyTint(r, MOSS, 0.1), r, 0.1, 0.55), 0.4);
   // In front of the boulder (towards the way the hero comes from): the slab, and the bundle under it.
   const front = Math.PI / 2 - at.yaw, [sx, sz] = onCircle(at, front, 1.1), [bx, bz] = onCircle(at, front, 1.4);
   const fx = sx - at.x, fz = sz - at.z;
-  k.box(bx - at.x, y + 0.05, bz - at.z, 0.55, 0.3, 0.4, at.yaw, CellarMat.Limewash, [92, 84, 62]);
-  k.stone(fx, y - 0.05, fz, 1.2, 0.18, 0.9, at.yaw + 0.3, WildMat.Rock, varyTint(r, ROCK, 0.08), r, 0.04, 0.2);
+  // The slab and the bundle under it, set on the ground as one.
+  k.onGround(at.ground, () => {
+    k.box(bx - at.x, 0.1, bz - at.z, 0.55, 0.3, 0.4, at.yaw, CellarMat.Limewash, [92, 84, 62]);
+    k.stone(fx, 0, fz, 1.2, 0.18, 0.9, at.yaw + 0.3, WildMat.Rock, varyTint(r, ROCK, 0.08), r, 0.04, 0.2);
+  }, 0.05);
   solids.push({ x: at.x, z: at.z, r: 1.1 });
 }

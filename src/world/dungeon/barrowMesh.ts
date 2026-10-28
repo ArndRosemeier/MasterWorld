@@ -2,12 +2,15 @@
  * A barrow as it stands on the land (pure): a grassed mound ringed with kerbstones, its passage banked
  * over with earth that slopes down onto a portal of rough rock (two jambs, a lintel) and a dark way in, in
  * the building mesh format so it draws with the town's one building shader. Its own frame: the doorway at
- * the origin, the way in towards −z (turn it by the site's yaw), the ground at y 0. `inBarrowShape` says
+ * the origin, the way in towards −z (turn it by the site's yaw), the ground at the doorway at y 0, `ground` the
+ * land's height in that frame (the skirts go down into it, the kerbstones lie on it). `inBarrowShape` says
  * where the walker cannot go (the mound, its bank and the stones).
  */
-import { Rng } from '@futuremagic/core';
-import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type Tint } from './meshKit';
-import type { BuildingMesh } from '@futuremagic/settlement';
+import { Rng, type Ground } from '@futuremagic/core';
+import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, LEVEL, type PlacedMesh, type Tint } from './meshKit';
+
+/** How far a skirt goes below the ground under it at least (m). */
+const SKIRT_UNDER = 0.5;
 
 /** The mound: radius and height (m), and how far behind the doorway its middle is. */
 export const MOUND = { r: 7, h: 2.8, back: 9.6 } as const;
@@ -35,40 +38,44 @@ const DARK: Tint = [10, 9, 8];
 
 const mix = (a: Tint, b: Tint, t: number): Tint => [0, 1, 2].map((i) => Math.round(a[i] + (b[i] - a[i]) * t)) as unknown as Tint;
 
-export function barrowMesh(seed = 1): BuildingMesh {
-  const k = new MeshKit(), rng = new Rng(seed);
-  mound(k);
-  bank(k);
-  passage(k, rng);
-  kerb(k, rng);
-  return k.mesh();
+export function barrowMesh(seed = 1, ground: Ground = LEVEL): PlacedMesh {
+  return barrowOf(seed, ground, false);
 }
 
 /**
  * A barrow long sealed (a barrow field's, B1): the same mound under grass, ringed all round with
  * kerbstones and no way in. Its own frame: the mound's middle at the origin, the ground at y 0.
  */
-export function sealedBarrowMesh(seed = 1): BuildingMesh {
+export function sealedBarrowMesh(seed = 1, ground: Ground = LEVEL): PlacedMesh {
+  return barrowOf(seed, ground, true);
+}
+
+/** A barrow with its way in (its mound behind the doorway), or sealed (its mound's middle at the origin). */
+function barrowOf(seed: number, ground: Ground, sealed: boolean): PlacedMesh {
   const k = new MeshKit(), rng = new Rng(seed);
-  mound(k, 0);
-  kerb(k, rng, true);
+  mound(k, ground, sealed ? 0 : MOUND.back);
+  if (!sealed) { bank(k, ground); passage(k, rng); }
+  kerb(k, rng, ground, sealed);
   return k.mesh();
 }
 
 /** The mound: rings of a flattened dome under grass, then a skirt into the ground (the land is never quite level). */
-function mound(k: MeshKit, back: number = MOUND.back): void {
+function mound(k: MeshKit, ground: Ground, back: number = MOUND.back): void {
   const seg = 28, rings = 7, start = k.mark;
   // Grass laid round the dome (u, along its rings) and down it (v, from the top), in metres near enough.
   const down = (Math.PI / 4) * (MOUND.r + MOUND.h);
   const ringPoint = (ring: number, s: number): { p: number[]; uv: number[] } => {
     const phi = (ring / rings) * (Math.PI / 2), a = (s / seg) * Math.PI * 2;
-    const r = ring > rings ? MOUND.r : MOUND.r * Math.sin(phi), y = ring > rings ? -2 : MOUND.h * Math.cos(phi);
-    return { p: [Math.cos(a) * r, y, -back + Math.sin(a) * r], uv: [a * Math.max(1.5, r), ring > rings ? down + 2 : (ring / rings) * down] };
+    const r = ring > rings ? MOUND.r : MOUND.r * Math.sin(phi), x = Math.cos(a) * r, z = -back + Math.sin(a) * r;
+    const y = ring > rings ? Math.min(-2, ground(x, z) - SKIRT_UNDER) : MOUND.h * Math.cos(phi);
+    return { p: [x, y, z], uv: [a * Math.max(1.5, r), ring > rings ? down + 2 : (ring / rings) * down] };
   };
-  for (let i = 0; i <= rings; i++) for (let s = 0; s < seg; s++) {
-    const q = [ringPoint(i, s), ringPoint(i, s + 1), ringPoint(i + 1, s + 1), ringPoint(i + 1, s)];
-    k.quad(q[0].p, q[1].p, q[2].p, q[3].p, q.map((e) => e.uv), WildMat.Grass, GRASS);
-  }
+  k.footed(() => {
+    for (let i = 0; i <= rings; i++) for (let s = 0; s < seg; s++) {
+      const q = [ringPoint(i, s), ringPoint(i, s + 1), ringPoint(i + 1, s + 1), ringPoint(i + 1, s)];
+      k.quad(q[0].p, q[1].p, q[2].p, q[3].p, q.map((e) => e.uv), WildMat.Grass, GRASS);
+    }
+  });
   k.smoothFrom(start);
 }
 
@@ -76,7 +83,7 @@ function mound(k: MeshKit, back: number = MOUND.back): void {
  * The earth heaped over the passage and against the portal: a ridge from the mound that slopes down at the
  * front onto the jambs and the lintel, so only their faces stand out of it.
  */
-function bank(k: MeshKit): void {
+function bank(k: MeshKit, ground: Ground): void {
   const n = 16, start = k.mark;
   // A point at angle θ (0 the right foot, π the left) on the portal's outline and on the bank's full arch.
   const sink = (th: number) => 0.45 * (1 - Math.sin(th)) ** 3;
@@ -98,7 +105,8 @@ function bank(k: MeshKit): void {
     }
     // A skirt at either foot into the ground.
     const R = out[0].p, L = out[n].p;
-    return [{ p: [R[0] + 0.5, -1.6, r.z], t: out[0].t }, ...out, { p: [L[0] - 0.5, -1.6, r.z], t: out[n].t }];
+    const skirt = (x: number) => Math.min(-1.6, ground(x, r.z) - SKIRT_UNDER);
+    return [{ p: [R[0] + 0.5, skirt(R[0] + 0.5), r.z], t: out[0].t }, ...out, { p: [L[0] - 0.5, skirt(L[0] - 0.5), r.z], t: out[n].t }];
   };
   // Grass laid over the arch (u, metres along each ring from its right foot) and along the bank (v, its z).
   const all = rings.map(ring).map((pts) => {
@@ -140,19 +148,21 @@ function passage(k: MeshKit, rng: Rng): void {
 }
 
 /** A ring of half-sunk kerbstones round the mound's foot, and a boulder or two holding each foot of the bank. */
-function kerb(k: MeshKit, rng: Rng, sealed = false): void {
+function kerb(k: MeshKit, rng: Rng, ground: Ground, sealed = false): void {
   // Round from one side of the bank to the other, behind (sealed: all round); each stone along the ring (yaw a quarter turn on).
   const gap = sealed ? 0 : Math.asin(BANK.half / MOUND.r) + 0.12, from = Math.PI / 2 + gap, count = sealed ? 30 : 26;
   const step = (2 * Math.PI - 2 * gap) / (sealed ? count : count - 1), quarter = -Math.PI / 2, back = sealed ? 0 : MOUND.back;
   for (let i = 0; i < count; i++) {
     const a = from + (i + rng.range(-0.25, 0.25)) * step;
     const r = MOUND.r - 0.1, x = Math.cos(a) * r, z = -back + Math.sin(a) * r;
-    k.stone(x, -0.4, z, rng.range(0.7, 1.1), rng.range(0.6, 0.95), rng.range(0.55, 0.8), quarter - a + rng.range(-0.15, 0.15), WildMat.Rock, varyTint(rng, ROCK, 0.08), rng, 0.08, 0.5);
+    const sx = rng.range(0.7, 1.1), sy = rng.range(0.6, 0.95), sz = rng.range(0.55, 0.8), turn = quarter - a + rng.range(-0.15, 0.15), tint = varyTint(rng, ROCK, 0.08);
+    k.onGround(ground, () => k.stone(x, 0, z, sx, sy, sz, turn, WildMat.Rock, tint, rng, 0.08, 0.5), 0.4);
   }
   if (sealed) return;
   for (const side of [-1, 1]) for (let j = 0; j < 2; j++) {
     const s = rng.range(0.55, 0.9);
-    k.stone(side * (BANK.half - 0.35 - j * 0.5), -0.35, PASSAGE.front - 0.6 - j * 1.1 - rng.range(0, 0.3), s * 1.2, s * 0.8, s, rng.range(0, 3), WildMat.Rock, varyTint(rng, ROCK, 0.08), rng, 0.1, 0.55);
+    const z = PASSAGE.front - 0.6 - j * 1.1 - rng.range(0, 0.3), turn = rng.range(0, 3), tint = varyTint(rng, ROCK, 0.08);
+    k.onGround(ground, () => k.stone(side * (BANK.half - 0.35 - j * 0.5), 0, z, s * 1.2, s * 0.8, s, turn, WildMat.Rock, tint, rng, 0.1, 0.55), 0.35);
   }
 }
 

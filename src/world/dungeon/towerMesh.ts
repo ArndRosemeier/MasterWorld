@@ -3,11 +3,12 @@
  * string courses and arrow slits, broken off at the top (one corner fallen lower than the rest), fallen
  * masonry heaped round its foot, and a doorway into the dark at the front, in the building mesh format so
  * it draws with the town's one building shader. Its own frame: the doorway at the origin, the way in
- * towards −z (turn it by the site's yaw), the ground at y 0. `inTowerShape` says where the walker cannot go.
+ * towards −z (turn it by the site's yaw), the ground at the doorway at y 0, `ground` the land's height in that
+ * frame: the walls go down into it wherever it falls away, and the fallen stones lie on it (MeshKit.onGround).
+ * `inTowerShape` says where the walker cannot go.
  */
-import { Rng, smoothstep } from '@futuremagic/core';
-import type { BuildingMesh } from '@futuremagic/settlement';
-import { BuildingMat, MeshKit, WildMat, mixTint, scaleTint, type Tint } from './meshKit';
+import { Rng, seatHeight, smoothstep, type Ground } from '@futuremagic/core';
+import { BuildingMat, MeshKit, WildMat, mixTint, scaleTint, LEVEL, type PlacedMesh, type Tint } from './meshKit';
 
 /** The keep: half its width, its depth (from the front wall back), the walls' thickness, metres. */
 export interface TowerSize { readonly half: number; readonly depth: number; readonly storeys: number }
@@ -16,8 +17,11 @@ const WALL = 1.3;
 export const TOWER_DOOR = { half: 0.75, h: 2.5, deep: 2.6 } as const;
 /** Where in the doorway the hero goes in (its frame). */
 export const TOWER_WAY_IN = { x: 0, z: -1.6 } as const;
-/** How far the walls go down into the ground (a keep's foot on ground a little uneven), metres. */
+/** How far the walls go down into the ground at least (a keep's foot on ground a little uneven), metres. */
 const FOOT = 2.2;
+/** How far below the lowest ground under it a pier's foot goes where the land falls away more than FOOT, metres. */
+const FOOT_UNDER = 0.6;
+
 /** Height of a storey on the outside, metres. */
 const STOREY_OUT = 3.4;
 
@@ -34,7 +38,7 @@ export function towerSize(w: number, d: number, storeys: number): TowerSize {
   return { half: Math.max(5, Math.min(9, w * 0.4)), depth: Math.max(10, Math.min(18, d * 0.8)), storeys: Math.max(3, Math.min(5, storeys)) };
 }
 
-export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
+export function towerMesh(size: TowerSize, seed = 1, ground: Ground = LEVEL): PlacedMesh {
   const k = new MeshKit(), rng = new Rng(seed);
   const { half, depth } = size;
   const top = size.storeys * STOREY_OUT + 1.2;
@@ -70,11 +74,13 @@ export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
       // Rain runs down some piers from the top, further where the wall has broken.
       const look: Weather = { streak: rng.chance(0.6) ? rng.range(0.6, 1) : 0, down: rng.range(2, 5) + (top - h) * 0.3 };
       const run = (y0: number, y1: number) => pier(k, ax, az, ux, uz, t0, t1, y0, y1, tint, look);
+      // Its foot: FOOT down, deeper where the land under it falls away (a keep on a slope).
+      const foot = Math.min(-FOOT, seatHeight(ground, cx, cz, w / 2 + 0.05, WALL / 2 + 0.05, yaw, FOOT_UNDER));
       if (front && Math.abs(cx) < TOWER_DOOR.half + 0.5 && Math.abs(cx) < TOWER_DOOR.half) { run(TOWER_DOOR.h, h); continue; }
       // A window on the upper storeys: the pier stands round a dark opening.
       const win = s === mid && !front;
-      if (win) {
-        let y = -FOOT;
+      if (win) k.footed(() => {
+        let y = foot;
         for (let st = 2; st < size.storeys && st * STOREY_OUT + 2 < h; st++) {
           const wy = st * STOREY_OUT + 0.7;
           run(y, wy);
@@ -82,7 +88,8 @@ export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
           y = wy + 1.4;
         }
         run(y, h);
-      } else run(-FOOT, h);
+      });
+      else k.footed(() => run(foot, h));
       // A string course at every storey, and an arrow slit (dark) on some of the piers.
       for (let st = 1; st < size.storeys && st * STOREY_OUT < h - 0.4; st++) {
         k.box(cx - ix * 0.08, st * STOREY_OUT - 0.12, cz - iz * 0.08, w + 0.03, 0.22, WALL + 0.16, yaw, BuildingMat.Ashlar, mixTint(COURSE, LICHEN, rng.range(0.3, 0.8)));
@@ -112,7 +119,9 @@ export function towerMesh(size: TowerSize, seed = 1): BuildingMesh {
     const s = rng.range(0.4, 0.95);
     // Lighter or darker and greened by the weather, never another hue.
     const fell = mixTint(scaleTint(STONE, rng.range(0.82, 1.02)), LICHEN, rng.range(0, 0.45));
-    k.stone(bx, -0.25, bz, s * rng.range(1, 1.6), s * 0.7, s, rng.range(0, 3), BuildingMat.Ashlar, fell, rng, 0.08, 0.35);
+    const sx = s * rng.range(1, 1.6), turn = rng.range(0, 3);
+    // Half in the grass, wherever the land lies (they floated round a keep on a slope).
+    k.onGround(ground, () => k.stone(bx, 0, bz, sx, s * 0.7, s, turn, BuildingMat.Ashlar, fell, rng, 0.08, 0.35), s * 0.3);
   }
   return k.mesh();
 }

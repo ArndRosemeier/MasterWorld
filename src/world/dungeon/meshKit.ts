@@ -3,8 +3,18 @@
  * @futuremagic/settlement (positions, normals, uv in metres, a material layer and a tint per vertex), so
  * dungeons draw with the town's one building shader.
  */
-import type { Rng } from '@futuremagic/core';
+import { SEAT_SINK, floatOf, seat, type Ground, type Rng } from '@futuremagic/core';
 import { BuildingMat, type BuildingMesh } from '@futuremagic/settlement';
+
+/**
+ * A mesh with the pieces that stand on the ground marked: `grounded` holds [from, to) pairs of offsets into
+ * `position` (x, y, z triples), one pair per piece (MeshKit.onGround, MeshKit.footed), so a test can scan
+ * that none of them floats (`floating`).
+ */
+/** Level land at y 0: the ground for a piece drawn on its own (a preview, a test). */
+export const LEVEL: Ground = () => 0;
+
+export interface PlacedMesh extends BuildingMesh { readonly grounded: Uint32Array }
 
 export type Tint = readonly [number, number, number];
 
@@ -15,6 +25,8 @@ export class MeshKit {
   private mat: number[] = [];
   private tint: number[] = [];
   private idx: number[] = [];
+  /** The pieces on the ground: [from, to) offsets into `p`. */
+  private placed: number[] = [];
 
   get empty(): boolean { return this.idx.length === 0; }
   /** How many vertices so far (smoothFrom from here). */
@@ -198,12 +210,43 @@ export class MeshKit {
     }
   }
 
-  mesh(): BuildingMesh {
+  /**
+   * THE way to put a loose thing on the land (a stone, a log, a tent, a cairn): what `draw` adds is drawn at
+   * any height, then set on `ground` (in the kit's frame) by core `seat`: lowered or raised so its foot is
+   * `sink` below the lowest ground under it. On a slope its uphill side goes into the ground and no edge floats.
+   * Several things drawn in one call keep their places to each other (a waystone on its footing).
+   */
+  onGround(ground: Ground, draw: () => void, sink = SEAT_SINK): void {
+    const from = this.p.length;
+    draw();
+    seat(ground, this.p, from, this.p.length, sink);
+    this.placed.push(from, this.p.length);
+  }
+
+  /** A piece whose builder sets its own foot into the ground (a wall's pier, a mound's skirt): only marked, so scans check it too. */
+  footed(draw: () => void): void {
+    const from = this.p.length;
+    draw();
+    this.placed.push(from, this.p.length);
+  }
+
+  mesh(): PlacedMesh {
     return {
       position: Float32Array.from(this.p), normal: Float32Array.from(this.n), uv: Float32Array.from(this.uv),
       mat: Uint8Array.from(this.mat), tint: Uint8Array.from(this.tint), index: Uint32Array.from(this.idx),
+      grounded: Uint32Array.from(this.placed),
     };
   }
+}
+
+/** The pieces of `m` on the ground that float over `ground` (in the mesh's frame): their index and by how much (m). */
+export function floating(m: PlacedMesh, ground: Ground, tolerance = 1e-4): { piece: number; by: number }[] {
+  const out: { piece: number; by: number }[] = [];
+  for (let i = 0; i + 1 < m.grounded.length; i += 2) {
+    const by = floatOf(ground, m.position, m.grounded[i], m.grounded[i + 1]);
+    if (by > tolerance) out.push({ piece: i / 2, by });
+  }
+  return out;
 }
 
 /** A box's corners, centred at (x, y0 + sy/2, z) and turned by yaw about +y: the bottom four, then the top four. */
