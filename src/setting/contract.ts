@@ -149,6 +149,39 @@ export interface WorldShape {
   readonly livestock: LivestockKind;
   /** The landforms the biomes' mixes name (D55); none if absent. */
   readonly landforms?: readonly LandformDef[];
+  /** The kinds of country (D55, plan 5.9), each stretch of 5-20 km one of them; all open country if absent. */
+  readonly kinds?: readonly LandscapeKindDef[];
+}
+
+/**
+ * A kind of country (D55, plan 5.9): the skeleton gives each stretch of 5-20 km one, by share, with a border
+ * a kilometre or two wide. A kind sets the big shapes (mesa country's plateaus) and the landforms; one with
+ * neither is the open country of hills, plains and the biomes' own landforms.
+ */
+export interface LandscapeKindDef {
+  readonly id: string;
+  /** Relative share of the land. */
+  readonly share: number;
+  /** Mesa country: flat-topped plateaus with cliff walls. */
+  readonly mesa?: MesaDef;
+  /** Its own landforms (instead of the biome's), on the valley floors and plateau tops alike. */
+  readonly landforms?: LandformMix;
+}
+
+/** Mesa country (D55, D56): plateaus with cliff walls, talus at their feet, valleys and canyons between. */
+export interface MesaDef {
+  /** Height of the plateaus over the valley floors, metres (each plateau its own). */
+  readonly height: readonly [number, number];
+  /** Share of the land the plateaus cover, 0..1. */
+  readonly cover: number;
+  /** Typical width of a plateau, metres. */
+  readonly size: number;
+  /** Steepness of the cliff walls, rise per metre. */
+  readonly steep: readonly [number, number];
+  /** Share of the cliff line that is a pass (a ramp of fallen rock or a gully up), 0..1. */
+  readonly passes: number;
+  /** How many steps the walls come in, at most (a bench between). */
+  readonly tiers: number;
 }
 
 /** Farm animals the game can draw. Sheep and pigs join when Actors has them. */

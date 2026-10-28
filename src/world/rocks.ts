@@ -9,7 +9,7 @@
  *
  * Pure, runs in workers.
  */
-import { Rng, seatHeight } from '@futuremagic/core';
+import { Rng, hash2i, seatHeight } from '@futuremagic/core';
 import { ROCK_SHAPES, rockModel, type RockShape } from '@futuremagic/rocks';
 import { FORM_CELL, type Landform } from './landforms';
 import type { Terrain } from './terrain';
@@ -109,16 +109,45 @@ export function rocksOf(f: Landform): number[] {
 /** A landform's phase (as world/landforms.ts shapeAt reads it from its seed). */
 const phaseOf = (f: Landform): number => (f.seed % 1000) / 159.2;
 
+/** Spacing of the spots where blocks may lie at a mesa wall's foot (metres). */
+const TALUS_STEP = 11;
+
 /**
- * The rocks of the landforms whose middle lies in the square [x0, x0 + size)² (ROCK_STRIDE floats each), set
- * on the ground; none in water or on a road.
+ * Blocks fallen from mesa walls in the square [x0, x0 + size)² (x, z, scale, yaw, kind each, as `rocksOf`):
+ * strewn over each wall's talus apron, thicker where a pass is a ramp of fallen rock. From the square's own
+ * seed, so they never move.
+ */
+export function talusOf(t: Terrain, x0: number, z0: number, size: number): number[] {
+  const sk = t.skeleton, out: number[] = [];
+  if (Math.max(sk.mesaWeight(x0, z0), sk.mesaWeight(x0 + size, z0), sk.mesaWeight(x0, z0 + size), sk.mesaWeight(x0 + size, z0 + size)) <= 0) return out;
+  const rng = new Rng(hash2i(0x7a105, Math.floor(x0 / size), Math.floor(z0 / size)) ^ sk.seed);
+  for (let z = z0; z < z0 + size; z += TALUS_STEP) for (let x = x0; x < x0 + size; x += TALUS_STEP) {
+    const px = x + rng.float() * TALUS_STEP, pz = z + rng.float() * TALUS_STEP, roll = rng.float(), size1 = rng.float(), kindRoll = rng.float(), yaw = rng.float() * Math.PI * 2, variant = rng.int(0, ROCK_VARIANTS - 1);
+    if (sk.mesaRise(px, pz) <= 0 && sk.lastMesa.u < -25) continue;
+    const { u, tall, pass } = sk.lastMesa;
+    const apron = Math.max(10, 0.3 * tall);
+    if (u < -25 || u > apron || sk.mesaWeight(px, pz) < 0.5) continue;
+    // Thickest at the wall's foot, thinning out over the floor; the biggest blocks rolled furthest.
+    const near = 1 - Math.abs(u - apron * 0.3) / (apron * 0.7 + 25);
+    if (roll > (0.22 + 0.3 * pass) * near) continue;
+    const shape: RockShape = kindRoll < 0.55 ? 'block' : kindRoll < 0.85 ? 'boulder' : 'slab';
+    const scale = (0.5 + 1.6 * size1 * size1) * (u < 0 ? 1.4 : 1) * Math.min(1.6, 0.6 + tall / 120);
+    out.push(px, pz, scale, yaw, ROCK_SHAPES.indexOf(shape) * ROCK_VARIANTS + variant);
+  }
+  return out;
+}
+
+/**
+ * The rocks of the landforms whose middle lies in the square [x0, x0 + size)², and the blocks fallen from mesa
+ * walls in it (ROCK_STRIDE floats each), set on the ground; none in water or on a road.
  */
 export function rockPlacement(t: Terrain, x0: number, z0: number, size: number): Float32Array {
   const ks = rockKinds();
   const out: number[] = [];
-  for (const f of t.landforms.within(x0 + size / 2, z0 + size / 2, size * 0.71)) {
-    if (f.x < x0 || f.x >= x0 + size || f.z < z0 || f.z >= z0 + size) continue;
-    const rs = rocksOf(f);
+  const lots = t.landforms.within(x0 + size / 2, z0 + size / 2, size * 0.71)
+    .filter((f) => f.x >= x0 && f.x < x0 + size && f.z >= z0 && f.z < z0 + size).map(rocksOf);
+  lots.push(talusOf(t, x0, z0, size));
+  for (const rs of lots) {
     for (let k = 0; k < rs.length; k += 5) {
       const x = rs[k], z = rs[k + 1], scale = rs[k + 2], yaw = rs[k + 3], kind = rs[k + 4], m = ks[kind];
       const r = m.foot * scale;

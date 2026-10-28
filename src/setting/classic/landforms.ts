@@ -2,7 +2,7 @@
  * The classic setting's landforms (D55, plan 5.9): the small shapes of the land and each biome's mix of them.
  * Sizes in metres; the rules that shape them are in world/landforms.ts.
  */
-import type { LandformDef, LandformMix } from '../contract';
+import type { LandformDef, LandformMix, LandscapeKindDef } from '../contract';
 
 export const landforms: readonly LandformDef[] = [
   { id: 'knoll', shape: 'knoll', size: [80, 260], height: [5, 16] },
@@ -31,3 +31,16 @@ export const landformMix: Readonly<Record<string, LandformMix>> = {
   desert: { perKm2: 36, relief: 10, mix: { ridge: 3, scarp: 3, dryValley: 3, ravine: 2, knoll: 2, boulders: 2, tor: 1 } },
   jungle: { perKm2: 42, relief: 9, mix: { knoll: 3, gully: 3, ravine: 2, dell: 2, sinkhole: 2, ridge: 1 } },
 };
+
+/**
+ * The kinds of country (D55): open country (hills and plains with the biomes' own landforms) and mesa country
+ * (plateaus 40-200 m high, cliff walls with a bench or two, passes up ramps of fallen rock and gullies).
+ */
+export const landscapeKinds: readonly LandscapeKindDef[] = [
+  { id: 'open', share: 0.62 },
+  {
+    id: 'mesa', share: 0.38,
+    mesa: { height: [40, 200], cover: 0.42, size: 2400, steep: [4.5, 6.5], passes: 0.2, tiers: 2 },
+    landforms: { perKm2: 40, relief: 4, mix: { boulders: 4, erratic: 3, gully: 3, dryValley: 2, scarp: 2, knoll: 2, sinkhole: 1, ravine: 1 } },
+  },
+];

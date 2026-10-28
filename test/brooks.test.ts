@@ -67,7 +67,9 @@ test('brooks: they lie in their beds, banks stay dry, and the near water mask dr
     assert.ok(terrain.height(x, z) < w.level - 0.2, 'bed below the water');
     const nx = -w.fz, nz = w.fx, d = w.half + 6;
     const bank = terrain.hydro.query(x + nx * d, z + nz * d);
-    if (bank.brook && Math.abs(bank.level - w.level) < 0.01) assert.ok(terrain.height(x + nx * d, z + nz * d) > w.level, 'bank above the water');
+    // (Unless that is in a river's channel: the brook runs into it there.)
+    const river = terrain.hydro.riverAt(x + nx * d, z + nz * d);
+    if (bank.brook && Math.abs(bank.level - w.level) < 0.01 && !(river.river && river.dist < river.half)) assert.ok(terrain.height(x + nx * d, z + nz * d) > w.level, 'bank above the water');
     checked++;
     if (checked > 8) continue;
     // The near mask is 2 m a sample.

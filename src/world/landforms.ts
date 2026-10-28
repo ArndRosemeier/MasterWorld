@@ -41,14 +41,16 @@ export interface Landform {
   readonly reach: number;
   /** Its own seed (wobble, rock). */
   readonly seed: number;
-  /** A dell's pond: its water level, metres (NaN: no pond). */
-  readonly pond: number;
+  /** A dell's pond: its water level, metres (NaN: no pond). Lowered below its neighbours' cuts once its cell is used. */
+  pond: number;
 }
 
 interface Cell {
   readonly forms: readonly Landform[];
   /** Height of the middle band of relief here, metres. */
   readonly relief: number;
+  /** Its ponds checked against the landforms round them (`settlePonds`). */
+  settled?: boolean;
 }
 
 /** A town's ground, which keeps landforms away (a town levels its ground). */
@@ -138,7 +140,7 @@ export class Landforms {
     const a = (di: number, dj: number) => this.nearRelief[(j + dj - this.nearJ + 1) * 3 + (i + di - this.nearI + 1)];
     const amp = (a(0, 0) * (1 - tx) + a(1, 0) * tx) * (1 - tz) + (a(0, 1) * (1 - tx) + a(1, 1) * tx) * tz;
     if (amp <= 0) return 0;
-    return amp * this.band.fbm2(x / 380 + 17.7, z / 380 - 4.1, 2);
+    return amp * this.bandAt(x, z);
   }
 
   private gatherNear(x: number, z: number): void {
@@ -155,7 +157,18 @@ export class Landforms {
     this.nearJ = j;
   }
 
+  /** Cell (i, j)'s landforms, its ponds settled. */
   private formCell(i: number, j: number): Cell {
+    const c = this.placedCell(i, j);
+    if (!c.settled) {
+      c.settled = true;
+      this.settlePonds(c, i, j);
+    }
+    return c;
+  }
+
+  /** Cell (i, j)'s landforms as placed (ponds not yet settled). */
+  private placedCell(i: number, j: number): Cell {
     const key = i + j * 2_097_152;
     let c = this.cells.get(key);
     if (!c) {
@@ -166,12 +179,40 @@ export class Landforms {
     return c;
   }
 
-  /** The landforms of cell (i, j), from the seed and the biome at the cell's centre. */
+  /**
+   * A pond's level was set from the land without the other landforms: a gully or a dell beside it may cut its
+   * rim lower. Lower it below the rim with all of them (or drop it if too little water is left).
+   */
+  private settlePonds(c: Cell, i: number, j: number): void {
+    if (!c.forms.some((f) => !Number.isNaN(f.pond))) return;
+    const all: Landform[] = [];
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) all.push(...this.placedCell(i + di, j + dj).forms);
+    const landAt = (x: number, z: number) => {
+      let h = this.skeleton.elevation(x, z) + c.relief * this.bandAt(x, z);
+      for (const g of all) {
+        const dx = x - g.x, dz = z - g.z;
+        if (dx * dx + dz * dz < g.reach * g.reach) h += shapeAt(g, dx * g.ax + dz * g.az, dz * g.ax - dx * g.az);
+      }
+      return h;
+    };
+    for (const f of c.forms) {
+      if (Number.isNaN(f.pond)) continue;
+      let rim = Infinity;
+      for (const r of [1.1, 1.4]) for (let a = 0; a < 16; a++) rim = Math.min(rim, landAt(f.x + Math.cos((a * Math.PI) / 8) * f.L * r, f.z + Math.sin((a * Math.PI) / 8) * f.L * r));
+      const level = Math.min(f.pond, rim - 1.4);
+      f.pond = level - landAt(f.x, f.z) > 0.8 ? level : NaN;
+    }
+  }
+
+  /**
+   * The landforms of cell (i, j), from the seed and the mix at the cell's centre: its kind of country's, else
+   * its biome's.
+   */
   private place(i: number, j: number): Cell {
     if (!this.defs.length) return EMPTY;
-    const sk = this.skeleton;
-    const b = sk.sample((i + 0.5) * FORM_CELL, (j + 0.5) * FORM_CELL).biome;
-    const mix = b >= 0 ? this.world.biomes[b].landforms : undefined;
+    const sk = this.skeleton, cx = (i + 0.5) * FORM_CELL, cz = (j + 0.5) * FORM_CELL;
+    const b = sk.sample(cx, cz).biome;
+    const mix = b >= 0 ? (sk.kinds[sk.kindAt(cx, cz)].landforms ?? this.world.biomes[b].landforms) : undefined;
     if (!mix) return EMPTY;
     const rng = new Rng(hash2i(this.seed, i, j));
     const defs = this.defs.filter((d) => (mix.mix[d.id] ?? 0) > 0);
@@ -186,12 +227,14 @@ export class Landforms {
       const size = rng.range(def.size[0], def.size[1]), width = def.width ? rng.range(def.width[0], def.width[1]) : size;
       const H = rng.range(def.height[0], def.height[1]), turn = rng.float() * Math.PI * 2, roll = rng.float(), fseed = rng.nextU32();
       // Not on the beach, not on a cliff, not in a town.
-      const e = sk.elevation(x, z), shore = sk.lastShore;
+      const e = sk.elevation(x, z), shore = sk.lastShore, wallU = sk.lastMesa.u, wallTall = sk.lastMesa.tall;
       if (e < 4 || shore < 250) continue;
       const gx = (sk.elevation(x + 20, z) - e) / 20, gz = (sk.elevation(x, z + 20) - e) / 20, slope = Math.hypot(gx, gz);
       if (slope > MAX_SLOPE) continue;
       const L = Math.min(size / 2, FORM_CELL * 0.98), W = Math.min(width / 2, L);
       const reach = Math.min(FORM_CELL * 0.98, reachOf(def.shape, L, W));
+      // Not across a mesa's wall (from its talus to back from its crest).
+      if (wallU > -reach - 30 && wallU < reach + wallTall * 0.8 + 40) continue;
       if (this.free.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + reach * 0.5)) continue;
       // Gullies, ravines and dry valleys run downhill; the rest lie any way.
       const downhill = (def.shape === 'gully' || def.shape === 'ravine' || def.shape === 'dryValley') && slope > 1e-3;
@@ -199,7 +242,7 @@ export class Landforms {
       // A pond only where the dell is whole: off the shore, away from towns and running water.
       const pondable = def.shape === 'dell' && slope < POND_SLOPE && roll < (def.pond ?? 0) && (e > 12 || shore > 700)
         && !this.free.some((t) => Math.hypot(x - t.x, z - t.z) < t.calm + L * 1.4) && !this.wet(x, z);
-      const pond = pondable ? this.pondLevel(x, z, L, H, b) : NaN;
+      const pond = pondable ? this.pondLevel(x, z, L, H, mix.relief) : NaN;
       forms.push({ def, shape: def.shape, x, z, ax, az, L, W, H, reach, seed: fseed, pond });
     }
     return { forms, relief: mix.relief };
@@ -209,18 +252,17 @@ export class Landforms {
    * A dell's pond level: below the lowest point of its rim (by a margin for the terrain's small bumps), at
    * most half way up from its floor. NaN if that leaves too little water.
    */
-  private pondLevel(x: number, z: number, L: number, H: number, biome: number): number {
-    const landAt = (px: number, pz: number) => this.skeleton.elevation(px, pz) + this.bandAt(px, pz, biome);
+  private pondLevel(x: number, z: number, L: number, H: number, relief: number): number {
+    const landAt = (px: number, pz: number) => this.skeleton.elevation(px, pz) + relief * this.bandAt(px, pz);
     let rim = Infinity;
     for (let a = 0; a < 12; a++) rim = Math.min(rim, landAt(x + Math.cos((a * Math.PI) / 6) * L * 1.1, z + Math.sin((a * Math.PI) / 6) * L * 1.1));
     const floor = landAt(x, z) - H, level = Math.min(rim - 1.4, floor + H * 0.55);
     return level - floor > 0.8 ? level : NaN;
   }
 
-  /** The middle relief at a point from one biome's mix (for a pond's level, set when it is placed). */
-  private bandAt(x: number, z: number, biome: number): number {
-    const amp = this.world.biomes[biome].landforms?.relief ?? 0;
-    return amp * this.band.fbm2(x / 380 + 17.7, z / 380 - 4.1, 2);
+  /** The middle relief's wave at a point, -1..1 (times a mix's `relief`). */
+  private bandAt(x: number, z: number): number {
+    return this.band.fbm2(x / 380 + 17.7, z / 380 - 4.1, 2);
   }
 }
 

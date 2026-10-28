@@ -56,7 +56,8 @@ test('terrain: rivers lie in their beds, banks stay dry', () => {
     // Sideways, just past the bank.
     const nx = -w.fz, nz = w.fx, d = w.half + 25;
     const side = t.hydro.query(x + nx * d, z + nz * d);
-    if (side.river && Math.abs(side.level - w.level) < 0.01) assert.ok(t.height(x + nx * d, z + nz * d) > w.level, 'bank above the water');
+    // (Unless the river bends back there: the point past the bank is in its channel again.)
+    if (side.river && Math.abs(side.level - w.level) < 0.01 && side.dist > side.half + 10) assert.ok(t.height(x + nx * d, z + nz * d) > w.level, 'bank above the water');
     checked++;
   }
   assert.ok(checked > 10, `${checked} rivers checked`);
