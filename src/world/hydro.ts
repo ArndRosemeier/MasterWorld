@@ -155,7 +155,7 @@ export interface BrookFeed {
   ground(x: number, z: number): number;
   join(x: number, z: number): { x: number; z: number; level: number } | null;
   /** Whether a river's channel may lie within `within` metres of (x, z) (a quick test before asking `join` often). */
-  near(x: number, z: number, within: number): boolean;
+  riverNear(x: number, z: number, within: number): boolean;
 }
 
 export class HydroTile {
@@ -350,7 +350,7 @@ export class HydroTile {
     const len = Math.hypot(bx - ax, bz - az) * c, steps = Math.ceil(len / 20);
     // (Most steps lie far from any river or lake: asked once for the whole step. Rivers join within ~0.35 of their
     // valley past their edge, under 150 m for all but the widest.)
-    if (Number.isNaN(this.lake[b]) && !feed.near(this.x0 + ((ax + bx) / 2 + 0.5) * c, this.z0 + ((az + bz) / 2 + 0.5) * c, len / 2 + 150)) return null;
+    if (Number.isNaN(this.lake[b]) && !feed.riverNear(this.x0 + ((ax + bx) / 2 + 0.5) * c, this.z0 + ((az + bz) / 2 + 0.5) * c, len / 2 + 150)) return null;
     for (let s = 1; s < steps; s++) {
       const t = s / steps;
       const hit = feed.join(this.x0 + (ax + (bx - ax) * t + 0.5) * c, this.z0 + (az + (bz - az) * t + 0.5) * c);
@@ -681,7 +681,7 @@ export class Hydrology {
         if (!Number.isNaN(w.lake) && sk.elevation(x, z) < w.lake) return { x, z, level: w.lake };
         return null;
       },
-      near: (x, z, within) => main.riverEdge(x, z, within) < Infinity,
+      riverNear: (x, z, within) => main.riverEdge(x, z, within) < Infinity,
     };
   }
 
