@@ -1329,7 +1329,7 @@ export async function start(b: Boot): Promise<void> {
     new DebugMenu({
       paused,
       get freeCamera() { return player.flying; },
-      set freeCamera(on) { player.flying = on; },
+      set freeCamera(on) { flyKey = true; player.flying = on; },
       goTo: (pos, look) => player.goTo(pos, look),
       get hour() { return view.sky.hour; },
       set hour(h) { view.sky.hour = h; },
@@ -1458,13 +1458,16 @@ export async function start(b: Boot): Promise<void> {
       // The ground's vertices lie a couple of metres apart: sunk well round the hatch, all of them under it go.
       sink: (at) => { if (at) GROUND_DIP.value.set(at.x, at.z, SINK_REACH, SINK_DEPTH); else GROUND_DIP.value.w = 0; },
     });
+    // The free camera is a debug tool: its key (F) works only with `?fly` or once the debug menu has flown, and
+    // always lands again while flying (a stray F in a cellar flew the camera through its walls).
+    let flyKey = params.fly;
     // F flies, H gets on or off a horse, X sits down to rest on the ground (dives in the water), E climbs a hatch's
     // ladder (the keys are in the settings).
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
       const b = settings.current.bindings;
       if (b.use.includes(e.code) && playing && climbs.use()) return;
-      if (b.fly.includes(e.code)) player.flying = !player.flying;
+      if (b.fly.includes(e.code) && (flyKey || player.flying)) player.flying = !player.flying;
       else if (b.mount.includes(e.code)) player.toggleMount();
       else if (b.dive.includes(e.code) && playing && player.walker.mode === 'ground' && !player.flying) {
         const said = useAbility(REST);
