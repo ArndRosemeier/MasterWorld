@@ -8,7 +8,7 @@
  * walks. Deterministic for a seed and a sequence of steps. Pure.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { distSqPointSeg, polyCentroid, type TownPlan } from '@futuremagic/settlement';
+import { Footprints, distSqPointSeg, polyCentroid, wayRound, type TownPlan } from '@futuremagic/settlement';
 import { NavGraph, aroundHouse } from './nav';
 import type { DayTask, RoutinesDef } from '../setting/contract';
 import { routines as classicRoutines } from '../setting/classic/routines';
@@ -123,6 +123,8 @@ const MARKET_REACH = 110;
 
 /** Agents farther than this from the focus skip their walks (m). */
 const DETAIL = 260;
+/** A child at play keeps this far off a wall (m). */
+const PLAY_CLEAR = 0.6;
 
 export class TownLife {
   readonly nav: NavGraph;
@@ -141,6 +143,8 @@ export class TownLife {
   /** Everyone has fled (a band holds the place, vgm/events.ts take): all are away until it is false again. */
   gone = false;
   private readonly market: [number, number];
+  /** Every building's footprint (walks go round them). */
+  private readonly footprints: Footprints;
   /** Where each road out leaves the town (travellers come and go there). */
   private readonly roadEnds: [number, number][] = [];
   private hour = 12;
@@ -169,6 +173,7 @@ export class TownLife {
     this.seed = seed;
     this.waiting = people;
     this.market = polyCentroid(plan.market) as [number, number];
+    this.footprints = new Footprints(plan.buildings.map((b) => b.poly));
     this.focus = { x: this.market[0], z: this.market[1] };
     for (const st of plan.streets) {
       if (st.kind !== 'road') continue;
@@ -373,6 +378,11 @@ export class TownLife {
     a.hidden = false;
   }
 
+  /** Open ground: no house there, nor a wall within a child's reach. */
+  private freeGround(x: number, z: number): boolean {
+    return !this.footprints.blocked(x, z, PLAY_CLEAR);
+  }
+
   /** Give up the spot (and seat) the agent holds. */
   private freeSpot(a: Agent): void {
     const was = a.spot >= 0 ? this.spots[a.spot] : null;
@@ -419,7 +429,8 @@ export class TownLife {
     const front = (b: typeof b0): [number, number] | undefined => (b ? [-b.vx, -b.vz] : undefined);
     const street = b0 && b0 === b1 ? [sx, sz, ex, ez] : this.nav.path(sx, sz, ex, ez, front(b0), front(b1));
     out.push(...street.slice(out.length ? 2 : 0), ...enter.slice(2), x, z);
-    return out;
+    // Never through a house: the steps off the street (and round a corner) go round any building in the way.
+    return wayRound([a.x, a.z, ...out], this.footprints).slice(2);
   }
 
   /** What to do next for the task at hand: a spot (or a free point), the activity and how long. */
@@ -509,10 +520,14 @@ export class TownLife {
         if (r.chance(0.8) || Math.hypot(hx - this.market[0], hz - this.market[1]) > 80) {
           // In front of the house, on its side of the street.
           const side = r.range(-1, 1) * b.hu, out = r.range(1.5, 4);
-          return free(hx + Math.cos(b.angle) * side - b.vx * out, hz + Math.sin(b.angle) * side - b.vz * out, 'play', [30, 120]);
+          const px = hx + Math.cos(b.angle) * side - b.vx * out, pz = hz + Math.sin(b.angle) * side - b.vz * out;
+          // Not where a house across the lane stands.
+          if (this.freeGround(px, pz)) return free(px, pz, 'play', [30, 120]);
         }
-        const ang = r.range(0, Math.PI * 2), d = r.range(2, 9);
-        return free(this.market[0] + Math.cos(ang) * d, this.market[1] + Math.sin(ang) * d, 'play', [30, 120]);
+        for (let k = 0; k < 4; k++) {
+          const ang = r.range(0, Math.PI * 2), d = r.range(2, 9), px = this.market[0] + Math.cos(ang) * d, pz = this.market[1] + Math.sin(ang) * d;
+          if (this.freeGround(px, pz)) return free(px, pz, 'play', [30, 120]);
+        }
       }
       offer(home, 1);
     } else if (task === 'rise') {
