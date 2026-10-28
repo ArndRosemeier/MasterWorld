@@ -156,16 +156,16 @@
     "reason": "Agents waiting a seeded while before their next act (until = time + rng.range(a, b)): the shape of every world-sim agent, not a copy."
   },
   {
-    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/smallLife.ts#step",
-    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+    "key": "same name: masterworld/app/spellFx/particles.ts#step + masterworld/sim/creatures.ts#step",
+    "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
   },
   {
     "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/sim/townLife.ts#step",
-    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+    "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
   },
   {
     "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/sim/wild.ts#step",
-    "reason": "step(dt, ...) is the world simulation's tick (plan 9.3): every sim advances by it with its own state."
+    "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
   },
   {
     "key": "clone: masterworld/world/dungeon/barrowMesh.ts#barrowMesh + masterworld/world/holdMesh.ts#holdMesh",

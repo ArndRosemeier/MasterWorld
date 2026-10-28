@@ -40,8 +40,20 @@ export interface Territory {
 /** How far a group's members spread around where they are gathered, metres. */
 const GATHER = 12;
 
-/** Steepest ground a beast walks up, rise per metre. */
+/** Steepest ground a beast walks up, rise per metre (judged over STRIDE, never per frame's step). */
 const STEEP = 0.9;
+/** The length over which the ground's rise is judged (m). */
+const STRIDE = 0.6;
+/** What it takes in its stride on top of the slope: a root, a stone, a bank's lip (m). */
+const STEP_UP = 0.3;
+/** A drop it jumps down, beyond the slope (m). */
+const STEP_DOWN = 0.8;
+/** Water it wades through on the way (m; spots to stand at stay dry). */
+const WADE = 0.5;
+/** Ways round something in the way: turned off the heading by these (radians), nearest first. */
+const TURNS = [0.35, -0.35, 0.75, -0.75, 1.15, -1.15, 1.55, -1.55, 1.9, -1.9];
+/** A hop free (Den.unstick): how far it may go (m) and how high up or down it lands. */
+const HOP = { near: 1.2, far: 4.5, up: 1.4, down: 3 } as const;
 
 /** Open land as a den's ground: the territories are its homes; walking is straight, around water and walls. */
 export class OpenGround implements DenGround {
@@ -84,12 +96,71 @@ export class OpenGround implements DenGround {
 
   way(_from: P3, to: P3): P3[] { return [to]; }
 
+  /**
+   * Along what is in the way: straight on, else turned off the heading a little, then more (round a trunk, along
+   * a bank). It wades shallow water, takes a small step or a bank's lip in its stride, and one standing where it
+   * should not (in deep water, against a wall) may always move to better ground.
+   */
   slide(x: number, y: number, z: number, dx: number, dz: number, r: number): { x: number; z: number } | null {
-    const ok = (nx: number, nz: number) => this.open(nx, nz, r) && Math.abs(this.land.height(nx, nz) - y) <= STEEP * Math.hypot(nx - x, nz - z) + 0.05;
-    if (ok(x + dx, z + dz)) return { x: x + dx, z: z + dz };
-    if (Math.abs(dx) > 1e-4 && ok(x + dx, z)) return { x: x + dx, z };
-    if (Math.abs(dz) > 1e-4 && ok(x, z + dz)) return { x, z: z + dz };
+    if (this.passes(x, y, z, dx, dz, r)) return { x: x + dx, z: z + dz };
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-5) return null;
+    for (const a of TURNS) {
+      const c = Math.cos(a), s = Math.sin(a), k = Math.max(0.5, c);
+      const tx = (dx * c - dz * s) * k, tz = (dx * s + dz * c) * k;
+      if (this.passes(x, y, z, tx, tz, r)) return { x: x + tx, z: z + tz };
+    }
     return null;
+  }
+
+  /** Can a body at (x, z) move by (dx, dz)? */
+  private passes(x: number, y: number, z: number, dx: number, dz: number, r: number): boolean {
+    const nx = x + dx, nz = z + dz, len = Math.hypot(dx, dz);
+    if (len < 1e-6) return true;
+    const wet = this.land.waterDepth(nx, nz), here = this.land.waterDepth(x, z);
+    // Out of deep water: any way to shallower goes.
+    if (wet >= WADE && !(here >= WADE && wet < here)) return false;
+    if (this.land.blocked?.(nx, nz, r) && !this.land.blocked!(x, z, r)) return false;
+    // The rise over a stride ahead (a frame's step is too short to judge a slope by).
+    const ux = dx / len, uz = dz / len, s = Math.max(len, STRIDE);
+    const rise = this.land.height(x + ux * s, z + uz * s) - Math.min(y, this.land.height(x, z));
+    return rise <= STEEP * s + STEP_UP && -rise <= STEEP * s * 2 + STEP_DOWN;
+  }
+
+  /**
+   * Where a body stuck at `from` hops to (Den.unstick): a dry, free spot a short hop off, from which it can walk
+   * on, nearer `toward` than it is now (over a brook, up a bank, round a snag). Stuck where it should not
+   * stand, any such spot. Null: nowhere worth it.
+   */
+  hop(from: P3, toward: P3 | null, r: number): P3 | null {
+    const bad = !this.open(from.x, from.z, r) || !this.free(from.x, from.y, from.z, r);
+    const goal = toward ? Math.hypot(toward.x - from.x, toward.z - from.z) : 0;
+    const base = toward ? Math.atan2(toward.z - from.z, toward.x - from.x) : 0;
+    let best: P3 | null = null, score = Infinity;
+    for (let d = HOP.near; d <= HOP.far + 1e-6; d += 0.8) {
+      for (let k = 0; k < 16; k++) {
+        const a = base + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 8);
+        const x = from.x + Math.cos(a) * d, z = from.z + Math.sin(a) * d, y = this.land.height(x, z);
+        const left = toward ? Math.hypot(toward.x - x, toward.z - z) : 0;
+        if (!bad && (!toward || left > goal - 0.75)) continue;
+        if (y - from.y > HOP.up || from.y - y > HOP.down || !this.open(x, z, r) || !this.free(x, y, z, r)) continue;
+        // Over water and low things, never through a house or a trunk.
+        let through = false;
+        for (const t of [0.25, 0.5, 0.75]) if (this.land.blocked?.(from.x + (x - from.x) * t, from.z + (z - from.z) * t, r)) through = true;
+        if (through) continue;
+        const sc = left + d * 0.5;
+        if (sc < score) { score = sc; best = { x, y, z }; }
+      }
+      if (best) break;
+    }
+    return best;
+  }
+
+  /** Room to walk on from a point: most ways round it go. */
+  private free(x: number, y: number, z: number, r: number): boolean {
+    let ok = 0;
+    for (let k = 0; k < 8; k++) if (this.passes(x, y, z, Math.cos((k * Math.PI) / 4) * 0.8, Math.sin((k * Math.PI) / 4) * 0.8, r)) ok++;
+    return ok >= 4;
   }
 
   /** Thirty metres or so straight away from `q`, or off to a side when water or a wall is in the way. */

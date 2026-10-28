@@ -11,7 +11,7 @@
  */
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import type { SettingModule } from '../setting/contract';
-import type { Creature } from '../sim/creatures';
+import { keepApart, type Creature, type Den } from '../sim/creatures';
 import type { Delve, Lootable } from '../game/delve';
 import type { Fight, FightEvent, HeroPose } from '../game/fight';
 import { POTION } from '../game/actionBar';
@@ -377,10 +377,13 @@ export function stepEncounters(dt: number, all: readonly Encounter[], calm: { re
   // A bird in the hero's place (bird form) is nothing the dwellers fight: every encounter rests meanwhile.
   const flown = !!calm.player.shape?.aloft;
   for (const e of all) if (!flown && e.stir >= 0 && (!best || e.stir > best.stir)) best = e;
+  const open: Den[] = [];
   for (const e of all) {
     if (flown || e.stir < 0) e.rest();
-    else e.play(dt, e === best);
+    else { e.play(dt, e === best); if (!e.arena.enclosed) open.push(e.delve.den); }
   }
+  // Out on the land, the bodies of different groups keep apart too (cellars have frames of their own).
+  keepApart(open);
   if (best) return;
   // Out of a fight: no fighting stance, but a spell's hands (or any action) play out.
   const act = calm.player.stance.action, h = calm.player.hero;

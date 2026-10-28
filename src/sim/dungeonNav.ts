@@ -148,6 +148,8 @@ export interface DenGround {
   slide(x: number, y: number, z: number, dx: number, dz: number, r: number): { x: number; z: number } | null;
   /** A way off from `from`, as far from `q` as it goes (empty: nowhere). */
   away(from: P3, q: P3): P3[];
+  /** Where a body stuck at `from` may hop to, nearer `toward` (null: nowhere; grounds without it never hop). */
+  hop?(from: P3, toward: P3 | null, r: number): P3 | null;
 }
 
 /** A dungeon as a den's ground: its rooms are the homes. */
