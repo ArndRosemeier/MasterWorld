@@ -40,7 +40,7 @@ export const landscapeKinds: readonly LandscapeKindDef[] = [
   { id: 'open', share: 0.62 },
   {
     id: 'mesa', share: 0.38,
-    mesa: { height: [40, 200], cover: 0.42, size: 2400, steep: [4.5, 6.5], passes: 0.2, tiers: 2 },
+    mesa: { height: [40, 200], cover: 0.42, size: 2400, steep: [4.5, 6.5], passes: 0.2, climbable: 0.3, tiers: 2 },
     landforms: { perKm2: 40, relief: 4, mix: { boulders: 4, erratic: 3, gully: 3, dryValley: 2, scarp: 2, knoll: 2, sinkhole: 1, ravine: 1 } },
   },
 ];

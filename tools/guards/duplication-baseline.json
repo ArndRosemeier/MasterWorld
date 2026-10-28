@@ -20,6 +20,10 @@
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the shared part already lives in the base class."
   },
   {
+    "key": "same name: masterworld/game/evening.ts#climbable + masterworld/main.ts#climbable",
+    "reason": "Both implement the WalkWorld interface (game/walker.ts): the evening check's land, and the game's land (out of doors only)."
+  },
+  {
     "key": "same name: masterworld/game/evening.ts#rockSurface + masterworld/main.ts#rockSurface",
     "reason": "Both implement the WalkWorld interface (game/walker.ts): the evening check's land, and the game's land with the open building in it."
   },

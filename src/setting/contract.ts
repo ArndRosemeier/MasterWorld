@@ -180,6 +180,8 @@ export interface MesaDef {
   readonly steep: readonly [number, number];
   /** Share of the cliff line that is a pass (a ramp of fallen rock or a gully up), 0..1. */
   readonly passes: number;
+  /** Share of the cliff line whose rock offers holds (cracks, ledges, broken faces): climbed (D56), 0..1. */
+  readonly climbable: number;
   /** How many steps the walls come in, at most (a bench between). */
   readonly tiers: number;
 }

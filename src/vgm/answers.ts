@@ -48,8 +48,8 @@ const OFF_TOWN = 80;
 const OFF_PLACE = 40;
 /** Spots that fit to choose the most open of. */
 const CHOICES = 6;
-/** Steps along the straight way to a spot by the way (m), and the steepest it may climb between two. */
-const WAY_STEP = 4, WAY_STEEP = 1;
+/** Steps along the straight way to a spot by the way (m), and the steepest it may climb between two (a walker goes up 1.25). */
+const WAY_STEP = 2, WAY_STEEP = 1.2;
 
 /** The sights in the log. */
 export function sightsOf(log: DecisionLog): SightDecision[] {

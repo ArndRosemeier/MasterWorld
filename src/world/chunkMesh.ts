@@ -108,31 +108,8 @@ export function groundLook(t: Terrain): (x: number, z: number, color: Float32Arr
   };
 }
 
-/** Vertex spacing (m) from which sheer ground is filtered over a vertex's cell (filterSheer). */
-const FILTER_STEP = 16;
-
-/**
- * On far chunks, the heights of vertices by sheer ground (a mesa's wall, D56) as the mean over their cell: a wall
- * running slantwise through vertices 16-32 m apart, each either on its top or at its foot, came out as a saw of
- * teeth; filtered it is a ramp a cell wide, which is a pixel or two out there. Gentle ground keeps its heights.
- */
-function filterSheer(t: Terrain, h: Float32Array, m: number, ox: number, oz: number, step: number): void {
-  const src = h.slice(), q = step / 3;
-  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
-    const c = src[j * m + i];
-    let d = 0;
-    if (i > 0) d = Math.max(d, Math.abs(src[j * m + i - 1] - c));
-    if (i < m - 1) d = Math.max(d, Math.abs(src[j * m + i + 1] - c));
-    if (j > 0) d = Math.max(d, Math.abs(src[(j - 1) * m + i] - c));
-    if (j < m - 1) d = Math.max(d, Math.abs(src[(j + 1) * m + i] - c));
-    if (d < step) continue;
-    const x = ox + i * step, z = oz + j * step;
-    // A 3 x 3 box over the cell: a vertex's height follows how much of its cell is up on the wall.
-    let sum = 0;
-    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) sum += a || b ? t.height(x + a * q, z + b * q) : c;
-    h[j * m + i] = sum / 9;
-  }
-}
+/** Vertex spacing (m) from which normals are taken over two cells each way (smoothNormals). */
+const SMOOTH_STEP = 16;
 
 export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const { x0, z0, size, segs } = spec;
@@ -141,7 +118,6 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const m = n + 4;
   const h = new Float32Array(m * m);
   for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) h[j * m + i] = t.height(x0 + (i - 2) * step, z0 + (j - 2) * step);
-  if (step >= FILTER_STEP) filterSheer(t, h, m, x0 - 2 * step, z0 - 2 * step, step);
   const H = (i: number, j: number): number => h[(j + 2) * m + i + 2];
   const vc = vertexCount(segs);
   const position = new Float32Array(vc * 3), normal = new Float32Array(vc * 3), color = new Float32Array(vc * 3);
@@ -162,7 +138,10 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     // The level: the slope over two cells each way.
     const sx = (H(i + 2, j) + dx - H(i - 2, j)) / (6 * step), sz = (H(i, j + 2) + dz - H(i, j - 2)) / (6 * step);
     level[v] = 1 / Math.sqrt(1 + sx * sx + sz * sz);
-    const nx = -dx, ny = 2 * step, nz = -dz, l = Math.hypot(nx, ny, nz);
+    // Far out, the normal over two cells each way, as the level: a wall running slantwise through vertices
+    // 16 m apart and more lit in a saw of light and dark teeth with the normal over one.
+    const far = step >= SMOOTH_STEP;
+    const nx = far ? -sx : -dx, ny = far ? 1 : 2 * step, nz = far ? -sz : -dz, l = Math.hypot(nx, ny, nz);
     normal[v * 3] = nx / l;
     normal[v * 3 + 1] = ny / l;
     normal[v * 3 + 2] = nz / l;

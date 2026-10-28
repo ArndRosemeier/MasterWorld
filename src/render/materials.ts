@@ -348,8 +348,11 @@ const tn = (s: Node<'vec4'>) => s.xy.mul(2).sub(1);
  */
 function rockFaces(g: GroundTextures, p: Node<'vec3'>, n: Node<'vec3'>) {
   const layer = (name: string, uv: Node<'vec2'>) => groundLayer(g, name, uv);
-  const bw0 = pow(abs(n), vec3(4));
-  const bw = bw0.div(bw0.x.add(bw0.y).add(bw0.z));
+  // Top or side first (a sharp blend: a slope of 45 degrees and more takes the walls' strata, whichever way it
+  // faces, not the pale weathered top stone), then the side between its two projections.
+  const top = pow(abs(n.y), 8), side = pow(length(n.xz), 8);
+  const ax = pow(abs(n.x), 4), az = pow(abs(n.z), 4), sx = ax.div(ax.add(az).add(1e-5));
+  const bw = vec3(side.mul(sx), top, side.mul(float(1).sub(sx))).div(top.add(side).add(1e-5));
   // The beds are not courses of brick: they swell and thin across a wall (scale), bend and dip along it (a slow
   // wave and a tilt), and the joints across them do not line up from bed to bed (the run shifted with height).
   const thick = float(1).add(mx_noise_float(p.xz.mul(0.004)).mul(0.35));

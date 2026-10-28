@@ -55,6 +55,8 @@ export class Character {
   mana: number;
   /** Sitting down to rest (game/rest.ts): health, mana and stamina come back faster. Not saved. */
   resting = false;
+  /** On a rock face (D56): stamina does not come back meanwhile. Not saved. */
+  climbing = false;
   readonly worn: Partial<Record<Slot | 'ring2', Item>> = {};
   readonly pack: Item[] = [];
   coins = 0;
@@ -353,7 +355,8 @@ export class Character {
    */
   recover(dt: number, fighting: boolean, still = 0): void {
     const sat = this.resting && !fighting;
-    this.stamina = Math.min(this.maxStamina, this.stamina + dt * (fighting ? 4 : sat ? 30 : 12));
+    // (On a rock face it does not come back: the climb spends it.)
+    if (!this.climbing) this.stamina = Math.min(this.maxStamina, this.stamina + dt * (fighting ? 4 : sat ? 30 : 12));
     this.mana = Math.min(this.maxMana, this.mana + dt * (fighting ? 0.5 : sat ? 6 : 2));
     if (!fighting && this.alive) this.health = Math.min(this.maxHealth, this.health + dt * (sat ? 3.5 : still > 4 ? 1.2 : 0.3));
   }
@@ -367,4 +370,12 @@ export class Character {
   save(): CharacterSave {
     return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, mana: this.mana, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), ...(this.ranks.size ? { ranks: Object.fromEntries(this.ranks) } : {}), learned: [...this.learned], bar: [...this.bar] };
   }
+}
+
+/** Strength a climb spends (stamina per second): hanging still, and more while moving on the face. */
+export const CLIMB_COST = { hang: 0.2, move: 0.55 };
+
+/** Health a fall of `metres` costs: nothing up to 4 m, then more and more (a fall of 20 m nearly kills). */
+export function fallHurt(metres: number): number {
+  return metres <= 4 ? 0 : Math.round(1.6 * (metres - 4) ** 1.45);
 }

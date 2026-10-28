@@ -102,12 +102,14 @@ export interface EveningOptions {
 const HOURS_PER_SECOND = 24 / 3600;
 /** The game starts in the morning. */
 const START_HOUR = 8;
-/** The longest walk the check allows, seconds (a barrow is at most ~1.4 km out; round a mesa to its pass, some 3 km). */
-const WALK_LIMIT = 900;
+/** The longest walk the check allows, seconds (a barrow is at most ~1.4 km out; round a mesa to its pass, some 5 km). */
+const WALK_LIMIT = 1500;
 /** How often the VGM looks again on a walk out on the land (s). */
 const ON_WAY = 60;
 /** How far along the way ahead the VGM looks for a spot by it (m). */
 const AHEAD_ON_WAY = 300;
+/** What a metre climbed costs the bot's way, in metres walked (a climb is slow and spends strength). */
+const CLIMB_COST = 8;
 /** How long one visit below may take, seconds. */
 const DELVE_LIMIT = 1200;
 
@@ -551,15 +553,22 @@ function settlementOut(seed: number, setting: SettingModule, terrain: Terrain, s
 }
 
 /** The hero's body walking the land and its towns (the game's walk world without the townsfolk and trees). */
-class LandWalk {
+export class LandWalk {
   readonly walker: Walker;
-  constructor(private readonly terrain: Terrain) {
+  /** Metres climbed on rock faces so far (D56). */
+  climbed = 0;
+  /**
+   * `climb`: the bot knows the stretches of a mesa's walls with holds (D56) and climbs them where that is the
+   * shorter way; else it keeps to the passes.
+   */
+  constructor(private readonly terrain: Terrain, private readonly climb = false) {
     const world: WalkWorld = {
       height: (x, z) => terrain.height(x, z),
       floor: (x, z) => standAt(terrain, x, z),
       rockSurface: (x, y, z) => terrain.rockSurface(x, y, z),
       waterLevel: (x, z) => { const h = terrain.height(x, z), d = terrain.waterDepth(x, z, h); return d > 0.4 ? h + d : null; },
       wall: (x, z, r) => solidAt(terrain, x, z, r),
+      ...(climb ? { climbable: (x: number, z: number) => terrain.climbable(x, z) } : {}),
     };
     this.walker = new Walker(world);
   }
@@ -570,13 +579,27 @@ class LandWalk {
     const pts = this.findWay(p.x, p.z, x, z);
     const dt = 0.1;
     let t = 0, metres = 0, check = { x: p.x, z: p.z, t: 0 }, side = 1;
-    let detour: [number, number] | null = null;
+    let detour: [number, number] | null = null, onFace = false;
     while (pts.length && t < WALK_LIMIT) {
       const [tx, tz]: [number, number] = detour ?? pts[0];
       const dx: number = tx - p.x, dz: number = tz - p.z, d = Math.hypot(dx, dz);
       if (d < (detour ? 0.8 : pts.length === 1 ? 0.6 : 1.2)) { if (detour) detour = null; else pts.shift(); continue; }
-      const bx = p.x, bz = p.z;
+      const bx = p.x, bz = p.z, by = p.y;
       w.step({ forward: 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: false, up: false, down: false }, dt);
+      // On a face: up it hand over hand, and over the top.
+      if (w.mode === 'climb' || w.mode === 'pull') {
+        if (w.mode === 'climb') this.climbed += Math.max(0, p.y - by);
+        t += dt;
+        check = { x: p.x, z: p.z, t };
+        onFace = true;
+        continue;
+      }
+      // Over the top: on from the first point of the way up here (those on the face are passed).
+      if (onFace) {
+        onFace = false;
+        const k = pts.findIndex(([qx, qz]) => this.terrain.height(qx, qz) > p.y - 2);
+        pts.splice(0, k < 0 ? pts.length - 1 : k);
+      }
       metres += Math.hypot(p.x - bx, p.z - bz);
       t += dt;
       if (onWay && Math.floor(t / ON_WAY) > Math.floor((t - dt) / ON_WAY)) {
@@ -585,11 +608,16 @@ class LandWalk {
         let ahead = pts[pts.length - 1], run = 0;
         for (let i = 0, [qx, qz] = [p.x, p.z]; i < pts.length; i++) { run += Math.hypot(pts[i][0] - qx, pts[i][1] - qz); [qx, qz] = pts[i]; if (run > AHEAD_ON_WAY) { ahead = pts[i]; break; } }
         onWay(t, ahead);
-        // Turned aside (to a sight, an ambush): on along the way from its nearest point.
+        // Turned aside (to a sight, an ambush): on from the nearest point of the way at the same height (not one
+        // up on a plateau beside it), or a way found afresh.
         if (Math.hypot(p.x - ox, p.z - oz) > 1) {
-          let k = 0;
-          for (let i = 1; i < pts.length; i++) if (Math.hypot(pts[i][0] - p.x, pts[i][1] - p.z) < Math.hypot(pts[k][0] - p.x, pts[k][1] - p.z)) k = i;
-          pts.splice(0, k);
+          let k = -1, best = 60;
+          for (let i = 0; i < pts.length; i++) {
+            const d = Math.hypot(pts[i][0] - p.x, pts[i][1] - p.z);
+            if (d < best && Math.abs(this.terrain.height(pts[i][0], pts[i][1]) - p.y) < 3) { best = d; k = i; }
+          }
+          if (k >= 0) pts.splice(0, k);
+          else pts.splice(0, pts.length, ...this.findWay(p.x, p.z, x, z));
           detour = null;
           check = { x: p.x, z: p.z, t };
         }
@@ -632,6 +660,13 @@ class LandWalk {
     return out;
   }
 
+  /** Can the bot climb from cell `c` up into cell `n`: a face with holds between them? */
+  private holds(c: number, n: number, centre: (c: number) => [number, number]): boolean {
+    if (!this.climb) return false;
+    const [ax, az] = centre(c), [bx, bz] = centre(n);
+    return this.terrain.climbable((ax + bx) / 2, (az + bz) / 2) !== null && this.terrain.climbable(bx, bz) !== null;
+  }
+
   /** A* over cells of `size` metres in the box round both ends, `M` metres wider; null when there is no way. */
   private search(ax: number, az: number, bx: number, bz: number, size: number, M: number): [number, number][] | null {
     const x0 = Math.floor(Math.min(ax, bx) - M), z0 = Math.floor(Math.min(az, bz) - M);
@@ -639,7 +674,7 @@ class LandWalk {
     const { terrain } = this;
     const cellCentre = (c: number): [number, number] => [x0 + ((c % nx) + 0.5) * size, z0 + (Math.floor(c / nx) + 0.5) * size];
     // Per cell, once: its height, and 1 free / 2 wall / 3 water.
-    const hs = new Float32Array(N), kind = new Uint8Array(N);
+    const hs = new Float32Array(N), kind = new Uint8Array(N), steep = new Uint8Array(N);
     const look = (c: number) => {
       if (kind[c]) return;
       const [x, z] = cellCentre(c);
@@ -648,7 +683,12 @@ class LandWalk {
       const sheer = size > 1 && Math.max(Math.abs(terrain.height(x + 1, z) - terrain.height(x - 1, z)), Math.abs(terrain.height(x, z + 1) - terrain.height(x, z - 1))) / 2 > WALK.maxSlope * 0.8;
       // Rock of a volume (a cave's hill, a tower's crag) standing on the ground there is a wall too.
       const rock = terrain.rockSurface(x, hs[c] + 1, z);
-      kind[c] = sheer || (rock !== null && rock < WALK.radius) || solidAt(terrain, x, z, WALK.radius + 0.25) ? 2 : terrain.waterDepth(x, z, hs[c]) > 0.4 ? 3 : 1;
+      kind[c] = (sheer && !(this.climb && terrain.climbable(x, z))) || (rock !== null && rock < WALK.radius) || solidAt(terrain, x, z, WALK.radius + 0.25) ? 2 : terrain.waterDepth(x, z, hs[c]) > 0.4 ? 3 : 1;
+    };
+    // The ground's own slope at a cell, looked at once when a way up into it is asked (1 steep, 2 not).
+    const steepAt = (c: number) => {
+      if (!steep[c]) { const [x, z] = cellCentre(c); steep[c] = Math.hypot(terrain.height(x + 0.4, z) - terrain.height(x - 0.4, z), terrain.height(x, z + 0.4) - terrain.height(x, z - 0.4)) / 0.8 > WALK.maxSlope * 0.8 ? 1 : 2; }
+      return steep[c] === 1;
     };
     const cell = (x: number, z: number) => Math.floor((x - x0) / size) + Math.floor((z - z0) / size) * nx;
     const a = cell(ax, az), b = cell(bx, bz);
@@ -674,8 +714,13 @@ class LandWalk {
         if (kind[n] === 2 && n !== b) continue;
         if (di && dj) { look(i + di + j * nx); look(i + (j + dj) * nx); if (kind[i + di + j * nx] === 2 || kind[i + (j + dj) * nx] === 2) continue; }
         const run = (di && dj ? Math.SQRT2 : 1) * size;
-        if ((hs[n] - hs[c]) / run > WALK.maxSlope * 0.8) continue;
-        const cost = g[c] + run * (kind[n] === 3 ? 3 : 1);
+        // Too steep to walk up: as the walker has it, by the step and by the ground's own slope (no zigzag).
+        // Nor down what could not be walked up again (a drop into a basin walled all round leaves the bot there).
+        const rise = (hs[n] - hs[c]) / run, fall = -rise;
+        const up = rise > WALK.maxSlope * 0.8 || (rise > WALK.maxSlope * 0.25 && size === 1 && steepAt(n));
+        if (up && !this.holds(c, n, cellCentre)) continue;
+        if (fall > WALK.maxSlope * 0.8 || (fall > WALK.maxSlope * 0.25 && size === 1 && steepAt(c))) continue;
+        const cost = g[c] + run * (kind[n] === 3 ? 3 : 1) + (up ? (hs[n] - hs[c]) * CLIMB_COST : 0);
         if (cost < g[n]) { g[n] = cost; from[n] = c; open.push(cost + toGoal(n), n); }
       }
     }

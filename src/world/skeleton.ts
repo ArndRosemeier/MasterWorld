@@ -154,10 +154,11 @@ export class Skeleton {
 
   /**
    * Of the last `mesaRise` point (or `elevation`, `sample` point): metres in from the wall's foot (negative out on the valley floor, -Infinity
-   * without mesa country), the plateau's full height there, how much of a pass it is (0..1), and the rise there
-   * (`elevation` and `sample` only).
+   * without mesa country), the plateau's full height there, how much of a pass it is (0..1), how much its wall
+   * offers holds to climb by (0..1), the way into the plateau (nx, nz: a unit vector across the wall), and the
+   * rise there (`elevation` and `sample` only).
    */
-  readonly lastMesa = { u: -Infinity, tall: 0, pass: 0, rise: 0 };
+  readonly lastMesa = { u: -Infinity, tall: 0, pass: 0, rise: 0, climb: 0, nx: 0, nz: 0 };
   /** The plateaus' share of the last `landAt` (their rise there, weighted by how much mesa country it is). */
   private lastRise = 0;
 
@@ -171,7 +172,7 @@ export class Skeleton {
    */
   mesaRise(x: number, z: number): number {
     const m = this.mesa, at = this.lastMesa;
-    at.u = -Infinity; at.tall = 0; at.pass = 0;
+    at.u = -Infinity; at.tall = 0; at.pass = 0; at.climb = 0;
     if (!m) return 0;
     const n = this.mesaNoise, s = 1 / m.size;
     const wx = n.fbm2(x / 1100 + 3.3, z / 1100 - 1.4, 1) * 160, wz = n.fbm2(x / 1100 - 7.6, z / 1100 + 5.2, 1) * 160;
@@ -190,6 +191,10 @@ export class Skeleton {
     // Read where the wall's foot is, straight across from here: a pass runs straight up, the same all along it.
     const fx = x - (gx / g) * u1, fz = z - (gz / g) * u1;
     const p = (at.pass = smoothstep(tp, tp + 0.06, n.fbm2(fx / 420 + 1.1, fz / 420 - 9.4, 2)));
+    // Stretches of broken rock, read at the foot too, so a climb up them finds holds all the way.
+    const tc = (0.5 - m.climbable) * 0.5;
+    at.climb = smoothstep(tc, tc + 0.05, n.fbm2(fx / 230 - 4.4, fz / 230 + 6.2, 2));
+    at.nx = gx / g; at.nz = gz / g;
     // Quick out: well down in a valley.
     if (u1 < -60 - (p > 0 ? m.height[1] / PASS_SLOPE : 0)) return 0;
     const tall = at.tall = lerp(m.height[0], m.height[1], smoothstep(-0.4, 0.4, n.fbm2(x / 6500 + 2.4, z / 6500 + 7.1, 1)));

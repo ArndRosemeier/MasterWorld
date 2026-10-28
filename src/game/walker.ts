@@ -1,7 +1,8 @@
 /**
  * The player's body in the world (pure, no three.js): walking on the height field and over rock volumes,
- * blocked by rock walls and slopes too steep to climb, jumping and falling, wading and swimming. The
- * input says where the player wants to go; the walker decides where the body ends up.
+ * blocked by rock walls and slopes too steep to climb, jumping and falling, wading and swimming, climbing
+ * rock that offers holds (D56: up, down and along a face, over its top with a pull-up, letting go when spent).
+ * The input says where the player wants to go; the walker decides where the body ends up.
  *
  * Facing (`yaw`) follows the humanoid's convention: the model's −z turned by yaw about +y, so yaw 0 faces
  * north (−z) and yaw π/2 faces west (−x).
@@ -22,6 +23,8 @@ export interface WalkWorld {
   sightSurface?(x: number, y: number, z: number): number | null;
   /** Walls (buildings, furniture): does a body of radius `r` at (x, z), its feet at `y` (the storey it is on), touch one? */
   wall?(x: number, z: number, r: number, y?: number): boolean;
+  /** A rock face with holds to climb by at (x, z): the way into it (a unit vector); null where none (D56). */
+  climbable?(x: number, z: number): { readonly nx: number; readonly nz: number } | null;
 }
 
 /** What the player wants this frame. */
@@ -42,7 +45,8 @@ export interface WalkIntent {
   pace?: number;
 }
 
-export type WalkMode = 'ground' | 'air' | 'swim';
+/** `climb`: on a rock face; `pull`: pulling up over its top. */
+export type WalkMode = 'ground' | 'air' | 'swim' | 'climb' | 'pull';
 
 /** Speeds (m/s) and the body of something that walks (the hero's, a horse's in game/horse.ts). */
 export interface WalkSpec {
@@ -50,7 +54,16 @@ export interface WalkSpec {
   height: number; radius: number; step: number; snap: number; maxSlope: number;
   /** How quickly the speed answers the input on the ground (1/s). */
   grip: number;
+  /** Climbing speed up a face (m/s); none: it does not climb. */
+  climb?: number;
 }
+
+/** Seconds to pull up over the top of a face (as @futuremagic/figure's ledge). */
+export const PULL_UP = 1.5;
+/** The body hangs this far off the face (m). */
+const OFF_FACE = 0.35;
+/** Pushing into a climbable face this long starts a climb (s): no climb by brushing past. */
+const GRIP_ON = 0.25;
 
 /** The hero's. */
 export const WALK: WalkSpec = {
@@ -71,6 +84,7 @@ export const WALK: WalkSpec = {
   /** Ground steeper than this (rise over run) cannot be walked up. */
   maxSlope: 1.25,
   grip: 12,
+  climb: 0.85,
 };
 
 export class Walker {
@@ -83,6 +97,17 @@ export class Walker {
   height: number;
   /** How long (s) the body has been asked to walk on the ground and has not got anywhere. */
   stuckFor = 0;
+  /** Climbing: the way into the face (unit), the feet's height where the climb began, and the pull-up's way. */
+  readonly face = { nx: 0, nz: 0, from: 0 };
+  readonly pull = { t: 0, x0: 0, y0: 0, z0: 0, x1: 0, y1: 0, z1: 0 };
+  /** Climbing costs strength: asked each climbing frame with the effort (0..1); false: spent, the body lets go. */
+  tire: ((dt: number, effort: number) => boolean) | null = null;
+  /** Metres the body fell before it last landed (the game reads it, hurts, and sets it back to 0). */
+  fell = 0;
+  /** Highest point of the fall under way. */
+  private airTop = -Infinity;
+  /** How long it has pushed into a climbable face. */
+  private pushing = 0;
 
   constructor(private readonly world: WalkWorld, readonly spec: WalkSpec = WALK) {
     this.height = spec.height;
@@ -154,6 +179,7 @@ export class Walker {
 
   step(intent: WalkIntent, dt: number): void {
     dt = Math.min(dt, 0.1);
+    if (this.mode === 'climb' || this.mode === 'pull') { this.climbStep(intent, dt); return; }
     const p = this.pos, v = this.vel;
     const swim = this.mode === 'swim';
     // What the input asks for, in world xz.
@@ -188,8 +214,9 @@ export class Walker {
         if (run > 1e-6 && rise > this.spec.step && rise / run > this.spec.maxSlope) return false;
         // The height field alone is too steep here (a step up of slope, not a ledge), unless a floor stands
         // over it (a bridge's deck over a brook's steep bank).
+        // Steep is steep whichever way one goes up it (no zigzag up a cliff): the ground's own slope there.
         const hf = this.world.height(nx, nz) - this.world.height(p.x, p.z);
-        if (run > 1e-6 && hf > 0 && hf / run > this.spec.maxSlope && this.world.rockSurface(nx, p.y, nz) === null && !this.onFloor(nx, nz)) return false;
+        if (run > 1e-6 && hf > 0 && (hf / run > this.spec.maxSlope || (hf / run > this.spec.maxSlope * 0.25 && this.groundSlope(nx, nz) > this.spec.maxSlope)) && this.world.rockSurface(nx, p.y, nz) === null && !this.onFloor(nx, nz)) return false;
       }
       p.x = nx; p.z = nz;
       return true;
@@ -202,6 +229,11 @@ export class Walker {
     }
     const asked = this.mode === 'ground' && len > 0.3;
     this.stuckFor = asked && Math.hypot(p.x - x0, p.z - z0) < speed * len * dt * 0.1 ? this.stuckFor + dt : 0;
+    // Pushing on into a face with holds: onto it.
+    if (asked && intent.forward > 0.5 && this.stuckFor > 0 && this.spec.climb && this.world.climbable) {
+      this.pushing += dt;
+      if (this.pushing >= GRIP_ON && this.gripFace(-sh, -ch)) return;
+    } else this.pushing = 0;
 
     // Up and down.
     const ground = this.support(p.x, p.z, p.y);
@@ -217,7 +249,12 @@ export class Walker {
       const above = this.world.rockSurface(p.x, ny + this.height, p.z);
       if (v.y > 0 && above !== null && above < 0.1) v.y = 0;
       else p.y = ny;
-      if (p.y <= ground) { p.y = ground; v.y = 0; this.mode = 'ground'; }
+      this.airTop = Math.max(this.airTop, p.y);
+      if (p.y <= ground) {
+        p.y = ground; v.y = 0; this.mode = 'ground';
+        this.fell = Math.max(0, this.airTop - p.y);
+        this.airTop = -Infinity;
+      }
     }
     const level = this.world.waterLevel(p.x, p.z);
     if (this.mode !== 'swim') {
@@ -234,6 +271,92 @@ export class Walker {
       if (level === null || ground > level - this.height * 0.55) { this.mode = 'ground'; p.y = Math.max(p.y, ground); v.y = 0; }
     }
     v.y = clamp(v.y, -50, 20);
+  }
+
+  /** The ground's slope at (x, z) (rise over run, either way). */
+  private groundSlope(x: number, z: number): number {
+    const d = 0.4, h = this.world.height.bind(this.world);
+    return Math.hypot(h(x + d, z) - h(x - d, z), h(x, z + d) - h(x, z - d)) / (2 * d);
+  }
+
+  /**
+   * The face's foot point at the feet's height `y`, along the way in (nx, nz) from (x, z): where the ground
+   * crosses `y` within a few metres either way. Null where it does not (over the top, or off the face).
+   */
+  private faceAt(x: number, z: number, y: number, nx: number, nz: number): [number, number] | null {
+    const above = (t: number) => this.world.height(x + nx * t, z + nz * t) - y;
+    let lo = -3, hi = 3;
+    if (above(lo) > 0 || above(hi) < 0) return null;
+    for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2; if (above(m) > 0) hi = m; else lo = m; }
+    const t = (lo + hi) / 2;
+    return [x + nx * t, z + nz * t];
+  }
+
+  /** Onto the climbable face ahead (dx, dz: the way the body pushes), if it is one; whether it got on. */
+  private gripFace(dx: number, dz: number): boolean {
+    const p = this.pos, r = this.spec.radius + 0.3;
+    const c = this.world.climbable?.(p.x + dx * r, p.z + dz * r);
+    if (!c || c.nx * dx + c.nz * dz < 0.5 || this.groundSlope(p.x + dx * r, p.z + dz * r) <= this.spec.maxSlope) return false;
+    const at = this.faceAt(p.x, p.z, p.y + 0.4, c.nx, c.nz);
+    if (!at) return false;
+    this.mode = 'climb';
+    this.face.nx = c.nx; this.face.nz = c.nz; this.face.from = p.y;
+    p.y += 0.4;
+    p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE;
+    this.vel.x = this.vel.y = this.vel.z = 0;
+    this.yaw = Math.atan2(-c.nx, -c.nz);
+    this.pushing = 0;
+    return true;
+  }
+
+  /** Let go of the face: falling, pushed off it a little. */
+  private letGo(): void {
+    this.mode = 'air';
+    this.airTop = this.pos.y;
+    this.vel.x = -this.face.nx * 1.2; this.vel.z = -this.face.nz * 1.2; this.vel.y = 0;
+  }
+
+  /** On a face (climbing up, down or along it as the keys say) or pulling up over its top. */
+  private climbStep(intent: WalkIntent, dt: number): void {
+    const p = this.pos, F = this.face;
+    this.vel.x = this.vel.y = this.vel.z = 0;
+    if (this.mode === 'pull') {
+      const q = this.pull;
+      q.t += dt / PULL_UP;
+      const u = Math.min(1, q.t), up = Math.min(1, u / 0.6), over = Math.max(0, (u - 0.4) / 0.6);
+      p.x = q.x0 + (q.x1 - q.x0) * over; p.z = q.z0 + (q.z1 - q.z0) * over; p.y = q.y0 + (q.y1 - q.y0) * up;
+      if (u >= 1) { this.mode = 'ground'; p.y = this.support(p.x, p.z, p.y); }
+      return;
+    }
+    // Spent, or jumping off: let go.
+    const moving = Math.abs(intent.forward) > 0.1 || Math.abs(intent.strafe) > 0.1;
+    if (intent.up || (this.tire && !this.tire(dt, moving ? 1 : 0.35))) { this.letGo(); return; }
+    const v = this.spec.climb ?? 0.8;
+    // The feet on the face again after the move: up or down, and along it (right of one facing it: (-nz, nx)).
+    const y = p.y + intent.forward * v * dt;
+    const ax = p.x + F.nx * OFF_FACE - F.nz * intent.strafe * v * 0.7 * dt, az = p.z + F.nz * OFF_FACE + F.nx * intent.strafe * v * 0.7 * dt;
+    // Over the top: the ground just in from the face is no higher than a pull-up and walkable.
+    const tx = ax + F.nx * 0.9, tz = az + F.nz * 0.9, top = this.world.height(tx, tz);
+    if (intent.forward > 0 && top - y < 1.1 && this.groundSlope(tx, tz) <= this.spec.maxSlope) {
+      const q = this.pull;
+      this.mode = 'pull';
+      q.t = 0; q.x0 = p.x; q.y0 = p.y; q.z0 = p.z; q.x1 = tx; q.z1 = tz; q.y1 = top;
+      return;
+    }
+    // Down to the foot: off onto the ground.
+    const back = this.support(p.x - F.nx * 0.3, p.z - F.nz * 0.3, y);
+    if (intent.forward < 0 && back >= y - 0.25 && this.groundSlope(p.x, p.z) <= this.spec.maxSlope * 1.5) {
+      this.mode = 'ground';
+      p.y = this.support(p.x, p.z, y);
+      return;
+    }
+    const at = this.faceAt(ax, az, y, F.nx, F.nz);
+    const c = at && this.world.climbable?.(at[0] + F.nx * 0.2, at[1] + F.nz * 0.2);
+    // No holds there (the broken rock ends): the body stays where it is.
+    if (!at || !c) return;
+    F.nx = c.nx; F.nz = c.nz;
+    p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE; p.y = y;
+    this.yaw = Math.atan2(-c.nx, -c.nz);
   }
 
   /** The gait for the animator. */
