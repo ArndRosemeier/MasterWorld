@@ -8,7 +8,7 @@
 import type { Vector3 } from 'three/webgpu';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { Stage } from '@futuremagic/stage';
-import type { Agent, TownLife, TownWeather } from '../sim/townLife';
+import { goingThrough, type Agent, type TownLife, type TownWeather } from '../sim/townLife';
 import type { Herds } from '../sim/livestock';
 import { Township, type TownshipContext, type TownshipSave } from '../game/township';
 import type { RegionDecision } from '../world/decisions';
@@ -208,7 +208,7 @@ export class Towns {
   /** Each walled town's gates (a capital's), drawn while the camera is near it. */
   private readonly gates = new Map<string, GateView>();
 
-  /** The gates of walled towns near the camera: open by day; at night opened for the hero and anyone walking through. */
+  /** The gates of walled towns near the camera: open by day; at night opened for the hero and anyone on their way through. */
   private swingGates(dt: number, cam: Vector3): void {
     const [dusk, dawn] = this.h.setting.routines.dark, hour = ((this.h.hours() % 24) + 24) % 24;
     const day = dusk > dawn ? hour < dusk && hour >= dawn : hour < dawn || hour >= dusk;
@@ -220,7 +220,7 @@ export class Towns {
       if (!near) { if (g) { g.clear(); this.gates.delete(id); } continue; }
       if (!g) { g = new GateView(this.h.stage, wall, id, day); this.gates.set(id, g); void g.place(); }
       const t = this.cores.get(id), folk = t?.living ? t.life.agents : [];
-      g.swing(dt, day, (x, z, r) => Math.hypot(cam.x - x, cam.z - z) < r || folk.some((a) => !a.hidden && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r));
+      g.swing(dt, day, (x, z, r) => Math.hypot(cam.x - x, cam.z - z) < r || folk.some((a) => goingThrough(a, x, z, r)));
     }
   }
 

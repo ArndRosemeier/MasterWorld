@@ -128,9 +128,11 @@ else {
   const open = () => page.evaluate(([id, i]) => window.game.towns.gatesOf(id)?.[i] ?? -1, [cap.id, gi]);
   await page.evaluate(() => { window.game.view.sky.hour = 22.5; });
   await before(44);
-  await page.waitForTimeout(4000);
+  // The hour jumped: let the town's people get home first (one coming through holds the gate open).
+  let shut = -1;
+  for (let i = 0; i < 20 && (shut = await open()) !== 0; i++) await page.waitForTimeout(1000);
   await settle();
-  const shut = await open();
+  shut = await open();
   await shoot('04-gate-night', await measureFrames(page, 1500));
   if (shut !== 0) { console.log(`the gate stands ${shut.toFixed(2)} open at night with nobody by it`); failed = true; }
   await before(14);

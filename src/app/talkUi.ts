@@ -161,6 +161,9 @@ export class TalkUi {
     this.offer();
   }
 
+  /** The talk's view again (after a scene played in it, the map's hand-over). */
+  reframe(): void { if (this.partner) this.frame(this.partner); }
+
   /** The talk's view of `a`, past the others about. */
   private frame(a: Agent): void {
     const at = this.whereIs(a);

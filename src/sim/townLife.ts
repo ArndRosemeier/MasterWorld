@@ -8,7 +8,7 @@
  * walks. Deterministic for a seed and a sequence of steps. Pure.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { polyCentroid, type TownPlan } from '@futuremagic/settlement';
+import { distSqPointSeg, polyCentroid, type TownPlan } from '@futuremagic/settlement';
 import { NavGraph, aroundHouse } from './nav';
 import type { DayTask, RoutinesDef } from '../setting/contract';
 import { routines as classicRoutines } from '../setting/classic/routines';
@@ -77,6 +77,24 @@ const facing = (a: Agent, x: number, z: number): number => Math.atan2(z - a.z, x
 
 /** Work done facing a thing that stands between the worker and whoever comes up to them (the thing 0.9 m before them). */
 const AT_A_THING = new Set<ActivityKind>(['smith', 'stoke', 'quench', 'bake', 'craft', 'tend', 'serve']);
+
+/** A walker going through a gateway passes this close to its middle (m); their way is looked at this many points ahead. */
+const GATEWAY = 4, AHEAD = 4;
+
+/**
+ * Whether `a` is on their way through the gateway at (x, z) and within `r` of it: walking, their way ahead
+ * passing through it (someone going along a street inside the wall does not open the town's gate at night).
+ */
+export function goingThrough(a: Agent, x: number, z: number, r: number): boolean {
+  if (a.hidden || a.act !== 'walk' || Math.abs(a.x - x) > r || Math.abs(a.z - z) > r) return false;
+  let px = a.x, pz = a.z;
+  for (let i = a.pi; i < Math.min(a.pi + AHEAD, a.path.length / 2); i++) {
+    const qx = a.path[i * 2], qz = a.path[i * 2 + 1];
+    if (distSqPointSeg(x, z, px, pz, qx, qz) < GATEWAY * GATEWAY) return true;
+    px = qx; pz = qz;
+  }
+  return false;
+}
 
 /**
  * The way round the thing someone at spot `s` works at, to stand by it on the side of (x, z) (who wants to talk),

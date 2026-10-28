@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planTown, pointInPoly } from '@futuremagic/settlement';
-import { roundTheWork, TownLife } from '../src/sim/townLife';
+import { goingThrough, roundTheWork, TownLife, type Agent } from '../src/sim/townLife';
 import type { ActivityKind, Spot } from '../src/sim/spots';
 
 // A town on flat land (no terrain needed): the plan is all the simulation reads.
@@ -176,4 +176,13 @@ test('town life: someone at work behind a barrel comes round it to talk, and is 
   assert.ok(Math.abs(Math.atan2(Math.sin(a.dir - Math.atan2(hz - a.z, hx - a.x)), Math.cos(a.dir - Math.atan2(hz - a.z, hx - a.x)))) < 0.01, 'facing the hero');
   life.letGo(a);
   assert.ok(!a.held);
+});
+
+test('town life: a gate opens at night for someone on their way through it, not for someone going along the wall', () => {
+  // A gateway at the origin; the wall runs along x.
+  const walker = (x: number, z: number, path: number[]) => ({ x, z, act: 'walk', hidden: false, path, pi: 0 }) as unknown as Agent;
+  assert.ok(goingThrough(walker(0, -15, [0, -5, 0, 10]), 0, 0, 22), 'coming up to it and on through');
+  assert.ok(!goingThrough(walker(-15, 6, [-5, 6, 15, 6]), 0, 0, 22), 'along the street inside');
+  assert.ok(!goingThrough(walker(0, -30, [0, 10]), 0, 0, 22), 'still too far off');
+  assert.ok(!goingThrough({ ...walker(0, -5, [0, 10]), act: 'chat' } as Agent, 0, 0, 22), 'standing by it');
 });

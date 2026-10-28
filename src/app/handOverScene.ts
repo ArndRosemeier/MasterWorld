@@ -3,19 +3,23 @@
  * the pack and holds it out, the teller takes it in both hands and marks it with a quill (their hands busy
  * over it), holds it out again, and the hero takes it back and puts it away. Driven by the hand-over's clock
  * (app/handOver.ts HandOverStage); the hero is a puppet meanwhile (their right hand reaching), the sheet goes
- * from hand to hand (render/hero/MapSheet.ts).
+ * from hand to hand (render/hero/MapSheet.ts). The camera watches from the side, both of them and the hands
+ * between them in the frame.
  */
 import { Vector3 } from 'three/webgpu';
 import type { LimbGoals } from '@futuremagic/figure';
 import type { Agent } from '../sim/townLife';
 import type { MapSheet } from '../render/hero/MapSheet';
 import type { Puppet } from './player';
+import type { Shot } from './heroCamera';
 import { heroReach, MARK, MARKED, sheetHeldBy, type HandOverStage } from './handOver';
 
 /** The hero's hand held out this far towards the teller (m, at most), this high over the feet, a little to the right. */
 const REACH = 0.55, CHEST = 1.15, RIGHT = 0.12;
 /** The sheet is tipped up towards whoever holds it (rad): held out flat-ish, read while marked. */
 const TIP_OUT = -0.25, TIP_READ = -0.6;
+/** Seen from straight behind either of them the hands are hidden: so much worse per unit of looking along the way between them. */
+const ALONG = 8;
 
 /** What the scene reads of the world each frame. */
 export interface HandOverWorld {
@@ -32,7 +36,8 @@ export interface HandOverWorld {
 
 export class HandOverScene implements HandOverStage, Puppet {
   readonly pose = null;
-  readonly shot = null;
+  /** From the side of the two of them, looking at the middle between them at chest height (null: the hero alone). */
+  shot: Shot | null = null;
   readonly walking = false;
   readonly vel: [number, number, number] = [0, 0, 0];
   readonly clip = undefined;
@@ -52,6 +57,13 @@ export class HandOverScene implements HandOverStage, Puppet {
     // Facing the teller (a walker's yaw: forward is (-sin, -cos)).
     const t = this.with;
     this.yaw = t ? Math.atan2(-(t.x - h.x), -(t.z - h.z)) : h.yaw;
+    if (t) {
+      const ux = t.x - h.x, uz = t.z - h.z, l = Math.hypot(ux, uz) || 1, mx = (h.x + t.x) / 2, mz = (h.z + t.z) / 2;
+      this.shot = {
+        round: new Vector3(mx, h.y, mz), at: new Vector3(mx, h.y + CHEST - 0.1, mz),
+        cost: (dx, dz) => Math.abs((dx * ux + dz * uz) / l) * ALONG,
+      };
+    } else this.shot = null;
     this.w.puppet(this);
   }
 
@@ -84,6 +96,7 @@ export class HandOverScene implements HandOverStage, Puppet {
     this.sheet.stow();
     if (this.with?.held) this.with.act = 'chat';
     this.with = null;
+    this.shot = null;
     this.limbs.R!.w = 0;
     this.w.puppet(null);
   }

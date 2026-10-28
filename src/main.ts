@@ -1176,7 +1176,7 @@ export async function start(b: Boot): Promise<void> {
         teller: () => talk?.partner ?? null,
         heroHand: (out) => player.hero?.handAt('r', out) ?? null,
         tellerHand: (a, side, out) => folk?.agentHand(a, side, out) ?? null,
-        puppet: (p) => { if (p) { if (!player.puppet) player.puppet = p; } else if (player.puppet === scene) player.puppet = null; },
+        puppet: (p) => { if (p) { if (!player.puppet) player.puppet = p; } else if (player.puppet === scene) { player.puppet = null; talk?.reframe(); } },
       }, new MapSheet(view.stage));
       handOver.world = scene;
     }
