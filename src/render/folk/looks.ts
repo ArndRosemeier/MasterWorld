@@ -136,14 +136,16 @@ export function clipOf(act: ActivityKind, id: number): string {
   return CLIP[act];
 }
 
+/** What a look is made of, as far as its shaders go: each garment, the hair, the beard, the body. */
+export const partsOf = (l: CharacterPatch): string[] => [...(l.outfit ?? []), `hair:${l.hair}`, `beard:${l.beard}`, `race:${l.race}`];
+
 /**
- * A few of `people` whose looks between them wear every garment, hairstyle and beard any of them has:
- * dressed in turn behind the loading screen, they compile every kind of mesh the town will show.
+ * A few of `people` whose looks between them wear every garment, hairstyle and beard any of them has (but those
+ * `worn` already): dressed in turn behind the loading screen, they compile every kind of mesh the town will show.
  */
-export function coveringLooks(people: readonly Person[]): CharacterPatch[] {
-  const partsOf = (l: CharacterPatch) => [...(l.outfit ?? []), `hair:${l.hair}`, `beard:${l.beard}`, `race:${l.race}`];
+export function coveringLooks(people: readonly Person[], worn: ReadonlySet<string> = new Set()): CharacterPatch[] {
   const looks = people.map(lookOf);
-  const left = new Set(looks.flatMap(partsOf));
+  const left = new Set(looks.flatMap(partsOf).filter((x) => !worn.has(x)));
   const out: CharacterPatch[] = [];
   while (left.size) {
     let best = looks[0], gain = 0;

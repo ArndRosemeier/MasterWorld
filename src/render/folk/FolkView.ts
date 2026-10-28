@@ -5,7 +5,7 @@
  * (FarFolk). Characters far off draw their "Crowd" level (one draw call plus the hair).
  */
 import { Frustum, Group, Matrix4, Sphere, Vector3, type Camera, type Object3D, type WebGPURenderer } from 'three/webgpu';
-import { Character, type CharacterCatalog } from '@actors/generator';
+import { Character, type CharacterCatalog, type CharacterPatch } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
@@ -16,7 +16,7 @@ import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
 import { castShadows, eachMesh, handOf, seatOf } from '../hero/play';
 import { SHADOW_ONLY } from '../sky';
-import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
+import { clipOf, coveringLooks, lookOf, partsOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -179,6 +179,8 @@ export class FolkView {
       this.warm = true;
       show();
     }).finally(show);
+    // Other towns' looks are tried on after these.
+    this.trials = done.catch(() => {});
     return { shown, done };
   }
 
@@ -189,6 +191,7 @@ export class FolkView {
     slot.busy = true; // not dressed for anybody while it tries the looks on
     this.trying = true;
     const looks = coveringLooks(this.dressedAs);
+    for (const l of looks) for (const x of partsOf(l)) this.worn.add(x);
     for (let i = 0; i < looks.length; i++) {
       if (i === 1) first();
       // Before the game begins the people round the hero come first: their dressing compiles what they wear, and
@@ -212,6 +215,44 @@ export class FolkView {
     slot.busy = false;
     this.trying = false;
   }
+  /**
+   * Another town's people, made as the hero comes near it (a capital's guilds and peoples wear what the start's
+   * folk do not): a free character tries on, behind play, every garment, hair, beard and body of theirs not tried
+   * yet, each detail level, so none of it builds its shaders as they first come into view. One town at a time.
+   */
+  tryOn(people: readonly Person[]): void {
+    this.trials = this.trials.then(() => this.tryLooks(coveringLooks(people, this.worn))).catch((e: unknown) => console.error('[folk] trying looks on failed', e));
+  }
+
+  private async tryLooks(looks: CharacterPatch[]): Promise<void> {
+    if (!looks.length) return;
+    for (const l of looks) for (const x of partsOf(l)) this.worn.add(x);
+    let slot: Slot | undefined;
+    while (!(slot = this.slots.find((x) => !x.agent && !x.busy))) await new Promise((r) => setTimeout(r, 200));
+    slot.busy = true;
+    const { ch, place } = slot;
+    place.removeFromParent();
+    try {
+      for (const look of looks) {
+        await ch.set({ ...look, animation: 'walk' });
+        for (let k = 0; k < ch.lods.length; k++) {
+          ch.setLod(k);
+          this.adapt(place);
+          await this.stage.prepare(place, { everyCaster: true });
+        }
+      }
+    } finally {
+      ch.setLod(0);
+      place.visible = false;
+      slot.look = '';
+      slot.ready = false;
+      slot.busy = false;
+    }
+  }
+
+  /** The parts of looks tried on so far (warmAll, tryOn). */
+  private readonly worn = new Set<string>();
+  private trials: Promise<void> = Promise.resolve();
   private warm = false;
   /** The first character tries the looks on (warmAll). */
   private trying = false;

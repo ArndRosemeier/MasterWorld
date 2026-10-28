@@ -89,8 +89,24 @@ else {
   });
   // CAPITAL_PROFILE=1: a CPU profile of the ride's first seconds (where its slow frames bunch); build with
   // `npx vite build --minify false` for readable names.
-  // CAPITAL_WAIT_MS: stand this long before riding (does the work still running behind play make the first frames slow?).
-  if (process.env.CAPITAL_WAIT_MS) await page.waitForTimeout(Number(process.env.CAPITAL_WAIT_MS));
+  // The ride waits till the work that runs behind play after loading (the townsfolk's looks and the late kinds
+  // tried on) is over: its first seconds are slow wherever the hero is (shots/polish5: 44 slow frames in the
+  // first 100 m riding at once, 5 after a 25 s stand), and the ride measures the capital. CAPITAL_RIDE_AT_ONCE=1:
+  // ride at once (the start's own slow seconds).
+  if (process.env.CAPITAL_RIDE_AT_ONCE !== '1') {
+    const calm = await page.evaluate((most) => new Promise((done) => {
+      const t0 = performance.now(), win = [];
+      let last = t0;
+      const step = (now) => {
+        win.push(now - last); last = now;
+        if (win.length > 180) win.shift();
+        const slow = win.filter((d) => d > 25).length;
+        if ((win.length === 180 && slow === 0) || now - t0 > most) done({ s: (now - t0) / 1000, slow }); else requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }), 45000);
+    console.log(`calm behind play after ${calm.s.toFixed(1)} s more${calm.slow ? ` (still ${calm.slow} slow frames in the last 180)` : ''}`);
+  }
   const profiling = process.env.CAPITAL_PROFILE === '1' ? rideProfile(Number(process.env.CAPITAL_PROFILE_MS ?? 7000)) : null;
   const way = await page.evaluate(([g, m, pace]) => new Promise((done) => {
     const game = window.game, p = game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;
