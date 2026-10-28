@@ -358,7 +358,8 @@ function rockFaces(g: GroundTextures, p: Node<'vec3'>, n: Node<'vec3'>) {
   const thick = float(1).add(mx_noise_float(p.xz.mul(0.004)).mul(0.35));
   const bend = mx_fractal_noise_float(p.xz.mul(0.018), 2, 2.0, 0.5).mul(5).add(p.x.add(p.z).mul(0.04));
   const sy = p.y.add(bend).div(thick);
-  const shift = mx_noise_float(vec2(sy.mul(0.45), 0.5)).mul(6);
+  // (Slowly with height: a quick shift shears the beds into swirls, wood grain up close.)
+  const shift = mx_noise_float(vec2(sy.mul(0.12), 0.5)).mul(2);
   const rx = layer('cliffStrata', vec2(p.z.add(shift), sy)), rz = layer('cliffStrata', vec2(p.x.add(shift), sy)), ry = layer('rockFace', p.xz);
   const big = 1 / 9;
   const mx = layer('cliffStrata', vec2(p.z, sy).mul(big)), mz = layer('cliffStrata', vec2(p.x, sy).mul(big));

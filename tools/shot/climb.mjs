@@ -26,7 +26,8 @@ page.on('pageerror', (e) => errors.push(`${e.message}\n${e.stack ?? ''}`));
 await page.goto(`${base}?seed=masterworld&title=0&hour=15&weather=clear&pos=${FOOT.x},${FOOT.z}${gl ? '&gl' : ''}`);
 await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT });
 await page.addStyleTag({ content: '#loading{display:none!important}' });
-await page.waitForTimeout(3000);
+// The late shader kinds build after play starts (MW #264): the ground shows untextured until they are in.
+await page.waitForTimeout(12000);
 await page.click('canvas', { position: { x: 640, y: 360 } }).catch(() => {});
 
 let failed = false;
@@ -36,7 +37,13 @@ const shoot = async (name) => {
   await page.screenshot({ path: file, type: 'jpeg', quality: 88, timeout: TIMEOUT });
   console.log(file);
 };
-const state = () => page.evaluate(() => { const w = window.game.player.walker; return { mode: w.mode, x: w.pos.x, y: w.pos.y, z: w.pos.z }; });
+const state = () => page.evaluate(() => {
+  const p = window.game.player, w = p.walker, h = p.hero;
+  // The body as drawn: posed by the climb (rigged), its clip, its yaw against the walker's, its hands' height over its feet.
+  const o = h?.object, hand = o?.getObjectByName?.('mixamorigRightHand') ?? null;
+  return { mode: w.mode, x: w.pos.x, y: w.pos.y, z: w.pos.z, rigged: !!h?.rigged, clip: h?.clip, yaw: o ? o.rotation.y - Math.PI : null, walkerYaw: w.yaw,
+    handUp: hand && o ? hand.getWorldPosition(hand.position.clone()).y - o.getWorldPosition(o.position.clone()).y : null };
+});
 /** The camera from the side and a little below, so the face and the climber show. */
 const side = (turn) => page.evaluate((turn) => { const p = window.game.player; p.heroCam.yaw = p.walker.yaw + turn; p.heroCam.pitch = -0.1; p.heroCam.zoom = 6; }, turn);
 
@@ -51,7 +58,8 @@ for (let t = 0; t < 400 && !(pulled && k > 2); t++) {
   await page.waitForTimeout(500);
   const s = await state();
   top = Math.max(top, s.y);
-  if (s.mode === 'climb' && !on) { on = true; await side(1.2); }
+  if (s.mode === 'climb' && !on) { on = true; await side(1.2); console.log('on the face', JSON.stringify(s)); }
+  if (s.mode === 'climb' && t % 8 === 0) console.log(JSON.stringify(s));
   if (s.mode === 'pull') pulled = true;
   // A picture every 4 s on the face, and through the pull-up.
   if ((s.mode === 'climb' && t % 8 === 0) || s.mode === 'pull' || (pulled && s.mode === 'ground')) { await shoot(`1-${String(t).padStart(3, '0')}-${s.mode}`); if (pulled) k++; }

@@ -109,7 +109,7 @@ export function groundLook(t: Terrain): (x: number, z: number, color: Float32Arr
 }
 
 /** Vertex spacing (m) from which normals are taken over two cells each way (smoothNormals). */
-const SMOOTH_STEP = 16;
+const SMOOTH_STEP = 4;
 
 export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const { x0, z0, size, segs } = spec;
