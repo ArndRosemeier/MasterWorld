@@ -105,3 +105,30 @@ test('wild: the dwarves\' hold stands on the land (plan 11.6): in its ring from 
   }
   for (const t of places) assert.ok(Math.hypot(t.x - hold.x, t.z - hold.z) > t.r + 60, `${t.id} keeps off the hold`);
 });
+
+test('wild: deer keep their distance (Arnd 2026-10-28): they bolt once, then watch from afar and never creep back', () => {
+  const wilds = new Wilds(places, land, classic.creatures);
+  const deer = wilds.bands.find((b) => b.territory.kind === 'deer')!;
+  const t = deer.territory, wary = classic.creatures.find((c) => c.id === 'deer')!.wary!;
+  // The hero stands in their meadow for three minutes.
+  const q = hero(t.x, t.z);
+  let fled = 0, near = 0;
+  for (let i = 0; i < 1800; i++) {
+    for (const e of wilds.step(0.1, q)) if (e.event.kind === 'flee') fled++;
+    if (i > 300) for (const c of deer.den.creatures) if (Math.hypot(c.x - q.x, c.z - q.z) < wary) near++;
+  }
+  assert.ok(fled <= deer.den.creatures.length, `${fled} bolts from ${deer.den.creatures.length} deer`);
+  assert.equal(near, 0, 'none walks back up to the hero');
+  // Seen from just beyond their flight distance: heads up, watching, not coming nearer.
+  const w2 = new Wilds(places, land, classic.creatures);
+  const d2 = w2.bands.find((b) => b.territory.kind === 'deer')!;
+  const c0 = d2.den.creatures[0];
+  const watcher = hero(c0.x + wary + 6, c0.z);
+  let bolts = 0, closest = Infinity;
+  for (let i = 0; i < 600; i++) {
+    for (const e of w2.step(0.1, watcher)) if (e.event.kind === 'flee') bolts++;
+    for (const c of d2.den.creatures) closest = Math.min(closest, Math.hypot(c.x - watcher.x, c.z - watcher.z));
+  }
+  assert.ok(closest > wary * 0.9, `closest ${closest.toFixed(1)} m`);
+  assert.ok(bolts <= d2.den.creatures.length, `${bolts} bolts`);
+});
