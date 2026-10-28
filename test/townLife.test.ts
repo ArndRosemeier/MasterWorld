@@ -42,21 +42,20 @@ test('town life: through a whole day nobody stands around, and everyone does sev
   assert.ok(few / adults.length < 0.05, `${few} of ${adults.length} adults did fewer than 3 things`);
 });
 
-test('town life: with the clock stopped the town keeps busy, and walkers keep to the streets', () => {
+test('town life: with the clock stopped the town keeps busy, and nobody seen out of doors is ever in a house\'s walls', () => {
   const life = new TownLife(plan, 7, 16);
-  let walking = 0, inside = 0;
+  const inWalls: string[] = [];
   const busy = new Set<number>();
   for (let s = 0; s < 600; s++) {
     life.step(1, 16);
     for (const a of life.agents) {
-      if (a.act !== 'walk') continue;
-      busy.add(a.person.id);
-      walking++;
-      if (plan.buildings.some((b) => Math.abs(b.cx - a.x) < 12 && Math.abs(b.cz - a.z) < 12 && pointInPoly(b.poly, a.x, a.z))) inside++;
+      if (a.act === 'walk') busy.add(a.person.id);
+      // Walking round a house, at work by it, at play before it (a walk once cut through the next house).
+      if (!a.hidden && plan.buildings.some((b) => Math.abs(b.cx - a.x) < 12 && Math.abs(b.cz - a.z) < 12 && pointInPoly(b.poly, a.x, a.z))) inWalls.push(`${a.act} ${a.x.toFixed(1)}, ${a.z.toFixed(1)}`);
     }
   }
   assert.ok(busy.size > life.agents.length * 0.5, `${busy.size} of ${life.agents.length} went somewhere in 10 minutes`);
-  assert.ok(inside / walking < 0.03, `${((inside / walking) * 100).toFixed(1)} % of walking steps inside a house`);
+  assert.deepEqual(inWalls.slice(0, 5), [], `${inWalls.length} seen in a house's walls`);
 });
 
 test('town life: the VGM gathers the town on the market, then sends everyone indoors', () => {
