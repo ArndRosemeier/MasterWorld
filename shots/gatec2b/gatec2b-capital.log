@@ -1,0 +1,10 @@
+
+> masterworld@0.0.0 shot:capital
+> node tools/shot/capital.mjs shots/gatec2b/capital
+
+region-24: 696 buildings, 2654 people, 5 gates; playable in 15.9 s
+01-gate.jpg: p50 7.2 ms, p95 9.4 ms
+worst frame coming in: 40 ms
+02-market.jpg: p50 10.6 ms, p95 15.5 ms
+03-seat.jpg: p50 11.2 ms, p95 17.3 ms
+F3: 0 shader violations

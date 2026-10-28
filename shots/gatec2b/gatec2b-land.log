@@ -1,0 +1,20 @@
+cellar: ready in 20.2 s
+12-cellar.jpg: drawn 0.1 s · settled 4.0 s · p50 5.2 ms · p95 14.1 ms · 0 shader violations
+land: ready in 15.4 s
+13-barrow.jpg: drawn 0.0 s · settled 4.0 s · p50 11.2 ms · p95 30.0 ms · 0 shader violations
+14-wild.jpg: drawn 0.4 s · settled 3.1 s · p50 8.2 ms · p95 11.1 ms · 0 shader violations
+15-fight.jpg: drawn 0.0 s · settled 1.5 s · p50 7.5 ms · p95 10.8 ms · 0 shader violations
+16-fight-magic.jpg: drawn 0.0 s · settled 1.5 s · p50 7.9 ms · p95 10.8 ms · 0 shader violations
+hamlet: ready in 14.6 s
+19-hamlet.jpg: drawn 0.1 s · settled 4.0 s · p50 8.0 ms · p95 15.8 ms · 0 shader violations
+20-road.jpg: drawn 0.2 s · settled 1.5 s · p50 6.5 ms · p95 8.8 ms · 0 shader violations
+village: ready in 14.1 s
+21-village.jpg: drawn 0.1 s · settled 4.0 s · p50 11.1 ms · p95 14.2 ms · 0 shader violations
+hold: ready in 11.5 s
+22-hold.jpg: drawn 2.7 s · settled 4.0 s · p50 10.7 ms · p95 28.0 ms · 0 shader violations
+23-hold-crag.jpg: drawn 0.1 s · settled 1.5 s · p50 12.9 ms · p95 29.8 ms · 0 shader violations
+24-hold-warden.jpg: drawn 0.1 s · settled 1.5 s · p50 11.4 ms · p95 29.5 ms · 0 shader violations
+situations: ready in 14.1 s
+25-hurt-traveller.jpg: drawn 0.0 s · settled 1.5 s · p50 10.2 ms · p95 27.4 ms · 0 shader violations
+26-raided-farm.jpg: drawn 0.0 s · settled 1.5 s · p50 7.8 ms · p95 10.1 ms · 0 shader violations
+land: 13 shots in shots\gatec2b\2026-10-28-0654bdb (171 s)
