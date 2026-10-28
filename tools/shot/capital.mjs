@@ -87,6 +87,9 @@ else {
     span(g.view.stage, 'prepare', 'stage prepare');
     span(g.view.renderer, 'render', 'render');
   });
+  // CAPITAL_PROFILE=1: a CPU profile of the ride's first seconds (where its slow frames bunch); build with
+  // `npx vite build --minify false` for readable names.
+  const profiling = process.env.CAPITAL_PROFILE === '1' ? rideProfile(Number(process.env.CAPITAL_PROFILE_MS ?? 7000)) : null;
   const way = await page.evaluate(([g, m, pace]) => new Promise((done) => {
     const game = window.game, p = game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;
     // To a point 34 m out before the gate, along its road's line.
@@ -120,6 +123,7 @@ else {
     console.log(`  ${f.dt.toFixed(0)} ms at ${f.at} m (outside these: ${(f.dt - known).toFixed(0)}): ${Object.entries(f.spans).filter(([, v]) => v >= 0.5).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')}${f.builds.length ? ' | ' + f.builds.join('; ') : ''}`);
   }
   rows.way = { ...way, frames: undefined };
+  if (profiling) await profiling;
   // Before the gate, outside, looking back in through the gateway.
   await page.evaluate(([g, m]) => {
     const p = window.game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;
@@ -197,3 +201,30 @@ writeFileSync(join(dir, 'index.md'), [
 await browser.close();
 await server.close();
 process.exit(failed ? 1 : 0);
+
+/** A CPU profile of the main thread for `ms`: self time and time with callees, by function (the game's own and the libraries'). */
+async function rideProfile(ms) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+  await cdp.send('Profiler.start');
+  await new Promise((r) => setTimeout(r, ms));
+  const { profile: prof } = await cdp.send('Profiler.stop');
+  await cdp.detach();
+  const self = new Map(), parent = new Map(), byId = new Map(prof.nodes.map((n) => [n.id, n]));
+  for (let i = 0; i < prof.samples.length; i++) self.set(prof.samples[i], (self.get(prof.samples[i]) ?? 0) + (prof.timeDeltas[i] ?? 0) / 1000);
+  for (const n of prof.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
+  const name = (n) => { const f = n.callFrame; return `${f.functionName || '(anonymous)'} ${(f.url.split('/').pop() || '(native)').replace(/-[\w-]{8}\.js$/, '.js')}:${f.lineNumber + 1}`; };
+  const own = new Map(), all = new Map();
+  let total = 0;
+  for (const [id, t] of self) {
+    const n = byId.get(id);
+    if (n.callFrame.functionName === '(idle)') continue;
+    total += t;
+    own.set(name(n), (own.get(name(n)) ?? 0) + t);
+    const seen = new Set();
+    for (let x = id; x !== undefined; x = parent.get(x)) { const k = name(byId.get(x)); if (!seen.has(k)) { seen.add(k); all.set(k, (all.get(k) ?? 0) + t); } }
+  }
+  const top = (m, n) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, t]) => `  ${t.toFixed(0).padStart(6)} ms  ${k}`).join('\n');
+  console.log(`ride CPU profile, first ${ms / 1000} s: ${total.toFixed(0)} ms busy\nself time:\n${top(own, 30)}\nwith callees:\n${top(all, 40)}`);
+}
