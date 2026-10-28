@@ -94,7 +94,7 @@ import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
 import { HandOverScene } from './app/handOverScene';
 import { MapSheet } from './render/hero/MapSheet';
-import { Orientation, mastery } from './game/orientation';
+import { Orientation } from './game/orientation';
 import { HOME_SIGHT, KnownLand } from './game/knownLand';
 import { Compass, type SkyGlyph } from './app/compass';
 import { fill } from './talk/folk';
@@ -1161,8 +1161,8 @@ export async function start(b: Boot): Promise<void> {
       roadLines: () => terrain.roads.roads,
       signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) }))),
     }) : null;
-    // The compass at the top (plan 17.1): turns with the camera, its needle as true as the orientation skill.
-    const compass = new Compass(seed);
+    // The compass at the top (plan 17.1): turns with the camera and always points true (no skill needed).
+    const compass = new Compass();
     const skyGlyph = (): SkyGlyph => {
       const w = wx.shown;
       return w.rain > 0.1 ? (w.snow > 0.5 ? 'snow' : 'rain') : w.cover > 0.6 ? 'cloud' : 'clear';
@@ -1706,10 +1706,9 @@ export async function start(b: Boot): Promise<void> {
       // The map fills in: the land round the hero as they go (not below ground), and a sketch of the way to each new mark.
       if (!visit() && (!seenAt || Math.hypot(at.x - seenAt[0], at.z - seenAt[1]) > 16)) { seenAt = [at.x, at.z]; known.see(at.x, at.z); }
       for (const l of journal.open) if (!known.told(l.id)) known.tell(l.id, rooms?.outside ? [rooms.outside.x, rooms.outside.z] : [at.x, at.z], [l.mark.x, l.mark.z]);
-      compass.visible = !title?.holding && !creator?.showing && !!window.__mwReady;
-      if (compass.visible) {
+      if (compass.showWhile(!title?.holding && !creator?.showing && !!window.__mwReady)) {
         const look = player.flying ? player.fly.yaw : player.heroCam.yaw;
-        compass.read(dt, { bearing: believed(look), look, mastery: mastery(character.skill('orientation')), hour: view.sky.hour, sky: skyGlyph(), marks: journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })) });
+        compass.read({ x: at.x, z: at.z, look, hour: view.sky.hour, sky: skyGlyph(), marks: journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })) });
       }
       direct(dt);
       notes.update(dt);
