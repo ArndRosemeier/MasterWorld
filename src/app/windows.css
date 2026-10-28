@@ -219,9 +219,9 @@
 @media (max-width: 560px) { .lessons .lesson { grid-template-columns: 1fr 36px 90px; } .lessons .rule { grid-column: 1 / -1; grid-row: 2; } }
 
 /* Talk (talkUi.ts): a brass speaking-ring; the topics turn into place like a dial, ones with a new lead glow. */
-#talk-prompt { position: fixed; left: 50%; bottom: 18%; transform: translateX(-50%); z-index: 5; padding: 6px 14px; background: linear-gradient(var(--leather-hi), var(--leather)); border: 1px solid var(--brass-mid); border-radius: 16px; color: var(--ink); font: 15px/1.3 'EB Garamond', Georgia, serif; pointer-events: none; opacity: 0; transition: opacity .2s, transform .25s cubic-bezier(.3, 1.6, .5, 1); box-shadow: 0 4px 14px #0009; }
-#talk-prompt.on { opacity: 1; transform: translateX(-50%) translateY(-4px); }
-#talk-prompt kbd, .talk kbd { display: inline-block; min-width: 1.1em; padding: 0 5px; margin-right: 7px; text-align: center; border: 1px solid var(--brass-mid); border-bottom-width: 2px; border-radius: 4px; color: var(--brass-hi); background: #0d0907; font: 13px 'Marcellus SC', Georgia, serif; }
+#talk-prompt, #use-prompt { position: fixed; left: 50%; bottom: 18%; transform: translateX(-50%); z-index: 5; padding: 6px 14px; background: linear-gradient(var(--leather-hi), var(--leather)); border: 1px solid var(--brass-mid); border-radius: 16px; color: var(--ink); font: 15px/1.3 'EB Garamond', Georgia, serif; pointer-events: none; opacity: 0; transition: opacity .2s, transform .25s cubic-bezier(.3, 1.6, .5, 1); box-shadow: 0 4px 14px #0009; }
+#talk-prompt.on, #use-prompt.on { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+#talk-prompt kbd, #use-prompt kbd, .talk kbd { display: inline-block; min-width: 1.1em; padding: 0 5px; margin-right: 7px; text-align: center; border: 1px solid var(--brass-mid); border-bottom-width: 2px; border-radius: 4px; color: var(--brass-hi); background: #0d0907; font: 13px 'Marcellus SC', Georgia, serif; }
 .talk { position: fixed; right: 20px; top: 50%; transform: translateY(-50%) translateX(30px); z-index: 9; width: min(410px, calc(100vw - 40px)); max-height: 76vh; display: flex; flex-direction: column; box-sizing: border-box; color: var(--ink);
   background: linear-gradient(170deg, #2e2016, var(--leather) 45%, #170f0b); border: 3px solid var(--brass-mid); border-radius: 12px;
   box-shadow: inset 0 0 0 1px var(--brass-lo), inset 0 0 0 7px var(--leather), inset 0 0 0 8px var(--brass-lo), 0 12px 40px #000b;
@@ -279,3 +279,4 @@
 @keyframes te-burn { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); opacity: .2; } }
 @keyframes te-rise { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -60px); } }
 @media (prefers-reduced-motion: reduce) { .tales-end *, .tales-end { animation: none !important; transition: none !important; } }
+#use-prompt { bottom: 24%; }

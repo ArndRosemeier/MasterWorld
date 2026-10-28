@@ -63,6 +63,7 @@ import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
 import { HatchClimb } from './app/hatchClimb';
+import { UsePrompt } from './app/usePrompt';
 import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
@@ -1523,7 +1524,8 @@ export async function start(b: Boot): Promise<void> {
       else void create(people ? PEOPLE_RACE[people] : null);
     };
     if (!title && ((params.create && !save) || save?.heir)) { paused(true); void create(null); }
-    // A cellar's hatch and ladder, climbed in sight (E; app/hatchClimb.ts).
+    // A cellar's hatch and ladder, climbed in sight (E; app/hatchClimb.ts), its key shown by them.
+    const usePrompt = new UsePrompt();
     const climbs = new HatchClimb({
       player, fade: new Fade(),
       hatchNear: () => (visit() ? null : rooms?.hatchNear() ?? null),
@@ -1784,6 +1786,8 @@ export async function start(b: Boot): Promise<void> {
       // Talk follows the hero from town to town (a talk going on stays where it is).
       { const t = here(); if (t) { if (!t.been) director.met('discovery'); t.been = true; if (talk) talk.place = t; } }
       talk?.watch();
+      // The key for what the hero stands by (a hatch, the ladder up): only the key and the deed, the climb is seen.
+      { const o = playing && open === 0 && !ended ? climbs.climbOffered : null; usePrompt.keyFor(settings.current.bindings.use[0], o === 'down' ? 'Climb down' : o === 'up' ? 'Climb up' : null); }
       const at = player.walker.pos;
       // The map fills in: the land round the hero as they go (not below ground), and a sketch of the way to each new mark.
       if (!visit() && (!seenAt || Math.hypot(at.x - seenAt[0], at.z - seenAt[1]) > 16)) { seenAt = [at.x, at.z]; known.see(at.x, at.z); }

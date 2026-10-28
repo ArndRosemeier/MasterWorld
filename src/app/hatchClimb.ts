@@ -114,16 +114,21 @@ export class HatchClimb implements Puppet {
   /** Climbing now. */
   get busy(): boolean { return this.host.player.puppet === this; }
 
+  /** What the use key (E) would do now: climb down the hatch the hero stands by, up the ladder they stand at, or nothing. */
+  get climbOffered(): 'down' | 'up' | null {
+    const P = this.host.player, w = P.walker;
+    if (this.starting || this.busy || P.puppet || P.offFoot || P.riding || w.mode !== 'ground') return null;
+    const v = this.host.below();
+    if (v) return v.atLadder && v.above ? 'up' : null;
+    return this.host.hatchNear() ? 'down' : null;
+  }
+
   /** The use key (E): down the hatch the hero stands by, or up the ladder they stand at. Whether it was used. */
   use(): boolean {
-    const P = this.host.player, w = P.walker;
-    if (this.starting || this.busy || P.puppet || P.offFoot || P.riding || w.mode !== 'ground') return false;
+    const was = this.climbOffered;
+    if (!was) return false;
     const v = this.host.below();
-    if (v) {
-      if (!v.atLadder || !v.above) return false;
-      this.up(v);
-      return true;
-    }
+    if (was === 'up' && v) { this.up(v); return true; }
     const h = this.host.hatchNear();
     if (!h) return false;
     this.starting = true;
