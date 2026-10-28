@@ -387,9 +387,9 @@ export class HydroTile {
 
   /** Smooth and resample a coarse path, then let it meander (offset by world position only). */
   private shape(px: number[], pz: number[], pl: number[], ph: number[]): River {
-    // Chaikin twice.
+    // Chaikin twice (a brook four times: it is narrow, so its bends would show as corners).
     let X = px, Z = pz, L = pl, H = ph;
-    for (let it = 0; it < 2; it++) {
+    for (let it = 0; it < (this.o.brook ? 4 : 2); it++) {
       const x: number[] = [X[0]], z: number[] = [Z[0]], l: number[] = [L[0]], h: number[] = [H[0]];
       for (let k = 0; k < X.length - 1; k++) {
         for (const t of [0.25, 0.75]) {
