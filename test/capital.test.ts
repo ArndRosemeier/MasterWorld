@@ -1,15 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
-import { regionDecisions, settlementsOf } from '../src/vgm/frontier';
+import { regionDecisions, settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { settlementOf } from '../src/world/decisions';
 import { townsfolk } from '../src/sim/people';
 import { guildHouses } from '../src/game/guilds';
-import { EAST, along, home, regions, terrain } from './frontierLand';
+import { EAST, first, home, regions, seed, terrain } from './frontierLand';
 
 /** The capital (C15, D41): the VGM founds one a few km out as the hero walks, and it replays from the log. */
 test('capital: one, a few km out, a decision in the log; walled, with its ruler, guild halls and shops', () => {
-  const log = along(EAST);
+  // Walking east until it is founded (the walk stops there).
+  const log = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, EAST, 9, (d) => settlementOf(d, regions.fills)?.size === 'capital')];
   const caps = regionDecisions(log).filter((d) => settlementOf(d, regions.fills)?.size === 'capital');
   assert.equal(caps.length, 1, 'one capital');
   const d = caps[0], t = settlementOf(d, regions.fills)!;

@@ -57,7 +57,16 @@ else {
   // Before a gate, outside, looking in through it.
   const g = cap.gates[0];
   await settle();
-  await standClear(page, { x: g.x, z: g.z, r: 6 }, 34, { pitch: 0.02 });
+  // Out along its road (away from the market), looking back in through the gateway.
+  await page.evaluate(([g, m]) => {
+    const p = window.game.player, ux = Math.cos(g.angle), uz = Math.sin(g.angle), s = (g.x - m.x) * ux + (g.z - m.z) * uz > 0 ? 1 : -1;
+    const x = g.x + ux * s * 34, z = g.z + uz * s * 34;
+    p.teleport(x, undefined, z, Math.atan2(x - g.x, z - g.z));
+    const cam = p.heroCam;
+    cam.yaw = p.walker.yaw + 0.25;
+    cam.pitch = 0.02;
+    cam.zoom = 2.6;
+  }, [g, cap.market]);
   await page.waitForTimeout(3000);
   await settle();
   await shoot('01-gate', await measureFrames(page, 2000));

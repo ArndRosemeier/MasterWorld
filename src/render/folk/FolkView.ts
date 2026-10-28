@@ -9,6 +9,7 @@ import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
+import { BENCH_SEAT } from '@futuremagic/settlement';
 import type { Agent, TownLife } from '../../sim/townLife';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
@@ -300,6 +301,8 @@ export class FolkView {
       } else s.since += dt;
       s.ch.update(dt);
       if (p?.seat !== undefined && clip.startsWith('sit')) this.seatOn(s, p.x, p.seat, p.z);
+      // Out of doors one sits on a bench (the town's fixtures, drawn with the houses).
+      else if (!p && a.act === 'sit' && clip.startsWith('sit')) this.seatOn(s, a.x, this.height(a.x, a.z) + BENCH_SEAT, a.z);
     }
     // The rest (and those whose character is still being dressed) as plain figures.
     const pending = near.filter(([, a]) => !this.shown.get(a)?.ready);

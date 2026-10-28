@@ -28,3 +28,13 @@ test('town: its buildings are meshed per cell and their walls stop the walker', 
   const s = marketStart(town.plan);
   assert.ok(!town.solid(s.x, s.z, 0.3), 'the market start is open');
 });
+
+test('town: its fixtures out of doors are drawn (stalls, the well, benches ...) and the hero walks round them, not the market start', () => {
+  const town = terrain.towns[0], h = (x: number, z: number) => terrain.height(x, z);
+  const count = (cells: ReturnType<typeof townMeshes>) => cells.reduce((s, c) => s + c.near.index.length, 0);
+  assert.ok(count(townMeshes(town, new Map(), h)) > count(townMeshes(town)), 'more drawn with the fixtures');
+  const well = town.plan.fixtures.find((f) => f.kind === 'well')!;
+  assert.ok(town.fixtureAt(well.x, well.z, 0.3) && !town.solid(well.x, well.z, 0.3), 'the well stops the hero only');
+  const s = marketStart(town.plan);
+  assert.ok(!town.fixtureAt(s.x, s.z, 0.3), 'the market start is free');
+});

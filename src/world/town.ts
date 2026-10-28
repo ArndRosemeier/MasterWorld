@@ -3,7 +3,7 @@
  * (@futuremagic/settlement), and what the ground is at a point of it (street, building, yard) for
  * the terrain, the plants and later the ground's look. Pure, runs in workers.
  */
-import { buildingEntrance, distToPoly, wallBlocks, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
+import { buildingEntrance, distToPoly, fixtureBlocks, wallBlocks, type Fixture, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { TownDecision } from './decisions';
 import type { Terrain } from './terrain';
 
@@ -102,6 +102,26 @@ export class Town {
     return false;
   }
 
+  /** The fixtures out of doors by 8 m square (for `fixtureAt`). */
+  private fixtureGrid: Map<string, Fixture[]> | null = null;
+
+  /** Does a body of radius `r` at (x, z) run into a fixture out of doors (a well, a stall, a woodpile ...)? The hero's; townsfolk use them. */
+  fixtureAt(x: number, z: number, r: number): boolean {
+    if (!this.near(x, z, r)) return false;
+    if (!this.fixtureGrid) {
+      this.fixtureGrid = new Map();
+      for (const f of this.plan.fixtures) {
+        const k = `${Math.floor(f.x / 8)},${Math.floor(f.z / 8)}`;
+        (this.fixtureGrid.get(k) ?? this.fixtureGrid.set(k, []).get(k)!).push(f);
+      }
+    }
+    const i = Math.floor(x / 8), j = Math.floor(z / 8);
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+      for (const f of this.fixtureGrid.get(`${i + di},${j + dj}`) ?? []) if (fixtureBlocks(f, x, z, r)) return true;
+    }
+    return false;
+  }
+
   /** Does a body of radius `r` standing at (x, z) touch a building's walls (or the temple's sanctuary, a fence, or the town wall away from its gates)? */
   solid(x: number, z: number, r: number, skip = -1): boolean {
     if (!this.near(x, z, r)) return false;
@@ -188,6 +208,8 @@ export class Town {
       }
     }
     this.fill(p.market, TownGround.Market);
+    // A capital's seat of rule stands in a paved court.
+    if (p.seatGrounds) this.fill(p.seatGrounds.outer, TownGround.Market);
     for (const b of p.buildings) this.fill(b.poly, TownGround.Building);
   }
 
