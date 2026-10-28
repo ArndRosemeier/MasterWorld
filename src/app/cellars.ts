@@ -29,7 +29,7 @@ import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh
 import { CaveSpace, caveField, caveShell } from '../world/dungeon/caveRock';
 import { MOUTH_WAY_DOWN, mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
 import { inWalkRaster } from '../world/dungeon/rockMesh';
-import { onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
+import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
 import { CELL } from '../world/dungeon/cellar';
 import type { DungeonLayout } from '@futuremagic/dungeon';
@@ -282,6 +282,8 @@ export class Cellars {
    */
   private heap(d: DungeonDecision, site: LandSite, layout: DungeonLayout): Mound {
     const h = this.host, y = h.ground(site.x, site.z);
+    // The land in the piece's own frame (its doorway at 0), so what stands on it is set on the ground.
+    const land = groundIn(site, (x, z) => h.ground(x, z), y);
     const put = (mesh: BuildingMesh, sink: number): Mesh => {
       const m = buildingMeshAt(mesh, site.x, y - sink, site.z, d.template, site.yaw);
       void h.stage.add(m);
@@ -300,9 +302,9 @@ export class Cellars {
     }
     if (shell === 'keep') {
       const size = towerOf(layout);
-      return { ...site, mesh: put(towerMesh(size, deriveSeed(d.seed, 'tower')), 0.02), inShape: (x, z, r) => inTowerShape(size, x, z, r), way: TOWER_WAY_IN, out: 2.4, cool: 0 };
+      return { ...site, mesh: put(towerMesh(size, deriveSeed(d.seed, 'tower'), land), 0.02), inShape: (x, z, r) => inTowerShape(size, x, z, r), way: TOWER_WAY_IN, out: 2.4, cool: 0 };
     }
-    return { ...site, mesh: put(barrowMesh(deriveSeed(d.seed, 'barrow')), 0.05), inShape: inBarrowShape, way: WAY_DOWN, out: 2.2, cool: 0 };
+    return { ...site, mesh: put(barrowMesh(deriveSeed(d.seed, 'barrow'), land), 0.05), inShape: inBarrowShape, way: WAY_DOWN, out: 2.2, cool: 0 };
   }
 
   /** New dwellers (a move-in after a clear, or a retake while it stands): only the latest of them lives there. */

@@ -168,10 +168,6 @@
     "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
   },
   {
-    "key": "clone: masterworld/world/dungeon/barrowMesh.ts#barrowMesh + masterworld/world/holdMesh.ts#holdMesh",
-    "reason": "Both are the MeshKit's usual opening (a kit and a seeded Rng, a few part builders, k.mesh()); the parts they build share nothing."
-  },
-  {
     "key": "idiom: [.camera .canvas .director .fight .hud .notes .player .setting] in masterworld/app/cellars.ts + masterworld/app/holdGate.ts + masterworld/app/wildLand.ts",
     "reason": "Each builds an Encounter (app/encounter.ts) from its host, whose constructor takes these parts; HoldHost already extends WildHost, so only the call remains."
   },
