@@ -30,6 +30,8 @@ export const names: Record<string, NamesDef> = {
 export const talk: TalkDef = {
   identity: {
     trade: "I'm {name}, the {trade}. Our home is {house}.",
+    'trade:ruler': "I am {name}. This realm is mine to keep, and the great hall is my seat. Speak plainly; I listen.",
+    'hand:ruler': "I'm {name}. I serve in the great hall, at the seat of the realm.",
     trader: "I'm {name}. I sell at the market, and we live in {house}.",
     keeper: "I'm {name}, keeper of the temple. I live in {house}.",
     hand: "I'm {name}. I help the {trade}; home is {house}.",

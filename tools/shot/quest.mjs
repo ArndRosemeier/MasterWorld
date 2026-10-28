@@ -64,7 +64,7 @@ else {
   if (!gift.knows) failed = true;
   else {
     await page.waitForTimeout(3000);
-    const said = await page.evaluate(() => window.game.birdForm?.invoke() ?? 'no bird form');
+    const said = await page.evaluate(() => { const b = window.game.birdForm; return b ? b.invoke() : 'no bird form'; });
     if (said) console.log(`bird form: ${said}`);
     await page.waitForTimeout(6000);
     await shoot('04-first-change');

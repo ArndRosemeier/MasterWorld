@@ -486,7 +486,7 @@ export async function start(b: Boot): Promise<void> {
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
         for (const d of walked) regionOpened(d);
-        const s = found.site, d = s.r + 14;
+        const s = found.site, d = s.r + (kind === 'capital' ? 60 : 14); // a capital's wall stands out past its houses
         player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
         break;
       }

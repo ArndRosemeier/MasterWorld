@@ -3,7 +3,7 @@
  * (@futuremagic/settlement), and what the ground is at a point of it (street, building, yard) for
  * the terrain, the plants and later the ground's look. Pure, runs in workers.
  */
-import { buildingEntrance, distToPoly, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
+import { buildingEntrance, distToPoly, wallBlocks, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { TownDecision } from './decisions';
 import type { Terrain } from './terrain';
 
@@ -102,10 +102,11 @@ export class Town {
     return false;
   }
 
-  /** Does a body of radius `r` standing at (x, z) touch a building's walls (or the temple's sanctuary, or a fence)? */
+  /** Does a body of radius `r` standing at (x, z) touch a building's walls (or the temple's sanctuary, a fence, or the town wall away from its gates)? */
   solid(x: number, z: number, r: number, skip = -1): boolean {
     if (!this.near(x, z, r)) return false;
     if (this.fenced(x, z, r)) return true;
+    if (this.plan.wall && wallBlocks(this.plan.wall, x, z, r)) return true;
     for (const b of this.plan.buildings) {
       if (b.id === skip) continue;
       const s = b.sanctuary;

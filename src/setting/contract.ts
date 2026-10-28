@@ -422,7 +422,7 @@ export interface RegionFillDef {
   /** How often, against the other fills that fit. */
   readonly weight: number;
   /** What stands there (none: plain country, nothing placed). */
-  readonly place: 'none' | 'waystation' | 'hamlet' | 'village' | 'camp' | 'ruin' | 'barrows';
+  readonly place: 'none' | 'waystation' | 'hamlet' | 'village' | 'capital' | 'camp' | 'ruin' | 'barrows';
   /** Footprint radius of the place, metres (trees keep out of it); a hamlet's or village's outline radius (its fields reach farther). */
   readonly radius?: number;
   /** How much farther round the footprint the trees keep off, metres (fields and gardens cleared, firewood cut). */
@@ -989,7 +989,7 @@ export interface NamesDef {
  * `{family}`, `{house}`, `{trade}` and `{sign}` are filled in by the engine.
  */
 export interface TalkDef {
-  /** Who someone is, by what they do (keys: trade, trader, keeper, hand, homemaker, child, traveller; {house} is where they live or lodge). */
+  /** Who someone is, by what they do (keys: trade, trader, keeper, hand, homemaker, child, traveller, or role:trade for one trade, as 'trade:ruler'; {house} is where they live or lodge). */
   readonly identity: Readonly<Record<string, string>>;
   /** The topics the player can pick, by id (greet, self, news, more, source, bye, and `lead` for a lead's topic). */
   readonly topics: Readonly<Record<string, string>>;
