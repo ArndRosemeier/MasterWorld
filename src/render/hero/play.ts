@@ -6,6 +6,7 @@
 import { LoopOnce, type Mesh, type Object3D, type Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { Character } from '@actors/generator';
+import { ORIGIN } from '../origin';
 
 /** Cross-fades (s): between gaits, and into a blow, a flinch or a fall (quicker, so it lands in time). */
 export const FADE = { loop: 0.25, once: 0.1 } as const;
@@ -71,4 +72,10 @@ export function seatOf(actor: Character['actor'], out: Vector3): Vector3 | null 
   actor.bones[ip].getWorldPosition(out);
   out.y -= drop;
   return out;
+}
+
+/** Where a hand of an Actors person is now, in the world (into `out`; the floating origin added back). Null before it has bones. */
+export function handOf(actor: Character['actor'], side: 'l' | 'r', out: Vector3): Vector3 | null {
+  const bone = actor.bones.find((b) => b.name === `hand_${side}`);
+  return bone ? ORIGIN.toWorld(bone.getWorldPosition(out)) : null;
 }

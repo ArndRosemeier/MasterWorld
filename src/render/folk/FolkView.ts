@@ -14,7 +14,7 @@ import type { Agent, TownLife } from '../../sim/townLife';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
-import { castShadows, eachMesh, seatOf } from '../hero/play';
+import { castShadows, eachMesh, handOf, seatOf } from '../hero/play';
 import { SHADOW_ONLY } from '../sky';
 import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 
@@ -218,6 +218,12 @@ export class FolkView {
   private waiting = 0;
 
   /** How many people within CLOSE in the camera's view (or of `focus`) are plain figures while their character is dressed (before the warm-up ends at least 1). */
+  /** Where a hand of `a`'s character is in the world (`out`); null if they are not drawn as a character now. */
+  agentHand(a: Agent, side: 'l' | 'r', out: Vector3): Vector3 | null {
+    const slot = this.shown.get(a);
+    return slot?.ready ? handOf(slot.ch.actor, side, out) : null;
+  }
+
   get undressed(): number { return this.warm ? this.waiting : Math.max(1, this.waiting); }
 
   /** While a building is drawn open: the people in it, where it has them (drawn besides those out of doors). */

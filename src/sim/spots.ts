@@ -3,7 +3,8 @@
  * (an anvil, a well, a bench ...) and each building's door becomes a spot; a spot says what can be done
  * there, by whom, for how long and by how many at once. Pure.
  */
-import { pointInPoly, type CropKind, type Fixture, type FixtureKind, type TownPlan } from '@futuremagic/settlement';
+import { hash2f } from '@futuremagic/core';
+import { distSqPointSeg, pointInPoly, type CropKind, type Fixture, type FixtureKind, type TownPlan } from '@futuremagic/settlement';
 
 /** What a person is doing (the renderer picks an animation by it). */
 export type ActivityKind =
@@ -14,7 +15,9 @@ export type ActivityKind =
   /** Farm work: in the fields by what grows there, with the animals in the paddock, hay and dung in the stable. */
   | 'plough' | 'sow' | 'hoe' | 'reap' | 'tendStock' | 'muckOut'
   /** Hurt, sitting on the ground (a situation, C10). */
-  | 'hurt';
+  | 'hurt'
+  /** Marking the hero's map, held in both hands (the hand-over, D35). */
+  | 'mark';
 
 /** Who may use a spot: its building's workers, its household, the market's traders, or anyone. */
 export type SpotUse = 'work' | 'home' | 'trade' | 'any';
@@ -79,21 +82,56 @@ export interface Spot {
   door: boolean;
   /** People using it or on their way. */
   users: number;
-  /** Who has each place at it (person id, -1 free; cap places, side by side across `dir`). */
+  /** Who has each place at it (person id, -1 free; cap places, side by side across `dir`, or round it for a chat). */
   seats?: number[];
+  /** On the market (a stall, its seller, a knot of people talking): people come to it from all over the town. */
+  market?: boolean;
 }
 
 /** Between two people side by side at one spot (m). */
 export const SEAT_GAP = 0.75;
 
-/** Where the place `seat` of a spot is: side by side, across the way its users face. */
+/** How far from a chat's middle its people stand (m). */
+const CHAT_R = 0.65;
+
+/** Where the place `seat` of a spot is: side by side, across the way its users face; round the middle of a chat. */
 export function seatAt(s: Spot, seat: number): [number, number] {
   if (s.cap <= 1 || s.door) return [s.x, s.z];
+  if (s.activity === 'chat') { const a = s.dir + (seat * 2 * Math.PI) / s.cap; return [s.x + Math.cos(a) * CHAT_R, s.z + Math.sin(a) * CHAT_R]; }
   const off = (seat - (s.cap - 1) / 2) * SEAT_GAP;
   return [s.x - Math.sin(s.dir) * off, s.z + Math.cos(s.dir) * off];
 }
 
-/** Every spot of a town: its fixtures, then one door per building. */
+/** The way someone at place `seat` of a spot faces: the spot's way; at a chat, in towards its middle. */
+export function seatDir(s: Spot, seat: number): number {
+  return s.activity === 'chat' && !s.door ? s.dir + (seat * 2 * Math.PI) / s.cap + Math.PI : s.dir;
+}
+
+/** On a market, a knot of people talking for about every this many square metres of open ground. */
+const CHAT_EVERY = 110;
+/** A knot keeps this far from the stalls, the well and the benches (m), and from the market's edge. */
+const CHAT_CLEAR = 3;
+
+/** Knots of people talking on the market (a town with stalls): spread over its open ground, clear of its fixtures. */
+export function marketChats(plan: TownPlan, first: number): Spot[] {
+  const m = plan.market;
+  if (!plan.fixtures.some((f) => f.kind === 'stall') || m.length < 6) return [];
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < m.length; i += 2) { x0 = Math.min(x0, m[i]); x1 = Math.max(x1, m[i]); z0 = Math.min(z0, m[i + 1]); z1 = Math.max(z1, m[i + 1]); }
+  const step = Math.sqrt(CHAT_EVERY), near = plan.fixtures.filter((f) => f.x > x0 - 9 && f.x < x1 + 9 && f.z > z0 - 9 && f.z < z1 + 9);
+  const edge = (x: number, z: number) => { let d = Infinity; for (let i = 0; i < m.length; i += 2) { const j = (i + 2) % m.length; d = Math.min(d, distSqPointSeg(x, z, m[i], m[i + 1], m[j], m[j + 1])); } return Math.sqrt(d); };
+  const out: Spot[] = [];
+  for (let z = z0 + step / 2; z < z1; z += step) for (let x = x0 + step / 2; x < x1; x += step) {
+    // A little off the lattice, by the place itself (the same every time the town is planned).
+    const i = Math.round(x), j = Math.round(z), px = x + (hash2f(1, i, j) - 0.5) * step * 0.6, pz = z + (hash2f(2, i, j) - 0.5) * step * 0.6;
+    if (!pointInPoly(m, px, pz) || edge(px, pz) < CHAT_CLEAR || near.some((f) => Math.hypot(f.x - px, f.z - pz) < CHAT_CLEAR + 1)) continue;
+    out.push({ id: first + out.length, activity: 'chat', use: 'any', cap: 3, secs: [45, 140], outside: true, x: px, z: pz, dir: hash2f(3, i, j) * Math.PI * 2, building: -1, door: false, users: 0, market: true });
+  }
+  return out;
+}
+
+
+/** Every spot of a town: its fixtures, the knots on its market, then one door per building. */
 export function townSpots(plan: TownPlan): Spot[] {
   const out: Spot[] = [];
   for (const f of plan.fixtures) {
@@ -104,8 +142,9 @@ export function townSpots(plan: TownPlan): Spot[] {
     }
     out.push(s);
     // A stall also has its seller, behind it, facing the market.
-    if (f.kind === 'stall') out.push({ id: out.length, activity: 'sell', use: 'trade', cap: 1, secs: [90, 300], outside: true, x: f.x - Math.cos(f.yaw) * 0.9, z: f.z - Math.sin(f.yaw) * 0.9, dir: f.yaw, building: -1, door: false, users: 0 });
+    if (f.kind === 'stall') { s.market = true; out.push({ id: out.length, activity: 'sell', use: 'trade', cap: 1, secs: [90, 300], outside: true, x: f.x - Math.cos(f.yaw) * 0.9, z: f.z - Math.sin(f.yaw) * 0.9, dir: f.yaw, building: -1, door: false, users: 0, market: true }); }
   }
+  out.push(...marketChats(plan, out.length));
   for (const b of plan.buildings) {
     const [x, z, dir] = b.door;
     out.push({ id: out.length, activity: 'indoors', use: 'home', cap: 99, secs: [60, 240], outside: false, x, z, dir: dir + Math.PI, building: b.id, door: true, users: 0 });

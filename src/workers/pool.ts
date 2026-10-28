@@ -130,9 +130,9 @@ export class TerrainJobs {
     return this.job({ kind: 'house', b, hatch, hall, sign });
   }
 
-  /** The ground masks of the town of this id (world/townMask.ts), `w` × `h` texels each. */
-  townMask(id: string, w: number, h: number): Promise<Uint8Array> {
-    return this.job({ kind: 'townMask', id, w, h });
+  /** The ground masks of the town of this id (world/townMask.ts), `w` × `h` texels each from cell (i0, j0) of its raster. */
+  townMask(id: string, w: number, h: number, i0 = 0, j0 = 0): Promise<Uint8Array> {
+    return this.job({ kind: 'townMask', id, w, h, i0, j0 });
   }
 
   /** The buildings of the town of this id, merged per cell, and its plan if `plan` (the worker plans a settlement founded while playing). */

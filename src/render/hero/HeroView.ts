@@ -20,7 +20,7 @@ import { buildArm } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE, SIT_DOWN, STAND_UP } from './clips';
 import { gripHeld } from './grips';
 import { ORIGIN } from '../origin';
-import { FADE, castShadows, playClip, preparePeople, seatOf } from './play';
+import { FADE, castShadows, handOf, playClip, preparePeople, seatOf } from './play';
 import { Jolt, joltRoot, joltSpine } from '../jolt';
 import { FigureRig, type LimbGoal, type LimbGoals, type Pose } from '@futuremagic/figure';
 
@@ -248,9 +248,7 @@ export class HeroView {
 
   /** Where a hand is in the world (`out`), null before the body has loaded. */
   handAt(side: 'l' | 'r', out: Vector3): Vector3 | null {
-    const bone = this.front.actor.bones.find((b) => b.name === `hand_${side}`);
-    if (!bone) return null;
-    return ORIGIN.toWorld(bone.getWorldPosition(out));
+    return handOf(this.front.actor, side, out);
   }
 
   /** Shown or not (first person hides it). */

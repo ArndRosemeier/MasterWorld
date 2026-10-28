@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { Character } from '../src/game/character';
 import { MASTER, NOVICE, Orientation } from '../src/game/orientation';
-import { cardAt, HAND_OVER_SECONDS } from '../src/app/handOver';
+import { CARD_HELD, cardAt, HAND_OVER_SECONDS, heroReach, MARKED, sheetHeldBy } from '../src/app/handOver';
 
 const at = (skill: number) => {
   const hero = new Character(classic);
@@ -44,7 +44,18 @@ test('hand-over: the card rises from the hand, the mark is drawn while it is hel
   for (let t = 0; t <= HAND_OVER_SECONDS; t += 0.05) {
     const c = cardAt(t);
     assert.ok(c.mark >= last); last = c.mark;
-    if (c.mark > 0 && c.mark < 1) { held = true; assert.ok(Math.abs(c.x - 0.42) < 0.01 && c.alpha === 1); }
+    if (c.mark > 0 && c.mark < 1) { held = true; assert.ok(Math.abs(c.x - CARD_HELD.x) < 0.01 && c.alpha === 1); }
   }
   assert.ok(held);
+});
+
+test('hand-over in the world: the hero holds the map out, the teller has it while marking, the hero takes it back and puts it away', () => {
+  assert.equal(heroReach(0), 0);
+  assert.equal(sheetHeldBy(0), 'hero', 'out of the pack into the hand');
+  assert.equal(heroReach(MARKED - 0.01), 1, 'held out as it is taken');
+  for (let t = MARKED; t < MARKED + 1.2; t += 0.1) assert.equal(sheetHeldBy(t), 'teller', 'in the teller\'s hands while marked');
+  const back = [...Array(40).keys()].map((i) => (i / 40) * HAND_OVER_SECONDS).filter((t) => t > MARKED + 1.4 && sheetHeldBy(t) === 'hero');
+  assert.ok(back.length && back.some((t) => heroReach(t) > 0.9), 'taken back with the hand out');
+  assert.equal(sheetHeldBy(HAND_OVER_SECONDS), null, 'away in the pack at the end');
+  assert.ok(heroReach(HAND_OVER_SECONDS) < 0.01, 'the hand down again');
 });

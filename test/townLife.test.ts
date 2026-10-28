@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planTown, pointInPoly } from '@futuremagic/settlement';
-import { TownLife } from '../src/sim/townLife';
-import type { ActivityKind } from '../src/sim/spots';
+import { goingThrough, roundTheWork, TownLife, type Agent } from '../src/sim/townLife';
+import type { ActivityKind, Spot } from '../src/sim/spots';
 
 // A town on flat land (no terrain needed): the plan is all the simulation reads.
 const plan = planTown({ seed: 7, x: 0, z: 0, radius: 130, height: () => 10 });
@@ -151,4 +151,38 @@ test('town life: the hero walks around townsfolk, and is never stuck in one who 
   assert.ok(life.touches(a.x + 0.4, a.z, 0.32, a.x + 3, a.z), 'blocked walking into them');
   assert.ok(!life.touches(a.x + 0.4, a.z, 0.32, a.x + 0.3, a.z), 'free when already touching');
   assert.ok(!life.touches(a.x + 2, a.z, 0.32, a.x + 3, a.z), 'free at a distance');
+});
+
+test('town life: someone at work behind a barrel comes round it to talk, and is seen walking there', () => {
+  const s = { id: 0, activity: 'serve', use: 'work', cap: 1, secs: [30, 80], outside: true, x: 0, z: 0, dir: 0, building: -1, door: false, users: 1 } as Spot;
+  const way = roundTheWork(s, { x: 0, z: 0 }, 2.5, 0.2)!;
+  assert.ok(way, 'the barrel stands between them');
+  const [tx, tz] = way.slice(-2), fx = 0.9, fz = 0;
+  // From where they end up, the barrel is no longer in the way.
+  const dx = 2.5 - tx, dz = 0.2 - tz, l2 = dx * dx + dz * dz, t = Math.max(0, Math.min(1, ((fx - tx) * dx + (fz - tz) * dz) / l2));
+  assert.ok(Math.hypot(tx + dx * t - fx, tz + dz * t - fz) > 0.75, 'in plain view');
+  assert.ok(Math.hypot(tx - fx, tz - fz) > 1, 'beside it, not on it');
+  assert.equal(roundTheWork(s, { x: 0, z: 0 }, -2, 0), null, 'from behind them nothing is in the way');
+  assert.equal(roundTheWork({ ...s, activity: 'sell' }, { x: 0, z: 0 }, 2.5, 0.2), null, 'a seller talks across the stall');
+  // In a town: held, they walk there and then talk, facing the hero.
+  const life = new TownLife(plan, 7, 10);
+  const a = life.agents.find((x) => x.spot >= 0 && ['smith', 'stoke', 'bake', 'craft', 'tend', 'serve', 'quench'].includes(life.spots[x.spot].activity) && !x.hidden);
+  assert.ok(a, 'someone at their work');
+  const sp = life.spots[a.spot], hx = sp.x + Math.cos(sp.dir) * 2.6, hz = sp.z + Math.sin(sp.dir) * 2.6;
+  life.hold(a, hx, hz);
+  assert.equal(a.act, 'walk');
+  for (let i = 0; i < 20; i++) life.step(0.25, 10 + i / 14400);
+  assert.equal(a.act, 'chat');
+  assert.ok(Math.abs(Math.atan2(Math.sin(a.dir - Math.atan2(hz - a.z, hx - a.x)), Math.cos(a.dir - Math.atan2(hz - a.z, hx - a.x)))) < 0.01, 'facing the hero');
+  life.letGo(a);
+  assert.ok(!a.held);
+});
+
+test('town life: a gate opens at night for someone on their way through it, not for someone going along the wall', () => {
+  // A gateway at the origin; the wall runs along x.
+  const walker = (x: number, z: number, path: number[]) => ({ x, z, act: 'walk', hidden: false, path, pi: 0 }) as unknown as Agent;
+  assert.ok(goingThrough(walker(0, -15, [0, -5, 0, 10]), 0, 0, 22), 'coming up to it and on through');
+  assert.ok(!goingThrough(walker(-15, 6, [-5, 6, 15, 6]), 0, 0, 22), 'along the street inside');
+  assert.ok(!goingThrough(walker(0, -30, [0, 10]), 0, 0, 22), 'still too far off');
+  assert.ok(!goingThrough({ ...walker(0, -5, [0, 10]), act: 'chat' } as Agent, 0, 0, 22), 'standing by it');
 });

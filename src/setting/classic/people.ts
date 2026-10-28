@@ -56,7 +56,6 @@ export const talk: TalkDef = {
   ownCellar: 'our cellar',
   lead: 'Something is wrong in {cellar}.',
   marked: '{name} marks {house} on your map.',
-  handOver: 'You hold out your map. {name} takes it and marks the place.',
   comes: [
     '{name} has seen you and comes over.',
     '“You there, a word!” {name} is coming your way.',

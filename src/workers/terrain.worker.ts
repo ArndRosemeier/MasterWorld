@@ -19,7 +19,7 @@ import type { Site } from '../world/dungeon/site';
 import { holdRockOnLand, type HoldRock } from '../world/holdRock';
 import { layOut, type SiteJob, type SiteLayout } from '../world/sites';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] });
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number; i0: number; j0: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] });
 export type TerrainResult = ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth | HoldRock | SiteLayout | OpenHouse | null;
 
 /** A town's buildings merged per cell, and its plan when asked for (a settlement founded while playing is planned here). */
@@ -46,7 +46,7 @@ serve<TerrainJob, TerrainResult>((job) => {
     return { result: { cells, plan: job.plan && town ? town.plan : null }, transfer: townMeshBuffers(cells) };
   }
   if (job.kind === 'townMask') {
-    const town = terrain.town(job.id), data = town ? townMaskData(town, job.w, job.h) : new Uint8Array(job.w * 2 * job.h * 4);
+    const town = terrain.town(job.id), data = town ? townMaskData(town, job.w, job.h, job.i0, job.j0) : new Uint8Array(job.w * 2 * job.h * 4);
     return { result: data, transfer: [data.buffer] };
   }
   if (job.kind === 'caveRock') {
