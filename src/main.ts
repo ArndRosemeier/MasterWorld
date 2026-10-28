@@ -1336,20 +1336,32 @@ export async function start(b: Boot): Promise<void> {
       player.flying = false;
       player.puppet = null;
     };
+    // The camera kept facing the way the hero was put down for a few frames (a shot played before, such as a
+    // walk out of a dungeon's door, can leave its own look behind; in a small room that is outside its walls).
+    const keepFacing = (): void => {
+      const yaw = player.walker.yaw;
+      let n = 10;
+      const again = () => { player.heroCam.yaw = player.walker.yaw = yaw; player.heroCam.release(); if (--n > 0) requestAnimationFrame(again); };
+      requestAnimationFrame(again);
+    };
     const spots = goSpots({
       setting,
       log: () => log,
       hours,
       heroPos: () => player.walker.pos,
       towns: () => towns?.every ?? [],
-      stand: async (s, pick) => { await outside(); const p = pick ? pick(s) : s; player.teleport(p.x, undefined, p.z, p.yaw); return p; },
-      // The hero's spot and the camera's behind them (about where it trails): no wall, no trunk, no water.
-      clear: (x, z, yaw) => {
-        const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && terrain.waterDepth(px, pz) <= 0.2;
-        return standsFree(x, z, 1.2) && [3.5, 6].every((d) => standsFree(x + Math.sin(yaw) * d, z + Math.cos(yaw) * d, 2.5));
+      stand: async (s, pick) => { await outside(); const p = pick ? pick(s) : s; player.teleport(p.x, undefined, p.z, p.yaw); keepFacing(); return p; },
+      // The hero's spot and the camera's behind them (about where it trails): no wall, no trunk, no water; and no
+      // trunk across the view to what they look at (up to 60 m, short of it, which may stand among trees itself).
+      clear: (x, z, yaw, at) => {
+        const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && (world.waterLevel(px, pz) ?? -Infinity) < terrain.height(px, pz) + 0.05;
+        if (!standsFree(x, z, 1.2) || ![3.5, 6].every((d) => standsFree(x + Math.sin(yaw) * d, z + Math.cos(yaw) * d, 2.5))) return false;
+        const d = at ? Math.min(60, Math.hypot(at.x - x, at.z - z) - 6) : 0;
+        for (let t = 3; t < d; t += 3) if (trunks.blocks(x - Math.sin(yaw) * t, z - Math.cos(yaw) * t, 0.6)) return false;
+        return true;
       },
       enter: async (id, b) => { const t = towns?.get(id); if (!t || !rooms) return; await outside(); await rooms.enter({ town: t, b }, true); },
-      below: async (id) => { const v = await cellars.build(id); if (!v) return false; await outside(); await v.enter(true); return true; },
+      below: async (id) => { const v = await cellars.build(id); if (!v) return false; await outside(); await v.enter(true); keepFacing(); return true; },
       open: async (place) => {
         if (!setting.regions || !regionSites) return null;
         const ids = new Set(setting.regions.fills.filter((f) => f.place === place).map((f) => f.id));

@@ -42,18 +42,18 @@ export const atDoor = (b: TownBuilding, d = 6): Stand => ({ x: b.door[0] - b.vx 
 export const outsideGate = (g: TownGate, d = 24): Stand => ({ x: g.x + Math.cos(g.angle) * d, z: g.z + Math.sin(g.angle) * d, yaw: Math.atan2(Math.cos(g.angle), Math.sin(g.angle)), at: { x: g.x, z: g.z } });
 
 /**
- * A stand from which the hero is seen and sees: `s` itself if `clear` there (no tree, wall or water at the hero
- * and at the camera behind them), else the nearest clear one round what it looks at (turned up to 180° either
+ * A stand from which the hero is seen and sees: `s` itself if `clear` there (no tree, wall or water at the hero,
+ * at the camera behind them or across the view), else the nearest clear one round what it looks at (turned up to 180° either
  * way, then a third nearer), else `s`.
  */
-export function clearStand(s: Stand, clear: (x: number, z: number, yaw: number) => boolean): Stand {
-  if (clear(s.x, s.z, s.yaw) || !s.at) return s;
+export function clearStand(s: Stand, clear: (x: number, z: number, yaw: number, at?: At) => boolean): Stand {
+  if (clear(s.x, s.z, s.yaw, s.at) || !s.at) return s;
   const a = s.at, d0 = Math.hypot(s.x - a.x, s.z - a.z), a0 = Math.atan2(s.x - a.x, s.z - a.z);
   for (const d of [d0, d0 * 0.67]) {
     for (let k = 1; k <= 12; k++) {
       const t = a0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 12) * 2;
       const x = a.x + Math.sin(t) * d, z = a.z + Math.cos(t) * d, yaw = toward(x, z, a);
-      if (clear(x, z, yaw)) return { x, z, yaw, at: a };
+      if (clear(x, z, yaw, a)) return { x, z, yaw, at: a };
     }
   }
   return s;

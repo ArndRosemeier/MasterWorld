@@ -34,7 +34,7 @@ export interface GoHost {
   /** Out of any cellar or building, on foot, standing there (the first stand `pick` gives, once outside). */
   stand(s: Stand, pick?: (s: Stand) => Stand): Promise<Stand>;
   /** Nothing in the way of the hero at (x, z) facing `yaw`, nor of the camera behind them (out of doors). */
-  clear(x: number, z: number, yaw: number): boolean;
+  clear(x: number, z: number, yaw: number, at?: { readonly x: number; readonly z: number }): boolean;
   /** Into a town's building, just inside its door. */
   enter(town: string, b: TownBuilding): Promise<void>;
   /** Down into a dungeon (false: it would not build). */
@@ -70,7 +70,7 @@ export function goSpots(h: GoHost): GoSpot[] {
   const add = (group: string, label: string, go: () => Promise<string>): void => { out.push({ group, label, go }); };
   const at = async (s: Stand | null, what: string): Promise<string> => {
     if (!s) return `no ${what}`;
-    const put = await h.stand(s, (x) => clearStand(x, (px, pz, yaw) => h.clear(px, pz, yaw)));
+    const put = await h.stand(s, (x) => clearStand(x, (px, pz, yaw, to) => h.clear(px, pz, yaw, to)));
     return `${what}: ${where(put)}`;
   };
   const fills = h.setting.regions?.fills ?? [];
@@ -142,7 +142,11 @@ export function goSpots(h: GoHost): GoSpot[] {
       const d = await regionPlace('capital');
       return d ? { d, t: townOf(d.id) } : null;
     };
-    add(S, 'Capital, before the wall', async () => { const c = await capital(); return at(c && before(c.d.site, c.d.site.r + CAPITAL_OFF), 'the capital'); });
+    add(S, 'Capital from afar', async () => {
+      // Its wall and a gate seen whole, from out on the road (before it is planned: out past its houses).
+      const c = await capital(), g = c?.t?.plan.wall?.gates[0];
+      return at(g ? outsideGate(g, 90) : c && before(c.d.site, c.d.site.r + CAPITAL_OFF), 'the capital');
+    });
     add(S, 'Capital gate', async () => {
       const c = await capital(), g = c?.t?.plan.wall?.gates[0];
       return at(g ? outsideGate(g) : c && before(c.d.site, c.d.site.r + CAPITAL_OFF), 'the capital\'s gate');
