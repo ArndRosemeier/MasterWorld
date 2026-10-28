@@ -145,11 +145,16 @@ export function smokesAt(log: DecisionLog, towns: readonly Town[], setting: Pick
 }
 
 /** The barn of the farm whose paddock a raid came down on (null: not a raid, or no farm works it). */
-function barnOf(towns: readonly Town[], e: EventDecision): { x: number; z: number } | null {
+function barnOf(towns: readonly Town[], e: EventDecision): { x: number; z: number; barn: number } | null {
   const plan = e.paddock === undefined ? null : townById(towns, e.town)?.plan;
   const pd = plan?.paddocks[e.paddock!], farm = pd && pd.farm >= 0 ? plan!.farms[pd.farm] : undefined;
   const b = farm ? plan!.buildings[farm.barn] : undefined;
-  return b ? { x: b.cx, z: b.cz } : null;
+  return b ? { x: b.cx, z: b.cz, barn: b.id } : null;
+}
+
+/** The barns raiders fired (C10), by town, while their raid is open: drawn burnt (the smoke rises over them for a while). */
+export function burntBarns(log: DecisionLog, towns: readonly Town[]): { town: string; barn: number }[] {
+  return openEvents(log).flatMap((e) => { const b = barnOf(towns, e); return b ? [{ town: e.town, barn: b.barn }] : []; });
 }
 
 /** What the cries read: the log, the towns (where a raided barn stands), the hero, the hours and the cries called. */

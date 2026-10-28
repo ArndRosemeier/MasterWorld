@@ -391,12 +391,13 @@ export interface StoryEventDef {
   /** Game hours the town's people gather at the market to talk it over (0 or none: they do not). */
   readonly gather?: number;
   /**
-   * How it is told: the lead's title, the news as it reaches the hero, the journal's note, and the line when
+   * How it is told: the lead's title, the `cry` a townsman shouts when the hero comes into the town (word reaches
+   * the hero as it reaches anyone: shouted, talked of, seen; no narrator), the journal's note once heard, and the line when
    * it is over. `{creatures}` (the plural), `{place}` (a raid's: the farm; a take's: the settlement), `{town}`, `{dir}` (which way from
    * the town the band is), and a raid's `{animals}` (the setting's livestock). `told`: how the townsfolk tell
    * it when asked (C11: talk knows events; none: the news).
    */
-  readonly words: { readonly title: string; readonly news: string; readonly note: string; readonly done: string; readonly told?: string; readonly faded?: string };
+  readonly words: { readonly title: string; readonly cry: string; readonly note: string; readonly done: string; readonly told?: string; readonly faded?: string };
   /**
    * Game hours an event left alone runs (C11: an ignored promise resolves): then it ends without the hero, as
    * `words.faded` tells it (the band goes, a raid's beasts with it for good). None: it waits for the hero.

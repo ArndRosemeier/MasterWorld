@@ -56,7 +56,7 @@ test('take: bandits left alone take the waystation: its folk flee, a band holds 
   assert.ok(life.agents.every((a) => life.taskOf(a) === 'away'), 'its folk have fled');
   // Told with the waystation, every word filled in.
   const told = eventTold(classic, now, terrain.towns, e)!;
-  assert.ok(told && /waystation/.test(told.news) && !/\{/.test(told.title + told.news + told.note + told.done), told?.news);
+  assert.ok(told && /waystation/.test(told.cry) && !/\{/.test(told.title + told.cry + told.note + told.done), told?.cry);
   // The lair: a place for a hideout, of the bandits' own kind of dwellers, near the waystation; asked once.
   const lair = lairFor(ctx(now, take.after + 1))!;
   assert.ok(lair, 'a lair');

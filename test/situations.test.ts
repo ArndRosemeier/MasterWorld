@@ -116,8 +116,14 @@ test('situations: by day a beast gets out of its paddock, someone of its farm go
   assert.ok(home, 'back in its paddock');
 });
 
-test('situations: speech bubbles carry only the cries (D52: rare, urgent lines)', () => {
+test('situations: speech bubbles carry only the cries and a story event shouted in town (D52: rare, urgent lines)', () => {
   const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
   const says = [...main.matchAll(/speech\.say\(([^,]+),/g)].map((m) => m[1].trim());
-  assert.deepEqual(says, ['c.text'], 'the game says nothing else in a bubble');
+  assert.deepEqual(says.sort(), ['c.text', 'told.cry'], 'the game says nothing else in a bubble');
+});
+
+test('situations: no narrator tells a story event, a lead or a feast (D52, rule 11)', () => {
+  const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const told = [...main.matchAll(/notes\.say\(([^,]+),/g)].map((m) => m[1].trim()).filter((s) => /told\.(cry|news|note)|lead\.note|Journal:/.test(s));
+  assert.deepEqual(told, [], 'word of these comes through people, sights and talk');
 });

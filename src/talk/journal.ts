@@ -41,7 +41,12 @@ export class Journal {
 
   /** A lead the hero gave themselves (where they fell, plan 11.1). */
   remember(lead: Lead): void {
-    if (!this.leads.some((l) => l.id === lead.id)) this.leads.push({ ...lead, notes: [...lead.notes] });
+    if (!this.knows(lead.id)) this.leads.push({ ...lead, notes: [...lead.notes] });
+  }
+
+  /** Has the hero heard of promise `id` (open or done)? */
+  knows(id: string): boolean {
+    return this.leads.some((l) => l.id === id);
   }
 
   /**

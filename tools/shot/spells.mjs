@@ -7,7 +7,7 @@
  * `<out dir>` (default `shots/spells/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  *
  * F3 in a fight with every school (C4): no shader is built for a spell once play has begun (the spells' one
- * shader is built behind the loading screen), and the shader monitor counts no violations.
+ * shader is built just after the start, within the budget), and the shader monitor counts no violations.
  */
 import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -41,6 +41,8 @@ const firsts = await page.evaluate(() => {
 });
 let failed = false;
 const shaders = () => page.evaluate(() => { const m = window.shaders; return m ? { ...m.summary(), lines: m.violations(), built: m.events.filter((e) => e.phase === 'run').map((e) => e.what) } : null; });
+// The spells' shader is built just after the start, within the budget (F4): casting builds none.
+await page.waitForFunction(() => window.game.spellView.entered, null, { timeout: TIMEOUT });
 const before = await shaders();
 for (const [i, id] of firsts.entries()) {
   await page.evaluate((id) => {
