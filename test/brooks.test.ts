@@ -150,3 +150,16 @@ test('brooks: a near terrain chunk with a brook in it is built at 1 m, others at
   const round = [...Array(25).keys()].map((i) => at(bx + ((i % 5) - 2) * 128, bz + (Math.floor(i / 5) - 2) * 128));
   assert.ok(round.some((s) => finerFor(terrain, s) === 64), 'chunks without a brook stay at 2 m');
 });
+
+test('brooks: none dams a river (its bed stays under its water where brooks cross or come down into it)', () => {
+  const rivers = terrain.hydro.tileAt(x0 + side / 2, z0 + side / 2).rivers;
+  let n = 0;
+  for (const r of rivers) for (let k = 0; k < r.level.length; k++) {
+    const x = r.xz[k * 2], z = r.xz[k * 2 + 1];
+    if (x < x0 || z < z0 || x >= x0 + side || z >= z0 + side) continue;
+    n++;
+    const above = terrain.height(x, z) - r.level[k];
+    assert.ok(above < 0.5, `river bed ${above.toFixed(1)} m above its water at ${x.toFixed(0)},${z.toFixed(0)}`);
+  }
+  assert.ok(n > 50, `${n} river points`);
+});

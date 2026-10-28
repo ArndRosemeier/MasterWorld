@@ -154,6 +154,8 @@ export const brookValley = (half: number): number => half * 5 + 10;
 export interface BrookFeed {
   ground(x: number, z: number): number;
   join(x: number, z: number): { x: number; z: number; level: number } | null;
+  /** Whether a river's channel may lie within `within` metres of (x, z) (a quick test before asking `join` often). */
+  riverNear(x: number, z: number, within: number): boolean;
 }
 
 export class HydroTile {
@@ -316,6 +318,8 @@ export class HydroTile {
         cells.push(c);
         if (used[c] || elev[c] <= 0 || !Number.isNaN(lake[c])) break;
         used[c] = 1;
+        // A narrow river (a gorge out of a lake) can lie between two cell centres: a brook crossing it ends in it.
+        if (feed && recv[c] >= 0 && (end = this.joinBetween(c, recv[c], feed))) break;
         c = recv[c];
       }
       const into = !end && used[cells[cells.length - 1]] && cells.length > 1;
@@ -337,6 +341,22 @@ export class HydroTile {
     }
     if (tributaries.length) this.joinTributaries(tributaries);
     this.rivers.forEach((r, ri) => this.index(r, ri));
+  }
+
+  /** Where the step from cell `a` to cell `b` first meets a river or lake (`BrookFeed.join`), checked every ~20 m. */
+  private joinBetween(a: number, b: number, feed: BrookFeed): ReturnType<BrookFeed['join']> {
+    const { n } = this, c = this.o.cell;
+    const ax = a % n, az = (a - ax) / n, bx = b % n, bz = (b - bx) / n;
+    const len = Math.hypot(bx - ax, bz - az) * c, steps = Math.ceil(len / 20);
+    // (Most steps lie far from any river or lake: asked once for the whole step. Rivers join within ~0.35 of their
+    // valley past their edge, under 150 m for all but the widest.)
+    if (Number.isNaN(this.lake[b]) && !feed.riverNear(this.x0 + ((ax + bx) / 2 + 0.5) * c, this.z0 + ((az + bz) / 2 + 0.5) * c, len / 2 + 150)) return null;
+    for (let s = 1; s < steps; s++) {
+      const t = s / steps;
+      const hit = feed.join(this.x0 + (ax + (bx - ax) * t + 0.5) * c, this.z0 + (az + (bz - az) * t + 0.5) * c);
+      if (hit) return hit;
+    }
+    return null;
   }
 
   /** The lake cell (the one draining most) that drains into head cell `h`, or -1. */
@@ -661,6 +681,7 @@ export class Hydrology {
         if (!Number.isNaN(w.lake) && sk.elevation(x, z) < w.lake) return { x, z, level: w.lake };
         return null;
       },
+      riverNear: (x, z, within) => main.riverEdge(x, z, within) < Infinity,
     };
   }
 
