@@ -2,7 +2,7 @@
  * Bridges where roads cross brooks (world/bridges.ts): `node tools/shot/bridges.mjs [out dir]` after
  * `npm run build` (and `npm run packs`), SHOT_GPU=1 on the reference machine. Lays a cart track from a
  * place out on the land to the start town (as the VGM links a hamlet), then shows the first bridges on it:
- * from the brook below, and from the road. JPEGs into `<out dir>` (default `shots/bridges/<date>-<commit>/`).
+ * from the brook below, from far up and down it, and from the road. JPEGs into `<out dir>` (default `shots/bridges/<date>-<commit>/`).
  * BRIDGE_FROM=x,z picks the place the track starts at. A slow check (docs/CHECKS.md), well under 5 min.
  */
 import { execSync } from 'node:child_process';
@@ -49,6 +49,21 @@ for (let k = 0; k < pts.length / 3 && shown < 3; k += 40) {
         const x = b.x + ox * back, z = b.z + oz * back;
         window.game.player.teleport(x, undefined, z, Math.atan2(x - b.x, z - b.z));
       }, [b, ox, oz, back]);
+      await page.waitForTimeout(4000);
+      await shoot(`${shown}-${tag}-${b.id.replace(/[^\w@-]/g, '_')}`);
+    }
+    // Down the brook (following its flow) 30 and 90 m, on its bank, looking back up it: how its water and
+    // channel read further along, in the near and the farther view.
+    for (const [tag, run] of [['along30', 30], ['along90', 90]]) {
+      await page.evaluate(([b, run]) => {
+        const h = window.game.terrain.hydro;
+        let x = b.x, z = b.z, w = h.brookAt(x, z);
+        for (let s = 0; s < run && w.brook; s += 2) { x += w.fx * 2; z += w.fz * 2; w = h.brookAt(x, z); }
+        // Onto the bank (off the flow's left), facing up the brook.
+        const off = (w.half ?? 2) + 2.5;
+        x += -w.fz * off; z += w.fx * off;
+        window.game.player.teleport(x, undefined, z, Math.atan2(w.fx, w.fz));
+      }, [b, run]);
       await page.waitForTimeout(4000);
       await shoot(`${shown}-${tag}-${b.id.replace(/[^\w@-]/g, '_')}`);
     }
