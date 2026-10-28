@@ -108,6 +108,29 @@ export function groundLook(t: Terrain): (x: number, z: number, color: Float32Arr
   };
 }
 
+/** Vertex spacing (m) from which sheer ground is filtered over a vertex's cell (filterSheer). */
+const FILTER_STEP = 16;
+
+/**
+ * On far chunks, the heights of vertices by sheer ground (a mesa's wall, D56) as the mean over their cell: a wall
+ * running slantwise through vertices 16-32 m apart, each either on its top or at its foot, came out as a saw of
+ * teeth; filtered it is a ramp a cell wide, which is a pixel or two out there. Gentle ground keeps its heights.
+ */
+function filterSheer(t: Terrain, h: Float32Array, m: number, ox: number, oz: number, step: number): void {
+  const src = h.slice(), q = step * 0.35;
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+    const c = src[j * m + i];
+    let d = 0;
+    if (i > 0) d = Math.max(d, Math.abs(src[j * m + i - 1] - c));
+    if (i < m - 1) d = Math.max(d, Math.abs(src[j * m + i + 1] - c));
+    if (j > 0) d = Math.max(d, Math.abs(src[(j - 1) * m + i] - c));
+    if (j < m - 1) d = Math.max(d, Math.abs(src[(j + 1) * m + i] - c));
+    if (d < step) continue;
+    const x = ox + i * step, z = oz + j * step;
+    h[j * m + i] = (c + t.height(x - q, z - q) + t.height(x + q, z - q) + t.height(x - q, z + q) + t.height(x + q, z + q)) / 5;
+  }
+}
+
 export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const { x0, z0, size, segs } = spec;
   const n = segs + 1, step = size / segs;
@@ -115,6 +138,7 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const m = n + 4;
   const h = new Float32Array(m * m);
   for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) h[j * m + i] = t.height(x0 + (i - 2) * step, z0 + (j - 2) * step);
+  if (step >= FILTER_STEP) filterSheer(t, h, m, x0 - 2 * step, z0 - 2 * step, step);
   const H = (i: number, j: number): number => h[(j + 2) * m + i + 2];
   const vc = vertexCount(segs);
   const position = new Float32Array(vc * 3), normal = new Float32Array(vc * 3), color = new Float32Array(vc * 3);
