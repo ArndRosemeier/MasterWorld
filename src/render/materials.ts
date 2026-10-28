@@ -6,8 +6,8 @@
  * Every mesh of a kind shares the kind's one material, so a kind is one shader; variation goes into
  * vertex attributes or uniforms, never into a new material.
  */
-import { DoubleSide, Mesh, MeshPhysicalNodeMaterial, Vector2, Vector4, type BufferGeometry, type Material } from 'three/webgpu';
-import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorldGeometry, positionWorld, pow, sin, cos, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
+import { DoubleSide, Mesh, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial, Vector2, Vector4, type BufferGeometry, type Material } from 'three/webgpu';
+import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorld, normalWorldGeometry, positionWorld, pow, sin, cos, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import { TOWN_GROUND_LAYER, TOWN_TILE_METERS, type GroundTextures } from './terrain/groundTextures';
@@ -21,6 +21,7 @@ import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 import { woodsFromAfar } from '@futuremagic/vegetation/node';
 import { ORIGIN, WORLD } from './origin';
+import { geometryInstancing } from '@futuremagic/instances/node';
 
 export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy' | 'mat' | 'tint' | 'look' | 'fx';
 
@@ -110,7 +111,6 @@ export const GROUND_DIP = uniform(new Vector4(0, 0, 0, 0));
 
 export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level', 'canopy'], () => {
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');
-  const { albedo: A, normal: N } = ground;
   // Double-sided so chunk skirts close cracks seen from either side.
   // Physical, for its specular strength: soil and grass reflect little of the bright sky, even at a low angle.
   // Not `vertexColors`: three would multiply the whole result by the biome colour (rock and snow too); the
@@ -129,13 +129,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // How level the ground is, smoothed over a few metres per vertex: what rock and sand follow, so their
   // edges run smoothly instead of along the triangles where a cliff's normal flips between vertices.
   const level = attribute('level', 'float');
-  const layer = (name: string, uv: Node<'vec2'>) => {
-    const i = LAYER(name), k = 1 / NATURAL_TILE_METERS[i];
-    const st = uv.mul(k);
-    return { a: texture(A).sample(st).depth(int(i)), n: texture(N).sample(st).depth(int(i)) };
-  };
-  // Tangent normal (0..1 encoded) to a world-space offset, for a projection whose u, v run along the axes.
-  const tn = (s: Node<'vec4'>) => s.xy.mul(2).sub(1);
+  const layer = (name: string, uv: Node<'vec2'>) => groundLayer(ground!, name, uv);
   // Height blend: inside a transition the higher material wins, so edges follow stones and tufts; outside
   // it (t = 0 or 1) height has no say.
   const hblend = (t: Node<'float'>, dh: Node<'float'>, k: number) => smoothstep(0.3, 0.7, t.add(dh.mul(k).mul(t).mul(float(1).sub(t)).mul(4)));
@@ -248,16 +242,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   }
 
   // Rock: triplanar, strata on the side faces, weathered rock on top.
-  const bw0 = pow(abs(n), vec3(4));
-  const bw = bw0.div(bw0.x.add(bw0.y).add(bw0.z));
-  const rx = layer('cliffStrata', p.zy), rz = layer('cliffStrata', p.xy), ry = layer('rockFace', p.xz);
-  // The same strata, nine times larger, so cliffs keep their structure from far away.
-  const big = 1 / 9;
-  const mx = layer('cliffStrata', p.zy.mul(big)), mz = layer('cliffStrata', p.xy.mul(big));
-  const macro = mx.a.rgb.mul(bw.x).add(mz.a.rgb.mul(bw.z)).add(vec3(0.45).mul(bw.y)).div(0.45);
-  const rockA = rx.a.mul(bw.x).add(rz.a.mul(bw.z)).add(ry.a.mul(bw.y));
-  const rockN = rx.n.mul(bw.x).add(rz.n.mul(bw.z)).add(ry.n.mul(bw.y));
-  const rockP = vec3(0, tn(rx.n).y, tn(rx.n).x).mul(bw.x).add(vec3(tn(rz.n).x, tn(rz.n).y, 0).mul(bw.z)).add(vec3(tn(ry.n).x, 0, tn(ry.n).y).mul(bw.y));
+  const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n);
   const rockT = smoothstep(0.82, 0.64, level.add(fine.mul(0.04)).add(mid.mul(0.12)));
   const rockB = hblend(rockT, rockN.b.sub(h), 2);
   const rockTone = float(1).add(broad.mul(0.25));
@@ -344,6 +329,62 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   m.normalNode = normalize(cameraViewMatrix.mul(vec4(nw, 0)).xyz);
   return m;
 });
+
+/** One of texgen's natural layers from the ground's texture arrays, projected along `uv` (metres). */
+function groundLayer(g: GroundTextures, name: string, uv: Node<'vec2'>) {
+  const i = LAYER(name), k = 1 / NATURAL_TILE_METERS[i];
+  const st = uv.mul(k);
+  return { a: texture(g.albedo).sample(st).depth(int(i)), n: texture(g.normal).sample(st).depth(int(i)) };
+}
+
+/** Tangent normal (0..1 encoded) to a world-space offset, for a projection whose u, v run along the axes. */
+const tn = (s: Node<'vec4'>) => s.xy.mul(2).sub(1);
+
+/**
+ * Rock, projected from three sides (world point `p`, normal `n`): strata on the side faces, weathered rock on top,
+ * and the strata nine times larger (`macro`), so cliffs keep their structure from far away. Cliffs (the terrain)
+ * and the rocks on the land (ROCKS) share it, so a boulder is of the stone of the scarp it fell from.
+ */
+function rockFaces(g: GroundTextures, p: Node<'vec3'>, n: Node<'vec3'>) {
+  const layer = (name: string, uv: Node<'vec2'>) => groundLayer(g, name, uv);
+  const bw0 = pow(abs(n), vec3(4));
+  const bw = bw0.div(bw0.x.add(bw0.y).add(bw0.z));
+  const rx = layer('cliffStrata', p.zy), rz = layer('cliffStrata', p.xy), ry = layer('rockFace', p.xz);
+  const big = 1 / 9;
+  const mx = layer('cliffStrata', p.zy.mul(big)), mz = layer('cliffStrata', p.xy.mul(big));
+  const macro = mx.a.rgb.mul(bw.x).add(mz.a.rgb.mul(bw.z)).add(vec3(0.45).mul(bw.y)).div(0.45);
+  const rockA = rx.a.mul(bw.x).add(rz.a.mul(bw.z)).add(ry.a.mul(bw.y));
+  const rockN = rx.n.mul(bw.x).add(rz.n.mul(bw.z)).add(ry.n.mul(bw.y));
+  const rockP = vec3(0, tn(rx.n).y, tn(rx.n).x).mul(bw.x).add(vec3(tn(rz.n).x, tn(rz.n).y, 0).mul(bw.z)).add(vec3(tn(ry.n).x, 0, tn(ry.n).y).mul(bw.y));
+  return { rockA, rockN, rockP, macro };
+}
+
+/**
+ * The rocks on the land (world/rocks.ts, @futuremagic/rocks models), drawn instanced (iM0..iM3): the cliffs' own
+ * stone (rockFaces), the models' occlusion (vertex colour) darkening their feet and corners, lichen and a little
+ * moss on what faces the sky. One shader for every rock.
+ */
+export const ROCKS = defineKind('rocks', ['position', 'normal', 'color'], () => {
+  if (!ground) throw new Error('rock material built before the ground textures were loaded');
+  const m = new MeshStandardNodeMaterial({ roughness: 0.9, metalness: 0 });
+  geometryInstancing(m);
+  const p = WORLD, n = normalWorld;
+  const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n);
+  const occ = vertexColor().r;
+  const broad = mx_fractal_noise_float(p.xz.mul(0.02), 2, 2.0, 0.5);
+  const fine = mx_noise_float(p.mul(0.6));
+  let col: Node<'vec3'> = rockA.rgb.mul(float(1).add(broad.mul(0.2))).mul(macro);
+  // Lichen and moss where the rock faces the sky, in patches.
+  const top = smoothstep(0.45, 0.85, n.y.add(fine.mul(0.25)));
+  col = mix(col, col.mul(vec3(0.75, 0.85, 0.55)), top.mul(0.6));
+  m.colorNode = col.mul(0.85);
+  m.roughnessNode = max(rockA.a, float(0.7));
+  m.aoNode = rockN.a.mul(occ);
+  m.normalNode = normalize(cameraViewMatrix.mul(vec4(normalize(n.add(rockP.mul(0.9))), 0)).xyz);
+  return m;
+  // Drawn only instanced: the warm-up's plain mesh would build a shader no rock uses. RockView.place builds the
+  // instanced one behind the loading screen (as the trees' are).
+}, { cast: true, receive: true }, true);
 
 /** Which texgen layer draws each biome surface. */
 const SURFACE_LAYER: Record<Surface, string> = { grass: 'wildGrass', forest: 'forestFloor', sand: 'sand', scree: 'scree' };

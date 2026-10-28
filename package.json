@@ -57,6 +57,7 @@
     "@futuremagic/figure": "file:vendor/assetgenerator/packages/figure",
     "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",
     "@futuremagic/props": "file:vendor/assetgenerator/packages/props",
+    "@futuremagic/rocks": "file:vendor/assetgenerator/packages/rocks",
     "@futuremagic/settlement": "file:vendor/assetgenerator/packages/settlement",
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",
     "@futuremagic/stage": "file:vendor/assetgenerator/packages/stage",
