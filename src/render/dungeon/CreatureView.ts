@@ -197,7 +197,8 @@ export class CreatureView {
       if (s.body.kind === 'modelled') {
         const f = s.body.fig, k = s.body.scale, speed = Math.hypot(vx, vz) / k;
         f.root.position.set(X, Y, Z);
-        f.root.rotation.set(0, yaw + Math.PI, 0);
+        // The quarry rat's head is at −z, as the den's yaw turns it (turned half round, it went tail first).
+        f.root.rotation.set(0, yaw, 0);
         f.root.scale.setScalar(k);
         joltRoot(f.root, s.jolt, c.def.body.kind === 'rat' ? c.def.body.length * 0.35 : 0.06, 0.25);
         if (c.def.body.kind === 'rat') limp(f.root, lame, s.walked, c.def.body.length * 0.9, c.def.body.length * 0.5, moving);
