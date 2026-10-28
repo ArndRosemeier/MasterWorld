@@ -40,7 +40,7 @@ export class PeoplesTalk {
     const site = h.holds.find((x) => x.people === p.race);
     if (!hold || !site || p.role === 'child' || p.role === 'traveller' || !h.standing.talks(p.race)) return [];
     const out: Service[] = [];
-    if (!h.journal.leads.some((l) => l.id === site.id)) out.push({ id: 'hold', label: hold.topic, line: fill(hold.told, { hold: hold.name }) });
+    if (!h.journal.knows(site.id)) out.push({ id: 'hold', label: hold.topic, line: fill(hold.told, { hold: hold.name }) });
     const price = h.standing.giftPrice(p.race), g = h.setting.standing.gift;
     if (price !== null && p.race !== h.standing.race) out.push({ id: 'gift', label: fill(g.topic, { coins: coinText(price) }), line: g.line });
     return out;

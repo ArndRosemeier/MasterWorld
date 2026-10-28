@@ -22,6 +22,8 @@
     "shot": "node tools/shot/shot.mjs",
     "load": "node tools/shot/load.mjs",
     "shot:set": "node tools/shot/set.mjs",
+    "shot:set:town": "node tools/shot/set.mjs shots/set --part=town",
+    "shot:set:land": "node tools/shot/set.mjs shots/set --part=land",
     "shot:origin": "node tools/shot/origin.mjs",
     "shot:spells": "node tools/shot/spells.mjs",
     "shot:rest": "node tools/shot/rest.mjs",

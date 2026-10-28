@@ -86,7 +86,12 @@ export class SpellView {
   /** Compiled and in the scene (hidden until a spell shows). */
   async enter(stage: Stage): Promise<void> {
     await this.view.enter(stage);
+    this.inScene = true;
   }
+
+  /** In the scene, its shader built (until then a spell is reckoned but not drawn: warmed after the start, F4). */
+  private inScene = false;
+  get entered(): boolean { return this.inScene; }
 
   /** How an ability shows: its own glow (an item's), else its skill's (a school's) motif, else radiance. */
   private showingOf(def: AbilityDef): Showing {
@@ -144,7 +149,7 @@ export class SpellView {
     }
     b.step(dt);
     this.shown = { shots: (f?.recipes.shots.length ?? 0) + this.tracers.length, flashes: b.parts.length + b.solids.length, motes: b.held.length + b.heldSolids.length };
-    this.view.draw(b);
+    if (this.inScene) this.view.draw(b);
   }
 
   /** Where the caster's feet and spell hand are, and which way they face. */

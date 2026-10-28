@@ -14,6 +14,8 @@ import { buildingMeshAt } from '../materials/building';
 const FAR = 200;
 /** Switch back a little nearer, so a camera on the line does not flicker between the two. */
 const HYSTERESIS = 12;
+/** How much of its colour a burnt building keeps (soot over wood and thatch). */
+const CHAR = 0.22;
 
 interface Cell { x: number; z: number; near: Mesh; far: Mesh; nearRanges: MeshRange[]; farRanges: MeshRange[] }
 
@@ -73,6 +75,38 @@ export class TownView {
       }
     }
     this.hidden.set(id, out);
+  }
+
+  /** Buildings drawn scorched (a raided barn), with their vertices' tints to put back. */
+  private readonly scorched = new Map<number, { tint: BufferAttribute; at: Uint32Array; saved: Float32Array }[]>();
+
+  /**
+   * Draws building `id` burnt (its colours darkened to char, near and far: a raided farm's barn, C10), or as it
+   * was. Only its vertices' tints change: no new draw, no new shader. False while the town is not meshed yet.
+   */
+  scorch(id: number, on: boolean): boolean {
+    if (on === this.scorched.has(id)) return true;
+    if (!this.cells.length) return false;
+    if (!on) {
+      for (const s of this.scorched.get(id)!) { s.at.forEach((v, k) => (s.tint.array as Float32Array).set(s.saved.subarray(k * 3, k * 3 + 3), v * 3)); s.tint.needsUpdate = true; }
+      this.scorched.delete(id);
+      return true;
+    }
+    const out: { tint: BufferAttribute; at: Uint32Array; saved: Float32Array }[] = [];
+    for (const c of this.cells) {
+      for (const [mesh, ranges] of [[c.near, c.nearRanges], [c.far, c.farRanges]] as const) {
+        const r = ranges.find((x) => x[0] === id);
+        if (!r) continue;
+        const index = mesh.geometry.index!.array as Uint32Array, tint = mesh.geometry.getAttribute('tint') as BufferAttribute, arr = tint.array as Float32Array;
+        const at = Uint32Array.from(new Set(index.subarray(r[1], r[1] + r[2])));
+        const saved = new Float32Array(at.length * 3);
+        at.forEach((v, k) => { saved.set(arr.subarray(v * 3, v * 3 + 3), k * 3); for (let j = 0; j < 3; j++) arr[v * 3 + j] *= CHAR; });
+        tint.needsUpdate = true;
+        out.push({ tint, at, saved });
+      }
+    }
+    this.scorched.set(id, out);
+    return true;
   }
 
   /** Triangles in the meshes drawn now (for the HUD). */

@@ -36,6 +36,8 @@ export interface TalkHost {
   readonly bindings: Bindings;
   /** A lead was opened: say it, and the journal and map show it (the hero hands the map over to be marked). */
   heard(lead: { id: string; title: string; note: string }): void;
+  /** The hero asked about story event `id` and was told of it (by `from`): the journal and map take it up. */
+  heardOf(event: string, from: string): void;
   /** A service was asked for (trade, a repair, a room): the talk has ended, open its window. */
   serve(service: string, agent: Agent): void;
   /** The hero tells `agent` the place of promise `id` is safe again: the game pays and keeps it; their answer. */
@@ -178,6 +180,7 @@ export class TalkUi {
     const r = t.id.startsWith('report:') ? this.host.report(t.id.slice(7), a) : this.talk.ask(a.person.id, t.id);
     this.speak(r.text);
     const from = this.talk.nameOf(a.person.id);
+    if (t.id.startsWith('event:')) this.host.heardOf(t.id.slice(6), from);
     for (const id of r.heard) {
       const b = this.plan.buildings[this.talk.houseOf(id)];
       const title = fill(this.words.lead, { cellar: this.talk.cellarCalled(id) });

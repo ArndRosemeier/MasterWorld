@@ -48,7 +48,7 @@ import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, promisePlace, type LandKind } from './vgm/dungeons';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
-import { bandOf, eventTold, gatherFor, openBands } from './vgm/events';
+import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
 import { PACING, vgmLines } from './vgm/vgmLog';
 import { findIn, travellerFor } from './vgm/answers';
@@ -56,8 +56,8 @@ import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
-import { criesDue, situationOf, smokesAt } from './vgm/situations';
-import { festivitiesOf, festivityOrder, festivityTold } from './vgm/festivities';
+import { burntBarns, criesDue, situationOf, smokesAt } from './vgm/situations';
+import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
 import { HatchClimb } from './app/hatchClimb';
@@ -359,7 +359,7 @@ export async function start(b: Boot): Promise<void> {
     };
     // Smoke over a raided farm (C10): one shader, built with the rain's.
     const smoke = new SmokeView(deriveSeed(seed, 'smoke'));
-    compileEarly([wx.precip, smoke.mesh]);
+    compileEarly([wx.precip]);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
     const jobs = new WorldJobs(worldPool, seed, setting.id);
@@ -556,7 +556,7 @@ export async function start(b: Boot): Promise<void> {
     // What is still compiling; then, the kinds warm, every part again: a cache hit for its shaders (or the build of
     // what changed since, such as the hero's arms), and its shadow casters drawn once (Stage.prepare).
     await Promise.all(compiling);
-    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, smoke.mesh, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
+    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
     let hurried = false;
     const shown = () => { view.stage.cap.share = hurried && !window.__mwReady ? 1 : capShare; view.stage.monitor.phase = hurried && !window.__mwReady ? 'warmup' : 'run'; };
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
@@ -573,10 +573,16 @@ export async function start(b: Boot): Promise<void> {
     await stock?.enter(view.stage);
     await smallView?.addBirds();
     await view.stage.add(wx.precip);
-    await view.stage.add(smoke.mesh);
-    // Spells (plan 10): one shader, built now behind the loading screen.
+    // Spells (plan 10) and the smoke over a raided farm (C10): built once the game is playable, within the
+    // shader budget (F3), so they do not lengthen the load (F4, gate C). Neither is needed in the first seconds:
+    // until then a spell is reckoned but not drawn, and no smoke rises.
     const spellView = new SpellView(setting);
-    await spellView.enter(view.stage);
+    let smokeIn = false;
+    const warmLater = async (): Promise<void> => {
+      await view.stage.add(smoke.mesh);
+      smokeIn = true;
+      await spellView.enter(view.stage);
+    };
 
     const notes = new Notes();
     if (lost) notes.say('That save was made before the town moved to its river: its world is gone, so a new game begins.', 10);
@@ -880,8 +886,8 @@ export async function start(b: Boot): Promise<void> {
         director.model.count('hints');
         // The hero's own first page ("ask at the inn") has done its work.
         journal.fulfil(ARRIVAL);
-        notes.say(`${lead.note} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 6);
       },
+      heardOf: (id, from) => learnEvent(id, from),
       serve: (id, a) => services.get(id)?.(a),
       report: (id, a) => {
         // The household hears it is safe again: they pay, the promise is kept, and the VGM's next lead may come up in the same breath.
@@ -1423,6 +1429,8 @@ export async function start(b: Boot): Promise<void> {
     let cryClock = 0, smokeClock = 0;
     /** The good days whose towns already tell them as past. */
     const feasted = new Set<string>();
+    /** Barns drawn burnt now (`town/building`). */
+    let scorched = new Set<string>();
     const speech = new Speech(view.camera);
     const answerOverdue = (below: boolean): void => {
       const need = director.overdue, now = performance.now() / 1000;
@@ -1476,8 +1484,7 @@ export async function start(b: Boot): Promise<void> {
         const t = towns?.get(d.town), order = festivityOrder(terrain.towns, d);
         if (t && order) orderTown(t, order);
         t?.promised(d);
-        const told = festivityTold(setting, log, terrain.towns, d);
-        if (told && (d.for || here() === t)) notes.say(told.news, 7);
+        // Seen, not told (rule 11): the town gathers at its market; asked, its folk tell of the feast.
       } else if (d.kind === 'kept' && d.faded) {
         // An event left alone ran its course (C11): its band goes, unseen; the town tells how it ended.
         const ev = log.find((x) => x.id === d.promise);
@@ -1495,10 +1502,37 @@ export async function start(b: Boot): Promise<void> {
         if (t && order) orderTown(t, order);
         // Its people know of it (C11: talk knows events).
         t?.promised(d);
-        const told = eventTold(setting, log, terrain.towns, d);
-        if (!told) return;
-        journal.hear(d.id, told.title, { text: told.note, from: 'word in town' }, { x: d.x, z: d.z, label: told.label });
-        notes.say(`${told.news} (Journal: ${keyName('journal')}, map: ${keyName('map')})`, 8);
+        // No narrator (D52, rule 11): word reaches the hero as it reaches anyone, shouted in the town, talked of,
+        // seen (the smoke, the refugees, the band itself); the journal and map take it up then (learnEvent).
+      }
+    };
+    /** The hero has heard of or seen story event `id` (from whom, or how): its journal page and map mark, once. */
+    const learnEvent = (id: string, from: string): void => {
+      const d = log.find((x) => x.id === id);
+      if (d?.kind !== 'event' || journal.knows(id) || keptOf(log).has(id)) return;
+      const told = eventTold(setting, log, terrain.towns, d);
+      if (told) journal.hear(d.id, told.title, { text: told.note, from }, { x: d.x, z: d.z, label: told.label });
+    };
+    /** Events the hero has had shouted at them in their town (once each). */
+    const shouted = new Set<string>();
+    /** Within this of a band (m), the hero has seen it. */
+    const SEEN_BAND = 80;
+    /** A townsman this near the hero (m) shouts the town's news. */
+    const SHOUT_R = 30;
+    /** Story events reach the hero (each 0.25 s): a shout in the town, or the band seen out on the land. */
+    const wordOfEvents = (): void => {
+      const p = player.walker.pos, t = here();
+      for (const e of openEvents(log)) {
+        if (journal.knows(e.id)) continue;
+        if (Math.hypot(p.x - e.x, p.z - e.z) < SEEN_BAND) { learnEvent(e.id, 'what you saw'); continue; }
+        if (!t || t.id !== e.town || shouted.has(e.id) || !t.living) continue;
+        const who = t.life.agents.filter((a) => !a.hidden && !a.held && Math.hypot(a.x - p.x, a.z - p.z) < SHOUT_R)
+          .sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
+        const told = who && eventTold(setting, log, terrain.towns, e);
+        if (!who || !told) continue;
+        shouted.add(e.id);
+        speech.say(told.cry, () => (who.hidden ? null : { x: who.x, y: terrain.height(who.x, who.z), z: who.z }));
+        learnEvent(e.id, 'a shout in town');
       }
     };
     /** A situation now, whatever the hour or the odds (the debug menu, shots): what was made, or null. */
@@ -1517,7 +1551,7 @@ export async function start(b: Boot): Promise<void> {
     const storyEventNow = (which?: string): string => {
       if (!start || !wild) return 'no wild here';
       const e = vgmStep({ tools: ['event'], early: true, which }).map((m) => m.decision).find((d) => d.kind === 'event');
-      return !e ? 'nothing is due' : (e.kind === 'event' && eventTold(setting, log, terrain.towns, e)?.news) || e.id;
+      return !e ? 'nothing is due' : (e.kind === 'event' && eventTold(setting, log, terrain.towns, e)?.cry) || e.id;
     };
     let last = performance.now(), frame = 0;
     view.renderer.setAnimationLoop(() => {
@@ -1573,7 +1607,10 @@ export async function start(b: Boot): Promise<void> {
             const who = c.kind === 'hurt-traveller' ? folk.find((a) => a.person.role === 'traveller')
               : folk.filter((a) => Math.hypot(a.x - c.x, a.z - c.z) < 90).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
             if (who) speech.say(c.text, () => (who.hidden ? null : { x: who.x, y: terrain.height(who.x, who.z), z: who.z }));
+            // The smoke over a raided farm and the refugees on the road are a story event seen: the hero knows of it now.
+            if (c.kind === 'raid-smoke' || c.kind === 'refugees') learnEvent(c.id.replace(/\/fled$/, ''), 'what you saw');
           }
+          wordOfEvents();
         }
         speech.hover(dt);
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
@@ -1613,8 +1650,17 @@ export async function start(b: Boot): Promise<void> {
         // Good days over: their towns tell them as past (C11).
         for (const f of festivitiesOf(log)) if (f.to <= hours() && !feasted.has(f.id)) { feasted.add(f.id); towns?.get(f.town)?.ended(f.id); }
         smoke.burn(smokesAt(log, terrain.towns, setting, hours()).map((s) => ({ x: s.x, y: terrain.height(s.x, s.z) + 2, z: s.z, thick: s.thick })));
+        // The barns they fired stand burnt while the raid is open (its folk have other worries than a new roof).
+        const burnt = new Set<string>();
+        for (const b of burntBarns(log, terrain.towns)) {
+          const key = `${b.town}/${b.barn}`;
+          if (towns?.viewOf(b.town)?.scorch(b.barn, true)) burnt.add(key);
+          else if (scorched.has(key)) burnt.add(key);
+        }
+        for (const key of scorched) if (!burnt.has(key)) { const [t, b] = key.split('/'); towns?.viewOf(t)?.scorch(Number(b), false); }
+        scorched = burnt;
       }
-      smoke.billow(dt);
+      if (smokeIn) smoke.billow(dt);
       view.sky.update(dt, view.camera);
       // Down in the cellar the land above is out of the frame (visit.onDepth): its updates wait.
       const above = !visit();
@@ -1687,6 +1733,7 @@ export async function start(b: Boot): Promise<void> {
       if (planted && dressedAt && !window.__mwReady) {
         window.__mwReady = true;
         shown();
+        void warmLater().catch((e: unknown) => console.error('[load] warming the spells and smoke failed', e));
         if (title) title.worldReady();
         else loading.done();
       }

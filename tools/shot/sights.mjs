@@ -10,7 +10,7 @@ import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
-import { meet, standClear } from './acts.mjs';
+import { hurtTraveller, meet, raidFarm, standClear } from './acts.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 const gl = process.env.SET_GL === '1';
@@ -104,12 +104,7 @@ else {
 }
 // A situation (C10): a hurt traveller by the way. Seen from 40 m first (no cry yet), then from 20 m, where
 // they cry out in a speech bubble.
-await page.evaluate(() => {
-  const g = window.game, d = g.towns.every[0].town.decision;
-  g.player.teleport(d.x - d.radius - 260, undefined, d.z - 600, Math.PI / 2);
-});
-await page.waitForTimeout(2500);
-const hurt = await page.evaluate(() => { const m = window.game.situationNow('hurt-traveller'); return m ? { id: m.decision.id, ...m.decision } : null; });
+const hurt = await hurtTraveller(page);
 console.log(`hurt traveller: ${hurt ? hurt.id : 'none'}`);
 if (!hurt) failed = true;
 else {
@@ -133,24 +128,20 @@ else {
   await shoot(`0${NEEDS.length + 3}-hurt-traveller`);
 }
 // A situation seen from afar (C10): a farm raided, its barn smoking over the trees, shot from its fields 80 m off, looking up.
-const raid = await page.evaluate(() => window.game.storyEvent('farm-raid'));
+const { said: raid, barn: smokeAt } = await raidFarm(page);
 console.log(`raid: ${raid}`);
 await page.waitForTimeout(1500);
-const smokeAt = await page.evaluate(() => {
-  const g = window.game, e = g.log.filter((d) => d.kind === 'event' && d.paddock !== undefined).at(-1);
-  if (!e) return null;
-  const t = g.towns.get(e.town).town, pd = t.plan.paddocks[e.paddock], b = t.plan.buildings[t.plan.farms[pd.farm].barn];
-  // Out in the farm's fields, away from the town, looking up at the column (from the woods near crowns
-  // hide the sky; from the town its houses do).
-  const [cx, cz] = t.plan.centre, l = Math.max(1, Math.hypot(b.cx - cx, b.cz - cz));
-  const x = b.cx + ((b.cx - cx) / l) * 80, z = b.cz + ((b.cz - cz) / l) * 80;
-  g.player.teleport(x, undefined, z, Math.atan2(x - b.cx, z - b.cz));
+// Out in the farm's fields, away from the town, looking up at the column (from the woods near crowns
+// hide the sky; from the town its houses do).
+if (smokeAt) await page.evaluate((b) => {
+  const g = window.game, c = b.centre, l = Math.max(1, Math.hypot(b.x - c.x, b.z - c.z));
+  const x = b.x + ((b.x - c.x) / l) * 80, z = b.z + ((b.z - c.z) / l) * 80;
+  g.player.teleport(x, undefined, z, Math.atan2(x - b.x, z - b.z));
   const cam = g.player.heroCam;
   cam.yaw = g.player.walker.yaw;
   cam.pitch = 0.3;
   cam.zoom = 3;
-  return { x: b.cx, z: b.cz };
-});
+}, smokeAt);
 console.log(`smoke: ${smokeAt ? `over the barn at ${smokeAt.x.toFixed(0)}, ${smokeAt.z.toFixed(0)}` : 'NO RAIDED FARM'}`);
 if (!smokeAt) failed = true;
 else {

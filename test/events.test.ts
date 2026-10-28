@@ -45,7 +45,7 @@ test('events: a place left alone too long spills its dwellers onto the land: the
   assert.equal(wilds.bands[0].den.creatures.length, e!.members.length);
   // The leads: told in the town's words, pointing at the band; the town gathers to talk it over.
   const told = eventTold(classic, now, towns, e!)!;
-  assert.ok(told && /came up out of|come up out of/.test(told.news) && !/\{/.test(told.news + told.note + told.done), told?.news);
+  assert.ok(told && /came up out of|come up out of/.test(told.cry) && !/\{/.test(told.cry + told.note + told.done), told?.cry);
   const order = gatherFor(classic, towns, e!);
   assert.ok(order && order.kind === 'gather' && order.to > order.from);
   // One at a time per town (its cooldown), and never under the hero's feet.
@@ -81,7 +81,7 @@ test('events: bandits left alone raid a farm: animals leave its paddock, a band 
   assert.ok(herds.animals.filter((a) => a.paddock === e.paddock).length === town.plan.paddocks[e.paddock!].animals - e.taken!);
   // The leads: told with the farm and its cattle; the band on the land; one raid at a time from that camp.
   const told = eventTold(classic, now, towns, e)!;
-  assert.ok(told && /cattle/.test(told.news) && /farm/.test(told.news) && !/\{/.test(told.news + told.note + told.done), told?.news);
+  assert.ok(told && /cattle/.test(told.cry) && /farm/.test(told.cry) && !/\{/.test(told.cry + told.note + told.done), told?.cry);
   assert.equal(openBands(now).length, 1);
   assert.equal(nextEvent({ ...at(now, raid.after + 2), early: true }), null, 'that camp has a band out already');
   // Beaten: the cattle are home again.
