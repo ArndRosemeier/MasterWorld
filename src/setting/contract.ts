@@ -61,6 +61,43 @@ export interface BiomeDef {
   readonly flora?: FloraDef;
   /** Grass; none if absent. */
   readonly grass?: GrassDef;
+  /** The small shapes of the land here (D55, plan 5.9); none if absent. */
+  readonly landforms?: LandformMix;
+}
+
+/**
+ * The shapes a landform can take (D55, plan 5.9): each is a rule in world/landforms.ts that bends the height
+ * field over 30-500 m. Round ones: knoll, tor (a knoll with rock breaking through its crown), dell, sinkhole.
+ * Long ones run along an axis: gully and ravine (cut downhill), ridge, scarp (a step in the land), dry valley,
+ * bank and sunken lane (old work of hands). Boulders and erratics leave the ground as it is; their rock is all.
+ */
+export const LANDFORM_SHAPES = ['knoll', 'tor', 'dell', 'sinkhole', 'gully', 'ravine', 'ridge', 'scarp', 'dryValley', 'bank', 'sunkenLane', 'boulders', 'erratic'] as const;
+export type LandformShape = (typeof LANDFORM_SHAPES)[number];
+
+/** One kind of landform: its shape and how big it comes. */
+export interface LandformDef {
+  readonly id: string;
+  readonly shape: LandformShape;
+  /** Length (long shapes) or width (round ones), metres: at most 500. */
+  readonly size: readonly [number, number];
+  /** Width of a long shape, metres (round ones are as wide as long). */
+  readonly width?: readonly [number, number];
+  /** Rise (or depth, for hollows and cuts), metres. */
+  readonly height: readonly [number, number];
+  /** Share of dells that hold a pond, 0..1 (on level ground only). */
+  readonly pond?: number;
+  /** How much bare rock it shows, 0 (none) .. 1 (a crown of rock): where the rock meshes stand (L2). */
+  readonly rock?: number;
+}
+
+/** A biome's landforms: how many and which. */
+export interface LandformMix {
+  /** Landforms per square kilometre. */
+  readonly perKm2: number;
+  /** Height of the middle band of relief (waves 200-600 m across), metres. */
+  readonly relief: number;
+  /** Relative share of each landform (by id in `WorldShape.landforms`). */
+  readonly mix: Readonly<Record<string, number>>;
 }
 
 /**
@@ -110,6 +147,8 @@ export interface WorldShape {
   readonly weather: WeatherDef;
   /** What grazes the farms' paddocks (the game draws each kind its own way). */
   readonly livestock: LivestockKind;
+  /** The landforms the biomes' mixes name (D55); none if absent. */
+  readonly landforms?: readonly LandformDef[];
 }
 
 /** Farm animals the game can draw. Sheep and pigs join when Actors has them. */
