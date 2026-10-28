@@ -16,7 +16,7 @@ import HumanWorker from '../../workers/human.worker?worker';
 import { grow, type BodyPlan, type CritterRole, type Integument } from '@futuremagic/creatures';
 import { CritterModel, ModelledCreature, type ClipUse, type CritterFigure, type ModelledFigure, type RigInput } from '@futuremagic/creatures/three';
 import type { CreatureDef } from '../../setting/contract';
-import type { Creature, Den } from '../../sim/creatures';
+import { woundOf, type Creature, type Den } from '../../sim/creatures';
 import { critterMaterials, ratMaterial } from '../materials/creatures';
 import { buildArm } from '../hero/arms';
 import { gripHeld } from '../hero/grips';
@@ -25,6 +25,8 @@ import { foeClip, foeLook, type FoeDoing } from './foes';
 import type { Stage } from '@futuremagic/stage';
 import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from './animals';
 import { Jolt, joltRoot, joltSpine } from '../jolt';
+import { limp, limpOf } from '../limp';
+import { PACE } from '../hero/clips';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -170,6 +172,9 @@ export class CreatureView {
       const c = s.c;
       const vx = dt > 0 ? (c.x - s.px) / dt : 0, vz = dt > 0 ? (c.z - s.pz) / dt : 0;
       s.px = c.x; s.pz = c.z;
+      s.walked += Math.hypot(vx, vz) * dt;
+      // Badly hurt, it limps as it goes (the den slows it too).
+      const lame = c.state === 'dead' ? 0 : limpOf(woundOf(c)), moving = Math.hypot(vx, vz) > 0.2;
       if (c.act === 'swing' && s.act !== 'swing') { s.blowAt = t; s.variant++; }
       if (c.health < s.health) s.hurtAt = t;
       s.jolt.step(dt);
@@ -189,11 +194,11 @@ export class CreatureView {
       const watching = !dead && (c.state === 'alert' || c.state === 'fight' || c.state === 'beg') && eye ? eye : null;
       if (s.body.kind === 'modelled') {
         const f = s.body.fig, k = s.body.scale, speed = Math.hypot(vx, vz) / k;
-        s.walked += Math.hypot(vx, vz) * dt;
         f.root.position.set(c.x, c.y, c.z);
         f.root.rotation.set(0, yaw + Math.PI, 0);
         f.root.scale.setScalar(k);
         joltRoot(f.root, s.jolt, c.def.body.kind === 'rat' ? c.def.body.length * 0.35 : 0.06, 0.25);
+        if (c.def.body.kind === 'rat') limp(f.root, lame, s.walked, c.def.body.length * 0.9, c.def.body.length * 0.5, moving);
         const clip = dead ? 'Die' : blowT < 1 ? 'Bite' : c.state === 'alert' ? 'Rear' : speed > 2.2 ? 'Run' : speed > 0.2 ? 'Scurry' : c.act === 'gnaw' || c.act === 'rummage' ? 'Graze' : 'Sniff';
         f.play(clip);
         f.pace(s.walked / k);
@@ -205,6 +210,7 @@ export class CreatureView {
           : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
         poseAnimal(s.body, c.x, c.y, c.z, yaw, doing, speed, dt, fresh);
         if (!dead) joltRoot(s.body.place, s.jolt, 0.14, 0.14);
+        if (!dead) limp(s.body.place, lame, s.walked, 1.3, 1, moving);
       } else if (s.body.kind === 'critter') {
         const i = this.input;
         // Its body pushed back from the blow, the feet planted where they stand.
@@ -240,12 +246,16 @@ export class CreatureView {
           playClip(p.ch, clip, once, () => p.clip === clip, doing.action === 'flinch' ? FLINCH * 1.5 : doing.action ? BLOW : undefined, fade);
         }
         if (p.drawn !== fighting) { p.drawn = fighting; gripHeld(p.held, null, fighting, p.ch.actor, p.place); }
+        // The gait at the pace it goes (a lamed one's steps slow with it), as the hero's.
+        const gait = p.ch.actor.currentAction, pace = doing.action || dead ? 0 : PACE[clip === 'zombie walk' ? 'walk' : clip];
+        if (gait && pace) gait.timeScale = Math.min(1.8, Math.max(0.5, doing.speed / pace));
         p.ch.update(dt);
         p.place.position.set(c.x, c.y, c.z);
         // The den's yaw turns −z; Actors' people face +z.
         p.place.rotation.set(0, yaw + Math.PI, 0);
         if (!dead) {
           joltRoot(p.place, s.jolt, 0.08);
+          limp(p.place, lame, s.walked, 1.4, c.def.body.kind === 'humanoid' ? c.def.body.height : 1.7, moving);
           const f = p.ch.actor.fittedSkeleton;
           if (f) joltSpine(p.ch.actor.bones, f.names, s.jolt, 0.45);
         }

@@ -61,6 +61,8 @@ export interface Creature {
   pleas: number;
   /** Blows that hurt it and staggered it (bleeding does not), counted: each one shows as a jolt. */
   blows: number;
+  /** Seconds since it was last hurt (it heals only once the fight has left it alone a while). */
+  calm: number;
   rng: Rng;
 }
 
@@ -100,6 +102,25 @@ const WINDUP = 0.4;
 /** Lost this long, it gives up the hunt. */
 const GIVE_UP = 9;
 
+/**
+ * A wound slows it (Arnd 2026-10-28: a badly hurt one that runs can be caught): at full pace down to this
+ * share of its health, then slower and slower, to the floor at none left.
+ */
+const LAME = { knee: 0.75, floor: 0.35 } as const;
+/** Healing, share of its health a second, once left alone this long (the hero's own pace, about). */
+const HEAL = { calm: 6, moving: 0.01, still: 0.03 } as const;
+
+/** How wounded it is, 0 (whole) .. 1 (at death's door). */
+export function woundOf(c: Creature): number {
+  return 1 - Math.max(0, Math.min(1, c.health / c.def.health));
+}
+
+/** The share of its speed a wound leaves it (1 whole .. LAME.floor). */
+export function paceOf(c: Creature): number {
+  const h = 1 - woundOf(c);
+  return LAME.floor + (1 - LAME.floor) * Math.min(1, h / LAME.knee);
+}
+
 export class Den {
   readonly ground: DenGround;
   readonly creatures: Creature[] = [];
@@ -122,7 +143,7 @@ export class Den {
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
         aware: 0, leader: id === 0 && def.pack, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
-        repath: 0, pleas: 0, blows: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
+        repath: 0, pleas: 0, blows: 0, calm: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
       this.creatures.push(c);
@@ -154,6 +175,7 @@ export class Den {
       c.stagger = Math.max(0, c.stagger - dt);
       c.ready = Math.max(0, c.ready - dt);
       c.repath = Math.max(0, c.repath - dt);
+      this.heal(c, dt);
       this.sense(c, q, dt, out);
       switch (c.state) {
         case 'idle': if (this.peace && c.aware > 0.35) this.watch(c, q, dt); else this.idle(c, dt); break;
@@ -166,6 +188,14 @@ export class Den {
     }
     this.spread();
     return out;
+  }
+
+  /** Wounds close as the hero's do: never in a fight, slowly on the move, faster when it stays still. */
+  private heal(c: Creature, dt: number): void {
+    c.calm += dt;
+    if (c.state === 'fight' || c.calm < HEAL.calm || c.health >= c.def.health) return;
+    const still = c.pi >= c.path.length && c.state !== 'flee';
+    c.health = Math.min(c.def.health, c.health + c.def.health * (still ? HEAL.still : HEAL.moving) * dt);
   }
 
   /** What it sees and hears of the hero this step. */
@@ -348,6 +378,7 @@ export class Den {
     const out: DenEvent[] = [];
     if (c.state === 'dead') return out;
     c.health -= s.damage;
+    if (s.damage > 0) c.calm = 0;
     c.aware = 1;
     c.seen = { ...from };
     c.lost = 0;
@@ -424,7 +455,7 @@ export class Den {
   /** Walk the path at a share of its speed; false when there is nowhere to go. */
   private move(c: Creature, dt: number, pace: number): boolean {
     if (c.pi >= c.path.length) return false;
-    let left = c.def.speed * pace * (1 - c.slow) * dt;
+    let left = c.def.speed * pace * paceOf(c) * (1 - c.slow) * dt;
     const r = radiusOf(c.def);
     for (let n = 0; left > 1e-4 && c.pi < c.path.length && n < 8; n++) {
       const p = c.path[c.pi], dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz);
