@@ -744,7 +744,7 @@ export function shapeByWater(w: WaterHere, h: number): number {
     const q = dist / half;
     shaped = rockLevel(w) - (depth + plunge(w)) * (1 - q * q);
   } else {
-    const bank = bankLevel(w) + 0.4 + (dist - half) * 0.12;
+    const bank = bankLevel(w) + rim(dist - half) + (dist - half) * 0.12;
     if (h >= bank) {
       // Higher ground slopes down to the bank over the valley, keeping a share of its own relief.
       const keep = 0.2 * smoothstep(half, half + 25, dist);
@@ -752,13 +752,21 @@ export function shapeByWater(w: WaterHere, h: number): number {
     } else {
       // Low ground: a low levee keeps the river in its bed, then the land is left as it is.
       // (Over the valley's outer half at most, so a brook's narrow valley ends where the land is its own.)
-      const levee = bankLevel(w) + 0.4 + Math.min((dist - half) * 0.12, 1.2), wide = valley - half;
+      const levee = bankLevel(w) + rim(dist - half) + Math.min((dist - half) * 0.12, 1.2), wide = valley - half;
       shaped = Math.max(h, lerp(levee, h, smoothstep(half + Math.min(30, wide / 4), Math.min((half + valley) / 2 + 30, valley), dist)));
     }
   }
   // At the mouth the sea takes over: only lower, never build banks out into the water.
   return level < 1 ? Math.min(h, shaped) : shaped;
 }
+
+/**
+ * The bank's rise over the water `out` metres past the water's edge: up to 0.4 m over BANK_RISE m, not a
+ * step at the edge. A step there fell between the ground mesh's vertices, so the waterline ran along it in
+ * stairs of the mesh's triangles (most of all on a brook, a few metres wide).
+ */
+const rim = (out: number): number => 0.4 * smoothstep(0, BANK_RISE, out);
+const BANK_RISE = 1.6;
 
 /** Extra depth of the pool a waterfall digs below its lip, metres. */
 function plunge(w: WaterHere): number {

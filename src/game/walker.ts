@@ -116,6 +116,12 @@ export class Walker {
     return Math.max(h, s);
   }
 
+  /** Whether a built floor at (x, z) stands over the height field there (one walks on it, not on the land below). */
+  private onFloor(x: number, z: number): boolean {
+    const f = this.world.floor?.(x, z) ?? null;
+    return f !== null && f >= this.world.height(x, z);
+  }
+
   /** Whether the body would be in rock at (x, z) with its feet at y. */
   private blocked(x: number, y: number, z: number): boolean {
     const r = this.spec.radius;
@@ -180,9 +186,10 @@ export class Walker {
         const run = Math.hypot(nx - p.x, nz - p.z);
         const rise = this.support(nx, nz, p.y) - p.y;
         if (run > 1e-6 && rise > this.spec.step && rise / run > this.spec.maxSlope) return false;
-        // The height field alone is too steep here (a step up of slope, not a ledge).
+        // The height field alone is too steep here (a step up of slope, not a ledge), unless a floor stands
+        // over it (a bridge's deck over a brook's steep bank).
         const hf = this.world.height(nx, nz) - this.world.height(p.x, p.z);
-        if (run > 1e-6 && hf > 0 && hf / run > this.spec.maxSlope && this.world.rockSurface(nx, p.y, nz) === null) return false;
+        if (run > 1e-6 && hf > 0 && hf / run > this.spec.maxSlope && this.world.rockSurface(nx, p.y, nz) === null && !this.onFloor(nx, nz)) return false;
       }
       p.x = nx; p.z = nz;
       return true;

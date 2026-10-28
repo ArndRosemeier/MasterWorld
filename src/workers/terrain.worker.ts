@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 /** Terrain meshes: height field chunks, and the rock volumes standing on the land. */
-import { buildChunk, type ChunkSpec, type ChunkMesh } from '../world/chunkMesh';
+import { buildChunk, finerFor, type ChunkSpec, type ChunkMesh } from '../world/chunkMesh';
 import { archMesh, type VolumeMesh } from '../world/volumes';
 import { openHouse, townMeshBuffers, townMeshes, type OpenHouse, type TownCellMesh } from '../world/townMesh';
 import { guildHouses, guildSigns } from '../game/guilds';
@@ -76,7 +76,7 @@ serve<TerrainJob, TerrainResult>((job) => {
     const map = horizonMap((x, z) => t.height(x, z), job);
     return { result: map, transfer: [map.buffer] };
   }
-  const mesh = buildChunk(terrain, job);
+  const mesh = buildChunk(terrain, { ...job, segs: finerFor(terrain, job) });
   return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer, mesh.level.buffer, mesh.canopy.buffer] };
 });
 

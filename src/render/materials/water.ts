@@ -187,10 +187,12 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const under = mix(W.deep.mul(W.ambient).mul(2), sky.mul(0.9).add(W.sunColor.mul(pow(max(dot(V.negate(), W.sunDir), 0), 40)).mul(2)), window);
     return vec4(select(up, col, under), 1);
   })();
-  // Dry land under a wave's edge: nothing.
+  // Dry land under a wave's edge: nothing. Running water has no waves: its banks hide it, so it is cut only
+  // well under them (where its surface sinks past lower ground), else the masks' 2 m samples cut a brook into steps.
   m.alphaTestNode = null;
+  const dryBelow = mix(float(-0.2), float(-0.75), smoothstep(0.05, 0.3, length(vFlow)));
   // (A falling sheet stays whole: it hangs over its own lip.)
-  m.opacityNode = select(waterAt(WORLD.xz).y.lessThan(-0.2).and(vFall.lessThan(0.3)), float(0), float(1));
+  m.opacityNode = select(waterAt(WORLD.xz).y.lessThan(dryBelow).and(vFall.lessThan(0.3)), float(0), float(1));
   m.alphaTest = 0.5;
   return m;
 }, { cast: false, receive: false });
