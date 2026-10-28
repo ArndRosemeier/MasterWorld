@@ -1,0 +1,216 @@
+
+> masterworld@0.0.0 shot:capital
+> node tools/shot/capital.mjs shots/polish5/b-waited
+
+region-24: 695 buildings, 2646 people, 5 gates; playable in 15.2 s
+the way in (1101 m at 16 m/s): worst frame 53 ms 211 m from the gate, 54 frames over 25 ms; its people lived from 980 m out
+slow frames by distance from the gate: 1000-1100 m: 5, 900-1000 m: 1, 800-900 m: 6, 700-800 m: 1, 500-600 m: 1, 200-300 m: 13, 100-200 m: 6, 0-100 m: 21
+drawn along the way:
+  1092 m 10 ms: 476 calls, 6.60 M tris, 869 geometries; town/buildings 186, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1087 m 31 ms SLOW: 393 calls, 6.03 M tris, 869 geometries; 
+  1086 m 30 ms SLOW: 393 calls, 6.04 M tris, 869 geometries; 
+  1085 m 29 ms SLOW: 487 calls, 6.59 M tris, 893 geometries; 
+  1084 m 29 ms SLOW: 405 calls, 6.04 M tris, 893 geometries; 
+  1083 m 28 ms SLOW: 411 calls, 6.09 M tris, 901 geometries; 
+  1081 m 9 ms: 494 calls, 6.66 M tris, 901 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1074 m 11 ms: 491 calls, 5.98 M tris, 901 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1066 m 9 ms: 492 calls, 5.99 M tris, 905 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1058 m 11 ms: 495 calls, 6.66 M tris, 905 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1050 m 9 ms: 492 calls, 6.65 M tris, 905 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1042 m 9 ms: 492 calls, 6.63 M tris, 905 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1034 m 12 ms: 491 calls, 6.63 M tris, 905 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1026 m 9 ms: 489 calls, 5.96 M tris, 905 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1018 m 10 ms: 488 calls, 5.94 M tris, 905 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1011 m 11 ms: 486 calls, 5.94 M tris, 905 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  1003 m 7 ms: 486 calls, 5.94 M tris, 906 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  996 m 8 ms: 487 calls, 5.94 M tris, 906 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  988 m 8 ms: 484 calls, 5.93 M tris, 906 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  980 m 12 ms: 480 calls, 5.23 M tris, 906 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  972 m 10 ms: 477 calls, 5.20 M tris, 908 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  965 m 8 ms: 477 calls, 5.20 M tris, 908 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  957 m 8 ms: 480 calls, 5.87 M tris, 908 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  950 m 8 ms: 482 calls, 5.90 M tris, 918 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  942 m 11 ms: 479 calls, 5.88 M tris, 918 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  935 m 8 ms: 478 calls, 5.87 M tris, 919 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  927 m 10 ms: 476 calls, 5.85 M tris, 919 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  920 m 8 ms: 476 calls, 5.84 M tris, 920 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  913 m 8 ms: 477 calls, 6.50 M tris, 920 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  908 m 26 ms SLOW: 477 calls, 6.51 M tris, 921 geometries; 
+  905 m 8 ms: 477 calls, 6.52 M tris, 921 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  897 m 9 ms: 477 calls, 6.52 M tris, 921 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  889 m 10 ms: 476 calls, 6.51 M tris, 921 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, cow/cow 6, squirrel/Group 6, cellar cellar-1/door oneway 3
+  886 m 29 ms SLOW: 478 calls, 7.19 M tris, 924 geometries; 
+  882 m 31 ms SLOW: 398 calls, 6.64 M tris, 924 geometries; 
+  879 m 8 ms: 479 calls, 7.18 M tris, 924 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  871 m 9 ms: 478 calls, 6.50 M tris, 929 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  864 m 8 ms: 478 calls, 6.54 M tris, 929 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  856 m 8 ms: 476 calls, 6.52 M tris, 929 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  849 m 11 ms: 474 calls, 6.51 M tris, 929 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  841 m 8 ms: 477 calls, 6.55 M tris, 937 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  833 m 8 ms: 478 calls, 6.55 M tris, 937 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  828 m 30 ms SLOW: 397 calls, 6.00 M tris, 937 geometries; 
+  827 m 28 ms SLOW: 397 calls, 6.01 M tris, 937 geometries; 
+  827 m 29 ms SLOW: 478 calls, 6.55 M tris, 941 geometries; 
+  826 m 35 ms SLOW: 480 calls, 6.57 M tris, 941 geometries; 
+  824 m 9 ms: 480 calls, 6.58 M tris, 941 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  815 m 10 ms: 476 calls, 5.88 M tris, 941 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  807 m 9 ms: 477 calls, 5.89 M tris, 945 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  800 m 10 ms: 477 calls, 5.90 M tris, 945 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  793 m 11 ms: 475 calls, 5.89 M tris, 945 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  785 m 10 ms: 476 calls, 5.90 M tris, 945 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  778 m 8 ms: 475 calls, 5.89 M tris, 945 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  777 m 32 ms SLOW: 395 calls, 5.35 M tris, 945 geometries; 
+  770 m 8 ms: 474 calls, 5.88 M tris, 945 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  763 m 11 ms: 473 calls, 5.89 M tris, 945 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  755 m 9 ms: 478 calls, 6.58 M tris, 950 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  748 m 11 ms: 477 calls, 6.57 M tris, 950 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  740 m 8 ms: 476 calls, 6.56 M tris, 950 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  733 m 8 ms: 474 calls, 6.55 M tris, 950 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  726 m 8 ms: 469 calls, 5.85 M tris, 950 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  718 m 8 ms: 467 calls, 5.85 M tris, 950 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  711 m 8 ms: 466 calls, 5.19 M tris, 954 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  704 m 9 ms: 466 calls, 5.19 M tris, 954 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  696 m 11 ms: 467 calls, 5.19 M tris, 956 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  687 m 11 ms: 465 calls, 5.18 M tris, 956 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  679 m 8 ms: 469 calls, 5.22 M tris, 960 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  672 m 9 ms: 471 calls, 5.90 M tris, 960 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  664 m 9 ms: 474 calls, 5.92 M tris, 964 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  657 m 9 ms: 471 calls, 5.91 M tris, 964 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 9, cow/cow 6, cellar cellar-1/door oneway 3
+  649 m 11 ms: 472 calls, 6.58 M tris, 967 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  641 m 9 ms: 473 calls, 7.26 M tris, 967 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  633 m 11 ms: 474 calls, 7.26 M tris, 968 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  625 m 9 ms: 475 calls, 7.26 M tris, 968 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  618 m 13 ms: 476 calls, 7.27 M tris, 972 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  610 m 11 ms: 475 calls, 7.26 M tris, 972 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  602 m 8 ms: 466 calls, 5.87 M tris, 972 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  594 m 9 ms: 474 calls, 7.25 M tris, 976 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  587 m 9 ms: 476 calls, 7.26 M tris, 976 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  581 m 28 ms SLOW: 480 calls, 7.30 M tris, 984 geometries; 
+  578 m 9 ms: 476 calls, 6.62 M tris, 984 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  571 m 9 ms: 477 calls, 6.64 M tris, 984 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  563 m 9 ms: 479 calls, 6.65 M tris, 988 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  555 m 9 ms: 476 calls, 5.97 M tris, 988 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  547 m 9 ms: 476 calls, 5.96 M tris, 989 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  540 m 9 ms: 476 calls, 5.97 M tris, 989 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  532 m 9 ms: 487 calls, 6.65 M tris, 999 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  524 m 9 ms: 486 calls, 6.62 M tris, 999 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  515 m 2 ms: 484 calls, 6.62 M tris, 999 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  508 m 10 ms: 484 calls, 5.94 M tris, 999 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  499 m 11 ms: 483 calls, 5.94 M tris, 999 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  490 m 9 ms: 479 calls, 5.91 M tris, 999 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  482 m 9 ms: 481 calls, 5.91 M tris, 1002 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  474 m 8 ms: 480 calls, 5.91 M tris, 1002 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  466 m 8 ms: 483 calls, 5.93 M tris, 1006 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  459 m 8 ms: 482 calls, 5.91 M tris, 1006 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  451 m 8 ms: 482 calls, 5.92 M tris, 1006 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  444 m 9 ms: 481 calls, 5.90 M tris, 1006 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  436 m 9 ms: 481 calls, 5.93 M tris, 1006 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  429 m 8 ms: 479 calls, 5.91 M tris, 1006 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  421 m 8 ms: 480 calls, 6.58 M tris, 1013 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  414 m 8 ms: 478 calls, 6.58 M tris, 1013 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  407 m 8 ms: 482 calls, 6.60 M tris, 1018 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  397 m 10 ms: 479 calls, 6.59 M tris, 1018 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  388 m 11 ms: 478 calls, 6.59 M tris, 1019 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  381 m 8 ms: 478 calls, 6.57 M tris, 1019 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  372 m 9 ms: 477 calls, 6.58 M tris, 1019 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  365 m 8 ms: 472 calls, 5.88 M tris, 1019 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  358 m 10 ms: 469 calls, 5.88 M tris, 1019 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  350 m 9 ms: 473 calls, 6.56 M tris, 1019 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  343 m 8 ms: 472 calls, 6.55 M tris, 1021 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  335 m 8 ms: 467 calls, 5.86 M tris, 1021 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  329 m 11 ms: 469 calls, 5.87 M tris, 1021 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  321 m 8 ms: 473 calls, 5.88 M tris, 1029 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  313 m 7 ms: 475 calls, 5.91 M tris, 1029 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  305 m 12 ms: 472 calls, 5.91 M tris, 1029 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  296 m 13 ms: 473 calls, 5.91 M tris, 1031 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  288 m 9 ms: 471 calls, 5.91 M tris, 1031 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  280 m 9 ms: 471 calls, 5.90 M tris, 1031 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  272 m 10 ms: 467 calls, 5.89 M tris, 1031 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  265 m 8 ms: 467 calls, 5.23 M tris, 1031 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  257 m 30 ms SLOW: 470 calls, 5.25 M tris, 1034 geometries; 
+  257 m 11 ms: 470 calls, 5.25 M tris, 1034 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  255 m 33 ms SLOW: 470 calls, 5.23 M tris, 1035 geometries; 
+  254 m 32 ms SLOW: 379 calls, 4.70 M tris, 1035 geometries; 
+  248 m 8 ms: 472 calls, 5.25 M tris, 1035 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  240 m 9 ms: 472 calls, 5.25 M tris, 1035 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  232 m 8 ms: 467 calls, 5.24 M tris, 1035 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  224 m 12 ms: 469 calls, 5.24 M tris, 1035 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  216 m 9 ms: 472 calls, 5.23 M tris, 1035 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, cow/cow 6, cellar cellar-1/door oneway 3
+  211 m 28 ms SLOW: 372 calls, 4.69 M tris, 1035 geometries; 
+  211 m 53 ms SLOW: 372 calls, 4.68 M tris, 1046 geometries; 
+  210 m 44 ms SLOW: 473 calls, 5.26 M tris, 1046 geometries; 
+  208 m 25 ms SLOW: 477 calls, 5.28 M tris, 1064 geometries; 
+  207 m 32 ms SLOW: 379 calls, 4.72 M tris, 1067 geometries; 
+  207 m 31 ms SLOW: 483 calls, 5.30 M tris, 1067 geometries; 
+  206 m 31 ms SLOW: 379 calls, 4.72 M tris, 1067 geometries; 
+  205 m 32 ms SLOW: 379 calls, 4.73 M tris, 1067 geometries; 
+  204 m 29 ms SLOW: 379 calls, 4.72 M tris, 1067 geometries; 
+  204 m 31 ms SLOW: 379 calls, 4.73 M tris, 1067 geometries; 
+  203 m 14 ms: 482 calls, 5.28 M tris, 1067 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, townsfolk/Group 11, cow/cow 6
+  193 m 13 ms: 477 calls, 5.28 M tris, 1067 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, townsfolk/Group 11, cow/cow 6
+  190 m 25 ms SLOW: 475 calls, 5.27 M tris, 1067 geometries; 
+  184 m 9 ms: 475 calls, 5.28 M tris, 1067 geometries; town/buildings 198, flora/Mesh 54, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, townsfolk/Group 11, cow/cow 6
+  176 m 13 ms: 472 calls, 5.28 M tris, 1067 geometries; town/buildings 198, flora/Mesh 51, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, townsfolk/Group 11, cow/cow 6
+  168 m 9 ms: 464 calls, 5.92 M tris, 1067 geometries; town/buildings 198, flora/Mesh 45, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, townsfolk/Group 11, cow/cow 6
+  160 m 12 ms: 447 calls, 5.86 M tris, 1067 geometries; town/buildings 198, flora/Mesh 36, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, townsfolk/Group 11, cow/cow 6
+  152 m 9 ms: 439 calls, 5.85 M tris, 1067 geometries; town/buildings 198, flora/Mesh 33, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, townsfolk/Group 11, cow/cow 6
+  144 m 12 ms: 442 calls, 5.87 M tris, 1067 geometries; town/buildings 198, flora/Mesh 36, creatures/smuggler 26, horse/Group 16, hero/Group 13, squirrel/Group 12, townsfolk/Group 11, cow/cow 6
+  142 m 28 ms SLOW: 442 calls, 5.88 M tris, 1067 geometries; 
+  142 m 29 ms SLOW: 441 calls, 5.88 M tris, 1079 geometries; 
+  135 m 9 ms: 445 calls, 5.89 M tris, 1082 geometries; town/buildings 198, flora/Mesh 33, creatures/smuggler 26, horse/Group 16, townsfolk/Group 14, hero/Group 13, squirrel/Group 12, cow/cow 6
+  130 m 26 ms SLOW: 340 calls, 5.31 M tris, 1081 geometries; 
+  128 m 29 ms SLOW: 343 calls, 5.31 M tris, 1082 geometries; 
+  125 m 12 ms: 449 calls, 5.91 M tris, 1082 geometries; town/buildings 198, flora/Mesh 36, creatures/smuggler 26, horse/Group 16, townsfolk/Group 14, hero/Group 13, squirrel/Group 12, cow/cow 6
+  124 m 27 ms SLOW: 342 calls, 5.31 M tris, 1097 geometries; 
+  116 m 9 ms: 448 calls, 6.59 M tris, 1100 geometries; town/buildings 198, flora/Mesh 36, creatures/smuggler 26, townsfolk/Group 17, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  106 m 13 ms: 446 calls, 6.60 M tris, 1100 geometries; town/buildings 198, flora/Mesh 36, creatures/smuggler 26, townsfolk/Group 17, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  96 m 15 ms: 451 calls, 6.59 M tris, 1100 geometries; town/buildings 198, flora/Mesh 36, creatures/smuggler 26, townsfolk/Group 17, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  95 m 28 ms SLOW: 352 calls, 6.03 M tris, 1112 geometries; 
+  88 m 35 ms SLOW: 346 calls, 4.68 M tris, 1131 geometries; 
+  85 m 11 ms: 468 calls, 5.34 M tris, 1133 geometries; town/buildings 198, flora/Mesh 42, creatures/smuggler 26, townsfolk/Group 23, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  84 m 27 ms SLOW: 334 calls, 4.62 M tris, 1133 geometries; 
+  83 m 28 ms SLOW: 334 calls, 4.63 M tris, 1131 geometries; 
+  83 m 26 ms SLOW: 333 calls, 4.62 M tris, 1134 geometries; 
+  79 m 27 ms SLOW: 470 calls, 5.33 M tris, 1135 geometries; 
+  78 m 32 ms SLOW: 349 calls, 5.37 M tris, 1136 geometries; 
+  74 m 9 ms: 354 calls, 5.39 M tris, 1134 geometries; town/buildings 198, flora/Mesh 45, creatures/smuggler 26, townsfolk/Group 25, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  73 m 26 ms SLOW: 474 calls, 6.02 M tris, 1146 geometries; 
+  67 m 26 ms SLOW: 360 calls, 5.46 M tris, 1161 geometries; 
+  67 m 34 ms SLOW: 359 calls, 5.47 M tris, 1164 geometries; 
+  64 m 8 ms: 354 calls, 5.43 M tris, 1164 geometries; town/buildings 198, flora/Mesh 45, townsfolk/Group 31, creatures/smuggler 26, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  62 m 28 ms SLOW: 353 calls, 5.43 M tris, 1164 geometries; 
+  60 m 27 ms SLOW: 478 calls, 6.08 M tris, 1164 geometries; 
+  54 m 8 ms: 355 calls, 5.45 M tris, 1164 geometries; town/buildings 198, flora/Mesh 45, townsfolk/Group 31, creatures/smuggler 26, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  43 m 9 ms: 348 calls, 4.75 M tris, 1179 geometries; town/buildings 198, flora/Mesh 45, townsfolk/Group 34, creatures/smuggler 26, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  34 m 8 ms: 343 calls, 4.74 M tris, 1179 geometries; town/buildings 198, flora/Mesh 45, townsfolk/Group 34, creatures/smuggler 26, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  29 m 25 ms SLOW: 341 calls, 4.74 M tris, 1179 geometries; 
+  25 m 8 ms: 344 calls, 4.75 M tris, 1179 geometries; town/buildings 198, flora/Mesh 48, townsfolk/Group 34, creatures/smuggler 26, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  23 m 28 ms SLOW: 343 calls, 4.73 M tris, 1179 geometries; 
+  16 m 7 ms: 341 calls, 4.76 M tris, 1179 geometries; town/buildings 198, flora/Mesh 48, townsfolk/Group 34, creatures/smuggler 26, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  14 m 28 ms SLOW: 338 calls, 4.75 M tris, 1179 geometries; 
+  13 m 31 ms SLOW: 466 calls, 5.51 M tris, 1193 geometries; 
+  13 m 27 ms SLOW: 466 calls, 5.52 M tris, 1196 geometries; 
+  9 m 29 ms SLOW: 334 calls, 4.76 M tris, 1200 geometries; 
+  5 m 8 ms: 339 calls, 4.79 M tris, 1200 geometries; town/buildings 198, flora/Mesh 48, townsfolk/Group 39, creatures/smuggler 26, horse/Group 16, squirrel/Group 15, hero/Group 13, cow/cow 6
+  4 m 30 ms SLOW: 338 calls, 4.79 M tris, 1214 geometries; 
+  2 m 32 ms SLOW: 342 calls, 4.79 M tris, 1231 geometries; 
+  0 m 27 ms SLOW: 346 calls, 4.81 M tris, 1232 geometries; 
+  53 ms at 211 m (outside these: 33): stage prepare 10.0, render 9.0 | node-async 17.9 MeshPhysicalNodeMaterial; gpu-module 0.0 createShaderModule; gpu-module 0.2 createShaderModule
+  44 ms at 210 m (outside these: 28): render 14.9, folk 0.5
+  35 ms at 826 m (outside these: 21): render 13.4
+  35 ms at 88 m (outside these: 23): render 8.9, folk 1.1, stage prepare 0.6
+  34 ms at 67 m (outside these: 26): render 6.3, folk 1.1
+  33 ms at 255 m (outside these: 18): render 13.9 | node-async 12.6 MeshStandardNodeMaterial; gpu-module 0.1 createShaderModule; gpu-module 0.0 createShaderModule
+  32 ms at 78 m (outside these: 23): render 6.7, trees 1.8, folk 0.9
+  32 ms at 205 m (outside these: 22): render 8.7, folk 0.5
+  32 ms at 777 m (outside these: 24): render 8.2
+  32 ms at 207 m (outside these: 21): render 9.8, folk 0.8 | gpu-pipeline-async 77.9 pipeline
+01-gate.jpg: p50 10.2 ms, p95 15.3 ms
+worst frame coming in: 49 ms
+02-market.jpg: p50 11.3 ms, p95 28.6 ms
+03-seat.jpg: p50 11.1 ms, p95 24.0 ms
+04-gate-night.jpg: p50 10.8 ms, p95 13.1 ms
+05-gate-opening.jpg
+06-gate-open.jpg
+the gate at night: 0.00 with nobody by it, 0.50 as the hero comes up, 1.00 once there
+F3: 0 shader violations
