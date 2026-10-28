@@ -96,8 +96,14 @@ test('talk: the journal keeps one lead per promise, with every new thing told', 
 
 test('talk: someone stopped for a talk stands and faces the player, and goes on when let go', () => {
   const life = new TownLife(town.plan, seed, 10);
-  const a = life.agents.find((x) => !x.hidden && x.person.role !== 'child')!;
-  life.hold(a, a.x + 1, a.z);
+  // (One at their work behind a barrel or an anvil first walks round it: that is another test's.)
+  const a = life.agents.find((x) => {
+    if (x.hidden || x.person.role === 'child') return false;
+    life.hold(x, x.x + 1, x.z);
+    if (x.act === 'chat') return true;
+    life.letGo(x);
+    return false;
+  })!;
   const at = [a.x, a.z];
   for (let i = 0; i < 50; i++) life.step(0.2, 10);
   assert.deepEqual([a.x, a.z], at, 'stays put');
