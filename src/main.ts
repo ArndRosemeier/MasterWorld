@@ -1360,7 +1360,9 @@ export async function start(b: Boot): Promise<void> {
         const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && !wet(px, pz);
         if (!standsFree(x, z, 1.2) || ![3.5, 6].every((d) => standsFree(x + Math.sin(yaw) * d, z + Math.cos(yaw) * d, 2.5))) return false;
         // Across the view a tree's crown, not only its trunk, is in the way (but near what it looks at, trees may stand).
-        const d = at ? Math.min(60, Math.hypot(at.x - x, at.z - z) - 4) : 0;
+        // Only for a place a stone's throw off (a cave's mouth): someone met close is seen anyway, and far off a stand
+        // turned round its target lands somewhere else entirely.
+        const off = at ? Math.hypot(at.x - x, at.z - z) : 0, d = off >= 12 && off <= 40 ? off - 4 : 0;
         for (let t = 3; t < d; t += 2) if (trunks.blocks(x - Math.sin(yaw) * t, z - Math.cos(yaw) * t, t < 8 ? 1.2 : 2.2)) return false;
         return true;
       },
