@@ -109,6 +109,10 @@ test('guilds: houses in towns and villages, none in a hamlet; trainers and a bar
   assert.deepEqual(guildHouses(hamlet, 'hamlet', classic), []);
 });
 
+test('guilds: only houses where fighting is taught are halls; the witch and the hidden houses are homes', () => {
+  assert.deepEqual(classic.guilds!.filter((g) => g.hall).map((g) => g.keeper), ['master-at-arms', 'lodge-master']);
+});
+
 test('guilds: no two guild houses next door to each other where the town has room', () => {
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     const hs = guildHouses(planTown({ seed, x: 0, z: 0, radius: 72, height: () => 10 }), 'town', classic);

@@ -19,8 +19,11 @@ export function placesFor(seed: string, start: { x: number; z: number }): Place[
 
 interface At { readonly x: number; readonly z: number }
 
-/** Where the hero stands, and the way they face (the walker's yaw: 0 faces −z); `at`: what they look at; `pitch`: the camera's (rad, up positive). */
-export interface Stand { readonly x: number; readonly z: number; readonly yaw: number; readonly at?: At; readonly pitch?: number }
+/**
+ * Where the hero stands, and the way they face (the walker's yaw: 0 faces −z); `at`: what they look at; `pitch`: the
+ * camera's (rad, up positive); `arc`: how far round what they look at a clearer stand may be (rad; none: all the way).
+ */
+export interface Stand { readonly x: number; readonly z: number; readonly yaw: number; readonly at?: At; readonly pitch?: number; readonly arc?: number }
 
 /** The way that faces `at` from (x, z). */
 const toward = (x: number, z: number, at: At): number => Math.atan2(x - at.x, z - at.z);
@@ -35,8 +38,8 @@ export function beside(at: At, from: At, d: number): Stand {
   return { x: at.x + ux * d, z: at.z + uz * d, yaw: Math.atan2(ux, uz), at };
 }
 
-/** In the street `d` m before a building's door, facing it. */
-export const atDoor = (b: TownBuilding, d = 6): Stand => ({ x: b.door[0] - b.vx * d, z: b.door[1] - b.vz * d, yaw: Math.atan2(-b.vx, -b.vz), at: { x: b.door[0], z: b.door[1] } });
+/** In the street `d` m before a building's door, facing it (never round to a side wall, where the door is out of sight). */
+export const atDoor = (b: TownBuilding, d = 6): Stand => ({ x: b.door[0] - b.vx * d, z: b.door[1] - b.vz * d, yaw: Math.atan2(-b.vx, -b.vz), at: { x: b.door[0], z: b.door[1] }, arc: Math.PI / 3 });
 
 /** Outside a town wall's gate, `d` m out on its road, facing in through it. */
 export const outsideGate = (g: TownGate, d = 24): Stand => ({ x: g.x + Math.cos(g.angle) * d, z: g.z + Math.sin(g.angle) * d, yaw: Math.atan2(Math.cos(g.angle), Math.sin(g.angle)), at: { x: g.x, z: g.z } });
@@ -44,14 +47,16 @@ export const outsideGate = (g: TownGate, d = 24): Stand => ({ x: g.x + Math.cos(
 /**
  * A stand from which the hero is seen and sees: `s` itself if `clear` there (no tree, wall or water at the hero,
  * at the camera behind them or across the view), else the nearest clear one round what it looks at (turned up to 180° either
- * way, then a third nearer), else `s`.
+ * way, or `s.arc`; then a third nearer), else `s`.
  */
 export function clearStand(s: Stand, clear: (x: number, z: number, yaw: number, at?: At) => boolean): Stand {
   if (clear(s.x, s.z, s.yaw, s.at) || !s.at) return s;
   const a = s.at, d0 = Math.hypot(s.x - a.x, s.z - a.z), a0 = Math.atan2(s.x - a.x, s.z - a.z);
   for (const d of [d0, d0 * 0.67]) {
     for (let k = 1; k <= 12; k++) {
-      const t = a0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 12) * 2;
+      const turn = Math.ceil(k / 2) * (Math.PI / 6);
+      if (turn > (s.arc ?? Math.PI) + 1e-9) break;
+      const t = a0 + (k % 2 ? 1 : -1) * turn;
       const x = a.x + Math.sin(t) * d, z = a.z + Math.cos(t) * d, yaw = toward(x, z, a);
       if (clear(x, z, yaw, a)) return { ...s, x, z, yaw };
     }
