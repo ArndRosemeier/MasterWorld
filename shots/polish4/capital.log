@@ -1,0 +1,99 @@
+
+> masterworld@0.0.0 shot:capital
+> node tools/shot/capital.mjs shots/polish4/capital
+
+region-24: 695 buildings, 2646 people, 5 gates; playable in 15.1 s
+ride CPU profile, first 7 s: 7393 ms busy
+self time:
+     780 ms  (program) (native):0
+     400 ms  updateForRender three.js:69329
+     303 ms  writeBuffer (native):0
+     274 ms  update three.js:74415
+     253 ms  updateHiddenSkin creatorUi.js:4675
+     209 ms  multiplyMatrices three.js:7215
+     199 ms  _update three.js:51711
+     180 ms  setVertexBuffer (native):0
+     167 ms  bindings._update fxView.js:342
+     155 ms  updateMatrixWorld three.js:9009
+     138 ms  _renderObjectDirect three.js:73886
+     136 ms  copyExternalImageToTexture (native):0
+     121 ms  build three.js:31000
+     120 ms  n2 src.js:240
+     108 ms  (garbage collector) (native):0
+     105 ms  get value three.js:37949
+     100 ms  get needsGeometryUpdate three.js:50039
+      99 ms  updateNumber three.js:74450
+      95 ms  update three.js:40239
+      87 ms  _draw three.js:88955
+      83 ms  updateAttributes three.js:50571
+      74 ms  update three.js:38369
+      67 ms  cyrb53 three.js:30094
+      65 ms  _getNodeChildren three.js:43725
+      64 ms  r._renderObjectDirect fxView.js:283
+      63 ms  getMaterialCacheKey three.js:49992
+      63 ms  intersectsObject three.js:17279
+      62 ms  needsRenderUpdate three.js:89128
+      60 ms  _getChildren three.js:30707
+      58 ms  updateAttribute three.js:50586
+with callees:
+    7393 ms  (root) (native):0
+    5084 ms  update three.js:49331
+    5068 ms  (anonymous) main.js:38787
+    4648 ms  o.<computed> (native):6
+    4357 ms  draw fxView.js:1880
+    4347 ms  draw fxView.js:962
+    4345 ms  render three.js:72505
+    4342 ms  _renderScene three.js:72603
+    3938 ms  _renderObjects three.js:73695
+    3929 ms  renderObject three.js:73804
+    3907 ms  r._renderObjectDirect fxView.js:283
+    3671 ms  drawNow fxView.js:284
+    3656 ms  _renderObjectDirect three.js:73886
+    1484 ms  _updateBindings three.js:51702
+    1477 ms  bindings._update fxView.js:342
+    1418 ms  updateForRender three.js:51609
+    1275 ms  _update three.js:51711
+     922 ms  updateBefore three.js:69278
+     784 ms  updateForRender three.js:69329
+     780 ms  (program) (native):0
+     623 ms  updateBefore three.js:61256
+     621 ms  updateShadow three.js:61182
+     620 ms  renderShadow three.js:61167
+     533 ms  buildAsync three.js:67750
+     521 ms  build three.js:53249
+     515 ms  build three.js:31000
+     510 ms  build three.js:31327
+     508 ms  build three.js:35348
+     490 ms  renderObjectFunction three.js:60577
+     476 ms  get three.js:50187
+     437 ms  update three.js:74415
+     430 ms  draw three.js:89044
+     425 ms  build three.js:32113
+     373 ms  _draw three.js:88955
+     335 ms  updateVisibility creatorUi.js:4226
+     317 ms  updateBinding three.js:86491
+     315 ms  updateMatrixWorld three.js:9009
+     308 ms  warmAll main.js:2928
+     303 ms  writeBuffer (native):0
+     300 ms  updateHiddenSkin creatorUi.js:4675
+the way in (1101 m at 16 m/s): worst frame 75 ms 1030 m from the gate, 113 frames over 25 ms; its people lived from 980 m out
+slow frames by distance from the gate: 1000-1100 m: 55, 900-1000 m: 2, 800-900 m: 3, 500-600 m: 4, 300-400 m: 5, 200-300 m: 8, 100-200 m: 9, 0-100 m: 27
+  75 ms at 1030 m (outside these: 65): render 8.9
+  61 ms at 1027 m (outside these: 48): render 13.3
+  60 ms at 1021 m (outside these: 48): render 11.3
+  59 ms at 1024 m (outside these: 47): render 11.9
+  59 ms at 1087 m (outside these: 44): render 14.7
+  58 ms at 1064 m (outside these: 51): render 6.9
+  58 ms at 1036 m (outside these: 49): render 8.2
+  57 ms at 1033 m (outside these: 50): render 6.6
+  57 ms at 1052 m (outside these: 48): render 8.4
+  56 ms at 1060 m (outside these: 45): render 9.7
+01-gate.jpg: p50 10.3 ms, p95 12.0 ms
+worst frame coming in: 40 ms
+02-market.jpg: p50 11.5 ms, p95 14.1 ms
+03-seat.jpg: p50 11.6 ms, p95 24.1 ms
+04-gate-night.jpg: p50 11.4 ms, p95 13.0 ms
+05-gate-opening.jpg
+06-gate-open.jpg
+the gate at night: 0.00 with nobody by it, 0.51 as the hero comes up, 1.00 once there
+F3: 0 shader violations
