@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Current phase: C.**
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Current phase: D** (to be planned in detail, section 4).
 
 ---
 
@@ -160,4 +160,9 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | The horse reads coarse (flat body, flat white saddle pad) | Seen at gate B; looks, not function |
 | Leaf litter has bright green blotches like texture splats | Seen at gate B |
 | Loop check: the hamlet summary says "0 copper earned" though the purse ends at 511 | Seen at gate B; a counting bug in the summary only |
+| Hurt traveller: on all fours (no lying or sitting-on-the-ground clip); the cry's bubble floats about two body heights up | Seen at gate C; reads, but a clip and a lower bubble would read better |
+| Town in the evening: p50 13–14 ms against the 12 ms aim (p95 uncapped 24–31 ms) | Seen at gate C; vsync p95 holds at 18 ms, F2 floor met |
+| Long-ride hitches of 100 ms and 83 ms at 0.5–0.7 km (walk.mjs, 25 m/s) | Seen at gate C; rare, on horseback only |
+| Discovery waits up to 4.5 min in village evenings (bar: 5) | Seen at gate C; little margin |
+| A sight found is described in a note ("A ring of standing stones…") | Seen at gate C; its lore can't be shown, but the note could wait for a closer look (rule 11) |
 | Barrow nits: straight slab edges close up, a crease where bank meets mound, a yellowish patch at the foot | Seen at gate A after #149 |
