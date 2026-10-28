@@ -39,10 +39,21 @@ const shoot = async (name) => {
 };
 const state = () => page.evaluate(() => {
   const p = window.game.player, w = p.walker, h = p.hero;
-  // The body as drawn: posed by the climb (rigged), its clip, its yaw against the walker's, its hands' height over its feet.
-  const o = h?.object, hand = o?.getObjectByName?.('mixamorigRightHand') ?? null;
+  // The body as drawn: posed by the climb (rigged), its clip, its yaw against the walker's, its right hand's
+  // height over its feet, and how far that hand is from the hold it reaches for (the goal as the rig gets it).
+  const o = h?.object, f = h?.front?.actor?.fittedSkeleton, bones = h?.front?.actor?.bones;
+  const hand = f && bones ? bones[f.names.indexOf('hand_r')] : null;
+  const V = (v) => [v.x, v.y, v.z].map((n) => Math.round(n * 100) / 100);
+  let handUp = null, toGoal = null, handAt = null, goal = null, at = null;
+  if (o && hand) {
+    o.updateWorldMatrix(true, true);
+    const hp = hand.getWorldPosition(hand.position.clone()), op = o.getWorldPosition(o.position.clone());
+    handUp = hp.y - op.y; handAt = V(hp); at = V(op);
+    const g = h.goals?.R;
+    if (g) { goal = V(g.p); toGoal = hp.distanceTo(g.p); }
+  }
   return { mode: w.mode, x: w.pos.x, y: w.pos.y, z: w.pos.z, rigged: !!h?.rigged, clip: h?.clip, yaw: o ? o.rotation.y - Math.PI : null, walkerYaw: w.yaw,
-    handUp: hand && o ? hand.getWorldPosition(hand.position.clone()).y - o.getWorldPosition(o.position.clone()).y : null };
+    handUp, toGoal, handAt, goal, at, goalW: h?.goals?.R?.w };
 });
 /** The camera from the side and a little below, so the face and the climber show. */
 const side = (turn) => page.evaluate((turn) => { const p = window.game.player; p.heroCam.yaw = p.walker.yaw + turn; p.heroCam.pitch = -0.1; p.heroCam.zoom = 6; }, turn);
