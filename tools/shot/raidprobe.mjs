@@ -1,0 +1,35 @@
+/** Temporary probe (gate C): is the raided barn drawn burnt? Two pictures, scorched and not. */
+import { launch } from './launch.mjs';
+import { raidFarm, standClear } from './acts.mjs';
+const out = process.argv[2] ?? 'shots/raidprobe';
+import { mkdirSync } from 'node:fs';
+mkdirSync(out, { recursive: true });
+const { server, base, browser } = await launch({});
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+page.on('pageerror', (e) => console.log('ERR', e.message));
+await page.goto(`${base}?title=0&day=0&hour=10&weather=fair`);
+await page.waitForFunction(() => window.__mwReady === true, null, { timeout: 120000 });
+await page.addStyleTag({ content: '#loading{display:none!important}#hud{visibility:hidden!important}' });
+const { barn } = await raidFarm(page);
+console.log('barn', JSON.stringify({ x: barn.x, z: barn.z, r: barn.r, circles: barn.avoid.circles.length }));
+await page.waitForTimeout(3000);
+const at = await standClear(page, barn, 22, { pitch: 0.05, zoom: 2.5, avoid: barn.avoid });
+console.log('stand', JSON.stringify(at));
+await page.waitForTimeout(5000);
+const info = () => page.evaluate(() => {
+  const g = window.game, e = g.log.filter((d) => d.kind === 'event' && d.paddock !== undefined).at(-1);
+  const t = g.towns.get(e.town).town, b = t.plan.buildings[t.plan.farms[t.plan.paddocks[e.paddock].farm].barn];
+  const v = g.towns.viewOf(e.town);
+  const cells = v.cells.map((c) => ({ near: c.near.visible, far: c.far.visible, inNear: !!c.nearRanges.find((r) => r[0] === b.id), parent: !!c.near.parent }));
+  const c = v.cells.find((c) => c.nearRanges.find((r) => r[0] === b.id));
+  const r = c?.nearRanges.find((r) => r[0] === b.id), tint = c?.near.geometry.getAttribute('tint');
+  const i0 = r ? c.near.geometry.index.array[r[1]] : -1;
+  return { id: b.id, kind: b.kind, scorched: [...v.scorched.keys()], cell: cells.filter((x) => x.inNear), tint: tint ? [...tint.array.slice(i0 * 3, i0 * 3 + 3)] : null, version: tint?.version, views: [...(g.towns.views?.keys?.() ?? [])] };
+});
+console.log('scorched', JSON.stringify(await info()));
+await page.screenshot({ path: `${out}/1-scorched.jpg`, type: 'jpeg', quality: 90 });
+await page.evaluate(() => { const g = window.game, e = g.log.filter((d) => d.kind === 'event' && d.paddock !== undefined).at(-1); const t = g.towns.get(e.town).town; g.towns.viewOf(e.town).scorch(t.plan.farms[t.plan.paddocks[e.paddock].farm].barn, false); });
+await page.waitForTimeout(500);
+console.log('unscorched', JSON.stringify(await info()));
+await page.screenshot({ path: `${out}/2-unscorched.jpg`, type: 'jpeg', quality: 90 });
+await browser.close(); await server.close();
