@@ -147,3 +147,16 @@ test('hydro: a river ends at the shore, at the sea\'s level (it never runs on ov
   }
   assert.ok(mouths > 0, 'no river reaches the sea');
 });
+
+test('hydro: a river that leaves a lake starts in it (it never begins on dry ground beyond it)', () => {
+  const { n, lake, recv, x0, z0 } = tile, cell = SMALL.cell;
+  const cellOf = (x: number, z: number) => Math.floor((z - z0) / cell) * n + Math.floor((x - x0) / cell);
+  let fed = 0;
+  for (const r of tile.rivers) {
+    const c = cellOf(r.xz[0], r.xz[1]);
+    if (!Number.isNaN(lake[c])) { fed++; assert.equal(r.level[0], lake[c], 'starts at the lake\'s level'); continue; }
+    // Not in a lake: then no lake drains into its first cell.
+    for (let nb = 0; nb < n * n; nb++) if (recv[nb] === c) assert.ok(Number.isNaN(lake[nb]), `river at ${r.xz[0]},${r.xz[1]} begins below a lake`);
+  }
+  assert.ok(fed > 0, 'some rivers leave lakes');
+});

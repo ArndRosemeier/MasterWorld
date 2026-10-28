@@ -304,6 +304,11 @@ export class HydroTile {
     const area = (o.cell / 1000) ** 2;
     for (const h of heads) {
       const cells: number[] = [];
+      // A river that leaves a lake starts in it: the lake fills its whole cell only where the land lies below its
+      // level, and the head cell's centre lies a cell further on, so the river began kilometres short of the lake,
+      // out of nothing on dry ground. From the lake's cell it cuts its way out through the rim at the lake's level.
+      const from = this.lakeAbove(h, DI, DJ);
+      if (from >= 0) cells.push(from);
       let c = h, end: ReturnType<BrookFeed['join']> = null;
       while (c >= 0) {
         // A brook ends where it reaches a river or lake: at the water's own line.
@@ -332,6 +337,20 @@ export class HydroTile {
     }
     if (tributaries.length) this.joinTributaries(tributaries);
     this.rivers.forEach((r, ri) => this.index(r, ri));
+  }
+
+  /** The lake cell (the one draining most) that drains into head cell `h`, or -1. */
+  private lakeAbove(h: number, DI: number[], DJ: number[]): number {
+    const { n, recv, lake, acc } = this;
+    const hi = h % n, hj = (h - hi) / n;
+    let best = -1;
+    for (let k = 0; k < 8; k++) {
+      const i = hi + DI[k], j = hj + DJ[k];
+      if (i < 0 || j < 0 || i >= n || j >= n) continue;
+      const nb = j * n + i;
+      if (recv[nb] === h && !Number.isNaN(lake[nb]) && (best < 0 || acc[nb] > acc[best])) best = nb;
+    }
+    return best;
   }
 
   /**
