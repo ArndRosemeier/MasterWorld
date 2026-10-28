@@ -21,7 +21,7 @@ import { festivitiesOf } from '../vgm/festivities';
 import { whereOf, type GuildHouse } from '../game/guilds';
 import { buildingOf } from '../sim/people';
 import { cap } from '../talk/folk';
-import { atDoor, before, beside, decisionsOf, nearestTo, outsideGate, regionsOf, type Stand } from './places';
+import { atDoor, before, beside, clearStand, decisionsOf, nearestTo, outsideGate, regionsOf, type Stand } from './places';
 
 /** What the go-to list reaches in the running game. */
 export interface GoHost {
@@ -31,8 +31,10 @@ export interface GoHost {
   heroPos(): { readonly x: number; readonly z: number };
   /** The towns planned so far (the start's, and every settlement founded), with their guild houses. */
   towns(): readonly { readonly town: Town; readonly guilds: readonly GuildHouse[] }[];
-  /** Out of any cellar or building, on foot, standing there. */
-  stand(s: Stand): Promise<void>;
+  /** Out of any cellar or building, on foot, standing there (the first stand `pick` gives, once outside). */
+  stand(s: Stand, pick?: (s: Stand) => Stand): Promise<Stand>;
+  /** Nothing in the way of the hero at (x, z) facing `yaw`, nor of the camera behind them (out of doors). */
+  clear(x: number, z: number, yaw: number): boolean;
   /** Into a town's building, just inside its door. */
   enter(town: string, b: TownBuilding): Promise<void>;
   /** Down into a dungeon (false: it would not build). */
@@ -68,8 +70,8 @@ export function goSpots(h: GoHost): GoSpot[] {
   const add = (group: string, label: string, go: () => Promise<string>): void => { out.push({ group, label, go }); };
   const at = async (s: Stand | null, what: string): Promise<string> => {
     if (!s) return `no ${what}`;
-    await h.stand(s);
-    return `${what}: ${where(s)}`;
+    const put = await h.stand(s, (x) => clearStand(x, (px, pz, yaw) => h.clear(px, pz, yaw)));
+    return `${what}: ${where(put)}`;
   };
   const fills = h.setting.regions?.fills ?? [];
   /** The town the hero is in or nearest that has `has`. */
@@ -124,7 +126,7 @@ export function goSpots(h: GoHost): GoSpot[] {
       const houses = h.towns().flatMap((x) => x.guilds.filter((k) => k.guild.keeper === g.keeper)).map((k) => ({ k, ...whereOf(k) }));
       const k = nearestTo(houses, p)?.k;
       if (!k) return `no ${g.name} in a town planned yet${g.sizes.includes('capital') ? ' (try the capital)' : ''}`;
-      if (k.out) { const [x, z] = onLand(k.out, 0, 12); return at({ x, z, yaw: k.out.yaw }, g.name); }
+      if (k.out) { const [x, z] = onLand(k.out, 0, 12); return at({ x, z, yaw: k.out.yaw, at: k.out }, g.name); }
       return at(atDoor(k.b), g.name);
     });
   }
@@ -147,11 +149,11 @@ export function goSpots(h: GoHost): GoSpot[] {
     });
     add(S, 'Capital market', async () => {
       const c = await capital(), m = c?.t?.plan.centre;
-      return at(m ? beside({ x: m[0], z: m[1] }, h.heroPos(), 10) : null, 'the capital\'s market (not planned yet: go before the wall first)');
+      return m ? at(beside({ x: m[0], z: m[1] }, h.heroPos(), 10), 'the capital\'s market') : 'the capital is not planned yet: go before its wall first';
     });
     add(S, 'Capital seat', async () => {
       const c = await capital(), b = c?.t?.plan.buildings.find((x) => x.trade === 'ruler');
-      return at(b ? atDoor(b, 14) : null, 'the seat of rule (not planned yet: go before the wall first)');
+      return b ? at(atDoor(b, 14), 'the seat of rule') : 'the capital is not planned yet: go before its wall first';
     });
   }
 
@@ -165,7 +167,7 @@ export function goSpots(h: GoHost): GoSpot[] {
     const hold = decisionsOf(h.log(), 'hold')[0];
     if (!hold) return 'no hold in this world';
     const [x, z] = onLand(hold, 0, COURT.depth + 4);
-    return at({ x, z, yaw: hold.yaw }, 'the hold\'s court');
+    return at({ x, z, yaw: hold.yaw, at: hold }, 'the hold\'s court');
   });
   add(L, 'Stone arch', async () => {
     const v = decisionsOf(h.log(), 'volume')[0];
@@ -173,7 +175,7 @@ export function goSpots(h: GoHost): GoSpot[] {
     const { a, b } = v.site, mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, span = Math.hypot(b[0] - a[0], b[1] - a[1]);
     // Square to its span, looking through it.
     const nx = -(b[1] - a[1]) / span, nz = (b[0] - a[0]) / span;
-    return at(beside({ x: mx, z: mz }, { x: mx + nx, z: mz + nz }, span * 1.6 + 10), 'the arch');
+    return at(beside({ x: mx, z: mz }, { x: mx + nx, z: mz + nz }, span + 15), 'the arch');
   });
   for (const s of h.setting.sights ?? []) {
     add(L, `Sight: ${s.id.replace(/-/g, ' ')}`, async () => {
@@ -195,7 +197,7 @@ export function goSpots(h: GoHost): GoSpot[] {
   for (const w of h.setting.wild ?? []) {
     add(L, `Wild: ${w.id}`, async () => {
       const d = nearestTo(decisionsOf(h.log(), 'wild').filter((x) => x.group === w.id), h.heroPos());
-      return at(d && beside(d, h.heroPos(), d.r + 20), `${w.id}'s ground`);
+      return at(d && beside(d, h.heroPos(), 30), `${w.id}'s ground`);
     });
   }
 
@@ -244,7 +246,7 @@ export function goSpots(h: GoHost): GoSpot[] {
       let d = openOf(e.id), said = '';
       if (!d) { said = h.event(e.id); d = openOf(e.id); }
       if (!d) return `no ${e.id}: ${said}`;
-      return at(beside(d, h.heroPos(), d.r + 25), `${e.id} (${d.id})`);
+      return at(beside(d, h.heroPos(), 25), `${e.id} (${d.id})`);
     });
   }
   add(W, 'Refugees on the road', async () => {
@@ -284,7 +286,7 @@ export function goSpots(h: GoHost): GoSpot[] {
   add(W, 'Ambush', async () => {
     let d = decisionsOf(h.log(), 'wild').filter((x) => x.group === 'ambush').at(-1);
     if (!d) { const m = h.answerFor('challenge'); d = m?.decision.kind === 'wild' ? m.decision : undefined; }
-    return at(d ? beside(d, h.heroPos(), d.r + 25) : null, 'ambush');
+    return at(d ? beside(d, h.heroPos(), 25) : null, 'ambush');
   });
   add(W, 'Feast or market day', async () => {
     let f = festivitiesOf(h.log()).at(-1), said = '';

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { goSpots, type GoHost } from '../src/app/goPlaces';
-import { atDoor, before, beside, outsideGate, type Stand } from '../src/app/places';
+import { atDoor, before, beside, clearStand, outsideGate, type Stand } from '../src/app/places';
 import { guildHouses } from '../src/game/guilds';
 import type { DecisionLog, DungeonDecision } from '../src/world/decisions';
 import { first, terrain } from './frontierLand';
@@ -26,6 +26,10 @@ test('places: every way of standing faces what it stands before', () => {
   const house = terrain.towns[0].plan.buildings.find((x) => x.kind === 'inn')!;
   const d = atDoor(house);
   assert.ok(looksAt(d, house.door[0], house.door[1]));
+  // Something in the way: turned round what it looks at, same distance, still facing it.
+  const c = clearStand(b, (x) => x < site.x);
+  assert.ok(c.x < site.x && Math.abs(Math.hypot(c.x - site.x, c.z - site.z) - 20) < 1e-6 && looksAt(c, site.x, site.z));
+  assert.equal(clearStand(b, () => false), b);
 });
 
 test('places: the debug go-to has every kind of place the setting has, and finds or makes each', async () => {
@@ -39,7 +43,8 @@ test('places: the debug go-to has every kind of place the setting has, and finds
     hours: () => 10,
     heroPos: () => stood ?? { x: town.decision.x, z: town.decision.z },
     towns: () => [{ town, guilds: guildHouses(town.plan, 'town', classic, log.filter((x) => x.kind === 'retreat')) }],
-    stand: async (s) => { stood = s; },
+    stand: async (s, pick) => { stood = pick ? pick(s) : s; return stood; },
+    clear: () => true,
     enter: async () => undefined,
     below: async () => true,
     open: async () => null,

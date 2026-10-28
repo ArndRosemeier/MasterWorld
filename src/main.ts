@@ -1342,7 +1342,12 @@ export async function start(b: Boot): Promise<void> {
       hours,
       heroPos: () => player.walker.pos,
       towns: () => towns?.every ?? [],
-      stand: async (s) => { await outside(); player.teleport(s.x, undefined, s.z, s.yaw); },
+      stand: async (s, pick) => { await outside(); const p = pick ? pick(s) : s; player.teleport(p.x, undefined, p.z, p.yaw); return p; },
+      // The hero's spot and the camera's behind them (about where it trails): no wall, no trunk, no water.
+      clear: (x, z, yaw) => {
+        const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && terrain.waterDepth(px, pz) <= 0.2;
+        return standsFree(x, z, 1.2) && [3.5, 6].every((d) => standsFree(x + Math.sin(yaw) * d, z + Math.cos(yaw) * d, 2.5));
+      },
       enter: async (id, b) => { const t = towns?.get(id); if (!t || !rooms) return; await outside(); await rooms.enter({ town: t, b }, true); },
       below: async (id) => { const v = await cellars.build(id); if (!v) return false; await outside(); await v.enter(true); return true; },
       open: async (place) => {
