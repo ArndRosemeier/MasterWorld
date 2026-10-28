@@ -1568,19 +1568,25 @@ export async function start(b: Boot): Promise<void> {
       get talkingTo() { return talk?.partner ?? null; },
       say: (text) => notes.say(text, 6),
     });
+    /** Each VGM tool's time into the hitch log (a slow frame names the tool). */
+    const vgmTimed = { timeNow: () => performance.now(), spent: (tool: string, ms: number) => { if (ms >= 2) HITCHES.note(`vgm ${tool}`, ms); } };
     const direct = (dt: number): void => {
       const below = !!visit();
       let fighting = 0, pressure = 0;
       for (const e of encounters()) { const p = e.pressure; fighting += p.fighting; pressure += p.pressure; }
+      HITCHES.part('vgm director');
       director.observe(dt, { fighting, pressure, health: character.health / character.maxHealth, talking: open > 0, underground: below, inTown: !!here() && !below, leads: journal.open.length });
       const m = director.next();
       if (m) notes.say(m, 6);
+      HITCHES.part('vgm gather+hails');
       if (!title?.holding && !creator?.showing) gatherNear();
       hails?.sendFor(dt, fighting > 0 || below);
       builderClock += dt;
       if (builderClock < 3 || title?.holding || creator?.showing) return;
       builderClock = 0;
+      HITCHES.part('vgm turn');
       vgmStep();
+      HITCHES.part('vgm answer');
       answerOverdue(below);
     };
     /**
@@ -1605,7 +1611,7 @@ export async function start(b: Boot): Promise<void> {
     /** The VGM's answer to `need` here and now, whatever the Director says (the debug menu, shots): what it made, or null. */
     const answerNow = (need: Need): Made | null => {
       const at = player.walker.pos;
-      const m = answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours: hours(), setting, home: start?.decision, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null, lean: (n) => director.model.lean(n) });
+      const m = answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours: hours(), setting, home: start?.decision, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null, lean: (n) => director.model.lean(n), ...vgmTimed });
       if (m) applied(m);
       return m;
     };
@@ -1619,7 +1625,7 @@ export async function start(b: Boot): Promise<void> {
         seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id),
         setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), hero: { x: player.walker.pos.x, z: player.walker.pos.z }, lean: (n) => director.model.lean(n),
         // A story event's band needs the wild to roam in.
-        tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which,
+        tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which, ...vgmTimed,
       });
       for (const m of made) applied(m);
       return made;

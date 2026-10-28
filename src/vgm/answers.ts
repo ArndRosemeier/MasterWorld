@@ -34,6 +34,9 @@ export interface NeedContext {
   readonly toward: { readonly x: number; readonly z: number } | null;
   /** How much this player enjoys a need (C12: the player model's lean, 1 as usual); none: no lean. */
   readonly lean?: (n: Need) => number;
+  /** Told how long each tool took (the hitch log): its id and ms, by `timeNow`. */
+  readonly spent?: (tool: string, ms: number) => void;
+  readonly timeNow?: () => number;
 }
 
 /** How far ahead on the way a sight stands (m), and how far to the side of it. */
