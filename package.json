@@ -39,6 +39,7 @@
     "shot:search": "node tools/shot/search.mjs",
     "shot:ways": "node tools/shot/ways.mjs",
     "shot:mouths": "node tools/shot/mouths.mjs",
+    "shot:capital": "node tools/shot/capital.mjs",
     "shot:quest": "node tools/shot/quest.mjs"
   },
   "dependencies": {
