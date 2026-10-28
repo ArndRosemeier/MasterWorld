@@ -79,7 +79,7 @@ const facing = (a: Agent, x: number, z: number): number => Math.atan2(z - a.z, x
 const BODY = 0.28;
 
 /** Trades one goes into on an errand (to buy bread, have shoes mended ...). */
-const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'potter', 'weaver', 'cooper', 'smith', 'miller']);
+const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'potter', 'weaver', 'cooper', 'smith', 'miller', 'fletcher', 'bowyer', 'armourer', 'jeweller', 'bookbinder', 'glazier']);
 
 /** Agents farther than this from the focus skip their walks (m). */
 const DETAIL = 260;

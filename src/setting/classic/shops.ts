@@ -1,7 +1,7 @@
 /**
  * The classic setting's shops (plan 11.5): the smith forges blades, axes, shields and mail; the market's
  * stalls keep the general goods of a valley town and take most things off a traveller's hands; the inn's
- * keeper sells food and drink and buys game for the kitchen. Above the plain goods each forge and stall keeps
+ * keeper sells food and drink and buys game for the kitchen. In the capital the armourer and the jeweller keep shop too. Above the plain goods each forge and stall keeps
  * a few finer pieces and one rare one, dear enough to save for over several evenings.
  *
  * And who teaches: the smith the weapons of the forge and how to wear armour; the carter, who rode guard on
@@ -24,6 +24,21 @@ export const shops: readonly ShopDef[] = [
     goods: [['torch', 4], ['rope', 2], ['lockpicks', 1], ['minor-potion', 2], ['bread', 3], ['cheese', 2], ['cloak', 1], ['gloves', 1], ['boots', 1], ['leather-cap', 1], ['padded-jack', 1], ['leather-jerkin', 1], ['ring', 1], ['amulet', 1]],
     buys: ['valuable', 'tool', 'food', 'potion', 'armour', 'weapon', 'shield', 'writing'], purse: 450, pays: 0.38, asks: 1.3, most: 2, restock: 3,
     fine: { uncommon: 2, rare: 1, danger: 6 },
+  },
+  // The capital's crafts (C15): finer armour than a valley smith keeps, and rings and pendants that pay well for gems.
+  {
+    keeper: 'armourer', name: "The armourer's", topic: 'Show me your harness.',
+    line: 'Mail riveted ring by ring, caps beaten from one sheet. Try it on; a coat that does not fit is a coat that kills you.',
+    goods: [['mail-shirt', 2], ['iron-cap', 2], ['round-shield', 2], ['buckler', 1], ['leather-jerkin', 1], ['gloves', 1], ['boots', 1]],
+    buys: ['armour', 'shield'], purse: 1200, pays: 0.45, asks: 1.25, restock: 3,
+    fine: { uncommon: 4, rare: 2, danger: 10 },
+  },
+  {
+    keeper: 'jeweller', name: "The jeweller's", topic: 'What do you have in the case?',
+    line: 'Rings, pendants, a stone or two. And if you found something shiny in the dark, I pay better than any stall.',
+    goods: [['ring', 3], ['amulet', 3]],
+    buys: ['valuable'], purse: 1500, pays: 0.55, asks: 1.3, restock: 3,
+    fine: { uncommon: 3, rare: 2, danger: 10 },
   },
   {
     keeper: 'innkeeper', name: 'The inn', topic: 'What is there to eat?',

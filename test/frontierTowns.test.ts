@@ -13,7 +13,8 @@ test('frontier: waystations, hamlets and villages are towns of their size from t
   const sizes = new Set<string>();
   for (const d of founded) {
     const t = settlementOf(d, regions.fills)!;
-    if (sizes.has(t.size!)) continue;
+    // The capital takes a second to plan: test/capital.test.ts has it.
+    if (sizes.has(t.size!) || t.size === 'capital') continue;
     sizes.add(t.size!);
     terrain.settleMore([d]);
     const town = terrain.town(d.id)!;

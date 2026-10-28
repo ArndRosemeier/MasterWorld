@@ -183,8 +183,8 @@ export interface RoadDecision {
   readonly at?: number;
 }
 
-/** A region place that is a settlement, planned as a town of its size (a waystation, a hamlet, a village). */
-export const settles = (place: RegionFillDef['place']): place is 'waystation' | 'hamlet' | 'village' => place === 'waystation' || place === 'hamlet' || place === 'village';
+/** A region place that is a settlement, planned as a town of its size (a waystation, a hamlet, a village, the capital). */
+export const settles = (place: RegionFillDef['place']): place is 'waystation' | 'hamlet' | 'village' | 'capital' => place === 'waystation' || place === 'hamlet' || place === 'village' || place === 'capital';
 
 /**
  * The settlement a region's place is (plan B3: hamlets and villages are planned like towns, by the one

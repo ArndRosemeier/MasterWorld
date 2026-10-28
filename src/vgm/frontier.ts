@@ -114,6 +114,8 @@ function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; 
     // point. Open ground first: the point's square, then the free squares beside it; woodland only when
     // none of them has open ground.
     for (let level = pick.level; level >= 0; level--) {
+      // A smaller square only while the place (and the fields round it) still fits in it: the capital never squeezes.
+      if (sizeOf(level) < (pick.radius ?? 20) * 5) break;
       const k = keyAt(level, p.x, p.z);
       if (!wholeFree(map, k)) continue;
       let wooded: { k: RegionKey; site: Spot } | null = null;
@@ -153,21 +155,21 @@ function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number 
   const apart = f.apart ?? 0;
   if (done.some((o) => o.fill === f.id && o.site && Math.hypot(o.site.x - p.x, o.site.z - p.z) < apart)) return false;
   // A settlement needs fresh water (D50): a brook, river or lake somewhere in the squares it may take.
-  return !SETTLES[f.place] || freshWaterEdge(t, p.x, p.z, sizeOf(f.level) * 1.5) < Infinity;
+  return !SETTLES[f.place] || freshWaterEdge(t, p.x, p.z, Math.min(sizeOf(f.level) * 1.5, 1500)) < Infinity;
 }
 
 /** The places people live in, which stand by fresh water (D50): their squares' banks are tried too. */
-const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, waystation: true, hamlet: true, village: true, camp: false, ruin: false, barrows: false };
+const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, waystation: true, hamlet: true, village: true, capital: true, camp: false, ruin: false, barrows: false };
 
 
 const woods = new WeakMap<Terrain, (x: number, z: number) => number>();
 
 /** How steep the ground may be round a place of each kind (rise per metre over its radius). */
-const STEEP: Record<RegionFillDef['place'], number> = { none: 1, waystation: 0.14, hamlet: 0.12, village: 0.1, camp: 0.16, ruin: 0.25, barrows: 0.16 };
+const STEEP: Record<RegionFillDef['place'], number> = { none: 1, waystation: 0.14, hamlet: 0.12, village: 0.1, capital: 0.08, camp: 0.16, ruin: 0.25, barrows: 0.16 };
 /** Ground this wooded or less (woodsOf, 0..1) round a place counts as open. */
 export const OPEN_GROUND = 0.3;
 /** How much a place of each kind keeps out of thick woods (ruins do not mind: the wood grew round them). */
-const OPEN: Record<RegionFillDef['place'], number> = { none: 0, waystation: 1, hamlet: 1.2, village: 1.2, camp: 0.3, ruin: 0, barrows: 0.8 };
+const OPEN: Record<RegionFillDef['place'], number> = { none: 0, waystation: 1, hamlet: 1.2, village: 1.2, capital: 1.5, camp: 0.3, ruin: 0, barrows: 0.8 };
 
 /**
  * Where in the square a place stands: dry, gentle ground with room for its footprint, away from towns and
@@ -191,13 +193,15 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
     x0 + margin + (size - 2 * margin) * ((i + hash2f(s, i, j + 40)) / N),
     z0 + margin + (size - 2 * margin) * ((j + hash2f(s, i + 40, j)) / N),
   ]);
-  if (settles) for (const b of bankSpots(t, x0 + size / 2, z0 + size / 2, size * 0.75, r)) {
+  if (settles) for (const b of bankSpots(t, x0 + size / 2, z0 + size / 2, Math.min(size * 0.75, 750), r)) {
     if (b.x > x0 + margin && b.x < x0 + size - margin && b.z > z0 + margin && b.z < z0 + size - margin) spots.push([b.x, b.z]);
   }
+  const fit: { x: number; z: number; base: number; open: boolean }[] = [];
   for (let q = 0; q < spots.length; q++) {
     const [x, z] = spots[q], i = q % N, j = Math.floor(q / N);
     const h = t.height(x, z);
     if (h < 3 || t.waterDepth(x, z, h) > 0) continue;
+    if (f.ring && Math.hypot(x - c.home.x, z - c.home.z) < f.ring[0]) continue;
     if (away.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 30)) continue;
     if (f.biomes && !f.biomes.includes(t.biomeIdAt(x, z) ?? '')) continue;
     let steep = 0, ok = true;
@@ -208,15 +212,23 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
       steep = Math.max(steep, Math.abs(ph - h) / rr);
     }
     if (!ok || steep > STEEP[f.place]) continue;
-    const water = settles ? freshWaterEdge(t, x, z, r + WATER_REACH) : 0;
-    if (water === Infinity) continue;
     // Open ground first (the place is seen from afar); woodland only when the square has none.
     // How wooded the place's footprint is, on the whole (its clearing opens the rest round it).
     let woods = wood(x, z);
     for (let a = 0; a < 8; a++) woods += wood(x + Math.cos((a * Math.PI) / 4) * r * 0.7, z + Math.sin((a * Math.PI) / 4) * r * 0.7);
     woods /= 9;
-    const rank = (woods > OPEN_GROUND ? 10 + woods : 0) + steep / STEEP[f.place] + woods * OPEN[f.place] + (Math.max(0, water - r - 30) / WATER_REACH) * 0.4 + hash2f(s, i, j) * 0.4;
-    if (rank < low) { low = rank; bx = x; bz = z; open = woods <= OPEN_GROUND; }
+    const base = (woods > OPEN_GROUND ? 10 + woods : 0) + steep / STEEP[f.place] + woods * OPEN[f.place] + hash2f(s, i, j) * 0.4;
+    fit.push({ x, z, base, open: woods <= OPEN_GROUND });
+  }
+  // The way to water only adds to a spot's rank, and is dear to look for (wide round a big place): best first,
+  // until no spot left could beat the best.
+  fit.sort((a, b) => a.base - b.base);
+  for (const p of fit) {
+    if (p.base >= low) break;
+    const water = settles ? freshWaterEdge(t, p.x, p.z, r + WATER_REACH) : 0;
+    if (water === Infinity) continue;
+    const rank = p.base + (Math.max(0, water - r - 30) / WATER_REACH) * 0.4;
+    if (rank < low) { low = rank; bx = p.x; bz = p.z; open = p.open; }
   }
   if (low === Infinity) return null;
   return { at: { x: bx, z: bz, yaw: Math.atan2(-(c.home.x - bx), -(c.home.z - bz)), r }, open };

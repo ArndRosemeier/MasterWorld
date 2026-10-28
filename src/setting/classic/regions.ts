@@ -1,6 +1,6 @@
 /**
  * What the land beyond the start holds in the classic setting (plan 5.5, 12.1): mostly plain country, now
- * and then a waystation on the way (an inn and a stable), a hamlet of a few farms, a village with its temple and inn, a camp in the woods, the ruins of the old realm from before the
+ * and then a waystation on the way (an inn and a stable), a hamlet of a few farms, a village with its temple and inn, the capital a few km out (one), a camp in the woods, the ruins of the old realm from before the
  * Fading, or a field of sealed barrows. Places lie farther out the bigger they are.
  */
 import type { RegionsDef } from '../contract';
@@ -13,6 +13,8 @@ export const regions: RegionsDef = {
     { id: 'country', name: 'open country', level: 2, weight: 6, place: 'none' },
     { id: 'waystation', name: 'a waystation', level: 0, weight: 1.5, place: 'waystation', radius: 24, clearing: 10, biomes: FARMLAND, ring: [800], apart: 2000 },
     { id: 'hamlet', name: 'a hamlet', level: 1, weight: 2, place: 'hamlet', radius: 45, biomes: FARMLAND, ring: [1500], apart: 2500 },
+    // The capital (D41, C15): one, a few km out, where the roads lead; it is all but sure to take the first land that fits.
+    { id: 'capital', name: 'the capital', level: 3, weight: 40, place: 'capital', radius: 260, biomes: FARMLAND, ring: [2800, 7000], apart: 1e7 },
     { id: 'village', name: 'a village', level: 2, weight: 1, place: 'village', radius: 72, biomes: FARMLAND, ring: [2500], apart: 4000 },
     { id: 'camp', name: 'a camp', level: 0, weight: 2, place: 'camp', radius: 14, clearing: 8, biomes: ['meadow', 'forest', 'taiga', 'heath', 'steppe'], ring: [900], apart: 1500 },
     { id: 'ruin', name: 'ruins of the old realm', level: 0, weight: 2, place: 'ruin', radius: 22, ring: [1100], apart: 1400 },

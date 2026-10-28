@@ -36,7 +36,11 @@ const APART = 30;
 export function guildHouses(plan: TownPlan, size: GuildDef['sizes'][number], setting: Pick<SettingModule, 'guilds'>, out: readonly RetreatDecision[] = []): GuildHouse[] {
   const taken = new Set<number>(), houses: GuildHouse[] = [];
   // Plain homes with somebody grown-up in them.
-  const homes = plan.buildings.filter((b) => (b.kind === 'house' || b.kind === 'cottage') && !b.trade && b.household >= 2);
+  const all = plan.buildings.filter((b) => (b.kind === 'house' || b.kind === 'cottage') && !b.trade && b.household >= 2);
+  // In the capital the guilds keep halls: only its biggest houses (the largest third, two storeys or more).
+  const area = (b: TownBuilding) => b.hu * b.hv * b.floors, cut = size === 'capital' ? all.map(area).sort((a, b) => b - a)[Math.floor(all.length / 3)] ?? 0 : 0;
+  const halls = all.filter((b) => area(b) >= cut && (size !== 'capital' || b.floors >= 2));
+  const homes = halls.length >= 12 ? halls : all;
   const [mx, mz] = polyCentroid(plan.market);
   for (const guild of setting.guilds ?? []) {
     if (!guild.sizes.includes(size)) continue;

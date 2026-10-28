@@ -187,7 +187,7 @@ export class TownTalk {
       names[pid(p.id)] = f.name;
       voices[pid(p.id)] = {};
       social[pid(p.id)] = {
-        identity: fill(talk.identity[p.role] ?? talk.identity.homemaker, { name: f.name, trade: p.trade, house: f.house }),
+        identity: fill(talk.identity[`${p.role}:${p.trade}`] ?? talk.identity[p.role] ?? talk.identity.homemaker, { name: f.name, trade: p.trade, house: f.house }),
         sourceReply: 'I know it from {source}: {claim}.',
       };
       // The household's own source reads as their own house.
