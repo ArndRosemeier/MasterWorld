@@ -1,0 +1,15 @@
+
+> masterworld@0.0.0 shot:capital
+> node tools/shot/capital.mjs shots/polish2/capital
+
+region-24: 695 buildings, 2646 people, 5 gates; playable in 16.6 s
+the way in (1101 m at 16 m/s): worst frame 88 ms 1039 m from the gate, 106 frames over 25 ms; its people lived from 978 m out
+01-gate.jpg: p50 10.4 ms, p95 12.8 ms
+worst frame coming in: 43 ms
+02-market.jpg: p50 11.3 ms, p95 14.6 ms
+03-seat.jpg: p50 11.5 ms, p95 24.7 ms
+04-gate-night.jpg: p50 11.0 ms, p95 13.1 ms
+05-gate-opening.jpg
+06-gate-open.jpg
+the gate at night: 0.00 with nobody by it, 0.51 as the hero comes up, 1.00 once there
+F3: 0 shader violations

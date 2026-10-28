@@ -1,0 +1,8 @@
+
+> masterworld@0.0.0 shot:handover
+> node tools/shot/handover.mjs shots/polish2/handover
+
+shots\polish2\handover\01-held-out.jpg
+shots\polish2\handover\02-marked.jpg
+shots\polish2\handover\03-handed-back.jpg
+F3: 0 shader violations
