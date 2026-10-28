@@ -7,6 +7,7 @@ import { deriveSeed } from '@futuremagic/core';
 import { roadProfile, routeRoad } from '@futuremagic/settlement';
 import type { DecisionLog, RoadDecision, RoadWay } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
+import { emptyWater, inChannel } from '../world/hydro';
 
 /** A place a road can lead to: its middle and how far its houses reach, m. */
 export interface Place {
@@ -26,7 +27,10 @@ function joins(t: Terrain, log: DecisionLog, not: string): Join[] {
     if (town.decision.id === not) continue;
     for (const s of town.plan.streets) {
       if (s.kind !== 'road' || s.pts.length < 4) continue;
-      out.push({ x: s.pts[s.pts.length - 2], z: s.pts[s.pts.length - 1], id: town.decision.id });
+      const x = s.pts[s.pts.length - 2], z = s.pts[s.pts.length - 1];
+      // A road out that ends at a river's ford is no place to join (no way leads into deep water).
+      if (t.waterDepth(x, z) > 0.7) continue;
+      out.push({ x, z, id: town.decision.id });
     }
   }
   for (const d of log) {
@@ -53,11 +57,13 @@ export function linkRoad(t: Terrain, log: DecisionLog, place: Place, way: RoadWa
     const e: [number, number] = [s.pts[s.pts.length - 2], s.pts[s.pts.length - 1]];
     if (Math.hypot(e[0] - to.x, e[1] - to.z) < Math.hypot(from[0] - to.x, from[1] - to.z)) from = e;
   }
+  const w = emptyWater();
   const id = `road-${log.filter((d) => d.kind === 'road').length + 1}`;
   const route = routeRoad({
     seed: deriveSeed(t.seed, 'road', id),
     height: t.height.bind(t),
-    water: t.waterDepth.bind(t),
+    // The banks of a brook count as wet: a road crosses it once, it does not run along it in its channel.
+    water: (x, z) => Math.max(t.waterDepth(x, z), inChannel(t.hydro.query(x, z, w), 8) && w.brook ? 0.05 : 0),
     blocked: (x, z) => t.towns.some((town) => town.solid(x, z, 2)),
   }, from, [to.x, to.z]);
   if (!route) return null;

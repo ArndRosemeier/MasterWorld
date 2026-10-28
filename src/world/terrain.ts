@@ -15,6 +15,13 @@ import { RoadNet } from './roads';
 import { brookCuts } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
+import { Landforms } from './landforms';
+
+/**
+ * How far out from a town's middle the landforms are eased away (its farms and outlying houses stand on calm
+ * ground; the planner places them before it knows of any landform), metres.
+ */
+const formsOut = (radius: number): number => radius * 2.5 + 130;
 
 export class Terrain {
   readonly skeleton: Skeleton;
@@ -24,6 +31,9 @@ export class Terrain {
   readonly biomes: SettingModule['world']['biomes'];
   private readonly here: WaterHere = emptyWater();
   private readonly brook: WaterHere = emptyWater();
+  private readonly wetProbe: WaterHere = emptyWater();
+  /** The small shapes of the land (D55): knolls, dells, gullies … and the middle band of relief. */
+  readonly landforms: Landforms;
 
   /** `hydro`, `brooks`: tile sizes for drainage (tests use small tiles; null: no brooks). */
   constructor(readonly seed: number, readonly setting: SettingModule, hydro: HydroOptions = HYDRO, brooks: HydroOptions | null = BROOKS) {
@@ -31,6 +41,12 @@ export class Terrain {
     this.detail = new Noise(deriveSeed(seed, 'terrain', 'detail'));
     this.hydro = new Hydrology(this.skeleton, hydro, brooks);
     this.biomes = setting.world.biomes;
+    this.landforms = new Landforms(seed, setting.world, this.skeleton, (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookAt(x, z, this.wetProbe).river);
+  }
+
+  /** The towns' grounds hold no landforms (a town levels its ground). */
+  private freeTowns(): void {
+    this.landforms.setFree(this.townSpots.map((s) => ({ x: s.d.x, z: s.d.z, r: formsOut(s.d.radius) * 0.7, calm: formsOut(s.d.radius) })));
   }
 
   private fields: ArchField[] = [];
@@ -55,10 +71,12 @@ export class Terrain {
     this.roadNet = new RoadNet();
     this.holdList = [];
     for (const d of log) {
-      if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
-      else if (d.kind === 'town') this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
+      if (d.kind === 'town') this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
       else if (d.kind === 'hold') this.holdList.push(d);
     }
+    this.freeTowns();
+    // Volumes read the ground as the towns have shaped it.
+    for (const d of log) if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
     this.clearingMap.clear();
     // Roads, clearings, and the settlements founded in regions (after the towns of the log, in its order).
     this.settleMore(log);
@@ -110,6 +128,7 @@ export class Terrain {
   addTown(d: TownDecision, plan?: TownPlan): void {
     if (this.townSpots.some((s) => s.d.id === d.id)) return;
     this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
+    this.freeTowns();
     if (this.townList) this.townList.push(new Town(d, this, plan));
   }
 
@@ -211,6 +230,8 @@ export class Terrain {
     const w = this.hydro.query(x, z, this.here);
     out.river = w.river ? w.dist - w.half : Infinity;
     out.lake = Number.isNaN(w.lake) ? Infinity : h - w.lake;
+    const pond = this.landforms.pondAt(x, z);
+    if (!Number.isNaN(pond)) out.lake = Math.min(out.lake, h - pond);
     return out;
   }
 
@@ -236,14 +257,26 @@ export class Terrain {
     // Small undulations everywhere, rougher where the land is high; none on the beach, so it runs smoothly
     // into the water instead of the waterline wandering over bumps.
     let calm = Math.max(smoothstep(SHORE.berm + 0.6, SHORE.berm + 5, e), smoothstep(350, 700, shore));
+    // Landforms keep further from the beach, and out of towns altogether.
+    let forms = Math.max(smoothstep(SHORE.berm + 3, SHORE.berm + 10, e), smoothstep(350, 700, shore));
     let level = e;
     for (const s of this.townSpots) {
       // A town calms its ground: most of the small relief goes, and the market is level.
       const d = Math.hypot(x - s.d.x, z - s.d.z), R = s.d.radius;
-      if (d > R * 1.8) continue;
+      if (d > Math.max(R * 1.8, formsOut(R))) continue;
       const market = smoothstep(40, 22, d);
       calm *= (1 - 0.75 * smoothstep(R * 1.8, R * 1.1, d)) * (1 - market);
+      forms *= smoothstep(R * 1.1, formsOut(R), d);
       level = lerp(level, s.level, market);
+    }
+    // The water was traced over the land without them: by a river or brook they give way to its banks.
+    const r = this.hydro.riverAt(x, z, this.here), bk = this.hydro.brookAt(x, z, this.brook);
+    if (forms > 0 && r.river) forms *= smoothstep(r.half + 10, r.half + 80, r.dist);
+    if (forms > 0) {
+      let shaped = Math.max(Math.min(level, 1), level + this.landforms.offset(x, z) * forms);
+      // By a brook they dig no lower than its water (a gully runs down into it, a dell beside it stays dry).
+      if (bk.river && bk.dist < bk.valley && shaped < level) shaped = Math.max(shaped, Math.min(level, bk.level + 0.6 + (bk.dist - bk.half) * 0.04));
+      level = shaped;
     }
     if (calm > 0) {
       const rough = 1 + Math.min(4, e / 600);
@@ -252,9 +285,8 @@ export class Terrain {
     }
     // Rivers shape their valleys, then brooks theirs in the land the rivers left (their levels come from it, D50),
     // each blending out to the edge of its own valley, so where two meet the land stays whole.
-    const r = this.hydro.riverAt(x, z, this.here);
     const byRiver = shapeByWater(r, level);
-    level = shapeByWater(this.hydro.brookAt(x, z, this.brook), byRiver);
+    level = shapeByWater(bk, byRiver);
     // A brook coming down into a river's gorge never banks the land up in the river's bed: from the river's edge it
     // may raise it at most as steeply as it rises away from it (else it dams the river).
     if (r.river && level > byRiver) level = Math.min(level, byRiver + Math.max(0, r.dist - r.half - 1));

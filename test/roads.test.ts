@@ -20,16 +20,19 @@ const terrain = new Terrain(seed, classic, SMALL);
 const log = firstDecisions(terrain, startPlace(terrain));
 terrain.settle(log);
 const town = terrain.towns[0];
-// The first hamlet the VGM founds on a walk east from the start (plan B1).
+// The first hamlet the VGM founds on a walk west from the start (plan B1). (East, the first lies over a river
+// with no ford: it has no road.)
 const regions = classic.regions!;
-const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, 0, 5, (d) => d.fill === 'hamlet' && !!d.site);
+const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, Math.PI, 5, (d) => d.fill === 'hamlet' && !!d.site);
 const hamlet = settlementsOf(walked, regions).find((t) => walked.some((d) => d.id === t.id && d.kind === 'region' && d.fill === 'hamlet'))!;
 // As the world worker routes it (WorldJobs.linkRoad): from the roads already decided alone.
 const road = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'track')!;
 const pt = (k: number) => ({ x: road.pts[k * 3], y: road.pts[k * 3 + 1], z: road.pts[k * 3 + 2] });
 const n = road.pts.length / 3;
 // Points well inside the road (not at its ends, not in water), and the bare land's height beside them.
-const inner = Array.from({ length: n }, (_, k) => k).filter((k) => k > 6 && k < n - 6 && k % 5 === 0 && terrain.waterDepth(pt(k).x, pt(k).z) <= 0);
+// (Nor by a brook it bridges: there its bank is cut open under the deck, the bridges' test has those.)
+const inner = Array.from({ length: n }, (_, k) => k).filter((k) => k > 6 && k < n - 6 && k % 5 === 0 && terrain.waterDepth(pt(k).x, pt(k).z) <= 0
+  && !inChannel(terrain.hydro.brookAt(pt(k).x, pt(k).z), 4));
 const bare = inner.map((k) => terrain.height(pt(k).x, pt(k).z));
 terrain.addRoad(road);
 
