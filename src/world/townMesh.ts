@@ -3,7 +3,7 @@
  * building (and each fence and haystack of its farmland), and those of one square cell are merged into
  * one mesh near and one far (fewer draws).
  */
-import { buildingMesh, wallMesh, doorLeaves, hatchLadderTopMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type DoorLeaf, type InteriorFixture, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
+import { buildingMesh, fixtureMesh, wallMesh, doorLeaves, hatchLadderTopMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type DoorLeaf, type InteriorFixture, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
 import type { Town } from './town';
 
 /** Side of a merge cell, metres. */
@@ -22,9 +22,9 @@ export interface TownCellMesh {
   farRanges: MeshRange[];
 }
 
-/** Every cell of a town that has buildings (or a stretch of its wall) in it. */
-/** `signs`: a shield over the door of these buildings (by id, its colour), the guild houses. */
-export function townMeshes(town: Town, signs: ReadonlyMap<number, [number, number, number]> = new Map()): TownCellMesh[] {
+/** Every cell of a town that has buildings (or a stretch of its wall, or fixtures out of doors) in it. */
+/** `signs`: a shield over the door of these buildings (by id, its colour), the guild houses. `height`: the ground the fixtures stand on (none: none drawn). */
+export function townMeshes(town: Town, signs: ReadonlyMap<number, [number, number, number]> = new Map(), height?: (x: number, z: number) => number): TownCellMesh[] {
   const cells = new Map<string, { i: number; j: number; list: TownBuilding[]; props: TownProp[] }>();
   const cellAt = (x: number, z: number) => {
     const i = Math.floor(x / TOWN_CELL), j = Math.floor(z / TOWN_CELL), key = `${i},${j}`;
@@ -41,11 +41,14 @@ export function townMeshes(town: Town, signs: ReadonlyMap<number, [number, numbe
     for (let k = 0; k < n; k++) cellAt((R[k * 2] + R[((k + 1) % n) * 2]) / 2, (R[k * 2 + 1] + R[((k + 1) % n) * 2 + 1]) / 2);
     for (const t of [...wall.towers, ...wall.gates]) cellAt(t.x, t.z);
   }
+  // The fixtures out of doors (stalls, wells, benches, anvils ...): where people do what they do.
+  if (height) for (const f of town.plan.fixtures) cellAt(f.x, f.z);
   return [...cells.values()].map(({ i, j, list, props }) => {
     const x = (i + 0.5) * TOWN_CELL, z = (j + 0.5) * TOWN_CELL;
     const meshes = (detail: boolean) => {
       const parts = list.map((b) => buildingMesh(b, [x, 0, z], detail, { sign: signs.get(b.id) }));
       const walls = wall ? [wallMesh(wall, [x, 0, z], detail, inCell(i, j))] : [];
+      if (height) walls.push(fixtureMesh(town.plan.fixtures, height, [x, 0, z], detail, inCell(i, j)));
       return { mesh: mergeMeshes([...parts, ...props.map((p) => propMesh(p, [x, 0, z], detail)), ...walls]), ranges: rangesOf(list, parts) };
     };
     const near = meshes(true), far = meshes(false);

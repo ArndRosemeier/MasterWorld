@@ -212,6 +212,12 @@ export class Towns {
     return best;
   }
 
+  /** Does the hero (radius `r` at x, z) run into a town's fixture out of doors (a well, a stall ...)? */
+  fixtureAt(x: number, z: number, r: number): boolean {
+    for (const t of this.near(x, z, r + 1)) if (t.town.fixtureAt(x, z, r)) return true;
+    return false;
+  }
+
   /** Is a body of radius `r` at (x, z), coming from (ax, az), stepping into somebody out in a town? */
   touches(x: number, z: number, r: number, ax: number, az: number): boolean {
     for (const t of this.near(x, z, r + 1)) if (t.living && t.life.touches(x, z, r, ax, az)) return true;

@@ -41,8 +41,8 @@ serve<TerrainJob, TerrainResult>((job) => {
     return { result: meshes, transfer: meshes.flatMap((m) => [m.position.buffer, m.normal.buffer, m.color.buffer, m.surface.buffer, m.level.buffer, m.index.buffer]) };
   }
   if (job.kind === 'town') {
-    const town = terrain.town(job.id);
-    const cells = town ? townMeshes(town, guildSigns(guildHouses(town.plan, town.decision.size ?? 'town', terrain.setting))) : [];
+    const land = terrain, town = land.town(job.id);
+    const cells = town ? townMeshes(town, guildSigns(guildHouses(town.plan, town.decision.size ?? 'town', land.setting)), (x, z) => land.height(x, z)) : [];
     return { result: { cells, plan: job.plan && town ? town.plan : null }, transfer: townMeshBuffers(cells) };
   }
   if (job.kind === 'townMask') {

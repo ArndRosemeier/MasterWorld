@@ -115,8 +115,8 @@ export function townSpots(plan: TownPlan): Spot[] {
 
 function fixtureSpot(id: number, f: Fixture): Spot {
   const d = SPOT_DEFS[f.kind];
-  // Stand a step in front of the thing, facing it (a stall's buyer in front, facing the seller).
+  // Stand a step in front of the thing, facing it (a stall's buyer in front, facing the seller); on a bench, sit on it.
   const dir = f.kind === 'stall' ? f.yaw + Math.PI : f.yaw;
-  const back = f.kind === 'stall' ? 1.4 : 0.9;
+  const back = f.kind === 'stall' ? 1.4 : f.kind === 'bench' ? 0 : 0.9;
   return { id, ...d, secs: [...d.secs] as [number, number], x: f.x - Math.cos(dir) * back, z: f.z - Math.sin(dir) * back, dir, building: f.building, door: false, users: 0 };
 }
