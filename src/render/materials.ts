@@ -243,7 +243,8 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
 
   // Rock: triplanar, strata on the side faces, weathered rock on top.
   const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n);
-  const rockT = smoothstep(0.82, 0.64, level.add(fine.mul(0.04)).add(mid.mul(0.12)));
+  // From some 35 degrees bare rock: soil projected from above stretches into stripes on a steeper slope.
+  const rockT = smoothstep(0.86, 0.7, level.add(fine.mul(0.04)).add(mid.mul(0.12)));
   const rockB = hblend(rockT, rockN.b.sub(h), 2);
   const rockTone = float(1).add(broad.mul(0.25));
   col = mix(col, rockA.rgb.mul(rockTone).mul(macro), rockB); rough = mix(rough, rockA.a, rockB); ao = mix(ao, rockN.a, rockB);

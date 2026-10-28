@@ -117,7 +117,7 @@ const FILTER_STEP = 16;
  * teeth; filtered it is a ramp a cell wide, which is a pixel or two out there. Gentle ground keeps its heights.
  */
 function filterSheer(t: Terrain, h: Float32Array, m: number, ox: number, oz: number, step: number): void {
-  const src = h.slice(), q = step * 0.35;
+  const src = h.slice(), q = step / 3;
   for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
     const c = src[j * m + i];
     let d = 0;
@@ -127,7 +127,10 @@ function filterSheer(t: Terrain, h: Float32Array, m: number, ox: number, oz: num
     if (j < m - 1) d = Math.max(d, Math.abs(src[(j + 1) * m + i] - c));
     if (d < step) continue;
     const x = ox + i * step, z = oz + j * step;
-    h[j * m + i] = (c + t.height(x - q, z - q) + t.height(x + q, z - q) + t.height(x - q, z + q) + t.height(x + q, z + q)) / 5;
+    // A 3 x 3 box over the cell: a vertex's height follows how much of its cell is up on the wall.
+    let sum = 0;
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) sum += a || b ? t.height(x + a * q, z + b * q) : c;
+    h[j * m + i] = sum / 9;
   }
 }
 
