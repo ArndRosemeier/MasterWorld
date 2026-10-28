@@ -643,12 +643,12 @@ An LLM can only *suggest*. The procedural layer stays the authority, so the game
 | Window | Signature |
 |---|---|
 | Item card | Shutters part, the ward traces the rim, stats rise one by one; the rarity sets the entrance (drop, slide, flip, iris). |
-| Map | A brass map case: the lid swings up and the parchment unrolls. A compass whose needle wanders or points true by the orientation skill; marks drawn in with a quill when an NPC adds one. |
+| Map | A brass map case: the lid swings up and the parchment unrolls. The orientation skill sharpens where the map puts the hero; marks drawn in with a quill when an NPC adds one. |
 | Journal | A brass-bound book. Pages turn, new leads write themselves in, a ward-lit bookmark sits at the newest lead. |
 | Dialogue | A brass speaking-ring around the topic list. Topics turn into place like a dial; topics with a new lead glow. |
 | Inventory and character | A field chest: the lid opens, compartments slide out. Character skills on brass gauges whose needles rise when a skill grows. |
 | Trade | A merchant's balance: coins and goods on two pans that tip as the deal changes. |
-| Compass (always on) | A brass ring at the top that turns with the camera. Its needle breathes and settles after each turn and wanders by the orientation skill; map marks slide in on the rim as small glowing studs. |
+| Compass (always on) | A brass ring at the top that turns with the camera, no needle: big bright N E S W letters, always true (a compass needs no skill, Arnd 2026-10-28); map marks slide in on the rim as small glowing studs. |
 | Health, stamina, mana (always on) | Three brass gauges with liquid behind glass: it sloshes when you are hit, bubbles when you heal, and the ward around each glows harder as it runs low. |
 | Quick slots and abilities (always on) | Brass sockets on a belt strap. Cooldowns run as a ward line around the socket; a ready ability gives a short glint. **Built (2026-10-27, Arnd's ask)**: the action bar, ten sockets with keys 1 to 0 (rebindable), there whenever the hero is played, not only in fights (`src/game/actionBar.ts` the slots, saved with the hero; `src/app/actionBarUi.ts` the strap). The ability book (K, `src/app/abilityBook.ts`) lists what the hero knows; abilities drag onto the bar, sockets drag onto each other to swap and off the bar to clear, and the strap's ward wakes and the glyphs jiggle while it is open. A newly learned ability goes into the first free socket. |
 | Target frame | A small brass plate that drops in on a hinge; the creature's threat colour shows in its ward. |

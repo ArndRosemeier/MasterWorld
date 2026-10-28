@@ -64,18 +64,17 @@
 @media (prefers-reduced-motion: reduce) { #fight * { animation-duration: 1ms !important; } }
 @media (max-width: 640px) { #fight .vial { width: 140px; } #fight .finds { right: 12px; } #fight .card { width: 200px; } }
 
-/* The compass (src/app/compass.ts): a brass ring at the top that turns with the camera; its needle breathes and
-   settles; marks ride the rim as glowing studs. Beside it the orrery: sun and moon by the hour, the weather. */
+/* The compass (src/app/compass.ts): a brass ring at the top that turns with the camera, no needle, big bright
+   letters; marks ride the rim as glowing studs. Beside it the orrery: sun and moon by the hour, the weather. */
 #compass { position: fixed; left: 50%; top: 10px; z-index: 4; display: flex; align-items: flex-start; gap: 6px; transform: translateX(-50%); pointer-events: none;
   transform-origin: 50% 0; opacity: 0; visibility: hidden; transition: opacity .3s, visibility 0s .3s; }
 #compass.shown { opacity: 1; visibility: visible; transition: opacity .3s; animation: compass-drop .7s cubic-bezier(.3, 1.6, .5, 1) backwards; }
 @keyframes compass-drop { from { transform: translateX(-50%) perspective(400px) rotateX(-90deg); } to { transform: translateX(-50%); } }
 #compass .ring { position: relative; width: 96px; height: 96px; border-radius: 50%; box-shadow: 0 4px 14px #000a; margin-left: 40px; }
-#compass .dial, #compass .needle { position: absolute; inset: 0; will-change: transform; }
+#compass .dial { position: absolute; inset: 0; will-change: transform; }
 #compass svg { display: block; width: 100%; height: 100%; }
 #compass .ward { opacity: var(--wake); stroke-dasharray: 100; animation: ward-trace 1.4s ease-out .5s backwards; filter: drop-shadow(0 0 1.5px var(--ward)); }
-#compass .letters { transition: opacity 1.2s; }
-#compass.lost .letters { opacity: .25; }
+#compass .letters { filter: drop-shadow(0 0 2px #ffcf7a99); }
 #compass .studs { position: absolute; left: 50%; top: 50%; }
 #compass .stud { position: absolute; left: -3.5px; top: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, #ff9a7a 45%, #c0391b); box-shadow: 0 0 6px #ff7a50; }
 #compass .stud.new { animation: stud-in 1.2s cubic-bezier(.3, 1.6, .5, 1) backwards; }
