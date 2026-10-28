@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Current phase: D** (to be planned in detail, section 4).
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd), with a second gate C after them; phase D waits.
 
 ---
 
@@ -112,10 +112,14 @@ Goal: magic returns to the world, and growing means more than bigger numbers.
 | C11 ✓ | **A story that remembers** (plan 4.5): events leave traces (ruins, ash, refugees, rumours, a survivor); ignored promises resolve through an event; the hero's deeds cause events; good events (a market day, a festival); talk knows events (Conversations domain) | Test: an event's traces stand in the world and in talk; an old promise resolves | 4.5 |
 | C12 ✓ | **The player model** (plan 4.1, 4.3): playstyle from decayed evidence, hints heard, leads taken; C9 and C10 lean towards what the player enjoys | Test: a mage and a fighter bot get measurably different moves | 4.1, 4.3 |
 | C7 ✓ | **Travel**: horses on roads, fast travel rules, time passing as designed | Test against 5.4's numbers | 5.4, D37 |
+| C13 | **Skills by trainers** (D54): nothing rises by use any more; every rank is bought from a trainer for coin, and given only at enough standing with the trainer's people (higher for dangerous skills); standing comes from deeds counted once (places cleared, people helped, promises kept, guild tasks); old saves keep their values; the loop bot buys ranks instead of grinding | Tests: no action raises a skill; a rank needs coin and standing; repeating a deed adds no standing; the loop check with a fighter and a mage still passes | 10, 11.4, D49, D54 |
+| C14 | **Bird form as a quest reward**: no trainer sells it; the fitting house (the hidden Undercroft, animism) asks a task worth it, made by the VGM (D52: seen, not handed out as a list), and the change of shape is its reward | Test: bird form can only be gained through its task; a GPU shot of the first change after the task | 10, D49, D52 |
+| C15 | **The capital** (D41): the first city of the world, placed by the VGM where the road network leads (a few km from the start town), on the one town core (B3a) with districts, a wall and gates, a market, the big guild halls and a seat of rule; the budget of D41 holds (30 full, 100 middle) | Test: the capital is a decision in the log and replays; F2 and F4 hold in a GPU shot in its market; the loop check runs an evening there | 7, 9.3, D41 |
+
 
 Built ahead of phase C (Arnd asked by name, 2026-10-27): **bird form**, a taught change of shape (the hero becomes a pheasant and flies; design section 10), and the **action bar** (ten slots, always shown, arranged in the ability book; 17.1) that C1's abilities will sit on. C3 gives bird form a teacher: the hidden Undercroft (C3 part 1, 2026-10-27).
 
-Gate C: a fight with magic in the F1 set, the loop check with a mage hero, every VGM tool in the toolbox and in vgm.md (C6b, C6c), no need overdue more than 5 minutes in the loop check (C9), the review.
+Gate C (passed 2026-10-28; again after C13–C15, Arnd): a fight with magic in the F1 set, the loop check with a mage hero, every VGM tool in the toolbox and in vgm.md (C6b, C6c), no need overdue more than 5 minutes in the loop check (C9), the review.
 
 ### Phase D: Seas (milestone 7)
 
@@ -150,7 +154,6 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 |---|---|
 | Other factions (Temple, the watch, a thieves' ring) | After peoples (B4) work; guilds are B3b |
 | freeryder / free LLMs (O15) | Parked by Arnd |
-| The capital | Prepared in B3, placed once a road network exists |
 | Companions (animals, elementals, summons) | After magic (C), since summons need it |
 | A hedge witch who teaches | Her cottage is C3 (D49) |
 | Interiors rework (ceiling joists cross the wall tops, dim rooms) | Seen at gate A; looks, not function. Before gate B's shots |
