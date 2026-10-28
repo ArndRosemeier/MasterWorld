@@ -26,17 +26,23 @@ export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'le
 
 export interface MaterialKind extends StageKind {
   readonly attributes: readonly Attribute[];
+  /**
+   * Not needed in the first seconds of play (spells, the bird form's feathers): left out of the warm-up behind the
+   * loading screen, so it does not lengthen the load (F4); built under the shader cap when first added (Stage.add).
+   */
+  readonly late: boolean;
 }
 
 const kinds = new Map<string, MaterialKind>();
 
-export function defineKind(name: string, attributes: readonly Attribute[], build: () => Material, shadow = { cast: true, receive: true }): MaterialKind {
+export function defineKind(name: string, attributes: readonly Attribute[], build: () => Material, shadow = { cast: true, receive: true }, late = false): MaterialKind {
   if (kinds.has(name)) throw new Error(`material kind "${name}" defined twice`);
   let made: Material | null = null;
   const kind: MaterialKind = {
     name,
     attributes,
     shadow,
+    late,
     make() {
       made ??= Object.assign(build(), { name });
       return made;
@@ -57,9 +63,14 @@ export function kindMesh(g: BufferGeometry, kind: MaterialKind, x = 0, y = 0, z 
   return mesh;
 }
 
-/** Every kind, for the warm-up. */
+/** Every kind. */
 export function allKinds(): readonly MaterialKind[] {
   return [...kinds.values()];
+}
+
+/** The kinds the warm-up builds behind the loading screen: all but the late ones. */
+export function warmKinds(): readonly MaterialKind[] {
+  return allKinds().filter((k) => !k.late);
 }
 
 /** The ground's texture arrays; set once at load, before the warm-up builds the terrain material. */

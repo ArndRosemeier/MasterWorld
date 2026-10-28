@@ -25,4 +25,4 @@ export const FEATHER = defineKind('feather swirl', ['position', 'uv'], () => {
   m.colorNode = col.mul(glow).mul(FEATHER_GLOW).mul(1.8);
   m.opacityNode = glow.mul(FEATHER_GLOW).mul(float(1.0));
   return m;
-}, { cast: false, receive: false });
+}, { cast: false, receive: false }, true);

@@ -167,7 +167,7 @@ const SESSIONS = [
       const { barn } = await raidFarm(p);
       if (!barn) throw new Error('raided-farm: no farm was raided');
       await p.waitForFunction(() => !!window.game.smoke.mesh.parent, null, { timeout: TIMEOUT });
-      await standClear(p, barn, 32, { pitch: 0.25, zoom: 4, side: 0.35, avoid: barn.avoid });
+      await standClear(p, barn, 24, { pitch: 0.2, zoom: 5, side: 0.25, avoid: barn.avoid });
       await p.waitForTimeout(4000);
     } },
   ] },
