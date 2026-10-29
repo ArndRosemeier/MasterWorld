@@ -113,3 +113,22 @@ test('settlements: no town system names the start town', () => {
     assert.deepEqual(hits, [], `${f} names the start town`);
   }
 });
+
+test('settlements: every guild house keeps its teacher at home while awake (the hedge witch is found in her cottage)', () => {
+  const start = new Township(terrain.towns[0], { seed, setting: classic, log: () => walked, hours: () => 9 });
+  const life = start.life;
+  start.keepMarked(life, []);
+  const teachers = start.guilds.map(({ guild, b }) => ({ b, a: life.agents.find((x) => x.person.work === b.id && x.person.trade === guild.keeper) })).filter((t) => t.a);
+  // The warden keeps watch at the tower's door out on the land (its own post), not in a house in town.
+  const housed = teachers.filter((t) => !t.a!.post);
+  assert.ok(teachers.some((t) => t.a!.person.trade === 'hedge-witch'), 'the start town has its hedge witch');
+  for (const { a } of housed) assert.ok(life.isKept(a!.person.id), `${a!.person.trade} is kept`);
+  // From 9:00 to 17:00: once at home, never out about the town.
+  const out = new Map<number, number>();
+  for (let s = 0; s < 8 * 150; s++) {
+    life.step(1, 9 + s / 150);
+    if (s < 150) continue;
+    for (const { a, b } of housed) if (a!.act === 'walk' || a!.spot < 0 || life.spots[a!.spot].building !== b.id) out.set(a!.person.id, (out.get(a!.person.id) ?? 0) + 1);
+  }
+  assert.deepEqual([...out], [], 'teachers out of their houses');
+});
