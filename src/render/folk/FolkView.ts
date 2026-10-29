@@ -285,8 +285,13 @@ export class FolkView {
       s.used = true;
       this.dress(s, a);
     }
-    const ranked: [number, Slot][] = [];
-    for (const s of this.shown.values()) if (s.ready) ranked.push([Math.hypot(s.place.position.x - cx, s.place.position.z - cz), s]);
+    // Detail and shadows go by how far each is from the camera itself: while the title's fly-over is far up over the
+    // town (dressing for `focus`), everyone is far off and draws as Crowd without a shadow.
+    const ranked: [number, Slot][] = [], c = cam.position;
+    for (const s of this.shown.values()) {
+      const at = s.place.position;
+      if (s.ready) ranked.push([this.focus ? Math.hypot(at.x - c.x, at.y - c.y, at.z - c.z) : Math.hypot(at.x - cx, at.z - cz), s]);
+    }
     ranked.sort((x, y) => x[0] - y[0]);
     // Who keeps the detail: those who had it, until they are STICK farther than the DETAILED-th nearest; then the
     // nearest fill it up.

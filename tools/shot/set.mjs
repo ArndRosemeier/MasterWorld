@@ -111,70 +111,31 @@ const SESSIONS = [
       await p.waitForTimeout(2500);
     } },
   ] })),
-  // Gate L: mesa country round the start (D56). From the valley floor before a plateau's wall; on a plateau top
-  // looking out over its rim; before a tor with its boulders; on a wall with holds, part way up it (climbing is
-  // shown: the hero holds W at the foot and goes up hand over hand).
+  // Gate L: mesa country round the start (D56), at spots found once for seed masterworld (open ground, no wood,
+  // fence or water where the hero and the camera stand): from the valley floor before a plateau's wall 675 m off;
+  // on a plateau top 63 m up near its rim, looking out over the valley; before the nearest tor (mesa country has
+  // none of its own: this one is some 9 km off); and on the wall with holds that tools/shot/climb.mjs climbs, part
+  // way up it (climbing is shown: W held at the foot until 8 m up), seen from the free camera beside it.
   { id: 'mesa', query: `${still}&hour=10.5&weather=fair`, shots: [
-    { name: 'mesa-valley', act: (p) => p.evaluate(() => {
-      // The nearest wall 0.6-2 km out that rises 60 m or more; the hero 450 m before its foot, on the open floor
-      // (no farmland, fence or wood there or just behind, where the camera trails), facing it.
-      const g = window.game, t = g.terrain, sk = t.skeleton, w = g.player.walker.pos, s = (window.__start = { x: w.x, z: w.z });
-      const open = (x, z) => t.townGround(x, z) === 0 && g.woods(x, z) < 0.2 && t.waterDepth(x, z) <= 0;
-      for (let r = 600; r <= 2500; r += 100) for (let a = 0; a < 32; a++) {
-        const dx = Math.cos((a * Math.PI) / 16), dz = Math.sin((a * Math.PI) / 16);
-        if (sk.mesaRise(s.x + dx * r, s.z + dz * r) < 60) continue;
-        const x = s.x + dx * (r - 450), z = s.z + dz * (r - 450);
-        if (sk.mesaRise(x, z) > 3 || !open(x, z) || !open(x - dx * 12, z - dz * 12) || !open(x - dx * 25, z - dz * 25)) continue;
-        g.player.teleport(x, undefined, z, Math.atan2(-dx, -dz));
-        g.player.heroCam.pitch = 0.12;
-        return;
-      }
-      throw new Error('no open floor before a plateau wall round the start');
-    }) },
-    { name: 'mesa-plateau', act: (p) => p.evaluate(() => {
-      // On an open plateau top 60 m or more over the floor, 40-90 m in from its rim, looking out over it (the way in
-      // is (nx, nz)): the valley below and the walls across it, no wood between.
-      const g = window.game, sk = g.terrain.skeleton, s = window.__start;
-      for (let r = 600; r <= 4000; r += 50) for (let a = 0; a < 48; a++) {
-        const x = s.x + Math.cos((a * Math.PI) / 24) * r, z = s.z + Math.sin((a * Math.PI) / 24) * r;
-        const rise = sk.mesaRise(x, z), { tall, nx, nz } = sk.lastMesa;
-        if (tall < 60 || rise < tall - 2) continue;
-        // The rim within 90 m out (the land drops there), not within 40 m (on the crest itself).
-        if (sk.mesaRise(x - nx * 40, z - nz * 40) < tall - 5 || sk.mesaRise(x - nx * 90, z - nz * 90) > tall - 20) continue;
-        if ([0, 20, 40, -12].some((d) => g.woods(x - nx * d, z - nz * d) > 0.1)) continue;
-        g.player.teleport(x, undefined, z, Math.atan2(nx, nz));
-        g.player.heroCam.pitch = -0.08;
-        return;
-      }
-      throw new Error('no open plateau top round the start');
-    }) },
-    { name: 'tor', act: (p) => p.evaluate(() => {
-      // The nearest tor out in the open (mesa country has none of its own: some 9 km off): the hero just off
-      // its foot on dry, open ground, the camera drawn back to show it whole with its boulders.
-      const g = window.game, t = g.terrain, s = window.__start, forms = t.landforms.within(s.x, s.z, 15000);
-      const tors = forms.filter((f) => f.shape === 'tor').sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z));
-      for (const f of tors) for (let a = 0; a < 8; a++) {
-        const dx = Math.cos((a * Math.PI) / 4), dz = Math.sin((a * Math.PI) / 4), d = Math.max(35, f.L * 1.6);
-        const x = f.x + dx * d, z = f.z + dz * d;
-        if ([0, d / 3, d / 1.5].some((k) => g.woods(f.x + dx * (d - k), f.z + dz * (d - k)) > 0.1) || g.woods(x + dx * 12, z + dz * 12) > 0.1) continue;
-        if (t.waterDepth(x, z) > 0 || t.townGround(x, z) !== 0) continue;
-        g.player.teleport(x, undefined, z, Math.atan2(dx, dz));
-        g.player.heroCam.pitch = 0.08; g.player.heroCam.zoom = 7;
-        return;
-      }
-      throw new Error('no tor in the open round the start');
-    }) },
+    { name: 'mesa-valley', act: stand(-22341, 37000, -0.924, 0.383, 0.12) },
+    { name: 'mesa-plateau', act: stand(-25757, 33680, 0.652, -0.758, -0.1) },
+    { name: 'tor', act: stand(-27268, 44392, 0, -1, 0.06, 7) },
     { name: 'climb', act: async (p) => {
-      // The wall with holds south of the start that tools/shot/climb.mjs climbs (seed masterworld): at its foot,
-      // facing in, W held until the hero is 8 m up the face, then let go there (it hangs on); seen from the side,
-      // level with the hero, the rock in its hands.
-      await p.evaluate(() => { const g = window.game, IN = { x: 0.259, z: 0.966 }; g.player.teleport(-30826, undefined, 35266, Math.atan2(-IN.x, -IN.z)); });
+      const IN = { x: 0.259, z: 0.966 };
+      await stand(-30826, 35266, IN.x, IN.z, 0.1)(p);
       await p.waitForTimeout(1500);
       const y0 = await p.evaluate(() => window.game.player.walker.pos.y);
       await p.keyboard.down('KeyW');
       await p.waitForFunction((y0) => { const w = window.game.player.walker; return w.mode === 'climb' && w.pos.y > y0 + 8; }, y0, { timeout: 60000 }).catch(() => console.log('climb: NOT 8 m UP THE FACE'));
       await p.keyboard.up('KeyW');
-      await p.evaluate(() => { const pl = window.game.player; pl.heroCam.yaw = pl.walker.yaw + 1.25; pl.heroCam.pitch = 0.05; pl.heroCam.zoom = 4.5; });
+      // The free camera 5 m out from the face and 4 m to its side, level with the hero, looking at it (the hero
+      // hangs on where it was left).
+      await p.evaluate(([ix, iz]) => {
+        const pl = window.game.player, h = pl.walker.pos, cx = h.x - ix * 5 - iz * 4, cz = h.z - iz * 5 + ix * 4, cy = h.y + 1.2;
+        pl.flying = true;
+        const dx = h.x - cx, dz = h.z - cz, dy = h.y + 1 - cy;
+        pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(dy, Math.hypot(dx, dz)) * 180) / Math.PI]);
+      }, [IN.x, IN.z]);
     } },
   ] },
   // L6: a cave's mouth in a cliff (D57), then inside, in the middle of its cavern (its highest room).
@@ -271,6 +232,16 @@ const SESSIONS = [
 /** The sessions of each part (each part one run, under 5 min). */
 const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave', 'mesa']);
 const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : 'land');
+
+/** Puts the hero at (x, z) facing along (dx, dz), the camera behind at `pitch` (up positive) and `zoom` metres. */
+function stand(x, z, dx, dz, pitch, zoom) {
+  return (p) => p.evaluate(([x, z, dx, dz, pitch, zoom]) => {
+    const pl = window.game.player;
+    pl.teleport(x, undefined, z, Math.atan2(-dx, -dz));
+    pl.heroCam.pitch = pitch;
+    if (zoom) pl.heroCam.zoom = zoom;
+  }, [x, z, dx, dz, pitch, zoom ?? 0]);
+}
 
 /** Puts the hero at (u, v) of the hold's gate frame (out of the gate is +v), looking at (lu, lv). */
 function atHold(u, v, lu, lv) {
