@@ -20,6 +20,8 @@ import { EYE, WORLD } from '../origin';
 let envTex: Texture | null = null;
 /** Seconds a running water's pattern is carried before it fades back (flow map cycle). */
 const FLOW_CYCLE = 1.6;
+/** How white the wet rim at a still water's edge is (0..1). */
+const WET_RIM = 0.2;
 /** Running water's foam streaks lie along one of this many fixed directions (the two nearest the current, blended). */
 const STREAK_DIRS = 12;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
@@ -187,7 +189,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       shore.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
         // The wet rim, on still water only: running water's depth comes from masks too coarse for a brook, which is
         // shallow all across and would turn white; its edge is where the surface meets the bank.
-        .add(float(1).sub(smoothstep(0.0, 0.3, depth)).mul(0.6).mul(still).mul(nearShore))
+        // Faint: at 0.6 it drew every lake's flat shore as a hard white line (gate W shots).
+        .add(float(1).sub(smoothstep(0.0, 0.3, depth)).mul(WET_RIM).mul(still).mul(nearShore))
         .add(smoothstep(0.55, 1.0, vCrest).mul(smoothstep(0.45, 0.75, n)).mul(0.7))
         // Streaks and white water on running water (the falling sheet itself is all foam, below).
         .add(runningFoam),
