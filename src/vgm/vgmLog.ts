@@ -30,7 +30,8 @@ export interface VgmLine {
 
 /**
  * Where a decision is on the land (world metres): its own spot, else its place's (a cellar under its town, a
- * kept promise at the dungeon it promised, an order in its town); null for what has no place (the land's shape).
+ * kept promise at the dungeon it promised, an order in its town); null for what has no place (the land's shape,
+ * open land).
  */
 export function placeOf(d: Decision, log: DecisionLog, depth = 0): readonly [number, number] | null {
   const by = (id: string): readonly [number, number] | null => {
@@ -44,7 +45,8 @@ export function placeOf(d: Decision, log: DecisionLog, depth = 0): readonly [num
     case 'kept': return by(d.promise);
     case 'order': case 'festivity': return by(d.town);
     case 'journey': return by(d.to);
-    case 'region': return d.site ? [d.site.x, d.site.z] : [d.x, d.z];
+    // Open land has nothing placed in it to see.
+    case 'region': return d.site ? [d.site.x, d.site.z] : null;
     case 'road': {
       const k = Math.floor(d.pts.length / 4) * 2;
       return d.pts.length >= 2 ? [d.pts[k], d.pts[k + 1]] : null;

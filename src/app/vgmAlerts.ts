@@ -17,8 +17,8 @@ const STAY = 8;
 /** Places marked on the minimap at once (the newest). */
 const MARKS = 16;
 
-/** A move worth a mark: one that put something somewhere (not the land growing: roads, open land). */
-const marked = (l: VgmLine): boolean => !!l.where && l.kind !== 'road' && l.kind !== 'volume' && !(l.kind === 'region' && l.reason.endsWith('(open land)'));
+/** A move worth a mark: one that put something somewhere (not the land growing: roads; open land has no place). */
+const marked = (l: VgmLine): boolean => !!l.where && l.kind !== 'road';
 
 export class VgmAlerts {
   /** Shown at all (the setting). */
