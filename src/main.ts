@@ -1189,7 +1189,9 @@ export async function start(b: Boot): Promise<void> {
       paused: pausedWith('ui/map'),
       get bindings() { return settings.current.bindings; },
       height: (x, z) => terrain.height(x, z),
-      water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
+      // The land's own water (rivers, lakes, the sea), everywhere: the sea's masks hold only what is round the camera.
+      water: (x, z) => terrain.waterDepth(x, z),
+      woods,
       heroAt: () => heroAt(player.walker.yaw),
       known,
       roadLines: () => terrain.roads.roads,
