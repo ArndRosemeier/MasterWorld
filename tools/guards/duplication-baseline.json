@@ -634,5 +634,9 @@
   {
     "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/townLife.ts#step",
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/cellars.ts#keep + masterworld/sim/townLife.ts#keep",
+    "reason": "Unrelated: Cellars.keep marks a promise kept and says what its household pays; TownLife.keep sends people to the buildings they keep to (sim/marked.ts). Only the name matches."
   }
 ]
