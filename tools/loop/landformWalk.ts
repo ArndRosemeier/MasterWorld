@@ -3,7 +3,8 @@
  * directions (3 km each) and through each kind of country (four ways, 2 km each, from its nearest stretch), on
  * foot at the hero's run (game/walker.ts), and notes each landform passed: a landform whose ground the hero
  * walks over or beside (within its reach, or a boulder field's half width, and 40 m more), a mesa's wall
- * within 60 m of its foot, or a crag (ground steep enough to show its rock) within 40 m. Water and a town's ground are not walking out on the land: no time passes there.
+ * within 60 m of its foot, or a crag (ground steep enough to show its rock) within 40 m. Water, a town's ground and the
+ * beach (where no landform goes) are not walking out on the land: no time passes there.
  * Prints each walk's longest stretch without a landform, in minutes, and exits 1 if one is over a minute.
  * `node --import tsx tools/loop/landformWalk.ts [seed]`; `npm run walk:landforms` runs three worlds (CI). Some 5-10 s each.
  */
@@ -11,6 +12,7 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../../src/setting/classic/index';
 import { firstDecisions, startPlace } from '../../src/vgm/builder';
 import { Terrain } from '../../src/world/terrain';
+import { BEACH } from '../../src/world/landforms';
 import { TownGround } from '../../src/world/town';
 import { WALK } from '../../src/game/walker';
 
@@ -36,7 +38,9 @@ function walk(x0: number, z0: number, dx: number, dz: number, km: number): { gap
   let since = 0, gap = 0, walked = 0, at: [number, number] = [x0, z0];
   for (let s = 0; s <= km * 1000; s += STEP) {
     const x = x0 + dx * s, z = z0 + dz * s, h = terrain.height(x, z);
-    if (terrain.waterDepth(x, z, h) > 0.4 || terrain.townGround(x, z) !== TownGround.None) { since = 0; continue; }
+    // (The beach is not either: landforms keep off it by design, world/landforms.ts, and the sea is in view.)
+    const beach = sk.elevation(x, z) < BEACH.elevation || sk.lastShore < BEACH.shore;
+    if (terrain.waterDepth(x, z, h) > 0.4 || terrain.townGround(x, z) !== TownGround.None || beach) { since = 0; continue; }
     since += STEP / PACE; walked += STEP / PACE;
     let near = false;
     for (const f of terrain.landforms.within(x, z, 600)) {
