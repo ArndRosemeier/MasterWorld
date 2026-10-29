@@ -118,20 +118,20 @@ const SESSIONS = [
   // way up it (climbing is shown: W held at the foot until 8 m up), seen from the free camera beside it.
   { id: 'mesa', query: `${still}&hour=10.5&weather=fair`, shots: [
     { name: 'mesa-valley', act: stand(-22341, 37000, -0.924, 0.383, 0.12) },
-    { name: 'mesa-plateau', act: stand(-24507, 38100, 0.680, 0.733, -0.12) },
-    { name: 'tor', act: stand(-27359, 44413, 0.707, -0.707, 0.05) },
+    { name: 'mesa-plateau', act: stand(-24480, 38129, 0.680, 0.733, -0.25) },
+    { name: 'tor', act: stand(-27240, 44351, -0.707, -0.707, -0.15) },
     { name: 'climb', act: async (p) => {
-      const IN = { x: -0.94, z: 0.342 };
-      await stand(-28696, 35388, IN.x, IN.z, 0.1)(p);
+      const IN = { x: 0.259, z: 0.966 };
+      await stand(-30826, 35266, IN.x, IN.z, 0.1)(p);
       await p.waitForTimeout(1500);
       const y0 = await p.evaluate(() => window.game.player.walker.pos.y);
       await p.keyboard.down('KeyW');
       await p.waitForFunction((y0) => { const w = window.game.player.walker; return w.mode === 'climb' && w.pos.y > y0 + 8; }, y0, { timeout: 60000 }).catch(() => console.log('climb: NOT 8 m UP THE FACE'));
       await p.keyboard.up('KeyW');
-      // The free camera 9 m out from the face, 3 m to its side and 2 m below the hero, looking up at it (the hero
-      // hangs on where it was left).
+      // The free camera 10 m out from the face, 5 m to its side and a little below the hero (never under the
+      // ground), looking up at it (the hero hangs on where it was left).
       await p.evaluate(([ix, iz]) => {
-        const pl = window.game.player, h = pl.walker.pos, cx = h.x - ix * 9 - iz * 3, cz = h.z - iz * 9 + ix * 3, cy = h.y - 2;
+        const pl = window.game.player, h = pl.walker.pos, cx = h.x - ix * 10 - iz * 5, cz = h.z - iz * 10 + ix * 5, cy = Math.max(h.y - 1, window.game.terrain.height(cx, cz) + 2);
         pl.flying = true;
         const dx = h.x - cx, dz = h.z - cz, dy = h.y + 1 - cy;
         pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(dy, Math.hypot(dx, dz)) * 180) / Math.PI]);
