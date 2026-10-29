@@ -62,6 +62,13 @@ import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
 import { OwnerComes } from './app/ownerComes';
+import { FAR } from './render/folk/FarFolk';
+/**
+ * One of a place's household goes out to wait before its way in once the hero is this near (m: within the 400 m round
+ * which a town's people out on the land live), never while it can be seen (nearer than anyone out of doors is drawn,
+ * FAR); they go home once the hero is this far off.
+ */
+const WAIT_FROM = 395, WAIT_UNSEEN = FAR + 10, WAIT_GONE = 600;
 import { burntBarns, criesDue, situationOf, smokesAt } from './vgm/situations';
 import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
@@ -938,8 +945,8 @@ export async function start(b: Boot): Promise<void> {
      * pay (a master's deed, C14, pays in their gift, not coin), the promise is kept, and the VGM's next lead may come up in
      * the same breath. What they say in thanks.
      */
-    const paidFor = (id: string, t: Township): string => {
-      const due = cellars.keep(id);
+    const paidFor = (id: string, t: Township, came = false): string => {
+      const due = cellars.keep(id, came);
       const deed = questGuild(setting, log, id);
       const coins = deed ? 0 : due?.coins ?? 0;
       character.coins += coins;
@@ -952,18 +959,41 @@ export async function start(b: Boot): Promise<void> {
     // climbs down the ladder, comes to the hero and thanks and pays them there.
     comeDown = (id) => {
       const v = visit(), t = townOfPromise(id);
-      if (!v?.above || owner || !t?.living || t.talk.isSettled(id)) return false;
-      const to = t.talk.reportTo(id)[0], a = t.life.agents.find((x) => x.person.id === to);
+      if (!v || owner || !t?.living || t.talk.isSettled(id)) return false;
+      // Under a house, the one they would tell; out on the land, whoever of the household waits outside.
+      const to = t.talk.reportTo(id)[0], a = v.above ? t.life.agentOf(to) : t.waiterOf(id);
       if (!a) return false;
       owner = new OwnerComes(v, a, {
         body: () => folk?.bodyOf(a) ?? null,
         say: (text, at) => speech.say(text, at),
         told: () => {
           t.talk.thanked(a.person.id, id);
-          return paidFor(id, t);
+          return paidFor(id, t, true);
         },
       });
       return true;
+    };
+    /**
+     * Out on the land, one of a place's household waits outside its way in while it is to be cleared (they come in to the
+     * hero once it is quiet: `comeDown`). They go out there unseen (the hero still beyond where anyone out of doors is
+     * drawn, or inside the place), and home again unseen once it is kept or the hero has gone off.
+     */
+    const waitOutside = (): void => {
+      const w = player.walker.pos, v = visit();
+      for (const p of cellars.landPlaces()) {
+        const t = towns?.get(p.town);
+        if (!t) continue;
+        const inside = !!v && v === p.visit, d = Math.hypot(w.x - p.x, w.z - p.z), waiter = t.waiterOf(p.id);
+        const unseen = inside || d > WAIT_UNSEEN;
+        if (t.talk.isSettled(p.id) || (!inside && d > WAIT_GONE)) {
+          if (waiter && unseen && owner?.agent !== waiter) t.waitOver(p.id);
+          continue;
+        }
+        if (waiter || (!inside && (d > WAIT_FROM || player.offFoot))) continue;
+        if (!unseen) continue;
+        const to = t.talk.reportTo(p.id)[0];
+        if (to !== undefined) t.waitAt(p.id, to, p.x, p.z, p.dir);
+      }
     };
     // Who knows the hero from before (plan 11.4): people of the town the game began in; their greeting names them.
     const friendsOf = (bg: BackgroundDef | undefined) => (bg && startTown ? acquaintances(bg, startTown.residents) : []);
@@ -1386,7 +1416,7 @@ export async function start(b: Boot): Promise<void> {
     const tradeAt = async (keeper: string): Promise<boolean> => {
       const t = here() ?? startTown;
       const m = t?.market.merchants.find((x) => x.shop.keeper === keeper);
-      const a = m && t?.life.agents.find((x) => x.person.id === m.person);
+      const a = m && t?.life.agentOf(m.person);
       if (!t || !m || !a) return false;
       talk?.close();
       await standBefore(a);
@@ -1661,7 +1691,7 @@ export async function start(b: Boot): Promise<void> {
     let answered = -Infinity;
     /** Situations whose cry was called (C10), and the time to the next look for one due. */
     const cried = new Set<string>();
-    let cryClock = 0, smokeClock = 0;
+    let cryClock = 0, smokeClock = 0, waitClock = 0;
     /** The good days whose towns already tell them as past. */
     const feasted = new Set<string>();
     /** Barns drawn burnt now (`town/building`). */
@@ -1844,6 +1874,8 @@ export async function start(b: Boot): Promise<void> {
           }
         }
         // A situation's cry (C10): once the hero is near enough to see what it is about, someone there calls out.
+        // One of a place's household waiting outside its way in (the task is done when they come in).
+        if ((waitClock -= dt) <= 0) { waitClock = 1; waitOutside(); }
         part('cries');
         if (!visit() && !player.offFoot && (cryClock -= dt) <= 0) {
           cryClock = 0.25;

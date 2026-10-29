@@ -13,6 +13,7 @@ export const barrow: CellarLore = {
   words: {
     quiet: 'All is still in {place} now. The household who told you of it will want to hear.',
     thanks: 'You went into {place} and walked out again? Here, {coins}, and our thanks with it.',
+    came: 'The noise stopped, so I came in after you. You are still standing, and nothing else is! Here, {coins}, and our thanks with it.',
   },
   uses: [
     { id: 'forecourt', name: 'the passage in', props: ['rubble', 'candle', 'bones', 'jar'] },

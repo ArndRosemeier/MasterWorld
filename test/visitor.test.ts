@@ -53,3 +53,22 @@ test('visitor: never walks through a wall on the way', () => {
     assert.ok(s.sdf(v.x, v.y + 1, v.z) > 0, `in the open at ${v.x.toFixed(1)},${v.y.toFixed(1)},${v.z.toFixed(1)}`);
   }
 });
+
+test('visitor: one of a household waits outside a place on the land, where the town lives round them, and goes home after', async () => {
+  const { Township } = await import('../src/game/township');
+  const { frontierLand } = await import('./frontierLand');
+  const { seed, terrain } = frontierLand();
+  const town = terrain.towns[0];
+  const t = new Township(town, { seed, setting: classic, log: () => [], hours: () => 30 });
+  const person = t.life.agents.find((a) => a.person.role !== 'child' && !a.post)!.person.id;
+  const at = { x: town.decision.x + 900, z: town.decision.z };
+  const a = t.waitAt('dungeon-1', person, at.x, at.z, 0);
+  assert.ok(a, 'they go');
+  assert.equal(t.waiterOf('dungeon-1'), a);
+  assert.equal(t.waitAt('dungeon-1', person, at.x, at.z, 0), a, 'once');
+  assert.ok(Math.hypot(a.x - at.x, a.z - at.z) < 0.01 && !a.hidden && a.act === 'wait', 'standing there');
+  assert.ok(t.posts.some((p) => Math.hypot(p.x - at.x, p.z - at.z) < 0.01), 'a post: the town lives round them');
+  t.waitOver('dungeon-1');
+  assert.equal(t.waiterOf('dungeon-1'), null);
+  assert.ok(a.hidden && !a.post, 'gone home');
+});

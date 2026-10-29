@@ -67,7 +67,7 @@ export class Hails {
       asleep: g.act === 'sleep' || g.act === 'away',
       busy: !!g.held || !!g.seek || g.person.role === 'child',
     })), knows, h, sent);
-    const b = id === null ? null : life.agents.find((g) => g.person.id === id) ?? null;
+    const b = id === null ? null : life.agentOf(id) ?? null;
     if (!b) return;
     sent.add(b.person.id);
     const at = besideHero(b, h);

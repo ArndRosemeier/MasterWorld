@@ -16,6 +16,7 @@ export const hideout: CellarLore = {
   words: {
     quiet: 'Nobody is left in {place}. Whoever they robbed will want to know.',
     thanks: '{place} is empty? Then we can drive the road again. Take {coins}, and our thanks.',
+    came: 'Not one of them left! I saw it all go quiet from outside. We can drive the road again. Take {coins}, and our thanks.',
   },
   uses: [
     { id: 'door', name: 'the hidden door', props: ['beam', 'rubble', 'lantern'] },

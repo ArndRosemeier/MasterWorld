@@ -13,6 +13,7 @@ export const cellar: CellarLore = {
   words: {
     quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',
     thanks: 'Quiet down there at last? Then we sleep tonight. Here, {coins}; you have earned every one.',
+    came: 'It went so quiet I had to come and see. You did it! We sleep tonight. Here, {coins}; you have earned every one.',
   },
   uses: [
     { id: 'store', name: 'the household store', props: ['sack', 'barrel', 'shelf', 'jar', 'lantern'] },

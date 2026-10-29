@@ -282,6 +282,8 @@ export interface DungeonWords {
   readonly quiet: string;
   /** What the household says when told it is quiet (the promise kept); `{coins}` the reward, `{place}` the place. */
   readonly thanks: string;
+  /** What the one of the household says who comes to the hero in the place once it has gone quiet (else `thanks`). */
+  readonly came?: string;
 }
 
 /** The setting's material for a kind of dungeon (plan 8: cellars in milestone 3, barrows after). */

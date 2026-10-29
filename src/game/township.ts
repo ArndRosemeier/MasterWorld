@@ -119,7 +119,7 @@ export class Township {
   waitAt(id: string, person: number, x: number, z: number, dir: number): Agent | null {
     const w = this.waiting.get(id);
     if (w) return w.agent;
-    const life = this.life, a = life.agents.find((p) => p.person.id === person);
+    const life = this.life, a = life.agentOf(person);
     if (!a || a.post) return null;
     life.station(a, x, z, dir);
     this.waiting.set(id, { agent: a, at: { x, z } });
