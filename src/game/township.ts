@@ -274,7 +274,8 @@ export class Township {
 
   /**
    * The map's marks (the open leads): whoever one is sent here to find (the innkeeper at the start, a cellar's
-   * household) keeps to that building while awake (sim/marked.ts), instead of wandering the town.
+   * household) keeps to that building while awake (sim/marked.ts), instead of wandering the town; so does every
+   * guild house's keeper (the teachers).
    */
   keepMarked(life: TownLife, marks: readonly { readonly id: string; readonly x: number; readonly z: number }[]): void {
     const t = this.talkOf;
@@ -282,7 +283,20 @@ export class Township {
     if (key === this.keptKey && life === this.keptLife) return;
     this.keptKey = key;
     this.keptLife = life;
-    life.keep(keptAt(this.town.plan, this.residents, marks.map((m) => ({ x: m.x, z: m.z, who: t && t.houseOf(m.id) >= 0 ? t.reportTo(m.id) : undefined }))));
+    const kept = keptAt(this.town.plan, this.residents, marks.map((m) => ({ x: m.x, z: m.z, who: t && t.houseOf(m.id) >= 0 ? t.reportTo(m.id) : undefined })));
+    // The teachers keep to their houses too (one comes to the hedge witch's cottage to find her there).
+    for (const [id, b] of this.teachersAt) if (!kept.has(id)) kept.set(id, b);
+    life.keep(kept);
+  }
+
+  /** Each guild house's keeper (by person id) and their house: where the hero comes to learn, always found there while awake. */
+  private get teachersAt(): Map<number, number> {
+    const out = new Map<number, number>();
+    for (const { guild, b } of this.guilds) {
+      const p = this.residents.find((x) => x.work === b.id && x.trade === guild.keeper);
+      if (p) out.set(p.id, b.id);
+    }
+    return out;
   }
 
   /** Whether its people live yet (a town far off never needed them). */
