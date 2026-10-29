@@ -13,8 +13,8 @@
 #bar .xp { position: absolute; left: 30px; right: 30px; top: -15px; height: 14px; pointer-events: none; }
 #bar .xp .trough { position: absolute; inset: 0; border-radius: 7px; overflow: hidden; background: linear-gradient(#0b0807, #1d140d); border: 1.5px solid var(--brass); box-shadow: 0 0 0 1px var(--brass-dark), inset 0 2px 4px #000, 0 2px 6px #0009; }
 #bar .xp .trough::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), #4a351099 calc(10% - 1px) 10%); }
-#bar .xp i { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(#fff0c0, var(--brass) 45%, var(--brass-mid)); box-shadow: 0 0 8px #e2bd6888, 2px 0 6px var(--ward); transition: width .8s cubic-bezier(.3, 1.2, .5, 1); }
-#bar .xp span { position: absolute; inset: 0; display: grid; place-items: center; font: 11px/1 'Marcellus SC', Georgia, serif; letter-spacing: .06em; color: var(--ink); text-shadow: 0 0 2px #000, 0 1px 2px #000, 0 0 4px #000; white-space: nowrap; }
+#bar .xp i { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(#fff0c0, var(--brass) 40%, var(--brass-mid) 75%, var(--brass-lo)), linear-gradient(90deg, transparent 70%, #8fe3ff55); background-blend-mode: screen; box-shadow: 0 0 8px #e2bd6888, 2px 0 6px var(--ward); transition: width .8s cubic-bezier(.3, 1.2, .5, 1); }
+#bar .xp span { position: absolute; inset: 0; display: grid; place-items: center; font: 11px/1 'Marcellus SC', Georgia, serif; letter-spacing: .06em; color: #fffaf0; text-shadow: 1px 0 0 #120c08, -1px 0 0 #120c08, 0 1px 0 #120c08, 0 -1px 0 #120c08, 0 0 4px #000, 0 0 6px #000c; white-space: nowrap; }
 #bar .xp.gained .trough { animation: xp-glint .9s ease-out; }
 @keyframes xp-glint { 0% { box-shadow: 0 0 0 1px var(--brass-dark), inset 0 2px 4px #000, 0 0 14px var(--ward); } 100% { box-shadow: 0 0 0 1px var(--brass-dark), inset 0 2px 4px #000, 0 2px 6px #0009; } }
 #bar.fallen .socket { filter: grayscale(1) brightness(.4); transition: filter 1.2s; }
