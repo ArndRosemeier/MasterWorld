@@ -87,6 +87,8 @@ import { Title } from './app/title/title';
 import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
 import { Notes } from './app/notes';
+import { VgmAlerts } from './app/vgmAlerts';
+import { VgmUi } from './app/vgmUi';
 import { BrookPrefetch } from './app/brooks';
 import { BridgeView } from './render/bridgeView';
 import { TalkUi } from './app/talkUi';
@@ -1442,6 +1444,25 @@ export async function start(b: Boot): Promise<void> {
       goodDay: () => goodDayNow(),
       bridges: (x, z) => bridgesNear(terrain.roads, terrain.hydro, x, z, 4000, (px, pz) => terrain.hydro.hasBrooks(px, pz)),
     });
+    // The VGM seen at work (a developer's aid; D53 keeps it out of play): its moves on screen as they come, and
+    // its window (F9) with its needs, its log and buttons that make it act now.
+    const vgmAlerts = new VgmAlerts(vgmLines(log, vgmLog));
+    const vgmUi = new VgmUi({
+      paused, get bindings() { return settings.current.bindings; },
+      lines: () => vgmLines(log, vgmLog),
+      needs: director.needs,
+      get alerts() { return settings.current.vgmAlerts; },
+      set alerts(on) { settings.set({ vgmAlerts: on }); },
+      answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
+      situations: ['hurt-traveller', 'paddock-wolves', 'stray-beast'],
+      situation: (kind) => { const m = situationNow(kind as SituationKind); return m ? `${m.tool}: ${m.reason}` : `no ${kind} here`; },
+      events: setting.events ?? [],
+      storyEvent: (id?: string) => storyEventNow(id),
+      goodDay: () => goodDayNow(),
+      // A few steps south of it, so what stands there is in front of the hero, not under their feet.
+      goNear: (x, z) => player.goTo([x, z + 8]),
+    });
+    settings.watch((s) => { vgmAlerts.on = s.vgmAlerts; });
     new DebugMenu({
       paused,
       get freeCamera() { return player.flying; },
@@ -1473,9 +1494,9 @@ export async function start(b: Boot): Promise<void> {
       legends: setting.items.uniques.map((u) => ({ id: u.id, name: u.name })),
       events: setting.events ?? [],
       storyEvent: (id?: string) => storyEventNow(id),
-      answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
-      situation: (kind) => { const m = situationNow(kind); return m ? `${m.tool}: ${m.reason}` : `no ${kind} here`; },
-      goodDay: () => goodDayNow(),
+      openVgm: () => vgmUi.setOpen(true),
+      get vgmAlerts() { return settings.current.vgmAlerts; },
+      set vgmAlerts(on) { settings.set({ vgmAlerts: on }); },
       gainLevel: () => { const next = setting.growth.xp[character.level]; if (next === undefined) return 'at the top level'; character.gain(next - character.xp); return `level ${character.level}`; },
       vgmLog: () => vgmLines(log, vgmLog),
       wearLegend: (id) => wearLegend(id),
@@ -1870,11 +1891,13 @@ export async function start(b: Boot): Promise<void> {
       if (minimap.showWhile(!title?.holding && !creator?.showing && !!window.__mwReady)) {
         const look = player.flying ? player.fly.yaw : player.heroCam.yaw, me = heroAt(player.walker.yaw);
         minimap.read({ x: me.x, z: me.z, look, yaw: me.yaw, hour: view.sky.hour, sky: skyGlyph(), marks: journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })) });
+        minimap.vgmMarks(vgmAlerts.marks, me.x, me.z);
       }
       part('vgm direct');
       direct(dt);
       part('notes+rest+bar');
       notes.update(dt);
+      vgmAlerts.seeLog(log, vgmLog, !title?.holding && !creator?.showing && !!window.__mwReady, dt);
       rest.watch(restWatch());
       player.resting = rest.sitting;
       actionBar.inPlay = playing && !ended && !title?.holding && !creator?.showing;

@@ -37,6 +37,9 @@ export type SheetPainter = (canvas: HTMLCanvasElement, x: number, z: number, acr
 const DEG = 180 / Math.PI;
 /** The rim's radius for the studs (px, in the dial's 100 px). */
 const RIM = 44;
+/** The VGM's studs (px from the middle of the 150 px ring, hud.css): RANGE metres is the land's edge, farther ones sit on the leather band. */
+const LAND_PX = 58;
+const BAND_PX = 66;
 /** Metres from the hero to the edge of what the minimap shows. */
 export const RANGE = 110;
 /** The sheet covers this much more than the round shows, so it can slide under it between paintings. */
@@ -76,6 +79,9 @@ export class Minimap {
   /** Marks seen once already: a later one slides in. */
   private primed = false;
   private readonly studAt = new Map<string, { el: HTMLElement; deg: number }>();
+  /** The VGM's studs (show mode), by decision id, with their last transform. */
+  private readonly vgmStuds = el('div', { className: 'studs' });
+  private readonly vgmAt = new Map<string, { el: HTMLElement; at: string }>();
   private dialDeg = NaN;
   private armDeg = NaN;
   private sky: SkyGlyph | null = null;
@@ -90,7 +96,7 @@ export class Minimap {
   /** `paint`: the map's painter (none: an empty round, before the game has a map). */
   constructor(private readonly paint: SheetPainter | null = null) {
     this.studs = el('div', { className: 'studs' });
-    this.dial = el('div', { className: 'dial' }, el('div', { className: 'land' }, this.sheet), svg(DIAL), this.studs);
+    this.dial = el('div', { className: 'dial' }, el('div', { className: 'land' }, this.sheet), svg(DIAL), this.vgmStuds, this.studs);
     this.arm = el('div', { className: 'arm' }, el('i', { className: 'sun' }), el('i', { className: 'moon' }));
     this.glyph = el('div', { className: 'glyph' });
     this.root = el('div', { id: 'compass', ariaHidden: 'true' },
@@ -152,6 +158,23 @@ export class Minimap {
       if (Math.abs(deg - s.deg) < 0.3) continue;
       s.deg = deg;
       s.el.style.transform = `rotate(${deg.toFixed(1)}deg) translateY(-${RIM}px)`;
+    }
+  }
+
+  /**
+   * Each frame while shown: where the VGM placed something lately (its show mode, a developer's aid), as
+   * ward-blue studs at their spot inside the round when near, on the band when farther; none: no studs.
+   */
+  vgmMarks(marks: readonly { readonly id: string; readonly x: number; readonly z: number }[], x: number, z: number): void {
+    const now = new Set(marks.map((m) => m.id));
+    for (const [id, s] of this.vgmAt) if (!now.has(id)) { s.el.remove(); this.vgmAt.delete(id); }
+    for (const m of marks) {
+      let s = this.vgmAt.get(m.id);
+      if (!s) { s = { el: el('i', { className: 'stud vgm new' }), at: '' }; this.vgmAt.set(m.id, s); this.vgmStuds.append(s.el); }
+      const d = Math.hypot(m.x - x, m.z - z), deg = Math.atan2(m.x - x, -(m.z - z)) * DEG;
+      const out = d > RANGE ? BAND_PX : (d / RANGE) * LAND_PX;
+      const at = `rotate(${deg.toFixed(1)}deg) translateY(-${out.toFixed(1)}px)`;
+      if (at !== s.at) { s.at = at; s.el.style.transform = at; }
     }
   }
 }
