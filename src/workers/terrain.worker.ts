@@ -7,6 +7,7 @@ import { guildHouses, guildSigns } from '../game/guilds';
 import type { Terrain } from '../world/terrain';
 import { openWorld } from '../vgm/builder';
 import { adoptTiles, type TracedTile } from '../world/hydro';
+import { waterMask, type MaskJob } from '../world/water';
 import { settingById } from '../setting/index';
 import { horizonMap, type HorizonSpec } from '../world/horizon';
 import { serve } from './serve';
@@ -20,8 +21,8 @@ import type { ScaledLayout } from '../world/dungeon/cellar';
 import { holdRockOnLand, type HoldRock } from '../world/holdRock';
 import { layOut, type SiteJob, type SiteLayout } from '../world/sites';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number; i0: number; j0: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: ScaledLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] } | { kind: 'tiles'; tiles: readonly TracedTile[] });
-export type TerrainResult = ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth | HoldRock | SiteLayout | OpenHouse | null;
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number; i0: number; j0: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: ScaledLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] } | { kind: 'tiles'; tiles: readonly TracedTile[] } | ({ kind: 'water' } & Omit<MaskJob, 'seed' | 'setting'>));
+export type TerrainResult = Float32Array | ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth | HoldRock | SiteLayout | OpenHouse | null;
 
 /** A town's buildings merged per cell, and its plan when asked for (a settlement founded while playing is planned here). */
 export interface TownMeshes { readonly cells: TownCellMesh[]; readonly plan: TownPlan | null }
@@ -37,6 +38,7 @@ serve<TerrainJob, TerrainResult>((job) => {
   // The rivers' and brooks' tiles the main thread traced: this worker opens the world on them instead of tracing them.
   if (job.kind === 'tiles') { adoptTiles(job.tiles); return { result: null, transfer: [] }; }
   if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = openWorld(job.seed, settingById(job.setting)).terrain;
+  if (job.kind === 'water') { const out = waterMask(terrain, job); return { result: out, transfer: [out.buffer] }; }
   if (job.kind === 'decisions') { terrain.settleMore(job.decisions); return { result: new Uint8Array(0), transfer: [] }; }
   if (job.kind === 'volumes') {
     const t = terrain;

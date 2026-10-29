@@ -95,6 +95,11 @@ export class TerrainJobs {
   private job<T>(job: DistributiveOmit<import('./terrain.worker').TerrainJob, 'seed' | 'setting'>): Promise<T> {
     return this.pool.run({ ...job, seed: this.seed, setting: this.setting } as import('./terrain.worker').TerrainJob) as Promise<T>;
   }
+  /** A water mask over a square (`res` samples a side): the terrain workers share the masks the world worker made alone. */
+  water(x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
+    return this.job<Float32Array>({ kind: 'water', x0, z0, size, res });
+  }
+
 
   chunk(x0: number, z0: number, size: number, segs: number): Promise<import('../world/chunkMesh').ChunkMesh> {
     return this.job({ kind: 'chunk', x0, z0, size, segs });
