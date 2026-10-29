@@ -11,7 +11,8 @@ import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
 const terrain = new Terrain(seed, classic, SMALL);
-const plants = floraPlacement(terrain, { seed, setting: classic.id, x0: -32000, z0: 32000, size: 128, spacing: NEAR_SPACING });
+// Broadleaf forest in open country (the downs round the old start have few trees).
+const plants = floraPlacement(terrain, { seed, setting: classic.id, x0: -32080, z0: 34720, size: 128, spacing: NEAR_SPACING });
 const all = Array.from({ length: plants.length / FLORA_STRIDE }, (_, k) => plants.subarray(k * FLORA_STRIDE, (k + 1) * FLORA_STRIDE));
 const trees = all.filter((p) => FLORA_KINDS[p[5]].trunk > 0);
 const shrubs = all.filter((p) => FLORA_KINDS[p[5]].trunk === 0);
@@ -24,7 +25,7 @@ test('trunks: every drawn tree has a trunk where it stands; shrubs and open grou
   for (const p of shrubs) if (!nearTree(p[0], p[2], 1.5)) assert.ok(!t.blocks(p[0], p[2], 0.3), 'a shrub blocks');
   let open = 0;
   for (let k = 0; k < 200; k++) {
-    const x = -32000 + (k % 20) * 6.3 + 1, z = 32000 + Math.floor(k / 20) * 12.1 + 1;
+    const x = -32080 + (k % 20) * 6.3 + 1, z = 34720 + Math.floor(k / 20) * 12.1 + 1;
     if (nearTree(x, z, 1.5)) continue;
     open++;
     assert.ok(!t.blocks(x, z, 0.32), `blocked in the open at ${x},${z}`);

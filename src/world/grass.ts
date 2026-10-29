@@ -5,7 +5,7 @@
  * position only, so masks agree where they overlap.
  */
 import { Noise, deriveSeed, lerp, smoothstep } from '@futuremagic/core';
-import { coverNoise, woodsAt } from './flora';
+import { coverNoise, thinnedWoods } from './flora';
 import type { MaskJob } from './water';
 import type { Terrain } from './terrain';
 import type { CropKind } from '@futuremagic/settlement';
@@ -52,18 +52,28 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
   const li0 = Math.floor(x0 / LATTICE), lj0 = Math.floor(z0 / LATTICE);
   const ln = Math.ceil(size / LATTICE) + 2;
   const lat = new Float32Array(ln * ln * 3);
+  const kinds = t.skeleton.kinds, wears = kinds.some((k) => k.wears);
   for (let j = 0; j < ln; j++) for (let i = 0; i < ln; i++) {
     const x = (li0 + i) * LATTICE, z = (lj0 + j) * LATTICE;
     const bi = t.biomeAt(x, z);
     const b = bi >= 0 ? biomes[bi] : undefined;
     const g = b?.grass;
     if (!g) continue;
-    // Thick woods shade the floor: grass thins there (more so the denser the trees).
-    const shade = b.flora ? woodsAt(cover, b.flora, x, z) * Math.min(1, b.flora.trees / 150) : 0;
+    // Thick woods shade the floor: grass thins there (more so the denser the trees); a bare kind of country has few.
+    const shade = b.flora ? thinnedWoods(t, cover, b.flora, x, z) * Math.min(1, b.flora.trees / 150) : 0;
     const k = (j * ln + i) * 3;
     lat[k] = g.cover * (1 - 0.5 * shade);
     lat[k + 1] = g.height * (1 - 0.3 * shade);
     lat[k + 2] = g.dry;
+    // A kind of country's own grass (downs' short turf, a moor's heather) over the biome's, by how much of it is here.
+    if (wears) {
+      const w = t.skeleton.kindWeights(x, z);
+      for (let q = 0; q < w.length; q++) {
+        const o = kinds[q].wears?.grass;
+        if (!o || w[q] <= 0) continue;
+        lat[k] = lerp(lat[k], o.cover, w[q]); lat[k + 1] = lerp(lat[k + 1], o.height, w[q]); lat[k + 2] = lerp(lat[k + 2], o.dry, w[q]);
+      }
+    }
   }
   const at = (x: number, z: number, c: number): number => {
     const fx = x / LATTICE - li0, fz = z / LATTICE - lj0;

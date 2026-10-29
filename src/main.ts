@@ -728,6 +728,9 @@ export async function start(b: Boot): Promise<void> {
     // `warden`: before the warden's tower, looking at its door and the warden at it.
     const wardenAt = params.warden ? retreats.sites[0] : undefined;
     if (wardenAt) { const [x, z] = onLand(wardenAt, 0, 12); player.teleport(x, undefined, z, wardenAt.yaw); }
+    // `kind=<id>`: out in the nearest stretch of that kind of country (L7), looking across it.
+    const inKind = params.kind ? terrain.skeleton.nearestKind(params.kind, player.walker.pos.x, player.walker.pos.z) : null;
+    if (inKind) player.teleport(inKind.x, undefined, inKind.z, 0);
     // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
     const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
     const lookForm = lookAt ? setting.dungeons[lookAt]?.form : undefined;

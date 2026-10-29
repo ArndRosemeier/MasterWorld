@@ -1,5 +1,5 @@
 /**
- * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves]` after `npm run build`,
+ * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves|kinds]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night, in rain and wet toward the afternoon sun, a cellar, a barrow, the wild, a fight, a fight with magic, a hurt traveller, a raided farm, the pack,
  * the map, the trade window, talk, a people's hold) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
@@ -8,10 +8,10 @@
  * then until no shader was built for 1.5 s (at most SET_SETTLE ms, default 4000). Per shot the index has the
  * frame time (median and 95th percentile over SET_MEASURE ms, default 2000, no frame cap), the shader summary
  * (F3), the page's errors and what was not drawn; it marks a shot over 16.7 ms or more than twice as slow as
- * the town at noon (F2). Three slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
+ * the town at noon (F2). Four slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
- * `--part=caves` is a cave's mouth in a cliff and its cavern (L6);
- * without `--part` all three run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
+ * `--part=caves` is a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
+ * without `--part` all four run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
  * Exits 1 when a page failed or a shot breaks F2 or F3 (what was still waiting to be drawn is noted).
  */
@@ -96,6 +96,21 @@ const SESSIONS = [
     }) },
   ] },
   { id: 'cellar', query: `${still}&hour=12&cellar=2`, shots: [{ name: 'cellar' }] },
+  // L7: out in each new kind of country (its nearest stretch from the start), at late morning: on foot, then
+  // from the free camera 120 m up and 200 m back, looking across it, so its shapes show.
+  ...['downs', 'moor', 'karst', 'badlands'].map((k) => ({ id: `kind-${k}`, query: `${still}&hour=10.5&weather=fair&kind=${k}`, shots: [
+    { name: `kind-${k}` },
+    { name: `kind-${k}-aloft`, act: async (p) => {
+      // (A page that never got ready fails its shot above; this one waits for the game rather than throwing.)
+      await p.waitForFunction(() => window.game?.player, null, { timeout: TIMEOUT });
+      await p.evaluate(() => {
+        const g = window.game, { x, z } = g.player.walker.pos;
+        g.player.flying = true;
+        g.player.goTo([x, g.terrain.height(x, z + 200) + 120, z + 200], [0, -14]); // yaw 0 looks north (-z), back at the hero
+      });
+      await p.waitForTimeout(2500);
+    } },
+  ] })),
   // L6: a cave's mouth in a cliff (D57), then inside, in the middle of its cavern (its highest room).
   { id: 'cave', query: `${still}&hour=11&weather=fair&cave`, shots: [
     { name: 'cave-mouth' },
@@ -189,7 +204,7 @@ const SESSIONS = [
 ];
 /** The sessions of each part (each part one run, under 5 min). */
 const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave']);
-const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : 'land');
+const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : 'land');
 
 /** Puts the hero at (u, v) of the hold's gate frame (out of the gate is +v), looking at (lu, lv). */
 function atHold(u, v, lu, lv) {
@@ -205,7 +220,7 @@ const root = args.find((a) => !a.startsWith('--')) ?? 'shots/set';
 // Both parts: each its own run (its own browser, its own time), one after the other.
 if (!part) {
   let bad = false;
-  for (const p of ['town', 'land', 'caves']) {
+  for (const p of ['town', 'land', 'caves', 'kinds']) {
     try { execFileSync(process.execPath, [fileURLToPath(import.meta.url), root, `--part=${p}`], { stdio: 'inherit' }); } catch { bad = true; }
   }
   process.exit(bad ? 1 : 0);
@@ -231,13 +246,19 @@ for (const s of sessions) {
   const errors = [];
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } }); // its own, as a player's first visit
   const page = await context.newPage();
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  // The page's last console lines, printed if it never gets ready (where its loading stopped).
+  const recent = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); recent.push(`${m.type()}: ${m.text()}`); if (recent.length > 40) recent.shift(); });
   page.on('pageerror', (e) => { failed = true; errors.push(`page error: ${e.message}`); console.error(`[page error] ${e.stack ?? e.message}`); });
   const started = Date.now();
   await page.goto(`${base}?${s.query}`);
   if (s.first) await s.first(page);
   const ready = await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT }).then(() => true, () => false);
-  if (!ready) { failed = true; errors.push('the page did not report ready'); }
+  if (!ready) {
+    failed = true; errors.push('the page did not report ready');
+    const stage = await page.evaluate(() => document.querySelector('#loading')?.textContent ?? '').catch(() => '(page gone)');
+    console.log(`${s.id}: NOT READY · loading screen: ${stage.trim().slice(0, 200)}\n  ${recent.join('\n  ')}`);
+  }
   const loadS = (Date.now() - started) / 1000;
   console.log(`${s.id}: ready in ${loadS.toFixed(1)} s`);
   await page.addStyleTag({ content: '#loading{display:none!important}#hud{visibility:hidden!important}' });

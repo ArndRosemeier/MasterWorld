@@ -29,9 +29,10 @@ const road = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'tr
 const pt = (k: number) => ({ x: road.pts[k * 3], y: road.pts[k * 3 + 1], z: road.pts[k * 3 + 2] });
 const n = road.pts.length / 3;
 // Points well inside the road (not at its ends, not in water), and the bare land's height beside them.
-// (Nor by a brook it bridges: there its bank is cut open under the deck, the bridges' test has those.)
+// (Nor by a brook it bridges: there its bank is cut open under the deck, the bridges' test has those. Nor where
+// it comes down a river's bank to a ford: the river cuts its channel through the road's shoulders by design.)
 const inner = Array.from({ length: n }, (_, k) => k).filter((k) => k > 6 && k < n - 6 && k % 5 === 0 && terrain.waterDepth(pt(k).x, pt(k).z) <= 0
-  && !inChannel(terrain.hydro.brookAt(pt(k).x, pt(k).z), 4));
+  && !inChannel(terrain.hydro.brookAt(pt(k).x, pt(k).z), 4) && !inChannel(terrain.hydro.riverAt(pt(k).x, pt(k).z, emptyWater()), 4));
 const bare = inner.map((k) => terrain.height(pt(k).x, pt(k).z));
 terrain.addRoad(road);
 
@@ -109,7 +110,7 @@ test('roads: every brook the track crosses has a bridge over its open channel', 
   assert.ok(bridges.length >= 1, 'it crosses a brook');
   const w = emptyWater();
   let wet = 0;
-  for (let k = 20; k + 20 < n; k++) for (let t = 0; t < 1; t += 0.25) {
+  for (let k = 0; k + 1 < n; k++) for (let t = 0; t < 1; t += 0.25) {
     const x = pt(k).x + (pt(k + 1).x - pt(k).x) * t, z = pt(k).z + (pt(k + 1).z - pt(k).z) * t;
     if (!inChannel(terrain.hydro.brookAt(x, z, w))) continue;
     wet++;

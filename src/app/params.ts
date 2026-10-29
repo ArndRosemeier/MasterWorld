@@ -83,6 +83,8 @@ export const params = {
   /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
   cave: q.has('cave'),
   tower: q.has('tower'),
+  /** Start out in the nearest stretch of a kind of country (`kind=downs`, moor, karst, badlands, mesa, open; L7). */
+  kind: q.get('kind'),
   /**
    * Start in the court of the first people's hold, facing its gate (`hold`); `hold=friend` (or another
    * tier: hated, unwelcome, stranger, honoured) sets the hero's standing with that people to it.

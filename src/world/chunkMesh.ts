@@ -96,15 +96,30 @@ const FOREST = SURFACES.indexOf('forest'), GRASS = SURFACES.indexOf('grass');
  * ground colour and its surface weights (one-hot, SURFACES order) at vertex `v` of `color` and `surface`.
  */
 export function groundLook(t: Terrain): (x: number, z: number, color: Float32Array, surface: Float32Array, v: number) => void {
-  const lin = t.biomes.map((b) => [srgbToLinear(((b.ground >> 16) & 255) / 255), srgbToLinear(((b.ground >> 8) & 255) / 255), srgbToLinear((b.ground & 255) / 255)]);
+  const linear = (c: number): number[] => [srgbToLinear(((c >> 16) & 255) / 255), srgbToLinear(((c >> 8) & 255) / 255), srgbToLinear((c & 255) / 255)];
+  const lin = t.biomes.map((b) => linear(b.ground));
   const surf = t.biomes.map((b) => SURFACES.indexOf(b.surface));
+  // The kinds of country that wear their own ground (downs' turf, badlands' clay), blended in by how much of each is here.
+  const kinds = t.skeleton.kinds, worn = kinds.map((k) => (k.wears ? { color: linear(k.wears.color), surface: SURFACES.indexOf(k.wears.surface) } : null));
+  const wears = worn.some((k) => k);
   return (x, z, color, surface, v) => {
     const b = clamp(t.biomeAt(x, z), 0, lin.length - 1), c = lin[b];
-    color[v * 3] = c[0]; color[v * 3 + 1] = c[1]; color[v * 3 + 2] = c[2];
-    surface.fill(0, v * 4, v * 4 + 4);
     // A settlement's ground is kept: grass, not the wood's floor, even where it was cleared from forest.
-    const kept = surf[b] === FOREST && t.townGround(x, z) !== TownGround.None;
-    surface[v * 4 + (kept ? GRASS : surf[b])] = 1;
+    const town = t.townGround(x, z) !== TownGround.None, kept = surf[b] === FOREST && town;
+    let left = 1, r = 0, g = 0, bl = 0;
+    surface.fill(0, v * 4, v * 4 + 4);
+    if (wears && !town && t.height(x, z) > 1.5) {
+      const w = t.skeleton.kindWeights(x, z);
+      for (let i = 0; i < w.length; i++) {
+        const k = worn[i];
+        if (!k || w[i] <= 0) continue;
+        r += w[i] * k.color[0]; g += w[i] * k.color[1]; bl += w[i] * k.color[2];
+        surface[v * 4 + k.surface] += w[i];
+        left -= w[i];
+      }
+    }
+    color[v * 3] = r + left * c[0]; color[v * 3 + 1] = g + left * c[1]; color[v * 3 + 2] = bl + left * c[2];
+    surface[v * 4 + (kept ? GRASS : surf[b])] += left;
   };
 }
 
