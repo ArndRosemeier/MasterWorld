@@ -48,9 +48,11 @@ test('house walk: the walker goes in at the door, up the stairs and stands on th
     w.place(foot.x, foot.z, foot.y);
     const [dx, dz] = (() => { const [x1, z1] = h.frame.toWorld(s.a + s.da, s.b + s.db), [x0, z0] = h.frame.toWorld(s.a, s.b); return [x1 - x0, z1 - z0]; })();
     const yaw = Math.atan2(-dx, -dz);
-    for (let i = 0; i < 120; i++) w.step({ forward: 1, strafe: 0, heading: yaw, walk: true, up: false, down: false }, 1 / 30);
+    // Up until standing on the floor above (a flight further up may start right at its top: not walked on into).
+    const up1 = b.floorY + plan.storeys[1].y;
+    for (let i = 0; i < 120 && !(h.storey(w.pos.y) === 1 && Math.abs(w.pos.y - up1) < 0.05); i++) w.step({ forward: 1, strafe: 0, heading: yaw, walk: true, up: false, down: false }, 1 / 30);
     assert.equal(h.storey(w.pos.y), 1, `${b.kind} #${b.id}: upstairs (feet ${(w.pos.y - b.floorY).toFixed(2)} m over the floor)`);
-    assert.ok(Math.abs(w.pos.y - (b.floorY + plan.storeys[1].y)) < 0.05, 'on the floor');
+    assert.ok(Math.abs(w.pos.y - up1) < 0.05, 'on the floor');
     climbed++;
   }
   assert.ok(climbed > 3);

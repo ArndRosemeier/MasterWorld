@@ -36,7 +36,8 @@ const inner = Array.from({ length: n }, (_, k) => k).filter((k) => k > 6 && k < 
   && !inChannel(terrain.hydro.brookAt(pt(k).x, pt(k).z), 4) && !inChannel(terrain.hydro.riverAt(pt(k).x, pt(k).z, emptyWater()), 4));
 const bare = inner.map((k) => terrain.height(pt(k).x, pt(k).z));
 // A track out to a spot 1.8 km south of the town, past a brook, for the bridges (the hamlet's track may cross none).
-const brookRoad = linkRoad(terrain, log.filter((d) => d.kind === 'road'), { id: 'ford', x: town.decision.x, z: town.decision.z + 1800, r: 20 }, 'track')!;
+// Its own id: laid with the hamlet track's (both are the log's first road), the net kept only the first.
+const brookRoad = { ...linkRoad(terrain, log.filter((d) => d.kind === 'road'), { id: 'ford', x: town.decision.x, z: town.decision.z + 1800, r: 20 }, 'track')!, id: 'road-ford' };
 const bp = (k: number) => ({ x: brookRoad.pts[k * 3], y: brookRoad.pts[k * 3 + 1], z: brookRoad.pts[k * 3 + 2] });
 const bn = brookRoad.pts.length / 3;
 terrain.addRoad(road);
@@ -104,10 +105,12 @@ test('roads: the mask holds the distances the shader draws from; roads replay fr
   const far = roadMask(terrain.roads, { seed, setting: classic.id, x0: p.x + 300, z0: p.z + 300, size: 4, res: 1 });
   assert.deepEqual([...far], [ROAD_REACH, 0, ROAD_REACH, 0]);
   // Settling the log with the road in it lays the same road (workers and loaded games), and laying it twice changes nothing.
+  const laid = terrain.roads.roads.length;
   terrain.settleMore([road, ...log]);
-  assert.equal(terrain.roads.roads.length, 1);
+  assert.equal(terrain.roads.roads.length, laid);
   const q = pt(inner[8]), h = terrain.height(q.x, q.z);
-  terrain.settle([...log, road]);
+  // (The brook's track, laid with addRoad above, is settled again too: the bridge tests below stand on it.)
+  terrain.settle([...log, road, brookRoad]);
   assert.equal(terrain.height(q.x, q.z), h);
 });
 
