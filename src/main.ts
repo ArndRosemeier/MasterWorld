@@ -61,6 +61,7 @@ import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
+import { OwnerComes } from './app/ownerComes';
 import { burntBarns, criesDue, situationOf, smokesAt } from './vgm/situations';
 import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
@@ -639,6 +640,10 @@ export async function start(b: Boot): Promise<void> {
     const house = firstPromise ? houseOf(firstPromise, terrain.towns) : null;
     /** A place gone quiet with the hero away from it: its household waits to be told (set once the town talks). */
     let quietPlace: ((id: string) => boolean) | null = null;
+    /** A cellar gone quiet with the hero down in it: its household comes down to them (set once the town talks). */
+    let comeDown: ((id: string) => boolean) | null = null;
+    /** Who of a cellar's household came down to the hero (app/ownerComes.ts), while they are there. */
+    let owner: OwnerComes | null = null;
     // What the fights (down in a cellar, out on the land) ask of the game.
     const fightHost: FightHost = {
       get bindings() { return settings.current.bindings; },
@@ -667,6 +672,7 @@ export async function start(b: Boot): Promise<void> {
       still: (on) => paused(on),
       armed: armHero,
       quiet: (id) => quietPlace?.(id) ?? false,
+      stilled: (id) => comeDown?.(id) ?? false,
     };
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
@@ -927,6 +933,38 @@ export async function start(b: Boot): Promise<void> {
       vgmStep({ tools: ['promise'] });
       if (questGift(setting, log, id, character)) learnedAbility();
     };
+    /**
+     * The household of promise `id` (in town `t`) knows its place is safe again, told in talk or come down to see: they
+     * pay (a master's deed, C14, pays in their gift, not coin), the promise is kept, and the VGM's next lead may come up in
+     * the same breath. What they say in thanks.
+     */
+    const paidFor = (id: string, t: Township): string => {
+      const due = cellars.keep(id);
+      const deed = questGuild(setting, log, id);
+      const coins = deed ? 0 : due?.coins ?? 0;
+      character.coins += coins;
+      if (coins) sounds?.cue({ kind: 'paid', coins });
+      character.earn(`cleared:${id}`, 'cleared');
+      keptNow(id, t);
+      return deed?.quest ? deed.quest.done : due ? due.thanks(coinText(coins)) : '';
+    };
+    // A cellar gone quiet with the hero down in it (show, don't tell): the one of its household the hero would report to
+    // climbs down the ladder, comes to the hero and thanks and pays them there.
+    comeDown = (id) => {
+      const v = visit(), t = townOfPromise(id);
+      if (!v?.above || owner || !t?.living || t.talk.isSettled(id)) return false;
+      const to = t.talk.reportTo(id)[0], a = t.life.agents.find((x) => x.person.id === to);
+      if (!a) return false;
+      owner = new OwnerComes(v, a, {
+        body: () => folk?.bodyOf(a) ?? null,
+        say: (text, at) => speech.say(text, at),
+        told: () => {
+          t.talk.thanked(a.person.id, id);
+          return paidFor(id, t);
+        },
+      });
+      return true;
+    };
     // Who knows the hero from before (plan 11.4): people of the town the game began in; their greeting names them.
     const friendsOf = (bg: BackgroundDef | undefined) => (bg && startTown ? acquaintances(bg, startTown.residents) : []);
     const meetOldFriends = () => {
@@ -980,16 +1018,8 @@ export async function start(b: Boot): Promise<void> {
       heardOf: (id, from) => learnEvent(id, from),
       serve: (id, a) => services.get(id)?.(a),
       report: (id, a) => {
-        // The household hears it is safe again: they pay, the promise is kept, and the VGM's next lead may come up in the same breath.
-        const due = cellars.keep(id);
-        // A master's deed (C14) pays in their gift, not coin.
-        const deed = questGuild(setting, log, id);
-        const coins = deed ? 0 : due?.coins ?? 0;
-        character.coins += coins;
-        if (coins) sounds?.cue({ kind: 'paid', coins });
         const t = talk!.place;
-        keptNow(id, t);
-        return t.talk.toldSafe(a.person.id, id, deed?.quest ? deed.quest.done : due ? due.thanks(coinText(coins)) : '');
+        return t.talk.toldSafe(a.person.id, id, paidFor(id, t));
       },
       get roomPeople() { return rooms?.inside ? rooms.people() : null; },
     }) : null;
@@ -1487,7 +1517,7 @@ export async function start(b: Boot): Promise<void> {
       places: placesFor(seedText, home),
       spots,
       seed: seedText,
-      game: { player, view, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
@@ -1953,7 +1983,15 @@ export async function start(b: Boot): Promise<void> {
       }
       // The people in the building drawn open (seen through its door and windows too).
       part('folk');
-      if (folk) folk.indoors = rooms && !visit() ? rooms.people() : null;
+      // Below, only whoever of the household came down to the hero (nobody else is in the frame).
+      if (owner && (owner.done || visit() !== owner.visit)) owner = null;
+      if (owner) owner.step(dt, player.walker.pos);
+      const ownerAt = owner?.placed() ?? null;
+      if (folk) {
+        folk.only = !!visit();
+        folk.indoors = visit() ? (ownerAt ? [ownerAt] : null) : rooms ? rooms.people() : null;
+        if (!above && ownerAt) folk.follow(dt, view.camera);
+      }
       if (above) {
         // Until the game begins, the people round the hero's place are dressed (the title's fly-over is far up).
         if (folk) folk.focus = title?.holding || !window.__mwReady ? player.walker.pos : null;

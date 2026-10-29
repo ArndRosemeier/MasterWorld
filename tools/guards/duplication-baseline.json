@@ -590,5 +590,53 @@
   {
     "key": "same name: masterworld/game/recipe.ts#check + masterworld/setting/contract.ts#check",
     "reason": "Different questions under a common verb: the recipe runner asks whether an ability can be used now; the setting's validation checks a table's numbers."
+  },
+  {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/app/searchKneel.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/app/spellFx/particles.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/game/visitor.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/lab/spellLab.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/creatures.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/livestock.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/game/visitor.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/particles.ts#step + masterworld/game/visitor.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/lab/spellLab.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/creatures.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/livestock.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   }
 ]
