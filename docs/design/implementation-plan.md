@@ -150,10 +150,13 @@ Goal: all water (lakes, rivers, brooks) comes after the land is finished and fol
 | W1 ✓ | **Measure the fit** (`npm run water:fit`): how deep brooks and rivers cut below the dry land, how many are raised above it, how many lakes leak | The numbers for four seeds, round the start and the nearest lake |
 | W2 ✓ | **The land drains**: hollows of the finished big land are filled or breached as water would (breaching is cheaper), and drainage reads the land with those floors; brooks run on the ground they cross, not on a 250 m cell's blend | Raised brooks fewer at every place measured (16 → 10 %, 25 → 9 %, 11 → 4 % …); tests green |
 | W3 ✓ | **Lakes from the finished land**: a lake only where a fine flood of the finished land finds a basin, its level its spill point, the outflow leaving at that level, rivers through it capped at its level | `water:fit`: no lake leaks, no lake above its rim; the vj4985 lake fixed in a GPU shot |
-| W4 | **Courses on the valley floor**: rivers and brooks keep to the lowest line of the land they cross; cuts shrink | `water:fit`: median cut under 5 m, raised under 3 % |
+| W4 ✓ | **Fixes on the way** (MW #315-#317): a brook's level reads its own sediment floors; a lake's raised rim slopes away instead of a flat terrace; shore foam only near the shore | Gate W shots: no raised water, no visible trench, no foam band. The cut target was not met: brooks run on 250 m cells that cross the land's small ridges (median cut 10-20 m on three of four seeds) |
+| W4b | **Valleys in the land** (Arnd, 2026-10-29: "carve valleys into the land first"): before any water, the land drains at the brooks' scale. A drainage on a fine grid (125 m or finer) of the finished big land; every hollow it cannot keep as a lake is breached along its way out, and along every way that drains a catchment a valley is carved, its floor and sides sized by the area drained (no steeper than about one in three). The valleys are part of the land itself, so towns, roads and landforms see them. | Tests: every way's floor falls downstream; valley sides no steeper than the limit; a brook tile is built in at most 0.8 s |
+| W4c | **Brooks in their valleys**: brook courses are those ways, smoothed into curves, their level the valley floor | `water:fit` against the finished land: brook median cut under 2 m, raised under 3 %; the brook tests hold (curves, fords, ends in water) |
+| W4d | **Rivers in their valleys**: the same at the rivers' scale, where a river crosses a ridge its cells did not see | `water:fit`: river median cut under 5 m |
 | W5 | **The world after**: start towns, places and tests checked on the moved water; the loop check passes | Tests and `npm run loop` green |
 
-Gate W: GPU shots of the vj4985 lake, a river into and out of a lake, and brooks in the start valley; `water:fit` holds W3 and W4; the review.
+Gate W: GPU shots of the vj4985 lake, a river into and out of a lake, and brooks in the start valley, seen as valleys; `water:fit` holds W3 and W4b-W4d; the loop check passes; the review.
 
 ### Phase D: Seas (milestone 7)
 
