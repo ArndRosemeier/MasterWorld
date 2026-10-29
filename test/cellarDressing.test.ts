@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Rng } from '@futuremagic/core';
 import { DIRS } from '@futuremagic/dungeon';
 import { classic } from '../src/setting/classic/index';
-import { CELL, DOOR_W, STOREY, blocksDoor, outlineCellar, propsClash, type Cellar } from '../src/world/dungeon/cellar';
+import { BUILT, DOOR_W, blocksDoor, outlineCellar, propsClash, type Cellar } from '../src/world/dungeon/cellar';
 import { DOOR_H, fallStones } from '../src/world/dungeon/cellarMesh';
 import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import type { DungeonTemplate } from '../src/world/decisions';
@@ -16,11 +16,11 @@ const places: { where: string; c: Cellar }[] = KINDS.flatMap((t) => Array.from({
 
 test('cellar dressing: every prop stands on its room floor, clear of every doorway (the way out, if it must, beside one)', () => {
   for (const { where, c } of places) for (const p of c.props) {
-    const R = c.layout.rooms[p.room];
+    const R = c.layout.rooms[p.room], { cell: CELL, storey: STOREY } = c.layout.scale;
     assert.equal(p.y, R.level * STOREY, `${where}: ${p.kind} off the floor`);
     for (const d of c.layout.links.flatMap((pl) => pl.doors)) {
       if (d.room !== p.room || d.level !== R.level || p.kind === 'puddle' || p === c.hatch) continue;
-      assert.ok(!blocksDoor(p, d), `${where}: ${p.kind} in front of a door of room ${p.room}`);
+      assert.ok(!blocksDoor(p, d, c.layout.scale, c.form.space.carved), `${where}: ${p.kind} in front of a door of room ${p.room}`);
       // The walking lane through the door, measured on its own: no prop's middle in it.
       const [dx, dz] = DIRS[d.dir], mx = (d.x + 0.5 + dx * 0.5) * CELL, mz = (d.z + 0.5 + dz * 0.5) * CELL;
       const along = Math.abs((p.x - mx) * -dz + (p.z - mz) * dx), into = -((p.x - mx) * dx + (p.z - mz) * dz);
@@ -41,7 +41,7 @@ test('cellar dressing: no two props stand in each other, and every clue lies som
 
 test('cellar dressing: a fallen way is a heap up to the lintel, every stone on the floor or on a stone below', () => {
   for (let s = 0; s < 50; s++) {
-    const rng = new Rng(s), yaw = rng.range(0, 6.28), ux = Math.cos(yaw), uz = Math.sin(yaw), y = rng.int(-1, 0) * STOREY;
+    const rng = new Rng(s), yaw = rng.range(0, 6.28), ux = Math.cos(yaw), uz = Math.sin(yaw), y = rng.int(-1, 0) * BUILT.storey;
     const st = fallStones(rng, rng.range(-20, 20), y, rng.range(-20, 20), ux, uz, -uz, ux);
     let top = -Infinity;
     for (const a of st) {

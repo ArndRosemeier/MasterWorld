@@ -287,6 +287,17 @@ export interface DungeonSpace {
   readonly scale?: DungeonScale;
   /** Half extent of the layout grid, cells (a tower stands on a small foot). */
   readonly radius: number;
+  /** Cells across a room of each size class, fewest and most (none: a cellar's, 2 to 5). */
+  readonly rooms?: Readonly<Record<'nook' | 'small' | 'medium' | 'large', readonly [number, number]>>;
+  /**
+   * How the ways run (none: short and straight, as people dig them): free cells between a room and the one
+   * it is reached from (fewest, most), what a turn costs (cells), the longest way (cells), how long all the
+   * ways are together at least (metres), and how many storeys a room may lie up or down from where the graph
+   * put it (the ways climb and drop to it).
+   */
+  readonly ways?: { readonly gap: readonly [number, number]; readonly turn: number; readonly longest: number; readonly least: number; readonly rise?: number };
+  /** One room rises into a cavern: this many storeys high, this many cells across (fewest, most). */
+  readonly cavern?: { readonly height: number; readonly size: readonly [number, number] };
   /** Most rooms in all. */
   readonly maxRooms: number;
   /** Deepest storey the graph may reach: without an older layer below, and with one. */

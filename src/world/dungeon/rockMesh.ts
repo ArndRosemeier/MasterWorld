@@ -25,6 +25,59 @@ export interface Field {
   readonly d: Float32Array;
 }
 
+/** Samples per side of a brick of a `BrickField`. */
+export const BRICK = 16;
+
+/**
+ * Signed distances on a grid kept in bricks of BRICK³ samples, only where there is anything (a big cave's
+ * chambers and ways in a box of solid rock): a missing brick is solid rock throughout.
+ */
+export interface BrickField extends Omit<Field, 'd'> {
+  /** Bricks per axis. */
+  readonly bx: number;
+  readonly by: number;
+  readonly bz: number;
+  /** By brick (x fastest, then y, then z); within one, x fastest, then y, then z. Null: solid rock. */
+  readonly bricks: (Float32Array | null)[];
+}
+
+/** A field, dense or in bricks. */
+export type AnyField = Field | BrickField;
+
+/** An empty field in bricks over nx·ny·nz samples (all solid rock). */
+export function brickField(ox: number, oy: number, oz: number, step: number, nx: number, ny: number, nz: number): BrickField {
+  const bx = Math.ceil(nx / BRICK), by = Math.ceil(ny / BRICK), bz = Math.ceil(nz / BRICK);
+  return { ox, oy, oz, step, nx, ny, nz, bx, by, bz, bricks: new Array<Float32Array | null>(bx * by * bz).fill(null) };
+}
+
+/** Set a sample of a field in bricks (its brick is made when first needed). */
+export function setSample(f: BrickField, i: number, j: number, k: number, v: number): void {
+  const b = ((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0));
+  let brick = f.bricks[b];
+  if (!brick) {
+    if (v === -1) return;
+    brick = f.bricks[b] = new Float32Array(BRICK * BRICK * BRICK).fill(-1);
+  }
+  brick[(i % BRICK) + BRICK * ((j % BRICK) + BRICK * (k % BRICK))] = v;
+}
+
+/** A sample of a field (inside its grid). */
+export function sampleOf(f: AnyField, i: number, j: number, k: number): number {
+  if ('d' in f) return f.d[i + f.nx * (j + f.ny * k)];
+  const brick = f.bricks[((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0))];
+  return brick ? brick[(i % BRICK) + BRICK * ((j % BRICK) + BRICK * (k % BRICK))] : -1;
+}
+
+/** Does a field in bricks hold anything but solid rock over samples i0..i1, j0..j1, k0..k1 (dense fields: yes)? */
+function anyIn(f: AnyField, i0: number, j0: number, k0: number, i1: number, j1: number, k1: number): boolean {
+  if ('d' in f) return true;
+  const b = (v: number, n: number) => Math.max(0, Math.min(n - 1, Math.floor(v / BRICK)));
+  for (let z = b(k0, f.bz); z <= b(k1, f.bz); z++) for (let y = b(j0, f.by); y <= b(j1, f.by); y++) for (let x = b(i0, f.bx); x <= b(i1, f.bx); x++) {
+    if (f.bricks[x + f.bx * (y + f.by * z)]) return true;
+  }
+  return false;
+}
+
 /** What the rock looks like where: a triangle's material (null: leave it out) by its middle and how much it faces up; a vertex's tint. */
 export interface RockLook {
   mat(x: number, y: number, z: number, up: number): number | null;
@@ -34,15 +87,16 @@ export interface RockLook {
 /** Cells per side of the cubes the field is meshed in. */
 const CHUNK = 32;
 
-export function meshField(f: Field, look: RockLook): BuildingMesh {
+export function meshField(f: AnyField, look: RockLook): BuildingMesh {
   const n = CHUNK + 2 * PAD + 1;
   const sample = new Float32Array(n * n * n);
   const pos: number[] = [], nor: number[] = [], uv: number[] = [], mat: number[] = [], tint: number[] = [], idx: number[] = [];
   for (let cz = 0; cz < f.nz - 1; cz += CHUNK) for (let cy = 0; cy < f.ny - 1; cy += CHUNK) for (let cx = 0; cx < f.nx - 1; cx += CHUNK) {
+    if (!anyIn(f, cx - PAD, cy - PAD, cz - PAD, cx + n - PAD, cy + n - PAD, cz + n - PAD)) continue;
     let air = false, rock = false;
     for (let k = 0; k < n; k++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const gi = cx + i - PAD, gj = cy + j - PAD, gk = cz + k - PAD;
-      const v = gi < 0 || gj < 0 || gk < 0 || gi >= f.nx || gj >= f.ny || gk >= f.nz ? -1 : f.d[gi + f.nx * (gj + f.ny * gk)];
+      const v = gi < 0 || gj < 0 || gk < 0 || gi >= f.nx || gj >= f.ny || gk >= f.nz ? -1 : sampleOf(f, gi, gj, gk);
       sample[i + n * (j + n * k)] = v;
       if (v > 0) air = true; else rock = true;
     }
@@ -86,12 +140,12 @@ export function meshField(f: Field, look: RockLook): BuildingMesh {
 }
 
 /** The field at a point (trilinear); `outside` beyond it. */
-export function fieldAt(f: Field, x: number, y: number, z: number, outside = -1): number {
+export function fieldAt(f: AnyField, x: number, y: number, z: number, outside = -1): number {
   const u = (x - f.ox) / f.step, v = (y - f.oy) / f.step, w = (z - f.oz) / f.step;
   const i = Math.floor(u), j = Math.floor(v), k = Math.floor(w);
   if (i < 0 || j < 0 || k < 0 || i >= f.nx - 1 || j >= f.ny - 1 || k >= f.nz - 1) return outside;
-  const a = u - i, b = v - j, c = w - k, { nx, ny, d } = f;
-  const at = (p: number, q: number, r: number) => d[p + nx * (q + ny * r)];
+  const a = u - i, b = v - j, c = w - k;
+  const at = (p: number, q: number, r: number) => sampleOf(f, p, q, r);
   return lerp(
     lerp(lerp(at(i, j, k), at(i + 1, j, k), a), lerp(at(i, j + 1, k), at(i + 1, j + 1, k), a), b),
     lerp(lerp(at(i, j, k + 1), at(i + 1, j, k + 1), a), lerp(at(i, j + 1, k + 1), at(i + 1, j + 1, k + 1), a), b),

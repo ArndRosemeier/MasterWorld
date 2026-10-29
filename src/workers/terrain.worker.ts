@@ -51,7 +51,7 @@ serve<TerrainJob, TerrainResult>((job) => {
   }
   if (job.kind === 'caveRock') {
     const field = caveField(job.layout, job.cave), shell = caveShell(field, job.layout, job.cave);
-    return { result: { field, shell }, transfer: [field.d.buffer, ...meshBuffers(shell)] };
+    return { result: { field, shell }, transfer: [...field.bricks.flatMap((b) => (b ? [b.buffer as ArrayBuffer] : [])), ...meshBuffers(shell)] };
   }
   if (job.kind === 'caveMouth') {
     const t = terrain, mouth = mouthOnLand((x, z) => t.height(x, z), job.site, job.cave);

@@ -17,7 +17,7 @@ export class DungeonNav {
 
   /** The standing cell of (i, j) on storey l: a room's floor, a stair's top, a passage itself. */
   cell(i: number, j: number, l: number): NavCell | null {
-    const g = this.space.grid, o = g.owner(i, j, l);
+    const g = this.space.grid, o = this.space.own(i, j, l);
     if (o === undefined) return null;
     if (o >= 0) return { i, j, l: this.space.layout.rooms[o].level };
     const st = g.stairs.get(`${i},${j},${l}`);
@@ -32,7 +32,7 @@ export class DungeonNav {
 
   /** Room id of a cell, or −1 in a passage. */
   roomOf(c: NavCell): number {
-    const o = this.space.grid.owner(c.i, c.j, c.l);
+    const o = this.space.own(c.i, c.j, c.l);
     return o !== undefined && o >= 0 ? o : -1;
   }
 

@@ -262,19 +262,55 @@ export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: Cel
     if (walk.needsSecret || !walk.shortcut || new Set(walk.route).size < 3) continue;
     // A tower whose rooms could not all be kept within a flight of each other does not fit its foot: the next.
     if (shape.rise && !climb(graph, walk, shape.rise, minLevel < 0 && !!layerOf(sketch, 'older'))) continue;
-    const scale = scaleOf(shape);
+    const scale = scaleOf(shape), sizes = shape.rooms ?? SIZE;
+    if (shape.ways?.rise) wander(graph, shape.ways.rise, minLevel, new Rng(deriveSeed(seed, 'wander')));
+    const cavern = shape.cavern ? cavernOf(graph, walk, new Rng(deriveSeed(seed, 'cavern'))) : -1;
+    if (cavern >= 0) graph.rooms[cavern].height = shape.cavern!.height;
     const laid = layoutDungeon(graph, seed, {
       entrance: { x: -(ew >> 1), z: -(ed >> 1), w: ew, d: ed },
       radius: shape.radius,
       stairRun: scale.stairRun,
-      maxPath: shape.rise ? 8 : 6,
+      maxPath: shape.ways?.longest ?? (shape.rise ? 8 : 6),
       attempts: 6,
-      size: (room, r) => { const [lo, hi] = SIZE[room.size]; return [r.int(lo, hi), r.int(lo, hi)]; },
+      ...(shape.ways ? { gap: shape.ways.gap, turn: shape.ways.turn } : {}),
+      size: (room, r) => {
+        const [lo, hi] = room.id === cavern ? shape.cavern!.size : sizes[room.size];
+        return [r.int(lo, hi), r.int(lo, hi)];
+      },
     });
     if (!laid) continue;
+    // A natural cave's ways run long between its chambers: too short a cave is the next try's.
+    if (shape.ways && waysLength(laid) * scale.cell < shape.ways.least) continue;
     return furnish(sketch, graph, { ...laid, scale }, link.id, new Rng(deriveSeed(seed, 'furnish')), lore);
   }
   throw new Error(`cellar ${d.id}: no layout fits`);
+}
+
+/**
+ * A natural cave's chambers lie up and down the rock (the water found its own way): each room but the
+ * entrance moves up to `rise` storeys from where the graph put it, never below `deepest`; rooms a drop or a
+ * grate joins keep theirs (a drop falls onto a ledge one storey down).
+ */
+function wander(graph: DungeonGraph, rise: number, deepest: number, rng: Rng): void {
+  const fixed = new Set(graph.links.filter((l) => l.kind === 'drop' || l.kind === 'grate').flatMap((l) => [l.a, l.b]));
+  for (const r of graph.rooms) {
+    if (r.id === graph.entrance || fixed.has(r.id)) continue;
+    r.level = Math.max(deepest, r.level + rng.int(-rise, rise));
+  }
+}
+
+/** How many cells the ways of a layout run in all. */
+export const waysLength = (l: DungeonLayout): number => l.links.reduce((n, pl) => n + pl.path.length, 0);
+
+/**
+ * The room that rises into the cave's great cavern: the lair at the end more often, else the room where the
+ * goal is first seen (a hall one looks down into), else the tensest room on the way that is not the entrance.
+ */
+function cavernOf(graph: DungeonGraph, walk: Pace, rng: Rng): number {
+  if (walk.reveal >= 0 && walk.reveal !== graph.entrance && rng.chance(0.4)) return walk.reveal;
+  if (rng.chance(0.75)) return graph.goal;
+  const on = walk.route.filter((r) => r !== graph.entrance && r !== graph.goal);
+  return on.length ? on.reduce((a, b) => (walk.tension[b] > walk.tension[a] ? b : a)) : graph.goal;
 }
 
 /**

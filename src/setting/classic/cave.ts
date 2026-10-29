@@ -12,7 +12,13 @@ export const cave: CellarLore = {
   // Water and rock: a storey below always (the water went down), the way up to the mouth a rock step with a ladder.
   form: {
     stands: 'slope', ring: [700, 1600], called: 'the cave {dir} of the town', word: 'cave', purposes: ['lead', 'den', 'hideout'], shell: 'mouth', clearing: { back: 6, r: 17 },
-    space: { ...CELLAR_SPACE, maxRooms: 12, depth: [-1, -1], inset: 0.95, entrance: [3, 3], carved: true, torches: false, arriveMid: true },
+    // Natural caves are big (D57): 3 m cells, 4 m storeys, ramps of rock between them, chambers far apart along
+    // long winding ways, and one great cavern six storeys (24 m) high.
+    space: {
+      ...CELLAR_SPACE, scale: { cell: 3, storey: 4, stairRun: 3, passage: 3.4 }, radius: 40, maxRooms: 13, depth: [-2, -2], inset: 1.25, entrance: [3, 3],
+      rooms: { nook: [2, 3], small: [3, 4], medium: [4, 5], large: [5, 7] }, ways: { gap: [3, 6], turn: 0.3, longest: 20, least: 220, rise: 1 }, cavern: { height: 6, size: [7, 10] },
+      carved: true, torches: false, arriveMid: true,
+    },
   },
   words: {
     quiet: 'Nothing stirs in {place} now. The household who told you of it will want to hear.',
