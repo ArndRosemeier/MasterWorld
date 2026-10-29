@@ -22,6 +22,8 @@ import type { Lake } from './lakes';
  * How far out from a town's middle the landforms are eased away (its farms and outlying houses stand on calm
  * ground; the planner places them before it knows of any landform), metres.
  */
+/** How far (m) from a brook a dell keeps above its water (`Hydrology.brookFloor`). */
+const DELL_REACH = 120;
 const formsOut = (radius: number): number => radius * 2.5 + 130;
 
 export class Terrain {
@@ -42,7 +44,7 @@ export class Terrain {
     this.detail = new Noise(deriveSeed(seed, 'terrain', 'detail'));
     this.hydro = new Hydrology(this.skeleton, hydro, brooks);
     this.biomes = setting.world.biomes;
-    this.landforms = new Landforms(seed, setting.world, this.skeleton, (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookAt(x, z, this.wetProbe).river);
+    this.landforms = new Landforms(seed, setting.world, this.skeleton, (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookFloor(x, z, DELL_REACH) < Infinity);
   }
 
   /** The towns' grounds hold no landforms (a town levels its ground). */
@@ -307,6 +309,8 @@ export class Terrain {
       let shaped = Math.max(Math.min(level, 1), level + this.landforms.offset(x, z) * forms);
       // By a brook they dig no lower than its water (a gully runs down into it, a dell beside it stays dry).
       if (bk?.river && bk.dist < bk.valley && shaped < level) shaped = Math.max(shaped, Math.min(level, bk.level + 0.6 + (bk.dist - bk.half) * 0.04));
+      // Nor, past its valley, a dell beside it lower than its water (it left the brook on a bank above the dell).
+      else if (bk && shaped < level) shaped = Math.max(shaped, Math.min(level, this.hydro.brookFloor(x, z, DELL_REACH, -Infinity)));
       level = shaped;
     }
     if (calm > 0) {
