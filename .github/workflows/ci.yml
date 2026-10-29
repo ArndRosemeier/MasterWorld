@@ -45,6 +45,8 @@ jobs:
         run: node tools/guards/budget.mjs 30 300 -- npm run variety
       - name: The evening loop
         run: node tools/guards/budget.mjs 60 300 -- npm run loop
+      - name: A landform every minute of walking (gate L)
+        run: node tools/guards/budget.mjs 30 300 -- npm run walk:landforms
 
   build:
     name: Build and WebGL 2 texture units

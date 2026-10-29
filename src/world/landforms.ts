@@ -19,6 +19,8 @@ import type { Skeleton } from './skeleton';
 export const FORM_CELL = 256;
 /** Steepest skeleton slope a landform is placed on (cliffs and terraces have their own shape). */
 const MAX_SLOPE = 0.35;
+/** Spots tried in its quarter for a landform before it is left out. */
+const SPOT_TRIES = 4;
 /** Steepest ground a dell keeps a pond on. */
 const POND_SLOPE = 0.08;
 
@@ -223,19 +225,32 @@ export class Landforms {
       const def = rng.weighted(defs, (d) => mix.mix[d.id] ?? 0);
       // Spread over the cell's quarters in turn, so no stretch of a walk goes long without one.
       const q = (k + start) % 4;
-      const x = (i + ((q & 1) + rng.float()) / 2) * FORM_CELL, z = (j + ((q >> 1) + rng.float()) / 2) * FORM_CELL;
+      let x = (i + ((q & 1) + rng.float()) / 2) * FORM_CELL, z = (j + ((q >> 1) + rng.float()) / 2) * FORM_CELL;
       const size = rng.range(def.size[0], def.size[1]), width = def.width ? rng.range(def.width[0], def.width[1]) : size;
       const H = rng.range(def.height[0], def.height[1]), turn = rng.float() * Math.PI * 2, roll = rng.float(), fseed = rng.nextU32();
-      // Not on the beach, not on a cliff, not in a town.
-      const e = sk.elevation(x, z), shore = sk.lastShore, wallU = sk.lastMesa.u, wallTall = sk.lastMesa.tall;
-      if (e < 4 || shore < 250) continue;
-      const gx = (sk.elevation(x + 20, z) - e) / 20, gz = (sk.elevation(x, z + 20) - e) / 20, slope = Math.hypot(gx, gz);
-      if (slope > MAX_SLOPE) continue;
       const L = Math.min(size / 2, FORM_CELL * 0.98), W = Math.min(width / 2, L);
       const reach = Math.min(FORM_CELL * 0.98, reachOf(def.shape, L, W));
-      // Not across a mesa's wall (from its talus to back from its crest).
-      if (wallU > -reach - 30 && wallU < reach + wallTall * 0.8 + 40) continue;
-      if (this.free.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + reach * 0.5)) continue;
+      // Where its first spot will not take it (by a wall's foot, a steep slope), a few more in its quarter, from a
+      // stream of their own (the landforms that took their first spot stay as they were): gate L, a landform
+      // every minute of a walk.
+      const again = new Rng(hash2i(fseed, i, j));
+      let e = 0, shore = 0, gx = 0, gz = 0, slope = 0, ok = false;
+      for (let tries = 0; tries < SPOT_TRIES && !ok; tries++) {
+        if (tries) { x = (i + ((q & 1) + again.float()) / 2) * FORM_CELL; z = (j + ((q >> 1) + again.float()) / 2) * FORM_CELL; }
+        // Not on the beach, not on a cliff, not in a town.
+        e = sk.elevation(x, z); shore = sk.lastShore;
+        const wallU = sk.lastMesa.u, wallTall = sk.lastMesa.tall;
+        if (e < 4 || shore < 250) continue;
+        gx = (sk.elevation(x + 20, z) - e) / 20; gz = (sk.elevation(x, z + 20) - e) / 20; slope = Math.hypot(gx, gz);
+        if (slope > MAX_SLOPE) continue;
+        // Not across a mesa's wall (from its talus to back from its crest). The first spot keeps clear of the
+        // wall's whole band (a bench up it, the step above); the others look round their own ground instead, so
+        // the plateau tops and valley floors near a wall get theirs too.
+        if (tries === 0 ? wallU > -reach - 30 && wallU < reach + wallTall * 0.8 + 40 : !this.wallFree(x, z, e, reach + 30)) continue;
+        if (this.free.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + reach * 0.5)) continue;
+        ok = true;
+      }
+      if (!ok) continue;
       // Gullies, ravines and dry valleys run downhill; the rest lie any way.
       const downhill = (def.shape === 'gully' || def.shape === 'ravine' || def.shape === 'dryValley') && slope > 1e-3;
       const ax = downhill ? -gx / slope : Math.cos(turn), az = downhill ? -gz / slope : Math.sin(turn);
@@ -246,6 +261,14 @@ export class Landforms {
       forms.push({ def, shape: def.shape, x, z, ax, az, L, W, H, reach, seed: fseed, pond });
     }
     return { forms, relief: mix.relief };
+  }
+
+  /** Whether the skeleton's land round (x, z) out to `r` metres keeps within a landform's slope of `e`: no wall in it. */
+  private wallFree(x: number, z: number, e: number, r: number): boolean {
+    for (let a = 0; a < 8; a++) {
+      if (Math.abs(this.skeleton.elevation(x + Math.cos((a * Math.PI) / 4) * r, z + Math.sin((a * Math.PI) / 4) * r) - e) > MAX_SLOPE * r) return false;
+    }
+    return true;
   }
 
   /**
