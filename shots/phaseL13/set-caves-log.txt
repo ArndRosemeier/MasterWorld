@@ -1,0 +1,4 @@
+cave: ready in 24.6 s
+13-cave-mouth.jpg: drawn 0.1 s · settled 4.0 s · p50 10.4 ms · p95 19.8 ms · 0 shader violations
+14-cave-cavern.jpg: drawn 0.1 s · settled 3.6 s · p50 4.3 ms · p95 9.6 ms · 0 shader violations
+caves: 2 shots in shots\phaseL13\set\2026-10-29-b98f798 (39 s)
