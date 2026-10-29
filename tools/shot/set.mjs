@@ -148,7 +148,15 @@ const SESSIONS = [
   ] },
   // L6: a cave's mouth in a cliff (D57), then inside, in the middle of its cavern (its highest room).
   { id: 'cave', query: `${still}&hour=11&weather=fair&cave`, shots: [
-    { name: 'cave-mouth' },
+    // The mouth from 16 m, turned round it to the first stand with no tree between.
+    { name: 'cave-mouth', act: (p) => p.evaluate(() => {
+      const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === 'cave'), s = d?.site;
+      if (!s) return;
+      for (const turn of [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05]) {
+        const a = s.yaw + turn, x = s.x + Math.sin(a) * 16, z = s.z + Math.cos(a) * 16;
+        if ([0.15, 0.4, 0.65, 0.9].every((q) => !g.trunks.blocks(s.x + (x - s.x) * q, s.z + (z - s.z) * q, 2.5))) { g.player.teleport(x, undefined, z, a); g.player.heroCam.pitch = 0.08; return; }
+      }
+    }) },
     { name: 'cave-cavern', act: async (p) => {
       await p.evaluate(async () => {
         const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === 'cave');
@@ -156,6 +164,15 @@ const SESSIONS = [
         if (!v) throw new Error('no cave to go into');
         const rooms = v.cellar.graph.rooms, top = rooms.reduce((a, r) => (r.height > a.height ? r : a), rooms[0]);
         await v.enter(true, top.id);
+        // Its size seen: the free camera low in a corner, looking across at the far side and up into its roof,
+        // the hero small in its middle.
+        const r = v.cellar.layout.rooms[top.id], { cell, storey } = v.cellar.layout.scale, O = v.origin;
+        const x0 = O.x + r.x * cell, x1 = O.x + (r.x + r.w) * cell, z0 = O.z + r.z * cell, z1 = O.z + (r.z + r.d) * cell, floor = O.y + r.level * storey;
+        const ix = Math.max(3, (x1 - x0) * 0.16), iz = Math.max(3, (z1 - z0) * 0.16);
+        const cx = x0 + ix, cz = z0 + iz, cy = floor + 1.6, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, my = floor + top.height * storey * 0.38;
+        const pl = g.player, dx = mx - cx, dz = mz - cz;
+        pl.flying = true;
+        pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(my - cy, Math.hypot(dx, dz)) * 180) / Math.PI]);
       });
       await p.waitForTimeout(1500);
     } },

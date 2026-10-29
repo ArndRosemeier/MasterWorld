@@ -179,20 +179,27 @@ export class CaveSpace extends DungeonSpace {
 
 /** The rock as it is (grey with a little ochre), and silt on the floors. */
 const ROCK: Tint = [168, 160, 148], SILT: Tint = [150, 132, 110];
+/** Silt so thin that the rock's grey shows through. */
+const BARE: Tint = [128, 126, 122];
 
 /** The cave's rock as one mesh in the building format (its own frame). */
 export function caveShell(f: CaveField, layout: ScaledLayout, seed: number): BuildingMesh {
   const space = new DungeonSpace(layout, true);
   const noise = new Noise(deriveSeed(seed, 'cave', 'tint'));
   return meshField(f, {
-    // Level floors gather silt in patches; the rest is bare rock.
-    mat: (x, _y, z, up) => (up > 0.8 && noise.fbm3(x / 3.5, 0.5, z / 3.5, 2) > -0.15 ? CellarMat.Earth : WildMat.Rock),
+    // Level floors are silt, the rest bare rock. The silt's patches are in its tint, which blends smoothly from
+    // vertex to vertex: a material chosen per triangle by a patch noise left saw-tooth edges along the mesh grid.
+    mat: (_x, _y, _z, up) => (up > 0.8 ? CellarMat.Earth : WildMat.Rock),
     tint: (x, y, z, m) => {
       // Damp darkens the foot of the walls, the beds of the rock run in bands, and some stretches are darker.
       const floor = Math.max(0, space.parts(x, y + 0.05, z, 3).floor);
       const band = 0.9 + 0.1 * Math.sin(y * 1.7 + noise.fbm3(x / 6, y / 6, z / 6, 2) * 3);
       const s = (0.62 + 0.38 * smoothstep(0, 0.9, floor)) * band * (0.85 + 0.3 * (noise.fbm3(x / 5, y / 5, z / 5, 2) * 0.5 + 0.5));
-      return scaleTint(m === WildMat.Rock ? ROCK : SILT, s);
+      if (m === WildMat.Rock) return scaleTint(ROCK, s);
+      // Thin silt shows the grey of the rock under it; thick patches are brown.
+      const thick = smoothstep(-0.45, 0.15, noise.fbm3(x / 3.5, 0.5, z / 3.5, 2));
+      const mix = (i: number) => SILT[i] + (BARE[i] - SILT[i]) * (1 - thick);
+      return scaleTint([mix(0), mix(1), mix(2)], s);
     },
   });
 }
