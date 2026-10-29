@@ -688,9 +688,11 @@ export class HydroTile {
     for (let k = 0; k <= last; k++) {
       xz.push(cx[k], cz[k]); hw.push(chw[k]);
       // A brook lies in the ground where it runs (its cells are too coarse for the dips between them): the land at the
-      // point itself, not the cells' blend, which stands metres above a dip between them (a brook on a bank, W2).
+      // point itself, not the cells' blend, which stands metres above a dip between them (a brook on a bank, W2);
+      // raised by this tile's own sediment floors, as the land is (else the bottom of a filled hollow, tens of metres
+      // down, held the brook's level down all the way after it: a trench, W4).
       if (!this.feed || k === last) { lv.push(cl[k]); continue; }
-      gr.push(this.feed.ground(cx[k], cz[k]));
+      gr.push(this.onFloors(cx[k], cz[k], this.feed.ground(cx[k], cz[k])));
       // Low by the sea, the land's small relief (terrain.ts, down to 0.5 m) dips below a brook's ground: it runs
       // at the sea's height there, so its banks stay dry.
       const bl = Math.min(cl[k], gr[k] - 0.2);
