@@ -148,7 +148,16 @@ const SESSIONS = [
   ] },
   // L6: a cave's mouth in a cliff (D57), then inside, in the middle of its cavern (its highest room).
   { id: 'cave', query: `${still}&hour=11&weather=fair&cave`, shots: [
-    { name: 'cave-mouth' },
+    // The mouth from 16 m, turned round it to the first stand with no tree between; the camera a little to the
+    // hero's side, so the hero does not stand in front of the mouth.
+    { name: 'cave-mouth', act: (p) => p.evaluate(() => {
+      const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === 'cave'), s = d?.site;
+      if (!s) return;
+      for (const turn of [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05]) {
+        const a = s.yaw + turn, x = s.x + Math.sin(a) * 16, z = s.z + Math.cos(a) * 16;
+        if ([0.15, 0.4, 0.65, 0.9].every((q) => !g.trunks.blocks(s.x + (x - s.x) * q, s.z + (z - s.z) * q, 2.5))) { g.player.teleport(x, undefined, z, a); g.player.heroCam.yaw = a + 0.3; g.player.heroCam.pitch = 0.08; return; }
+      }
+    }) },
     { name: 'cave-cavern', act: async (p) => {
       await p.evaluate(async () => {
         const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === 'cave');
@@ -156,7 +165,20 @@ const SESSIONS = [
         if (!v) throw new Error('no cave to go into');
         const rooms = v.cellar.graph.rooms, top = rooms.reduce((a, r) => (r.height > a.height ? r : a), rooms[0]);
         await v.enter(true, top.id);
-      });
+        // Its size seen: the free camera 12 m up over one end of the cavern (a quarter of its length in), looking down
+        // along it past the hero: the floor runs away to the far wall, the side walls rise at both edges, the hero
+        // small in the middle (low views, even 30° up from a corner, see only the dome's rock: its walls lean in).
+        const r = v.cellar.layout.rooms[top.id], { cell, storey } = v.cellar.layout.scale, O = v.view.origin, pl = g.player;
+        const x0 = O.x + r.x * cell, z0 = O.z + r.z * cell, W = r.w * cell, D = r.d * cell, floor = O.y + r.level * storey;
+        const along = W >= D, ux = along ? 1 : 0, uz = along ? 0 : 1, L = along ? W : D;
+        const mx = x0 + W / 2, mz = z0 + D / 2;
+        const cx = mx - ux * L * 0.25, cz = mz - uz * L * 0.25, cy = floor + 12;
+        const tx = mx + ux * 4, tz = mz + uz * 4, dx = tx - cx, dz = tz - cz;
+        pl.walker.yaw = Math.atan2(-ux, -uz);
+        pl.flying = true;
+        pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(floor - cy, Math.hypot(dx, dz)) * 180) / Math.PI]);
+        return `cavern: ${W} × ${D} m, ${top.height * storey} m high; camera 12 m up, ${(L * 0.25).toFixed(1)} m back from its middle`;
+      }).then((said) => console.log(said));
       await p.waitForTimeout(1500);
     } },
   ] },

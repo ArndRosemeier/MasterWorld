@@ -41,7 +41,12 @@ export class TerrainView {
     return !this.swapping && this.wanted.every((k) => this.shown.has(chunkId(k)));
   }
 
-  update(camera: Camera): void {
+  /** Ask for the chunks the view wants without showing them yet (the start, before the land's shader is warm). */
+  prefetch(camera: Camera): void {
+    this.update(camera, false);
+  }
+
+  update(camera: Camera, show = true): void {
     const p = camera.position;
     if (Math.hypot(p.x - this.last.x, p.z - this.last.z) > MOVE || Math.abs(p.y - this.last.y) > MOVE) {
       this.last = { x: p.x, z: p.z, y: p.y };
@@ -56,7 +61,7 @@ export class TerrainView {
       if (this.built.has(id) || this.building.has(id)) continue;
       this.request(k);
     }
-    if (!this.swapping && this.wanted.every((k) => this.built.has(chunkId(k))) && this.wanted.some((k) => !this.shown.has(chunkId(k)))) void this.swap();
+    if (show && !this.swapping && this.wanted.every((k) => this.built.has(chunkId(k))) && this.wanted.some((k) => !this.shown.has(chunkId(k)))) void this.swap();
   }
 
   /** Build everything the view wants and show it (behind the loading screen). */

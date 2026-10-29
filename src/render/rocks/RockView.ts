@@ -49,9 +49,12 @@ export class RockView {
     ORIGIN.pin(this.draws.group);
   }
 
-  /** Placements for the start, before the first frame. */
+  /**
+   * Placements for the start, before the first frame: only the cells next to the camera's (to some 400 m), so
+   * the world workers are free for the land; the rest are asked for by the first frames.
+   */
   async placeStart(cam: Vector3): Promise<void> {
-    this.cells.askAround(cam.x, cam.z);
+    this.cells.askAround(cam.x, cam.z, 1);
     await until(() => this.cells.allHere);
     this.setRecords();
   }

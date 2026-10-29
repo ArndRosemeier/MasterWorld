@@ -34,8 +34,8 @@ export class CameraCells {
   }
 
   /** Ask for the missing cells round (x, z); forget those well out of reach (kept a little, so walking back and forth costs nothing). */
-  askAround(x: number, z: number): void {
-    const [ci, cj] = this.cellOf(x, z), R = this.reach;
+  askAround(x: number, z: number, R = this.reach): void {
+    const [ci, cj] = this.cellOf(x, z);
     for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) {
       const i = ci + di, j = cj + dj, key = `${i},${j}`;
       if (this.cells.has(key)) continue;

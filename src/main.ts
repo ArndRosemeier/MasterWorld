@@ -352,6 +352,7 @@ export async function start(b: Boot): Promise<void> {
         useTownMasks(start);
       }
       texPool.dispose();
+      console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: ground textures made`);
     })();
 
     const wx = new WeatherView(weather, (x, z) => terrain.height(x, z));
@@ -391,6 +392,11 @@ export async function start(b: Boot): Promise<void> {
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
+    // The land round the camera is asked for early (after the roads, which the workers hear of first), so its
+    // chunks build while the hero and the town load; it is shown once its shader is warm.
+    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
+    // (Once the ground's textures are made: their workers come first, as the warm-up waits for them.)
+    void painted.then(() => ground.prefetch(view.camera));
     // Every town: the start's, and the hamlets and villages founded out on the land (plan B3), all alike (B3a).
     // A town's words are tied into the game (how its people take the hero, what they offer) once the game's
     // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.
@@ -407,7 +413,8 @@ export async function start(b: Boot): Promise<void> {
     const sea = new WaterView(jobs);
     water = sea;
     // The seas' masks come from the world worker while the hero is made here.
-    const seas = sea.prime(view.camera.position);
+    // Only the near one now (the hero's water); the wide ones are asked for once the woods and rocks are placed.
+    const seas = sea.prime(view.camera.position, 1);
     loading.set('Dressing the hero');
     // In the look the player made (a save's), or a new hero of the setting drawn from the seed.
     const hero = await HeroView.load(view.stage, view.renderer, setting.hero, save?.looks?.look ?? null, seed);
@@ -572,7 +579,6 @@ export async function start(b: Boot): Promise<void> {
     const folkWarm = folk ? await folk.warmObjects() : [];
     await painted;
     // The land, its rock and the town's houses are built in workers meanwhile; their shaders compile with the rest.
-    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
     roadWork.rebuilds({ ground, flora, grass, trunks, rocks, rockView });
     await roadWork.mask.start(view.camera.position);
     const rock = Promise.all([new VolumeView(view.stage, terrainJobs).raise(), rockView.raise()]);
@@ -591,6 +597,7 @@ export async function start(b: Boot): Promise<void> {
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
     if (chosen) hurry();
     loading.set('Raising the land');
+    await sea.prime(view.camera.position);
     await landReady;
     await rock;
     await raised;

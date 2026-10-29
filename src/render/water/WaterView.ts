@@ -90,9 +90,12 @@ export class WaterView {
     return w !== null && w.depth > 0 && p.y < w.level - 0.05;
   }
 
-  /** Masks for the start, before the first frame. */
-  async prime(cam: Vector3): Promise<void> {
-    await Promise.all(this.masks.map((m) => m.start(cam)));
+  /**
+   * Masks for the start, before the first frame: the finest `n` (default all). The start asks for the near one
+   * first, so the world worker places the woods and rocks before it bakes the wide ones.
+   */
+  async prime(cam: Vector3, n = this.masks.length): Promise<void> {
+    await Promise.all(this.masks.slice(0, n).map((m) => m.start(cam)));
   }
 
   /** `gain`: the multiplier the scene's lights carry on the sky's light rig (SkyView.gain). */
