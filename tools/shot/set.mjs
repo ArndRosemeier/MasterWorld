@@ -101,6 +101,8 @@ const SESSIONS = [
   ...['downs', 'moor', 'karst', 'badlands'].map((k) => ({ id: `kind-${k}`, query: `${still}&hour=10.5&weather=fair&kind=${k}`, shots: [
     { name: `kind-${k}` },
     { name: `kind-${k}-aloft`, act: async (p) => {
+      // (A page that never got ready fails its shot above; this one waits for the game rather than throwing.)
+      await p.waitForFunction(() => window.game?.player, null, { timeout: TIMEOUT });
       await p.evaluate(() => {
         const g = window.game, { x, z } = g.player.walker.pos;
         g.player.flying = true;
