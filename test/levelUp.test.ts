@@ -40,6 +40,6 @@ test('level up: the ring rises from the feet above the head in brass and is gone
     if (r) heights.push(r.y);
   }
   assert.equal(ring.on, false, 'over by itself');
-  assert.ok(heights[0]! < feet[1] + 0.3 && Math.max(...heights) > feet[1] + 2, `rises from ${heights[0]} to ${Math.max(...heights)}`);
+  assert.ok(heights[0]! < feet[1] + 0.3 && Math.max(...heights) > feet[1] + 1.3, `rises from ${heights[0]} to ${Math.max(...heights)}`);
   for (let i = 1; i < heights.length; i++) assert.ok(heights[i]! >= heights[i - 1]! - 1e-9, 'only up');
 });

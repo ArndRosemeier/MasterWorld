@@ -23,6 +23,9 @@ const THREAT: Record<Threat, string> = { trivial: '#9c9a94', easy: '#6fdc7a', ev
 const THREAT_WORD: Record<Threat, string> = { trivial: 'no match for you', easy: 'weaker than you', even: 'a fair fight', hard: 'stronger than you', deadly: 'far beyond you' };
 const STATE: Partial<Record<Creature['state'], string>> = { alert: 'wary', fight: 'fighting', flee: 'fleeing', beg: 'begging', meek: 'cowed', dead: 'dead' };
 
+/** How long (ms) the gauges stay shown after a level gained out of a fight, its seal engraved. */
+const CHEER_SHOWN = 4500;
+
 export class FightHud {
   private readonly root = el('div', { id: 'fight', className: 'hidden' });
   private readonly vials: Record<'health' | 'stamina' | 'mana', { box: HTMLElement; liquid: HTMLElement; text: HTMLElement; was: number }>;
@@ -57,7 +60,10 @@ export class FightHud {
     document.body.append(this.root);
   }
 
-  set shown(on: boolean) { this.root.classList.toggle('hidden', !on); }
+  /** Shown (a fight, a wound; and for a while after a level gained, so its seal is seen engraved: G3). */
+  set shown(on: boolean) { this.root.classList.toggle('hidden', !on && performance.now() >= this.cheerUntil); }
+  /** Until when (ms) a level gained keeps the gauges shown. */
+  private cheerUntil = 0;
 
   /** Every frame without a fight: only the gauges (no target, nothing to search). */
   calm(hero: Character): void {
@@ -137,7 +143,7 @@ export class FightHud {
     const l = hero.level, f = towardNext(this.setting.growth, hero.xp);
     if (l !== this.shownLevel) {
       // A level gained (not the first showing): the new number is engraved into the seal as the ring rises (G3).
-      if (this.shownLevel > 0 && l > this.shownLevel) { this.seal.classList.remove('engrave'); void this.seal.offsetWidth; this.seal.classList.add('engrave'); }
+      if (this.shownLevel > 0 && l > this.shownLevel) { this.seal.classList.remove('engrave'); void this.seal.offsetWidth; this.seal.classList.add('engrave'); this.cheerUntil = performance.now() + CHEER_SHOWN; this.shown = true; }
       this.seal.textContent = String(l);
       this.shownLevel = l;
     }

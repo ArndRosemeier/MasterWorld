@@ -10,12 +10,12 @@ import type { SpellBits, Vec3 } from './particles';
 /** How long it plays (s). */
 export const RING_TIME = 2.4;
 /** Brass, glowing (linear, over 1). */
-const BRASS: Vec3 = [2.6, 1.7, 0.6];
-const WHITE_BRASS: Vec3 = [4, 3.2, 1.8];
+const BRASS: Vec3 = [2.5, 1.4, 0.35];
+const WHITE_BRASS: Vec3 = [3.6, 2.4, 0.9];
 const UP: Vec3 = [0, 1, 0];
-/** The ring's radius on the ground (m) and how high it rises. */
-const RADIUS = 1.25;
-const RISE = 2.3;
+/** The ring's radius on the ground (m) and how high it rises: to the hero's chest and head, a halo, not a cage. */
+const RADIUS = 0.95;
+const RISE = 1.5;
 /** The brass lines standing round the ring. */
 const LINES = 20;
 
@@ -31,7 +31,7 @@ export class LevelRing {
   kindle(b: SpellBits, feet: Vec3): void {
     this.age = 0;
     // The first flare: a burst of brass sparks off the ground.
-    b.burst({ sprite: 'spark', life: [0.5, 0.9], size: [0.06, 0.02], spread: RADIUS, ring: true, speed: [0.3, 1], up: [1.5, 3], drag: 1.2, color: WHITE_BRASS, to: BRASS, stretch: 0.04 }, 36, [feet[0], feet[1] + 0.05, feet[2]]);
+    b.burst({ sprite: 'spark', life: [0.6, 1.1], size: [0.1, 0.03], spread: RADIUS, ring: true, speed: [0.3, 1], up: [1.5, 3], drag: 1.2, color: k(WHITE_BRASS, 1.6), to: BRASS, stretch: 0.06 }, 60, [feet[0], feet[1] + 0.05, feet[2]]);
   }
 
   /** Every frame while it plays: drawn round `feet`. */
@@ -61,6 +61,6 @@ export class LevelRing {
       }
     }
     // Sparks drift up off the ring.
-    b.emit({ sprite: 'spark', life: [0.4, 0.8], size: [0.04, 0.015], spread: r, ring: true, speed: [0, 0.2], up: [0.6, 1.4], drag: 0.8, color: WHITE_BRASS, to: BRASS, stretch: 0.03 }, 60 * fade, dt, at);
+    b.emit({ sprite: 'spark', life: [0.5, 1], size: [0.09, 0.03], spread: r, ring: true, speed: [0, 0.3], up: [0.7, 1.6], drag: 0.8, color: k(WHITE_BRASS, 1.6), to: BRASS, stretch: 0.05 }, 110 * fade, dt, at);
   }
 }

@@ -219,6 +219,8 @@ const SESSIONS = [
       await p.waitForFunction(() => window.game.spellView.entered, null, { timeout: TIMEOUT });
       await p.evaluate(() => { const g = window.game, h = g.character; h.gain(g.setting.growth.xp[h.level] - h.xp); });
       await p.waitForFunction(() => window.game.spellView.ringing, null, { timeout: 20000 });
+      // The hands raised to the light held (the clip stays at its end) while the set settles and measures.
+      await p.evaluate(() => { const pl = window.game.player, a = pl.stance.action; if (a) pl.stance = { ...pl.stance, action: { ...a, dur: 120 } }; });
       await p.waitForTimeout(900);
       // Held still while the set waits for the shaders and measures (the last shot of its page): else it is gone.
       await p.evaluate(() => { window.game.spellView.frozen = true; });
