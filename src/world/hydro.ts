@@ -497,8 +497,12 @@ export class HydroTile {
         if (E[c] <= E[floor]) break;
         path.push(c);
       }
+      // A way out through a lake would lower the lake's water: such a hollow is filled (it lies by the lake, lower
+      // than its water; breached, a brook ran up out of it through the lake's wall).
+      const { feed } = this, mid = (c: number): [number, number] => { const i = c % n; return [this.x0 + (i + 0.5) * cell, this.z0 + ((c - i) / n + 0.5) * cell]; };
+      const throughLake = path.some((c) => !Number.isNaN(lake[c]) || (feed !== null && !Number.isNaN(feed.lake(...mid(c)))));
       let best = spill, cost = Infinity;
-      for (let t = 0; t <= HOLLOW_TRIES; t++) {
+      for (let t = throughLake ? HOLLOW_TRIES : 0; t <= HOLLOW_TRIES; t++) {
         const level = lerp(E[floor], spill, t / HOLLOW_TRIES);
         let fill = 0, cut = 0;
         for (const c of members) fill += Math.max(0, level - E[c]);
