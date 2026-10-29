@@ -207,6 +207,23 @@ export class Terrain {
   }
 
   /**
+   * A mesa wall with holds at (x, z) (D56: a stretch of broken rock, cracks and ledges): the way into it, as a
+   * unit vector (reused: read it before the next call); null where the rock is sheer or there is no wall.
+   */
+  climbable(x: number, z: number): { readonly nx: number; readonly nz: number } | null {
+    const sk = this.skeleton;
+    if (sk.mesaWeight(x, z) < 0.5) return null;
+    sk.mesaRise(x, z);
+    const m = sk.lastMesa;
+    if (m.climb < 0.5 || m.u < -5) return null;
+    this.grip.nx = m.nx;
+    this.grip.nz = m.nz;
+    return this.grip;
+  }
+
+  private readonly grip = { nx: 0, nz: 0 };
+
+  /**
    * The solid ground near a volume as a signed distance (positive in air): its rock blended into the
    * height field, as it is meshed. Null away from every volume (the height field alone holds there).
    */

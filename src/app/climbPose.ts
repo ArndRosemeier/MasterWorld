@@ -1,0 +1,57 @@
+/**
+ * The hero seen climbing rock (D56, rule 11): hand over hand up, down and along a face while the walker is
+ * on it (game/walker.ts, mode `climb`), and the pull-up over its top (`pull`). The holds are
+ * @futuremagic/figure's ladder rungs laid on the face, leaning back with it; the body is its puppet.
+ */
+import { LadderClimb, type Climber, type Ladder } from '@futuremagic/figure';
+import type { Walker } from '../game/walker';
+import type { HeroPuppet } from '../render/hero/HeroView';
+
+/** Where the holds are: the face is this far in front of the walker's body (game/walker.ts OFF_FACE). */
+const FACE = 0.35;
+/** The most a face leans back, metres in per metre up: with the hands over the head (reach) the holds must stay near the body, so the face is taken as near sheer. */
+const MAX_LEAN = 0.1;
+
+export class ClimbPose {
+  private readonly climb = new LadderClimb();
+  private pulling = false;
+  private lastY = 0;
+  // Rock is climbed with the hands over the head (on a ladder they take the rungs at the chest).
+  private readonly face: Ladder = { x: 0, z: 0, nx: 0, nz: 1, lo: 0, hi: 0, floor: 0, halfWidth: 0.3, rim: false, reach: 1.9, hang: 0.2 };
+
+  constructor(private readonly height: (x: number, z: number) => number) {}
+
+  /** This frame's pose for a walker on a face (and where the body goes), or null when it is not on one. */
+  onFace(w: Walker, body: Climber, dt: number): { readonly puppet: HeroPuppet; readonly pos: { x: number; y: number; z: number }; readonly yaw: number } | null {
+    const F = w.face, p = w.pos;
+    if (w.mode === 'climb') {
+      this.pulling = false;
+      // The face at the feet, and how far it leans back (a metre up it is that much further in).
+      const fx = p.x + F.nx * FACE, fz = p.z + F.nz * FACE;
+      // (Measured on the face over the body's own height: just under the feet the ground at its foot may
+      // still be gentle, which would lay the holds far back and out of the hands' reach.)
+      const rise = Math.max(...[0, 0.5, 1].map((d) => this.height(fx + F.nx * (d + 0.5), fz + F.nz * (d + 0.5)) - this.height(fx + F.nx * (d - 0.5), fz + F.nz * (d - 0.5))));
+      const lean = rise > 1 / MAX_LEAN ? 1 / rise : MAX_LEAN, h = p.y - F.from;
+      const l = this.face;
+      l.nx = F.nx; l.nz = F.nz;
+      // The rungs' line at the climb's foot, so the face leans through the feet now.
+      l.x = fx - F.nx * lean * h; l.z = fz - F.nz * lean * h;
+      l.lean = lean; l.floor = l.lo = F.from; l.hi = p.y + 3;
+      this.climb.cling(l, h, p.y >= this.lastY - 1e-4, body);
+      this.lastY = p.y;
+      return { puppet: this.climb, pos: this.climb.pos, yaw: this.climb.yaw };
+    }
+    if (w.mode === 'pull') {
+      const q = w.pull;
+      if (!this.pulling) {
+        this.pulling = true;
+        const ex = q.x0 + F.nx * FACE, ez = q.z0 + F.nz * FACE;
+        this.climb.play([{ kind: 'ledge', ledge: { x: ex, z: ez, nx: F.nx, nz: F.nz, floor: q.y1 }, feet: q.y0 }], q.x0, q.y0, q.z0, w.yaw, body);
+      }
+      this.climb.advance(dt);
+      if (this.climb.active) return { puppet: this.climb, pos: this.climb.pos, yaw: this.climb.yaw };
+    }
+    this.pulling = false;
+    return null;
+  }
+}

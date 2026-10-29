@@ -107,7 +107,7 @@ import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
 import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved, townSaves, type SaveData } from './app/saveGame';
 import { release } from './app/release';
-import { Character } from './game/character';
+import { CLIMB_COST, Character, fallHurt } from './game/character';
 import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
 import { bardTells, GuildBook, isGuild, questGift, whereOf } from './game/guilds';
@@ -278,6 +278,8 @@ export async function start(b: Boot): Promise<void> {
       sightSurface: (x, y, z) => { const b = below(); return b?.sightSurface ? b.sightSurface(x, y, z) : surfaceAt(x, y, z, !!rooms?.inside); },
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
+      // Rock faces with holds (D56): out of doors only.
+      climbable: (x, z) => (below() ? null : terrain.climbable(x, z)),
       // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
       wall: (x, z, r, y) => {
         const b = below();
@@ -427,6 +429,10 @@ export async function start(b: Boot): Promise<void> {
     let heroName = save?.looks?.name ?? '';
     // The hero's sheet (skills, health, gear, purse) and what they hold.
     const character = new Character(setting, save?.character ?? undefined);
+    player.walker.tire = (dt, effort) => {
+      character.stamina = Math.max(0, character.stamina - dt * (CLIMB_COST.hang + (CLIMB_COST.move - CLIMB_COST.hang) * effort));
+      return character.stamina > 0;
+    };
     // `wear`: the gear starts worn, the main hand most (for looking at the smith's bench).
     if (params.wear) Object.entries(character.worn).forEach(([slot, it], i) => { if (it) character.worn[slot as keyof typeof character.worn] = { ...it, wear: params.wear * Math.max(0.3, 1 - i * 0.25) }; });
     // How each people stands with the hero (plan 11.6): their own kin start higher.
@@ -1799,6 +1805,13 @@ export async function start(b: Boot): Promise<void> {
         }
         part('encounters+spells');
         speech.hover(dt);
+        // A climb spends strength, and a fall hurts (a lethal one leaves the hero at the last of their health).
+        character.climbing = player.walker.mode === 'climb';
+        if (player.walker.fell > 0) {
+          const hurt = fallHurt(player.walker.fell);
+          player.walker.fell = 0;
+          if (hurt > 0 && character.alive) { character.health = Math.max(1, character.health - hurt); fightHud.hurt(); }
+        }
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
         const lead = leading();
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });

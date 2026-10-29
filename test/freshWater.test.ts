@@ -28,8 +28,11 @@ test('fresh water: the start town stands by a river (D50), on dry ground, not fa
 
 test('fresh water: the edge distance is negative in a river, Infinity where none is in reach; the sea does not count', () => {
   const tile = terrain.hydro.tileAt(town.x, town.z);
-  const r = tile.rivers.find((v) => v.half[0] > 3 && v.level[0] > 5)!;
-  assert.ok(freshWaterEdge(terrain, r.xz[0], r.xz[1], 50) < 0, 'in the river');
+  // A river whose middle lies in the tile's own core (its margin's rivers are the next tile's to answer for).
+  const mid = (v: (typeof tile.rivers)[number]) => v.level.length >> 1;
+  const r = tile.rivers.find((v) => v.half[0] > 3 && v.level[0] > 5 && terrain.hydro.tileAt(v.xz[mid(v) * 2], v.xz[mid(v) * 2 + 1]) === tile)!;
+  const k = mid(r);
+  assert.ok(freshWaterEdge(terrain, r.xz[k * 2], r.xz[k * 2 + 1], 50) < 0, 'in the river');
   // Out at sea, far from any river mouth.
   assert.ok(terrain.height(-36000, 26000) < 0, 'at sea');
   assert.equal(freshWaterEdge(terrain, -36000, 26000, 100), Infinity);

@@ -61,8 +61,9 @@ test('landforms: none in a town; the town and its market keep their ground', () 
 test('landforms: a pond lies in its dell, below the rim all round', () => {
   const t = new Terrain(seed, classic, SMALL);
   const ponds = [];
-  for (let k = 0; k < 30 && ponds.length < 4; k++) {
-    for (const f of t.landforms.within(START.x + 2000 * (k % 6), START.z - 2000 * Math.floor(k / 6), 1000)) if (!Number.isNaN(f.pond)) ponds.push(f);
+  // Round the start (mesa country holds few dells; open country more).
+  for (let k = 0; k < 64 && ponds.length < 4; k++) {
+    for (const f of t.landforms.within(START.x + 2000 * ((k % 8) - 4), START.z + 2000 * (Math.floor(k / 8) - 4), 1000)) if (!Number.isNaN(f.pond)) ponds.push(f);
   }
   assert.ok(ponds.length >= 2, `${ponds.length} ponds`);
   for (const f of ponds) {

@@ -36,6 +36,7 @@
     "check:units": "node tools/units/check.mjs",
     "shot:spellfx": "node tools/shot/spellfx.mjs",
     "shot:hatch": "node tools/shot/hatch.mjs",
+    "shot:climb": "node tools/shot/climb.mjs",
     "shot:doors": "node tools/shot/doors.mjs",
     "shot:search": "node tools/shot/search.mjs",
     "shot:ways": "node tools/shot/ways.mjs",

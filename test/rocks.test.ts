@@ -5,7 +5,7 @@ import { rockModel } from '@futuremagic/rocks';
 import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
 import { FORM_CELL } from '../src/world/landforms';
-import { ROCK_STRIDE, Rocks, STEP_OVER, obstaclesOf, rockKinds, rockPlacement } from '../src/world/rocks';
+import { ROCK_STRIDE, Rocks, STEP_OVER, obstaclesOf, rockKinds, rockPlacement, talusOf } from '../src/world/rocks';
 import { Walker } from '../src/game/walker';
 import { SMALL } from './small';
 
@@ -61,4 +61,26 @@ test('rocks: the walker goes round a boulder, not through it', () => {
     w.step({ forward: 1, strafe: 0, heading: Math.atan2(-1, 0), walk: true, up: false, down: false }, 1 / 60);
     assert.ok(Math.hypot(w.pos.x - bx, w.pos.z - bz) > br * 0.9, `inside the rock at step ${k}`);
   }
+});
+
+test('rocks: blocks fallen from a mesa wall lie on its talus', () => {
+  // Along a line across mesa country: the wall feet it crosses, and the blocks in their cells.
+  const sk = terrain.skeleton;
+  let feet = 0, blocks = 0, onTalus = 0;
+  for (let x = -25000; x < -20000 && feet < 6; x += 9) {
+    const z = 36500;
+    sk.mesaRise(x, z);
+    if (sk.lastMesa.u < 0 || sk.lastMesa.u > 9 || sk.mesaWeight(x, z) < 1) continue;
+    feet++;
+    const x0 = Math.floor(x / FORM_CELL) * FORM_CELL, z0 = Math.floor(z / FORM_CELL) * FORM_CELL, d = talusOf(terrain, x0, z0, FORM_CELL);
+    for (let k = 0; k < d.length; k += 5) {
+      blocks++;
+      sk.mesaRise(d[k], d[k + 1]);
+      if (sk.lastMesa.u >= -25 && sk.lastMesa.u <= Math.max(10, 0.3 * sk.lastMesa.tall)) onTalus++;
+    }
+    x += FORM_CELL;
+  }
+  assert.ok(feet >= 3, `${feet} wall feet crossed`);
+  assert.ok(blocks >= feet * 10, `${blocks} blocks at ${feet} wall feet`);
+  assert.equal(onTalus, blocks, 'every block on a talus');
 });

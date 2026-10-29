@@ -243,7 +243,8 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
 
   // Rock: triplanar, strata on the side faces, weathered rock on top.
   const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n);
-  const rockT = smoothstep(0.82, 0.64, level.add(fine.mul(0.04)).add(mid.mul(0.12)));
+  // From some 35 degrees bare rock: soil projected from above stretches into stripes on a steeper slope.
+  const rockT = smoothstep(0.86, 0.7, level.add(fine.mul(0.04)).add(mid.mul(0.12)));
   const rockB = hblend(rockT, rockN.b.sub(h), 2);
   const rockTone = float(1).add(broad.mul(0.25));
   col = mix(col, rockA.rgb.mul(rockTone).mul(macro), rockB); rough = mix(rough, rockA.a, rockB); ao = mix(ao, rockN.a, rockB);
@@ -347,11 +348,21 @@ const tn = (s: Node<'vec4'>) => s.xy.mul(2).sub(1);
  */
 function rockFaces(g: GroundTextures, p: Node<'vec3'>, n: Node<'vec3'>) {
   const layer = (name: string, uv: Node<'vec2'>) => groundLayer(g, name, uv);
-  const bw0 = pow(abs(n), vec3(4));
-  const bw = bw0.div(bw0.x.add(bw0.y).add(bw0.z));
-  const rx = layer('cliffStrata', p.zy), rz = layer('cliffStrata', p.xy), ry = layer('rockFace', p.xz);
+  // Top or side first (a sharp blend: a slope of 45 degrees and more takes the walls' strata, whichever way it
+  // faces, not the pale weathered top stone), then the side between its two projections.
+  const top = pow(abs(n.y), 8), side = pow(length(n.xz), 8);
+  const ax = pow(abs(n.x), 4), az = pow(abs(n.z), 4), sx = ax.div(ax.add(az).add(1e-5));
+  const bw = vec3(side.mul(sx), top, side.mul(float(1).sub(sx))).div(top.add(side).add(1e-5));
+  // The beds are not courses of brick: they swell and thin across a wall (scale), bend and dip along it (a slow
+  // wave and a tilt), and the joints across them do not line up from bed to bed (the run shifted with height).
+  const thick = float(1).add(mx_noise_float(p.xz.mul(0.004)).mul(0.35));
+  const bend = mx_fractal_noise_float(p.xz.mul(0.018), 2, 2.0, 0.5).mul(5).add(p.x.add(p.z).mul(0.04));
+  const sy = p.y.add(bend).div(thick);
+  // (Slowly with height: a quick shift shears the beds into swirls, wood grain up close.)
+  const shift = mx_noise_float(vec2(sy.mul(0.12), 0.5)).mul(2);
+  const rx = layer('cliffStrata', vec2(p.z.add(shift), sy)), rz = layer('cliffStrata', vec2(p.x.add(shift), sy)), ry = layer('rockFace', p.xz);
   const big = 1 / 9;
-  const mx = layer('cliffStrata', p.zy.mul(big)), mz = layer('cliffStrata', p.xy.mul(big));
+  const mx = layer('cliffStrata', vec2(p.z, sy).mul(big)), mz = layer('cliffStrata', vec2(p.x, sy).mul(big));
   const macro = mx.a.rgb.mul(bw.x).add(mz.a.rgb.mul(bw.z)).add(vec3(0.45).mul(bw.y)).div(0.45);
   const rockA = rx.a.mul(bw.x).add(rz.a.mul(bw.z)).add(ry.a.mul(bw.y));
   const rockN = rx.n.mul(bw.x).add(rz.n.mul(bw.z)).add(ry.n.mul(bw.y));

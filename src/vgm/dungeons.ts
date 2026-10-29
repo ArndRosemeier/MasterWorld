@@ -191,17 +191,25 @@ export function promisePlace(kind: LandKind, form: DungeonForm, seed: number, te
   return { kind: 'dungeon', id: `${kind}-${n}`, template: kind, town: town.decision.id, building: knower.id, site: { x: best.x, z: best.z, yaw }, seed: s, setPiece: piece, danger: dangerAt({ decision: best }, home) };
 }
 
+/** How far (m) a place may lie up or down a mesa's walls from where it is asked. */
+const MESA_LEVEL = 15;
+
 /**
  * The best spot for a kind of place on a ring round `at` (metres from it, at least and at most), on dry
  * ground that fits the kind, away from `avoid`; null if none of the tries fits.
  */
+
 function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[]): { x: number; z: number; score: number; yaw?: number } | null {
   const [r0, r1] = ring, fit = GROUND[stands](terrain, s);
+  // On the level of where it is asked from (D56): not up on a mesa's plateau or bench over a valley, whose way up
+  // may be kilometres round to a pass.
+  const sk = terrain.skeleton, level = sk.mesaRise(at.x, at.z);
   let best: { x: number; z: number; score: number; yaw?: number } | null = null;
   for (let k = 0; k < TRIES; k++) {
     const d = r0 + (r1 - r0) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
     const x = at.x + Math.cos(a) * d, z = at.z + Math.sin(a) * d;
     if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < 3) continue;
+    if (Math.abs(sk.mesaRise(x, z) - level) > MESA_LEVEL) continue;
     if (avoid.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40)) continue;
     const f = fit(x, z, k);
     if (f && (!best || f.score > best.score)) best = { x, z, ...f };

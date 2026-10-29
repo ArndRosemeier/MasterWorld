@@ -227,7 +227,9 @@ export class HeroView {
     const f = this.front.actor.fittedSkeleton;
     if (!f) return null;
     try {
-      const rig = new FigureRig(this.front.object, this.front.actor.bones);
+      // Its frame is the hero's own (feet at its origin): Actors lifts the body's group by its ground offset
+      // (half a metre for a small people), which the rig would take for the feet, its hips then at the feet.
+      const rig = new FigureRig(this.object, this.front.actor.bones);
       rig.fit(this.height);
       this.rig = { ch: this.front, rig };
       return rig;

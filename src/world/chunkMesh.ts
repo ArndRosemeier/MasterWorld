@@ -108,6 +108,9 @@ export function groundLook(t: Terrain): (x: number, z: number, color: Float32Arr
   };
 }
 
+/** Vertex spacing (m) from which normals are taken over two cells each way (smoothNormals). */
+const SMOOTH_STEP = 4;
+
 export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const { x0, z0, size, segs } = spec;
   const n = segs + 1, step = size / segs;
@@ -135,7 +138,10 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     // The level: the slope over two cells each way.
     const sx = (H(i + 2, j) + dx - H(i - 2, j)) / (6 * step), sz = (H(i, j + 2) + dz - H(i, j - 2)) / (6 * step);
     level[v] = 1 / Math.sqrt(1 + sx * sx + sz * sz);
-    const nx = -dx, ny = 2 * step, nz = -dz, l = Math.hypot(nx, ny, nz);
+    // Far out, the normal over two cells each way, as the level: a wall running slantwise through vertices
+    // 16 m apart and more lit in a saw of light and dark teeth with the normal over one.
+    const far = step >= SMOOTH_STEP;
+    const nx = far ? -sx : -dx, ny = far ? 1 : 2 * step, nz = far ? -sz : -dz, l = Math.hypot(nx, ny, nz);
     normal[v * 3] = nx / l;
     normal[v * 3 + 1] = ny / l;
     normal[v * 3 + 2] = nz / l;

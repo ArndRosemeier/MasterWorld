@@ -12,6 +12,7 @@ import type { HorseView } from '../render/horse/HorseView';
 import { FlyCamera } from './flyCamera';
 import { HeroCamera, type Shot } from './heroCamera';
 import { lookFromDegrees } from './look';
+import { ClimbPose } from './climbPose';
 
 /** Leaving the free camera lands at most this far under it (m); farther down it is no open ground but a cellar's floor of the world. */
 const LAND_BELOW = 800;
@@ -49,9 +50,12 @@ export class Player {
   private readonly seat = new Vector3();
   private flyingNow: boolean;
   private readonly head = new Vector3();
+  /** The hero seen on a rock face (the walker climbing it). */
+  private readonly climbing: ClimbPose;
 
   constructor(private readonly camera: PerspectiveCamera, canvas: HTMLElement, private readonly world: WalkWorld, flying: boolean) {
     this.walker = new Walker(world);
+    this.climbing = new ClimbPose((x, z) => world.height(x, z));
     this.heroCam = new HeroCamera(camera, canvas, world);
     this.fly = new FlyCamera(camera, canvas, world.height);
     this.flyingNow = flying;
@@ -259,6 +263,10 @@ export class Player {
     if (riding && ridden) {
       // Seated on the saddle: pos is the point under it, the seat its height over the horse's ground.
       hero.animateTo({ pos: { x: ridden.x, y: riding.pos.y, z: ridden.z }, vel: riding.walker.vel, yaw: riding.yaw, gait: 'ride', seat: ridden.y - riding.pos.y }, dt);
+    } else if (walker.mode === 'climb' || walker.mode === 'pull') {
+      const c = this.climbing.onFace(walker, { height: hero.height, hipHeight: hero.hipHeight }, dt);
+      if (c) hero.animateTo({ pos: c.pos, vel: walker.vel, yaw: c.yaw, gait: 'idle', puppet: c.puppet }, dt);
+      else hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: 'idle' }, dt);
     } else if (this.puppet) {
       const pp = this.puppet;
       hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: pp.walking ? 'walk' : 'idle', puppet: pp }, dt);
@@ -266,7 +274,7 @@ export class Player {
       hero.animateTo({ pos: walker.pos, vel: walker.vel, yaw: walker.yaw, gait: walker.gait, combat: this.stance.combat, action: this.stance.action, rest: this.resting }, dt);
     }
     // A scene played out is seen, whatever the zoom.
-    hero.visible = this.flying || !!this.puppet || !this.heroCam.firstPerson;
+    hero.visible = this.flying || !!this.puppet || walker.mode === 'climb' || walker.mode === 'pull' || !this.heroCam.firstPerson;
   }
 
   /** Where the view is, as URL parameters (`pos=x,y,z&look=yaw,pitch`, degrees), to come back to it. */

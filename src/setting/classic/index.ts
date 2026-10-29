@@ -23,7 +23,7 @@ import { tower } from './tower';
 import { items, travel, upkeep } from './items';
 import { sights } from './sights';
 import { situations } from './situations';
-import { landformMix, landforms } from './landforms';
+import { landformMix, landforms, landscapeKinds } from './landforms';
 import { shops, trainers } from './shops';
 import { bard, guilds, skillRanks } from './guilds';
 import { abilities, director, effects, skills } from './skills';
@@ -59,6 +59,7 @@ export const classic: SettingModule = {
     // Cattle graze the paddocks.
     livestock: 'cow',
     landforms,
+    kinds: landscapeKinds,
   },
   start: {
     biomes: ['meadow', 'forest'],

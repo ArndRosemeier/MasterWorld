@@ -19,6 +19,8 @@ const DILATE = 3;
  * vertices lie ~10-20 m apart a few hundred metres out, and a brook a pixel wide must not fall between them.
  */
 const HIDDEN_DILATE = 6;
+/** How far above a river's level its flow is carried onto the bank (m). */
+const FLOW_BANK = 2;
 /** Depth written where no water is near (the surface hides below the ground). */
 export const DRY = -3;
 
@@ -84,11 +86,14 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
       // The true (negative) depth where the ground stands above the carried level, so the surface runs out
       // right at the waterline on a gentle beach instead of a pixel short of it. Where the ground lies below it
       // (beside a river's bed, a dip by a brook) the surface sinks under that ground, so no sheet of still
-      // water floats over the land there. Its flow comes along, so a river's edge runs with it.
+      // water floats over the land there. Its flow comes along by the waterline, so a river's edge runs with it;
+      // not further from it, above it or below: there the level runs steeply up or down to the next dry ground
+      // (a mesa's wall by a river, D56), and running water on a steep level is drawn as a fall, a white sheet.
       const d = level - ground[p];
       if (pass >= DILATE && d > 0) continue;
       out[p * 4] = d <= 0 ? level : ground[p] + DRY / 3; out[p * 4 + 1] = d <= 0 ? d : DRY / 3;
-      out[p * 4 + 2] = fx / cnt; out[p * 4 + 3] = fz / cnt;
+      const runs = d <= 0 && d > -FLOW_BANK;
+      out[p * 4 + 2] = runs ? fx / cnt : 0; out[p * 4 + 3] = runs ? fz / cnt : 0;
       if (d <= 0) next[p] = 2;
     }
     wet.set(next);
