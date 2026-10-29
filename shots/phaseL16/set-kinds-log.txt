@@ -1,0 +1,13 @@
+kind-downs: ready in 24.5 s
+13-kind-downs.jpg: drawn 0.1 s · settled 4.0 s · p50 10.5 ms · p95 15.2 ms · 0 shader violations
+14-kind-downs-aloft.jpg: drawn 0.0 s · settled 3.1 s · p50 8.2 ms · p95 10.5 ms · 0 shader violations
+kind-moor: ready in 18.9 s
+15-kind-moor.jpg: drawn 0.1 s · settled 4.0 s · p50 8.9 ms · p95 14.0 ms · 0 shader violations
+16-kind-moor-aloft.jpg: drawn 0.0 s · settled 2.4 s · p50 7.2 ms · p95 9.8 ms · 0 shader violations
+kind-karst: ready in 16.7 s
+17-kind-karst.jpg: drawn 0.0 s · settled 4.0 s · p50 6.9 ms · p95 9.2 ms · 0 shader violations
+18-kind-karst-aloft.jpg: drawn 0.0 s · settled 1.5 s · p50 7.6 ms · p95 10.3 ms · 0 shader violations
+kind-badlands: ready in 18.3 s
+19-kind-badlands.jpg: drawn 0.1 s · settled 4.0 s · p50 8.0 ms · p95 14.5 ms · 0 shader violations
+20-kind-badlands-aloft.jpg: drawn 0.0 s · settled 1.5 s · p50 8.8 ms · p95 12.2 ms · 0 shader violations
+kinds: 8 shots in shots\phaseL16\set\2026-10-29-b9ea533 (133 s)
