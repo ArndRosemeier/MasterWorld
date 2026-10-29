@@ -68,6 +68,9 @@ export interface EveningResult {
   readonly spells: number;
   /** The hero's power at the start and at the end. */
   readonly power: readonly [number, number];
+  /** The hero's level at the end (D58), and the experience earned. */
+  readonly level: number;
+  readonly xp: number;
   /** Simulated seconds walking and fighting. */
   readonly seconds: number;
   /** Per need of the Director (plan 4.1, C9): the longest it stood overdue, seconds of play. */
@@ -96,6 +99,8 @@ export interface EveningOptions {
    * at a teacher the bard names and casts it in the first place; later evenings it learns that school's spells.
    */
   readonly mage?: boolean;
+  /** The levels the hero must end within (D58, G1: an evening of play brings a fresh hero to level 3–5); none: any. */
+  readonly levels?: readonly [number, number];
 }
 
 /** One game day takes 60 real minutes (D37): game hours per second played. */
@@ -144,6 +149,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const home = marketStart(town.plan);
   land.walker.place(home.x, home.z);
   const power0 = hero.power;
+  // Standing in a town for the first time is a discovery (D58), as in the game.
+  hero.earn(`town:${town.decision.id}`, 'town');
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [], opened: string[] = [];
   const book = new GuildBook();
   // A human hero (the creator's first people): trainers open ranks by the hero's reputation (D54).
@@ -209,7 +216,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const byTheWay = (x: number, z: number) => {
     // Every need that falls due on the way is answered at once (as the game's VGM tick does), then the hero comes
     // upon each, nearest first.
-    const met: { need: Need; at: [number, number]; what: string; reason: string }[] = [];
+    const met: { need: Need; at: [number, number]; what: string; reason: string; sight?: string }[] = [];
     for (const need of ['discovery', 'reward', 'challenge', 'people'] as const) {
       const p = land.walker.pos, eta = Math.hypot(x - p.x, z - p.z) / WALK.run / 60;
       if (director.needs[need] + setting.director.needs[need] * director.pace * eta < 1) continue;
@@ -228,7 +235,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       log = [...log, d];
       const at: [number, number] = d.kind === 'wild' ? [d.x, d.z] : [d.x + Math.sin(d.yaw) * 4, d.z + Math.cos(d.yaw) * 4];
       const what = d.kind === 'sight' ? `${d.sight} (${d.id})` : d.kind === 'wild' ? `the ${d.encounter} lying in wait (${d.id})` : `a traveller resting (${d.id})`;
-      met.push({ need, at, what, reason: m.reason });
+      met.push({ need, at, what, reason: m.reason, ...(d.kind === 'sight' ? { sight: d.id } : {}) });
     }
     while (met.length) {
       const p = land.walker.pos, far = (q: (typeof met)[number]) => Math.hypot(q.at[0] - p.x, q.at[1] - p.z);
@@ -238,6 +245,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       pass(s.seconds);
       if (!s.arrived) throw new Broke(`stuck on the way to ${next.what}: ${s.left.toFixed(0)} m short`);
       director.met(next.need);
+      // A sight found is a discovery (D58), once.
+      if (next.sight) hero.earn(`sight:${next.sight}`, 'sight');
       say(`came upon ${next.what} on the way (${s.metres.toFixed(0)} m, ${s.seconds.toFixed(0)} s): ${next.reason}`);
     }
   };
@@ -301,7 +310,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     walkTo(h.guild.name, ...front(h.b));
     // A school whose first spell strikes a foe, if the teacher has one (it shows magic in a fight).
     const skill = h.guild.skills.find((k) => spellsOf(setting, h.guild).some((x) => x.skill === k && !(x.level ?? 0) && aimsAtFoe(x))) ?? h.guild.skills[0], before = hero.coins;
-    const no = openRank(setting, h.guild, hero, skill, book, log, standing.renown);
+    const no = openRank(setting, h.guild, hero, skill, book, log);
     if (no) throw new Broke(`${h.guild.name} would not open ${skill}: ${no} (${hero.coins} copper)`);
     if (!hero.maxMana) throw new Broke(`opened ${skill} but has no mana`);
     opened.push(`${skill} 0`);
@@ -317,7 +326,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     if (opts.mage) school = becomeMage();
     const evenings = opts.evenings ?? 1;
     for (let e = 0; e < evenings; e++) {
-      say(`evening ${e + 1}: power ${hero.power}, ${hero.coins} copper, ${hero.pack.length} in the pack`);
+      say(`evening ${e + 1}: level ${hero.level} (${hero.xp} xp), power ${hero.power}, ${hero.coins} copper, ${hero.pack.length} in the pack`);
       let paid = 0;
       const fromRumour = rumour && openPromises(log).some((o) => o.id === rumour!.id) ? rumour : null;
       if (fromRumour) say(`follows the rumour of ${fromRumour.id}`);
@@ -341,6 +350,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         else walkTo(name, ...front(house));
         // A new place meets Discovery; one known but changed (new dwellers moved in) half of it.
         if (!seen.has(lead.id)) { director.met('discovery', seen.has(dungeon.id) ? 0.5 : 1); seen.add(lead.id); seen.add(dungeon.id); }
+        hero.earn(`place:${lead.id}`, 'place');
       };
       goDown();
       if (opts.reckless && e === 0) {
@@ -371,6 +381,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         saved = r.delve.tally();
         spells += cast;
         if (r.won && r.out) {
+          hero.earn(`cleared:${lead.id}`, 'cleared');
           say(`cleared ${name}: ${r.kills} killed, ${r.spared} spared, ${r.looted} searched, ${r.potions} potions, health ${(r.health * 100).toFixed(0)}%`);
           break;
         }
@@ -408,7 +419,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const kept = keepPromise(log, lead.id, hours);
       if (kept) log = [...log, kept];
       // The household's people think better of the hero for it, once (D54).
-      if (kept) standing.keptFor(to.race, lead.id);
+      if (kept) { standing.keptFor(to.race, lead.id); hero.earn(`kept:${lead.id}`, 'kept'); }
       cleared.push(lead.id);
       watch.leads = 0;
       director.met('reward');
@@ -486,11 +497,11 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         const next = nextRank(setting, hero, skill);
         if (!by || !next || hero.coins - next.def.price < reserve) continue;
         const g = guildOf(setting, by.t.keeper)!;
-        if (book.thank(g, log)) standing.deed(`task:${g.keeper}`, by.p.race, setting.standing.task);
-        if (rankRefusal(setting, g, hero, skill, book, log, standing.renown)) continue;
+        if (book.thank(g, log)) { standing.deed(`task:${g.keeper}`, by.p.race, setting.standing.task); hero.earn(`task:${g.keeper}`, 'task'); }
+        if (rankRefusal(setting, g, hero, skill, book, log)) continue;
         walkTo(g.name, ...front(town.plan.buildings[by.p.work]));
         const before = hero.coins;
-        openRank(setting, g, hero, skill, book, log, standing.renown);
+        openRank(setting, g, hero, skill, book, log);
         paid += before - hero.coins;
         opened.push(`${skill} ${next.rank}`);
         say(`${g.name} opens ${skill} rank ${next.rank} for ${before - hero.coins} copper`);
@@ -525,6 +536,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       promiseDue();
     }
     if (opts.reckless && !falls) throw new Broke('went down reckless and did not fall');
+    const lv = opts.levels;
+    if (lv && (hero.level < lv[0] || hero.level > lv[1])) throw new Broke(`ended at level ${hero.level} (${hero.xp} xp), not ${lv[0]}–${lv[1]}`);
     if (setting.guilds?.length && township.guilds.length && !opened.length) throw new Broke(`opened no skill or rank at a guild house in ${evenings} evenings`);
     if (shops && !bought.length) throw new Broke(`bought no upgrade in ${evenings} evenings (${hero.coins} copper left)`);
     if (shops && hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
@@ -536,9 +549,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
 }
 
 /** A point just outside a building's door. */

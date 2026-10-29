@@ -36,7 +36,7 @@ export interface StandingSave {
   readonly gifts: Readonly<Record<string, number>>;
   /** The good deeds already counted (D54: each once), by key. */
   readonly deeds?: readonly string[];
-  /** The hero's name for good deeds, wherever done (D54); none: 0. */
+  /** Old saves only (D54's reputation, before levels): it becomes experience on loading (D58). */
   readonly renown?: number;
 }
 
@@ -53,11 +53,6 @@ export class Standing {
   private readonly of = new Map<string, number>();
   private readonly gifts = new Map<string, number>();
   private readonly deeds = new Set<string>();
-  /**
-   * The hero's reputation (D54): one number for the whole world, 0 .. 100, raised by every good deed wherever
-   * it was done (a travelling hero carries it along). Trainers read it; the peoples' standing is on top.
-   */
-  private fame = 0;
   private readonly rules: StandingDef;
   private readonly peoples: readonly PeopleDef[];
   race: string;
@@ -69,11 +64,7 @@ export class Standing {
     for (const p of this.peoples) this.of.set(p.id, saved?.of[p.id] ?? this.first(p));
     for (const [k, v] of Object.entries(saved?.gifts ?? {})) this.gifts.set(k, v);
     for (const k of saved?.deeds ?? []) this.deeds.add(k);
-    this.fame = saved?.renown ?? 0;
   }
-
-  /** The hero's reputation, the same everywhere (D54). */
-  get renown(): number { return this.fame; }
 
   private first(p: PeopleDef): number { return p.id === this.race ? p.kin : p.regard; }
 
@@ -82,7 +73,6 @@ export class Standing {
     this.race = race;
     this.gifts.clear();
     this.deeds.clear();
-    this.fame = 0;
     for (const p of this.peoples) this.of.set(p.id, this.first(p));
   }
 
@@ -104,14 +94,13 @@ export class Standing {
   }
 
   /**
-   * A good deed for one of people `id` (D54), counted once by its `key` (a second time: nothing): the hero's
-   * reputation rises by `by`, and that people think `by` better of them; `told`: word gets round the other
-   * peoples too, a third as much.
+   * A good deed for one of people `id` (D54), counted once by its `key` (a second time: nothing): that people
+   * think `by` better of the hero; `told`: word gets round the other peoples too, a third as much. (Its
+   * experience is the hero's own, game/growth.ts.)
    */
   deed(key: string, id: string, by: number, told = false): StandingChange[] {
     if (this.deeds.has(key) || !this.people(id)) return [];
     this.deeds.add(key);
-    this.fame = Math.min(100, Math.round(this.fame + by));
     const out: StandingChange[] = [];
     for (const p of this.peoples) {
       const c = p.id === id ? this.change(p.id, by) : told ? this.change(p.id, by / 3) : null;
@@ -174,7 +163,7 @@ export class Standing {
   }
 
   save(): StandingSave {
-    return { race: this.race, of: Object.fromEntries(this.of), gifts: Object.fromEntries(this.gifts), ...(this.deeds.size ? { deeds: [...this.deeds] } : {}), ...(this.fame ? { renown: this.fame } : {}) };
+    return { race: this.race, of: Object.fromEntries(this.of), gifts: Object.fromEntries(this.gifts), ...(this.deeds.size ? { deeds: [...this.deeds] } : {}) };
   }
 }
 

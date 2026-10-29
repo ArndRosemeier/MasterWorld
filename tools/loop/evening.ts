@@ -14,7 +14,8 @@ const evenings = Number(process.argv[2] ?? 6);
 const seeds = process.argv.length > 3 ? process.argv.slice(3) : ['masterworld', 'alpha', 'x4'];
 const clock = (h: number) => `day ${Math.floor(h / 24)} ${String(Math.floor(h % 24)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 const runs: { seed: string; opts: EveningOptions; what: string }[] = [
-  ...seeds.map((seed) => ({ seed, opts: { evenings }, what: `${evenings} evenings` })),
+  // An evening of play brings a fresh hero to level 3–5 (D58, G1), a fighter and a mage alike.
+  ...seeds.map((seed) => ({ seed, opts: { evenings, ...(evenings === 6 ? { levels: [3, 5] as const } : {}) }, what: `${evenings} evenings` })),
   { seed: seeds[0], opts: { evenings: 1, reckless: true }, what: 'a reckless evening (a fall)' },
   // A second town (plan B3a): the same game in a village out on the land, through the same code.
   { seed: seeds[0], opts: { evenings: 3, settlement: 'village' }, what: '3 evenings in a village' },
@@ -22,7 +23,7 @@ const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   // The capital (C15): an evening in the first city, its 700 houses and 2700 people.
   { seed: seeds[0], opts: { evenings: 1, settlement: 'capital' }, what: 'an evening in the capital' },
   // A mage (plan C3): asks the bard, opens a school at its teacher and casts in the first place.
-  { seed: seeds[2] ?? seeds[0], opts: { evenings: 3, mage: true }, what: '3 evenings as a mage' },
+  { seed: seeds[2] ?? seeds[0], opts: { evenings: 3, mage: true, levels: [3, 5] }, what: '3 evenings as a mage' },
 ];
 
 /** Play one run here; true if it passed. */
@@ -31,7 +32,7 @@ function play(i: number): boolean {
   console.log(`\n== ${seed}: ${what}`);
   const t0 = performance.now();
   const r = playEvening(parseSeed(seed), classic, { ...opts, log: (s) => console.log(`${clock(s.hour)}  ${s.what}`) });
-  console.log(`${r.ok ? 'passed' : 'FAILED'}: ${r.cleared.length} places cleared, ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, lessons ${r.lessons.join(', ') || 'none'}, opened ${r.opened.join(', ') || 'none'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}${r.spells ? `, ${r.spells} spells cast` : ''}; plays like a ${r.style ?? 'newcomer'} (challenge x${r.challengeLean.toFixed(2)}); longest overdue ${Object.entries(r.overdue).map(([n, s]) => `${n} ${(s / 60).toFixed(1)}`).join(', ')} min; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+  console.log(`${r.ok ? 'passed' : 'FAILED'}: ${r.cleared.length} places cleared, ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, lessons ${r.lessons.join(', ') || 'none'}, opened ${r.opened.join(', ') || 'none'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}, level ${r.level} (${r.xp} xp)${r.spells ? `, ${r.spells} spells cast` : ''}; plays like a ${r.style ?? 'newcomer'} (challenge x${r.challengeLean.toFixed(2)}); longest overdue ${Object.entries(r.overdue).map(([n, s]) => `${n} ${(s / 60).toFixed(1)}`).join(', ')} min; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   return r.ok;
 }
 

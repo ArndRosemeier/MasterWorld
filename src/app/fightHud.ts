@@ -14,6 +14,7 @@ import type { Loot } from '../game/items';
 import { coinText } from '../game/items';
 import { keyLabel, type Bindings } from '../input/controls';
 import { cap } from '../talk/townTalk';
+import { levelOfDanger, towardNext } from '../game/growth';
 import { el } from './dom';
 import { itemCard, plainCard } from './itemCard';
 import { replay } from './ward';
@@ -29,6 +30,13 @@ export class FightHud {
   private readonly tName = el('div', { className: 'name' });
   private readonly tState = el('div', { className: 'state' });
   private readonly tBar = el('div');
+  /** The foe's level (D58): the level whose even fight it is. */
+  private readonly tLevel = el('div', { className: 'lvl' });
+  /** The hero's level engraved on a brass seal by the vials, and the way to the next as a thin rule (D58). */
+  private readonly seal = el('div', { className: 'seal' });
+  private readonly sealRule = el('i');
+  private shownLevel = 0;
+  private shownToward = -1;
   private readonly prompt = el('div', { className: 'prompt plate' });
   private readonly finds = el('div', { className: 'finds' });
   private readonly hurtEdge = el('div', { className: 'hurt' });
@@ -43,8 +51,9 @@ export class FightHud {
       return { box, liquid, text, was: -1 };
     };
     this.vials = { health: vial('health'), stamina: vial('stamina'), mana: vial('mana') };
-    this.target.append(el('div', { className: 'ward' }), this.tName, this.tState, el('div', { className: 'bar' }, this.tBar));
-    this.root.append(this.hurtEdge, el('div', { className: 'gauges plate' }, this.vials.health.box, this.vials.stamina.box, this.vials.mana.box), this.target, this.prompt, this.finds, this.dark);
+    this.target.append(el('div', { className: 'ward' }), this.tLevel, this.tName, this.tState, el('div', { className: 'bar' }, this.tBar));
+    const level = el('div', { className: 'level' }, this.seal, el('div', { className: 'toward' }, this.sealRule));
+    this.root.append(this.hurtEdge, el('div', { className: 'gauges plate' }, level, this.vials.health.box, this.vials.stamina.box, this.vials.mana.box), this.target, this.prompt, this.finds, this.dark);
     document.body.append(this.root);
   }
 
@@ -52,6 +61,7 @@ export class FightHud {
 
   /** Every frame without a fight: only the gauges (no target, nothing to search). */
   calm(hero: Character): void {
+    this.levelOf(hero);
     this.vial('health', hero.health, hero.maxHealth);
     this.vial('stamina', hero.stamina, hero.maxStamina);
     this.vial('mana', hero.mana, hero.maxMana);
@@ -61,6 +71,7 @@ export class FightHud {
 
   /** Every frame: the gauges, the target. */
   follow(fight: Fight, hero: Character, search: string | null): void {
+    this.levelOf(hero);
     this.vial('health', hero.health, hero.maxHealth);
     this.vial('stamina', hero.stamina, hero.maxStamina);
     this.vial('mana', hero.mana, hero.maxMana);
@@ -71,6 +82,7 @@ export class FightHud {
       if (t) {
         replay(this.target, 'shown');
         this.tName.textContent = cap(t.def.name);
+        this.tLevel.textContent = String(levelOfDanger(this.setting.growth, t.def.danger));
       }
     }
     if (t) {
@@ -118,6 +130,13 @@ export class FightHud {
   fallen(on: boolean, text = ''): void {
     this.root.classList.toggle('fallen', on);
     this.dark.textContent = text;
+  }
+
+  /** The hero's level on its seal, and the rule towards the next (only what changed). */
+  private levelOf(hero: Character): void {
+    const l = hero.level, f = towardNext(this.setting.growth, hero.xp);
+    if (l !== this.shownLevel) { this.seal.textContent = String(l); this.shownLevel = l; }
+    if (Math.abs(f - this.shownToward) > 0.002) { this.sealRule.style.width = `${(f * 100).toFixed(1)}%`; this.shownToward = f; }
   }
 
   /** A gauge; mana only once the hero has any (a school of magic opened). */

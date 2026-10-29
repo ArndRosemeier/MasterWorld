@@ -13,6 +13,7 @@ import type { Character } from './character';
 import { defOf, rollLoot, type Item, type Loot } from './items';
 import { blowOf, mendCaster, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
 import { WEAR, type WearState } from './upkeep';
+import { dauntsFrom, fightXp } from './growth';
 
 export interface HeroPose {
   readonly x: number;
@@ -30,7 +31,7 @@ export type FightEvent =
   | { readonly kind: 'hurt'; readonly by: Creature; readonly strike: Strike }
   | { readonly kind: 'swing'; readonly who: Creature }
   | { readonly kind: 'notice'; readonly who: Creature }
-  | { readonly kind: 'killed'; readonly who: Creature; readonly loot: Loot }
+  | { readonly kind: 'killed'; readonly who: Creature; readonly loot: Loot; readonly xp: number }
   | { readonly kind: 'flee'; readonly who: Creature }
   | { readonly kind: 'plea'; readonly who: Creature; readonly text: string }
   | { readonly kind: 'spared'; readonly who: Creature }
@@ -85,7 +86,8 @@ export class Fight implements RecipeWorld {
     const veil = 1 - this.recipes.veilOf(SELF);
     const noise = Math.max(this.quiet < 3 ? 1 : 0, moving * (1 - stealth / 160)) * veil;
     const g = this.hero.guard(this.hero.stamina <= 0 || this.recipes.isHeld(SELF));
-    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) } };
+    // Foes the hero has outgrown so far they give no experience dare not start a fight (D58).
+    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) }, daunts: dauntsFrom(this.setting.growth, this.hero.level) };
   }
 
   /**
@@ -157,6 +159,13 @@ export class Fight implements RecipeWorld {
     const loot = c.def.loot ? rollLoot(this.setting.items, c.def.loot, c.def.danger, new Rng(deriveSeed(this.rng.seed, 'body', c.id))) : { items: [], coins: 0 };
     if (loot.items.length || loot.coins) this.bodies.set(c.id, loot);
     return loot;
+  }
+
+  /** The experience a fallen foe gives the hero (D58), given now. */
+  private earnFrom(c: Creature): number {
+    const xp = fightXp(this.setting.growth, c.def.danger, this.hero.level);
+    this.hero.gain(xp);
+    return xp;
   }
 
   /** Take what a fallen creature carried (null if nothing is left on it). */
@@ -286,7 +295,8 @@ export class Fight implements RecipeWorld {
       case 'flee': out.push({ kind: 'flee', who: e.who }); break;
       case 'plea': out.push({ kind: 'plea', who: e.who, text: e.text }); break;
       case 'spared': out.push({ kind: 'spared', who: e.who }); break;
-      case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who) }); break;
+      // Experience for the foe (D58), weighed by its danger against the hero's level.
+      case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who), xp: this.earnFrom(e.who) }); break;
       default: break;
     }
   }

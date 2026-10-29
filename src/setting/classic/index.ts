@@ -10,6 +10,7 @@ import { hideout } from './hideout';
 import { cellar } from './cellar';
 import { names, talk } from './people';
 import { peoples, standing } from './peoples';
+import { growth } from './growth';
 import { creatures } from './creatures';
 import { hero } from './hero';
 import { routines } from './routines';
@@ -72,6 +73,7 @@ export const classic: SettingModule = {
   names,
   peoples,
   standing,
+  growth,
   talk,
   skills,
   creatures,

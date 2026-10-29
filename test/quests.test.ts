@@ -4,7 +4,6 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic';
 import { Character } from '../src/game/character';
 import { GuildBook, openRank, questDue, questGift, spellRefusal } from '../src/game/guilds';
-import { Standing } from '../src/game/standing';
 import { openWorld } from '../src/vgm/builder';
 import { questFor, questOf, questReward } from '../src/vgm/quests';
 import { keepPromise } from '../src/vgm/leads';
@@ -22,11 +21,14 @@ test('quests: bird form is gained only through the Undercroft keeper\'s deed', (
   hero.coins = 1e6;
   // No trainer sells it, for any coin.
   for (const g of classic.guilds!) assert.notEqual(spellRefusal(classic, g, hero, classic.abilities.find((a) => a.id === bird)!), null);
-  // The keeper speaks of it only to a student whose name is good enough.
-  assert.equal(questDue(under, hero, 100, first), false, 'not a student');
-  assert.equal(openRank(classic, under, hero, 'cryomancy', new GuildBook(), first, 0), null);
-  assert.equal(questDue(under, hero, under.quest!.renown - 1, first), false, 'not known well enough');
-  assert.equal(questDue(under, hero, under.quest!.renown, first), true);
+  // The keeper speaks of it only to a student of the level it asks (D58).
+  hero.xp = classic.growth.xp[under.quest!.level - 1];
+  assert.equal(questDue(under, hero, first), false, 'not a student');
+  assert.equal(openRank(classic, under, hero, 'cryomancy', new GuildBook(), first), null);
+  assert.equal(questDue(under, hero, first), true);
+  hero.xp = classic.growth.xp[under.quest!.level - 2];
+  assert.equal(questDue(under, hero, first), false, 'not grown enough');
+  hero.xp = classic.growth.xp[under.quest!.level - 1];
   // The VGM makes its place: a kind the guild asks for, out on the land, its household the keeper's.
   const d = questFor({ guild: under, town, building: 7, hours: 30 }, { ...c, log: first })!;
   assert.ok(d && under.quest!.kinds.includes(d.template) && d.site, `a ${d?.template} out on the land`);
@@ -35,7 +37,7 @@ test('quests: bird form is gained only through the Undercroft keeper\'s deed', (
   let log: DecisionLog = [...first, d];
   assert.equal(questOf(log, under.keeper), d);
   assert.equal(questFor({ guild: under, town, building: 7, hours: 31 }, { ...c, log }), null, 'asked once');
-  assert.equal(questDue(under, hero, 100, log), false, 'and never again');
+  assert.equal(questDue(under, hero, log), false, 'and never again');
   // Not done yet: no gift. Cleared and told: the gift, once.
   assert.equal(questReward(classic, log, d.id), null);
   assert.equal(questGift(classic, log, d.id, hero), null);
@@ -46,16 +48,4 @@ test('quests: bird form is gained only through the Undercroft keeper\'s deed', (
   assert.equal(questGift(classic, log, d.id, hero), null, 'given once');
   // A place of a guild without a deed gives nothing.
   assert.equal(questReward(classic, [...log, { ...d, id: 'cave-9', quest: undefined }, { kind: 'kept', id: 'k9', promise: 'cave-9', at: 41 }], 'cave-9'), null);
-});
-
-test('quests: good deeds raise one reputation, each once; the keeper reads it wherever it was earned', () => {
-  const s = new Standing(classic, 'elf');
-  assert.equal(s.renown, 0, 'nobody has heard of a new hero');
-  s.keptFor('dwarf', 'cave-1');
-  s.deed('band:event-1', 'human', classic.standing.kept, true);
-  s.deed('wolves:wild-3', 'halfling', classic.standing.help);
-  s.deed('tend:traveller-2', 'human', classic.standing.help);
-  for (const k of ['band:event-1', 'wolves:wild-3', 'tend:traveller-2']) assert.deepEqual(s.deed(k, 'human', 50), [], `${k} counts once`);
-  assert.equal(s.renown, 2 * classic.standing.kept + 2 * classic.standing.help);
-  assert.ok(s.renown >= under.quest!.renown, 'enough for the keeper, whoever was helped');
 });
