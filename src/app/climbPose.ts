@@ -9,6 +9,8 @@ import type { HeroPuppet } from '../render/hero/HeroView';
 
 /** Where the holds are: the face is this far in front of the walker's body (game/walker.ts OFF_FACE). */
 const FACE = 0.35;
+/** The most a face leans back, metres in per metre up (a rock face climbed by its holds is near sheer). */
+const MAX_LEAN = 0.3;
 
 export class ClimbPose {
   private readonly climb = new LadderClimb();
@@ -25,8 +27,10 @@ export class ClimbPose {
       this.pulling = false;
       // The face at the feet, and how far it leans back (a metre up it is that much further in).
       const fx = p.x + F.nx * FACE, fz = p.z + F.nz * FACE;
-      const rise = this.height(fx + F.nx * 0.5, fz + F.nz * 0.5) - this.height(fx - F.nx * 0.5, fz - F.nz * 0.5);
-      const lean = rise > 0.2 ? Math.min(0.6, 1 / rise) : 0.6, h = p.y - F.from;
+      // (Measured on the face over the body's own height: just under the feet the ground at its foot may
+      // still be gentle, which would lay the holds far back and out of the hands' reach.)
+      const rise = Math.max(...[0, 0.5, 1].map((d) => this.height(fx + F.nx * (d + 0.5), fz + F.nz * (d + 0.5)) - this.height(fx + F.nx * (d - 0.5), fz + F.nz * (d - 0.5))));
+      const lean = rise > 1 / MAX_LEAN ? 1 / rise : MAX_LEAN, h = p.y - F.from;
       const l = this.face;
       l.nx = F.nx; l.nz = F.nz;
       // The rungs' line at the climb's foot, so the face leans through the feet now.
