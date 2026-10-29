@@ -280,3 +280,40 @@
 @keyframes te-rise { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -60px); } }
 @media (prefers-reduced-motion: reduce) { .tales-end *, .tales-end { animation: none !important; transition: none !important; } }
 #use-prompt { bottom: 24%; }
+
+/* The VGM's moves (src/app/vgmAlerts.ts, a developer's aid): brass slips at the top right, newest at the bottom; they never take the mouse. */
+#vgm-alerts { position: fixed; right: 16px; top: 16px; z-index: 6; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; width: min(340px, calc(100vw - 32px)); pointer-events: none; }
+.vgm-slip { position: relative; width: 100%; box-sizing: border-box; padding: 7px 14px 8px; font: 14px/1.35 'EB Garamond', Georgia, serif; color: var(--ink); background: linear-gradient(var(--leather-hi), var(--leather)); border: 2px solid var(--brass-mid); border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--brass-lo), 0 6px 18px #000a; animation: vgm-in .45s cubic-bezier(.3, 1.6, .5, 1) both; transition: opacity .35s, transform .35s; }
+.vgm-slip::after { content: ''; position: absolute; inset: -2px; border-radius: inherit; border: 1px solid var(--ward); animation: note-ring .9s ease-out .3s backwards; opacity: 0; }
+.vgm-slip.off { opacity: 0; transform: translateX(30px); }
+.vgm-slip .head { display: flex; align-items: center; gap: 8px; }
+.vgm-slip .seal { padding: 2px 6px; border-radius: 8px; font: 11px/1 'Marcellus SC', Georgia, serif; letter-spacing: .08em; color: #1e140a; background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 60%, var(--brass-mid)); box-shadow: 0 0 6px var(--ward); }
+.vgm-slip .tool { font: 15px/1.2 'Marcellus SC', Georgia, serif; letter-spacing: .05em; color: var(--brass); }
+.vgm-slip .need { margin-left: auto; font: italic 13px 'EB Garamond', Georgia, serif; color: var(--ward); }
+.vgm-slip .why { margin-top: 2px; color: var(--ink-dim); }
+.vgm-slip .where { margin-top: 2px; font-size: 12px; color: var(--ward); }
+@keyframes vgm-in { from { opacity: 0; transform: translateX(40px); } }
+
+/* The VGM window (src/app/vgmUi.ts, a developer's aid): its needs as brass gauges, buttons that make it act, its log. */
+.panel.vgm { width: min(640px, 100%); }
+.vgm h3 { margin: 12px 0 6px; font: 400 15px/1.2 'Marcellus SC', Georgia, serif; letter-spacing: .05em; color: var(--brass); }
+.vgm .said { margin: 0 0 6px; padding: 6px 12px; border: 1px solid var(--ward); border-radius: 10px; color: var(--ward-hot); font-style: italic; }
+.vgm .needs { display: grid; gap: 4px; }
+.vgm .need { display: grid; grid-template-columns: 7em 1fr 3em; align-items: center; gap: 10px; color: var(--ink-dim); }
+.vgm .need .bar { height: 8px; border-radius: 4px; background: #0b0807; border: 1px solid var(--brass-lo); overflow: hidden; }
+.vgm .need .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--brass-mid), var(--brass)); }
+.vgm .need.due { color: var(--ink); }
+.vgm .need.due .bar i { background: linear-gradient(90deg, var(--brass), var(--ward)); box-shadow: 0 0 6px var(--ward); }
+.vgm .need .value { text-align: right; font-variant-numeric: tabular-nums; }
+.vgm .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.vgm .btns .brass-btn { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.vgm .log { display: grid; gap: 2px; }
+.vgm .move { padding: 5px 2px 6px; border-bottom: 1px solid #4a351055; }
+.vgm .move .head { display: flex; gap: 10px; align-items: baseline; }
+.vgm .move .tool { font: 14px/1.2 'Marcellus SC', Georgia, serif; color: var(--brass); }
+.vgm .move .need { color: var(--ward); font-style: italic; font-size: 13px; }
+.vgm .move .at { margin-left: auto; color: #a8987a; font-size: 13px; }
+.vgm .move .go { padding: 1px 8px; font: 12px/1.3 'Marcellus SC', Georgia, serif; color: var(--ward); background: transparent; border: 1px solid var(--brass-lo); border-radius: 8px; cursor: pointer; }
+.vgm .move .go:hover { border-color: var(--ward); }
+.vgm .move .why { color: var(--ink-dim); }

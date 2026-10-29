@@ -49,6 +49,12 @@ export function carryRenown(hero: { gain(xp: number): number }, saved: { readonl
   if (saved && saved.xp === undefined && standing?.renown) hero.gain(standing.renown * RENOWN_XP);
 }
 
+/** Experience still needed for the next level (whole points, at least 1), or null at the top. */
+export function xpToNext(g: GrowthDef, xp: number): number | null {
+  const l = levelOf(g, xp);
+  return l >= g.xp.length ? null : Math.max(1, Math.ceil(g.xp[l] - xp));
+}
+
 /** Share of the way from this level to the next (1 at the top). */
 export function towardNext(g: GrowthDef, xp: number): number {
   const l = levelOf(g, xp);

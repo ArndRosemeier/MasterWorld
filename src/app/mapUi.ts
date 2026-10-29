@@ -17,6 +17,8 @@ export interface MapHost extends WindowHost {
   /** Ground height and water depth (> 0: water) at a point. */
   height(x: number, z: number): number;
   water(x: number, z: number): number;
+  /** How wooded the land is, 0 (open) .. 1 (closed wood): the woods are inked green. */
+  woods?(x: number, z: number): number;
   /** Where the hero is and faces (yaw as the walker's: 0 north). */
   heroAt(): { readonly x: number; readonly z: number; readonly yaw: number };
   /** Named houses drawn on the sheet from the start (the guild houses, D49; a hidden one once the bard told of it). */
@@ -130,9 +132,14 @@ export class MapUi extends KeyWindow {
       // Light from the north-west; contours every 10 m.
       const shade = Math.max(-0.35, Math.min(0.35, (-dx - dz) / step * 0.6));
       const contour = Math.floor(y / 10) !== Math.floor(h[k + 1] / 10) || Math.floor(y / 10) !== Math.floor(h[k + R + 1] / 10);
-      const wet = this.map.water(x0 + (i + 0.5) * step, z0 + (j + 0.5) * step) > 0.05;
-      let r = 226, gr = 208, b = 168;
-      if (wet) { r = 150; gr = 170; b = 160; }
+      const px = x0 + (i + 0.5) * step, pz = z0 + (j + 0.5) * step;
+      const wet = this.map.water(px, pz) > 0.05;
+      // Parchment, a touch greener low and browner high; the woods washed green over it; water blue-grey.
+      const up = Math.max(0, Math.min(1, y / 400));
+      let r = 222 + 10 * up, gr = 210 - 6 * up, b = 166 - 4 * up;
+      const wood = wet ? 0 : (this.map.woods?.(px, pz) ?? 0);
+      if (wood > 0) { const k = 0.6 * Math.min(1, wood * 1.3); r += (128 - r) * k; gr += (152 - gr) * k; b += (100 - b) * k; }
+      if (wet) { r = 128; gr = 160; b = 168; }
       const f = 1 + shade;
       const p = (j * R + i) * 4;
       img.data[p] = r * f - (contour ? 40 : 0);

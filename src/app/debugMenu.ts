@@ -41,12 +41,9 @@ export interface DebugHost {
   readonly events: readonly { readonly id: string; readonly kind: string }[];
   /** A story event now (C6), whatever its wait (one of `events` by id, or the first that can): what the town hears, or why none came. */
   storyEvent(id?: string): string;
-  /** The VGM's answer to a need here and now (C9), whatever the Director says: what it made, or why nothing. */
-  answerNeed(need: 'discovery' | 'challenge' | 'reward' | 'people' | 'purpose'): string;
-  /** A situation of this kind now (C10), whatever the hour: what was made, or why not. */
-  situation(kind: 'hurt-traveller' | 'paddock-wolves' | 'stray-beast'): string;
-  /** A good day now (C11): a feast for a deed kept lately, else a market day in the town the hero is in. */
-  goodDay(): string;
+  /** The VGM window (its needs, its moves, buttons that make it act), and its moves on screen on or off. */
+  openVgm(): void;
+  vgmAlerts: boolean;
   /** The experience to the next level, so its celebration plays (G3): the level reached. */
   gainLevel(): string;
   /** The VGM's log (D53, C8): its moves, oldest first (the tool, the need, why). */
@@ -131,16 +128,9 @@ export class DebugMenu {
         { label: 'Curfew', run: () => h.town('stayIn') },
       ]],
       ['VGM', [
-        { label: 'Its last 30 moves', run: () => this.lines(h.vgmLog().slice(-30)) },
-        { label: 'Every move', run: () => this.lines(h.vgmLog()) },
-        { label: 'Answer Discovery now (a sight)', run: () => h.answerNeed('discovery') },
-        { label: 'Answer Reward now (a find)', run: () => h.answerNeed('reward') },
-        { label: 'Answer Challenge now (an ambush)', run: () => h.answerNeed('challenge') },
-        { label: 'Answer People now (a traveller)', run: () => h.answerNeed('people') },
-        { label: 'Situation now: a hurt traveller', run: () => h.situation('hurt-traveller') },
-        { label: 'Situation now: wolves at the paddock (in a town)', run: () => h.situation('paddock-wolves') },
-        { label: 'Situation now: a beast got out (in a town)', run: () => h.situation('stray-beast') },
-        { label: 'A good day now (a feast after a deed, else market day in a town)', run: () => h.goodDay() },
+        { label: 'The VGM window (F9): needs, moves, make it act', run: () => h.openVgm() },
+        { label: 'Its moves on screen on / off', run: () => { h.vgmAlerts = !h.vgmAlerts; return h.vgmAlerts ? 'alerts on' : 'alerts off'; } },
+        { label: 'Every move (printed, to copy)', run: () => this.lines(h.vgmLog()) },
       ]],
       ['Weather', [
         { label: 'Natural', run: () => h.weather(null) },

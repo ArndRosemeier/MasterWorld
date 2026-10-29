@@ -11,7 +11,7 @@
  */
 import { MinHeap, Noise, clamp, deriveSeed, hash2f, lerp, smoothstep } from '@futuremagic/core';
 import type { Skeleton } from './skeleton';
-import { chamfer, floodLake, type Lake } from './lakes';
+import { chamfer, floodLake, unpackLake, type Lake } from './lakes';
 
 export interface HydroOptions {
   /** Coarse cell side, metres. */
@@ -307,6 +307,8 @@ export class HydroTile {
       this.lake = new Float32Array(N).fill(NaN);
       this.plain = given.plain;
       this.vale = given.vale;
+      this.lakes.push(...given.lakes);
+      this.lakeOf = given.lakeOf;
       this.rivers.push(...given.rivers);
       this.rivers.forEach((r, ri) => this.index(r, ri));
       return;
@@ -427,13 +429,14 @@ export class HydroTile {
     // Far above the land a valley's side lowers nothing (VALE_KEEP): dropped, so a tile hands over little. A
     // river's valley is carved too (W4d), but never below RIVER_KEEP over the river's water: the rivers keep their
     // levels and the land folds down to them.
-    // A cell is dropped only with all its neighbours: a valley's last cells blend out between finite heights (one
-    // left Infinity beside them made the land jump back up a cliff where the blend stopped).
+    // A cell is dropped only with all cells two round it: a valley's last cells blend out between finite heights (one
+    // left Infinity beside them made the land jump back up a cliff where the blend stopped), and `valeAt` blends
+    // over the 3 x 3 cells round a point's nearest.
     const far = (c: number) => E[c] <= 0 || wide[c] > E[c] + VALE_KEEP;
     const drop = new Uint8Array(N);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       let all = true;
-      for (let dj = -1; dj <= 1 && all; dj++) for (let di = -1; di <= 1 && all; di++) {
+      for (let dj = -2; dj <= 2 && all; dj++) for (let di = -2; di <= 2 && all; di++) {
         const a = i + di, b = j + dj;
         if (a >= 0 && b >= 0 && a < n && b < n && !far(b * n + a)) all = false;
       }
@@ -466,17 +469,28 @@ export class HydroTile {
     return keep;
   }
 
-  /** The most the land may stand at (x, z) by the valleys (W4b): blended between cells, Infinity off them. */
+  /**
+   * The most the land may stand at (x, z) by the valleys (W4b), Infinity off them: a quadratic B-spline over the
+   * 3 x 3 cells round the nearest, so its slope runs on smoothly across cells. (Blended straight between four cells,
+   * the slope jumped at every cell's middle: the valleys' sides were flat facets with straight creases, which the
+   * map's hill shade drew as seams.) Its weights are never negative, so it never dips below the cells' lowest.
+   */
   valeAt(x: number, z: number): number {
     const { n, vale } = this, c = this.o.cell;
     if (!vale.length) return Infinity;
     const u = (x - this.x0) / c - 0.5, v = (z - this.z0) / c - 0.5;
-    const i = Math.floor(u), j = Math.floor(v);
-    if (i < 0 || j < 0 || i >= n - 1 || j >= n - 1) return Infinity;
-    const fu = u - i, fv = v - j, k = j * n + i;
-    const a = vale[k], b = vale[k + 1], d = vale[k + n], e = vale[k + n + 1];
-    if (a === Infinity || b === Infinity || d === Infinity || e === Infinity) return Infinity;
-    return (a * (1 - fu) + b * fu) * (1 - fv) + (d * (1 - fu) + e * fu) * fv;
+    const i = Math.round(u), j = Math.round(v);
+    if (i < 1 || j < 1 || i >= n - 1 || j >= n - 1) return Infinity;
+    const tu = u - i, tv = v - j;
+    const wu0 = 0.5 * (0.5 - tu) ** 2, wu1 = 0.75 - tu * tu, wu2 = 0.5 * (0.5 + tu) ** 2;
+    const wv0 = 0.5 * (0.5 - tv) ** 2, wv1 = 0.75 - tv * tv, wv2 = 0.5 * (0.5 + tv) ** 2;
+    let sum = 0;
+    for (let dj = -1; dj <= 1; dj++) {
+      const k = (j + dj) * n + i, a = vale[k - 1], b = vale[k], d = vale[k + 1];
+      if (a === Infinity || b === Infinity || d === Infinity) return Infinity;
+      sum += (a * wu0 + b * wu1 + d * wu2) * (dj < 0 ? wv0 : dj > 0 ? wv2 : wv1);
+    }
+    return sum;
   }
 
   /**
@@ -1029,6 +1043,13 @@ export class HydroTile {
     return out;
   }
 
+  /** The cells with a lake, as (cell, lake) pairs (packTile). */
+  lakeCells(): number[] {
+    const out: number[] = [];
+    this.lakeOf.forEach((id, c) => { if (id >= 0) out.push(c, id); });
+    return out;
+  }
+
   /** The lake of cell `c` (W3), or null. */
   private lakeIn(c: number): Lake | null {
     const id = this.lakeOf.length ? this.lakeOf[c] : -1;
@@ -1055,11 +1076,15 @@ export interface PackedTile {
   rivers: River[];
   plain: Float32Array;
   vale: Float32Array;
+  /** A river tile's lakes and which one each cell may hold (empty in a brook tile). */
+  lakes: Lake[];
+  lakeOf: Int32Array;
 }
 
 /**
  * A tile packed into one array, to hand it to another thread: [count, then per river: points, xz, level, half, fall,
- * reach (0 or n)], then [floors, then per floor: cell, level], then [vales, then per valley cell: cell, height].
+ * reach (0 or n)], then [floors, then per floor: cell, level], then [vales, then per valley cell: cell, height], then
+ * [lakes, then each lake's numbers (Lake.pack)], then [lake cells, then per cell: cell, lake].
  */
 export function packTile(t: HydroTile): Float64Array {
   const { rivers, plain } = t;
@@ -1071,6 +1096,8 @@ export function packTile(t: HydroTile): Float64Array {
   const cuts: number[] = [];
   t.vale.forEach((v, c) => { if (v !== Infinity) cuts.push(c, v); });
   size += 1 + cuts.length;
+  const lakes = t.lakes.flatMap((l) => l.pack()), of = t.lakeCells();
+  size += 2 + lakes.length + of.length;
   const out = new Float64Array(size);
   let o = 0;
   out[o++] = rivers.length;
@@ -1087,7 +1114,11 @@ export function packTile(t: HydroTile): Float64Array {
   out[o++] = floors.length / 2;
   out.set(floors, o); o += floors.length;
   out[o++] = cuts.length / 2;
-  out.set(cuts, o);
+  out.set(cuts, o); o += cuts.length;
+  out[o++] = t.lakes.length;
+  out.set(lakes, o); o += lakes.length;
+  out[o++] = of.length / 2;
+  out.set(of, o);
   return out;
 }
 
@@ -1107,9 +1138,15 @@ export function unpackTile(a: Float64Array, cells: number): PackedTile {
   }
   const plain = new Float32Array(cells).fill(NaN);
   for (let k = 0, count = a[o++]; k < count; k++, o += 2) plain[a[o]] = a[o + 1];
-  const vale = new Float32Array(o < a.length ? cells : 0).fill(Infinity);
-  for (let k = 0, count = o < a.length ? a[o++] : 0; k < count; k++, o += 2) vale[a[o]] = a[o + 1];
-  return { rivers, plain, vale };
+  const cuts = a[o++];
+  // A river tile has no valleys of its own (an empty vale, as it was built).
+  const vale = new Float32Array(cuts ? cells : 0).fill(Infinity);
+  for (let k = 0; k < cuts; k++, o += 2) vale[a[o]] = a[o + 1];
+  const lakes: Lake[] = [];
+  for (let k = 0, count = a[o++]; k < count; k++) { const l = unpackLake(a, o); lakes.push(l.lake); o = l.end; }
+  const count = a[o++], lakeOf = new Int32Array(count ? cells : 0).fill(-1);
+  for (let k = 0; k < count; k++, o += 2) lakeOf[a[o]] = a[o + 1];
+  return { rivers, plain, vale, lakes, lakeOf };
 }
 
 /**
@@ -1125,6 +1162,25 @@ const worldKey = (sk: Skeleton): string => {
   if (k === undefined) worldKeys.set(sk, (k = `${sk.seed}|${JSON.stringify(sk.shape)}`));
   return k;
 };
+/** Tiles another thread traced (`adoptTiles`), packed, by the same keys as `shared`: taken when first asked for. */
+const adopted = new Map<string, Float64Array>();
+
+/** A tile traced in one thread, packed with its key, for another thread of the same world (`adoptTiles`). */
+export interface TracedTile { readonly key: string; readonly data: Float64Array }
+
+/**
+ * Every tile this thread has traced for the world of `sk`, packed: the main thread hands them to the terrain workers,
+ * which then need not trace them again (since phase W's lakes and valleys, seconds each).
+ */
+export function tracedTiles(sk: Skeleton): TracedTile[] {
+  const prefix = `${worldKey(sk)}|`;
+  return [...shared].filter(([k]) => k.startsWith(prefix)).map(([key, t]) => ({ key, data: packTile(t) }));
+}
+
+/** Tiles another thread traced (`tracedTiles`): this thread takes them instead of tracing them. */
+export function adoptTiles(tiles: readonly TracedTile[]): void {
+  for (const t of tiles) adopted.set(t.key, t.data);
+}
 
 export class Hydrology {
   private readonly tiles = new Map<string, HydroTile>();
@@ -1212,7 +1268,9 @@ export class Hydrology {
     if (!t) {
       const k = `${worldKey(this.skeleton)}|${JSON.stringify(o)}|${tiles === this.tiles ? '' : JSON.stringify(this.o)}|${key}`;
       t = shared.get(k);
+      const given = t ? undefined : adopted.get(k);
       if (t) shared.delete(k);
+      else if (given) { adopted.delete(k); t = new HydroTile(this.skeleton, tx, tz, o, null, unpackTile(given, (o.core + 2 * o.margin) ** 2)); }
       else t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz));
       shared.set(k, t);
       if (shared.size > SHARED_TILES) shared.delete(shared.keys().next().value!);

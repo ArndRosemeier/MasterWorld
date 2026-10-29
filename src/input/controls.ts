@@ -37,6 +37,7 @@ export const ACTIONS = [
   { id: 'book', label: 'Abilities (arrange the bar)' },
   { id: 'search', label: 'Search, open, take' },
   { id: 'use', label: 'Use: climb down a hatch, up a ladder' },
+  { id: 'vgm', label: 'The game master (for building the game)' },
 ] as const;
 
 export type Action = (typeof ACTIONS)[number]['id'];
@@ -84,6 +85,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   search: ['KeyG', ''],
   // E also strafes right: it uses only what is there to use (a hatch at one's feet, a ladder in front).
   use: ['KeyE', ''],
+  vgm: ['F9', ''],
 };
 
 /** Keys that are never bound: Escape opens the settings. */

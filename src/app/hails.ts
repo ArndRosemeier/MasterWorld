@@ -65,7 +65,8 @@ export class Hails {
     const id = hailer(life.agents.map((g) => ({
       id: g.person.id, x: g.x, z: g.z,
       asleep: g.act === 'sleep' || g.act === 'away',
-      busy: !!g.held || !!g.seek || g.person.role === 'child',
+      // One a map mark keeps in place (the innkeeper while the hero is told to ask at the inn) does not come over.
+      busy: !!g.held || !!g.seek || g.person.role === 'child' || life.isKept(g.person.id),
     })), knows, h, sent);
     const b = id === null ? null : life.agentOf(id) ?? null;
     if (!b) return;

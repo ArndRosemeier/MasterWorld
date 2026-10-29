@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { Director } from '../src/vgm/director';
 import { TOOLS, toolOf, vgmTurn } from '../src/vgm/toolbox';
-import { PACING, toolFor, vgmLines } from '../src/vgm/vgmLog';
+import { PACING, toolFor, vgmLines, VgmWatch } from '../src/vgm/vgmLog';
 import type { Decision, DungeonDecision } from '../src/world/decisions';
 import { EAST, frontierLand } from './frontierLand';
 
@@ -68,4 +68,16 @@ test('vgm log: the pacing changes how fast the needs grow', () => {
     assert.ok(calm[n] < normal[n] && normal[n] < eventful[n], n);
     assert.ok(Math.abs(eventful[n] / calm[n] - PACING.eventful / PACING.calm) < 1e-6, n);
   }
+});
+
+test('vgm log: the watch for its alerts gives each new move once, not what was there before', () => {
+  const sight = (id: string): Decision => ({ kind: 'sight', id, sight: 'cairn', x: 0, z: 0, yaw: 0, seed: 1, at: 1 });
+  const before = [sight('sight-1'), sight('sight-2')];
+  const watch = new VgmWatch(before.length);
+  assert.deepEqual(watch.see(before), [], 'what the log held is not news');
+  const later = [...before, sight('sight-3'), sight('sight-4')];
+  assert.deepEqual(watch.see(later).map((l) => l.id), ['sight-3', 'sight-4']);
+  assert.equal(watch.see(later).length, 0, 'each move once');
+  assert.equal(watch.see([sight('other-1')]).length, 0, 'a shorter log (another game) starts over from its end');
+  assert.deepEqual(watch.see([sight('other-1'), sight('other-2')]).map((l) => l.tool), ['sight']);
 });

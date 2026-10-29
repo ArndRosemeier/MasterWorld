@@ -21,6 +21,7 @@ import type { Town } from '../world/town';
 import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
+import { keptAt } from '../sim/marked';
 
 /** How many of a taken place's folk wait at their camp, and how far round its middle they sit (m). */
 const CAMPED = 5;
@@ -294,6 +295,37 @@ export class Township {
   /** A VGM order for this town (a gathering, a curfew): into the log by the caller, and its people follow it. */
   obey(o: TownOrder): void {
     this.life.order(o);
+  }
+
+  /** The marks last kept to (`keepMarked`), and in which life. */
+  private keptKey = '';
+  private keptLife: TownLife | null = null;
+
+  /**
+   * The map's marks (the open leads): whoever one is sent here to find (the innkeeper at the start, a cellar's
+   * household) keeps to that building while awake (sim/marked.ts), instead of wandering the town; so does every
+   * guild house's keeper (the teachers).
+   */
+  keepMarked(life: TownLife, marks: readonly { readonly id: string; readonly x: number; readonly z: number }[]): void {
+    const t = this.talkOf;
+    const key = `${t ? 1 : 0}|${marks.map((m) => `${m.id}@${m.x.toFixed(1)},${m.z.toFixed(1)}`).join('|')}`;
+    if (key === this.keptKey && life === this.keptLife) return;
+    this.keptKey = key;
+    this.keptLife = life;
+    const kept = keptAt(this.town.plan, this.residents, marks.map((m) => ({ x: m.x, z: m.z, who: t && t.houseOf(m.id) >= 0 ? t.reportTo(m.id) : undefined })));
+    // The teachers keep to their houses too (one comes to the hedge witch's cottage to find her there).
+    for (const [id, b] of this.teachersAt) if (!kept.has(id)) kept.set(id, b);
+    life.keep(kept);
+  }
+
+  /** Each guild house's keeper (by person id) and their house: where the hero comes to learn, always found there while awake. */
+  private get teachersAt(): Map<number, number> {
+    const out = new Map<number, number>();
+    for (const { guild, b } of this.guilds) {
+      const p = this.residents.find((x) => x.work === b.id && x.trade === guild.keeper);
+      if (p) out.set(p.id, b.id);
+    }
+    return out;
   }
 
   /** Whether its people live yet (a town far off never needed them). */

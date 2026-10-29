@@ -8,6 +8,15 @@
   font-family: 'EB Garamond', Georgia, serif; color: var(--ink); transition: opacity .6s, transform .6s cubic-bezier(.3, 1.4, .5, 1), box-shadow .4s; user-select: none; }
 #bar.hidden { opacity: 0; pointer-events: none; transform: translate(-50%, 30px); }
 #bar.editing { box-shadow: 0 6px 20px #000a, inset 0 1px 0 #ffffff14, 0 0 0 1px var(--ward), 0 0 18px #8fe3ff66; animation: bar-wake 2.4s ease-in-out infinite; }
+/* The experience rule (D58): a brass trough along the strap's top, notched every tenth, filling with brass light
+   toward the next level; the experience still needed engraved on it. It glints when experience comes in. */
+#bar .xp { position: absolute; left: 30px; right: 30px; top: -15px; height: 14px; pointer-events: none; }
+#bar .xp .trough { position: absolute; inset: 0; border-radius: 7px; overflow: hidden; background: linear-gradient(#0b0807, #1d140d); border: 1.5px solid var(--brass); box-shadow: 0 0 0 1px var(--brass-dark), inset 0 2px 4px #000, 0 2px 6px #0009; }
+#bar .xp .trough::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), #4a351099 calc(10% - 1px) 10%); }
+#bar .xp i { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(#fff0c0, var(--brass) 40%, var(--brass-mid) 75%, var(--brass-lo)), linear-gradient(90deg, transparent 70%, #8fe3ff55); background-blend-mode: screen; box-shadow: 0 0 8px #e2bd6888, 2px 0 6px var(--ward); transition: width .8s cubic-bezier(.3, 1.2, .5, 1); }
+#bar .xp span { position: absolute; inset: 0; display: grid; place-items: center; font: 11px/1 'Marcellus SC', Georgia, serif; letter-spacing: .06em; color: #fffaf0; text-shadow: 1px 0 0 #120c08, -1px 0 0 #120c08, 0 1px 0 #120c08, 0 -1px 0 #120c08, 0 0 4px #000, 0 0 6px #000c; white-space: nowrap; }
+#bar .xp.gained .trough { animation: xp-glint .9s ease-out; }
+@keyframes xp-glint { 0% { box-shadow: 0 0 0 1px var(--brass-dark), inset 0 2px 4px #000, 0 0 14px var(--ward); } 100% { box-shadow: 0 0 0 1px var(--brass-dark), inset 0 2px 4px #000, 0 2px 6px #0009; } }
 #bar.fallen .socket { filter: grayscale(1) brightness(.4); transition: filter 1.2s; }
 @keyframes bar-wake { 50% { box-shadow: 0 6px 20px #000a, inset 0 1px 0 #ffffff14, 0 0 0 1px var(--ward-hot), 0 0 26px #8fe3ffaa; } }
 
@@ -44,4 +53,4 @@
 .book .ability small { display: block; color: var(--ink-dim); font-size: 14px; line-height: 1.25; }
 .book .ability .cost { color: var(--brass); font-size: 12px; font-style: italic; }
 
-@media (max-width: 640px) { #bar { gap: 4px; padding: 6px 8px; bottom: 10px; } .socket { width: 30px; height: 30px; font-size: 15px; } .socket .ring { -webkit-mask: radial-gradient(circle, transparent 16px, #000 17px); mask: radial-gradient(circle, transparent 16px, #000 17px); } }
+@media (max-width: 640px) { #bar { gap: 4px; padding: 6px 8px; bottom: 10px; } #bar .xp { left: 18px; right: 18px; top: -13px; height: 12px; } #bar .xp span { font-size: 10px; } .socket { width: 30px; height: 30px; font-size: 15px; } .socket .ring { -webkit-mask: radial-gradient(circle, transparent 16px, #000 17px); mask: radial-gradient(circle, transparent 16px, #000 17px); } }

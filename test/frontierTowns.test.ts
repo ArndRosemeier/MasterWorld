@@ -11,7 +11,9 @@ import { EAST, SOUTH, WEST, frontierLand } from './frontierLand';
 const { along, first, home, regions, seed, terrain } = frontierLand();
 
 test('frontier: waystations, hamlets and villages are towns of their size from the one planner, settled from the log', () => {
-  const founded = [along(EAST), along(SOUTH), along(WEST)].flatMap((log) => regionDecisions(log).filter((d) => settlementOf(d, regions.fills)));
+  // Each walk numbers its regions from the start's: their places are named apart here (one region-16 a waystation
+  // east and a village south settled the waystation twice).
+  const founded = [along(EAST), along(SOUTH), along(WEST)].flatMap((log, w) => regionDecisions(log).filter((d) => settlementOf(d, regions.fills)).map((d) => ({ ...d, id: `${d.id}-${w}` })));
   const sizes = new Set<string>();
   for (const d of founded) {
     const t = settlementOf(d, regions.fills)!;

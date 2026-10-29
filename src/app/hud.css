@@ -16,7 +16,7 @@
 #fight .vial.stamina .liquid { background: linear-gradient(#ffe6a0, #c99a2e 55%, #6f4f12); }
 #fight .vial.mana .liquid { background: linear-gradient(#a8c8ff, #3157c9 55%, #142a6e); }
 #fight .vial.hidden { display: none; }
-/* The hero's level (D58): a brass seal with the number engraved, the way to the next a thin rule beside it. */
+/* The hero's level (D58): a brass seal with the number engraved (the way to the next: the action bar's experience rule). */
 #fight .level { display: flex; align-items: center; gap: 8px; }
 #fight .seal { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 15px 'Marcellus SC', Georgia, serif; color: #2a1c0c; background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 55%, var(--brass-dark)); box-shadow: inset 0 1px 2px #fff8, inset 0 -2px 3px #0008, 0 0 0 1px var(--brass-dark); text-shadow: 0 1px 0 #fff6; }
 /* A level gained (G3): the seal flares with ward light and the new number is cut into it, from a bright groove to brass. */
@@ -26,8 +26,6 @@
   35% { box-shadow: inset 0 1px 2px #fff8, inset 0 -2px 3px #0008, 0 0 0 1px var(--brass-dark), 0 0 14px 4px var(--ward); transform: scale(1.12); }
   100% { box-shadow: inset 0 1px 2px #fff8, inset 0 -2px 3px #0008, 0 0 0 1px var(--brass-dark), 0 0 0 0 transparent; color: #2a1c0c; text-shadow: 0 1px 0 #fff6; transform: scale(1); }
 }
-#fight .toward { flex: 1; height: 4px; border-radius: 2px; background: #0b0807; border: 1px solid var(--brass-lo); overflow: hidden; }
-#fight .toward i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--brass), var(--ward)); transition: width .6s; }
 #fight .vial .liquid::after { content: ''; position: absolute; inset: 2px 6px auto 6px; height: 3px; border-radius: 2px; background: #fff6; animation: hud-glint 5s ease-in-out infinite; }
 #fight .vial .text { position: absolute; inset: 0; text-align: center; font-size: 12px; line-height: 13px; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
 #fight .vial.slosh .liquid { animation: hud-slosh .45s ease-out; }
@@ -100,6 +98,10 @@
 #compass .studs { position: absolute; left: 50%; top: 50%; }
 #compass .stud { position: absolute; left: -3.5px; top: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, #ff9a7a 45%, #c0391b); box-shadow: 0 0 6px #ff7a50; }
 #compass .stud.new { animation: stud-in 1.2s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+/* The VGM's places (its show mode, a developer's aid): ward-blue studs with a slow pulse. */
+#compass .stud.vgm { left: -4px; top: -4px; width: 8px; height: 8px; background: radial-gradient(circle at 40% 35%, #fff, var(--ward) 45%, #1d6f8a); box-shadow: 0 0 7px var(--ward); }
+#compass .stud.vgm::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--ward); animation: vgm-stud 2.4s ease-out infinite; opacity: 0; }
+@keyframes vgm-stud { from { scale: .6; opacity: .9; } to { scale: 2.2; opacity: 0; } }
 @keyframes stud-in { from { scale: 3.5; opacity: 0; } }
 #compass .lubber { position: absolute; left: 50%; top: -4px; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-top: 9px solid var(--brass); filter: drop-shadow(0 1px 1px #000); }
 #compass .orrery { position: relative; width: 34px; height: 34px; margin-top: 8px; }

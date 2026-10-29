@@ -95,6 +95,8 @@ import { Title } from './app/title/title';
 import type { People } from './app/title/lines';
 import { Creator, PEOPLE_RACE, heroNameFor } from './app/creatorUi';
 import { Notes } from './app/notes';
+import { VgmAlerts } from './app/vgmAlerts';
+import { VgmUi } from './app/vgmUi';
 import { BrookPrefetch } from './app/brooks';
 import { BridgeView } from './render/bridgeView';
 import { TalkUi } from './app/talkUi';
@@ -143,7 +145,7 @@ import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/s
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
 import { bridgesNear } from './world/bridges';
-import { emptyWater, inChannel } from './world/hydro';
+import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
 declare global {
@@ -397,7 +399,11 @@ export async function start(b: Boot): Promise<void> {
     // Brook tiles ahead of the hero come from the world worker (D50).
     const brooks = new BrookPrefetch(terrain.hydro, jobs);
     // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
-    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
+    const terrainPool = createTerrainPool();
+    // First of all they hear of the rivers' and brooks' tiles this thread traced opening the world: each opens it on
+    // them instead of tracing them again (since phase W's lakes and valleys, seconds each, while 'Raising the land' waited).
+    void terrainPool.broadcast({ kind: 'tiles', tiles: tracedTiles(terrain.skeleton), seed, setting: setting.id }).catch(() => {});
+    const terrainJobs = new TerrainJobs(terrainPool, seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
     // The land round the camera is asked for early (after the roads, which the workers hear of first), so its
@@ -1249,7 +1255,9 @@ export async function start(b: Boot): Promise<void> {
       paused: pausedWith('ui/map'),
       get bindings() { return settings.current.bindings; },
       height: (x, z) => terrain.height(x, z),
-      water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
+      // The land's own water (rivers, lakes, the sea), everywhere: the sea's masks hold only what is round the camera.
+      water: (x, z) => terrain.waterDepth(x, z),
+      woods,
       heroAt: () => heroAt(player.walker.yaw),
       known,
       roadLines: () => terrain.roads.roads,
@@ -1500,6 +1508,25 @@ export async function start(b: Boot): Promise<void> {
       goodDay: () => goodDayNow(),
       bridges: (x, z) => bridgesNear(terrain.roads, terrain.hydro, x, z, 4000, (px, pz) => terrain.hydro.hasBrooks(px, pz)),
     });
+    // The VGM seen at work (a developer's aid; D53 keeps it out of play): its moves on screen as they come, and
+    // its window (F9) with its needs, its log and buttons that make it act now.
+    const vgmAlerts = new VgmAlerts(vgmLines(log, vgmLog));
+    const vgmUi = new VgmUi({
+      paused, get bindings() { return settings.current.bindings; },
+      lines: () => vgmLines(log, vgmLog),
+      needs: director.needs,
+      get alerts() { return settings.current.vgmAlerts; },
+      set alerts(on) { settings.set({ vgmAlerts: on }); },
+      answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
+      situations: ['hurt-traveller', 'paddock-wolves', 'stray-beast'],
+      situation: (kind) => { const m = situationNow(kind as SituationKind); return m ? `${m.tool}: ${m.reason}` : `no ${kind} here`; },
+      events: setting.events ?? [],
+      storyEvent: (id?: string) => storyEventNow(id),
+      goodDay: () => goodDayNow(),
+      // A few steps south of it, so what stands there is in front of the hero, not under their feet.
+      goNear: (x, z) => player.goTo([x, z + 8]),
+    });
+    settings.watch((s) => { vgmAlerts.on = s.vgmAlerts; });
     new DebugMenu({
       paused,
       get freeCamera() { return player.flying; },
@@ -1531,9 +1558,9 @@ export async function start(b: Boot): Promise<void> {
       legends: setting.items.uniques.map((u) => ({ id: u.id, name: u.name })),
       events: setting.events ?? [],
       storyEvent: (id?: string) => storyEventNow(id),
-      answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
-      situation: (kind) => { const m = situationNow(kind); return m ? `${m.tool}: ${m.reason}` : `no ${kind} here`; },
-      goodDay: () => goodDayNow(),
+      openVgm: () => vgmUi.setOpen(true),
+      get vgmAlerts() { return settings.current.vgmAlerts; },
+      set vgmAlerts(on) { settings.set({ vgmAlerts: on }); },
       gainLevel: () => { const next = setting.growth.xp[character.level]; if (next === undefined) return 'at the top level'; character.gain(next - character.xp); return `level ${character.level}`; },
       vgmLog: () => vgmLines(log, vgmLog),
       wearLegend: (id) => wearLegend(id),
@@ -1930,11 +1957,13 @@ export async function start(b: Boot): Promise<void> {
       if (minimap.showWhile(!title?.holding && !creator?.showing && !!window.__mwReady)) {
         const look = player.flying ? player.fly.yaw : player.heroCam.yaw, me = heroAt(player.walker.yaw);
         minimap.read({ x: me.x, z: me.z, look, yaw: me.yaw, hour: view.sky.hour, sky: skyGlyph(), marks: journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })) });
+        minimap.vgmMarks(vgmAlerts.marks, me.x, me.z);
       }
       part('vgm direct');
       direct(dt);
       part('notes+rest+bar');
       notes.update(dt);
+      vgmAlerts.seeLog(log, vgmLog, !title?.holding && !creator?.showing && !!window.__mwReady, dt);
       rest.watch(restWatch());
       player.resting = rest.sitting;
       actionBar.inPlay = playing && !ended && !title?.holding && !creator?.showing;
@@ -1984,7 +2013,7 @@ export async function start(b: Boot): Promise<void> {
       // Every town's people near the hero live (and are drawn), and its animals graze.
       const cam = view.camera.position;
       part('towns.live');
-      const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain });
+      const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain }, journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })));
       if (folk) folk.lives = lives;
       part('herds');
       stock?.herd(dt, cam, towns.graze(dt, cam.x, cam.z));

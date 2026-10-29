@@ -4,6 +4,7 @@
  * of milestone 1 a short walk outside it, and the hold of a people (plan 11.6) in the hills a walk away. Deterministic per seed; the result goes into the decision log.
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
+import { HOUSE_SCALE } from '@futuremagic/settlement';
 import type { SettingModule } from '../setting/contract';
 import { sitesIn, type Decision, type DecisionLog, type TownDecision } from '../world/decisions';
 import { findStart, startGround, type StartPlace } from '../world/start';
@@ -67,7 +68,7 @@ const STEP = 100;
 /** How far from the setting's start place the start may move to reach a river (doubling until one is found). */
 const BANK_SEARCH = [6000, 12000, 24000, 48000];
 /** A town's outline radius, roughly, while the start looks for a bank. */
-const START_R = 75;
+const START_R = 75 * HOUSE_SCALE;
 
 /**
  * The start moved to the river nearest the setting's start place (D50: a town needs fresh water): the
@@ -105,8 +106,8 @@ export function waterside(t: Terrain, start: StartPlace): StartPlace {
  */
 export function startTown(t: Terrain, home: { x: number; z: number }, arch: ArchSite | null): TownDecision | null {
   const seed = deriveSeed(t.seed, 'vgm', 'start-town');
-  // A small town of about 80-120 people (D41): an outline of 68-76 m.
-  const R = 68 + 8 * hash2f(seed, 1, 1);
+  // A small town of about 80-120 people (D41): an outline of 68-76 m, times the houses' scale (AssetGenerator HOUSE_SCALE).
+  const R = (68 + 8 * hash2f(seed, 1, 1)) * HOUSE_SCALE;
   const w = { river: 0, lake: 0 };
   // Only where the start has water near (else, on a dry seed, the old rule: the best spot without it).
   const needWater = freshWaterEdge(t, home.x, home.z, SEARCH, false) < SEARCH;

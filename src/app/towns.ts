@@ -227,14 +227,16 @@ export class Towns {
   /** The gates' leaves of the town of this id, how far open each gate stands (none: not drawn). */
   gatesOf(id: string): number[] | null { return this.gates.get(id)?.open ?? null; }
 
-  /** Every town's people near `focus`, living (detail where `focus` is); those are drawn. */
-  live(dt: number, focus: { x: number; z: number }, weather: TownWeather): TownLife[] {
+  /** Every town's people near `focus`, living (detail where `focus` is); those are drawn. `marks`: the map's (the open leads). */
+  live(dt: number, focus: { x: number; z: number }, weather: TownWeather, marks: readonly { readonly id: string; readonly x: number; readonly z: number }[] = []): TownLife[] {
     const out: TownLife[] = [];
     for (const t of this.cores.values()) {
       // Its own ground near, or one of its people out on the land (a traveller far from home, C9).
       if (!t.town.near(focus.x, focus.z, LIVE) && !t.posts.some((p) => Math.hypot(p.x - focus.x, p.z - focus.z) < LIVE)) continue;
       const life = t.life;
       life.focus = focus;
+      // Whoever the map's marks point at here stays where the mark is.
+      t.keepMarked(life, marks);
       life.step(dt, this.h.hours(), weather);
       out.push(life);
     }

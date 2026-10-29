@@ -97,10 +97,21 @@ export class Lake {
     return [bx, bz];
   }
 
+  /** The lake as numbers, to hand it to another thread (`unpackLake` makes it again). */
+  pack(): number[] {
+    return [this.level, this.depth, this.cells, this.i0, this.j0, this.w, this.h, ...this.crest, ...this.spill, ...this.shoreDist];
+  }
+
   /** The world box (x0, z0, x1, z1) of the lake and its shore. */
   get box(): [number, number, number, number] {
     return [this.i0 * LAKE_GRID, this.j0 * LAKE_GRID, (this.i0 + this.w) * LAKE_GRID, (this.j0 + this.h) * LAKE_GRID];
   }
+}
+
+/** A lake `Lake.pack` packed, from `a` at `o`; and where its numbers end. */
+export function unpackLake(a: ArrayLike<number>, o: number): { lake: Lake; end: number } {
+  const w = a[o + 5], h = a[o + 6], d = Float32Array.from(Array.prototype.slice.call(a, o + 11, o + 11 + w * h) as number[]);
+  return { lake: new Lake(a[o], a[o + 1], a[o + 2], a[o + 3], a[o + 4], w, h, d, [a[o + 7], a[o + 8]], [a[o + 9], a[o + 10]]), end: o + 11 + w * h };
 }
 
 /**

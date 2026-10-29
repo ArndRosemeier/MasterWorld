@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
-import { BROOKS, brookDepth, packTile } from '../src/world/hydro';
+import { BROOKS, HydroTile, brookDepth, packTile, tracedTiles, unpackTile } from '../src/world/hydro';
 import { DRY, flowSpeed, waterMask } from '../src/world/water';
 import { finerFor } from '../src/world/chunkMesh';
 import { SMALL } from './small';
@@ -110,6 +110,25 @@ test('brooks: a tile traced in a worker and handed over answers as one traced he
     assert.deepEqual(other.hydro.query(x, z), terrain.hydro.query(x, z));
     assert.equal(other.height(x, z), terrain.height(x, z));
   }
+});
+
+test('a river tile traced here and handed to a worker answers alike, its lakes too', () => {
+  const main = terrain.hydro.tileAt(-30000, 34000), o = SMALL;
+  const given = new HydroTile(terrain.skeleton, main.tx, main.tz, o, null, unpackTile(packTile(main), (o.core + 2 * o.margin) ** 2));
+  assert.equal(given.lakes.length, main.lakes.length);
+  assert.ok(main.lakes.length > 0, 'a tile with lakes');
+  // Round every lake (its water and shore) and over the tile.
+  const at: [number, number][] = [];
+  for (const l of main.lakes.slice(0, 20)) { const [ax, az, bx, bz] = l.box; for (let k = 0; k < 20; k++) at.push([ax + (bx - ax) * ((k * 7) % 20) / 20, az + (bz - az) * ((k * 13) % 20) / 20]); }
+  const span = (o.core + 2 * o.margin) * o.cell;
+  for (let k = 0; k < 300; k++) at.push([main.x0 + span * ((k * 7919) % 300) / 300, main.z0 + span * ((k * 104729) % 299) / 299]);
+  for (const [x, z] of at) {
+    assert.deepEqual(given.query(x, z), main.query(x, z));
+    assert.equal(given.onFloors(x, z, 50), main.onFloors(x, z, 50));
+    assert.equal(given.valeAt(x, z), main.valeAt(x, z));
+  }
+  // What a worker is handed: this world's tiles, each by its key.
+  assert.ok(tracedTiles(terrain.skeleton).some((t) => t.key.endsWith(`|${main.tx},${main.tz}`)));
 });
 
 test('brooks: the mask carries a brook\'s level well onto its banks, under the ground, so far water vertices find it', () => {
