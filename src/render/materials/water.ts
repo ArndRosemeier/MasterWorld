@@ -20,6 +20,8 @@ import { EYE, WORLD } from '../origin';
 let envTex: Texture | null = null;
 /** Seconds a running water's pattern is carried before it fades back (flow map cycle). */
 const FLOW_CYCLE = 1.6;
+/** Above this height (m) still water is a lake, not the sea, and has no surf. */
+const SEA_SURF_TOP = 3;
 /** How white the wet rim at a still water's edge is (0..1). */
 const WET_RIM = 0.2;
 /** Running water's foam streaks lie along one of this many fixed directions (the two nearest the current, blended). */
@@ -160,6 +162,9 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const deepens = fwidth(depth).div(max(fwidth(p.x).add(fwidth(p.z)), 1e-3));
     const nearShore = float(1).sub(smoothstep(3.0, 10.0, depth.div(max(deepens, 0.02))));
     const shore = float(1).sub(smoothstep(0.0, 2.8, depth)).mul(still).mul(nearShore);
+    // Surf rolls in from the sea only: a lake has no breakers, and over its long flat shelves the bands stood still as
+    // one solid white strip along the shore (gate W). The sea's surface is at 0 m, a lake's well above it.
+    const surf = shore.mul(smoothstep(SEA_SURF_TOP, 0.5, p.y));
     // Streaks: noise stretched along the flow and carried with it (in the same two layers as the ripples). Stretched
     // along one of STREAK_DIRS fixed directions, the two either side of the current blended: turning the world
     // coordinates by the current itself (which bends across a narrow brook) tore them into blocks.
@@ -186,7 +191,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       .add(mx_noise_float(vec3(sideways.mul(4.0), p.y.mul(0.5).add(t.mul(6.0)), 3.1)).mul(0.15)).add(0.5);
     const bands = sin(depth.mul(4.2).sub(t.mul(1.7)).add(n.mul(5))).mul(0.5).add(0.5);
     const foam = clamp(
-      shore.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
+      surf.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
         // The wet rim, on still water only: running water's depth comes from masks too coarse for a brook, which is
         // shallow all across and would turn white; its edge is where the surface meets the bank.
         // Faint: at 0.6 it drew every lake's flat shore as a hard white line (gate W shots).
