@@ -6,7 +6,7 @@ import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonForm } from '../../setting/contract';
 import type { DungeonDecision, DungeonTemplate } from '../decisions';
-import { outlineCellar, type Cellar, type DungeonPlace } from './cellar';
+import { isEmpty, outlineCellar, type Cellar, type DungeonPlace } from './cellar';
 import { setPiecesFor } from './setPieces';
 
 export interface VarietyReport {
@@ -63,7 +63,7 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
     if (!c.history.every((h) => c.rooms.some((r) => r.era === h.layer) || c.props.some((p) => p.trace === h.layer))) problems.push(`${where}: a history layer left nothing behind`);
     if (c.pieceLink < 0) problems.push(`${where}: no signature set piece`);
     if (!c.clues.length) problems.push(`${where}: nothing to read`);
-    if (!c.spawns.length) problems.push(`${where}: nobody lives there`);
+    if (!c.spawns.length && !isEmpty(c)) problems.push(`${where}: nobody lives there`);
     if (!c.hatch || c.hatch.kind !== lore.form.space.way) problems.push(`${where}: no way back out`);
     aspects.layout.push(c.signature);
     aspects.mainPattern.push(c.graph.patterns[0]);

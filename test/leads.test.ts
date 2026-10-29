@@ -7,7 +7,7 @@ import { LEADS, keepPromise, nextPromise, openPromises, occupationOf } from '../
 import { loreOf, placeOf } from '../src/vgm/dungeons';
 import { townsfolk } from '../src/sim/people';
 import { talkCellar, townTalk } from '../src/talk/townTalk';
-import { moveIn, occupantId, outlineCellar } from '../src/world/dungeon/cellar';
+import { isEmpty, moveIn, occupantId, outlineCellar } from '../src/world/dungeon/cellar';
 import type { Decision, DecisionLog, DungeonDecision } from '../src/world/decisions';
 import { SMALL } from './small';
 
@@ -91,7 +91,7 @@ test('leads: now and then the new place is out on the land (a barrow, a cave, a 
     assert.ok(far > 500 && far < 1700, `${b.id} at ${far.toFixed(0)} m`);
     assert.equal(terrain.waterDepth(b.site!.x, b.site!.z), 0);
     const c = outlineCellar(b, placeOf(b, terrain.towns, classic.dungeons)!, loreOf(classic, kind));
-    assert.ok(classic.dungeons[kind]!.dwellers.some((w) => w.id === c.dweller.id), `a ${kind} dweller`);
+    assert.ok(classic.dungeons[kind]!.dwellers.some((w) => w.id === c.dweller.id) || isEmpty(c), `a ${kind} dweller (or an empty cave)`);
     assert.ok(!c.setPiece.kinds || c.setPiece.kinds.includes(kind), `${c.setPiece.id} fits a ${kind}`);
     assert.match(c.house, new RegExp(`^${NAMES[kind]} (north|south|east|west)`));
     const t = talkCellar(b, classic, town, people, log)!;

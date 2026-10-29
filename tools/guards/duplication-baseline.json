@@ -550,5 +550,17 @@
   {
     "key": "same name: masterworld/sim/dungeonNav.ts#at + masterworld/sim/townLife.ts#at",
     "reason": "Unrelated lookups that share a name: the dungeon cell under a point, and a townsperson's errand at a spot."
+  },
+  {
+    "key": "same name: masterworld/game/delve.ts#beaten + masterworld/sim/creatures.ts#beaten",
+    "reason": "Delve.beaten is the den's, except for an empty place (a sight, D57), which is done once what lies at its end is searched."
+  },
+  {
+    "key": "same name: masterworld/vgm/dungeons.ts#cliff + masterworld/world/skeleton.ts#cliff",
+    "reason": "Unrelated: the ground rule for a place standing at a cliff's foot (a DungeonForm.stands key), and the skeleton's sea cliff height."
+  },
+  {
+    "key": "idiom: [.seed .terrain] in masterworld/app/regionSites.ts + masterworld/vgm/caves.ts + masterworld/vgm/events.ts",
+    "reason": "Reading the world's seed and terrain off a context object is how every VGM tool starts, not a copied helper; the cave tool (L6) was the third."
   }
 ]

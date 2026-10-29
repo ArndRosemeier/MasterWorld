@@ -39,7 +39,8 @@ export function cellarDanger(c: Cellar, defs: readonly CreatureDef[]): number {
 
 /** The cellar's chests and the lair's hoard. */
 export function hoardsOf(c: Cellar, defs: readonly CreatureDef[]): Hoard[] {
-  const danger = cellarDanger(c, defs);
+  // An empty place (a sight) keeps what an older people left: as rich as the land's danger there.
+  const danger = c.dweller.creatures.length ? cellarDanger(c, defs) : (c.decision.danger ?? 18) * 0.8;
   const out: Hoard[] = [];
   for (const p of c.props) {
     if (p.kind !== 'chest') continue;
@@ -49,7 +50,7 @@ export function hoardsOf(c: Cellar, defs: readonly CreatureDef[]): Hoard[] {
   out.push({
     id: out.length, x: (r.x + r.w / 2) * cell, y: r.level * storey, z: (r.z + r.d / 2) * cell, room: r.id, table: 'lair', danger,
     // New dwellers gather a hoard of their own.
-    seed: deriveSeed(c.occupation?.seed ?? c.decision.seed, 'hoard', out.length), name: `the ${c.dweller.id === 'rats' ? 'nest' : 'hoard'}`, prop: false,
+    seed: deriveSeed(c.occupation?.seed ?? c.decision.seed, 'hoard', out.length), name: !c.dweller.creatures.length ? 'what was left here' : `the ${c.dweller.id === 'rats' ? 'nest' : 'hoard'}`, prop: false,
   });
   return out;
 }

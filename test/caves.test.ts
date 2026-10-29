@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { outlineCellar, waysLength } from '../src/world/dungeon/cellar';
 import { CaveSpace, caveField, caveShell } from '../src/world/dungeon/caveRock';
-import { caveMouth, MOUTH_WAY_DOWN } from '../src/world/dungeon/caveMouth';
+import { caveMouth, inCliff, MOUTH_WAY_DOWN } from '../src/world/dungeon/caveMouth';
 import { inWalkRaster } from '../src/world/dungeon/rockMesh';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../src/world/dungeon/towerMesh';
 import { inFrame, onLand } from '../src/world/dungeon/site';
@@ -82,6 +82,16 @@ test('cave mouth: a crag on the hillside, its way in open from the land to the w
   assert.ok(inWalkRaster(m.walk, 0, -9), 'rock over the way down');
   // Seeded.
   assert.deepEqual(caveMouth(5, slope).mesh.position, m.mesh.position);
+});
+
+test('cave mouth: in a cliff, a bigger crag against the face, its way in open to its own way down', () => {
+  // Level ground, then a wall 30 m high 6 m in.
+  const wall = (x: number, z: number) => (z > -6 ? 0 : Math.min(30, (-6 - z) * 4)) + Math.sin(x * 0.3) * 0.2;
+  assert.ok(inCliff(wall) && !inCliff((_x, z) => -z * 0.25), 'a cliff is told from a hillside');
+  const m = caveMouth(5, wall, true);
+  assert.ok(m.cliff && m.way.z < MOUTH_WAY_DOWN.z, 'its way down lies deeper in');
+  for (let z = 4; z >= m.way.z; z -= 0.25) assert.ok(!inWalkRaster(m.walk, 0, z), `blocked at z ${z}`);
+  assert.ok(inWalkRaster(m.walk, 6, -3) || inWalkRaster(m.walk, -6, -3), 'flanks of rock');
 });
 
 test('tower: a keep with its doorway open, its walls in the way, sized to its rooms', () => {

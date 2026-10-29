@@ -288,7 +288,10 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     find: (g) => g.links.find((l) => l.kind === 'grate' && (l.a === g.goal || l.b === g.goal)) ?? null,
     dress({ link, graph, dweller, put, clue }) {
       const near = other(link, graph.goal);
-      const k = clue(`Through a crack in the rock no wider than a hand, by your lantern's edge: ${dweller.signs[0].charAt(0).toLowerCase()}${dweller.signs[0].slice(1).replace(/[.!]$/, '')}. A draught comes through it, and the smell of where they sleep.`, near, link.id);
+      // (An empty cave: what lies at its end, no dwellers.)
+      const k = dweller.creatures.length
+        ? clue(`Through a crack in the rock no wider than a hand, by your lantern's edge: ${dweller.signs[0].charAt(0).toLowerCase()}${dweller.signs[0].slice(1).replace(/[.!]$/, '')}. A draught comes through it, and the smell of where they sleep.`, near, link.id)
+        : clue(`Through a crack in the rock no wider than a hand, by your lantern's edge: a hall going on further than the light, and something left there long ago. A draught comes through it, cold and old.`, near, link.id);
       put(near, 'rubble', 'now', k);
       put(graph.goal, 'bones', 'now');
     },

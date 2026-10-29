@@ -209,7 +209,9 @@ export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: Cell
   // Who was asked for (`dungeonFor`'s dwellers), if the lore has them here.
   const asked = d.dwellers ? lore.dwellers.filter((w) => w.encounter === d.dwellers) : [];
   const first = asked.length ? pickDef(rng, asked) : pickDef(rng, lore.dwellers, (w) => (!w.with || w.with.some((x) => ids.includes(x))) && w.danger <= (d.danger ?? Infinity));
-  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || first;
+  // Not every one is lived in (D57): an empty one is a sight, unless dwellers were asked for (its own stream: the rest stays).
+  const empty = lore.empty && !asked.length && !moved && new Rng(deriveSeed(d.seed, 'cellar', 'empty')).chance(lore.empty.share) ? emptyDweller(lore.empty.def) : null;
+  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || empty || first;
   const line = (def: HistoryDef) => def.text.replaceAll('{house}', name).replaceAll('{place}', name);
   const history: HistoryEntry[] = [];
   if (older) history.push({ layer: 'older', def: older, text: line(older) });
@@ -229,6 +231,14 @@ export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: Cell
   if (moved) facts.push([moved.id, moved.kind === 'retake' ? 'took' : 'moved into', d.id], [moved.id, 'is', dweller.id]);
   return { decision: d, form: lore.form, history, dweller, setPiece: piece, hints, facts, knownBy: { town: d.town, building: d.building }, house: name, ...(house.name ? { called: name } : {}), ...(d.site ? { site: d.site } : {}), ...(moved?.kind === 'move-in' ? { occupation: { id: moved.id, seed: moved.seed } } : {}), ...(moved ? { taken: moved.id } : {}) };
 }
+
+/** Nobody, as the dwellers of an empty place (its lore's `empty`): no creatures, no danger. */
+export function emptyDweller(def: NonNullable<CellarLore['empty']>['def']): DwellerDef {
+  return { ...def, encounter: '', creatures: [], crowd: 0, danger: 0 };
+}
+
+/** Nobody lives there (an empty place, a sight to explore). */
+export const isEmpty = (c: CellarSketch): boolean => c.dweller.creatures.length === 0;
 
 /** A sketch's history layer of a kind, if it has one. */
 export function layerOf(s: CellarSketch, k: HistoryLayer): HistoryEntry | undefined {
@@ -468,6 +478,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: ScaledLayout
  */
 function settle(graph: DungeonGraph, p: Pace, rooms: readonly CellarRoom[], now: DwellerDef, rng: Rng): Spawn[] {
   const spawns: Spawn[] = [];
+  if (!now.creatures.length) return spawns;
   const [lead, ...rest] = now.creatures;
   const other = () => (rest.length && rng.chance(0.6) ? rest[0] : lead);
   spawns.push({ creature: lead, room: graph.goal });

@@ -11,7 +11,7 @@ import { CELLAR_SPACE } from './cellar';
 export const cave: CellarLore = {
   // Water and rock: a storey below always (the water went down), the way up to the mouth a rock step with a ladder.
   form: {
-    stands: 'slope', ring: [700, 1600], called: 'the cave {dir} of the town', word: 'cave', purposes: ['lead', 'den', 'hideout'], shell: 'mouth', clearing: { back: 6, r: 17 },
+    stands: 'cliff', ring: [700, 1600], called: 'the cave {dir} of the town', word: 'cave', purposes: ['lead', 'den', 'hideout'], shell: 'mouth', clearing: { back: 6, r: 17 },
     // Natural caves are big (D57): 3 m cells, 4 m storeys, ramps of rock between them, chambers far apart along
     // long winding ways, and one great cavern six storeys (24 m) high.
     space: {
@@ -74,6 +74,16 @@ export const cave: CellarLore = {
     { id: 'lost', text: 'A shepherd boy went in after a lamb and was never found; nobody from town has gone in since.', uses: [], patterns: ['twin-paths', 'side-loop', 'hidden-shortcut'], traces: ['lantern'] },
     { id: 'sealed', text: 'Someone walled up the inner chambers long ago, and the wall has been broken from the inside.', uses: ['stand'], patterns: ['secret-key', 'barred-return', 'lock-key'], traces: ['bricks'] },
   ],
+  // Most caves are lived in (Arnd: "of course caves are usually populated"); one in five stands empty, a sight
+  // to explore to its end, where an older people left something.
+  empty: {
+    share: 0.2,
+    def: {
+      id: 'nobody', text: 'Nothing lives in {place} that anyone knows of. It goes deeper into the rock than anyone from the valley has gone.', uses: ['drip-hall', 'pool'], lair: 'painted-chamber',
+      patterns: ['seen-goal', 'gallery', 'split-descent', 'side-loop'], traces: ['jar'],
+      signs: ['Children dare each other to go in as far as the light reaches. None has gone further.', 'There is a wind out of it in summer, cold as a cellar, and a sound like water a long way down.'],
+    },
+  },
   dwellers: [
     {
       id: 'wolves', text: 'A wolf pack dens in {place} and hunts the valley from it.', uses: [], ...who('wolves'), lair: 'den', crowd: 2, danger: 16,
