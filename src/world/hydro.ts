@@ -361,7 +361,23 @@ export class HydroTile {
     this.resolveHollows(DI, DJ);
 
     this.vale = feed ? this.carveValleys(order, popped) : new Float32Array(0);
+    if (feed) this.leaveLakeBeds();
     this.traceRivers(DI, DJ);
+  }
+
+  /**
+   * A brook tile took a lake as ground at its water (its valleys come down to it): in the lake's cells that water is
+   * not the lake's bed, so they keep no sediment floor and cap the land no lower than the water. Cell by cell, so the
+   * land blends between them (switched off at the lake's edge, cliff tops there jumped from carved to uncarved).
+   */
+  private leaveLakeBeds(): void {
+    const { n, plain, vale, feed } = this, cell = this.o.cell;
+    for (let c = 0; c < n * n; c++) {
+      const i = c % n, level = feed!.lake(this.x0 + (i + 0.5) * cell, this.z0 + ((c - i) / n + 0.5) * cell);
+      if (Number.isNaN(level)) continue;
+      plain[c] = NaN;
+      vale[c] = Math.max(vale[c], level);
+    }
   }
 
   /**
@@ -1169,22 +1185,13 @@ export class Hydrology {
    * drainage ran over the land the rivers' floors and valleys had shaped).
    */
   onFloors(x: number, z: number, h: number): number {
-    const r = this.tileAt(x, z).onFloors(x, z, h);
-    return this.brookLand(x, z)?.onFloors(x, z, r) ?? r;
+    const r = this.tileAt(x, z).onFloors(x, z, h), b = this.brookTileAt(x, z);
+    return b ? b.onFloors(x, z, r) : r;
   }
 
   /** The most the land may stand at (x, z) by the brooks' valleys (W4b; Infinity without brooks). */
   valeAt(x: number, z: number): number {
-    return this.brookLand(x, z)?.valeAt(x, z) ?? Infinity;
-  }
-
-  /**
-   * The brook tile whose floors and valleys shape the land at (x, z): none in a lake (the brooks took a lake as ground
-   * at its water, so their valleys come down to it; their floors and valleys there are not its bed).
-   */
-  private brookLand(x: number, z: number): HydroTile | null {
-    const b = this.brookTileAt(x, z);
-    return b && Number.isNaN(this.tileAt(x, z).lakeLevel(x, z)) ? b : null;
+    return this.brookTileAt(x, z)?.valeAt(x, z) ?? Infinity;
   }
 
   /** The brook tile that owns a point (null without brooks). */

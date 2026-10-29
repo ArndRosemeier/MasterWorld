@@ -306,12 +306,14 @@ export class Terrain {
     // The water was traced over the land without them: by a river or brook they give way to its banks, and by a
     // lake to its shore (its rim holds it as the land's big shape has it, W3).
     if (forms > 0 && r?.river) forms *= smoothstep(r.half + 10, r.half + 80, r.dist);
-    // By a brook they and the small undulations give way closer in: its bed lies on its valley's floor, not under a
-    // knoll or a swell of the detail (a trench dug through them).
-    if (bk?.river) { const keep = smoothstep(bk.half + BROOK_CLEAR[0], bk.half + BROOK_CLEAR[1], bk.dist); forms *= keep; calm *= keep; }
+    // By a brook what they raise gives way closer in: its bed lies on its valley's floor, not under a knoll or a swell
+    // of the detail (a trench dug through them). What they lower stays (dells keep above its water, below): faded
+    // too, the land by the brook stood up as a strip with a bare drop where the dells came back.
+    const clear = bk?.river ? smoothstep(bk.half + BROOK_CLEAR[0], bk.half + BROOK_CLEAR[1], bk.dist) : 1;
     if (lake) { const keep = 1 - lake.calm(x, z); forms *= keep; calm *= keep; }
     if (forms > 0) {
-      let shaped = Math.max(Math.min(level, 1), level + this.landforms.offset(x, z) * forms);
+      const off = this.landforms.offset(x, z);
+      let shaped = Math.max(Math.min(level, 1), level + off * forms * (off > 0 ? clear : 1));
       // By a brook they dig no lower than its water (a gully runs down into it, a dell beside it stays dry).
       if (bk?.river && bk.dist < bk.valley && shaped < level) shaped = Math.max(shaped, Math.min(level, bk.level + 0.6 + (bk.dist - bk.half) * 0.04));
       // Nor, past its valley, a dell beside it lower than its water (it left the brook on a bank above the dell).
@@ -321,7 +323,7 @@ export class Terrain {
     if (calm > 0) {
       const rough = 1 + Math.min(4, e / 600);
       const d = this.detail.fbm2(x / 70, z / 70, 3) * 2.2 + this.detail.fbm2(x / 9 + 71.3, z / 9 - 12.9, 2) * 0.25;
-      level = Math.max(Math.min(level, 0.5), level + d * rough * calm);
+      level = Math.max(Math.min(level, 0.5), level + d * rough * calm * (d > 0 ? clear : 1));
     }
     return level;
   }
