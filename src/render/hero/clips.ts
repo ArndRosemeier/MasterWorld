@@ -18,6 +18,8 @@ export const ACTION_CLIPS: Readonly<Record<string, string>> = {
   // A spell: the hands held up before the body while it gathers, then an overhand throw lets it go (big enough to
   // read from behind the hero; Actors' 'spell raise' and 'spell cast' barely lift one hand).
   spell_charge: 'spell ready', spell_release: 'throw',
+  // A level gained (G3): the hands raised before the body as the ring of light rises round the hero.
+  level_up: 'spell ready',
 };
 
 /** The ground speed (m/s) each moving clip shows at its own pace. */

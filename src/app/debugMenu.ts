@@ -47,6 +47,8 @@ export interface DebugHost {
   situation(kind: 'hurt-traveller' | 'paddock-wolves' | 'stray-beast'): string;
   /** A good day now (C11): a feast for a deed kept lately, else a market day in the town the hero is in. */
   goodDay(): string;
+  /** The experience to the next level, so its celebration plays (G3): the level reached. */
+  gainLevel(): string;
   /** The VGM's log (D53, C8): its moves, oldest first (the tool, the need, why). */
   vgmLog(): readonly VgmLine[];
   /** The world's seed (a fresh one each start unless `?seed=` names it). */
@@ -111,6 +113,7 @@ export class DebugMenu {
         { label: 'Fly on / off (F)', run: () => { h.freeCamera = !h.freeCamera; return h.freeCamera ? 'flying' : 'walking'; } },
         { label: 'Copy link to this view', run: () => this.copyLink() },
         { label: 'Where am I', run: () => h.viewParams },
+        { label: 'Gain a level', run: () => h.gainLevel() },
       ]],
       ['Abilities', h.taught.map(({ id, name }) => ({ label: `Learn / forget ${name}`, run: () => { const on = !h.known(id); return h.learn(id, on); } }))],
       ['Legendary items', h.legends.map(({ id, name }) => ({ label: `Put on ${name}`, run: () => h.wearLegend(id) }))],
