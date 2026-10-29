@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Gate L passed on 2026-10-29** after one retake (review: `/mnt/project-files/masterworld/shots/gateL/gate-l-review.md`, shots in branch `claude/phaseL-gate-final2`, `shots/gateL-final2/`). Phase D is next, once Arnd has decided on its steps.
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Gate L passed on 2026-10-29** after one retake (review: `/mnt/project-files/masterworld/shots/gateL/gate-l-review.md`, shots in branch `claude/phaseL-gate-final2`, `shots/gateL-final2/`). **Phase W (water after the land, Arnd 2026-10-29) comes before phase D.**
 
 ---
 
@@ -140,6 +140,20 @@ This phase moves the ground that everything else stands on. The start moves, so 
 | L7 ✓ | **More landscape kinds** as data (rolling downs, moor with tors, karst, badlands …), each with its landform mix | Test: each kind is found on a long walk; a GPU shot of each | 5.9 |
 
 Gate L (passed 2026-10-29): the F1 set adds the mesa valley, a plateau top, a climb, a tor with boulders and a cavern; a walk trace shows a landform at least every minute of walking; F2 and F4 hold; the loop check passes on the new start; the review.
+
+### Phase W: Water after the land (Arnd, 2026-10-29; before phase D)
+
+Goal: all water (lakes, rivers, brooks) comes after the land is finished and folds into it: a lake only where the finished land holds one, its level at its rim, rivers in and out of it at that level, brooks and rivers on their valley floors. Seen at seed vj4985: a river ran through a lake raised far above the land, because lakes were decided as 2 km squares on a coarse grid before the landforms were added.
+
+| Step | Delivers | Done when |
+|---|---|---|
+| W1 ✓ | **Measure the fit** (`npm run water:fit`): how deep brooks and rivers cut below the dry land, how many are raised above it, how many lakes leak | The numbers for four seeds, round the start and the nearest lake |
+| W2 ✓ | **The land drains**: hollows of the finished big land are filled or breached as water would (breaching is cheaper), and drainage reads the land with those floors; brooks run on the ground they cross, not on a 250 m cell's blend | Raised brooks fewer at every place measured (16 → 10 %, 25 → 9 %, 11 → 4 % …); tests green |
+| W3 | **Lakes from the finished land**: a lake only where a fine flood of the finished land finds a basin, its level its spill point, the outflow leaving at that level, rivers through it capped at its level | `water:fit`: no lake leaks, no lake above its rim; the vj4985 lake fixed in a GPU shot |
+| W4 | **Courses on the valley floor**: rivers and brooks keep to the lowest line of the land they cross; cuts shrink | `water:fit`: median cut under 5 m, raised under 3 % |
+| W5 | **The world after**: start towns, places and tests checked on the moved water; the loop check passes | Tests and `npm run loop` green |
+
+Gate W: GPU shots of the vj4985 lake, a river into and out of a lake, and brooks in the start valley; `water:fit` holds W3 and W4; the review.
 
 ### Phase D: Seas (milestone 7)
 

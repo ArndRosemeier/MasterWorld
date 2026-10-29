@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
-import { BROOKS, brookDepth, packRivers } from '../src/world/hydro';
+import { BROOKS, brookDepth, packTile } from '../src/world/hydro';
 import { DRY, flowSpeed, waterMask } from '../src/world/water';
 import { finerFor } from '../src/world/chunkMesh';
 import { SMALL } from './small';
@@ -103,7 +103,7 @@ test('brooks: they lie in their beds, banks stay dry, and the near water mask dr
 
 test('brooks: a tile traced in a worker and handed over answers as one traced here', () => {
   const other = new Terrain(seed, classic, SMALL);
-  other.hydro.adoptBrooks(tile.tx, tile.tz, packRivers(tile.rivers));
+  other.hydro.adoptBrooks(tile.tx, tile.tz, packTile(tile));
   assert.ok(other.hydro.hasBrooks(-30000, 34000));
   for (let i = 0; i < 200; i++) {
     const x = x0 + ((i * 7919) % 200) / 200 * side, z = z0 + ((i * 104729) % 199) / 199 * side;

@@ -269,7 +269,9 @@ export class Terrain {
    * water, `dryLand`), which ease the landforms away from their banks.
    */
   private landShape(x: number, z: number, r: WaterHere | null, bk: WaterHere | null): number {
-    const base = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
+    const big = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
+    // The hollows' sediment floors (W2): the land as erosion left it, before its small shapes.
+    const base = big > 0 ? this.hydro.onFloors(x, z, big) : big;
     // The swash: low swells along the waterline (beach cusps), so the water's edge curves gently instead of
     // running dead straight; they die out on dry sand and in deeper water.
     const swash = Math.abs(base) < 2.5 ? (1 - smoothstep(0.6, 2.5, Math.abs(base))) * this.detail.fbm2(x / 22 - 40.1, z / 22 + 8.8, 2) * 0.15 : 0;
