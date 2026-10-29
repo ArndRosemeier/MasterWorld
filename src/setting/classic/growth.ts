@@ -15,4 +15,7 @@ export const growth: GrowthDef = {
   even: { base: 9, step: 2.5 },
   fight: 2.5,
   deeds: { cleared: 40, kept: 50, band: 80, task: 60, help: 30, town: 20, place: 15, sight: 20, read: 25, learn: 10 },
+  // An ability learned at level 1 hits about 1.6 times as hard at level 10; its effects last a fifth longer.
+  // A spell gains a hundredth for each point of spell power on the gear.
+  scale: { damage: 0.07, heal: 0.07, duration: 0.02, range: 0.01, spell: 0.01 },
 };
