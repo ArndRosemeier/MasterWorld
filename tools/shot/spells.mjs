@@ -6,6 +6,9 @@
  * once the spell shows (in flight, bursting or flaring), the spells' drawing held still for it. JPEGs into
  * `<out dir>` (default `shots/spells/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  *
+ * `SPELLS_AT=cellar`: the same down in the town's cellar, 8 m from the nearest goblin (spells must show below too:
+ * the land leaves the frame there, the spells must not). Each shot also checks the spells are in the drawn scene.
+ *
  * F3 in a fight with every school (C4): no shader is built for a spell once play has begun (the spells' one
  * shader is built just after the start, within the budget), and the shader monitor counts no violations.
  */
@@ -13,25 +16,31 @@ import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
-import { meet } from './acts.mjs';
+import { FIGHT, faceNearest, meet } from './acts.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 /** More of the page's query (SwiftShader in the cloud: `&trees=0` for a quicker load). */
 const EXTRA = process.env.SPELLS_QUERY ?? '';
 const gl = process.env.SET_GL !== '0';
+const below = process.env.SPELLS_AT === 'cellar';
 const git = (cmd) => { try { return execSync(`git ${cmd}`, { encoding: 'utf8' }).trim(); } catch { return ''; } };
-const dir = process.argv[2] ?? join('shots/spells', `${new Date().toISOString().slice(0, 10)}-${git('rev-parse --short HEAD') || 'nocommit'}`);
+const dir = process.argv[2] ?? join(below ? 'shots/spells-cellar' : 'shots/spells', `${new Date().toISOString().slice(0, 10)}-${git('rev-parse --short HEAD') || 'nocommit'}`);
 mkdirSync(dir, { recursive: true });
 
 const { server, base, browser } = await launch({});
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-await page.goto(`${base}?title=0&day=0&hour=10&weather=fair${gl ? '&gl' : ''}${EXTRA}`);
+await page.goto(`${base}?title=0&day=0&hour=10&weather=fair${gl ? '&gl' : ''}${below ? '&cellar=2&dweller=goblins' : ''}${EXTRA}`);
 await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT });
 await page.addStyleTag({ content: '#loading{display:none!important}' });
-await meet('wolves', 11)(page);
+if (below) {
+  await page.waitForFunction(`!!${FIGHT}`, null, { timeout: 30000 });
+  await faceNearest(page, 8);
+} else await meet('wolves', 11)(page);
 await page.waitForTimeout(2000);
+/** The spells are in the drawn scene: their group and everything above it shown. */
+const inScene = () => page.evaluate(() => { let o = window.game.spellView.group; const top = window.game.view.scene; while (o && o !== top) { if (!o.visible) return false; o = o.parent; } return o === top && top.visible; });
 
 // The first spell of every school, in the setting's order (the lowest level of the school).
 const firsts = await page.evaluate(() => {
@@ -52,8 +61,8 @@ for (const [i, id] of firsts.entries()) {
     h.health = h.maxHealth;
     h.cooldowns.clear();
   }, id);
-  // Tab picks a wolf (the fight on the land leads once the hero is near the band).
-  await page.waitForFunction(() => window.game.wild.encounters.some((e) => e.leading), null, { timeout: TIMEOUT });
+  // Tab picks a foe (the fight leads once the hero is near the band).
+  await page.waitForFunction(`!!${FIGHT}`, null, { timeout: TIMEOUT });
   await page.keyboard.press('Tab');
   // A spell on oneself (mend) may still be gathering from the last turn: wait for it to finish.
   let why = null;
@@ -67,8 +76,9 @@ for (const [i, id] of firsts.entries()) {
   await page.evaluate(() => { window.game.spellView.frozen = true; });
   const file = join(dir, `${String(i + 1).padStart(2, '0')}-${id}.jpg`);
   await page.screenshot({ path: file, type: 'jpeg', quality: 92, timeout: TIMEOUT });
-  console.log(`${file}${shown ? '' : ' (the spell never showed)'}`);
-  if (!shown) failed = true;
+  const seen = await inScene();
+  console.log(`${file}${shown ? '' : ' (the spell never showed)'}${seen ? '' : ' (the spells are not in the drawn scene)'}`);
+  if (!shown || !seen) failed = true;
   await page.evaluate(() => { window.game.spellView.frozen = false; });
   await page.waitForTimeout(1500);
 }
