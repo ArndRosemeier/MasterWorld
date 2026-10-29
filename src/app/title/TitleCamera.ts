@@ -4,7 +4,7 @@
  */
 import { damp, type Vec3 } from '@futuremagic/core';
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
-import { DIVE_SECONDS, divePose, orbitPose, type Orbit, type Pose } from './route';
+import { DIVE_SECONDS, divePose, orbitPose, steadyHeight, type Orbit, type Pose } from './route';
 
 export class TitleCamera {
   private t = 0;
@@ -16,6 +16,8 @@ export class TitleCamera {
   private readonly look = new Vector3();
   private readonly side = new Vector3();
   private readonly fov: number;
+  /** The orbit's height last frame (eased: steadyHeight). */
+  private height: number | null = null;
 
   constructor(private readonly camera: PerspectiveCamera, private readonly orbit: Orbit) {
     this.fov = camera.fov;
@@ -69,7 +71,8 @@ export class TitleCamera {
     this.pointer.sx += (this.pointer.x - this.pointer.sx) * k;
     this.pointer.sy += (this.pointer.y - this.pointer.sy) * k;
     const p = orbitPose(this.orbit, this.t, this.near);
-    this.aim(p.at, p.look, 1);
+    this.height = steadyHeight(this.orbit, p, this.height, dt);
+    this.aim([p.at[0], this.height, p.at[2]], p.look, 1);
   }
 
   /** Puts the camera at `at` looking at `look`, leaning with the pointer by `sway`. */

@@ -20,10 +20,9 @@ const terrain = new Terrain(seed, classic, SMALL);
 const log = firstDecisions(terrain, startPlace(terrain));
 terrain.settle(log);
 const town = terrain.towns[0];
-// The first hamlet the VGM founds on a walk west from the start (plan B1). (East, the first lies over a river
-// with no ford: it has no road.)
+// The first hamlet the VGM founds on a walk east from the start (plan B1).
 const regions = classic.regions!;
-const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, Math.PI, 5, (d) => d.fill === 'hamlet' && !!d.site);
+const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, 0, 5, (d) => d.fill === 'hamlet' && !!d.site);
 const hamlet = settlementsOf(walked, regions).find((t) => walked.some((d) => d.id === t.id && d.kind === 'region' && d.fill === 'hamlet'))!;
 // As the world worker routes it (WorldJobs.linkRoad): from the roads already decided alone.
 const road = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'track')!;

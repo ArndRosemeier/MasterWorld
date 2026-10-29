@@ -198,6 +198,11 @@ export interface StartSpec {
   readonly maxSlope: number;
   /** Least height difference within 6 km of the start, metres: something to look at (D18). */
   readonly vista: number;
+  /**
+   * The kind of country the start lies in the midst of (a landscape kind's id, D56); in mesa country on a
+   * valley floor, with plateaus in view. None: any kind.
+   */
+  readonly kind?: string;
 }
 
 /** The props the engine can draw in a dungeon (simple kit pieces). */

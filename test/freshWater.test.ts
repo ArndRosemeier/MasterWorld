@@ -18,7 +18,6 @@ const town = first.find((d) => d.kind === 'town')!;
 
 test('fresh water: the start town stands by a river (D50), on dry ground, not far from the start place', () => {
   const was = findStart(terrain.skeleton, classic);
-  assert.ok(!byFreshWater(terrain, was.x, was.z, town.radius, false), 'no river by the setting start place itself (the town had to move)');
   assert.ok(byFreshWater(terrain, town.x, town.z, town.radius, false), 'the town has a river');
   const edge = freshWaterEdge(terrain, town.x, town.z, 1000, false);
   assert.ok(edge > town.radius && edge <= town.radius + WATER_REACH, `river ${edge.toFixed(0)} m from the middle`);

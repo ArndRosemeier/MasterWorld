@@ -4,7 +4,7 @@
  * from wherever the orbit is, down through the sky to the camera behind the hero. Pure numbers, no
  * three.js, so it is tested headless.
  */
-import { clamp, lerp, smootherstep, v3lerp, type Vec3 } from '@futuremagic/core';
+import { clamp, damp, lerp, smootherstep, v3lerp, type Vec3 } from '@futuremagic/core';
 
 /** A camera pose: where it is and the point it looks at. */
 export interface Pose {
@@ -27,8 +27,13 @@ const LAP = 260;
 const FAR = { radius: 520, height: 130 };
 // Close enough that the town (about 200 m across) fills much of the frame, high enough to clear its roofs.
 const NEAR = { radius: 180, height: 55 };
-/** Ground checked this far around the camera, so no hill rises into the view. */
-const CLEAR = [0, 60, 140];
+/**
+ * Ground checked this far around the camera, so no hill rises into the view; the farther, the less it counts
+ * (CLEAR_FALL metres down per metre out), so the camera rises over a mesa's wall ahead of it in a slow climb,
+ * not a jump (D56: the start lies in a mesa valley).
+ */
+const CLEAR = [0, 15, 30, 60, 100, 140, 220, 320, 440];
+const CLEAR_FALL = 0.35;
 
 /** The pose on the orbit `t` seconds in, `near` (0..1) of the way from far to close. */
 export function orbitPose(o: Orbit, t: number, near: number): Pose {
@@ -39,15 +44,29 @@ export function orbitPose(o: Orbit, t: number, near: number): Pose {
   const [cx, cy, cz] = o.centre;
   const x = cx + Math.sin(a) * r, z = cz + Math.cos(a) * r;
   let ground = cy;
-  for (const d of CLEAR) for (let k = 0; k < 6; k++) {
-    const b = (k / 6) * Math.PI * 2;
-    ground = Math.max(ground, o.ground(x + Math.cos(b) * d, z + Math.sin(b) * d));
+  for (const d of CLEAR) for (let k = 0, m = d ? 12 : 1; k < m; k++) {
+    const b = (k / m) * Math.PI * 2;
+    ground = Math.max(ground, o.ground(x + Math.cos(b) * d, z + Math.sin(b) * d) - d * CLEAR_FALL);
   }
   const y = ground + lerp(FAR.height, NEAR.height, n) * (1 + 0.15 * Math.sin(t * 0.07));
   // It looks at the town, wandering a little around it.
   const wander = lerp(50, 25, n);
   const look: Vec3 = [cx + Math.sin(t * 0.031) * wander, cy + 6, cz + Math.cos(t * 0.023) * wander];
   return { at: [x, y, z], look };
+}
+
+/** The camera never comes nearer the ground under it than this (m), however it eases (steadyHeight). */
+const FLOOR_CLEAR = 30;
+
+/**
+ * The orbit's height eased over time (`prev` last frame's, null at first): the ground the orbit looks round
+ * jumps where a mesa's wall comes into or leaves its reach, and the camera follows that in a glide, never
+ * lower than FLOOR_CLEAR over the ground under it.
+ */
+export function steadyHeight(o: Orbit, pose: Pose, prev: number | null, dt: number): number {
+  const floor = o.ground(pose.at[0], pose.at[2]) + FLOOR_CLEAR;
+  if (prev === null) return Math.max(floor, pose.at[1]);
+  return Math.max(floor, prev + (pose.at[1] - prev) * damp(0.8, dt));
 }
 
 /** Seconds a dive takes. */
