@@ -24,8 +24,15 @@ const FILL_REACH = 7;
 /** The shadow torch's cube map side (texels) and reach (m). */
 const SHADOW_MAP = 512;
 const REACH = 12;
+/** How far a plain light of the pool reaches (m): a doorway's, a torch's. */
+const LIGHT_REACH = 11;
 
 interface Spot { x: number; y: number; z: number; roll: number }
+
+/** How underground lights burn: their colour, candela, reach (m), fall-off and whether they flicker. */
+export interface BelowLight { readonly color: number; readonly strength: number; readonly reach: number; readonly decay: number; readonly flicker: boolean }
+/** A cellar's torches. */
+export const TORCHLIGHT: BelowLight = { color: 0xff9a50, strength: TORCH, reach: REACH, decay: 2, flicker: true };
 
 export class WarmLights {
   readonly lights: PointLight[] = [];
@@ -40,7 +47,7 @@ export class WarmLights {
 
   constructor(scene: Scene) {
     for (let i = 0; i < WARM_LIGHTS; i++) {
-      const l = new PointLight(0xffa860, 0, 11, 2);
+      const l = new PointLight(0xffa860, 0, LIGHT_REACH, 2);
       l.castShadow = false;
       l.name = 'warm light';
       this.lights.push(l);
@@ -75,11 +82,24 @@ export class WarmLights {
     }
   }
 
-  /** Underground: the torches (world positions), or null on the way up again. */
-  lightTorches(spots: readonly { x: number; y: number; z: number }[] | null): void {
+  /**
+   * Underground: the torches (world positions), or null on the way up again; `look`: how they burn (a cave's
+   * daylight through a crack in a cavern's roof is cool, steady and reaches far). The same lights, recoloured:
+   * no new light, so no shader is built again.
+   */
+  lightTorches(spots: readonly { x: number; y: number; z: number }[] | null, look: BelowLight = TORCHLIGHT): void {
     this.torches = spots ? spots.map((s, i) => ({ ...s, roll: hashToFloat(hash32(i * 104729 + 3)) })) : null;
     if (!spots) this.shadowed.intensity = 0;
+    const below = spots ? look : TORCHLIGHT, warm = below === TORCHLIGHT ? 0xffa860 : below.color;
+    this.look = below;
+    for (const l of this.lights) { l.color.setHex(warm); l.decay = below.decay; l.distance = below === TORCHLIGHT ? LIGHT_REACH : below.reach; }
+    const s = this.shadowed;
+    s.color.setHex(below.color);
+    s.decay = below.decay;
+    s.distance = below.reach;
+    if (s.shadow.camera.far !== below.reach) { s.shadow.camera.far = below.reach; s.shadow.camera.updateProjectionMatrix(); }
   }
+  private look: BelowLight = TORCHLIGHT;
 
   /**
    * Once per frame: `glow` 0 by day .. 1 at night, `share` of the houses with a light on (ignored underground).
@@ -97,7 +117,7 @@ export class WarmLights {
       this.lights[0]!.distance = FILL_REACH;
       return;
     }
-    this.lights[0]!.distance = 11;
+    this.lights[0]!.distance = LIGHT_REACH;
     const near = glow > 0 ? closest(this.doors.filter((d) => d.roll < share), cam, WARM_LIGHTS + 1) : [];
     this.setLights(this.lights, near, DOOR * glow, false);
   }
@@ -114,10 +134,10 @@ export class WarmLights {
       const moved = s.position.x !== first.s.x || s.position.y !== first.s.y || s.position.z !== first.s.z || this.steps !== ORIGIN.steps;
       this.steps = ORIGIN.steps;
       s.position.set(first.s.x, first.s.y, first.s.z);
-      s.intensity = TORCH * this.flicker(first.s);
+      s.intensity = this.look.strength * (this.look.flicker ? this.flicker(first.s) : 1);
       if (moved || ++this.frames % 3 === 0) s.shadow.needsUpdate = true;
     } else s.intensity = 0;
-    this.setLights(this.lights, near.slice(1), TORCH, true);
+    this.setLights(this.lights, near.slice(1), this.look.strength, this.look.flicker);
   }
 
   private setLights(lights: PointLight[], near: { s: Spot; dist: number }[], strength: number, flicker: boolean): void {

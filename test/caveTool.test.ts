@@ -8,6 +8,7 @@ import { dungeonFor, loreOf, placeOf } from '../src/vgm/dungeons';
 import { answerNeed } from '../src/vgm/toolbox';
 import { siteInCliff } from '../src/world/dungeon/caveMouth';
 import { isEmpty, outlineCellar, sketchCellar } from '../src/world/dungeon/cellar';
+import { caveGlows, torchSpots } from '../src/world/dungeon/torches';
 import { SMALL } from './small';
 
 test('cave tool: Discovery overdue near a cliff opens a cave in it, one at a time', () => {
@@ -44,6 +45,10 @@ test('caves: a share stand empty, sights with nobody in them; asked-for dwellers
   assert.ok(share > 0.05 && share < 0.4, `about a fifth empty (${(share * 100).toFixed(0)} %)`);
   const c = outlineCellar(empty[0], place, lore);
   assert.equal(c.spawns.length, 0, 'nobody to fight in an empty cave');
+  // No torches in a natural cave: daylight falls into its cavern through a crack high in the roof.
+  const glows = caveGlows(c), floor = Math.min(...c.layout.rooms.map((r) => r.level)) * c.layout.scale.storey;
+  assert.equal(torchSpots(c).length, 0);
+  assert.ok(glows.length >= 1 && glows.every((g) => g.y - floor > 15), `daylight high in the cavern (${glows.map((g) => g.y.toFixed(1)).join(', ')})`);
   assert.equal(c.dweller.id, lore.empty!.def.id);
   const asked = lore.dwellers[0].encounter;
   assert.ok(empty.every((d) => !isEmpty(sketchCellar({ ...d, dwellers: asked }, place, lore))), 'dwellers asked for move in');

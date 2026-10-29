@@ -55,3 +55,19 @@ export function torchSpots(c: Cellar): TorchSpot[] {
   }
   return out;
 }
+
+/** A crack's daylight hangs this far under a cavern's roof (m). */
+const CRACK_DOWN = 3;
+
+/**
+ * Where a natural cave's daylight falls in (pure): through a crack high in the roof of each cavern (a room
+ * three storeys high or more), over its middle. A cave without caverns has none (the lantern alone).
+ */
+export function caveGlows(c: Cellar): { x: number; y: number; z: number }[] {
+  if (c.form.space.torches || !c.form.space.carved) return [];
+  const { cell, storey } = c.layout.scale;
+  return c.layout.rooms.flatMap((r) => {
+    const h = c.graph.rooms[r.id]?.height ?? 1;
+    return h >= 3 ? [{ x: (r.x + r.w / 2) * cell, y: (r.level + h) * storey - CRACK_DOWN, z: (r.z + r.d / 2) * cell }] : [];
+  });
+}

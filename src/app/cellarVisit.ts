@@ -11,8 +11,8 @@ import { dungeonWorld } from '../game/dungeonWorld';
 import type { WalkWorld } from '../game/walker';
 import type { CellarView } from '../render/dungeon/CellarView';
 import type { SkyView } from '../render/sky';
-import type { WarmLights } from '../render/warmLights';
-import { torchSpots } from '../world/dungeon/torches';
+import type { BelowLight, WarmLights } from '../render/warmLights';
+import { caveGlows, torchSpots } from '../world/dungeon/torches';
 import type { Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace, keySpot, type SpaceEvent } from '../world/dungeon/space';
 import { SearchKneel } from './searchKneel';
@@ -101,14 +101,19 @@ export class CellarVisit {
     this.view.group.visible = true;
     this.sky.indoors = true;
     this.onDepth?.(true);
-    const O = this.view.origin;
-    this.warm.lightTorches(torchSpots(this.cellar).map((t) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z })));
+    const O = this.view.origin, inWorld = (t: { x: number; y: number; z: number }) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z });
+    // A natural cave has no torches: daylight falls into its caverns through cracks in their roofs (D57).
+    const glows = caveGlows(this.cellar);
+    this.sky.cave = !!this.cellar.form.space.carved;
+    if (glows.length) this.warm.lightTorches(glows.map(inWorld), DAYLIGHT_BELOW);
+    else this.warm.lightTorches(torchSpots(this.cellar).map(inWorld));
   }
 
   private goOut(): void {
     this.inside = false;
     this.view.group.visible = false;
     this.sky.indoors = false;
+    this.sky.cave = false;
     this.onDepth?.(false);
     this.lantern.intensity = 0;
     this.warm.lightTorches(null);
@@ -193,6 +198,9 @@ export class CellarVisit {
   /** The hero kneeling to pick up a key (null: not). */
   private kneel: SearchKneel | null = null;
 }
+
+/** Daylight through a crack in a cavern's roof: cool, steady, reaching down to its floor and walls. */
+const DAYLIGHT_BELOW: BelowLight = { color: 0xc4d4ff, strength: 70, reach: 48, decay: 1.25, flicker: false };
 
 /** A place on the land is walked out of from this far inside its doorway, metres. */
 const WALK_OUT = 1.0;

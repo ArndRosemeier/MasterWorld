@@ -25,6 +25,13 @@ type Extent = typeof EXTENT | typeof CLIFF_EXTENT;
 export const CLIFF_RISE = 9;
 /** How much bigger a cliff's way in is than a hillside's. */
 const CLIFF_WAY = 1.55;
+/**
+ * Where a cliff's way in ends, rounded off (m from the mouth): the mouth stands far enough out from the wall
+ * (`CLIFF_FACE`) that the land's own face never shows inside it; it is dark well before.
+ */
+const CLIFF_DEEP = 4;
+/** How far behind the mouth a cliff's own face begins (m): its way in and the crag's foot stand before it. */
+export const CLIFF_FACE = 8;
 /** Sample spacing of the mouth's field, metres. */
 const STEP = 0.5;
 /** How far the walk raster reaches beyond a body (the walker's radius and a little). */
@@ -54,12 +61,15 @@ class Crag {
   private readonly high: number;
   /** How much bigger than a hillside's (1: a hillside's). */
   private readonly k: number;
+  /** How deep the way in goes before its rounded end (m): a cliff's ends short of the wall's own face behind it. */
+  private readonly deep: number;
 
   constructor(seed: number, private readonly ground: (x: number, z: number) => number, private readonly E: Extent, cliff: boolean) {
     const rng = new Rng(deriveSeed(seed, 'cave', 'mouth'));
     this.noise = new Noise(deriveSeed(seed, 'cave', 'crag'));
     this.lean = rng.range(-0.05, 0.05);
     this.k = cliff ? CLIFF_WAY : 1;
+    this.deep = cliff ? CLIFF_DEEP : 9;
     // In a cliff the crag is the wall's own foot: high, so the face goes on up into the wall behind.
     this.high = cliff ? rng.range(15, 20) : rng.range(4.6, 6.2);
   }
@@ -89,7 +99,7 @@ class Crag {
   tunnel(x: number, y: number, z: number): number {
     const k = this.k, t = Math.max(0, Math.min(1, (2.5 * k - z) / (11.5 * k)));
     const cy = (1.15 - t * 0.5) * k, r = (1.55 - t * 0.25) * k;
-    const dz = z < -9 * k ? z + 9 * k : z > 2.5 * k ? z - 2.5 * k : 0;
+    const dz = z < -this.deep ? z + this.deep : z > 2.5 * k ? z - 2.5 * k : 0;
     return r - Math.hypot(x, (y - cy) / 1.25, dz) + this.noise.fbm3(x / 1.4, y / 1.4, z / 1.4 + 4.4, 2) * 0.18 * k;
   }
 }
@@ -135,9 +145,9 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
     ),
     tint: (x, y, z, m) => {
       // Deeper in the way, darker, until it is black where it goes on down.
-      const inside = crag.tunnel(x, y, z) > -0.7 ? smoothstep(0.3, cliff ? 10 : 7.5, -z) : 0;
+      const inside = crag.tunnel(x, y, z) > -0.7 ? smoothstep(0.3, cliff ? 5.5 : 7.5, -z) : 0;
       const tone = (0.85 + 0.3 * (look.fbm3(x / 4, y / 4, z / 4, 2) * 0.5 + 0.5)) * (1 - 0.94 * inside);
-      return scaleTint(m === WildMat.Grass ? GRASS : ROCK, tone);
+      return scaleTint(m === WildMat.Grass ? GRASS : cliff ? WALL : ROCK, tone);
     },
   });
   // Where the fillet runs out onto the plain ground, sink it a hand's breadth so the land's mesh wins there.
@@ -170,7 +180,8 @@ export function mouthOnLand(height: (x: number, z: number) => number, site: Site
 /** How far the mouth's rock reaches from its site, metres (for quick tests). */
 export const MOUTH_REACH = Math.hypot(CLIFF_EXTENT.half, CLIFF_EXTENT.back);
 
-const ROCK: Tint = [178, 172, 160], GRASS: Tint = [196, 196, 168];
+/** A cliff's crag is the wall's own rock: the warm tan of a mesa's beds, not a hillside's grey. */
+const ROCK: Tint = [178, 172, 160], WALL: Tint = [196, 168, 134], GRASS: Tint = [196, 196, 168];
 const PLAIN: Extent = EXTENT;
 
 /** Whether a cave's mouth at this site on the land goes into a cliff (a rise of more than `CLIFF_RISE` behind it). */

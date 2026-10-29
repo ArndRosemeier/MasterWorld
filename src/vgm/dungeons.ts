@@ -10,7 +10,7 @@ import { farmlandReach, type TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonForm, SettingModule } from '../setting/contract';
 import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate, type RetakeDecision, type RetreatDecision, type TownDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
-import { CLIFF_RISE } from '../world/dungeon/caveMouth';
+import { CLIFF_FACE, CLIFF_RISE } from '../world/dungeon/caveMouth';
 import type { DungeonPlace } from '../world/dungeon/cellar';
 import { setPiecesFor } from '../world/dungeon/setPieces';
 import type { Terrain } from '../world/terrain';
@@ -129,8 +129,10 @@ export function compass(dx: number, dz: number): string {
  */
 type Fit = (x: number, z: number, k: number) => { score: number; yaw?: number; x?: number; z?: number } | null;
 
-/** A cave's mouth in a cliff stands this far out from where the face begins (m): its way in reaches the face. */
-const CLIFF_OUT = 5;
+/** A cave's mouth in a cliff stands this far out from where the face begins (m): its way in and crag before it. */
+const CLIFF_OUT = CLIFF_FACE;
+/** How deep a cliff's way in reaches (m): the ground up to there stays low. */
+const WAY_IN = 6.5;
 
 /**
  * What ground a place wants, by how its kind stands (`DungeonForm.stands`): on a rise (a barrow); at the
@@ -171,10 +173,11 @@ const GROUND: Readonly<Record<Exclude<DungeonForm['stands'], 'house'>, (t: Terra
           // Up to where the face begins (the wall's line is only roughly where the field says): the mouth at its foot.
           for (let i = 0; i < 30 && t.height(px + w.nx * CLIFF_OUT, pz + w.nz * CLIFF_OUT) - t.height(px, pz) < 1; i++) { px += w.nx; pz += w.nz; }
           const h = t.height(px, pz);
-          // Not on a pass (fallen rock, no face), the ground before the mouth walkable, a cliff's height behind it.
-          const near = t.height(px + w.nx * 4, pz + w.nz * 4) - h;
+          // Not on a pass (fallen rock, no face), the ground under the way in level (the land's own face must not
+          // show inside it), a cliff's height behind it.
+          const near = Math.max(t.height(px + w.nx * 4, pz + w.nz * 4), t.height(px + w.nx * WAY_IN, pz + w.nz * WAY_IN)) - h;
           const behind = Math.max(t.height(px + w.nx * 20, pz + w.nz * 20), t.height(px + w.nx * 16, pz + w.nz * 16)) - h;
-          if (w.pass < 0.3 && near < 1.6 && behind > CLIFF_RISE + 1.5) {
+          if (w.pass < 0.3 && near < 1 && behind > CLIFF_RISE + 1.5) {
             return { score: 2 + Math.min(1, behind / 30) - woods(px, pz) + hash2f(s, k, 3) * 0.3, yaw: Math.atan2(-w.nx, -w.nz), x: px, z: pz };
           }
         }
