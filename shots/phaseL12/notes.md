@@ -37,6 +37,6 @@ hold-crag 9.1, hold-warden 10.4, hurt-traveller 9.8, raided-farm 12.6 ms p50. 0 
 Load (quiet PC): title 0.40 s, playable **19.4 s**, load: ok.
 
 ## 4. `npm run variety`: no problems (exit 0)
-1000 caves in 11.8 s: 1000 distinct layouts, 17 main patterns, 18 patterns, 477 stories, 6 goal rooms, 10 set pieces.
-Cellars, barrows (sic, as listed), towers and hideouts are all distinct too; "no problems". The output doesn't list cavern height or
+1000 caves in 11.8 s (the others take 1.2-2.1 s): 1000 distinct layouts, 17 main patterns, 18 patterns, 580 stories, 8 goal rooms
+(most common painted-chamber 18.3 %), 10 set pieces. Cellars, barrows, towers and hideouts pass as well; "no problems". The output doesn't list cavern height or
 way length, so the "over 20 m / over 200 m" claims aren't shown by this sweep.
