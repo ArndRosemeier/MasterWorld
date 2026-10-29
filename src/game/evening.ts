@@ -570,6 +570,8 @@ function settlementOut(seed: number, setting: SettingModule, terrain: Terrain, s
   throw new Error(`no ${size} found within 8 km of the start`);
 }
 
+/** How often a walk finds its way again from where it got stuck. */
+const REPLANS = 4;
 /** Looks along a move between metre cells for a step too high to walk. */
 const STEP_LOOKS = 4;
 
@@ -601,6 +603,7 @@ export class LandWalk {
     const dt = 0.1;
     let t = 0, metres = 0, check = { x: p.x, z: p.z, t: 0 }, side = 1;
     let detour: [number, number] | null = null, onFace = false;
+    let replans = 0;
     while (pts.length && t < WALK_LIMIT) {
       const [tx, tz]: [number, number] = detour ?? pts[0];
       const dx: number = tx - p.x, dz: number = tz - p.z, d = Math.hypot(dx, dz);
@@ -645,7 +648,11 @@ export class LandWalk {
       }
       // No headway for a while (a slope, a rock): step aside and hop, alternating sides, further each time.
       if (t - check.t > 1.5) {
-        if (Math.hypot(p.x - check.x, p.z - check.z) < 1) {
+        if (Math.hypot(p.x - check.x, p.z - check.z) < 1 && Math.abs(side) > 6 && replans < REPLANS) {
+          // Hopped aside long enough: off the way found (slid down a slope beside it): a way from here.
+          pts.splice(0, pts.length, ...this.findWay(p.x, p.z, x, z));
+          replans++; side = 1; detour = null;
+        } else if (Math.hypot(p.x - check.x, p.z - check.z) < 1) {
           const n: number = Math.hypot(dx, dz) || 1, reach = 3 + 2 * Math.min(4, Math.abs(side));
           detour = [p.x - (dz / n) * reach * Math.sign(side) - (dx / n), p.z + (dx / n) * reach * Math.sign(side) - (dz / n)];
           side = -side + Math.sign(-side);

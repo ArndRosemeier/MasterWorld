@@ -932,6 +932,25 @@ export class HydroTile {
     }
   }
 
+  /**
+   * The lowest a hollow may dig at (x, z) beside this tile's water: of every point within `within` metres, its level
+   * plus 0.6 m and 1 in 25 past its edge, rising steeply over the outer half (`none` with none near). A dell dug deeper beside a brook left the brook
+   * standing metres above it, on a bank of its own (gate W).
+   */
+  floorBy(x: number, z: number, within: number, none = Infinity): number {
+    const B = this.bucket;
+    let low = Infinity;
+    for (let i = Math.floor((x - within) / B); i <= Math.floor((x + within) / B); i++) for (let j = Math.floor((z - within) / B); j <= Math.floor((z + within) / B); j++) {
+      const list = this.buckets.get(this.key(i, j));
+      if (list) for (let q = 0; q < list.length; q += 2) {
+        const r = this.rivers[list[q]], k = list[q + 1], d = Math.hypot(r.xz[k * 2] - x, r.xz[k * 2 + 1] - z);
+        // 1 in 25 past its edge; past half way out 1 in 2, so it lets go gently before it ends.
+        if (d <= within) low = Math.min(low, r.level[k] + 0.6 + Math.max(0, d - r.half[k]) * 0.04 + Math.max(0, d - within / 2) * 0.5);
+      }
+    }
+    return low === Infinity ? none : low;
+  }
+
   /** Metres from (x, z) to the nearest river's edge (negative in the water), if one lies within `within`; else Infinity. */
   riverEdge(x: number, z: number, within: number): number {
     const B = this.bucket;
@@ -1216,6 +1235,11 @@ export class Hydrology {
     if (b) return b.query(x, z, out);
     out.river = out.brook = false;
     return out;
+  }
+
+  /** The lowest a hollow may dig at (x, z) beside a brook within `within` metres (`HydroTile.floorBy`; `none` with none). */
+  brookFloor(x: number, z: number, within: number, none = Infinity): number {
+    return this.brookTileAt(x, z)?.floorBy(x, z, within, none) ?? none;
   }
 
   /** Metres to the nearest river's (or brook's) edge within `within`, else Infinity. */
