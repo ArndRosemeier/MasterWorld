@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 13;
+export const CONTRACT_VERSION = 14;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -1003,6 +1003,8 @@ export interface AbilityDef {
   readonly cooldown: number;
   /** Seconds standing still to cast it (absent or 0: at once). Moving breaks the cast. */
   readonly cast?: number;
+  /** How this ability grows with the hero's level, where it differs from the setting's (growth.scale; G2). */
+  readonly scale?: Partial<AbilityScale>;
   readonly ops: readonly AbilityOp[];
 }
 
@@ -1332,6 +1334,20 @@ export interface GrowthDef {
   readonly fight: number;
   /** Experience for each deed or discovery, once each. */
   readonly deeds: Readonly<Record<GrowthSource, number>>;
+  /**
+   * How an ability grows with the hero (G2, D58): the share each part gains per level above the ability's
+   * own; an ability's own `scale` sets its parts instead. `spell` is the share per point of the spell
+   * quality gear adds to a spell's damage and healing.
+   */
+  readonly scale: AbilityScale & { readonly spell: number };
+}
+
+/** The share an ability's damage, healing, effect duration and range gain per level above its own (G2). */
+export interface AbilityScale {
+  readonly damage: number;
+  readonly heal: number;
+  readonly duration: number;
+  readonly range: number;
 }
 
 /**
@@ -1580,6 +1596,7 @@ function validatePeoples(m: SettingModule, where: string): string[] {
   if (!(g.even.base > 0 && g.even.step > 0 && g.fight > 0)) out.push(`${where}: growth.even and growth.fight must be above 0`);
   if (!(g.prowess.base > 0 && g.prowess.step > 0 && g.prowess.base + g.prowess.step * (g.xp.length - 1) <= 100)) out.push(`${where}: growth.prowess must rise and stay within 100`);
   for (const k of GROWTH_SOURCES) if (!(g.deeds[k] > 0)) out.push(`${where}: growth.deeds.${k} must give experience`);
+  for (const k of ['damage', 'heal', 'duration', 'range', 'spell'] as const) if (!(g.scale[k] >= 0 && g.scale[k] < 1)) out.push(`${where}: growth.scale.${k} must be a share per level, 0..1`);
   return out;
 }
 
@@ -1684,6 +1701,7 @@ function validateAbilities(m: SettingModule, schools: ReadonlySet<string>, where
     ids.add(a.id);
     if (a.school && !schools.has(a.school)) out.push(`${at} is of unknown school "${a.school}"`);
     if (a.item && a.taught) out.push(`${at} is item-only and cannot be taught too`);
+    for (const [k, v] of Object.entries(a.scale ?? {})) if (!(v >= 0 && v < 1)) out.push(`${at}: scale.${k} must be a share per level, 0..1`);
     if (a.level !== undefined && !(Number.isInteger(a.level) && a.level >= 1 && a.level <= m.growth.xp.length)) out.push(`${at} needs a level 1..${m.growth.xp.length}`);
     if (!(a.cooldown >= 0) || !((a.cast ?? 0) >= 0) || Object.values(a.cost ?? {}).some((v) => !(v >= 0))) out.push(`${at} needs cooldown, cast and costs of 0 or more`);
     if (!a.ops.length) out.push(`${at} has no steps`);

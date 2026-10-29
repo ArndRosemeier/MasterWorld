@@ -4,7 +4,7 @@
  * nothing; each deed and each discovery counts once (by its key). The level is read for health, stamina and
  * mana, and by the trainers. Pure.
  */
-import type { GrowthDef } from '../setting/contract';
+import type { AbilityDef, AbilityScale, GrowthDef } from '../setting/contract';
 
 /** The highest level of a growth table. */
 export const topLevel = (g: GrowthDef): number => g.xp.length;
@@ -54,4 +54,21 @@ export function towardNext(g: GrowthDef, xp: number): number {
   const l = levelOf(g, xp);
   if (l >= g.xp.length) return 1;
   return (xp - g.xp[l - 1]) / (g.xp[l] - g.xp[l - 1]);
+}
+
+/** An ability's strength as multipliers of its numbers (1: as written). */
+export type Strength = AbilityScale;
+
+/** As written: for casters that do not grow (creatures, tests). */
+export const AS_WRITTEN: Strength = { damage: 1, heal: 1, duration: 1, range: 1 };
+
+/**
+ * How strong an ability is for a hero of `level` (G2, D58): each part gains its share (the ability's own
+ * `scale`, else the setting's) for every level above the ability's; a spell's damage and healing also gain
+ * from the spell power on the gear (`spell`).
+ */
+export function strengthOf(g: GrowthDef, def: AbilityDef, level: number, spell = 0): Strength {
+  const up = Math.max(0, level - (def.level ?? 1)), s = { ...g.scale, ...def.scale };
+  const gear = def.school ? 1 + g.scale.spell * spell : 1;
+  return { damage: (1 + s.damage * up) * gear, heal: (1 + s.heal * up) * gear, duration: 1 + s.duration * up, range: 1 + s.range * up };
 }

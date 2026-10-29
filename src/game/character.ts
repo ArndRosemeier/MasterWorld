@@ -10,7 +10,7 @@ import { addToBar, cleanBar, clearSlot, defaultBar, type Bar } from './actionBar
 import type { Worn } from './recipe';
 import { defOf, plainItem, withQualities, type Item } from './items';
 import { strengthOf, wearState, wornBy, type Lodging, type WearState } from './upkeep';
-import { levelOf } from './growth';
+import { levelOf, strengthOf as grownBy, type Strength } from './growth';
 
 export interface CharacterSave {
   /** Old saves only (before D59): dropped on loading. */
@@ -221,6 +221,8 @@ export class Character {
   get speech(): number { return this.prowess * 0.75 + this.bonus('speech'); }
   /** How strongly an ability works: a spell with the gear that adds to spells. */
   powerOf(def: AbilityDef): number { return this.prowess + (def.school ? this.bonus('spell') : 0); }
+  /** How strong an ability is for this hero (G2): from their level, a spell also from the spell power worn. */
+  strengthOf(def: AbilityDef): Strength { return grownBy(this.setting.growth, def, this.level, this.bonus('spell')); }
   /** The hero knows a spell (D59: mana comes with the first). */
   get hasMagic(): boolean { return this.known.some((id) => !!abilityOf(this.setting, id)?.school); }
 
@@ -261,9 +263,9 @@ export class Character {
   private get shieldKnack(): number { return this.prowess * 0.5 + this.bonus('block'); }
 
   /** The blow a weapon ability's `blow` step throws now. */
-  blow(step?: { readonly power: number; readonly aim?: number }): Blow {
-    const w = this.weapon;
-    return { damage: w.damage, kind: w.kind, prowess: this.aim, power: step?.power ?? 1, aim: step?.aim ?? 0 };
+  blow(step?: { readonly power: number; readonly aim?: number }, def?: AbilityDef): Blow {
+    const w = this.weapon, grown = def ? this.strengthOf(def).damage : 1;
+    return { damage: w.damage, kind: w.kind, prowess: this.aim, power: (step?.power ?? 1) * grown, aim: step?.aim ?? 0 };
   }
 
   guard(open = false): Guard {
@@ -275,7 +277,8 @@ export class Character {
    * wherever it needs one; the world itself is never scaled to it (D29).
    */
   get power(): number {
-    const w = this.weapon, avg = (w.damage[0] + w.damage[1]) / 2;
+    // The weapon's blows grow with the level as a level-1 ability's do (G2).
+    const w = this.weapon, avg = (w.damage[0] + w.damage[1]) / 2 * (1 + this.setting.growth.scale.damage * (this.level - 1));
     const knack = (this.aim + this.defence + this.armourKnack * 0.5 + (this.worn.off ? this.shieldKnack * 0.5 : 0)) / 5;
     return Math.round((knack + avg * (1 + this.aim / 220) / w.time * 2.2 + this.armour * 0.9 + this.blockChance * 8 + (this.maxHealth - 55) * 0.08) * 10) / 10;
   }

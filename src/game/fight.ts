@@ -264,7 +264,7 @@ export class Fight implements RecipeWorld {
     this.recipes.spend(a);
     this.swing = w.time * (b.power > 1.5 ? 1.25 : 1);
     this.quiet = 0;
-    const s = strike(this.hero.blow(b), this.den.guardOf(t), this.rng);
+    const s = strike(this.hero.blow(b, a), this.den.guardOf(t), this.rng);
     out.push({ kind: 'struck', who: t, strike: s, ability: a.id });
     this.wearOut('main', WEAR.blow * (s.outcome === 'miss' ? 1 / 3 : 1), out);
     for (const e of this.den.wound(t, s, p, b.stagger ?? 0)) this.denEvent(e, out);

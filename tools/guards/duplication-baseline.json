@@ -586,5 +586,9 @@
   {
     "key": "idiom: [.group Promise] in masterworld/app/spellFx/fxView.ts + masterworld/render/grass/GrassView.ts + masterworld/render/rocks/RockView.ts",
     "reason": "Views that build their pipelines off the render path keep the build's promise beside their group (F4, docs/SHADERS.md); each builds its own meshes."
+  },
+  {
+    "key": "same name: masterworld/game/recipe.ts#check + masterworld/setting/contract.ts#check",
+    "reason": "Different questions under a common verb: the recipe runner asks whether an ability can be used now; the setting's validation checks a table's numbers."
   }
 ]
