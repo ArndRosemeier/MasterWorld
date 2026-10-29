@@ -173,7 +173,7 @@ export class WorldJobs {
     return this.pool.run({ kind: 'roads', seed: this.seed, setting: this.setting, x0, z0, size, res }) as Promise<Float32Array>;
   }
 
-  /** A brook tile's brooks, traced in the world worker (world/hydro.ts packRivers). */
+  /** A brook tile's brooks and sediment floors, traced in the world worker (world/hydro.ts packTile). */
   brooks(tx: number, tz: number): Promise<Float64Array> {
     return this.pool.run({ kind: 'brooks', seed: this.seed, setting: this.setting, tx, tz }) as Promise<Float64Array>;
   }

@@ -45,6 +45,22 @@ const LAKE_MAX_CELLS = 100;
 /** Single-cell pits are noise; of the rest, this share are lakes (the skeleton is far more pitted than eroded land). */
 const LAKE_MIN_CELLS = 2;
 const LAKE_SHARE = 0.35;
+/**
+ * A hollow that holds no lake is resolved the way erosion would (phase W, W2): partly filled with sediment to a flat
+ * floor, partly breached by its outflow, at the level where the two together move the least earth. Below this depth
+ * (m) a hollow is left to its outflow alone.
+ */
+const HOLLOW_MIN = 0.5;
+/** Cross-section of a breach per metre of cut squared: its sides slope about one in three. */
+const BREACH_SIDES = 3;
+/**
+ * How much dearer filling is than breaching, per cubic metre: running water cuts its way out far sooner than a
+ * hollow silts up, and a filled hollow takes the height from the walls round it (a mesa's valley would lose its
+ * cliffs).
+ */
+const FILL_COST = 4;
+/** Levels tried between a hollow's floor and its spill, for the cheapest mix of fill and breach. */
+const HOLLOW_TRIES = 12;
 /** Spacing of river polyline points after resampling, metres. */
 const STEP = 80;
 /** Brooks: resample spacing, meander scale (metres), and the half widths they keep to. */
@@ -242,13 +258,15 @@ export class HydroTile {
   readonly acc: Float32Array;
   /** Lake level per cell (NaN: no lake). */
   readonly lake: Float32Array;
+  /** The level a hollow's sediment floor fills this cell to (NaN: none; W2). */
+  readonly plain: Float32Array;
   readonly rivers: River[] = [];
   /** Segment index: bucket (BUCKET-m squares) → [river, point] pairs. */
   private readonly buckets = new Map<number, number[]>();
   private readonly bucket: number;
 
-  /** `given`: the tile's rivers as another thread traced them (`packRivers`); the drainage is not kept then. */
-  constructor(readonly skeleton: Skeleton, readonly tx: number, readonly tz: number, readonly o: HydroOptions = HYDRO, private readonly feed: BrookFeed | null = null, given: readonly River[] | null = null) {
+  /** `given`: the tile as another thread traced it (`packTile`); the drainage is not kept then. */
+  constructor(readonly skeleton: Skeleton, readonly tx: number, readonly tz: number, readonly o: HydroOptions = HYDRO, private readonly feed: BrookFeed | null = null, given: PackedTile | null = null) {
     const { cell, core, margin } = o;
     const n = (this.n = core + 2 * margin);
     this.x0 = (tx * core - margin) * cell;
@@ -259,7 +277,8 @@ export class HydroTile {
       this.elev = this.fill = this.acc = new Float32Array(0);
       this.recv = new Int32Array(0);
       this.lake = new Float32Array(N).fill(NaN);
-      this.rivers.push(...given);
+      this.plain = given.plain;
+      this.rivers.push(...given.rivers);
       this.rivers.forEach((r, ri) => this.index(r, ri));
       return;
     }
@@ -308,8 +327,74 @@ export class HydroTile {
       for (let c = 0; c < N; c++) if (E[c] > 0 && F[c] - E[c] > LAKE_MIN) lake[c] = F[c];
       this.flattenLakes(DI, DJ);
     }
+    this.plain = new Float32Array(N).fill(NaN);
+    this.resolveHollows(DI, DJ);
 
     this.traceRivers(DI, DJ);
+  }
+
+  /**
+   * Every hollow that holds no lake (W2): the drainage filled it to its spill level, which no water could reach; erosion
+   * would have filled it with sediment or cut its outflow down. Of the levels between its floor and its spill, the one
+   * where filling below it and breaching the outflow above it together move the least earth: cells below it get a
+   * flat floor at that level (`plain`, raised in the land too: `onFloors`), and the courses cut down to it (they never
+   * rise downstream), so a brook no longer saws a deep gorge through a ridge to leave a shallow dip.
+   */
+  private resolveHollows(DI: number[], DJ: number[]): void {
+    const { n, elev: E, fill: F, recv, lake, plain } = this, cell = this.o.cell, N = n * n;
+    const seen = new Uint8Array(N), stack: number[] = [], members: number[] = [];
+    const deep = (c: number) => E[c] > 0 && F[c] - E[c] > HOLLOW_MIN && Number.isNaN(lake[c]);
+    for (let s = 0; s < N; s++) {
+      if (seen[s] || !deep(s)) continue;
+      stack.push(s); seen[s] = 1; members.length = 0;
+      let floor = s, spill = -Infinity;
+      while (stack.length) {
+        const c = stack.pop()!;
+        members.push(c);
+        if (E[c] < E[floor]) floor = c;
+        spill = Math.max(spill, F[c]);
+        const ci = c % n, cj = (c - ci) / n;
+        for (let k = 0; k < 8; k++) {
+          const i = ci + DI[k], j = cj + DJ[k];
+          if (i < 0 || j < 0 || i >= n || j >= n) continue;
+          const nb = j * n + i;
+          if (!seen[nb] && deep(nb)) { seen[nb] = 1; stack.push(nb); }
+        }
+      }
+      // The outflow: from the floor down the drainage until the land is lower than the floor again.
+      const path: number[] = [];
+      for (let c = recv[floor], guard = 0; c >= 0 && guard < 4 * n; c = recv[c], guard++) {
+        if (E[c] <= E[floor]) break;
+        path.push(c);
+      }
+      let best = spill, cost = Infinity;
+      for (let t = 0; t <= HOLLOW_TRIES; t++) {
+        const level = lerp(E[floor], spill, t / HOLLOW_TRIES);
+        let fill = 0, cut = 0;
+        for (const c of members) fill += Math.max(0, level - E[c]);
+        for (const c of path) { const d = Math.max(0, E[c] - level); cut += d * d; }
+        const total = FILL_COST * fill * cell * cell + BREACH_SIDES * cut * cell;
+        if (total < cost) { cost = total; best = level; }
+      }
+      for (const c of members) if (E[c] < best) { plain[c] = best; E[c] = best; }
+    }
+  }
+
+  /**
+   * Ground `h` at (x, z) as the hollows' sediment floors raise it (W2): blended from the cells round it, so a floor
+   * runs out smoothly where the land rises above it.
+   */
+  onFloors(x: number, z: number, h: number): number {
+    const { n, plain } = this, c = this.o.cell;
+    const u = (x - this.x0) / c - 0.5, v = (z - this.z0) / c - 0.5;
+    const i = Math.floor(u), j = Math.floor(v);
+    if (i < 0 || j < 0 || i >= n - 1 || j >= n - 1) return h;
+    const fu = u - i, fv = v - j, k = j * n + i;
+    let w = 0, sum = 0;
+    const take = (cell: number, wt: number) => { const p = plain[cell]; if (!Number.isNaN(p)) { w += wt; sum += p * wt; } };
+    take(k, (1 - fu) * (1 - fv)); take(k + 1, fu * (1 - fv)); take(k + n, (1 - fu) * fv); take(k + n + 1, fu * fv);
+    if (w <= 0) return h;
+    return h + w * Math.max(0, sum / w - h);
   }
 
   private flattenLakes(DI: number[], DJ: number[]): void {
@@ -534,9 +619,10 @@ export class HydroTile {
     const last = cx.length - 1;
     for (let k = 0; k <= last; k++) {
       xz.push(cx[k], cz[k]); hw.push(chw[k]);
-      // A brook lies in the ground where it runs (its cells are too coarse for the dips between them).
+      // A brook lies in the ground where it runs (its cells are too coarse for the dips between them): the land at the
+      // point itself, not the cells' blend, which stands metres above a dip between them (a brook on a bank, W2).
       if (!this.feed || k === last) { lv.push(cl[k]); continue; }
-      gr.push(this.drainedAt(cx[k], cz[k]));
+      gr.push(this.feed.ground(cx[k], cz[k]));
       // Low by the sea, the land's small relief (terrain.ts, down to 0.5 m) dips below a brook's ground: it runs
       // at the sea's height there, so its banks stay dry.
       const bl = Math.min(cl[k], gr[k] - 0.2);
@@ -712,10 +798,23 @@ export class HydroTile {
 }
 
 /** Hydro tiles by need: the tile that owns a point (by its core), computed once. */
-/** Rivers packed into one array, to hand a tile to another thread: [count, then per river: points, xz, level, half, fall, reach (0 or n)]. */
-export function packRivers(rivers: readonly River[]): Float64Array {
-  let size = 1;
+/** A tile as another thread traced it: its rivers and its sediment floors. */
+export interface PackedTile {
+  rivers: River[];
+  plain: Float32Array;
+}
+
+/**
+ * A tile packed into one array, to hand it to another thread: [count, then per river: points, xz, level, half, fall,
+ * reach (0 or n)], then [floors, then per floor: cell, level].
+ */
+export function packTile(t: HydroTile): Float64Array {
+  const { rivers, plain } = t;
+  let size = 2;
   for (const r of rivers) size += 2 + r.level.length * 4 + r.fall.length + (r.reach?.length ?? 0);
+  const floors: number[] = [];
+  plain.forEach((p, c) => { if (!Number.isNaN(p)) floors.push(c, p); });
+  size += floors.length;
   const out = new Float64Array(size);
   let o = 0;
   out[o++] = rivers.length;
@@ -729,12 +828,14 @@ export function packRivers(rivers: readonly River[]): Float64Array {
     out[o++] = r.reach ? 1 : 0;
     if (r.reach) { out.set(r.reach, o); o += n; }
   }
+  out[o++] = floors.length / 2;
+  out.set(floors, o);
   return out;
 }
 
-/** The rivers `packRivers` packed (the same numbers: levels and widths were float32 to begin with). */
-export function unpackRivers(a: Float64Array): River[] {
-  const out: River[] = [];
+/** The tile `packTile` packed (the same numbers: levels and widths were float32 to begin with); `cells` per tile. */
+export function unpackTile(a: Float64Array, cells: number): PackedTile {
+  const rivers: River[] = [];
   let o = 1;
   for (let k = 0; k < a[0]; k++) {
     const n = a[o++];
@@ -744,9 +845,11 @@ export function unpackRivers(a: Float64Array): River[] {
     const fall = Float32Array.from(a.subarray(o, o + n - 1)); o += n - 1;
     const r: River = { xz, level, half, fall };
     if (a[o++]) { r.reach = Float32Array.from(a.subarray(o, o + n)); o += n; }
-    out.push(r);
+    rivers.push(r);
   }
-  return out;
+  const plain = new Float32Array(cells).fill(NaN);
+  for (let k = 0, count = a[o++]; k < count; k++, o += 2) plain[a[o]] = a[o + 1];
+  return { rivers, plain };
 }
 
 export class Hydrology {
@@ -766,7 +869,7 @@ export class Hydrology {
   private feedOf(main: HydroTile): BrookFeed {
     const w = emptyWater(), sk = this.skeleton;
     return {
-      ground: (x, z) => shapeByWater(main.query(x, z, w), sk.elevation(x, z)),
+      ground: (x, z) => shapeByWater(main.query(x, z, w), main.onFloors(x, z, sk.elevation(x, z))),
       join: (x, z) => {
         main.query(x, z, w);
         // Into a river: once well inside its valley, straight to its line.
@@ -791,11 +894,21 @@ export class Hydrology {
     return !b || this.brookTiles.has(`${Math.floor(x / side)},${Math.floor(z / side)}`);
   }
 
-  /** A brook tile traced in another thread (its `packRivers`): it need not be traced here (that takes 0.2-0.3 s). */
+  /** A brook tile traced in another thread (its `packTile`): it need not be traced here (that takes 0.2-0.3 s). */
   adoptBrooks(tx: number, tz: number, packed: Float64Array): void {
     const b = this.brooks, key = `${tx},${tz}`;
     if (!b || this.brookTiles.has(key)) return;
-    this.brookTiles.set(key, new HydroTile(this.skeleton, tx, tz, b, null, unpackRivers(packed)));
+    const n = b.core + 2 * b.margin;
+    this.brookTiles.set(key, new HydroTile(this.skeleton, tx, tz, b, null, unpackTile(packed, n * n)));
+  }
+
+  /**
+   * Ground `h` at (x, z) as the hollows' sediment floors raise it (W2): the rivers' grid's, then the brooks' (whose
+   * drainage ran over the land the rivers' floors and valleys had shaped).
+   */
+  onFloors(x: number, z: number, h: number): number {
+    const r = this.tileAt(x, z).onFloors(x, z, h), b = this.brookTileAt(x, z);
+    return b ? b.onFloors(x, z, r) : r;
   }
 
   /** The brook tile that owns a point (null without brooks). */

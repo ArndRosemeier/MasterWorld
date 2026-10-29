@@ -15,9 +15,19 @@ const world: WalkWorld = {
   climbable: (x, z) => terrain.climbable(x, z),
 };
 const sk = terrain.skeleton;
+const climber = new LandWalk(terrain, true);
+/** Does the climbing bot's way from 25 m before a foot to 60 m behind it (looked for 40 m round) run nearly straight? */
+function upStraight(x: number, z: number, nx: number, nz: number): boolean {
+  let [px, pz] = [x - nx * 25, z - nz * 25], run = 0;
+  for (const [qx, qz] of climber['search'](px, pz, x + nx * 60, z + nz * 60, 1, 40) ?? []) { run += Math.hypot(qx - px, qz - pz); [px, pz] = [qx, qz]; }
+  return run > 0 && run < 85 * 1.5;
+}
 
-/** A mesa wall's foot (where the wall starts to rise) along a line east, with holds on it or sheer. */
-function wallFoot(holds: boolean): { x: number; z: number; nx: number; nz: number; tall: number } {
+/**
+ * A mesa wall's foot (where the wall starts to rise) along a line east, with holds on it or sheer; `straight`: one
+ * the loop bot's way runs straight up (a talus slope or a gully beside it can be the shorter way).
+ */
+function wallFoot(holds: boolean, straight = false): { x: number; z: number; nx: number; nz: number; tall: number } {
   for (let z = 36000; z < 39000; z += 97) for (let x = -25000; x < -20000; x += 3) {
     sk.mesaRise(x, z);
     const m = sk.lastMesa;
@@ -27,7 +37,10 @@ function wallFoot(holds: boolean): { x: number; z: number; nx: number; nz: numbe
     const { nx, nz, tall } = m;
     let same = true;
     for (let k = 1; k < 8 && same; k++) { sk.mesaRise(x + nx * k * 8, z + nz * k * 8); same = (sk.lastMesa.climb > 0.9) === holds && sk.lastMesa.pass === 0; }
-    if (same) return { x: x - nx * 4, z: z - nz * 4, nx, nz, tall };
+    if (!same) continue;
+    const fx = x - nx * 4, fz = z - nz * 4;
+    if (straight && !upStraight(fx, fz, nx, nz)) continue;
+    return { x: fx, z: fz, nx, nz, tall };
   }
   throw new Error('no wall foot found');
 }
@@ -98,7 +111,7 @@ test('climb: the loop bot reaches a plateau top once by a pass and once by climb
   assert.ok(byPass.arrived, `up the pass: ${byPass.left.toFixed(0)} m short`);
   assert.equal(byPass.climbed, 0, 'walked up the pass');
   assert.ok(byPass.top > 30 && byPass.rose > byPass.top - 3, `rose ${byPass.rose.toFixed(0)} m to a top ${byPass.top.toFixed(0)} m up`);
-  const face = wallFoot(true), byClimb = botUp(face, true, 60);
+  const face = wallFoot(true, true), byClimb = botUp(face, true, 60);
   assert.ok(byClimb.arrived, `up the face: ${byClimb.left.toFixed(0)} m short`);
   assert.ok(byClimb.climbed > face.tall * 0.25, `climbed ${byClimb.climbed.toFixed(0)} m of a wall of ${face.tall.toFixed(0)} m`);
   assert.ok(byClimb.top > 30 && byClimb.rose > byClimb.top - 3, `rose ${byClimb.rose.toFixed(0)} m to a top ${byClimb.top.toFixed(0)} m up`);

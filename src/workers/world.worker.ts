@@ -14,7 +14,7 @@ import { roadMask } from '../world/roads';
 import type { Decision, RegionDecision, RoadDecision, RoadWay } from '../world/decisions';
 import { linkRoad, type Place } from '../vgm/roads';
 import { serve } from './serve';
-import { packRivers } from '../world/hydro';
+import { packTile } from '../world/hydro';
 import { nextRegion, type FrontierAsk } from '../vgm/frontier';
 
 export type WorldJob = ({ kind: 'mask' } & MaskJob) | ({ kind: 'grass' } & MaskJob) | ({ kind: 'roads' } & MaskJob) | ({ kind: 'flora' } & FloraJob) | { kind: 'rocks'; seed: number; setting: string; x0: number; z0: number; size: number } | { kind: 'decisions'; seed: number; setting: string; decisions: readonly Decision[] }
@@ -37,7 +37,7 @@ serve<WorldJob, WorldResult>((job) => {
   // Tracing a brook tile takes 0.2-0.3 s: here, for the main thread (D50, floor F2).
   if (job.kind === 'brooks') {
     const b = terrain.hydro.brooks!, side = b.core * b.cell;
-    const packed = packRivers(terrain.hydro.brookTileAt((job.tx + 0.5) * side, (job.tz + 0.5) * side)!.rivers);
+    const packed = packTile(terrain.hydro.brookTileAt((job.tx + 0.5) * side, (job.tz + 0.5) * side)!);
     return { result: packed, transfer: [packed.buffer] };
   }
   const out = job.kind === 'mask' ? waterMask(terrain, job) : job.kind === 'grass' ? grassMask(terrain, job) : job.kind === 'roads' ? roadMask(terrain.roads, job) : job.kind === 'rocks' ? rockPlacement(terrain, job.x0, job.z0, job.size) : floraPlacement(terrain, job);
