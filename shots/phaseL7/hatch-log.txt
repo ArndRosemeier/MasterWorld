@@ -1,0 +1,34 @@
+
+> masterworld@0.0.0 shot:hatch
+> node tools/shot/hatch.mjs shots/phaseL7/hatch
+
+start {"climbing":false,"below":false,"inside":true,"x":-30816.86134834503,"y":52.06811691319928,"z":34578.78267650395,"built":7}
+shots\phaseL7\hatch\0-by-the-hatch.jpg
+prompt by the hatch: "E Climb down"
+shots\phaseL7\hatch\1-down-00.jpg
+shots\phaseL7\hatch\1-down-01.jpg
+shots\phaseL7\hatch\1-down-02.jpg
+shots\phaseL7\hatch\1-down-03.jpg
+shots\phaseL7\hatch\1-down-04.jpg
+shots\phaseL7\hatch\1-down-05.jpg
+shots\phaseL7\hatch\1-down-06.jpg
+shots\phaseL7\hatch\1-down-07.jpg
+shots\phaseL7\hatch\1-down-08.jpg
+shots\phaseL7\hatch\1-down-09.jpg
+below {"climbing":false,"below":true,"inside":false,"x":-30814.91901947671,"y":-400,"z":34579.94267212166,"built":7}
+shots\phaseL7\hatch\2-at-the-foot.jpg
+prompt at the ladder: "E Climb up"
+shots\phaseL7\hatch\3-up-00.jpg
+shots\phaseL7\hatch\3-up-01.jpg
+shots\phaseL7\hatch\3-up-02.jpg
+shots\phaseL7\hatch\3-up-03.jpg
+shots\phaseL7\hatch\3-up-04.jpg
+shots\phaseL7\hatch\3-up-05.jpg
+shots\phaseL7\hatch\3-up-06.jpg
+shots\phaseL7\hatch\3-up-07.jpg
+shots\phaseL7\hatch\3-up-08.jpg
+shots\phaseL7\hatch\3-up-09.jpg
+above {"climbing":false,"below":false,"inside":true,"x":-30816.088984582275,"y":52.06811691319928,"z":34578.67379942657,"built":9}
+shots\phaseL7\hatch\4-out-again.jpg
+shaders 80 warm-up + 9 later · worst 21 ms · policy ok
+hatch: ok
