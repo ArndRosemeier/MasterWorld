@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic';
 import { GROWTH_SOURCES } from '../src/setting/contract';
 import { Character } from '../src/game/character';
-import { carryRenown, dauntsFrom, evenDanger, fightXp, levelOf, levelOfDanger, topLevel } from '../src/game/growth';
+import { carryRenown, dauntsFrom, evenDanger, fightXp, levelOf, levelOfDanger, topLevel, xpToNext } from '../src/game/growth';
 import { fightBot } from '../src/game/bot';
 import { plainItem } from '../src/game/items';
 import { outlineCellar } from '../src/world/dungeon/cellar';
@@ -107,4 +107,12 @@ test('growth: foes the hero has outgrown dare not start a fight, but fight back 
   assert.equal(grown.hurt, 0, 'goblins watch a level-10 hero and keep their distance');
   assert.notEqual(grown.state, 'fight');
   assert.ok(run(10, true).hurt > 0, 'struck, they defend themselves');
+});
+
+test('the experience bar: what the next level still needs, nothing at the top', () => {
+  const g = classic.growth;
+  assert.equal(xpToNext(g, 0), g.xp[1]);
+  assert.equal(xpToNext(g, g.xp[1] - 0.4), 1);
+  assert.equal(xpToNext(g, g.xp[1]), g.xp[2] - g.xp[1]);
+  assert.equal(xpToNext(g, 1e9), null);
 });

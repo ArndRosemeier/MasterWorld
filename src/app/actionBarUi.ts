@@ -3,12 +3,14 @@
  * (not only in fights). Each socket holds what the hero's bar (game/actionBar.ts) puts there; its key (1 to 0,
  * rebindable) or a click uses it. A cooldown runs round its socket as a ward line. The ability book (K,
  * abilityBook.ts) arranges it: abilities drag onto a socket, sockets drag onto each other to swap, and a socket
- * dragged off the bar is cleared.
+ * dragged off the bar is cleared. Along its top runs the experience rule: how far the hero is toward the next
+ * level, and how much experience that level still needs (D58; Arnd).
  */
 import './actionBar.css';
 import { abilityOf, type AbilityDef, type SettingModule } from '../setting/contract';
 import { BAR_SLOTS, clearSlot, placeOnBar, POTION, REST, swapOnBar } from '../game/actionBar';
 import type { Character } from '../game/character';
+import { towardNext, xpToNext } from '../game/growth';
 import { BAR_KEYS, barSlotOf, keyLabel, type Bindings } from '../input/controls';
 import { onKeyDown } from '../input/keys';
 import { el } from './dom';
@@ -67,6 +69,11 @@ export class ActionBarUi {
   private readonly root = el('div', { id: 'bar', className: 'hidden' });
   private shownSlots: Shown[] = [];
   private edit = false;
+  /** The experience rule along the strap's top: a brass trough filling with light, the experience still needed engraved on it. */
+  private readonly fill = el('i');
+  private readonly need = el('span');
+  private readonly xp = el('div', { className: 'xp' }, el('div', { className: 'trough' }, this.fill), this.need);
+  private shownXp = -1;
 
   constructor(private readonly hero: Character, private readonly setting: SettingModule, private readonly host: BarHost) {
     document.body.append(this.root);
@@ -129,7 +136,7 @@ export class ActionBarUi {
       kids.push(s);
       this.shownSlots.push({ id, el: s, was: 0, done: '', key: '', count: '' });
     }
-    this.root.replaceChildren(...kids);
+    this.root.replaceChildren(...kids, this.xp);
     this.readSlots();
   }
 
@@ -139,8 +146,9 @@ export class ActionBarUi {
     this.host.arranged();
   }
 
-  /** Every frame: keys, cooldown wards, what can be used. Writes only what changed. */
+  /** Every frame: keys, cooldown wards, what can be used, the experience rule. Writes only what changed. */
   readSlots(): void {
+    this.readXp();
     const b = this.host.bindings;
     this.shownSlots.forEach((s, i) => {
       const key = keyLabel(b[BAR_KEYS[i]][0]);
@@ -156,5 +164,16 @@ export class ActionBarUi {
       const count = st.count !== undefined && st.count > 0 ? String(st.count) : '';
       if (s.count !== count) { (s.el.querySelector('.count') as HTMLElement).textContent = count; s.count = count; }
     });
+  }
+
+  /** The experience rule: filled as far as the hero is toward the next level; a glint when experience comes in. */
+  private readXp(): void {
+    const xp = this.hero.xp;
+    if (xp === this.shownXp) return;
+    const g = this.setting.growth, left = xpToNext(g, xp), gained = this.shownXp >= 0 && xp > this.shownXp;
+    this.shownXp = xp;
+    this.fill.style.width = `${(towardNext(g, xp) * 100).toFixed(1)}%`;
+    this.need.textContent = left === null ? `Level ${this.hero.level}` : `${left} xp to level ${this.hero.level + 1}`;
+    if (gained) replay(this.xp, 'gained');
   }
 }
