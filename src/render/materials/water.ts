@@ -7,7 +7,7 @@
  */
 import { DoubleSide, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
-  Fn, abs, atan, cameraPosition, cos, clamp, cross, dot, exp, float, frontFacing, length, max, mix, mx_noise_float, normalize, pmremTexture,
+  Fn, abs, atan, cameraPosition, cos, clamp, cross, dot, exp, float, frontFacing, fwidth, length, max, mix, mx_noise_float, normalize, pmremTexture,
   positionLocal, positionWorld, pow, fract, reflect, screenUV, select, sin, floor, smoothstep, texture, varying, vec2, vec3, vec4, viewportSharedTexture,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
@@ -153,7 +153,11 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const n = mx_noise_float(vec3(p.xz.mul(0.45), t.mul(0.3))).mul(0.5).add(0.5);
     // Surf rolls in only on still water; a river shows its wet rim and streaks drawn out by the current.
     const still = running.oneMinus();
-    const shore = float(1).sub(smoothstep(0.0, 2.8, depth)).mul(still);
+    // Near the shore by distance, not depth alone: over a wide shallow shelf (a lake's flat edge) a depth test turned
+    // a band tens of metres wide white. The metres to the shore: depth over how fast it deepens across the pixels.
+    const deepens = fwidth(depth).div(max(fwidth(p.x).add(fwidth(p.z)), 1e-3));
+    const nearShore = float(1).sub(smoothstep(3.0, 10.0, depth.div(max(deepens, 0.02))));
+    const shore = float(1).sub(smoothstep(0.0, 2.8, depth)).mul(still).mul(nearShore);
     // Streaks: noise stretched along the flow and carried with it (in the same two layers as the ripples). Stretched
     // along one of STREAK_DIRS fixed directions, the two either side of the current blended: turning the world
     // coordinates by the current itself (which bends across a narrow brook) tore them into blocks.
@@ -183,7 +187,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       shore.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
         // The wet rim, on still water only: running water's depth comes from masks too coarse for a brook, which is
         // shallow all across and would turn white; its edge is where the surface meets the bank.
-        .add(float(1).sub(smoothstep(0.0, 0.3, depth)).mul(0.6).mul(still))
+        .add(float(1).sub(smoothstep(0.0, 0.3, depth)).mul(0.6).mul(still).mul(nearShore))
         .add(smoothstep(0.55, 1.0, vCrest).mul(smoothstep(0.45, 0.75, n)).mul(0.7))
         // Streaks and white water on running water (the falling sheet itself is all foam, below).
         .add(runningFoam),
