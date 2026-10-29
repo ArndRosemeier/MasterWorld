@@ -246,13 +246,19 @@ for (const s of sessions) {
   const errors = [];
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } }); // its own, as a player's first visit
   const page = await context.newPage();
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  // The page's last console lines, printed if it never gets ready (where its loading stopped).
+  const recent = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); recent.push(`${m.type()}: ${m.text()}`); if (recent.length > 40) recent.shift(); });
   page.on('pageerror', (e) => { failed = true; errors.push(`page error: ${e.message}`); console.error(`[page error] ${e.stack ?? e.message}`); });
   const started = Date.now();
   await page.goto(`${base}?${s.query}`);
   if (s.first) await s.first(page);
   const ready = await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT }).then(() => true, () => false);
-  if (!ready) { failed = true; errors.push('the page did not report ready'); }
+  if (!ready) {
+    failed = true; errors.push('the page did not report ready');
+    const stage = await page.evaluate(() => document.querySelector('#loading')?.textContent ?? '').catch(() => '(page gone)');
+    console.log(`${s.id}: NOT READY · loading screen: ${stage.trim().slice(0, 200)}\n  ${recent.join('\n  ')}`);
+  }
   const loadS = (Date.now() - started) / 1000;
   console.log(`${s.id}: ready in ${loadS.toFixed(1)} s`);
   await page.addStyleTag({ content: '#loading{display:none!important}#hud{visibility:hidden!important}' });

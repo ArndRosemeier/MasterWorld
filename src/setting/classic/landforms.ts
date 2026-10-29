@@ -51,7 +51,7 @@ export const landscapeKinds: readonly LandscapeKindDef[] = [
   // Moor: high, open and treeless, tors of grey rock on the crests, boulders strewn, boggy hollows with pools.
   {
     id: 'moor', share: 0.09, swell: { height: 26, size: 1800 }, bare: 0.995,
-    wears: { color: 0x6a5a6c, surface: 'forest', grass: { cover: 0.85, height: 0.25, dry: 0.55 } },
+    wears: { color: 0x7a3a8a, surface: 'grass', grass: { cover: 0.55, height: 0.22, dry: 0.4 } },
     landforms: { perKm2: 44, relief: 6, mix: { tor: 5, boulders: 4, erratic: 3, dell: 3, knoll: 2, ridge: 1 } },
   },
   // Karst: limestone country pitted with sinkholes and dolines, dry valleys and ravines where the water went under.
