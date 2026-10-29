@@ -1,0 +1,29 @@
+
+> masterworld@0.0.0 shot
+> node tools/shot/shot.mjs seed=masterworld&fly&hud&weather=clear&pos=-30820,260,35350&look=0,-6&hour=16 shots/phaseL10/far-mesas.png seed=masterworld&fly&hud&weather=clear&pos=-30652,400,35378&look=0,-20&hour=16 shots/phaseL10/plateau-view.png seed=masterworld&fly&hud&weather=clear&pos=-30820,34750&look=180,6&hour=12 shots/phaseL10/valley-noon.png seed=masterworld&fly&hud&weather=clear&pos=-30820,34750&look=180,6&hour=19.5 shots/phaseL10/valley-dusk.png seed=masterworld&fly&hud&weather=clear&pos=-30820,352,34200&look=180,-12&hour=11 shots/phaseL10/overview.png
+
+shots/phaseL10/far-mesas.png: webgpu · seed masterworld · 39.7 ms · -30820, 260, 35350 · chunks 279 (+0) · grass 98+194 · 0.00 dense 0.00 m · folk 0/30
+weather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00
+shaders 72 warm-up + 30 later · worst 12 ms · policy ok · wild - (0/7 built) · regions 8 (2 places drawn) · towns 1 (133 folk) · small life 11 squirrels, 62/62 birds (15 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 72 built in warm-up, 30 after (0 drawn late), worst block 12 ms, 0 violations, 0 built again alike
+shots/phaseL10/plateau-view.png: webgpu · seed masterworld · 18.2 ms · -30652, 400, 35378 · chunks 279 (+0) · grass 98+403 · 0.32 dense 0.18 m · folk 0/30
+weather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00
+shaders 72 warm-up + 32 later · worst 13 ms · policy ok · wild - (0/7 built) · regions 9 (2 places drawn) · towns 1 (133 folk) · small life 11 squirrels, 77/77 birds (2 drawn, 3/3 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 72 built in warm-up, 32 after (0 drawn late), worst block 13 ms, 0 violations, 0 built again alike
+shots/phaseL10/valley-noon.png: webgpu · seed masterworld · 17.1 ms · -30820, 57, 34750 · chunks 282 (+0) · grass 98+194 · 0.00 dense 0.00 m · folk 1/30
+weather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00
+shaders 74 warm-up + 13 later · worst 10 ms · policy ok · wild - (0/7 built) · regions 6 (0 places drawn) · towns 1 (133 folk) · small life 1 squirrels, 54/54 birds (45 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 74 built in warm-up, 13 after (0 drawn late), worst block 10 ms, 0 violations, 0 built again alike
+shots/phaseL10/valley-dusk.png: webgpu · seed masterworld · 18.5 ms · -30820, 57, 34750 · chunks 282 (+0) · grass 98+194 · 0.00 dense 0.00 m · folk 0/30
+weather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00
+shaders 74 warm-up + 28 later · worst 9 ms · policy ok · wild - (0/7 built) · regions 6 (0 places drawn) · towns 1 (133 folk) · small life 1 squirrels, 54/54 birds (45 drawn, 0/0 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 74 built in warm-up, 28 after (0 drawn late), worst block 9 ms, 0 violations, 0 built again alike
+shots/phaseL10/overview.png: webgpu · seed masterworld · 20.1 ms · -30820, 352, 34200 · chunks 246 (+0) · grass 88+370 · 0.06 dense 0.27 m · folk 0/30
+weather cover 0.08 rain 0.00 storm 0.00 mist 0.00 wind 0.20 wet 0.00
+shaders 72 warm-up + 32 later · worst 14 ms · policy ok · wild - (0/7 built) · regions 6 (0 places drawn) · towns 1 (133 folk) · small life 10 squirrels, 58/58 birds (0 drawn, 2/2 squirrel bodies)
+sound: waiting for a click · mood -
+shaders: 72 built in warm-up, 32 after (0 drawn late), worst block 14 ms, 0 violations, 0 built again alike
