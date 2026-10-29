@@ -62,6 +62,9 @@ const side = (turn) => page.evaluate((turn) => { const p = window.game.player; p
 await page.evaluate(([nx, nz]) => { const p = window.game.player; p.walker.yaw = Math.atan2(-nx, -nz); p.heroCam.yaw = p.walker.yaw; }, [IN.x, IN.z]);
 const s0 = await state();
 console.log('start', JSON.stringify(s0));
+// Out of the first person view (the hero is not drawn in it): from behind, the hero and the wall ahead.
+await side(0.6);
+await page.waitForTimeout(1500);
 await shoot('0-at-the-foot');
 await page.keyboard.down('KeyW');
 let on = false, pulled = false, top = s0.y, k = 0;

@@ -9,14 +9,15 @@ import type { HeroPuppet } from '../render/hero/HeroView';
 
 /** Where the holds are: the face is this far in front of the walker's body (game/walker.ts OFF_FACE). */
 const FACE = 0.35;
-/** The most a face leans back, metres in per metre up (a rock face climbed by its holds is near sheer). */
-const MAX_LEAN = 0.3;
+/** The most a face leans back, metres in per metre up: with the hands over the head (reach) the holds must stay near the body, so the face is taken as near sheer. */
+const MAX_LEAN = 0.1;
 
 export class ClimbPose {
   private readonly climb = new LadderClimb();
   private pulling = false;
   private lastY = 0;
-  private readonly face: Ladder = { x: 0, z: 0, nx: 0, nz: 1, lo: 0, hi: 0, floor: 0, halfWidth: 0.3, rim: false };
+  // Rock is climbed with the hands over the head (on a ladder they take the rungs at the chest).
+  private readonly face: Ladder = { x: 0, z: 0, nx: 0, nz: 1, lo: 0, hi: 0, floor: 0, halfWidth: 0.3, rim: false, reach: 1.9, hang: 0.2 };
 
   constructor(private readonly height: (x: number, z: number) => number) {}
 
