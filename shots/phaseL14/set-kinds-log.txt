@@ -1,0 +1,9 @@
+kind-downs: ready in 25.0 s
+13-kind-downs.jpg: drawn 0.1 s · settled 4.0 s · p50 11.6 ms · p95 47.6 ms · 0 shader violations
+kind-moor: ready in 20.9 s
+14-kind-moor.jpg: drawn 0.0 s · settled 4.0 s · p50 8.9 ms · p95 13.3 ms · 0 shader violations
+kind-karst: ready in 16.8 s
+15-kind-karst.jpg: drawn 0.0 s · settled 4.0 s · p50 10.0 ms · p95 30.3 ms · 0 shader violations
+kind-badlands: ready in 20.8 s
+16-kind-badlands.jpg: drawn 0.1 s · settled 4.0 s · p50 8.8 ms · p95 14.7 ms · 0 shader violations
+kinds: 4 shots in shots\phaseL14\set\2026-10-29-fcb4975 (110 s)

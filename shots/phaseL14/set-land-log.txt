@@ -1,0 +1,20 @@
+cellar: ready in 23.6 s
+12-cellar.jpg: drawn 0.0 s · settled 4.1 s · p50 5.4 ms · p95 15.2 ms · 0 shader violations
+land: ready in 18.7 s
+19-barrow.jpg: drawn 0.0 s · settled 4.0 s · p50 10.3 ms · p95 28.9 ms · 0 shader violations
+20-wild.jpg: drawn 0.3 s · settled 4.0 s · p50 7.7 ms · p95 10.0 ms · 0 shader violations
+21-fight.jpg: drawn 0.0 s · settled 1.5 s · p50 8.4 ms · p95 12.4 ms · 0 shader violations
+22-fight-magic.jpg: drawn 0.0 s · settled 1.5 s · p50 8.5 ms · p95 11.0 ms · 0 shader violations
+hamlet: ready in 20.3 s
+25-hamlet.jpg: drawn 0.1 s · settled 4.0 s · p50 10.2 ms · p95 30.7 ms · 0 shader violations
+26-road.jpg: drawn 0.3 s · settled 1.7 s · p50 8.5 ms · p95 24.5 ms · 0 shader violations
+village: ready in 21.6 s
+27-village.jpg: drawn 0.1 s · settled 3.8 s · p50 11.4 ms · p95 14.2 ms · 0 shader violations
+hold: ready in 15.5 s
+28-hold.jpg: drawn 2.6 s · settled 4.0 s · p50 13.1 ms · p95 35.7 ms · 0 shader violations
+29-hold-crag.jpg: drawn 0.1 s · settled 1.5 s · p50 9.1 ms · p95 11.2 ms · 0 shader violations
+30-hold-warden.jpg: drawn 0.1 s · settled 1.5 s · p50 10.1 ms · p95 12.2 ms · 0 shader violations
+situations: ready in 19.3 s
+31-hurt-traveller.jpg: drawn 0.0 s · settled 1.5 s · p50 12.0 ms · p95 16.3 ms · 0 shader violations
+32-raided-farm.jpg: drawn 0.0 s · settled 1.5 s · p50 11.4 ms · p95 13.9 ms · 0 shader violations
+land: 13 shots in shots\phaseL14\set\2026-10-29-fcb4975 (203 s)
