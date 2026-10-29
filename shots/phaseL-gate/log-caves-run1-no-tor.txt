@@ -1,0 +1,17 @@
+mesa: ready in 27.9 s
+21-mesa-valley.jpg: drawn 0.2 s · settled 3.8 s · p50 10.2 ms · p95 14.8 ms · 0 shader violations
+22-mesa-plateau.jpg: drawn 0.1 s · settled 2.6 s · p50 9.4 ms · p95 14.1 ms · 0 shader violations
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+page.evaluate: Error: no tor round the start
+    at eval (eval at evaluate (:370:30), <anonymous>:13:13)
+    at UtilityScript.evaluate (<anonymous>:372:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+    at Object.act (C:\Projekte\MasterWorld-shotwt-phaseL\tools\shot\set.mjs:148:34)
+    at C:\Projekte\MasterWorld-shotwt-phaseL\tools\shot\set.mjs:331:30 {
+  log: []
+}
+
+Node.js v24.19.0
