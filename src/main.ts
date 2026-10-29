@@ -352,6 +352,7 @@ export async function start(b: Boot): Promise<void> {
         useTownMasks(start);
       }
       texPool.dispose();
+      console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: ground textures made`);
     })();
 
     const wx = new WeatherView(weather, (x, z) => terrain.height(x, z));
@@ -391,10 +392,11 @@ export async function start(b: Boot): Promise<void> {
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
-    // The land round the camera is asked for now (after the roads, which the workers hear of first), so its
-    // chunks build while the seas, the hero and the town load; it is shown once its shader is warm.
+    // The land round the camera is asked for early (after the roads, which the workers hear of first), so its
+    // chunks build while the hero and the town load; it is shown once its shader is warm.
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
-    ground.prefetch(view.camera);
+    // (Once the ground's textures are made: their workers come first, as the warm-up waits for them.)
+    void painted.then(() => ground.prefetch(view.camera));
     // Every town: the start's, and the hamlets and villages founded out on the land (plan B3), all alike (B3a).
     // A town's words are tied into the game (how its people take the hero, what they offer) once the game's
     // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.

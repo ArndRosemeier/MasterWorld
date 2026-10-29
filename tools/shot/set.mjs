@@ -165,12 +165,22 @@ const SESSIONS = [
         if (!v) throw new Error('no cave to go into');
         const rooms = v.cellar.graph.rooms, top = rooms.reduce((a, r) => (r.height > a.height ? r : a), rooms[0]);
         await v.enter(true, top.id);
-        // Its size seen: the hero in its middle, facing along its longer side, the camera pulled far back and
-        // looking a little up, so the far side and the roof show and the hero is small (the camera stays clear of the
-        // rock as it does in play).
-        const r = v.cellar.layout.rooms[top.id], along = r.w >= r.d, pl = g.player;
-        const yaw = along ? -Math.PI / 2 : Math.PI;
-        pl.walker.yaw = yaw; pl.heroCam.yaw = yaw; pl.heroCam.pitch = 0.08; pl.heroCam.zoom = 16;
+        // Its size seen: the free camera low at the cavern's far side from the hero, looking past the hero and up
+        // into its roof. The way with the most room (of eight) is found by stepping through the rock as the hero's
+        // camera sees it.
+        const pl = g.player, h = pl.walker.pos, w = pl.heroCam.world, sight = w.sightSurface ?? w.rockSurface;
+        const y = h.y + 1.2;
+        const room = (dx, dz) => { let d = 0; while (d < 40) { const r = sight(h.x + dx * (d + 0.5), y, h.z + dz * (d + 0.5)); if (r !== null && r < 0.8) break; d += 0.5; } return d; };
+        let best = null;
+        for (let k = 0; k < 8; k++) {
+          const a = (k * Math.PI) / 4, dx = Math.sin(a), dz = Math.cos(a), back = room(-dx, -dz), ahead = room(dx, dz);
+          if (!best || back + ahead > best.n) best = { dx, dz, back, n: back + ahead };
+        }
+        const off = Math.min(best.back * 0.8, 22), cx = h.x - best.dx * off, cz = h.z - best.dz * off;
+        pl.walker.yaw = Math.atan2(-best.dx, -best.dz);
+        pl.flying = true;
+        pl.goTo([cx, y, cz], [(Math.atan2(best.dx, -best.dz) * 180) / Math.PI, 20]);
+        console.log(`cavern: camera ${off.toFixed(1)} m behind the hero, ${best.n.toFixed(1)} m of room along its way`);
       });
       await p.waitForTimeout(1500);
     } },
