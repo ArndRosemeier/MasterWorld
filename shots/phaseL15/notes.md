@@ -27,8 +27,8 @@ no package-lock change, `npm run build`. GPU (`SHOT_GPU=1`, the set draws WebGL 
   beyond is darker olive and brown, more moor-like, but it's far away.
 - **Karst: partly.** On foot it's green rolling turf with trees and tan rock scars in the middle distance. Aloft it's the best
   of the four: green land broken by **tan stepped limestone scarps and terraces** (pavement-like), with small white rock patches.
-  It reads as limestone country. But **no round sinkholes are visible**. The few hollows read as shadows, not pits. And it's grey-green?
-  No, it's the same bright green turf.
+  It reads as limestone country. But **no round sinkholes are visible**. The few hollows read as shadows, not pits.
+  The ground is the same bright green turf as downs, not grey-green.
 - **Badlands: yes, mostly.** Bare tan and clay ground everywhere, almost no green. On foot: a sharp ridge rising steeply to the right
   with fine vertical flutes (gully runnels) down its face, a smooth dune-like slope in front, and grey weathered patches.
   Aloft: a sea of **sharp tan ridges and gullies** to the coast, a strong badlands read. However: about **25-30 round green trees** stand
