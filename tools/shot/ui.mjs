@@ -3,7 +3,7 @@
  * `npm run build`: `node tools/shot/ui.mjs <out dir> ["<query>"]`, best with SHOT_GPU=1 on a machine with a
  * graphics card. It gives the hero one uncommon, rare and legendary thing (so the cards show every ward),
  * then for each window takes one picture during its entrance and one at rest; then the found cards on the
- * HUD and the compass. Prints the page's console errors.
+ * HUD and the minimap. Prints the page's console errors.
  */
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';

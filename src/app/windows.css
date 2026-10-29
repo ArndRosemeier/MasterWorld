@@ -107,7 +107,7 @@
 .panel.map { width: min(720px, 100%); }
 .map .parchment { display: block; width: auto; max-width: 100%; height: auto; max-height: calc(100vh - 150px); margin: 0 auto; border: 6px solid #6a5434; border-radius: 4px; box-shadow: inset 0 0 30px #0006, 0 0 0 2px var(--brass-lo); cursor: grab; }
 
-/* The pack: the worn slots and carried things as cards, the skills as brass gauges. */
+/* The pack: the worn slots and carried things as cards, what the level gives as brass gauges. */
 .panel.pack { width: min(760px, 100%); }
 .pack .card { padding: 6px 10px 7px; }
 .pack .worn { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -192,8 +192,8 @@
 .trade .scales.balk { animation: balk .4s ease-in-out; }
 @keyframes balk { 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
 
-/* Lessons (lessonsUi.ts): set down like a slate; each skill a brass rule, a ward line up to the hero's level,
-   a notch where the teacher's knowledge ends. A lesson lights the line up to its new mark, the number turns. */
+/* Lessons (lessonsUi.ts): set down like a slate; each ability a brass rule, a ward line up to the hero's level,
+   an ability learned lights up. */
 .panel.lessons { width: min(620px, 100%); }
 .shade.open .panel.lessons { animation: win-slate .7s cubic-bezier(.2, 1.4, .4, 1) backwards; }
 @keyframes win-slate { 0% { transform: scale(1.12) translateY(-12px); filter: blur(3px); opacity: 0; } 60% { filter: none; opacity: 1; transform: scale(.985); } }

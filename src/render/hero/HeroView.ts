@@ -8,7 +8,7 @@
  * (each garment, hairstyle and shadow) and then swapped in, so the old look shows until the new one is ready.
  */
 import { Group, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
-import { Rng, deriveSeed } from '@futuremagic/core';
+import { Rng, deriveSeed, smoothstep } from '@futuremagic/core';
 import { Character, outfitGarments, randomConfig, type CharacterCatalog, type CharacterConfig, type CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
 import { Mount } from '@actors/three';
@@ -302,9 +302,33 @@ export class HeroView {
       if (f) joltSpine(this.front.actor.bones, f.names, this.jolt, 0.4);
     }
     if (p.puppet) this.puppetOn(p.puppet);
+    else if (acting?.id === 'level_up') this.armsUp(this.time - acting.t0, acting.dur);
     // A spell is cast with empty hands: the weapon goes away while it gathers and is thrown.
     const drawn = !!p.combat && !acting?.id.startsWith('spell_');
     if (this.held.drawn !== drawn) { this.held.drawn = drawn; this.moveHeld(); }
+  }
+
+  /**
+   * A level gained (G3): both arms raised high to the ring of light, seen from behind as from the front (no clip
+   * lifts them that far). Up over the first quarter second, down over the last third of one.
+   */
+  private armsUp(t: number, dur: number): void {
+    const rig = this.rigOf();
+    if (!rig) return;
+    const w = smoothstep(0, 0.25, t) * (1 - smoothstep(dur - 0.35, dur, t));
+    if (w <= 0) return;
+    const o = this.object, g = this.goals, h = this.height;
+    o.updateMatrixWorld(true);
+    // Actors' people face +z: the hands a little apart and forward, above the head.
+    g.L!.p.set(0.2 * h / 1.75, 1.2 * h, 0.12 * h / 1.75);
+    g.R!.p.set(-0.2 * h / 1.75, 1.2 * h, 0.12 * h / 1.75);
+    for (const k of ['L', 'R'] as const) { const to = g[k]!; o.localToWorld(to.p); to.w = w; to.pole = undefined; to.flat = null; }
+    g.footL!.w = 0;
+    g.footR!.w = 0;
+    g.curl = { L: 0.25, R: 0.25 };
+    g.curlW = w;
+    rig.reachFor(g);
+    this.rigged = true;
   }
 
   /** A scene's pose over the clips, and hands and feet onto its goals (moved into the scene's frame). */

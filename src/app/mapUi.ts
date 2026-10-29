@@ -109,13 +109,6 @@ export class MapUi extends KeyWindow {
     step();
   }
 
-  /** Whether any cell of tile (ti, tj) is known. */
-  private tileKnown(ti: number, tj: number): boolean {
-    const n = TILE / CELL;
-    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (this.map.known.level(ti * n + i, tj * n + j)) return true;
-    return false;
-  }
-
   private middle(): [number, number] {
     return [this.centre[0], this.centre[1]];
   }
@@ -182,7 +175,16 @@ export class MapUi extends KeyWindow {
     if (t >= 1) this.inked.add(id);
   }
 
-  private paintMap(canvas: HTMLCanvasElement, cx: number, cz: number, zoom: number, strokeOf: (id: string) => number): void {
+  /**
+   * The minimap's sheet (G4): the same known land, roads, towns, guild houses and marks round (x, z), `across`
+   * metres across the canvas, north up, with the townsfolk near as dots; no names, no hero and no north (the
+   * minimap's own rim and arrow show those). False while some known land is still to be inked.
+   */
+  paintAround(canvas: HTMLCanvasElement, x: number, z: number, across: number, dots: readonly { readonly x: number; readonly z: number }[]): boolean {
+    return this.paintMap(canvas, x, z, SPAN / across, () => 1, { names: false, dots });
+  }
+
+  private paintMap(canvas: HTMLCanvasElement, cx: number, cz: number, zoom: number, strokeOf: (id: string) => number, small?: { readonly names: false; readonly dots: readonly { readonly x: number; readonly z: number }[] }): boolean {
     const g = canvas.getContext('2d')!;
     const size = canvas.width;
     const s = (size / SPAN) * zoom, u = size / SIZE;
@@ -203,7 +205,7 @@ export class MapUi extends KeyWindow {
     const fine = TILE * s >= FINE_PIXELS ? 1 : 0;
     l.imageSmoothingEnabled = true;
     for (let tj = tj0; tj <= tj1; tj++) for (let ti = ti0; ti <= ti1; ti++) {
-      if (!this.tileKnown(ti, tj)) continue;
+      if (!this.map.known.tileKnown(ti, tj, TILE)) continue;
       const key = ((ti + 32768) * 65536 + (tj + 32768)) * 2;
       let tile = this.tiles.get(key + fine);
       if (!tile && performance.now() - t0 <= INK_BUDGET) this.tiles.set(key + fine, (tile = this.paintTile(ti, tj, fine ? FINE : COARSE)));
@@ -260,7 +262,7 @@ export class MapUi extends KeyWindow {
       g.fillStyle = '#5a3a24';
       g.beginPath(); g.moveTo(x - k, z - k); g.lineTo(x + k, z - k); g.lineTo(x + k, z); g.quadraticCurveTo(x + k, z + k, x, z + k * 1.5); g.quadraticCurveTo(x - k, z + k, x - k, z); g.closePath(); g.fill();
       g.font = `${Math.round(13 * Math.max(1, u))}px Georgia, serif`; g.textAlign = 'left';
-      if (zoom >= 0.5) g.fillText(sg.label, x + k + 4, z + 4);
+      if (zoom >= 0.5 && !small) g.fillText(sg.label, x + k + 4, z + 4);
     }
     // The marks: a ring of red ink and the place's name.
     for (const l of this.journal.open) {
@@ -269,16 +271,23 @@ export class MapUi extends KeyWindow {
       const x = X(l.mark.x), z = Z(l.mark.z), r = 12 * Math.max(1, u);
       g.strokeStyle = '#a0281e'; g.lineWidth = 2.5 * Math.max(1, u);
       g.beginPath(); g.arc(x, z, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * t); g.stroke();
-      if (t >= 1) {
+      if (t >= 1 && !small) {
         g.font = `italic ${Math.round(15 * Math.max(1, u))}px Georgia, serif`; g.fillStyle = '#7a1e16'; g.textAlign = 'left';
         g.fillText(l.mark.label, x + r + 4, z + 5);
       }
+    }
+    if (small) {
+      // The townsfolk near: small dots of brown ink.
+      g.fillStyle = '#4a3220';
+      for (const d of small.dots) { g.beginPath(); g.arc(X(d.x), Z(d.z), 2.2, 0, Math.PI * 2); g.fill(); }
+      return !missing;
     }
     this.paintHero(g, X, Z);
     // North.
     g.fillStyle = ink; g.font = `600 ${Math.round(16 * u)}px Georgia, serif`; g.textAlign = 'center';
     g.fillText('N', size - 28 * u, 30 * u);
     g.beginPath(); g.moveTo(size - 28 * u, 36 * u); g.lineTo(size - 33 * u, 56 * u); g.lineTo(size - 23 * u, 56 * u); g.closePath(); g.fill();
+    return !missing;
   }
 
   /** The hero: a blue arrow where they stand, pointing the way they face. */
