@@ -373,6 +373,10 @@ export async function start(b: Boot): Promise<void> {
     // hero, the town and the woods load on the main thread, which left it waiting for seconds at 'Preparing
     // shaders'. The material kinds go first, once the ground's textures (which the land's shader reads) are made.
     const capShare = view.stage.cap.share;
+    // Behind the loading screen or the title's painted still nothing shows yet: every compile goes at full speed from
+    // the start (docs/SHADERS.md rule 5), not only once the kinds are warm. The share comes back once the world shows.
+    view.stage.cap.share = 1;
+    view.stage.monitor.phase = 'warmup';
     const kindsWarm = painted.then(() => view.stage.warmUp()).then(() => {
       // While the loading screen (or the title's painted still) still covers the view, the land, trees and
       // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
@@ -424,15 +428,23 @@ export async function start(b: Boot): Promise<void> {
       raised: (t) => { lit.push(t); view.warm.atDoors(lit.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z), lit.flatMap((x) => x.town.plan.wall ?? [])); },
     });
     const startTown = towns.start;
-    const sea = new WaterView(jobs);
+    // Its masks come from the terrain workers, four of them (the world worker alone made them one after another,
+    // between its grass, rocks and plants: 'Raising the land' waited on them).
+    const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
-    // The seas' masks come from the world worker while the hero is made here.
-    // Only the near one now (the hero's water); the wide ones are asked for once the woods and rocks are placed.
-    const seas = sea.prime(view.camera.position, 1);
+    // The near one first, while the hero is made here (the hero's water; the horses keep out of it).
+    const seas = sea.prime(view.camera.position, 1).then(() => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: near water mask made`));
     loading.set('Dressing the hero');
     // In the look the player made (a save's), or a new hero of the setting drawn from the seed.
     const hero = await HeroView.load(view.stage, view.renderer, setting.hero, save?.looks?.look ?? null, seed);
+    console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: hero's body made`);
     await seas;
+    // The one building shader (bridges, the VGM's sites, the town) samples the town's textures: nothing is built with it
+    // before they are made (the near mask can come first now, and a shader built without them stays grey).
+    await painted;
+    // The wide masks right after (in the terrain workers, beside the land's first chunks): ready by 'Raising the land',
+    // which waited seconds for them when they were asked for only once the woods and rocks were placed.
+    const wideSeas = sea.prime(view.camera.position);
     // In the water from the start (now that the water is known), and the hero's body built.
     player.resettle();
     title?.run(0);
@@ -613,7 +625,7 @@ export async function start(b: Boot): Promise<void> {
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
     if (chosen) hurry();
     loading.set('Raising the land');
-    await sea.prime(view.camera.position);
+    await wideSeas;
     await landReady;
     await rock;
     await raised;

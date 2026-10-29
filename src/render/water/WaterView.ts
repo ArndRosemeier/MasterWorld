@@ -8,7 +8,6 @@ import { BufferGeometry, Float32BufferAttribute, Mesh, type Vector3 } from 'thre
 import type { SkyLight } from '@futuremagic/sky';
 import { WATER } from '../materials/waterInputs';
 import { WATER_KIND } from '../materials/water';
-import type { WorldJobs } from '../../workers/pool';
 import { FollowedMask } from '../followedMask';
 import { prevailingWind } from '../../world/weather';
 import { swellHeight, swellScale } from '../../world/swell';
@@ -40,16 +39,17 @@ export class WaterView {
   private readonly masks: FollowedMask[];
   private time = 0;
 
-  constructor(jobs: WorldJobs) {
+  /** `mask`: a water mask over a square, made in a worker (`res` samples a side); `seed`: the world's (for its wind). */
+  constructor(seed: number, mask: (x0: number, z0: number, side: number, res: number) => Promise<Float32Array>) {
     // Rings grow geometrically: ~0.4 m apart under the camera, out past the horizon (~150 km).
     this.mesh = new Mesh(radialGrid(192, 150, 0.4, 1.068), WATER_KIND.make());
     this.mesh.name = 'sea';
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
     // Each rebaked once the camera is a fifth of its side from its centre.
-    this.masks = [WATER.near, WATER.mid, WATER.far].map((mask) => new FollowedMask(mask, (x0, z0, side, res) => jobs.mask('mask', x0, z0, side, res), mask.side / 5, mask.side / 16));
+    this.masks = [WATER.near, WATER.mid, WATER.far].map((m) => new FollowedMask(m, mask, m.side / 5, m.side / 16));
     // The swell runs with the prevailing wind (the weather's gusts and turns only change its height).
-    const a = prevailingWind(jobs.seed);
+    const a = prevailingWind(seed);
     WATER.wind.value.set(Math.cos(a), Math.sin(a));
   }
 
