@@ -411,7 +411,8 @@ export async function start(b: Boot): Promise<void> {
     const sea = new WaterView(jobs);
     water = sea;
     // The seas' masks come from the world worker while the hero is made here.
-    const seas = sea.prime(view.camera.position);
+    // Only the near one now (the hero's water); the wide ones are asked for once the woods and rocks are placed.
+    const seas = sea.prime(view.camera.position, 1);
     loading.set('Dressing the hero');
     // In the look the player made (a save's), or a new hero of the setting drawn from the seed.
     const hero = await HeroView.load(view.stage, view.renderer, setting.hero, save?.looks?.look ?? null, seed);
@@ -594,6 +595,7 @@ export async function start(b: Boot): Promise<void> {
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
     if (chosen) hurry();
     loading.set('Raising the land');
+    await sea.prime(view.camera.position);
     await landReady;
     await rock;
     await raised;
