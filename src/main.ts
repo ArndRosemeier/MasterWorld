@@ -190,6 +190,10 @@ export async function start(b: Boot): Promise<void> {
     // masks (asked at 'Filling the seas') do not wait for it: any job opens it, this one a single sample.
     const worldPool = createWorldPool();
     void worldPool.run({ kind: 'mask', seed, setting: setting.id, x0: 0, z0: 0, size: 1, res: 1 }).catch(() => {});
+    // So do the terrain workers, each its own (since phase W's lakes and valleys, seconds of work): opened now, they
+    // are ready when the land's first chunks are asked for, instead of opening it then while 'Raising the land' waits.
+    const terrainPool = createTerrainPool();
+    void terrainPool.broadcast({ kind: 'decisions', decisions: [], seed, setting: setting.id }).catch(() => {});
     // The VGM's first decisions: the start town (and the arch outside it) stand on the land.
     const opened = openWorld(seed, setting);
     // A save whose start town stood elsewhere (before D50 moved it to its river) belongs to a world that is
@@ -389,7 +393,7 @@ export async function start(b: Boot): Promise<void> {
     // Brook tiles ahead of the hero come from the world worker (D50).
     const brooks = new BrookPrefetch(terrain.hydro, jobs);
     // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
-    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
+    const terrainJobs = new TerrainJobs(terrainPool, seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
     // The land round the camera is asked for early (after the roads, which the workers hear of first), so its
