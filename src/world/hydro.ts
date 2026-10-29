@@ -1061,6 +1061,20 @@ export function unpackTile(a: Float64Array, cells: number): PackedTile {
   return { rivers, plain, vale };
 }
 
+/**
+ * Tiles already traced in this thread, by the world and grid they belong to: a tile depends only on the skeleton
+ * (its seed and shape) and its grid, so a second world of the same seed (a new game, a test file run after another)
+ * takes them instead of tracing them again (0.7-3 s each). The oldest go past SHARED_TILES.
+ */
+const shared = new Map<string, HydroTile>();
+const SHARED_TILES = 48;
+const worldKeys = new WeakMap<Skeleton, string>();
+const worldKey = (sk: Skeleton): string => {
+  let k = worldKeys.get(sk);
+  if (k === undefined) worldKeys.set(sk, (k = `${sk.seed}|${JSON.stringify(sk.shape)}`));
+  return k;
+};
+
 export class Hydrology {
   private readonly tiles = new Map<string, HydroTile>();
   private readonly brookTiles = new Map<string, HydroTile>();
@@ -1141,7 +1155,15 @@ export class Hydrology {
     if (last && last.tx === tx && last.tz === tz) return last;
     const key = `${tx},${tz}`;
     let t = tiles.get(key);
-    if (!t) tiles.set(key, (t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz))));
+    if (!t) {
+      const k = `${worldKey(this.skeleton)}|${JSON.stringify(o)}|${tiles === this.tiles ? '' : JSON.stringify(this.o)}|${key}`;
+      t = shared.get(k);
+      if (t) shared.delete(k);
+      else t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz));
+      shared.set(k, t);
+      if (shared.size > SHARED_TILES) shared.delete(shared.keys().next().value!);
+      tiles.set(key, t);
+    }
     if (tiles === this.tiles) this.lastRiver = t; else this.lastBrook = t;
     return t;
   }
