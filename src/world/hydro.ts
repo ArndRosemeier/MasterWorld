@@ -427,13 +427,14 @@ export class HydroTile {
     // Far above the land a valley's side lowers nothing (VALE_KEEP): dropped, so a tile hands over little. A
     // river's valley is carved too (W4d), but never below RIVER_KEEP over the river's water: the rivers keep their
     // levels and the land folds down to them.
-    // A cell is dropped only with all its neighbours: a valley's last cells blend out between finite heights (one
-    // left Infinity beside them made the land jump back up a cliff where the blend stopped).
+    // A cell is dropped only with all cells two round it: a valley's last cells blend out between finite heights (one
+    // left Infinity beside them made the land jump back up a cliff where the blend stopped), and `valeAt` blends
+    // over the 3 x 3 cells round a point's nearest.
     const far = (c: number) => E[c] <= 0 || wide[c] > E[c] + VALE_KEEP;
     const drop = new Uint8Array(N);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       let all = true;
-      for (let dj = -1; dj <= 1 && all; dj++) for (let di = -1; di <= 1 && all; di++) {
+      for (let dj = -2; dj <= 2 && all; dj++) for (let di = -2; di <= 2 && all; di++) {
         const a = i + di, b = j + dj;
         if (a >= 0 && b >= 0 && a < n && b < n && !far(b * n + a)) all = false;
       }
@@ -466,17 +467,28 @@ export class HydroTile {
     return keep;
   }
 
-  /** The most the land may stand at (x, z) by the valleys (W4b): blended between cells, Infinity off them. */
+  /**
+   * The most the land may stand at (x, z) by the valleys (W4b), Infinity off them: a quadratic B-spline over the
+   * 3 x 3 cells round the nearest, so its slope runs on smoothly across cells. (Blended straight between four cells,
+   * the slope jumped at every cell's middle: the valleys' sides were flat facets with straight creases, which the
+   * map's hill shade drew as seams.) Its weights are never negative, so it never dips below the cells' lowest.
+   */
   valeAt(x: number, z: number): number {
     const { n, vale } = this, c = this.o.cell;
     if (!vale.length) return Infinity;
     const u = (x - this.x0) / c - 0.5, v = (z - this.z0) / c - 0.5;
-    const i = Math.floor(u), j = Math.floor(v);
-    if (i < 0 || j < 0 || i >= n - 1 || j >= n - 1) return Infinity;
-    const fu = u - i, fv = v - j, k = j * n + i;
-    const a = vale[k], b = vale[k + 1], d = vale[k + n], e = vale[k + n + 1];
-    if (a === Infinity || b === Infinity || d === Infinity || e === Infinity) return Infinity;
-    return (a * (1 - fu) + b * fu) * (1 - fv) + (d * (1 - fu) + e * fu) * fv;
+    const i = Math.round(u), j = Math.round(v);
+    if (i < 1 || j < 1 || i >= n - 1 || j >= n - 1) return Infinity;
+    const tu = u - i, tv = v - j;
+    const wu0 = 0.5 * (0.5 - tu) ** 2, wu1 = 0.75 - tu * tu, wu2 = 0.5 * (0.5 + tu) ** 2;
+    const wv0 = 0.5 * (0.5 - tv) ** 2, wv1 = 0.75 - tv * tv, wv2 = 0.5 * (0.5 + tv) ** 2;
+    let sum = 0;
+    for (let dj = -1; dj <= 1; dj++) {
+      const k = (j + dj) * n + i, a = vale[k - 1], b = vale[k], d = vale[k + 1];
+      if (a === Infinity || b === Infinity || d === Infinity) return Infinity;
+      sum += (a * wu0 + b * wu1 + d * wu2) * (dj < 0 ? wv0 : dj > 0 ? wv2 : wv1);
+    }
+    return sum;
   }
 
   /**
