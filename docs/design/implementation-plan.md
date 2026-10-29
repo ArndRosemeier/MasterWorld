@@ -137,7 +137,7 @@ This phase moves the ground that everything else stands on. The start moves, so 
 | L4 ✓ | **Climbing** (D56): the hero climbs where rock has holds, seen climbing (rule 11), with stamina and falls; the walker and the loop bot know climbable stretches and passes | Test: a bot reaches a plateau top once by a pass and once by climbing; a GPU shot of the climb | 5.9, 11.2 |
 | L5 ✓ | **The start in a mesa valley** (D56): the setting asks for a mesa valley with a river; the start town, the arch, the hold and the first places are sited there; the title fly-over still works | Test: the start town stands on a valley floor by fresh water with plateaus in view; the F1 set and the loop check pass on the new start | 6, D50 |
 | L6 ✓ | **Real caves** (D57): cave dungeons that are big (caverns tens of metres high, several chambers, ways that climb and drop, water), with mouths in cliff faces and mesa walls as volumes; some caves are sights without dwellers; the B5 cave grows | Test: a cave's main cavern is over 20 m high and its ways over 200 m long; the variety sweep covers it; a GPU shot inside a cavern and of a mouth in a cliff | 5.6, 8, D57 |
-| L7 | **More landscape kinds** as data (rolling downs, moor with tors, karst, badlands …), each with its landform mix | Test: each kind is found on a long walk; a GPU shot of each | 5.9 |
+| L7 ✓ | **More landscape kinds** as data (rolling downs, moor with tors, karst, badlands …), each with its landform mix | Test: each kind is found on a long walk; a GPU shot of each | 5.9 |
 
 Gate L: the F1 set adds the mesa valley, a plateau top, a climb, a tor with boulders and a cavern; a walk trace shows a landform at least every minute of walking; F2 and F4 hold; the loop check passes on the new start; the review.
 
