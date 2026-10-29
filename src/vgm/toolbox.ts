@@ -9,6 +9,7 @@ import type { SettingModule } from '../setting/contract';
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
+import { caveFor } from './caves';
 import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { festivityFor } from './festivities';
 import { hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
@@ -78,6 +79,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'festivity', name: 'A good day', writes: ['festivity'], need: 'people', asked: 'turn', next: festivityFor,
     why: (d) => (d.kind === 'festivity' ? `${d.festivity} in ${d.town}${d.for ? `: the hero kept ${d.for}` : ''}` : d.kind) },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
+  { id: 'cave', name: 'A cave in the cliffs', writes: ['dungeon'], need: 'discovery', asked: 'need', answer: caveFor },
   { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
   { id: 'cache', name: 'A find by the way', writes: ['sight'], need: 'reward', asked: 'need', answer: (c) => sightFor(c, 'reward') },
   { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },
@@ -129,7 +131,7 @@ export function answerNeed(need: Need, c: NeedContext): Made | null {
     if (t.asked !== 'need' || t.need !== need || !t.answer) continue;
     const t0 = c.timeNow?.() ?? 0, d = t.answer(c);
     if (c.spent && c.timeNow) c.spent(t.id, c.timeNow() - t0);
-    if (d) return madeBy(t.id, d, `${need} is overdue: ${d.kind === 'sight' ? d.sight : d.kind === 'wild' ? `${d.encounter} (${d.members.length}) lying in wait` : d.kind} by the hero's way${c.toward ? ` to ${Math.round(c.toward.x)}, ${Math.round(c.toward.z)}` : ''}`, c.hours);
+    if (d) return madeBy(t.id, d, `${need} is overdue: ${d.kind === 'sight' ? d.sight : d.kind === 'dungeon' ? `a ${d.template} in a cliff` : d.kind === 'wild' ? `${d.encounter} (${d.members.length}) lying in wait` : d.kind} by the hero's way${c.toward ? ` to ${Math.round(c.toward.x)}, ${Math.round(c.toward.z)}` : ''}`, c.hours);
   }
   return null;
 }

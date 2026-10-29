@@ -7,7 +7,7 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
 import { Den, type Creature } from '../sim/creatures';
-import type { Cellar } from '../world/dungeon/cellar';
+import { isEmpty, type Cellar } from '../world/dungeon/cellar';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { hoardsOf, type Hoard } from '../world/dungeon/treasure';
 import type { Character } from './character';
@@ -53,8 +53,14 @@ export class Delve {
     for (const c of this.den.creatures) if (c.state === 'dead' && !this.searched.has(c.id)) this.fight.restoreBody(c);
   }
 
-  /** The cellar is quiet: nobody left who would fight. */
-  get beaten(): boolean { return this.den.beaten; }
+  /**
+   * The cellar is quiet: nobody left who would fight. An empty one (a sight, D57) is done once what lies at
+   * its end has been found and searched.
+   */
+  get beaten(): boolean {
+    if (this.cellar && isEmpty(this.cellar)) return this.hoards.some((h) => !h.prop && this.opened.has(h.id));
+    return this.den.beaten;
+  }
 
   step(dt: number, pose: HeroPose, breathe = true): FightEvent[] {
     return this.fight.advance(dt, pose, breathe);

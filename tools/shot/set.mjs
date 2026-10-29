@@ -1,5 +1,5 @@
 /**
- * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land]` after `npm run build`,
+ * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night, in rain and wet toward the afternoon sun, a cellar, a barrow, the wild, a fight, a fight with magic, a hurt traveller, a raided farm, the pack,
  * the map, the trade window, talk, a people's hold) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
@@ -8,9 +8,10 @@
  * then until no shader was built for 1.5 s (at most SET_SETTLE ms, default 4000). Per shot the index has the
  * frame time (median and 95th percentile over SET_MEASURE ms, default 2000, no frame cap), the shader summary
  * (F3), the page's errors and what was not drawn; it marks a shot over 16.7 ms or more than twice as slow as
- * the town at noon (F2). Two slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
+ * the town at noon (F2). Three slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
- * without `--part` both run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
+ * `--part=caves` is a cave's mouth in a cliff and its cavern (L6);
+ * without `--part` all three run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
  * Exits 1 when a page failed or a shot breaks F2 or F3 (what was still waiting to be drawn is noted).
  */
@@ -95,6 +96,20 @@ const SESSIONS = [
     }) },
   ] },
   { id: 'cellar', query: `${still}&hour=12&cellar=2`, shots: [{ name: 'cellar' }] },
+  // L6: a cave's mouth in a cliff (D57), then inside, in the middle of its cavern (its highest room).
+  { id: 'cave', query: `${still}&hour=11&weather=fair&cave`, shots: [
+    { name: 'cave-mouth' },
+    { name: 'cave-cavern', act: async (p) => {
+      await p.evaluate(async () => {
+        const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === 'cave');
+        const v = d && await g.cellars.build(d.id);
+        if (!v) throw new Error('no cave to go into');
+        const rooms = v.cellar.graph.rooms, top = rooms.reduce((a, r) => (r.height > a.height ? r : a), rooms[0]);
+        await v.enter(true, top.id);
+      });
+      await p.waitForTimeout(1500);
+    } },
+  ] },
   // Out on the land: the barrow, then the hero is moved to the deer and the wolves (a load is the dearest part).
   { id: 'land', query: `${still}&hour=10&weather=fair&barrow`, shots: [
     { name: 'barrow' },
@@ -173,8 +188,8 @@ const SESSIONS = [
   ] },
 ];
 /** The sessions of each part (each part one run, under 5 min). */
-const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']);
-const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : 'land');
+const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave']);
+const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : 'land');
 
 /** Puts the hero at (u, v) of the hold's gate frame (out of the gate is +v), looking at (lu, lv). */
 function atHold(u, v, lu, lv) {
@@ -190,7 +205,7 @@ const root = args.find((a) => !a.startsWith('--')) ?? 'shots/set';
 // Both parts: each its own run (its own browser, its own time), one after the other.
 if (!part) {
   let bad = false;
-  for (const p of ['town', 'land']) {
+  for (const p of ['town', 'land', 'caves']) {
     try { execFileSync(process.execPath, [fileURLToPath(import.meta.url), root, `--part=${p}`], { stdio: 'inherit' }); } catch { bad = true; }
   }
   process.exit(bad ? 1 : 0);

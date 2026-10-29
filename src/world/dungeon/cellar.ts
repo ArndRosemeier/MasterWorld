@@ -13,16 +13,28 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { cyclicGraph, layoutDungeon, pace, PATTERNS, DIRS, type DungeonGraph, type DungeonLayout, type Pace, type Room } from '@futuremagic/dungeon';
-import type { CellarLore, DungeonForm, DungeonProp, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
+import type { CellarLore, DungeonForm, DungeonProp, DungeonScale, DungeonSpace as SpaceDef, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
 import type { DungeonDecision, MoveInDecision, RetakeDecision } from '../decisions';
 import { depthOf, entranceOf } from './kinds';
 import { setPieceById, type SetPieceDef } from './setPieces';
 
-/** Metres per layout cell, per storey, and stairs per storey (cells). */
+/** Metres per layout cell, per storey, and stairs per storey (cells): a built cellar's. */
 export const CELL = 2;
 export const STOREY = 2.8;
+export const STAIR_RUN = 2;
 /** Width of a door's opening, metres. */
 export const DOOR_W = 1.3;
+
+/** A built dungeon's grid in metres (a cellar, a barrow, a tower). */
+export const BUILT: DungeonScale = { cell: CELL, storey: STOREY, stairRun: STAIR_RUN, passage: 2.5 };
+
+/** A kind's grid in metres. */
+export const scaleOf = (s: SpaceDef): DungeonScale => s.scale ?? BUILT;
+
+/** A layout with its grid in metres: everything that turns its cells into the world reads it from here. */
+export interface ScaledLayout extends DungeonLayout {
+  readonly scale: DungeonScale;
+}
 
 /**
  * What stands at a wall takes up, as half its size along the wall and out from it (m), with room for the
@@ -56,10 +68,10 @@ function rectsMeet(p: Rect, q: Rect, slack = 0.02): boolean {
 export const propRect = (p: { kind: DungeonProp; x: number; z: number; yaw: number }): Rect =>
   ({ x: p.x, z: p.z, ux: Math.cos(p.yaw), uz: -Math.sin(p.yaw), a: FOOT[p.kind][0], b: FOOT[p.kind][1] });
 
-/** The floor kept clear before a door, on the side of its room. */
-export const doorRect = (d: { x: number; z: number; dir: number }): Rect => {
-  const [dx, dz] = DIRS[d.dir];
-  return { x: (d.x + 0.5 + dx * 0.5) * CELL - dx * DOOR_CLEAR[1] / 2, z: (d.z + 0.5 + dz * 0.5) * CELL - dz * DOOR_CLEAR[1] / 2, ux: -dz, uz: dx, a: DOOR_CLEAR[0], b: DOOR_CLEAR[1] / 2 };
+/** The floor kept clear before a door, on the side of its room (a carved way opens the whole side of its cell). */
+export const doorRect = (d: { x: number; z: number; dir: number }, s: DungeonScale = BUILT, carved = false): Rect => {
+  const [dx, dz] = DIRS[d.dir], c = s.cell;
+  return { x: (d.x + 0.5 + dx * 0.5) * c - dx * DOOR_CLEAR[1] / 2, z: (d.z + 0.5 + dz * 0.5) * c - dz * DOOR_CLEAR[1] / 2, ux: -dz, uz: dx, a: carved ? c / 2 : DOOR_CLEAR[0], b: DOOR_CLEAR[1] / 2 };
 };
 
 /** Prop `p` may stand beside `q` (loose things lie among each other; a puddle under anything). */
@@ -67,12 +79,11 @@ export const propsClash = (p: { kind: DungeonProp; x: number; z: number; yaw: nu
   p.kind !== 'puddle' && q.kind !== 'puddle' && !(LOOSE.has(p.kind) && LOOSE.has(q.kind)) && rectsMeet(propRect(p), propRect(q));
 
 /** Prop `p` stands in the way of door `d` (a puddle may lie there). */
-export const blocksDoor = (p: { kind: DungeonProp; x: number; z: number; yaw: number }, d: { x: number; z: number; dir: number }): boolean =>
-  p.kind !== 'puddle' && rectsMeet(propRect(p), doorRect(d));
+export const blocksDoor = (p: { kind: DungeonProp; x: number; z: number; yaw: number }, d: { x: number; z: number; dir: number }, s: DungeonScale = BUILT, carved = false): boolean =>
+  p.kind !== 'puddle' && rectsMeet(propRect(p), doorRect(d, s, carved));
 
 /** Cell (i, j) lies in the room's footprint. */
 export const cellIn = (r: { x: number; z: number; w: number; d: number }, i: number, j: number): boolean => i >= r.x && i < r.x + r.w && j >= r.z && j < r.z + r.d;
-export const STAIR_RUN = 2;
 
 export type HistoryLayer = 'built' | 'older' | 'trouble' | 'now';
 
@@ -153,7 +164,7 @@ export interface Spawn {
 export interface Cellar extends CellarSketch {
   readonly graph: DungeonGraph;
   readonly pace: Pace;
-  readonly layout: DungeonLayout;
+  readonly layout: ScaledLayout;
   readonly rooms: CellarRoom[];
   readonly props: Prop[];
   readonly clues: Clue[];
@@ -198,7 +209,9 @@ export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: Cell
   // Who was asked for (`dungeonFor`'s dwellers), if the lore has them here.
   const asked = d.dwellers ? lore.dwellers.filter((w) => w.encounter === d.dwellers) : [];
   const first = asked.length ? pickDef(rng, asked) : pickDef(rng, lore.dwellers, (w) => (!w.with || w.with.some((x) => ids.includes(x))) && w.danger <= (d.danger ?? Infinity));
-  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || first;
+  // Not every one is lived in (D57): an empty one is a sight, unless dwellers were asked for (its own stream: the rest stays).
+  const empty = lore.empty && !asked.length && !moved && new Rng(deriveSeed(d.seed, 'cellar', 'empty')).chance(lore.empty.share) ? emptyDweller(lore.empty.def) : null;
+  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || empty || first;
   const line = (def: HistoryDef) => def.text.replaceAll('{house}', name).replaceAll('{place}', name);
   const history: HistoryEntry[] = [];
   if (older) history.push({ layer: 'older', def: older, text: line(older) });
@@ -218,6 +231,14 @@ export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: Cell
   if (moved) facts.push([moved.id, moved.kind === 'retake' ? 'took' : 'moved into', d.id], [moved.id, 'is', dweller.id]);
   return { decision: d, form: lore.form, history, dweller, setPiece: piece, hints, facts, knownBy: { town: d.town, building: d.building }, house: name, ...(house.name ? { called: name } : {}), ...(d.site ? { site: d.site } : {}), ...(moved?.kind === 'move-in' ? { occupation: { id: moved.id, seed: moved.seed } } : {}), ...(moved ? { taken: moved.id } : {}) };
 }
+
+/** Nobody, as the dwellers of an empty place (its lore's `empty`): no creatures, no danger. */
+export function emptyDweller(def: NonNullable<CellarLore['empty']>['def']): DwellerDef {
+  return { ...def, encounter: '', creatures: [], crowd: 0, danger: 0 };
+}
+
+/** Nobody lives there (an empty place, a sight to explore). */
+export const isEmpty = (c: CellarSketch): boolean => c.dweller.creatures.length === 0;
 
 /** A sketch's history layer of a kind, if it has one. */
 export function layerOf(s: CellarSketch, k: HistoryLayer): HistoryEntry | undefined {
@@ -251,18 +272,55 @@ export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: Cel
     if (walk.needsSecret || !walk.shortcut || new Set(walk.route).size < 3) continue;
     // A tower whose rooms could not all be kept within a flight of each other does not fit its foot: the next.
     if (shape.rise && !climb(graph, walk, shape.rise, minLevel < 0 && !!layerOf(sketch, 'older'))) continue;
-    const layout = layoutDungeon(graph, seed, {
+    const scale = scaleOf(shape), sizes = shape.rooms ?? SIZE;
+    if (shape.ways?.rise) wander(graph, shape.ways.rise, minLevel, new Rng(deriveSeed(seed, 'wander')));
+    const cavern = shape.cavern ? cavernOf(graph, walk, new Rng(deriveSeed(seed, 'cavern'))) : -1;
+    if (cavern >= 0) graph.rooms[cavern].height = shape.cavern!.height;
+    const laid = layoutDungeon(graph, seed, {
       entrance: { x: -(ew >> 1), z: -(ed >> 1), w: ew, d: ed },
       radius: shape.radius,
-      stairRun: STAIR_RUN,
-      maxPath: shape.rise ? 8 : 6,
+      stairRun: scale.stairRun,
+      maxPath: shape.ways?.longest ?? (shape.rise ? 8 : 6),
       attempts: 6,
-      size: (room, r) => { const [lo, hi] = SIZE[room.size]; return [r.int(lo, hi), r.int(lo, hi)]; },
+      ...(shape.ways ? { gap: shape.ways.gap, turn: shape.ways.turn } : {}),
+      size: (room, r) => {
+        const [lo, hi] = room.id === cavern ? shape.cavern!.size : sizes[room.size];
+        return [r.int(lo, hi), r.int(lo, hi)];
+      },
     });
-    if (!layout) continue;
-    return furnish(sketch, graph, layout, link.id, new Rng(deriveSeed(seed, 'furnish')), lore);
+    if (!laid) continue;
+    // A natural cave's ways run long between its chambers: too short a cave is the next try's.
+    if (shape.ways && waysLength(laid) * scale.cell < shape.ways.least) continue;
+    return furnish(sketch, graph, { ...laid, scale }, link.id, new Rng(deriveSeed(seed, 'furnish')), lore);
   }
   throw new Error(`cellar ${d.id}: no layout fits`);
+}
+
+/**
+ * A natural cave's chambers lie up and down the rock (the water found its own way): each room but the
+ * entrance moves up to `rise` storeys from where the graph put it, never below `deepest`; rooms a drop or a
+ * grate joins keep theirs (a drop falls onto a ledge one storey down).
+ */
+function wander(graph: DungeonGraph, rise: number, deepest: number, rng: Rng): void {
+  const fixed = new Set(graph.links.filter((l) => l.kind === 'drop' || l.kind === 'grate').flatMap((l) => [l.a, l.b]));
+  for (const r of graph.rooms) {
+    if (r.id === graph.entrance || fixed.has(r.id)) continue;
+    r.level = Math.max(deepest, r.level + rng.int(-rise, rise));
+  }
+}
+
+/** How many cells the ways of a layout run in all. */
+export const waysLength = (l: DungeonLayout): number => l.links.reduce((n, pl) => n + pl.path.length, 0);
+
+/**
+ * The room that rises into the cave's great cavern: the lair at the end more often, else the room where the
+ * goal is first seen (a hall one looks down into), else the tensest room on the way that is not the entrance.
+ */
+function cavernOf(graph: DungeonGraph, walk: Pace, rng: Rng): number {
+  if (walk.reveal >= 0 && walk.reveal !== graph.entrance && rng.chance(0.4)) return walk.reveal;
+  if (rng.chance(0.75)) return graph.goal;
+  const on = walk.route.filter((r) => r !== graph.entrance && r !== graph.goal);
+  return on.length ? on.reduce((a, b) => (walk.tension[b] > walk.tension[a] ? b : a)) : graph.goal;
 }
 
 /**
@@ -304,8 +362,8 @@ function climb(graph: DungeonGraph, walk: Pace, rise: number, older: boolean): b
   return true;
 }
 
-function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayout, pieceLink: number, rng: Rng, lore: CellarLore): Cellar {
-  const shape = sketch.form.space;
+function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: ScaledLayout, pieceLink: number, rng: Rng, lore: CellarLore): Cellar {
+  const shape = sketch.form.space, { cell: CELL_M, storey: STOREY_M } = layout.scale;
   const p = pace(graph);
   const useById = new Map(lore.uses.map((u) => [u.id, u]));
   const use = (id: string) => useById.get(id)!;
@@ -362,13 +420,13 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
     const inset = shape.inset;
     const standAt = (s: { x: number; z: number; dir: number }) => ({
       kind,
-      x: (s.x + 0.5) * CELL + DIRS[s.dir][0] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][1] !== 0 ? 1 : 0),
-      z: (s.z + 0.5) * CELL + DIRS[s.dir][1] * (CELL / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][0] !== 0 ? 1 : 0),
+      x: (s.x + 0.5) * CELL_M + DIRS[s.dir][0] * (CELL_M / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][1] !== 0 ? 1 : 0),
+      z: (s.z + 0.5) * CELL_M + DIRS[s.dir][1] * (CELL_M / 2 - inset) + rng.range(-0.3, 0.3) * (DIRS[s.dir][0] !== 0 ? 1 : 0),
       yaw: Math.atan2(DIRS[s.dir][0], DIRS[s.dir][1]),
     });
     // Where it fits: clear of the doors and of what already stands there.
-    const fits = (p: ReturnType<typeof standAt>, doorsClear: boolean) => !(doorsClear && doors.some((d) => blocksDoor(p, d))) && !here.some((q) => propsClash(p, q));
-    const roomy = (s: { x: number; z: number }) => !here.some((q) => Math.hypot(q.x - (s.x + 0.5) * CELL, q.z - (s.z + 0.5) * CELL) < 1.2);
+    const fits = (p: ReturnType<typeof standAt>, doorsClear: boolean) => !(doorsClear && doors.some((d) => blocksDoor(p, d, layout.scale, shape.carved))) && !here.some((q) => propsClash(p, q));
+    const roomy = (s: { x: number; z: number }) => !here.some((q) => Math.hypot(q.x - (s.x + 0.5) * CELL_M, q.z - (s.z + 0.5) * CELL_M) < 1.2);
     // A wall of its own if there is one; a full room is crowded (props stand closer), never piled up. The way
     // out must stand somewhere: in a small room with a door in every cell, beside a door.
     const all = wallSpots(room);
@@ -378,7 +436,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
       if (spot) break;
     }
     if (!spot) return false;
-    props.push({ ...spot, y: R.level * STOREY, room, ...(trace ? { trace } : {}), ...(clue !== undefined ? { clue } : {}) });
+    props.push({ ...spot, y: R.level * STOREY_M, room, ...(trace ? { trace } : {}), ...(clue !== undefined ? { clue } : {}) });
     return true;
   };
   // The way out first (the ladder up to the hatch, a tower's door), so nothing stands in front of it.
@@ -420,6 +478,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: DungeonLayou
  */
 function settle(graph: DungeonGraph, p: Pace, rooms: readonly CellarRoom[], now: DwellerDef, rng: Rng): Spawn[] {
   const spawns: Spawn[] = [];
+  if (!now.creatures.length) return spawns;
   const [lead, ...rest] = now.creatures;
   const other = () => (rest.length && rng.chance(0.6) ? rest[0] : lead);
   spawns.push({ creature: lead, room: graph.goal });

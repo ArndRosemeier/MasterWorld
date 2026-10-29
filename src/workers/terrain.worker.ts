@@ -11,15 +11,15 @@ import { horizonMap, type HorizonSpec } from '../world/horizon';
 import { serve } from './serve';
 import { townMaskData } from '../world/townMask';
 import type { Decision } from '../world/decisions';
-import type { DungeonLayout } from '@futuremagic/dungeon';
 import type { BuildingMesh, TownBuilding, TownPlan } from '@futuremagic/settlement';
 import { caveField, caveShell, type CaveField } from '../world/dungeon/caveRock';
 import { mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
 import type { Site } from '../world/dungeon/site';
+import type { ScaledLayout } from '../world/dungeon/cellar';
 import { holdRockOnLand, type HoldRock } from '../world/holdRock';
 import { layOut, type SiteJob, type SiteLayout } from '../world/sites';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number; i0: number; j0: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: DungeonLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] });
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number; i0: number; j0: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: ScaledLayout; cave: number } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] });
 export type TerrainResult = ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth | HoldRock | SiteLayout | OpenHouse | null;
 
 /** A town's buildings merged per cell, and its plan when asked for (a settlement founded while playing is planned here). */
@@ -51,7 +51,7 @@ serve<TerrainJob, TerrainResult>((job) => {
   }
   if (job.kind === 'caveRock') {
     const field = caveField(job.layout, job.cave), shell = caveShell(field, job.layout, job.cave);
-    return { result: { field, shell }, transfer: [field.d.buffer, ...meshBuffers(shell)] };
+    return { result: { field, shell }, transfer: [...field.bricks.flatMap((b) => (b ? [b.buffer as ArrayBuffer] : [])), ...meshBuffers(shell)] };
   }
   if (job.kind === 'caveMouth') {
     const t = terrain, mouth = mouthOnLand((x, z) => t.height(x, z), job.site, job.cave);

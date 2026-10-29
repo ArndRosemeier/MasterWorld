@@ -19,7 +19,7 @@ import type { LivestockKind, SettingModule, StoryEventDef } from '../setting/con
 import type { Territory } from '../sim/wild';
 import type { TownOrder } from '../sim/townLife';
 import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type EventDecision, type KeptDecision } from '../world/decisions';
-import { sketchCellar } from '../world/dungeon/cellar';
+import { isEmpty, sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import { townById, type Town } from '../world/town';
 import { compass, dungeonFor, farFrom, houseOf, loreOf, placeOf } from './dungeons';
@@ -238,6 +238,8 @@ function spill(c: EventsContext, def: StoryEventDef, past: readonly EventDecisio
     const place = placeOf(d, c.towns, c.setting.dungeons);
     if (!place) continue;
     const sketch = sketchCellar(d, place, loreOf(c.setting, d.template), dwellersOf(c.log, p));
+    // Nobody lives in an empty place (a sight): nothing comes out of it.
+    if (isEmpty(sketch)) continue;
     const s = deriveSeed(c.seed, 'vgm', 'event', past.length);
     const at = bandSpot(c, d.site ?? null, houseOf(d, c.towns)?.door ?? null, town, s);
     if (!at) continue;

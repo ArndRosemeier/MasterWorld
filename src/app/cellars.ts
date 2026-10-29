@@ -31,8 +31,7 @@ import { MOUTH_WAY_DOWN, mouthOnLand, type CaveMouth } from '../world/dungeon/ca
 import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
-import { CELL } from '../world/dungeon/cellar';
-import type { DungeonLayout } from '@futuremagic/dungeon';
+import type { ScaledLayout } from '../world/dungeon/cellar';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { moveIn, occupantId, outlineCellar, type Cellar, type DungeonPlace } from '../world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
@@ -76,7 +75,7 @@ export interface CellarsHost {
   ground(x: number, z: number): number;
   /** The terrain workers, for a cave's rock and mouth (none: built here, a moment's stall). */
   readonly jobs?: {
-    caveRock(layout: DungeonLayout, cave: number): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
+    caveRock(layout: ScaledLayout, cave: number): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
     caveMouth(site: LandSite, cave: number): Promise<CaveMouth>;
   };
   /** A place out on the land opens: the trees round it go (the land's views are built again there). */
@@ -91,10 +90,10 @@ interface Mound extends LandSite {
   mesh: Mesh | null;
   /** Is a body of radius `r` at (x, z) of its own frame in its way? */
   inShape: (x: number, z: number, r: number) => boolean;
-  /** Where in its doorway the way goes in (its frame). */
-  readonly way: { readonly x: number; readonly z: number };
+  /** Where in its doorway the way goes in (its frame; a cave's once its mouth is made). */
+  way: { readonly x: number; readonly z: number };
   /** Where the hero comes back out (its frame), facing away from it. */
-  readonly out: number;
+  out: number;
   /** Seconds before walking into the doorway goes in again (after coming out). */
   cool: number;
 }
@@ -280,7 +279,7 @@ export class Cellars {
    * A place's piece on the land at its site (the town's building shader: nothing new to build): a barrow's
    * mound and passage, a cave's crag and mouth (made by a worker), a tower's keep sized to its rooms.
    */
-  private heap(d: DungeonDecision, site: LandSite, layout: DungeonLayout): Mound {
+  private heap(d: DungeonDecision, site: LandSite, layout: ScaledLayout): Mound {
     const h = this.host, y = h.ground(site.x, site.z);
     // The land in the piece's own frame (its doorway at 0), so what stands on it is set on the ground.
     const land = groundIn(site, (x, z) => h.ground(x, z), y);
@@ -297,6 +296,9 @@ export class Cellars {
       void (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
         mound.mesh = put(mouth.mesh, 0);
         mound.inShape = (x, z) => inWalkRaster(mouth.walk, x, z);
+        // A cliff's way in is bigger: it goes down further in, and the hero comes out further before it.
+        mound.way = mouth.way;
+        if (mouth.cliff) mound.out = 4.5;
       });
       return mound;
     }
@@ -338,7 +340,8 @@ export class Cellars {
     }
     await view.add(h.stage);
     // A place on the land: back out in front of its doorway, facing away from it.
-    const out = m ? { door: [...onLand(m, 0, m.out), m.yaw + Math.PI] as const } : s.house;
+    // (Read when the hero comes out: a cave's mouth may be made after this, a cliff's further out.)
+    const out = m ? { get door() { return [...onLand(m, 0, m.out), m.yaw + Math.PI] as const; } } : s.house;
     const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, carved);
     if (!m) visit.above = { town: s.decision.town, house: s.house };
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
@@ -398,11 +401,11 @@ const CELLAR_WORDS = {
 };
 
 /** A tower's keep for its rooms: as wide and deep as the rooms above the ground, as many storeys as they climb. */
-function towerOf(layout: DungeonLayout): ReturnType<typeof towerSize> {
+function towerOf(layout: ScaledLayout): ReturnType<typeof towerSize> {
   const up = layout.rooms.filter((r) => r.level >= 0);
   const x0 = Math.min(...up.map((r) => r.x)), x1 = Math.max(...up.map((r) => r.x + r.w));
   const z0 = Math.min(...up.map((r) => r.z)), z1 = Math.max(...up.map((r) => r.z + r.d));
-  return towerSize((x1 - x0) * CELL, (z1 - z0) * CELL, layout.levels[1] + 1);
+  return towerSize((x1 - x0) * layout.scale.cell, (z1 - z0) * layout.scale.cell, layout.levels[1] + 1);
 }
 
 /** The chests a cellar's earlier dwellers' visit opened (not the lair's hoard). */

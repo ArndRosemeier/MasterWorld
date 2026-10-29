@@ -10,6 +10,7 @@ import { farmlandReach, type TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonForm, SettingModule } from '../setting/contract';
 import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate, type RetakeDecision, type RetreatDecision, type TownDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
+import { CLIFF_FACE, CLIFF_RISE } from '../world/dungeon/caveMouth';
 import type { DungeonPlace } from '../world/dungeon/cellar';
 import { setPiecesFor } from '../world/dungeon/setPieces';
 import type { Terrain } from '../world/terrain';
@@ -122,12 +123,21 @@ export function compass(dx: number, dz: number): string {
   return names[(Math.round(a / (Math.PI / 4)) + 8) % 8];
 }
 
-/** A spot's fitness for a kind of place: higher is better; the way into it (yaw); null if it does not fit. */
-type Fit = (x: number, z: number, k: number) => { score: number; yaw?: number } | null;
+/**
+ * A spot's fitness for a kind of place: higher is better; the way into it (yaw); where it really is, if the
+ * ground moved it (a cave's mouth to the foot of the wall it was near); null if it does not fit.
+ */
+type Fit = (x: number, z: number, k: number) => { score: number; yaw?: number; x?: number; z?: number } | null;
+
+/** A cave's mouth in a cliff stands this far out from where the face begins (m): its way in and crag before it. */
+const CLIFF_OUT = CLIFF_FACE;
+/** How deep a cliff's way in reaches (m): the ground up to there stays low. */
+const WAY_IN = 6.5;
 
 /**
  * What ground a place wants, by how its kind stands (`DungeonForm.stands`): on a rise (a barrow); at the
- * foot of a slope, going into the hill (a cave's mouth); on a rise of level ground, its door towards the
+ * foot of a slope, going into the hill (a cave's mouth); at the foot of a cliff, going into it (a cave's
+ * mouth in a mesa's wall; a slope where there is none); on a rise of level ground, its door towards the
  * town (a tower). Places in slopes and on level ground keep out of the woods.
  */
 const GROUND: Readonly<Record<Exclude<DungeonForm['stands'], 'house'>, (t: Terrain, s: number) => Fit>> = {
@@ -148,6 +158,32 @@ const GROUND: Readonly<Record<Exclude<DungeonForm['stands'], 'house'>, (t: Terra
         const rise = t.height(x + ix * 14, z + iz * 14) - h;
         if (rise < 3) return null;
         return { score: Math.min(1.5, rise / 8) - woods(x, z) - Math.max(0, slope - 0.35) + hash2f(s, k, 3) * 0.3, yaw: Math.atan2(-ix, -iz) };
+      };
+  },
+  cliff: (t, s) => {
+      const slope = GROUND.slope(t, s), woods = woodsOf(t), sk = t.skeleton;
+      return (x, z, k) => {
+        // Near a mesa's wall (D57: cliffs are where caves are): to its foot, straight across.
+        sk.mesaRise(x, z);
+        const m = sk.lastMesa;
+        if (m.u > -160 && m.u < 40 && m.tall >= 25) {
+          let px = x - m.nx * (m.u + CLIFF_OUT), pz = z - m.nz * (m.u + CLIFF_OUT);
+          sk.mesaRise(px, pz);
+          const w = sk.lastMesa;
+          // Up to where the face begins (the wall's line is only roughly where the field says): the mouth at its foot.
+          for (let i = 0; i < 30 && t.height(px + w.nx * CLIFF_OUT, pz + w.nz * CLIFF_OUT) - t.height(px, pz) < 1; i++) { px += w.nx; pz += w.nz; }
+          const h = t.height(px, pz);
+          // Not on a pass (fallen rock, no face), the ground under the way in level (the land's own face must not
+          // show inside it), a cliff's height behind it.
+          const near = Math.max(t.height(px + w.nx * 4, pz + w.nz * 4), t.height(px + w.nx * WAY_IN, pz + w.nz * WAY_IN)) - h;
+          const behind = Math.max(t.height(px + w.nx * 20, pz + w.nz * 20), t.height(px + w.nx * 16, pz + w.nz * 16)) - h;
+          if (w.pass < 0.3 && near < 1 && behind > CLIFF_RISE + 1.5) {
+            return { score: 2 + Math.min(1, behind / 30) - woods(px, pz) + hash2f(s, k, 3) * 0.3, yaw: Math.atan2(-w.nx, -w.nz), x: px, z: pz };
+          }
+        }
+        // No cliff here: a hillside will do, but any cliff on the ring is better.
+        const f = slope(x, z, k);
+        return f && { ...f, score: f.score - 3 };
       };
   },
   level: (t, s) => {
@@ -205,14 +241,15 @@ function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number]
   // may be kilometres round to a pass.
   const sk = terrain.skeleton, level = sk.mesaRise(at.x, at.z);
   let best: { x: number; z: number; score: number; yaw?: number } | null = null;
+  const dry = (x: number, z: number) => terrain.waterDepth(x, z) <= 0 && terrain.height(x, z) >= 3 && Math.abs(sk.mesaRise(x, z) - level) <= MESA_LEVEL && !avoid.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40);
   for (let k = 0; k < TRIES; k++) {
     const d = r0 + (r1 - r0) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
     const x = at.x + Math.cos(a) * d, z = at.z + Math.sin(a) * d;
-    if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < 3) continue;
-    if (Math.abs(sk.mesaRise(x, z) - level) > MESA_LEVEL) continue;
-    if (avoid.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40)) continue;
+    if (!dry(x, z)) continue;
     const f = fit(x, z, k);
-    if (f && (!best || f.score > best.score)) best = { x, z, ...f };
+    // Ground that moved the spot: the spot it moved to must suit too (dry, on the level asked, clear of others).
+    if (!f || (f.x !== undefined && !dry(f.x, f.z!))) continue;
+    if (!best || f.score > best.score) best = { x, z, ...f };
   }
   return best;
 }

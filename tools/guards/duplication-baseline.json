@@ -224,10 +224,6 @@
     "reason": "Each simulation steps its own agents (a den's creatures, the townsfolk) by dt; the finder paired them anew as files changed."
   },
   {
-    "key": "idiom: [.doors .flatMap .links] in masterworld/world/dungeon/caveRock.ts + masterworld/world/dungeon/cellarMesh.ts + masterworld/world/dungeon/torches.ts",
-    "reason": "Walking a dungeon layout's doors (layout.links.flatMap(pl => pl.doors ...)), each with its own filter and output; the package's data shape, not a copied helper."
-  },
-  {
     "key": "idiom: [.fbm3 .sin Math] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
     "reason": "Rock beds as a sine warped by fbm noise: one line of shaping in each rock field, with its own scales and amplitudes."
   },
@@ -546,5 +542,25 @@
   {
     "key": "same name: masterworld/world/rocks.ts#forgetOver + masterworld/world/trunks.ts#forgetOver",
     "reason": "The same seam on purpose: app/roads.ts RoadViews drops both kinds of obstacle cells near a new road; both keep their cells in world/fetchedCells.ts."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#summary + stage/monitor.ts#summary",
+    "reason": "Unrelated getters that share a name: where the hero is below ground for the HUD, and the stage monitor's frame summary."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#at + masterworld/sim/townLife.ts#at",
+    "reason": "Unrelated lookups that share a name: the dungeon cell under a point, and a townsperson's errand at a spot."
+  },
+  {
+    "key": "same name: masterworld/game/delve.ts#beaten + masterworld/sim/creatures.ts#beaten",
+    "reason": "Delve.beaten is the den's, except for an empty place (a sight, D57), which is done once what lies at its end is searched."
+  },
+  {
+    "key": "same name: masterworld/vgm/dungeons.ts#cliff + masterworld/world/skeleton.ts#cliff",
+    "reason": "Unrelated: the ground rule for a place standing at a cliff's foot (a DungeonForm.stands key), and the skeleton's sea cliff height."
+  },
+  {
+    "key": "idiom: [.seed .terrain] in masterworld/app/regionSites.ts + masterworld/vgm/caves.ts + masterworld/vgm/events.ts",
+    "reason": "Reading the world's seed and terrain off a context object is how every VGM tool starts, not a copied helper; the cave tool (L6) was the third."
   }
 ]

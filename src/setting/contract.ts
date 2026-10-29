@@ -270,9 +270,34 @@ export interface DungeonWords {
  * grow, which way it goes (a cellar down under its house, a tower up), how its way out looks, whether its
  * rock is carved (a natural cave) or built, and how its walls look.
  */
+/** How big a dungeon's grid is in metres: a built cellar's 2 m cells and 2.8 m storeys, a natural cave's wider and higher. */
+export interface DungeonScale {
+  /** Metres per layout cell. */
+  readonly cell: number;
+  /** Metres per storey. */
+  readonly storey: number;
+  /** Cells a stair (a cave's ramp) takes to climb one storey. */
+  readonly stairRun: number;
+  /** Clear height of a passage, metres (rooms reach their storeys' full height). */
+  readonly passage: number;
+}
+
 export interface DungeonSpace {
+  /** Its grid in metres (none: a built cellar's). */
+  readonly scale?: DungeonScale;
   /** Half extent of the layout grid, cells (a tower stands on a small foot). */
   readonly radius: number;
+  /** Cells across a room of each size class, fewest and most (none: a cellar's, 2 to 5). */
+  readonly rooms?: Readonly<Record<'nook' | 'small' | 'medium' | 'large', readonly [number, number]>>;
+  /**
+   * How the ways run (none: short and straight, as people dig them): free cells between a room and the one
+   * it is reached from (fewest, most), what a turn costs (cells), the longest way (cells), how long all the
+   * ways are together at least (metres), and how many storeys a room may lie up or down from where the graph
+   * put it (the ways climb and drop to it).
+   */
+  readonly ways?: { readonly gap: readonly [number, number]; readonly turn: number; readonly longest: number; readonly least: number; readonly rise?: number };
+  /** One room rises into a cavern: this many storeys high, this many cells across (fewest, most). */
+  readonly cavern?: { readonly height: number; readonly size: readonly [number, number] };
   /** Most rooms in all. */
   readonly maxRooms: number;
   /** Deepest storey the graph may reach: without an older layer below, and with one. */
@@ -300,8 +325,11 @@ export interface DungeonSpace {
  * and its space. The code reads this, never the kind's name, so a new kind is data (and at most a new shell).
  */
 export interface DungeonForm {
-  /** Under a house of a town; out on the land on a rise, at the foot of a slope going into its hill, or on level raised ground. */
-  readonly stands: 'house' | 'rise' | 'slope' | 'level';
+  /**
+   * Under a house of a town; out on the land on a rise, at the foot of a slope going into its hill, at the
+   * foot of a cliff going into it (a slope where there is none), or on level raised ground.
+   */
+  readonly stands: 'house' | 'rise' | 'slope' | 'cliff' | 'level';
   /** Metres from the town's market it lies, at least and at most (out on the land). */
   readonly ring?: readonly [number, number];
   /** What people call one out on the land, `{dir}` the way from the town ("the barrow {dir} of the town"). */
@@ -331,6 +359,12 @@ export interface CellarLore {
   /** What went wrong. */
   readonly troubles: readonly HistoryDef[];
   readonly dwellers: readonly DwellerDef[];
+  /**
+   * Not every one holds dwellers (D57: some caves are sights to explore): this share of fresh ones stands
+   * empty, told as `def` (its lair the room at the end, its signs what people say of it). Done once its end
+   * is reached and what lies there searched. None: every one is lived in.
+   */
+  readonly empty?: { readonly share: number; readonly def: HistoryDef & { readonly lair: string; readonly signs: readonly string[] } };
 }
 
 /** The skills a character can learn from trainers (plan 10, 11.4, D30, D54): no classes, no XP. */
@@ -1444,6 +1478,8 @@ export function validateSetting(m: SettingModule): string[] {
       if (!uses.has(d.lair)) out.push(`${where}: ${kind} dweller "${d.id}" lair "${d.lair}" is unknown`);
       if (!d.signs.length) out.push(`${where}: ${kind} dweller "${d.id}" has no signs to hint with`);
     }
+    const e = c.empty;
+    if (e && (!(e.share > 0 && e.share < 1) || !uses.has(e.def.lair) || !e.def.signs.length || e.def.uses.some((u) => !uses.has(u)))) out.push(`${where}: ${kind} empty needs a share between 0 and 1, a known room at its end, signs and known room uses`);
   }
   for (const race of ['human', 'dwarf', 'halfling', 'elf']) {
     const n = m.names[race];

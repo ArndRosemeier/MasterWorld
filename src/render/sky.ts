@@ -72,6 +72,10 @@ export function lowSunSky(sunUp: number): number {
   return Math.min(3, Math.sqrt(SKY_E[SKY_E.length - 1][1] / e));
 }
 
+/** In a natural cave: the faint fill of the day's light through its cracks, and the darkness's density (a cellar's 0.06). */
+const CAVE_FILL = 0.16;
+const CAVE_FOG = 0.022;
+
 export class SkyView {
   /** Hours 0..24, and whole days since the start. */
   hour: number;
@@ -90,6 +94,11 @@ export class SkyView {
   private readonly stars: Sprite;
   /** Below ground (a cellar, a dungeon): no sun or sky, a faint warm fill, darkness closing in. */
   indoors = false;
+  /**
+   * Below ground in a natural cave (with `indoors`): its caverns are tens of metres high, so the darkness
+   * closes in further off, and a faint cool light from cracks to the day above lies on the rock.
+   */
+  cave = false;
   /**
    * In a building above ground (drawn open in its place): the sun and sky go on, through its windows and
    * door; the eye adapts to the room over a moment and less of the sky's light falls on the people in it.
@@ -285,15 +294,21 @@ export class SkyView {
     if (this.indoors) {
       this.sun.intensity = 0;
       WINDOWS.glow.value = 0;
-      this.hemi.color.setRGB(0.55, 0.42, 0.3);
-      this.hemi.groundColor.setRGB(0.12, 0.09, 0.07);
-      this.hemi.intensity = 0.05;
+      if (this.cave) {
+        this.hemi.color.setRGB(0.42, 0.47, 0.55);
+        this.hemi.groundColor.setRGB(0.1, 0.09, 0.08);
+        this.hemi.intensity = CAVE_FILL;
+      } else {
+        this.hemi.color.setRGB(0.55, 0.42, 0.3);
+        this.hemi.groundColor.setRGB(0.12, 0.09, 0.07);
+        this.hemi.intensity = 0.05;
+      }
       this.scene.environmentIntensity = 0.01;
       this.renderer.toneMappingExposure = 1.4 * this.exposure / EXPOSURE;
       this.dome.visible = false;
       (this.stars.material as { opacity: number }).opacity = 0;
       fog.setRGB(0.008, 0.006, 0.005);
-      FOG.density.value = 0.06;
+      FOG.density.value = this.cave ? CAVE_FOG : 0.06;
       FOG.mist.value = 0;
       FOG.flat.value = 1;
       this.scene.background = fog;

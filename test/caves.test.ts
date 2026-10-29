@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
-import { CELL, STOREY, outlineCellar } from '../src/world/dungeon/cellar';
+import { outlineCellar, waysLength } from '../src/world/dungeon/cellar';
 import { CaveSpace, caveField, caveShell } from '../src/world/dungeon/caveRock';
-import { caveMouth, MOUTH_WAY_DOWN } from '../src/world/dungeon/caveMouth';
+import { caveMouth, inCliff, MOUTH_WAY_DOWN } from '../src/world/dungeon/caveMouth';
 import { inWalkRaster } from '../src/world/dungeon/rockMesh';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../src/world/dungeon/towerMesh';
 import { inFrame, onLand } from '../src/world/dungeon/site';
@@ -11,13 +11,14 @@ import { torchSpots } from '../src/world/dungeon/torches';
 import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
 import { BuildingMat, WildMat } from '../src/world/dungeon/meshKit';
 import { testDecision, testHouse } from '../src/world/dungeon/variety';
+import { DIRS } from '@futuremagic/dungeon';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { DungeonNav, navKey } from '../src/sim/dungeonNav';
 
 const cave = (n: number) => outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
 
 test('cave: its rock leaves every room and way walkable, and the walker reads the rock it sees', () => {
-  const c = cave(3), field = caveField(c.layout, 3), space = new CaveSpace(c.layout, field);
+  const c = cave(3), field = caveField(c.layout, 3), space = new CaveSpace(c.layout, field), { cell: CELL, storey: STOREY } = c.layout.scale;
   // In the middle of every room and every passage cell, a body stands clear of the rock at chest height.
   for (const r of c.layout.rooms) {
     const x = (r.x + r.w / 2) * CELL, z = (r.z + r.d / 2) * CELL, y = r.level * STOREY + 1.1;
@@ -28,6 +29,28 @@ test('cave: its rock leaves every room and way walkable, and the walker reads th
     const x = (p.x + 0.5) * CELL, z = (p.z + 0.5) * CELL, y = p.level * STOREY + 1.1;
     assert.ok(space.sdf(x, y, z) > 0.32, `passage ${pl.link.id} at ${p.x},${p.z}: ${space.sdf(x, y, z).toFixed(2)}`);
   }
+  // Every doorway open at chest height, into a cavern too.
+  for (const pl of c.layout.links) for (const d of pl.doors) {
+    if (pl.link.kind !== 'open') continue;
+    const x = (d.x + 0.5 + DIRS[d.dir][0] * 0.5) * CELL, z = (d.z + 0.5 + DIRS[d.dir][1] * 0.5) * CELL, y = d.level * STOREY + 1.1;
+    assert.ok(space.sdf(x, y, z) > 0.32, `doorway of ${pl.link.id} into room ${d.room}: ${space.sdf(x, y, z).toFixed(2)}`);
+  }
+  // Its great cavern (D57): over 20 m from floor to roof in its middle, the roof a dome with stalactites, never over a body's head.
+  const cav = c.layout.rooms.find((r) => r.height >= 3)!;
+  const mx = (cav.x + cav.w / 2) * CELL, mz = (cav.z + cav.d / 2) * CELL, floor = cav.level * STOREY;
+  let roof = 0, open = 0, spots = 0;
+  for (const [u, v] of [[0, 0], [0.1, 0.1], [-0.1, 0.05], [0.05, -0.1]]) {
+    const x = mx + u * cav.w * CELL, z = mz + v * cav.d * CELL;
+    let y = floor + 1;
+    while (y < floor + 40 && space.sdf(x, y, z) > 0) y += 0.25;
+    roof = Math.max(roof, y - floor);
+  }
+  for (let u = 0.15; u < 0.9; u += 0.1) for (let v = 0.15; v < 0.9; v += 0.1) {
+    spots++;
+    if (space.sdf((cav.x + u * cav.w) * CELL, floor + 1.8, (cav.z + v * cav.d) * CELL) > 0.4) open++;
+  }
+  assert.ok(roof > 20, `the cavern is ${roof.toFixed(1)} m high`);
+  assert.equal(open, spots, 'nothing hangs down into the way of a body');
   // Rock all round: a few metres outside the space is solid.
   const r0 = c.layout.rooms[0];
   assert.ok(space.sdf(r0.x * CELL - 3, r0.level * STOREY + 1, r0.z * CELL - 3) < 0);
@@ -36,6 +59,16 @@ test('cave: its rock leaves every room and way walkable, and the walker reads th
   assert.ok(m.index.length / 3 > 3000, `${m.index.length / 3} triangles`);
   assert.ok([...new Set(m.mat)].every((x) => x === 10 || x === 15), 'rock and earth only');
   assert.deepEqual(torchSpots(c), []);
+});
+
+test('cave: big and deep (D57): ways over 200 m in all, a cavern 24 m high, ways that climb and drop', () => {
+  for (let n = 0; n < 10; n++) {
+    const c = cave(n), L = c.layout;
+    assert.ok(waysLength(L) * L.scale.cell > 200, `cave ${n}: ways ${waysLength(L) * L.scale.cell} m`);
+    assert.ok(L.rooms.some((r) => r.height * L.scale.storey > 20), `cave ${n}: no cavern`);
+    assert.ok(L.levels[1] - L.levels[0] >= 4, `cave ${n}: storeys ${L.levels}`);
+    assert.ok(L.links.some((pl) => pl.path.some((p) => p.stair)), `cave ${n}: no way climbs`);
+  }
 });
 
 test('cave mouth: a crag on the hillside, its way in open from the land to the way down', () => {
@@ -49,6 +82,16 @@ test('cave mouth: a crag on the hillside, its way in open from the land to the w
   assert.ok(inWalkRaster(m.walk, 0, -9), 'rock over the way down');
   // Seeded.
   assert.deepEqual(caveMouth(5, slope).mesh.position, m.mesh.position);
+});
+
+test('cave mouth: in a cliff, a bigger crag against the face, its way in open to its own way down', () => {
+  // Level ground, then a wall 30 m high 6 m in.
+  const wall = (x: number, z: number) => (z > -6 ? 0 : Math.min(30, (-6 - z) * 4)) + Math.sin(x * 0.3) * 0.2;
+  assert.ok(inCliff(wall) && !inCliff((_x, z) => -z * 0.25), 'a cliff is told from a hillside');
+  const m = caveMouth(5, wall, true);
+  assert.ok(m.cliff && m.way.z < MOUTH_WAY_DOWN.z, 'its way down lies deeper in');
+  for (let z = 4; z >= m.way.z; z -= 0.25) assert.ok(!inWalkRaster(m.walk, 0, z), `blocked at z ${z}`);
+  assert.ok(inWalkRaster(m.walk, 6, -3) || inWalkRaster(m.walk, -6, -3), 'flanks of rock');
 });
 
 test('tower: a keep with its doorway open, its walls in the way, sized to its rooms', () => {

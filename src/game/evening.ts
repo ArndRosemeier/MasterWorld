@@ -210,7 +210,16 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     for (const need of ['discovery', 'reward', 'challenge', 'people'] as const) {
       const p = land.walker.pos, eta = Math.hypot(x - p.x, z - p.z) / WALK.run / 60;
       if (director.needs[need] + setting.director.needs[need] * director.pace * eta < 1) continue;
-      const m = answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours, setting, hero: { x: p.x, z: p.z }, toward: { x, z } });
+      const ask = () => answerNeed(need, { seed, log, terrain, towns: terrain.towns, hours, setting, hero: { x: p.x, z: p.z }, toward: { x, z } });
+      let m = ask();
+      // A cave opened in a cliff nearby (L6) is a place to come back to, its town's people tell of it; the way
+      // on still gets its sight.
+      if (m?.decision.kind === 'dungeon') {
+        log = [...log, m.decision];
+        township.promised(m.decision);
+        say(`the VGM opens ${m.decision.id} in a cliff near the way`);
+        m = ask();
+      }
       const d = m?.decision;
       if (!m || !d || (d.kind !== 'sight' && d.kind !== 'wild' && d.kind !== 'traveller')) continue;
       log = [...log, d];
@@ -552,6 +561,9 @@ function settlementOut(seed: number, setting: SettingModule, terrain: Terrain, s
   throw new Error(`no ${size} found within 8 km of the start`);
 }
 
+/** Looks along a move between metre cells for a step too high to walk. */
+const STEP_LOOKS = 4;
+
 /** The hero's body walking the land and its towns (the game's walk world without the townsfolk and trees). */
 export class LandWalk {
   readonly walker: Walker;
@@ -690,6 +702,17 @@ export class LandWalk {
       if (!steep[c]) { const [x, z] = cellCentre(c); steep[c] = Math.hypot(terrain.height(x + 0.4, z) - terrain.height(x - 0.4, z), terrain.height(x, z + 0.4) - terrain.height(x, z - 0.4)) / 0.8 > WALK.maxSlope * 0.8 ? 1 : 2; }
       return steep[c] === 1;
     };
+    // A step up between two cells too high to walk (a bank's edge between their centres, which their own slopes miss).
+    const stepUp = (c: number, n: number) => {
+      const [cx, cz] = cellCentre(c), [qx, qz] = cellCentre(n);
+      let h = hs[c];
+      for (let k = 1; k <= STEP_LOOKS; k++) {
+        const g = terrain.height(cx + ((qx - cx) * k) / STEP_LOOKS, cz + ((qz - cz) * k) / STEP_LOOKS);
+        if (g - h > WALK.step * 0.9) return true;
+        h = g;
+      }
+      return false;
+    };
     const cell = (x: number, z: number) => Math.floor((x - x0) / size) + Math.floor((z - z0) / size) * nx;
     const a = cell(ax, az), b = cell(bx, bz);
     const g = new Float64Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), done = new Uint8Array(N);
@@ -717,7 +740,7 @@ export class LandWalk {
         // Too steep to walk up: as the walker has it, by the step and by the ground's own slope (no zigzag).
         // Nor down what could not be walked up again (a drop into a basin walled all round leaves the bot there).
         const rise = (hs[n] - hs[c]) / run, fall = -rise;
-        const up = rise > WALK.maxSlope * 0.8 || (rise > WALK.maxSlope * 0.25 && size === 1 && steepAt(n));
+        const up = rise > WALK.maxSlope * 0.8 || (rise > WALK.maxSlope * 0.25 && size === 1 && (steepAt(n) || stepUp(c, n)));
         if (up && !this.holds(c, n, cellCentre)) continue;
         if (fall > WALK.maxSlope * 0.8 || (fall > WALK.maxSlope * 0.25 && size === 1 && steepAt(c))) continue;
         const cost = g[c] + run * (kind[n] === 3 ? 3 : 1) + (up ? (hs[n] - hs[c]) * CLIMB_COST : 0);

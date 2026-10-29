@@ -11,9 +11,9 @@ import { dungeonWorld } from '../game/dungeonWorld';
 import type { WalkWorld } from '../game/walker';
 import type { CellarView } from '../render/dungeon/CellarView';
 import type { SkyView } from '../render/sky';
-import type { WarmLights } from '../render/warmLights';
-import { torchSpots } from '../world/dungeon/torches';
-import { CELL, STOREY, type Cellar } from '../world/dungeon/cellar';
+import type { BelowLight, WarmLights } from '../render/warmLights';
+import { caveGlows, torchSpots } from '../world/dungeon/torches';
+import type { Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace, keySpot, type SpaceEvent } from '../world/dungeon/space';
 import { SearchKneel } from './searchKneel';
 import { WalkTo } from './walkTo';
@@ -65,8 +65,8 @@ export class CellarVisit {
       // Some kinds bring the hero in the middle of the entrance room (world/dungeon/kinds.ts).
       if (room === undefined && this.cellar.form.space.arriveMid) room = this.cellar.graph.entrance;
       if (room !== undefined && this.cellar.layout.rooms[room]) {
-        const r = this.cellar.layout.rooms[room];
-        this.player.teleport(O.x + (r.x + r.w / 2) * CELL, O.y + r.level * STOREY, O.z + (r.z + r.d / 2) * CELL, h.yaw);
+        const r = this.cellar.layout.rooms[room], { cell, storey } = this.cellar.layout.scale;
+        this.player.teleport(O.x + (r.x + r.w / 2) * cell, O.y + r.level * storey, O.z + (r.z + r.d / 2) * cell, h.yaw);
       } else this.player.teleport(O.x + h.x - fx * 1.0, O.y + h.y, O.z + h.z - fz * 1.0, h.yaw);
     });
     if (!now) this.onSwap?.();
@@ -101,14 +101,19 @@ export class CellarVisit {
     this.view.group.visible = true;
     this.sky.indoors = true;
     this.onDepth?.(true);
-    const O = this.view.origin;
-    this.warm.lightTorches(torchSpots(this.cellar).map((t) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z })));
+    const O = this.view.origin, inWorld = (t: { x: number; y: number; z: number }) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z });
+    // A natural cave has no torches: daylight falls into its caverns through cracks in their roofs (D57).
+    const glows = caveGlows(this.cellar);
+    this.sky.cave = !!this.cellar.form.space.carved;
+    if (glows.length) this.warm.lightTorches(glows.map(inWorld), DAYLIGHT_BELOW);
+    else this.warm.lightTorches(torchSpots(this.cellar).map(inWorld));
   }
 
   private goOut(): void {
     this.inside = false;
     this.view.group.visible = false;
     this.sky.indoors = false;
+    this.sky.cave = false;
     this.onDepth?.(false);
     this.lantern.intensity = 0;
     this.warm.lightTorches(null);
@@ -172,7 +177,7 @@ export class CellarVisit {
   get summary(): string {
     if (!this.inside) return '';
     const w = this.player.walker, O = this.view.origin;
-    const owner = this.space.grid.owner(Math.floor((w.pos.x - O.x) / CELL), Math.floor((w.pos.z - O.z) / CELL), this.space.levelAt(w.pos.y - O.y));
+    const owner = this.space.ownerAt(w.pos.x - O.x, w.pos.y - O.y, w.pos.z - O.z);
     const r = owner !== undefined && owner >= 0 ? this.cellar.rooms[owner] : null;
     return r ? `below: ${r.use.name} (room ${r.id}, ${r.beat}, tension ${r.tension.toFixed(2)})` : 'below: a passage';
   }
@@ -193,6 +198,9 @@ export class CellarVisit {
   /** The hero kneeling to pick up a key (null: not). */
   private kneel: SearchKneel | null = null;
 }
+
+/** Daylight through a crack in a cavern's roof: cool, steady, reaching down to its floor and walls. */
+const DAYLIGHT_BELOW: BelowLight = { color: 0xc4d4ff, strength: 70, reach: 48, decay: 1.25, flicker: false };
 
 /** A place on the land is walked out of from this far inside its doorway, metres. */
 const WALK_OUT = 1.0;

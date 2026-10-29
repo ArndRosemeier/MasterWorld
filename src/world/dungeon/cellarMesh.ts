@@ -11,11 +11,11 @@
 import { DIRS, type Door, type PathCell, type PlacedLink } from '@futuremagic/dungeon';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import type { DungeonProp } from '../../setting/contract';
-import { CELL, STOREY, cellIn, type Cellar, type Prop } from './cellar';
+import { BUILT, cellIn, type Cellar, type Prop } from './cellar';
 import { BuildingMat as M, CellarMat as C, MeshKit, WildMat, scaleTint, varyTint, type Tint } from './meshKit';
 import { stampModel, type PropModels, type Stamp } from './propModels';
 import type { PropModel } from '@futuremagic/props';
-import { DOOR_W, DungeonSpace, PASSAGE_H, isFeature, keySpot, stairDrop } from './space';
+import { DOOR_W, DungeonSpace, isFeature, keySpot, stairDrop } from './space';
 import { TORCH_OUT, torchSpots } from './torches';
 import { Rng, deriveSeed } from '@futuremagic/core';
 
@@ -89,8 +89,8 @@ function grimyWall(kit: MeshKit, px: number, pz: number, qx: number, qz: number,
 }
 
 /** Corners of side `k` of cell (i, j), travelling so that the face looks into the cell. */
-function sideEdge(i: number, j: number, k: number): [number, number, number, number] {
-  const x0 = i * CELL, x1 = x0 + CELL, z0 = j * CELL, z1 = z0 + CELL;
+function sideEdge(i: number, j: number, k: number, cell: number): [number, number, number, number] {
+  const x0 = i * cell, x1 = x0 + cell, z0 = j * cell, z1 = z0 + cell;
   return k === 0 ? [x1, z1, x1, z0] : k === 1 ? [x0, z1, x1, z1] : k === 2 ? [x0, z0, x0, z1] : [x1, z0, x0, z0];
 }
 
@@ -98,8 +98,8 @@ function sideEdge(i: number, j: number, k: number): [number, number, number, num
  * A wall face on side k of a cell from y0 to y1, with an optional hole (lateral s0..s1 along the face, height
  * h0..h1); its grime runs from `floor` to `top` (default y0 .. y1).
  */
-function wallWithHole(kit: MeshKit, i: number, j: number, k: number, y0: number, y1: number, hole: [number, number, number, number] | null, look: WallLook, floor = y0, top = y1): void {
-  const [ax, az, bx, bz] = sideEdge(i, j, k);
+function wallWithHole(kit: MeshKit, cell: number, i: number, j: number, k: number, y0: number, y1: number, hole: [number, number, number, number] | null, look: WallLook, floor = y0, top = y1): void {
+  const CELL = cell, [ax, az, bx, bz] = sideEdge(i, j, k, cell);
   const along = (s: number) => [ax + ((bx - ax) * s) / CELL, az + ((bz - az) * s) / CELL];
   const seg = (s0: number, s1: number, h0: number, h1: number) => {
     if (s1 - s0 < 0.005 || h1 - h0 < 0.005) return;
@@ -131,7 +131,7 @@ const ASHLAR: Tint = [196, 186, 170];
  */
 export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
   const shell = new MeshKit(), propKit = new MeshKit();
-  const L = c.layout;
+  const L = c.layout, { cell: CELL, storey: STOREY, passage: PASSAGE_H } = L.scale;
   const shape = c.form.space, carved = shape.carved, tower = shape.walls === 'dressed';
   const space = new DungeonSpace(L);
   const owner = (i: number, j: number, l: number) => {
@@ -192,7 +192,7 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
     for (let j = r.z; j < r.z + r.d; j++) for (let i = r.x; i < r.x + r.w; i++) for (let k = 0; k < 4; k++) {
       const ni = i + DIRS[k][0], nj = j + DIRS[k][1];
       if (cellIn(r, ni, nj)) continue;
-      for (let lv = r.level; lv < r.level + r.height; lv++) wallWithHole(shell, i, j, k, lv * STOREY, (lv + 1) * STOREY, hole(i, j, lv, k), look, y0, y1);
+      for (let lv = r.level; lv < r.level + r.height; lv++) wallWithHole(shell, CELL, i, j, k, lv * STOREY, (lv + 1) * STOREY, hole(i, j, lv, k), look, y0, y1);
     }
   }
   // Passages: floor, ceiling, walls; stairs as steps.
@@ -204,7 +204,7 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
       const look: WallLook = dug ? { mat: M.Rubble, tint: EARTH, damp: 0.5 } : tower ? { mat: M.Ashlar, tint: old ? OLD : ASHLAR, damp: old ? 0.6 : 0.2 } : old ? { mat: C.Brick, tint: BRICK, damp: 0.6 } : { mat: M.Rubble, tint: STONE, damp: 0.3 };
       const top = l * STOREY, ceil = top + PASSAGE_H;
       const st = cell.stair;
-      const lo = st ? top - stairDrop(cell, (i + (st.dir === 0 ? 1 : st.dir === 2 ? 0 : 0.5)) * CELL, (j + (st.dir === 1 ? 1 : st.dir === 3 ? 0 : 0.5)) * CELL) : top;
+      const lo = st ? top - stairDrop(cell, (i + (st.dir === 0 ? 1 : st.dir === 2 ? 0 : 0.5)) * CELL, (j + (st.dir === 1 ? 1 : st.dir === 3 ? 0 : 0.5)) * CELL, L.scale) : top;
       shell.flat(i * CELL, j * CELL, (i + 1) * CELL, (j + 1) * CELL, ceil, false, old ? C.Brick : C.Boards, old ? scaleTint(BRICK, 0.8) : RAFTERS);
       if (!st) shell.flat(i * CELL, j * CELL, (i + 1) * CELL, (j + 1) * CELL, top, true, dug ? C.Earth : tower && l > 0 ? C.Boards : C.Flagstone, dug ? DIRT : tower && l > 0 ? RAFTERS : old ? OLD_FLAGS : FLAGS);
       else {
@@ -230,8 +230,8 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
             const nf = n.stair ? n.level * STOREY - ((n.stair.step + (k === n.stair.dir ? 0 : 1)) / n.stair.run) * STOREY : n.level * STOREY;
             gap = [0, CELL, Math.min(nf, gap?.[2] ?? Infinity), Math.max((n.stair ? n.level * STOREY : nf) + PASSAGE_H, gap?.[3] ?? -Infinity)];
           }
-          wallWithHole(shell, i, j, k, bottom, ceil, gap, look, lo, ceil);
-        } else if (!same(l)) wallWithHole(shell, i, j, k, top, ceil, hole(i, j, l, k), look);
+          wallWithHole(shell, CELL, i, j, k, bottom, ceil, gap, look, lo, ceil);
+        } else if (!same(l)) wallWithHole(shell, CELL, i, j, k, top, ceil, hole(i, j, l, k), look);
       }
     }
   });
@@ -241,7 +241,7 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
   for (const pl of L.links) pl.doors.forEach((door, end) => {
     if (end === 1 && pl.path.length === 0) return;
     const o = { pl, end: end as 0 | 1 };
-    const k = door.dir, [ax, az, bx, bz] = sideEdge(door.x, door.z, k);
+    const k = door.dir, [ax, az, bx, bz] = sideEdge(door.x, door.z, k, CELL);
     const mx = (ax + bx) / 2, mz = (az + bz) / 2, ux = (bx - ax) / CELL, uz = (bz - az) / CELL;
     const y = door.level * STOREY, yaw = Math.atan2(ux, uz) - Math.PI / 2;
     const kind = pl.link.kind;
@@ -508,7 +508,7 @@ const LITTER: Readonly<Record<string, readonly string[]>> = {
 
 /** Litter along the walls of every room, clear of the doors and the props already standing. */
 function dress(k: MeshKit, c: Cellar, models: PropModels): void {
-  const L = c.layout;
+  const L = c.layout, { cell: CELL, storey: STOREY } = L.scale;
   const doors = L.links.flatMap((pl) => pl.doors.map((d) => [(d.x + 0.5 + DIRS[d.dir][0] * 0.5) * CELL, (d.z + 0.5 + DIRS[d.dir][1] * 0.5) * CELL, d.level]));
   for (const r of L.rooms) {
     const kinds = LITTER[c.rooms[r.id].use.id];
@@ -587,6 +587,6 @@ function prop(k: MeshKit, p: Prop): void {
       { const [px, pz] = spot(-1.45, -0.4); k.box(px, y, pz, 1.1, 2.3, 0.08, yaw, M.Oak, t(DARK_OAK)); }
       break;
     }
-    case 'ladder': { const [a, b] = spot(0, -0.15); for (const u of [-0.3, 0.3]) { const [px, pz] = spot(u, -0.15); k.box(px, y, pz, 0.08, STOREY, 0.08, yaw, M.Oak, t(OAK)); } for (let s = 0; s < 8; s++) k.box(a, y + 0.3 + s * 0.32, b, 0.6, 0.05, 0.06, yaw, M.Oak, t(OAK)); break; }
+    case 'ladder': { const [a, b] = spot(0, -0.15); for (const u of [-0.3, 0.3]) { const [px, pz] = spot(u, -0.15); k.box(px, y, pz, 0.08, BUILT.storey, 0.08, yaw, M.Oak, t(OAK)); } for (let s = 0; s < 8; s++) k.box(a, y + 0.3 + s * 0.32, b, 0.6, 0.05, 0.06, yaw, M.Oak, t(OAK)); break; }
   }
 }
