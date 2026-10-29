@@ -205,7 +205,7 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
     if (away.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 30)) continue;
     if (f.biomes && !f.biomes.includes(t.biomeIdAt(x, z) ?? '')) continue;
     let steep = 0, ok = true;
-    for (const rr of [r * 0.5, r]) for (let a = 0; a < 8 && ok; a++) {
+    for (const rr of [r * 0.25, r * 0.5, r]) for (let a = 0; a < 8 && ok; a++) {
       const px = x + Math.cos((a * Math.PI) / 4) * rr, pz = z + Math.sin((a * Math.PI) / 4) * rr;
       const ph = t.height(px, pz);
       if (ph < 1.5 || t.waterDepth(px, pz, ph) > 0) ok = false;

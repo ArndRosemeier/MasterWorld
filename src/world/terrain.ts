@@ -72,7 +72,7 @@ export class Terrain {
     this.roadNet = new RoadNet();
     this.holdList = [];
     for (const d of log) {
-      if (d.kind === 'town') this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
+      if (d.kind === 'town') this.townSpots.push({ d, level: this.erodedLand(d.x, d.z) });
       else if (d.kind === 'hold') this.holdList.push(d);
     }
     this.freeTowns();
@@ -128,7 +128,7 @@ export class Terrain {
    */
   addTown(d: TownDecision, plan?: TownPlan): void {
     if (this.townSpots.some((s) => s.d.id === d.id)) return;
-    this.townSpots.push({ d, level: this.skeleton.elevation(d.x, d.z) });
+    this.townSpots.push({ d, level: this.erodedLand(d.x, d.z) });
     this.freeTowns();
     if (this.townList) this.townList.push(new Town(d, this, plan));
   }
@@ -269,10 +269,16 @@ export class Terrain {
    * The land before rivers and brooks dig their beds: `r`, `bk` the river and brook here (null: as if there were no
    * water, `dryLand`), which ease the landforms away from their banks.
    */
+  /**
+   * The land's big shape as erosion left it, before its small shapes: the skeleton, with the hollows' sediment floors
+   * (W2) and the brooks' valleys carved into it (W4b).
+   */
+  private erodedLand(x: number, z: number, big = this.skeleton.elevation(x, z)): number {
+    return big > 0 ? Math.min(this.hydro.onFloors(x, z, big), this.hydro.valeAt(x, z)) : big;
+  }
+
   private landShape(x: number, z: number, r: WaterHere | null, bk: WaterHere | null, lake: Lake | null = null): number {
-    const big = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
-    // The hollows' sediment floors (W2): the land as erosion left it, before its small shapes.
-    const base = big > 0 ? this.hydro.onFloors(x, z, big) : big;
+    const big = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore, base = this.erodedLand(x, z, big);
     // The swash: low swells along the waterline (beach cusps), so the water's edge curves gently instead of
     // running dead straight; they die out on dry sand and in deeper water.
     const swash = Math.abs(base) < 2.5 ? (1 - smoothstep(0.6, 2.5, Math.abs(base))) * this.detail.fbm2(x / 22 - 40.1, z / 22 + 8.8, 2) * 0.15 : 0;
@@ -317,6 +323,14 @@ export class Terrain {
    */
   dryLand(x: number, z: number): number {
     return this.landShape(x, z, null, null);
+  }
+
+  /**
+   * The land the water folds into (phase W): as `dryLand`, but with the landforms giving way to the rivers' and
+   * brooks' banks, before the water shapes its channels and banks into it.
+   */
+  landBeforeBanks(x: number, z: number): number {
+    return this.landShape(x, z, this.hydro.riverAt(x, z, this.here), this.hydro.brookAt(x, z, this.brook), this.hydro.lakeNear(x, z));
   }
 
   private landHeight(x: number, z: number): number {

@@ -1,7 +1,8 @@
 /**
  * Water fit (phase W, step W1): how well the water follows the finished land. For each world it looks at two
  * 16 km squares, round the start town and round the lake nearest to it, on a 40 m grid, and compares the water
- * with the land as it is before any water shapes it (skeleton, landforms, detail):
+ * with the land the water folds into: skeleton, valleys, landforms and detail, before the water shapes its channels
+ * and banks (the landforms give way to the banks, as they were built to; `Terrain.landBeforeBanks`):
  *
  * - cut: at the middle of a river's or brook's channel, how far that land lies above the water's level. Water that
  *   follows the land sits about a metre below it; a big number is a trench dug to make the land fit the water.
@@ -43,7 +44,7 @@ function measure(t: Terrain, cx: number, cz: number): Fit {
   const fit: Fit = { cuts: { brook: [], river: [] }, lake: 0, leaks: 0 };
   for (let z = cz - SIDE / 2; z < cz + SIDE / 2; z += STEP) for (let x = cx - SIDE / 2; x < cx + SIDE / 2; x += STEP) {
     t.hydro.query(x, z, w);
-    if (w.river && w.dist < w.half * 0.3) fit.cuts[w.brook ? 'brook' : 'river'].push(t.dryLand(x, z) - w.level);
+    if (w.river && w.dist < w.half * 0.3) fit.cuts[w.brook ? 'brook' : 'river'].push(t.landBeforeBanks(x, z) - w.level);
     if (Number.isNaN(w.lake)) continue;
     const h = t.height(x, z);
     if (h >= w.lake) continue;

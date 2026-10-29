@@ -152,26 +152,30 @@ export function floodLake(ground: (x: number, z: number) => number, x: number, z
   const i0 = a - ring, j0 = c - ring, w = b - a + 1 + 2 * ring, h = d - c + 1 + 2 * ring;
   const dist = new Float32Array(w * h).fill(LAKE_SHORE * 4);
   for (const k of water) dist[(keyJ(k) - j0) * w + keyI(k) - i0] = 0;
-  // Distances from the water: a chamfer pass each way.
-  const D = G * Math.SQRT2;
-  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-    const p = j * w + i;
-    if (i > 0) dist[p] = Math.min(dist[p], dist[p - 1] + G);
-    if (j > 0) {
-      dist[p] = Math.min(dist[p], dist[p - w] + G);
-      if (i > 0) dist[p] = Math.min(dist[p], dist[p - w - 1] + D);
-      if (i < w - 1) dist[p] = Math.min(dist[p], dist[p - w + 1] + D);
-    }
-  }
-  for (let j = h - 1; j >= 0; j--) for (let i = w - 1; i >= 0; i--) {
-    const p = j * w + i;
-    if (i < w - 1) dist[p] = Math.min(dist[p], dist[p + 1] + G);
-    if (j < h - 1) {
-      dist[p] = Math.min(dist[p], dist[p + w] + G);
-      if (i < w - 1) dist[p] = Math.min(dist[p], dist[p + w + 1] + D);
-      if (i > 0) dist[p] = Math.min(dist[p], dist[p + w - 1] + D);
-    }
-  }
+  // Distances from the water.
+  chamfer(dist, w, h, G, G * Math.SQRT2);
   const centre = (k: number): [number, number] => [(keyI(k) + 0.5) * G, (keyJ(k) + 0.5) * G];
   return new Lake(level, level - floor, water.length, i0, j0, w, h, dist, centre(crest), centre(spill));
+}
+
+/**
+ * A chamfer distance pass over a w×h grid, in place: each cell becomes the least of itself and its neighbours plus
+ * `along` (sideways) or `diag` (corner to corner), one sweep each way; with `scale`, those steps into a cell cost that
+ * many times more.
+ */
+export function chamfer(g: Float32Array, w: number, h: number, along: number, diag: number, scale?: Float32Array): void {
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const p = j * w + i, a = scale ? along * scale[p] : along, d = scale ? diag * scale[p] : diag;
+    let v = g[p];
+    if (i > 0) v = Math.min(v, g[p - 1] + a);
+    if (j > 0) { v = Math.min(v, g[p - w] + a); if (i > 0) v = Math.min(v, g[p - w - 1] + d); if (i < w - 1) v = Math.min(v, g[p - w + 1] + d); }
+    g[p] = v;
+  }
+  for (let j = h - 1; j >= 0; j--) for (let i = w - 1; i >= 0; i--) {
+    const p = j * w + i, a = scale ? along * scale[p] : along, d = scale ? diag * scale[p] : diag;
+    let v = g[p];
+    if (i < w - 1) v = Math.min(v, g[p + 1] + a);
+    if (j < h - 1) { v = Math.min(v, g[p + w] + a); if (i < w - 1) v = Math.min(v, g[p + w + 1] + d); if (i > 0) v = Math.min(v, g[p + w - 1] + d); }
+    g[p] = v;
+  }
 }

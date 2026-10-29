@@ -11,7 +11,7 @@
  */
 import { MinHeap, Noise, clamp, deriveSeed, hash2f, lerp, smoothstep } from '@futuremagic/core';
 import type { Skeleton } from './skeleton';
-import { floodLake, type Lake } from './lakes';
+import { chamfer, floodLake, type Lake } from './lakes';
 
 export interface HydroOptions {
   /** Coarse cell side, metres. */
@@ -32,7 +32,7 @@ export const HYDRO: HydroOptions = { cell: 2000, core: 512, margin: 128, minArea
  * settlement can stand by fresh water. A tile is 32 km with 8 km round it: a brook's catchment is small, so
  * neighbouring tiles trace the same brooks.
  */
-export const BROOKS: HydroOptions = { cell: 250, core: 128, margin: 32, minArea: 1, brook: true };
+export const BROOKS: HydroOptions = { cell: 160, core: 200, margin: 50, minArea: 1, brook: true };
 
 /** Fill above the ground (metres) from which a cell is part of a lake. */
 const LAKE_MIN = 2;
@@ -65,6 +65,14 @@ const BREACH_SIDES = 3;
  * cliffs).
  */
 const FILL_COST = 4;
+/** How steeply (m a metre) a valley's sides rise from its floor where the land is carved for a way out (W4b). */
+const VALLEY_SIDE = 1 / 3;
+/** How much (m) a valley's floor rises from its way's cells to the cells either side (W4b). */
+const FLOOR_RISE = 1.5;
+/** A valley's side more than this (m) above a cell's land is not kept: it could lower nothing there (W4b). */
+const VALE_KEEP = 60;
+/** How far (m) a brook runs below its valley floor: the land's small relief (terrain.ts) dips that far round it, and its water stays in them. */
+const BROOK_SINK = 0.5;
 /** Levels tried between a hollow's floor and its spill, for the cheapest mix of fill and breach. */
 const HOLLOW_TRIES = 12;
 /** Spacing of river polyline points after resampling, metres. */
@@ -249,6 +257,8 @@ export interface BrookFeed {
   join(x: number, z: number): { x: number; z: number; level: number } | null;
   /** Whether a river's channel may lie within `within` metres of (x, z) (a quick test before asking `join` often). */
   riverNear(x: number, z: number, within: number): boolean;
+  /** The rivers the land was shaped by (a brook's valley never lowers the land below their water, W4b). */
+  rivers: readonly River[];
 }
 
 export class HydroTile {
@@ -269,6 +279,11 @@ export class HydroTile {
   private lakeOf: Int32Array = new Int32Array(0);
   /** The level a hollow's sediment floor fills this cell to (NaN: none; W2). */
   readonly plain: Float32Array;
+  /**
+   * A brook tile's valleys (W4b): at each cell the height the land may stand at most, its valley floor plus its
+   * sides (Infinity: no valley near). Empty in a river tile.
+   */
+  readonly vale: Float32Array;
   readonly rivers: River[] = [];
   /** Segment index: bucket (BUCKET-m squares) → [river, point] pairs. */
   private readonly buckets = new Map<number, number[]>();
@@ -287,6 +302,7 @@ export class HydroTile {
       this.recv = new Int32Array(0);
       this.lake = new Float32Array(N).fill(NaN);
       this.plain = given.plain;
+      this.vale = given.vale;
       this.rivers.push(...given.rivers);
       this.rivers.forEach((r, ri) => this.index(r, ri));
       return;
@@ -340,7 +356,88 @@ export class HydroTile {
     this.plain = new Float32Array(N).fill(NaN);
     this.resolveHollows(DI, DJ);
 
+    this.vale = feed ? this.carveValleys(order, popped) : new Float32Array(0);
     this.traceRivers(DI, DJ);
+  }
+
+  /**
+   * The valleys of a brook tile, carved into the land before any water runs in them (W4b). Down every way the
+   * drainage found the floor never rises: where a way crosses higher ground than it came from (a ridge it breaches out
+   * of a hollow, or ground its cells' middles stand above), the land is lowered to the floor it came at. The floor
+   * spreads one cell either side (a brook's course wanders that far off its cells' middles), and from it the sides
+   * rise no steeper than VALLEY_SIDE. The cells' land (`elev`) is the carved land after.
+   */
+  private carveValleys(order: Int32Array, popped: number): Float32Array {
+    const { n, elev: E, recv } = this, cell = this.o.cell, N = n * n;
+    const floor = Float32Array.from(E), river = this.riverCells();
+    // Upstream first: each cell's floor carried down to the cell it drains to, up to a river's valley.
+    for (let k = popped - 1; k >= 0; k--) {
+      const c = order[k], r = recv[c];
+      if (r >= 0 && E[c] > 0 && E[r] > 0 && !river[r] && floor[c] < floor[r]) floor[r] = floor[c];
+    }
+    const S = new Float32Array(N).fill(Infinity);
+    for (let c = 0; c < N; c++) if (floor[c] < E[c] - 0.01) S[c] = floor[c];
+    // The floor one cell wide either side. `cut`: how deep (negated) a cell may be lowered, at most as deep as the
+    // way it hangs from was cut (a mesa standing beside a valley is not planed down to the valley's slope).
+    const wide = Float32Array.from(S), cut = new Float32Array(N).fill(0);
+    for (let c = 0; c < N; c++) if (S[c] < Infinity) cut[c] = S[c] - E[c];
+    for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+      const c = j * n + i;
+      if (S[c] === Infinity) continue;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const d = c + dj * n + di;
+        if (S[c] + FLOOR_RISE < wide[d]) wide[d] = S[c] + FLOOR_RISE;
+        if (S[c] - E[c] < cut[d]) cut[d] = S[c] - E[c];
+      }
+    }
+    // The valley's sides: from the floor, the land no higher than it plus VALLEY_SIDE a metre out, or as steeply as
+    // the land stood there; the depth a side may cut falls off as fast.
+    const steep = new Float32Array(N).fill(1);
+    for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+      const c = j * n + i;
+      const g = Math.max(Math.abs(E[c + 1] - E[c - 1]), Math.abs(E[c + n] - E[c - n])) / (2 * cell);
+      steep[c] = Math.max(1, g / VALLEY_SIDE);
+    }
+    const along = cell * VALLEY_SIDE, diag = along * Math.SQRT2;
+    for (let pass = 0; pass < 2; pass++) { chamfer(wide, n, n, along, diag, steep); chamfer(cut, n, n, along, diag, steep); }
+    for (let c = 0; c < N; c++) wide[c] = Math.max(wide[c], E[c] + Math.min(0, cut[c]));
+    // Far above the land a valley's side lowers nothing (VALE_KEEP): dropped, so a tile hands over little. A
+    // river's valley the rivers shaped first: a brook's valley lowers nothing there.
+    for (let c = 0; c < N; c++) {
+      if (E[c] <= 0 || wide[c] > E[c] + VALE_KEEP) wide[c] = Infinity;
+      else if (river[c]) wide[c] = Math.max(wide[c], E[c]);
+      else if (wide[c] < E[c]) E[c] = wide[c];
+    }
+    return wide;
+  }
+
+  /** The cells in a river's valley (1), where the brooks' valleys lower nothing (W4b). */
+  private riverCells(): Uint8Array {
+    const { n } = this, cell = this.o.cell, inside = new Uint8Array(n * n);
+    for (const r of this.feed!.rivers) {
+      for (let k = 0; k < r.level.length; k++) {
+        const x = r.xz[k * 2], z = r.xz[k * 2 + 1], R = valleyOf(r.half[k]) + cell * 0.5;
+        const i0 = Math.max(0, Math.floor((x - R - this.x0) / cell)), i1 = Math.min(n - 1, Math.floor((x + R - this.x0) / cell));
+        const j0 = Math.max(0, Math.floor((z - R - this.z0) / cell)), j1 = Math.min(n - 1, Math.floor((z + R - this.z0) / cell));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          if (Math.hypot(this.x0 + (i + 0.5) * cell - x, this.z0 + (j + 0.5) * cell - z) <= R) inside[j * n + i] = 1;
+        }
+      }
+    }
+    return inside;
+  }
+
+  /** The most the land may stand at (x, z) by the valleys (W4b): blended between cells, Infinity off them. */
+  valeAt(x: number, z: number): number {
+    const { n, vale } = this, c = this.o.cell;
+    if (!vale.length) return Infinity;
+    const u = (x - this.x0) / c - 0.5, v = (z - this.z0) / c - 0.5;
+    const i = Math.floor(u), j = Math.floor(v);
+    if (i < 0 || j < 0 || i >= n - 1 || j >= n - 1) return Infinity;
+    const fu = u - i, fv = v - j, k = j * n + i;
+    const a = vale[k], b = vale[k + 1], d = vale[k + n], e = vale[k + n + 1];
+    if (a === Infinity || b === Infinity || d === Infinity || e === Infinity) return Infinity;
+    return (a * (1 - fu) + b * fu) * (1 - fv) + (d * (1 - fu) + e * fu) * fv;
   }
 
   /**
@@ -692,10 +789,10 @@ export class HydroTile {
       // raised by this tile's own sediment floors, as the land is (else the bottom of a filled hollow, tens of metres
       // down, held the brook's level down all the way after it: a trench, W4).
       if (!this.feed || k === last) { lv.push(cl[k]); continue; }
-      gr.push(this.onFloors(cx[k], cz[k], this.feed.ground(cx[k], cz[k])));
+      gr.push(Math.min(this.onFloors(cx[k], cz[k], this.feed.ground(cx[k], cz[k])), this.valeAt(cx[k], cz[k])));
       // Low by the sea, the land's small relief (terrain.ts, down to 0.5 m) dips below a brook's ground: it runs
       // at the sea's height there, so its banks stay dry.
-      const bl = Math.min(cl[k], gr[k] - 0.2);
+      const bl = Math.min(cl[k], gr[k] - BROOK_SINK);
       lv.push(bl < LOW_LAND ? Math.min(bl, 0.3) : bl);
     }
     // A river ends where it meets the sea: its coarse cells would carry it on over the sea floor, a band of water
@@ -885,11 +982,12 @@ export class HydroTile {
 export interface PackedTile {
   rivers: River[];
   plain: Float32Array;
+  vale: Float32Array;
 }
 
 /**
  * A tile packed into one array, to hand it to another thread: [count, then per river: points, xz, level, half, fall,
- * reach (0 or n)], then [floors, then per floor: cell, level].
+ * reach (0 or n)], then [floors, then per floor: cell, level], then [vales, then per valley cell: cell, height].
  */
 export function packTile(t: HydroTile): Float64Array {
   const { rivers, plain } = t;
@@ -898,6 +996,9 @@ export function packTile(t: HydroTile): Float64Array {
   const floors: number[] = [];
   plain.forEach((p, c) => { if (!Number.isNaN(p)) floors.push(c, p); });
   size += floors.length;
+  const cuts: number[] = [];
+  t.vale.forEach((v, c) => { if (v !== Infinity) cuts.push(c, v); });
+  size += 1 + cuts.length;
   const out = new Float64Array(size);
   let o = 0;
   out[o++] = rivers.length;
@@ -912,7 +1013,9 @@ export function packTile(t: HydroTile): Float64Array {
     if (r.reach) { out.set(r.reach, o); o += n; }
   }
   out[o++] = floors.length / 2;
-  out.set(floors, o);
+  out.set(floors, o); o += floors.length;
+  out[o++] = cuts.length / 2;
+  out.set(cuts, o);
   return out;
 }
 
@@ -932,7 +1035,9 @@ export function unpackTile(a: Float64Array, cells: number): PackedTile {
   }
   const plain = new Float32Array(cells).fill(NaN);
   for (let k = 0, count = a[o++]; k < count; k++, o += 2) plain[a[o]] = a[o + 1];
-  return { rivers, plain };
+  const vale = new Float32Array(o < a.length ? cells : 0).fill(Infinity);
+  for (let k = 0, count = o < a.length ? a[o++] : 0; k < count; k++, o += 2) vale[a[o]] = a[o + 1];
+  return { rivers, plain, vale };
 }
 
 export class Hydrology {
@@ -961,6 +1066,7 @@ export class Hydrology {
         return null;
       },
       riverNear: (x, z, within) => main.riverEdge(x, z, within) < Infinity,
+      rivers: main.rivers,
     };
   }
 
@@ -992,6 +1098,11 @@ export class Hydrology {
   onFloors(x: number, z: number, h: number): number {
     const r = this.tileAt(x, z).onFloors(x, z, h), b = this.brookTileAt(x, z);
     return b ? b.onFloors(x, z, r) : r;
+  }
+
+  /** The most the land may stand at (x, z) by the brooks' valleys (W4b; Infinity without brooks). */
+  valeAt(x: number, z: number): number {
+    return this.brookTileAt(x, z)?.valeAt(x, z) ?? Infinity;
   }
 
   /** The brook tile that owns a point (null without brooks). */
