@@ -257,6 +257,8 @@ export const brookValley = (half: number): number => half * 5 + 10;
 export interface BrookFeed {
   ground(x: number, z: number): number;
   join(x: number, z: number): { x: number; z: number; level: number } | null;
+  /** The level of the lake whose water may lie at (x, z) (as the water's query gives it), NaN where none. */
+  lake(x: number, z: number): number;
   /** Whether a river's channel may lie within `within` metres of (x, z) (a quick test before asking `join` often). */
   riverNear(x: number, z: number, within: number): boolean;
   /** The rivers the land was shaped by (a brook's valley never lowers the land below their water, W4b). */
@@ -832,6 +834,16 @@ export class HydroTile {
         lv[j] = land;
       }
     }
+    // A brook ends where it runs into a lake: where its level falls under the lake's (the carved land between its
+    // cells dips below it), it meets the water. Run on, it was drawn across the lake's water (gate W).
+    if (this.feed) for (let k = 1; k < lv.length - 1; k++) {
+      const l = this.feed.lake(xz[k * 2], xz[k * 2 + 1]);
+      if (!(lv[k] < l)) continue;
+      xz.length = (k + 1) * 2; lv.length = hw.length = k + 1;
+      if (gr.length > k + 1) gr.length = k + 1;
+      lv[k] = l;
+      break;
+    }
     // Never rise downstream.
     for (let k = 1; k < lv.length; k++) lv[k] = Math.min(lv[k], lv[k - 1]);
     const fall = new Float32Array(lv.length - 1);
@@ -1100,6 +1112,7 @@ export class Hydrology {
         if (!Number.isNaN(w.lake) && sk.elevation(x, z) < w.lake) return { x, z, level: w.lake };
         return null;
       },
+      lake: (x, z) => main.query(x, z, w).lake,
       riverNear: (x, z, within) => main.riverEdge(x, z, within) < Infinity,
       rivers: main.rivers,
     };
