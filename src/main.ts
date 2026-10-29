@@ -435,6 +435,9 @@ export async function start(b: Boot): Promise<void> {
     const hero = await HeroView.load(view.stage, view.renderer, setting.hero, save?.looks?.look ?? null, seed);
     console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: hero's body made`);
     await seas;
+    // The one building shader (bridges, the VGM's sites, the town) samples the town's textures: nothing is built with it
+    // before they are made (the near mask can come first now, and a shader built without them stays grey).
+    await painted;
     // The wide masks right after (in the terrain workers, beside the land's first chunks): ready by 'Raising the land',
     // which waited seconds for them when they were asked for only once the woods and rocks were placed.
     const wideSeas = sea.prime(view.camera.position);
