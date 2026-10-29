@@ -57,6 +57,20 @@ test('hydro: a lake lies in the land, at the height where it runs out over its r
     }
     assert.ok(wet > 0, 'the lake shows');
   }
+  // A river into or out of a lake banks no levee up in its water: beside its end there, where the lake's land lies
+  // under it, the lake shows on both sides.
+  let ends = 0;
+  for (const r of tl.rivers) for (const k of [0, r.level.length - 1]) {
+    const x = r.xz[k * 2], z = r.xz[k * 2 + 1], level = t.hydro.lakeLevel(x, z);
+    if (Number.isNaN(level)) continue;
+    ends++;
+    const j = k ? k - 1 : 1, dx = r.xz[j * 2] - x, dz = r.xz[j * 2 + 1] - z, len = Math.hypot(dx, dz);
+    for (const side of [-1, 1]) {
+      const o = (r.half[k] + 15) * side, px = x - (dz / len) * o, pz = z + (dx / len) * o;
+      if (!Number.isNaN(t.hydro.lakeLevel(px, pz)) && sk.elevation(px, pz) < level - 1) assert.ok(t.height(px, pz) < level, `levee in the lake at ${px.toFixed(0)},${pz.toFixed(0)}`);
+    }
+  }
+  assert.ok(ends > 0, 'rivers run into and out of lakes');
 });
 
 test('hydro: the same seed gives the same rivers', () => {
