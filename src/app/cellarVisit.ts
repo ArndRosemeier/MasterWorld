@@ -13,7 +13,7 @@ import type { CellarView } from '../render/dungeon/CellarView';
 import type { SkyView } from '../render/sky';
 import type { WarmLights } from '../render/warmLights';
 import { torchSpots } from '../world/dungeon/torches';
-import { CELL, STOREY, type Cellar } from '../world/dungeon/cellar';
+import type { Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace, keySpot, type SpaceEvent } from '../world/dungeon/space';
 import { SearchKneel } from './searchKneel';
 import { WalkTo } from './walkTo';
@@ -65,8 +65,8 @@ export class CellarVisit {
       // Some kinds bring the hero in the middle of the entrance room (world/dungeon/kinds.ts).
       if (room === undefined && this.cellar.form.space.arriveMid) room = this.cellar.graph.entrance;
       if (room !== undefined && this.cellar.layout.rooms[room]) {
-        const r = this.cellar.layout.rooms[room];
-        this.player.teleport(O.x + (r.x + r.w / 2) * CELL, O.y + r.level * STOREY, O.z + (r.z + r.d / 2) * CELL, h.yaw);
+        const r = this.cellar.layout.rooms[room], { cell, storey } = this.cellar.layout.scale;
+        this.player.teleport(O.x + (r.x + r.w / 2) * cell, O.y + r.level * storey, O.z + (r.z + r.d / 2) * cell, h.yaw);
       } else this.player.teleport(O.x + h.x - fx * 1.0, O.y + h.y, O.z + h.z - fz * 1.0, h.yaw);
     });
     if (!now) this.onSwap?.();
@@ -172,7 +172,7 @@ export class CellarVisit {
   get summary(): string {
     if (!this.inside) return '';
     const w = this.player.walker, O = this.view.origin;
-    const owner = this.space.grid.owner(Math.floor((w.pos.x - O.x) / CELL), Math.floor((w.pos.z - O.z) / CELL), this.space.levelAt(w.pos.y - O.y));
+    const owner = this.space.ownerAt(w.pos.x - O.x, w.pos.y - O.y, w.pos.z - O.z);
     const r = owner !== undefined && owner >= 0 ? this.cellar.rooms[owner] : null;
     return r ? `below: ${r.use.name} (room ${r.id}, ${r.beat}, tension ${r.tension.toFixed(2)})` : 'below: a passage';
   }

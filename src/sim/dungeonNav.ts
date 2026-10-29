@@ -5,7 +5,6 @@
  * never up. Paths keep only where each room is entered and left, since a room is open floor. Pure.
  */
 import { DIRS } from '@futuremagic/dungeon';
-import { CELL, STOREY } from '../world/dungeon/cellar';
 import { stairDrop, type DungeonSpace } from '../world/dungeon/space';
 
 /** A cell to stand in: i, j and the storey of its floor. */
@@ -27,7 +26,7 @@ export class DungeonNav {
 
   /** The cell under a point of the dungeon's frame (feet height `y`). */
   at(x: number, y: number, z: number): NavCell | null {
-    const i = Math.floor(x / CELL), j = Math.floor(z / CELL);
+    const [i, j] = this.space.cellAt(x, z);
     return this.cell(i, j, this.space.levelAt(y)) ?? this.cell(i, j, this.space.levelAt(y) - 1);
   }
 
@@ -51,11 +50,11 @@ export class DungeonNav {
 
   /** Middle of a cell, on its floor (the dungeon's frame). */
   centre(c: NavCell): { x: number; y: number; z: number } {
-    const x = (c.i + 0.5) * CELL, z = (c.j + 0.5) * CELL;
+    const S = this.space.scale, x = (c.i + 0.5) * S.cell, z = (c.j + 0.5) * S.cell;
     // A stair's floor from its own steps (another way may pass over its foot).
     const st = this.space.grid.stairs.get(`${c.i},${c.j},${c.l - 1}`);
-    if (st && st.level === c.l && st.x === c.i && st.z === c.j) return { x, y: c.l * STOREY - stairDrop(st, x, z), z };
-    return { x, y: this.space.floorAt(x, z, c.l * STOREY + 1) ?? c.l * STOREY, z };
+    if (st && st.level === c.l && st.x === c.i && st.z === c.j) return { x, y: c.l * S.storey - stairDrop(st, x, z, S), z };
+    return { x, y: this.space.floorAt(x, z, c.l * S.storey + 1) ?? c.l * S.storey, z };
   }
 
   /** Steps from `from` to every cell reachable within `limit` steps (breadth first). */
@@ -161,9 +160,9 @@ export class DungeonGround implements DenGround {
   }
 
   spot(room: number, rng: { range(a: number, b: number): number }): P3 {
-    const r = this.space.layout.rooms[room];
-    const x = (r.x + rng.range(0.25, r.w - 0.25)) * CELL, z = (r.z + rng.range(0.25, r.d - 0.25)) * CELL;
-    return { x, y: this.space.floorAt(x, z, r.level * STOREY + 1) ?? r.level * STOREY, z };
+    const r = this.space.layout.rooms[room], S = this.space.scale;
+    const x = (r.x + rng.range(0.25, r.w - 0.25)) * S.cell, z = (r.z + rng.range(0.25, r.d - 0.25)) * S.cell;
+    return { x, y: this.space.floorAt(x, z, r.level * S.storey + 1) ?? r.level * S.storey, z };
   }
 
   floorAt(x: number, z: number, y: number): number | null { return this.space.floorAt(x, z, y); }

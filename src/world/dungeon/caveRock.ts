@@ -11,9 +11,9 @@
  * are still shut, so what is seen is what is walked.
  */
 import { Noise, deriveSeed, smin, smoothstep } from '@futuremagic/core';
-import { DIRS, type DungeonLayout } from '@futuremagic/dungeon';
+import { DIRS } from '@futuremagic/dungeon';
 import type { BuildingMesh } from '@futuremagic/settlement';
-import { CELL, STOREY } from './cellar';
+import type { ScaledLayout } from './cellar';
 import { CellarMat, WildMat, scaleTint, type Tint } from './meshKit';
 import { fieldAt, meshField, type Field } from './rockMesh';
 import { DungeonSpace } from './space';
@@ -27,8 +27,8 @@ const SKIN = 0.15;
 export type CaveField = Field;
 
 /** The field around every room and way of the layout, a cell of rock beyond. */
-export function caveField(layout: DungeonLayout, seed: number, step = CAVE_STEP): CaveField {
-  const space = new DungeonSpace(layout, true);
+export function caveField(layout: ScaledLayout, seed: number, step = CAVE_STEP): CaveField {
+  const space = new DungeonSpace(layout, true), { cell: CELL, storey: STOREY } = layout.scale;
   const noise = new Noise(deriveSeed(seed, 'cave', 'rock'));
   const [lo, hi] = layout.levels;
   let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
@@ -95,7 +95,7 @@ export const caveAt = (f: CaveField, x: number, y: number, z: number): number =>
 
 /** A cave's space to walk in: its rock, and the layout's doors still shut (a door, a grate, a hidden way). */
 export class CaveSpace extends DungeonSpace {
-  constructor(layout: DungeonLayout, readonly rock: CaveField) {
+  constructor(layout: ScaledLayout, readonly rock: CaveField) {
     super(layout);
   }
 
@@ -108,7 +108,7 @@ export class CaveSpace extends DungeonSpace {
 const ROCK: Tint = [168, 160, 148], SILT: Tint = [150, 132, 110];
 
 /** The cave's rock as one mesh in the building format (its own frame). */
-export function caveShell(f: CaveField, layout: DungeonLayout, seed: number): BuildingMesh {
+export function caveShell(f: CaveField, layout: ScaledLayout, seed: number): BuildingMesh {
   const space = new DungeonSpace(layout, true);
   const noise = new Noise(deriveSeed(seed, 'cave', 'tint'));
   return meshField(f, {

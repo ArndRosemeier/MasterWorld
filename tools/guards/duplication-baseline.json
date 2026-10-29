@@ -546,5 +546,13 @@
   {
     "key": "same name: masterworld/world/rocks.ts#forgetOver + masterworld/world/trunks.ts#forgetOver",
     "reason": "The same seam on purpose: app/roads.ts RoadViews drops both kinds of obstacle cells near a new road; both keep their cells in world/fetchedCells.ts."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#summary + stage/monitor.ts#summary",
+    "reason": "Unrelated getters that share a name: where the hero is below ground for the HUD, and the stage monitor's frame summary."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#at + masterworld/sim/townLife.ts#at",
+    "reason": "Unrelated lookups that share a name: the dungeon cell under a point, and a townsperson's errand at a spot."
   }
 ]

@@ -5,7 +5,7 @@
  */
 import { deriveSeed } from '@futuremagic/core';
 import type { CreatureDef } from '../../setting/contract';
-import { CELL, STOREY, type Cellar } from './cellar';
+import type { Cellar } from './cellar';
 
 export interface Hoard {
   /** Index within the cellar's hoards (saves name the opened ones by it). */
@@ -45,9 +45,9 @@ export function hoardsOf(c: Cellar, defs: readonly CreatureDef[]): Hoard[] {
     if (p.kind !== 'chest') continue;
     out.push({ id: out.length, x: p.x, y: p.y, z: p.z, room: p.room, table: 'cellar-chest', danger: danger * 0.7, seed: deriveSeed(c.decision.seed, 'hoard', out.length), name: 'a chest', prop: true, front: [p.x - Math.sin(p.yaw) * FRONT, p.z - Math.cos(p.yaw) * FRONT] });
   }
-  const r = c.layout.rooms[c.graph.goal];
+  const r = c.layout.rooms[c.graph.goal], { cell, storey } = c.layout.scale;
   out.push({
-    id: out.length, x: (r.x + r.w / 2) * CELL, y: r.level * STOREY, z: (r.z + r.d / 2) * CELL, room: r.id, table: 'lair', danger,
+    id: out.length, x: (r.x + r.w / 2) * cell, y: r.level * storey, z: (r.z + r.d / 2) * cell, room: r.id, table: 'lair', danger,
     // New dwellers gather a hoard of their own.
     seed: deriveSeed(c.occupation?.seed ?? c.decision.seed, 'hoard', out.length), name: `the ${c.dweller.id === 'rats' ? 'nest' : 'hoard'}`, prop: false,
   });

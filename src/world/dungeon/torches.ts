@@ -4,7 +4,7 @@
  * lights and flames hang on the same spots.
  */
 import { DIRS } from '@futuremagic/dungeon';
-import { CELL, STOREY, cellIn, type Cellar } from './cellar';
+import { cellIn, type Cellar } from './cellar';
 
 export interface TorchSpot {
   /** The flame, in the cellar's frame (metres). */
@@ -42,10 +42,10 @@ export function torchSpots(c: Cellar): TorchSpot[] {
         const i = d.x + along[0] * s, j = d.z + along[1] * s;
         if (!cellIn(r, i, j) || opening.has(`${i},${j},${d.level},${d.dir}`)) continue;
         // On the wall face of that side, a little way from the doorway.
-        const cx = (d.x + 0.5) * CELL + ox * CELL / 2, cz = (d.z + 0.5) * CELL + oz * CELL / 2;
-        const off = CELL * 0.62 * s;
+        const { cell, storey } = L.scale, cx = (d.x + 0.5) * cell + ox * cell / 2, cz = (d.z + 0.5) * cell + oz * cell / 2;
+        const off = cell * 0.62 * s;
         out.push({
-          x: cx + along[0] * off - ox * TORCH_OUT, y: d.level * STOREY + TORCH_Y, z: cz + along[1] * off - oz * TORCH_OUT,
+          x: cx + along[0] * off - ox * TORCH_OUT, y: d.level * storey + TORCH_Y, z: cz + along[1] * off - oz * TORCH_OUT,
           nx: -ox, nz: -oz, room: r.id,
         });
         placed++;

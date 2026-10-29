@@ -6,12 +6,13 @@
  *
  * Coordinates: metres in the dungeon's own frame (cell (i, j) spans x = i·CELL .. (i+1)·CELL).
  */
-import { DIRS, LayoutGrid, type Door, type DungeonLayout, type PathCell, type PlacedLink } from '@futuremagic/dungeon';
+import { DIRS, LayoutGrid, type Door, type PathCell, type PlacedLink } from '@futuremagic/dungeon';
 import { smin } from '@futuremagic/core';
-import { CELL, DOOR_W, STOREY } from './cellar';
+import type { DungeonScale } from '../../setting/contract';
+import { BUILT, DOOR_W, type ScaledLayout } from './cellar';
 
-/** Clear height of passages (rooms reach their storey's full height). */
-export const PASSAGE_H = 2.5;
+/** Clear height of a built dungeon's passages (rooms reach their storey's full height). */
+export const PASSAGE_H = BUILT.passage;
 export { DOOR_W };
 
 export interface SpaceEvent {
@@ -23,9 +24,9 @@ export interface SpaceEvent {
 export const KEY_REACH = 1.3;
 
 /** Where room `room`'s key lies: on the floor in its middle (x, y, z; dungeon frame). */
-export function keySpot(layout: DungeonLayout, room: number): [number, number, number] {
-  const r = layout.rooms[room];
-  return [(r.x + r.w / 2) * CELL, r.level * STOREY, (r.z + r.d / 2) * CELL];
+export function keySpot(layout: ScaledLayout, room: number): [number, number, number] {
+  const r = layout.rooms[room], { cell, storey } = layout.scale;
+  return [(r.x + r.w / 2) * cell, r.level * storey, (r.z + r.d / 2) * cell];
 }
 
 interface Opening { readonly pl: PlacedLink; readonly door: Door; readonly end: 0 | 1 }
@@ -38,6 +39,8 @@ const ekey = (x: number, z: number, l: number, dir: number) => {
 
 export class DungeonSpace {
   readonly grid: LayoutGrid;
+  /** Its grid in metres (the layout's). */
+  readonly scale: DungeonScale;
   private readonly openings = new Map<string, Opening>();
   /** Links whose door is open (unlocked, unbarred, found). */
   readonly open = new Set<number>();
@@ -49,8 +52,9 @@ export class DungeonSpace {
    * `carve`: the space as rock is carved from it (world/dungeon/caveRock.ts): every way stands open (doors
    * are drawn as pieces of their own) but a fall of rubble, and the whole side of a cell opens, not just a doorway.
    */
-  constructor(readonly layout: DungeonLayout, private readonly carve = false) {
+  constructor(readonly layout: ScaledLayout, private readonly carve = false) {
     this.grid = new LayoutGrid(layout);
+    this.scale = layout.scale;
     for (const pl of layout.links) pl.doors.forEach((door, end) => {
       const k = ekey(door.x, door.z, door.level, door.dir);
       // An empty path has one door: keep it once.
@@ -58,24 +62,36 @@ export class DungeonSpace {
     });
   }
 
+  /** The grid cell (i, j) a point of the floor plan lies in. */
+  cellAt(x: number, z: number): [number, number] {
+    return [Math.floor(x / this.scale.cell), Math.floor(z / this.scale.cell)];
+  }
+
+  /** Who owns the cell a point lies in (a room id, −1 − a passage's link index), if any. */
+  ownerAt(x: number, y: number, z: number): number | undefined {
+    const [i, j] = this.cellAt(x, z);
+    return this.grid.owner(i, j, this.levelAt(y));
+  }
+
   /** Storey a point is on (feet height). */
   levelAt(y: number): number {
-    return Math.floor((y + 0.4) / STOREY);
+    return Math.floor((y + 0.4) / this.scale.storey);
   }
 
   private cellInfo(i: number, j: number, l: number): { floor: (x: number, z: number) => number; ceil: number; owner: number } | null {
     const owner = this.grid.owner(i, j, l);
     if (owner === undefined) return null;
+    const S = this.scale;
     if (owner >= 0) {
       const r = this.layout.rooms[owner];
-      return { owner, floor: () => r.level * STOREY, ceil: (r.level + r.height) * STOREY };
+      return { owner, floor: () => r.level * S.storey, ceil: (r.level + r.height) * S.storey };
     }
     const st = this.grid.stairs.get(`${i},${j},${l}`);
     if (st) {
-      const top = st.level * STOREY;
-      return { owner, ceil: top + PASSAGE_H, floor: (x, z) => top - stairDrop(st, x, z) };
+      const top = st.level * S.storey;
+      return { owner, ceil: top + S.passage, floor: (x, z) => top - stairDrop(st, x, z, S) };
     }
-    return { owner, floor: () => l * STOREY, ceil: l * STOREY + PASSAGE_H };
+    return { owner, floor: () => l * S.storey, ceil: l * S.storey + S.passage };
   }
 
   /** The opening in the wall on side `dir` of cell (i, j, l), if any (the door, and whether it lets through now). */
@@ -111,7 +127,7 @@ export class DungeonSpace {
   floorsMeet(i: number, j: number, ni: number, nj: number, lv: number, dir: number): boolean {
     const a = this.cellInfo(i, j, lv), b = this.cellInfo(ni, nj, lv);
     if (!a || !b) return false;
-    const x = (i + 0.5 + DIRS[dir][0] * 0.5) * CELL, z = (j + 0.5 + DIRS[dir][1] * 0.5) * CELL;
+    const C = this.scale.cell, x = (i + 0.5 + DIRS[dir][0] * 0.5) * C, z = (j + 0.5 + DIRS[dir][1] * 0.5) * C;
     return Math.abs(a.floor(x, z) - b.floor(x, z)) < 0.5;
   }
 
@@ -149,7 +165,7 @@ export class DungeonSpace {
    * blend over that many metres (carved rock), else the nearest wins. Outside the space all are −0.1.
    */
   parts(x: number, y: number, z: number, reach = Infinity, round = 0): { floor: number; ceil: number; walls: number } {
-    const l = this.levelAt(y);
+    const l = this.levelAt(y), CELL = this.scale.cell;
     const i = Math.floor(x / CELL), j = Math.floor(z / CELL);
     let c = this.cellInfo(i, j, l);
     // Just under a floor: the cell below may be air (a ledge, a tall room).
@@ -179,7 +195,7 @@ export class DungeonSpace {
 
   /** Floor height under a point (the top of whatever is below `y`), or null outside. */
   floorAt(x: number, z: number, y: number): number | null {
-    const i = Math.floor(x / CELL), j = Math.floor(z / CELL);
+    const i = Math.floor(x / this.scale.cell), j = Math.floor(z / this.scale.cell);
     for (let l = this.levelAt(y); l >= this.layout.levels[0]; l--) {
       const c = this.cellInfo(i, j, l);
       if (c) return c.floor(x, z);
@@ -194,7 +210,7 @@ export class DungeonSpace {
    */
   touch(x: number, y: number, z: number, dt: number): SpaceEvent[] {
     const out: SpaceEvent[] = [];
-    const l = this.levelAt(y), i = Math.floor(x / CELL), j = Math.floor(z / CELL);
+    const CELL = this.scale.cell, l = this.levelAt(y), i = Math.floor(x / CELL), j = Math.floor(z / CELL);
     const here = this.grid.owner(i, j, l);
     if (here === undefined) return out;
     const lock = here >= 0 && !this.keys.has(here) ? this.layout.links.find((pl) => pl.link.kind === 'locked' && pl.link.key === here) : undefined;
@@ -227,9 +243,9 @@ export function isFeature(o: { pl: PlacedLink; end: 0 | 1 }): boolean {
 }
 
 /** How far a stair cell's floor has fallen below its top at (x, z), metres. */
-export function stairDrop(st: PathCell, x: number, z: number): number {
+export function stairDrop(st: PathCell, x: number, z: number, scale: DungeonScale): number {
   const s = st.stair!;
-  const fx = x / CELL - st.x, fz = z / CELL - st.z;
+  const fx = x / scale.cell - st.x, fz = z / scale.cell - st.z;
   const t = [fx, fz, 1 - fx, 1 - fz][s.dir];
-  return ((s.step + Math.min(1, Math.max(0, t))) / s.run) * STOREY;
+  return ((s.step + Math.min(1, Math.max(0, t))) / s.run) * scale.storey;
 }

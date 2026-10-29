@@ -270,7 +270,21 @@ export interface DungeonWords {
  * grow, which way it goes (a cellar down under its house, a tower up), how its way out looks, whether its
  * rock is carved (a natural cave) or built, and how its walls look.
  */
+/** How big a dungeon's grid is in metres: a built cellar's 2 m cells and 2.8 m storeys, a natural cave's wider and higher. */
+export interface DungeonScale {
+  /** Metres per layout cell. */
+  readonly cell: number;
+  /** Metres per storey. */
+  readonly storey: number;
+  /** Cells a stair (a cave's ramp) takes to climb one storey. */
+  readonly stairRun: number;
+  /** Clear height of a passage, metres (rooms reach their storeys' full height). */
+  readonly passage: number;
+}
+
 export interface DungeonSpace {
+  /** Its grid in metres (none: a built cellar's). */
+  readonly scale?: DungeonScale;
   /** Half extent of the layout grid, cells (a tower stands on a small foot). */
   readonly radius: number;
   /** Most rooms in all. */
