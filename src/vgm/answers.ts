@@ -8,14 +8,14 @@
  */
 import type { Need } from './director';
 import { Rng, deriveSeed } from '@futuremagic/core';
+import { farmlandReach } from '@futuremagic/settlement';
 import { rollLoot, type Loot } from '../game/items';
 import type { SettingModule, SightDef } from '../setting/contract';
-import type { DecisionLog, SightDecision, TravellerDecision, WildDecision } from '../world/decisions';
+import { sitesIn, type DecisionLog, type SightDecision, type TravellerDecision, type WildDecision } from '../world/decisions';
 import { buildingOf } from '../sim/people';
 import { woodsOf } from '../world/flora';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
-import { regionDecisions } from './frontier';
 import { dangerAt, farFrom } from './dungeons';
 import { encounterFor } from './encounters';
 
@@ -46,6 +46,8 @@ const ASIDE: readonly [number, number] = [8, 22];
 const APART = 350;
 const OFF_TOWN = 80;
 const OFF_PLACE = 40;
+/** How far a dungeon's shell on the land reaches round its site (m): a cave's crag in a cliff some 25. */
+const DUNGEON_R = 30;
 /** Spots that fit to choose the most open of. */
 const CHOICES = 6;
 /** Steps along the straight way to a spot by the way (m), and the steepest it may climb between two (a walker goes up 1.25). */
@@ -143,7 +145,8 @@ function straightWay(t: Terrain, ax: number, az: number, bx: number, bz: number)
 }
 
 function wayside(c: NeedContext, r: Rng, apart: readonly { readonly x: number; readonly z: number }[]): { x: number; z: number; woods: number } | null {
-  const t = c.terrain, places = regionDecisions(c.log).flatMap((d) => (d.site ? [d.site] : []));
+  // Clear of every place on the land: a region's site, a dungeon's shell (a cave's crag in its cliff), a hold.
+  const t = c.terrain, places = sitesIn(c.log, DUNGEON_R);
   const way = c.toward ? Math.atan2(c.toward.z - c.hero.z, c.toward.x - c.hero.x) : r.range(0, Math.PI * 2);
   const far = c.toward ? Math.hypot(c.toward.x - c.hero.x, c.toward.z - c.hero.z) - 40 : AHEAD[1];
   const woods = woodsOf(t), fits: { x: number; z: number; woods: number }[] = [];
@@ -157,7 +160,8 @@ function wayside(c: NeedContext, r: Rng, apart: readonly { readonly x: number; r
     if (t.waterDepth(x, z, h) > 0 || h < 2 || t.steepness(x, z, 6, h) > 0.35) continue;
     if (t.roads.fromEdge(x, z) < 4) continue;
     if (!straightWay(t, c.hero.x, c.hero.z, x, z)) continue;
-    if (c.towns.some((w) => farFrom(w, { x, z }) < w.decision.radius + OFF_TOWN)) continue;
+    // Out past a town's fields too (an ambush in a paddock is fenced off from the way).
+    if (c.towns.some((w) => farFrom(w, { x, z }) < w.decision.radius + Math.max(OFF_TOWN, farmlandReach(w.decision.radius) + 20))) continue;
     if (places.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + OFF_PLACE)) continue;
     if (apart.some((p) => Math.hypot(p.x - x, p.z - z) < APART)) continue;
     fits.push({ x, z, woods: woods(x, z) });

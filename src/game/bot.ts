@@ -70,6 +70,9 @@ function castNow(hero: Character, setting: SettingModule, fight: Fight): string 
   return null;
 }
 
+/** How far (cells) the bot looks for a way: a big cave's far end lies a hundred or more along its winding ways. */
+const WAY_CELLS = 400;
+
 /** How near a spot counts as there, metres. */
 const NEAR = 1.2;
 
@@ -94,6 +97,12 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   let chase: Creature | null = null;
   const spells: string[] = [];
   const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z }, spells });
+  /** Nothing in the way of walking straight to `to` (no wall's corner between, which sliding would never get round). */
+  const clear = (to: { x: number; z: number }): boolean => {
+    const n = Math.ceil(Math.hypot(to.x - x, to.z - z) / 0.25);
+    for (let k = 1; k < n; k++) if (!den.nav.free(x + ((to.x - x) * k) / n, y, z + ((to.z - z) * k) / n, 0.35)) return false;
+    return true;
+  };
   /** One step along the nav towards a point (`key`: what is being walked to, so a new goal is routed at once). */
   const towards = (to: { x: number; y: number; z: number }, key: object): void => {
     repath -= dt;
@@ -101,8 +110,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       goal = key;
       const a = den.nav.at(x, y + 0.3, z), b = den.nav.at(to.x, to.y + 0.3, to.z);
       // Close by on the same floor: straight at it (the cells' centres can lead away from a foe in reach of a blow).
-      const close = Math.hypot(to.x - x, to.z - z) < 3 && Math.abs(to.y - y) < 0.8;
-      path = close ? [{ x: to.x, y: to.y, z: to.z }] : a && b ? [...den.nav.way(a, b, 80), { x: to.x, y: to.y, z: to.z }] : [];
+      const close = Math.hypot(to.x - x, to.z - z) < 3 && Math.abs(to.y - y) < 0.8 && clear(to);
+      path = close ? [{ x: to.x, y: to.y, z: to.z }] : a && b ? [...den.nav.way(a, b, WAY_CELLS), { x: to.x, y: to.y, z: to.z }] : [];
       repath = close ? 0.2 : 0.5;
     }
     const p = path[0];
