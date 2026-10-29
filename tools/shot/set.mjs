@@ -165,22 +165,19 @@ const SESSIONS = [
         if (!v) throw new Error('no cave to go into');
         const rooms = v.cellar.graph.rooms, top = rooms.reduce((a, r) => (r.height > a.height ? r : a), rooms[0]);
         await v.enter(true, top.id);
-        // Its size seen: the free camera low at the cavern's far side from the hero, looking past the hero and up
-        // into its dome, where daylight falls in through the crack (the hero small at the frame's foot). The way with the most room (of eight) is found by stepping through the rock as the hero's
-        // camera sees it.
-        const pl = g.player, h = pl.walker.pos, w = pl.heroCam.world, sight = w.sightSurface ?? w.rockSurface;
-        const y = h.y + 1.2;
-        const room = (dx, dz) => { let d = 0; while (d < 40) { const r = sight(h.x + dx * (d + 0.5), y, h.z + dz * (d + 0.5)); if (r !== null && r < 0.8) break; d += 0.5; } return d; };
-        let best = null;
-        for (let k = 0; k < 8; k++) {
-          const a = (k * Math.PI) / 4, dx = Math.sin(a), dz = Math.cos(a), back = room(-dx, -dz), ahead = room(dx, dz);
-          if (!best || back + ahead > best.n) best = { dx, dz, back, n: back + ahead };
-        }
-        const off = Math.min(best.back * 0.8, 22), cx = h.x - best.dx * off, cz = h.z - best.dz * off;
-        pl.walker.yaw = Math.atan2(-best.dx, -best.dz);
+        // Its size seen: the free camera 12 m up over one end of the cavern (a quarter of its length in), looking down
+        // along it past the hero: the floor runs away to the far wall, the side walls rise at both edges, the hero
+        // small in the middle (low views, even 30° up from a corner, see only the dome's rock: its walls lean in).
+        const r = v.cellar.layout.rooms[top.id], { cell, storey } = v.cellar.layout.scale, O = v.view.origin, pl = g.player;
+        const x0 = O.x + r.x * cell, z0 = O.z + r.z * cell, W = r.w * cell, D = r.d * cell, floor = O.y + r.level * storey;
+        const along = W >= D, ux = along ? 1 : 0, uz = along ? 0 : 1, L = along ? W : D;
+        const mx = x0 + W / 2, mz = z0 + D / 2;
+        const cx = mx - ux * L * 0.25, cz = mz - uz * L * 0.25, cy = floor + 12;
+        const tx = mx + ux * 4, tz = mz + uz * 4, dx = tx - cx, dz = tz - cz;
+        pl.walker.yaw = Math.atan2(-ux, -uz);
         pl.flying = true;
-        pl.goTo([cx, y, cz], [(Math.atan2(best.dx, -best.dz) * 180) / Math.PI, 34]);
-        return `cavern: camera ${off.toFixed(1)} m behind the hero, ${best.n.toFixed(1)} m of room along its way`;
+        pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(floor - cy, Math.hypot(dx, dz)) * 180) / Math.PI]);
+        return `cavern: ${W} × ${D} m, ${top.height * storey} m high; camera 12 m up, ${(L * 0.25).toFixed(1)} m back from its middle`;
       }).then((said) => console.log(said));
       await p.waitForTimeout(1500);
     } },
