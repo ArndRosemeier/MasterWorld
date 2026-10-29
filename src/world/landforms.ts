@@ -17,6 +17,8 @@ import type { Skeleton } from './skeleton';
 
 /** Side of a landform cell, metres. A landform's reach never passes its neighbours (3 x 3 cells hold it). */
 export const FORM_CELL = 256;
+/** The beach, where no landform stands: below this skeleton elevation (m), or nearer the shore than this (m). */
+export const BEACH = { elevation: 4, shore: 250 } as const;
 /** Steepest skeleton slope a landform is placed on (cliffs and terraces have their own shape). */
 const MAX_SLOPE = 0.35;
 /** Spots tried in its quarter for a landform before it is left out. */
@@ -240,7 +242,7 @@ export class Landforms {
         // Not on the beach, not on a cliff, not in a town.
         e = sk.elevation(x, z); shore = sk.lastShore;
         const wallU = sk.lastMesa.u, wallTall = sk.lastMesa.tall;
-        if (e < 4 || shore < 250) continue;
+        if (e < BEACH.elevation || shore < BEACH.shore) continue;
         gx = (sk.elevation(x + 20, z) - e) / 20; gz = (sk.elevation(x, z + 20) - e) / 20; slope = Math.hypot(gx, gz);
         if (slope > MAX_SLOPE) continue;
         // Not across a mesa's wall (from its talus to back from its crest). The first spot keeps clear of the

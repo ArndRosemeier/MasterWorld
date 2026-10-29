@@ -31,6 +31,27 @@ test('brooks: many, running downhill, narrow and shallow enough to ford', () => 
   }
 });
 
+test('brooks: they bend in curves, not corners (their cells step in eight directions only)', () => {
+  // How far a brook turns from one point to the next (20 m on): no point is a corner, a bend takes several.
+  const turns: number[] = [];
+  for (const r of own) for (let k = 1; k < r.level.length - 1; k++) {
+    const ax = r.xz[k * 2] - r.xz[k * 2 - 2], az = r.xz[k * 2 + 1] - r.xz[k * 2 - 1];
+    const bx = r.xz[k * 2 + 2] - r.xz[k * 2], bz = r.xz[k * 2 + 3] - r.xz[k * 2 + 1];
+    turns.push(Math.abs(Math.atan2(ax * bz - az * bx, ax * bx + az * bz)) * (180 / Math.PI));
+  }
+  turns.sort((a, b) => a - b);
+  const p99 = turns[Math.floor(turns.length * 0.99)], most = turns[turns.length - 1];
+  assert.ok(p99 < 22 && most < 45, `turns: 99% under ${p99.toFixed(1)}°, most ${most.toFixed(1)}°`);
+  // Not along the grid: their courses run every way, not mostly north-south, east-west and the diagonals.
+  const bins = new Array(8).fill(0);
+  for (const r of own) for (let k = 0; k + 1 < r.level.length; k++) {
+    const a = Math.atan2(r.xz[k * 2 + 3] - r.xz[k * 2 + 1], r.xz[k * 2 + 2] - r.xz[k * 2]);
+    bins[Math.floor(((((a * 180) / Math.PI + 360 + 2.8125) % 45) / 45) * 8) % 8]++;
+  }
+  const total = bins.reduce((s, b) => s + b, 0);
+  assert.ok(bins[0] / total < 0.2, `${((bins[0] / total) * 100).toFixed(0)}% of the course runs along the grid's eight directions`);
+});
+
 test('brooks: each ends in water (a river, a lake, the sea or a bigger brook)', () => {
   let wet = 0;
   for (const r of own) {
@@ -69,7 +90,7 @@ test('brooks: they lie in their beds, banks stay dry, and the near water mask dr
     const bank = terrain.hydro.query(x + nx * d, z + nz * d);
     // (Unless that is in a river's channel: the brook runs into it there.)
     const river = terrain.hydro.riverAt(x + nx * d, z + nz * d);
-    if (bank.brook && Math.abs(bank.level - w.level) < 0.01 && !(river.river && river.dist < river.half)) assert.ok(terrain.height(x + nx * d, z + nz * d) > w.level, 'bank above the water');
+    if (bank.brook && Math.abs(bank.level - w.level) < 0.01 && !(river.river && river.dist < river.half)) assert.ok(terrain.height(x + nx * d, z + nz * d) > w.level, `bank above the water at ${x.toFixed(0)},${z.toFixed(0)}: ${terrain.height(x + nx * d, z + nz * d).toFixed(2)} vs ${w.level.toFixed(2)} half ${w.half.toFixed(1)} bankdist ${bank.dist.toFixed(1)}`);
     checked++;
     if (checked > 8) continue;
     // The near mask is 2 m a sample.
