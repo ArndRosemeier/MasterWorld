@@ -166,7 +166,7 @@ const SESSIONS = [
         const rooms = v.cellar.graph.rooms, top = rooms.reduce((a, r) => (r.height > a.height ? r : a), rooms[0]);
         await v.enter(true, top.id);
         // Its size seen: the free camera low at the cavern's far side from the hero, looking past the hero and up
-        // into its roof. The way with the most room (of eight) is found by stepping through the rock as the hero's
+        // into its dome, where daylight falls in through the crack (the hero small at the frame's foot). The way with the most room (of eight) is found by stepping through the rock as the hero's
         // camera sees it.
         const pl = g.player, h = pl.walker.pos, w = pl.heroCam.world, sight = w.sightSurface ?? w.rockSurface;
         const y = h.y + 1.2;
@@ -179,9 +179,9 @@ const SESSIONS = [
         const off = Math.min(best.back * 0.8, 22), cx = h.x - best.dx * off, cz = h.z - best.dz * off;
         pl.walker.yaw = Math.atan2(-best.dx, -best.dz);
         pl.flying = true;
-        pl.goTo([cx, y, cz], [(Math.atan2(best.dx, -best.dz) * 180) / Math.PI, 20]);
-        console.log(`cavern: camera ${off.toFixed(1)} m behind the hero, ${best.n.toFixed(1)} m of room along its way`);
-      });
+        pl.goTo([cx, y, cz], [(Math.atan2(best.dx, -best.dz) * 180) / Math.PI, 34]);
+        return `cavern: camera ${off.toFixed(1)} m behind the hero, ${best.n.toFixed(1)} m of room along its way`;
+      }).then((said) => console.log(said));
       await p.waitForTimeout(1500);
     } },
   ] },
