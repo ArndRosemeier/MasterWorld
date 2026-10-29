@@ -391,6 +391,10 @@ export async function start(b: Boot): Promise<void> {
     const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
+    // The land round the camera is asked for now (after the roads, which the workers hear of first), so its
+    // chunks build while the seas, the hero and the town load; it is shown once its shader is warm.
+    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
+    ground.prefetch(view.camera);
     // Every town: the start's, and the hamlets and villages founded out on the land (plan B3), all alike (B3a).
     // A town's words are tied into the game (how its people take the hero, what they offer) once the game's
     // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.
@@ -572,7 +576,6 @@ export async function start(b: Boot): Promise<void> {
     const folkWarm = folk ? await folk.warmObjects() : [];
     await painted;
     // The land, its rock and the town's houses are built in workers meanwhile; their shaders compile with the rest.
-    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
     roadWork.rebuilds({ ground, flora, grass, trunks, rocks, rockView });
     await roadWork.mask.start(view.camera.position);
     const rock = Promise.all([new VolumeView(view.stage, terrainJobs).raise(), rockView.raise()]);

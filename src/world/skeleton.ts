@@ -80,6 +80,13 @@ export class Skeleton {
   /** The point `weights` were last worked out for. */
   private wx = NaN;
   private wz = NaN;
+  /** The cell whose seed points (`seedX9`, `seedZ9`, in cells) and kinds (`kinds9`) are kept, and its one kind if all nine are (else -1). */
+  private bi = NaN;
+  private bj = NaN;
+  private oneKind = -1;
+  private readonly seedX9 = new Float64Array(9);
+  private readonly seedZ9 = new Float64Array(9);
+  private readonly kinds9 = new Int32Array(9);
 
   constructor(readonly seed: number, readonly shape: WorldShape) {
     this.continentNoise = new Noise(deriveSeed(seed, 'skeleton', 'continent'));
@@ -125,14 +132,25 @@ export class Skeleton {
     const px = (x + n.fbm2(x / 7000 + 1.7, z / 7000 - 4.2, 2) * 2600) / KIND_CELL;
     const pz = (z + n.fbm2(x / 7000 - 6.3, z / 7000 + 2.8, 2) * 2600) / KIND_CELL;
     const xi = Math.floor(px), zi = Math.floor(pz);
-    const ds = near9, ks = kinds9;
-    let f1 = Infinity, m = 0;
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-      const i = xi + di, j = zi + dj, h = hash2i(this.kindSeed, i, j);
-      const dx = i + 0.15 + 0.7 * hashToFloat(h) - px, dz = j + 0.15 + 0.7 * hashToFloat(Math.imul(h, 2654435761)) - pz;
+    const ds = near9, ks = this.kinds9, sx = this.seedX9, sz = this.seedZ9;
+    // The 3 × 3 seed points and their kinds, kept from the last call in the same cell (nearly every call).
+    if (xi !== this.bi || zi !== this.bj) {
+      this.bi = xi; this.bj = zi;
+      let m = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const i = xi + di, j = zi + dj, h = hash2i(this.kindSeed, i, j);
+        sx[m] = i + 0.15 + 0.7 * hashToFloat(h); sz[m] = j + 0.15 + 0.7 * hashToFloat(Math.imul(h, 2654435761));
+        ks[m++] = this.kindOfCell(i, j);
+      }
+      this.oneKind = ks.every((k) => k === ks[0]) ? ks[0] : -1;
+    }
+    // All nine of one kind: it is all there is here.
+    if (this.oneKind >= 0) { w[this.oneKind] = 1; return w; }
+    let f1 = Infinity;
+    for (let m = 0; m < 9; m++) {
+      const dx = sx[m] - px, dz = sz[m] - pz;
       const d = Math.sqrt(dx * dx + dz * dz) * KIND_CELL;
       ds[m] = d;
-      ks[m++] = this.kindOfCell(i, j);
       f1 = Math.min(f1, d);
     }
     let sum = 0;
@@ -459,7 +477,6 @@ export function cliffProfile(u: number, top: number, steep: number, apron = 0.4,
 const amplitude = (relief: number, drama: number): number => lerp(45, 560, relief) * (0.55 + 0.45 * drama);
 
 const near9 = new Float64Array(9);
-const kinds9 = new Int32Array(9);
 
 export function emptySample(): SkeletonSample {
   return { elevation: 0, continent: 0, range: 0, temperature: 0, moisture: 0, biome: -1 };

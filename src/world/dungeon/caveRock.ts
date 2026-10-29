@@ -198,8 +198,8 @@ export function caveShell(f: CaveField, layout: ScaledLayout, seed: number): Bui
       if (m === WildMat.Rock) return scaleTint(ROCK, s);
       // Thin silt shows the grey of the rock under it; thick patches are brown.
       const thick = smoothstep(-0.45, 0.15, noise.fbm3(x / 3.5, 0.5, z / 3.5, 2));
-      const mix = (i: number) => SILT[i] + (BARE[i] - SILT[i]) * (1 - thick);
-      return scaleTint([mix(0), mix(1), mix(2)], s);
+      const thin = 1 - thick;
+      return scaleTint([SILT[0] + (BARE[0] - SILT[0]) * thin, SILT[1] + (BARE[1] - SILT[1]) * thin, SILT[2] + (BARE[2] - SILT[2]) * thin], s);
     },
   });
 }

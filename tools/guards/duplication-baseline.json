@@ -228,10 +228,6 @@
     "reason": "Rock beds as a sine warped by fbm noise: one line of shaping in each rock field, with its own scales and amplitudes."
   },
   {
-    "key": "same name: masterworld/world/dungeon/caveMouth.ts#tint + masterworld/world/dungeon/caveRock.ts#tint",
-    "reason": "Both implement RockLook.tint (world/dungeon/rockMesh.ts): each rock colours its own faces; the shared meshing already lives in meshField."
-  },
-  {
     "key": "same name: masterworld/world/dungeon/caveRock.ts#sdf + masterworld/world/dungeon/space.ts#sdf",
     "reason": "CaveSpace.sdf overrides DungeonSpace.sdf: the layout's distance with the carved rock over it (it calls super.sdf)."
   },
@@ -250,10 +246,6 @@
   {
     "key": "same name: masterworld/world/dungeon/caveMouth.ts#tint + masterworld/world/holdRock.ts#tint",
     "reason": "Both implement RockLook.tint (world/dungeon/rockMesh.ts): each rock colours its own faces; the shared meshing lives in meshField and the shared faces in cragMat."
-  },
-  {
-    "key": "same name: masterworld/world/dungeon/caveRock.ts#tint + masterworld/world/holdRock.ts#tint",
-    "reason": "Both implement RockLook.tint (world/dungeon/rockMesh.ts): each rock colours its own faces; the shared meshing already lives in meshField."
   },
   {
     "key": "same name: masterworld/app/abilityBook.ts#opened + masterworld/app/journalUi.ts#opened",
