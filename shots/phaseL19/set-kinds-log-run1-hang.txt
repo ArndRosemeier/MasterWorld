@@ -1,0 +1,23 @@
+kind-downs: ready in 24.6 s
+13-kind-downs.jpg: drawn 0.0 s · settled 4.0 s · p50 9.2 ms · p95 30.3 ms · 0 shader violations
+14-kind-downs-aloft.jpg: drawn 0.0 s · settled 3.7 s · p50 7.6 ms · p95 10.0 ms · 0 shader violations
+kind-moor: ready in 18.3 s
+15-kind-moor.jpg: drawn 0.0 s · settled 4.0 s · p50 8.1 ms · p95 16.5 ms · 0 shader violations
+16-kind-moor-aloft.jpg: drawn 0.0 s · settled 1.5 s · p50 8.1 ms · p95 10.6 ms · 0 shader violations
+kind-karst: ready in 18.5 s
+17-kind-karst.jpg: drawn 0.1 s · settled 4.0 s · p50 7.8 ms · p95 28.1 ms · 0 shader violations
+18-kind-karst-aloft.jpg: drawn 0.0 s · settled 1.5 s · p50 8.5 ms · p95 11.1 ms · 0 shader violations
+kind-badlands: ready in 120.1 s
+19-kind-badlands.jpg: drawn 0.0 s · settled 1.5 s · p50 32.1 ms · p95 32.7 ms · 0 shader violations · 1 errors
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+page.waitForFunction: Timeout 120000ms exceeded.
+    at Object.act (C:\Projekte\MasterWorld-shotwt-phaseL\tools\shot\set.mjs:105:15)
+    at C:\Projekte\MasterWorld-shotwt-phaseL\tools\shot\set.mjs:265:30 {
+  log: [],
+  name: 'TimeoutError'
+}
+
+Node.js v24.19.0
