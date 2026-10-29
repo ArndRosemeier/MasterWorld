@@ -61,9 +61,10 @@ async function goDown(kind) {
     }
     await page.keyboard.up('KeyW');
     if (!inside) return false;
-    // Into the room farthest from the way in.
+    // Into the room farthest from the way in, its doors on the way seen open (as the hero who walked there left them).
     await page.evaluate(() => {
       const g = window.game, v = g.cellar, c = v.cellar, O = v.origin, h = c.hatch, cell = c.layout.scale.cell, storey = c.layout.scale.storey;
+      v.restore({ open: c.layout.links.map((pl) => pl.link.id), keys: [], read: [] });
       const far = (r) => Math.hypot((r.x + r.w / 2) * cell - h.x, (r.z + r.d / 2) * cell - h.z);
       const r = [...c.layout.rooms].filter((q) => Math.abs(q.level * storey - h.y) < 0.5).sort((a, b) => far(b) - far(a))[0] ?? c.layout.rooms[0];
       g.player.teleport(O.x + (r.x + r.w / 2) * cell, O.y + r.level * storey, O.z + (r.z + r.d / 2) * cell, 0);
@@ -109,6 +110,17 @@ for (const kind of (process.env.OWNER_KIND ?? 'cellar,barrow').split(',')) {
     gone = phases.size > 0 && (s.phase === null || s.phase === 'gone');
     if (i % 2 === 0 || s.line) await shoot(`${kind}-${String(i).padStart(3, '0')}-${s.phase ?? 'none'}`);
   }
+  // A long line in the bubble over the hero: it wraps (taller, never wider than its 300 px) and nothing runs out of it.
+  const long = await page.evaluate(async () => {
+    const g = window.game, w = g.player.walker.pos;
+    g.speech.say('A long line to see the bubble wrap: it goes onto more lines and grows taller, and no word of it runs out of the bubble at either side.', () => ({ x: w.x, y: w.y - 0.6, z: w.z }));
+    await new Promise((r) => setTimeout(r, 400));
+    const b = document.querySelector('.speech'), r = b.getBoundingClientRect();
+    return { shown: b.style.display !== 'none', w: r.width, h: r.height, over: b.scrollWidth > b.clientWidth + 1 };
+  });
+  await shoot(`${kind}-zz-bubble`);
+  console.log(`${kind}: long bubble ${JSON.stringify(long)}`);
+  if (!long.shown || long.over || long.w > 302 || long.h < 40) fail(`${kind}: the long bubble does not wrap (${JSON.stringify(long)})`);
   const after = await page.evaluate(() => ({ coins: window.game.character.coins, kept: window.game.log.filter((d) => d.kind === 'kept').length, said: window.__said ?? [] }));
   console.log(`${kind}: phases ${[...phases].join(' > ')} · nearest ${nearest.toFixed(2)} m · said "${line}" · coins ${before.coins} > ${after.coins} · kept ${before.kept} > ${after.kept} · queued ${JSON.stringify(after.said)} · bubble ${JSON.stringify(bubble)}`);
   for (const p of kind === 'cellar' ? ['down', 'walk', 'up'] : ['walk']) if (!phases.has(p)) fail(`${kind}: never ${p}`);
