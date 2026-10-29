@@ -13,7 +13,7 @@ import type { Character } from './character';
 import { defOf, rollLoot, type Item, type Loot } from './items';
 import { blowOf, mendCaster, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
 import { WEAR, type WearState } from './upkeep';
-import { fightXp } from './growth';
+import { dauntsFrom, fightXp } from './growth';
 
 export interface HeroPose {
   readonly x: number;
@@ -86,7 +86,8 @@ export class Fight implements RecipeWorld {
     const veil = 1 - this.recipes.veilOf(SELF);
     const noise = Math.max(this.quiet < 3 ? 1 : 0, moving * (1 - stealth / 160)) * veil;
     const g = this.hero.guard(this.hero.stamina <= 0 || this.recipes.isHeld(SELF));
-    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) } };
+    // Foes the hero has outgrown so far they give no experience dare not start a fight (D58).
+    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) }, daunts: dauntsFrom(this.setting.growth, this.hero.level) };
   }
 
   /**

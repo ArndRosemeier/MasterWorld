@@ -88,6 +88,9 @@ export interface Hop {
   t: number;
 }
 
+/** Too frightened of the hero to start a fight (Quarry.daunts). */
+const cowed = (c: Creature, q: Quarry): boolean => c.def.danger < (q.daunts ?? 0);
+
 /** The hero as the den sees them. */
 export interface Quarry {
   readonly x: number;
@@ -99,6 +102,12 @@ export interface Quarry {
   readonly light: number;
   readonly alive: boolean;
   readonly guard: Guard;
+  /**
+   * Foes of less danger than this are too frightened of the hero to start a fight (D58: those the hero has
+   * outgrown so far they give no experience): they watch from where they are and fight back only when struck,
+   * or when their own are fought. None: every foe may start one.
+   */
+  readonly daunts?: number;
 }
 
 export type DenEvent =
@@ -260,7 +269,7 @@ export class Den {
     if (this.peace) { if (c.state === 'alert') c.state = 'idle'; return; }
     // Left a hero it could not reach: it keeps to itself a while.
     if (c.spurn > 0 && c.state === 'idle') return;
-    if ((c.state === 'idle' || c.state === 'alert') && c.aware >= 1 && !this.keepsOff(c, q)) this.notice(c, q, out);
+    if ((c.state === 'idle' || c.state === 'alert') && c.aware >= 1 && !this.keepsOff(c, q) && !cowed(c, q)) this.notice(c, q, out);
     else if (c.state === 'idle' && c.aware > 0.35) { c.state = 'alert'; c.path = []; }
   }
 
@@ -347,8 +356,8 @@ export class Den {
   /** Something is there: it turns towards it and creeps closer. */
   private alert(c: Creature, q: Quarry, dt: number): void {
     if (c.aware < 0.2) { c.state = 'idle'; c.until = 0; return; }
-    // A shy beast never creeps closer: head up, it keeps the hero in sight.
-    if (c.def.wary) { if (!this.move(c, dt, 0.32)) { c.act = 'watch'; c.dir = Math.atan2(q.z - c.z, q.x - c.x); } return; }
+    // A shy beast never creeps closer: head up, it keeps the hero in sight; nor does one too frightened of them.
+    if (c.def.wary || cowed(c, q)) { if (!this.move(c, dt, 0.32)) { c.act = 'watch'; c.dir = Math.atan2(q.z - c.z, q.x - c.x); } return; }
     if (c.seen && c.repath === 0) { this.headTo(c, c.seen); c.repath = 1.5; }
     if (!this.move(c, dt, 0.35)) { c.act = 'watch'; c.dir = Math.atan2(q.z - c.z, q.x - c.x); }
   }

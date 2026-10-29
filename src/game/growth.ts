@@ -24,6 +24,12 @@ export function levelOfDanger(g: GrowthDef, danger: number): number {
   return Math.max(1, Math.round((danger - g.even.base) / g.even.step + 1));
 }
 
+/** Below this share of an even fight a foe gives no experience. */
+const OUTGROWN = 0.25;
+
+/** The danger below which a foe gives a hero of `level` no experience, and so dares not start a fight with them. */
+export const dauntsFrom = (g: GrowthDef, level: number): number => evenDanger(g, level) * OUTGROWN;
+
 /**
  * Experience for a foe of `danger` beaten at `level`: its danger times `fight`, weighed by how it stands
  * against an even fight. Stronger foes give up to twice as much; weaker ones fall off fast, and one under a
@@ -31,7 +37,7 @@ export function levelOfDanger(g: GrowthDef, danger: number): number {
  */
 export function fightXp(g: GrowthDef, danger: number, level: number): number {
   const r = danger / evenDanger(g, level);
-  const w = r >= 1 ? Math.min(2, r) : Math.max(0, (r - 0.25) / 0.75) ** 2;
+  const w = r >= 1 ? Math.min(2, r) : Math.max(0, (r - OUTGROWN) / (1 - OUTGROWN)) ** 2;
   return Math.round(danger * g.fight * w * 10) / 10;
 }
 

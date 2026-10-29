@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic';
 import { GROWTH_SOURCES } from '../src/setting/contract';
 import { Character } from '../src/game/character';
-import { carryRenown, evenDanger, fightXp, levelOf, levelOfDanger, topLevel } from '../src/game/growth';
+import { carryRenown, dauntsFrom, evenDanger, fightXp, levelOf, levelOfDanger, topLevel } from '../src/game/growth';
 import { fightBot } from '../src/game/bot';
 import { plainItem } from '../src/game/items';
 import { outlineCellar } from '../src/world/dungeon/cellar';
 import { testDecision, testHouse } from '../src/world/dungeon/variety';
+import { cellarFight } from './fightKit';
 
 const g = classic.growth;
 const danger = (id: string) => classic.creatures.find((c) => c.id === id)!.danger;
@@ -86,4 +87,24 @@ test('growth: a fight won gives experience; an old save\'s reputation becomes ex
   const now = new Character(classic);
   carryRenown(now, now.save(), { renown: 35 });
   assert.equal(now.xp, 0, 'a save with experience keeps it as it is');
+});
+
+test('growth: foes the hero has outgrown dare not start a fight, but fight back when struck', () => {
+  const run = (level: number, strikeFirst: boolean) => {
+    const { d, hero, foe, pose } = cellarFight(7, 2.5);
+    hero.gain(g.xp[level - 1]);
+    let hurt = 0;
+    for (let t = 0; t < 20; t += 0.1) {
+      if (strikeFirst && t === 0) d.den.wound(foe, { outcome: 'hit', damage: 1 }, pose);
+      for (const e of d.step(0.1, pose)) if (e.kind === 'hurt') hurt++;
+    }
+    return { hurt, state: foe.state };
+  };
+  assert.ok(danger('goblin') < dauntsFrom(g, 10) && danger('goblin') >= dauntsFrom(g, 1));
+  const fresh = run(1, false);
+  assert.ok(fresh.hurt > 0, 'a fresh hero is set upon');
+  const grown = run(10, false);
+  assert.equal(grown.hurt, 0, 'goblins watch a level-10 hero and keep their distance');
+  assert.notEqual(grown.state, 'fight');
+  assert.ok(run(10, true).hurt > 0, 'struck, they defend themselves');
 });
