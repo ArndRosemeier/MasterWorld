@@ -25,7 +25,15 @@ export function inBuild(roll: () => CharacterConfig, build: HeroBuildDef | undef
     const range = build[k];
     if (range && !within(body[k], range)) body[k] = draw(range, random);
   }
-  return { ...look, body };
+  // Only a plain human's height slider is free: the other peoples' comes from their lore height.
+  if (build.height && look.race === 'human' && !look.race2 && !within(body.height, build.height)) body.height = draw(build.height, random);
+  if (build.cupSize && body.gender < 0.5 && !within(body.cupSize, build.cupSize)) body.cupSize = draw(build.cupSize, random);
+  const details = { ...look.details };
+  for (const id in build.details) {
+    const range = build.details[id];
+    if (!within(details[id] ?? 0, range)) details[id] = draw(range, random);
+  }
+  return { ...look, body, details };
 }
 
 const within = (v: number, [lo, hi]: readonly [number, number]) => v >= lo && v <= hi;

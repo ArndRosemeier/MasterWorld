@@ -1199,6 +1199,12 @@ export interface HeroBuildDef {
   readonly muscle?: readonly [number, number];
   /** 0 plain .. 1 ideal proportions. */
   readonly proportions?: readonly [number, number];
+  /** Height slider, 0..1, for humans only (the other peoples take their height from Actors' lore). */
+  readonly height?: readonly [number, number];
+  /** Bust, 0..1, for women. */
+  readonly cupSize?: readonly [number, number];
+  /** Actors' detail sliders by id (MakeHuman modifiers, e.g. "stomach/stomach-pregnant-decr-incr"; none = 0). */
+  readonly details?: Readonly<Record<string, readonly [number, number]>>;
 }
 
 /**

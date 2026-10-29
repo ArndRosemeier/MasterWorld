@@ -12,5 +12,12 @@ export const hero: HeroLooksDef = {
   races: ['human', 'dwarf', 'halfling', 'elf'],
   outfits: ['med-traveller', 'med-peasant', 'peasant', 'med-archer'],
   // A hero sets out young to prime, fit and lean (Arnd: no overweight grandma as the first hero).
-  build: { ageYears: [19, 38], weight: [0.15, 0.5], muscle: [0.5, 0.9], proportions: [0.5, 1] },
+  // Dwarves and halflings stay stocky and short, as Actors makes them; nobody gets a belly or wide hips.
+  build: {
+    ageYears: [19, 38], weight: [0.1, 0.35], muscle: [0.5, 0.9], proportions: [0.5, 1], height: [0.45, 1], cupSize: [0.2, 0.6],
+    details: Object.fromEntries([
+      'stomach/stomach-pregnant-decr-incr', 'hip/hip-scale-depth-decr-incr', 'hip/hip-scale-horiz-decr-incr', 'torso/measure-hips-circ-decr-incr',
+      'torso/measure-waist-circ-decr-incr', 'torso/torso-scale-depth-decr-incr', 'buttocks/buttocks-volume-decr-incr',
+    ].map((id) => [id, [-0.4, 0.1] as const])),
+  },
 };

@@ -6,13 +6,14 @@ import { classic } from '../src/setting/classic/index';
 import { inBuild } from '../src/render/hero/build';
 
 /** Just enough of Actors' catalog for randomConfig: the classic peoples, no clothes or hair. */
+const DETAILS = Object.keys(classic.hero.build!.details!);
 const catalog = {
-  races: classic.hero.races.map((id) => ({ id })), outfits: [], hair: [], eyes: [], brows: [], details: [],
+  races: classic.hero.races.map((id) => ({ id })), outfits: [], hair: [], eyes: [], brows: [], details: DETAILS.map((id) => ({ id, min: -1, max: 1 })),
   garmentColors: [], hairColors: [], animations: [],
 } as unknown as CharacterCatalog;
-const base = { race: 'human', race2: null, raceMix: 0, body: { gender: 1, ageYears: 30, muscle: 0.5, weight: 0.5, height: 0.5, proportions: 0.5 }, outfit: [], garmentColors: {} } as unknown as CharacterConfig;
+const base = { race: 'human', race2: null, raceMix: 0, body: { gender: 1, ageYears: 30, muscle: 0.5, weight: 0.5, height: 0.5, proportions: 0.5, cupSize: 0.5 }, details: {}, outfit: [], garmentColors: {} } as unknown as CharacterConfig;
 
-test('hero build: every random classic hero is 19-38, lean and fit, of every people and both sexes', () => {
+test('hero build: every random classic hero is 19-38, lean and fit, no belly or wide hips, of every people and both sexes', () => {
   const build = classic.hero.build!;
   const races = new Set<string>(), sexes = new Set<boolean>();
   for (let seed = 1; seed <= 300; seed++) {
@@ -20,7 +21,10 @@ test('hero build: every random classic hero is 19-38, lean and fit, of every peo
     const c = inBuild(() => randomConfig(catalog, base, { random, race: 'any', outfit: false }), build, random);
     const b = c.body;
     assert.ok(b.ageYears >= 19 && b.ageYears <= 38, `age ${b.ageYears}`);
-    assert.ok(b.weight >= 0.15 && b.weight <= 0.5, `weight ${b.weight}`);
+    assert.ok(b.weight >= 0.1 && b.weight <= 0.35, `weight ${b.weight}`);
+    if (c.race === 'human') assert.ok(b.height >= 0.45, `height ${b.height}`);
+    if (b.gender < 0.5) assert.ok(b.cupSize <= 0.6, `cup ${b.cupSize}`);
+    for (const id of DETAILS) assert.ok((c.details[id] ?? 0) <= 0.1, `${id} ${c.details[id]}`);
     assert.ok(b.muscle >= 0.5 && b.muscle <= 0.9, `muscle ${b.muscle}`);
     assert.ok(b.proportions >= 0.5 && b.proportions <= 1, `proportions ${b.proportions}`);
     assert.notEqual(c.hairColor, '#9a968f', 'no grey hair of an old roll');
