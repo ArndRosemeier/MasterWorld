@@ -50,3 +50,15 @@ test('known land: saved and loaded as it was', () => {
   assert.ok(back.told('hold'));
   assert.equal(back.waysOf(new Set(['hold'])).length, 1);
 });
+
+test('known land: the minimap paints only the tiles the hero knows (G4)', () => {
+  const k = new KnownLand(), tile = 128;
+  k.see(0, 0, 150);
+  assert.ok(k.tileKnown(0, 0, tile) && k.tileKnown(-1, -1, tile), 'round where the hero stood');
+  assert.ok(!k.tileKnown(5, 0, tile) && !k.tileKnown(0, -6, tile), 'not beyond what they saw');
+  // Told of: a patch round a mark comes in, faint, and only it.
+  assert.ok(!k.tileKnown(20, 20, tile));
+  k.tell('lead-1', [0, 0], [20 * tile + 64, 20 * tile + 64]);
+  assert.ok(k.tileKnown(20, 20, tile));
+  assert.ok(!k.tileKnown(40, 40, tile));
+});

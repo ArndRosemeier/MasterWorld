@@ -93,6 +93,13 @@ export class KnownLand {
   /** The ways sketched for the leads in `open`. */
   waysOf(open: ReadonlySet<string>): SketchedWay[] { return this.ways.filter((w) => open.has(w.id)); }
 
+  /** Whether any cell of the square tile (ti, tj), `tile` metres a side, is known (the map and minimap paint only those). */
+  tileKnown(ti: number, tj: number, tile: number): boolean {
+    const n = tile / CELL;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (this.level(ti * n + i, tj * n + j)) return true;
+    return false;
+  }
+
   /** Every known cell, with how it is known. */
   eachCell(fn: (i: number, j: number, level: number) => void): void {
     for (const [k, v] of this.cells) fn(iOf(k), jOf(k), v);
