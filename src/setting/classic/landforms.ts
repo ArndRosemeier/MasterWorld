@@ -42,22 +42,26 @@ export const landscapeKinds: readonly LandscapeKindDef[] = [
   { id: 'open', share: 0.3 },
   // Rolling downs: broad rounded hills of short grass, dry valleys between, old banks and lanes, few trees.
   {
-    id: 'downs', share: 0.1, swell: { height: 38, size: 1300 }, bare: 0.55,
+    id: 'downs', share: 0.1, swell: { height: 50, size: 1200 }, bare: 0.85,
+    wears: { color: 0x7c9c48, surface: 'grass', grass: { cover: 1, height: 0.12, dry: 0.2 } },
     landforms: { perKm2: 34, relief: 5, mix: { dryValley: 4, knoll: 3, bank: 2, sunkenLane: 2, dell: 2, scarp: 1 } },
   },
   // Moor: high, open and treeless, tors of grey rock on the crests, boulders strewn, boggy hollows with pools.
   {
-    id: 'moor', share: 0.09, swell: { height: 26, size: 1800 }, bare: 0.88,
+    id: 'moor', share: 0.09, swell: { height: 30, size: 1600 }, bare: 0.97,
+    wears: { color: 0x6e5a3e, surface: 'grass', grass: { cover: 0.85, height: 0.32, dry: 0.65 } },
     landforms: { perKm2: 44, relief: 6, mix: { tor: 5, boulders: 4, erratic: 3, dell: 3, knoll: 2, ridge: 1 } },
   },
   // Karst: limestone country pitted with sinkholes and dolines, dry valleys and ravines where the water went under.
   {
-    id: 'karst', share: 0.07, swell: { height: 22, size: 900 }, bare: 0.25,
+    id: 'karst', share: 0.07, swell: { height: 20, size: 550 }, bare: 0.45,
+    wears: { color: 0x8e9670, surface: 'grass', grass: { cover: 0.7, height: 0.14, dry: 0.35 } },
     landforms: { perKm2: 72, relief: 6, mix: { sinkhole: 8, dell: 3, ravine: 2, dryValley: 2, tor: 2, knoll: 2, boulders: 1 } },
   },
   // Badlands: bare, crumbling ground cut into knife ridges by countless gullies, scarps and ravines.
   {
-    id: 'badlands', share: 0.06, swell: { height: 30, size: 650, sharp: true }, bare: 0.94,
+    id: 'badlands', share: 0.06, swell: { height: 26, size: 280, sharp: true }, bare: 0.99,
+    wears: { color: 0xa8805a, surface: 'sand', grass: { cover: 0.05, height: 0.08, dry: 0.95 } },
     landforms: { perKm2: 62, relief: 10, mix: { gully: 6, ravine: 4, ridge: 3, scarp: 3, knoll: 1 } },
   },
   {

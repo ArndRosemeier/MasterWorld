@@ -170,6 +170,15 @@ export interface LandscapeKindDef {
   readonly swell?: SwellDef;
   /** How bare of trees and bushes it is, 0..1 (a moor, badlands): the biome's plants thinned by this much. */
   readonly bare?: number;
+  /** The ground it wears over the biome's (downs' short turf, a moor's heather, badlands' bare clay). */
+  readonly wears?: KindGround;
+}
+
+/** A kind of country's own ground (D55): its colour, surface and grass, over the biome's where it holds. */
+export interface KindGround {
+  readonly color: number;
+  readonly surface: Surface;
+  readonly grass: GrassDef;
 }
 
 /** A landscape kind's big shapes (D55): hills `height` metres high, `size` metres across; `sharp`: knife ridges with gullies between instead of rounded hills. */

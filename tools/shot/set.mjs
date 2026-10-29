@@ -96,8 +96,19 @@ const SESSIONS = [
     }) },
   ] },
   { id: 'cellar', query: `${still}&hour=12&cellar=2`, shots: [{ name: 'cellar' }] },
-  // L7: out in each new kind of country (its nearest stretch from the start), at late morning.
-  ...['downs', 'moor', 'karst', 'badlands'].map((k) => ({ id: `kind-${k}`, query: `${still}&hour=10.5&weather=fair&kind=${k}`, shots: [{ name: `kind-${k}` }] })),
+  // L7: out in each new kind of country (its nearest stretch from the start), at late morning: on foot, then
+  // from the free camera 120 m up and 200 m back, looking across it, so its shapes show.
+  ...['downs', 'moor', 'karst', 'badlands'].map((k) => ({ id: `kind-${k}`, query: `${still}&hour=10.5&weather=fair&kind=${k}`, shots: [
+    { name: `kind-${k}` },
+    { name: `kind-${k}-aloft`, act: async (p) => {
+      await p.evaluate(() => {
+        const g = window.game, { x, z } = g.player.walker.pos;
+        g.player.flying = true;
+        g.player.goTo([x, g.terrain.height(x, z + 200) + 120, z + 200], [0, -14]); // yaw 0 looks north (-z), back at the hero
+      });
+      await p.waitForTimeout(2500);
+    } },
+  ] })),
   // L6: a cave's mouth in a cliff (D57), then inside, in the middle of its cavern (its highest room).
   { id: 'cave', query: `${still}&hour=11&weather=fair&cave`, shots: [
     { name: 'cave-mouth' },

@@ -73,9 +73,9 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     const flora = bi >= 0 ? biomes[bi].flora : undefined;
     if (!flora) continue;
     // A bare kind of country (a moor, badlands) thins the biome's plants, the trees most.
-    const woods = woodsAt(cover, flora, x, z), bare = t.skeleton.bareAt(x, z);
-    const pTree = (flora.trees / 10000) * NEAR_SPACING ** 2 * (0.08 + 0.92 * woods) * (1 - bare);
-    const pShrub = (flora.shrubs / 10000) * NEAR_SPACING ** 2 * (0.4 + 0.6 * woods) * (1 - 0.6 * bare);
+    const woods = woodsAt(cover, flora, x, z);
+    const pTree = treesAt(t, cover, flora, x, z) * NEAR_SPACING ** 2;
+    const pShrub = (flora.shrubs / 10000) * NEAR_SPACING ** 2 * (0.4 + 0.6 * woods) * (1 - 0.6 * t.skeleton.bareAt(x, z));
     const near = spacing === NEAR_SPACING;
     // Far away a candidate stands for `thin` near ones: a tree there as often as one would be among them
     // (up to MAX_P), shrubs not at all.
@@ -119,13 +119,23 @@ export function woodsAt(cover: Noise, flora: FloraDef, x: number, z: number): nu
   return smoothstep(-0.15, 0.25, cover.fbm2(x / 260, z / 260, 3) + flora.cover);
 }
 
+/** Trees per square metre where the biome's flora grows: its woods' density, thinned by a bare kind of country (a moor, badlands). */
+export function treesAt(t: Terrain, cover: Noise, flora: FloraDef, x: number, z: number): number {
+  return (flora.trees / 10000) * (0.08 + 0.92 * woodsAt(cover, flora, x, z)) * (1 - t.skeleton.bareAt(x, z));
+}
+
+/** How wooded it is, 0 .. 1 (`woodsAt`), thinned by a bare kind of country. */
+export function thinnedWoods(t: Terrain, cover: Noise, flora: FloraDef, x: number, z: number): number {
+  return woodsAt(cover, flora, x, z) * (1 - t.skeleton.bareAt(x, z));
+}
+
 /** How wooded the land is at a point, 0 (open) .. 1 (closed wood): biomes with few trees count as open. */
 export function woodsOf(t: Terrain): (x: number, z: number) => number {
   const cover = coverNoise(t.seed);
   return (x, z) => {
     const b = t.biomeAt(x, z);
     const f: FloraDef | undefined = b >= 0 ? t.setting.world.biomes[b]?.flora : undefined;
-    return f && f.trees > 20 ? woodsAt(cover, f, x, z) * (1 - t.skeleton.bareAt(x, z)) : 0;
+    return f && f.trees > 20 ? thinnedWoods(t, cover, f, x, z) : 0;
   };
 }
 

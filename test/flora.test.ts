@@ -43,11 +43,12 @@ test('flora: far stand-ins are fewer and bigger', () => {
 
 test('flora: a place out on the land stands in a clearing; the trees beyond it are as they were', () => {
   const land = new Terrain(seed, classic, SMALL);
-  const before = floraPlacement(land, job(-32000, 32000, 128));
-  const site = { x: -31936, z: 32064, yaw: 0.7 };
+  // In broadleaf forest of open country (the downs round it have few trees).
+  const before = floraPlacement(land, job(-32080, 34720, 128));
+  const site = { x: -32016, z: 34784, yaw: 0.7 };
   land.settleMore([{ kind: 'dungeon', id: 'tower-1', template: 'tower', seed: 1, town: 'town-0', building: -1, at: 0, site } as unknown as Decision]);
   const c = land.clearings.get('tower-1')!;
-  const after = floraPlacement(land, job(-32000, 32000, 128));
+  const after = floraPlacement(land, job(-32080, 34720, 128));
   const trees = (d: Float32Array, keep: (x: number, z: number) => boolean) => {
     const out: string[] = [];
     for (let r = 0; r < d.length; r += FLORA_STRIDE) if (FLORA_KINDS[d[r + 5]].species !== 'shrub' && keep(d[r], d[r + 2])) out.push(`${d[r].toFixed(2)},${d[r + 2].toFixed(2)}`);

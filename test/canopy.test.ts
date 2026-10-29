@@ -21,9 +21,9 @@ test('canopy: a forest is covered, the sea is not; a pine wood is all conifer', 
   const setting = settingById('classic');
   const t = new Terrain(parseSeed('masterworld'), setting, SMALL);
   const at = canopySampler(t), c = { cover: 0, height: 0, spacing: 0, conifer: 0 };
-  // The start is in broadleaf forest; the sea lies north-east of it.
+  // Broadleaf forest in open country (not a bare kind of country) by the first town; the sea lies north-east of it.
   let most = 0;
-  for (let k = 0; k < 40; k++) most = Math.max(most, at(-32000 + k * 25, 32000 - k * 7, c).cover);
+  for (let k = 0; k < 40; k++) most = Math.max(most, at(-32080 + k * 25, 34749 - k * 7, c).cover);
   assert.ok(most > 0.4, `forest cover ${most}`);
   assert.equal(at(-31060, 31060, c).cover, 0);
   const taiga = setting.world.biomes.find((b) => b.id === 'taiga')!;
