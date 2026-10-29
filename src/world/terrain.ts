@@ -24,6 +24,8 @@ import type { Lake } from './lakes';
  */
 /** How far (m) from a brook a dell keeps above its water (`Hydrology.brookFloor`). */
 const DELL_REACH = 120;
+/** From how far past a brook's edge (m) to how far the land's small shapes ease in beside it. */
+const BROOK_CLEAR = [4, 40] as const;
 const formsOut = (radius: number): number => radius * 2.5 + 130;
 
 export class Terrain {
@@ -304,6 +306,9 @@ export class Terrain {
     // The water was traced over the land without them: by a river or brook they give way to its banks, and by a
     // lake to its shore (its rim holds it as the land's big shape has it, W3).
     if (forms > 0 && r?.river) forms *= smoothstep(r.half + 10, r.half + 80, r.dist);
+    // By a brook they and the small undulations give way closer in: its bed lies on its valley's floor, not under a
+    // knoll or a swell of the detail (a trench dug through them).
+    if (bk?.river) { const keep = smoothstep(bk.half + BROOK_CLEAR[0], bk.half + BROOK_CLEAR[1], bk.dist); forms *= keep; calm *= keep; }
     if (lake) { const keep = 1 - lake.calm(x, z); forms *= keep; calm *= keep; }
     if (forms > 0) {
       let shaped = Math.max(Math.min(level, 1), level + this.landforms.offset(x, z) * forms);
