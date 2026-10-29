@@ -1181,6 +1181,24 @@ export interface HeroLooksDef {
   readonly races: readonly string[];
   /** Actors outfit presets a new hero starts in, one drawn per hero (each must fit the themes). */
   readonly outfits: readonly string[];
+  /**
+   * The build a random hero is drawn in (the first hero and every roll of the dice): heroes start young and
+   * fit, not as anyone at all. Values outside a range are drawn again inside it. By hand the player may still
+   * pick any look. None: Actors' whole range.
+   */
+  readonly build?: HeroBuildDef;
+}
+
+/** Ranges a random hero's body is drawn in, as Actors' body values ([low, high]). */
+export interface HeroBuildDef {
+  /** Age in years (Actors: 18..90). */
+  readonly ageYears?: readonly [number, number];
+  /** Body fat, 0..1. */
+  readonly weight?: readonly [number, number];
+  /** Muscle, 0..1. */
+  readonly muscle?: readonly [number, number];
+  /** 0 plain .. 1 ideal proportions. */
+  readonly proportions?: readonly [number, number];
 }
 
 /**
