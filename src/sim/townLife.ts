@@ -152,6 +152,9 @@ export class TownLife {
   private hours = 12;
   private weather: TownWeather = { rain: 0 };
 
+  /** Who a map mark points at, kept to that building while awake (sim/marked.ts): by person id, the building. */
+  private kept = new Map<number, number>();
+
   /** The town's inn and temple doors (-1: none). */
   private readonly inn: number;
   private readonly temple: number;
@@ -213,6 +216,25 @@ export class TownLife {
   /** Everyone living here (the agents' persons, in their order). */
   get persons(): Person[] { return this.agents.map((a) => a.person); }
 
+  /**
+   * Who keeps to which building from now on (by person id; sim/marked.ts keptAt): those newly kept go there now,
+   * those let go pick up their day.
+   */
+  keep(kept: ReadonlyMap<number, number>): void {
+    const was = this.kept;
+    if (was.size === kept.size && [...kept].every(([id, b]) => was.get(id) === b)) return;
+    this.kept = new Map(kept);
+    for (const a of this.agents) {
+      const id = a.person.id;
+      if (was.get(id) === kept.get(id) || a.held || a.post) continue;
+      if (a.seek) a.seek = undefined;
+      this.choose(a, false);
+    }
+  }
+
+  /** Whether a map mark keeps this person where they are. */
+  isKept(id: number): boolean { return this.kept.has(id); }
+
   /** Give the town an order (the VGM's way in). */
   order(o: TownOrder): void { this.orders.push(o); }
 
@@ -262,7 +284,7 @@ export class TownLife {
    * day. Sent again while on the way, they turn towards the new point.
    */
   seek(a: Agent, x: number, z: number, face: { x: number; z: number }, secs: number): void {
-    if (a.post) return;
+    if (a.post || this.kept.has(a.person.id)) return;
     const was = a.spot >= 0 ? this.spots[a.spot] : null;
     this.freeSpot(a);
     a.spot = -1;
@@ -457,6 +479,9 @@ export class TownLife {
       }
       task = 'home';
     }
+    // Marked on the hero's map: in that building while awake, where the hero was sent to find them.
+    const kept = this.kept.get(p.id);
+    if (kept !== undefined && this.doorOf(kept) >= 0) return inside(this.doorOf(kept));
     // In the dark only the lit inn and the way home are out of doors.
     if (dark && (task === 'play' || task === 'leisure' || task === 'errands')) task = 'home';
     if (task === 'home') return inside(home);

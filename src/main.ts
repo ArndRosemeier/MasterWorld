@@ -1922,7 +1922,7 @@ export async function start(b: Boot): Promise<void> {
       // Every town's people near the hero live (and are drawn), and its animals graze.
       const cam = view.camera.position;
       part('towns.live');
-      const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain });
+      const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain }, journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })));
       if (folk) folk.lives = lives;
       part('herds');
       stock?.herd(dt, cam, towns.graze(dt, cam.x, cam.z));
