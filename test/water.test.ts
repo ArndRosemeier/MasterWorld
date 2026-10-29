@@ -4,6 +4,7 @@ import { parseSeed } from '@futuremagic/core';
 import { Terrain } from '../src/world/terrain';
 import { Skeleton } from '../src/world/skeleton';
 import { HydroTile, riverDepth } from '../src/world/hydro';
+import { LAKE_GRID } from '../src/world/lakes';
 import { classic } from '../src/setting/classic/index';
 import { DRY, SEA_LEVEL, joinPieces, maskPieces, waterMask } from '../src/world/water';
 import { SMALL } from './small';
@@ -67,7 +68,8 @@ test('hydro: a lake lies in the land, at the height where it runs out over its r
     const j = k ? k - 1 : 1, dx = r.xz[j * 2] - x, dz = r.xz[j * 2 + 1] - z, len = Math.hypot(dx, dz);
     for (const side of [-1, 1]) {
       const o = (r.half[k] + 15) * side, px = x - (dz / len) * o, pz = z + (dx / len) * o;
-      if (!Number.isNaN(t.hydro.lakeLevel(px, pz)) && sk.elevation(px, pz) < level - 1) assert.ok(t.height(px, pz) < level, `levee in the lake at ${px.toFixed(0)},${pz.toFixed(0)}`);
+      // (In the lake's water: a river arriving slantwise has its sides out on the shore ground, where the lake's own rim lip stands.)
+      if ((t.hydro.lakeNear(px, pz)?.shore(px, pz) ?? Infinity) <= LAKE_GRID / 2 && sk.elevation(px, pz) < level - 1) assert.ok(t.height(px, pz) < level, `levee in the lake at ${px.toFixed(0)},${pz.toFixed(0)}`);
     }
   }
   assert.ok(ends > 0, 'rivers run into and out of lakes');
@@ -102,8 +104,8 @@ test('water mask: a river\'s current dies away where it meets a lake, the lake l
   for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
     const x = x0 + (i + 0.5) * step, z = z0 + (j + 0.5) * step, p = (j * res + i) * 4, l = tl.lakeNear(x, z);
     const flow = Math.hypot(m[p + 2], m[p + 3]);
-    // (The mouth itself, as wide as the river is, still runs a little; the lake beyond it lies still.)
-    if (l && l.shore(x, z) <= 50 && m[p + 1] > 0 && Math.hypot(x - mouth[0], z - mouth[1]) > widest) { still++; assert.equal(flow, 0, `current on the lake at ${x.toFixed(0)},${z.toFixed(0)}`); }
+    // (The mouth itself, as wide as the river is and a couple of pixels of soft edge more, still runs a little; the lake beyond it lies still.)
+    if (l && l.shore(x, z) <= 50 && m[p + 1] > 0 && Math.hypot(x - mouth[0], z - mouth[1]) > widest + 2 * step) { still++; assert.equal(flow, 0, `current on the lake at ${x.toFixed(0)},${z.toFixed(0)}`); }
     else if (flow > 0.3) running++;
   }
   assert.ok(still > 20 && running > 5, `still ${still}, running ${running}`);

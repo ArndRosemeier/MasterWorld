@@ -26,8 +26,8 @@ function meshAt(m: ReturnType<typeof buildChunk>, x0: number, z0: number, x: num
 test('drawn ground: the hero stands on exactly what the finest chunk draws, cut quads and brooks\' finer chunks too', () => {
   const t = new Terrain(parseSeed('masterworld'), classic, SMALL), src = drawnSource(t), g = new DrawnGround(src);
   // A chunk of sea cliff north of the start (quads cut along a rim) and one by the start with a brook in it.
-  const chunks: [number, number][] = [[-31872, 30848], [-24448, 34432]];
-  assert.ok(src.segs(-24448, 34432) > SEGS, 'a chunk with a brook, drawn finer');
+  const chunks: [number, number][] = [[-31872, 30848], [-24576, 34560]];
+  assert.ok(src.segs(-24576, 34560) > SEGS, 'a chunk with a brook, drawn finer');
   let cut = false, worst = 0;
   for (const [x0, z0] of chunks) {
     const m = buildChunk(t, { x0, z0, size: CHUNK0, segs: finerFor(t, { x0, z0, size: CHUNK0, segs: SEGS }) });

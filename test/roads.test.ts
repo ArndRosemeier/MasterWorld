@@ -14,10 +14,10 @@ import { frontierLand } from './frontierLand';
 // The start's land (test/frontierLand.ts; ours, as roads are laid on it).
 const { seed, terrain, first: log, plans } = frontierLand({ own: true });
 const town = terrain.towns[0];
-// The first hamlet the VGM founds on a walk south-east from the start (plan B1). (East, it stands across the river
+// The first hamlet the VGM founds on a walk south-south-east from the start (plan B1). (East, it stands across the river
 // where it has no ford: no track reaches it.)
 const regions = classic.regions!;
-const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, Math.PI / 4, 5, (d) => d.fill === 'hamlet' && !!d.site);
+const walked = walkFrontier({ seed, log, terrain, regions, home: town.decision }, (3 * Math.PI) / 4, 5, (d) => d.fill === 'hamlet' && !!d.site);
 const hamlet = settlementsOf(walked, regions).find((t) => walked.some((d) => d.id === t.id && d.kind === 'region' && d.fill === 'hamlet'))!;
 // As the world worker routes it (WorldJobs.linkRoad): from the roads already decided alone.
 const road = linkRoad(terrain, log.filter((d) => d.kind === 'road'), hamlet, 'track')!;

@@ -15,7 +15,7 @@ test('creatures\' feet: a library animal of any size, on the drawn ground of a c
   const ground = (x: number, z: number) => g.footing(x, z);
   for (const size of [1, 14]) {
     let worst = 0;
-    for (const [x0, z0] of [[-31872, 30848], [-24448, 34432]]) for (let k = 0; k < 5; k++) {
+    for (const [x0, z0] of [[-31872, 30848], [-24576, 34560]]) for (let k = 0; k < 5; k++) {
       const x = x0 + 20 + ((k * 37.31) % 340), z = z0 + 20 + ((k * 61.7) % 340);
       worst = Math.max(worst, feetOn(ground, x, z, k * 0.7, size, k).sunk / size);
     }

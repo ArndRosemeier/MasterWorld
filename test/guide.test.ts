@@ -70,8 +70,9 @@ test('guide: from a fresh start, someone near the market comes over, waits by th
   assert.ok(came >= 0, `they arrive (now ${a.act} at ${Math.hypot(a.x - hero.x, a.z - hero.z).toFixed(1)} m)`);
   assert.ok(Math.abs(Math.atan2(hero.z - a.z, hero.x - a.x) - a.dir) < 1e-6, 'facing the hero');
   // They wait, then go back to their day.
-  for (let s = 0; s < 20; s++) life.step(1, 8.3);
-  assert.equal(a.act, 'chat', 'still waiting');
+  // (The wait runs from the hail, so one who walked far has little of it left on arrival.)
+  for (let s = 0; s < Math.min(20, HAIL.wait - came - 5); s++) life.step(1, 8.3);
+  assert.equal(a.act, 'chat', `still waiting (now ${a.act}, person ${a.person.id} ${a.person.role})`);
   for (let s = 0; s < HAIL.wait + 10; s++) life.step(1, 8.3);
   assert.equal(a.seek, undefined, 'gave up and went on');
   // Talked to: the hail opens the talk, the news glows and leads somewhere.
