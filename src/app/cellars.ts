@@ -100,6 +100,8 @@ interface Mound extends LandSite {
 
 /** A place on the land is built (rooms, dwellers) once the hero is this near, metres. */
 const BARROW_NEAR = 250;
+/** Where one waits for the hero before a place's way in: this far out in front of it, and to the side (m). */
+const WAIT_OUT = 2.5, WAIT_ASIDE = 2.2;
 /** How far past its way point the hero walks on into a place's doorway before going in, metres. */
 const WALK_IN = 0.9;
 /** How far a place's piece reaches from its site, metres (for quick tests). */
@@ -145,6 +147,20 @@ export class Cellars {
     for (const d of log) {
       if (d.kind === 'dungeon' && !this.sites.has(d.id)) this.open(d);
       else if (d.kind === 'move-in' || d.kind === 'retake') this.moved(d);
+    }
+  }
+
+  /**
+   * The places out on the land (not under a house): each's promise (its dweller's), town, the spot before its way in
+   * where one may wait for the hero (x, z, and the facing out from it as an agent's: atan2 of z and x), and its visit
+   * once built.
+   */
+  *outside(): Iterable<{ readonly id: string; readonly town: string; readonly x: number; readonly z: number; readonly dir: number; readonly visit: CellarVisit | null }> {
+    for (const s of this.sites.values()) {
+      const m = s.mound;
+      if (!m) continue;
+      const [x, z] = onLand(m, WAIT_ASIDE, m.out + WAIT_OUT);
+      yield { id: occupantId(s.cellar), town: s.decision.town, x, z, dir: Math.atan2(Math.cos(m.yaw), Math.sin(m.yaw)), visit: s.ready?.visit ?? null };
     }
   }
 

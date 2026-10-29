@@ -1,10 +1,11 @@
 /**
- * The cellar's household comes down when it has gone quiet (show, don't tell; CLAUDE.md rule 11): a moment after the
- * last of its dwellers falls, the one the hero would have reported to climbs down the ladder under the hatch, seen on
- * the rungs (@futuremagic/figure's LadderClimb, their body its puppet as the hero's is), walks through the cellar to
- * the hero (game/visitor.ts), and thanks them there, paying as they would have at their door. Then they go back to
- * the ladder and up it. So the hero sees that the task is done; no line has to say so. Drawn as townsfolk are
- * (FolkView, which places them in the cellar while the land above is out of the frame).
+ * A place's household comes to the hero when it has gone quiet (show, don't tell; CLAUDE.md rule 11): a moment after
+ * the last of its dwellers falls, the one the hero would have reported to comes. Under a house they climb down the
+ * ladder under the hatch, seen on the rungs (@futuremagic/figure's LadderClimb, their body its puppet as the hero's
+ * is); out on the land they waited outside its way in (Township.waitAt) and come in through it. They walk through the
+ * place to the hero (game/visitor.ts) and thank them there, paying as they would have at their door; then they go back
+ * the way they came. So the hero sees that the task is done; no line has to say so. Drawn as townsfolk are (FolkView,
+ * which places them in the place while the land above is out of the frame).
  */
 import { LadderClimb, faceYaw, type ClimbStep, type Climber } from '@futuremagic/figure';
 import { DungeonGround, type P3 } from '../sim/dungeonNav';
@@ -17,6 +18,8 @@ import type { CellarVisit } from './cellarVisit';
 export const COME_AFTER = 3;
 /** Where they wait to come down, and where the climb starts and ends: this far over the cellar's floor (m), out of sight up the shaft. */
 const UP_THE_SHAFT = 6, CLIMB_TOP = 2.5;
+/** A place on the land: they wait this far out behind its way in (in the rock, unseen), and step in this far inside it (m). */
+const BEHIND = 4, IN_FROM = 0.8;
 /** Seconds they hold out the purse as their thanks begin (the 'interact' clip), then talk. */
 const HAND_OVER = 1.4;
 
@@ -60,6 +63,13 @@ export class OwnerComes {
       const body = this.host.body();
       if (!body || this.t < COME_AFTER) return;
       this.body = body;
+      // A place out on the land: they come in through its way in, where they waited outside.
+      if (!this.visit.above) {
+        const h = this.visit.cellar.hatch, f = this.out;
+        this.walker = new Visitor(this.ground, { x: h.x - f[0] * IN_FROM, y: h.y, z: h.z - f[1] * IN_FROM }, Math.atan2(-f[1], -f[0]));
+        this.phase = 'walk';
+        return;
+      }
       this.play([
         { kind: 'climb', ladder: L, from: L.floor + CLIMB_TOP, to: L.floor },
         { kind: 'foot', ladder: L, dir: 'off' },
@@ -85,7 +95,8 @@ export class OwnerComes {
       const text = this.host.told();
       if (text) this.host.say(text, () => (this.phase === 'walk' ? { x: v.x + O.x, y: v.y + O.y, z: v.z + O.z } : null));
     }
-    if (e === 'gone') {
+    if (e === 'gone' && !this.visit.above) this.phase = 'gone';
+    else if (e === 'gone') {
       // At the ladder's foot: onto it and up into the house again.
       this.play([
         { kind: 'foot', ladder: L, dir: 'on' },
@@ -99,6 +110,11 @@ export class OwnerComes {
   placed(): Placed | null {
     const L = this.visit.ladder, a = this.agent;
     if (this.phase === 'gone') return null;
+    if (this.phase === 'wait' && !this.visit.above) {
+      // Out of sight behind the way in, being dressed.
+      const O = this.visit.origin, h = this.visit.cellar.hatch, f = this.out;
+      return { agent: a, x: O.x + h.x + f[0] * BEHIND, y: O.y + h.y, z: O.z + h.z + f[1] * BEHIND, dir: Math.atan2(-f[1], -f[0]), act: 'wait' };
+    }
     if (this.phase === 'wait') return { agent: a, x: L.x, y: L.floor + UP_THE_SHAFT, z: L.z, dir: -Math.PI / 2 - faceYaw(L), act: 'wait' };
     if (this.phase === 'down' || this.phase === 'up') {
       const p = this.climb.pos;
@@ -107,6 +123,12 @@ export class OwnerComes {
     const O = this.visit.origin, v = this.walker!;
     const act = v.walking ? 'walk' : this.thanking >= 0 && this.thanking < HAND_OVER ? 'mark' : v.phase === 'thank' ? 'chat' : 'wait';
     return { agent: a, x: v.x + O.x, y: v.y + O.y, z: v.z + O.z, dir: v.dir, act };
+  }
+
+  /** Out of the place through its way in (the frame's x, z): the hero arrives facing the other way. */
+  private get out(): readonly [number, number] {
+    const yaw = this.visit.cellar.hatch.yaw;
+    return [Math.sin(yaw), Math.cos(yaw)];
   }
 
   /** Start a climb at feet height `y` (by the ladder, or at x, z), facing the ladder. */

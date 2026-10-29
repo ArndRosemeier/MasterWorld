@@ -54,21 +54,24 @@ const setup = await page.evaluate(`(() => {
   return { ladder: [L.x, L.floor, L.z], hero: [w.x, w.y, w.z], d: Math.hypot(L.x - w.x, L.z - w.z) };
 })()`);
 console.log(`hero ${setup.d.toFixed(1)} m from the ladder`);
-let phases = new Set(), nearest = Infinity, line = null, gone = false;
+let phases = new Set(), nearest = Infinity, line = null, gone = false, bubble = null;
 for (let i = 0; i < 160 && !gone; i++) {
   await page.waitForTimeout(500);
   const s = await page.evaluate(() => {
     const g = window.game, o = g.owner, w = g.player.walker.pos, at = o?.placed();
-    return { phase: o?.phase ?? null, d: at ? Math.hypot(at.x - w.x, at.z - w.z) : null, line: g.speech.line };
+    const b = document.querySelector('.speech'), r = b && b.style.display !== 'none' ? b.getBoundingClientRect() : null;
+    return { phase: o?.phase ?? null, d: at ? Math.hypot(at.x - w.x, at.z - w.z) : null, line: g.speech.line, bubble: r ? { w: r.width, h: r.height, over: b.scrollWidth > b.clientWidth + 1 } : null };
   });
   if (s.phase) phases.add(s.phase);
   if (s.d !== null && s.phase === 'walk') nearest = Math.min(nearest, s.d);
   line ??= s.line;
+  // A long line wraps: the bubble grows taller, never past its width, and no text runs out of it.
+  if (s.bubble) { bubble = s.bubble; if (s.bubble.over || s.bubble.w > 302) fail(`the speech bubble overflows (${JSON.stringify(s.bubble)})`); }
   gone = phases.size > 0 && (s.phase === null || s.phase === 'gone');
   if (i % 2 === 0 || s.line) await shoot(`${String(i).padStart(3, '0')}-${s.phase ?? 'none'}`);
 }
 const after = await page.evaluate(() => ({ coins: window.game.character.coins, kept: window.game.log.filter((d) => d.kind === 'kept').length, said: window.__said ?? [] }));
-console.log(`phases ${[...phases].join(' > ')} · nearest ${nearest.toFixed(2)} m · said "${line}" · coins ${before.coins} > ${after.coins} · kept ${before.kept} > ${after.kept} · queued ${JSON.stringify(after.said)}`);
+console.log(`phases ${[...phases].join(' > ')} · nearest ${nearest.toFixed(2)} m · said "${line}" · coins ${before.coins} > ${after.coins} · kept ${before.kept} > ${after.kept} · queued ${JSON.stringify(after.said)} · bubble ${JSON.stringify(bubble)}`);
 for (const p of ['down', 'walk', 'up']) if (!phases.has(p)) fail(`never ${p}`);
 if (nearest > 3.5) fail(`never came near the hero (${nearest.toFixed(2)} m)`);
 if (!line) fail('no thanks said');
