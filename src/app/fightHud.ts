@@ -135,7 +135,12 @@ export class FightHud {
   /** The hero's level on its seal, and the rule towards the next (only what changed). */
   private levelOf(hero: Character): void {
     const l = hero.level, f = towardNext(this.setting.growth, hero.xp);
-    if (l !== this.shownLevel) { this.seal.textContent = String(l); this.shownLevel = l; }
+    if (l !== this.shownLevel) {
+      // A level gained (not the first showing): the new number is engraved into the seal as the ring rises (G3).
+      if (this.shownLevel > 0 && l > this.shownLevel) { this.seal.classList.remove('engrave'); void this.seal.offsetWidth; this.seal.classList.add('engrave'); }
+      this.seal.textContent = String(l);
+      this.shownLevel = l;
+    }
     if (Math.abs(f - this.shownToward) > 0.002) { this.sealRule.style.width = `${(f * 100).toFixed(1)}%`; this.shownToward = f; }
   }
 

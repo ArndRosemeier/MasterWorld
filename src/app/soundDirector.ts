@@ -203,10 +203,17 @@ export class SoundDirector {
 
   /** The smith's hammer on a mended piece, and the coins for it. */
   rang(): void {
-    const e = this.host.engine;
-    e.play('fight/block', { bus: 'ui', gain: 0.8, pitch: 1.25 });
-    e.play('fight/block', { bus: 'ui', gain: 0.5, pitch: 1.4, delay: 0.32 });
-    e.play('fight/coins', { bus: 'ui', gain: 0.7, delay: 0.7 });
+    this.notes([['fight/block', 0.8, 1.25, 0], ['fight/block', 0.5, 1.4, 0.32], ['fight/coins', 0.7, 1, 0.7]]);
+  }
+
+  /** A few sounds on the ui bus, one after another: [sound, gain, pitch, delay (s)]. */
+  private notes(list: readonly (readonly [string, number, number, number])[]): void {
+    for (const [id, gain, pitch, delay] of list) this.host.engine.play(id, { bus: 'ui', gain, pitch, delay });
+  }
+
+  /** A level gained (G3): a bright brass chime, the bell struck high and the ward's ring after it. */
+  chime(): void {
+    this.notes([['title/bell', 0.55, 1.6, 0], ['title/bell', 0.35, 2.4, 0.12], ['title/ward', 0.5, 1.2, 0.25]]);
   }
 
   /** Coins changed hands (a trade). */

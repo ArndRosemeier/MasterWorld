@@ -18,6 +18,7 @@ import { blowOf, shapeOf, type RecipeEvent, type Recipes, type Spot } from '../g
 import { SpellBits, type Vec3 } from './spellFx/particles';
 import { lookOf, type Caster, type FxLook } from './spellFx/looks';
 import { FxView } from './spellFx/fxView';
+import { LevelRing } from './spellFx/levelRing';
 
 /** Where the hand holds a spell when the body's hand is not known: in front of the caster (m) and over the feet (m). */
 const HANDS_AHEAD = 0.45, HANDS_UP = 1.35;
@@ -76,6 +77,9 @@ export class SpellView {
   shown = { shots: 0, flashes: 0, motes: 0 };
   /** Hears casts, releases and hits (main.ts: the hero's clips and the sounds). */
   listener: SpellListener | null = null;
+  /** The level celebration round the hero (G3), and whether one waits to begin. */
+  private readonly ring = new LevelRing();
+  private ringDue = false;
   /** Where the hero's hand is in the world (main.ts: the body's bone), null while not known. */
   handOf: ((out: Vector3) => Vector3 | null) | null = null;
 
@@ -105,6 +109,12 @@ export class SpellView {
     }
     return s;
   }
+
+  /** The hero gained a level: the ring of light rises round them from the next frame on (G3). */
+  levelUp(): void { this.ringDue = true; }
+
+  /** The level ring is playing. */
+  get ringing(): boolean { return this.ringDue || this.ring.on; }
 
   /** Every frame: draw the frame's spells (null: none). */
   show(dt: number, f: SpellFrame | null): void {
@@ -146,6 +156,11 @@ export class SpellView {
       const a = tr.age / tr.life, A = tr.from, B = tr.to;
       const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2], len = Math.hypot(dx, dy, dz) || 1;
       tr.look.bolt(b, [A[0] + dx * a, A[1] + dy * a, A[2] + dz * a], [dx / len, dy / len, dz / len], len / tr.life, tr.launched, dt, this.t);
+    }
+    if (f && (this.ringDue || this.ring.on)) {
+      const feet: Vec3 = [f.offset.x + f.me.x, f.offset.y + f.me.y, f.offset.z + f.me.z];
+      if (this.ringDue) { this.ring.kindle(b, feet); this.ringDue = false; }
+      this.ring.rise(b, feet, dt);
     }
     b.step(dt);
     this.shown = { shots: (f?.recipes.shots.length ?? 0) + this.tracers.length, flashes: b.parts.length + b.solids.length, motes: b.held.length + b.heldSolids.length };

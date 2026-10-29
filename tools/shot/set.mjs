@@ -213,6 +213,17 @@ const SESSIONS = [
       await p.evaluate(() => { window.game.spellView.frozen = true; });
     } },
   ] },
+  // Gate G (G3): a level gained in town, the ring of brass light at its height round the hero and the seal engraved.
+  { id: 'level', query: `${still}&hour=17&weather=fair&hud`, shots: [
+    { name: 'level-up', act: async (p) => {
+      await p.waitForFunction(() => window.game.spellView.entered, null, { timeout: TIMEOUT });
+      await p.evaluate(() => { const g = window.game, h = g.character; h.gain(g.setting.growth.xp[h.level] - h.xp); });
+      await p.waitForFunction(() => window.game.spellView.ringing, null, { timeout: 20000 });
+      await p.waitForTimeout(900);
+      // Held still while the set waits for the shaders and measures (the last shot of its page): else it is gone.
+      await p.evaluate(() => { window.game.spellView.frozen = true; });
+    } },
+  ] },
   { id: 'inn', query: `${still}&hour=20&room=inn`, shots: [{ name: 'inn' }] },
   { id: 'talk', query: `${still}&hour=20&talk=inn&topics=news`, shots: [{ name: 'talk' }] },
   // Out on the land (gate B): a hamlet the VGM opened, then halfway along the longest road, looking along it.

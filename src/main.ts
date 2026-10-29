@@ -109,6 +109,7 @@ import { release } from './app/release';
 import { CLIMB_COST, Character, fallHurt } from './game/character';
 import { itemWorth } from './game/trade';
 import { bardTells, GuildBook, questGift, teacherOf, whereOf } from './game/guilds';
+import { CHEER, LevelWatch } from './app/levelUp';
 import { carryRenown } from './game/growth';
 import { coinText, uniqueItem } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
@@ -1175,6 +1176,8 @@ export async function start(b: Boot): Promise<void> {
       },
       arranged: () => { book.redraw(); },
     });
+    // The level watched each frame for its celebration (G3).
+    const levelWatch = new LevelWatch(character.level);
     const book = new AbilityBook(character, setting, actionBar, { paused, get bindings() { return settings.current.bindings; } });
     // Where the map shows the hero, facing `yaw` (down in a cellar: at its house; in a barrow: at its forecourt). D59: exactly.
     const heroAt = (yaw: number) => {
@@ -1466,6 +1469,7 @@ export async function start(b: Boot): Promise<void> {
       answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
       situation: (kind) => { const m = situationNow(kind); return m ? `${m.tool}: ${m.reason}` : `no ${kind} here`; },
       goodDay: () => goodDayNow(),
+      gainLevel: () => { const next = setting.growth.xp[character.level]; if (next === undefined) return 'at the top level'; character.gain(next - character.xp); return `level ${character.level}`; },
       vgmLog: () => vgmLines(log, vgmLog),
       wearLegend: (id) => wearLegend(id),
       learn: (id, on) => {
@@ -1832,6 +1836,14 @@ export async function start(b: Boot): Promise<void> {
         }
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
         const lead = leading();
+        // A level gained (G3): the ring of light, the chime and the seal engraved; the hands raised only out of a fight.
+        const h = player.hero, act = player.stance.action, acting = !!act && !!h && h.clock - act.t0 < act.dur;
+        const cheer = levelWatch.see(character.level, !encounters().some((e) => e.pressure.fighting > 0) && !player.riding && player.walker.mode === 'ground' && !acting);
+        if (cheer) {
+          spellView.levelUp();
+          sounds?.chime();
+          if (cheer.gesture && h) player.stance = { ...player.stance, action: { ...CHEER, t0: h.clock } };
+        }
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }
