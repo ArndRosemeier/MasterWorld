@@ -15,18 +15,10 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../../src/setting/classic/index';
 import { startPlace } from '../../src/vgm/builder';
 import { Terrain } from '../../src/world/terrain';
-import { emptyWater, type WaterHere } from '../../src/world/hydro';
+import { emptyWater } from '../../src/world/hydro';
 
 const SIDE = 16_000, STEP = 40;
 const seeds = process.argv.slice(2).length ? process.argv.slice(2) : ['masterworld', 'vj4985', 'vc1bkb', 'alpha'];
-
-/** The land before water shapes it: the same world with its rivers and brooks hidden from the height. */
-function dryLand(seed: number): Terrain {
-  const t = new Terrain(seed, classic);
-  const none = (_x: number, _z: number, o: WaterHere = emptyWater()): WaterHere => { o.river = o.brook = false; o.lake = NaN; return o; };
-  Object.assign(t.hydro, { riverAt: none, brookAt: none });
-  return t;
-}
 
 /** The middle of the lake cell nearest to (x, z), or null where the river tile has none. */
 function nearestLake(t: Terrain, x: number, z: number): { x: number; z: number } | null {
@@ -46,12 +38,12 @@ const share = (a: number[], ok: (v: number) => boolean): string => (a.length ? `
 
 interface Fit { cuts: { brook: number[]; river: number[] }; lake: number; leaks: number }
 
-function measure(t: Terrain, dry: Terrain, cx: number, cz: number): Fit {
+function measure(t: Terrain, cx: number, cz: number): Fit {
   const w = emptyWater(), v = emptyWater();
   const fit: Fit = { cuts: { brook: [], river: [] }, lake: 0, leaks: 0 };
   for (let z = cz - SIDE / 2; z < cz + SIDE / 2; z += STEP) for (let x = cx - SIDE / 2; x < cx + SIDE / 2; x += STEP) {
     t.hydro.query(x, z, w);
-    if (w.river && w.dist < w.half * 0.3) fit.cuts[w.brook ? 'brook' : 'river'].push(dry.height(x, z) - w.level);
+    if (w.river && w.dist < w.half * 0.3) fit.cuts[w.brook ? 'brook' : 'river'].push(t.dryLand(x, z) - w.level);
     if (Number.isNaN(w.lake)) continue;
     const h = t.height(x, z);
     if (h >= w.lake) continue;
@@ -73,12 +65,12 @@ const rows: string[] = ['| World | Square | Water | Points | Median cut m | p95 
 const lakes: string[] = ['| World | Square | Lake water samples | Leaking samples |', '| --- | --- | --- | --- |'];
 const started = performance.now();
 for (const name of seeds) {
-  const seed = parseSeed(name), t = new Terrain(seed, classic), dry = dryLand(seed);
+  const t = new Terrain(parseSeed(name), classic);
   const home = startPlace(t), lake = nearestLake(t, home.x, home.z);
   const squares: [string, number, number][] = [['start', home.x, home.z]];
   if (lake) squares.push([`lake ${Math.round(lake.x)},${Math.round(lake.z)}`, lake.x, lake.z]);
   for (const [label, x, z] of squares) {
-    const fit = measure(t, dry, x, z);
+    const fit = measure(t, x, z);
     for (const kind of ['river', 'brook'] as const) {
       const a = fit.cuts[kind];
       rows.push(`| ${name} | ${label} | ${kind} | ${a.length} | ${f1(pct(a, 0.5))} | ${f1(pct(a, 0.95))} | ${share(a, (c) => c > 10)} | ${share(a, (c) => c < -2)} |`);
