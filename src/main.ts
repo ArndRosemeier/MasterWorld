@@ -428,15 +428,18 @@ export async function start(b: Boot): Promise<void> {
     // between its grass, rocks and plants: 'Raising the land' waited on them).
     const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
-    // The seas' masks come from the world worker while the hero is made here.
-    // Only the near one now (the hero's water); the wide ones are asked for once the woods and rocks are placed.
-    // The near water's mask (seconds of the world worker's work since phase W): the hero, the horses, the herds and
-    // the town load meanwhile; nothing before 'Raising the land' needs it (the horses keep off the land's own water).
+    // The near one first, while the hero is made here (the hero's water; the horses keep out of it).
     const seas = sea.prime(view.camera.position, 1).then(() => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: near water mask made`));
     loading.set('Dressing the hero');
     // In the look the player made (a save's), or a new hero of the setting drawn from the seed.
     const hero = await HeroView.load(view.stage, view.renderer, setting.hero, save?.looks?.look ?? null, seed);
     console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: hero's body made`);
+    await seas;
+    // The wide masks right after (in the terrain workers, beside the land's first chunks): ready by 'Raising the land',
+    // which waited seconds for them when they were asked for only once the woods and rocks were placed.
+    const wideSeas = sea.prime(view.camera.position);
+    // In the water from the start (now that the water is known), and the hero's body built.
+    player.resettle();
     title?.run(0);
     player.walker.height = hero.height;
     hero.onLook(() => { player.walker.height = hero.height; });
@@ -542,9 +545,9 @@ export async function start(b: Boot): Promise<void> {
     let horses: HorseView | null = null;
     if (params.horses > 0) {
       loading.set('Saddling the horses');
-      const standable = (x: number, z: number, r: number) => !world.wall?.(x, z, r) && terrain.waterDepth(x, z) <= 0;
+      const free = (x: number, z: number, r: number) => !world.wall?.(x, z, r) && world.waterLevel(x, z) === null;
       const by = player.walker.pos;
-      const spots = horseSpots(by.x, by.z, player.walker.yaw, params.horses, standable);
+      const spots = horseSpots(by.x, by.z, player.walker.yaw, params.horses, free);
       horses = await HorseView.make(view.renderer, spots.length);
       const pace = groundPace(terrain);
       player.steeds = spots.map((p, i) => {
@@ -615,10 +618,7 @@ export async function start(b: Boot): Promise<void> {
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
     if (chosen) hurry();
     loading.set('Raising the land');
-    await seas;
-    // In the water from the start (now that the water is known).
-    player.resettle();
-    await sea.prime(view.camera.position);
+    await wideSeas;
     await landReady;
     await rock;
     await raised;
