@@ -1,0 +1,76 @@
+
+> masterworld@0.0.0 load
+> node tools/shot/load.mjs
+
+  [title] dawn, clear, 7.7 h
+  [load] 0.0 s: Fetching the world
+page loaded 0.1
+  [load] 0.5 s: Finding the start
+  [load] 1.4 s: Starting the renderer
+title 0.42 (first paint; the probe saw it at 0.10)
+  [load] 1.7 s: Painting the ground
+  [load] 1.7 s: Filling the seas
+  [load] 1.7 s: Dressing the hero
+  [load] 2.0 s: compiled rain (0.3 s)
+  [load] 5.8 s: Saddling the horses
+  [load] 5.9 s: Turning out the herds
+  [load] 6.1 s: Waking the town
+  [load] 6.1 s: compiled cow (0.0 s)
+  [load] 6.1 s: compiled cow (0.0 s)
+  [load] 6.1 s: compiled cow (0.0 s)
+  [load] 6.1 s: compiled cow (0.0 s)
+  [load] 6.1 s: compiled cow (0.0 s)
+  [load] 6.4 s: compiled cow (0.3 s)
+  [load] 6.4 s: compiled birds (0.3 s)
+  [load] 6.8 s: compiled horse (1.0 s)
+  [load] 7.0 s: Growing the woods
+  [load] 7.6 s: compiled horse (1.8 s)
+  [load] 8.4 s: Dressing the townsfolk
+  [load] 8.5 s: Preparing shaders
+  [load] 8.8 s: compiled far folk (0.3 s)
+  [load] 8.9 s: compiled grass (0.5 s)
+  [load] 9.2 s: compiled townsfolk (0.7 s)
+  [load] 9.2 s: compiled hero (3.5 s)
+  [load] 15.0 s: compiled the kinds (warm-up)
+  [load] 15.0 s: every early compile done; their shadows next
+  [load] 15.0 s: Raising the land
+  [load] 15.1 s: Waking the cellar
+  [load] 15.7 s: Planting the trees
+  [load] 16.1 s: cellar ready (shaders 61 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 16.7 s: townsfolk ready (shaders 67 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 17.1 s: trees ready (shaders 71 warm-up + 0 later · worst 10 ms · policy ok)
+  [load] 17.1 s: Waking the townsfolk
+  [load] 18.8 s: townsfolk round the hero dressed
+playable 18.9
+shader builds before play: 307, 26196 ms in all; the costliest:
+   24995 ms  86x pipeline
+     357 ms  12x MeshStandardNodeMaterial
+     337 ms  10x MeshPhysicalNodeMaterial
+      55 ms   1x terrain
+      40 ms   2x leaves (after depth)
+      36 ms   2x MI_F_Deer_Fur_01
+      32 ms   1x water
+      29 ms   1x critter eye
+      26 ms   1x critter
+      26 ms   1x rocks
+      23 ms   1x far folk (instanced)
+      22 ms   1x building
+      20 ms   1x far folk
+      17 ms   1x animal eye
+      16 ms   1x rat coat
+  [load] 21.6 s: townsfolk, every look ready (shaders 75 warm-up + 13 later · worst 10 ms · policy ok)
+title 0.42 s · playable 18.9 s · start download 93.6 MB
+  packs/start-1-bdf6e502555f.bin     1 files    15.19 MB
+  packs/start-2-6e406f006acb.bin     1 files    15.19 MB
+  packs/start-3-e131a24531bd.bin     1 files    15.09 MB
+  packs/start-4-d1fc59464949.bin     1 files    14.38 MB
+  packs/start-0-7f0c2a8f156c.bin     1 files    13.22 MB
+  packs/start-5-a21ca89b2d6f.bin     1 files     7.72 MB
+  wildmesh3d                       4 files     7.34 MB
+  sound/music                      1 files     1.63 MB
+  packs/human                     13 files     1.10 MB
+  assets                          37 files     1.02 MB
+  title                            4 files     0.53 MB
+  props                            1 files     0.51 MB
+music at the start: sound/music/title.mp3 · in the world: none yet
+load: ok

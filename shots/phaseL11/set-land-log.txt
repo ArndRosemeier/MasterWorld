@@ -1,0 +1,24 @@
+
+> masterworld@0.0.0 shot:set
+> node tools/shot/set.mjs shots/phaseL11/set --part=land
+
+cellar: ready in 23.1 s
+12-cellar.jpg: drawn 0.1 s · settled 4.0 s · p50 5.3 ms · p95 15.2 ms · 0 shader violations
+land: ready in 18.5 s
+13-barrow.jpg: drawn 0.1 s · settled 4.0 s · p50 11.3 ms · p95 17.2 ms · 0 shader violations
+14-wild.jpg: drawn 0.6 s · settled 4.0 s · p50 7.7 ms · p95 10.4 ms · 0 shader violations
+15-fight.jpg: drawn 0.0 s · settled 1.5 s · p50 9.2 ms · p95 14.5 ms · 0 shader violations
+16-fight-magic.jpg: drawn 0.0 s · settled 1.5 s · p50 9.1 ms · p95 12.4 ms · 0 shader violations
+hamlet: ready in 20.6 s
+19-hamlet.jpg: drawn 0.1 s · settled 4.0 s · p50 9.9 ms · p95 14.7 ms · 0 shader violations
+20-road.jpg: drawn 0.2 s · settled 1.6 s · p50 8.0 ms · p95 13.6 ms · 0 shader violations
+village: ready in 20.1 s
+21-village.jpg: drawn 0.1 s · settled 4.0 s · p50 12.1 ms · p95 14.2 ms · 0 shader violations
+hold: ready in 16.1 s
+22-hold.jpg: drawn 2.4 s · settled 4.0 s · p50 12.8 ms · p95 31.7 ms · 0 shader violations
+23-hold-crag.jpg: drawn 0.1 s · settled 1.5 s · p50 9.8 ms · p95 14.5 ms · 0 shader violations
+24-hold-warden.jpg: drawn 0.1 s · settled 1.5 s · p50 9.7 ms · p95 12.0 ms · 0 shader violations
+situations: ready in 17.1 s
+25-hurt-traveller.jpg: drawn 0.0 s · settled 1.7 s · p50 12.5 ms · p95 17.2 ms · 0 shader violations
+26-raided-farm.jpg: drawn 0.0 s · settled 1.5 s · p50 12.7 ms · p95 14.7 ms · 0 shader violations
+land: 13 shots in shots\phaseL11\set\2026-10-29-8b068d8 (200 s)

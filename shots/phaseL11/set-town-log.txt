@@ -1,0 +1,23 @@
+
+> masterworld@0.0.0 shot:set
+> node tools/shot/set.mjs shots/phaseL11/set --part=town
+
+title: ready in 33.8 s
+01-title.jpg: drawn 0.1 s · settled 4.0 s · p50 17.3 ms · p95 39.6 ms · 0 shader violations
+02-creator.jpg: drawn 1.1 s · settled 2.1 s · p50 16.5 ms · p95 35.7 ms · 0 shader violations
+town: ready in 21.6 s
+03-town-noon.jpg: drawn 0.1 s · settled 4.0 s · p50 15.5 ms · p95 32.5 ms · 0 shader violations
+04-pack.jpg: drawn 0.0 s · settled 1.5 s · p50 5.0 ms · p95 21.9 ms · 0 shader violations
+05-map.jpg: drawn 0.0 s · settled 1.5 s · p50 4.2 ms · p95 20.8 ms · 0 shader violations
+06-town-dusk.jpg: drawn 0.0 s · settled 1.5 s · p50 14.2 ms · p95 18.6 ms · 0 shader violations
+07-town-night.jpg: drawn 0.0 s · settled 1.5 s · p50 14.9 ms · p95 18.4 ms · 0 shader violations
+08-town-rain.jpg: drawn 0.0 s · settled 1.5 s · p50 16.9 ms · p95 39.8 ms · 0 shader violations
+09-paddock.jpg: drawn 0.2 s · settled 1.5 s · p50 10.3 ms · p95 16.5 ms · 0 shader violations
+10-trade.jpg: drawn 0.0 s · settled 1.5 s · p50 13.5 ms · p95 24.7 ms · 0 shader violations
+wet: ready in 18.3 s
+11-town-wet-sun.jpg: drawn 0.1 s · settled 1.7 s · p50 16.3 ms · p95 27.5 ms · 0 shader violations
+inn: ready in 18.8 s
+17-inn.jpg: drawn 0.1 s · settled 4.0 s · p50 8.1 ms · p95 9.9 ms · 0 shader violations
+talk: ready in 16.6 s
+18-talk.jpg: drawn 0.0 s · settled 4.0 s · p50 12.8 ms · p95 18.3 ms · 0 shader violations
+town: 13 shots in shots\phaseL11\set\2026-10-29-8b068d8 (182 s)

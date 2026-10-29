@@ -1,0 +1,17 @@
+
+> masterworld@0.0.0 shot:set
+> node tools/shot/set.mjs ../phaseL11-main-set --part=town
+
+title: ready in 31.5 s
+01-title.jpg: drawn 0.1 s · settled 3.9 s · p50 17.7 ms · p95 39.4 ms · 0 shader violations
+02-creator.jpg: drawn 0.0 s · settled 2.0 s · p50 16.2 ms · p95 33.1 ms · 0 shader violations
+town: ready in 23.1 s
+03-town-noon.jpg: drawn 0.1 s · settled 1.7 s · p50 11.1 ms · p95 14.8 ms · 0 shader violations
+04-pack.jpg: drawn 0.0 s · settled 1.5 s · p50 5.6 ms · p95 16.7 ms · 0 shader violations
+05-map.jpg: drawn 0.0 s · settled 1.5 s · p50 3.6 ms · p95 18.4 ms · 0 shader violations
+06-town-dusk.jpg: drawn 0.0 s · settled 1.5 s · p50 14.8 ms · p95 37.3 ms · 0 shader violations
+07-town-night.jpg: drawn 0.0 s · settled 2.0 s · p50 15.4 ms · p95 22.3 ms · 0 shader violations
+08-town-rain.jpg: drawn 0.0 s · settled 1.5 s · p50 17.7 ms · p95 47.7 ms · 0 shader violations
+09-paddock.jpg: drawn 0.1 s · settled 2.2 s · p50 12.6 ms · p95 18.0 ms · 0 shader violations
+10-trade.jpg: drawn 0.0 s · settled 1.5 s · p50 11.8 ms · p95 18.6 ms · 0 shader violations
+town: 10 shots in ..\phaseL11-main-set\2026-10-29-ff9ab33 (107 s)
