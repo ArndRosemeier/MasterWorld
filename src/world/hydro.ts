@@ -11,7 +11,7 @@
  */
 import { MinHeap, Noise, clamp, deriveSeed, hash2f, lerp, smoothstep } from '@futuremagic/core';
 import type { Skeleton } from './skeleton';
-import { chamfer, floodLake, type Lake } from './lakes';
+import { chamfer, floodLake, unpackLake, type Lake } from './lakes';
 
 export interface HydroOptions {
   /** Coarse cell side, metres. */
@@ -307,6 +307,8 @@ export class HydroTile {
       this.lake = new Float32Array(N).fill(NaN);
       this.plain = given.plain;
       this.vale = given.vale;
+      this.lakes.push(...given.lakes);
+      this.lakeOf = given.lakeOf;
       this.rivers.push(...given.rivers);
       this.rivers.forEach((r, ri) => this.index(r, ri));
       return;
@@ -1041,6 +1043,13 @@ export class HydroTile {
     return out;
   }
 
+  /** The cells with a lake, as (cell, lake) pairs (packTile). */
+  lakeCells(): number[] {
+    const out: number[] = [];
+    this.lakeOf.forEach((id, c) => { if (id >= 0) out.push(c, id); });
+    return out;
+  }
+
   /** The lake of cell `c` (W3), or null. */
   private lakeIn(c: number): Lake | null {
     const id = this.lakeOf.length ? this.lakeOf[c] : -1;
@@ -1067,11 +1076,15 @@ export interface PackedTile {
   rivers: River[];
   plain: Float32Array;
   vale: Float32Array;
+  /** A river tile's lakes and which one each cell may hold (empty in a brook tile). */
+  lakes: Lake[];
+  lakeOf: Int32Array;
 }
 
 /**
  * A tile packed into one array, to hand it to another thread: [count, then per river: points, xz, level, half, fall,
- * reach (0 or n)], then [floors, then per floor: cell, level], then [vales, then per valley cell: cell, height].
+ * reach (0 or n)], then [floors, then per floor: cell, level], then [vales, then per valley cell: cell, height], then
+ * [lakes, then each lake's numbers (Lake.pack)], then [lake cells, then per cell: cell, lake].
  */
 export function packTile(t: HydroTile): Float64Array {
   const { rivers, plain } = t;
@@ -1083,6 +1096,8 @@ export function packTile(t: HydroTile): Float64Array {
   const cuts: number[] = [];
   t.vale.forEach((v, c) => { if (v !== Infinity) cuts.push(c, v); });
   size += 1 + cuts.length;
+  const lakes = t.lakes.flatMap((l) => l.pack()), of = t.lakeCells();
+  size += 2 + lakes.length + of.length;
   const out = new Float64Array(size);
   let o = 0;
   out[o++] = rivers.length;
@@ -1099,7 +1114,11 @@ export function packTile(t: HydroTile): Float64Array {
   out[o++] = floors.length / 2;
   out.set(floors, o); o += floors.length;
   out[o++] = cuts.length / 2;
-  out.set(cuts, o);
+  out.set(cuts, o); o += cuts.length;
+  out[o++] = t.lakes.length;
+  out.set(lakes, o); o += lakes.length;
+  out[o++] = of.length / 2;
+  out.set(of, o);
   return out;
 }
 
@@ -1119,9 +1138,15 @@ export function unpackTile(a: Float64Array, cells: number): PackedTile {
   }
   const plain = new Float32Array(cells).fill(NaN);
   for (let k = 0, count = a[o++]; k < count; k++, o += 2) plain[a[o]] = a[o + 1];
-  const vale = new Float32Array(o < a.length ? cells : 0).fill(Infinity);
-  for (let k = 0, count = o < a.length ? a[o++] : 0; k < count; k++, o += 2) vale[a[o]] = a[o + 1];
-  return { rivers, plain, vale };
+  const cuts = a[o++];
+  // A river tile has no valleys of its own (an empty vale, as it was built).
+  const vale = new Float32Array(cuts ? cells : 0).fill(Infinity);
+  for (let k = 0; k < cuts; k++, o += 2) vale[a[o]] = a[o + 1];
+  const lakes: Lake[] = [];
+  for (let k = 0, count = a[o++]; k < count; k++) { const l = unpackLake(a, o); lakes.push(l.lake); o = l.end; }
+  const count = a[o++], lakeOf = new Int32Array(count ? cells : 0).fill(-1);
+  for (let k = 0; k < count; k++, o += 2) lakeOf[a[o]] = a[o + 1];
+  return { rivers, plain, vale, lakes, lakeOf };
 }
 
 /**
@@ -1137,6 +1162,25 @@ const worldKey = (sk: Skeleton): string => {
   if (k === undefined) worldKeys.set(sk, (k = `${sk.seed}|${JSON.stringify(sk.shape)}`));
   return k;
 };
+/** Tiles another thread traced (`adoptTiles`), packed, by the same keys as `shared`: taken when first asked for. */
+const adopted = new Map<string, Float64Array>();
+
+/** A tile traced in one thread, packed with its key, for another thread of the same world (`adoptTiles`). */
+export interface TracedTile { readonly key: string; readonly data: Float64Array }
+
+/**
+ * Every tile this thread has traced for the world of `sk`, packed: the main thread hands them to the terrain workers,
+ * which then need not trace them again (since phase W's lakes and valleys, seconds each).
+ */
+export function tracedTiles(sk: Skeleton): TracedTile[] {
+  const prefix = `${worldKey(sk)}|`;
+  return [...shared].filter(([k]) => k.startsWith(prefix)).map(([key, t]) => ({ key, data: packTile(t) }));
+}
+
+/** Tiles another thread traced (`tracedTiles`): this thread takes them instead of tracing them. */
+export function adoptTiles(tiles: readonly TracedTile[]): void {
+  for (const t of tiles) adopted.set(t.key, t.data);
+}
 
 export class Hydrology {
   private readonly tiles = new Map<string, HydroTile>();
@@ -1224,7 +1268,9 @@ export class Hydrology {
     if (!t) {
       const k = `${worldKey(this.skeleton)}|${JSON.stringify(o)}|${tiles === this.tiles ? '' : JSON.stringify(this.o)}|${key}`;
       t = shared.get(k);
+      const given = t ? undefined : adopted.get(k);
       if (t) shared.delete(k);
+      else if (given) { adopted.delete(k); t = new HydroTile(this.skeleton, tx, tz, o, null, unpackTile(given, (o.core + 2 * o.margin) ** 2)); }
       else t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz));
       shared.set(k, t);
       if (shared.size > SHARED_TILES) shared.delete(shared.keys().next().value!);

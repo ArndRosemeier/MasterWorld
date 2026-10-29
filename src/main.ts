@@ -135,7 +135,7 @@ import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/s
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
 import { bridgesNear } from './world/bridges';
-import { emptyWater, inChannel } from './world/hydro';
+import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
 declare global {
@@ -389,7 +389,11 @@ export async function start(b: Boot): Promise<void> {
     // Brook tiles ahead of the hero come from the world worker (D50).
     const brooks = new BrookPrefetch(terrain.hydro, jobs);
     // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
-    const terrainJobs = new TerrainJobs(createTerrainPool(), seed, setting.id);
+    const terrainPool = createTerrainPool();
+    // First of all they hear of the rivers' and brooks' tiles this thread traced opening the world: each opens it on
+    // them instead of tracing them again (since phase W's lakes and valleys, seconds each, while 'Raising the land' waited).
+    void terrainPool.broadcast({ kind: 'tiles', tiles: tracedTiles(terrain.skeleton), seed, setting: setting.id }).catch(() => {});
+    const terrainJobs = new TerrainJobs(terrainPool, seed, setting.id);
     const roadWork = new RoadWork(terrain, jobs, terrainJobs);
     void roadWork.start(later);
     // The land round the camera is asked for early (after the roads, which the workers hear of first), so its
