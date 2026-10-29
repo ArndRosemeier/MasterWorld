@@ -33,11 +33,33 @@ export const landformMix: Readonly<Record<string, LandformMix>> = {
 };
 
 /**
- * The kinds of country (D55): open country (hills and plains with the biomes' own landforms) and mesa country
- * (plateaus 40-200 m high, cliff walls with a bench or two, passes up ramps of fallen rock and gullies).
+ * The kinds of country (D55): open country (hills and plains with the biomes' own landforms), rolling downs, moor,
+ * karst, badlands (L7: each its big shapes, landforms and bareness) and mesa country (plateaus 40-200 m high,
+ * cliff walls with a bench or two, passes up ramps of fallen rock and gullies).
  */
 export const landscapeKinds: readonly LandscapeKindDef[] = [
-  { id: 'open', share: 0.62 },
+  // (The kinds before mesa country share what open country alone had, so the mesas stand where they stood.)
+  { id: 'open', share: 0.3 },
+  // Rolling downs: broad rounded hills of short grass, dry valleys between, old banks and lanes, few trees.
+  {
+    id: 'downs', share: 0.1, swell: { height: 38, size: 1300 }, bare: 0.55,
+    landforms: { perKm2: 34, relief: 5, mix: { dryValley: 4, knoll: 3, bank: 2, sunkenLane: 2, dell: 2, scarp: 1 } },
+  },
+  // Moor: high, open and treeless, tors of grey rock on the crests, boulders strewn, boggy hollows with pools.
+  {
+    id: 'moor', share: 0.09, swell: { height: 26, size: 1800 }, bare: 0.88,
+    landforms: { perKm2: 44, relief: 6, mix: { tor: 5, boulders: 4, erratic: 3, dell: 3, knoll: 2, ridge: 1 } },
+  },
+  // Karst: limestone country pitted with sinkholes and dolines, dry valleys and ravines where the water went under.
+  {
+    id: 'karst', share: 0.07, swell: { height: 22, size: 900 }, bare: 0.25,
+    landforms: { perKm2: 72, relief: 6, mix: { sinkhole: 8, dell: 3, ravine: 2, dryValley: 2, tor: 2, knoll: 2, boulders: 1 } },
+  },
+  // Badlands: bare, crumbling ground cut into knife ridges by countless gullies, scarps and ravines.
+  {
+    id: 'badlands', share: 0.06, swell: { height: 30, size: 650, sharp: true }, bare: 0.94,
+    landforms: { perKm2: 62, relief: 10, mix: { gully: 6, ravine: 4, ridge: 3, scarp: 3, knoll: 1 } },
+  },
   {
     id: 'mesa', share: 0.38,
     mesa: { height: [40, 200], cover: 0.42, size: 2400, steep: [4.5, 6.5], passes: 0.2, climbable: 0.3, tiers: 2 },

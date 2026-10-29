@@ -70,10 +70,16 @@ export class Skeleton {
   /** The kinds of country, and the mesa country's shape (if any kind is one). */
   readonly kinds: readonly LandscapeKindDef[];
   private readonly mesa: MesaDef | null;
+  /** Whether any kind has big shapes of its own, or is bare of plants. */
+  private readonly swells: boolean;
+  private readonly bares: boolean;
   /** Each kind's weight at the last `kindWeights` point. */
   private readonly weights: Float64Array;
   /** The kinds' shares summed. */
   private readonly shares: number;
+  /** The point `weights` were last worked out for. */
+  private wx = NaN;
+  private wz = NaN;
 
   constructor(readonly seed: number, readonly shape: WorldShape) {
     this.continentNoise = new Noise(deriveSeed(seed, 'skeleton', 'continent'));
@@ -90,6 +96,8 @@ export class Skeleton {
     this.kindSeed = deriveSeed(seed, 'skeleton', 'kinds');
     this.kinds = shape.kinds?.length ? shape.kinds : OPEN;
     this.mesa = this.kinds.find((k) => k.mesa)?.mesa ?? null;
+    this.swells = this.kinds.some((k) => k.swell);
+    this.bares = this.kinds.some((k) => k.bare);
     this.weights = new Float64Array(this.kinds.length);
     this.shares = this.kinds.reduce((a, k) => a + k.share, 0);
   }
@@ -108,6 +116,9 @@ export class Skeleton {
    */
   kindWeights(x: number, z: number): Float64Array {
     const w = this.weights;
+    // Asked again for the same point (the mesas and the kinds' swells both ask, one after the other): as it was.
+    if (x === this.wx && z === this.wz) return w;
+    this.wx = x; this.wz = z;
     w.fill(0);
     if (this.kinds.length === 1) { w[0] = 1; return w; }
     const n = this.kindNoise;
@@ -147,6 +158,44 @@ export class Skeleton {
   kindShare(id: string, x: number, z: number): number {
     const k = this.kinds.findIndex((d) => d.id === id);
     return k < 0 ? 0 : this.kindWeights(x, z)[k];
+  }
+
+  /** The kinds' own big shapes at (x, z), metres, each as much as its kind is there. */
+  private swellAt(x: number, z: number): number {
+    const w = this.kindWeights(x, z);
+    let h = 0;
+    for (let i = 0; i < w.length; i++) {
+      const s = this.kinds[i].swell;
+      if (!s || w[i] <= 0) continue;
+      const n = this.hillNoise.fbm2(x / s.size + 31.7 * (i + 1), z / s.size - 17.3 * (i + 1), 3);
+      // Rounded hills stand on the land; knife ridges are what is left between gullies cut down into it.
+      h += w[i] * s.height * (s.sharp ? Math.pow(1 - Math.min(1, Math.abs(n) * 2.2), 2) : 0.5 + n);
+    }
+    return h;
+  }
+
+  /** How bare of plants the land is at (x, z), 0..1 (its kinds' `bare`). */
+  bareAt(x: number, z: number): number {
+    if (!this.bares) return 0;
+    const w = this.kindWeights(x, z);
+    let b = 0;
+    for (let i = 0; i < w.length; i++) b += w[i] * (this.kinds[i].bare ?? 0);
+    return b;
+  }
+
+  /**
+   * The nearest land well inside the kind of country `id` from (x, z), along a spiral walked out from there
+   * (turns 2 km apart, a step every 250 m, out to some 40 km); null if none is met. For shots and checks.
+   */
+  nearestKind(id: string, x: number, z: number, share = 0.95): { x: number; z: number } | null {
+    const k = this.kinds.findIndex((d) => d.id === id);
+    if (k < 0) return null;
+    for (let a = 0, s = 0; s < 12000; s++) {
+      const r = 1000 + (a * 2000) / (2 * Math.PI), px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+      a += 250 / r;
+      if (this.elevation(px, pz) >= 5 && this.kindWeights(px, pz)[k] > share) return { x: px, z: pz };
+    }
+    return null;
   }
 
   /** How much of mesa country is at (x, z), 0..1. */
@@ -321,6 +370,8 @@ export class Skeleton {
       const terraced = Math.floor(land / step) * step + step * smoothstep(0.3, 0.7, (land % step) / step);
       land = lerp(land, terraced, w.drama * 0.7 * smoothstep(0.45, 0.8, relief));
     }
+    // Each kind's own big shapes (downs' rounded hills, badlands' knife ridges), as much as the kind is here.
+    if (this.swells) land += this.swellAt(x, z);
     // Mesa country: broad, gentler valley floors and the plateaus over them.
     const k = this.mesa ? this.mesaWeight(x, z) : 0;
     this.lastRise = 0;

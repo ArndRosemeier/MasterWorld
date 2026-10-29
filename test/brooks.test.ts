@@ -102,6 +102,9 @@ test('brooks: the mask carries a brook\'s level well onto its banks, under the g
     const big = waterMask(terrain, { seed, setting: classic.id, x0: x - 32, z0: z - 32, size: 64, res: 32 });
     const i = Math.floor((bx - (x - 32)) / 2), j = Math.floor((bz - (z - 32)) / 2), p = (j * 32 + i) * 4;
     const ground = terrain.height(bx, bz);
+    // A bank that falls away below the water (a brook along a hillside) has no level carried onto it: the surface
+    // would float over the land there.
+    if (ground < w.level) continue;
     tried++;
     if (big[p + 1] !== DRY && Math.abs(big[p] - w.level) < 0.5) { carried++; assert.ok(big[p] <= ground + 0.01, 'never above the bank'); }
     if (tried >= 8) break;
