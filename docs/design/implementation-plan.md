@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Gate L passed on 2026-10-29** after one retake (review: `/mnt/project-files/masterworld/shots/gateL/gate-l-review.md`, shots in branch `claude/phaseL-gate-final2`, `shots/gateL-final2/`). **Phase W (water after the land, Arnd 2026-10-29) comes before phase D**, then **phase G (levels, D58; Arnd 2026-10-29)**.
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Gate L passed on 2026-10-29** after one retake (review: `/mnt/project-files/masterworld/shots/gateL/gate-l-review.md`, shots in branch `claude/phaseL-gate-final2`, `shots/gateL-final2/`). **Phase W (water after the land, Arnd 2026-10-29) comes before phase D**, and **phase G (levels and no skills, D58, D59) runs in parallel with it** (Arnd 2026-10-29: before more content is built the old way).
 
 ---
 
@@ -158,7 +158,9 @@ Goal: all water (lakes, rivers, brooks) comes after the land is finished and fol
 
 Gate W: GPU shots of the vj4985 lake, a river into and out of a lake, and brooks in the start valley, seen as valleys; `water:fit` holds W3 and W4b-W4d; the loop check passes; the review.
 
-### Phase G: Levels (Arnd, 2026-10-29; after phase W, before phase D)
+### Phase G: Levels (Arnd, 2026-10-29; now, in parallel with phase W, before phase D)
+
+Arnd, 2026-10-29: so much relies on this that it starts at once, before more content is built on skills and reputation.
 
 Goal: the hero grows by levels, every kind of play counts towards them, and the level is the skill for every ability (D58, D59).
 
