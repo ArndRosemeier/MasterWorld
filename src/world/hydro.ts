@@ -48,8 +48,18 @@ const LAKE_SHARE = 0.35;
 /** Spacing of river polyline points after resampling, metres. */
 const STEP = 80;
 /** Brooks: resample spacing, meander scale (metres), and the half widths they keep to. */
-const BROOK_STEP = 40;
+const BROOK_STEP = 20;
 const BROOK_MEANDER = 450;
+/**
+ * Brooks: how far (metres) a course may leave its cells' centres to run straight. The cells only step in eight
+ * directions, so a brook traced through them runs in right angles and 45° zigzags; straightened first, it runs
+ * any way, and is then rounded.
+ */
+const BROOK_STRAIGHTEN = 70;
+/** Brooks: the spacing (metres) a course is rounded and meandered at, before it keeps every BROOK_STEP. */
+const BROOK_FINE = 10;
+/** Brooks: passes of a 1-2-1 blur over the meandered course (at BROOK_FINE): no kinks left where it bends. */
+const BROOK_BLUR = 10;
 const BROOK_HALF: readonly [number, number] = [1, 3.5];
 /**
  * Waterfalls: where a river drops at least FALL_MIN metres within FALL_RUN metres, the drop may gather into
@@ -77,6 +87,67 @@ export interface River {
    * so its sides stay walkable slopes, not walls). Rivers: none (`valleyOf`).
    */
   reach?: Float32Array;
+}
+
+/** A course's points: x, z, water level and half width. */
+type Course = [number[], number[], number[], number[]];
+
+/** Chaikin corner cutting of a course (its ends kept), `times` over. */
+function chaikin(c: Course, times: number): Course {
+  for (let it = 0; it < times; it++) {
+    const n = c[0].length, out: Course = [[], [], [], []];
+    for (let q = 0; q < 4; q++) {
+      const a = c[q], o = out[q];
+      o.push(a[0]);
+      for (let k = 0; k < n - 1; k++) o.push(a[k] * 0.75 + a[k + 1] * 0.25, a[k] * 0.25 + a[k + 1] * 0.75);
+      o.push(a[n - 1]);
+    }
+    c = out;
+  }
+  return c;
+}
+
+/** A course resampled every `step` metres along it (its ends kept). */
+function resampleCourse(c: Course, step: number): Course {
+  const [X, Z] = c, out: Course = [[], [], [], []];
+  const along = [0];
+  for (let k = 1; k < X.length; k++) along.push(along[k - 1] + Math.hypot(X[k] - X[k - 1], Z[k] - Z[k - 1]));
+  const total = along[along.length - 1], count = Math.max(1, Math.round(total / step));
+  for (let i = 0, k = 0; i <= count; i++) {
+    const d = (i / count) * total;
+    while (k < X.length - 2 && along[k + 1] < d) k++;
+    const t = along[k + 1] > along[k] ? clamp((d - along[k]) / (along[k + 1] - along[k]), 0, 1) : 0;
+    for (let q = 0; q < 4; q++) out[q].push(lerp(c[q][k], c[q][k + 1], t));
+  }
+  return out;
+}
+
+/** Which points of a path to keep so it runs straight wherever it strays no more than `tol` metres (Douglas-Peucker). */
+function straighten(x: readonly number[], z: readonly number[], tol: number): number[] {
+  const keep = new Uint8Array(x.length);
+  keep[0] = keep[x.length - 1] = 1;
+  const spans: [number, number][] = [[0, x.length - 1]];
+  while (spans.length) {
+    const [a, b] = spans.pop()!;
+    const dx = x[b] - x[a], dz = z[b] - z[a], len = Math.hypot(dx, dz) || 1;
+    let worst = -1, far = tol;
+    for (let k = a + 1; k < b; k++) {
+      const d = Math.abs((x[k] - x[a]) * dz - (z[k] - z[a]) * dx) / len;
+      if (d > far) { far = d; worst = k; }
+    }
+    if (worst >= 0) { keep[worst] = 1; spans.push([a, worst], [worst, b]); }
+  }
+  const out: number[] = [];
+  keep.forEach((v, k) => { if (v) out.push(k); });
+  return out;
+}
+
+/** 1-2-1 blur of a line of values, `passes` times; its ends stay. */
+function blur(a: number[], passes: number): void {
+  for (let p = 0; p < passes; p++) {
+    let prev = a[0];
+    for (let k = 1; k < a.length - 1; k++) { const cur = a[k]; a[k] = (prev + 2 * cur + a[k + 1]) / 4; prev = cur; }
+  }
 }
 
 /** Height (m) below which the land's relief may dip under a brook's drained ground (terrain.ts: up to ~2.5 m down, never below 0.5 m). */
@@ -301,8 +372,8 @@ export class HydroTile {
       if (!fed) heads.push(c);
     }
     heads.sort((a, b) => acc[b] - acc[a] || a - b);
-    // Brooks that end in a bigger brook (traced before them): their last point moves onto its meandering line.
-    const tributaries: number[] = [];
+    // Brooks that end in a bigger brook (traced before them) end on its meandering line (`ontoLine`).
+    const lines = o.brook ? new Map<number, number[]>() : null;
     const area = (o.cell / 1000) ** 2;
     for (const h of heads) {
       const cells: number[] = [];
@@ -336,10 +407,10 @@ export class HydroTile {
       if (end) { px.push(end.x); pz.push(end.z); pl.push(end.level); ph.push(ph[ph.length - 1]); }
       // Levels never rise downstream: through a rim the river cuts a gorge down to the level it came at.
       for (let k = 1; k < pl.length; k++) pl[k] = Math.min(pl[k], pl[k - 1]);
+      if (into && lines) this.ontoLine(lines, px, pz, pl);
       this.rivers.push(this.shape(px, pz, pl, ph));
-      if (into && o.brook) tributaries.push(this.rivers.length - 1);
+      if (lines) this.addLine(lines, this.rivers.length - 1);
     }
-    if (tributaries.length) this.joinTributaries(tributaries);
     this.rivers.forEach((r, ri) => this.index(r, ri));
   }
 
@@ -373,62 +444,44 @@ export class HydroTile {
     return best;
   }
 
-  /**
-   * A brook that runs into a bigger one ends at that brook's cell; but the bigger one meanders away from its
-   * cells, so the end moves to the nearest point of its line (and no higher than the water there).
-   */
-  private joinTributaries(tribs: readonly number[]): void {
-    const G = 100, grid = new Map<number, number[]>();
-    this.rivers.forEach((r, ri) => {
-      for (let k = 0; k < r.level.length; k++) {
-        const key = this.key(Math.floor(r.xz[k * 2] / G), Math.floor(r.xz[k * 2 + 1] / G));
-        let list = grid.get(key);
-        if (!list) grid.set(key, (list = []));
-        list.push(ri, k);
-      }
-    });
-    for (const ti of tribs) {
-      const t = this.rivers[ti], e = t.level.length - 1, x = t.xz[e * 2], z = t.xz[e * 2 + 1];
-      let best = Infinity, bx = x, bz = z, bl = t.level[e];
-      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
-        const list = grid.get(this.key(Math.floor(x / G) + i, Math.floor(z / G) + j));
-        if (list) for (let q = 0; q < list.length; q += 2) {
-          // Only brooks traced before it: the one whose cell it ran into is among them.
-          if (list[q] >= ti) continue;
-          const r = this.rivers[list[q]], k = list[q + 1], d = Math.hypot(r.xz[k * 2] - x, r.xz[k * 2 + 1] - z);
-          if (d < best) { best = d; bx = r.xz[k * 2]; bz = r.xz[k * 2 + 1]; bl = r.level[k]; }
-        }
-      }
-      if (best === Infinity) continue;
-      t.xz[e * 2] = bx; t.xz[e * 2 + 1] = bz;
-      t.level[e] = Math.min(t.level[e], bl);
+  /** Brooks' points by 100 m square (`ontoLine`). */
+  private addLine(lines: Map<number, number[]>, ri: number): void {
+    const r = this.rivers[ri];
+    for (let k = 0; k < r.level.length; k++) {
+      const key = this.key(Math.floor(r.xz[k * 2] / 100), Math.floor(r.xz[k * 2 + 1] / 100));
+      let list = lines.get(key);
+      if (!list) lines.set(key, (list = []));
+      list.push(ri, k);
     }
   }
 
-  /** Smooth and resample a coarse path, then let it meander (offset by world position only). */
-  private shape(px: number[], pz: number[], pl: number[], ph: number[]): River {
-    // Chaikin twice.
-    let X = px, Z = pz, L = pl, H = ph;
-    for (let it = 0; it < 2; it++) {
-      const x: number[] = [X[0]], z: number[] = [Z[0]], l: number[] = [L[0]], h: number[] = [H[0]];
-      for (let k = 0; k < X.length - 1; k++) {
-        for (const t of [0.25, 0.75]) {
-          x.push(X[k] + (X[k + 1] - X[k]) * t); z.push(Z[k] + (Z[k + 1] - Z[k]) * t);
-          l.push(L[k] + (L[k + 1] - L[k]) * t); h.push(H[k] + (H[k + 1] - H[k]) * t);
-        }
+  /**
+   * A brook that runs into a bigger one ends at that brook's cell; but the bigger one meanders away from its
+   * cells, so its path ends at the nearest point of that one's line instead (and no higher than the water there),
+   * before it is shaped: it bends over to it in a curve like any other.
+   */
+  private ontoLine(lines: Map<number, number[]>, px: number[], pz: number[], pl: number[]): void {
+    const e = px.length - 1, x = px[e], z = pz[e];
+    let best = Infinity, bx = x, bz = z, bl = pl[e];
+    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+      const list = lines.get(this.key(Math.floor(x / 100) + i, Math.floor(z / 100) + j));
+      if (list) for (let q = 0; q < list.length; q += 2) {
+        const r = this.rivers[list[q]], k = list[q + 1], d = Math.hypot(r.xz[k * 2] - x, r.xz[k * 2 + 1] - z);
+        if (d < best) { best = d; bx = r.xz[k * 2]; bz = r.xz[k * 2 + 1]; bl = r.level[k]; }
       }
-      x.push(X[X.length - 1]); z.push(Z[Z.length - 1]); l.push(L[L.length - 1]); h.push(H[H.length - 1]);
-      X = x; Z = z; L = l; H = h;
     }
-    // Resample every STEP metres, offset sideways by a meander field.
-    const xz: number[] = [], lv: number[] = [], hw: number[] = [];
-    // A brook's ground at each point (for its level and how far its sides spread).
-    const gr: number[] = [];
-    const amp = Math.min(this.o.cell * 0.3, 650), brook = this.o.brook ?? false;
-    const step = brook ? BROOK_STEP : STEP, scale = brook ? BROOK_MEANDER : 2600;
+    if (best === Infinity) return;
+    px[e] = bx; pz[e] = bz; pl[e] = Math.min(pl[e], bl);
+  }
+
+  /** A river's course: its coarse path smoothed (Chaikin twice), resampled every STEP metres and meandering. */
+  private riverCourse(px: number[], pz: number[], pl: number[], ph: number[]): Course {
+    const [X, Z, L, H] = chaikin([px, pz, pl, ph], 2);
+    const c: Course = [[], [], [], []];
+    const amp = Math.min(this.o.cell * 0.3, 650);
     for (let k = 0; k < X.length - 1; k++) {
       const dx = X[k + 1] - X[k], dz = Z[k + 1] - Z[k], len = Math.hypot(dx, dz);
-      const steps = Math.max(1, Math.round(len / step));
+      const steps = Math.max(1, Math.round(len / STEP));
       const nx = -dz / (len || 1), nz = dx / (len || 1);
       for (let s = 0; s < steps; s++) {
         const t = s / steps;
@@ -436,19 +489,59 @@ export class HydroTile {
         const half = H[k] + (H[k + 1] - H[k]) * t;
         // Meanders: wider rivers swing in wider loops; fade at the ends so mouths and joins stay put.
         const ends = Math.min(1, Math.min(k + t, X.length - 1 - k - t) / 3);
-        const m = this.meander.fbm2(x / scale, z / scale, 2) * amp * (brook ? 1 : clamp(half / 25, 0.35, 1)) * ends;
-        xz.push(x + nx * m, z + nz * m);
-        // A brook lies in the ground where it runs (its cells are too coarse for the dips between them).
-        const lk = L[k] + (L[k + 1] - L[k]) * t;
-        if (this.feed) gr.push(this.drainedAt(x + nx * m, z + nz * m));
-        // Low by the sea, the land's small relief (terrain.ts, down to 0.5 m) dips below a brook's ground: it runs
-        // at the sea's height there, so its banks stay dry.
-        const bl = this.feed ? Math.min(lk, gr[gr.length - 1] - 0.2) : lk;
-        lv.push(this.feed && bl < LOW_LAND ? Math.min(bl, 0.3) : bl);
-        hw.push(half);
+        const m = this.meander.fbm2(x / 2600, z / 2600, 2) * amp * clamp(half / 25, 0.35, 1) * ends;
+        c[0].push(x + nx * m); c[1].push(z + nz * m); c[2].push(L[k] + (L[k + 1] - L[k]) * t); c[3].push(half);
       }
     }
-    xz.push(X[X.length - 1], Z[Z.length - 1]); lv.push(L[L.length - 1]); hw.push(H[H.length - 1]);
+    c[0].push(X[X.length - 1]); c[1].push(Z[Z.length - 1]); c[2].push(L[L.length - 1]); c[3].push(H[H.length - 1]);
+    return c;
+  }
+
+  /**
+   * A brook's course (D50): its cells' path straightened (they step in eight directions only), rounded, and
+   * meandering along its own smooth line, so it bends in curves, never in corners. Every BROOK_STEP metres.
+   */
+  private brookCourse(px: number[], pz: number[], pl: number[], ph: number[]): Course {
+    const keep = straighten(px, pz, BROOK_STRAIGHTEN);
+    const [X, Z, L, H] = resampleCourse(chaikin([keep.map((k) => px[k]), keep.map((k) => pz[k]), keep.map((k) => pl[k]), keep.map((k) => ph[k])], 3), BROOK_FINE);
+    const n = X.length, amp = Math.min(this.o.cell * 0.3, 650), run = (n - 1) * BROOK_FINE;
+    // Sideways by the meander field, across the rounded line (its direction over 40 m either way: on a tight bend
+    // the sideways swing would fold the course over).
+    blur(X, BROOK_BLUR); blur(Z, BROOK_BLUR);
+    const mx = X.slice(), mz = Z.slice();
+    for (let k = 1; k < n - 1; k++) {
+      const a = Math.max(0, k - 4), b = Math.min(n - 1, k + 4);
+      const dx = X[b] - X[a], dz = Z[b] - Z[a], len = Math.hypot(dx, dz) || 1;
+      // Faded at the ends, so heads, mouths and joins stay put.
+      const ends = Math.min(1, Math.min(k, n - 1 - k) * BROOK_FINE / Math.min(150, run / 3));
+      const m = this.meander.fbm2(X[k] / BROOK_MEANDER, Z[k] / BROOK_MEANDER, 2) * amp * ends;
+      mx[k] = X[k] - (dz / len) * m; mz[k] = Z[k] + (dx / len) * m;
+    }
+    blur(mx, BROOK_BLUR); blur(mz, BROOK_BLUR);
+    const every = BROOK_STEP / BROOK_FINE, c: Course = [[], [], [], []];
+    for (let k = 0; k < n; k += every) { c[0].push(mx[k]); c[1].push(mz[k]); c[2].push(L[k]); c[3].push(H[k]); }
+    if ((n - 1) % every) { c[0].push(mx[n - 1]); c[1].push(mz[n - 1]); c[2].push(L[n - 1]); c[3].push(H[n - 1]); }
+    return c;
+  }
+
+  /** Smooth and resample a coarse path, then let it meander (offset by world position only). */
+  private shape(px: number[], pz: number[], pl: number[], ph: number[]): River {
+    const brook = this.o.brook ?? false, step = brook ? BROOK_STEP : STEP;
+    const [cx, cz, cl, chw] = brook ? this.brookCourse(px, pz, pl, ph) : this.riverCourse(px, pz, pl, ph);
+    const xz: number[] = [], lv: number[] = [], hw: number[] = [];
+    // A brook's ground at each point (for its level and how far its sides spread).
+    const gr: number[] = [];
+    const last = cx.length - 1;
+    for (let k = 0; k <= last; k++) {
+      xz.push(cx[k], cz[k]); hw.push(chw[k]);
+      // A brook lies in the ground where it runs (its cells are too coarse for the dips between them).
+      if (!this.feed || k === last) { lv.push(cl[k]); continue; }
+      gr.push(this.drainedAt(cx[k], cz[k]));
+      // Low by the sea, the land's small relief (terrain.ts, down to 0.5 m) dips below a brook's ground: it runs
+      // at the sea's height there, so its banks stay dry.
+      const bl = Math.min(cl[k], gr[k] - 0.2);
+      lv.push(bl < LOW_LAND ? Math.min(bl, 0.3) : bl);
+    }
     // A river ends where it meets the sea: its coarse cells would carry it on over the sea floor, a band of water
     // standing metres above the sea. One point past the shore, at the sea's level, so it reaches the water.
     const sea = (k: number) => this.skeleton.elevation(xz[k * 2], xz[k * 2 + 1]) < 0;
