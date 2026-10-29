@@ -55,8 +55,8 @@ const state = () => page.evaluate(() => {
   return { mode: w.mode, x: w.pos.x, y: w.pos.y, z: w.pos.z, rigged: !!h?.rigged, clip: h?.clip, yaw: o ? o.rotation.y - Math.PI : null, walkerYaw: w.yaw,
     handUp, toGoal, handAt, goal, at, goalW: h?.goals?.R?.w };
 });
-/** The camera from the side and a little below, so the face and the climber show. */
-const side = (turn) => page.evaluate((turn) => { const p = window.game.player; p.heroCam.yaw = p.walker.yaw + turn; p.heroCam.pitch = -0.1; p.heroCam.zoom = 6; }, turn);
+/** The camera behind and to one side, a little below, looking a little up the face: the climber and the rock in their hands. */
+const side = (turn) => page.evaluate((turn) => { const p = window.game.player; p.heroCam.yaw = p.walker.yaw + turn; p.heroCam.pitch = 0.12; p.heroCam.zoom = 5; }, turn);
 
 // Face the wall and walk at it.
 await page.evaluate(([nx, nz]) => { const p = window.game.player; p.walker.yaw = Math.atan2(-nx, -nz); p.heroCam.yaw = p.walker.yaw; }, [IN.x, IN.z]);
@@ -69,7 +69,7 @@ for (let t = 0; t < 400 && !(pulled && k > 2); t++) {
   await page.waitForTimeout(500);
   const s = await state();
   top = Math.max(top, s.y);
-  if (s.mode === 'climb' && !on) { on = true; await side(1.2); console.log('on the face', JSON.stringify(s)); }
+  if (s.mode === 'climb' && !on) { on = true; await side(0.6); console.log('on the face', JSON.stringify(s)); }
   if (s.mode === 'climb' && t % 8 === 0) console.log(JSON.stringify(s));
   if (s.mode === 'pull') pulled = true;
   // A picture every 4 s on the face, and through the pull-up.
