@@ -542,9 +542,9 @@ export async function start(b: Boot): Promise<void> {
     let horses: HorseView | null = null;
     if (params.horses > 0) {
       loading.set('Saddling the horses');
-      const free = (x: number, z: number, r: number) => !world.wall?.(x, z, r) && terrain.waterDepth(x, z) <= 0;
+      const standable = (x: number, z: number, r: number) => !world.wall?.(x, z, r) && terrain.waterDepth(x, z) <= 0;
       const by = player.walker.pos;
-      const spots = horseSpots(by.x, by.z, player.walker.yaw, params.horses, free);
+      const spots = horseSpots(by.x, by.z, player.walker.yaw, params.horses, standable);
       horses = await HorseView.make(view.renderer, spots.length);
       const pace = groundPace(terrain);
       player.steeds = spots.map((p, i) => {
