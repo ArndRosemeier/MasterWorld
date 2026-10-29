@@ -1,0 +1,103 @@
+
+> masterworld@0.0.0 shot:mouths
+> node tools/shot/mouths.mjs shots/phaseL12/mouths
+
+shots\phaseL12\mouths\barrow-in-00.jpg
+shots\phaseL12\mouths\barrow-in-04.jpg
+shots\phaseL12\mouths\barrow-in-08.jpg
+shots\phaseL12\mouths\barrow-in-12.jpg
+shots\phaseL12\mouths\barrow-in-16.jpg
+shots\phaseL12\mouths\barrow-in-17.jpg
+shots\phaseL12\mouths\barrow-in-18.jpg
+shots\phaseL12\mouths\barrow-in-19.jpg
+shots\phaseL12\mouths\barrow-in-20.jpg
+shots\phaseL12\mouths\barrow-in-21.jpg
+barrow: walked into the doorway on their own true · went in true
+shots\phaseL12\mouths\barrow-inside.jpg
+shots\phaseL12\mouths\barrow-out-00.jpg
+shots\phaseL12\mouths\barrow-out-01.jpg
+shots\phaseL12\mouths\barrow-out-02.jpg
+shots\phaseL12\mouths\barrow-out-03.jpg
+shots\phaseL12\mouths\barrow-out-04.jpg
+shots\phaseL12\mouths\barrow-out-05.jpg
+shots\phaseL12\mouths\barrow-out-06.jpg
+shots\phaseL12\mouths\barrow-out-07.jpg
+shots\phaseL12\mouths\barrow-out-08.jpg
+shots\phaseL12\mouths\barrow-out-09.jpg
+shots\phaseL12\mouths\barrow-out-10.jpg
+shots\phaseL12\mouths\barrow-out-11.jpg
+shots\phaseL12\mouths\barrow-out-12.jpg
+shots\phaseL12\mouths\barrow-out-13.jpg
+barrow: came out true · walked out on their own true · 1.53 m out of the doorway · still played false
+shots\phaseL12\mouths\cave-in-00.jpg
+shots\phaseL12\mouths\cave-in-04.jpg
+shots\phaseL12\mouths\cave-in-08.jpg
+shots\phaseL12\mouths\cave-in-12.jpg
+shots\phaseL12\mouths\cave-in-16.jpg
+shots\phaseL12\mouths\cave-in-20.jpg
+shots\phaseL12\mouths\cave-in-23.jpg
+shots\phaseL12\mouths\cave-in-24.jpg
+shots\phaseL12\mouths\cave-in-25.jpg
+shots\phaseL12\mouths\cave-in-26.jpg
+shots\phaseL12\mouths\cave-in-27.jpg
+shots\phaseL12\mouths\cave-in-28.jpg
+cave: walked into the doorway on their own true · went in true
+shots\phaseL12\mouths\cave-inside.jpg
+shots\phaseL12\mouths\cave-out-00.jpg
+shots\phaseL12\mouths\cave-out-01.jpg
+shots\phaseL12\mouths\cave-out-02.jpg
+shots\phaseL12\mouths\cave-out-03.jpg
+shots\phaseL12\mouths\cave-out-04.jpg
+shots\phaseL12\mouths\cave-out-05.jpg
+shots\phaseL12\mouths\cave-out-06.jpg
+shots\phaseL12\mouths\cave-out-07.jpg
+shots\phaseL12\mouths\cave-out-08.jpg
+shots\phaseL12\mouths\cave-out-09.jpg
+shots\phaseL12\mouths\cave-out-10.jpg
+shots\phaseL12\mouths\cave-out-11.jpg
+shots\phaseL12\mouths\cave-out-12.jpg
+shots\phaseL12\mouths\cave-out-13.jpg
+cave: came out true · walked out on their own true · 1.54 m out of the doorway · still played false
+shots\phaseL12\mouths\tower-in-00.jpg
+shots\phaseL12\mouths\tower-in-04.jpg
+shots\phaseL12\mouths\tower-in-08.jpg
+shots\phaseL12\mouths\tower-in-12.jpg
+shots\phaseL12\mouths\tower-in-16.jpg
+shots\phaseL12\mouths\tower-in-17.jpg
+shots\phaseL12\mouths\tower-in-18.jpg
+shots\phaseL12\mouths\tower-in-19.jpg
+shots\phaseL12\mouths\tower-in-20.jpg
+tower: walked into the doorway on their own true · went in true
+shots\phaseL12\mouths\tower-inside.jpg
+shots\phaseL12\mouths\tower-out-00.jpg
+shots\phaseL12\mouths\tower-out-01.jpg
+shots\phaseL12\mouths\tower-out-02.jpg
+shots\phaseL12\mouths\tower-out-03.jpg
+shots\phaseL12\mouths\tower-out-04.jpg
+shots\phaseL12\mouths\tower-out-05.jpg
+shots\phaseL12\mouths\tower-out-06.jpg
+shots\phaseL12\mouths\tower-out-07.jpg
+shots\phaseL12\mouths\tower-out-08.jpg
+shots\phaseL12\mouths\tower-out-09.jpg
+shots\phaseL12\mouths\tower-out-10.jpg
+shots\phaseL12\mouths\tower-out-11.jpg
+shots\phaseL12\mouths\tower-out-12.jpg
+shots\phaseL12\mouths\tower-out-13.jpg
+tower: came out true · walked out on their own true · 1.54 m out of the doorway · still played false
+shots\phaseL12\mouths\remains-00.jpg
+shots\phaseL12\mouths\remains-01.jpg
+shots\phaseL12\mouths\remains-02.jpg
+shots\phaseL12\mouths\remains-03.jpg
+shots\phaseL12\mouths\remains-04.jpg
+shots\phaseL12\mouths\remains-05.jpg
+shots\phaseL12\mouths\remains-06.jpg
+shots\phaseL12\mouths\remains-07.jpg
+shots\phaseL12\mouths\remains-08.jpg
+shots\phaseL12\mouths\remains-09.jpg
+shots\phaseL12\mouths\remains-10.jpg
+shots\phaseL12\mouths\remains-11.jpg
+shots\phaseL12\mouths\remains-12.jpg
+shots\phaseL12\mouths\remains-13.jpg
+remains: knelt true · taken up true · still played false
+shaders 83 warm-up + 8 later · worst 14 ms · policy ok
+mouths: ok

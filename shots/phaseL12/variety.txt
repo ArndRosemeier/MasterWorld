@@ -1,0 +1,45 @@
+
+> masterworld@0.0.0 variety
+> node --import tsx tools/variety/cellars.ts
+
+1000 cellars in 1.3 s
+  layout        1000 distinct, most common 0.1%: drop-in+gambit+shortcut+refuge|10r12l|2x2x1@-1,2x2x1@-1,2x2x1@0,2x3x1@
+  mainPattern     17 distinct, most common 11.6%: drop-in
+  pattern         18 distinct, most common 12.6%: collapsed-way
+  story          464 distinct, most common 0.8%: realm-store/chandler/sealed/rats
+  goalRoom         5 distinct, most common 25.1%: web-hall
+  dressing      1000 distinct, most common 0.1%: barrel,barrel,beam,beam,beam,beam,beam,beam,beam,beam,beam,beam,beam,b
+  setPiece        12 distinct, most common 8.4%: broken-floor
+1000 barrows in 1.2 s
+  layout         999 distinct, most common 0.2%: collapsed-way+twin-paths+shortcut|8r10l|2x2x1@0,2x2x1@0,2x3x1@0,3x2x1@
+  mainPattern     17 distinct, most common 16.1%: bolt-hole
+  pattern         18 distinct, most common 13.1%: collapsed-way
+  story          329 distinct, most common 0.9%: older-graves/wardens/flood/rats
+  goalRoom         4 distinct, most common 33.6%: chieftain-tomb
+  dressing      1000 distinct, most common 0.1%: bones,bones,bones,bones,bones,bones,bones,bones,bones,bones,bones,bone
+  setPiece        10 distinct, most common 10.0%: barred-view
+1000 caves in 11.8 s
+  layout        1000 distinct, most common 0.1%: low-road+barred-return+gallery+shortcut+refuge|12r15l|3x2x1@-1,3x3x1@0
+  mainPattern     17 distinct, most common 13.2%: drop-in
+  pattern         18 distinct, most common 9.1%: side-loop
+  story          580 distinct, most common 0.8%: fault/collapse/spiders
+  goalRoom         8 distinct, most common 18.3%: painted-chamber
+  dressing      1000 distinct, most common 0.1%: barrel,beam,beam,beam,bones,bones,bones,bones,bones,candle,candle,cand
+  setPiece        10 distinct, most common 10.0%: last-stand
+1000 towers in 2.1 s
+  layout         999 distinct, most common 0.2%: gallery+seen-key+shortcut+refuge|10r13l|2x2x1@0,2x2x1@1,2x2x1@1,2x2x1@
+  mainPattern     17 distinct, most common 15.6%: drop-in
+  pattern         18 distinct, most common 10.4%: drop-in
+  story          477 distinct, most common 0.9%: watch/abandoned/highwaymen
+  goalRoom         6 distinct, most common 20.6%: rat-nest
+  dressing      1000 distinct, most common 0.1%: beam,beam,beam,beam,bones,bones,bones,bones,candle,candle,candle,crate
+  setPiece        10 distinct, most common 10.0%: barred-view
+1000 hideouts in 1.3 s
+  layout         998 distinct, most common 0.2%: collapsed-way+side-loop+shortcut|8r10l|2x2x1@0,2x2x1@0,2x2x1@0,2x3x1@0
+  mainPattern     16 distinct, most common 13.6%: bolt-hole
+  pattern         18 distinct, most common 14.3%: collapsed-way
+  story           81 distinct, most common 2.5%: old-workings/diggers/sold-out/rats
+  goalRoom         3 distinct, most common 34.3%: rat-nest
+  dressing      1000 distinct, most common 0.1%: barrel,barrel,barrel,barrel,beam,beam,beam,beam,bin,bricks,bricks,bric
+  setPiece        12 distinct, most common 8.4%: broken-floor
+no problems

@@ -1,0 +1,64 @@
+{
+  "commit": "8d02c0beebe4b2d7a6990032342ad03ad987f231",
+  "dirty": false,
+  "date": "2026-10-29",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": true,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 39.741,
+  "part": "caves",
+  "shots": [
+    {
+      "name": "cave-mouth",
+      "file": "13-cave-mouth.jpg",
+      "query": "title=0&day=0&gl&hour=11&weather=fair&cave",
+      "loadS": 25.016,
+      "drawnS": 0.101,
+      "settledS": 4.020700000047683,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 174,
+      "p50": 10,
+      "p95": 17.69999999999709,
+      "mean": 13.479310344964604,
+      "shaders": {
+        "warmup": 74,
+        "run": 23,
+        "late": 0,
+        "worstMs": 14.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "cave-cavern",
+      "file": "14-cave-cavern.jpg",
+      "query": "title=0&day=0&gl&hour=11&weather=fair&cave",
+      "loadS": 25.016,
+      "drawnS": 0.017,
+      "settledS": 3.701899999976158,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 541,
+      "p50": 3.6999999999970896,
+      "p95": 5,
+      "mean": 3.69722735674676,
+      "shaders": {
+        "warmup": 74,
+        "run": 33,
+        "late": 0,
+        "worstMs": 14.5,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    }
+  ]
+}
