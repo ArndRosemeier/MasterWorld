@@ -264,7 +264,11 @@ export class Terrain {
     return h;
   }
 
-  private landHeight(x: number, z: number): number {
+  /**
+   * The land before rivers and brooks dig their beds: `r`, `bk` the river and brook here (null: as if there were no
+   * water, `dryLand`), which ease the landforms away from their banks.
+   */
+  private landShape(x: number, z: number, r: WaterHere | null, bk: WaterHere | null): number {
     const base = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
     // The swash: low swells along the waterline (beach cusps), so the water's edge curves gently instead of
     // running dead straight; they die out on dry sand and in deeper water.
@@ -287,12 +291,11 @@ export class Terrain {
       level = lerp(level, s.level, market);
     }
     // The water was traced over the land without them: by a river or brook they give way to its banks.
-    const r = this.hydro.riverAt(x, z, this.here), bk = this.hydro.brookAt(x, z, this.brook);
-    if (forms > 0 && r.river) forms *= smoothstep(r.half + 10, r.half + 80, r.dist);
+    if (forms > 0 && r?.river) forms *= smoothstep(r.half + 10, r.half + 80, r.dist);
     if (forms > 0) {
       let shaped = Math.max(Math.min(level, 1), level + this.landforms.offset(x, z) * forms);
       // By a brook they dig no lower than its water (a gully runs down into it, a dell beside it stays dry).
-      if (bk.river && bk.dist < bk.valley && shaped < level) shaped = Math.max(shaped, Math.min(level, bk.level + 0.6 + (bk.dist - bk.half) * 0.04));
+      if (bk?.river && bk.dist < bk.valley && shaped < level) shaped = Math.max(shaped, Math.min(level, bk.level + 0.6 + (bk.dist - bk.half) * 0.04));
       level = shaped;
     }
     if (calm > 0) {
@@ -300,6 +303,21 @@ export class Terrain {
       const d = this.detail.fbm2(x / 70, z / 70, 3) * 2.2 + this.detail.fbm2(x / 9 + 71.3, z / 9 - 12.9, 2) * 0.25;
       level = Math.max(Math.min(level, 0.5), level + d * rough * calm);
     }
+    return level;
+  }
+
+  /**
+   * The land as it is before any water shapes it (phase W, layer 1): skeleton, landforms and detail, as the towns
+   * calm it. Water reads this; nothing in it reads water.
+   */
+  dryLand(x: number, z: number): number {
+    return this.landShape(x, z, null, null);
+  }
+
+  private landHeight(x: number, z: number): number {
+    const r = this.hydro.riverAt(x, z, this.here), bk = this.hydro.brookAt(x, z, this.brook);
+    let level = this.landShape(x, z, r, bk);
+    if (level <= 0) return level;
     // Rivers shape their valleys, then brooks theirs in the land the rivers left (their levels come from it, D50),
     // each blending out to the edge of its own valley, so where two meet the land stays whole.
     const byRiver = shapeByWater(r, level);
