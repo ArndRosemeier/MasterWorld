@@ -169,7 +169,8 @@ export class Skeleton {
       if (!s || w[i] <= 0) continue;
       const n = this.hillNoise.fbm2(x / s.size + 31.7 * (i + 1), z / s.size - 17.3 * (i + 1), 3);
       // Rounded hills stand on the land; knife ridges are what is left between gullies cut down into it.
-      h += w[i] * s.height * (s.sharp ? Math.pow(1 - Math.min(1, Math.abs(n) * 2.2), 2) : 0.5 + n);
+      // (The crest is rounded a little, over some metres: a cusp sharper than the far ground's mesh cuts it into saw teeth.)
+      h += w[i] * s.height * (s.sharp ? Math.pow(1 - Math.min(1, Math.sqrt(n * n + 0.0016) * 2.2), 2) : 0.5 + n);
     }
     return h;
   }
