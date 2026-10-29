@@ -1,0 +1,19 @@
+title: ready in 20.1 s
+01-title.jpg: drawn 0.1 s · settled 2.4 s · p50 8.9 ms · p95 12.7 ms · 0 shader violations
+02-creator.jpg: drawn 0.2 s · settled 1.5 s · p50 10.1 ms · p95 12.5 ms · 0 shader violations
+town: ready in 17.0 s
+03-town-noon.jpg: drawn 0.1 s · settled 2.3 s · p50 9.2 ms · p95 12.2 ms · 0 shader violations
+04-pack.jpg: drawn 0.0 s · settled 1.5 s · p50 9.9 ms · p95 13.8 ms · 0 shader violations
+05-map.jpg: drawn 0.0 s · settled 1.5 s · p50 9.9 ms · p95 11.8 ms · 0 shader violations
+06-town-dusk.jpg: drawn 0.2 s · settled 1.5 s · p50 10.6 ms · p95 16.0 ms · 0 shader violations
+07-town-night.jpg: drawn 0.0 s · settled 1.5 s · p50 11.1 ms · p95 17.7 ms · 0 shader violations
+08-town-rain.jpg: drawn 1.5 s · settled 1.5 s · p50 11.1 ms · p95 14.2 ms · 0 shader violations
+09-paddock.jpg: drawn 0.1 s · settled 1.5 s · p50 8.1 ms · p95 14.0 ms · 0 shader violations
+10-trade.jpg: drawn 0.0 s · settled 1.5 s · p50 10.5 ms · p95 13.4 ms · 0 shader violations
+wet: ready in 17.1 s
+11-town-wet-sun.jpg: drawn 0.0 s · settled 2.5 s · p50 10.0 ms · p95 13.3 ms · 0 shader violations
+inn: ready in 15.9 s
+31-inn.jpg: drawn 0.0 s · settled 4.0 s · p50 7.7 ms · p95 10.4 ms · 0 shader violations
+talk: ready in 15.6 s
+32-talk.jpg: drawn 0.0 s · settled 4.0 s · p50 8.8 ms · p95 11.2 ms · 0 shader violations
+town: 13 shots in shots\phaseL-r34\town\2026-10-29-3172b18 (154 s)
