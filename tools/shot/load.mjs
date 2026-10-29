@@ -3,7 +3,8 @@
  * Opens the game as a player does (presses a key at the title's gate, so sound may start), and reports when the title
  * shows, when the world is playable (`__mwReady`), and what was downloaded until then, by folder. It fails when the
  * start downloads music other than the title's own theme (music streams: a piece loads when it first plays), or when
- * LIMIT_TITLE / LIMIT_READY (seconds, default 1 and 20, the F4 marks on the reference machine; SwiftShader in the cloud
+ * LIMIT_TITLE / LIMIT_READY (seconds, default 1 and 20, the F4 marks on the reference machine, and 30 to play for the
+ * WebGL fallback timed on a GPU (SHOT_GPU with "?gl"); SwiftShader in the cloud
  * container is far slower, so set them there or pass LIMITS=0 to only report).
  */
 import { existsSync, renameSync, writeFileSync } from 'node:fs';
@@ -19,7 +20,7 @@ const [query = process.env.SHOT_GPU ? '?' : '?gl'] = process.argv.slice(2).filte
 const bundles = 'dist/packs/bundles.json';
 if (record && existsSync(bundles)) renameSync(bundles, `${bundles}.off`);
 const limits = process.env.LIMITS !== '0';
-const LIMIT_TITLE = Number(process.env.LIMIT_TITLE ?? 1), LIMIT_READY = Number(process.env.LIMIT_READY ?? 20);
+const LIMIT_TITLE = Number(process.env.LIMIT_TITLE ?? 1), LIMIT_READY = Number(process.env.LIMIT_READY ?? (process.env.SHOT_GPU && /\bgl\b/.test(query) ? 30 : 20));
 
 const { server, base, browser } = await launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });

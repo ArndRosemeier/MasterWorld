@@ -10,7 +10,7 @@
  * (F3), the page's errors and what was not drawn; it marks a shot over 16.7 ms or more than twice as slow as
  * the town at noon (F2). Four slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
- * `--part=caves` is a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
+ * `--part=caves` is mesa country (a valley, a plateau top, a tor, a climb; gate L) and a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
  * without `--part` all four run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
  * Exits 1 when a page failed or a shot breaks F2 or F3 (what was still waiting to be drawn is noted).
@@ -111,6 +111,41 @@ const SESSIONS = [
       await p.waitForTimeout(2500);
     } },
   ] })),
+  // Gate L: mesa country round the start (D56), at spots found once for seed masterworld (open ground, no wood,
+  // fence or water where the hero and the camera stand): from the valley floor before a plateau's wall 675 m off;
+  // on a plateau top 63 m up near its rim, looking out over the valley; before the nearest tor (mesa country has
+  // none of its own: this one is some 9 km off); and on the wall with holds that tools/shot/climb.mjs climbs, part
+  // way up it (climbing is shown: W held at the foot until 8 m up), seen from the free camera beside it.
+  { id: 'mesa', query: `${still}&hour=10.5&weather=fair`, shots: [
+    { name: 'mesa-valley', act: stand(-22341, 37000, -0.924, 0.383, 0.12) },
+    { name: 'mesa-plateau', act: stand(-24480, 38129, 0.680, 0.733, -0.25) },
+    { name: 'tor', act: stand(-27248, 44323, -1, 0, 0.05) },
+    { name: 'climb', act: async (p) => {
+      const IN = { x: 0.259, z: 0.966 };
+      await stand(-30826, 35266, IN.x, IN.z, 0.1)(p);
+      await p.waitForTimeout(1500);
+      const y0 = await p.evaluate(() => window.game.player.walker.pos.y);
+      await p.keyboard.down('KeyW');
+      await p.waitForFunction((y0) => { const w = window.game.player.walker; return w.mode === 'climb' && w.pos.y > y0 + 8; }, y0, { timeout: 60000 }).catch(() => console.log('climb: NOT 8 m UP THE FACE'));
+      await p.keyboard.up('KeyW');
+      // The free camera some 10 m out from the face, clear of trees, a little below the hero (never under the
+      // ground), looking up at it (the hero hangs on where it was left).
+      await p.evaluate(([ix, iz]) => {
+        const g = window.game, pl = g.player, h = pl.walker.pos;
+        // The first spot whose line to the hero passes no tree's crown (a trunk within 6 m).
+        const clear = (x, z) => [0, 0.2, 0.4, 0.6].every((q) => !g.trunks.blocks(x + (h.x - x) * q, z + (h.z - z) * q, 6));
+        let cx = h.x - ix * 10, cz = h.z - iz * 10;
+        found: for (const out of [10, 8, 12, 6, 14]) for (const side of [0, 5, -5, 8, -8]) {
+          const x = h.x - ix * out - iz * side, z = h.z - iz * out + ix * side;
+          if (clear(x, z)) { cx = x; cz = z; break found; }
+        }
+        const cy = Math.max(h.y - 1, g.terrain.height(cx, cz) + 2);
+        pl.flying = true;
+        const dx = h.x - cx, dz = h.z - cz, dy = h.y + 1 - cy;
+        pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(dy, Math.hypot(dx, dz)) * 180) / Math.PI]);
+      }, [IN.x, IN.z]);
+    } },
+  ] },
   // L6: a cave's mouth in a cliff (D57), then inside, in the middle of its cavern (its highest room).
   { id: 'cave', query: `${still}&hour=11&weather=fair&cave`, shots: [
     { name: 'cave-mouth' },
@@ -203,8 +238,18 @@ const SESSIONS = [
   ] },
 ];
 /** The sessions of each part (each part one run, under 5 min). */
-const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave']);
+const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave', 'mesa']);
 const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : 'land');
+
+/** Puts the hero at (x, z) facing along (dx, dz), the camera behind at `pitch` (up positive) and `zoom` metres. */
+function stand(x, z, dx, dz, pitch, zoom) {
+  return (p) => p.evaluate(([x, z, dx, dz, pitch, zoom]) => {
+    const pl = window.game.player;
+    pl.teleport(x, undefined, z, Math.atan2(-dx, -dz));
+    pl.heroCam.pitch = pitch;
+    if (zoom) pl.heroCam.zoom = zoom;
+  }, [x, z, dx, dz, pitch, zoom ?? 0]);
+}
 
 /** Puts the hero at (u, v) of the hold's gate frame (out of the gate is +v), looking at (lu, lv). */
 function atHold(u, v, lu, lv) {

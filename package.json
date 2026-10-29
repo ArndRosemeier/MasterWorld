@@ -35,6 +35,7 @@
     "shot:limp": "node tools/shot/limp.mjs",
     "variety": "node --import tsx tools/variety/cellars.ts",
     "loop": "node --import tsx tools/loop/evening.ts",
+    "walk:landforms": "node --import tsx tools/loop/landformWalk.ts masterworld && node --import tsx tools/loop/landformWalk.ts alpha && node --import tsx tools/loop/landformWalk.ts x4",
     "check:units": "node tools/units/check.mjs",
     "shot:spellfx": "node tools/shot/spellfx.mjs",
     "shot:hatch": "node tools/shot/hatch.mjs",
