@@ -1127,7 +1127,9 @@ export class Hydrology {
   private feedOf(main: HydroTile): BrookFeed {
     const w = emptyWater(), sk = this.skeleton;
     return {
-      ground: (x, z) => shapeByWater(main.query(x, z, w), main.onFloors(x, z, sk.elevation(x, z))),
+      // A lake is ground at its water's level: the brooks' valleys come down to its water, not to its bed (cut below
+      // it, the lake stood walled off above them by its rim).
+      ground: (x, z) => { const g = shapeByWater(main.query(x, z, w), main.onFloors(x, z, sk.elevation(x, z))); return Number.isNaN(w.lake) ? g : Math.max(g, w.lake); },
       join: (x, z) => {
         main.query(x, z, w);
         // Into a river: once well inside its valley, straight to its line.
@@ -1167,13 +1169,22 @@ export class Hydrology {
    * drainage ran over the land the rivers' floors and valleys had shaped).
    */
   onFloors(x: number, z: number, h: number): number {
-    const r = this.tileAt(x, z).onFloors(x, z, h), b = this.brookTileAt(x, z);
-    return b ? b.onFloors(x, z, r) : r;
+    const r = this.tileAt(x, z).onFloors(x, z, h);
+    return this.brookLand(x, z)?.onFloors(x, z, r) ?? r;
   }
 
   /** The most the land may stand at (x, z) by the brooks' valleys (W4b; Infinity without brooks). */
   valeAt(x: number, z: number): number {
-    return this.brookTileAt(x, z)?.valeAt(x, z) ?? Infinity;
+    return this.brookLand(x, z)?.valeAt(x, z) ?? Infinity;
+  }
+
+  /**
+   * The brook tile whose floors and valleys shape the land at (x, z): none in a lake (the brooks took a lake as ground
+   * at its water, so their valleys come down to it; their floors and valleys there are not its bed).
+   */
+  private brookLand(x: number, z: number): HydroTile | null {
+    const b = this.brookTileAt(x, z);
+    return b && Number.isNaN(this.tileAt(x, z).lakeLevel(x, z)) ? b : null;
   }
 
   /** The brook tile that owns a point (null without brooks). */
