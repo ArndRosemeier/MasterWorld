@@ -24,6 +24,33 @@ export interface VgmLine {
   readonly reason: string;
   /** Game hours, when known. */
   readonly at?: number;
+  /** Where on the land it is (world metres), when it has a place (`placeOf`). */
+  readonly where?: readonly [number, number];
+}
+
+/**
+ * Where a decision is on the land (world metres): its own spot, else its place's (a cellar under its town, a
+ * kept promise at the dungeon it promised, an order in its town); null for what has no place (the land's shape).
+ */
+export function placeOf(d: Decision, log: DecisionLog, depth = 0): readonly [number, number] | null {
+  const by = (id: string): readonly [number, number] | null => {
+    const o = depth < 3 ? log.find((x) => x.id === id) : undefined;
+    return o ? placeOf(o, log, depth + 1) : null;
+  };
+  switch (d.kind) {
+    case 'volume': return null;
+    case 'dungeon': return d.site ? [d.site.x, d.site.z] : by(d.town);
+    case 'move-in': case 'retake': return by(d.dungeon);
+    case 'kept': return by(d.promise);
+    case 'order': case 'festivity': return by(d.town);
+    case 'journey': return by(d.to);
+    case 'region': return d.site ? [d.site.x, d.site.z] : [d.x, d.z];
+    case 'road': {
+      const k = Math.floor(d.pts.length / 4) * 2;
+      return d.pts.length >= 2 ? [d.pts[k], d.pts[k + 1]] : null;
+    }
+    default: return [d.x, d.z];
+  }
 }
 
 /**
@@ -78,12 +105,30 @@ export function decisionSays(d: Decision): string {
   }
 }
 
-/** One line per decision in the log, oldest first, with the tool, its need and why. */
-export function vgmLines(log: DecisionLog, made: readonly Made[] = []): VgmLine[] {
+/** One line per decision in the log (from the `from`th on), oldest first, with the tool, its need and why. */
+export function vgmLines(log: DecisionLog, made: readonly Made[] = [], from = 0): VgmLine[] {
   const why = new Map(made.map((m) => [m.decision.id, m]));
-  return log.map((d) => {
+  return log.slice(from).map((d) => {
     const m = why.get(d.id), tool = toolOf(m?.tool ?? toolFor(d, log));
     const at = m?.at ?? ('at' in d ? d.at : undefined);
-    return { id: d.id, kind: d.kind, tool: tool.id, name: tool.name, need: tool.need, reason: m?.reason ?? decisionSays(d), ...(at !== undefined ? { at } : {}) };
+    const where = placeOf(d, log);
+    return { id: d.id, kind: d.kind, tool: tool.id, name: tool.name, need: tool.need, reason: m?.reason ?? decisionSays(d), ...(at !== undefined ? { at } : {}), ...(where ? { where } : {}) };
   });
+}
+
+/**
+ * The VGM's moves since the last look, for its alerts on screen (a developer's aid; D53 keeps it out of play
+ * otherwise). What the log held when the watch began is not news; a log that shrank (another game loaded)
+ * starts over from its end.
+ */
+export class VgmWatch {
+  constructor(private seen: number) {}
+
+  see(log: DecisionLog, made: readonly Made[] = []): VgmLine[] {
+    if (log.length < this.seen) this.seen = log.length;
+    if (log.length === this.seen) return [];
+    const lines = vgmLines(log, made, this.seen);
+    this.seen = log.length;
+    return lines;
+  }
 }
