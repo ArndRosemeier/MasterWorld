@@ -28,8 +28,11 @@ export interface MinimapReading {
   readonly marks: readonly { readonly id: string; readonly x: number; readonly z: number }[];
 }
 
-/** Paints the known land round (x, z), `across` metres across the canvas, north up (MapUi.paintAround). */
-export type SheetPainter = (canvas: HTMLCanvasElement, x: number, z: number, across: number) => void;
+/**
+ * Paints the known land round (x, z), `across` metres across the canvas, north up (MapUi.paintAround); false while
+ * some of its land is still to be inked (a few tiles a painting), so it is painted again soon.
+ */
+export type SheetPainter = (canvas: HTMLCanvasElement, x: number, z: number, across: number) => boolean;
 
 const DEG = 180 / Math.PI;
 /** The rim's radius for the studs (px, in the dial's 100 px). */
@@ -80,7 +83,7 @@ export class Minimap {
   private readonly sheet = el('canvas', { width: SHEET_PX, height: SHEET_PX, className: 'sheet' });
   private readonly arrow = el('div', { className: 'hero' });
   /** Where and when (s) the sheet was last painted. */
-  private painted: { x: number; z: number; t: number } | null = null;
+  private painted: { x: number; z: number; t: number; whole: boolean } | null = null;
   private slid = '';
   private arrowDeg = NaN;
 
@@ -122,8 +125,8 @@ export class Minimap {
   private slideSheet(r: MinimapReading): void {
     if (!this.paint) return;
     const t = performance.now() / 1000, p = this.painted;
-    const due = !p || (t - p.t >= LEAST && (Math.hypot(r.x - p.x, r.z - p.z) > MOVED || t - p.t >= MOST));
-    if (due) { this.paint(this.sheet, r.x, r.z, ACROSS); this.painted = { x: r.x, z: r.z, t }; }
+    const due = !p || (t - p.t >= LEAST && (!p.whole || Math.hypot(r.x - p.x, r.z - p.z) > MOVED || t - p.t >= MOST));
+    if (due) this.painted = { x: r.x, z: r.z, t, whole: this.paint(this.sheet, r.x, r.z, ACROSS) };
     const q = this.painted!, slide = `translate(${((q.x - r.x) / ACROSS * 100).toFixed(2)}%, ${((q.z - r.z) / ACROSS * 100).toFixed(2)}%)`;
     if (slide !== this.slid) { this.slid = slide; this.sheet.style.transform = slide; }
   }

@@ -178,13 +178,13 @@ export class MapUi extends KeyWindow {
   /**
    * The minimap's sheet (G4): the same known land, roads, towns, guild houses and marks round (x, z), `across`
    * metres across the canvas, north up, with the townsfolk near as dots; no names, no hero and no north (the
-   * minimap's own rim and arrow show those).
+   * minimap's own rim and arrow show those). False while some known land is still to be inked.
    */
-  paintAround(canvas: HTMLCanvasElement, x: number, z: number, across: number, dots: readonly { readonly x: number; readonly z: number }[]): void {
-    this.paintMap(canvas, x, z, SPAN / across, () => 1, { names: false, dots });
+  paintAround(canvas: HTMLCanvasElement, x: number, z: number, across: number, dots: readonly { readonly x: number; readonly z: number }[]): boolean {
+    return this.paintMap(canvas, x, z, SPAN / across, () => 1, { names: false, dots });
   }
 
-  private paintMap(canvas: HTMLCanvasElement, cx: number, cz: number, zoom: number, strokeOf: (id: string) => number, small?: { readonly names: false; readonly dots: readonly { readonly x: number; readonly z: number }[] }): void {
+  private paintMap(canvas: HTMLCanvasElement, cx: number, cz: number, zoom: number, strokeOf: (id: string) => number, small?: { readonly names: false; readonly dots: readonly { readonly x: number; readonly z: number }[] }): boolean {
     const g = canvas.getContext('2d')!;
     const size = canvas.width;
     const s = (size / SPAN) * zoom, u = size / SIZE;
@@ -280,13 +280,14 @@ export class MapUi extends KeyWindow {
       // The townsfolk near: small dots of brown ink.
       g.fillStyle = '#4a3220';
       for (const d of small.dots) { g.beginPath(); g.arc(X(d.x), Z(d.z), 2.2, 0, Math.PI * 2); g.fill(); }
-      return;
+      return !missing;
     }
     this.paintHero(g, X, Z);
     // North.
     g.fillStyle = ink; g.font = `600 ${Math.round(16 * u)}px Georgia, serif`; g.textAlign = 'center';
     g.fillText('N', size - 28 * u, 30 * u);
     g.beginPath(); g.moveTo(size - 28 * u, 36 * u); g.lineTo(size - 33 * u, 56 * u); g.lineTo(size - 23 * u, 56 * u); g.closePath(); g.fill();
+    return !missing;
   }
 
   /** The hero: a blue arrow where they stand, pointing the way they face. */

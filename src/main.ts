@@ -1200,7 +1200,7 @@ export async function start(b: Boot): Promise<void> {
     const minimap = new Minimap(map ? (canvas, x, z, across) => {
       const t = visit() ? null : here(), r = across / 2;
       const dots = (t?.life.agents ?? []).filter((a) => !a.hidden && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);
-      map.paintAround(canvas, x, z, across, dots);
+      return map.paintAround(canvas, x, z, across, dots);
     } : null);
     const skyGlyph = (): SkyGlyph => {
       const w = wx.shown;
