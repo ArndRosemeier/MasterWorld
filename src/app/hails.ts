@@ -68,7 +68,7 @@ export class Hails {
       // One a map mark keeps in place (the innkeeper while the hero is told to ask at the inn) does not come over.
       busy: !!g.held || !!g.seek || g.person.role === 'child' || life.isKept(g.person.id),
     })), knows, h, sent);
-    const b = id === null ? null : life.agents.find((g) => g.person.id === id) ?? null;
+    const b = id === null ? null : life.agentOf(id) ?? null;
     if (!b) return;
     sent.add(b.person.id);
     const at = besideHero(b, h);

@@ -18,6 +18,8 @@ import { castShadows, eachMesh, handOf, seatOf } from '../hero/play';
 import { SHADOW_ONLY } from '../sky';
 import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 import { Held, Steady } from '../steady';
+import type { LimbGoals } from '@futuremagic/figure';
+import { BodyRig, applyPuppet, limbGoals, type HeroPuppet } from '../hero/puppet';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -80,6 +82,8 @@ export interface Placed {
   act: ActivityKind;
   /** Sitting on a bench: the height of its top (the sitter's seat goes there, whatever their size). */
   seat?: number;
+  /** Played by a scene (down a cellar's ladder): its pose and clip over the act's, placed exactly where it says. */
+  puppet?: HeroPuppet;
 }
 
 interface Slot {
@@ -110,6 +114,10 @@ interface Slot {
   /** What is drawn follows the agent smoothly, and its clip changes only once wanted a moment (render/steady.ts). */
   st: Steady;
   held: Held<string>;
+  /** Hands-on control of its bones, made when a scene first plays it (null: none yet), and whether it turned any last frame. */
+  readonly rig: BodyRig;
+  rigged: boolean;
+  readonly goals: LimbGoals;
 }
 
 export class FolkView {
@@ -130,7 +138,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0, st: new Steady(), held: new Held('') };
+      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0, st: new Steady(), held: new Held(''), rig: new BodyRig(place), rigged: false, goals: limbGoals() };
       this.slots.push(slot);
     }
   }
@@ -224,6 +232,14 @@ export class FolkView {
   private waiting = 0;
 
   /** How many people within CLOSE in the camera's view (or of `focus`) are plain figures while their character is dressed (before the warm-up ends at least 1). */
+  /** The body of `a`'s character for a climb (height, hips over the feet), once they are drawn as one; else null. */
+  bodyOf(a: Agent): { readonly height: number; readonly hipHeight: number } | null {
+    const s = this.shown.get(a);
+    if (!s?.ready) return null;
+    const height = s.ch.height || 1.75;
+    return { height, hipHeight: s.rig.of(s.ch, s.ch.height || 1.75)?.hipHeight ?? 0.52 * height };
+  }
+
   /** Where a hand of `a`'s character is in the world (`out`); null if they are not drawn as a character now. */
   agentHand(a: Agent, side: 'l' | 'r', out: Vector3): Vector3 | null {
     const slot = this.shown.get(a);
@@ -234,6 +250,11 @@ export class FolkView {
 
   /** While a building is drawn open: the people in it, where it has them (drawn besides those out of doors). */
   indoors: readonly Placed[] | null = null;
+  /**
+   * Only those `indoors` are drawn, nobody out of doors (down in a cellar: the land above is out of the frame, and
+   * whoever of the household came down is placed there).
+   */
+  only = false;
 
   /** Where nobody out of doors is drawn just now (the creator's view of the hero), or null. */
   clear: ((x: number, z: number) => boolean) | null = null;
@@ -257,7 +278,7 @@ export class FolkView {
     const near: [number, Agent][] = [];
     const placed = new Map<Agent, Placed>();
     for (const p of this.indoors ?? []) { near.push([Math.hypot(p.x - cx, p.z - cz), p.agent]); placed.set(p.agent, p); }
-    for (const life of this.lives) {
+    for (const life of this.only ? [] : this.lives) {
       for (const a of life.agents) {
         if (a.hidden || placed.has(a) || this.clear?.(a.x, a.z)) continue;
         const d = Math.hypot(a.x - cx, a.z - cz);
@@ -275,6 +296,8 @@ export class FolkView {
       s.ready = false;
       s.place.visible = false;
     }
+    // A free character stays hidden (the cellar's frame may have hidden it and shown it again since).
+    for (const s of this.slots) if (!s.agent && !s.busy && s.place.visible) s.place.visible = false;
     // Dress free characters for the nearest people without one.
     this.dressWait = Math.max(0, this.dressWait - dt);
     for (const [, a] of near) {
@@ -311,17 +334,21 @@ export class FolkView {
       const a = s.agent!, p = placed.get(a);
       const o = s.place;
       // Agents face `dir` (atan2 in x, z); a character faces +z.
-      const st = p ? s.st.ease(dt, p.x, p.y, p.z, Math.PI / 2 - p.dir) : s.st.ease(dt, a.x, this.height(a.x, a.z), a.z, Math.PI / 2 - a.dir);
+      // A scene's puppet is where it says (its hands are on the rungs); everyone else follows smoothly.
+      const st = p?.puppet ? { x: p.x, y: p.y, z: p.z, yaw: Math.PI / 2 - p.dir } : p ? s.st.ease(dt, p.x, p.y, p.z, Math.PI / 2 - p.dir) : s.st.ease(dt, a.x, this.height(a.x, a.z), a.z, Math.PI / 2 - a.dir);
       o.position.set(st.x, st.y, st.z);
       o.rotation.y = st.yaw;
       this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
-      const clip = s.held.pick(dt, clipOf(p ? p.act : a.act, a.person.id));
+      const clip = p?.puppet?.clip ?? s.held.pick(dt, clipOf(p ? p.act : a.act, a.person.id));
       if (clip !== s.clip) {
         s.clip = clip;
         s.since = 0;
         void s.ch.play(clip);
       } else s.since += dt;
+      // Bones a scene turned last frame go back as bound before the clip plays on.
+      if (s.rigged) { s.rig.current?.relax(); s.rigged = false; }
       s.ch.update(dt);
+      if (p?.puppet) { const rig = s.rig.of(s.ch, s.ch.height || 1.75); if (rig) s.rigged = applyPuppet(rig, o, s.goals, p.puppet); }
       if (p?.seat !== undefined && clip.startsWith('sit')) this.seatOn(s, p.x, p.seat, p.z);
       // Out of doors one sits on a bench (the town's fixtures, drawn with the houses).
       else if (!p && a.act === 'sit' && clip.startsWith('sit')) this.seatOn(s, a.x, this.height(a.x, a.z) + BENCH_SEAT, a.z);
@@ -361,6 +388,9 @@ export class FolkView {
   private dress(s: Slot, a: Agent): void {
     s.agent = a;
     s.ready = false;
+    // A new body: its rig is fitted again when a scene plays it.
+    s.rig.reset();
+    s.rigged = false;
     s.clip = clipOf(a.act, a.person.id);
     s.st = new Steady();
     s.held = new Held(s.clip);

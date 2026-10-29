@@ -18,7 +18,7 @@ import { CellarView } from '../render/dungeon/CellarView';
 import type { WarmLights } from '../render/warmLights';
 import { CreatureView } from '../render/dungeon/CreatureView';
 import type { SkyView } from '../render/sky';
-import type { SettingModule } from '../setting/contract';
+import type { DungeonWords, SettingModule } from '../setting/contract';
 import type { Journal } from '../talk/journal';
 import type { Director } from '../vgm/director';
 import { buildingMeshAt } from '../render/materials/building';
@@ -100,6 +100,8 @@ interface Mound extends LandSite {
 
 /** A place on the land is built (rooms, dwellers) once the hero is this near, metres. */
 const BARROW_NEAR = 250;
+/** Where one waits for the hero before a place's way in: this far out in front of it, and to the side (m). */
+const WAIT_OUT = 2.5, WAIT_ASIDE = 2.2;
 /** How far past its way point the hero walks on into a place's doorway before going in, metres. */
 const WALK_IN = 0.9;
 /** How far a place's piece reaches from its site, metres (for quick tests). */
@@ -145,6 +147,20 @@ export class Cellars {
     for (const d of log) {
       if (d.kind === 'dungeon' && !this.sites.has(d.id)) this.open(d);
       else if (d.kind === 'move-in' || d.kind === 'retake') this.moved(d);
+    }
+  }
+
+  /**
+   * The places out on the land (not under a house): each's promise (its dweller's), town, the spot before its way in
+   * where one may wait for the hero (x, z, and the facing out from it as an agent's: atan2 of z and x), and its visit
+   * once built.
+   */
+  *landPlaces(): Iterable<{ readonly id: string; readonly town: string; readonly x: number; readonly z: number; readonly dir: number; readonly visit: CellarVisit | null }> {
+    for (const s of this.sites.values()) {
+      const m = s.mound;
+      if (!m) continue;
+      const [x, z] = onLand(m, WAIT_ASIDE, m.out + WAIT_OUT);
+      yield { id: occupantId(s.cellar), town: s.decision.town, x, z, dir: Math.atan2(Math.cos(m.yaw), Math.sin(m.yaw)), visit: s.ready?.visit ?? null };
     }
   }
 
@@ -226,15 +242,16 @@ export class Cellars {
 
   /**
    * A promise kept: its household was told the place is safe (`id`: the dungeon's, or the move-in's).
-   * What they pay and how they thank the hero; null for a promise with no place here.
+   * What they pay and how they thank the hero (`came`: one of them came to the hero in the place, app/ownerComes.ts);
+   * null for a promise with no place here.
    */
-  keep(id: string): { readonly coins: number; thanks(coins: string): string } | null {
+  keep(id: string, came = false): { readonly coins: number; thanks(coins: string): string } | null {
     for (const s of this.sites.values()) {
       if (occupantId(s.cellar) !== id) continue;
       this.kept.add(id);
       if (s.ready) s.ready.fight.paid = true;
       const words = loreOf(this.host.setting, s.decision.template).words ?? CELLAR_WORDS;
-      return { coins: rewardFor(s.cellar, this.host.setting.creatures), thanks: (coins) => cap(fill(words.thanks, { place: s.cellar.house, coins })) };
+      return { coins: rewardFor(s.cellar, this.host.setting.creatures), thanks: (coins) => cap(fill((came && words.came) || words.thanks, { place: s.cellar.house, coins })) };
     }
     return null;
   }
@@ -395,7 +412,7 @@ export class Cellars {
 }
 
 /** How a cellar is spoken of when the setting gives no words of its own. */
-const CELLAR_WORDS = {
+const CELLAR_WORDS: DungeonWords = {
   quiet: 'The cellar of {place} is quiet now. Its household will want to hear.',
   thanks: 'Quiet down there at last? Here, {coins}, and our thanks.',
 };

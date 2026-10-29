@@ -319,6 +319,11 @@ export class TownLife {
    * Their watch is over (a traveller rested by the way, C9): they are on the road again, out of sight, and
    * come back into town where its road leaves it when their day says so.
    */
+  /** The agent of person `id` (undefined: nobody of that id lives here). */
+  agentOf(id: number | null | undefined): Agent | undefined {
+    return this.agents.find((a) => a.person.id === id);
+  }
+
   unstation(a: Agent): void {
     const door = this.spots[this.doorOf(a.person.home)], [x, z] = this.roadEnds[0] ?? [door.x, door.z];
     Object.assign(a, { post: undefined, x, z, act: 'away', next: 'away', task: 'away', hidden: true, path: [], pi: 0, until: this.time + 600 });

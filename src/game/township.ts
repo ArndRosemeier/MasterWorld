@@ -106,7 +106,36 @@ export class Township {
    */
   get posts(): readonly { readonly x: number; readonly z: number }[] {
     const log = this.c.log(), camp = this.camp(log);
-    return [...this.retreats, ...restingAt(log, this.c.hours(), this.id), ...(camp ? [camp] : [])];
+    return [...this.retreats, ...restingAt(log, this.c.hours(), this.id), ...(camp ? [camp] : []), ...[...this.waiting.values()].map((w) => w.at)];
+  }
+
+  /** Who of its folk wait outside a place out on the land for the hero (one of a promise's household), by promise. */
+  private readonly waiting = new Map<string, { readonly agent: Agent; readonly at: { readonly x: number; readonly z: number } }>();
+
+  /**
+   * `person` (of a promise's household) goes to wait outside the place of promise `id`, at (x, z) facing `dir`
+   * (an agent's: atan2 of z and x), until it is quiet: they come in to the hero then (app/ownerComes.ts). Their
+   * agent, or null (not living here, or keeping watch at another post).
+   */
+  waitAt(id: string, person: number, x: number, z: number, dir: number): Agent | null {
+    const w = this.waiting.get(id);
+    if (w) return w.agent;
+    const life = this.life, a = life.agentOf(person);
+    if (!a || a.post) return null;
+    life.station(a, x, z, dir);
+    this.waiting.set(id, { agent: a, at: { x, z } });
+    return a;
+  }
+
+  /** Who waits outside the place of promise `id` (null: nobody). */
+  waiterOf(id: string): Agent | null { return this.waiting.get(id)?.agent ?? null; }
+
+  /** The wait outside the place of promise `id` is over: they go home (out of sight first: the caller says when). */
+  waitOver(id: string): void {
+    const w = this.waiting.get(id);
+    if (!w) return;
+    this.waiting.delete(id);
+    this.lifeOf?.unstation(w.agent);
   }
 
   /** Every town standing (or this one alone). */

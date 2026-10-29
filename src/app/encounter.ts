@@ -49,6 +49,11 @@ export interface FightHost {
    * its household can be told. True once the game has taken it in (it is not said again).
    */
   quiet(id: string): boolean;
+  /**
+   * The place of a promise has just gone quiet with the hero in it: whoever waits to hear of it may come to the hero
+   * (a cellar's household down its ladder, app/ownerComes.ts). True if someone comes (then no line says it is quiet).
+   */
+  stilled(id: string): boolean;
 }
 
 /** Where an encounter is: a cellar, a band's ground. */
@@ -287,7 +292,8 @@ export class Encounter {
     if (!this.quietSaid && this.delve.beaten) {
       this.quietSaid = true;
       this.onCue({ kind: 'quiet' });
-      if (this.arena.quietLine) this.director.queue(this.arena.quietLine, 2);
+      const comes = !this.paid && !!this.arena.promise && this.arena.inside && this.host.stilled(this.arena.promise);
+      if (this.arena.quietLine && !comes) this.director.queue(this.arena.quietLine, 2);
     }
     if (!lead) return;
     if (this.kneel?.done) this.getUp();

@@ -170,6 +170,9 @@ export class CellarVisit {
     for (const r of d.read) this.read.add(r);
   }
 
+  /** Where its frame lies in the world (its space's points plus this). */
+  get origin(): { readonly x: number; readonly y: number; readonly z: number } { return this.view.origin; }
+
   /** The house's door above, or the barrow's forecourt (x, z, yaw). */
   get houseDoor(): readonly [number, number, number] { return this.house.door; }
 

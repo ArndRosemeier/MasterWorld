@@ -316,14 +316,19 @@ export class TownTalk {
     this.session.core.applyEvent({ id: `settled/${id}`, changes: [{ atom: { predicate: 'troubled', args: { subject: id }, polarity: false } }], observers, origin: { kind: 'vgm', promise: id } });
   }
 
+  /** `person` of the household knows the place of promise `id` is safe again and has thanked the hero (they came to see): kept. */
+  thanked(person: number, id: string): void {
+    this.hush(id);
+    this.beckoned.delete(person);
+  }
+
   /**
    * The hero tells `person` the place of promise `id` is safe again: the promise is kept, and they say
    * `thanks` (the game pays). With a lead the hero has not heard of yet, they pass on its rumour (the
    * journal and the map take it up as any lead heard).
    */
   toldSafe(person: number, id: string, thanks: string): Reply {
-    this.hush(id);
-    this.beckoned.delete(person);
+    this.thanked(person, id);
     const next = this.rumour(person, id);
     return { text: next ? `${thanks} ${this.talk.cleared.rumour} ${next.text}` : thanks, heard: next ? next.heard : [], done: false, reported: id };
   }

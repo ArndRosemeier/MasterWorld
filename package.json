@@ -43,6 +43,7 @@
     "shot:climb": "node tools/shot/climb.mjs",
     "shot:doors": "node tools/shot/doors.mjs",
     "shot:search": "node tools/shot/search.mjs",
+    "shot:owner": "node tools/shot/owner.mjs",
     "shot:ways": "node tools/shot/ways.mjs",
     "shot:mouths": "node tools/shot/mouths.mjs",
     "shot:capital": "node tools/shot/capital.mjs",

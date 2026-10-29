@@ -117,8 +117,10 @@
 
 /* A speech bubble (app/speech.ts, D52): rare, only an urgent cry, over the speaker's head. */
 .speech {
-  max-width: 260px; padding: 6px 12px 7px; border-radius: 12px; background: rgba(239, 227, 204, .94); color: #2a1c14;
-  font-family: 'EB Garamond', Georgia, serif; font-size: 17px; font-style: italic; text-align: center; white-space: nowrap;
+  /* As wide as a short line needs; a longer one wraps onto more lines and the bubble grows taller (never wider than this). */
+  width: max-content; max-width: min(300px, 80vw); box-sizing: border-box; line-height: 1.25;
+  padding: 6px 12px 7px; border-radius: 12px; background: rgba(239, 227, 204, .94); color: #2a1c14;
+  font-family: 'EB Garamond', Georgia, serif; font-size: 17px; font-style: italic; text-align: center; white-space: normal; overflow-wrap: break-word;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .35); margin-top: -10px;
 }
 .speech::after {
