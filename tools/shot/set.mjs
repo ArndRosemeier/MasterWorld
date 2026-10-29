@@ -119,7 +119,7 @@ const SESSIONS = [
   { id: 'mesa', query: `${still}&hour=10.5&weather=fair`, shots: [
     { name: 'mesa-valley', act: stand(-22341, 37000, -0.924, 0.383, 0.12) },
     { name: 'mesa-plateau', act: stand(-24480, 38129, 0.680, 0.733, -0.25) },
-    { name: 'tor', act: stand(-27240, 44351, -0.707, -0.707, -0.15) },
+    { name: 'tor', act: stand(-27248, 44323, -1, 0, 0.05) },
     { name: 'climb', act: async (p) => {
       const IN = { x: 0.259, z: 0.966 };
       await stand(-30826, 35266, IN.x, IN.z, 0.1)(p);
@@ -128,10 +128,18 @@ const SESSIONS = [
       await p.keyboard.down('KeyW');
       await p.waitForFunction((y0) => { const w = window.game.player.walker; return w.mode === 'climb' && w.pos.y > y0 + 8; }, y0, { timeout: 60000 }).catch(() => console.log('climb: NOT 8 m UP THE FACE'));
       await p.keyboard.up('KeyW');
-      // The free camera 10 m out from the face, 5 m to its side and a little below the hero (never under the
+      // The free camera some 10 m out from the face, clear of trees, a little below the hero (never under the
       // ground), looking up at it (the hero hangs on where it was left).
       await p.evaluate(([ix, iz]) => {
-        const pl = window.game.player, h = pl.walker.pos, cx = h.x - ix * 10 - iz * 5, cz = h.z - iz * 10 + ix * 5, cy = Math.max(h.y - 1, window.game.terrain.height(cx, cz) + 2);
+        const g = window.game, pl = g.player, h = pl.walker.pos;
+        // The first spot whose line to the hero passes no tree's crown (a trunk within 6 m).
+        const clear = (x, z) => [0, 0.2, 0.4, 0.6].every((q) => !g.trunks.blocks(x + (h.x - x) * q, z + (h.z - z) * q, 6));
+        let cx = h.x - ix * 10, cz = h.z - iz * 10;
+        found: for (const out of [10, 8, 12, 6, 14]) for (const side of [0, 5, -5, 8, -8]) {
+          const x = h.x - ix * out - iz * side, z = h.z - iz * out + ix * side;
+          if (clear(x, z)) { cx = x; cz = z; break found; }
+        }
+        const cy = Math.max(h.y - 1, g.terrain.height(cx, cz) + 2);
         pl.flying = true;
         const dx = h.x - cx, dz = h.z - cz, dy = h.y + 1 - cy;
         pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(dy, Math.hypot(dx, dz)) * 180) / Math.PI]);
