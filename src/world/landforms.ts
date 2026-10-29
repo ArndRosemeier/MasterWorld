@@ -214,19 +214,25 @@ export class Landforms {
    */
   private place(i: number, j: number): Cell {
     if (!this.defs.length) return EMPTY;
-    const sk = this.skeleton, cx = (i + 0.5) * FORM_CELL, cz = (j + 0.5) * FORM_CELL;
-    const b = sk.sample(cx, cz).biome;
-    const mix = b >= 0 ? (sk.kinds[sk.kindAt(cx, cz)].landforms ?? this.world.biomes[b].landforms) : undefined;
+    const sk = this.skeleton, mix = this.mixOf(i, j);
     if (!mix) return EMPTY;
     const rng = new Rng(hash2i(this.seed, i, j));
     const defs = this.defs.filter((d) => (mix.mix[d.id] ?? 0) > 0);
     const expected = (mix.perKm2 * FORM_CELL * FORM_CELL) / 1e6;
     const n = Math.floor(expected) + (rng.float() < expected % 1 ? 1 : 0);
     const forms: Landform[] = [], start = rng.int(0, 3);
-    for (let k = 0; k < n && defs.length; k++) {
+    // Spread over the cell's quarters in turn, so no stretch of a walk goes long without one; and a quarter left
+    // empty between two empty ones in a row (its own cell's or the next's) gets one of its own after all (gate L).
+    const quarters: [number, Rng][] = [];
+    for (let k = 0; k < n; k++) quarters.push([(k + start) % 4, rng]);
+    for (let q = 0; q < 4; q++) {
+      if (n >= 4 || (q - start + 4) % 4 < n) continue;
+      const X = 2 * i + (q & 1), Z = 2 * j + (q >> 1);
+      if ((this.emptyQuarter(X - 1, Z) && this.emptyQuarter(X + 1, Z)) || (this.emptyQuarter(X, Z - 1) && this.emptyQuarter(X, Z + 1))) quarters.push([q, new Rng(hash2i(deriveSeed(this.seed, 'fill'), X, Z))]);
+    }
+    for (const [q, rng] of quarters) {
+      if (!defs.length) break;
       const def = rng.weighted(defs, (d) => mix.mix[d.id] ?? 0);
-      // Spread over the cell's quarters in turn, so no stretch of a walk goes long without one.
-      const q = (k + start) % 4;
       let x = (i + ((q & 1) + rng.float()) / 2) * FORM_CELL, z = (j + ((q >> 1) + rng.float()) / 2) * FORM_CELL;
       const size = rng.range(def.size[0], def.size[1]), width = def.width ? rng.range(def.width[0], def.width[1]) : size;
       const H = rng.range(def.height[0], def.height[1]), turn = rng.float() * Math.PI * 2, roll = rng.float(), fseed = rng.nextU32();
@@ -263,6 +269,23 @@ export class Landforms {
       forms.push({ def, shape: def.shape, x, z, ax, az, L, W, H, reach, seed: fseed, pond });
     }
     return { forms, relief: mix.relief };
+  }
+
+  /** The landform mix of cell (i, j): its kind of country's, else its biome's (at the cell's centre). */
+  private mixOf(i: number, j: number) {
+    const sk = this.skeleton, cx = (i + 0.5) * FORM_CELL, cz = (j + 0.5) * FORM_CELL;
+    const b = sk.sample(cx, cz).biome;
+    return b >= 0 ? (sk.kinds[sk.kindAt(cx, cz)].landforms ?? this.world.biomes[b].landforms) : undefined;
+  }
+
+  /** Whether quarter (X, Z) (half cells) is left without a landform by its cell's count and first quarter. */
+  private emptyQuarter(X: number, Z: number): boolean {
+    const i = Math.floor(X / 2), j = Math.floor(Z / 2), q = (X - 2 * i) + 2 * (Z - 2 * j);
+    const mix = this.mixOf(i, j);
+    if (!mix) return true;
+    const rng = new Rng(hash2i(this.seed, i, j)), expected = (mix.perKm2 * FORM_CELL * FORM_CELL) / 1e6;
+    const n = Math.floor(expected) + (rng.float() < expected % 1 ? 1 : 0), start = rng.int(0, 3);
+    return n < 4 && (q - start + 4) % 4 >= n;
   }
 
   /** Whether the skeleton's land round (x, z) out to `r` metres keeps within a landform's slope of `e`: no wall in it. */

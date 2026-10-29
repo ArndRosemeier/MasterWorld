@@ -16,6 +16,7 @@ import { brookCuts } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
 import { Landforms } from './landforms';
+import type { Lake } from './lakes';
 
 /**
  * How far out from a town's middle the landforms are eased away (its farms and outlying houses stand on calm
@@ -268,7 +269,7 @@ export class Terrain {
    * The land before rivers and brooks dig their beds: `r`, `bk` the river and brook here (null: as if there were no
    * water, `dryLand`), which ease the landforms away from their banks.
    */
-  private landShape(x: number, z: number, r: WaterHere | null, bk: WaterHere | null): number {
+  private landShape(x: number, z: number, r: WaterHere | null, bk: WaterHere | null, lake: Lake | null = null): number {
     const big = this.skeleton.elevation(x, z), shore = this.skeleton.lastShore;
     // The hollows' sediment floors (W2): the land as erosion left it, before its small shapes.
     const base = big > 0 ? this.hydro.onFloors(x, z, big) : big;
@@ -292,8 +293,10 @@ export class Terrain {
       forms *= smoothstep(R * 1.1, formsOut(R), d);
       level = lerp(level, s.level, market);
     }
-    // The water was traced over the land without them: by a river or brook they give way to its banks.
+    // The water was traced over the land without them: by a river or brook they give way to its banks, and by a
+    // lake to its shore (its rim holds it as the land's big shape has it, W3).
     if (forms > 0 && r?.river) forms *= smoothstep(r.half + 10, r.half + 80, r.dist);
+    if (lake) { const keep = 1 - lake.calm(x, z); forms *= keep; calm *= keep; }
     if (forms > 0) {
       let shaped = Math.max(Math.min(level, 1), level + this.landforms.offset(x, z) * forms);
       // By a brook they dig no lower than its water (a gully runs down into it, a dell beside it stays dry).
@@ -318,8 +321,10 @@ export class Terrain {
 
   private landHeight(x: number, z: number): number {
     const r = this.hydro.riverAt(x, z, this.here), bk = this.hydro.brookAt(x, z, this.brook);
-    let level = this.landShape(x, z, r, bk);
+    const lake = this.hydro.lakeNear(x, z);
+    let level = this.landShape(x, z, r, bk, lake);
     if (level <= 0) return level;
+    if (lake) level = lake.rim(x, z, level);
     // Rivers shape their valleys, then brooks theirs in the land the rivers left (their levels come from it, D50),
     // each blending out to the edge of its own valley, so where two meet the land stays whole.
     const byRiver = shapeByWater(r, level);

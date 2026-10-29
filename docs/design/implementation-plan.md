@@ -149,7 +149,7 @@ Goal: all water (lakes, rivers, brooks) comes after the land is finished and fol
 |---|---|---|
 | W1 ✓ | **Measure the fit** (`npm run water:fit`): how deep brooks and rivers cut below the dry land, how many are raised above it, how many lakes leak | The numbers for four seeds, round the start and the nearest lake |
 | W2 ✓ | **The land drains**: hollows of the finished big land are filled or breached as water would (breaching is cheaper), and drainage reads the land with those floors; brooks run on the ground they cross, not on a 250 m cell's blend | Raised brooks fewer at every place measured (16 → 10 %, 25 → 9 %, 11 → 4 % …); tests green |
-| W3 | **Lakes from the finished land**: a lake only where a fine flood of the finished land finds a basin, its level its spill point, the outflow leaving at that level, rivers through it capped at its level | `water:fit`: no lake leaks, no lake above its rim; the vj4985 lake fixed in a GPU shot |
+| W3 ✓ | **Lakes from the finished land**: a lake only where a fine flood of the finished land finds a basin, its level its spill point, the outflow leaving at that level, rivers through it capped at its level | `water:fit`: no lake leaks, no lake above its rim; the vj4985 lake fixed in a GPU shot |
 | W4 | **Courses on the valley floor**: rivers and brooks keep to the lowest line of the land they cross; cuts shrink | `water:fit`: median cut under 5 m, raised under 3 % |
 | W5 | **The world after**: start towns, places and tests checked on the moved water; the loop check passes | Tests and `npm run loop` green |
 
