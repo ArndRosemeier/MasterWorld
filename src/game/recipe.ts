@@ -43,7 +43,10 @@ export interface Caster {
   mana: number;
   health: number;
   readonly maxHealth: number;
-  skill(id: string): number;
+  /** The caster's level (D58): an ability asks one before it can be used. */
+  readonly level: number;
+  /** How strongly an ability works for this caster (0..100: the hero's prowess, D59). */
+  powerOf(def: AbilityDef): number;
   /** Cooldowns kept by the caster, shared by every runner it casts with (absent: the runner's own). */
   readonly cooldowns?: Map<string, number>;
   /** The caster's own status effects, kept by the caster the same way (absent: the runner's own). */
@@ -85,13 +88,13 @@ export interface RecipeWorld {
   clear?(at: Spot): boolean;
 }
 
-/** One cast as it plays: what, at whom, where, and the skill behind it. */
+/** One cast as it plays: what, at whom, where, and the strength behind it (the caster's prowess). */
 interface Play {
   readonly def: AbilityDef;
   readonly target: number | null;
   readonly point: Spot;
   readonly me: Spot;
-  readonly skill: number;
+  readonly power: number;
 }
 
 /** Something loosed and flying. */
@@ -208,7 +211,7 @@ export class Recipes {
   check(def: AbilityDef, target: number | null, me: Spot): string | null {
     if (this.cooling(def.id) > 0) return `${def.name} is not ready yet.`;
     if (this.isHeld(SELF)) return 'You are held fast.';
-    if (def.skill && (def.level ?? 0) > this.caster.skill(def.skill)) return `You are not yet skilled enough for ${def.name}.`;
+    if ((def.level ?? 1) > this.caster.level) return `You are not yet ready for ${def.name}.`;
     if (this.casting) return `You are casting ${this.casting.def.name}.`;
     const why = this.afford(def);
     if (why) return why;
@@ -263,7 +266,7 @@ export class Recipes {
   /** Play an ability's steps (all but its blow) at a target. */
   playRest(def: AbilityDef, target: number | null, me: Spot): void {
     const t = target === null ? undefined : this.mark(target);
-    const play: Play = { def, target: t ? target : null, point: t ? { x: t.x, y: t.y, z: t.z } : { ...me }, me: { ...me }, skill: def.skill ? this.caster.skill(def.skill) : 0 };
+    const play: Play = { def, target: t ? target : null, point: t ? { x: t.x, y: t.y, z: t.z } : { ...me }, me: { ...me }, power: this.caster.powerOf(def) };
     this.playSteps(play.def.ops, play);
   }
 
@@ -315,11 +318,11 @@ export class Recipes {
 
   // ------------------------------------------------------------------ effects
 
-  /** Put an effect on someone (scaled by the skill behind it); the same effect again refreshes it. */
-  putOn(id: number, apply: EffectApply, skill = 0): void {
+  /** Put an effect on someone (scaled by the strength behind it); the same effect again refreshes it. */
+  putOn(id: number, apply: EffectApply, power = 0): void {
     const def = this.effectDefs.get(apply.id);
     if (!def || (apply.chance !== undefined && !this.rng.chance(apply.chance))) return;
-    const magnitude = apply.magnitude * (def.dot || def.hot ? 1 + skill / 150 : 1);
+    const magnitude = apply.magnitude * (def.dot || def.hot ? 1 + power / 150 : 1);
     const list = this.listOf(id, true);
     const was = list.find((w) => w.def.id === def.id);
     if (was) {
@@ -404,9 +407,9 @@ export class Recipes {
     }
   }
 
-  /** A spell's damage as a blow: a spread around its number, the skill behind it, hard to dodge. */
+  /** A spell's damage as a blow: a spread around its number, the strength behind it, hard to dodge. */
   private spellBlow(p: Play, damage: number, kind: DamageKind | undefined, aim: number): Blow {
-    return { damage: [damage * 0.85, damage * 1.15], kind: kind ?? 'blunt', skill: p.skill, aim };
+    return { damage: [damage * 0.85, damage * 1.15], kind: kind ?? 'blunt', prowess: p.power, aim };
   }
 
   /** `over`: a tick of healing over time, not one healing at once. */
@@ -442,13 +445,13 @@ export class Recipes {
       }
       case 'effect': {
         const id = o.to === 'self' ? SELF : p.target;
-        if (id !== null) this.putOn(id, o.effect, p.skill);
+        if (id !== null) this.putOn(id, o.effect, p.power);
         return;
       }
       case 'heal': {
         const id = o.to === 'self' ? SELF : p.target ?? SELF;
         const base = o.share ? o.amount * this.caster.maxHealth : o.amount;
-        this.healOn(id, base * (p.def.skill ? 1 + p.skill / 150 : 1));
+        this.healOn(id, base * (p.def.school ? 1 + p.power / 150 : 1));
         return;
       }
       case 'terrain': {
@@ -487,8 +490,8 @@ export class Recipes {
       touched.push(m.id);
       // Weaker at the rim.
       if (o.damage) this.world.hit(m.id, this.spellBlow(p, o.damage * (1 - 0.4 * (d / o.radius)), o.kind, AREA_AIM), p.def);
-      if (o.heal) this.healOn(m.id, o.heal * (p.def.skill ? 1 + p.skill / 150 : 1));
-      if (o.effect) this.putOn(m.id, o.effect, p.skill);
+      if (o.heal) this.healOn(m.id, o.heal * (p.def.school ? 1 + p.power / 150 : 1));
+      if (o.effect) this.putOn(m.id, o.effect, p.power);
     }
     this.pending.push({ kind: 'area', ability: p.def, at, radius: o.radius, look: o.look, touched });
   }
@@ -519,7 +522,7 @@ export class Recipes {
     const p = s.play, o = s.op;
     if (on !== null) {
       if (o.damage) this.world.hit(on, this.spellBlow(p, o.damage, o.kind, SPELL_AIM), p.def);
-      if (o.effect) this.putOn(on, o.effect, p.skill);
+      if (o.effect) this.putOn(on, o.effect, p.power);
     }
     this.pending.push({ kind: 'landed', shot: s, on });
     const m = on === null ? undefined : this.mark(on);

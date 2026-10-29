@@ -4,7 +4,7 @@
  * for their trade. Stock is limited and seeded; what the hero sells stays on the shelf to be bought back;
  * over the days stock and coin come back towards what the shop likes to hold. Prices follow what the
  * town has: what a shop here makes is cheaper, and the more of a thing the town's merchants already hold,
- * the less they pay for it and the less they ask. The hero's speech skill narrows the gap, and their
+ * the less they pay for it and the less they ask. The hero's speech (their level and gear) narrows the gap, and their
  * standing with the merchant's people (plan 11.6) moves it. Pure: saved
  * as plain data.
  */
@@ -18,7 +18,7 @@ import { condition } from './upkeep';
 
 /** How much more a rarer thing is worth than a plain one of its kind. */
 const RARITY_WORTH: Record<Rarity, number> = { common: 1, uncommon: 2.5, rare: 6, legendary: 20 };
-/** Copper per skill point an item adds. */
+/** Copper per quality point an item adds. */
 const BONUS_WORTH = 4;
 /** Things a merchant keeps that they did not make, at most (the rest is sold on). */
 const SECOND_HAND = 12;
@@ -160,7 +160,7 @@ export class Market {
   /** The hero buys one of the merchant's things into the pack. */
   buy(hero: Character, m: Merchant, item: Item): Refusal {
     if (!m.stock.includes(item)) return 'gone';
-    const price = this.asks(m, item, hero.skill('speech'));
+    const price = this.asks(m, item, hero.speech);
     if (hero.coins < price) return 'coin';
     return this.hand(hero, m, item, m.stock, hero.pack, -price);
   }
@@ -168,7 +168,7 @@ export class Market {
   /** The hero sells a thing from the pack (not something worn). */
   sell(hero: Character, m: Merchant, item: Item): Refusal {
     if (!hero.pack.includes(item)) return Object.values(hero.worn).includes(item) ? 'worn' : 'gone';
-    const price = this.pays(m, item, hero.skill('speech'));
+    const price = this.pays(m, item, hero.speech);
     if (!price) return 'not-bought';
     if (m.coins < price) return 'their-coin';
     return this.hand(hero, m, item, hero.pack, m.stock, price);
@@ -188,7 +188,7 @@ export class Market {
    * power it gives (the bot and the shop's "for you" mark use it); null if nothing does.
    */
   upgradeFor(hero: Character, m: Merchant): { item: Item; power: number } | null {
-    const speech = hero.skill('speech');
+    const speech = hero.speech;
     let best: { item: Item; power: number } | null = null;
     for (const item of m.stock) {
       if (!defOf(this.cat, item.def).slot || this.asks(m, item, speech) > hero.coins) continue;

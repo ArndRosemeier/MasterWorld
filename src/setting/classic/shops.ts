@@ -3,12 +3,8 @@
  * stalls keep the general goods of a valley town and take most things off a traveller's hands; the inn's
  * keeper sells food and drink and buys game for the kitchen. In the capital the armourer and the jeweller keep shop too. Above the plain goods each forge and stall keeps
  * a few finer pieces and one rare one, dear enough to save for over several evenings.
- *
- * And who teaches: the smith the weapons of the forge and how to wear armour; the carter, who rode guard on
- * the caravans before the Fading closed the roads, the spear, dodging, fists and finding the way; the inn's
- * keeper, who hears everything, how to listen and how to talk.
  */
-import type { ShopDef, TrainerDef } from '../contract';
+import type { ShopDef } from '../contract';
 
 export const shops: readonly ShopDef[] = [
   {
@@ -45,13 +41,5 @@ export const shops: readonly ShopDef[] = [
     line: 'Bread from this morning, cheese, and a draught or two for the road. Game for the pot I always buy.',
     goods: [['bread', 4], ['cheese', 3], ['venison', 1], ['minor-potion', 1], ['potion', 1], ['torch', 2]],
     buys: ['food', 'valuable'], purse: 300, pays: 0.45, asks: 1.25, restock: 2,
-  },
-];
-
-export const trainers: readonly TrainerDef[] = [
-  {
-    keeper: 'innkeeper', title: '{name}, keeper of the inn', topic: 'How do you hear so much?',
-    line: 'You listen more than you talk, and when you talk you make them laugh. Sit down, I will show you.',
-    skills: ['speech', 'perception'], upTo: 30, price: 11, hours: 1,
   },
 ];

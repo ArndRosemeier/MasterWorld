@@ -1,21 +1,21 @@
 /**
  * The classic setting's first items (plan 11.5, 12.1, D31): weapons of each kind, shields, three weights
  * of armour, potions, food, tools and valuables; a few legendary pieces with their history; what places
- * and creatures of some danger hold. Rarity and the skill bonuses are rolled when an item is found.
+ * and creatures of some danger hold. Rarity and the bonuses to its qualities are rolled when an item is found.
  */
 import type { ItemCatalog, TravelDef, UpkeepDef } from '../contract';
 
 export const items: ItemCatalog = {
   items: [
-    { id: 'knife', name: 'Knife', kind: 'weapon', slot: 'main', weapon: { skill: 'blades', damage: [2, 5], kind: 'cut', time: 1.4, reach: 0.7 }, value: 8, weight: 0.3 },
-    { id: 'dagger', name: 'Dagger', kind: 'weapon', slot: 'main', weapon: { skill: 'blades', damage: [3, 6], kind: 'pierce', time: 1.5, reach: 0.75 }, value: 30, weight: 0.4 },
-    { id: 'short-sword', name: 'Short sword', kind: 'weapon', slot: 'main', weapon: { skill: 'blades', damage: [4, 8], kind: 'cut', time: 1.9, reach: 0.95 }, value: 90, weight: 1.2 },
-    { id: 'arming-sword', name: 'Arming sword', kind: 'weapon', slot: 'main', weapon: { skill: 'blades', damage: [5, 11], kind: 'cut', time: 2.2, reach: 1.1 }, value: 260, weight: 1.4 },
-    { id: 'hatchet', name: 'Hatchet', kind: 'weapon', slot: 'main', weapon: { skill: 'axes', damage: [4, 8], kind: 'cut', time: 1.9, reach: 0.85 }, value: 40, weight: 1.1 },
-    { id: 'bearded-axe', name: 'Bearded axe', kind: 'weapon', slot: 'main', weapon: { skill: 'axes', damage: [6, 12], kind: 'cut', time: 2.5, reach: 1.0 }, value: 180, weight: 1.8 },
-    { id: 'club', name: 'Club', kind: 'weapon', slot: 'main', weapon: { skill: 'maces', damage: [3, 7], kind: 'blunt', time: 1.8, reach: 0.85 }, value: 4, weight: 1.3 },
-    { id: 'mace', name: 'Flanged mace', kind: 'weapon', slot: 'main', weapon: { skill: 'maces', damage: [5, 10], kind: 'blunt', time: 2.3, reach: 0.9 }, value: 200, weight: 2.0 },
-    { id: 'spear', name: 'Spear', kind: 'weapon', slot: 'main', weapon: { skill: 'spears', damage: [4, 9], kind: 'pierce', time: 2.1, reach: 1.6 }, value: 60, weight: 1.8 },
+    { id: 'knife', name: 'Knife', kind: 'weapon', slot: 'main', weapon: { swing: 'slash', damage: [2, 5], kind: 'cut', time: 1.4, reach: 0.7 }, value: 8, weight: 0.3 },
+    { id: 'dagger', name: 'Dagger', kind: 'weapon', slot: 'main', weapon: { swing: 'slash', damage: [3, 6], kind: 'pierce', time: 1.5, reach: 0.75 }, value: 30, weight: 0.4 },
+    { id: 'short-sword', name: 'Short sword', kind: 'weapon', slot: 'main', weapon: { swing: 'slash', damage: [4, 8], kind: 'cut', time: 1.9, reach: 0.95 }, value: 90, weight: 1.2 },
+    { id: 'arming-sword', name: 'Arming sword', kind: 'weapon', slot: 'main', weapon: { swing: 'slash', damage: [5, 11], kind: 'cut', time: 2.2, reach: 1.1 }, value: 260, weight: 1.4 },
+    { id: 'hatchet', name: 'Hatchet', kind: 'weapon', slot: 'main', weapon: { swing: 'slash', damage: [4, 8], kind: 'cut', time: 1.9, reach: 0.85 }, value: 40, weight: 1.1 },
+    { id: 'bearded-axe', name: 'Bearded axe', kind: 'weapon', slot: 'main', weapon: { swing: 'slash', damage: [6, 12], kind: 'cut', time: 2.5, reach: 1.0 }, value: 180, weight: 1.8 },
+    { id: 'club', name: 'Club', kind: 'weapon', slot: 'main', weapon: { swing: 'slam', damage: [3, 7], kind: 'blunt', time: 1.8, reach: 0.85 }, value: 4, weight: 1.3 },
+    { id: 'mace', name: 'Flanged mace', kind: 'weapon', slot: 'main', weapon: { swing: 'slam', damage: [5, 10], kind: 'blunt', time: 2.3, reach: 0.9 }, value: 200, weight: 2.0 },
+    { id: 'spear', name: 'Spear', kind: 'weapon', slot: 'main', weapon: { swing: 'thrust', damage: [4, 9], kind: 'pierce', time: 2.1, reach: 1.6 }, value: 60, weight: 1.8 },
     { id: 'buckler', name: 'Buckler', kind: 'shield', slot: 'off', armour: 0, block: 0.18, value: 40, weight: 1.5 },
     { id: 'round-shield', name: 'Round shield', kind: 'shield', slot: 'off', armour: 1, block: 0.28, value: 70, weight: 3.5 },
     { id: 'padded-jack', name: 'Padded jack', kind: 'armour', slot: 'body', armour: 1, value: 30, weight: 3 },
@@ -54,9 +54,9 @@ export const items: ItemCatalog = {
     { id: 'scroll-mend', name: 'Scroll of mending', kind: 'writing', teaches: 'mend', value: 70, weight: 0.1, lore: 'A hedge witch wrote it out, with a pressed leaf in the fold.' },
   ],
   uniques: [
-    { id: 'lantern-blade', base: 'short-sword', name: "Grundmar's Lantern-Blade", bonuses: { blades: 10, perception: 6 }, danger: 14, grants: 'deeplight', lore: 'A dwarf of the old realm forged it to light the deep halls. Since the Fading it has only glinted, until lately.' },
-    { id: 'threshold', base: 'round-shield', name: 'Threshold', bonuses: { shields: 10, armour: 5 }, danger: 18, grants: 'hold-door', lore: 'Its rim bears the open door of the Threshold. The temple keeper would give a great deal to see it.' },
-    { id: 'watch-mace', base: 'mace', name: 'Coldiron of the Watch', bonuses: { maces: 9, dodge: 4 }, danger: 18, grants: 'watch-cold', lore: 'The valley watch carried it when the watch-house still stood. It is cold to the touch in any weather.' },
+    { id: 'lantern-blade', base: 'short-sword', name: "Grundmar's Lantern-Blade", bonuses: { aim: 10, guard: 4 }, danger: 14, grants: 'deeplight', lore: 'A dwarf of the old realm forged it to light the deep halls. Since the Fading it has only glinted, until lately.' },
+    { id: 'threshold', base: 'round-shield', name: 'Threshold', bonuses: { block: 10, armour: 5 }, danger: 18, grants: 'hold-door', lore: 'Its rim bears the open door of the Threshold. The temple keeper would give a great deal to see it.' },
+    { id: 'watch-mace', base: 'mace', name: 'Coldiron of the Watch', bonuses: { aim: 9, guard: 4 }, danger: 18, grants: 'watch-cold', lore: 'The valley watch carried it when the watch-house still stood. It is cold to the touch in any weather.' },
   ],
   treasure: [
     // What a creature carries fits what it is: animals only their own hide, fangs or silk (rats nothing at all),
@@ -78,18 +78,14 @@ export const items: ItemCatalog = {
     },
   ],
   affixes: {
-    blades: { prefix: 'Keen', suffix: 'of the Edge' },
-    axes: { prefix: 'Hewing', suffix: 'of the Woodsman' },
-    maces: { prefix: 'Heavy', suffix: 'of the Smith' },
-    spears: { prefix: 'Long', suffix: 'of the Watch' },
-    unarmed: { prefix: "Brawler's", suffix: 'of the Fist' },
-    shields: { prefix: 'Steady', suffix: 'of the Wall' },
+    aim: { prefix: 'Keen', suffix: 'of the Edge' },
+    guard: { prefix: 'Nimble', suffix: 'of the Cat' },
     armour: { prefix: 'Stout', suffix: 'of the Ox' },
-    dodge: { prefix: 'Nimble', suffix: 'of the Cat' },
-    perception: { prefix: 'Watchful', suffix: 'of the Owl' },
+    block: { prefix: 'Steady', suffix: 'of the Wall' },
+    spell: { prefix: 'Humming', suffix: 'of the Old Ways' },
     stealth: { prefix: 'Quiet', suffix: 'of Shadows' },
-    orientation: { prefix: "Wayfinder's", suffix: 'of the Road' },
     speech: { prefix: 'Silver', suffix: 'of the Market' },
+    health: { prefix: 'Hale', suffix: 'of the Hearth' },
   },
 };
 

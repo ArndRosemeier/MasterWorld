@@ -104,7 +104,7 @@ test('settlements: houses are told apart by town (building ids start at 0 in eac
 
 // The town systems take the town they work in; none reaches for the start town by itself.
 test('settlements: no town system names the start town', () => {
-  const systems = ['app/talkUi.ts', 'app/interiorVisit.ts', 'app/upkeepUi.ts', 'app/hails.ts', 'app/tradeUi.ts', 'app/cellars.ts', 'app/soundDirector.ts', 'app/mapUi.ts', 'app/towns.ts', 'game/township.ts', 'sim/townLife.ts', 'talk/townTalk.ts', 'game/trade.ts', 'game/upkeep.ts', 'game/lessons.ts'];
+  const systems = ['app/talkUi.ts', 'app/interiorVisit.ts', 'app/upkeepUi.ts', 'app/hails.ts', 'app/tradeUi.ts', 'app/cellars.ts', 'app/soundDirector.ts', 'app/mapUi.ts', 'app/towns.ts', 'game/township.ts', 'sim/townLife.ts', 'talk/townTalk.ts', 'game/trade.ts', 'game/upkeep.ts', 'game/guilds.ts'];
   const startTown = /towns\[0\]|'town-1'|"town-1"|\bstartTown\b|\bstart\.decision\b/;
   for (const f of systems) {
     const src = readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8').split('\n');

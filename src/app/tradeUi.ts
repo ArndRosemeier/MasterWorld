@@ -67,7 +67,7 @@ export class TradeUi extends BodyWindow {
   protected opened(): void {
     const m = this.with;
     if (!m) return;
-    const h = this.hero, speech = h.skill('speech');
+    const h = this.hero, speech = h.speech;
     const enter = this.entrances(0.45, 0.04);
     const up = this.market.upgradeFor(h, m)?.item;
     // Alike things lie in one stack with its count; a click deals the top one (the marked upgrade, if it is there).

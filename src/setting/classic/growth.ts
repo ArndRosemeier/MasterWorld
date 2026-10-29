@@ -10,6 +10,8 @@ const xp = Array.from({ length: 20 }, (_, i) => 25 * i * (i + 3));
 export const growth: GrowthDef = {
   xp,
   perLevel: { health: 6, stamina: 4, mana: 5 },
+  // Level 1 aims like a guard fresh off the caravans; level 20 like the best of the old realm.
+  prowess: { base: 16, step: 4.4 },
   even: { base: 9, step: 2.5 },
   fight: 2.5,
   deeds: { cleared: 40, kept: 50, band: 80, task: 60, help: 30, town: 20, place: 15, sight: 20, read: 25, learn: 10 },

@@ -40,7 +40,7 @@ test('trade: a seeded hero sells a find and buys an upgrade (done-check A2)', ()
   // Sell every find someone in town buys.
   const before = hero.coins;
   for (const it of [...hero.pack]) {
-    const to = [smith, trader].find((s) => m.pays(s, it, hero.skill('speech')) > 0 && s.coins >= m.pays(s, it, hero.skill('speech')));
+    const to = [smith, trader].find((s) => m.pays(s, it, hero.speech) > 0 && s.coins >= m.pays(s, it, hero.speech));
     if (to) assert.equal(m.sell(hero, to, it), null);
   }
   assert.ok(hero.coins > before, `sold for ${hero.coins - before} copper`);
@@ -61,7 +61,7 @@ test('trade: they ask more than they pay, speech narrows it, and rarer is dearer
   assert.ok(m.pays(s, sword, 10) < m.asks(s, sword, 10));
   assert.ok(m.pays(s, sword, 60) > m.pays(s, sword, 10));
   assert.ok(m.asks(s, sword, 60) < m.asks(s, sword, 10));
-  const keen: Item = { ...sword, rarity: 'rare', name: 'Keen short sword of the Edge', bonuses: { blades: 7, dodge: 3 } };
+  const keen: Item = { ...sword, rarity: 'rare', name: 'Keen short sword of the Edge', bonuses: { aim: 7, guard: 3 } };
   assert.ok(itemWorth(classic.items, keen) > itemWorth(classic.items, sword) * 5);
   // Worn gear fetches less; its worth as new (what the smith's mending reads) stays.
   const battered: Item = { ...sword, wear: 0.6 };
@@ -114,7 +114,7 @@ test('trade: no coin, no sale; their purse and shelves come back over the days; 
 test('trade: alike things stack (kind, rarity, name, bonuses and wear), others stay apart', () => {
   const knife = () => plainItem(classic.items, 'knife');
   const worn: Item = { ...knife(), wear: 0.3 };
-  const keen: Item = { ...knife(), rarity: 'uncommon', name: 'Keen knife', bonuses: { blades: 3 } };
+  const keen: Item = { ...knife(), rarity: 'uncommon', name: 'Keen knife', bonuses: { aim: 3 } };
   const st = stackAlike([knife(), keen, knife(), worn, { ...keen }]);
   assert.deepEqual(st.map((s) => s.length), [2, 2, 1]);
 });

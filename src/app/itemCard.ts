@@ -1,20 +1,23 @@
 /**
- * An item's card (plan 17.1, D31, D45): its rarity and name in the rarity's colour, what it does, its skill
+ * An item's card (plan 17.1, D31, D45): its rarity and name in the rarity's colour, what it does, its quality
  * bonuses and its lore, in a brass plate whose ward shows the rarity: common is plain brass with a glint,
  * uncommon a breathing ward, rare a ward with a running spark and frost, legendary two sparks, a gear and
  * stars. Shown fresh, the rarity sets the entrance and the lines rise one by one. The fight HUD shows finds
  * with it, the pack window what is worn and carried (styles in brass.css).
  */
-import { abilityOf, skillOf, type Rarity, type SettingModule } from '../setting/contract';
+import { abilityOf, type Quality, type Rarity, type SettingModule } from '../setting/contract';
 import type { Item } from '../game/items';
 import { condition, wearState } from '../game/upkeep';
 import { el } from './dom';
 import { twinkles, wardRim } from './ward';
 
 /** The lines under an item's name: damage or armour, then its bonuses. */
+
+/** What a quality is called on a card. */
+const QUALITY_NAMES: Record<Quality, string> = { aim: 'aim', guard: 'guard', armour: 'armour', block: 'block', spell: 'spell power', stealth: 'stealth', speech: 'speech', health: 'health' };
 export function itemLines(i: Item, setting: SettingModule): string[] {
   const d = setting.items.items.find((x) => x.id === i.def);
-  const lines = Object.entries(i.bonuses).map(([k, v]) => `+${v} ${skillOf(setting, k)?.name ?? k}`);
+  const lines = Object.entries(i.bonuses).map(([k, v]) => `+${v} ${QUALITY_NAMES[k as Quality] ?? k}`);
   if (d?.weapon) lines.unshift(`${d.weapon.damage[0]}–${d.weapon.damage[1]} damage`);
   if (d?.armour) lines.unshift(`armour ${d.armour}`);
   if (d?.block) lines.unshift(`blocks ${Math.round(d.block * 100)}%`);

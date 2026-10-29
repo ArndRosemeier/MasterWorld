@@ -53,11 +53,12 @@ test('action bar: a taught ability is learned onto the bar and saved with the he
   const hero = new Character(setting);
   assert.ok(!hero.knows('taught-test'), 'not known at the start');
   assert.ok(!hero.bar.includes('taught-test'));
+  const free = hero.bar.indexOf(null);
   assert.ok(hero.learn('taught-test'));
   assert.ok(!hero.learn('taught-test'), 'only once');
   assert.ok(hero.knows('taught-test'));
-  assert.equal(hero.bar[6], 'taught-test', 'first free slot after the potion and resting');
-  hero.bar = swapOnBar(hero.bar, 6, 9);
+  assert.equal(hero.bar[free], 'taught-test', 'the first free slot (after the past\'s ability, the potion and resting)');
+  hero.bar = swapOnBar(hero.bar, free, 9);
   const again = new Character(setting, JSON.parse(JSON.stringify(hero.save())));
   assert.ok(again.knows('taught-test'));
   assert.equal(again.bar[9], 'taught-test', 'the arrangement is kept');

@@ -1,19 +1,19 @@
 /**
- * Items as found (plan 11.5, D31): a catalogue kind with its rarity and skill bonuses, rolled from a seed
- * when a place's treasure or a creature's pack is opened. Uncommon finds raise one skill, rare ones two
+ * Items as found (plan 11.5, D31, D59): a catalogue kind with its rarity and bonuses to its qualities, rolled from a seed
+ * when a place's treasure or a creature's pack is opened. Uncommon finds add to one quality, rare ones two
  * and carry a name; legendary ones are the catalogue's named uniques, only where the danger is high
  * enough. Pure.
  */
 import { Rng } from '@futuremagic/core';
-import type { ItemCatalog, ItemDef, Rarity, UniqueDef } from '../setting/contract';
+import { QUALITIES, type ItemCatalog, type ItemDef, type Quality, type Rarity, type UniqueDef } from '../setting/contract';
 
 export interface Item {
   /** Catalogue id. */
   readonly def: string;
   readonly rarity: Rarity;
   readonly name: string;
-  /** Skill id → points while worn. */
-  readonly bonuses: Readonly<Record<string, number>>;
+  /** Quality → points while worn. */
+  readonly bonuses: Partial<Readonly<Record<Quality, number>>>;
   readonly lore?: string;
   /** An item-only ability it gives while worn (D31, C5). */
   readonly grants?: string;
@@ -46,13 +46,31 @@ export function defOf(cat: ItemCatalog, id: string): ItemDef {
   return d;
 }
 
-/** The skills a found item may raise: its own weapon skill first, then what fits its kind. */
-function bonusSkills(d: ItemDef): string[] {
-  if (d.weapon) return [d.weapon.skill, 'dodge', 'perception'];
-  if (d.kind === 'shield') return ['shields', 'armour'];
-  if (d.slot === 'ring' || d.slot === 'amulet') return ['perception', 'stealth', 'speech', 'orientation', 'dodge'];
-  if (d.slot === 'feet' || d.slot === 'cloak') return ['stealth', 'dodge', 'orientation'];
-  return ['armour', 'dodge', 'perception'];
+/** The qualities a found item may add to: what it is for first, then what fits its kind. */
+function qualitiesFor(d: ItemDef): Quality[] {
+  if (d.weapon) return ['aim', 'guard'];
+  if (d.kind === 'shield') return ['block', 'armour'];
+  if (d.slot === 'ring' || d.slot === 'amulet') return ['spell', 'stealth', 'speech', 'guard', 'health'];
+  if (d.slot === 'feet' || d.slot === 'cloak') return ['stealth', 'guard'];
+  return ['armour', 'guard', 'health'];
+}
+
+/** What an old save's skill bonus (before D59) adds to now; none: it goes (orientation, perception). */
+const OLD_SKILL: Readonly<Record<string, Quality>> = {
+  blades: 'aim', axes: 'aim', maces: 'aim', spears: 'aim', unarmed: 'aim', dodge: 'guard', shields: 'block', armour: 'armour', stealth: 'stealth', speech: 'speech',
+  pyromancy: 'spell', cryomancy: 'spell', geomancy: 'spell', vitae: 'spell', luminism: 'spell', umbramancy: 'spell',
+};
+
+/** An item from a save before D59: its skill bonuses become bonuses to qualities. */
+export function withQualities(it: Item): Item {
+  const keys = Object.keys(it.bonuses);
+  if (keys.every((k) => (QUALITIES as readonly string[]).includes(k))) return it;
+  const bonuses: Partial<Record<Quality, number>> = {};
+  for (const [k, v] of Object.entries(it.bonuses) as [string, number][]) {
+    const q = (QUALITIES as readonly string[]).includes(k) ? (k as Quality) : OLD_SKILL[k];
+    if (q) bonuses[q] = (bonuses[q] ?? 0) + v;
+  }
+  return { ...it, bonuses };
 }
 
 /** A named legendary item (plan 11.5) as found, with the ability it gives (C5). */
@@ -75,12 +93,12 @@ export function rollItem(cat: ItemCatalog, id: string, danger: number, rng: Rng)
 
 /**
  * One item of kind `id` of a given rarity (common, uncommon or rare), its bonuses as found at `danger`:
- * uncommon raises one skill, rare two and carries its full name. Fine work in a shop is made with it.
+ * uncommon adds to one quality, rare to two and carries its full name. Fine work in a shop is made with it.
  */
 export function itemAs(cat: ItemCatalog, id: string, rarity: Exclude<Rarity, 'legendary'>, danger: number, rng: Rng): Item {
   const d = defOf(cat, id);
   if (rarity === 'common' || !wearable(d)) return plainItem(cat, id);
-  const pool = bonusSkills(d), bonuses: Record<string, number> = {};
+  const pool = qualitiesFor(d), bonuses: Partial<Record<Quality, number>> = {};
   const first = rng.chance(0.65) ? pool[0] : rng.pick(pool);
   const size = (lo: number, hi: number) => Math.round(rng.range(lo, hi) + danger * 0.15);
   bonuses[first] = rarity === 'rare' ? size(5, 8) : size(2, 5);

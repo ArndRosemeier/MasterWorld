@@ -29,11 +29,12 @@ await page.addStyleTag({ content: '#loading{display:none!important}' });
 const shoot = async (name) => { const file = join(dir, `${name}.jpg`); await page.screenshot({ path: file, type: 'jpeg', quality: 90, timeout: TIMEOUT }); console.log(file); };
 let failed = false;
 
-// A student of the Undercroft (frost opened) whose name is good enough, before its keeper.
+// A student of the Undercroft (a frost spell learned) of the level its keeper asks, before its keeper.
 const asked = await page.evaluate(() => {
   const g = window.game, t = g.towns.every[0];
-  g.standing.deed('shot:deeds', g.standing.race, 40);
-  g.character.openSkill('cryomancy');
+  const under = g.setting.guilds.find((x) => x.keeper === 'undercroft-keeper');
+  g.character.gain(Math.max(0, g.setting.growth.xp[under.quest.level - 1] - g.character.xp));
+  g.character.learn(g.setting.abilities.find((a) => a.school === 'cryomancy' && (a.level ?? 1) === 1).id);
   const a = t.life.agents.find((x) => x.person.trade === 'undercroft-keeper');
   if (!a) return null;
   g.player.teleport(a.x + 1.6, undefined, a.z, Math.PI / 2);

@@ -33,11 +33,10 @@ await page.addStyleTag({ content: '#loading{display:none!important}' });
 await meet('wolves', 11)(page);
 await page.waitForTimeout(2000);
 
-// The first spell of every school, in the setting's order (taught, level 0, a magic skill).
+// The first spell of every school, in the setting's order (the lowest level of the school).
 const firsts = await page.evaluate(() => {
   const g = window.game, setting = g.setting;
-  const magic = setting.skills.filter((s) => s.group === 'magic').map((s) => s.id);
-  return magic.map((k) => setting.abilities.find((a) => a.skill === k && (a.level ?? 0) === 0)?.id).filter(Boolean);
+  return setting.schools.map((k) => setting.abilities.filter((a) => a.school === k.id).sort((a, b) => (a.level ?? 1) - (b.level ?? 1))[0]?.id).filter(Boolean);
 });
 let failed = false;
 const shaders = () => page.evaluate(() => { const m = window.shaders; return m ? { ...m.summary(), lines: m.violations(), built: m.events.filter((e) => e.phase === 'run').map((e) => e.what) } : null; });

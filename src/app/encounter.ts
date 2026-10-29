@@ -324,8 +324,8 @@ export class Encounter {
       case 'struck': {
         this.hud.struck(e.strike.damage, e.strike.outcome);
         if (e.spell) break;
-        const w = this.hero.worn.main, shape = w ? defOf(this.setting.items, w.def).weapon?.skill : 'unarmed';
-        this.act(shape === 'unarmed' ? 'punch' : shape === 'maces' ? 'slam' : e.ability === 'shove' ? 'kick' : 'swing_1h', Math.min(0.9, this.hero.weapon.time * 0.6));
+        const w = this.hero.worn.main, shape = w ? defOf(this.setting.items, w.def).weapon?.swing : 'punch';
+        this.act(shape === 'punch' ? 'punch' : shape === 'slam' ? 'slam' : e.ability === 'shove' ? 'kick' : 'swing_1h', Math.min(0.9, this.hero.weapon.time * 0.6));
         break;
       }
       case 'hurt':

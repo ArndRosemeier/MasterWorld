@@ -42,7 +42,7 @@ import { WINDOWS } from './render/materials/building';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg } from '@futuremagic/settlement';
-import { abilityOf, skillOf, validateSetting, type BackgroundDef, type GrowthSource, type SituationKind } from './setting/contract';
+import { abilityOf, validateSetting, type BackgroundDef, type GrowthSource, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -99,7 +99,6 @@ import { MapUi } from './app/mapUi';
 import { HandOver } from './app/handOver';
 import { HandOverScene } from './app/handOverScene';
 import { MapSheet } from './render/hero/MapSheet';
-import { Orientation } from './game/orientation';
 import { HOME_SIGHT, KnownLand } from './game/knownLand';
 import { Compass, type SkyGlyph } from './app/compass';
 import { fill } from './talk/folk';
@@ -109,8 +108,7 @@ import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved
 import { release } from './app/release';
 import { CLIMB_COST, Character, fallHurt } from './game/character';
 import { itemWorth } from './game/trade';
-import { teacherOf } from './game/lessons';
-import { bardTells, GuildBook, isGuild, questGift, whereOf } from './game/guilds';
+import { bardTells, GuildBook, questGift, teacherOf, whereOf } from './game/guilds';
 import { carryRenown } from './game/growth';
 import { coinText, uniqueItem } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
@@ -435,7 +433,7 @@ export async function start(b: Boot): Promise<void> {
       giantReady = preparePeople(view.stage, g.view.object).then(() => view.stage.add(g.view.object)).then(() => { giant = g; });
     }
     let heroName = save?.looks?.name ?? '';
-    // The hero's sheet (skills, health, gear, purse) and what they hold.
+    // The hero's sheet (level, abilities, health, gear, purse) and what they hold.
     const character = new Character(setting, save?.character ?? undefined);
     player.walker.tire = (dt, effort) => {
       character.stamina = Math.max(0, character.stamina - dt * (CLIMB_COST.hang + (CLIMB_COST.move - CLIMB_COST.hang) * effort));
@@ -1035,7 +1033,7 @@ export async function start(b: Boot): Promise<void> {
       learnedAbility();
       return `${u.name} worn${it.grants ? `: ${abilityOf(setting, it.grants)?.name ?? it.grants} on the action bar` : ''}`;
     };
-    // Lessons (plan 11.4, D49): the guild houses' trainers open skills and ranks and teach, the innkeeper teaches; one more service.
+    // Lessons (plan 11.4, D49, D59): the guild houses' trainers teach abilities for coin at a level; one more service.
     const lessons = new LessonsUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -1059,7 +1057,7 @@ export async function start(b: Boot): Promise<void> {
       },
     });
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id), a.person.race); });
-    // The bard at the inn (D49): "where can I learn a skill?" names every guild house of the town and puts
+    // The bard at the inn (D49): "where can I learn something?" names every guild house of the town and puts
     // it on the map, a hidden one with its way in.
     services.set('bard', (a) => {
       const t = talkTown();
@@ -1090,7 +1088,7 @@ export async function start(b: Boot): Promise<void> {
           ...(shop ? [{ id: 'trade', label: shop.topic, line: shop.line }] : []),
           ...upkeep.services(p),
           // A hidden guild house's trainer is a locksmith like any other until the bard told the way in (D49).
-          ...(teacher && !(isGuild(teacher) && !guildBook.onMap(t.id, teacher)) ? [{ id: 'lessons', label: teacher.topic, line: teacher.line }] : []),
+          ...(teacher && guildBook.onMap(t.id, teacher) ? [{ id: 'lessons', label: teacher.topic, line: teacher.line }] : []),
           ...(setting.bard && t.bard?.id === id && t.guilds.length ? [{ id: 'bard', label: setting.bard.topic, line: setting.bard.line }] : []),
           ...peoples.services(p),
           // The hurt traveller by the way (C10): the hero may see to them.
@@ -1178,12 +1176,10 @@ export async function start(b: Boot): Promise<void> {
       arranged: () => { book.redraw(); },
     });
     const book = new AbilityBook(character, setting, actionBar, { paused, get bindings() { return settings.current.bindings; } });
-    // How exactly the hero knows where they are (plan 11.7): the map shows it, travel and reading it train it.
-    const orientation = new Orientation(seed, character);
-    // Where the hero believes they are, facing `yaw` (down in a cellar: at its house; in a barrow: at its forecourt).
-    const believed = (yaw: number) => {
+    // Where the map shows the hero, facing `yaw` (down in a cellar: at its house; in a barrow: at its forecourt). D59: exactly.
+    const heroAt = (yaw: number) => {
       const h = visit()?.houseDoor ?? null, w = player.walker;
-      return h ? orientation.bearing(h[0], h[1], h[2]) : orientation.bearing(w.pos.x, w.pos.z, yaw);
+      return h ? { x: h[0], z: h[1], yaw: h[2] } : { x: w.pos.x, z: w.pos.z, yaw };
     };
     // The map: the sheet round where the game began, every town on it.
     const map = start ? new MapUi([home.x, home.z], () => terrain.towns.map((t) => t.plan), journal, {
@@ -1191,12 +1187,12 @@ export async function start(b: Boot): Promise<void> {
       get bindings() { return settings.current.bindings; },
       height: (x, z) => terrain.height(x, z),
       water: (x, z) => sea.waterAt(x, z)?.depth ?? 0,
-      heroBearing: () => believed(player.walker.yaw),
+      heroAt: () => heroAt(player.walker.yaw),
       known,
       roadLines: () => terrain.roads.roads,
       signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) }))),
     }) : null;
-    // The compass at the top (plan 17.1): turns with the camera and always points true (no skill needed).
+    // The compass at the top (plan 17.1): turns with the camera and always points true.
     const compass = new Compass();
     const skyGlyph = (): SkyGlyph => {
       const w = wx.shown;
@@ -1508,7 +1504,7 @@ export async function start(b: Boot): Promise<void> {
       camera: view.camera, canvas, renderer: view.renderer, hero, looks: setting.hero, body: w,
       nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
       backgrounds: setting.backgrounds,
-      skillName: (id) => skillOf(setting, id)?.name ?? id,
+      abilityName: (id) => abilityOf(setting, id)?.name ?? id,
       itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
       knownBy: (bg) => (startTown ? friendsOf(bg).map((a) => `${startTown.talk.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
       click: () => sound.play('click'),
@@ -1528,7 +1524,7 @@ export async function start(b: Boot): Promise<void> {
       if (folk) folk.clear = null;
       heroName = made.name;
       creator = null;
-      // The past chosen: its skills, kit and the people in town who know the hero.
+      // The past chosen: its first ability, kit and the people in town who know the hero.
       const bg = setting.backgrounds.find((b) => b.id === made.background);
       if (bg) { character.beginAs(bg); armHero(); }
       // A new hero: every people thinks of them as of any stranger, their own kin a little better.

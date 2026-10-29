@@ -25,9 +25,9 @@ import { items, travel, upkeep } from './items';
 import { sights } from './sights';
 import { situations } from './situations';
 import { landformMix, landforms, landscapeKinds } from './landforms';
-import { shops, trainers } from './shops';
-import { bard, guilds, skillRanks } from './guilds';
-import { abilities, director, effects, skills } from './skills';
+import { shops } from './shops';
+import { bard, guilds } from './guilds';
+import { abilities, director, effects, schools } from './abilities';
 
 export const classic: SettingModule = {
   contractVersion: CONTRACT_VERSION,
@@ -75,7 +75,7 @@ export const classic: SettingModule = {
   standing,
   growth,
   talk,
-  skills,
+  schools,
   creatures,
   items,
   upkeep,
@@ -83,9 +83,7 @@ export const classic: SettingModule = {
   sights,
   situations,
   shops,
-  trainers,
   guilds,
-  skillRanks,
   bard,
   abilities,
   effects,

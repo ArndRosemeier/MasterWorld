@@ -6,41 +6,40 @@ import { Alone, Recipes, SELF } from '../src/game/recipe';
 import { cellarFight } from './fightKit';
 
 const SCHOOLS = ['pyromancy', 'cryomancy', 'geomancy', 'vitae', 'luminism', 'umbramancy'];
-const spellsOf = (k: string) => classic.abilities.filter((a) => a.skill === k);
+const spellsOf = (k: string) => classic.abilities.filter((a) => a.school === k);
 
-test('schools: six schools of magic, each with a first spell at level 0 and more above it', () => {
+test('schools: six schools of magic, each with first spells and more at higher levels', () => {
+  assert.deepEqual(classic.schools.map((x) => x.id).sort(), [...SCHOOLS].sort());
   for (const k of SCHOOLS) {
-    const s = classic.skills.find((x) => x.id === k);
-    assert.ok(s && s.group === 'magic' && !s.open && s.color, k);
+    const s = classic.schools.find((x) => x.id === k);
+    assert.ok(s && s.color && s.motif, k);
     const spells = spellsOf(k);
     assert.ok(spells.length >= 3, `${k}: ${spells.length} spells`);
-    assert.equal(spells.filter((a) => (a.level ?? 0) === 0).length, 1, `${k}: one first spell`);
+    const first = Math.min(...spells.map((a) => a.level ?? 1));
+    assert.ok(first <= 2 && spells.some((a) => (a.level ?? 1) > first), `${k}: first spells and higher ones`);
     for (const a of spells) assert.ok(a.taught && (a.cost?.mana ?? 0) > 0, `${a.id} is taught and costs mana`);
   }
 });
 
-test('schools: no hero starts with magic; a spell learned opens its school and gives mana', () => {
+test('schools: no hero starts with magic; the first spell learned gives mana', () => {
   const hero = new Character(classic);
   assert.equal(hero.maxMana, 0);
-  assert.ok(!hero.opened('pyromancy'));
   assert.ok(hero.learn('fire-dart'));
-  assert.ok(hero.opened('pyromancy'));
   assert.ok(hero.maxMana >= 30 && hero.mana === hero.maxMana);
-  // The school's rank is saved: a load keeps the magic.
+  // A load keeps the magic.
   const again = new Character(classic, JSON.parse(JSON.stringify(hero.save())));
-  assert.ok(again.opened('pyromancy') && again.knows('fire-dart') && again.maxMana === hero.maxMana);
-  // A higher spell waits for the school's level.
+  assert.ok(again.knows('fire-dart') && again.maxMana === hero.maxMana);
+  // A higher spell waits for the hero's level.
   const r = new Recipes(hero, new Alone(hero, () => ({ x: 0, y: 0, z: 0 })), classic.effects!, 1);
   hero.learn('fireball');
-  assert.match(r.check(classic.abilities.find((a) => a.id === 'fireball')!, 1, { x: 0, y: 0, z: 0 }) ?? '', /not yet skilled/);
+  assert.match(r.check(classic.abilities.find((a) => a.id === 'fireball')!, 1, { x: 0, y: 0, z: 0 }) ?? '', /not yet ready/);
 });
 
 test('schools: out of a fight the hero’s own spells work, and cooldowns and wards carry into a fight', () => {
   const hero = new Character(classic);
   hero.learn('mend');
   hero.learn('stone-skin');
-  hero.skills.set('geomancy', 12);
-  hero.ranks.set('geomancy', 0);
+  hero.xp = classic.growth.xp[3];
   hero.mana = hero.maxMana;
   hero.health = 20;
   const alone = new Recipes(hero, new Alone(hero, () => ({ x: 0, y: 0, z: 0 })), classic.effects!, 2);
@@ -56,10 +55,10 @@ test('schools: out of a fight the hero’s own spells work, and cooldowns and wa
 });
 
 test('schools: every spell of every school plays in a cellar fight without fault', () => {
-  for (const [i, a] of classic.abilities.filter((x) => SCHOOLS.includes(x.skill ?? '')).entries()) {
+  for (const [i, a] of classic.abilities.filter((x) => SCHOOLS.includes(x.school ?? '')).entries()) {
     const { d, hero, foe, pose } = cellarFight(10 + i);
     hero.learn(a.id);
-    hero.skills.set(a.skill!, 40);
+    hero.xp = classic.growth.xp[9];
     hero.mana = hero.maxMana;
     d.step(0.01, pose);
     d.fight.pick(foe);
@@ -76,7 +75,7 @@ test('schools: every spell of every school plays in a cellar fight without fault
 test('schools: dread sends a creature running; a veil makes the hero hard to notice', () => {
   const { d, hero, foe, pose } = cellarFight(40);
   hero.learn('dread');
-  hero.skills.set('umbramancy', 25);
+  hero.xp = classic.growth.xp[5];
   hero.mana = hero.maxMana;
   foe.state = 'fight';
   d.step(0.01, pose);
@@ -90,17 +89,17 @@ test('schools: dread sends a creature running; a veil makes the hero hard to not
   assert.ok(hushed.noise < loud.noise * 0.5 && hushed.light < loud.light);
 });
 
-test('schools: the debug menu’s learn lifts the skill to the spell’s level, never lowers it', () => {
+test('schools: the debug menu’s learn lifts the hero to the spell’s level, never lowers it', () => {
   const hero = new Character(classic);
   const fireball = classic.abilities.find((a) => a.id === 'fireball')!;
-  assert.ok((fireball.level ?? 0) > 0);
+  assert.ok((fireball.level ?? 1) > 1);
   assert.ok(hero.learnToUse('fireball'));
-  assert.equal(hero.skills.get('pyromancy'), fireball.level);
+  assert.equal(hero.level, fireball.level);
   assert.equal(hero.mana, hero.maxMana);
   const r = new Recipes(hero, new Alone(hero, () => ({ x: 0, y: 0, z: 0 })), classic.effects!, 4);
-  assert.doesNotMatch(r.check(fireball, 1, { x: 0, y: 0, z: 0 }) ?? '', /not yet skilled/);
-  hero.skills.set('pyromancy', 40);
+  assert.doesNotMatch(r.check(fireball, 1, { x: 0, y: 0, z: 0 }) ?? '', /not yet ready/);
+  hero.xp = classic.growth.xp[11];
   hero.forget('fireball');
   assert.ok(hero.learnToUse('fireball'));
-  assert.equal(hero.skills.get('pyromancy'), 40);
+  assert.equal(hero.level, 12);
 });

@@ -1,19 +1,20 @@
 /**
- * The hero as numbers (plan 11.4, 11.5, D29, D30, D54, D58): a level earned with experience from everything
- * they do, skills taught by trainers (no classes, and nothing rises by use), health, stamina and mana that grow
- * with the level and the skills that use them, what is worn and carried, and the one "power" number the VGM
- * reads. Pure: saved as plain data.
+ * The hero as numbers (plan 11.4, 11.5, D29, D58, D59): a level earned with experience from everything they do
+ * and no skills (the level is the skill: it sets the hero's prowess at everything), abilities taught by the guild
+ * houses, health, stamina and mana that grow with the level, what is worn and carried (gear adds to its
+ * qualities), and the one "power" number the VGM reads. No classes, nothing rises by use. Pure: saved as plain data.
  */
-import { abilityOf, skillOf, type BackgroundDef, type DamageKind, type GrowthSource, type ItemCatalog, type SettingModule, type Slot } from '../setting/contract';
+import { abilityOf, type AbilityDef, type BackgroundDef, type DamageKind, type GrowthSource, type ItemCatalog, type Quality, type SettingModule, type Slot, type WeaponSwing } from '../setting/contract';
 import type { Blow, Guard } from '../sim/combat';
 import { addToBar, cleanBar, clearSlot, defaultBar, type Bar } from './actionBar';
 import type { Worn } from './recipe';
-import { defOf, plainItem, type Item } from './items';
+import { defOf, plainItem, withQualities, type Item } from './items';
 import { strengthOf, wearState, wornBy, type Lodging, type WearState } from './upkeep';
 import { levelOf } from './growth';
 
 export interface CharacterSave {
-  readonly skills: Readonly<Record<string, number>>;
+  /** Old saves only (before D59): dropped on loading. */
+  readonly skills?: Readonly<Record<string, number>>;
   readonly health: number;
   readonly stamina: number;
   /** Absent in saves from before magic (C1): full. */
@@ -25,7 +26,7 @@ export interface CharacterSave {
   readonly background?: string;
   /** The inn where the hero last took a room: where they wake after a fall (absent: none yet). */
   readonly lodging?: Lodging;
-  /** The rank opened in each skill a guild teaches (D49; absent in older saves: what they had, opened). */
+  /** Old saves only (D49's skill ranks, before D59): dropped on loading. */
   readonly ranks?: Readonly<Record<string, number>>;
   /** Abilities a teacher (or the debug menu) opened (absent: none). */
   readonly learned?: readonly string[];
@@ -38,7 +39,7 @@ export interface CharacterSave {
 }
 
 export interface WeaponStats {
-  readonly skill: string;
+  readonly swing: WeaponSwing;
   readonly damage: readonly [number, number];
   readonly kind: DamageKind;
   readonly time: number;
@@ -46,18 +47,12 @@ export interface WeaponStats {
 }
 
 /** Fists, when nothing is held. */
-const FISTS: WeaponStats = { skill: 'unarmed', damage: [1, 3], kind: 'blunt', time: 1.3, reach: 0.6 };
+const FISTS: WeaponStats = { swing: 'punch', damage: [1, 3], kind: 'blunt', time: 1.3, reach: 0.6 };
 
 export class Character {
-  readonly skills = new Map<string, number>();
-  /**
-   * The rank opened in each skill a guild teaches (D49, D54): lessons raise it only up to that rank's top,
-   * and not at all before a trainer (or the hero's past) opened it. Skills no guild teaches have no ranks.
-   */
-  readonly ranks = new Map<string, number>();
   health: number;
   stamina: number;
-  /** For spells (plan 10); none until a school of magic is opened. */
+  /** For spells (plan 10, D59); none until the first spell is learned. */
   mana: number;
   /** Sitting down to rest (game/rest.ts): health, mana and stamina come back faster. Not saved. */
   resting = false;
@@ -86,19 +81,14 @@ export class Character {
 
   constructor(private readonly setting: SettingModule, saved?: CharacterSave) {
     this.cat = setting.items;
-    for (const s of setting.skills) this.skills.set(s.id, saved?.skills[s.id] ?? s.start);
     if (saved) {
+      // Old saves: skills and ranks are dropped (D59); what they learned stays, gear's skill bonuses become qualities.
       Object.assign(this.worn, saved.worn);
-      for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) this.worn[k] = this.granting(this.worn[k]!);
-      this.pack.push(...saved.pack.map((it) => this.granting(it)));
+      for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) this.worn[k] = withQualities(this.granting(this.worn[k]!));
+      this.pack.push(...saved.pack.map((it) => withQualities(this.granting(it))));
       this.coins = saved.coins;
       this.background = saved.background ?? '';
       this.lodging = saved.lodging ?? null;
-      // A save from before the ranks opens what the hero had, as far as it had come; magic never opens so,
-      // nor does a skill a guild began to teach after the save (a school of magic: C3).
-      for (const id of this.rankedSkills()) this.ranks.set(id, saved.ranks?.[id] ?? (saved.ranks || this.isMagic(id) ? this.freshRank(id) : this.rankFor(this.skills.get(id) ?? 0)));
-      // A school of magic opened by a spell learned (no guild teaches it yet) keeps its rank too.
-      for (const [id, r] of Object.entries(saved.ranks ?? {})) if (!this.ranks.has(id) && this.skills.has(id)) this.ranks.set(id, r);
       for (const id of saved.learned ?? []) if (setting.abilities.some((a) => a.id === id && a.taught)) this.learned.add(id);
       this.xp = saved.xp ?? 0;
       for (const k of saved.earned ?? []) this.earned.add(k);
@@ -109,16 +99,14 @@ export class Character {
     this.mana = Math.min(saved?.mana ?? Infinity, this.maxMana);
   }
 
-  /** Starts a new hero's life with this past: its skills over the starts, its kit and coins, fully rested. */
+  /** Starts a new hero's life with this past: its kit and coins, the abilities it taught, fully rested. */
   beginAs(bg: BackgroundDef): void {
     this.background = bg.id;
     this.lodging = null;
     this.xp = 0;
     this.earned.clear();
-    for (const s of this.setting.skills) this.skills.set(s.id, s.start + (bg.skills[s.id] ?? 0));
-    // What everyone can do, and what this past taught, is open; the rest waits for a guild's trainer.
-    this.ranks.clear();
-    for (const id of this.rankedSkills()) this.ranks.set(id, skillOf(this.setting, id)?.open || bg.skills[id] ? 0 : -1);
+    this.learned.clear();
+    for (const id of bg.abilities) this.learned.add(id);
     for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) delete this.worn[k];
     this.pack.length = 0;
     const p = (id: string) => plainItem(this.cat, id);
@@ -128,7 +116,6 @@ export class Character {
     this.health = this.maxHealth;
     this.stamina = this.maxStamina;
     this.mana = this.maxMana;
-    this.learned.clear();
     this.bar = defaultBar(this.known);
   }
 
@@ -187,30 +174,21 @@ export class Character {
   learn(id: string): boolean {
     const a = abilityOf(this.setting, id);
     if (this.knows(id) || !a || a.item) return false;
+    const magic = this.hasMagic;
     this.learned.add(id);
     this.earn(`learn:${id}`, 'learn');
-    // A spell opens its school (at its first rank) if nothing opened it before.
-    if (a.skill && !this.opened(a.skill)) this.openSkill(a.skill);
+    // The first spell wakes the hero's mana (D59), full.
+    if (!magic && this.hasMagic) this.mana = this.maxMana;
     this.bar = addToBar(this.bar, id);
     return true;
   }
 
-  /** The debug menu's learn: also lifts the ability's skill to its level (never lowers it), so a new hero can use it at once. */
+  /** The debug menu's learn: also lifts the hero to the ability's level (never lowers it), so they can use it at once. */
   learnToUse(id: string): boolean {
     if (!this.learn(id)) return false;
-    const a = abilityOf(this.setting, id)!;
-    const need = a.level ?? 0;
-    if (a.skill && (this.skills.get(a.skill) ?? 0) < need) {
-      this.skills.set(a.skill, need);
-      if (this.isMagic(a.skill)) this.mana = this.maxMana;
-    }
+    const need = abilityOf(this.setting, id)?.level ?? 1;
+    if (this.level < need) this.gain(this.setting.growth.xp[need - 1] - this.xp);
     return true;
-  }
-
-  /** A skill opened at its first rank (a trainer, a spell learned); a school of magic fills the mana with it. */
-  openSkill(id: string): void {
-    this.ranks.set(id, 0);
-    if (this.isMagic(id)) this.mana = this.maxMana;
   }
 
   /** A learned ability forgotten (the debug menu): off the bar too. */
@@ -220,71 +198,42 @@ export class Character {
     return true;
   }
 
-  /** Skills some guild teaches (they have ranks). */
-  private rankedSkills(): string[] {
-    const g = new Set((this.setting.guilds ?? []).flatMap((x) => x.skills));
-    return this.setting.skills.map((s) => s.id).filter((id) => g.has(id));
-  }
+  /**
+   * The hero's prowess at everything they do (D59: the level is the skill), on the scale of the creatures' aim
+   * and defence (0..100).
+   */
+  get prowess(): number { const p = this.setting.growth.prowess; return p.base + p.step * (this.level - 1); }
 
-  private isMagic(id: string): boolean { return skillOf(this.setting, id)?.group === 'magic'; }
-
-  /** A ranked skill's rank for a new hero with no past: open to all at 0, else not opened. */
-  private freshRank(id: string): number { return skillOf(this.setting, id)?.open ? 0 : -1; }
-
-  /** The rank whose span holds a skill level (an older save's skills open as far as they had come). */
-  private rankFor(v: number): number {
-    const r = this.setting.skillRanks ?? [];
-    const i = r.findIndex((x) => x.upTo > v);
-    return i < 0 ? r.length - 1 : i;
-  }
-
-  /** The rank opened in a skill (-1: not opened; null: no guild teaches it, it has no ranks). */
-  rankOf(id: string): number | null {
-    return this.ranks.get(id) ?? null;
-  }
-
-  /** How high lessons may raise a skill now (its rank's top; where it is, before it is opened). */
-  capOf(id: string): number {
-    const r = this.ranks.get(id);
-    if (r === undefined) return 100;
-    return r < 0 ? this.skills.get(id) ?? 0 : this.setting.skillRanks?.[r]?.upTo ?? 100;
-  }
-
-  /** A skill with what is worn added. */
-  skill(id: string): number {
-    let v = this.skills.get(id) ?? 0;
-    for (const it of Object.values(this.worn)) v += it?.bonuses[id] ?? 0;
+  /** What worn gear adds to a quality. */
+  bonus(q: Quality): number {
+    let v = 0;
+    for (const it of Object.values(this.worn)) v += it?.bonuses[q] ?? 0;
     return v;
   }
+
+  /** How well the hero's blows land and bite. */
+  get aim(): number { return this.prowess + this.bonus('aim'); }
+  /** How well the hero slips blows. */
+  get defence(): number { return this.prowess * 0.8 + this.bonus('guard'); }
+  /** How quietly the hero moves (0..100): a little with the level, more with gear made for it. */
+  get stealth(): number { return this.prowess * 0.4 + this.bonus('stealth'); }
+  /** How well the hero bargains (0..100). */
+  get speech(): number { return this.prowess * 0.75 + this.bonus('speech'); }
+  /** How strongly an ability works: a spell with the gear that adds to spells. */
+  powerOf(def: AbilityDef): number { return this.prowess + (def.school ? this.bonus('spell') : 0); }
+  /** The hero knows a spell (D59: mana comes with the first). */
+  get hasMagic(): boolean { return this.known.some((id) => !!abilityOf(this.setting, id)?.school); }
 
   /** What the levels above the first add (D58). */
   private perLevel(k: 'health' | 'stamina' | 'mana'): number { return this.setting.growth.perLevel[k] * (this.level - 1); }
 
-  /** Health grows with the level and the skills that take blows. */
-  get maxHealth(): number { return Math.round(55 + this.perLevel('health') + (this.base('armour') + this.base('shields')) * 0.35 + this.bestWeapon() * 0.25); }
-  get maxStamina(): number { return Math.round(60 + this.perLevel('stamina') + (this.base('dodge') + this.bestWeapon()) * 0.3); }
-  /** Mana grows with the level and the schools of magic opened: 30, and the best one most (none opened: none). */
-  get maxMana(): number {
-    let best = -1, all = 0;
-    for (const s of this.setting.skills) {
-      if (s.group !== 'magic' || !this.opened(s.id)) continue;
-      const v = this.base(s.id);
-      best = Math.max(best, v);
-      all += v;
-    }
-    return best < 0 ? 0 : Math.round(30 + this.perLevel('mana') + best * 0.6 + all * 0.2);
-  }
-
-  /** A skill the hero may use: opened by a trainer or the past, or open to all where no guild teaches it. */
-  opened(id: string): boolean {
-    const r = this.ranks.get(id);
-    return r === undefined ? !!skillOf(this.setting, id)?.open : r >= 0;
-  }
+  /** Health and stamina grow with the level (and gear made for it). */
+  get maxHealth(): number { return Math.round(66 + this.perLevel('health') + this.bonus('health')); }
+  get maxStamina(): number { return Math.round(69 + this.perLevel('stamina')); }
+  /** Mana comes with the first spell and grows with the level (none before). */
+  get maxMana(): number { return this.hasMagic ? Math.round(30 + this.perLevel('mana')) : 0; }
 
   get alive(): boolean { return this.health > 0; }
-
-  private base(id: string): number { return this.skills.get(id) ?? 0; }
-  private bestWeapon(): number { return Math.max(...['blades', 'axes', 'maces', 'spears', 'unarmed'].map((s) => this.base(s))); }
 
   /** What the main hand swings. */
   get weapon(): WeaponStats {
@@ -298,33 +247,37 @@ export class Character {
   get armour(): number {
     let a = 0;
     for (const it of Object.values(this.worn)) a += it ? (defOf(this.cat, it.def).armour ?? 0) * strengthOf(it) : 0;
-    // Wearing it well: the armour skill makes it count for more.
-    return a * (1 + this.skill('armour') / 150);
+    // Wearing it well: prowess and gear made for it make it count for more.
+    return a * (1 + this.armourKnack / 150);
   }
 
   get blockChance(): number {
     const it = this.worn.off, b = it ? (defOf(this.cat, it.def).block ?? 0) * strengthOf(it) : 0;
-    return b ? Math.min(0.6, b * (1 + this.skill('shields') / 80)) : 0;
+    return b ? Math.min(0.6, b * (1 + this.shieldKnack / 80)) : 0;
   }
+
+  /** How well armour and a shield are worn (prowess, and what gear adds). */
+  private get armourKnack(): number { return this.prowess * 0.5 + this.bonus('armour'); }
+  private get shieldKnack(): number { return this.prowess * 0.5 + this.bonus('block'); }
 
   /** The blow a weapon ability's `blow` step throws now. */
   blow(step?: { readonly power: number; readonly aim?: number }): Blow {
     const w = this.weapon;
-    return { damage: w.damage, kind: w.kind, skill: this.skill(w.skill), power: step?.power ?? 1, aim: step?.aim ?? 0 };
+    return { damage: w.damage, kind: w.kind, prowess: this.aim, power: step?.power ?? 1, aim: step?.aim ?? 0 };
   }
 
   guard(open = false): Guard {
-    return { defence: this.skill('dodge'), armour: this.armour, block: this.blockChance, open };
+    return { defence: this.defence, armour: this.armour, block: this.blockChance, open };
   }
 
   /**
-   * Power, on the creatures' danger scale (a fresh hero is about 10): skills plus gear. The VGM reads it
-   * wherever it needs a level; the world itself is never scaled to it (D29).
+   * Power, on the creatures' danger scale (a fresh hero is about 15): prowess plus gear. The VGM reads it
+   * wherever it needs one; the world itself is never scaled to it (D29).
    */
   get power(): number {
     const w = this.weapon, avg = (w.damage[0] + w.damage[1]) / 2;
-    const skill = (this.skill(w.skill) + this.skill('dodge') + this.skill('armour') * 0.5 + (this.worn.off ? this.skill('shields') * 0.5 : 0)) / 5;
-    return Math.round((skill + avg * (1 + this.skill(w.skill) / 220) / w.time * 2.2 + this.armour * 0.9 + this.blockChance * 8 + (this.maxHealth - 55) * 0.08) * 10) / 10;
+    const knack = (this.aim + this.defence + this.armourKnack * 0.5 + (this.worn.off ? this.shieldKnack * 0.5 : 0)) / 5;
+    return Math.round((knack + avg * (1 + this.aim / 220) / w.time * 2.2 + this.armour * 0.9 + this.blockChance * 8 + (this.maxHealth - 55) * 0.08) * 10) / 10;
   }
 
   /**
@@ -413,7 +366,7 @@ export class Character {
   }
 
   save(): CharacterSave {
-    return { skills: Object.fromEntries(this.skills), health: this.health, stamina: this.stamina, mana: this.mana, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), ...(this.ranks.size ? { ranks: Object.fromEntries(this.ranks) } : {}), learned: [...this.learned], bar: [...this.bar], xp: this.xp, ...(this.earned.size ? { earned: [...this.earned] } : {}) };
+    return { health: this.health, stamina: this.stamina, mana: this.mana, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), learned: [...this.learned], bar: [...this.bar], xp: this.xp, ...(this.earned.size ? { earned: [...this.earned] } : {}) };
   }
 }
 

@@ -32,7 +32,7 @@
     "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
   },
   {
-    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",
+    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/items.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",
     "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   },
   {
@@ -574,5 +574,17 @@
   {
     "key": "same name: masterworld/game/character.ts#level + masterworld/game/knownLand.ts#level",
     "reason": "The hero's level (D58) and how well a map cell is known; unrelated, only the word matches."
+  },
+  {
+    "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/lessonsUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/lessonsUi.ts#opened + masterworld/app/mapUi.ts#opened",
+    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+  },
+  {
+    "key": "idiom: [.group Promise] in masterworld/app/spellFx/fxView.ts + masterworld/render/grass/GrassView.ts + masterworld/render/rocks/RockView.ts",
+    "reason": "Views that build their pipelines off the render path keep the build's promise beside their group (F4, docs/SHADERS.md); each builds its own meshes."
   }
 ]

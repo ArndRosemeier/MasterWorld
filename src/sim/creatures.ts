@@ -374,7 +374,7 @@ export class Den {
       if (c.windup <= 0) {
         c.ready = atk.time;
         // Stepped back out of reach: the blow goes wide.
-        if (d < reach + 0.3 && dy < 1.2) out.push({ kind: 'blow', who: c, strike: strike({ damage: atk.damage, kind: atk.kind, skill: atk.skill }, q.guard, c.rng) });
+        if (d < reach + 0.3 && dy < 1.2) out.push({ kind: 'blow', who: c, strike: strike({ damage: atk.damage, kind: atk.kind, prowess: atk.prowess }, q.guard, c.rng) });
       }
       return;
     }
