@@ -160,21 +160,22 @@ export function floodLake(ground: (x: number, z: number) => number, x: number, z
 
 /**
  * A chamfer distance pass over a w×h grid, in place: each cell becomes the least of itself and its neighbours plus
- * `along` (sideways) or `diag` (corner to corner), one sweep each way.
+ * `along` (sideways) or `diag` (corner to corner), one sweep each way; with `scale`, those steps into a cell cost that
+ * many times more.
  */
-export function chamfer(g: Float32Array, w: number, h: number, along: number, diag: number): void {
+export function chamfer(g: Float32Array, w: number, h: number, along: number, diag: number, scale?: Float32Array): void {
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-    const p = j * w + i;
+    const p = j * w + i, a = scale ? along * scale[p] : along, d = scale ? diag * scale[p] : diag;
     let v = g[p];
-    if (i > 0) v = Math.min(v, g[p - 1] + along);
-    if (j > 0) { v = Math.min(v, g[p - w] + along); if (i > 0) v = Math.min(v, g[p - w - 1] + diag); if (i < w - 1) v = Math.min(v, g[p - w + 1] + diag); }
+    if (i > 0) v = Math.min(v, g[p - 1] + a);
+    if (j > 0) { v = Math.min(v, g[p - w] + a); if (i > 0) v = Math.min(v, g[p - w - 1] + d); if (i < w - 1) v = Math.min(v, g[p - w + 1] + d); }
     g[p] = v;
   }
   for (let j = h - 1; j >= 0; j--) for (let i = w - 1; i >= 0; i--) {
-    const p = j * w + i;
+    const p = j * w + i, a = scale ? along * scale[p] : along, d = scale ? diag * scale[p] : diag;
     let v = g[p];
-    if (i < w - 1) v = Math.min(v, g[p + 1] + along);
-    if (j < h - 1) { v = Math.min(v, g[p + w] + along); if (i < w - 1) v = Math.min(v, g[p + w + 1] + diag); if (i > 0) v = Math.min(v, g[p + w - 1] + diag); }
+    if (i < w - 1) v = Math.min(v, g[p + 1] + a);
+    if (j < h - 1) { v = Math.min(v, g[p + w] + a); if (i < w - 1) v = Math.min(v, g[p + w + 1] + d); if (i > 0) v = Math.min(v, g[p + w - 1] + d); }
     g[p] = v;
   }
 }

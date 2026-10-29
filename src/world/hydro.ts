@@ -377,19 +377,30 @@ export class HydroTile {
     }
     const S = new Float32Array(N).fill(Infinity);
     for (let c = 0; c < N; c++) if (floor[c] < E[c] - 0.01) S[c] = floor[c];
-    // The floor one cell wide either side.
-    const wide = Float32Array.from(S);
+    // The floor one cell wide either side. `cut`: how deep (negated) a cell may be lowered, at most as deep as the
+    // way it hangs from was cut (a mesa standing beside a valley is not planed down to the valley's slope).
+    const wide = Float32Array.from(S), cut = new Float32Array(N).fill(0);
+    for (let c = 0; c < N; c++) if (S[c] < Infinity) cut[c] = S[c] - E[c];
     for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
       const c = j * n + i;
       if (S[c] === Infinity) continue;
       for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
         const d = c + dj * n + di;
         if (S[c] + FLOOR_RISE < wide[d]) wide[d] = S[c] + FLOOR_RISE;
+        if (S[c] - E[c] < cut[d]) cut[d] = S[c] - E[c];
       }
     }
-    // The valley's sides: from the floor, the land no higher than it plus VALLEY_SIDE a metre out.
+    // The valley's sides: from the floor, the land no higher than it plus VALLEY_SIDE a metre out, or as steeply as
+    // the land stood there; the depth a side may cut falls off as fast.
+    const steep = new Float32Array(N).fill(1);
+    for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+      const c = j * n + i;
+      const g = Math.max(Math.abs(E[c + 1] - E[c - 1]), Math.abs(E[c + n] - E[c - n])) / (2 * cell);
+      steep[c] = Math.max(1, g / VALLEY_SIDE);
+    }
     const along = cell * VALLEY_SIDE, diag = along * Math.SQRT2;
-    for (let pass = 0; pass < 2; pass++) chamfer(wide, n, n, along, diag);
+    for (let pass = 0; pass < 2; pass++) { chamfer(wide, n, n, along, diag, steep); chamfer(cut, n, n, along, diag, steep); }
+    for (let c = 0; c < N; c++) wide[c] = Math.max(wide[c], E[c] + Math.min(0, cut[c]));
     // Far above the land a valley's side lowers nothing (VALE_KEEP): dropped, so a tile hands over little. A
     // river's valley the rivers shaped first: a brook's valley lowers nothing there.
     for (let c = 0; c < N; c++) {
