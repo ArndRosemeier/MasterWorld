@@ -10,7 +10,7 @@
  * (F3), the page's errors and what was not drawn; it marks a shot over 16.7 ms or more than twice as slow as
  * the town at noon (F2). Four slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
- * `--part=caves` is a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
+ * `--part=caves` is mesa country (a valley, a plateau top, a tor, a climb; gate L) and a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
  * without `--part` all four run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
  * Exits 1 when a page failed or a shot breaks F2 or F3 (what was still waiting to be drawn is noted).
@@ -111,6 +111,66 @@ const SESSIONS = [
       await p.waitForTimeout(2500);
     } },
   ] })),
+  // Gate L: mesa country round the start (D56). From the valley floor before a plateau's wall; on a plateau top
+  // looking out over its rim; before a tor with its boulders; on a wall with holds, part way up it (climbing is
+  // shown: the hero holds W at the foot and goes up hand over hand).
+  { id: 'mesa', query: `${still}&hour=10.5&weather=fair`, shots: [
+    { name: 'mesa-valley', act: (p) => p.evaluate(() => {
+      // The nearest wall 0.6-2 km out that rises 60 m or more; the hero 450 m before its foot, on the floor, facing it.
+      const g = window.game, sk = g.terrain.skeleton, w = g.player.walker.pos, s = (window.__start = { x: w.x, z: w.z });
+      for (let r = 600; r <= 2000; r += 100) for (let a = 0; a < 32; a++) {
+        const dx = Math.cos((a * Math.PI) / 16), dz = Math.sin((a * Math.PI) / 16);
+        if (sk.mesaRise(s.x + dx * r, s.z + dz * r) < 60) continue;
+        const x = s.x + dx * (r - 450), z = s.z + dz * (r - 450);
+        if (sk.mesaRise(x, z) > 3 || g.terrain.waterDepth(x, z) > 0) continue;
+        g.player.teleport(x, undefined, z, Math.atan2(-dx, -dz));
+        g.player.heroCam.pitch = 0.12;
+        return;
+      }
+      throw new Error('no plateau wall round the start');
+    }) },
+    { name: 'mesa-plateau', act: (p) => p.evaluate(() => {
+      // On a plateau top 60 m or more over the floor, 40-90 m in from its rim, looking out over it (the way in is
+      // (nx, nz)): the valley below and the walls across it.
+      const g = window.game, sk = g.terrain.skeleton, s = window.__start;
+      for (let r = 600; r <= 3000; r += 50) for (let a = 0; a < 48; a++) {
+        const x = s.x + Math.cos((a * Math.PI) / 24) * r, z = s.z + Math.sin((a * Math.PI) / 24) * r;
+        const rise = sk.mesaRise(x, z), { tall, nx, nz } = sk.lastMesa;
+        if (tall < 60 || rise < tall - 2) continue;
+        // The rim within 90 m out (the land drops there), not within 40 m (on the crest itself).
+        if (sk.mesaRise(x - nx * 40, z - nz * 40) < tall - 5 || sk.mesaRise(x - nx * 90, z - nz * 90) > tall - 20) continue;
+        g.player.teleport(x, undefined, z, Math.atan2(nx, nz));
+        g.player.heroCam.pitch = -0.08;
+        return;
+      }
+      throw new Error('no plateau top round the start');
+    }) },
+    { name: 'tor', act: (p) => p.evaluate(() => {
+      // The nearest tor with boulders round it: the hero 2.5 tor-widths off, on dry land, facing it.
+      const g = window.game, s = window.__start, forms = g.terrain.landforms.within(s.x, s.z, 6000);
+      const tors = forms.filter((f) => f.shape === 'tor').sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z));
+      for (const f of tors) for (let a = 0; a < 8; a++) {
+        const dx = Math.cos((a * Math.PI) / 4), dz = Math.sin((a * Math.PI) / 4), d = Math.max(30, f.L * 2.5);
+        const x = f.x + dx * d, z = f.z + dz * d;
+        if (g.terrain.waterDepth(x, z) > 0 || g.terrain.townGround(x, z) !== 0) continue;
+        g.player.teleport(x, undefined, z, Math.atan2(dx, dz));
+        g.player.heroCam.pitch = 0.1;
+        return;
+      }
+      throw new Error('no tor round the start');
+    }) },
+    { name: 'climb', act: async (p) => {
+      // The wall with holds south of the start that tools/shot/climb.mjs climbs (seed masterworld): at its foot,
+      // facing in, W held until the hero is 8 m up the face, then let go there (it hangs on); seen from the side.
+      await p.evaluate(() => { const g = window.game, IN = { x: 0.259, z: 0.966 }; g.player.teleport(-30826, undefined, 35266, Math.atan2(-IN.x, -IN.z)); });
+      await p.waitForTimeout(1500);
+      const y0 = await p.evaluate(() => window.game.player.walker.pos.y);
+      await p.keyboard.down('KeyW');
+      await p.waitForFunction((y0) => { const w = window.game.player.walker; return w.mode === 'climb' && w.pos.y > y0 + 8; }, y0, { timeout: 60000 }).catch(() => console.log('climb: NOT 8 m UP THE FACE'));
+      await p.keyboard.up('KeyW');
+      await p.evaluate(() => { const pl = window.game.player; pl.heroCam.yaw = pl.walker.yaw + 0.6; pl.heroCam.pitch = 0.12; pl.heroCam.zoom = 3.5; });
+    } },
+  ] },
   // L6: a cave's mouth in a cliff (D57), then inside, in the middle of its cavern (its highest room).
   { id: 'cave', query: `${still}&hour=11&weather=fair&cave`, shots: [
     { name: 'cave-mouth' },
@@ -203,7 +263,7 @@ const SESSIONS = [
   ] },
 ];
 /** The sessions of each part (each part one run, under 5 min). */
-const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave']);
+const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave', 'mesa']);
 const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : 'land');
 
 /** Puts the hero at (u, v) of the hold's gate frame (out of the gate is +v), looking at (lu, lv). */
