@@ -15,10 +15,13 @@ const { home, seed, terrain, walk } = frontierLand();
 const log = walk(2, EAST);
 // Out past the mesa wall east of the town, on open land.
 const out = { x: home.x + home.radius + 350, z: home.z };
+// The sights' own tests read a setting without cliff caves: where a cliff stands near the way, a cave in it answers
+// Discovery first (test/caves.test.ts has that tool).
+const noCaves = { ...classic, dungeons: { ...Object.fromEntries(Object.entries(classic.dungeons).filter(([, d]) => d?.form.stands !== 'cliff')), cellar: classic.dungeons.cellar } };
 const c = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: classic, hero: out, toward: { x: out.x + 600, z: out.z }, ...over });
 
 test('answers: Discovery overdue puts a sight by the hero\'s way, on dry ground off towns and places', () => {
-  const m = answerNeed('discovery', c());
+  const m = answerNeed('discovery', c({ setting: noCaves }));
   assert.ok(m, 'a sight fits');
   assert.equal(m.tool, 'sight');
   assert.equal(m.need, 'discovery');
@@ -94,7 +97,7 @@ test('answers: People overdue brings a town\'s traveller to rest by the way; the
 
 test('answers: a need with no tool for it, or a setting without sights, gets no answer', () => {
   assert.equal(answerNeed('purpose', c()), null);
-  assert.equal(answerNeed('discovery', c({ setting: { ...classic, sights: [] } })), null);
+  assert.equal(answerNeed('discovery', c({ setting: { ...noCaves, sights: [] } })), null);
 });
 
 test('answers: every sight shape stands on the land, with something the walker cannot go through', () => {

@@ -79,6 +79,9 @@ const BROOK_SINK = 0.5;
 const HOLLOW_TRIES = 12;
 /** Spacing of river polyline points after resampling, metres. */
 const STEP = 80;
+/** Rivers: the spacing (metres) a course is rounded and meandered at, and passes of a 1-2-1 blur over it there. */
+const RIVER_FINE = 20;
+const RIVER_BLUR = 16;
 /** Brooks: resample spacing, meander scale (metres), and the half widths they keep to. */
 const BROOK_STEP = 20;
 const BROOK_MEANDER = 450;
@@ -767,27 +770,16 @@ export class HydroTile {
     px[e] = bx; pz[e] = bz; pl[e] = Math.min(pl[e], bl);
   }
 
-  /** A river's course: its coarse path smoothed (Chaikin twice), resampled every STEP metres and meandering. */
+  /**
+   * A river's course: its cells' path rounded (Chaikin three times), resampled every RIVER_FINE metres and meandering
+   * along its own smooth line, so it bends in curves, never in corners (meandered piece by piece, each 80 m piece
+   * along its own direction, it turned a corner where two met). Every STEP metres. Wider rivers swing in wider loops.
+   */
   private riverCourse(px: number[], pz: number[], pl: number[], ph: number[]): Course {
-    const [X, Z, L, H] = chaikin([px, pz, pl, ph], 2);
-    const c: Course = [[], [], [], []];
     const amp = Math.min(this.o.cell * 0.3, 650);
-    for (let k = 0; k < X.length - 1; k++) {
-      const dx = X[k + 1] - X[k], dz = Z[k + 1] - Z[k], len = Math.hypot(dx, dz);
-      const steps = Math.max(1, Math.round(len / STEP));
-      const nx = -dz / (len || 1), nz = dx / (len || 1);
-      for (let s = 0; s < steps; s++) {
-        const t = s / steps;
-        const x = X[k] + dx * t, z = Z[k] + dz * t;
-        const half = H[k] + (H[k + 1] - H[k]) * t;
-        // Meanders: wider rivers swing in wider loops; fade at the ends so mouths and joins stay put.
-        const ends = Math.min(1, Math.min(k + t, X.length - 1 - k - t) / 3);
-        const m = this.meander.fbm2(x / 2600, z / 2600, 2) * amp * clamp(half / 25, 0.35, 1) * ends;
-        c[0].push(x + nx * m); c[1].push(z + nz * m); c[2].push(L[k] + (L[k + 1] - L[k]) * t); c[3].push(half);
-      }
-    }
-    c[0].push(X[X.length - 1]); c[1].push(Z[Z.length - 1]); c[2].push(L[L.length - 1]); c[3].push(H[H.length - 1]);
-    return c;
+    return this.meanderCourse(resampleCourse(chaikin([px, pz, pl, ph], 3), RIVER_FINE), {
+      fine: RIVER_FINE, blur: RIVER_BLUR, scale: 2600, amp: (half) => amp * clamp(half / 25, 0.35, 1), fade: 1500, side: 10, step: STEP,
+    });
   }
 
   /**
@@ -795,23 +787,31 @@ export class HydroTile {
    * meandering along its own smooth line, so it bends in curves, never in corners. Every BROOK_STEP metres.
    */
   private brookCourse(px: number[], pz: number[], pl: number[], ph: number[]): Course {
-    const keep = straighten(px, pz, BROOK_STRAIGHTEN);
-    const [X, Z, L, H] = resampleCourse(chaikin([keep.map((k) => px[k]), keep.map((k) => pz[k]), keep.map((k) => pl[k]), keep.map((k) => ph[k])], 3), BROOK_FINE);
-    const n = X.length, amp = Math.min(this.o.cell * 0.3, 650), run = (n - 1) * BROOK_FINE;
-    // Sideways by the meander field, across the rounded line (its direction over 40 m either way: on a tight bend
-    // the sideways swing would fold the course over).
-    blur(X, BROOK_BLUR); blur(Z, BROOK_BLUR);
+    const keep = straighten(px, pz, BROOK_STRAIGHTEN), amp = Math.min(this.o.cell * 0.3, 650);
+    return this.meanderCourse(resampleCourse(chaikin([keep.map((k) => px[k]), keep.map((k) => pz[k]), keep.map((k) => pl[k]), keep.map((k) => ph[k])], 3), BROOK_FINE), {
+      fine: BROOK_FINE, blur: BROOK_BLUR, scale: BROOK_MEANDER, amp: () => amp, fade: 150, side: 4, step: BROOK_STEP,
+    });
+  }
+
+  /**
+   * A rounded course (points every `fine` metres) blurred, swung sideways by the meander field across its own smooth
+   * line (its direction over `side` points either way: on a tight bend the swing would fold the course over), blurred
+   * again, and kept every `step` metres. The swing fades over `fade` metres at the ends, so heads, mouths and joins
+   * stay put.
+   */
+  private meanderCourse([X, Z, L, H]: Course, o: { fine: number; blur: number; scale: number; amp: (half: number) => number; fade: number; side: number; step: number }): Course {
+    const n = X.length, run = (n - 1) * o.fine;
+    blur(X, o.blur); blur(Z, o.blur);
     const mx = X.slice(), mz = Z.slice();
     for (let k = 1; k < n - 1; k++) {
-      const a = Math.max(0, k - 4), b = Math.min(n - 1, k + 4);
+      const a = Math.max(0, k - o.side), b = Math.min(n - 1, k + o.side);
       const dx = X[b] - X[a], dz = Z[b] - Z[a], len = Math.hypot(dx, dz) || 1;
-      // Faded at the ends, so heads, mouths and joins stay put.
-      const ends = Math.min(1, Math.min(k, n - 1 - k) * BROOK_FINE / Math.min(150, run / 3));
-      const m = this.meander.fbm2(X[k] / BROOK_MEANDER, Z[k] / BROOK_MEANDER, 2) * amp * ends;
+      const ends = Math.min(1, Math.min(k, n - 1 - k) * o.fine / Math.min(o.fade, run / 3));
+      const m = this.meander.fbm2(X[k] / o.scale, Z[k] / o.scale, 2) * o.amp(H[k]) * ends;
       mx[k] = X[k] - (dz / len) * m; mz[k] = Z[k] + (dx / len) * m;
     }
-    blur(mx, BROOK_BLUR); blur(mz, BROOK_BLUR);
-    const every = BROOK_STEP / BROOK_FINE, c: Course = [[], [], [], []];
+    blur(mx, o.blur); blur(mz, o.blur);
+    const every = Math.max(1, Math.round(o.step / o.fine)), c: Course = [[], [], [], []];
     for (let k = 0; k < n; k += every) { c[0].push(mx[k]); c[1].push(mz[k]); c[2].push(L[k]); c[3].push(H[k]); }
     if ((n - 1) % every) { c[0].push(mx[n - 1]); c[1].push(mz[n - 1]); c[2].push(L[n - 1]); c[3].push(H[n - 1]); }
     return c;
