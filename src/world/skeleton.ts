@@ -175,20 +175,22 @@ export class Skeleton {
     return h;
   }
 
-  /** How bare of plants the land is at (x, z), 0..1 (its kinds' `bare`). */
+  /** How bare of plants the land is at (x, z), 0..1 (its kinds' `bare`, blended by the plants they leave). */
   bareAt(x: number, z: number): number {
     if (!this.bares) return 0;
+    // Blended as the share of plants left, on a log scale: across a kind's border the woods thin out evenly by
+    // orders of magnitude, so a moor's edge (95% moor) is nearly as bare as its heart, not left with 5% of a wood.
     const w = this.kindWeights(x, z);
-    let b = 0;
-    for (let i = 0; i < w.length; i++) b += w[i] * (this.kinds[i].bare ?? 0);
-    return b;
+    let left = 0;
+    for (let i = 0; i < w.length; i++) if (w[i] > 0) left += w[i] * Math.log(Math.max(1e-3, 1 - (this.kinds[i].bare ?? 0)));
+    return 1 - Math.exp(left);
   }
 
   /**
    * The nearest land well inside the kind of country `id` from (x, z), along a spiral walked out from there
    * (turns 2 km apart, a step every 250 m, out to some 40 km); null if none is met. For shots and checks.
    */
-  nearestKind(id: string, x: number, z: number, share = 0.95): { x: number; z: number } | null {
+  nearestKind(id: string, x: number, z: number, share = 0.99): { x: number; z: number } | null {
     const k = this.kinds.findIndex((d) => d.id === id);
     if (k < 0) return null;
     for (let a = 0, s = 0; s < 12000; s++) {
