@@ -150,18 +150,22 @@ function wayside(c: NeedContext, r: Rng, apart: readonly { readonly x: number; r
   const way = c.toward ? Math.atan2(c.toward.z - c.hero.z, c.toward.x - c.hero.x) : r.range(0, Math.PI * 2);
   const far = c.toward ? Math.hypot(c.toward.x - c.hero.x, c.toward.z - c.hero.z) - 40 : AHEAD[1];
   const woods = woodsOf(t), fits: { x: number; z: number; woods: number }[] = [];
+  // Out past a town's fields too (an ambush in a paddock is fenced off from the way).
+  const inFields = (x: number, z: number) => c.towns.some((w) => farFrom(w, { x, z }) < w.decision.radius + Math.max(OFF_TOWN, farmlandReach(w.decision.radius) + 20));
+  // Still in a town's fields, it looks ahead past them, on the way out.
+  let clear = 0;
+  if (c.toward) while (clear + 20 < far && inFields(c.hero.x + Math.cos(way) * clear, c.hero.z + Math.sin(way) * clear)) clear += 20;
   for (let k = 0; k < 40; k++) {
     // On the way while it can be; later tries swing wider round the hero.
     const a = way + (k < 20 ? 0 : r.range(-1, 1) * Math.min(Math.PI, (k - 19) * 0.2));
-    const d = Math.min(far, r.range(AHEAD[0], AHEAD[1]));
+    const d = Math.min(far, (k < 20 ? clear : 0) + r.range(AHEAD[0], AHEAD[1]));
     if (d < AHEAD[0] * 0.6) continue;
     const side = r.range(ASIDE[0], ASIDE[1]) * (r.chance(0.5) ? 1 : -1);
     const x = c.hero.x + Math.cos(a) * d - Math.sin(a) * side, z = c.hero.z + Math.sin(a) * d + Math.cos(a) * side, h = t.height(x, z);
     if (t.waterDepth(x, z, h) > 0 || h < 2 || t.steepness(x, z, 6, h) > 0.35) continue;
     if (t.roads.fromEdge(x, z) < 4) continue;
     if (!straightWay(t, c.hero.x, c.hero.z, x, z)) continue;
-    // Out past a town's fields too (an ambush in a paddock is fenced off from the way).
-    if (c.towns.some((w) => farFrom(w, { x, z }) < w.decision.radius + Math.max(OFF_TOWN, farmlandReach(w.decision.radius) + 20))) continue;
+    if (inFields(x, z)) continue;
     if (places.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + OFF_PLACE)) continue;
     if (apart.some((p) => Math.hypot(p.x - x, p.z - z) < APART)) continue;
     fits.push({ x, z, woods: woods(x, z) });

@@ -34,7 +34,13 @@ const n = road.pts.length / 3;
 const inner = Array.from({ length: n }, (_, k) => k).filter((k) => k > 6 && k < n - 6 && k % 5 === 0 && terrain.waterDepth(pt(k).x, pt(k).z) <= 0
   && !inChannel(terrain.hydro.brookAt(pt(k).x, pt(k).z), 4) && !inChannel(terrain.hydro.riverAt(pt(k).x, pt(k).z, emptyWater()), 4));
 const bare = inner.map((k) => terrain.height(pt(k).x, pt(k).z));
+// A track out to a spot 2.3 km east-north-east of the town, past a brook, for the bridges (the hamlet's track
+// may cross none).
+const brookRoad = linkRoad(terrain, log.filter((d) => d.kind === 'road'), { id: 'ford', x: town.decision.x + 2153, z: town.decision.z + 892, r: 20 }, 'track')!;
+const bp = (k: number) => ({ x: brookRoad.pts[k * 3], y: brookRoad.pts[k * 3 + 1], z: brookRoad.pts[k * 3 + 2] });
+const bn = brookRoad.pts.length / 3;
 terrain.addRoad(road);
+terrain.addRoad(brookRoad);
 
 test('roads: a hamlet out on the land gets a cart track to a road out of the town', () => {
   assert.ok(road, 'a road');
@@ -106,12 +112,12 @@ test('roads: the mask holds the distances the shader draws from; roads replay fr
 });
 
 test('roads: every brook the track crosses has a bridge over its open channel', () => {
-  const bridges = bridgesOn(road, terrain.hydro, pt(0).x, pt(0).z, 1e5, () => true);
+  const bridges = bridgesOn(brookRoad, terrain.hydro, bp(0).x, bp(0).z, 1e5, () => true);
   assert.ok(bridges.length >= 1, 'it crosses a brook');
   const w = emptyWater();
   let wet = 0;
-  for (let k = 0; k + 1 < n; k++) for (let t = 0; t < 1; t += 0.25) {
-    const x = pt(k).x + (pt(k + 1).x - pt(k).x) * t, z = pt(k).z + (pt(k + 1).z - pt(k).z) * t;
+  for (let k = 0; k + 1 < bn; k++) for (let t = 0; t < 1; t += 0.25) {
+    const x = bp(k).x + (bp(k + 1).x - bp(k).x) * t, z = bp(k).z + (bp(k + 1).z - bp(k).z) * t;
     if (!inChannel(terrain.hydro.brookAt(x, z, w))) continue;
     wet++;
     const on = bridges.map((b) => deckAt(b, x, z)).find((y) => y !== null);
@@ -140,7 +146,7 @@ test('roads: every brook the track crosses has a bridge over its open channel', 
 });
 
 test('roads: the hero walks over every bridge both ways, no jump over the steep banks under the deck', () => {
-  const bridges = bridgesOn(road, terrain.hydro, pt(0).x, pt(0).z, 1e5, () => true);
+  const bridges = bridgesOn(brookRoad, terrain.hydro, bp(0).x, bp(0).z, 1e5, () => true);
   const deck = (x: number, z: number) => bridges.map((b) => deckAt(b, x, z)).find((y) => y !== null) ?? null;
   const world = {
     height: (x: number, z: number) => terrain.height(x, z),

@@ -207,6 +207,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
    * that the VGM answers.
    */
   const byTheWay = (x: number, z: number) => {
+    // Every need that falls due on the way is answered at once (as the game's VGM tick does), then the hero comes
+    // upon each, nearest first.
+    const met: { need: Need; at: [number, number]; what: string; reason: string }[] = [];
     for (const need of ['discovery', 'reward', 'challenge', 'people'] as const) {
       const p = land.walker.pos, eta = Math.hypot(x - p.x, z - p.z) / WALK.run / 60;
       if (director.needs[need] + setting.director.needs[need] * director.pace * eta < 1) continue;
@@ -223,13 +226,19 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const d = m?.decision;
       if (!m || !d || (d.kind !== 'sight' && d.kind !== 'wild' && d.kind !== 'traveller')) continue;
       log = [...log, d];
-      const [tx, tz] = d.kind === 'wild' ? [d.x, d.z] : [d.x + Math.sin(d.yaw) * 4, d.z + Math.cos(d.yaw) * 4];
+      const at: [number, number] = d.kind === 'wild' ? [d.x, d.z] : [d.x + Math.sin(d.yaw) * 4, d.z + Math.cos(d.yaw) * 4];
       const what = d.kind === 'sight' ? `${d.sight} (${d.id})` : d.kind === 'wild' ? `the ${d.encounter} lying in wait (${d.id})` : `a traveller resting (${d.id})`;
-      const s = land.go(tx, tz);
+      met.push({ need, at, what, reason: m.reason });
+    }
+    while (met.length) {
+      const p = land.walker.pos, far = (q: (typeof met)[number]) => Math.hypot(q.at[0] - p.x, q.at[1] - p.z);
+      const next = met.reduce((a, b) => (far(b) < far(a) ? b : a));
+      met.splice(met.indexOf(next), 1);
+      const s = land.go(...next.at);
       pass(s.seconds);
-      if (!s.arrived) throw new Broke(`stuck on the way to ${what}: ${s.left.toFixed(0)} m short`);
-      director.met(need);
-      say(`came upon ${what} on the way (${s.metres.toFixed(0)} m, ${s.seconds.toFixed(0)} s): ${m.reason}`);
+      if (!s.arrived) throw new Broke(`stuck on the way to ${next.what}: ${s.left.toFixed(0)} m short`);
+      director.met(next.need);
+      say(`came upon ${next.what} on the way (${s.metres.toFixed(0)} m, ${s.seconds.toFixed(0)} s): ${next.reason}`);
     }
   };
   const workplace = (m: Merchant): { at: [number, number]; name: string } => workOf(people[m.person], m.shop.keeper);
