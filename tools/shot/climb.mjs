@@ -56,7 +56,7 @@ const state = () => page.evaluate(() => {
     handUp, toGoal, handAt, goal, at, goalW: h?.goals?.R?.w };
 });
 /** The camera behind and to one side, a little below, looking a little up the face: the climber and the rock in their hands. */
-const side = (turn) => page.evaluate((turn) => { const p = window.game.player; p.heroCam.yaw = p.walker.yaw + turn; p.heroCam.pitch = 0.12; p.heroCam.zoom = 5; }, turn);
+const side = (turn) => page.evaluate((turn) => { const p = window.game.player; p.heroCam.yaw = p.walker.yaw + turn; p.heroCam.pitch = 0.12; p.heroCam.zoom = 3.5; }, turn);
 
 // Face the wall and walk at it.
 await page.evaluate(([nx, nz]) => { const p = window.game.player; p.walker.yaw = Math.atan2(-nx, -nz); p.heroCam.yaw = p.walker.yaw; }, [IN.x, IN.z]);

@@ -60,6 +60,8 @@ export interface WalkSpec {
 
 /** Seconds to pull up over the top of a face (as @futuremagic/figure's ledge). */
 export const PULL_UP = 1.5;
+/** The top of a face comes to this share of the body's height over the feet when the pull-up starts. */
+const PULL_RISE = 0.5;
 /** The body hangs this far off the face (m). */
 const OFF_FACE = 0.35;
 /** Pushing into a climbable face this long starts a climb (s): no climb by brushing past. */
@@ -335,9 +337,11 @@ export class Walker {
     // The feet on the face again after the move: up or down, and along it (right of one facing it: (-nz, nx)).
     const y = p.y + intent.forward * v * dt;
     const ax = p.x + F.nx * OFF_FACE - F.nz * intent.strafe * v * 0.7 * dt, az = p.z + F.nz * OFF_FACE + F.nx * intent.strafe * v * 0.7 * dt;
-    // Over the top: the ground just in from the face is no higher than a pull-up and walkable.
+    // Over the top: the ground just in from the face is up at the waist (where the hands go flat on it and
+    // the body pushes up: @futuremagic/figure's ledge, so the pull-up starts where the climb left the feet)
+    // and walkable.
     const tx = ax + F.nx * 0.9, tz = az + F.nz * 0.9, top = this.world.height(tx, tz);
-    if (intent.forward > 0 && top - y < 1.1 && this.groundSlope(tx, tz) <= this.spec.maxSlope) {
+    if (intent.forward > 0 && top - y < PULL_RISE * this.height && this.groundSlope(tx, tz) <= this.spec.maxSlope) {
       const q = this.pull;
       this.mode = 'pull';
       q.t = 0; q.x0 = p.x; q.y0 = p.y; q.z0 = p.z; q.x1 = tx; q.z1 = tz; q.y1 = top;
