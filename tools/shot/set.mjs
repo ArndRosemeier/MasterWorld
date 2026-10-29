@@ -187,16 +187,15 @@ const SESSIONS = [
     { name: 'barrow' },
     { name: 'wild', act: meet('deer', 25) },
     { name: 'fight', act: async (p) => { await meet('wolves', 12)(p); await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
-    // Gate C: a fight with magic. The hero learns the earliest spell of the first school (the debug menu's way),
+    // Gate C: a fight with magic. The hero learns a spell a fresh hero may cast (the debug menu's way),
     // picks a wolf and casts; the picture is taken once the spell shows.
     { name: 'fight-magic', act: async (p) => {
       // The spells' shader is built just after the start (F4): wait for it, so the spell is drawn.
       await p.waitForFunction(() => window.game.spellView.entered, null, { timeout: TIMEOUT });
       const id = await p.evaluate(() => {
         const g = window.game, setting = g.setting, h = g.character;
-        const school = setting.schools[0]?.id;
-        // Its earliest spell (fire's first is taught a level later than the others').
-        const spell = setting.abilities.filter((a) => a.school === school).sort((a, b) => (a.level ?? 1) - (b.level ?? 1))[0]?.id;
+        // A spell a fresh hero may cast: the first school's first spell at level 1 (fire's comes a level later).
+        const spell = setting.schools.map((s) => setting.abilities.find((a) => a.school === s.id && (a.level ?? 1) <= h.level)).find(Boolean)?.id;
         if (!spell) return null;
         h.learn(spell);
         h.mana = h.maxMana;
