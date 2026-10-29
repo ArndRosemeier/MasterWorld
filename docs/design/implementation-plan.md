@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Gate L passed on 2026-10-29** after one retake (review: `/mnt/project-files/masterworld/shots/gateL/gate-l-review.md`, shots in branch `claude/phaseL-gate-final2`, `shots/gateL-final2/`). **Phase W (water after the land, Arnd 2026-10-29) comes before phase D.**
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Gate L passed on 2026-10-29** after one retake (review: `/mnt/project-files/masterworld/shots/gateL/gate-l-review.md`, shots in branch `claude/phaseL-gate-final2`, `shots/gateL-final2/`). **Phase W (water after the land, Arnd 2026-10-29) comes before phase D**, then **phase G (levels, D58; Arnd 2026-10-29)**.
 
 ---
 
@@ -157,6 +157,18 @@ Goal: all water (lakes, rivers, brooks) comes after the land is finished and fol
 | W5 | **The world after**: start towns, places and tests checked on the moved water; the loop check passes | Tests and `npm run loop` green |
 
 Gate W: GPU shots of the vj4985 lake, a river into and out of a lake, and brooks in the start valley, seen as valleys; `water:fit` holds W3 and W4b-W4d; the loop check passes; the review.
+
+### Phase G: Levels (Arnd, 2026-10-29; after phase W, before phase D)
+
+Goal: the hero grows by levels, and every kind of play counts towards them (D58).
+
+| Step | Delivers | Done when | Design |
+|---|---|---|---|
+| G1 | **Experience and levels** (D58): experience from fights (weighed by the foe's danger against the hero's level), places cleared, promises kept, people helped, bands beaten, guild tasks, discoveries, reading and learning; deeds and discoveries once each; levels 1–20 on a curve in the setting; health, stamina and mana per level; trainers ask a level instead of reputation (renown goes, the peoples' standing stays); saves carry experience over (old renown becomes experience); the target card reads levels; the loop bot levels | Tests: every source gives experience, a deed or discovery only once; a foe far below the hero's level gives next to nothing, so a bot killing rats for an hour gains less than one level past 5; a rank needs its level; the loop check with a fighter and a mage reaches level 3–5 in an evening | 11.4, D54, D58 |
+| G2 | **Abilities scale with level** (D58): each ability's strength (damage, healing, duration, range where it fits) grows with level as well as skill, as data in the recipe format | Tests: the same ability at level 1 and level 10 differs as the setting says; the fight balance tests still hold (rats and goblins winnable at the start, spiders and the ghoul not) | 10, D58 |
+| G3 | **The level celebration** (D58, rule 11): the warded-brass lines flare up from the ground round the hero in a rising ring of light, with a chime; the new number is engraved into the HUD; a short gesture when not fighting; never stops play; within the shader budget (F3) | A GPU shot of the ring at its height in the F1 set; F3 holds; test: a level gained mid-fight plays the ring without the gesture | 17.1, D58 |
+
+Gate G: the loop check with a fighter and a mage levels as G1 says; the level ring in the F1 set; F2, F3 and F4 hold; the review.
 
 ### Phase D: Seas (milestone 7)
 
