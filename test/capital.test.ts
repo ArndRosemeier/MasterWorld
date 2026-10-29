@@ -5,6 +5,7 @@ import { regionDecisions, settlementsOf, walkFrontier } from '../src/vgm/frontie
 import { settlementOf } from '../src/world/decisions';
 import { townsfolk } from '../src/sim/people';
 import { guildHouses } from '../src/game/guilds';
+import { tooSteep } from '@futuremagic/settlement';
 import { EAST, frontierLand } from './frontierLand';
 
 const { first, home, regions, seed, terrain } = frontierLand();
@@ -29,6 +30,9 @@ test('capital: one, a few km out, a decision in the log; walled, with its ruler,
   assert.ok(!town.solid(g.x, g.z, 0.4), 'the gate is open');
   const R = w.ring, k = R.length >> 2;
   assert.ok(town.solid(R[k * 2], R[k * 2 + 1], 0.4) || w.gates.some((o) => Math.hypot(o.x - R[k * 2], o.z - R[k * 2 + 1]) < 10), 'the wall is solid');
+  // No house up a mesa wall or a hillside (one cottage once spanned 68 m of rise): the planner leaves such plots empty.
+  const steep = plan.buildings.filter((b) => tooSteep(b.poly, terrain.height.bind(terrain)));
+  assert.deepEqual(steep.map((b) => `${b.kind}@${b.cx.toFixed(0)},${b.cz.toFixed(0)}`), [], 'no building on steep ground');
   // Its seat of rule has its ruler; the guilds keep big halls; its armourer and jeweller keep shop.
   const folk = townsfolk(plan, d.seed);
   const seat = plan.buildings.find((b) => b.trade === 'ruler')!;
