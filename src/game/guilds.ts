@@ -1,9 +1,8 @@
 /**
- * Guild houses (plan 10, D49): where a hero opens a skill and its ranks. Every town of a guild's sizes has
- * its house: a plain house near what the guild names (the smithy, the inn, the edge), whose first grown-up
- * becomes its trainer. A trainer opens a skill at rank 0 and each next rank for coin (D54: nothing rises by
- * use), once the hero's level (D58) is high enough, higher for a dangerous skill; the third rank also asks the
- * guild's task. The task done is a good deed, once. The bard at
+ * Guild houses (plan 10, D49, D59): where a hero learns abilities. Every town of a guild's sizes has its house:
+ * a plain house near what the guild names (the smithy, the inn, the edge), whose first grown-up becomes its
+ * trainer. A trainer teaches each of its abilities for coin, once the hero is of the ability's level (there are
+ * no skills: the level is the skill); the dearer ones also ask the guild's task. The task done is a good deed, once. The bard at
  * the inn knows every house. The same for every town, start town or village. Pure.
  */
 import { hexToRgb } from '@futuremagic/core';
@@ -12,10 +11,11 @@ import { cap } from '../talk/townTalk';
 import { compass } from '../vgm/dungeons';
 import { questOf, questReward } from '../vgm/quests';
 import { houseShape, polyCentroid, signPlace, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
-import { skillOf, type AbilityDef, type GuildDef, type SettingModule, type SkillRankDef, type TrainerDef } from '../setting/contract';
+import { abilityOf, guildOf, type AbilityDef, type GuildDef, type SettingModule } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
 import { dungeonOf, type DecisionLog, type RetreatDecision } from '../world/decisions';
 import type { Character } from './character';
+import { keeperOf } from './trade';
 
 /** One guild's house in a town. */
 export interface GuildHouse {
@@ -98,12 +98,9 @@ export function bardOf(people: readonly Person[], plan: TownPlan): Person | null
   return people.find((p) => p.work === inn.id && p.role === 'hand') ?? people.find((p) => p.work === inn.id && p.role === 'trade') ?? null;
 }
 
-/** Whether a teacher is a guild house's trainer (who also opens skills and ranks). */
-export const isGuild = (t: TrainerDef): t is GuildDef => 'sizes' in t;
-
-/** The guild a skill is opened at (null: none teaches it, it rises freely). */
-export function guildFor(setting: Pick<SettingModule, 'guilds'>, skill: string): GuildDef | null {
-  return setting.guilds?.find((g) => g.skills.includes(skill)) ?? null;
+/** The guild a townsperson teaches for (D49), if any: by their trade. */
+export function teacherOf(setting: Pick<SettingModule, 'guilds'>, p: Person): GuildDef | null {
+  return guildOf(setting, keeperOf(p)) ?? null;
 }
 
 /**
@@ -172,109 +169,62 @@ export class GuildBook {
   }
 }
 
-/** Why a rank was not opened (null: it was). */
-export type RankRefusal = 'not-taught' | 'top' | 'task' | 'level' | 'coin' | null;
-
-/** The next rank of a skill and what it asks (null: it has none, or the hero has them all). */
-export function nextRank(setting: Pick<SettingModule, 'skillRanks'>, hero: Character, skill: string): { readonly rank: number; readonly def: SkillRankDef } | null {
-  const r = hero.rankOf(skill);
-  if (r === null) return null;
-  const def = setting.skillRanks?.[r + 1];
-  return def ? { rank: r + 1, def } : null;
+/** The abilities a guild teaches, in its order. */
+export function teachingsOf(setting: Pick<SettingModule, 'abilities'>, g: GuildDef): AbilityDef[] {
+  return g.teaches.flatMap((id) => { const a = abilityOf(setting, id); return a ? [a] : []; });
 }
 
-/** Copper this guild asks to open a rank (the opening may be its own price). */
-export const rankPrice = (g: GuildDef, next: { readonly rank: number; readonly def: SkillRankDef }): number =>
-  next.rank === 0 && g.openPrice !== undefined ? g.openPrice : next.def.price;
-
-/** The level a skill's rank asks (D58): the rank's, and more for a dangerous skill. */
-export function levelFor(setting: Pick<SettingModule, 'skillRanks' | 'skills'>, skill: string, rank: number): number {
-  return (setting.skillRanks?.[rank]?.level ?? 1) + (skillOf(setting, skill)?.danger ?? 0);
+/** Copper for an ability at this guild: its price at level 1 (a first lesson's, if the guild has one), n^1.5 times that at level n. */
+export function abilityPrice(g: GuildDef, a: AbilityDef): number {
+  const level = a.level ?? 1;
+  return level <= 1 && g.first !== undefined ? g.first : Math.round(g.price * level ** 1.5);
 }
 
-/** What stands between the hero and a skill's next rank at this guild (null: nothing). */
-export function rankRefusal(setting: Pick<SettingModule, 'skillRanks' | 'skills'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
-  if (!g.skills.includes(skill)) return 'not-taught';
-  const next = nextRank(setting, hero, skill);
-  if (!next) return 'top';
-  if (next.def.task && !book.taskDone(g, log)) return 'task';
-  if (hero.level < levelFor(setting, skill, next.rank)) return 'level';
-  if (hero.coins < rankPrice(g, next)) return 'coin';
-  return null;
-}
+/** Why an ability was not taught (null: it was): not taught here, known already, not of its level yet, the guild's task first, the purse. */
+export type TeachRefusal = 'not-taught' | 'known' | 'level' | 'task' | 'coin' | null;
 
-/** Open a skill's next rank at this guild: the coin goes, lessons may raise the skill to the new rank's top. */
-export function openRank(setting: Pick<SettingModule, 'skillRanks' | 'skills' | 'abilities'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
-  const no = rankRefusal(setting, g, hero, skill, book, log);
-  if (no) return no;
-  const next = nextRank(setting, hero, skill)!;
-  hero.coins -= rankPrice(g, next);
-  if (next.rank > 0) hero.ranks.set(skill, next.rank);
-  else {
-    // Opening a school of magic (C3) gives its first spells with it, so the hero can cast at once.
-    hero.openSkill(skill);
-    for (const a of spellsOf(setting, g)) if (a.skill === skill && (a.level ?? 0) === 0) hero.learn(a.id);
-  }
-  return null;
-}
-
-/** The spells (taught abilities) a magic teacher teaches: its schools', lowest level first, then its others. */
-export function spellsOf(setting: Pick<SettingModule, 'abilities'>, g: GuildDef): AbilityDef[] {
-  if (!g.spellPrice) return [];
-  const own = setting.abilities.filter((a) => a.taught && a.skill && g.skills.includes(a.skill));
-  own.sort((a, b) => (a.level ?? 0) - (b.level ?? 0) || g.skills.indexOf(a.skill!) - g.skills.indexOf(b.skill!));
-  return [...own, ...setting.abilities.filter((a) => g.abilities?.includes(a.id))];
-}
-
-/** Copper for a spell at this teacher. */
-export const spellPrice = (g: GuildDef, a: AbilityDef): number => Math.round((g.spellPrice ?? 0) * (1 + (a.level ?? 0) / 10));
-
-/** Why a spell was not taught (null: it was): known already, its school not opened, not yet its level, the purse. */
-export type SpellRefusal = 'not-taught' | 'known' | 'closed' | 'unearned' | 'coin' | null;
-
-export function spellRefusal(setting: Pick<SettingModule, 'abilities'>, g: GuildDef, hero: Character, a: AbilityDef): SpellRefusal {
-  if (!spellsOf(setting, g).includes(a)) return 'not-taught';
+export function teachRefusal(g: GuildDef, hero: Character, a: AbilityDef, book: GuildBook, log: DecisionLog): TeachRefusal {
+  if (!g.teaches.includes(a.id)) return 'not-taught';
   if (hero.knows(a.id)) return 'known';
-  if (a.skill && !hero.opened(a.skill)) return 'closed';
-  if (a.skill && Math.floor(hero.skills.get(a.skill) ?? 0) < (a.level ?? 0)) return 'unearned';
-  if (hero.coins < spellPrice(g, a)) return 'coin';
+  if (hero.level < (a.level ?? 1)) return 'level';
+  if ((a.level ?? 1) >= g.task.from && !book.taskDone(g, log)) return 'task';
+  if (hero.coins < abilityPrice(g, a)) return 'coin';
   return null;
 }
 
-/** Learn a spell from this teacher: the coin goes, the spell goes onto the action bar. */
-export function learnSpell(setting: Pick<SettingModule, 'abilities'>, g: GuildDef, hero: Character, a: AbilityDef): SpellRefusal {
-  const no = spellRefusal(setting, g, hero, a);
+/** Learn an ability from this guild: the coin goes, the ability goes onto the action bar. */
+export function teach(g: GuildDef, hero: Character, a: AbilityDef, book: GuildBook, log: DecisionLog): TeachRefusal {
+  const no = teachRefusal(g, hero, a, book, log);
   if (no) return no;
-  hero.coins -= spellPrice(g, a);
+  hero.coins -= abilityPrice(g, a);
   hero.learn(a.id);
   return null;
 }
 
 /**
- * The bard's answer to "where can I learn a skill?" (D49): a line for each guild house of the town, a hidden
+ * The bard's answer to "where can I learn something?" (D49): a line for each guild house of the town, a hidden
  * one with its way in, which the book now knows (so it goes on the map). `keeperName`: what the house's
  * master is called, if anyone is.
  */
-export function bardTells(setting: Pick<SettingModule, 'bard' | 'skills'>, town: { readonly id: string; readonly x: number; readonly z: number }, houses: readonly GuildHouse[], book: GuildBook, keeperName: (keeper: string) => string | null): string[] {
+export function bardTells(setting: Pick<SettingModule, 'bard'>, town: { readonly id: string; readonly x: number; readonly z: number }, houses: readonly GuildHouse[], book: GuildBook, keeperName: (keeper: string) => string | null): string[] {
   const bard = setting.bard;
   if (!bard) return [];
-  const names = (ids: readonly string[]) => ids.map((id) => skillOf(setting, id)?.name.toLowerCase() ?? id).join(', ');
   return houses.map(({ guild: g, out }) => {
     if (g.hidden) book.tell(houseIn(town.id, g.keeper));
     const house = cap(g.name), keeper = keeperName(g.keeper) ?? 'the master';
-    const values = { house, skills: names(g.skills), keeper, way: g.way ?? '', dir: out ? compass(out.x - town.x, out.z - town.z) : '' };
+    const values = { house, about: g.about, keeper, way: g.way ?? '', dir: out ? compass(out.x - town.x, out.z - town.z) : '' };
     if (out && bard.tellsOut) return fill(bard.tellsOut, { ...values, house: g.name, keeper: cap(keeper) });
     return fill(g.hidden ? bard.tellsHidden : bard.tells, values);
   });
 }
 
 /**
- * Whether a guild's master speaks of their one deed now (C14): the hero is their student (has opened a skill
+ * Whether a guild's master speaks of their one deed now (C14): the hero is their student (has learned something
  * there), of the level it asks (D58), the deed was never asked, and its gift is not the hero's yet.
  */
 export function questDue(g: GuildDef, hero: Character, log: DecisionLog): boolean {
   const q = g.quest;
-  return !!q && !questOf(log, g.keeper) && g.skills.some((s) => hero.opened(s)) && hero.level >= q.level && !hero.knows(q.reward);
+  return !!q && !questOf(log, g.keeper) && g.teaches.some((id) => hero.learned.has(id)) && hero.level >= q.level && !hero.knows(q.reward);
 }
 
 /** A master's deed done (its place kept): their gift is the hero's now (once). What was given, or null. */

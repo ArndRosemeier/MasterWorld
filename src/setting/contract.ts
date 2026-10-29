@@ -387,25 +387,26 @@ export interface CellarLore {
   readonly empty?: { readonly share: number; readonly def: HistoryDef & { readonly lair: string; readonly signs: readonly string[] } };
 }
 
-/** The skills a character can learn from trainers (plan 10, 11.4, D30, D54): no classes, no XP. */
-export interface SkillDef {
+/**
+ * A school of magic (plan 10, D59): not a skill, only a family of spells and how they look. Its spells are
+ * taught by its teachers, each at a level of the hero; the first opens the hero's mana.
+ */
+export interface SchoolDef {
   readonly id: string;
   readonly name: string;
-  readonly group: 'combat' | 'magic' | 'utility' | 'survival' | 'social';
-  /** Where a fresh character starts (0..100). */
-  readonly start: number;
-  /**
-   * A dangerous skill (fire, shadow, stealth; D54, D58): the levels it asks on top of
-   * each rank's, the opening too. None: as any other.
-   */
-  readonly danger?: number;
-  /** Everyone can use it from the start (with guilds, D49: other skills wait for a trainer or a past). */
-  readonly open?: boolean;
-  /** Its colour (sRGB 0..1): a school of magic's spells glow in it. */
-  readonly color?: readonly [number, number, number];
-  /** How a school's spells move and shimmer (C4): one of the engine's motifs; radiance by default. */
-  readonly motif?: SpellMotif;
+  /** Its colour (sRGB 0..1): its spells glow in it. */
+  readonly color: readonly [number, number, number];
+  /** How its spells move and shimmer (C4): one of the engine's motifs. */
+  readonly motif: SpellMotif;
 }
+
+/**
+ * What a piece of gear can be better at (plan 11.5, D59): an uncommon or rare find adds a little to one or two.
+ * aim: blows land and bite harder; guard: blows miss the hero; armour: what armour stops; block: a shield's
+ * catch; spell: spells; stealth: unseen and unheard; speech: prices; health: more of it.
+ */
+export const QUALITIES = ['aim', 'guard', 'armour', 'block', 'spell', 'stealth', 'speech', 'health'] as const;
+export type Quality = (typeof QUALITIES)[number];
 
 /** The spell looks the engine draws (C4): flickering tongues, glittering ice, dull grit, pulsing growth, rays, a hollow dark. */
 export const SPELL_MOTIFS = ['flame', 'frost', 'stone', 'bloom', 'radiance', 'shade'] as const;
@@ -425,8 +426,8 @@ export interface AttackDef {
   readonly reach: number;
   /** Seconds from one blow to the next. */
   readonly time: number;
-  /** How well it is aimed (0..100, as a skill). */
-  readonly skill: number;
+  /** How well it is aimed (0..100, on the scale of the hero's prowess). */
+  readonly prowess: number;
 }
 
 /** How a creature is drawn: an Actors person (race, look) or one of the engine's small bodies. */
@@ -622,7 +623,7 @@ export interface CreatureDef {
   readonly health: number;
   /** Damage taken off every blow. */
   readonly armour: number;
-  /** Dodging and parrying (0..100, as a skill). */
+  /** Dodging and parrying (0..100, on the scale of the hero's prowess). */
   readonly defence: number;
   /** Running speed, m/s. */
   readonly speed: number;
@@ -652,6 +653,9 @@ export interface CreatureDef {
   readonly pleas?: readonly string[];
 }
 
+/** How a weapon is swung (the hero's clip). */
+export type WeaponSwing = 'slash' | 'slam' | 'thrust' | 'punch';
+
 export const RARITIES = ['common', 'uncommon', 'rare', 'legendary'] as const;
 export type Rarity = (typeof RARITIES)[number];
 
@@ -664,8 +668,8 @@ export interface ItemDef {
   readonly name: string;
   readonly kind: 'weapon' | 'shield' | 'armour' | 'potion' | 'food' | 'tool' | 'valuable' | 'writing';
   readonly slot?: Slot;
-  /** Weapons: the skill it trains and how it hits. */
-  readonly weapon?: { readonly skill: string; readonly damage: readonly [number, number]; readonly kind: DamageKind; readonly time: number; readonly reach: number };
+  /** Weapons: how it hits, and how it is swung (`swing`: a blade or axe slashes, a mace slams, fists punch). */
+  readonly weapon?: { readonly swing: WeaponSwing; readonly damage: readonly [number, number]; readonly kind: DamageKind; readonly time: number; readonly reach: number };
   /** Armour and shields: damage taken off, and a shield's chance to block (0..1). */
   readonly armour?: number;
   readonly block?: number;
@@ -676,7 +680,7 @@ export interface ItemDef {
   readonly weight: number;
   /** A line of lore on its card. */
   readonly lore?: string;
-  /** Writings (tomes, scrolls; C3, D49): the taught ability read from it (it opens the ability's school too). */
+  /** Writings (tomes, scrolls; C3, D49): the taught ability read from it (a first spell brings mana). */
   readonly teaches?: string;
 }
 
@@ -685,7 +689,7 @@ export interface UniqueDef {
   readonly id: string;
   readonly base: string;
   readonly name: string;
-  readonly bonuses: Readonly<Record<string, number>>;
+  readonly bonuses: Partial<Readonly<Record<Quality, number>>>;
   readonly lore: string;
   /** Least danger of a place that may hold it. */
   readonly danger: number;
@@ -709,8 +713,8 @@ export interface ItemCatalog {
   readonly items: readonly ItemDef[];
   readonly uniques: readonly UniqueDef[];
   readonly treasure: readonly TreasureDef[];
-  /** Name parts for uncommon and rare finds, by the skill they raise ("Keen" for blades). */
-  readonly affixes: Readonly<Record<string, { readonly prefix: string; readonly suffix: string }>>;
+  /** Name parts for uncommon and rare finds, by the quality they add most to ("Keen" for aim). */
+  readonly affixes: Readonly<Record<Quality, { readonly prefix: string; readonly suffix: string }>>;
 }
 
 /**
@@ -857,7 +861,7 @@ export interface ShopDef {
   readonly buys: readonly ItemDef['kind'][];
   /** The coin they keep (copper); spent on what they buy, it comes back over the days. */
   readonly purse: number;
-  /** Share of a thing's worth they pay for it, and ask for it (before the hero's speech). */
+  /** Share of a thing's worth they pay for it, and ask for it (before the hero's way with words). */
   readonly pays: number;
   readonly asks: number;
   /** At most this many keep the shop in a town (the market's first stalls; absent: every keeper). */
@@ -873,55 +877,23 @@ export interface ShopDef {
 }
 
 /**
- * A teacher (plan 11.4, 11.5): a townsperson of this trade sells lessons in a few skills. A lesson is one
- * point of the skill and some hours; it costs more the higher the skill, and above `upTo` they have
- * nothing more to teach (from there only use and harder masters).
+ * A guild's task (D49): clear a place (below a house, or out on the land with `out`). The guild's dearer
+ * abilities (of level `from` and up) are taught only once it is done.
  */
-export interface TrainerDef {
-  /** The teacher's trade ('smith', 'carter', 'innkeeper'), or 'trader' / 'keeper' by role. */
-  readonly keeper: string;
-  /** Who they are as a teacher ("Borin, the smith"), shown on the window: `{name}`. */
-  readonly title: string;
-  /** The talk topic that opens the lessons, and their line as it opens. */
-  readonly topic: string;
-  readonly line: string;
-  readonly skills: readonly string[];
-  readonly upTo: number;
-  /** Copper for a lesson at skill 0; it grows with the square of (1 + skill / 20). */
-  readonly price: number;
-  /** Game hours one lesson takes. */
-  readonly hours: number;
-}
-
-/**
- * A skill's ranks (D49, D54): how far lessons may raise it once a guild's trainer has opened that rank. Rank
- * 0 is the opening. Each rank is paid in coin, and may ask the guild's task done and a level of the hero (D58;
- * more for a dangerous skill: SkillDef.danger). Nothing rises by use.
- */
-export interface SkillRankDef {
-  /** The highest the skill rises at this rank. */
-  readonly upTo: number;
-  /** Copper the trainer asks to open it. */
-  readonly price: number;
-  /** The guild's task must be done first. */
-  readonly task?: boolean;
-  /** The hero's level needed (D58; absent: any). */
-  readonly level?: number;
-}
-
-/** A guild's task for a higher rank: clear a place (below a house, or out on the land with `out`). */
 export interface GuildTaskDef {
   /** What the trainer asks, and says when it is done. */
   readonly ask: string;
   readonly done: string;
   /** Only a place out on the land counts (a barrow, a cave, a tower), not a cellar. */
   readonly out?: boolean;
+  /** Abilities of this level and higher wait for it. */
+  readonly from: number;
 }
 
 /**
- * A deed a guild's master asks once, for what no trainer sells (C14, D52): once the hero has opened one of
- * the house's skills and its people trust them enough, the master speaks of a place the VGM makes for it
- * (vgm/quests.ts); cleared and told back to the master's household, its reward is the master's gift.
+ * A deed a guild's master asks once, for what no trainer sells (C14, D52): once the hero has learned something
+ * at the house and is of the level it asks, the master speaks of a place the VGM makes for it (vgm/quests.ts);
+ * cleared and told back to the master's household, its reward is the master's gift.
  */
 export interface GuildQuestDef {
   /** The taught ability given for it (classic: bird form); no guild sells it. */
@@ -937,13 +909,30 @@ export interface GuildQuestDef {
 }
 
 /**
- * A guild house (D49): a trainer who opens a few skills and their ranks, and sells lessons within a rank
- * (as a TrainerDef, `keeper` is the guild's id). Each town of the listed sizes has one, in a plain house
- * near what it names; a hidden house is not on the map, and the bard gives its way in.
+ * A guild house (D49, D59): a trainer who teaches a few abilities for coin, each at a level of the hero (there
+ * are no skills: the level is the skill). Each town of the listed sizes has one, in a plain house near what it
+ * names; a hidden house is not on the map, and the bard gives its way in.
  */
-export interface GuildDef extends TrainerDef {
+export interface GuildDef {
+  /** Its master's trade id ('master-at-arms'): the townsperson who teaches there. */
+  readonly keeper: string;
   /** The house's name ("the Hall of Arms"). */
   readonly name: string;
+  /** Who they are as a teacher ("Borin, master of the Hall"), shown on the window: `{name}`. */
+  readonly title: string;
+  /** The talk topic that opens the teaching, and their line as it opens. */
+  readonly topic: string;
+  readonly line: string;
+  /** What it teaches, in words for the bard ("the sword, the axe and the shield"). */
+  readonly about: string;
+  /** The abilities it teaches (taught abilities), in the order shown. */
+  readonly teaches: readonly string[];
+  /** Copper for an ability of level 1; one of level n costs n^1.5 times as much. */
+  readonly price: number;
+  /** What an ability of level 1 costs here instead (a teacher wants students: a fresh hero's purse holds a first spell). */
+  readonly first?: number;
+  /** Game hours one teaching takes. */
+  readonly hours: number;
   /** In towns of these sizes ('town' is the start town's). */
   readonly sizes: readonly SettlementSize[];
   /**
@@ -961,22 +950,10 @@ export interface GuildDef extends TrainerDef {
   readonly dress?: 'fighter' | 'traveller';
   /** The colour of the round shield over its door ('#rrggbb'; none: no sign, as for a hidden house). */
   readonly sign?: string;
-  /** What the trainer says on opening a skill or a rank, and when the hero is not of the level for it yet (`{skill}`). */
-  readonly opens: string;
+  /** What the trainer says on teaching an ability (`{ability}`), and when the hero is not of its level yet. */
+  readonly teachesLine: string;
   readonly distrust: string;
   readonly task: GuildTaskDef;
-  /**
-   * A magic teacher (plan 10, C3): copper for one of its schools' spells (the taught abilities of its skills),
-   * at a spell's level 0; dearer by a tenth per level. Opening a school gives its first spells; the others
-   * are taught once the school has reached their level. None: the house teaches no abilities.
-   */
-  readonly spellPrice?: number;
-  /** Copper to open a skill here, instead of its first rank's price (a magic teacher asks little: a fresh hero can start). */
-  readonly openPrice?: number;
-  /** Further taught abilities of no school it teaches as well, at `spellPrice`. */
-  readonly abilities?: readonly string[];
-  /** What the teacher says on teaching a spell (`{spell}`). */
-  readonly teachesSpell?: string;
   /** Its master's one deed for a gift no trainer sells (C14). */
   readonly quest?: GuildQuestDef;
 }
@@ -985,7 +962,7 @@ export interface GuildDef extends TrainerDef {
 export interface BardDef {
   readonly topic: string;
   readonly line: string;
-  /** How he tells of one house (`{house}`, `{skills}`, `{keeper}`; `{way}` for a hidden one). */
+  /** How he tells of one house (`{house}`, `{about}`, `{keeper}`; `{way}` for a hidden one). */
   readonly tells: string;
   readonly tellsHidden: string;
   /** Of a master out on the land (`near: 'out'`; `{dir}`: which way from the town); none: as `tells`. */
@@ -996,7 +973,7 @@ export interface BardDef {
 /**
  * An ability (plan 10): its costs, cooldown and cast time, and a recipe of steps (`ops`) the recipe runner
  * (game/recipe.ts) plays, ported from Norgo's format. Weapon abilities are recipes too: a `blow` step lands on
- * the next swing. Numbers are base values; the ability's skill scales damage, healing and effects.
+ * the next swing. Numbers are base values; the hero's level (and a spell's gear) scales damage, healing and effects.
  */
 export interface AbilityDef {
   readonly id: string;
@@ -1010,11 +987,11 @@ export interface AbilityDef {
   readonly taught?: boolean;
   /** Only an item gives it (D31, C5): known while a worn item grants it, never taught. */
   readonly item?: boolean;
-  /** How its spell shows when not as its skill's school does (an item's ability): colour (sRGB 0..1) and motif. */
+  /** How its spell shows when not as its school's (an item's ability): colour (sRGB 0..1) and motif. */
   readonly glow?: { readonly color: readonly [number, number, number]; readonly motif: SpellMotif };
-  /** The skill that powers it and that its use trains (absent: the weapon's). */
-  readonly skill?: string;
-  /** How good at its skill the hero must be to use it (absent: 0); a teacher opens it by rank (C3). */
+  /** A spell's school of magic (absent: not a spell). */
+  readonly school?: string;
+  /** The hero's level a teacher asks before teaching it (D59; absent: 1). */
   readonly level?: number;
   /** What it is aimed at: a foe (the target), or the hero themself. Absent: a foe when a step needs one. */
   readonly aim?: 'foe' | 'self';
@@ -1208,16 +1185,16 @@ export interface HeroBuildDef {
 }
 
 /**
- * A hero's past (plan 11.4): what they did before the story starts. It sets the starting skills and kit
- * and gives one or two people in town who already know them.
+ * A hero's past (plan 11.4, D59): what they did before the story starts. It gives the kit of that life, a
+ * first ability or two, and one or two people in town who already know them.
  */
 export interface BackgroundDef {
   readonly id: string;
   readonly name: string;
   /** A line or two on who they were. */
   readonly text: string;
-  /** Points over each skill's start. */
-  readonly skills: Readonly<Record<string, number>>;
+  /** Taught abilities that life already taught them. */
+  readonly abilities: readonly string[];
   /** What they wear (item ids by slot), carry and own (copper). */
   readonly kit: { readonly worn: Partial<Readonly<Record<Slot, string>>>; readonly pack: readonly string[]; readonly coins: number };
   /**
@@ -1344,6 +1321,11 @@ export interface GrowthDef {
   readonly xp: readonly number[];
   /** What each level above the first adds. */
   readonly perLevel: { readonly health: number; readonly stamina: number; readonly mana: number };
+  /**
+   * The hero's prowess (D59: the level is the skill): how well they aim, dodge, wear armour and cast, on the
+   * scale of the creatures' aim and defence (0..100), at level 1 and how much more at each level above.
+   */
+  readonly prowess: { readonly base: number; readonly step: number };
   /** The foe danger that is an even fight at level 1, and how much more at each level above. */
   readonly even: { readonly base: number; readonly step: number };
   /** Experience per point of a foe's danger, met as an even fight. */
@@ -1391,7 +1373,8 @@ export interface SettingModule {
   /** Levels and experience (D58). */
   readonly growth: GrowthDef;
   readonly talk: TalkDef;
-  readonly skills: readonly SkillDef[];
+  /** The schools of magic (plan 10, D59): its spells' families and looks. */
+  readonly schools: readonly SchoolDef[];
   readonly creatures: readonly CreatureDef[];
   readonly items: ItemCatalog;
   /** Rooms and mending (plan 11.5). */
@@ -1404,11 +1387,8 @@ export interface SettingModule {
   readonly travel?: TravelDef;
   /** The town's shops (plan 11.5), by who keeps them. */
   readonly shops: readonly ShopDef[];
-  /** Who teaches what in town (plan 11.4). */
-  readonly trainers: readonly TrainerDef[];
-  /** The guild houses (D49), the ranks they open and the bard who knows them; without them every skill rises freely. */
+  /** The guild houses (D49, D59) that teach abilities, and the bard who knows them; without them nothing is taught. */
   readonly guilds?: readonly GuildDef[];
-  readonly skillRanks?: readonly SkillRankDef[];
   readonly bard?: BardDef;
   readonly abilities: readonly AbilityDef[];
   /** Status effects abilities put on (plan 10). */
@@ -1446,9 +1426,9 @@ export function abilityOf(m: Pick<SettingModule, 'abilities'>, id: string | unde
   return id === undefined ? undefined : m.abilities.find((a) => a.id === id);
 }
 
-/** A skill of the setting by id (undefined: none such). */
-export function skillOf(m: Pick<SettingModule, 'skills'>, id: string | undefined): SkillDef | undefined {
-  return id === undefined ? undefined : m.skills.find((s) => s.id === id);
+/** A school of magic of the setting by id (undefined: none such). */
+export function schoolOf(m: Pick<SettingModule, 'schools'>, id: string | undefined): SchoolDef | undefined {
+  return id === undefined ? undefined : m.schools.find((s) => s.id === id);
 }
 
 /** A guild by its keeper's id (none: the setting has no such guild). */
@@ -1598,21 +1578,21 @@ function validatePeoples(m: SettingModule, where: string): string[] {
   const g = m.growth;
   if (!(g.xp.length >= 2 && g.xp[0] === 0 && g.xp.every((x, i) => i === 0 || x > g.xp[i - 1]))) out.push(`${where}: growth.xp must start at 0 and rise`);
   if (!(g.even.base > 0 && g.even.step > 0 && g.fight > 0)) out.push(`${where}: growth.even and growth.fight must be above 0`);
+  if (!(g.prowess.base > 0 && g.prowess.step > 0 && g.prowess.base + g.prowess.step * (g.xp.length - 1) <= 100)) out.push(`${where}: growth.prowess must rise and stay within 100`);
   for (const k of GROWTH_SOURCES) if (!(g.deeds[k] > 0)) out.push(`${where}: growth.deeds.${k} must give experience`);
   return out;
 }
 
-/** Skills, creatures, items and abilities: every name points at something that exists. */
+/** Schools, creatures, items and abilities: every name points at something that exists. */
 function validateFight(m: SettingModule, where: string): string[] {
   const out: string[] = [];
-  const skills = new Set(m.skills.map((s) => s.id));
-  if (skills.size !== m.skills.length) out.push(`${where}: a skill is defined twice`);
-  for (const s of m.skills) if (!(s.start >= 0 && s.start <= 100) || !((s.danger ?? 0) >= 0)) out.push(`${where}: skill "${s.id}" needs start 0..100 and no negative danger`);
-  for (const k of ['dodge', 'armour', 'shields', 'unarmed']) if (!skills.has(k)) out.push(`${where}: skill "${k}" is missing (the engine trains it)`);
+  const schools = new Set(m.schools.map((s) => s.id));
+  if (schools.size !== m.schools.length) out.push(`${where}: a school is defined twice`);
+  const quality = (k: string) => (QUALITIES as readonly string[]).includes(k);
+  const taught = (id: string) => m.abilities.some((a) => a.id === id && a.taught);
   const items = new Map(m.items.items.map((i) => [i.id, i]));
   const tables = new Set(m.items.treasure.map((t) => t.id));
   for (const i of m.items.items) {
-    if (i.weapon && !skills.has(i.weapon.skill)) out.push(`${where}: item "${i.id}" trains unknown skill "${i.weapon.skill}"`);
     if (i.weapon && !(i.weapon.damage[0] > 0 && i.weapon.damage[0] <= i.weapon.damage[1])) out.push(`${where}: item "${i.id}" damage must be a rising range above 0`);
     if (i.slot && !SLOTS.includes(i.slot)) out.push(`${where}: item "${i.id}" slot "${i.slot}" is unknown`);
     if ((i.kind === 'weapon' || i.kind === 'shield' || i.kind === 'armour') && !i.slot) out.push(`${where}: item "${i.id}" is worn but has no slot`);
@@ -1623,40 +1603,33 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (!(sh.restock >= 1)) out.push(`${where}: shop "${sh.keeper}" must restock every day or more`);
     if (sh.fine && !sh.goods.some(([id]) => items.get(id)?.slot)) out.push(`${where}: shop "${sh.keeper}" has fine work but no wearable goods`);
   }
-  for (const t of m.trainers) {
-    for (const k of t.skills) if (!skills.has(k)) out.push(`${where}: trainer "${t.keeper}" teaches unknown skill "${k}"`);
-    if (!(t.price > 0 && t.hours > 0 && t.upTo > 0 && t.upTo <= 100)) out.push(`${where}: trainer "${t.keeper}" needs a price, hours and upTo 1..100`);
-  }
   for (const g of m.guilds ?? []) {
-    for (const k of g.skills) if (!skills.has(k)) out.push(`${where}: guild "${g.keeper}" teaches unknown skill "${k}"`);
+    for (const id of g.teaches) if (!taught(id)) out.push(`${where}: guild "${g.keeper}" teaches unknown or untaught ability "${id}"`);
+    if (!g.teaches.length || !(g.price > 0 && g.hours > 0)) out.push(`${where}: guild "${g.keeper}" needs abilities to teach, a price and hours`);
     if (g.hidden && !g.way) out.push(`${where}: hidden guild "${g.keeper}" needs a way in`);
-    if (!m.skillRanks?.length) out.push(`${where}: guilds need skillRanks`);
-    for (const id of g.abilities ?? []) if (!m.abilities.some((a) => a.id === id && a.taught)) out.push(`${where}: guild "${g.keeper}" teaches unknown or untaught ability "${id}"`);
-    if ((g.abilities?.length || g.teachesSpell) && !(g.spellPrice! > 0)) out.push(`${where}: guild "${g.keeper}" teaches abilities but has no spellPrice`);
     const q = g.quest;
     if (q) {
-      if (!m.abilities.some((a) => a.id === q.reward && a.taught)) out.push(`${where}: guild "${g.keeper}" quest rewards unknown or untaught ability "${q.reward}"`);
-      if (m.guilds!.some((o) => o.abilities?.includes(q.reward))) out.push(`${where}: quest reward "${q.reward}" is sold by a guild too`);
+      if (!taught(q.reward)) out.push(`${where}: guild "${g.keeper}" quest rewards unknown or untaught ability "${q.reward}"`);
+      if (m.guilds!.some((o) => o.teaches.includes(q.reward))) out.push(`${where}: quest reward "${q.reward}" is sold by a guild too`);
       if (!q.kinds.length || q.kinds.some((k) => !m.dungeons[k]?.form.purposes.includes('lead'))) out.push(`${where}: guild "${g.keeper}" quest asks for a place no lead kind is`);
     }
   }
-  if (m.skillRanks?.some((r, i, a) => i > 0 && r.upTo <= a[i - 1].upTo)) out.push(`${where}: skill ranks must rise`);
   if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);
-  for (const it of m.items.items) if (it.teaches && !m.abilities.some((a) => a.id === it.teaches && a.taught)) out.push(`${where}: item "${it.id}" teaches unknown or untaught ability "${it.teaches}"`);
+  for (const it of m.items.items) if (it.teaches && !taught(it.teaches)) out.push(`${where}: item "${it.id}" teaches unknown or untaught ability "${it.teaches}"`);
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);
-    for (const k of Object.keys(u.bonuses)) if (!skills.has(k)) out.push(`${where}: unique "${u.id}" raises unknown skill "${k}"`);
+    for (const k of Object.keys(u.bonuses)) if (!quality(k)) out.push(`${where}: unique "${u.id}" adds to unknown quality "${k}"`);
     if (u.grants && !m.abilities.some((a) => a.id === u.grants && a.item)) out.push(`${where}: unique "${u.id}" grants unknown or not item-only ability "${u.grants}"`);
   }
   for (const b of m.backgrounds) {
-    for (const k of Object.keys(b.skills)) if (!skills.has(k)) out.push(`${where}: background "${b.id}" raises unknown skill "${k}"`);
+    for (const id of b.abilities) if (!taught(id)) out.push(`${where}: background "${b.id}" gives unknown or untaught ability "${id}"`);
     for (const [slot, id] of Object.entries(b.kit.worn)) if (items.get(id)?.slot !== slot) out.push(`${where}: background "${b.id}" wears "${id}" in ${slot}, which does not go there`);
     for (const id of b.kit.pack) if (!items.has(id)) out.push(`${where}: background "${b.id}" carries unknown item "${id}"`);
     if (!b.known.length) out.push(`${where}: background "${b.id}" is known by no one in town`);
     for (const k of b.known) if (!k.line.includes('{hero}')) out.push(`${where}: background "${b.id}": the ${k.trade}'s greeting must name {hero}`);
   }
   for (const t of m.items.treasure) for (const [id] of t.items) if (!items.has(id)) out.push(`${where}: treasure "${t.id}" holds unknown item "${id}"`);
-  for (const k of Object.keys(m.items.affixes)) if (!skills.has(k)) out.push(`${where}: affix for unknown skill "${k}"`);
+  for (const k of QUALITIES) if (!m.items.affixes[k]) out.push(`${where}: no affix for quality "${k}"`);
   const ids = new Set<string>();
   for (const c of m.creatures) {
     if (ids.has(c.id)) out.push(`${where}: creature "${c.id}" defined twice`);
@@ -1695,12 +1668,12 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (w.ring[1] < w.ring[0] || w.range <= 0) out.push(`${where}: wild "${w.id}" needs a ring and a range`);
   }
   if (!m.abilities.length) out.push(`${where}: no abilities`);
-  out.push(...validateAbilities(m, skills, where));
+  out.push(...validateAbilities(m, schools, where));
   return out;
 }
 
-/** Abilities: known skills and effects, sane numbers, and every step of every recipe well formed. */
-function validateAbilities(m: SettingModule, skills: ReadonlySet<string>, where: string): string[] {
+/** Abilities: known schools and effects, sane numbers, and every step of every recipe well formed. */
+function validateAbilities(m: SettingModule, schools: ReadonlySet<string>, where: string): string[] {
   const out: string[] = [];
   const effects = new Set((m.effects ?? []).map((e) => e.id));
   if (effects.size !== (m.effects ?? []).length) out.push(`${where}: an effect is defined twice`);
@@ -1709,9 +1682,9 @@ function validateAbilities(m: SettingModule, skills: ReadonlySet<string>, where:
     const at = `${where}: ability "${a.id}"`;
     if (ids.has(a.id)) out.push(`${at} defined twice`);
     ids.add(a.id);
-    if (a.skill && !skills.has(a.skill)) out.push(`${at} trains unknown skill "${a.skill}"`);
+    if (a.school && !schools.has(a.school)) out.push(`${at} is of unknown school "${a.school}"`);
     if (a.item && a.taught) out.push(`${at} is item-only and cannot be taught too`);
-    if (a.level !== undefined && (!a.skill || !(a.level >= 0 && a.level <= 100))) out.push(`${at} needs a skill for its level, and a level 0..100`);
+    if (a.level !== undefined && !(Number.isInteger(a.level) && a.level >= 1 && a.level <= m.growth.xp.length)) out.push(`${at} needs a level 1..${m.growth.xp.length}`);
     if (!(a.cooldown >= 0) || !((a.cast ?? 0) >= 0) || Object.values(a.cost ?? {}).some((v) => !(v >= 0))) out.push(`${at} needs cooldown, cast and costs of 0 or more`);
     if (!a.ops.length) out.push(`${at} has no steps`);
     const check = (ops: readonly AbilityOp[], depth: number): void => {

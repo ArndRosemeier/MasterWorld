@@ -1,7 +1,7 @@
 /**
  * The hero's side of a fight (plan 11.2, D13): a target picked with Tab (hostile ones in front, nearest
  * and most threatening first) or by clicking, a blow again and again while attacking, abilities on the
- * belt with their stamina and cooldowns, the den's blows taken, skills used (D30), the fallen searched.
+ * belt with their stamina and cooldowns, the den's blows taken, abilities used (D30), the fallen searched.
  * The den (sim/creatures.ts) moves and decides for the creatures; this decides for the hero. Positions
  * are the dungeon's own frame. Pure: the game turns the events into notes, sounds and the HUD.
  */
@@ -80,7 +80,7 @@ export class Fight implements RecipeWorld {
 
   /** The den's view of the hero now. */
   quarry(p: HeroPose): Quarry {
-    const stealth = this.hero.skill('stealth');
+    const stealth = this.hero.stealth;
     const moving = p.speed > 3.5 ? 1 : p.speed > 0.5 ? 0.4 : 0.08;
     // Veiled in shadow, the hero is heard and seen less.
     const veil = 1 - this.recipes.veilOf(SELF);

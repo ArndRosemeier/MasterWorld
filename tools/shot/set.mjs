@@ -194,8 +194,8 @@ const SESSIONS = [
       await p.waitForFunction(() => window.game.spellView.entered, null, { timeout: TIMEOUT });
       const id = await p.evaluate(() => {
         const g = window.game, setting = g.setting, h = g.character;
-        const school = setting.skills.find((s) => s.group === 'magic')?.id;
-        const spell = setting.abilities.find((a) => a.skill === school && (a.level ?? 0) === 0)?.id;
+        const school = setting.schools[0]?.id;
+        const spell = setting.abilities.find((a) => a.school === school && (a.level ?? 1) === 1)?.id;
         if (!spell) return null;
         h.learn(spell);
         h.mana = h.maxMana;

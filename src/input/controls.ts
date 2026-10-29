@@ -22,7 +22,7 @@ export const ACTIONS = [
   { id: 'talk', label: 'Talk to someone' },
   { id: 'journal', label: 'Journal' },
   { id: 'map', label: 'Map' },
-  { id: 'pack', label: 'Pack and skills' },
+  { id: 'pack', label: 'Pack and level' },
   { id: 'target', label: 'Next target' },
   { id: 'bar1', label: 'Action bar 1' },
   { id: 'bar2', label: 'Action bar 2' },

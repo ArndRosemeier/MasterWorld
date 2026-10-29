@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic';
 import { Character } from '../src/game/character';
-import { GuildBook, openRank, questDue, questGift, spellRefusal } from '../src/game/guilds';
+import { GuildBook, questDue, questGift, teach, teachingsOf, teachRefusal } from '../src/game/guilds';
 import { openWorld } from '../src/vgm/builder';
 import { questFor, questOf, questReward } from '../src/vgm/quests';
 import { keepPromise } from '../src/vgm/leads';
@@ -20,11 +20,12 @@ test('quests: bird form is gained only through the Undercroft keeper\'s deed', (
   const hero = new Character(classic);
   hero.coins = 1e6;
   // No trainer sells it, for any coin.
-  for (const g of classic.guilds!) assert.notEqual(spellRefusal(classic, g, hero, classic.abilities.find((a) => a.id === bird)!), null);
+  for (const g of classic.guilds!) assert.equal(teachRefusal(g, hero, classic.abilities.find((a) => a.id === bird)!, new GuildBook(), first), 'not-taught');
   // The keeper speaks of it only to a student of the level it asks (D58).
   hero.xp = classic.growth.xp[under.quest!.level - 1];
   assert.equal(questDue(under, hero, first), false, 'not a student');
-  assert.equal(openRank(classic, under, hero, 'cryomancy', new GuildBook(), first), null);
+  const frost = teachingsOf(classic, under).find((a) => a.school === 'cryomancy' && (a.level ?? 1) < under.task.from)!;
+  assert.equal(teach(under, hero, frost, new GuildBook(), first), null);
   assert.equal(questDue(under, hero, first), true);
   hero.xp = classic.growth.xp[under.quest!.level - 2];
   assert.equal(questDue(under, hero, first), false, 'not grown enough');

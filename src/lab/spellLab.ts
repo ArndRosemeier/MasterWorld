@@ -12,7 +12,7 @@ import { BufferGeometry, CapsuleGeometry, CircleGeometry, Float32BufferAttribute
 import { createView } from '../render/view';
 import { LAB_FLOOR } from '../render/materials/lab';
 import { classic } from '../setting/classic';
-import { skillOf, type AbilityDef, type AbilityOp, type SpellMotif } from '../setting/contract';
+import { schoolOf, type AbilityDef, type AbilityOp, type SpellMotif } from '../setting/contract';
 import { SHAPES, SPRITES, SpellBits, type Vec3 } from '../app/spellFx/particles';
 import { lookOf, type Caster, type FxLook } from '../app/spellFx/looks';
 import { FxView } from '../app/spellFx/fxView';
@@ -28,8 +28,8 @@ const CAMS: Record<string, { at: Vec3; look: Vec3 }> = {
 };
 
 const setting = classic;
-const spells = setting.abilities.filter((a) => a.glow || skillOf(setting, a.skill)?.group === 'magic');
-const motifOf = (a: AbilityDef): SpellMotif => a.glow?.motif ?? skillOf(setting, a.skill)?.motif ?? 'radiance';
+const spells = setting.abilities.filter((a) => a.glow || a.school);
+const motifOf = (a: AbilityDef): SpellMotif => a.glow?.motif ?? schoolOf(setting, a.school)?.motif ?? 'radiance';
 
 /** One spell played from its start: what has happened so far. */
 class Run {

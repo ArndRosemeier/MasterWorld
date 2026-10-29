@@ -58,7 +58,7 @@ export interface SaveData {
   readonly journal: readonly Lead[];
   /** The land the hero knows, as the map shows it (none in older saves: the land round the start town). */
   readonly map?: KnownLandSave;
-  /** The hero's skills, health, gear and purse (version 2; none: a fresh hero). */
+  /** The hero's level, abilities, health, gear and purse (version 2; none: a fresh hero). */
   readonly character: CharacterSave | null;
   /** The Director's needs and tension (version 2). */
   readonly director: DirectorSave | null;

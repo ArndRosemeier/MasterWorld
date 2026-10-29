@@ -1,9 +1,10 @@
 /**
- * The pack window (plan 17.1, D31): what the hero wears and carries, the purse and the skills. Its key (I)
+ * The pack window (plan 17.1, D31): what the hero wears and carries, the purse and the level. Its key (I)
  * opens and closes it. A click on something carried puts it on (or drinks or eats it); a click on
- * something worn takes it off. The skills show what use has made of them and what the gear adds. In warded
- * brass (D45, windows.css): a field chest whose lid swings up, the cards make their entrances by rarity,
- * and each skill is a brass gauge whose needle rises (the ward on its dial is what the gear adds).
+ * something worn takes it off. The gauges show what the level gives (aim, defence, stealth, speech; D59:
+ * there are no skills) and what the gear adds. In warded brass (D45, windows.css): a field chest whose lid
+ * swings up, the cards make their entrances by rarity, and each gauge's needle rises (the ward on its dial
+ * is what the gear adds).
  */
 import { SLOTS, type SettingModule, type Slot } from '../setting/contract';
 import type { Character } from '../game/character';
@@ -28,11 +29,11 @@ export interface PackHost extends WindowHost {
   readOut(why: string | null, ability: string): void;
 }
 
-/** Where a gauge's needle stands for a skill (degrees from pointing left; full at 100). */
+/** Where a gauge's needle stands for a value (degrees from pointing left; full at 100). */
 const angle = (v: number) => Math.min(180, Math.max(0, v * 1.8));
 
 export class PackUi extends BodyWindow {
-  /** Each skill as last shown: a needle that rose since swings up again. */
+  /** Each gauge as last shown: a needle that rose since swings up again. */
   private readonly seen = new Map<string, number>();
 
   constructor(private readonly hero: Character, private readonly setting: SettingModule, private readonly packHost: PackHost) {
@@ -62,25 +63,29 @@ export class PackUi extends BodyWindow {
       }
       return c;
     });
-    const skills = this.setting.skills.filter((s) => s.group !== 'magic' || h.opened(s.id)).sort((a, b) => h.skill(b.id) - h.skill(a.id)).map((s, i) => {
-      const base = Math.floor(h.skills.get(s.id) ?? 0), all = Math.floor(h.skill(s.id)), plus = all - base;
+    // What the level gives (D59: no skills) and what the gear adds, each a gauge on the 0..100 of aim and defence.
+    const p = h.prowess, sides: [string, string, number, number][] = [
+      ['aim', 'Aim', p, h.aim], ['guard', 'Defence', p * 0.8, h.defence], ['stealth', 'Stealth', p * 0.4, h.stealth], ['speech', 'Speech', p * 0.75, h.speech],
+      ...(h.hasMagic ? [['spell', 'Spell power', p, p + h.bonus('spell')] as [string, string, number, number]] : [])];
+    const gauges = sides.map(([id, name, b, a], i) => {
+      const base = Math.floor(b), all = Math.floor(a), plus = all - base;
       const needle = el('div', { className: 'needle' });
       needle.style.animationDelay = `${(0.6 + i * 0.05).toFixed(2)}s`;
       const dial = el('div', { className: 'dial' }, el('div', { className: 'face' }), el('div', { className: 'arc' }), needle, el('div', { className: 'hub' }));
       dial.style.setProperty('--angle', `${angle(all) - 90}deg`);
       dial.style.setProperty('--b', `${angle(base)}deg`);
       dial.style.setProperty('--t', `${angle(all)}deg`);
-      const rose = (this.seen.get(s.id) ?? all) < all;
-      this.seen.set(s.id, all);
-      return el('div', { className: `gauge${rose ? ' up' : ''}`, title: plus ? `${s.name}: ${base}, +${plus} from what you wear` : `${s.name}: ${base}` },
-        dial, el('div', { className: 'name', textContent: s.name }), el('div', { className: 'value' }, String(base), ...(plus ? [' ', el('b', { textContent: `+${plus}` })] : [])));
+      const rose = (this.seen.get(id) ?? all) < all;
+      this.seen.set(id, all);
+      return el('div', { className: `gauge${rose ? ' up' : ''}`, title: plus ? `${name}: ${base} from your level, +${plus} from what you wear` : `${name}: ${base} from your level` },
+        dial, el('div', { className: 'name', textContent: name }), el('div', { className: 'value' }, String(base), ...(plus ? [' ', el('b', { textContent: `+${plus}` })] : [])));
     });
     this.fill([
       el('h3', { textContent: 'Worn' }), el('div', { className: 'worn' }, ...worn),
       el('h3', { textContent: 'Carried' }),
       carried.length ? el('div', { className: 'carried' }, ...carried) : el('p', { className: 'hint', textContent: 'Nothing but lint.' }),
       el('p', { className: 'hint', textContent: 'Click something carried to put it on, drink, eat or read it; click something worn to take it off.' }),
-      el('h3', { textContent: 'Skills' }), el('div', { className: 'skills' }, ...skills)],
+      el('h3', { textContent: `Level ${h.level}` }), el('div', { className: 'gauges' }, ...gauges)],
     [
       el('span', { textContent: `Level ${h.level}${h.level < topLevel(this.setting.growth) ? ` · ${Math.floor(h.xp)} / ${this.setting.growth.xp[h.level]} experience` : ''}` }),
       el('span', { textContent: `Health ${Math.ceil(h.health)} / ${h.maxHealth} · Stamina ${Math.ceil(h.stamina)} / ${h.maxStamina}` }),

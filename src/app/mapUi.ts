@@ -5,12 +5,10 @@
  * people put on it when they tell of a place and the ways they sketched there. Land not known stays bare
  * parchment; it is inked in tile by tile as the map shows it. The map key (M) unrolls it; the wheel zooms, dragging pans. A new
  * mark is drawn in with a quill stroke the first time the map shows it (or while the teller marks it, the
- * hand-over). Where the hero is follows their orientation skill: a vague area for a novice, an exact arrow
- * at mastery (src/game/orientation.ts).
+ * hand-over). The map shows exactly where the hero is and which way they face (D59: no orientation skill).
  */
 import type { TownPlan } from '@futuremagic/settlement';
 import { CELL, SEEN, type KnownLand } from '../game/knownLand';
-import type { Bearing } from '../game/orientation';
 import type { Journal } from '../talk/journal';
 import { el } from './dom';
 import { KeyWindow, type WindowHost } from './window';
@@ -19,8 +17,8 @@ export interface MapHost extends WindowHost {
   /** Ground height and water depth (> 0: water) at a point. */
   height(x: number, z: number): number;
   water(x: number, z: number): number;
-  /** Where the hero believes they are and face (yaw as the walker's: 0 north), by their orientation. */
-  heroBearing(): Bearing;
+  /** Where the hero is and faces (yaw as the walker's: 0 north). */
+  heroAt(): { readonly x: number; readonly z: number; readonly yaw: number };
   /** Named houses drawn on the sheet from the start (the guild houses, D49; a hidden one once the bard told of it). */
   signs?(): readonly MapSign[];
   /** The land the hero knows: the map shows only that. */
@@ -276,36 +274,18 @@ export class MapUi extends KeyWindow {
         g.fillText(l.mark.label, x + r + 4, z + 5);
       }
     }
-    this.paintHero(g, X, Z, s);
+    this.paintHero(g, X, Z);
     // North.
     g.fillStyle = ink; g.font = `600 ${Math.round(16 * u)}px Georgia, serif`; g.textAlign = 'center';
     g.fillText('N', size - 28 * u, 30 * u);
     g.beginPath(); g.moveTo(size - 28 * u, 36 * u); g.lineTo(size - 33 * u, 56 * u); g.lineTo(size - 23 * u, 56 * u); g.closePath(); g.fill();
   }
 
-  /** The hero as their orientation knows it: a wash of blue ink where they may be, and the arrow once they can tell their facing. */
-  private paintHero(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number, s: number): void {
-    const hero = this.map.heroBearing();
-    const hx = X(hero.x), hz = Z(hero.z);
-    const blue = '#1e4a8a';
-    if (hero.radius > 0) {
-      const r = Math.max(8, hero.radius * s);
-      const wash = g.createRadialGradient(hx, hz, 0, hx, hz, r);
-      wash.addColorStop(0, '#1e4a8a55'); wash.addColorStop(0.7, '#1e4a8a2a'); wash.addColorStop(1, '#1e4a8a00');
-      g.fillStyle = wash;
-      g.beginPath(); g.arc(hx, hz, r, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = '#1e4a8a99'; g.lineWidth = 1.5; g.setLineDash([5, 6]);
-      g.beginPath(); g.arc(hx, hz, r, 0, Math.PI * 2); g.stroke();
-      g.setLineDash([]);
-      if (hero.yaw === null) {
-        g.font = 'italic 15px Georgia, serif'; g.fillStyle = blue; g.textAlign = 'center';
-        g.fillText('you?', hx, hz + 5);
-        return;
-      }
-    }
-    if (hero.yaw === null) return;
-    const fx = -Math.sin(hero.yaw), fz = -Math.cos(hero.yaw);
-    g.fillStyle = hero.radius > 0 ? '#1e4a8acc' : blue;
+  /** The hero: a blue arrow where they stand, pointing the way they face. */
+  private paintHero(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number): void {
+    const hero = this.map.heroAt();
+    const hx = X(hero.x), hz = Z(hero.z), fx = -Math.sin(hero.yaw), fz = -Math.cos(hero.yaw);
+    g.fillStyle = '#1e4a8a';
     g.beginPath();
     g.moveTo(hx + fx * 10, hz + fz * 10);
     g.lineTo(hx - fx * 6 + fz * 6, hz - fz * 6 - fx * 6);

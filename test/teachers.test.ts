@@ -4,7 +4,7 @@ import { planTown } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic';
 import { Character } from '../src/game/character';
 import { plainItem } from '../src/game/items';
-import { bardTells, GuildBook, guildHouses, houseIn, learnSpell, openRank, spellRefusal, spellsOf } from '../src/game/guilds';
+import { abilityPrice, bardTells, GuildBook, guildHouses, houseIn, teach, teachingsOf, teachRefusal } from '../src/game/guilds';
 import type { DecisionLog, RetreatDecision } from '../src/world/decisions';
 import { parseSeed } from '@futuremagic/core';
 import { openWorld } from '../src/vgm/builder';
@@ -16,33 +16,35 @@ const under = classic.guilds!.find((g) => g.keeper === 'undercroft-keeper')!;
 const ability = (id: string) => classic.abilities.find((a) => a.id === id)!;
 const log: DecisionLog = [];
 
-test('teachers: the hedge witch opens a school for a fresh hero’s coin, with its first spell and mana', () => {
-  const hero = new Character(classic);
-  assert.ok(hero.coins >= witch.openPrice! && hero.maxMana === 0);
-  assert.equal(openRank(classic, witch, hero, 'vitae', new GuildBook(), log), null);
-  assert.ok(hero.opened('vitae') && hero.knows('mend') && hero.mana === hero.maxMana && hero.maxMana > 0);
-  assert.ok(!hero.knows('regrowth'), 'only the first spell comes with the school');
+test('teachers: the hedge witch teaches a first spell for a fresh hero\'s coin; mana comes with it (D59)', () => {
+  const hero = new Character(classic), mend = ability('mend');
+  assert.ok(hero.coins >= abilityPrice(witch, mend) && hero.maxMana === 0);
+  assert.equal(teach(witch, hero, mend, new GuildBook(), log), null);
+  assert.ok(hero.knows('mend') && hero.mana === hero.maxMana && hero.maxMana > 0);
+  assert.ok(!hero.knows('regrowth'), 'only the spell taught');
   assert.ok(hero.bar.includes('mend'), 'onto the action bar');
 });
 
-test('teachers: further spells wait for the school’s level and cost coin; other schools wait to be opened', () => {
+test('teachers: further spells wait for the hero\'s level and cost more; spells of other schools are not taught here', () => {
   const hero = new Character(classic), book = new GuildBook();
   hero.coins = 1000;
-  openRank(classic, witch, hero, 'geomancy', book, log);
   const skin = ability('stone-skin');
-  assert.equal(spellRefusal(classic, witch, hero, skin), 'unearned');
-  hero.skills.set('geomancy', skin.level!);
+  assert.equal(teachRefusal(witch, hero, skin, book, log), 'level');
+  hero.xp = classic.growth.xp[skin.level! - 1];
   const coins = hero.coins;
-  assert.equal(learnSpell(classic, witch, hero, skin), null);
-  assert.ok(hero.knows('stone-skin') && hero.coins < coins);
-  assert.equal(learnSpell(classic, witch, hero, skin), 'known');
-  assert.equal(spellRefusal(classic, witch, hero, ability('regrowth')), 'closed', 'vitae is not open');
-  assert.equal(spellRefusal(classic, witch, hero, ability('fire-dart')), 'not-taught');
+  book.assign(witch.keeper, 0);
+  // The witch's task: a place out on the land cleared after she asked.
+  const done: DecisionLog = [{ kind: 'dungeon', id: 'c', template: 'barrow', town: 't', building: 1, site: { x: 300, z: 0, yaw: 0 }, seed: 1, setPiece: 'x' }, { kind: 'kept', id: 'k', promise: 'c', at: 1 }];
+  assert.equal(teachRefusal(witch, hero, skin, book, log), 'task');
+  assert.equal(teach(witch, hero, skin, book, done), null);
+  assert.ok(hero.knows('stone-skin') && hero.coins === coins - abilityPrice(witch, skin) && abilityPrice(witch, skin) > abilityPrice(witch, ability('mend')));
+  assert.equal(teach(witch, hero, skin, book, done), 'known');
+  assert.equal(teachRefusal(witch, hero, ability('fire-dart'), book, log), 'not-taught');
 });
 
 test('teachers: the hidden Undercroft teaches shadow and frost, but sells no bird form; the bard tells its way in', () => {
-  assert.deepEqual(spellsOf(classic, under).filter((a) => !a.skill).map((a) => a.id), []);
-  for (const g of classic.guilds!) assert.equal(spellRefusal(classic, g, new Character(classic), ability('bird')), 'not-taught', `${g.keeper} does not sell it`);
+  assert.deepEqual(teachingsOf(classic, under).filter((a) => !a.school).map((a) => a.id), []);
+  for (const g of classic.guilds!) assert.equal(teachRefusal(g, new Character(classic), ability('bird'), new GuildBook(), log), 'not-taught', `${g.keeper} does not sell it`);
   const book = new GuildBook();
   const town = planTown({ seed: 3, x: 0, z: 0, radius: 72, height: () => 10 });
   const houses = guildHouses(town, 'town', classic);
@@ -56,16 +58,12 @@ test('teachers: the hidden Undercroft teaches shadow and frost, but sells no bir
   assert.ok(Math.hypot(w.b.cx, w.b.cz) > Math.hypot(arms.b.cx, arms.b.cz));
 });
 
-test('teachers: a save made before the teachers never opens magic; one after keeps it', () => {
+test('teachers: a save keeps the spells learned and the mana that came with them', () => {
   const hero = new Character(classic);
-  const old = JSON.parse(JSON.stringify(hero.save()));
-  delete old.ranks;
-  const back = new Character(classic, old);
-  for (const k of ['vitae', 'geomancy', 'umbramancy', 'cryomancy']) assert.ok(!back.opened(k), k);
-  hero.coins = 100;
-  openRank(classic, witch, hero, 'vitae', new GuildBook(), log);
+  teach(witch, hero, ability('mend'), new GuildBook(), log);
   const again = new Character(classic, JSON.parse(JSON.stringify(hero.save())));
-  assert.ok(again.opened('vitae') && again.knows('mend') && !again.opened('geomancy'));
+  assert.ok(again.knows('mend') && again.maxMana === hero.maxMana && !again.knows('regrowth'));
+  assert.equal(new Character(classic, JSON.parse(JSON.stringify(new Character(classic).save()))).maxMana, 0);
 });
 
 test('teachers: the warden keeps watch at a half-ruined tower past the start town’s fields and teaches fire and light', () => {
@@ -86,19 +84,20 @@ test('teachers: the warden keeps watch at a half-ruined tower past the start tow
   const told = bardTells(classic, d, t.guilds, new GuildBook(), () => 'Odo');
   assert.ok(told.some((x) => x.includes('half-ruined tower') && x.includes('pyromancy') && /(north|south|east|west)/.test(x)), told.join(' | '));
   // Fire asks a hero who has grown a little (D58).
-  const hero = new Character(classic);
-  assert.equal(openRank(classic, h.guild, hero, 'pyromancy', new GuildBook(), log), 'level');
-  hero.xp = classic.growth.xp[2];
-  assert.equal(openRank(classic, h.guild, hero, 'pyromancy', new GuildBook(), log), null);
+  const hero = new Character(classic), dart = ability('fire-dart');
+  assert.equal(teachRefusal(h.guild, hero, dart, new GuildBook(), log), 'level');
+  hero.xp = classic.growth.xp[dart.level! - 1];
+  hero.coins = 1000;
+  assert.equal(teach(h.guild, hero, dart, new GuildBook(), log), null);
   assert.ok(hero.knows('fire-dart'));
 });
 
-test('teachers: a writing found below teaches its spell, opens its school and crumbles; read again it says so', () => {
+test('teachers: a writing found below teaches its spell, brings mana and crumbles; read again it says so', () => {
   const hero = new Character(classic);
   const tome = plainItem(classic.items, 'tome-embers');
   hero.pack.push(tome);
   assert.equal(hero.readWriting(tome), null);
-  assert.ok(hero.knows('fireball') && hero.opened('pyromancy') && hero.maxMana > 0 && !hero.pack.includes(tome));
+  assert.ok(hero.knows('fireball') && hero.maxMana > 0 && !hero.pack.includes(tome));
   hero.pack.push(tome);
   assert.match(hero.readWriting(tome) ?? '', /already/);
   // Writings lie in the treasure of places below, rarely.

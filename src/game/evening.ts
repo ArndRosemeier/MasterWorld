@@ -10,7 +10,7 @@
  */
 import { MinHeap, deriveSeed } from '@futuremagic/core';
 import { polyCentroid, type SettlementSize, type TownBuilding } from '@futuremagic/settlement';
-import { guildOf, type GuildDef, type SettingModule } from '../setting/contract';
+import { type GuildDef, type SettingModule } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
 import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
@@ -32,8 +32,7 @@ import { rewardFor } from './reward';
 import { itemWorth, type Merchant } from './trade';
 import { Township } from './township';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
-import { lessonPrice, takeLesson, teacherOf } from './lessons';
-import { bardTells, GuildBook, isGuild, learnSpell, nextRank, openRank, rankRefusal, spellRefusal, spellsOf } from './guilds';
+import { abilityPrice, bardTells, GuildBook, teach, teachingsOf, teachRefusal } from './guilds';
 import { Standing } from './standing';
 import { WALK, Walker, type WalkWorld } from './walker';
 import type { Terrain } from '../world/terrain';
@@ -56,11 +55,9 @@ export interface EveningResult {
   /** Copper the finds fetched, and what was bought. */
   readonly earned: number;
   readonly bought: readonly string[];
-  /** Lessons taken ("blades 13"). */
+  /** Abilities learned at a guild house ("Cleave"; D59: no skills, trainers teach abilities). */
   readonly lessons: readonly string[];
-  /** Skills and ranks opened at a guild house ("shields 0"). */
-  readonly opened: readonly string[];
-  /** Per evening: copper spent on gear and lessons (the coin sink, plan A2b). */
+  /** Per evening: copper spent on gear and abilities (the coin sink, plan A2b). */
   readonly spent: readonly number[];
   /** The purse at the end. */
   readonly purse: number;
@@ -95,8 +92,9 @@ export interface EveningOptions {
    */
   readonly settlement?: SettlementSize;
   /**
-   * A mage (plan C3): before the first evening the hero asks the bard where to learn, opens a school of magic
-   * at a teacher the bard names and casts it in the first place; later evenings it learns that school's spells.
+   * A mage (plan C3): before the first evening the hero asks the bard where to learn, learns a first spell
+   * at a teacher the bard names (mana comes with it, D59) and casts it in the first place; later evenings it
+   * learns that teacher's spells as its level allows.
    */
   readonly mage?: boolean;
   /** The levels the hero must end within (D58, G1: an evening of play brings a fresh hero to level 3–5); none: any. */
@@ -118,10 +116,8 @@ const CLIMB_COST = 8;
 /** How long one visit below may take, seconds. */
 const DELVE_LIMIT = 1200;
 
-/** Copper kept back from lessons (with the room): a mending or two. */
+/** Copper kept back from abilities (with the room): a mending or two. */
 const LESSON_RESERVE = 40;
-/** Lessons in one skill an evening, at most. */
-const LESSONS_A_DAY = 4;
 /** A purse above this at the end means coin piles up with nothing to buy (plan A2b). */
 const SENSIBLE_PURSE = 400;
 
@@ -151,13 +147,13 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const power0 = hero.power;
   // Standing in a town for the first time is a discovery (D58), as in the game.
   hero.earn(`town:${town.decision.id}`, 'town');
-  const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [], opened: string[] = [];
+  const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
   const book = new GuildBook();
-  // A human hero (the creator's first people): trainers open ranks by the hero's reputation (D54).
+  // A human hero (the creator's first people): a guild's task done is a good deed with its trainer's people (D54).
   const standing = new Standing(setting, 'human');
   let falls = 0, earned = 0, seconds = 0, spells = 0;
-  /** The mage's school, and its teacher's house. */
-  let school: { skill: string; house: TownBuilding; guild: GuildDef } | null = null;
+  /** The mage's teacher and its house. */
+  let school: { house: TownBuilding; guild: GuildDef } | null = null;
   // The Director watches the evening as it would a player's (plan 4.1): where the hero is, whether they
   // have a lead to follow; play meets its needs (a fight Challenge, finds Reward, a new place Discovery,
   // the townsfolk People). How long each stands overdue is the check of C9.
@@ -257,7 +253,6 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     const [x, z] = polyCentroid(town.plan.market);
     return { at: [x, z], name: `the ${keeper} at the market` };
   };
-  const teachers = people.flatMap((p) => { const t = teacherOf(setting, p); return t ? [{ p, t }] : []; });
   const shops = market.merchants.length > 0;
   const merchant = (keeper: string) => market.merchants.find((m) => m.shop.keeper === keeper) ?? null;
 
@@ -298,24 +293,25 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     return lead;
   };
 
-  /** The mage asks the bard at the inn where to learn magic, walks to the first teacher named and opens a school. */
-  const becomeMage = (): { skill: string; house: TownBuilding; guild: GuildDef } => {
+  /** The mage asks the bard at the inn where to learn magic, walks to the first teacher named and learns a first spell. */
+  const becomeMage = (): { house: TownBuilding; guild: GuildDef } => {
     const bard = township.bard, inn = buildingOf(town.plan, 'inn');
     if (!bard || !inn) throw new Broke('no bard at an inn to ask where to learn magic');
     walkTo('the inn', ...front(inn));
     const told = bardTells(setting, town.decision, township.guilds, book, (k) => { const m = people.find((p) => p.trade === k); return m ? talk.nameOf(m.id) : null; });
-    const h = township.guilds.find(({ guild: g }) => spellsOf(setting, g).length && book.onMap(town.decision.id, g));
+    const firsts = (g: GuildDef) => teachingsOf(setting, g).filter((a) => a.school && (a.level ?? 1) <= hero.level);
+    const h = township.guilds.find(({ guild: g }) => firsts(g).length && book.onMap(town.decision.id, g));
     if (!h) throw new Broke(`the bard named no magic teacher (${told.length} houses)`);
     say(`asked the bard where to learn magic: ${told.find((t) => t.toLowerCase().includes(h.guild.name.toLowerCase())) ?? h.guild.name}`);
     walkTo(h.guild.name, ...front(h.b));
-    // A school whose first spell strikes a foe, if the teacher has one (it shows magic in a fight).
-    const skill = h.guild.skills.find((k) => spellsOf(setting, h.guild).some((x) => x.skill === k && !(x.level ?? 0) && aimsAtFoe(x))) ?? h.guild.skills[0], before = hero.coins;
-    const no = openRank(setting, h.guild, hero, skill, book, log);
-    if (no) throw new Broke(`${h.guild.name} would not open ${skill}: ${no} (${hero.coins} copper)`);
-    if (!hero.maxMana) throw new Broke(`opened ${skill} but has no mana`);
-    opened.push(`${skill} 0`);
-    say(`${h.guild.name} opens ${skill} for ${before - hero.coins} copper: knows ${spellsOf(setting, h.guild).filter((a) => hero.knows(a.id)).map((a) => a.name).join(', ')}; ${hero.maxMana} mana`);
-    return { skill, house: h.b, guild: h.guild };
+    // A first spell that strikes a foe, if the teacher has one (it shows magic in a fight).
+    const first = firsts(h.guild).find(aimsAtFoe) ?? firsts(h.guild)[0], before = hero.coins;
+    const no = teach(h.guild, hero, first, book, log);
+    if (no) throw new Broke(`${h.guild.name} would not teach ${first.name}: ${no} (${hero.coins} copper)`);
+    if (!hero.maxMana) throw new Broke(`learned ${first.name} but has no mana`);
+    taught.push(first.name);
+    say(`${h.guild.name} teaches ${first.name} for ${before - hero.coins} copper; ${hero.maxMana} mana`);
+    return { house: h.b, guild: h.guild };
   };
 
   const heard = new Set<string>();
@@ -406,7 +402,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       }
       if (left) throw new Broke(`cleared ${name} but never found the pack left at the fall`);
       if (school && e === 0 && !spells) throw new Broke(`the mage cast no spell in ${name}`);
-      if (school) say(`${spells} spells cast so far; ${school.skill} ${Math.floor(hero.skills.get(school.skill) ?? 0)}`);
+      if (school) say(`${spells} spells cast so far`);
       // Quiet, and the hero gone: back to its household to tell them (plan 4.2). They pay, the promise is
       // kept, and with the next lead already about they pass on its rumour.
       if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
@@ -447,7 +443,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         let got = 0;
         for (const it of [...hero.pack]) {
           if (keepIt(it)) continue;
-          const price = market.pays(m, it, hero.skill('speech'));
+          const price = market.pays(m, it, hero.speech);
           if (price > 0 && !market.sell(hero, m, it)) got += price;
         }
         if (got) say(`sold to ${w.name} for ${got} copper`);
@@ -476,53 +472,32 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         say(`bought ${up.item.name} from the ${m.shop.keeper}: power ${was} -> ${hero.power}`);
         break;
       }
-      // Lessons with what is left above a night's room and a mending (the weapon's skill first, then guarding).
+      // Abilities with what is left above a night's room and a mending (D59): at each guild house on the map, the
+      // cheapest first; a mage keeps to its teacher's spells and the fighting houses' arts, a fighter to the arts.
       const reserve = setting.upkeep.room + LESSON_RESERVE;
-      const wanted = [...(school ? [school.skill] : []), hero.weapon.skill, 'armour', 'dodge', 'shields'];
-      // The mage's next spells first, at the teacher's (once the school has reached their level).
-      if (school) {
-        const g = school.guild;
-        for (const a of spellsOf(setting, g).filter((x) => x.skill === school!.skill)) {
-          if (spellRefusal(setting, g, hero, a) || hero.coins < reserve + 40) continue;
-          walkTo(g.name, ...front(school.house));
-          const before = hero.coins;
-          learnSpell(setting, g, hero, a);
-          paid += before - hero.coins;
-          say(`${g.name} teaches ${a.name} for ${before - hero.coins} copper`);
-        }
-      }
-      // First what a guild house must open (D49): a skill never learned, or a rank use has earned.
-      for (const skill of wanted) {
-        const by = teachers.find(({ t }) => t.skills.includes(skill) && isGuild(t));
-        const next = nextRank(setting, hero, skill);
-        if (!by || !next || hero.coins - next.def.price < reserve) continue;
-        const g = guildOf(setting, by.t.keeper)!;
-        if (book.thank(g, log)) { standing.deed(`task:${g.keeper}`, by.p.race, setting.standing.task); hero.earn(`task:${g.keeper}`, 'task'); }
-        if (rankRefusal(setting, g, hero, skill, book, log)) continue;
-        walkTo(g.name, ...front(town.plan.buildings[by.p.work]));
-        const before = hero.coins;
-        openRank(setting, g, hero, skill, book, log);
-        paid += before - hero.coins;
-        opened.push(`${skill} ${next.rank}`);
-        say(`${g.name} opens ${skill} rank ${next.rank} for ${before - hero.coins} copper`);
-      }
-      for (const skill of wanted) {
-        const by = teachers.find(({ t }) => t.skills.includes(skill));
-        if (!by) continue;
+      for (const h of [...township.guilds].sort((x, y) => Number(y.guild === school?.guild) - Number(x.guild === school?.guild))) {
+        const g = h.guild;
+        if (!book.onMap(town.decision.id, g)) continue;
+        if (book.thank(g, log)) { standing.deed(`task:${g.keeper}`, 'human', setting.standing.task); hero.earn(`task:${g.keeper}`, 'task'); say(`${g.name} thanks the hero for its task`); }
+        const fit = teachingsOf(setting, g).filter((a) => (school ? !a.school || g === school.guild : !a.school))
+          .sort((a, b) => abilityPrice(g, a) - abilityPrice(g, b));
         let walked = false;
-        for (let n = 0; n < LESSONS_A_DAY; n++) {
-          if (hero.coins - lessonPrice(by.t, hero.skills.get(skill) ?? 0) < reserve) break;
-          if (!walked) { const w = workOf(by.p, by.t.keeper); walkTo(w.name, ...w.at); walked = true; }
+        for (const a of fit) {
+          const no = teachRefusal(g, hero, a, book, log);
+          // A dearer ability waits for the guild's task: the trainer gives it, and a promise kept does it.
+          if (no === 'task' && !book.asked(g.keeper)) { book.assign(g.keeper, hours); say(`${g.name} asks its task`); }
+          if (no || hero.coins - abilityPrice(g, a) < reserve) continue;
+          if (!walked) { walkTo(g.name, ...front(h.b)); walked = true; }
           const before = hero.coins;
-          if (takeLesson(hero, by.t, skill)) break;
+          teach(g, hero, a, book, log);
           paid += before - hero.coins;
-          hours += by.t.hours;
-          taught.push(`${skill} ${Math.floor(hero.skills.get(skill) ?? 0)}`);
-          say(`a lesson in ${skill} from the ${by.t.keeper} for ${before - hero.coins} copper: ${Math.floor(hero.skills.get(skill) ?? 0)}`);
+          hours += g.hours;
+          taught.push(a.name);
+          say(`${g.name} teaches ${a.name} (level ${a.level ?? 1}) for ${before - hero.coins} copper`);
         }
       }
       spent.push(paid);
-      if (shops && e > 0 && !paid && !spent[e - 1]) throw new Broke(`two evenings with nothing bought and no lesson (${hero.coins} copper)`);
+      if (shops && e > 0 && !paid && !spent[e - 1]) throw new Broke(`two evenings with nothing bought and no ability learned (${hero.coins} copper)`);
       // A room for the night, and the next morning's news.
       // A town without an inn (a hamlet): the night at home in the household's barn or by the hearth.
       const innB = buildingOf(town.plan, 'inn');
@@ -538,7 +513,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     if (opts.reckless && !falls) throw new Broke('went down reckless and did not fall');
     const lv = opts.levels;
     if (lv && (hero.level < lv[0] || hero.level > lv[1])) throw new Broke(`ended at level ${hero.level} (${hero.xp} xp), not ${lv[0]}–${lv[1]}`);
-    if (setting.guilds?.length && township.guilds.length && !opened.length) throw new Broke(`opened no skill or rank at a guild house in ${evenings} evenings`);
+    if (setting.guilds?.length && township.guilds.length && !taught.length) throw new Broke(`learned no ability at a guild house in ${evenings} evenings`);
     if (shops && !bought.length) throw new Broke(`bought no upgrade in ${evenings} evenings (${hero.coins} copper left)`);
     if (shops && hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
     // Gate C (C9): the VGM answers every need; none stands overdue longer than OVERDUE_MOST.
@@ -549,9 +524,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, opened, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
 }
 
 /** A point just outside a building's door. */

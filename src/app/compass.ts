@@ -1,8 +1,7 @@
 /**
  * The compass, always on (plan 17.1, D35, D45): a brass ring at the top of the screen that turns with the
  * camera, with no needle: the lubber mark on top shows where the hero looks, and the letters stay upright
- * as the ring turns. A compass needs no skill, so it always points true; the orientation skill only sharpens
- * where the map puts the hero (src/game/orientation.ts). The places marked on the map ride on the rim as glowing studs.
+ * as the ring turns, and it always points true. The places marked on the map ride on the rim as glowing studs.
  * Beside it a tiny orrery: sun and moon turn with the hour, and a cloud, raindrop or snowflake rides along
  * with the weather. Plain DOM (hud.css); every frame only transforms change, and only when they moved.
  */

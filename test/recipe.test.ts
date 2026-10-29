@@ -30,7 +30,7 @@ class TestWorld implements RecipeWorld {
   clear(at: { x: number }): boolean { return this.wall === null || at.x < this.wall; }
 }
 
-const caster = (mana = 50): Caster => ({ stamina: 60, mana, health: 50, maxHealth: 80, skill: () => 20 });
+const caster = (mana = 50): Caster => ({ stamina: 60, mana, health: 50, maxHealth: 80, level: 1, powerOf: () => 20 });
 const foe = (id: number, x: number, z = 0): Mark => ({ id, x, y: 0, z, radius: 0.4, foe: true });
 const here = { x: 0, y: 0, z: 0 };
 const kinds = (ev: readonly RecipeEvent[]) => ev.map((e) => e.kind);
@@ -43,7 +43,7 @@ function run(r: Recipes, t: number, dt = 0.05, speed = 0): RecipeEvent[] {
 }
 
 const bolt: AbilityDef = {
-  id: 'bolt', name: 'Bolt', text: '', skill: 'blades', cost: { mana: 10 }, cooldown: 4, cast: 1.5,
+  id: 'bolt', name: 'Bolt', text: '', cost: { mana: 10 }, cooldown: 4, cast: 1.5,
   ops: [{ op: 'projectile', speed: 20, damage: 10, kind: 'cold', effect: { id: 'chilled', magnitude: 0.4, duration: 3 }, onHit: [{ op: 'area', radius: 2, damage: 4 }] }],
 };
 
@@ -175,10 +175,10 @@ test('recipes: the setting checks every recipe step', () => {
   assert.deepEqual(validateSetting(classic), []);
   const bad: SettingModule = {
     ...classic,
-    abilities: [...classic.abilities, { id: 'broken', name: 'Broken', text: '', cooldown: -1, skill: 'nope', ops: [{ op: 'zone', radius: 0, duration: 1, tick: 2, ops: [{ op: 'effect', to: 'target', effect: { id: 'ghost', magnitude: 1, duration: 1 } }] }] }],
+    abilities: [...classic.abilities, { id: 'broken', name: 'Broken', text: '', cooldown: -1, school: 'nope', ops: [{ op: 'zone', radius: 0, duration: 1, tick: 2, ops: [{ op: 'effect', to: 'target', effect: { id: 'ghost', magnitude: 1, duration: 1 } }] }] }],
   };
   const errors = validateSetting(bad).join('\n');
-  for (const want of ['unknown skill "nope"', 'cooldown', 'zone needs a radius', 'tick within', 'effect "ghost"']) assert.ok(errors.includes(want), errors);
+  for (const want of ['unknown school "nope"', 'cooldown', 'zone needs a radius', 'tick within', 'effect "ghost"']) assert.ok(errors.includes(want), errors);
 });
 
 test('recipes: in a cellar fight, a spell flies at the target and hurts it; second wind needs no target', () => {

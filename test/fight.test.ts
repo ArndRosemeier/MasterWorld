@@ -26,31 +26,37 @@ test('fight: the setting names only things that exist', () => {
   for (const want of ['"rat" defined twice', 'loot "nowhere"']) assert.ok(errors.includes(want), errors);
 });
 
-test('fight: blows land by skill against dodging, armour takes its share, never nothing', () => {
+test('fight: blows land by prowess against defence, armour takes its share, never nothing', () => {
   assert.ok(hitChance(50, 10) > hitChance(10, 50));
   assert.ok(hitChance(0, 100) >= 0.08 && hitChance(100, 0) <= 0.96);
   const rng = new Rng(3);
   let hits = 0, dmg = 0;
   for (let i = 0; i < 2000; i++) {
-    const s = strike({ damage: [4, 8], kind: 'cut', skill: 30 }, { defence: 20, armour: 3 }, rng);
+    const s = strike({ damage: [4, 8], kind: 'cut', prowess: 30 }, { defence: 20, armour: 3 }, rng);
     if (s.outcome !== 'miss') { hits++; dmg += s.damage; assert.ok(s.damage >= 1); }
   }
   assert.ok(Math.abs(hits / 2000 - hitChance(30, 20)) < 0.04, `hit share ${hits / 2000}`);
   assert.ok(dmg / hits > 2 && dmg / hits < 8);
-  const a = strike({ damage: [4, 8], kind: 'cut', skill: 30 }, { defence: 20, armour: 3 }, new Rng(9));
-  assert.deepEqual(a, strike({ damage: [4, 8], kind: 'cut', skill: 30 }, { defence: 20, armour: 3 }, new Rng(9)));
+  const a = strike({ damage: [4, 8], kind: 'cut', prowess: 30 }, { defence: 20, armour: 3 }, new Rng(9));
+  assert.deepEqual(a, strike({ damage: [4, 8], kind: 'cut', prowess: 30 }, { defence: 20, armour: 3 }, new Rng(9)));
   assert.equal(threatOf(2, 15), 'trivial');
   assert.equal(threatOf(15, 15), 'even');
   assert.equal(threatOf(40, 15), 'deadly');
 });
 
-test('fight: a fresh hero is about power 15; nothing rises by use (D54), however long the hero fights', () => {
+test('fight: a fresh hero is about power 15; nothing rises by use (D54, D59), only the level does', () => {
   const h = new Character(classic);
   assert.ok(h.power > 11 && h.power < 19, `power ${h.power}`);
   assert.equal(h.health, h.maxHealth);
-  const hero = new Character(classic), before = JSON.stringify([...hero.skills]);
+  const hero = new Character(classic);
   for (const [i, c] of cellars.slice(0, 4).entries()) fightBot(c, classic, i, hero, 400);
-  assert.equal(JSON.stringify([...hero.skills]), before, 'blows struck, dodged, blocked and taken leave every skill where it was');
+  // Whatever the fights did, the hero's prowess is their level's: there is nothing else to raise.
+  const same = new Character(classic);
+  same.xp = hero.xp;
+  assert.equal(hero.prowess, same.prowess, 'blows struck, dodged, blocked and taken train nothing');
+  assert.ok(hero.xp > 0, 'the fights gave experience');
+  same.xp = classic.growth.xp[1];
+  assert.ok(same.prowess > new Character(classic).prowess, 'a level makes the hero better at everything');
 });
 
 test('fight: finds have rarities by danger, legendary only where it is dangerous', () => {
@@ -74,24 +80,24 @@ test('fight: finds have rarities by danger, legendary only where it is dangerous
   assert.equal(coinText(0), '0 copper');
 });
 
-test('fight: wearing a find raises its skills; a potion heals', () => {
+test('fight: wearing a find raises its qualities; a potion heals', () => {
   const h = new Character(classic);
-  const blade = { def: 'short-sword', rarity: 'rare' as const, name: 'Keen Short sword of the Edge', bonuses: { blades: 6, dodge: 3 } };
-  const before = h.skill('blades');
+  const blade = { def: 'short-sword', rarity: 'rare' as const, name: 'Keen Short sword of the Edge', bonuses: { aim: 6, guard: 3 } };
+  const before = h.aim;
   h.pack.push(blade);
   h.equip(blade);
-  assert.equal(h.skill('blades'), before + 6);
+  assert.equal(h.aim, before + 6);
   assert.ok(h.pack.some((i) => i.def === 'short-sword' && i.rarity === 'common'), 'the old one went into the pack');
   h.health = 10;
   const pot = h.remedy!;
   assert.ok(h.consume(pot) > 0 && h.health > 10);
   const saved = JSON.parse(JSON.stringify(h.save()));
-  assert.equal(new Character(classic, saved).skill('blades'), h.skill('blades'));
+  assert.equal(new Character(classic, saved).aim, h.aim);
   // Taking it off: back into the pack, the bonus gone.
   h.unequip('main');
   assert.equal(h.worn.main, undefined);
   assert.ok(h.pack.includes(blade));
-  assert.equal(h.skill('blades'), before);
+  assert.equal(h.aim, before);
 });
 
 test('fight: creatures can walk from the hatch to every room, along the walls, never through them', () => {
@@ -209,12 +215,12 @@ test('fight: a delve saves who fell and what was taken, and a load finds the sam
   assert.deepEqual(again.fight.bodies.get(victim.id) ?? { items: [], coins: 0 }, loot);
 });
 
-test('fight: every past gives its skills and kit, and a fresh hero of any past is a fair start (power 10-20)', () => {
+test('fight: every past gives its first ability and kit, and a fresh hero of any past is a fair start (power 10-20)', () => {
   for (const bg of classic.backgrounds) {
     const h = new Character(classic);
     h.beginAs(bg);
     assert.equal(h.background, bg.id);
-    for (const s of classic.skills) assert.equal(h.skills.get(s.id), s.start + (bg.skills[s.id] ?? 0));
+    for (const a of bg.abilities) assert.ok(h.knows(a) && h.bar.includes(a), `${bg.id}: ${a}`);
     assert.equal(h.worn.main?.def, bg.kit.worn.main);
     assert.equal(h.pack.length, bg.kit.pack.length);
     assert.equal(h.coins, bg.kit.coins);

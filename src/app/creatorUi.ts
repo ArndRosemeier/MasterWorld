@@ -30,8 +30,8 @@ export interface CreatorHost {
   nameFor(race: string, female: boolean, n: number): string;
   /** The pasts to choose from (the setting's backgrounds), the first chosen at first. */
   readonly backgrounds: readonly BackgroundDef[];
-  /** A skill's and an item's name. */
-  skillName(id: string): string;
+  /** An ability's and an item's name. */
+  abilityName(id: string): string;
   itemName(id: string): string;
   /** Who in town would know a hero with this past ("Borin Ironfoot, the smith"). */
   knownBy(bg: BackgroundDef): string[];
@@ -244,12 +244,12 @@ export class Creator {
 
   /** The Past tab: one card per background, what it gives and who knows you; one is chosen. */
   private pasts(): HTMLElement {
-    const { backgrounds, skillName, itemName, knownBy } = this.host;
+    const { backgrounds, abilityName, itemName, knownBy } = this.host;
     this.past = backgrounds[0]?.id ?? '';
     const list = el('section', { className: 'cr-past', role: 'radiogroup', ariaLabel: 'Your past' });
     list.dataset.section = 'past';
     for (const bg of backgrounds) {
-      const skills = Object.entries(bg.skills).map(([id, n]) => `${skillName(id)} +${n}`).join(' · ');
+      const firsts = bg.abilities.map(abilityName).join(' · ');
       const kit = [...Object.values(bg.kit.worn), ...bg.kit.pack].map(itemName);
       const kitLine = [...new Set(kit)].map((n) => (kit.filter((k) => k === n).length > 1 ? `${n} ×${kit.filter((k) => k === n).length}` : n)).join(', ');
       const known = knownBy(bg);
@@ -260,7 +260,7 @@ export class Creator {
       }, { className: 'cr-bg', type: 'button', role: 'radio' },
       el('strong', { textContent: bg.name }),
       el('span', { className: 'cr-bg-text', textContent: bg.text }),
-      el('span', { className: 'cr-bg-skills', textContent: skills }),
+      el('span', { className: 'cr-bg-abilities', textContent: firsts }),
       el('span', { className: 'cr-bg-kit', textContent: `${kitLine}; ${bg.kit.coins} copper` }),
       ...(known.length ? [el('span', { className: 'cr-bg-known', textContent: `Knows you: ${known.join('; ')}` })] : []));
       card.setAttribute('aria-checked', String(bg.id === this.past));
