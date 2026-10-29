@@ -2,7 +2,7 @@
 
 What gets built, in which order, and when a step counts as done. The design is [masterworld-plan.md](masterworld-plan.md). This file only decides the order and the bar, and it points to the design for everything else.
 
-Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Phase L (the land at every scale) comes next** (Arnd, 2026-10-28), then phase D.
+Status: **2026-10-26.** Written after the first review of the build (milestones 1–4 as first cuts, see the plan's status line). **Gate A passed on 2026-10-26** (review: `/mnt/project-files/masterworld/shots/2026-10-26-8ca069c-webgpu/gate-a-review.md` and the fixes after it). **Gate B passed on 2026-10-27** (review: `/mnt/project-files/masterworld/shots/gateb/gate-b-review.md`, final retake on 01ac13b in `/mnt/project-files/masterworld/shots/gateb-final/`). **Gate C passed on 2026-10-28** (review: `/mnt/project-files/masterworld/shots/gatec/gate-c-review.md`, retake on da14451 in branch `claude/gatec-shots`, `shots/gatec-retake3/`). **Phase C reopened on 2026-10-28** for C13–C15 (Arnd); **the second gate C passed on 2026-10-28** on 0654bdb (review: `/mnt/project-files/masterworld/shots/gatec/gate-c2-review.md`, shots in branch `claude/gatec-shots`, `shots/gatec2b/`). **Gate L passed on 2026-10-29** after one retake (review: `/mnt/project-files/masterworld/shots/gateL/gate-l-review.md`, shots in branch `claude/phaseL-gate-final2`, `shots/gateL-final2/`). Phase D is next, once Arnd has decided on its steps.
 
 ---
 
@@ -139,7 +139,7 @@ This phase moves the ground that everything else stands on. The start moves, so 
 | L6 ✓ | **Real caves** (D57): cave dungeons that are big (caverns tens of metres high, several chambers, ways that climb and drop, water), with mouths in cliff faces and mesa walls as volumes; some caves are sights without dwellers; the B5 cave grows | Test: a cave's main cavern is over 20 m high and its ways over 200 m long; the variety sweep covers it; a GPU shot inside a cavern and of a mouth in a cliff | 5.6, 8, D57 |
 | L7 ✓ | **More landscape kinds** as data (rolling downs, moor with tors, karst, badlands …), each with its landform mix | Test: each kind is found on a long walk; a GPU shot of each | 5.9 |
 
-Gate L: the F1 set adds the mesa valley, a plateau top, a climb, a tor with boulders and a cavern; a walk trace shows a landform at least every minute of walking; F2 and F4 hold; the loop check passes on the new start; the review.
+Gate L (passed 2026-10-29): the F1 set adds the mesa valley, a plateau top, a climb, a tor with boulders and a cavern; a walk trace shows a landform at least every minute of walking; F2 and F4 hold; the loop check passes on the new start; the review.
 
 ### Phase D: Seas (milestone 7)
 
@@ -191,4 +191,8 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | Grass tufts grow through the capital seat's paved court | Seen at the second gate C |
 | One 40–47 ms frame on first walking into the capital (its 2650 people built at once) | Seen at the second gate C; build them over several frames |
 | Talk: the person spoken to may sit behind a barrel or on the ground; "You hold out your map…" narrates the map hand-over | Seen at the second gate C; a standing pose and a shown hand-over (rule 11) |
+| Cavern shape: the big cavern is a flat rectangle with straight wall feet and walls that lean in; dark, the lantern pool weak; thin blue and red streaks at one wall's foot; no water or light shaft yet | Seen at gate L; its size reads from above, but it looks like a hall, not a natural cave (D57). First in line after gate L |
+| Rock looks: tors, climb faces and mesa walls wear the cracked-mud ground texture; mesa walls show vertical comb stripes | Seen at gate L; a rock material of their own would lift all of them |
+| Landscape kinds on foot: badlands read as a sand desert with dunes, moor as khaki grassland, not heather; the start valley floor is rippled desert sand | Seen at gate L; ground textures and plants per kind |
+| Perched brooks (about 12 %); the F1 set stalled on a late page in 2 of 8 runs | Seen at gate L |
 | Barrow nits: straight slab edges close up, a crease where bank meets mound, a yellowish patch at the foot | Seen at gate A after #149 |
