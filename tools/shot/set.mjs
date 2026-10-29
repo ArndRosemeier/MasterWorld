@@ -118,20 +118,20 @@ const SESSIONS = [
   // way up it (climbing is shown: W held at the foot until 8 m up), seen from the free camera beside it.
   { id: 'mesa', query: `${still}&hour=10.5&weather=fair`, shots: [
     { name: 'mesa-valley', act: stand(-22341, 37000, -0.924, 0.383, 0.12) },
-    { name: 'mesa-plateau', act: stand(-25757, 33680, 0.652, -0.758, -0.1) },
-    { name: 'tor', act: stand(-27268, 44392, 0, -1, 0.06, 7) },
+    { name: 'mesa-plateau', act: stand(-24507, 38100, 0.680, 0.733, -0.12) },
+    { name: 'tor', act: stand(-27359, 44413, 0.707, -0.707, 0.05) },
     { name: 'climb', act: async (p) => {
-      const IN = { x: 0.259, z: 0.966 };
-      await stand(-30826, 35266, IN.x, IN.z, 0.1)(p);
+      const IN = { x: -0.94, z: 0.342 };
+      await stand(-28696, 35388, IN.x, IN.z, 0.1)(p);
       await p.waitForTimeout(1500);
       const y0 = await p.evaluate(() => window.game.player.walker.pos.y);
       await p.keyboard.down('KeyW');
       await p.waitForFunction((y0) => { const w = window.game.player.walker; return w.mode === 'climb' && w.pos.y > y0 + 8; }, y0, { timeout: 60000 }).catch(() => console.log('climb: NOT 8 m UP THE FACE'));
       await p.keyboard.up('KeyW');
-      // The free camera 5 m out from the face and 4 m to its side, level with the hero, looking at it (the hero
+      // The free camera 9 m out from the face, 3 m to its side and 2 m below the hero, looking up at it (the hero
       // hangs on where it was left).
       await p.evaluate(([ix, iz]) => {
-        const pl = window.game.player, h = pl.walker.pos, cx = h.x - ix * 5 - iz * 4, cz = h.z - iz * 5 + ix * 4, cy = h.y + 1.2;
+        const pl = window.game.player, h = pl.walker.pos, cx = h.x - ix * 9 - iz * 3, cz = h.z - iz * 9 + ix * 3, cy = h.y - 2;
         pl.flying = true;
         const dx = h.x - cx, dz = h.z - cz, dy = h.y + 1 - cy;
         pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(dy, Math.hypot(dx, dz)) * 180) / Math.PI]);

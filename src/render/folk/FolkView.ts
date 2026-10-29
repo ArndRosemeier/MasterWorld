@@ -42,6 +42,8 @@ const DETAILED = 6;
 const STICK = 4;
 /** People farther than this (m) cast no shadow (in the Crowd level only the body casts one). */
 const SHADOW_RANGE = 35;
+/** The title's fly-over this far (m) from the place it dresses for draws everyone as a plain figure. */
+const ALOFT = 120;
 /** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
 const CLOSE = 40;
 const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3(), BALL = new Sphere();
@@ -299,8 +301,13 @@ export class FolkView {
     for (const [d, s] of ranked) if (s.detailed && d <= edge && keep.size < DETAILED) keep.add(s);
     for (const [, s] of ranked) if (keep.size < DETAILED) keep.add(s);
     for (const [d, s] of ranked) this.detail(s, keep.has(s), s.shadow ? d < SHADOW_RANGE + STICK : d < SHADOW_RANGE);
+    // From the title's fly-over far up, the dressed characters wait unseen (dressed for the dive) and everyone is a
+    // plain figure: thirty skinned characters cost the fly-over some 5 ms (gate L).
+    const aloft = !!this.focus && Math.hypot(c.x - this.focus.x, c.z - this.focus.z, c.y - this.height(this.focus.x, this.focus.z)) > ALOFT;
     for (const s of this.shown.values()) {
       if (!s.ready) continue;
+      s.place.visible = !aloft;
+      if (aloft) continue;
       const a = s.agent!, p = placed.get(a);
       const o = s.place;
       // Agents face `dir` (atan2 in x, z); a character faces +z.
@@ -322,7 +329,7 @@ export class FolkView {
     // The rest (and those whose character is still being dressed) as plain figures.
     const pending = near.filter(([, a]) => !this.shown.get(a)?.ready);
     // (Those in the open building wait for a character: a plain figure stands on the ground, not on its floor.)
-    this.far.place(pending.filter(([, a]) => !placed.has(a)).map(([, a]) => a), this.height);
+    this.far.place((aloft ? near : pending).filter(([, a]) => !placed.has(a)).map(([, a]) => a), this.height);
     // How many of those (or of the room's people), close in view, wait for a character (beyond the characters' count they stay plain).
     let waiting = 0;
     // In a room too (nobody there is a plain figure: the undressed are not drawn at all).
