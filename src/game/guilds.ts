@@ -2,8 +2,8 @@
  * Guild houses (plan 10, D49): where a hero opens a skill and its ranks. Every town of a guild's sizes has
  * its house: a plain house near what the guild names (the smithy, the inn, the edge), whose first grown-up
  * becomes its trainer. A trainer opens a skill at rank 0 and each next rank for coin (D54: nothing rises by
- * use), once the hero's reputation (one for the whole world, game/standing.ts `renown`) is high enough, higher
- * for a dangerous skill; the third rank also asks the guild's task. The task done is a good deed, once. The bard at
+ * use), once the hero's level (D58) is high enough, higher for a dangerous skill; the third rank also asks the
+ * guild's task. The task done is a good deed, once. The bard at
  * the inn knows every house. The same for every town, start town or village. Pure.
  */
 import { hexToRgb } from '@futuremagic/core';
@@ -173,7 +173,7 @@ export class GuildBook {
 }
 
 /** Why a rank was not opened (null: it was). */
-export type RankRefusal = 'not-taught' | 'top' | 'task' | 'renown' | 'coin' | null;
+export type RankRefusal = 'not-taught' | 'top' | 'task' | 'level' | 'coin' | null;
 
 /** The next rank of a skill and what it asks (null: it has none, or the hero has them all). */
 export function nextRank(setting: Pick<SettingModule, 'skillRanks'>, hero: Character, skill: string): { readonly rank: number; readonly def: SkillRankDef } | null {
@@ -187,28 +187,25 @@ export function nextRank(setting: Pick<SettingModule, 'skillRanks'>, hero: Chara
 export const rankPrice = (g: GuildDef, next: { readonly rank: number; readonly def: SkillRankDef }): number =>
   next.rank === 0 && g.openPrice !== undefined ? g.openPrice : next.def.price;
 
-/** The reputation a skill's rank asks (D54): the rank's, and more for a dangerous skill. */
-export function renownFor(setting: Pick<SettingModule, 'skillRanks' | 'skills'>, skill: string, rank: number): number {
-  return (setting.skillRanks?.[rank]?.renown ?? 0) + (skillOf(setting, skill)?.danger ?? 0);
+/** The level a skill's rank asks (D58): the rank's, and more for a dangerous skill. */
+export function levelFor(setting: Pick<SettingModule, 'skillRanks' | 'skills'>, skill: string, rank: number): number {
+  return (setting.skillRanks?.[rank]?.level ?? 1) + (skillOf(setting, skill)?.danger ?? 0);
 }
 
-/**
- * What stands between the hero and a skill's next rank at this guild (null: nothing). `renown`: the hero's
- * reputation (Standing.renown: the same at every trainer, wherever the deeds were done).
- */
-export function rankRefusal(setting: Pick<SettingModule, 'skillRanks' | 'skills'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog, renown: number): RankRefusal {
+/** What stands between the hero and a skill's next rank at this guild (null: nothing). */
+export function rankRefusal(setting: Pick<SettingModule, 'skillRanks' | 'skills'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
   if (!g.skills.includes(skill)) return 'not-taught';
   const next = nextRank(setting, hero, skill);
   if (!next) return 'top';
   if (next.def.task && !book.taskDone(g, log)) return 'task';
-  if (renown < renownFor(setting, skill, next.rank)) return 'renown';
+  if (hero.level < levelFor(setting, skill, next.rank)) return 'level';
   if (hero.coins < rankPrice(g, next)) return 'coin';
   return null;
 }
 
 /** Open a skill's next rank at this guild: the coin goes, lessons may raise the skill to the new rank's top. */
-export function openRank(setting: Pick<SettingModule, 'skillRanks' | 'skills' | 'abilities'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog, renown: number): RankRefusal {
-  const no = rankRefusal(setting, g, hero, skill, book, log, renown);
+export function openRank(setting: Pick<SettingModule, 'skillRanks' | 'skills' | 'abilities'>, g: GuildDef, hero: Character, skill: string, book: GuildBook, log: DecisionLog): RankRefusal {
+  const no = rankRefusal(setting, g, hero, skill, book, log);
   if (no) return no;
   const next = nextRank(setting, hero, skill)!;
   hero.coins -= rankPrice(g, next);
@@ -273,11 +270,11 @@ export function bardTells(setting: Pick<SettingModule, 'bard' | 'skills'>, town:
 
 /**
  * Whether a guild's master speaks of their one deed now (C14): the hero is their student (has opened a skill
- * there), their name is good enough (`renown`), the deed was never asked, and its gift is not the hero's yet.
+ * there), of the level it asks (D58), the deed was never asked, and its gift is not the hero's yet.
  */
-export function questDue(g: GuildDef, hero: Character, renown: number, log: DecisionLog): boolean {
+export function questDue(g: GuildDef, hero: Character, log: DecisionLog): boolean {
   const q = g.quest;
-  return !!q && !questOf(log, g.keeper) && g.skills.some((s) => hero.opened(s)) && renown >= q.renown && !hero.knows(q.reward);
+  return !!q && !questOf(log, g.keeper) && g.skills.some((s) => hero.opened(s)) && hero.level >= q.level && !hero.knows(q.reward);
 }
 
 /** A master's deed done (its place kept): their gift is the hero's now (once). What was given, or null. */

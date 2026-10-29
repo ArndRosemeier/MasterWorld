@@ -4,7 +4,7 @@ import { houseShape, planTown, signPlace } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic';
 import { townsfolk } from '../src/sim/people';
 import { Character } from '../src/game/character';
-import { GuildBook, bardOf, guildHouses, openRank, rankRefusal, staffGuilds, renownFor } from '../src/game/guilds';
+import { GuildBook, bardOf, guildHouses, levelFor, openRank, rankRefusal, staffGuilds } from '../src/game/guilds';
 import { Standing } from '../src/game/standing';
 import { takeLesson } from '../src/game/lessons';
 import type { Decision, DecisionLog } from '../src/world/decisions';
@@ -12,8 +12,8 @@ import type { Decision, DecisionLog } from '../src/world/decisions';
 const arms = classic.guilds!.find((g) => g.keeper === 'master-at-arms')!;
 const lodge = classic.guilds!.find((g) => g.keeper === 'lodge-master')!;
 
-/** The hero's reputation after one promise kept (classic +10), and after a few deeds more. */
-const KIN = 10, KEPT = 25;
+/** A hero raised to `level` (D58). */
+const atLevel = (hero: Character, level: number): Character => { hero.xp = classic.growth.xp[level - 1]; return hero; };
 
 test('guilds: a skill cannot rise before a trainer opens it; then lessons raise it up to its rank', () => {
   const hero = new Character(classic); // the caravan guard: blades open, shields not
@@ -21,9 +21,9 @@ test('guilds: a skill cannot rise before a trainer opens it; then lessons raise 
   assert.equal(hero.rankOf('shields'), -1);
   assert.equal(takeLesson(hero, arms, 'shields'), 'closed', 'no lesson before it is opened');
   hero.coins = 0;
-  assert.equal(openRank(classic, arms, hero, 'shields', book, log, KIN), 'coin');
+  assert.equal(openRank(classic, arms, hero, 'shields', book, log), 'coin');
   hero.coins = 1e6;
-  assert.equal(openRank(classic, arms, hero, 'shields', book, log, KIN), null);
+  assert.equal(openRank(classic, arms, hero, 'shields', book, log), null);
   assert.equal(hero.rankOf('shields'), 0);
   assert.equal(hero.coins, 1e6 - classic.skillRanks![0].price);
   while (!takeLesson(hero, arms, 'shields'));
@@ -31,23 +31,27 @@ test('guilds: a skill cannot rise before a trainer opens it; then lessons raise 
   // Skills open to everyone are open from the start; those no guild teaches have no ranks.
   assert.equal(hero.rankOf('dodge'), 0);
   assert.equal(hero.rankOf('speech'), null);
-  assert.equal(openRank(classic, lodge, hero, 'blades', book, log, KIN), 'not-taught');
+  assert.equal(openRank(classic, lodge, hero, 'blades', book, log), 'not-taught');
 });
 
-test('guilds: a rank needs coin and reputation (more for a dangerous skill), the third the guild\'s task', () => {
+test('guilds: a rank needs coin and a level (more for a dangerous skill), the third the guild\'s task', () => {
   const hero = new Character(classic), book = new GuildBook();
   let log: Decision[] = [];
   hero.coins = 1e6;
-  // The next rank is not a matter of use: a hero nobody has heard of does not get it.
-  assert.equal(rankRefusal(classic, arms, hero, 'blades', book, log, 5), 'renown');
-  assert.equal(renownFor(classic, 'blades', 1), classic.skillRanks![1].renown);
-  assert.equal(openRank(classic, arms, hero, 'blades', book, log, KIN), null);
+  // The next rank is not a matter of use: a fresh hero (level 1) does not get it (D58).
+  assert.equal(rankRefusal(classic, arms, hero, 'blades', book, log), 'level');
+  assert.equal(levelFor(classic, 'blades', 1), classic.skillRanks![1].level);
+  atLevel(hero, levelFor(classic, 'blades', 1));
+  assert.equal(openRank(classic, arms, hero, 'blades', book, log), null);
   assert.equal(hero.rankOf('blades'), 1);
-  assert.equal(rankRefusal(classic, arms, hero, 'blades', book, log, KEPT), 'task');
-  // A dangerous skill asks more: stealth's opening already wants a name.
+  atLevel(hero, 10);
+  assert.equal(rankRefusal(classic, arms, hero, 'blades', book, log), 'task');
+  // A dangerous skill asks more: stealth's opening already wants a level above the first.
   const quiet = classic.guilds!.find((g) => g.keeper === 'locksmith')!;
-  assert.ok(renownFor(classic, 'stealth', 0) > 0);
-  assert.equal(rankRefusal(classic, quiet, hero, 'stealth', book, log, 0), 'renown');
+  assert.ok(levelFor(classic, 'stealth', 0) > 1);
+  const green = new Character(classic);
+  green.coins = 1e6;
+  assert.equal(rankRefusal(classic, quiet, green, 'stealth', book, log), 'level');
   // The task: a place cleared after the trainer asked.
   const place: Decision = { kind: 'dungeon', id: 'cellar-1', template: 'cellar', town: 'town-1', building: 3, seed: 1, setPiece: 'x' };
   log = [place, { kind: 'kept', id: 'kept-1', promise: 'cellar-1', at: 5 }];
@@ -60,7 +64,7 @@ test('guilds: a rank needs coin and reputation (more for a dangerous skill), the
   // The Lodge asks for a place out on the land: a cellar does not count.
   book.assign('lodge-master', 10);
   assert.equal(book.taskDone(lodge, log), false);
-  assert.equal(openRank(classic, arms, hero, 'blades', book, log, KEPT), null);
+  assert.equal(openRank(classic, arms, hero, 'blades', book, log), null);
   // Thanks for the task come once (a deed counts once, D54), and a save keeps that.
   assert.equal(book.thank(arms, log), true);
   assert.equal(book.thank(arms, log), false);
@@ -75,21 +79,19 @@ test('guilds: a rank needs coin and reputation (more for a dangerous skill), the
   assert.equal(new Character(classic, old).skills.get('axes'), 30);
 });
 
-test('guilds: repeating a deed adds nothing; the reputation is one for the whole world', () => {
+test('guilds: repeating a deed adds nothing, to standing or experience', () => {
   const standing = new Standing(classic, 'human'), log: DecisionLog = [];
   const book = new GuildBook();
   book.assign('master-at-arms', 0);
   const done: DecisionLog = [{ kind: 'dungeon', id: 'c', template: 'cellar', town: 't', building: 1, seed: 1, setPiece: 'x' }, { kind: 'kept', id: 'k', promise: 'c', at: 1 }];
-  for (let i = 0; i < 5; i++) if (book.thank(arms, done)) standing.deed(`task:${arms.keeper}`, 'human', classic.standing.task);
-  for (let i = 0; i < 5; i++) standing.deed(`task:${arms.keeper}`, 'human', classic.standing.task);
-  assert.equal(standing.renown, classic.standing.task, 'the task counted once');
+  const hero = new Character(classic);
+  for (let i = 0; i < 5; i++) if (book.thank(arms, done)) { standing.deed(`task:${arms.keeper}`, 'human', classic.standing.task); hero.earn(`task:${arms.keeper}`, 'task'); }
+  for (let i = 0; i < 5; i++) { standing.deed(`task:${arms.keeper}`, 'human', classic.standing.task); hero.earn(`task:${arms.keeper}`, 'task'); }
+  assert.equal(hero.xp, classic.growth.deeds.task, 'the task counted once');
   assert.equal(standing.value('human'), classic.peoples.find((p) => p.id === 'human')!.kin + classic.standing.task);
   assert.equal(book.thank(arms, log), false);
-  // Deeds for other peoples, far apart, raise the same name: every trainer reads it.
+  assert.equal(new Character(classic, JSON.parse(JSON.stringify(hero.save()))).earn(`task:${arms.keeper}`, 'task'), 0, 'a save keeps the deeds counted');
   standing.keptFor('dwarf', 'cave-1');
-  standing.deed('tend:traveller-1', 'elf', classic.standing.help);
-  assert.equal(standing.renown, classic.standing.task + classic.standing.kept + classic.standing.help);
-  assert.equal(new Standing(classic, 'human', JSON.parse(JSON.stringify(standing.save()))).renown, standing.renown, 'a save keeps it');
   assert.deepEqual(new Standing(classic, 'human', JSON.parse(JSON.stringify(standing.save()))).keptFor('dwarf', 'cave-1'), [], 'and the deeds done');
 });
 

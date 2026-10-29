@@ -11,7 +11,7 @@
  * also teaches spells: a row each, with its school's level and price, learned on a click.
  */
 import { skillOf, type AbilityDef, type GuildDef, type SettingModule, type TrainerDef } from '../setting/contract';
-import { isGuild, learnSpell, nextRank, openRank, questDue, rankPrice, rankRefusal, spellPrice, spellRefusal, spellsOf, renownFor, type GuildBook, type RankRefusal, type SpellRefusal } from '../game/guilds';
+import { isGuild, learnSpell, nextRank, openRank, questDue, rankPrice, rankRefusal, spellPrice, spellRefusal, spellsOf, levelFor, type GuildBook, type RankRefusal, type SpellRefusal } from '../game/guilds';
 import type { Standing } from '../game/standing';
 import type { DecisionLog } from '../world/decisions';
 import type { Character } from '../game/character';
@@ -30,7 +30,7 @@ export interface LessonsHost extends WindowHost {
   readonly book: GuildBook;
   log(): DecisionLog;
   hours(): number;
-  /** The hero's standing: a trainer opens ranks by the hero's reputation (`renown`, D54), the same everywhere. */
+  /** The hero's standing with the peoples (a guild's task done is a good deed with the trainer's). */
   readonly standing: Standing;
   /** A master speaks of their one deed (C14): the VGM makes its place; what it is called, or null if none fits. */
   quest(g: GuildDef): string | null;
@@ -55,12 +55,13 @@ export class LessonsUi extends BodyWindow {
     this.t = t;
     this.who = who;
     this.said = `“${t.line}”`;
-    // The guild's task done: thanked for once, a good deed (D54): the hero's name grows, and the trainer's people think better of them.
+    // The guild's task done: thanked for once, a good deed (D54) and experience (D58); the trainer's people think better of the hero.
     const h = this.lessonsHost;
     if (this.guild && h.book.thank(this.guild, h.log())) {
       h.standing.deed(`task:${this.guild.keeper}`, people, this.setting.standing.task);
+      this.hero.earn(`task:${this.guild.keeper}`, 'task');
       this.said = `“${this.guild.task.done}”`;
-    } else if (this.guild?.quest && questDue(this.guild, this.hero, h.standing.renown, h.log())) {
+    } else if (this.guild?.quest && questDue(this.guild, this.hero, h.log())) {
       // A student they trust now: the master speaks of the deed for what no trainer sells (C14).
       const place = h.quest(this.guild);
       if (place) this.said = `“${fill(this.guild.quest.ask, { place })}”`;
@@ -77,7 +78,7 @@ export class LessonsUi extends BodyWindow {
     const rows = lessonsFor(this.setting, t, this.hero).map((l) => this.lessonRow(t, l));
     const g = this.guild, h = this.lessonsHost;
     const hint = g
-      ? `${g.name}: a skill opened here grows by lessons up to its rank. A lesson is one point and ${t.hours === 1 ? 'an hour' : `${t.hours} hours`}; at a rank's top the next can be opened once your name is good enough: every good deed, anywhere, adds to it.`
+      ? `${g.name}: a skill opened here grows by lessons up to its rank. A lesson is one point and ${t.hours === 1 ? 'an hour' : `${t.hours} hours`}; at a rank's top the next can be opened once you have grown enough: every rank asks a level.`
       : `A lesson is one point of a skill and ${t.hours === 1 ? 'an hour' : `${t.hours} hours`}. The higher the skill, the dearer the lesson; past ${t.upTo} this teacher knows no more.`;
     const foot: Node[] = [el('span', { className: 'purse', textContent: `Your purse: ${coinText(this.hero.coins)}` })];
     if (g && !h.book.asked(g.keeper)) {
@@ -85,7 +86,7 @@ export class LessonsUi extends BodyWindow {
       ask.addEventListener('click', () => { h.book.assign(g.keeper, h.hours()); this.said = `“${g.task.ask}”`; this.opened(); });
       foot.push(ask);
     }
-    if (g) foot.push(el('span', { className: 'standing', textContent: `Your name: ${h.standing.renown}${h.book.asked(g.keeper) ? (h.book.taskDone(g, h.log()) ? ' · task done' : ' · task open') : ''}` }));
+    if (g) foot.push(el('span', { className: 'standing', textContent: `Your level: ${this.hero.level}${h.book.asked(g.keeper) ? (h.book.taskDone(g, h.log()) ? ' · task done' : ' · task open') : ''}` }));
     this.fill([
       el('p', { className: 'says', textContent: this.said }),
       el('div', { className: 'rules' }, ...rows),
@@ -112,9 +113,9 @@ export class LessonsUi extends BodyWindow {
 
   /** A skill not opened, or at the top of its rank: what opening the next rank costs and needs. */
   private rankRow(g: GuildDef, l: Lesson, rank: number, price: number): HTMLElement {
-    const h = this.lessonsHost, no = rankRefusal(this.setting, g, this.hero, l.skill, h.book, h.log(), h.standing.renown);
+    const h = this.lessonsHost, no = rankRefusal(this.setting, g, this.hero, l.skill, h.book, h.log());
     const what = rank === 0 ? 'open' : `rank ${rank}`;
-    const label = no === 'task' ? 'the task first' : no === 'renown' ? `name ${renownFor(this.setting, l.skill, rank)}` : `${what}: ${coinText(price)}`;
+    const label = no === 'task' ? 'the task first' : no === 'level' ? `level ${levelFor(this.setting, l.skill, rank)}` : `${what}: ${coinText(price)}`;
     const rule = el('div', { className: 'rule' }, el('i', { className: 'line' }), el('i', { className: 'cap' }));
     rule.style.setProperty('--v', String(Math.min(1, l.level / 100)));
     rule.style.setProperty('--cap', String(this.hero.capOf(l.skill) / 100));
@@ -156,11 +157,11 @@ export class LessonsUi extends BodyWindow {
 
   /** Open a skill or its next rank at this guild house (by click, or from the console). */
   open(g: GuildDef, l: Pick<Lesson, 'skill' | 'name'>): RankRefusal {
-    const h = this.lessonsHost, no = openRank(this.setting, g, this.hero, l.skill, h.book, h.log(), h.standing.renown);
+    const h = this.lessonsHost, no = openRank(this.setting, g, this.hero, l.skill, h.book, h.log());
     const skill = l.name.toLowerCase();
     this.said = no === null ? `“${fill(g.opens, { skill })}”`
       : no === 'task' ? `“${h.book.asked(g.keeper) ? 'Your task first. You know what I asked.' : g.task.ask}”`
-      : no === 'renown' ? `“${fill(g.distrust, { skill })}”`
+      : no === 'level' ? `“${fill(g.distrust, { skill })}”`
       : no === 'coin' ? '“Come back when your purse is heavier.”'
       : no === 'top' ? '“There is nothing higher I can open for you.”' : `“I do not teach ${skill}.”`;
     if (no === 'task') h.book.assign(g.keeper, h.hours());

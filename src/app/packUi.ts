@@ -8,6 +8,7 @@
 import { SLOTS, type SettingModule, type Slot } from '../setting/contract';
 import type { Character } from '../game/character';
 import { coinText, defOf } from '../game/items';
+import { topLevel } from '../game/growth';
 import { el } from './dom';
 import { itemCard } from './itemCard';
 import { BodyWindow, type WindowHost } from './window';
@@ -81,6 +82,7 @@ export class PackUi extends BodyWindow {
       el('p', { className: 'hint', textContent: 'Click something carried to put it on, drink, eat or read it; click something worn to take it off.' }),
       el('h3', { textContent: 'Skills' }), el('div', { className: 'skills' }, ...skills)],
     [
+      el('span', { textContent: `Level ${h.level}${h.level < topLevel(this.setting.growth) ? ` · ${Math.floor(h.xp)} / ${this.setting.growth.xp[h.level]} experience` : ''}` }),
       el('span', { textContent: `Health ${Math.ceil(h.health)} / ${h.maxHealth} · Stamina ${Math.ceil(h.stamina)} / ${h.maxStamina}` }),
       el('span', { textContent: `${coinText(h.coins)} · ${h.carried.toFixed(1)} kg` })]);
   }

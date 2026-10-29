@@ -42,7 +42,7 @@ import { WINDOWS } from './render/materials/building';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg } from '@futuremagic/settlement';
-import { abilityOf, skillOf, validateSetting, type BackgroundDef, type SituationKind } from './setting/contract';
+import { abilityOf, skillOf, validateSetting, type BackgroundDef, type GrowthSource, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -111,6 +111,7 @@ import { CLIMB_COST, Character, fallHurt } from './game/character';
 import { itemWorth } from './game/trade';
 import { teacherOf } from './game/lessons';
 import { bardTells, GuildBook, isGuild, questGift, whereOf } from './game/guilds';
+import { carryRenown } from './game/growth';
 import { coinText, uniqueItem } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
@@ -444,6 +445,8 @@ export async function start(b: Boot): Promise<void> {
     if (params.wear) Object.entries(character.worn).forEach(([slot, it], i) => { if (it) character.worn[slot as keyof typeof character.worn] = { ...it, wear: params.wear * Math.max(0.3, 1 - i * 0.25) }; });
     // How each people stands with the hero (plan 11.6): their own kin start higher.
     const standing = new Standing(setting, save?.looks?.look.race ?? hero.look.race ?? 'human', save?.standing);
+    // A save from before levels (D58): the old reputation becomes experience.
+    carryRenown(character, save?.character, save?.standing);
     // The hero's dealings with the guild houses (D49): which gave their task, and when.
     const guildBook = new GuildBook(save?.guilds);
     const armHero = () => hero.arm(character.worn.main?.def ?? null, character.worn.off?.def ?? null);
@@ -869,8 +872,9 @@ export async function start(b: Boot): Promise<void> {
     const eventEnded = (ev: EventDecision): void => {
       for (const id of [ev.town, ev.held]) if (id) towns?.get(id)?.ended(ev.id);
     };
-    /** A good deed for a town's people (D54, once by `key`): how they take it is said, as for a promise kept. */
-    const deedFor = (key: string, t: Township | null | undefined, by: number, told = false): void => {
+    /** A good deed for a town's people (D54, once by `key`): how they take it is said, as for a promise kept; it gives experience (D58). */
+    const deedFor = (key: string, t: Township | null | undefined, by: number, source: GrowthSource, told = false): void => {
+      character.earn(key, source);
       const people = t ? peopleOf(t.residents) : null;
       const own = people ? standing.deed(key, people, by, told).find((c) => c.people.id === people) : undefined;
       if (own) notes.say(changeLine(own), 5);
@@ -885,7 +889,7 @@ export async function start(b: Boot): Promise<void> {
         journal.fulfil(id);
         eventEnded(ev);
         // A good deed (D54): the town freed of the band (a held place's own folk most) thinks better of the hero.
-        deedFor(`band:${id}`, towns?.get(ev.held ?? ev.town), setting.standing.kept, true);
+        deedFor(`band:${id}`, towns?.get(ev.held ?? ev.town), setting.standing.kept, 'band', true);
         director.met('purpose');
         const told = eventTold(setting, log, terrain.towns, ev);
         if (told) director.queue(told.done, 2);
@@ -895,9 +899,11 @@ export async function start(b: Boot): Promise<void> {
       if (ev?.kind === 'wild' && ev.situation) {
         const k = keepPromise(log, id, hours());
         if (k) log = [...log, k];
-        deedFor(`wolves:${id}`, towns?.get(ev.town), setting.standing.help);
+        deedFor(`wolves:${id}`, towns?.get(ev.town), setting.standing.help, 'help');
         return true;
       }
+      // A place cleared is experience (D58), once; telling its household is more.
+      character.earn(`cleared:${id}`, 'cleared');
       const t = townOfPromise(id);
       if (!t || !t.talk.clear(id)) return true;
       const words = t.talk, to = words.reportTo(id)[0], p = t.residents.find((x) => x.id === to);
@@ -916,6 +922,7 @@ export async function start(b: Boot): Promise<void> {
       journal.fulfil(id);
       director.met('purpose');
       const who = householdOf(log, id, t.residents);
+      character.earn(`kept:${id}`, 'kept');
       const own = who ? standing.keptFor(who.race, id).find((c) => c.people.id === who.race) : undefined;
       if (own) notes.say(changeLine(own), 5);
       vgmStep({ tools: ['promise'] });
@@ -952,6 +959,7 @@ export async function start(b: Boot): Promise<void> {
         const kept = keepPromise(log, d.id, hours());
         if (kept) log = [...log, kept];
         director.met('people');
+        character.earn(`tend:${d.id}`, 'help');
         const own = standing.deed(`tend:${d.id}`, a.person.race, setting.standing.help).find((c) => c.people.id === a.person.race);
         if (own) notes.say(changeLine(own), 5);
       }, { x: a.x + dx * k, z: a.z + dz * k }, { busy: TEND_FOR, ground: (x, z) => terrain.height(x, z), up: () => { if (player.puppet === kneel) player.puppet = null; } });
@@ -1794,7 +1802,11 @@ export async function start(b: Boot): Promise<void> {
               sounds?.coins();
               director.met('reward');
             } else director.met('discovery');
-          } else if (came) director.met('discovery', 0.5);
+            character.earn(`sight:${came.id}`, 'sight');
+          } else if (came) {
+            director.met('discovery', 0.5);
+            character.earn(`place:${came.id}`, 'place');
+          }
         }
         // A situation's cry (C10): once the hero is near enough to see what it is about, someone there calls out.
         part('cries');
@@ -1831,7 +1843,7 @@ export async function start(b: Boot): Promise<void> {
       if (!visit()) rooms?.update(dt);
       if (rooms?.door) cellars.nearHouse(rooms.door.town.id, rooms.door.b.id);
       // Talk follows the hero from town to town (a talk going on stays where it is).
-      { const t = here(); if (t) { if (!t.been) director.met('discovery'); t.been = true; if (talk) talk.place = t; } }
+      { const t = here(); if (t) { if (!t.been) director.met('discovery'); character.earn(`town:${t.town.decision.id}`, 'town'); t.been = true; if (talk) talk.place = t; } }
       talk?.watch();
       // The key for what the hero stands by (a hatch, the ladder up): only the key and the deed, the climb is seen.
       { const o = playing && open === 0 && !ended ? climbs.climbOffered : null; usePrompt.keyFor(settings.current.bindings.use[0], o === 'down' ? 'Climb down' : o === 'up' ? 'Climb up' : null); }

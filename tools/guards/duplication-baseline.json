@@ -208,10 +208,6 @@
     "reason": "Both supply TownTalk.services (talk/townTalk.ts) with their own topics: a people's hold and gifts, rooms and mending."
   },
   {
-    "key": "same name: masterworld/game/character.ts#save + masterworld/game/standing.ts#save",
-    "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
-  },
-  {
     "key": "same name: masterworld/game/standing.ts#save + masterworld/game/trade.ts#save",
     "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
   },
@@ -570,5 +566,13 @@
   {
     "key": "idiom: [.some .towns] in masterworld/game/horse.ts + masterworld/vgm/answers.ts + masterworld/vgm/roads.ts",
     "reason": "Asking whether any town holds a point, each a different question (on its streets, in its fields, against its walls); towns.some is the language idiom, not a copied helper."
+  },
+  {
+    "key": "same name: masterworld/game/character.ts#learn + masterworld/main.ts#learn",
+    "reason": "The debug menu's learn toggle (main.ts) calls Character.learnToUse/forget and redraws; only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/character.ts#level + masterworld/game/knownLand.ts#level",
+    "reason": "The hero's level (D58) and how well a map cell is known; unrelated, only the word matches."
   }
 ]

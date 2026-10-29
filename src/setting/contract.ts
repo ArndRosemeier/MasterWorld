@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 12;
+export const CONTRACT_VERSION = 13;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -395,7 +395,7 @@ export interface SkillDef {
   /** Where a fresh character starts (0..100). */
   readonly start: number;
   /**
-   * A dangerous skill (fire, shadow, stealth; D54): the reputation it asks on top of
+   * A dangerous skill (fire, shadow, stealth; D54, D58): the levels it asks on top of
    * each rank's, the opening too. None: as any other.
    */
   readonly danger?: number;
@@ -895,8 +895,8 @@ export interface TrainerDef {
 
 /**
  * A skill's ranks (D49, D54): how far lessons may raise it once a guild's trainer has opened that rank. Rank
- * 0 is the opening. Each rank is paid in coin, and may ask the guild's task done and the hero's reputation (one
- * for the whole world, raised by good deeds; more for a dangerous skill: SkillDef.danger). Nothing rises by use.
+ * 0 is the opening. Each rank is paid in coin, and may ask the guild's task done and a level of the hero (D58;
+ * more for a dangerous skill: SkillDef.danger). Nothing rises by use.
  */
 export interface SkillRankDef {
   /** The highest the skill rises at this rank. */
@@ -905,8 +905,8 @@ export interface SkillRankDef {
   readonly price: number;
   /** The guild's task must be done first. */
   readonly task?: boolean;
-  /** The reputation needed (0..100, game/standing.ts `renown`). */
-  readonly renown?: number;
+  /** The hero's level needed (D58; absent: any). */
+  readonly level?: number;
 }
 
 /** A guild's task for a higher rank: clear a place (below a house, or out on the land with `out`). */
@@ -928,8 +928,8 @@ export interface GuildQuestDef {
   readonly reward: string;
   /** The dungeon kinds the place may be, tried in this order (each a lead's kind). */
   readonly kinds: readonly string[];
-  /** The hero's reputation before the master speaks of it (0..100). */
-  readonly renown: number;
+  /** The hero's level before the master speaks of it (D58). */
+  readonly level: number;
   /** What the master says of it (`{place}`: what the place is called, "the old tower north of the town"). */
   readonly ask: string;
   /** What the master says when told it is done, and gives the reward. */
@@ -961,7 +961,7 @@ export interface GuildDef extends TrainerDef {
   readonly dress?: 'fighter' | 'traveller';
   /** The colour of the round shield over its door ('#rrggbb'; none: no sign, as for a hidden house). */
   readonly sign?: string;
-  /** What the trainer says on opening a skill or a rank, and when they do not trust the hero enough for it yet (`{skill}`). */
+  /** What the trainer says on opening a skill or a rank, and when the hero is not of the level for it yet (`{skill}`). */
   readonly opens: string;
   readonly distrust: string;
   readonly task: GuildTaskDef;
@@ -1330,6 +1330,28 @@ export interface HoldDef {
   readonly lead: string;
 }
 
+/** What earns experience (D58): a fight is weighed by danger; the rest count once each. */
+export const GROWTH_SOURCES = ['cleared', 'kept', 'band', 'task', 'help', 'town', 'place', 'sight', 'read', 'learn'] as const;
+export type GrowthSource = (typeof GROWTH_SOURCES)[number];
+
+/**
+ * Levels and experience (D58): everything the hero does counts towards the next level. A foe's experience is
+ * weighed by its danger against the danger a hero of their level meets as an even fight, so foes the hero has
+ * outgrown give next to nothing; deeds and discoveries count once each.
+ */
+export interface GrowthDef {
+  /** Experience to reach each level: `xp[0]` is level 1 (0), the last the highest level. */
+  readonly xp: readonly number[];
+  /** What each level above the first adds. */
+  readonly perLevel: { readonly health: number; readonly stamina: number; readonly mana: number };
+  /** The foe danger that is an even fight at level 1, and how much more at each level above. */
+  readonly even: { readonly base: number; readonly step: number };
+  /** Experience per point of a foe's danger, met as an even fight. */
+  readonly fight: number;
+  /** Experience for each deed or discovery, once each. */
+  readonly deeds: Readonly<Record<GrowthSource, number>>;
+}
+
 /**
  * What changes the hero's standing (plan 11.6, D54): every good deed, once. A promise kept for one of a
  * people's households, or a town freed of a story event's band (`kept`; the other peoples in town hear of it
@@ -1366,6 +1388,8 @@ export interface SettingModule {
   /** The peoples as factions (plan 11.6, D34), and what changes the hero's standing with them. */
   readonly peoples: readonly PeopleDef[];
   readonly standing: StandingDef;
+  /** Levels and experience (D58). */
+  readonly growth: GrowthDef;
   readonly talk: TalkDef;
   readonly skills: readonly SkillDef[];
   readonly creatures: readonly CreatureDef[];
@@ -1571,6 +1595,10 @@ function validatePeoples(m: SettingModule, where: string): string[] {
   if (!(s.prices[0] > 1 && s.prices[1] > 0 && s.prices[1] < 1)) out.push(`${where}: standing.prices must be above 1 when hated and below 1 when honoured`);
   if (!(s.gift.price > 0 && s.gift.raise > 0)) out.push(`${where}: standing.gift needs a price and a raise`);
   if (!(s.kept > 0 && s.task > 0 && s.help > 0)) out.push(`${where}: standing.kept, task and help must raise standing`);
+  const g = m.growth;
+  if (!(g.xp.length >= 2 && g.xp[0] === 0 && g.xp.every((x, i) => i === 0 || x > g.xp[i - 1]))) out.push(`${where}: growth.xp must start at 0 and rise`);
+  if (!(g.even.base > 0 && g.even.step > 0 && g.fight > 0)) out.push(`${where}: growth.even and growth.fight must be above 0`);
+  for (const k of GROWTH_SOURCES) if (!(g.deeds[k] > 0)) out.push(`${where}: growth.deeds.${k} must give experience`);
   return out;
 }
 

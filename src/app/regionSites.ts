@@ -111,15 +111,15 @@ export class RegionSites {
 
   /**
    * The place the hero at (x, z) has just come upon for the first time (Discovery, C9): a sight with its
-   * words and decision, or a region's place (`sight` null); null if none.
+   * words and decision, or a region's place (`sight` null); null if none. `id`: the place, for its experience (D58).
    */
-  cameUpon(x: number, z: number): { readonly sight: SightDef | null; readonly decision?: SightDecision } | null {
+  cameUpon(x: number, z: number): { readonly id: string; readonly sight: SightDef | null; readonly decision?: SightDecision } | null {
     for (const s of this.sites) {
       if (s.found || Math.hypot(s.at.x - x, s.at.z - z) > s.at.r + CAME_UPON) continue;
       s.found = true;
       const sight = s.sight;
       s.sight = null;
-      return { sight, decision: s.decision };
+      return { id: s.label, sight, decision: s.decision };
     }
     return null;
   }
