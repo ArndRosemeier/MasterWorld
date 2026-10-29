@@ -32,9 +32,31 @@ test('hydro: lakes lie flat and are a small share of the land', () => {
     if (Number.isNaN(lake[c])) continue;
     lakes++;
     for (const nb of [c + 1, c + n]) if (!Number.isNaN(lake[nb])) assert.equal(lake[nb], lake[c]);
-    assert.ok(lake[c] > elev[c]);
   }
   assert.ok(lakes / land < 0.1, `${lakes} of ${land}`);
+});
+
+test('hydro: a lake lies in the land, at the height where it runs out over its rim (W3)', () => {
+  const t = terrain, tl = t.hydro.tileAt(-32000, 32000), sk = t.skeleton;
+  assert.ok(tl.lakes.length > 3, `${tl.lakes.length} lakes`);
+  for (const l of tl.lakes.slice(0, 6)) {
+    // It runs out at its crest: the land there is at its level, and lower just beyond.
+    assert.ok(Math.abs(sk.elevation(l.crest[0], l.crest[1]) - l.level) < 0.01, 'crest at the level');
+    assert.ok(sk.elevation(l.spill[0], l.spill[1]) < l.level, 'lower beyond the crest');
+    assert.ok(l.depth >= 4);
+    // Nowhere does its water stand beside dry ground lower than it (it would hang in the air there).
+    const [x0, z0, x1, z1] = l.box;
+    let wet = 0;
+    for (let z = z0; z < z1; z += 25) for (let x = x0; x < x1; x += 25) {
+      if (Number.isNaN(t.hydro.lakeLevel(x, z)) || t.height(x, z) >= l.level) continue;
+      wet++;
+      for (const [dx, dz] of [[25, 0], [-25, 0], [0, 25], [0, -25]]) {
+        const nx = x + dx, nz = z + dz;
+        if (Number.isNaN(t.hydro.lakeLevel(nx, nz))) assert.ok(t.height(nx, nz) > l.level - 0.5 || t.hydro.query(nx, nz).river, `dry ground below the lake at ${nx},${nz}`);
+      }
+    }
+    assert.ok(wet > 0, 'the lake shows');
+  }
 });
 
 test('hydro: the same seed gives the same rivers', () => {

@@ -132,8 +132,8 @@
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the card entrances are shared in KeyWindow.entrances."
   },
   {
-    "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/hydro.ts",
-    "reason": "The MinHeap's pop loop (@futuremagic/core) in three different searches: A* over the town's street graph, the priority flood of a tile's water, and A* over 1 m walk cells in the loop check. The heap is shared; the searches are not the same."
+    "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/hydro.ts + masterworld/world/lakes.ts",
+    "reason": "The MinHeap's pop loop (@futuremagic/core) in four different searches: A* over the town's street graph, the priority flood of a tile's water, a lake's inside-out flood (W3), and A* over 1 m walk cells in the loop check. The heap is shared; the searches are not the same."
   },
   {
     "key": "same name: masterworld/game/evening.ts#floor + masterworld/world/dungeon/space.ts#floor",
@@ -554,5 +554,17 @@
   {
     "key": "idiom: [.seed .terrain] in masterworld/app/regionSites.ts + masterworld/vgm/caves.ts + masterworld/vgm/events.ts",
     "reason": "Reading the world's seed and terrain off a context object is how every VGM tool starts, not a copied helper; the cave tool (L6) was the third."
+  },
+  {
+    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/holdRock.ts",
+    "reason": "Rock beds and faces shaped by fbm3 noise: one line of shaping in each rock field, with its own scales and amplitudes (the finder pairs them anew as other files change)."
+  },
+  {
+    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/holdRock.ts + masterworld/world/volumes.ts",
+    "reason": "Rock beds and faces shaped by fbm3 noise: one line of shaping in each rock field, with its own scales and amplitudes (the finder pairs them anew as other files change)."
+  },
+  {
+    "key": "idiom: [.weighted] in masterworld/app/title/draw.ts + masterworld/vgm/answers.ts + masterworld/world/landforms.ts",
+    "reason": "The seeded weighted pick (@futuremagic/core) in three unrelated choices: the title's scenery, the VGM's answer to a need, and a cell's landform. The pick is shared; the choices are not."
   }
 ]

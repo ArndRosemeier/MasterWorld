@@ -11,6 +11,7 @@
  */
 import { MinHeap, Noise, clamp, deriveSeed, hash2f, lerp, smoothstep } from '@futuremagic/core';
 import type { Skeleton } from './skeleton';
+import { floodLake, type Lake } from './lakes';
 
 export interface HydroOptions {
   /** Coarse cell side, metres. */
@@ -45,6 +46,11 @@ const LAKE_MAX_CELLS = 100;
 /** Single-cell pits are noise; of the rest, this share are lakes (the skeleton is far more pitted than eroded land). */
 const LAKE_MIN_CELLS = 2;
 const LAKE_SHARE = 0.35;
+/** A basin's lowest cells the lake is poured into (W3), and the spacing (m) its lowest point is looked for at in each. */
+const LAKE_STARTS = 2;
+const LAKE_LOOK = 250;
+/** Cells past a tile's core whose lakes it still finds. */
+const LAKE_FAR = 16;
 /**
  * A hollow that holds no lake is resolved the way erosion would (phase W, W2): partly filled with sediment to a flat
  * floor, partly breached by its outflow, at the level where the two together move the least earth. Below this depth
@@ -256,8 +262,11 @@ export class HydroTile {
   readonly recv: Int32Array;
   /** Catchment in cells. */
   readonly acc: Float32Array;
-  /** Lake level per cell (NaN: no lake). */
+  /** Lake level per cell the rivers' drainage filled (NaN: no lake). */
   readonly lake: Float32Array;
+  /** The lakes as the land holds them (W3), and per cell the one whose water or shore may lie in it (-1: none). */
+  readonly lakes: Lake[] = [];
+  private lakeOf: Int32Array = new Int32Array(0);
   /** The level a hollow's sediment floor fills this cell to (NaN: none; W2). */
   readonly plain: Float32Array;
   readonly rivers: River[] = [];
@@ -326,6 +335,7 @@ export class HydroTile {
     if (!feed) {
       for (let c = 0; c < N; c++) if (E[c] > 0 && F[c] - E[c] > LAKE_MIN) lake[c] = F[c];
       this.flattenLakes(DI, DJ);
+      this.findLakes(DI, DJ);
     }
     this.plain = new Float32Array(N).fill(NaN);
     this.resolveHollows(DI, DJ);
@@ -395,6 +405,54 @@ export class HydroTile {
     take(k, (1 - fu) * (1 - fv)); take(k + 1, fu * (1 - fv)); take(k + n, (1 - fu) * fv); take(k + n + 1, fu * fv);
     if (w <= 0) return h;
     return h + w * Math.max(0, sum / w - h);
+  }
+
+  /**
+   * Each basin the drainage filled (W3) only says where a lake may lie: on 2 km cells its rim's gaps are missed and its
+   * water is squares. The lake itself is found on the land: water poured in at the basin's lowest points rises until it
+   * runs out over the rim (`floodLake`); the biggest of those is the lake, at that level. A basin whose water runs out
+   * before it is a lake holds none (its hollow is then resolved like any other).
+   */
+  private findLakes(DI: number[], DJ: number[]): void {
+    const { n, lake, elev } = this, cell = this.o.cell, sk = this.skeleton;
+    const lakeOf = (this.lakeOf = new Int32Array(n * n).fill(-1));
+    const seen = new Uint8Array(n * n), bigLand = (x: number, z: number) => sk.elevation(x, z);
+    for (let s = 0; s < n * n; s++) {
+      if (seen[s] || Number.isNaN(lake[s])) continue;
+      const members = [s];
+      seen[s] = 1;
+      for (let q = 0; q < members.length; q++) {
+        const c = members[q], ci = c % n, cj = (c - ci) / n;
+        for (let k = 0; k < 8; k++) {
+          const i = ci + DI[k], j = cj + DJ[k], nb = j * n + i;
+          if (i >= 0 && j >= 0 && i < n && j < n && !seen[nb] && !Number.isNaN(lake[nb])) { seen[nb] = 1; members.push(nb); }
+        }
+      }
+      // Lakes far out in the margin are their own tiles' (a river from one into the core starts tens of km off).
+      const { core, margin } = this.o, inCore = (c: number) => { const i = c % n, j = (c - i) / n; return i >= margin - LAKE_FAR && j >= margin - LAKE_FAR && i < margin + core + LAKE_FAR && j < margin + core + LAKE_FAR; };
+      if (!members.some(inCore)) { for (const c of members) lake[c] = NaN; continue; }
+      // Poured in at the lowest point of each of its lowest cells.
+      let best: Lake | null = null;
+      for (const c of [...members].sort((a, b) => elev[a] - elev[b] || a - b).slice(0, LAKE_STARTS)) {
+        const ci = c % n, x0 = this.x0 + (c % n) * cell, z0 = this.z0 + ((c - ci) / n) * cell;
+        let lx = x0, lz = z0, low = Infinity;
+        for (let z = z0 + LAKE_LOOK / 2; z < z0 + cell; z += LAKE_LOOK) for (let x = x0 + LAKE_LOOK / 2; x < x0 + cell; x += LAKE_LOOK) {
+          const e = bigLand(x, z);
+          if (e < low) { low = e; lx = x; lz = z; }
+        }
+        if (best?.holds(lx, lz)) continue;
+        const l = floodLake(bigLand, lx, lz);
+        if (l && (!best || l.cells > best.cells)) best = l;
+      }
+      for (const c of members) lake[c] = best ? best.level : NaN;
+      if (!best) continue;
+      const id = this.lakes.push(best) - 1;
+      for (const c of members) lakeOf[c] = id;
+      const [ax, az, bx, bz] = best.box;
+      for (let j = Math.max(0, Math.floor((az - this.z0) / cell)); j < n && this.z0 + j * cell < bz; j++) {
+        for (let i = Math.max(0, Math.floor((ax - this.x0) / cell)); i < n && this.x0 + i * cell < bx; i++) if (lakeOf[j * n + i] < 0) lakeOf[j * n + i] = id;
+      }
+    }
   }
 
   private flattenLakes(DI: number[], DJ: number[]): void {
@@ -490,6 +548,16 @@ export class HydroTile {
         ph.push(o.brook ? clamp(riverHalf(acc[cc] * area), BROOK_HALF[0], BROOK_HALF[1]) : riverHalf(acc[cc] * area));
       }
       if (end) { px.push(end.x); pz.push(end.z); pl.push(end.level); ph.push(ph[ph.length - 1]); }
+      // Into a lake: on to its water's edge (the cell's middle may be dry land). Out of one: from its water, over the
+      // rim where it runs out, then down to its course.
+      const last = cells[cells.length - 1], pond = !end && cells.length > 1 && !Number.isNaN(lake[last]) ? this.lakeIn(last) : null;
+      if (pond) [px[px.length - 1], pz[pz.length - 1]] = pond.nearestWater(px[px.length - 2], pz[pz.length - 2]);
+      const out = from >= 0 ? this.lakeIn(from) : null;
+      if (out) {
+        const [wx, wz] = out.nearestWater(out.crest[0], out.crest[1]);
+        px.splice(0, 1, wx, out.crest[0], out.spill[0]); pz.splice(0, 1, wz, out.crest[1], out.spill[1]);
+        pl.splice(0, 1, out.level, out.level, out.level); ph.splice(0, 1, ph[0], ph[0], ph[0]);
+      }
       // Levels never rise downstream: through a rim the river cuts a gorge down to the level it came at.
       for (let k = 1; k < pl.length; k++) pl[k] = Math.min(pl[k], pl[k - 1]);
       if (into && lines) this.ontoLine(lines, px, pz, pl);
@@ -790,10 +858,23 @@ export class HydroTile {
     return out;
   }
 
+  /** The lake of cell `c` (W3), or null. */
+  private lakeIn(c: number): Lake | null {
+    const id = this.lakeOf.length ? this.lakeOf[c] : -1;
+    return id >= 0 ? this.lakes[id] : null;
+  }
+
+  /** The lake whose water or shore may lie at (x, z), or null. */
+  lakeNear(x: number, z: number): Lake | null {
+    const i = Math.floor((x - this.x0) / this.o.cell), j = Math.floor((z - this.z0) / this.o.cell);
+    const id = i >= 0 && j >= 0 && i < this.n && j < this.n && this.lakeOf.length ? this.lakeOf[j * this.n + i] : -1;
+    return id >= 0 ? this.lakes[id] : null;
+  }
+
   /** The level of the lake at (x, z), NaN where there is none. */
   lakeLevel(x: number, z: number): number {
-    const i = Math.floor((x - this.x0) / this.o.cell), j = Math.floor((z - this.z0) / this.o.cell);
-    return i >= 0 && j >= 0 && i < this.n && j < this.n ? this.lake[j * this.n + i] : NaN;
+    const l = this.lakeNear(x, z);
+    return l?.holds(x, z) ? l.level : NaN;
   }
 }
 
@@ -943,6 +1024,11 @@ export class Hydrology {
       out.fallAt = Infinity; out.fallDrop = 0; out.fallBase = 0; out.slope = f.slope;
     }
     return out;
+  }
+
+  /** The lake whose water or shore may lie at (x, z) (W3), or null. */
+  lakeNear(x: number, z: number): Lake | null {
+    return this.tileAt(x, z).lakeNear(x, z);
   }
 
   /** The level of the lake at (x, z), NaN where there is none (as `query` gives it, without the rivers). */
