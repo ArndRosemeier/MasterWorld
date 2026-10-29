@@ -373,6 +373,10 @@ export async function start(b: Boot): Promise<void> {
     // hero, the town and the woods load on the main thread, which left it waiting for seconds at 'Preparing
     // shaders'. The material kinds go first, once the ground's textures (which the land's shader reads) are made.
     const capShare = view.stage.cap.share;
+    // Behind the loading screen or the title's painted still nothing shows yet: every compile goes at full speed from
+    // the start (docs/SHADERS.md rule 5), not only once the kinds are warm. The share comes back once the world shows.
+    view.stage.cap.share = 1;
+    view.stage.monitor.phase = 'warmup';
     const kindsWarm = painted.then(() => view.stage.warmUp()).then(() => {
       // While the loading screen (or the title's painted still) still covers the view, the land, trees and
       // townsfolk compile at full speed (docs/SHADERS.md rule 5); the cap's share comes back once the world shows.
