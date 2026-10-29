@@ -712,9 +712,10 @@ export async function start(b: Boot): Promise<void> {
       cleared: (d) => void roadWork.clear(d),
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
+      // The hero, what they leave lying and their spells go down with them.
       depth: (down, keep) => {
         if (!down) { for (const o of hidden) o.visible = true; hidden.length = 0; return; }
-        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group]);
+        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group, spellView.group]);
         for (const o of view.scene.children) if (o.visible && !kept.has(o) && !(o as Light).isLight) { o.visible = false; hidden.push(o); }
       },
     }, terrain.towns, save?.cellars ?? {});

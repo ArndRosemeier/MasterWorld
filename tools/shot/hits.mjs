@@ -11,7 +11,7 @@ import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
-import { meet } from './acts.mjs';
+import { FIGHT, faceNearest, meet } from './acts.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 const SLOW = 10;
@@ -36,9 +36,6 @@ const { server, base, browser } = await launch({});
 const errors = [];
 let failed = false;
 
-/** The fight the hero is in now (out on the land, or down in the cellar). */
-const FIGHT = `(() => { const g = window.game; return g.cellars?.fightBelow ?? g.wild?.encounters.find((e) => e.leading) ?? null; })()`;
-
 for (const s of SCENES.filter((x) => !only || only.includes(x.id))) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.on('pageerror', (e) => errors.push(`${s.id}: ${e.message}`));
@@ -53,14 +50,7 @@ for (const s of SCENES.filter((x) => !only || only.includes(x.id))) {
   const ok = await page.waitForFunction(`!!${FIGHT}`, null, { timeout: 30000 }).then(() => true, () => false);
   if (!ok) { console.log(`${s.id}: no fight found`); failed = true; await page.close(); continue; }
   // The hero 2.5 m from the nearest one, facing it.
-  await page.evaluate(`(() => {
-    const g = window.game, f = ${FIGHT}, O = f.spellFrame().offset, p = g.player.walker.pos;
-    const c = f.delve.den.alive.reduce((a, b) => Math.hypot(b.x + O.x - p.x, b.z + O.z - p.z) < Math.hypot(a.x + O.x - p.x, a.z + O.z - p.z) ? b : a);
-    const cx = c.x + O.x, cz = c.z + O.z, l = Math.max(0.01, Math.hypot(p.x - cx, p.z - cz));
-    const x = cx + (p.x - cx) / l * 2.5, z = cz + (p.z - cz) / l * 2.5;
-    g.player.teleport(x, c.y + O.y, z, Math.atan2(x - cx, z - cz));
-    window.__hitWho = c;
-  })()`);
+  await faceNearest(page, 2.5);
   await page.waitForTimeout(1500);
   await page.screenshot({ path: join(dir, `${s.id}-0-before.jpg`), type: 'jpeg', quality: 85 });
   const t0 = await page.evaluate(`(() => {

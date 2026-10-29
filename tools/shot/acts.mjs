@@ -3,6 +3,19 @@
  */
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 
+/** The fight the hero is in now (out on the land, or down in the cellar), as page code. */
+export const FIGHT = `(() => { const g = window.game; return g.cellars?.fightBelow ?? g.wild?.encounters.find((e) => e.leading) ?? null; })()`;
+
+/** The hero `d` m (at most where they stand) from the nearest foe of the fight, facing it; that foe kept as `window.__hitWho`. */
+export const faceNearest = (page, d) => page.evaluate(`(() => {
+  const g = window.game, f = ${FIGHT}, O = f.spellFrame().offset, p = g.player.walker.pos;
+  const c = f.delve.den.alive.reduce((a, b) => Math.hypot(b.x + O.x - p.x, b.z + O.z - p.z) < Math.hypot(a.x + O.x - p.x, a.z + O.z - p.z) ? b : a);
+  const cx = c.x + O.x, cz = c.z + O.z, l = Math.max(0.01, Math.hypot(p.x - cx, p.z - cz)), d = Math.min(${d}, l);
+  const x = cx + (p.x - cx) / l * d, z = cz + (p.z - cz) / l * d;
+  g.player.teleport(x, c.y + O.y, z, Math.atan2(x - cx, z - cz));
+  window.__hitWho = c;
+})()`);
+
 /** The hero a few metres from a group of the wild (`kind`), facing it, once it is built near them. */
 export const meet = (kind, d) => async (page) => {
   await page.evaluate((kind) => {
