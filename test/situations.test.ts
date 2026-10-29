@@ -16,7 +16,8 @@ const { home, seed, terrain, walk } = frontierLand();
 
 const log = walk(2, EAST);
 const town = terrain.towns[0];
-const out = { x: home.x + home.radius + 250, z: home.z };
+// Out past the mesa wall east of the town, on open land.
+const out = { x: home.x + home.radius + 350, z: home.z };
 const sure = { ...classic, situations: classic.situations!.map((t) => (t.kind === 'hurt-traveller' ? { ...t, chance: 1 } : t)) };
 const need = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: sure, hero: out, toward: { x: out.x + 600, z: out.z }, ...over });
 const dusk = (over: Partial<PaddockContext> = {}): PaddockContext => ({ seed, log, hours: 24 * 2 + 19, near: town, setting: classic, ...over });

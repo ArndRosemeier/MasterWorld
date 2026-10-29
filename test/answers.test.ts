@@ -13,7 +13,8 @@ const { home, seed, terrain, walk } = frontierLand();
 // C9: an overdue need asks the tools that meet it for their cheapest fitting move, on the hero's way.
 
 const log = walk(2, EAST);
-const out = { x: home.x + home.radius + 250, z: home.z };
+// Out past the mesa wall east of the town, on open land.
+const out = { x: home.x + home.radius + 350, z: home.z };
 const c = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: classic, hero: out, toward: { x: out.x + 600, z: out.z }, ...over });
 
 test('answers: Discovery overdue puts a sight by the hero\'s way, on dry ground off towns and places', () => {
