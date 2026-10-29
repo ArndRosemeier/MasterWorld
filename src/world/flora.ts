@@ -72,10 +72,10 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     const bi = t.biomeAt(x, z);
     const flora = bi >= 0 ? biomes[bi].flora : undefined;
     if (!flora) continue;
-    // A bare kind of country (a moor, badlands) thins the biome's plants, the trees most.
+    // A bare kind of country (a moor, badlands) thins the biome's plants, the trees most (treesAt).
     const woods = woodsAt(cover, flora, x, z);
     const pTree = treesAt(t, cover, flora, x, z) * NEAR_SPACING ** 2;
-    const pShrub = (flora.shrubs / 10000) * NEAR_SPACING ** 2 * (0.4 + 0.6 * woods) * (1 - 0.6 * t.skeleton.bareAt(x, z));
+    const pShrub = (flora.shrubs / 10000) * NEAR_SPACING ** 2 * (0.4 + 0.6 * woods) * (1 - 0.9 * t.skeleton.bareAt(x, z));
     const near = spacing === NEAR_SPACING;
     // Far away a candidate stands for `thin` near ones: a tree there as often as one would be among them
     // (up to MAX_P), shrubs not at all.
