@@ -1,0 +1,15 @@
+mesa: ready in 27.0 s
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+page.evaluate: Error: no open floor before a plateau wall round the start
+    at eval (eval at evaluate (:370:30), <anonymous>:15:13)
+    at UtilityScript.evaluate (<anonymous>:372:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+    at Object.act (C:\Projekte\MasterWorld-shotwt-phaseL\tools\shot\set.mjs:118:42)
+    at C:\Projekte\MasterWorld-shotwt-phaseL\tools\shot\set.mjs:337:30 {
+  log: []
+}
+
+Node.js v24.19.0

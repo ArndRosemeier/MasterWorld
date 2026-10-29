@@ -1,0 +1,168 @@
+{
+  "commit": "ce21d33e52620176cf4b6c45de4d4a54f068c510",
+  "dirty": false,
+  "date": "2026-10-29",
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "gl": true,
+  "viewport": "1920x1080",
+  "settleMs": 4000,
+  "measureMs": 2000,
+  "seconds": 92.236,
+  "part": "caves",
+  "shots": [
+    {
+      "name": "mesa-valley",
+      "file": "21-mesa-valley.jpg",
+      "query": "title=0&day=0&gl&hour=10.5&weather=fair",
+      "loadS": 26.895,
+      "drawnS": 0.073,
+      "settledS": 3.8112999999523165,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 135,
+      "p50": 14.400000000001455,
+      "p95": 32.099999999998545,
+      "mean": 14.818518518871754,
+      "shaders": {
+        "warmup": 81,
+        "run": 7,
+        "late": 0,
+        "worstMs": 10.700000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "mesa-plateau",
+      "file": "22-mesa-plateau.jpg",
+      "query": "title=0&day=0&gl&hour=10.5&weather=fair",
+      "loadS": 26.895,
+      "drawnS": 0.133,
+      "settledS": 1.5183999999761582,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 234,
+      "p50": 8.5,
+      "p95": 13.099999999998545,
+      "mean": 8.564102564306353,
+      "shaders": {
+        "warmup": 81,
+        "run": 7,
+        "late": 0,
+        "worstMs": 10.700000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "tor",
+      "file": "23-tor.jpg",
+      "query": "title=0&day=0&gl&hour=10.5&weather=fair",
+      "loadS": 26.895,
+      "drawnS": 0.256,
+      "settledS": 1.518899999976158,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 178,
+      "p50": 8.900000000001455,
+      "p95": 28.299999999995634,
+      "mean": 11.247752808988755,
+      "shaders": {
+        "warmup": 81,
+        "run": 7,
+        "late": 0,
+        "worstMs": 10.700000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "climb",
+      "file": "24-climb.jpg",
+      "query": "title=0&day=0&gl&hour=10.5&weather=fair",
+      "loadS": 26.895,
+      "drawnS": 0.044,
+      "settledS": 1.5063000000715256,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 165,
+      "p50": 12.5,
+      "p95": 14.80000000000291,
+      "mean": 12.161212120923146,
+      "shaders": {
+        "warmup": 81,
+        "run": 10,
+        "late": 0,
+        "worstMs": 10.700000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": [
+        "over the 12 ms aim"
+      ]
+    },
+    {
+      "name": "cave-mouth",
+      "file": "25-cave-mouth.jpg",
+      "query": "title=0&day=0&gl&hour=11&weather=fair&cave",
+      "loadS": 19.895,
+      "drawnS": 0.033,
+      "settledS": 4.010799999952316,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 172,
+      "p50": 9.799999999999272,
+      "p95": 28.799999999999272,
+      "mean": 11.677325581118122,
+      "shaders": {
+        "warmup": 74,
+        "run": 23,
+        "late": 0,
+        "worstMs": 11.700000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    },
+    {
+      "name": "cave-cavern",
+      "file": "26-cave-cavern.jpg",
+      "query": "title=0&day=0&gl&hour=11&weather=fair&cave",
+      "loadS": 19.895,
+      "drawnS": 0.025,
+      "settledS": 4.003299999952317,
+      "missing": [],
+      "backend": "webgl2",
+      "frames": 369,
+      "p50": 4.30000000000291,
+      "p95": 9.799999999999272,
+      "mean": 5.422222221963766,
+      "shaders": {
+        "warmup": 74,
+        "run": 35,
+        "late": 0,
+        "worstMs": 11.700000047683716,
+        "violations": 0,
+        "repeats": 0,
+        "lines": []
+      },
+      "errors": [],
+      "marks": []
+    }
+  ]
+}

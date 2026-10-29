@@ -1,0 +1,90 @@
+
+## noon: title&day=0&gl
+
+settled in 3.9 s
+
+| part | objects | meshes | casters | skinned | triangles |
+|---|---|---|---|---|---|
+| rocks | 1 | 36 | 24 | 0 | 5040 |
+| town | 1 | 56 | 56 | 0 | 80326 |
+| volumes | 1 | 1 | 1 | 0 | 20214 |
+| terrain | 267 | 267 | 267 | 0 | 2349056 |
+| sky | 1 | 1 | 0 | 0 | 12 |
+| sea | 1 | 1 | 0 | 0 | 57408 |
+| grass | 1 | 2 | 0 | 0 | 10752 |
+| hero | 1 | 14 | 8 | 13 | 81819 |
+| horse | 2 | 16 | 2 | 16 | 352224 |
+| hold | 1 | 1 | 1 | 0 | 3024 |
+| retreat | 1 | 1 | 1 | 0 | 4918 |
+| flora | 1 | 70 | 52 | 0 | 148312 |
+| far folk | 1 | 1 | 1 | 0 | 3388 |
+| townsfolk | 30 | 478 | 59 | 478 | 4086916 |
+
+| drawn | p50 ms | p95 ms | render ms (main thread) | draw calls | shaders built | saves ms (vs the runs next to it) |
+|---|---|---|---|---|---|---|
+| everything | 16.8 | 37.3 | 17.8 | 316 | 0 |  |
+| without rocks | 15.3 | 35.8 | 15.9 | 303 | 0 | 1.2 |
+| without town | 15.6 | 39.3 | 16.7 | 305 | 1 | 0.7 |
+| without volumes | 16.6 | 35.2 | 17.2 | 327 | 0 | -0.3 |
+| without terrain | 11.8 | 15.9 | 11.4 | 236 | 0 | 4.5 |
+| without sky | 16.2 | 20.0 | 15.3 | 340 | 0 | -0.1 |
+| without sea | 15.8 | 22.8 | 15.1 | 338 | 0 | 0.0 |
+| without grass | 15.9 | 19.4 | 14.8 | 335 | 0 | -0.0 |
+| without hero | 16.4 | 29.2 | 15.7 | 332 | 0 | -0.6 |
+| without horse | 15.0 | 27.2 | 14.2 | 319 | 0 | 0.6 |
+| without hold | 16.0 | 18.7 | 15.0 | 332 | 0 | -0.2 |
+| without retreat | 16.5 | 21.0 | 15.4 | 323 | 0 | -0.2 |
+| without flora | 15.0 | 18.6 | 13.4 | 275 | 0 | 1.2 |
+| without far folk | 16.5 | 28.3 | 15.5 | 324 | 0 | -0.4 |
+| without townsfolk | 11.5 | 16.4 | 11.1 | 229 | 0 | 5.0 |
+| without sun shadow redraw | 13.4 | 15.9 | 11.3 | 347 | 0 | 3.4 |
+| nothing (empty scene, post chain only) | 4.5 | 6.3 | 2.8 | 24 | 0 | 12.3 |
+
+townsfolk over 5 s: 0 dressings, freed {"hidden":0,"ranked":0,"far":0}; updateHiddenSkin 0× 0 ms: 
+
+slow frames over 10 s: 16 of 620 over 33 ms (p50 16.4, p95 21.2); in them / in the rest: sun shadow redrawn 10 / 300, with a build 0 / 0
+
+| mean ms in | slow frames | the rest |
+|---|---|---|
+| actors update | 1.4 | 0.9 |
+| town life | 0.0 | 0.0 |
+| folk follow | 1.6 | 1.1 |
+| render | 23.7 | 15.6 |
+| actors skin | 0.2 | 0.1 |
+| stage prepare (sync part) | 0.0 | 0.0 |
+| actors crowd merge | 0.0 | 0.0 |
+| actors shape write | 0.0 | 0.0 |
+
+slowest frames:
+```
+43.3 ms (sun shadow): actors update 1.4, folk follow 1.6, render 25.3
+43.3 ms (sun shadow): actors update 1.3, folk follow 1.4, render 24.9
+42.4 ms: actors update 0.9, folk follow 1.3, render 10.3, actors skin 3.4
+41.3 ms (sun shadow): actors update 0.9, folk follow 1.1, render 20.0
+39.2 ms (sun shadow): actors update 2.1, folk follow 2.3, render 37.4
+39.0 ms (sun shadow): actors update 1.5, folk follow 1.7, render 37.4
+38.4 ms (sun shadow): actors update 1.9, folk follow 2.0, render 40.4
+38.2 ms (sun shadow): actors update 1.1, folk follow 1.4, render 35.5
+37.8 ms (sun shadow): actors update 1.4, folk follow 1.7, render 21.7
+35.6 ms: actors update 1.7, folk follow 2.0, render 19.4
+35.6 ms: actors update 1.3, folk follow 1.5, render 18.1
+34.9 ms (sun shadow): actors update 1.4, folk follow 1.8, render 23.4
+```
+
+shaders:
+```
+shaders: 71 built in warm-up, 17 after (2 drawn late), worst block 11 ms, 0 violations, 0 built again alike
+```
+
+built after warm-up, by what:
+- 5× spell solid (instanced)
+- 3× MeshStandardNodeMaterial
+- 1× ShadowMaterial (instanced) of Mesh far folk<Shadow Map [ ID: 15 ]
+- 1× ShadowMaterial of SkinnedMesh hair-french-braid<townsfolk<Shadow Map [ ID: 15 ]
+- 1× ShadowMaterial of SkinnedMesh crowd<townsfolk<Shadow Map [ ID: 15 ]
+- 1× ShadowMaterial of SkinnedMesh medieval-dress<townsfolk<Shadow Map [ ID: 15 ]
+- 1× MeshPhysicalNodeMaterial
+- 1× MeshBasicNodeMaterial
+- 1× spell sprite
+- 1× ShadowMaterial of SkinnedMesh SKM_Cow001<RootNode<Root_Scene
+- 1× ShadowMaterial of SkinnedMesh body-crowd<townsfolk<Shadow Map [ ID: 15 ]

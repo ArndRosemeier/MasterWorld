@@ -1,0 +1,9 @@
+mesa: ready in 26.9 s
+21-mesa-valley.jpg: drawn 0.1 s · settled 3.8 s · p50 14.4 ms · p95 32.1 ms · 0 shader violations
+22-mesa-plateau.jpg: drawn 0.1 s · settled 1.5 s · p50 8.5 ms · p95 13.1 ms · 0 shader violations
+23-tor.jpg: drawn 0.3 s · settled 1.5 s · p50 8.9 ms · p95 28.3 ms · 0 shader violations
+24-climb.jpg: drawn 0.0 s · settled 1.5 s · p50 12.5 ms · p95 14.8 ms · 0 shader violations
+cave: ready in 19.9 s
+25-cave-mouth.jpg: drawn 0.0 s · settled 4.0 s · p50 9.8 ms · p95 28.8 ms · 0 shader violations
+26-cave-cavern.jpg: drawn 0.0 s · settled 4.0 s · p50 4.3 ms · p95 9.8 ms · 0 shader violations
+caves: 6 shots in shots\phaseL-gate2\caves\2026-10-29-ce21d33 (92 s)
