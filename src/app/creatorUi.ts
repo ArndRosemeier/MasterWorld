@@ -5,7 +5,8 @@
  * ward traces its rim, the tabs drop in one by one; at rest a spark runs the rim and the turntable's gear
  * ticks. Dragging the view turns the hero, the wheel steps closer or back. Begin hands the hero to the game.
  */
-import { CharacterEditor, randomConfig, type Character, type CharacterConfig } from '@actors/generator';
+import { CharacterEditor, randomConfig, type Character, type CharacterConfig, type RandomOptions } from '@actors/generator';
+import { inBuild } from '../render/hero/build';
 import { Vector3, type PerspectiveCamera, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed, lerp } from '@futuremagic/core';
 import type { BackgroundDef, NamesDef } from '../setting/contract';
@@ -119,7 +120,7 @@ export class Creator {
       const { hero, renderer, looks } = this.host;
       const model = await hero.model(renderer, looks);
       if (race && race !== model.config.race && model.catalog.races.some((r) => r.id === race)) {
-        await model.set(randomConfig(model.catalog, model.config, { random: this.random(), race: race as never, outfit: false }));
+        await model.set(this.roll(model, { race: race as never, outfit: false }));
         // The hero the dive lands on is already of that people.
         void hero.dress(model.config);
       }
@@ -171,14 +172,14 @@ export class Creator {
     });
     this.editor = new CharacterEditor(model, pane, {
       title: 'Your hero', sections: SECTIONS, buttons: [], hide: ['anatomy'], mode: 'simple',
-      randomize: () => randomConfig(model.catalog, model.config, { random: this.random(), race: 'any' }),
+      randomize: () => this.roll(model, { race: 'any' }),
     });
     pane.append(this.pasts());
     tabTo('race');
     const begin = button('', () => this.begin(), { className: 't-btn primary cr-begin', type: 'button' }, svg(gearIcon), el('span', { textContent: 'Begin' }));
     const roll = button('Roll the dice', () => {
       this.host.click?.();
-      void model.set(randomConfig(model.catalog, model.config, { random: this.random(), outfit: true }));
+      void model.set(this.roll(model, { outfit: true }));
     }, { className: 't-btn quiet', type: 'button' });
     const turn = el('div', { className: 'cr-turn', ariaHidden: 'true' }, svg(gearIcon), el('span', { textContent: 'Drag to turn · wheel to look closer' }));
     this.root.replaceChildren(
@@ -270,6 +271,12 @@ export class Creator {
 
   private defaultName(c: CharacterConfig): string {
     return this.host.nameFor(c.race, c.body.gender < 0.5, this.seed + this.rolls);
+  }
+
+  /** A random look in the setting's build (young and fit), from a new seeded source. */
+  private roll(model: Character, options: RandomOptions): CharacterConfig {
+    const random = this.random();
+    return inBuild(() => randomConfig(model.catalog, model.config, { ...options, random }), this.host.looks.build, random);
   }
 
   /** A seeded random source, new for every roll. */

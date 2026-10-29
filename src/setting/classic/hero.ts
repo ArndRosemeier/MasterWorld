@@ -11,4 +11,6 @@ export const hero: HeroLooksDef = {
   without: ['real-faith'],
   races: ['human', 'dwarf', 'halfling', 'elf'],
   outfits: ['med-traveller', 'med-peasant', 'peasant', 'med-archer'],
+  // A hero sets out young to prime, fit and lean (Arnd: no overweight grandma as the first hero).
+  build: { ageYears: [19, 38], weight: [0.15, 0.5], muscle: [0.5, 0.9], proportions: [0.5, 1] },
 };

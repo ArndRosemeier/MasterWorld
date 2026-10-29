@@ -22,6 +22,8 @@ import { gripHeld } from './grips';
 import { ORIGIN } from '../origin';
 import { FADE, castShadows, handOf, playClip, preparePeople, seatOf } from './play';
 import { Jolt, joltRoot, joltSpine } from '../jolt';
+import { inBuild } from './build';
+import type { HeroBuildDef } from '../../setting/contract';
 import { FigureRig, type LimbGoal, type LimbGoals, type Pose } from '@futuremagic/figure';
 
 /** An empty goal for a hand or foot. */
@@ -69,6 +71,8 @@ export interface HeroLooks {
   readonly races: readonly string[];
   /** Outfit presets a new hero starts in. */
   readonly outfits: readonly string[];
+  /** The build a random hero is drawn in. */
+  readonly build?: HeroBuildDef;
 }
 
 /** Outfit presets a hero is never offered (real-world religious orders). */
@@ -101,7 +105,8 @@ export function newHero(catalog: CharacterCatalog, looks: HeroLooks, base: Chara
   const rng = new Rng(deriveSeed(seed, 'hero', 'look'));
   const races = catalog.races.map((r) => r.id);
   const born = (race && races.includes(race as RaceId) ? race : rng.pick(races)) as RaceId;
-  const look = randomConfig(catalog, base, { random: () => rng.float(), race: born, outfit: false });
+  const random = () => rng.float();
+  const look = inBuild(() => randomConfig(catalog, base, { random, race: born, outfit: false }), looks.build, random);
   const female = look.body.gender < 0.5;
   const presets = catalog.outfits.filter((o) => looks.outfits.includes(o.id) && (!o.gender || o.gender === (female ? 'female' : 'male')));
   const preset = presets.length ? rng.pick(presets) : null;
