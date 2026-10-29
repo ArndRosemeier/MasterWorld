@@ -16,6 +16,8 @@ const MIN_DEPTH = 4;
 const MIN_CELLS = 10;
 /** How high (m) a lake's lip stands above its water where the rim is raised. */
 const LIP = 0.3;
+/** How steeply (m a metre) a lake's raised rim falls away from it to the land beyond. */
+const RIM_FALL = 0.15;
 /** Cells a flood may look at before it gives up (a basin that never spills on the grid: no lake). */
 const MAX_CELLS = 20_000;
 
@@ -67,13 +69,16 @@ export class Lake {
   /**
    * Ground `h` at (x, z) as the lake's rim holds it: just past the water's cells, where the grid saw land above the
    * level but the ground between its points dips below it, the rim is raised to a lip a little above the water (no
-   * lake hangs over lower dry land there). Away from the shore the land is its own.
+   * lake hangs over lower dry land there), its bank falling away outward. Away from the shore the land is its own.
    */
   rim(x: number, z: number, h: number): number {
     const lip = this.level + LIP;
     if (h >= lip) return h;
-    const d = this.shore(x, z), t = smoothstep(LAKE_GRID * 0.6, LAKE_GRID * 0.9, d) * (1 - smoothstep(LAKE_GRID * 2, LAKE_GRID * 3, d));
-    return t > 0 ? h + (lip - h) * t : h;
+    // A bank that slopes away from the lip (RIM_FALL a metre), not a flat terrace at the water's height out to the
+    // shore's edge: from the lake that read as a wide white strand along a straight line.
+    const d = this.shore(x, z), t = smoothstep(LAKE_GRID * 0.6, LAKE_GRID * 0.9, d);
+    const bank = lip - Math.max(0, d - LAKE_GRID * 1.3) * RIM_FALL;
+    return t > 0 && bank > h ? h + (bank - h) * t : h;
   }
 
   /** Whether (x, z) lies in the lake (where the ground is below its level, the water shows). */
