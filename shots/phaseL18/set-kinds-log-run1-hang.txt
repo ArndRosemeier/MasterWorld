@@ -1,0 +1,22 @@
+kind-downs: ready in 25.0 s
+13-kind-downs.jpg: drawn 0.1 s · settled 4.0 s · p50 9.6 ms · p95 31.5 ms · 0 shader violations
+14-kind-downs-aloft.jpg: drawn 0.0 s · settled 3.5 s · p50 8.0 ms · p95 10.7 ms · 0 shader violations
+kind-moor: ready in 18.5 s
+15-kind-moor.jpg: drawn 0.0 s · settled 4.0 s · p50 7.9 ms · p95 19.3 ms · 0 shader violations
+16-kind-moor-aloft.jpg: drawn 0.0 s · settled 1.5 s · p50 8.5 ms · p95 11.2 ms · 0 shader violations
+kind-karst: ready in 120.0 s
+17-kind-karst.jpg: drawn 0.0 s · settled 1.5 s · p50 32.0 ms · p95 32.6 ms · 0 shader violations · 1 errors
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+page.evaluate: TypeError: Cannot read properties of undefined (reading 'player')
+    at eval (eval at evaluate (:370:30), <anonymous>:2:45)
+    at UtilityScript.evaluate (<anonymous>:372:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+    at Object.act (C:\Projekte\MasterWorld-shotwt-phaseL\tools\shot\set.mjs:104:15)
+    at C:\Projekte\MasterWorld-shotwt-phaseL\tools\shot\set.mjs:263:30 {
+  log: []
+}
+
+Node.js v24.19.0
