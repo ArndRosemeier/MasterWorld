@@ -1,0 +1,86 @@
+
+## noon: title=0&day=0&gl&hour=16&weather=fair&site=village
+
+settled in 3.8 s
+
+| part | objects | meshes | casters | skinned | triangles |
+|---|---|---|---|---|---|
+| town | 7 | 438 | 438 | 0 | 1624246 |
+| volumes | 1 | 1 | 1 | 0 | 20214 |
+| rocks | 1 | 36 | 24 | 0 | 5040 |
+| terrain | 267 | 267 | 267 | 0 | 2574848 |
+| sky | 1 | 1 | 0 | 0 | 12 |
+| sea | 1 | 1 | 0 | 0 | 57408 |
+| grass | 1 | 2 | 0 | 0 | 10752 |
+| hero | 1 | 14 | 8 | 13 | 81819 |
+| horse | 2 | 16 | 2 | 16 | 352224 |
+| cow | 6 | 6 | 6 | 6 | 16458 |
+| birds | 1 | 1 | 0 | 0 | 82 |
+| hold | 1 | 1 | 1 | 0 | 3024 |
+| retreat | 1 | 1 | 1 | 0 | 4918 |
+| Group | 1 | 2 | 2 | 0 | 592 |
+| flora | 1 | 70 | 52 | 0 | 148312 |
+| far folk | 1 | 1 | 1 | 0 | 12936 |
+| townsfolk | 13 | 199 | 48 | 199 | 1563760 |
+| camp region-38 | 1 | 1 | 1 | 0 | 1298 |
+| ruin region-39 | 1 | 1 | 1 | 0 | 3924 |
+| barrows region-41 | 1 | 1 | 1 | 0 | 18440 |
+
+| drawn | p50 ms | p95 ms | render ms (main thread) | draw calls | shaders built | saves ms (vs the runs next to it) |
+|---|---|---|---|---|---|---|
+| everything | 13.9 | 34.4 | 15.0 | 353 | 0 |  |
+| without town | 10.1 | 14.0 | 10.5 | 210 | 0 | 3.2 |
+| without volumes | 13.1 | 15.9 | 13.1 | 352 | 0 | -0.1 |
+| without rocks | 12.0 | 14.5 | 12.0 | 343 | 0 | 1.6 |
+| without terrain | 9.7 | 12.6 | 10.0 | 273 | 0 | 3.9 |
+| without sky | 13.4 | 16.4 | 13.4 | 364 | 0 | 0.1 |
+| without sea | 13.4 | 15.5 | 13.3 | 362 | 0 | 0.1 |
+| without grass | 13.2 | 15.2 | 13.3 | 362 | 0 | 0.0 |
+| without hero | 13.6 | 15.3 | 13.3 | 364 | 0 | -0.1 |
+| without horse | 14.6 | 32.1 | 14.9 | 356 | 1 | -0.1 |
+| without cow | 14.0 | 24.2 | 14.4 | 363 | 0 | 0.4 |
+| without birds | 13.9 | 15.9 | 13.5 | 370 | 0 | 0.2 |
+| without hold | 14.1 | 16.4 | 13.8 | 376 | 0 | -0.1 |
+| without retreat | 14.2 | 15.9 | 13.7 | 373 | 0 | -0.5 |
+| without Group | 13.8 | 15.9 | 13.6 | 371 | 0 | -0.1 |
+| without flora | 12.3 | 14.8 | 12.3 | 337 | 0 | 1.4 |
+| without far folk | 14.6 | 18.9 | 14.7 | 378 | 0 | -0.4 |
+| without townsfolk | 12.0 | 15.1 | 11.6 | 321 | 0 | 2.7 |
+| without camp region-38 | 15.1 | 17.1 | 14.4 | 389 | 0 | -0.5 |
+| without ruin region-39 | 15.0 | 17.1 | 14.6 | 393 | 0 | -0.2 |
+| without barrows region-41 | 15.9 | 18.2 | 15.1 | 394 | 0 | -0.7 |
+| without sun shadow redraw | 12.7 | 14.9 | 10.8 | 449 | 0 | 2.8 |
+| nothing (empty scene, post chain only) | 3.3 | 4.0 | 2.1 | 22 | 0 | 11.7 |
+
+townsfolk over 5 s: 2 dressings, freed {"hidden":1,"ranked":0,"far":0}; updateHiddenSkin 12× 27 ms: 4× other -> level 0, 3× other -> level 1, 3× other -> level 2, 2× applyShape -> level 0
+
+slow frames over 10 s: 2 of 682 over 29 ms (p50 14.7, p95 18.1); in them / in the rest: sun shadow redrawn 1 / 340, with a build 0 / 0
+
+| mean ms in | slow frames | the rest |
+|---|---|---|
+| stage prepare (sync part) | 0.0 | 0.0 |
+| actors update | 1.8 | 0.7 |
+| town life | 0.1 | 0.0 |
+| folk follow | 1.9 | 0.9 |
+| render | 24.3 | 15.0 |
+| actors skin | 0.0 | 0.0 |
+| actors shape write | 0.0 | 0.0 |
+| actors crowd merge | 0.0 | 0.0 |
+
+slowest frames:
+```
+38.1 ms: actors update 0.9, folk follow 0.9, render 9.8
+36.5 ms (sun shadow): actors update 2.6, folk follow 2.9, render 38.9
+```
+
+shaders:
+```
+shaders: 78 built in warm-up, 9 after (0 drawn late), worst block 15 ms, 0 violations, 0 built again alike
+```
+
+built after warm-up, by what:
+- 5× spell solid (instanced)
+- 1× MeshBasicNodeMaterial
+- 1× ShadowMaterial of SkinnedMesh body-crowd<townsfolk<Shadow Map [ ID: 15 ]
+- 1× spell sprite
+- 1× ShadowMaterial of SkinnedMesh beard<townsfolk<Shadow Map [ ID: 15 ]
