@@ -282,8 +282,7 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const below = waterAt(p.xz).x.sub(p.y);
   const wet = smoothstep(-1.2, -0.2, below).mul(float(1).sub(snowB));
   col = col.mul(mix(float(1), float(0.55), wet));
-  // Only a little glossy: at 0.25 a flat shore's wet strip mirrored the sun, a hard white line round a lake from above.
-  rough = mix(rough, float(0.55), wet.mul(smoothstep(0.6, 0.95, up)));
+  rough = mix(rough, float(0.25), wet.mul(smoothstep(0.6, 0.95, up)));
 
   // Rain: the ground darkens and turns glossy; flat hollows hold puddles that mirror the sky, ringed by
   // the drops while it rains. They dry from the edges in (the hollow's depth against the wetness).
