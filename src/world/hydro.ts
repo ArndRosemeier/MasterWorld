@@ -71,6 +71,8 @@ const VALLEY_SIDE = 1 / 3;
 const FLOOR_RISE = 1.5;
 /** A valley's side more than this (m) above a cell's land is not kept: it could lower nothing there (W4b). */
 const VALE_KEEP = 60;
+/** A river's valley is carved down to this far (m) above its water, no further (W4d). */
+const RIVER_KEEP = 2;
 /** How far (m) a brook runs below its valley floor: the land's small relief (terrain.ts) dips that far round it, and its water stays in them. */
 const BROOK_SINK = 0.5;
 /** Levels tried between a hollow's floor and its spill, for the cheapest mix of fill and breach. */
@@ -369,14 +371,17 @@ export class HydroTile {
    */
   private carveValleys(order: Int32Array, popped: number): Float32Array {
     const { n, elev: E, recv } = this, cell = this.o.cell, N = n * n;
-    const floor = Float32Array.from(E), river = this.riverCells();
-    // Upstream first: each cell's floor carried down to the cell it drains to, up to a river's valley.
+    const floor = Float32Array.from(E), keep = this.riverKeep();
+    // Upstream first: each cell's floor carried down to the cell it drains to.
     for (let k = popped - 1; k >= 0; k--) {
       const c = order[k], r = recv[c];
-      if (r >= 0 && E[c] > 0 && E[r] > 0 && !river[r] && floor[c] < floor[r]) floor[r] = floor[c];
+      if (r >= 0 && E[c] > 0 && E[r] > 0 && floor[c] < floor[r]) floor[r] = floor[c];
     }
     const S = new Float32Array(N).fill(Infinity);
     for (let c = 0; c < N; c++) if (floor[c] < E[c] - 0.01) S[c] = floor[c];
+    // A river's course is a valley floor too (W4d): RIVER_KEEP over its water.
+    const bed = this.riverKeep(true);
+    for (let c = 0; c < N; c++) if (bed[c] > -Infinity && bed[c] < E[c] - 0.01 && bed[c] < S[c]) S[c] = bed[c];
     // The floor one cell wide either side. `cut`: how deep (negated) a cell may be lowered, at most as deep as the
     // way it hangs from was cut (a mesa standing beside a valley is not planed down to the valley's slope).
     const wide = Float32Array.from(S), cut = new Float32Array(N).fill(0);
@@ -402,29 +407,45 @@ export class HydroTile {
     for (let pass = 0; pass < 2; pass++) { chamfer(wide, n, n, along, diag, steep); chamfer(cut, n, n, along, diag, steep); }
     for (let c = 0; c < N; c++) wide[c] = Math.max(wide[c], E[c] + Math.min(0, cut[c]));
     // Far above the land a valley's side lowers nothing (VALE_KEEP): dropped, so a tile hands over little. A
-    // river's valley the rivers shaped first: a brook's valley lowers nothing there.
+    // river's valley is carved too (W4d), but never below RIVER_KEEP over the river's water: the rivers keep their
+    // levels and the land folds down to them.
+    // A cell is dropped only with all its neighbours: a valley's last cells blend out between finite heights (one
+    // left Infinity beside them made the land jump back up a cliff where the blend stopped).
+    const far = (c: number) => E[c] <= 0 || wide[c] > E[c] + VALE_KEEP;
+    const drop = new Uint8Array(N);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      let all = true;
+      for (let dj = -1; dj <= 1 && all; dj++) for (let di = -1; di <= 1 && all; di++) {
+        const a = i + di, b = j + dj;
+        if (a >= 0 && b >= 0 && a < n && b < n && !far(b * n + a)) all = false;
+      }
+      drop[j * n + i] = all ? 1 : 0;
+    }
     for (let c = 0; c < N; c++) {
-      if (E[c] <= 0 || wide[c] > E[c] + VALE_KEEP) wide[c] = Infinity;
-      else if (river[c]) wide[c] = Math.max(wide[c], E[c]);
-      else if (wide[c] < E[c]) E[c] = wide[c];
+      if (drop[c]) wide[c] = Infinity;
+      else if ((wide[c] = Math.max(wide[c], keep[c], E[c] <= 0 ? E[c] : -Infinity)) < E[c]) E[c] = wide[c];
     }
     return wide;
   }
 
-  /** The cells in a river's valley (1), where the brooks' valleys lower nothing (W4b). */
-  private riverCells(): Uint8Array {
-    const { n } = this, cell = this.o.cell, inside = new Uint8Array(n * n);
+  /**
+   * At each cell in a river's valley (or, `course`, by its water), the lowest the valleys may lower the land:
+   * RIVER_KEEP over its water (W4d).
+   */
+  private riverKeep(course = false): Float32Array {
+    const { n } = this, cell = this.o.cell, keep = new Float32Array(n * n).fill(-Infinity);
     for (const r of this.feed!.rivers) {
       for (let k = 0; k < r.level.length; k++) {
-        const x = r.xz[k * 2], z = r.xz[k * 2 + 1], R = valleyOf(r.half[k]) + cell * 0.5;
+        const x = r.xz[k * 2], z = r.xz[k * 2 + 1], R = (course ? r.half[k] : valleyOf(r.half[k])) + cell * 0.5, lv = r.level[k] + RIVER_KEEP;
         const i0 = Math.max(0, Math.floor((x - R - this.x0) / cell)), i1 = Math.min(n - 1, Math.floor((x + R - this.x0) / cell));
         const j0 = Math.max(0, Math.floor((z - R - this.z0) / cell)), j1 = Math.min(n - 1, Math.floor((z + R - this.z0) / cell));
         for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-          if (Math.hypot(this.x0 + (i + 0.5) * cell - x, this.z0 + (j + 0.5) * cell - z) <= R) inside[j * n + i] = 1;
+          const c = j * n + i;
+          if (lv > keep[c] && Math.hypot(this.x0 + (i + 0.5) * cell - x, this.z0 + (j + 0.5) * cell - z) <= R) keep[c] = lv;
         }
       }
     }
-    return inside;
+    return keep;
   }
 
   /** The most the land may stand at (x, z) by the valleys (W4b): blended between cells, Infinity off them. */

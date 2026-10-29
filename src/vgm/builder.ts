@@ -119,7 +119,8 @@ export function startTown(t: Terrain, home: { x: number; z: number }, arch: Arch
     const h0 = t.height(x, z);
     if (h0 < 4 || !startGround(t.skeleton, t.setting.start, x, z)) continue;
     const water = needWater ? freshWaterEdge(t, x, z, R + WATER_REACH, false) : Infinity;
-    if (needWater && water > R + WATER_REACH) continue;
+    // By the water, not over it: the river's edge out past the town's.
+    if (needWater && (water > R + WATER_REACH || water <= R)) continue;
     // Dry and gentle within the inner town, mostly so out to its edge.
     let steep = 0, wet = 0, ok = true;
     for (const [r, k] of [[R * 0.45, 8], [R * 0.9, 16]] as const) for (let i = 0; i < k && ok; i++) {

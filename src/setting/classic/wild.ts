@@ -6,7 +6,8 @@
 import type { WildDef } from '../contract';
 
 export const wild: readonly WildDef[] = [
-  { id: 'deer', encounter: 'deer', habitat: 'open', ring: [250, 1400], range: 60, groups: 3 },
+  // Every group's ground starts past the distance a group wakes at (sim/wild.ts WAKE, 260 m) from the town's middle.
+  { id: 'deer', encounter: 'deer', habitat: 'open', ring: [330, 1400], range: 60, groups: 3 },
   { id: 'boar', encounter: 'boar', habitat: 'wood', ring: [350, 1200], range: 45, groups: 2 },
   { id: 'wolves', encounter: 'wolves', habitat: 'wood', ring: [700, 1600], range: 80, groups: 1 },
   { id: 'bandits', encounter: 'highwaymen', habitat: 'road', ring: [450, 1000], range: 30, groups: 1 },
