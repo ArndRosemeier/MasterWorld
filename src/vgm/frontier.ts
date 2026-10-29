@@ -7,6 +7,7 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { RegionFillDef, RegionsDef } from '../setting/contract';
+import { HOUSE_SCALE } from '@futuremagic/settlement';
 import { settlementOf, sitesIn, type DecisionLog, type RegionDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import { bankSpots, freshWaterEdge, WATER_REACH } from '../world/freshWater';
@@ -115,7 +116,7 @@ function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; 
     // none of them has open ground.
     for (let level = pick.level; level >= 0; level--) {
       // A smaller square only while the place (and the fields round it) still fits in it: the capital never squeezes.
-      if (sizeOf(level) < (pick.radius ?? 20) * 5) break;
+      if (sizeOf(level) < radiusOf(pick) * 5) break;
       const k = keyAt(level, p.x, p.z);
       if (!wholeFree(map, k)) continue;
       let wooded: { k: RegionKey; site: Spot } | null = null;
@@ -161,6 +162,11 @@ function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number 
 /** The places people live in, which stand by fresh water (D50): their squares' banks are tried too. */
 const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, waystation: true, hamlet: true, village: true, capital: true, camp: false, ruin: false, barrows: false };
 
+/** A fill's footprint radius (m): a settlement's grows with its houses (AssetGenerator HOUSE_SCALE), a camp's or a ruin's does not. */
+function radiusOf(f: RegionFillDef): number {
+  return (f.radius ?? 20) * (SETTLES[f.place] ? HOUSE_SCALE : 1);
+}
+
 
 const woods = new WeakMap<Terrain, (x: number, z: number) => number>();
 
@@ -176,7 +182,7 @@ const OPEN: Record<RegionFillDef['place'], number> = { none: 0, waystation: 1, h
  * other places; the way it faces (yaw: towards the start). Null if no ground fits.
  */
 function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number): Spot | null {
-  const t = c.terrain, r = f.radius ?? 20;
+  const t = c.terrain, r = radiusOf(f);
   const [x0, z0] = boundsOf(k), size = sizeOf(k.level), margin = r + 12;
   const away = [
     ...(c.avoid ?? []),
