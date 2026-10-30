@@ -14,7 +14,7 @@ import { Vector3, type Mesh, type PerspectiveCamera, type Vector4 } from 'three/
 import type { Stage } from '@futuremagic/stage';
 import { smoothstep } from '@futuremagic/core';
 import { beyondFrame, homeFrame, PortalStone, STONE_PORTAL, STONE_SHAPE, stoneSpot, type PortalStoneSave, type RoomProbe } from '../game/portalStone';
-import type { PortalFrame } from '../game/portal';
+import type { Portal, PortalFrame } from '../game/portal';
 import { kindMesh } from '../render/materials';
 import { GLYPH_REACH, GLYPHS, PORTAL_STONE, STONE_LOOK, STONE_SIZE, stoneGeometry } from '../render/materials/portalStone';
 import { PORTAL_RIFT, RIFT_STATE, riftGeometry } from '../render/materials/portal';
@@ -34,10 +34,12 @@ export interface StoneHost {
   readonly canvas: HTMLElement;
   readonly player: Player;
   readonly portals: Portals;
-  /** What a portal's spot is checked against (on the land). */
+  /** What a portal's spot is checked against (where the hero is: the land, or the place below they are in). */
   readonly probe: RoomProbe;
-  /** Out on the land (not below ground): only there do glyphs take. */
-  onLand(): boolean;
+  /** The realm the hero is in: 'land', or a place below by its id. */
+  realm(): string;
+  /** A realm made ready to be joined (a place below built); false if it cannot be. */
+  ready(realm: string): Promise<boolean>;
   /** The game takes clicks now (no window open). */
   playing(): boolean;
   sound(what: StoneSound, at: Vec3): void;
@@ -95,7 +97,7 @@ export class PortalStoneUse {
     this.mesh.matrixAutoUpdate = true;
     this.mesh.scale.setScalar(SHOWN);
     const p = this.stone.portal;
-    if (p) { host.portals.add(p); this.openA = this.openB = 1; }
+    if (p) { this.letIn(p); this.openA = this.openB = 1; }
     this.haze = [0, 1].map((slot) => {
       const h = kindMesh(riftGeometry(STONE_SHAPE, slot, 0), PORTAL_RIFT);
       h.name = slot ? 'portal stone rift (far)' : 'portal stone rift (home)';
@@ -182,10 +184,10 @@ export class PortalStoneUse {
     return best;
   }
 
-  /** Would a portal open for a hero standing at `feet` facing `yaw` (checks and shots look for a spot with room)? */
-  wouldOpen(feet: { x: number; y: number; z: number }, yaw: number): boolean {
+  /** How big a portal would open for a hero at `feet` facing `yaw` (of STONE_SHAPE; null: it fizzles). Checks and shots look for a spot with room. */
+  wouldOpen(feet: { x: number; y: number; z: number }, yaw: number): number | null {
     const f = beyondFrame(stoneSpot(feet, yaw), yaw, (x, z) => this.host.probe.standFloor(x, z));
-    return this.host.onLand() && this.stone.canOpen(f, this.host.probe);
+    return this.stone.canOpen(f, this.host.probe, this.host.realm());
   }
 
   /** The first glyph: a beam down to the floor under the stone, which becomes home. */
@@ -194,13 +196,8 @@ export class PortalStoneUse {
     const floor = this.host.probe.standFloor(this.at.x, this.at.z), to: Vec3 = [this.at.x, floor, this.at.z];
     this.host.sound('beam', to);
     this.due.push((b) => this.fx.beamDown(b, foot, to));
-    if (!this.host.onLand()) {
-      // Below ground the floor takes no mark: the light only splashes there.
-      this.counts.fizzled++;
-      return;
-    }
     const was = this.stone.portal;
-    this.stone.markHome(homeFrame(this.at, this.yaw, (x, z) => this.host.probe.standFloor(x, z)));
+    this.stone.markHome(homeFrame(this.at, this.yaw, (x, z) => this.host.probe.standFloor(x, z)), this.host.realm());
     if (was) {
       this.host.portals.remove(STONE_PORTAL);
       this.due.push((b) => { this.fx.shutDown(b, was.a.frame, was.shape); this.fx.shutDown(b, was.b.frame, was.shape); });
@@ -215,27 +212,43 @@ export class PortalStoneUse {
   private openHere(): void {
     const f = beyondFrame(this.at, this.yaw, (x, z) => this.host.probe.standFloor(x, z));
     const where: Vec3 = [f.x, f.y + 1.3, f.z];
-    if (!this.host.onLand() || !this.stone.canOpen(f, this.host.probe)) {
+    const realm = this.host.realm(), size = this.stone.canOpen(f, this.host.probe, realm);
+    if (size === null) {
       this.due.push((b) => this.fx.fizzle(b, f));
       this.host.sound('fizzle', where);
       this.counts.fizzled++;
       return;
     }
-    const made = this.stone.open(f);
+    const wasShape = this.stone.portal?.shape ?? STONE_SHAPE;
+    const made = this.stone.open(f, realm, size);
     if (!made) return;
     if (made.closed) {
-      const old: PortalFrame = made.closed;
-      this.due.push((b) => this.fx.shutDown(b, old, STONE_SHAPE));
+      const old: PortalFrame = made.closed.frame;
+      this.due.push((b) => this.fx.shutDown(b, old, wasShape));
       this.host.sound('close', [old.x, old.y + 1.2, old.z]);
     }
-    this.host.portals.add(made.portal);
+    this.letIn(made.portal);
     // The far one tears open; the home one (already open) stays, now leading here.
     this.openB = 0;
     if (!made.closed) this.openA = 0;
-    this.due.push((b) => { this.fx.tearOpen(b, made.portal.b.frame, STONE_SHAPE); if (!made.closed) this.fx.tearOpen(b, made.portal.a.frame, STONE_SHAPE); });
+    this.due.push((b) => { this.fx.tearOpen(b, made.portal.b.frame, made.portal.shape); if (!made.closed) this.fx.tearOpen(b, made.portal.a.frame, made.portal.shape); });
     this.host.sound('open', where);
     this.counts.opened++;
     this.host.changed();
+  }
+
+  /**
+   * Open the pair (again: moved), once both realms are ready (a place below is built first, so its side can be
+   * looked into and walked into); a pair replaced in the meantime is not opened.
+   */
+  private letIn(p: Portal): void {
+    // Made afresh: its size may have changed.
+    const reopen = (): void => { this.host.portals.remove(p.id); this.host.portals.add(p); };
+    const below = [p.a.realm, p.b.realm].filter((r) => r !== 'land');
+    if (!below.length) { reopen(); return; }
+    void Promise.all(below.map((r) => this.host.ready(r))).then((ok) => {
+      if (ok.every(Boolean) && this.stone.home === p.a && this.stone.far === p.b) reopen();
+    });
   }
 
   /** Every frame: the stone comes, floats, goes; the portals open and waver. */
@@ -277,13 +290,14 @@ export class PortalStoneUse {
       this.openA = Math.min(1, this.openA + dt / OPENING);
       this.openB = Math.min(1, this.openB + dt / OPENING);
     }
-    const sides = p ? [p.a.frame, p.b.frame] : [];
+    // Each side's haze stands in its own realm: shown only while the hero is there too (the land's goes when they go below).
+    const here = this.host.realm(), sides = p ? [p.a, p.b].map((sd) => (sd.realm === here ? sd.frame : null)) : [];
     const opens = [this.openA, this.openB];
     this.haze.forEach((h, i) => {
       const f = sides[i];
       h.visible = !!f;
-      if (f) standAt(h, f);
-      (RIFT_STATE.array[i] as Vector4).set(f ? smoothstep(0, 1, opens[i]!) : 0, this.t + i * 7.3, 0, 0);
+      if (f) { standAt(h, f); h.scale.setScalar(this.stone.size); h.updateMatrix(); }
+      (RIFT_STATE.array[i] as Vector4).set(p ? smoothstep(0, 1, opens[i]!) : 0, this.t + i * 7.3, 0, 0);
     });
   }
 
@@ -299,5 +313,5 @@ export class PortalStoneUse {
     this.fx.glowFrame(b, dt, this.state === 'away' ? null : { at: [this.at.x, this.at.y, this.at.z], there: this.there }, rims);
   }
 
-  stoneSave(): PortalStoneSave { return this.stone.save(); }
+  stoneSave(): PortalStoneSave { return this.stone.kept(); }
 }

@@ -829,12 +829,15 @@ export async function start(b: Boot): Promise<void> {
       player, view: portalView, hero: hero.object, lamp: view.lantern,
       realm: () => cellars?.realm ?? 'land',
       // Walked through a cave's portal: down in it now (or out again), with no fade; the game saves as after a fade.
+      // A portal stone's pair may join two places below, or one with itself.
       crossed: (to, from) => {
-        const v = cellars?.visitOf(to === 'land' ? from : to);
-        if (!v) return;
-        if (to === 'land') v.depart(); else v.arrive();
+        if (to === from) return;
+        const out = from === 'land' ? null : cellars?.visitOf(from), into = to === 'land' ? null : cellars?.visitOf(to);
+        if (!out && !into) return;
+        out?.depart();
+        into?.arrive();
         caveLit = null;
-        v.onSwap?.();
+        (into ?? out)?.onSwap?.();
       },
       // One realm shown for a view: the land (what left the frame below comes back, the places below go) or a place
       // below (the land leaves the frame; the hero, what lies about and the spells stay), and its light.
@@ -876,13 +879,15 @@ export async function start(b: Boot): Promise<void> {
     // The portal stone (game/portalStone.ts): held up from the pack, its glyphs mark home and open a portal back to it.
     const stoneUse = new PortalStoneUse({
       stage: view.stage, camera: view.camera, canvas, player, portals,
+      // Where the hero is: the land, or the place below they are in (its floor, walls and rock).
       probe: {
-        standFloor: (x, z) => landWorld.floor!(x, z) ?? landWorld.height(x, z),
-        blocksAt: (x, z, r, y) => landWorld.wall!(x, z, r, y),
-        rockGapAt: (x, y, z) => landWorld.rockSurface(x, y, z),
-        wetAt: (x, z) => landWorld.waterLevel(x, z),
+        standFloor: (x, z) => world.floor!(x, z) ?? world.height(x, z),
+        blocksAt: (x, z, r, y) => world.wall!(x, z, r, y),
+        rockGapAt: (x, y, z) => world.rockSurface(x, y, z),
+        wetAt: (x, z) => world.waterLevel(x, z),
       },
-      onLand: () => !visit(),
+      realm: () => cellars?.realm ?? 'land',
+      ready: async (realm) => realm === 'land' || !!(await cellars?.build(realm)),
       playing: () => open === 0 && playing,
       sound: (what, at) => {
         if (what === 'raise') sounds?.spell('gather', 'shade', at);

@@ -15,6 +15,12 @@ export const STONE_PORTAL = 'portal-stone';
 /** The stone's portals: a tall rift (an upright ellipse, materials/portal.ts) a head over a person. */
 export const STONE_SHAPE: PortalShape = { halfWidth: 1.2, height: 3.2 };
 
+/** A portal where there is less room shrinks to fit, down to the least of these (of STONE_SHAPE): still a head over the hero. */
+export const FITS = [1, 0.86, 0.74, 0.64] as const;
+
+/** STONE_SHAPE at `k` of its size. */
+export const stoneShape = (k: number): PortalShape => ({ halfWidth: STONE_SHAPE.halfWidth * k, height: STONE_SHAPE.height * k });
+
 /**
  * Where the stone floats: this far ahead of the feet, this far to their right and this high over them (m): over
  * the hero's shoulder as the camera trails behind, not hidden by the head.
@@ -92,67 +98,76 @@ export function hasRoom(f: PortalFrame, shape: PortalShape, probe: RoomProbe): b
   return true;
 }
 
-/** What is kept: the home and the far portal's frames (all on the land). */
+/** What is kept: the home and the far portal's frames, and their realms ('land', or a place below by its id; none: the land). */
 export interface PortalStoneSave {
   readonly home: PortalFrame | null;
   readonly far: PortalFrame | null;
+  readonly homeRealm?: string;
+  readonly farRealm?: string;
+  /** The pair's size, of STONE_SHAPE (FITS; none: whole). */
+  readonly size?: number;
 }
 
 const isFrame = (f: unknown): f is PortalFrame => !!f && typeof f === 'object' && ['x', 'y', 'z', 'yaw'].every((k) => Number.isFinite((f as Record<string, number>)[k]));
+const realmOf = (r: unknown): string => (typeof r === 'string' && r ? r : 'land');
 
 /** A save's stone, checked (a broken one is a stone that marked nothing yet). */
 export function cleanStoneSave(raw: unknown): PortalStoneSave {
-  const r = (raw && typeof raw === 'object' ? raw : {}) as { home?: unknown; far?: unknown };
-  const home = isFrame(r.home) ? r.home : null;
-  return { home, far: home && isFrame(r.far) ? r.far : null };
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { home?: unknown; far?: unknown; homeRealm?: unknown; farRealm?: unknown; size?: unknown };
+  const home = isFrame(r.home) ? r.home : null, far = home && isFrame(r.far) ? r.far : null;
+  const size = typeof r.size === 'number' && r.size >= FITS[FITS.length - 1] && r.size <= 1 ? r.size : 1;
+  return { home, far, homeRealm: realmOf(r.homeRealm), farRealm: realmOf(r.farRealm), size };
 }
 
-/** The realm the stone's portals stand in. */
-const REALM = 'land';
-
 export class PortalStone {
-  home: PortalFrame | null;
-  far: PortalFrame | null;
+  home: PortalSide | null;
+  far: PortalSide | null;
+  /** The open pair's size (of STONE_SHAPE). */
+  size = 1;
 
   constructor(saved?: PortalStoneSave) {
     const s = cleanStoneSave(saved);
-    this.home = s.home;
-    this.far = s.far;
+    this.size = s.size ?? 1;
+    this.home = s.home ? { realm: s.homeRealm ?? 'land', frame: s.home } : null;
+    this.far = s.far ? { realm: s.farRealm ?? 'land', frame: s.far } : null;
   }
 
   /** The pair open now (a home side and a far side), or null. */
   get portal(): Portal | null {
     if (!this.home || !this.far) return null;
-    const side = (frame: PortalFrame): PortalSide => ({ realm: REALM, frame });
-    return { id: STONE_PORTAL, shape: STONE_SHAPE, a: side(this.home), b: side(this.far), rift: true };
+    return { id: STONE_PORTAL, shape: stoneShape(this.size), a: this.home, b: this.far, rift: true };
   }
 
-  /** Home is marked at `f`: the pair that was open (if any) is closed. Returns whether one was. */
-  markHome(f: PortalFrame): boolean {
+  /** Home is marked at `f` in `realm`: the pair that was open (if any) is closed. Returns whether one was. */
+  markHome(f: PortalFrame, realm = 'land'): boolean {
     const was = !!this.portal;
-    this.home = f;
+    this.home = { realm, frame: f };
     this.far = null;
     return was;
   }
 
   /**
-   * Can a portal open at `f`? Not without a home, not on top of it, and not without room.
+   * How big a portal can open at `f` in `realm` (`probe` asks that realm): the largest of FITS with room, or null
+   * (no home, on top of it, or no room even at the least).
    */
-  canOpen(f: PortalFrame, probe: RoomProbe): boolean {
-    if (!this.home) return false;
-    if (Math.hypot(f.x - this.home.x, f.z - this.home.z) < NEAR_HOME) return false;
-    return hasRoom(f, STONE_SHAPE, probe) && hasRoom(this.home, STONE_SHAPE, probe);
+  canOpen(f: PortalFrame, probe: RoomProbe, realm = 'land'): number | null {
+    if (!this.home) return null;
+    const h = this.home.frame;
+    if (this.home.realm === realm && Math.hypot(f.x - h.x, f.z - h.z) < NEAR_HOME) return null;
+    for (const k of FITS) if (hasRoom(f, stoneShape(k), probe)) return k;
+    return null;
   }
 
-  /** Open the far portal at `f` (the old far one, if any, closes): the pair now open, and where the old far one stood. */
-  open(f: PortalFrame): { portal: Portal; closed: PortalFrame | null } | null {
+  /** Open the far portal at `f` in `realm`, `size` of STONE_SHAPE (the old far one, if any, closes): the pair now open, and the old far side. */
+  open(f: PortalFrame, realm = 'land', size = 1): { portal: Portal; closed: PortalSide | null } | null {
     if (!this.home) return null;
     const closed = this.far;
-    this.far = f;
+    this.far = { realm, frame: f };
+    this.size = size;
     return { portal: this.portal!, closed };
   }
 
-  save(): PortalStoneSave {
-    return { home: this.home, far: this.far };
+  kept(): PortalStoneSave {
+    return { home: this.home?.frame ?? null, far: this.far?.frame ?? null, homeRealm: this.home?.realm ?? 'land', farRealm: this.far?.realm ?? 'land', size: this.size };
   }
 }
