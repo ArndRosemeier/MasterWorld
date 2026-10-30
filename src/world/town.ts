@@ -3,7 +3,7 @@
  * (@futuremagic/settlement), and what the ground is at a point of it (street, building, yard) for
  * the terrain, the plants and later the ground's look. Pure, runs in workers.
  */
-import { buildingEntrance, distToPoly, fixtureBlocks, fixtureSight, wallBlocks, type Fixture, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
+import { buildingEntrance, distToPoly, pierDist, fixtureBlocks, fixtureSight, wallBlocks, type Fixture, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { TownDecision } from './decisions';
 import type { Terrain } from './terrain';
 
@@ -193,10 +193,29 @@ export class Town {
     return this.entrances[b.id];
   }
 
-  /** The highest step or porch floor at (x, z) (world y), or null where there is none. */
+  private harbourBox: number[] | null = null;
+
+  /** A harbour town's quay paving and piers' decks at (x, z) (world y), null off them (S2). */
+  harbourFloor(x: number, z: number): number | null {
+    const h = this.plan.harbour;
+    if (!h) return null;
+    if (!this.harbourBox) {
+      const [x0, z0, x1, z1] = polyBounds(h.quay), b = [x0, z0, x1, z1];
+      for (const p of h.piers) b.splice(0, 4, Math.min(b[0], p.x0 - p.half, p.x1 - p.half), Math.min(b[1], p.z0 - p.half, p.z1 - p.half), Math.max(b[2], p.x0 + p.half, p.x1 + p.half), Math.max(b[3], p.z0 + p.half, p.z1 + p.half));
+      this.harbourBox = b;
+    }
+    const b = this.harbourBox;
+    if (x < b[0] || z < b[1] || x > b[2] || z > b[3]) return null;
+    for (const p of h.piers) if (pierDist(p, x, z) <= 0) return p.deckY;
+    return pointInPoly(h.quay, x, z) ? h.quayY : null;
+  }
+
+  /** The highest step or porch floor at (x, z) (world y), the quay and the piers too, or null where there is none. */
   stand(x: number, z: number): number | null {
-    if (!this.near(x, z, 0)) return null;
-    let top: number | null = null;
+    // (The piers reach out past the town's raster.)
+    const quay = this.harbourFloor(x, z);
+    if (!this.near(x, z, 0)) return quay;
+    let top: number | null = quay;
     for (const b of this.plan.buildings) {
       const reach = Math.max(b.hu, b.hv) + 4;
       if (Math.abs(x - b.cx) > reach || Math.abs(z - b.cz) > reach) continue;
@@ -308,7 +327,7 @@ export function townById(towns: readonly Town[], id: string): Town | undefined {
 }
 
 export function townPlanOf(d: TownDecision, t: Terrain): TownPlan {
-  return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t), farmland: d.size !== 'waystation' });
+  return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t), farmland: d.size !== 'waystation', ...(d.harbour ? { harbour: d.harbour } : {}) });
 }
 
 /** A building's key among every town's (building ids count from 0 in each town). */

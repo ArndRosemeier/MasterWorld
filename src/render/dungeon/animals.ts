@@ -199,7 +199,7 @@ export function poseAnimal(b: AnimalBody, x: number, y: number, z: number, yaw: 
   // The den's yaw turns −z; the animals face +z.
   b.place.rotation.set(0, yaw + Math.PI, 0);
   if (again && ONCE.includes(doing)) b.doing = '';
-  if (b.lib) { poseLibrary(b, b.lib, doing, speed, dt); return; }
+  if (b.lib) { poseLibrary(b, b.lib, b.def.library!, doing, speed, dt); return; }
   const actor = b.actor!;
   // (A doing without a clip of its own, a wolf's flinch, keeps the clip playing.)
   const name = b.def.clips[doing];
@@ -216,8 +216,9 @@ export function poseAnimal(b: AnimalBody, x: number, y: number, z: number, yaw: 
   actor.update(dt);
 }
 
-function poseLibrary(b: AnimalBody, lib: LibraryAnimal, doing: AnimalDoing, speed: number, dt: number): void {
-  const name = doing !== b.doing ? libraryClip(lib, b.def.library!, doing) : undefined;
+/** A frame of a library animal's clips (`b.doing`: what it did last frame): the clip for `doing`, the gait at the ground speed. */
+export function poseLibrary(b: { doing: AnimalDoing | '' }, lib: LibraryAnimal, kind: LibraryKind, doing: AnimalDoing, speed: number, dt: number): void {
+  const name = doing !== b.doing ? libraryClip(lib, kind, doing) : undefined;
   if (name) {
     b.doing = doing;
     const a = lib.play(name, { fade: !lib.currentAction ? 0 : doing === 'dead' ? 0.1 : 0.25, loop: !ONCE.includes(doing) });

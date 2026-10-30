@@ -64,6 +64,10 @@ export const params = {
   folk: Number(q.get('folk') ?? 30),
   /** How many of the farms' grazing animals are drawn at most, the nearest (`stock=0`: none). */
   stock: Number(q.get('stock') ?? 6),
+  /** How many of the yards' hens are drawn at most, the nearest (`hens=0`: none); a cock to every five. `hens` alone: start beside a flock. */
+  hens: q.get('hens') === '' ? 10 : Number(q.get('hens') ?? 10),
+  /** Start beside a flock of hens (`hens` given without a number). */
+  henShot: q.get('hens') === '',
   /** How many saddled horses wait near the start (`horses=0`: none). */
   horses: Number(q.get('horses') ?? 2),
   /** The wild around the town (`wild=0` leaves it out; `wild=wolves` starts beside the first group of that kind). */
@@ -87,6 +91,8 @@ export const params = {
   portal: q.has('portal'),
   /** Start out in the nearest stretch of a kind of country (`kind=downs`, moor, karst, badlands, mesa, open; L7). */
   kind: q.get('kind'),
+  /** Start by the nearest sea (`coast=beach`, `cliff` on a sea cliff's top, `under` on the bed off that beach; S1), facing out to sea. */
+  coast: q.get('coast') as 'beach' | 'cliff' | 'under' | null,
   /**
    * Start in the court of the first people's hold, facing its gate (`hold`); `hold=friend` (or another
    * tier: hated, unwelcome, stranger, honoured) sets the hero's standing with that people to it.

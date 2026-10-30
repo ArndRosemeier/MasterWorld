@@ -100,6 +100,8 @@ export class SkyView {
   readonly gain = LIGHT;
   /** The camera is under water: fog turns to the water's own colour. */
   underwater = false;
+  /** The sea's murk under water now (the light of the day in it). */
+  readonly murk = new Color();
   /** The star field (its opacity follows the night and the cloud cover). */
   private readonly stars: Sprite;
   /** Below ground (a cellar, a dungeon): no sun or sky, a faint warm fill, darkness closing in. */
@@ -342,11 +344,13 @@ export class SkyView {
     FOG.flat.value = 0;
     this.dome.visible = !this.underwater;
     this.scene.background = this.underwater ? fog : null;
+    // The sea's murk: blue-green, dimmer at night (the underwater fog, and the veil's colour: render/underwater.ts).
+    const k = 0.15 + 0.85 * L.day;
+    this.murk.setRGB(0.03 * k, 0.17 * k, 0.19 * k);
     if (this.underwater) {
-      // Light fades fast with depth of view under water; blue-green, dimmer at night.
-      const k = 0.15 + 0.85 * L.day;
-      fog.setRGB(0.03 * k, 0.17 * k, 0.19 * k);
-      FOG.density.value = 0.022;
+      // Light fades fast with depth of view under water.
+      fog.copy(this.murk);
+      FOG.density.value = 0.04;
       FOG.mist.value = 0;
       FOG.flat.value = 1;
     }

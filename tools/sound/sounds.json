@@ -469,6 +469,18 @@
    "prompt": "The sound of a rooster crowing once in the morning on a farm, nothing else"
   },
   {
+   "id": "call/hen",
+   "kind": "call",
+   "most": 2.5,
+   "prompt": "The sound of a single hen clucking softly a few times while pecking in a farmyard, close by, nothing else"
+  },
+  {
+   "id": "call/hen-squawk",
+   "kind": "call",
+   "most": 1.5,
+   "prompt": "The sound of a startled hen squawking and flapping its wings once as it runs off, nothing else"
+  },
+  {
    "id": "bed/inn",
    "kind": "bed",
    "prompt": "The sound of a warm busy tavern in a medieval inn: a low murmur of many people talking without clear words, laughter, wooden mugs knocking on tables, a crackling hearth fire, no music, continuous for twenty seconds"
