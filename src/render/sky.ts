@@ -228,7 +228,8 @@ export class SkyView {
     this.sunLight.value.setRGB(0, 0, 0);
     WINDOWS.glow.value = 0;
     if (cave) {
-      this.hemi.color.setRGB(0.42, 0.47, 0.55);
+      // Near neutral: a blue fill from above lit the floors grey-lilac against the brown walls (phase P shots).
+      this.hemi.color.setRGB(0.45, 0.44, 0.42);
       this.hemi.groundColor.setRGB(0.1, 0.09, 0.08);
       this.hemi.intensity = CAVE_FILL;
     } else {
