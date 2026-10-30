@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { planInterior, planTown } from '@futuremagic/settlement';
 import { TownLife } from '../src/sim/townLife';
 import { roomCast } from '../src/sim/roomCast';
+import { RoomFlow } from '../src/sim/roomFlow';
 
 const plan = planTown({ seed: 7, x: 0, z: 0, radius: 130, height: () => 10 });
 
@@ -82,7 +83,7 @@ test('room cast: a guild hall\'s master stands by the practice post; nobody sits
   assert.ok(seen >= 3, `${seen} halls with somebody in`);
 });
 
-test('room cast: one woken in bed for a talk (a teacher at night) is in the room, up from bed', () => {
+test('room cast: one woken in bed for a talk (a teacher at night) stands by their bed, which nobody else takes, and lies down again after', () => {
   const life = new TownLife(plan, 7, 2);
   for (let s = 0; s < 300; s++) life.step(1, 2);
   const a = life.agents.find((x) => x.act === 'sleep' && x.spot >= 0 && life.spots[x.spot].door && planInterior(plan.buildings[life.spots[x.spot].building]).spots.some((s) => s.kind !== 'sleep'))!;
@@ -91,7 +92,14 @@ test('room cast: one woken in bed for a talk (a teacher at night) is in the room
   assert.equal(roomCast(life.agents, life.spots, b.id, room).find((x) => x.agent === a)?.act, 'sleep');
   life.hold(a, b.door[0], b.door[1]);
   assert.equal(a.heldIn, true);
-  const c = roomCast(life.agents, life.spots, b.id, room).find((x) => x.agent === a);
+  const cast = roomCast(life.agents, life.spots, b.id, room), c = cast.find((x) => x.agent === a);
   assert.ok(c, 'still in the room');
-  assert.notEqual(room.spots[c.spot].kind, 'sleep', 'up from bed');
+  assert.equal(c.act, 'chat', 'up for the talk');
+  assert.equal(room.spots[c.spot].kind, 'sleep', 'by their bed');
+  assert.equal(cast.filter((x) => x.spot === c.spot).length, 1, 'nobody else in that bed');
+  const flow = new RoomFlow(room), at = flow.frame(cast, 1 / 60).find((p) => p.agent === a)!;
+  assert.ok(Math.abs(at.a - room.spots[c.spot].a) > 0.8, 'beside the bed, not on it');
+  life.letGo(a);
+  for (let s = 0; s < 120; s++) life.step(1, 2);
+  assert.equal(roomCast(life.agents, life.spots, b.id, room).find((x) => x.agent === a)?.act, 'sleep', 'back in bed');
 });
