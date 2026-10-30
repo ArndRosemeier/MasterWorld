@@ -31,7 +31,7 @@ import { THROAT_OPENING, caveThroat, type ThroatFrame } from '../world/dungeon/c
 import type { Portal } from '../game/portal';
 import { caveFeatures, keepSpots } from '../world/dungeon/caveFeatures';
 import { caveSeed } from '../world/dungeon/torches';
-import { MOUTH_WAY_DOWN, mouthOnLand, throatWalk, type CaveMouth } from '../world/dungeon/caveMouth';
+import { MOUTH_WAY_DOWN, mouthOnLand, throatShare, throatWalk, type CaveMouth } from '../world/dungeon/caveMouth';
 import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
@@ -248,6 +248,17 @@ export class Cellars {
       if (y !== null) return t.y + y;
     }
     return null;
+  }
+
+  /** How far into a cave mouth's throat on the land (x, z) is: 0 outside, 1 deep in (the lantern is lit as one goes in). */
+  inThroat(x: number, z: number): number {
+    for (const s of this.sites.values()) {
+      const m = s.mound, t = m?.throat;
+      if (!m || !t || !s.throat || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
+      const [fx, fz] = inFrame(m, x, z);
+      if (Math.abs(fx) < 2.5 && fz > t.z - 1.5 && fz < 1) return throatShare(fz);
+    }
+    return 0;
   }
 
   /** The realm the hero is in (app/portals.ts): the place below by its id, else the land. */

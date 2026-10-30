@@ -22,6 +22,8 @@ export interface PortalsHost {
   readonly view: PortalView;
   /** The hero's body, drawn on the far side of an opening it is passing through. */
   readonly hero: Object3D;
+  /** The hero's lantern, carried through with the body (it lights the throat on whichever side is drawn). */
+  readonly lamp?: Object3D;
   /** The realm the hero is in now. */
   realm(): string;
   /** The hero walked through into `to` (from `from`): the walk world, the sky and the music follow. */
@@ -200,6 +202,11 @@ export class Portals {
     o.position.set(p.x, p.y, p.z);
     o.rotation.y = stepYaw(from, to, yaw);
     o.updateMatrixWorld(true);
-    return () => { o.position.copy(pos); o.rotation.y = yaw; o.updateMatrixWorld(true); };
+    const lamp = this.host.lamp, lit = lamp?.position.clone();
+    if (lamp && lit) { const q = stepPoint(from, to, lit); lamp.position.set(q.x, q.y, q.z); lamp.updateMatrixWorld(); }
+    return () => {
+      o.position.copy(pos); o.rotation.y = yaw; o.updateMatrixWorld(true);
+      if (lamp && lit) { lamp.position.copy(lit); lamp.updateMatrixWorld(); }
+    };
   }
 }

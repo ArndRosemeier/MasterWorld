@@ -10,6 +10,7 @@ import { atDoor, placesFor } from './app/places';
 import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
 import { Portals } from './app/portals';
+import { CAVE_LANTERN } from './app/cellarVisit';
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
 import { SettingsStore } from './app/settings';
@@ -729,6 +730,8 @@ export async function start(b: Boot): Promise<void> {
     const hidden: Object3D[] = [];
     // The portals (app/portals.ts: a cave's mouth joined to its throat below), and those opened before they were set up.
     let portals: Portals | null = null;
+    /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts inThroat). */
+    let throatLamp = false;
     const portalsDue: Portal[] = [];
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
@@ -807,7 +810,7 @@ export async function start(b: Boot): Promise<void> {
     const portalView = new PortalView(view);
     await view.stage.add(portalView.group);
     portals = new Portals({
-      player, view: portalView, hero: hero.object,
+      player, view: portalView, hero: hero.object, lamp: view.lantern,
       realm: () => cellars?.realm ?? 'land',
       // Walked through a cave's portal: down in it now (or out again), with no fade; the game saves as after a fade.
       crossed: (to, from) => {
@@ -1965,7 +1968,18 @@ export async function start(b: Boot): Promise<void> {
         through.placeCamera(view.camera, player.headPoint);
         // The eye adapts to where the camera is; from below, the sun's shadows are cast round the land beyond the portal.
         const seen = through.cameraRealm, heroIn = cellars?.realm ?? 'land';
-        view.sky.eye = seen === heroIn ? null : { indoors: seen !== 'land' };
+        // Walking into a cave's mouth the hero's lantern is lit (it is already burning at its portal), and deep in the
+        // throat the eye adapts to its dark before the cave.
+        const w = player.walker.pos, deep = heroIn === 'land' ? cellars?.inThroat(w.x, w.z) ?? 0 : 0;
+        if (heroIn === 'land' && (deep > 0 || throatLamp)) {
+          const L = view.lantern;
+          L.intensity += (CAVE_LANTERN * deep - L.intensity) * Math.min(1, dt * 2);
+          L.position.set(w.x - Math.sin(player.walker.yaw) * 0.4, w.y + 1.9, w.z - Math.cos(player.walker.yaw) * 0.4);
+          throatLamp = deep > 0 || L.intensity > 0.05;
+          if (!throatLamp) L.intensity = 0;
+        } else throatLamp = false;
+        const camDeep = seen === 'land' ? cellars?.inThroat(view.camera.position.x, view.camera.position.z) ?? 0 : 0;
+        view.sky.eye = seen === heroIn && camDeep < 0.6 ? null : { indoors: seen !== 'land' || camDeep >= 0.6 };
         view.sky.shadowFocus = seen === 'land' ? null : through.landSide(view.camera.position);
       }
       creator?.orbit(dt);

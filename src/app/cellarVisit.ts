@@ -147,7 +147,7 @@ export class CellarVisit {
     if (this.kneel?.done) { if (this.player.puppet === this.kneel) this.player.puppet = null; this.kneel = null; }
     // The lantern, held up and a little ahead (brighter in a cave: its rock is dark, its halls wide).
     // Walked in through a throat, it brightens over a moment as the day behind fades (else it is lit in the dark of a fade).
-    const lit = this.cellar.form.space.carved ? 13 : 8;
+    const lit = this.cellar.form.space.carved ? CAVE_LANTERN : 8;
     this.lantern.intensity = this.throat ? this.lantern.intensity + (lit - this.lantern.intensity) * Math.min(1, dt * LANTERN_UP) : lit;
     this.lantern.position.set(w.pos.x - Math.sin(w.yaw) * 0.4, w.pos.y + 1.9, w.pos.z - Math.cos(w.yaw) * 0.4);
     const lx = w.pos.x - O.x, ly = w.pos.y - O.y, lz = w.pos.z - O.z;
@@ -209,6 +209,9 @@ export class CellarVisit {
 
 /** Daylight through a crack in a cavern's roof: cool, steady, reaching down to its floor and walls. */
 const DAYLIGHT_BELOW: BelowLight = { color: 0xc4d4ff, strength: 70, reach: 48, decay: 1.25, flicker: false };
+
+/** The lantern's strength in a cave (its rock is dark, its halls wide). */
+export const CAVE_LANTERN = 13;
 
 /** How fast the lantern brightens in a throat (per second). */
 const LANTERN_UP = 1.5;
