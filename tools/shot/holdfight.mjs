@@ -36,6 +36,14 @@ const profiling = process.env.HITCH_PROFILE === '1', alloc = process.env.HITCH_A
 if (profiling) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
 if (alloc) { await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.startSampling', { samplingInterval: 16384, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true }); }
 
+// HITCH_UNBOX=1: every matrix's numbers moved into a fresh array of doubles before the fight (an experiment: do they
+// stay doubles, and how much garbage goes with it). Their kinds after are what HITCH_ELEMENTS=1 prints.
+if (process.env.HITCH_UNBOX === '1') console.log(`--- unboxed matrices: ${await page.evaluate(() => {
+  let n = 0;
+  const fresh = (m) => { const e = m.elements, a = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; for (let i = 0; i < 16; i++) a[i] = e[i]; m.elements = a; n++; };
+  window.game.view.scene.traverse((o) => { fresh(o.matrix); fresh(o.matrixWorld); for (const b of o.skeleton?.bones ?? []) { fresh(b.matrix); fresh(b.matrixWorld); } });
+  return n;
+})}`);
 // HITCH_KEYS=1: who has three work out their material's cache key again (a material's version bumped, the lights changed),
 // counted by object and material during the fight.
 if (process.env.HITCH_KEYS === '1') await page.evaluate(() => {
