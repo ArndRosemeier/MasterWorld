@@ -295,7 +295,12 @@ export async function start(b: Boot): Promise<void> {
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
       rockSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, false)),
       // In a building the camera stays in the room (its doorway shut to it).
-      sightSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, !!rooms?.inside)),
+      // Out of doors also a stall's awning, a well's roof (the talk view stood on an awning).
+      sightSurface: (x, y, z) => {
+        if (cellars?.throatAir(x, y, z)) return null;
+        const s = surfaceAt(x, y, z, !!rooms?.inside), f = rooms?.inside ? null : towns?.fixtureSight(x, y, z) ?? null;
+        return s === null ? f : f === null ? s : Math.min(s, f);
+      },
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => water?.surfaceAt(x, z) ?? null,
       // Rock faces with holds (D56).
