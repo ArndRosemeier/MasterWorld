@@ -642,5 +642,9 @@
   {
     "key": "idiom: [.d .sort] in masterworld/sim/smallLife.ts + masterworld/vgm/hints.ts + masterworld/world/coast.ts",
     "reason": "Sorting found candidates nearest first by a distance field is a language idiom; the candidates (small life spots, hints, river mouths) and what follows differ."
+  },
+  {
+    "key": "same name: masterworld/app/towns.ts#stand + masterworld/main.ts#stand",
+    "reason": "Unrelated: the towns' floor height at a point (steps, quay, piers) vs the shot hook that puts the hero at a spot; only the name matches."
   }
 ]
