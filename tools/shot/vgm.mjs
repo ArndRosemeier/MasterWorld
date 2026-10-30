@@ -3,7 +3,8 @@
  * the reference machine. Out on the land east of the start town the VGM answers Discovery: its move must come in
  * at the top of the VGM panel docked at the right and its place must get a ward-blue stud on the minimap
  * (01-panel). Filtered to that move's kind only such moves are listed (02-filtered); the move clicked lights up on
- * the minimap (03-picked); its Go there puts the hero beside the place (04-there); F9 hides the panel. JPEGs into `<out dir>`
+ * the minimap (03-picked); its Go there puts the hero beside the place (04-there); Clear empties the list and the next move
+ * comes in alone (05-cleared); F9 hides the panel. JPEGs into `<out dir>`
  * (default `shots/vgm/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  */
 import { execSync } from 'node:child_process';
@@ -65,6 +66,14 @@ await shoot('04-there');
 
 // Back to every kind (the filter is kept in the settings), and F9 hides the panel.
 await page.locator(`${P} .chip`, { hasText: 'All' }).click();
+// Clear empties the list; the next move comes in on its own.
+await page.locator(`${P} .tab`, { hasText: 'Clear' }).click();
+await page.waitForTimeout(300);
+check(await page.locator(`${P} .move`).count() === 0, 'Clear empties the list');
+await page.evaluate(() => window.game.answerNow('discovery'));
+await page.waitForTimeout(500);
+check(await page.locator(`${P} .move`).count() >= 1, 'a move after Clear is listed');
+await shoot('05-cleared');
 await page.keyboard.press('F9');
 await page.waitForTimeout(300);
 check(await page.locator(`${P}.shown`).count() === 0, 'F9 hides the panel');
