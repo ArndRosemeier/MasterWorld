@@ -82,6 +82,8 @@ export const params = {
   site: q.get('site'),
   /** With `site`: stand this far (m) outside its edge (default 14; a capital's 60, outside its wall). */
   siteAt: q.has('siteAt') ? Number(q.get('siteAt')) : null,
+  /** With `site=harbour`: start aboard the first ship moored there, on its main deck by the gangway (S3). */
+  aboard: q.has('aboard'),
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
   /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
