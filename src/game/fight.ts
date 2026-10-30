@@ -41,7 +41,9 @@ export type FightEvent =
   | { readonly kind: 'worn'; readonly item: Item; readonly state: WearState }
   | { readonly kind: 'refused'; readonly text: string }
   /** What the hero's abilities did (casts, things loosed, areas, effects): for the eye and the ear. */
-  | { readonly kind: 'recipe'; readonly event: RecipeEvent };
+  | { readonly kind: 'recipe'; readonly event: RecipeEvent }
+  /** A foe lifted a door's bar (link) standing at `from` (the den's frame): the door is seen swinging away from it. */
+  | { readonly kind: 'unbarred'; readonly link: number; readonly from: readonly [number, number] };
 
 /** Hero body radius, metres. */
 const HERO_R = 0.35;
@@ -257,6 +259,8 @@ export class Fight implements RecipeWorld {
     const w = this.hero.weapon;
     const d = Math.hypot(t.x - p.x, t.z - p.z), reach = this.reach(t);
     if (d > reach || Math.abs(t.y - p.y) > 1.3) return;
+    // Never through a wall or a shut door.
+    if (!this.den.ground.sees(p.x, p.y, p.z, t.x, t.y, t.z, 0.9)) return;
     if (Math.abs(angleDiff(Math.atan2(t.z - p.z, t.x - p.x), yawToDir(p.yaw))) > FACING) return;
     const a = this.queued ?? this.setting.abilities.find((x) => blowOf(x)?.again)!;
     const b = blowOf(a)!;
@@ -295,6 +299,7 @@ export class Fight implements RecipeWorld {
       case 'flee': out.push({ kind: 'flee', who: e.who }); break;
       case 'plea': out.push({ kind: 'plea', who: e.who, text: e.text }); break;
       case 'spared': out.push({ kind: 'spared', who: e.who }); break;
+      case 'unbarred': out.push({ kind: 'unbarred', link: e.link, from: [e.who.x, e.who.z] }); break;
       // Experience for the foe (D58), weighed by its danger against the hero's level.
       case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who), xp: this.earnFrom(e.who) }); break;
       default: break;
