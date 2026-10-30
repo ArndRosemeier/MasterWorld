@@ -68,6 +68,8 @@ export interface Agent {
    */
   stay?: number;
   /** Held in a building's room (they were in it when the talk began): drawn there, not where they stand outside (read only while `held`). */
+  /** Held for a talk out of bed (asleep when the hero came): they stand by their bed, which stays theirs. */
+  woke?: boolean;
   heldIn?: boolean;
   /** Sent over by the VGM (plan D27): walks up to (x, z), then waits there facing `face` until let go or `until`. */
   seek?: { x: number; z: number; face: { x: number; z: number } };
@@ -331,7 +333,9 @@ export class TownLife {
    */
   hold(a: Agent, x: number, z: number): void {
     const s = a.spot >= 0 ? this.spots[a.spot] : null;
-    a.heldIn = !!s && inRoom(a, s);
+    // Woken in bed (a teacher the hero comes to at night): in the room, up beside the bed to talk.
+    a.woke = a.act === 'sleep' && !!s?.door && s.building >= 0;
+    a.heldIn = !!s && (inRoom(a, s) || a.woke);
     a.held = true;
     a.hidden = false;
     if (a.act === 'sit') return;
@@ -373,6 +377,7 @@ export class TownLife {
   /** The talk is over: they pick up their day from here. */
   letGo(a: Agent): void {
     a.held = false;
+    a.woke = false;
     if (a.post) this.station(a, a.post.x, a.post.z, a.post.dir, a.post.act);
     else this.choose(a, false);
   }

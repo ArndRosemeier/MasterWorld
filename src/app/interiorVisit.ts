@@ -303,12 +303,20 @@ export class InteriorVisit {
   }
   private placed: Placed[] | null = null;
 
+  /**
+   * Those in the open building one can talk to: not those asleep, but for the ones the hero comes to find (a
+   * teacher, one a map mark sends the hero to): they get up for the hero at any hour.
+   */
+  talkers(): Placed[] | null {
+    const o = this.open, all = this.people();
+    return o && all ? all.filter((p) => p.act !== 'sleep' || o.door.town.life.isKept(p.agent.person.id)) : all;
+  }
+
   /** Who is in the open building this frame, and where (walking in, sitting down, walking out). */
   private stepPeople(dt: number): void {
     const o = this.open;
     if (!o) { this.placed = null; return; }
     const life = o.door.town.life;
-    // Only those drawn (Actors makes adults): a child would hold a seat and show nobody.
     const cast = roomCast(life.agents, life.spots, o.b.id, o.plan, o.flow.kept);
     const places = o.flow.frame(cast, dt);
     // Those walking out wait on the doorstep until they reach it (else they would be in the street already).

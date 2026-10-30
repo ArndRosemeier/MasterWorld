@@ -280,10 +280,6 @@
     "reason": "Only the name matches: the spell drawing's own release (app/spellFx, spell lab) and an unrelated system's."
   },
   {
-    "key": "same name: masterworld/app/spellFx/particles.ts#hold + masterworld/sim/townLife.ts#hold",
-    "reason": "Only the name matches: the spell drawing's own hold (app/spellFx, spell lab) and an unrelated system's."
-  },
-  {
     "key": "same name: masterworld/app/spellFx/particles.ts#spot + masterworld/sim/dungeonNav.ts#spot",
     "reason": "Only the name matches: the spell drawing's own spot (app/spellFx, spell lab) and an unrelated system's."
   },
