@@ -10,6 +10,7 @@ import type { TownBuilding } from '@futuremagic/settlement';
 import type { Stage } from '@futuremagic/stage';
 import { goingThrough, type Agent, type TownLife, type TownWeather } from '../sim/townLife';
 import type { Herds } from '../sim/livestock';
+import type { Poultry } from '../sim/poultry';
 import { Township, type TownshipContext, type TownshipSave } from '../game/township';
 import type { RegionDecision } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
@@ -46,6 +47,8 @@ export interface TownDoor {
 
 /** People live (their walks, their day) while the hero is within this of the town's edge (m). */
 const LIVE = 400;
+/** Hens farther than this (m) from a town's ground are left be (they are neither seen nor heard). */
+const HENS = 200;
 /** The hero is in a town (talks there, hears its leads) within this of its edge (m). */
 const IN = 60;
 /** The hero at a teacher's tower out on the land is with that town's people within this of it (m). */
@@ -248,6 +251,19 @@ export class Towns {
   graze(dt: number, x: number, z: number): Herds[] {
     const out: Herds[] = [];
     for (const t of this.near(x, z, LIVE)) { const h = t.herds; if (h) { h.step(dt); out.push(h); } }
+    return out;
+  }
+
+  /** The hens of every town near (x, z), scratching about; `near`: the hero on foot (they scatter from them), null: none. */
+  peck(dt: number, x: number, z: number, near: { x: number; z: number } | null): Poultry[] {
+    const out: Poultry[] = [], def = this.h.setting.world.poultry;
+    if (!def) return out;
+    for (const t of this.near(x, z, HENS)) {
+      const p = t.poultry;
+      if (!p) continue;
+      p.step(dt, this.h.hours(), def, near, (px, pz, r) => t.town.solid(px, pz, r));
+      out.push(p);
+    }
     return out;
   }
 

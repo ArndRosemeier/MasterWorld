@@ -7,7 +7,7 @@
 import type { BirdDoing } from '../sim/birdFlight';
 
 /** What a wild animal does this frame (from its den state). */
-export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 'hurt' | 'dead' | 'flick';
+export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 'hurt' | 'dead' | 'flick' | 'rest' | 'call';
 
 /** A kind drawn as library animals: which ones (by seed), their clips, and how big. */
 export interface LibraryKind {
@@ -40,6 +40,16 @@ export const LIBRARY_KINDS = {
     // Red deer: a stag to every two hinds (one rig, so the same clips).
     ids: ['red-deer-male', 'female-deer', 'female-deer'],
     clips: { idle: ['Idle'], alert: ['Idle_2', 'Idle_Idle_02', 'Idle_Breathing_01'], feed: ['Idle_Eating', 'Idle_Eating_01'], walk: ['Walk'], run: ['Sprint', 'Run'], hurt: ['Hit_Stand_L01'], dead: ['Death_Stand_R01'] },
+  },
+  hen: {
+    // The yards' hens (sim/poultry.ts): both idles peck at the ground; at night they sit (IdleLay).
+    ids: ['chicken'],
+    clips: { idle: ['Idle'], feed: ['Idle2', 'Idle'], walk: ['Walk'], run: ['Run'], rest: ['IdleLay'], hurt: ['GetHit'], dead: ['Death'] },
+  },
+  cock: {
+    // A cock to the hens: Idle_4 throws the head up and back (the crow, heard as call/rooster); Idle_2, _5 and _6 peck.
+    ids: ['rooster'],
+    clips: { idle: ['Idle', 'Oneleg02'], feed: ['Idle_6', 'Idle_5'], walk: ['Walk'], run: ['Run'], rest: ['Sitting01'], call: ['Idle_4'], hurt: ['Damage'], dead: ['Death'] },
   },
   pheasant: {
     // The hero's bird form (game/birdForm.ts): a cock pheasant, with flight of its own (BIRD_CLIPS).

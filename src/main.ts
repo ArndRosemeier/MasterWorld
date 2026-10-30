@@ -32,6 +32,7 @@ import { GIANT_SPEED, giantPose, type Orbit } from './app/title/route';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
 import { StockView } from './render/livestock/StockView';
+import { PoultryView } from './render/livestock/PoultryView';
 import { Steed, groundPace, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import type { Agent, TownOrder } from './sim/townLife';
@@ -623,6 +624,9 @@ export async function start(b: Boot): Promise<void> {
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r),
     }, setting.smallLife) : null;
     const smallView = small ? new SmallLifeView(small, view.stage, view.renderer) : null;
+    // The yards' hens (the private library's chicken and rooster): bodies for the nearest; none without the library.
+    const hens = params.hens > 0 && setting.world.poultry ? await PoultryView.pool(params.hens, Math.max(1, Math.round(params.hens / 5)), (x, z) => feet.footing(x, z)) : null;
+    if (hens) compileEarly(hens.toWarm());
     if (stock) compileEarly(stock.toWarm());
     if (smallView) compileEarly(smallView.toWarm());
     let folk: FolkView | null = null;
@@ -657,7 +661,7 @@ export async function start(b: Boot): Promise<void> {
     // what changed since, such as the hero's arms), and its shadow casters drawn once (Stage.prepare).
     await Promise.all(compiling);
     console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: every early compile done; their shadows next`);
-    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
+    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(hens ? hens.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
     let hurried = false;
     const shown = () => { view.stage.cap.share = hurried && !window.__mwReady ? 1 : capShare; view.stage.monitor.phase = hurried && !window.__mwReady ? 'warmup' : 'run'; };
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
@@ -676,6 +680,7 @@ export async function start(b: Boot): Promise<void> {
     await view.stage.add(hero.object);
     await horses?.show(view.stage);
     await stock?.enter(view.stage);
+    await hens?.enter(view.stage);
     await smallView?.addBirds();
     await view.stage.add(wx.precip);
     stamp('sky, sea, hero and animals shown')();
@@ -939,6 +944,7 @@ export async function start(b: Boot): Promise<void> {
     let lookWild = by ? by.kind : null;
     // `small=squirrel` / `birds` / `flock`: beside the first that is about (for looking at them).
     let lookSmall = params.smallAt;
+    let lookHens = params.henShot;
     /** With `fly`: the one the free camera follows, and how far off. */
     let watchSmall: { it: { x: number; y: number; z: number }; d: number } | null = null;
     /** The hero `d` metres from `seen`, on the side they are on, facing it. */
@@ -2236,6 +2242,18 @@ export async function start(b: Boot): Promise<void> {
       if (folk) folk.lives = lives;
       part('herds');
       stock?.herd(dt, cam, towns.graze(dt, cam.x, cam.z));
+      part('hens');
+      {
+        // The yards' hens scratch about whether drawn or not (they are heard); they scatter from the hero on foot out of doors.
+        const w = player.walker.pos, onFoot = above && !rooms?.inside && !player.flying ? { x: w.x, z: w.z } : null;
+        const flocks = towns.peck(dt, cam.x, cam.z, onFoot);
+        if (lookHens) {
+          const near = flocks.flatMap((f) => f.hens).filter((a) => !a.cock).sort((a, b) => Math.hypot(a.x - w.x, a.z - w.z) - Math.hypot(b.x - w.x, b.z - w.z))[0];
+          if (near) { standBeside(near, 3.2); lookHens = false; }
+        }
+        if (above) for (const f of flocks) for (const e of f.heard) sounds?.hen(e);
+        hens?.showFlocks(dt, cam, above ? flocks : []);
+      }
       part('small life');
       if (small && smallView) {
         // Out of doors only: below or inside, the land's small life waits.
