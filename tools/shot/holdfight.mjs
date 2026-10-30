@@ -70,6 +70,32 @@ if (process.env.HITCH_REVERT === '1') console.log(`--- boxed again:\n${await pag
   await new Promise((r) => setTimeout(r, 1000));
   return `${a}\n${b}\n${look('after a second')}`;
 })}`);
+// HITCH_INFECT=1 (with HITCH_ELEMENTS=1): the scene's matrices unboxed, then for two frames every call of a matrix
+// method on a matrix still boxed is counted by where it came from: who holds the boxed matrices that box the others again.
+if (process.env.HITCH_INFECT === '1') console.log(`--- calls on boxed matrices, by caller:\n${await page.evaluate(async () => {
+  const kind = new Function('a', 'return %HasObjectElements(a)');
+  const fresh = (m) => { const e = m.elements, a = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; for (let i = 0; i < 16; i++) a[i] = e[i]; m.elements = a; };
+  const scene = window.game.view.scene;
+  scene.traverse((o) => { fresh(o.matrix); fresh(o.matrixWorld); });
+  const M4 = scene.matrix.constructor, P = M4.prototype, saved = {}, counts = new Map(), who = new Set();
+  for (const k of Object.getOwnPropertyNames(P)) {
+    const f = P[k];
+    if (typeof f !== 'function' || k === 'constructor') continue;
+    saved[k] = f;
+    P[k] = function (...a) {
+      if (kind(this.elements)) {
+        who.add(this);
+        const st = (new Error().stack ?? '').split('\n').slice(2, 7).map((l) => l.trim().replace(/\(.*\/([^/]+:\d+):\d+\)/, '($1)')).join(' < ');
+        const key = `${k}: ${st}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      return f.apply(this, a);
+    };
+  }
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  for (const k of Object.keys(saved)) P[k] = saved[k];
+  return `  ${who.size} boxed matrices called\n${[...counts].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, n]) => `  ${n} ${k}`).join('\n')}`;
+})}`);
 // HITCH_KEYS=1: who has three work out their material's cache key again (a material's version bumped, the lights changed),
 // counted by object and material during the fight.
 if (process.env.HITCH_KEYS === '1') await page.evaluate(() => {
