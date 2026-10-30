@@ -199,8 +199,8 @@ export class CaveSpace extends DungeonSpace {
 
 /** The rock as it is (grey with a little ochre), and silt on the floors. */
 const ROCK: Tint = [168, 160, 148], SILT: Tint = [150, 132, 110];
-/** Silt so thin that the rock's grey shows through. */
-const BARE: Tint = [128, 126, 122];
+/** Silt so thin that the rock shows through (warm: a grey floor stood cold against the brown walls). */
+const BARE: Tint = [138, 124, 106];
 
 /** The cave's rock as one mesh in the building format (its own frame). */
 export function caveShell(f: CaveField, layout: ScaledLayout, seed: number, feat = caveFeatures(layout, seed)): BuildingMesh {

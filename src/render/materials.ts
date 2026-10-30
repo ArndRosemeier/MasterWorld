@@ -437,7 +437,7 @@ export const CAVE_ROCK = defineKind('cave rock', ['position', 'normal', 'tint'],
   const tile = mix(float(1 / NATURAL_TILE_METERS[roofL]), float(1 / NATURAL_TILE_METERS[floorL]), below);
   const st = vec2(p.x.add(mx_noise_float(p.xz.mul(0.07)).mul(1.5)), p.z).mul(tile);
   const topA = texture(ground.albedo).sample(st).depth(li), topN = texture(ground.normal).sample(st).depth(li);
-  const warm = mix(vec3(1), vec3(1.25, 1.08, 0.88), below);
+  const warm = mix(vec3(1), vec3(1.45, 1.12, 0.76), below);
   const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n, { a: vec4(topA.rgb.mul(warm), topA.a), n: topN });
   // The tint is about 0.4 (linear) on bare rock: brought back to the rock's own colour, a little darker underground.
   const tint = pow(attribute('tint', 'vec3'), vec3(2.2)).mul(1.9);
