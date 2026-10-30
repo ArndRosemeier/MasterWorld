@@ -260,14 +260,16 @@ export class TownLife {
 
   /**
    * Stop someone for a talk: they turn to (x, z) where they stand; one at their work behind a barrel, an anvil or
-   * an oven (the thing between them and the one talking) first comes round it, and is seen walking there.
+   * an oven (the thing between them and the one talking) first comes round it, and is seen walking there. One
+   * sitting on a bench stays sitting, as they sat, and talks from there (standing up on the spot stood them in it).
    */
   hold(a: Agent, x: number, z: number): void {
     const s = a.spot >= 0 ? this.spots[a.spot] : null;
     a.heldIn = !!s && inRoom(a, s);
     a.held = true;
-    a.act = 'chat';
     a.hidden = false;
+    if (a.act === 'sit') return;
+    a.act = 'chat';
     a.dir = facing(a, x, z);
     const way = s && !a.heldIn && a.path.length === 0 ? roundTheWork(s, a, x, z) : null;
     if (!way) return;

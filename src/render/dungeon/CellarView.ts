@@ -13,7 +13,7 @@ import type { BuildingMesh } from '@futuremagic/settlement';
 import type { Stage } from '@futuremagic/stage';
 import { DOOR_W, type Cellar } from '../../world/dungeon/cellar';
 import { cellarMeshes, type DoorPiece } from '../../world/dungeon/cellarMesh';
-import { buildingMeshAt } from '../materials/building';
+import { buildingMeshAt, caveRockMeshAt } from '../materials/building';
 import { loadCellarProps } from './props';
 import { flameMesh } from '../materials/flame';
 import { caveShaftMesh, caveWaterMesh } from '../materials/caveWater';
@@ -47,7 +47,7 @@ export class CellarView {
   async add(stage: Stage): Promise<void> {
     const m = cellarMeshes(this.cellar, await loadCellarProps(), this.throat);
     this.group.add(this.piece(m.shell, 'shell'), this.piece(m.props, 'props'));
-    if (this.rock) this.group.add(this.piece(this.rock, 'rock'));
+    if (this.rock) this.group.add(caveRockMeshAt(this.rock, this.origin.x, this.origin.y, this.origin.z));
     const O = this.origin;
     for (const m of this.cave ? [caveWaterMesh(this.cave, O.x, O.y, O.z), caveShaftMesh(this.cave, O.x, O.y, O.z)] : []) if (m) this.group.add(m);
     const torches = torchSpots(this.cellar);

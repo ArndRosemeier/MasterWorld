@@ -339,7 +339,7 @@ export class FolkView {
       o.position.set(st.x, st.y, st.z);
       o.rotation.y = st.yaw;
       this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
-      const clip = p?.puppet?.clip ?? s.held.pick(dt, clipOf(p ? p.act : a.act, a.person.id));
+      const clip = p?.puppet?.clip ?? s.held.pick(dt, clipOf(p ? p.act : a.act, a.person.id, !!a.held));
       if (clip !== s.clip) {
         s.clip = clip;
         s.since = 0;

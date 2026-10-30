@@ -9,7 +9,7 @@ import { BufferAttribute, BufferGeometry, Color, MeshPhysicalNodeMaterial, type 
 import { attribute, dot, float, floor, fract, int, mix, normalMap, pow, round, sin, step, texture, uniform, uniformArray, varying, vec3 } from 'three/tsl';
 import { WORLD } from '../origin';
 import { BuildingMat, INSIDE_LEVELS, INSIDE_LIGHT, type BuildingMesh } from '@futuremagic/settlement';
-import { defineKind, kindMesh } from '../materials';
+import { CAVE_ROCK, defineKind, kindMesh } from '../materials';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 import { townTextures } from './townGround';
 import { WEATHER } from './weather';
@@ -63,18 +63,32 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
   return m;
 });
 
-/** A mesh in the building format (@futuremagic/settlement) as a three mesh with the building shader, at (x, y, z). */
-export function buildingMeshAt(m: BuildingMesh, x: number, y: number, z: number, name: string, yaw = 0): Mesh {
+/** A building-format mesh's geometry: position, normal and tint, and its uv and material if `full`. */
+function buildingGeometry(m: BuildingMesh, full: boolean): BufferGeometry {
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(m.position, 3));
   g.setAttribute('normal', new BufferAttribute(m.normal, 3));
-  g.setAttribute('uv', new BufferAttribute(m.uv, 2));
-  // Floats: WebGPU has no 1- or 3-byte vertex formats.
-  g.setAttribute('mat', new BufferAttribute(Float32Array.from(m.mat), 1));
+  if (full) {
+    g.setAttribute('uv', new BufferAttribute(m.uv, 2));
+    // Floats: WebGPU has no 1- or 3-byte vertex formats.
+    g.setAttribute('mat', new BufferAttribute(Float32Array.from(m.mat), 1));
+  }
   g.setAttribute('tint', new BufferAttribute(Float32Array.from(m.tint, (v) => v / 255), 3));
   g.setIndex(new BufferAttribute(m.index, 1));
   g.computeBoundingSphere();
-  const mesh = kindMesh(g, BUILDING, x, y, z);
+  return g;
+}
+
+/** A natural cave's rock (world/dungeon/caveRock.ts, building format) with the cave rock shader, at (x, y, z). */
+export function caveRockMeshAt(m: BuildingMesh, x: number, y: number, z: number): Mesh {
+  const mesh = kindMesh(buildingGeometry(m, false), CAVE_ROCK, x, y, z);
+  mesh.name = 'rock';
+  return mesh;
+}
+
+/** A mesh in the building format (@futuremagic/settlement) as a three mesh with the building shader, at (x, y, z). */
+export function buildingMeshAt(m: BuildingMesh, x: number, y: number, z: number, name: string, yaw = 0): Mesh {
+  const mesh = kindMesh(buildingGeometry(m, true), BUILDING, x, y, z);
   // Turned about +y (a barrow, a hold's gate); its matrix is fixed, so it is set here, once.
   mesh.rotation.y = yaw;
   mesh.updateMatrix();

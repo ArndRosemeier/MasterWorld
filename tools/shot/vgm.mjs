@@ -18,7 +18,7 @@ const git = (cmd) => { try { return execSync(`git ${cmd}`, { encoding: 'utf8' })
 const dir = process.argv[2] ?? join('shots/vgm', `${new Date().toISOString().slice(0, 10)}-${git('rev-parse --short HEAD') || 'nocommit'}`);
 mkdirSync(dir, { recursive: true });
 
-const { server, base, browser } = await launch({});
+const { server, base, browser } = await launch({ vgmPanel: true });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));

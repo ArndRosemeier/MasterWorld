@@ -31,7 +31,7 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 const t0 = Date.now();
-await page.goto(`${base}?title=0&day=0&hour=12&weather=fair&site=capital&siteAt=${FAR_OUT}${gl ? '&gl' : ''}`);
+await page.goto(`${base}?title=0&day=0&hour=12&weather=fair&site=capital&siteAt=${FAR_OUT}&stock=0${gl ? '&gl' : ''}`);
 await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT });
 const readyS = (Date.now() - t0) / 1000;
 await page.addStyleTag({ content: '#loading{display:none!important}#hud{visibility:hidden!important}' });
@@ -203,7 +203,10 @@ else {
   }, [g, cap.market, d]);
   const open = () => page.evaluate(([id, i]) => window.game.towns.gatesOf(id)?.[i] ?? -1, [cap.id, gi]);
   await page.evaluate(() => { window.game.view.sky.hour = 22.5; });
-  await before(44);
+  // Nearer than by day, still past the 22 m at which the gate opens for one coming (render/town/GateView.ts COME),
+  // and from a little higher (the page has no grazing beasts, `stock=0`: a cow by the road filled the picture).
+  await before(30);
+  await page.evaluate(() => { window.game.player.heroCam.pitch = 0.14; });
   // The hour jumped: let the town's people get home first (one coming through holds the gate open).
   let shut = -1;
   for (let i = 0; i < 20 && (shut = await open()) !== 0; i++) await page.waitForTimeout(1000);
