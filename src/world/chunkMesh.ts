@@ -88,13 +88,12 @@ export function chunkIndex(segs: number): Uint32Array {
 }
 
 /**
- * A far chunk's own triangle list, where a quad is cut along the diagonal whose corners lie nearer in height: a steep
- * edge (a scarp's or a mesa's rim) running slantwise through vertices 4 m apart and more stood in a saw of teeth along
+ * A chunk's own triangle list, where a quad is cut along the diagonal whose corners lie nearer in height: a steep
+ * edge (a scarp's or a mesa's rim, a moor's drop) running slantwise through the vertices stood in a saw of teeth along
  * the shared list's one diagonal, the same way in every quad. Null when no quad needs it (the shared list serves).
- * Near chunks keep the shared cut (2 m cells: their teeth are small, and every chunk there drawing the shared list keeps it cheap).
+ * Near chunks too: a moor's 2 m drop seen from 50 m stood in the same saw of teeth on 2 m cells (gate P shots).
  */
 export function followEdges(h: (i: number, j: number) => number, segs: number, step: number): Uint16Array | Uint32Array | null {
-  if (step < SMOOTH_STEP) return null;
   const n = segs + 1;
   let out: Uint16Array | Uint32Array | null = null;
   for (let j = 0; j < segs; j++) for (let i = 0; i < segs; i++) {
