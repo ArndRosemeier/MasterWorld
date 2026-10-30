@@ -23,12 +23,18 @@ test('feast: a ring dances facing its middle, the rest revel round it, the child
   assert.ok(revellers.length > dancers.length, `${revellers.length} revelling`);
   for (const a of dancers) {
     const d = Math.hypot(a.x - x, a.z - z);
-    assert.ok(d > 2 && d < 5.5, `a dancer ${d.toFixed(1)} m from the middle`);
+    assert.ok(d > 6 && d < 8, `a dancer ${d.toFixed(1)} m from the middle`);
     const toMiddle = Math.atan2(z - a.z, x - a.x), off = Math.abs(Math.atan2(Math.sin(a.dir - toMiddle), Math.cos(a.dir - toMiddle)));
     assert.ok(off < 0.5, `a dancer faces ${off.toFixed(2)} rad off the middle`);
     assert.ok(a.person.age < OLD_AGE && a.person.role !== 'child', 'the old and the children do not dance');
   }
-  for (const a of revellers) assert.ok(Math.hypot(a.x - x, a.z - z) > 4, 'revellers keep out of the ring');
+  const faces = (a: (typeof dancers)[number]) => {
+    const toMiddle = Math.atan2(z - a.z, x - a.x);
+    return Math.abs(Math.atan2(Math.sin(a.dir - toMiddle), Math.cos(a.dir - toMiddle))) < 0.5;
+  };
+  for (const a of revellers) assert.ok(Math.hypot(a.x - x, a.z - z) > 8.5, 'revellers keep out of the ring');
+  assert.ok(revellers.filter(faces).length > revellers.length * 0.9, `${revellers.filter(faces).length} of ${revellers.length} revellers face the ring`);
+  assert.ok(dancers.length <= (2 * Math.PI * 7) / 1.1, `${dancers.length} dancers, room for each`);
   const kids = life.agents.filter((a) => a.person.role === 'child' && !a.hidden);
   assert.ok(kids.length && kids.filter((a) => ran.has(a.person.id)).length > kids.length * 0.6, `${ran.size} of ${kids.length} children ran`);
 });

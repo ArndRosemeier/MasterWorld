@@ -75,16 +75,32 @@ export function findLoop(def, frames, { cycle = [0.8, 1.9], minPace = 0.25, maxT
 }
 
 /**
+ * Whether frames a..b keep upright: the hips never more than `hips` hip heights below where the take stands (its 90th percentile),
+ * the chest never leaning more than `tilt` radians off upright. Not a squat, a sit or a tumble.
+ */
+function uprightIn(frames, a, b, { hips, tilt, stand, chest }) {
+  for (let f = a; f <= b; f++) {
+    if (frames[f].root[1] < stand - hips) return false;
+    if (rotate(frames[f].q[chest], [0, 1, 0])[1] < Math.cos(tilt)) return false;
+  }
+  return true;
+}
+
+/**
  * Finds a loop done on the spot (a dance, a laugh, a cheer): of the windows `secs` long whose ends match within
  * `seam` and that keep within `travel` hip heights of where they began, the one with the most going on (so not a
- * stretch of standing still before or after the act).
+ * stretch of standing still before or after the act). With `upright` ({ hips, tilt }), only stretches that keep upright.
  */
-export function findStill(def, frames, { secs = [2, 4], seam = 0.08, travel = 0.4 } = {}) {
+export function findStill(def, frames, { secs = [2, 4], seam = 0.08, travel = 0.4, upright = null } = {}) {
   const fps = def.fps, n = frames.length;
   const lo = Math.round(secs[0] * fps), hi = Math.round(secs[1] * fps);
   // How much the body moves from each frame to the next (summed, so a window's motion is one difference).
   const moved = new Float64Array(n);
   for (let f = 1; f < n; f++) moved[f] = moved[f - 1] + unlike(frames[f - 1], frames[f], true);
+  if (upright) {
+    const ys = frames.map((f) => f.root[1]).sort((x, y) => x - y);
+    upright = { ...upright, stand: ys[Math.floor(ys.length * 0.9)], chest: def.bones.indexOf('spine_03') };
+  }
   let best = null;
   for (let a = 0; a + lo < n; a++) {
     for (let len = lo; len <= hi && a + len < n; len += 2) {
@@ -94,6 +110,7 @@ export function findStill(def, frames, { secs = [2, 4], seam = 0.08, travel = 0.
       let far = false;
       for (let f = a; f <= b && !far; f += 3) if (Math.hypot(frames[f].root[0] - A.root[0], frames[f].root[2] - A.root[2]) > travel) far = true;
       if (far) continue;
+      if (upright && !uprightIn(frames, a, b, upright)) continue;
       const busy = (moved[b] - moved[a]) / len;
       if (!best || busy > best.busy) best = { start: a, len, score, pace: 0, busy };
     }

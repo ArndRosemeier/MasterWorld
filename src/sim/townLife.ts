@@ -176,8 +176,12 @@ const DETAIL = 260;
 const PLAY_CLEAR = 0.6;
 /** Running is this many times one's walking pace. */
 export const RUN = 2.3;
-/** A feast (TownOrder mood 'feast'): the ring dances this far from the middle (m), the share of the grown who dance in it, revellers stand round it from REVEL out. */
-const FEAST = { ring: 3.6, dancers: 0.35, revel: 5.5 } as const;
+/**
+ * A feast (TownOrder mood 'feast'): the ring dances this far from the middle (m: clear of a well or a cross there),
+ * the share of the grown who dance in it, each dancer's room along the ring (m), revellers stand round it from
+ * `revel` out.
+ */
+const FEAST = { ring: 7, dancers: 0.35, room: 1.1, revel: 9.5 } as const;
 
 /** How fast `a` goes when on the move (m/s). */
 export const paceOf = (a: Agent): number => a.person.speed * (a.run ? RUN : 1);
@@ -509,11 +513,12 @@ export class TownLife {
       const [x, z] = openSpot(1, order.radius * 0.8);
       return { spot: -1, x, z, act: 'play', secs: [3, 9], run: true };
     }
-    if (p.age < OLD_AGE && r.chance(FEAST.dancers)) {
-      const [x, z] = openSpot(FEAST.ring - 0.4, FEAST.ring + 0.4);
+    const dancing = this.agents.filter((o) => o !== a && (o.act === 'dance' || o.next === 'dance')).length;
+    if (p.age < OLD_AGE && r.chance(FEAST.dancers) && dancing < (2 * Math.PI * FEAST.ring) / FEAST.room) {
+      const [x, z] = openSpot(FEAST.ring - 0.3, FEAST.ring + 0.3);
       return { spot: -1, x, z, act: 'dance', secs: [60, 180], face };
     }
-    const [x, z] = openSpot(FEAST.revel, Math.max(FEAST.revel + 1, order.radius));
+    const [x, z] = openSpot(FEAST.revel, Math.max(FEAST.revel + 2, order.radius));
     return { spot: -1, x, z, act: 'revel', secs: [60, 200], face };
   }
 

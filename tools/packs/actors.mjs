@@ -33,10 +33,10 @@ const heroLooks = readFileSync(join(root, 'src/setting/classic/hero.ts'), 'utf8'
 const gaitText = readFileSync(join(root, 'src/render/folk/gaits.ts'), 'utf8');
 const cuts = [...gaitText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', pace: ([\d.]+) \}/g)].map((m) => ({ clip: m[1], take: m[2], pace: Number(m[3]) }));
 if (!cuts.length) throw new Error('no GAIT_CUTS in src/render/folk/gaits.ts');
-// Moves on the spot cut out of the CMU takes (src/render/folk/moves.ts), one `{ clip, take, secs, seam, travel }` a line.
+// Moves on the spot cut out of the CMU takes (src/render/folk/moves.ts), one `{ clip, take, secs, seam, travel, upright }` a line.
 const moveText = readFileSync(join(root, 'src/render/folk/moves.ts'), 'utf8');
-for (const m of moveText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', secs: \[([\d.]+), ([\d.]+)\], seam: ([\d.]+), travel: ([\d.]+) \}/g)) {
-  cuts.push({ clip: m[1], take: m[2], still: { secs: [Number(m[3]), Number(m[4])], seam: Number(m[5]), travel: Number(m[6]) } });
+for (const m of moveText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', secs: \[([\d.]+), ([\d.]+)\], seam: ([\d.]+), travel: ([\d.]+), upright: \{ hips: ([\d.]+), tilt: ([\d.]+) \} \}/g)) {
+  cuts.push({ clip: m[1], take: m[2], still: { secs: [Number(m[3]), Number(m[4])], seam: Number(m[5]), travel: Number(m[6]), upright: { hips: Number(m[7]), tilt: Number(m[8]) } } });
 }
 if (!cuts.some((c) => c.still)) throw new Error('no MOVE_CUTS in src/render/folk/moves.ts');
 // The pack's walk at its own speed (m/s): the cuts' paces are measured against it.
