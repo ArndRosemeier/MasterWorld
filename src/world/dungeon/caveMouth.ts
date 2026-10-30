@@ -202,7 +202,8 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
     (x, y, z) => crag.rock(x, y, z), groundUnder,
     (x, y, z, up) => up > 0.45 && (up > 0.75 || y > groundUnder(x, z) + crag.top(x, z) - 0.7),
   );
-  const inThroatOrCrag = (x: number, y: number, z: number, up: number) => (Math.abs(x) < 2.4 && throatShare(z) > 0.5 && y < rampAt(z) + 0.6 && throat(x, y, z) > -0.6 ? WildMat.Rock : craggy(x, y, z, up));
+  // The throat's own faces are always drawn (bare rock), also where it runs under the land beyond the crag's own rock.
+  const inThroatOrCrag = (x: number, y: number, z: number, up: number) => (Math.abs(x) < 3 && throatShare(z) > 0.3 && throat(x, y, z) > -0.6 ? WildMat.Rock : craggy(x, y, z, up));
   const mesh = meshField(field, {
     // Only the crag and its fillet (the plain ground around and the floor of the way in are the land's own), not
     // the field's own edges (where it is cut off); turf on the knoll's top and flanks, bare rock on its face.

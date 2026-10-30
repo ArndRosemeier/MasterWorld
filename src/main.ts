@@ -832,7 +832,14 @@ export async function start(b: Boot): Promise<void> {
           for (const o of mine) set(o, true);
         }
         const back = view.sky.shade(realm === 'land' ? 'open' : cellars?.visitOf(realm)?.cellar.form.space.carved ? 'cave' : 'below');
-        return () => { for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; back(); };
+        // The other realm's shadow maps are not drawn of this one (a cave's torch over the land's plants would build
+        // shaders in play); only the sun's of the land, which a view out of a cave draws.
+        const held: { needsUpdate: boolean }[] = [];
+        for (const o of view.scene.children) {
+          const l = o as Light & { shadow?: { needsUpdate: boolean } };
+          if (l.isLight && l.shadow?.needsUpdate && !(realm === 'land' && l === view.sun)) { l.shadow.needsUpdate = false; held.push(l.shadow); }
+        }
+        return () => { for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; for (const s of held) s.needsUpdate = true; back(); };
       },
       world: (realm) => (realm === 'land' ? landWorld : cellars?.visitOf(realm)?.world ?? null),
     });
