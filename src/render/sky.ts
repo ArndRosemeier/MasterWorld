@@ -73,7 +73,7 @@ export function lowSunSky(sunUp: number): number {
 }
 
 /** How fast the eye adapts to a change of light (per second: about a second from a cave out into the day). */
-const ADAPT = 2.2;
+const ADAPT = 3;
 
 /** The light set for one view (SkyView.shade). */
 interface SkyShade {

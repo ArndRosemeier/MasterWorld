@@ -1976,13 +1976,15 @@ export async function start(b: Boot): Promise<void> {
         const w = player.walker.pos, deep = heroIn === 'land' ? cellars?.throatDepth(w.x, w.z) ?? 0 : 0;
         if (heroIn === 'land' && (deep > 0 || throatLamp)) {
           const L = view.lantern;
-          L.intensity += (CAVE_LANTERN * deep - L.intensity) * Math.min(1, dt * 2);
+          // As deep in as the hero is (the walk sets the pace), easing out again when they turn back.
+          L.intensity = deep > 0 ? CAVE_LANTERN * deep : L.intensity * Math.max(0, 1 - dt * 2);
           L.position.set(w.x - Math.sin(player.walker.yaw) * 0.4, w.y + 1.9, w.z - Math.cos(player.walker.yaw) * 0.4);
           throatLamp = deep > 0 || L.intensity > 0.05;
           if (!throatLamp) L.intensity = 0;
         } else throatLamp = false;
         // The eye adapts to the dark as the camera goes into the throat, all the way by its portal.
-        const camDeep = seen === 'land' ? cellars?.throatDepth(view.camera.position.x, view.camera.position.z) ?? 0 : 1;
+        // (The hero's way in sets it: the camera trails a few metres behind, still out in the day.)
+        const camDeep = seen === 'land' ? Math.max(deep, heroIn === 'land' ? 0 : 1, cellars?.throatDepth(view.camera.position.x, view.camera.position.z) ?? 0) : 1;
         view.sky.eye = seen === heroIn && (seen !== 'land' || camDeep === 0) ? null : { dark: camDeep };
         view.sky.shadowFocus = seen === 'land' ? null : through.landSide(view.camera.position);
         // For the HUD (checks): near a portal, the realms of the hero and the camera and the throat's light.
