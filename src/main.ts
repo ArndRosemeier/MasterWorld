@@ -55,7 +55,7 @@ import { questFor, questGuild } from './vgm/quests';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
-import { PACING, vgmLines } from './vgm/vgmLog';
+import { cleanWhys, PACING, vgmLines, whyOf, WHY_KEPT, type VgmLine, type VgmWhy } from './vgm/vgmLog';
 import { findIn, travellerFor } from './vgm/answers';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
@@ -720,11 +720,12 @@ export async function start(b: Boot): Promise<void> {
       },
     }, terrain.towns, save?.cellars ?? {});
     cellars.sync(log);
-    // What the VGM made and why (D53: never shown in play; the debug menu and, later, the settings read it).
-    const vgmLog: Made[] = [];
+    // What the VGM made and why (D53: never shown in play; its window, alerts and the debug menu read it).
+    // Kept in the save (the newest WHY_KEPT), so the log reads the same after a reload.
+    const vgmLog: VgmWhy[] = cleanWhys(save?.vgm);
     const noteMade = (m: Made): void => {
-      vgmLog.push(m);
-      if (vgmLog.length > 200) vgmLog.shift();
+      vgmLog.push(whyOf(m));
+      if (vgmLog.length > WHY_KEPT) vgmLog.shift();
     };
     // The wild on the land around the town: the VGM places its groups into the log (an older save's too, the
     // same groups it had), built as the hero comes near (D27, plan 9.3, C6b).
@@ -1366,6 +1367,7 @@ export async function start(b: Boot): Promise<void> {
           director: director.snapshot(),
           mode,
           remains: [...remains],
+          vgm: [...vgmLog],
         };
         const v = visit();
         // Where the hero is, for the save's label (the title's Continue shows it).
@@ -1524,6 +1526,7 @@ export async function start(b: Boot): Promise<void> {
     // The VGM seen at work (a developer's aid; D53 keeps it out of play): its moves on screen as they come, and
     // its window (F9) with its needs, its log and buttons that make it act now.
     const vgmAlerts = new VgmAlerts(vgmLines(log, vgmLog));
+    let vgmPicked: VgmLine | null = null;
     const vgmUi = new VgmUi({
       paused, get bindings() { return settings.current.bindings; },
       lines: () => vgmLines(log, vgmLog),
@@ -1538,6 +1541,9 @@ export async function start(b: Boot): Promise<void> {
       goodDay: () => goodDayNow(),
       // A few steps south of it, so what stands there is in front of the hero, not under their feet.
       goNear: (x, z) => player.goTo([x, z + 8]),
+      get picked() { return vgmPicked; },
+      set picked(l) { vgmPicked = l; },
+      hero: () => [player.walker.pos.x, player.walker.pos.z],
     });
     settings.watch((s) => { vgmAlerts.on = s.vgmAlerts; });
     new DebugMenu({
@@ -1970,7 +1976,7 @@ export async function start(b: Boot): Promise<void> {
       if (minimap.showWhile(!title?.holding && !creator?.showing && !!window.__mwReady)) {
         const look = player.flying ? player.fly.yaw : player.heroCam.yaw, me = heroAt(player.walker.yaw);
         minimap.read({ x: me.x, z: me.z, look, yaw: me.yaw, hour: view.sky.hour, sky: skyGlyph(), marks: journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })) });
-        minimap.vgmMarks(vgmAlerts.marks, me.x, me.z);
+        minimap.vgmMarks(vgmAlerts.marks, me.x, me.z, vgmPicked?.where ? { id: vgmPicked.id, x: vgmPicked.where[0], z: vgmPicked.where[1] } : null);
       }
       part('vgm direct');
       direct(dt);

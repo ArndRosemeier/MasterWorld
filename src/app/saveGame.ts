@@ -14,6 +14,7 @@ import type { GuildBookSave } from '../game/guilds';
 import type { MarketSave } from '../game/trade';
 import type { TownshipSave } from '../game/township';
 import type { DirectorSave } from '../vgm/director';
+import type { VgmWhy } from '../vgm/vgmLog';
 import type { TownTalkSave } from '../talk/townTalk';
 import { clock } from './dom';
 import type { Lead } from '../talk/journal';
@@ -76,6 +77,8 @@ export interface SaveData {
   readonly guilds?: GuildBookSave;
   /** A people's hold: who of its wardens fell, was searched (none: all at their posts). */
   readonly hold?: DelveSave;
+  /** Why the VGM made its latest moves (its log's reasons; none in older saves: their decisions say what they are). */
+  readonly vgm?: readonly VgmWhy[];
   /** A roguelike hero fell: the world goes on and the next start makes a new hero in it. */
   readonly heir?: boolean;
 }
