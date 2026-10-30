@@ -3,7 +3,9 @@
  * `npm run build` (and `npm run packs`), SHOT_GPU=1 on the reference machine. Lays a cart track from a
  * place out on the land to the start town (as the VGM links a hamlet), then shows the first bridges on it:
  * from the brook below, from far up and down it, and from the road. JPEGs into `<out dir>` (default `shots/bridges/<date>-<commit>/`).
- * BRIDGE_FROM=x,z picks the place the track starts at. A slow check (docs/CHECKS.md), well under 5 min.
+ * BRIDGE_FROM=x,z picks the place the track starts at. BRIDGE_GO=<go-to label> (e.g. "Capital gate") lays no track:
+ * it runs that debug go-to and shows the bridges on the town's own streets round where it lands (BRIDGE_NEAR=x,z: the
+ * one nearest that first, e.g. the capital's west gate road). A slow check (docs/CHECKS.md), well under 5 min.
  */
 import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -26,19 +28,29 @@ await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIM
 await page.addStyleTag({ content: '#loading{display:none!important}' });
 const shoot = async (name) => { const file = join(dir, `${name}.jpg`); await page.screenshot({ path: file, type: 'jpeg', quality: 90, timeout: TIMEOUT }); console.log(file); };
 
-const road = await page.evaluate(([x, z]) => window.game.layRoad(x, z).then((d) => d && { id: d.id, n: d.pts.length / 3 }), FROM);
-console.log('road', road);
-// Walk the hero along the track until bridges are drawn round them.
-const pts = await page.evaluate(() => Array.from(window.game.log.findLast((d) => d.kind === 'road').pts));
+const GO = process.env.BRIDGE_GO, NEAR = process.env.BRIDGE_NEAR?.split(',').map(Number);
+let pts;
+if (GO) {
+  console.log('go', GO, await page.evaluate((l) => Promise.resolve(window.game.go(l)).then(String), GO));
+  // Stand where the bridges are wanted (the go-to's spot, or BRIDGE_NEAR) and wait for its brooks.
+  const at = NEAR ?? await page.evaluate(() => [window.game.player.walker.pos.x, window.game.player.walker.pos.z]);
+  pts = [at[0], 0, at[1]];
+  await page.waitForTimeout(6000);
+} else {
+  const road = await page.evaluate(([x, z]) => window.game.layRoad(x, z).then((d) => d && { id: d.id, n: d.pts.length / 3 }), FROM);
+  console.log('road', road);
+  // Walk the hero along the track until bridges are drawn round them.
+  pts = await page.evaluate(() => Array.from(window.game.log.findLast((d) => d.kind === 'road').pts));
+}
 let shown = 0;
 const seen = new Set();
 for (let k = 0; k < pts.length / 3 && shown < 3; k += 40) {
   await page.evaluate(([x, z]) => window.game.player.teleport(x, undefined, z, 0), [pts[k * 3], pts[k * 3 + 2]]);
   await page.waitForTimeout(1500);
-  const list = await page.evaluate(() => window.game.bridges.bridges.map((b) => {
+  const list = await page.evaluate(([x, z]) => window.game.bridges.bridges.map((b) => {
     const dx = b.x1 - b.x0, dz = b.z1 - b.z0, l = Math.hypot(dx, dz);
     return { id: b.id, x: b.x, z: b.z, ax: dx / l, az: dz / l, len: l };
-  }));
+  }).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z)), [pts[k * 3], pts[k * 3 + 2]]);
   for (const b of list) {
     if (shown >= 3 || seen.has(b.id)) continue;
     seen.add(b.id);

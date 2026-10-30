@@ -93,7 +93,7 @@ test('chunk mesh: the level runs 0..1 and is smoother than the normals on a clif
   assert.ok(level < 0.75 * normal, `level changes ${level} vs normals ${normal}`);
 });
 
-test('chunk mesh: far quads are cut along a slantwise edge, not across it; near and level ones keep the shared cut', () => {
+test('chunk mesh: quads are cut along a slantwise edge, not across it; level ones keep the shared cut', () => {
   // A step 10 m high along the line i = j (a rim running slantwise through the grid): the shared cut (b-c) crosses it.
   const segs = 4, step = 8, n = segs + 1, rim = (i: number, j: number) => (i > j ? 10 : 0);
   const own = followEdges(rim, segs, step)!;
@@ -107,6 +107,6 @@ test('chunk mesh: far quads are cut along a slantwise edge, not across it; near 
   const shared = chunkIndex(segs);
   assert.equal(own.length, shared.length);
   assert.deepEqual([...own.slice(18, 24)], [...shared.slice(18, 24)]); // (3, 0): all on top
-  assert.equal(followEdges(rim, segs, 2), null, 'near chunks (2 m) keep the shared list');
+  assert.ok(followEdges(rim, segs, 2), 'near chunks (2 m) follow it too');
   assert.equal(followEdges(() => 3, segs, step), null, 'level ground keeps it');
 });

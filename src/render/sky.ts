@@ -228,9 +228,11 @@ export class SkyView {
     this.sunLight.value.setRGB(0, 0, 0);
     WINDOWS.glow.value = 0;
     if (cave) {
-      // Near neutral: a blue fill from above lit the floors grey-lilac against the brown walls (phase P shots).
-      this.hemi.color.setRGB(0.45, 0.44, 0.42);
-      this.hemi.groundColor.setRGB(0.1, 0.09, 0.08);
+      // As much from below as from above, warm: a fill from above lit the floors four times the walls' light, and the
+      // eye, opened to the dark, saw them pale grey-lilac (a dark brown floor came out beige; gate P shots). The cave's
+      // light comes off its own rock, all round.
+      this.hemi.color.setRGB(0.27, 0.25, 0.22);
+      this.hemi.groundColor.setRGB(0.24, 0.21, 0.17);
       this.hemi.intensity = CAVE_FILL;
     } else {
       this.hemi.color.setRGB(0.55, 0.42, 0.3);

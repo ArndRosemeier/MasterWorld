@@ -220,8 +220,12 @@ export class CellarVisit {
   private kneel: SearchKneel | null = null;
 }
 
-/** Daylight through a crack in a cavern's roof: cool, steady, reaching down to its floor and walls. */
-const DAYLIGHT_BELOW: BelowLight = { color: 0xc4d4ff, strength: 70, reach: 48, decay: 1.25, flicker: false };
+/**
+ * Daylight through a crack in a cavern's roof: steady, reaching down to its floor and walls, warmed by the rock it
+ * comes down along. Sky blue and stronger, it lit the floors (facing it) grey-lilac against the brown walls, whatever
+ * their colour (gate P: a floor painted dark brown still came out pale).
+ */
+const DAYLIGHT_BELOW: BelowLight = { color: 0xffe2c0, strength: 45, reach: 48, decay: 1.25, flicker: false };
 
 /** The lantern's strength in a cave (its rock is dark, its halls wide). */
 export const CAVE_LANTERN = 13;

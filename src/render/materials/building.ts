@@ -5,7 +5,7 @@
  * layer of the town texture array; `tint` (sRGB) colours it: lime washes, timber stains, glass. Texture
  * coordinates are in metres and scaled per layer. Rain darkens and wets the walls and roofs.
  */
-import { BufferAttribute, BufferGeometry, Color, MeshPhysicalNodeMaterial, type Mesh } from 'three/webgpu';
+import { BufferAttribute, BufferGeometry, Color, MeshPhysicalNodeMaterial, Sphere, Vector3, type Mesh } from 'three/webgpu';
 import { attribute, dot, float, floor, fract, int, mix, normalMap, pow, round, sin, step, texture, uniform, uniformArray, varying, vec3 } from 'three/tsl';
 import { WORLD } from '../origin';
 import { BuildingMat, INSIDE_LEVELS, INSIDE_LIGHT, type BuildingMesh } from '@futuremagic/settlement';
@@ -71,12 +71,41 @@ function buildingGeometry(m: BuildingMesh, full: boolean): BufferGeometry {
   if (full) {
     g.setAttribute('uv', new BufferAttribute(m.uv, 2));
     // Floats: WebGPU has no 1- or 3-byte vertex formats.
-    g.setAttribute('mat', new BufferAttribute(Float32Array.from(m.mat), 1));
+    g.setAttribute('mat', new BufferAttribute(floats(m.mat, 1), 1));
   }
-  g.setAttribute('tint', new BufferAttribute(Float32Array.from(m.tint, (v) => v / 255), 3));
+  g.setAttribute('tint', new BufferAttribute(floats(m.tint, 1 / 255), 3));
   g.setIndex(new BufferAttribute(m.index, 1));
-  g.computeBoundingSphere();
+  g.boundingSphere = sphereOf(m.position);
   return g;
+}
+
+/**
+ * The sphere round flat x, y, z positions, as three's `computeBoundingSphere` makes it (the box's middle, out to the
+ * farthest point), in plain loops: three's goes through a vector per vertex, garbage by the megabyte per town.
+ */
+function sphereOf(p: ArrayLike<number>): Sphere {
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i + 2 < p.length; i += 3) {
+    const x = p[i], y = p[i + 1], z = p[i + 2];
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+    if (z < z0) z0 = z; if (z > z1) z1 = z;
+  }
+  if (x0 > x1) return new Sphere(new Vector3(), -1);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+  let r2 = 0;
+  for (let i = 0; i + 2 < p.length; i += 3) {
+    const dx = p[i] - cx, dy = p[i + 1] - cy, dz = p[i + 2] - cz, d = dx * dx + dy * dy + dz * dz;
+    if (d > r2) r2 = d;
+  }
+  return new Sphere(new Vector3(cx, cy, cz), Math.sqrt(r2));
+}
+
+/** Bytes as floats times `k`, in a plain loop (`Float32Array.from` with a map boxed every value: garbage by the megabyte per town). */
+function floats(src: ArrayLike<number>, k: number): Float32Array {
+  const out = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) out[i] = src[i] * k;
+  return out;
 }
 
 /** A natural cave's rock (world/dungeon/caveRock.ts, building format) with the cave rock shader, at (x, y, z). */

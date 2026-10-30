@@ -13,7 +13,7 @@
 import { Vector3, type Mesh, type PerspectiveCamera, type Vector4 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import { smoothstep } from '@futuremagic/core';
-import { beyondFrame, homeFrame, PortalStone, STONE_PORTAL, STONE_SHAPE, stoneSpot, type PortalStoneSave, type RoomProbe } from '../game/portalStone';
+import { beyondFrame, homeFrame, PortalStone, STONE_PORTAL, STONE_SHAPE, STONE_UP, stoneSpot, type PortalStoneSave, type RoomProbe } from '../game/portalStone';
 import type { Portal, PortalFrame } from '../game/portal';
 import { kindMesh } from '../render/materials';
 import { GLYPH_REACH, GLYPHS, PORTAL_STONE, STONE_LOOK, STONE_SIZE, stoneGeometry } from '../render/materials/portalStone';
@@ -186,18 +186,18 @@ export class PortalStoneUse {
 
   /** How big a portal would open for a hero at `feet` facing `yaw` (of STONE_SHAPE; null: it fizzles). Checks and shots look for a spot with room. */
   wouldOpen(feet: { x: number; y: number; z: number }, yaw: number): number | null {
-    const f = beyondFrame(stoneSpot(feet, yaw), yaw, (x, z) => this.host.probe.standFloor(x, z));
+    const f = beyondFrame(stoneSpot(feet, yaw), yaw, (x, z, near) => this.host.probe.standFloor(x, z, near));
     return this.stone.canOpen(f, this.host.probe, this.host.realm());
   }
 
   /** The first glyph: a beam down to the floor under the stone, which becomes home. */
   private markHome(): void {
     const foot: Vec3 = [this.at.x, this.at.y - STONE_SIZE.y * SHOWN, this.at.z];
-    const floor = this.host.probe.standFloor(this.at.x, this.at.z), to: Vec3 = [this.at.x, floor, this.at.z];
+    const floor = this.host.probe.standFloor(this.at.x, this.at.z, this.at.y - STONE_UP), to: Vec3 = [this.at.x, floor, this.at.z];
     this.host.sound('beam', to);
     this.due.push((b) => this.fx.beamDown(b, foot, to));
     const was = this.stone.portal;
-    this.stone.markHome(homeFrame(this.at, this.yaw, (x, z) => this.host.probe.standFloor(x, z)), this.host.realm());
+    this.stone.markHome(homeFrame(this.at, this.yaw, (x, z, near) => this.host.probe.standFloor(x, z, near)), this.host.realm());
     if (was) {
       this.host.portals.remove(STONE_PORTAL);
       this.due.push((b) => { this.fx.shutDown(b, was.a.frame, was.shape); this.fx.shutDown(b, was.b.frame, was.shape); });
@@ -210,7 +210,7 @@ export class PortalStoneUse {
 
   /** The second glyph: a portal just beyond the stone, joined to home; a fizzle where it cannot open. */
   private openHere(): void {
-    const f = beyondFrame(this.at, this.yaw, (x, z) => this.host.probe.standFloor(x, z));
+    const f = beyondFrame(this.at, this.yaw, (x, z, near) => this.host.probe.standFloor(x, z, near));
     const where: Vec3 = [f.x, f.y + 1.3, f.z];
     const realm = this.host.realm(), size = this.stone.canOpen(f, this.host.probe, realm);
     if (size === null) {

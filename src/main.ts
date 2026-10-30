@@ -1,3 +1,5 @@
+// First: every three.js matrix made from here on keeps its numbers unboxed (render/typedMatrices.ts).
+import './render/typedMatrices';
 import { Vector3, type Light, type Object3D } from 'three/webgpu';
 import { GraphicsUnavailable } from '@futuremagic/stage';
 import { deriveSeed, parseSeed } from '@futuremagic/core';
@@ -151,7 +153,7 @@ import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
 import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
-import { bridgesNear } from './world/bridges';
+import { GroundCache } from './world/groundCache';
 import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
@@ -271,7 +273,8 @@ export async function start(b: Boot): Promise<void> {
     // Every town (the start's and each settlement's): their cores and their buildings (set once the workers run).
     let towns: Towns | null = null;
     // The land, and the steps and porches before the doors (where the townsfolk stand).
-    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), towns?.stand(x, z) ?? -Infinity);
+    // (Over a brook on a town's street the bridge's deck: folk walk out to their fields over it.)
+    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), towns?.stand(x, z) ?? -Infinity, bridgeView.deck(x, z) ?? -Infinity);
     // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
     const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
     // Rocks one walks round (D55), asked ahead the same way.
@@ -607,10 +610,12 @@ export async function start(b: Boot): Promise<void> {
       loading.set('Turning out the herds');
       stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => terrain.height(x, z));
     }
+    // The ground under birds' and creatures' feet: off a fine grid of exact heights (the land's own is costly, asked every frame).
+    const feet = new GroundCache((x, z) => terrain.height(x, z), () => terrain.version);
     // Birds and squirrels about the land (plan 9.3): their squares are the trunks' cells.
     const woods = woodsOf(terrain);
     const small = setting.smallLife && params.small ? new SmallLife(seed, {
-      height: (x, z) => bridgeView.ground(x, z, terrain.height(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
       // The town's farmland and fields are open land whatever the woods round them.
       woods: (x, z) => (terrain.townGround(x, z) >= TownGround.Street ? 0 : woods(x, z)),
@@ -796,7 +801,7 @@ export async function start(b: Boot): Promise<void> {
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
     }, start, {
-      height: (x, z) => bridgeView.ground(x, z, terrain.height(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
@@ -812,7 +817,7 @@ export async function start(b: Boot): Promise<void> {
         changed: (c) => notes.say(changeLine(c), 6),
         jobs: terrainJobs,
       }, holdSite, holdPeople, {
-        height: (x, z) => bridgeView.ground(x, z, terrain.height(x, z)),
+        height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
         waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
         blocked: (x, z, r) => !!hold?.solid(x, z, r) || bridgeView.side(x, z, r),
       }, save?.hold);
@@ -886,7 +891,8 @@ export async function start(b: Boot): Promise<void> {
       stage: view.stage, camera: view.camera, canvas, player, portals,
       // Where the hero is: the land, or the place below they are in (its floor, walls and rock).
       probe: {
-        standFloor: (x, z) => world.floor!(x, z) ?? world.height(x, z),
+        // As the walker finds it: a cave's rock floor, a deck, a step (from a step over `near` down).
+        standFloor: (x, z, near) => player.walker.support(x, z, near),
         blocksAt: (x, z, r, y) => world.wall!(x, z, r, y),
         rockGapAt: (x, y, z) => world.rockSurface(x, y, z),
         wetAt: (x, z) => world.waterLevel(x, z),
@@ -1672,7 +1678,7 @@ export async function start(b: Boot): Promise<void> {
       answerFor: (need) => answerNow(need),
       event: (id) => storyEventNow(id),
       goodDay: () => goodDayNow(),
-      bridges: (x, z) => bridgesNear(terrain.roads, terrain.hydro, x, z, 4000, (px, pz) => terrain.hydro.hasBrooks(px, pz)),
+      bridges: (x, z) => bridgeView.around(x, z, 4000),
     });
     // The VGM seen at work (a developer's aid; D53 keeps it out of play): its panel (F9), docked at the right while
     // the hero plays, with its moves live, filtered by kind, each placed one shown on the minimap when clicked.

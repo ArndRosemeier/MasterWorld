@@ -14,8 +14,9 @@ const evenings = Number(process.argv[2] ?? 6);
 const seeds = process.argv.length > 3 ? process.argv.slice(3) : ['masterworld', 'alpha', 'x4'];
 const clock = (h: number) => `day ${Math.floor(h / 24)} ${String(Math.floor(h % 24)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 const runs: { seed: string; opts: EveningOptions; what: string }[] = [
-  // An evening of play brings a fresh hero to level 3–5 (D58, G1), a fighter and a mage alike.
-  ...seeds.map((seed) => ({ seed, opts: { evenings, ...(evenings === 6 ? { levels: [3, 5] as const } : {}) }, what: `${evenings} evenings` })),
+  // The level a run ends at is printed, not held to a band (Arnd 2026-10-30: these runs are artificial; he judges
+  // progression in play). `levels` stays for a run by hand.
+  ...seeds.map((seed) => ({ seed, opts: { evenings }, what: `${evenings} evenings` })),
   { seed: seeds[0], opts: { evenings: 1, reckless: true }, what: 'a reckless evening (a fall)' },
   // A second town (plan B3a): the same game in a village out on the land, through the same code.
   { seed: seeds[0], opts: { evenings: 3, settlement: 'village' }, what: '3 evenings in a village' },
@@ -23,7 +24,7 @@ const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   // The capital (C15): an evening in the first city, its 700 houses and 2700 people.
   { seed: seeds[0], opts: { evenings: 1, settlement: 'capital' }, what: 'an evening in the capital' },
   // A mage (plan C3): asks the bard, opens a school at its teacher and casts in the first place.
-  { seed: seeds[2] ?? seeds[0], opts: { evenings: 3, mage: true, levels: [3, 5] }, what: '3 evenings as a mage' },
+  { seed: seeds[2] ?? seeds[0], opts: { evenings: 3, mage: true }, what: '3 evenings as a mage' },
 ];
 
 /** Play one run here; true if it passed. */

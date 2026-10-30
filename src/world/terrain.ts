@@ -62,6 +62,8 @@ export class Terrain {
   private readonly wet = { river: 0, lake: 0 };
   private roadNet = new RoadNet();
   private readonly clearingMap = new Map<string, Clearing>();
+  /** Counts up whenever the land's heights may change (a road laid, a town founded): caches of them start over (world/groundCache.ts). */
+  version = 0;
 
   /**
    * Build what the decision log says stands on the land (plan 5.1): rock volumes and towns (the start's,
@@ -70,6 +72,7 @@ export class Terrain {
    * from the heights.
    */
   settle(log: DecisionLog): void {
+    this.version++;
     this.fields = [];
     this.townSpots = [];
     this.townList = null;
@@ -92,6 +95,7 @@ export class Terrain {
    * was built from the old heights near it (meshes, plants) is for the caller to build again.
    */
   addRoad(d: RoadDecision): void {
+    this.version++;
     this.roadNet.insert(d);
   }
 
@@ -132,6 +136,7 @@ export class Terrain {
    */
   addTown(d: TownDecision, plan?: TownPlan): void {
     if (this.townSpots.some((s) => s.d.id === d.id)) return;
+    this.version++;
     this.townSpots.push({ d, level: this.erodedLand(d.x, d.z) });
     this.freeTowns();
     if (this.townList) this.townList.push(new Town(d, this, plan));

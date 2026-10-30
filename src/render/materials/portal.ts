@@ -58,7 +58,7 @@ export const PORTAL_RIFT = defineKind('portal-rift', ['position', 'uv', 'color']
   m.colorNode = mix(inside, rimC.mul(0.7), toward).mul(mask).add(rimC.mul(motes.mul(mask).mul(0.9))).add(rimC.mul(rim.mul(1.8)));
   m.opacityNode = max(mask.mul(mix(float(0.55), float(0.95), view)), rim).mul(open.greaterThan(0.001).select(float(1.0), float(0.0)));
   return m;
-}, { cast: false, receive: false });
+}, { cast: false, receive: false }, true);
 
 /** The ellipse inside a portal's shape (in its plane): its middle's height over the floor and its half sizes. */
 export function riftEllipse(shape: { readonly halfWidth: number; readonly height: number }): { cy: number; rx: number; ry: number } {

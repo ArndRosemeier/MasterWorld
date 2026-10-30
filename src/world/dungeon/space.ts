@@ -126,8 +126,12 @@ export class DungeonSpace {
     return this.passLevel(i, j, l, dir, lateral) !== null;
   }
 
-  /** The storey on which one passes from cell (i, j, l) to its neighbour on side `dir` (a stair spans two), or null. */
-  passLevel(i: number, j: number, l: number, dir: number, lateral: number): number | null {
+  /**
+   * The storey on which one passes from cell (i, j, l) to its neighbour on side `dir` (a stair spans two), or null.
+   * `unbars`: a barred door lets through from its bar's side (whoever comes lifts the bar: the hero, a foe with
+   * hands); without, every door not yet open is shut (a rat, a spider, a look through it).
+   */
+  passLevel(i: number, j: number, l: number, dir: number, lateral: number, unbars = true): number | null {
     const a = this.own(i, j, l);
     if (a === undefined) return null;
     const ni = i + DIRS[dir][0], nj = j + DIRS[dir][1];
@@ -140,7 +144,7 @@ export class DungeonSpace {
       // Within a passage: only where its floors meet (not off the side of its own stair onto its way above or below).
       if (b === here) { if (b >= 0 || this.floorsMeet(i, j, ni, nj, lv, dir)) return lv; continue; }
       const o = this.opening(i, j, lv, dir);
-      if (o && (this.carve || Math.abs(lateral) < DOOR_W / 2) && this.lets(o, here)) return lv;
+      if (o && (this.carve || Math.abs(lateral) < DOOR_W / 2) && this.lets(o, here, unbars)) return lv;
     }
     return null;
   }
@@ -154,14 +158,14 @@ export class DungeonSpace {
   }
 
   /** Does the door let one through from the side owned by `from`? A passage's kind sits at its `b` end; its `a` end is an open arch. */
-  private lets(o: Opening, from: number): boolean {
+  private lets(o: Opening, from: number, unbars = true): boolean {
     const l = o.pl.link;
     if (!isFeature(o)) return true;
     if (this.carve) return l.kind !== 'blocked';
     switch (l.kind) {
       case 'open': case 'door': case 'drop': return true;
       case 'grate': case 'blocked': return false;
-      default: return this.open.has(l.id) || (l.kind === 'oneway' && this.onSide(o, from, 'a'));
+      default: return this.open.has(l.id) || (unbars && l.kind === 'oneway' && this.onSide(o, from, 'a'));
     }
   }
 
@@ -214,8 +218,11 @@ export class DungeonSpace {
     return { floor, ceil, walls: Math.min(walls, reach) };
   }
 
-  /** Distance to the sides of the point's cell that are doors shut now (a carved cave's only walls besides its rock). */
-  shut(x: number, y: number, z: number): number {
+  /**
+   * Distance to the sides of the point's cell that are doors shut now (a carved cave's only walls besides its rock).
+   * `unbars` as in passLevel: false counts a barred door shut from its bar's side too.
+   */
+  shut(x: number, y: number, z: number, unbars = true): number {
     const C = this.scale.cell, l = this.levelAt(y), i = Math.floor(x / C), j = Math.floor(z / C);
     const here = this.own(i, j, l);
     if (here === undefined) return Infinity;
@@ -223,7 +230,7 @@ export class DungeonSpace {
     let d = Infinity;
     for (let k = 0; k < 4; k++) {
       const o = this.opening(i, j, l, k);
-      if (o && !this.lets(o, here)) d = Math.min(d, edge[k]);
+      if (o && !this.lets(o, here, unbars)) d = Math.min(d, edge[k]);
     }
     return d;
   }
@@ -253,13 +260,8 @@ export class DungeonSpace {
       const [kx, , kz] = keySpot(this.layout, here);
       if (Math.hypot(kx - x, kz - z) < KEY_REACH) { this.keys.add(here); out.push({ kind: 'key', link: lock.link.id }); }
     }
-    for (let k = 0; k < 4; k++) {
-      const o = this.opening(i, j, l, k);
-      if (!o) continue;
-      const fx = x - i * CELL, fz = z - j * CELL;
-      const dist = [CELL - fx, CELL - fz, fx, fz][k];
+    for (const { o } of this.shutBy(x, y, z)) {
       const link = o.pl.link;
-      if (this.open.has(link.id) || dist > 1.1 || !isFeature(o)) continue;
       if (link.kind === 'oneway' && this.onSide(o, here, 'a')) { this.open.add(link.id); out.push({ kind: 'unbarred', link: link.id }); }
       else if (link.kind === 'locked' && link.key !== undefined && this.keys.has(link.key)) { this.open.add(link.id); out.push({ kind: 'unlocked', link: link.id }); }
       else if (link.kind === 'secret') {
@@ -270,7 +272,38 @@ export class DungeonSpace {
     }
     return out;
   }
+
+  /**
+   * A foe with hands at (x, y, z), walking on to `to` (its way's next point): a barred door it comes to on its bar's
+   * side, with `to` beyond it (or in its doorway), it unbars (CellarView shows the bar lifted and the door swung away from it). The links opened.
+   */
+  unbar(x: number, y: number, z: number, to: { readonly x: number; readonly z: number }): number[] {
+    const C = this.scale.cell, here = this.ownerAt(x, y, z), i = Math.floor(x / C), j = Math.floor(z / C);
+    if (here === undefined) return [];
+    const out: number[] = [];
+    for (const { o, k } of this.shutBy(x, y, z)) {
+      const beyond = [to.x >= (i + 1) * C, to.z >= (j + 1) * C, to.x <= i * C, to.z <= j * C][k];
+      if (o.pl.link.kind !== 'oneway' || !this.onSide(o, here, 'a') || !beyond) continue;
+      this.open.add(o.pl.link.id);
+      out.push(o.pl.link.id);
+    }
+    return out;
+  }
+
+  /** The doors not yet open (each its link's own) on the sides of the point's cell, within TOUCH metres of it. */
+  private shutBy(x: number, y: number, z: number): { o: Opening; k: number }[] {
+    const C = this.scale.cell, l = this.levelAt(y), i = Math.floor(x / C), j = Math.floor(z / C), fx = x - i * C, fz = z - j * C;
+    const out: { o: Opening; k: number }[] = [];
+    for (let k = 0; k < 4; k++) {
+      const o = this.opening(i, j, l, k);
+      if (o && isFeature(o) && !this.open.has(o.pl.link.id) && [C - fx, C - fz, fx, fz][k] <= TOUCH) out.push({ o, k });
+    }
+    return out;
+  }
 }
+
+/** A door is touched (opened, searched) from this far off its side, metres. */
+const TOUCH = 1.1;
 
 /** Is this the door that carries its link's kind (the `b` end, or the only door)? */
 export function isFeature(o: { pl: PlacedLink; end: 0 | 1 }): boolean {

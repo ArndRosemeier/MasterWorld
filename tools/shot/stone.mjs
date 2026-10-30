@@ -37,7 +37,7 @@ const shoot = async (name) => {
 };
 const state = () => page.evaluate(() => {
   const g = window.game, w = g.player.walker.pos;
-  return { x: w.x, y: w.y, z: w.z, yaw: g.player.walker.yaw, raised: g.stone.raised, counts: { ...g.stone.counts }, home: g.stone.stone.home, far: g.stone.stone.far, passed: g.portals.passed };
+  return { x: w.x, y: w.y, z: w.z, yaw: g.player.walker.yaw, raised: g.stone.raised, counts: { ...g.stone.counts }, home: g.stone.stone.home?.frame ?? null, far: g.stone.stone.far?.frame ?? null, passed: g.portals.passed };
 });
 /** The camera behind the hero, `turn` rad round from behind. */
 const look = (turn = 0, zoom = 3.6, pitch = -0.18) => page.evaluate(([turn, zoom, pitch]) => {
@@ -132,7 +132,9 @@ await shoot('9-out-at-home');
 await look(Math.PI, 4.5, -0.12);
 await page.waitForTimeout(700);
 await shoot('10-looking-back-through');
-// By home a portal fizzles.
+// By home a portal fizzles. Stand on home itself: walking out of the portal may have carried the hero past it.
+await page.evaluate(() => { const g = window.game, h = g.stone.stone.home.frame; g.player.teleport(h.x, undefined, h.z, h.yaw); });
+await page.waitForTimeout(400);
 await look();
 await raise(false);
 await press(2);
@@ -188,13 +190,13 @@ console.log('cave:', await go('Down in: cave'));
 await page.waitForTimeout(8000);
 const realm = await page.evaluate(() => window.game.stone.host?.realm?.() ?? null);
 console.log('realm', realm);
-// Turn to where there is room (eight ways round, then a few steps on).
+// Turn to where there is room (eight ways round, then a few steps on). Below ground the teleport keeps the feet's height: with none it would look for the ground from far above the cave.
 console.log('cave spot', await page.evaluate(() => {
   const g = window.game, p = g.player, w = p.walker, x0 = w.pos.x, z0 = w.pos.z;
   for (const d of [0, 2, 4, 6]) for (let i = 0; i < 8; i++) {
     const yaw = w.yaw + (i * Math.PI) / 4, x = x0 - Math.sin(yaw) * d, z = z0 - Math.cos(yaw) * d;
     const k = g.stone.wouldOpen({ x, y: w.pos.y, z }, yaw);
-    if (k !== null) { p.teleport(x, undefined, z, yaw); return `${d} m, ${i}/8 round, size ${k}`; }
+    if (k !== null) { p.teleport(x, w.pos.y, z, yaw); return `${d} m, ${i}/8 round, size ${k}`; }
   }
   return 'none found';
 }));
