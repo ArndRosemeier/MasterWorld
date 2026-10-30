@@ -44,6 +44,7 @@ const MARKS = 16;
 
 const words = (id: string) => id.replace(/-/g, ' ');
 const upper = (s: string) => s[0].toUpperCase() + s.slice(1);
+const moves = (n: number) => `${n} move${n === 1 ? '' : 's'}`;
 /** A move worth a mark: one that put something somewhere (not a road; open land has no place). */
 const marked = (l: VgmLine): boolean => !!l.where && l.kind !== 'road';
 
@@ -99,9 +100,10 @@ export class VgmPanel {
       this.mark(fresh);
       const known = new Set([...this.chips.querySelectorAll<HTMLElement>('button[data-tool]')].map((b) => b.dataset.tool));
       if (fresh.some((l) => !known.has(l.tool))) this.drawChips(); else this.counts();
+      if (fresh.some((l) => this.passes(l))) this.list.querySelector('.hint')?.remove();
       for (const l of fresh) if (this.passes(l)) this.list.prepend(this.moveRow(l));
       while (this.list.children.length > ROWS) this.list.lastElementChild!.remove();
-      this.count.textContent = `${this.lines.length} moves`;
+      this.count.textContent = moves(this.lines.length);
     }
     const t = performance.now();
     if (this.onScreen && t - this.needsAt > 1000) {
@@ -150,7 +152,7 @@ export class VgmPanel {
     const n = new Map<string, number>();
     for (const l of this.lines) n.set(l.tool, (n.get(l.tool) ?? 0) + 1);
     for (const b of this.chips.querySelectorAll<HTMLElement>('button[data-tool]')) b.querySelector('small')!.textContent = ` ${n.get(b.dataset.tool!) ?? 0}`;
-    this.count.textContent = `${this.lines.length} moves`;
+    this.count.textContent = moves(this.lines.length);
   }
 
   private drawList(): void {
