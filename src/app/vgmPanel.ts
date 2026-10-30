@@ -5,7 +5,8 @@
  * need, why and when. Chips filter by kind of move (the toolbox's tools); a move with a place, clicked, lights up
  * on the minimap and says how far and which way it lies; Go there puts the hero beside it. The places of the
  * last moves that put something somewhere get ward-blue studs on the minimap (`marks`). A fold holds the
- * VGM's needs and buttons that make it act now. The panel never takes focus, so the game keeps its keys.
+ * VGM's needs and buttons that make it act now; Clear empties the list (kept in the save). The panel never
+ * takes focus, so the game keeps its keys.
  */
 import './windows.css';
 import { NEEDS, type Need } from '../vgm/director';
@@ -21,6 +22,8 @@ export interface VgmHost {
   /** Shown at all (the setting), and the kinds of move shown (tool ids; none: all). */
   panelOn: boolean;
   kinds: readonly string[];
+  /** Moves cleared from the panel: the log's length when Clear was pressed (kept in the save; 0: none). */
+  cleared: number;
   /** How overdue each need is (1: due). */
   readonly needs: Readonly<Record<Need, number>>;
   answerNeed(need: Need): string;
@@ -41,6 +44,7 @@ const MARKS = 16;
 
 const words = (id: string) => id.replace(/-/g, ' ');
 const upper = (s: string) => s[0].toUpperCase() + s.slice(1);
+const moves = (n: number) => `${n} move${n === 1 ? '' : 's'}`;
 /** A move worth a mark: one that put something somewhere (not a road; open land has no place). */
 const marked = (l: VgmLine): boolean => !!l.where && l.kind !== 'road';
 
@@ -53,6 +57,8 @@ export class VgmPanel {
   private readonly count = el('span', { className: 'count' });
   private readonly watch: VgmWatch;
   private lines: VgmLine[];
+  /** Moves in the log so far, cleared or not. */
+  private total: number;
   private placed: { id: string; x: number; z: number }[] = [];
   /** The move lit on the minimap. */
   picked: VgmLine | null = null;
@@ -61,12 +67,14 @@ export class VgmPanel {
 
   /** `lines`: the log's moves so far. */
   constructor(lines: readonly VgmLine[], private readonly host: VgmHost) {
-    this.lines = [...lines];
+    this.total = lines.length;
+    this.lines = lines.slice(Math.min(host.cleared, lines.length));
     this.watch = new VgmWatch(lines.length);
-    this.mark(lines);
+    this.mark(this.lines);
+    const clear = button('Clear', () => this.clear(), { className: 'tab', title: 'Clear the list (the moves so far stay in the world)' });
     const actBtn = button('Make it act', () => { this.fold.classList.toggle('open'); this.drawFold(); }, { className: 'tab' });
     this.root.append(
-      el('div', { className: 'head' }, el('h2', { textContent: 'The game master' }), this.count, actBtn, button('×', () => { host.panelOn = false; }, { className: 'close', title: 'Hide (F9)' })),
+      el('div', { className: 'head' }, el('h2', { textContent: 'The game master' }), this.count, actBtn, clear, button('×', () => { host.panelOn = false; }, { className: 'close', title: 'Hide (F9)' })),
       this.fold, this.chips, this.list);
     // Clicks never take focus: the game keeps its keys (Space would press a focused button again).
     this.root.onmousedown = (e) => e.preventDefault();
@@ -87,13 +95,15 @@ export class VgmPanel {
     this.root.classList.toggle('shown', this.onScreen);
     const fresh = this.watch.see(log, made);
     if (fresh.length) {
+      this.total += fresh.length;
       this.lines.push(...fresh);
       this.mark(fresh);
       const known = new Set([...this.chips.querySelectorAll<HTMLElement>('button[data-tool]')].map((b) => b.dataset.tool));
       if (fresh.some((l) => !known.has(l.tool))) this.drawChips(); else this.counts();
+      if (fresh.some((l) => this.passes(l))) this.list.querySelector('.hint')?.remove();
       for (const l of fresh) if (this.passes(l)) this.list.prepend(this.moveRow(l));
       while (this.list.children.length > ROWS) this.list.lastElementChild!.remove();
-      this.count.textContent = `${this.lines.length} moves`;
+      this.count.textContent = moves(this.lines.length);
     }
     const t = performance.now();
     if (this.onScreen && t - this.needsAt > 1000) {
@@ -103,6 +113,16 @@ export class VgmPanel {
       const w = this.picked && this.list.querySelector('.move.picked .way');
       if (w && this.picked) w.textContent = this.way(this.picked);
     }
+  }
+
+  /** Clear the list, its chips and the minimap's studs (the moves stay in the log and the world). */
+  private clear(): void {
+    this.host.cleared = this.total;
+    this.lines = [];
+    this.placed = [];
+    this.picked = null;
+    this.drawChips();
+    this.drawList();
   }
 
   private mark(lines: readonly VgmLine[]): void {
@@ -132,12 +152,12 @@ export class VgmPanel {
     const n = new Map<string, number>();
     for (const l of this.lines) n.set(l.tool, (n.get(l.tool) ?? 0) + 1);
     for (const b of this.chips.querySelectorAll<HTMLElement>('button[data-tool]')) b.querySelector('small')!.textContent = ` ${n.get(b.dataset.tool!) ?? 0}`;
-    this.count.textContent = `${this.lines.length} moves`;
+    this.count.textContent = moves(this.lines.length);
   }
 
   private drawList(): void {
     const shown = this.lines.filter((l) => this.passes(l)).slice(-ROWS).reverse();
-    this.list.replaceChildren(...(shown.length ? shown.map((l) => this.moveRow(l)) : [el('p', { className: 'hint', textContent: 'No moves of these kinds yet.' })]));
+    this.list.replaceChildren(...(shown.length ? shown.map((l) => this.moveRow(l)) : [el('p', { className: 'hint', textContent: this.lines.length ? 'No moves of these kinds yet.' : 'No moves since the list was cleared.' })]));
   }
 
   private moveRow(l: VgmLine): HTMLElement {

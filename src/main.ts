@@ -1382,6 +1382,7 @@ export async function start(b: Boot): Promise<void> {
           mode,
           remains: [...remains],
           vgm: [...vgmLog],
+          ...(vgmCleared ? { vgmCleared } : {}),
         };
         const v = visit();
         // Where the hero is, for the save's label (the title's Continue shows it).
@@ -1539,12 +1540,15 @@ export async function start(b: Boot): Promise<void> {
     });
     // The VGM seen at work (a developer's aid; D53 keeps it out of play): its panel (F9), docked at the right while
     // the hero plays, with its moves live, filtered by kind, each placed one shown on the minimap when clicked.
+    let vgmCleared = typeof save?.vgmCleared === 'number' ? save.vgmCleared : 0;
     const vgmPanel = new VgmPanel(vgmLines(log, vgmLog), {
       get bindings() { return settings.current.bindings; },
       get panelOn() { return settings.current.vgmPanel; },
       set panelOn(on) { settings.set({ vgmPanel: on }); },
       get kinds() { return settings.current.vgmKinds; },
       set kinds(k) { settings.set({ vgmKinds: [...k] }); },
+      get cleared() { return vgmCleared; },
+      set cleared(n) { vgmCleared = n; },
       needs: director.needs,
       answerNeed: (need) => { const m = answerNow(need); return m ? `${m.tool}: ${m.reason}` : `no answer to ${need} here`; },
       situations: ['hurt-traveller', 'paddock-wolves', 'stray-beast'],

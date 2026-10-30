@@ -289,7 +289,7 @@
 #vgm-panel .head { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--brass-lo); }
 #vgm-panel h2 { margin: 0; font: 400 16px/1.2 'Marcellus SC', Georgia, serif; letter-spacing: .05em; color: var(--brass); }
 #vgm-panel .count { color: #a8987a; font-size: 13px; }
-#vgm-panel .head .tab { margin-left: auto; }
+#vgm-panel .head .tab:first-of-type { margin-left: auto; }
 #vgm-panel .tab, #vgm-panel .chip, #vgm-panel .go { padding: 2px 9px; font: 12px/1.4 'Marcellus SC', Georgia, serif; color: var(--ink-dim); background: transparent; border: 1px solid var(--brass-lo); border-radius: 9px; cursor: pointer; }
 #vgm-panel :is(.tab, .chip, .go):hover { color: var(--ward); border-color: var(--ward); }
 #vgm-panel .chip.on { color: #1e140a; background: linear-gradient(var(--brass), var(--brass-mid)); border-color: var(--brass-lo); }
