@@ -22,12 +22,40 @@ await page.addStyleTag({ content: '#loading{display:none!important}' });
 await page.waitForFunction(() => { const h = window.game.hold; return !!h && h.encounters.length > 0 && !h.warming; }, null, { timeout: TIMEOUT });
 await page.waitForTimeout(3000);
 await page.evaluate((o) => { window.game.hitches.over = o; window.game.hitches.clear(); }, over);
+// What is drawn before the fight: anything with a material made since is named after it (the shaders built late).
+await page.evaluate(() => {
+  const seen = new Set();
+  window.game.view.scene.traverse((o) => { for (const m of [o.material].flat()) if (m) seen.add(m.uuid); });
+  window.__seenMats = seen;
+  window.__shadersBefore = window.shaders?.events.length ?? 0;
+});
 
 const cdp = await page.context().newCDPSession(page);
 const profiling = process.env.HITCH_PROFILE === '1', alloc = process.env.HITCH_ALLOC === '1';
 if (profiling) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
 if (alloc) { await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.startSampling', { samplingInterval: 16384, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true }); }
 
+// HITCH_KEYS=1: who has three work out their material's cache key again (a material's version bumped, the lights changed),
+// counted by object and material during the fight.
+if (process.env.HITCH_KEYS === '1') await page.evaluate(() => {
+  const objects = window.game.view.renderer._objects, get = objects.get.bind(objects), counts = (window.__keyCounts = new Map());
+  let patched = false;
+  objects.get = function (...a) {
+    const ro = get(...a);
+    if (!patched && ro) {
+      patched = true;
+      const proto = Object.getPrototypeOf(ro), key = proto.getMaterialCacheKey;
+      proto.getMaterialCacheKey = function () {
+        const names = [];
+        for (let p = this.object; p && names.length < 4; p = p.parent) if (p.name) names.push(p.name);
+        const k = `${this.material.type}${this.material.name ? ` "${this.material.name}"` : ''} on ${this.object.type} ${names.join('<')} (version ${this.material.version === this.version ? 'same' : 'bumped'})`;
+        counts.set(k, (counts.get(k) ?? 0) + 1);
+        return key.call(this);
+      };
+    }
+    return ro;
+  };
+});
 const heap = [], lines = [];
 const t0 = Date.now();
 await page.mouse.click(800, 450);
@@ -51,6 +79,21 @@ await page.keyboard.up(turn);
 console.log(`--- hold fight, ${secs} s\n${await page.evaluate(() => window.game.hitches.report())}`);
 console.log(`heap MB every 2 s: ${heap.join(' ')}`);
 console.log(`stage every 2 s:\n  ${lines.join('\n  ')}`);
+console.log(`--- shaders built during the fight:\n${await page.evaluate(() => (window.shaders?.events ?? []).slice(window.__shadersBefore).filter((e) => e.kind === 'node-async' || e.kind === 'node-sync' || e.kind === 'node-late').map((e) => `  ${(e.t / 1000).toFixed(1)} s ${e.kind} ${e.ms.toFixed(1)} ms ${e.what}`).join('\n'))}`);
+console.log(`--- materials new since the fight began (type, then the object's names up the tree):\n${await page.evaluate(() => {
+  const out = new Map();
+  window.game.view.scene.traverse((o) => {
+    for (const m of [o.material].flat()) {
+      if (!m || window.__seenMats.has(m.uuid)) continue;
+      const names = [];
+      for (let p = o; p && names.length < 5; p = p.parent) names.push(p.name || p.type);
+      const k = `${m.type}${m.name ? ` "${m.name}"` : ''} on ${names.join('<')}${o.visible ? '' : ' (hidden)'}`;
+      out.set(k, (out.get(k) ?? 0) + 1);
+    }
+  });
+  return [...out].map(([k, n]) => `  ${n}x ${k}`).join('\n') || '  none';
+})}`);
+if (process.env.HITCH_KEYS === '1') console.log(`--- material cache keys worked out during the fight (calls, by what):\n${await page.evaluate(() => [...window.__keyCounts].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([k, n]) => `  ${n} ${k}`).join('\n'))}`);
 if (profiling) report((await cdp.send('Profiler.stop')).profile);
 if (alloc) allocs((await cdp.send('HeapProfiler.stopSampling')).profile);
 await browser.close();
