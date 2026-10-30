@@ -6,7 +6,7 @@ import { settlementOf, type RoadDecision } from '../src/world/decisions';
 import { townsfolk } from '../src/sim/people';
 import { guildHouses } from '../src/game/guilds';
 import { tooSteep } from '@futuremagic/settlement';
-import { TownGround } from '../src/world/town';
+import { TownGround, type Town } from '../src/world/town';
 import { grassMask } from '../src/world/grass';
 import { bridgesOn, deckAt, townBridges, type Bridge } from '../src/world/bridges';
 import { emptyWater, inChannel } from '../src/world/hydro';
@@ -45,6 +45,12 @@ test('capital: one, a few km out, a decision in the log; walled, with its ruler,
   const brookIn = (x: number, z: number, r: number) => { const q = terrain.hydro.query(x, z); return q.river && q.dist < q.half + r; };
   for (let i = 0; i < R.length; i += 2) assert.ok(!brookIn(R[i], R[i + 1], w.thick / 2), `the wall in water at ${R[i].toFixed(0)},${R[i + 1].toFixed(0)}`);
   for (const tw of w.towers) assert.ok(!brookIn(tw.x, tw.z, w.towerHalf), `a tower in water at ${tw.x.toFixed(0)},${tw.z.toFixed(0)}`);
+  // Along the whole line too, not only its corners, and no gate opens onto water (Arnd: a wall and gate stood in a river).
+  for (let i = 0, n = R.length >> 1; i < n; i++) {
+    const j = (i + 1) % n, x = (R[i * 2] + R[j * 2]) / 2, z = (R[i * 2 + 1] + R[j * 2 + 1]) / 2;
+    assert.ok(!brookIn(x, z, w.thick / 2), `the wall in water at ${x.toFixed(0)},${z.toFixed(0)}`);
+  }
+  for (const g of w.gates) for (const k of [-6, 6]) assert.ok(!brookIn(g.x + Math.cos(g.angle) * k, g.z + Math.sin(g.angle) * k, g.half), `the gate at ${g.x.toFixed(0)},${g.z.toFixed(0)} opens onto water`);
   for (const f of plan.fixtures) assert.ok(!brookIn(f.x, f.z, 1), `a ${f.kind} in water`);
   // Its seat of rule has its ruler; the guilds keep big halls; its armourer and jeweller keep shop.
   const folk = townsfolk(plan, d.seed);
@@ -79,8 +85,19 @@ const all = () => true;
 const w = emptyWater();
 const wet = (x: number, z: number) => inChannel(terrain.hydro.brookAt(x, z, w)) && w.brook;
 const onDeck = (bs: readonly Bridge[], x: number, z: number) => bs.some((b) => deckAt(b, x, z) !== null);
+// The road out of the west gate crosses a brook a stone's throw past the wall; a road out can end in one (it ends a
+// little past the fields, which grow and shrink with the town), so the capital is also taken with that road cut short
+// in the brook.
+const crossing = (pts: readonly number[]) => { const n = pts.length; for (let k = Math.max(0, n - 80); k < n; k += 2) if (wet(pts[k], pts[k + 1])) return k; return -1; };
+const capitalEndingInBrook = (): Town => {
+  const town = capital(), streets = town.plan.streets.map((s) => {
+    const k = s.kind === 'road' ? crossing(s.pts) : -1;
+    return k < 0 ? s : { ...s, pts: s.pts.slice(0, k + 2) };
+  });
+  return Object.create(town, { plan: { value: { ...town.plan, streets } } }) as Town;
+};
 // The road out that ends in the brook.
-const gateRoad = () => capital().plan.streets.find((s) => s.kind === 'road' && wet(s.pts[s.pts.length - 2], s.pts[s.pts.length - 1]))!;
+const gateRoad = () => capitalEndingInBrook().plan.streets.find((s) => s.kind === 'road' && wet(s.pts[s.pts.length - 2], s.pts[s.pts.length - 1]))!;
 
 /** Points every metre along a street's centre line. */
 function along(pts: readonly number[], closed = false): [number, number][] {
@@ -93,13 +110,16 @@ function along(pts: readonly number[], closed = false): [number, number][] {
 }
 
 test('town bridges: every street of the capital that crosses a brook crosses it on a bridge, the road out of its gate too', () => {
-  const town = capital(), gate = gateRoad();
+  for (const town of [capital(), capitalEndingInBrook()]) {
+    const bs = townBridges(town, new RoadNet(), terrain.hydro, height, all)!;
+    assert.ok(bs.length >= 1);
+    for (const s of town.plan.streets) for (const [x, z] of along(s.pts, s.closed)) {
+      if (wet(x, z)) assert.ok(onDeck(bs, x, z), `the ${s.kind} in a brook at ${x.toFixed(0)}, ${z.toFixed(0)} without a bridge`);
+    }
+  }
+  const town = capitalEndingInBrook(), gate = gateRoad();
   assert.ok(town && gate, 'the capital, its road out ending in a brook');
   const bs = townBridges(town, new RoadNet(), terrain.hydro, height, all)!;
-  assert.ok(bs.length >= 1);
-  for (const s of town.plan.streets) for (const [x, z] of along(s.pts, s.closed)) {
-    if (wet(x, z)) assert.ok(onDeck(bs, x, z), `the ${s.kind} in a brook at ${x.toFixed(0)}, ${z.toFixed(0)} without a bridge`);
-  }
   // The gate road's runs on over the brook it ends in, its ends on the land (no step up onto it, none off).
   const n = gate.pts.length, end = bs.find((b) => Math.hypot(b.x - gate.pts[n - 2], b.z - gate.pts[n - 1]) < 15);
   assert.ok(end, 'a bridge where the gate road ends in the brook');
@@ -113,13 +133,13 @@ test('town bridges: every street of the capital that crosses a brook crosses it 
 
 test('town bridges: a road laid on from the gate road has the bridge over the brook between them, once', () => {
   // A track on from the gate road's end, straight on 60 m.
-  const town = capital(), p = gateRoad().pts, n = p.length, L = Math.hypot(p[n - 2] - p[n - 4], p[n - 1] - p[n - 3]);
+  const town = capitalEndingInBrook(), p = gateRoad().pts, n = p.length, L = Math.hypot(p[n - 2] - p[n - 4], p[n - 1] - p[n - 3]);
   const ux = (p[n - 2] - p[n - 4]) / L, uz = (p[n - 1] - p[n - 3]) / L, pts: number[] = [];
   for (let k = 0; k <= 10; k++) { const x = p[n - 2] + ux * k * 6, z = p[n - 1] + uz * k * 6; pts.push(x, height(x, z), z); }
   const road: RoadDecision = { kind: 'road', id: 'road-on', way: 'track', from: 'out', to: town.decision.id, pts };
   const net = new RoadNet();
   net.insert(road);
-  const inTown = townBridges(town, net, terrain.hydro, height, all)!, onRoad = bridgesOn(road, terrain.hydro, p[n - 2], p[n - 1], 1e4, all, terrain);
+  const inTown = townBridges(town, net, terrain.hydro, height, all)!, onRoad = bridgesOn(road, terrain.hydro, p[n - 2], p[n - 1], 1e4, all, { towns: [town], height });
   assert.equal(onRoad.length, 1, 'the road has the bridge at the join');
   const b = onRoad[0];
   assert.ok(!inTown.some((o) => Math.hypot(o.x - b.x, o.z - b.z) < 20), 'and the town none there as well');
