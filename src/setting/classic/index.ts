@@ -59,6 +59,8 @@ export const classic: SettingModule = {
     weather: { frontSize: 70_000, frontSpeed: 3_500, change: 14, rainfall: 0.5, storms: 0.45, mist: 0.55, windiness: 0.45, drying: 3 },
     // Cattle graze the paddocks.
     livestock: 'cow',
+    // Hens in every farmyard and in a third of the town's back yards; the cock crows from first light to mid-morning.
+    poultry: { farmHens: [4, 7], yardShare: 0.35, yardArea: 40, yardHens: [2, 4], yardCock: 0.3, awake: [5.5, 20.5], crowUntil: 9 },
     landforms,
     kinds: landscapeKinds,
   },

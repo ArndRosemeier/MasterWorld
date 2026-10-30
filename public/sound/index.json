@@ -361,6 +361,24 @@
     3
    ]
   },
+  "call/hen": {
+   "kind": "call",
+   "files": [
+    "call/hen.mp3"
+   ],
+   "seconds": [
+    2.5
+   ]
+  },
+  "call/hen-squawk": {
+   "kind": "call",
+   "files": [
+    "call/hen-squawk.mp3"
+   ],
+   "seconds": [
+    1.5
+   ]
+  },
   "call/lark": {
    "kind": "call",
    "files": [
