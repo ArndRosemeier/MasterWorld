@@ -155,6 +155,17 @@ export class Decks {
     return c.y > reach ? m.y : c.y;
   }
 
+  /** A ship's plan (null: not near). */
+  planOf(id: string): ShipPlan | null {
+    return this.ships.get(id)?.plan ?? null;
+  }
+
+  /** A point of a ship's frame (a along it, h up, b across to port) in the world now (null: not near). */
+  worldOf(id: string, a: number, h: number, b: number): At | null {
+    const s = this.ships.get(id);
+    return s ? toWorld(s.pose, a, h, b) : null;
+  }
+
   /** A ship's pose now (null: not near). */
   poseOf(id: string): Pose | null {
     return this.ships.get(id)?.pose ?? null;
