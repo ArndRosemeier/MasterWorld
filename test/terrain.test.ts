@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { Terrain } from '../src/world/terrain';
-import { buildChunk, chunkIndex, vertexCount } from '../src/world/chunkMesh';
+import { buildChunk, chunkIndex, followEdges, vertexCount } from '../src/world/chunkMesh';
 import { selectChunks, chunkSize, CHUNK0 } from '../src/render/terrain/lod';
 import { classic } from '../src/setting/classic/index';
 import { SMALL } from './small';
@@ -91,4 +91,22 @@ test('chunk mesh: the level runs 0..1 and is smoother than the normals on a clif
   }
   assert.ok(steepest < 0.6, `no cliff in the stretch (level ${steepest})`);
   assert.ok(level < 0.75 * normal, `level changes ${level} vs normals ${normal}`);
+});
+
+test('chunk mesh: far quads are cut along a slantwise edge, not across it; near and level ones keep the shared cut', () => {
+  // A step 10 m high along the line i = j (a rim running slantwise through the grid): the shared cut (b-c) crosses it.
+  const segs = 4, step = 8, n = segs + 1, rim = (i: number, j: number) => (i > j ? 10 : 0);
+  const own = followEdges(rim, segs, step)!;
+  assert.ok(own, 'the rim gets its own triangle list');
+  // On the rim's quads (i = j) the cut runs a-d, along the rim.
+  for (let k = 0; k < segs; k++) {
+    const a = k * n + k, d = a + n + 1, q = (k * segs + k) * 6;
+    assert.deepEqual([...own.slice(q, q + 6)].filter((v) => v === a || v === d).length, 4);
+  }
+  // Same triangle count as the shared list; a quad away from the rim as it was.
+  const shared = chunkIndex(segs);
+  assert.equal(own.length, shared.length);
+  assert.deepEqual([...own.slice(18, 24)], [...shared.slice(18, 24)]); // (3, 0): all on top
+  assert.equal(followEdges(rim, segs, 2), null, 'near chunks (2 m) keep the shared list');
+  assert.equal(followEdges(() => 3, segs, step), null, 'level ground keeps it');
 });
