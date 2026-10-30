@@ -13,7 +13,7 @@ import { launch } from './launch.mjs';
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 180000);
 const secs = Number(process.argv[2] ?? 40), over = Number(process.env.HITCH_OVER ?? 50);
 const elements = process.env.HITCH_ELEMENTS === '1';
-const { server, base, browser } = await launch({ args: ['--enable-precise-memory-info', ...(elements ? ['--js-flags=--allow-natives-syntax'] : [])] });
+const { server, base, browser } = await launch({ args: ['--enable-precise-memory-info', ...(elements || process.env.HITCH_JSFLAGS ? [`--js-flags=${[elements ? '--allow-natives-syntax' : '', process.env.HITCH_JSFLAGS ?? ''].join(' ').trim()}`] : [])] });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 page.on('pageerror', (e) => console.log(`PAGE ERROR: ${e.message}`));
 await page.goto(`${base}?title=0&day=0&hour=11&weather=fair&hold=hated${process.env.SET_GL === '1' ? '&gl' : ''}`);
