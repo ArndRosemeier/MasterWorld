@@ -53,6 +53,7 @@ if (process.env.HITCH_UNBOX === '1') console.log(`--- unboxed matrices: ${await 
   window.game.view.scene.traverse((o) => { fresh(o.matrix); fresh(o.matrixWorld); for (const b of o.skeleton?.bones ?? []) { fresh(b.matrix); fresh(b.matrixWorld); } });
   return n;
 })}`);
+if (process.env.HITCH_FIRSTBOX === '1') await page.evaluate(() => { window.__firstBox = true; });
 if (process.env.HITCH_UNBOXALL === '1') console.log(`--- every matrix unboxed: ${await page.evaluate(async () => {
   const isObj = new Function('a', 'return %HasObjectElements(a)');
   const live = () => window.__allMatrices.map((r) => r.deref()).filter(Boolean);
@@ -60,10 +61,31 @@ if (process.env.HITCH_UNBOXALL === '1') console.log(`--- every matrix unboxed: $
   const before = count();
   for (const m of live()) { const e = m.elements, a = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; for (let i = 0; i < 16; i++) a[i] = e[i]; m.elements = a; }
   const after = count();
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // HITCH_FIRSTBOX=1: for the next two frames each matrix method checks its own matrix and the matrices it was
+  // given, before and after: the first calls that leave one boxed, and from where.
+  const first = [];
+  if (window.__firstBox) {
+    const P = live()[0].constructor.prototype, saved = {};
+    const kinds = (self, a) => [self, ...a].map((m) => (m && m.elements && Array.isArray(m.elements) ? isObj(m.elements) : null));
+    for (const k of Object.getOwnPropertyNames(P)) {
+      const f = P[k];
+      if (typeof f !== 'function' || k === 'constructor') continue;
+      saved[k] = f;
+      P[k] = function (...a) {
+        const was = kinds(this, a), r = f.apply(this, a), now = kinds(this, a);
+        if (first.length < 8 && now.some((x, i) => x === true && was[i] === false)) {
+          const who = now.map((x, i) => (x === true && was[i] === false ? (i ? `arg${i - 1}` : 'this') : null)).filter(Boolean).join('+');
+          first.push(`${k} boxed ${who}: ${(new Error().stack ?? '').split('\n').slice(2, 10).map((l) => l.trim()).join(' < ')}`);
+        }
+        return r;
+      };
+    }
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    for (const k of Object.keys(saved)) P[k] = saved[k];
+  } else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   const frame = count();
   await new Promise((r) => setTimeout(r, 3000));
-  return `before ${before}; unboxed ${after}; two frames later ${frame}; 3 s later ${count()}`;
+  return `before ${before}; unboxed ${after}; two frames later ${frame}; 3 s later ${count()}${first.length ? `\n  first calls that boxed one:\n  ${first.join('\n  ')}` : window.__firstBox ? '\n  no matrix method boxed one (it happens elsewhere)' : ''}`;
 })}`);
 // HITCH_REVERT=1 (with HITCH_ELEMENTS=1): unboxed as above, then after one frame and after a second, which objects'
 // matrices are boxed again, and any matrix number or position, scale or turn that is not a number at all.
