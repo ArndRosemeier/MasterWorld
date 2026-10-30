@@ -14,37 +14,26 @@ import { Noise, Rng, deriveSeed, smin, smoothstep } from '@futuremagic/core';
 import { DIRS } from '@futuremagic/dungeon';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import type { ScaledLayout } from './cellar';
-import { CellarMat, WildMat, scaleTint, type Tint } from './meshKit';
+import { WildMat, scaleTint, type Tint } from './meshKit';
 import { brickField, fieldAt, meshField, setSample, type BrickField } from './rockMesh';
 import { DungeonSpace } from './space';
+import { blockAt, caveFeatures, domeAt, hallAt, miteAt, floorLift, toCourse, type CaveBlock, type CaveFeatures, type CaveMite } from './caveFeatures';
 
 /** Sample spacing of the cave's field, metres: a sixth of a cell, 0.4 m at least (a cellar-sized cave's). */
 export const caveStep = (cell: number): number => Math.max(0.4, Math.min(0.6, cell / 6));
 /** Half the least thickness of rock between two ways side by side, metres, for a 2 m cell. */
 const SKIN = 0.15;
-/** A room this many storeys high is a cavern: its roof a dome, its walls leaning in as they rise, stalactites hanging. */
-const CAVERN = 3;
 /** How far a cavern's walls lean in for every metre they rise above head height. */
 const LEAN = 0.22;
-/** A cavern's dome falls to this share of its height at its walls. */
-const DOME_EDGE = 0.4;
 
 /** The cave's rock as signed distances (positive in air), in bricks, in the dungeon's own frame. */
 export type CaveField = BrickField;
 
-/** A cavern of the layout in metres: its floor plan, floor and full height. */
-interface Cavern { readonly id: number; readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number; readonly floor: number; readonly high: number }
 /** A stalactite: where it hangs, how long it is and how thick at its root. */
 interface Stalactite { readonly x: number; readonly z: number; readonly len: number; readonly r: number }
 
-/** A cavern's roof over (x, z): its full height in the middle, falling towards the walls. */
-function domeAt(c: Cavern, x: number, z: number): number {
-  const u = (2 * x - c.x0 - c.x1) / (c.x1 - c.x0), v = (2 * z - c.z0 - c.z1) / (c.z1 - c.z0);
-  return c.floor + c.high * (1 - (1 - DOME_EDGE) * Math.min(1, u * u + v * v));
-}
-
 /** The field around every room and way of the layout, a cell of rock beyond. */
-export function caveField(layout: ScaledLayout, seed: number, step = caveStep(layout.scale.cell)): CaveField {
+export function caveField(layout: ScaledLayout, seed: number, feat = caveFeatures(layout, seed), step = caveStep(layout.scale.cell)): CaveField {
   const space = new DungeonSpace(layout, true), { cell: CELL, storey: STOREY } = layout.scale;
   // Everything that is a length in a cellar-sized cave grows with the cell.
   const g = CELL / 2;
@@ -57,7 +46,8 @@ export function caveField(layout: ScaledLayout, seed: number, step = caveStep(la
   }
   const ox = (i0 - 1) * CELL, oz = (j0 - 1) * CELL, oy = lo * STOREY - 1.2;
   const nx = Math.ceil(((i1 + 2) * CELL - ox) / step) + 1, nz = Math.ceil(((j1 + 2) * CELL - oz) / step) + 1;
-  const ny = Math.ceil(((hi + 1) * STOREY + 1 - oy) / step) + 1;
+  const shaftTop = Math.max((hi + 1) * STOREY + 1, ...feat.shafts.map((s) => s.top + 1));
+  const ny = Math.ceil((shaftTop - oy) / step) + 1;
   // Per cell column: the lowest and highest storey anything is on there (the solid rock between is not sampled).
   const ci = i1 - i0 + 3, cj = j1 - j0 + 3;
   const colLo = new Int16Array(ci * cj).fill(32767), colHi = new Int16Array(ci * cj).fill(-32768);
@@ -87,20 +77,24 @@ export function caveField(layout: ScaledLayout, seed: number, step = caveStep(la
     for (const q of near[c]) best = Math.min(best, Math.hypot(q[0] - x, (q[1] - y) * 0.7, q[2] - z));
     return best;
   };
-  // The caverns, and the stalactites hanging from their roofs (none near the walls, where the roof is low).
-  const caverns = new Map<number, Cavern>(), drips = new Map<number, Stalactite[]>();
-  for (const r of layout.rooms) {
-    if (r.height < CAVERN) continue;
-    const c: Cavern = { id: r.id, x0: r.x * CELL, x1: (r.x + r.w) * CELL, z0: r.z * CELL, z1: (r.z + r.d) * CELL, floor: r.level * STOREY, high: r.height * STOREY };
-    caverns.set(r.id, c);
-    const rng = new Rng(deriveSeed(seed, 'cave', 'stalactites', r.id)), list: Stalactite[] = [];
+  // The stalactites hanging from the caverns' roofs (none near the walls, where the roof is low, nor in a shaft).
+  const drips = new Map<number, Stalactite[]>();
+  for (const c of feat.halls.values()) {
+    if (!c.cavern) continue;
+    const rng = new Rng(deriveSeed(seed, 'cave', 'stalactites', c.id)), list: Stalactite[] = [];
     const n = Math.round(((c.x1 - c.x0) * (c.z1 - c.z0)) / 14);
     for (let t = 0; t < n; t++) {
       const u = rng.range(0.12, 0.88), v = rng.range(0.12, 0.88);
-      list.push({ x: c.x0 + (c.x1 - c.x0) * u, z: c.z0 + (c.z1 - c.z0) * v, len: rng.range(0.8, 4.5) * rng.range(0.5, 1), r: rng.range(0.25, 0.75) });
+      const s: Stalactite = { x: c.x0 + (c.x1 - c.x0) * u, z: c.z0 + (c.z1 - c.z0) * v, len: rng.range(0.8, 4.5) * rng.range(0.5, 1), r: rng.range(0.25, 0.75) };
+      if (!feat.shafts.some((h) => Math.hypot(h.x - s.x, h.z - s.z) < h.r + s.r + 0.5)) list.push(s);
     }
-    drips.set(r.id, list);
+    drips.set(c.id, list);
   }
+  // What stands on each hall's floor (blocks, stalagmites), and its shafts.
+  const blocks = new Map<number, CaveBlock[]>(), mites = new Map<number, CaveMite[]>();
+  for (const b of feat.blocks) blocks.set(b.hall, [...(blocks.get(b.hall) ?? []), b]);
+  for (const m of feat.mites) mites.set(m.hall, [...(mites.get(m.hall) ?? []), m]);
+  const shaftAt = (x: number, z: number) => feat.shafts.find((s) => Math.hypot(x - s.x, z - s.z) < s.r * 1.5 + 1);
   const f = brickField(ox, oy, oz, step, nx, ny, nz);
   for (let k = 0; k < nz; k++) {
     const z = oz + k * step;
@@ -108,13 +102,16 @@ export function caveField(layout: ScaledLayout, seed: number, step = caveStep(la
       const x = ox + i * step;
       const col = Math.floor((z - oz) / CELL) * ci + Math.floor((x - ox) / CELL);
       if (sLo[col] > sHi[col]) continue;
-      const ja = Math.max(0, Math.floor((sLo[col] * STOREY - 1.2 - oy) / step)), jb = Math.min(ny - 1, Math.ceil(((sHi[col] + 1) * STOREY + 1 - oy) / step));
+      const shaft = shaftAt(x, z);
+      // The floor's relief here, once per hall over this column (it depends on x and z alone).
+      let reliefHall = -1, relief = 0;
+      const ja = Math.max(0, Math.floor((sLo[col] * STOREY - 1.2 - oy) / step)), jb = Math.min(ny - 1, Math.ceil(((shaft ? shaft.top - (sHi[col] + 1) * STOREY : 0) + (sHi[col] + 1) * STOREY + 1 - oy) / step));
       for (let j = ja; j <= jb; j++) {
         const y = oy + j * step;
         const p = space.parts(x, y, z, 3 * g, 0.6 * g);
         let walls = p.walls - SKIN * g, ceil = p.ceil, round = 0.2 * g;
         const own = space.own(Math.floor(x / CELL), Math.floor(z / CELL), space.levelAt(y));
-        const cav = own !== undefined ? caverns.get(own) : undefined;
+        const hall = own !== undefined && own >= 0 ? feat.halls.get(own) : undefined, cav = hall?.cavern ? hall : undefined;
         let high = 0;
         if (cav) {
           // A cavern: the roof a dome, the walls leaning in above head height, so it is a hall of rock, not a box.
@@ -144,7 +141,15 @@ export function caveField(layout: ScaledLayout, seed: number, step = caveStep(la
           ceil -= (0.05 + amp * 0.38) * g * (noise.fbm3(x / (3.1 * g) + 7.3, y / (3.1 * g), z / (3.1 * g), 2) * 0.5 + 0.5) + grit + crag * 0.6;
           round += amp * 0.8 * g;
         }
-        let d = smin(smin(walls, ceil, round), p.floor, 0.45);
+        // The floor heaped, stepped and banked, with its pools and stream (caveFeatures.ts); its walls curve into
+        // it (in a cavern over a metre and a half), and blocks and stalagmites stand on it.
+        if (hall && reliefHall !== hall.id) { reliefHall = hall.id; relief = floorLift(feat, hall, x, z); }
+        const floor = hall ? (p.floor - relief - noise.fbm3(x / 0.9 + 3.1, y / 0.9, z / 0.9, 2) * 0.07 * (hall.cavern ? 1 : 0.5)) * 0.8 : p.floor;
+        let d = smin(smin(walls, ceil, round), floor, cav ? 1.6 : hall ? 0.8 : 0.45);
+        if (hall) {
+          for (const b of blocks.get(hall.id) ?? []) if (Math.abs(x - b.x) < 2 && Math.abs(z - b.z) < 2) d = smin(d, blockAt(b, x, y, z), 0.25);
+          for (const m of mites.get(hall.id) ?? []) if (Math.abs(x - m.x) < m.r + 0.7 && Math.abs(z - m.z) < m.r + 0.7) d = smin(d, miteAt(m, x, y, z), 0.35);
+        }
         // Stalactites over a cavern's floor, from its roof down (their tips well over a body's head).
         if (cav && high > 0) for (const s of drips.get(cav.id)!) {
           const hd = Math.hypot(x - s.x, z - s.z);
@@ -152,6 +157,13 @@ export function caveField(layout: ScaledLayout, seed: number, step = caveStep(la
           const tip = domeAt(cav, s.x, s.z) - s.len, t = (y - tip) / s.len;
           const cone = t < 0 ? Math.hypot(hd, y - tip) : (hd - s.r * Math.min(1, t)) * 0.85;
           d = Math.min(d, cone);
+        }
+        // A shaft up through the roof to the day: a rough chimney, its rim worn round, shut a little under its top.
+        if (shaft && y > shaft.roof - 4) {
+          const a = Math.atan2(z - shaft.z, x - shaft.x);
+          const r = shaft.r * (1 + 0.22 * noise.fbm3(Math.cos(a) * 1.3, y / 2.5, Math.sin(a) * 1.3, 2)) + 1.4 * smoothstep(shaft.roof + 0.5, shaft.roof - 3, y);
+          const air = Math.min(r - Math.hypot(x - shaft.x, z - shaft.z), shaft.top - y);
+          d = -smin(-d, -air, 0.8);
         }
         setSample(f, i, j, k, d);
       }
@@ -168,8 +180,16 @@ export const caveAt = (f: CaveField, x: number, y: number, z: number): number =>
  * way). Nothing else of the layout's space walls it in, so where the rock is open one walks.
  */
 export class CaveSpace extends DungeonSpace {
-  constructor(layout: ScaledLayout, readonly rock: CaveField) {
+  constructor(layout: ScaledLayout, readonly rock: CaveField, readonly features: CaveFeatures) {
     super(layout);
+  }
+
+  /** The floor as carved: heaped, stepped and banked in the rooms, hollowed under water (caveFeatures.ts). */
+  override floorAt(x: number, z: number, y: number): number | null {
+    const at = super.floorAt(x, z, y);
+    if (at === null) return null;
+    const hall = hallAt(this.features, this, x, at + 0.1, z);
+    return hall ? at + floorLift(this.features, hall, x, z) : at;
   }
 
   override sdf(x: number, y: number, z: number): number {
@@ -183,23 +203,37 @@ const ROCK: Tint = [168, 160, 148], SILT: Tint = [150, 132, 110];
 const BARE: Tint = [128, 126, 122];
 
 /** The cave's rock as one mesh in the building format (its own frame). */
-export function caveShell(f: CaveField, layout: ScaledLayout, seed: number): BuildingMesh {
+export function caveShell(f: CaveField, layout: ScaledLayout, seed: number, feat = caveFeatures(layout, seed)): BuildingMesh {
   const space = new DungeonSpace(layout, true);
   const noise = new Noise(deriveSeed(seed, 'cave', 'tint'));
+  // Damp: by the water, and where a shaft lets the rain in.
+  const wetness = (x: number, z: number): number => {
+    let w = 0;
+    for (const p of feat.pools) w = Math.max(w, smoothstep(p.r + 1.8, p.r * 0.6, Math.hypot(x - p.x, z - p.z)));
+    for (const s of feat.streams) w = Math.max(w, smoothstep(s.w + 1.2, s.w * 0.5, toCourse(s.pts, x, z)));
+    for (const s of feat.shafts) w = Math.max(w, 0.6 * smoothstep(s.r + 3, s.r, Math.hypot(x - s.x, z - s.z)));
+    return w;
+  };
   return meshField(f, {
-    // Level floors are silt, the rest bare rock. The silt's patches are in its tint, which blends smoothly from
-    // vertex to vertex: a material chosen per triangle by a patch noise left saw-tooth edges along the mesh grid.
-    mat: (_x, _y, _z, up) => (up > 0.8 ? CellarMat.Earth : WildMat.Rock),
-    tint: (x, y, z, m) => {
-      // Damp darkens the foot of the walls, the beds of the rock run in bands, and some stretches are darker.
+    // All of it rock; the silt on the floors is in the tint, which blends smoothly from vertex to vertex. A
+    // material chosen per triangle (by a patch noise, or by how level it lies on a heaped floor) left saw-tooth
+    // edges along the mesh grid.
+    mat: () => WildMat.Rock,
+    tint: (x, y, z, _m, up) => {
+      // Damp darkens the foot of the walls and the wet ground, the beds of the rock run in bands, and some stretches are darker.
       const floor = Math.max(0, space.parts(x, y + 0.05, z, 3).floor);
+      const hall = hallAt(feat, space, x, y + 0.05, z), over = hall ? y - hall.floor : 0;
       const band = 0.9 + 0.1 * Math.sin(y * 1.7 + noise.fbm3(x / 6, y / 6, z / 6, 2) * 3);
-      const s = (0.62 + 0.38 * smoothstep(0, 0.9, floor)) * band * (0.85 + 0.3 * (noise.fbm3(x / 5, y / 5, z / 5, 2) * 0.5 + 0.5));
-      if (m === WildMat.Rock) return scaleTint(ROCK, s);
-      // Thin silt shows the grey of the rock under it; thick patches are brown.
-      const thick = smoothstep(-0.45, 0.15, noise.fbm3(x / 3.5, 0.5, z / 3.5, 2));
+      const damp = 1 - 0.35 * wetness(x, z) * (1 - smoothstep(0.5, 2.5, floor));
+      const s = (0.62 + 0.38 * smoothstep(0, 0.9, floor)) * band * damp * (0.85 + 0.3 * (noise.fbm3(x / 5, y / 5, z / 5, 2) * 0.5 + 0.5));
+      // Walls are bare rock; the floor (lying level, `up`) is silted, thin silt showing the grey of the rock under it.
+      const flat = smoothstep(0.7, 0.92, up);
+      if (flat <= 0) return scaleTint(ROCK, s);
+      // Thin silt shows the grey of the rock under it; thick patches are brown, lying in the hollows; heaps and steps are bare.
+      const thick = smoothstep(-0.45, 0.15, noise.fbm3(x / 3.5, 0.5, z / 3.5, 2)) * (1 - smoothstep(0.15, 0.5, over));
       const thin = 1 - thick;
-      return scaleTint([SILT[0] + (BARE[0] - SILT[0]) * thin, SILT[1] + (BARE[1] - SILT[1]) * thin, SILT[2] + (BARE[2] - SILT[2]) * thin], s);
+      const silt: Tint = [SILT[0] + (BARE[0] - SILT[0]) * thin, SILT[1] + (BARE[1] - SILT[1]) * thin, SILT[2] + (BARE[2] - SILT[2]) * thin];
+      return scaleTint([ROCK[0] + (silt[0] - ROCK[0]) * flat, ROCK[1] + (silt[1] - ROCK[1]) * flat, ROCK[2] + (silt[2] - ROCK[2]) * flat], s);
     },
   });
 }

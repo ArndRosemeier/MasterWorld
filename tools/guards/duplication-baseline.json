@@ -396,10 +396,6 @@
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
@@ -462,10 +458,6 @@
   {
     "key": "same name: masterworld/app/birdForm.ts#event + masterworld/app/cellarVisit.ts#event",
     "reason": "Each handles its own events (a change of shape; a way opening, a key found)."
-  },
-  {
-    "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/app/player.ts#update",
-    "reason": "Per-frame updates of different things: the cellar visit (lantern, ways, key) and the player."
   },
   {
     "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/render/flora/FloraView.ts#add",
@@ -634,5 +626,37 @@
   {
     "key": "same name: masterworld/app/cellars.ts#keep + masterworld/sim/townLife.ts#keep",
     "reason": "Unrelated: Cellars.keep marks a promise kept and says what its household pays; TownLife.keep sends people to the buildings they keep to (sim/marked.ts). Only the name matches."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic and blending in shader code (render/materials/caveWater.ts, plan P1): how the shading language is written, not a copied routine."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL arithmetic and blending in shader code (render/materials/caveWater.ts, plan P1): how the shading language is written, not a copied routine."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL arithmetic and blending in shader code (render/materials/caveWater.ts, plan P1): how the shading language is written, not a copied routine."
+  },
+  {
+    "key": "idiom: [.blending] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/feathers.ts + masterworld/render/materials/flame.ts",
+    "reason": "Each glowing kind sets additive blending on its own material (a material property, one line); nothing to share."
+  },
+  {
+    "key": "idiom: [.cos .sin .yaw Math] in masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/propModels.ts + masterworld/world/dungeon/site.ts",
+    "reason": "Turning a point by a yaw: a fallen block's box (caveFeatures.blockAt), a prop, a site's frame; two lines of trigonometry each, in different frames."
+  },
+  {
+    "key": "idiom: [.doors .links] in masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/dungeon/torches.ts",
+    "reason": "Walking a layout's doorways: a hall's doorways for its level floor (caveFeatures), the doorways near each column for the rock's bulge (caveRock), a torch beside each doorway (torches); each keeps different ones."
+  },
+  {
+    "key": "idiom: [.int .range] in masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/cellarMesh.ts + masterworld/world/sites.ts",
+    "reason": "Seeded random draws (Rng.int/Rng.range) for different things: how every seeded choice is written."
+  },
+  {
+    "key": "same name: masterworld/game/interiorWorld.ts#floorAt + masterworld/world/dungeon/caveRock.ts#floorAt",
+    "reason": "CaveSpace.floorAt overrides DungeonSpace.floorAt with the carved floor's relief (plan P1); interiorWorld's is a house's storey floor. Only the name matches."
   }
 ]

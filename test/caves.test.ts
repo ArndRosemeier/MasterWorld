@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { outlineCellar, waysLength } from '../src/world/dungeon/cellar';
 import { CaveSpace, caveField, caveShell } from '../src/world/dungeon/caveRock';
+import { caveFeatures, edgeOf, keepSpots, floorLift } from '../src/world/dungeon/caveFeatures';
 import { caveMouth, inCliff, MOUTH_WAY_DOWN } from '../src/world/dungeon/caveMouth';
 import { inWalkRaster } from '../src/world/dungeon/rockMesh';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../src/world/dungeon/towerMesh';
@@ -14,11 +15,14 @@ import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { DIRS } from '@futuremagic/dungeon';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { DungeonNav, navKey } from '../src/sim/dungeonNav';
+import { dungeonWorld } from '../src/game/dungeonWorld';
+import { Walker } from '../src/game/walker';
+import { Rng } from '@futuremagic/core';
 
 const cave = (n: number) => outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
 
 test('cave: its rock leaves every room and way walkable, and the walker reads the rock it sees', () => {
-  const c = cave(3), field = caveField(c.layout, 3), space = new CaveSpace(c.layout, field), { cell: CELL, storey: STOREY } = c.layout.scale;
+  const c = cave(3), feat = caveFeatures(c.layout, 3, keepSpots(c)), field = caveField(c.layout, 3, feat), space = new CaveSpace(c.layout, field, feat), { cell: CELL, storey: STOREY } = c.layout.scale;
   // In the middle of every room and every passage cell, a body stands clear of the rock at chest height.
   for (const r of c.layout.rooms) {
     const x = (r.x + r.w / 2) * CELL, z = (r.z + r.d / 2) * CELL, y = r.level * STOREY + 1.1;
@@ -45,9 +49,13 @@ test('cave: its rock leaves every room and way walkable, and the walker reads th
     while (y < floor + 40 && space.sdf(x, y, z) > 0) y += 0.25;
     roof = Math.max(roof, y - floor);
   }
+  // (Over the floor as it lies, heaped and banked; not where a fallen block or a stalagmite stands.)
+  const stands = (x: number, z: number) => feat.blocks.some((b) => Math.hypot(b.x - x, b.z - z) < Math.hypot(b.hx, b.hz) + 0.5) || feat.mites.some((m) => Math.hypot(m.x - x, m.z - z) < m.r + 0.5);
   for (let u = 0.15; u < 0.9; u += 0.1) for (let v = 0.15; v < 0.9; v += 0.1) {
+    const x = (cav.x + u * cav.w) * CELL, z = (cav.z + v * cav.d) * CELL;
+    if (stands(x, z)) continue;
     spots++;
-    if (space.sdf((cav.x + u * cav.w) * CELL, floor + 1.8, (cav.z + v * cav.d) * CELL) > 0.4) open++;
+    if (space.sdf(x, space.floorAt(x, z, floor + 1)! + 1.8, z) > 0.4) open++;
   }
   assert.ok(roof > 20, `the cavern is ${roof.toFixed(1)} m high`);
   assert.equal(open, spots, 'nothing hangs down into the way of a body');
@@ -55,7 +63,7 @@ test('cave: its rock leaves every room and way walkable, and the walker reads th
   const r0 = c.layout.rooms[0];
   assert.ok(space.sdf(r0.x * CELL - 3, r0.level * STOREY + 1, r0.z * CELL - 3) < 0);
   // Its mesh: rock and silt, no torches (the lantern is all the light).
-  const m = caveShell(field, c.layout, 3);
+  const m = caveShell(field, c.layout, 3, feat);
   assert.ok(m.index.length / 3 > 3000, `${m.index.length / 3} triangles`);
   assert.ok([...new Set(m.mat)].every((x) => x === 10 || x === 15), 'rock and earth only');
   assert.deepEqual(torchSpots(c), []);
@@ -161,4 +169,58 @@ test('tower: weathered stone, greyed and greened, never pastel; its foot darker 
   }
   assert.ok(nf > 20 && nw > 20);
   assert.ok(foot / nf < (wall / nw) * 0.7, `foot ${(foot / nf).toFixed(0)} vs wall ${(wall / nw).toFixed(0)}`);
+});
+
+test('cave (P1): natural floors, water and a shaft; level where things lie; the walker stands on the floor it sees', () => {
+  for (let n = 0; n < 10; n++) {
+    const c = cave(n), f = caveFeatures(c.layout, n, keepSpots(c)), space = new DungeonSpace(c.layout);
+    const top = c.layout.rooms.reduce((a, r) => (r.height > a.height ? r : a));
+    assert.ok(f.shafts.some((s) => s.hall === top.id), `cave ${n}: a shaft in its highest cavern`);
+    assert.ok(f.pools.some((p) => f.halls.get(p.hall)!.cavern), `cave ${n}: a pool in a cavern`);
+    // Its cavern's floor is uneven: heaps and steps over a metre apart, banks at the walls.
+    const h = f.halls.get(top.id)!;
+    let lo = Infinity, hi = -Infinity;
+    for (let u = 0.05; u < 1; u += 0.05) for (let v = 0.05; v < 1; v += 0.05) {
+      const r = floorLift(f, h, h.x0 + (h.x1 - h.x0) * u, h.z0 + (h.z1 - h.z0) * v);
+      lo = Math.min(lo, r); hi = Math.max(hi, r);
+    }
+    assert.ok(hi - lo > 1, `cave ${n}: the cavern floor varies ${(hi - lo).toFixed(2)} m`);
+    // Level where things are put down, and in the doorways.
+    for (const [x, z] of f.keep) {
+      const r = space.own(Math.floor(x / c.layout.scale.cell), Math.floor(z / c.layout.scale.cell), top.level);
+      const hall = r !== undefined && r >= 0 ? f.halls.get(r) : undefined;
+      if (hall) assert.ok(Math.abs(floorLift(f, hall, x, z)) < 0.02, `cave ${n}: kept spot ${x.toFixed(1)},${z.toFixed(1)} raised ${floorLift(f, hall, x, z).toFixed(2)}`);
+    }
+    for (const hall of f.halls.values()) for (const [x, z] of hall.doors) assert.ok(Math.abs(floorLift(f, hall, x, z)) < 0.02, `cave ${n}: doorway of room ${hall.id} raised`);
+  }
+  // The walker stands on the floor the field carves (heaped, banked, in a pool's hollow), not the layout's level.
+  const c = cave(4), f = caveFeatures(c.layout, 4, keepSpots(c)), space = new CaveSpace(c.layout, caveField(c.layout, 4, f), f);
+  const h = [...f.halls.values()].find((x) => x.cavern)!;
+  let checked = 0;
+  for (let u = 0.1; u < 0.95; u += 0.08) for (let v = 0.1; v < 0.95; v += 0.08) {
+    const x = h.x0 + (h.x1 - h.x0) * u, z = h.z0 + (h.z1 - h.z0) * v;
+    if (edgeOf(h, x, z) < 2 || f.blocks.some((b) => Math.hypot(b.x - x, b.z - z) < 2.2) || f.mites.some((m) => Math.hypot(m.x - x, m.z - z) < 1)) continue;
+    const y = space.floorAt(x, z, h.floor + 2)!;
+    assert.ok(space.sdf(x, y + 0.25, z) > 0, `air just over the floor at ${x.toFixed(1)},${z.toFixed(1)}`);
+    assert.ok(space.sdf(x, y - 0.25, z) < 0, `rock just under it at ${x.toFixed(1)},${z.toFixed(1)}`);
+    checked++;
+  }
+  assert.ok(checked > 30, `${checked} spots`);
+});
+
+test('cave: a body running and jumping about its rooms never ends in the rock, nor is lifted up a face', () => {
+  const c = cave(5), feat = caveFeatures(c.layout, 5, keepSpots(c)), space = new CaveSpace(c.layout, caveField(c.layout, 5, feat), feat);
+  const { cell: C, storey: S } = c.layout.scale, w = new Walker(dungeonWorld(space, { x: 0, y: 0, z: 0 })), rng = new Rng(5);
+  w.tire = () => true;
+  for (const r of c.layout.rooms.slice(0, 6)) {
+    w.place((r.x + r.w / 2) * C, (r.z + r.d / 2) * C, r.level * S + 1);
+    let heading = 0;
+    for (let i = 0; i < 900; i++) {
+      if (i % 90 === 0) heading = rng.range(0, Math.PI * 2);
+      const y0 = w.pos.y, was = w.mode;
+      w.step({ forward: 1, strafe: 0, heading, walk: false, up: i % 37 === 0, down: false }, 1 / 60);
+      assert.ok(space.sdf(w.pos.x, w.pos.y + 1, w.pos.z) > 0, `room ${r.id}: in the rock at ${w.pos.x.toFixed(1)}, ${w.pos.y.toFixed(1)}, ${w.pos.z.toFixed(1)}`);
+      if (was !== 'pull') assert.ok(w.pos.y - y0 < 0.5, `room ${r.id}: lifted ${(w.pos.y - y0).toFixed(2)} m in a frame (${was} to ${w.mode})`);
+    }
+  }
 });

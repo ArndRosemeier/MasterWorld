@@ -25,6 +25,8 @@ export interface WalkWorld {
   wall?(x: number, z: number, r: number, y?: number): boolean;
   /** A rock face with holds to climb by at (x, z): the way into it (a unit vector); null where none (D56). */
   climbable?(x: number, z: number): { readonly nx: number; readonly nz: number } | null;
+  /** The rock itself offers holds wherever it stands as a wall (a cave's broken rock): climbed by its faces in `rockSurface`. */
+  rockHolds?(): boolean;
 }
 
 /** What the player wants this frame. */
@@ -150,14 +152,19 @@ export class Walker {
   }
 
   /** Whether the body would be in rock at (x, z) with its feet at y. */
-  private blocked(x: number, y: number, z: number): boolean {
-    const r = this.spec.radius;
-    if (this.world.wall?.(x, z, r, y)) return true;
-    for (const k of [0.75, 1.3, this.height - r]) {
+  private bodyInRock(x: number, y: number, z: number): boolean {
+    if (this.world.wall?.(x, z, this.spec.radius, y)) return true;
+    return this.clearance(x, y, z) < this.spec.radius;
+  }
+
+  /** How far the body's middle is from rock at (x, z), its feet at y (less than its radius: it is in it). */
+  private clearance(x: number, y: number, z: number): number {
+    let c = Infinity;
+    for (const k of [0.75, 1.3, this.height - this.spec.radius]) {
       const d = this.world.rockSurface(x, y + k, z);
-      if (d !== null && d < r) return true;
+      if (d !== null) c = Math.min(c, d);
     }
-    return false;
+    return c;
   }
 
   /** Where the water surface is, if the body is in it deep enough to swim; else null. */
@@ -197,19 +204,23 @@ export class Walker {
 
     // Across: blocked by rock (try each axis alone, to slide along a wall) and by too steep a slope. A body
     // already in something (placed against a tree) may move, so it can walk out.
-    const stuck = this.blocked(p.x, p.y, p.z);
+    const stuck = this.bodyInRock(p.x, p.y, p.z), held = stuck ? this.clearance(p.x, p.y, p.z) : Infinity;
     const tryMove = (nx: number, nz: number): boolean => {
+      // Out, not further in (else it walks into the rock and up its face, or into the wall itself), unless going down
+      // a step (the body sinks as it moves on: a tall head under a low edge on the way down a stair).
+      if (stuck && this.clearance(nx, p.y, nz) < held - 1e-4 && !(this.mode === 'ground' && this.floorAhead(nx, nz) < p.y - 0.01)) return false;
       // Going down a step the body sinks as it moves on, so the head is tested at the lower floor too
       // (else a tall body under a low edge climbs a stair it can never come down again).
-      if (!stuck && this.blocked(nx, p.y, nz)) {
-        // The floor a body's width ahead: the step down it is about to take.
-        const run = Math.hypot(nx - p.x, nz - p.z), k = run > 1e-6 ? this.spec.radius / run : 0;
-        const ahead = this.mode === 'ground' ? this.support(nx + (nx - p.x) * k, nz + (nz - p.z) * k, p.y) : p.y;
+      if (!stuck && this.bodyInRock(nx, p.y, nz)) {
+        const ahead = this.mode === 'ground' ? this.floorAhead(nx, nz) : p.y;
         if (ahead >= p.y - 1e-3) return false;
         // Sinking up to a step (not into the step ahead's own block, nor deeper than the floor ahead).
         const low = Math.max(ahead, p.y - this.spec.step);
-        if ([this.support(nx, nz, p.y), (p.y + low) / 2, low].every((y) => y >= p.y - 1e-3 || this.blocked(nx, y, nz))) return false;
+        if ([this.support(nx, nz, p.y), (p.y + low) / 2, low].every((y) => y >= p.y - 1e-3 || this.bodyInRock(nx, y, nz))) return false;
       }
+      // In the air the body goes over an edge only with its feet near the top (a step under them): never lifted
+      // onto a ledge it did not jump high enough for (the knees clear of it, the feet still under it).
+      if (this.mode === 'air' && this.support(nx, nz, p.y) > p.y + this.spec.step) return false;
       if (this.mode === 'ground') {
         const run = Math.hypot(nx - p.x, nz - p.z);
         const rise = this.support(nx, nz, p.y) - p.y;
@@ -232,7 +243,7 @@ export class Walker {
     const asked = this.mode === 'ground' && len > 0.3;
     this.stuckFor = asked && Math.hypot(p.x - x0, p.z - z0) < speed * len * dt * 0.1 ? this.stuckFor + dt : 0;
     // Pushing on into a face with holds: onto it.
-    if (asked && intent.forward > 0.5 && this.stuckFor > 0 && this.spec.climb && this.world.climbable) {
+    if (asked && intent.forward > 0.5 && this.stuckFor > 0 && this.spec.climb && (this.world.climbable || this.inRock())) {
       this.pushing += dt;
       if (this.pushing >= GRIP_ON && this.gripFace(-sh, -ch)) return;
     } else this.pushing = 0;
@@ -275,6 +286,12 @@ export class Walker {
     v.y = clamp(v.y, -50, 20);
   }
 
+  /** The floor a body's width on from (nx, nz), going there from where it stands: the step down it is about to take. */
+  private floorAhead(nx: number, nz: number): number {
+    const p = this.pos, run = Math.hypot(nx - p.x, nz - p.z), k = run > 1e-6 ? this.spec.radius / run : 0;
+    return this.support(nx + (nx - p.x) * k, nz + (nz - p.z) * k, p.y);
+  }
+
   /** The ground's slope at (x, z) (rise over run, either way). */
   private groundSlope(x: number, z: number): number {
     const d = 0.4, h = this.world.height.bind(this.world);
@@ -286,19 +303,42 @@ export class Walker {
    * crosses `y` within a few metres either way. Null where it does not (over the top, or off the face).
    */
   private faceAt(x: number, z: number, y: number, nx: number, nz: number): [number, number] | null {
-    const above = (t: number) => this.world.height(x + nx * t, z + nz * t) - y;
-    let lo = -3, hi = 3;
+    // In rock (a cave): where the rock begins at the knees (a narrow way: not as far as its other wall).
+    const rock = this.inRock();
+    const above = rock ? (t: number) => -(this.world.rockSurface(x + nx * t, y + 0.5, z + nz * t) ?? -1) : (t: number) => this.world.height(x + nx * t, z + nz * t) - y;
+    let lo = rock ? -1.2 : -3, hi = rock ? 1.2 : 3;
     if (above(lo) > 0 || above(hi) < 0) return null;
     for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2; if (above(m) > 0) hi = m; else lo = m; }
     const t = (lo + hi) / 2;
     return [x + nx * t, z + nz * t];
   }
 
+  /** Whether the walker climbs the rock's own faces (a cave's), not the height field's. */
+  private inRock(): boolean {
+    return !!this.world.rockHolds?.();
+  }
+
+  /**
+   * Holds at (x, z) with the feet at y: the way into the face. Out of doors the land's climbable faces; in a cave the
+   * rock wherever it stands as a wall within reach (not a floor, nor a roof over the head).
+   */
+  private holds(x: number, z: number, y: number): { nx: number; nz: number } | null {
+    if (!this.inRock()) return this.world.climbable?.(x, z) ?? null;
+    const f = (px: number, py: number, pz: number) => this.world.rockSurface(px, py, pz) ?? -1, e = 0.15, h = y + 1;
+    if (f(x, h, z) > 0.6) return null;
+    const gx = f(x + e, h, z) - f(x - e, h, z), gy = f(x, h + e, z) - f(x, h - e, z), gz = f(x, h, z + e) - f(x, h, z - e);
+    const across = Math.hypot(gx, gz);
+    if (across < 1e-6 || across < 0.7 * Math.hypot(gx, gy, gz)) return null;
+    return { nx: -gx / across, nz: -gz / across };
+  }
+
   /** Onto the climbable face ahead (dx, dz: the way the body pushes), if it is one; whether it got on. */
   private gripFace(dx: number, dz: number): boolean {
-    const p = this.pos, r = this.spec.radius + 0.3;
-    const c = this.world.climbable?.(p.x + dx * r, p.z + dz * r);
-    if (!c || c.nx * dx + c.nz * dz < 0.5 || this.groundSlope(p.x + dx * r, p.z + dz * r) <= this.spec.maxSlope) return false;
+    const p = this.pos, r = this.spec.radius + 0.3, fx = p.x + dx * r, fz = p.z + dz * r;
+    const c = this.holds(fx, fz, p.y);
+    if (!c || c.nx * dx + c.nz * dz < 0.5) return false;
+    // A face, not a step or a bank one walks up: out of doors too steep a slope; in a cave rock up past the chest.
+    if (this.inRock() ? (this.world.rockSurface(fx, p.y + 1.3, fz) ?? -1) > 0.3 : this.groundSlope(fx, fz) <= this.spec.maxSlope) return false;
     const at = this.faceAt(p.x, p.z, p.y + 0.4, c.nx, c.nz);
     if (!at) return false;
     this.mode = 'climb';
@@ -340,8 +380,11 @@ export class Walker {
     // Over the top: the ground just in from the face is up at the waist (where the hands go flat on it and
     // the body pushes up: @futuremagic/figure's ledge, so the pull-up starts where the climb left the feet)
     // and walkable.
-    const tx = ax + F.nx * 0.9, tz = az + F.nz * 0.9, top = this.world.height(tx, tz);
-    if (intent.forward > 0 && top - y < PULL_RISE * this.height && this.groundSlope(tx, tz) <= this.spec.maxSlope) {
+    const rock = this.inRock(), tx = ax + F.nx * 0.9, tz = az + F.nz * 0.9;
+    const top = rock ? this.support(tx, tz, y + PULL_RISE * this.height) : this.world.height(tx, tz);
+    // In a cave the ledge's top is where the body fits (stood up on it, clear of the roof).
+    const over = rock ? top > y && !this.bodyInRock(tx, top, tz) : this.groundSlope(tx, tz) <= this.spec.maxSlope;
+    if (intent.forward > 0 && top - y < PULL_RISE * this.height && over) {
       const q = this.pull;
       this.mode = 'pull';
       q.t = 0; q.x0 = p.x; q.y0 = p.y; q.z0 = p.z; q.x1 = tx; q.z1 = tz; q.y1 = top;
@@ -349,15 +392,16 @@ export class Walker {
     }
     // Down to the foot: off onto the ground.
     const back = this.support(p.x - F.nx * 0.3, p.z - F.nz * 0.3, y);
-    if (intent.forward < 0 && back >= y - 0.25 && this.groundSlope(p.x, p.z) <= this.spec.maxSlope * 1.5) {
+    if (intent.forward < 0 && back >= y - 0.25 && (rock || this.groundSlope(p.x, p.z) <= this.spec.maxSlope * 1.5)) {
       this.mode = 'ground';
       p.y = this.support(p.x, p.z, y);
       return;
     }
     const at = this.faceAt(ax, az, y, F.nx, F.nz);
-    const c = at && this.world.climbable?.(at[0] + F.nx * 0.2, at[1] + F.nz * 0.2);
-    // No holds there (the broken rock ends): the body stays where it is.
+    const c = at && (rock ? this.holds(at[0] - F.nx * 0.2, at[1] - F.nz * 0.2, y) : this.holds(at[0] + F.nx * 0.2, at[1] + F.nz * 0.2, y));
+    // No holds there (the broken rock ends), or the head at the roof: the body stays where it is.
     if (!at || !c) return;
+    if (rock && intent.forward > 0 && (this.world.rockSurface(at[0] - c.nx * OFF_FACE, y + this.height + 0.05, at[1] - c.nz * OFF_FACE) ?? 1) < 0.1) return;
     F.nx = c.nx; F.nz = c.nz;
     p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE; p.y = y;
     this.yaw = Math.atan2(-c.nx, -c.nz);

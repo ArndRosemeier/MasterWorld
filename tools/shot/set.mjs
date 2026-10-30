@@ -181,6 +181,11 @@ const SESSIONS = [
       }).then((said) => console.log(said));
       await p.waitForTimeout(1500);
     } },
+    // P1: the same cavern from its floor (the free camera at eye height near one end, looking across to the far
+    // side), at its water (a pool, from a few metres off and above) and up its shaft of daylight.
+    { name: 'cave-floor', act: caveLook('floor') },
+    { name: 'cave-water', act: caveLook('water') },
+    { name: 'cave-shaft', act: caveLook('shaft') },
   ] },
   // Out on the land: the barrow, then the hero is moved to the deer and the wolves (a load is the dearest part).
   { id: 'land', query: `${still}&hour=10&weather=fair&barrow`, shots: [
@@ -276,6 +281,46 @@ const SESSIONS = [
 /** The sessions of each part (each part one run, under 5 min). */
 const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave', 'mesa']);
 const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : 'land');
+
+/**
+ * The free camera in the start cave's highest cavern (cave-cavern went in): from its floor at eye height across it,
+ * at a pool of its water, or looking up its shaft of daylight (world/dungeon/caveFeatures.ts).
+ */
+function caveLook(what) {
+  return async (p) => {
+    const said = await p.evaluate(async (what) => {
+      const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === 'cave');
+      const v = d && await g.cellars.build(d.id);
+      if (!v) throw new Error('no cave');
+      const rooms = v.cellar.graph.rooms, top = rooms.reduce((a, r) => (r.height > a.height ? r : a), rooms[0]);
+      const r = v.cellar.layout.rooms[top.id], { cell, storey } = v.cellar.layout.scale, O = v.view.origin, f = v.view.cave;
+      const x0 = r.x * cell, z0 = r.z * cell, W = r.w * cell, D = r.d * cell, floor = r.level * storey;
+      const ground = (x, z) => v.space.floorAt(x, z, floor + 3) ?? floor;
+      const pool = f?.pools.find((q) => q.hall === r.id) ?? f?.pools[0], shaft = f?.shafts.find((q) => q.hall === r.id) ?? f?.shafts[0];
+      let eye, at;
+      if (what === 'floor') {
+        // From a quarter in along the long side, looking past the middle to the far corner, a little up.
+        const ex = x0 + W * 0.2, ez = z0 + D * 0.25;
+        eye = [ex, ground(ex, ez) + 1.7, ez]; at = [x0 + W * 0.85, floor + 3.5, z0 + D * 0.8];
+      } else if (what === 'water' && pool) {
+        // From 5 m off the pool, towards the cavern's middle, 2.5 m up.
+        const mx = x0 + W / 2 - pool.x, mz = z0 + D / 2 - pool.z, l = Math.hypot(mx, mz) || 1, ex = pool.x + (mx / l) * (pool.r + 4), ez = pool.z + (mz / l) * (pool.r + 4);
+        eye = [ex, ground(ex, ez) + 2.5, ez]; at = [pool.x, pool.top, pool.z];
+      } else if (what === 'shaft' && shaft) {
+        // From 9 m off, low, looking up the beam to its middle.
+        const ex = shaft.x + (x0 + W * 0.1 < shaft.x - 9 ? -9 : 9), ez = shaft.z;
+        eye = [ex, ground(ex, ez) + 1.6, ez]; at = [shaft.x, shaft.floor + 10, shaft.z];
+      } else return `cave-${what}: none in this cave`;
+      const pl = g.player, [cx, cy, cz] = [O.x + eye[0], O.y + eye[1], O.z + eye[2]], [tx, ty, tz] = [O.x + at[0], O.y + at[1], O.z + at[2]];
+      const dx = tx - cx, dz = tz - cz;
+      pl.flying = true;
+      pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(ty - cy, Math.hypot(dx, dz)) * 180) / Math.PI]);
+      return `cave-${what}: pools ${f?.pools.length ?? 0}, streams ${f?.streams.length ?? 0}, shafts ${f?.shafts.length ?? 0}, blocks ${f?.blocks.length ?? 0}, stalagmites ${f?.mites.length ?? 0}`;
+    }, what);
+    console.log(said);
+    await p.waitForTimeout(1500);
+  };
+}
 
 /** Puts the hero at (x, z) facing along (dx, dz), the camera behind at `pitch` (up positive) and `zoom` metres. */
 function stand(x, z, dx, dz, pitch, zoom) {

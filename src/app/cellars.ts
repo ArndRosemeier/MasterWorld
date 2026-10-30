@@ -27,6 +27,8 @@ import { occupationOf } from '../vgm/leads';
 import type { DecisionLog, DungeonDecision, MoveInDecision, RetakeDecision } from '../world/decisions';
 import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh';
 import { CaveSpace, caveField, caveShell } from '../world/dungeon/caveRock';
+import { caveFeatures, keepSpots } from '../world/dungeon/caveFeatures';
+import { caveSeed } from '../world/dungeon/torches';
 import { MOUTH_WAY_DOWN, mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
 import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
@@ -75,7 +77,7 @@ export interface CellarsHost {
   ground(x: number, z: number): number;
   /** The terrain workers, for a cave's rock and mouth (none: built here, a moment's stall). */
   readonly jobs?: {
-    caveRock(layout: ScaledLayout, cave: number): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
+    caveRock(layout: ScaledLayout, cave: number, keep: readonly (readonly [number, number])[]): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
     caveMouth(site: LandSite, cave: number): Promise<CaveMouth>;
   };
   /** A place out on the land opens: the trees round it go (the land's views are built again there). */
@@ -350,10 +352,13 @@ export class Cellars {
     // A cave: its rock carved round its rooms (a worker's few hundred milliseconds), walked as it is seen.
     let carved: CaveSpace | undefined;
     if (s.first.form.space.carved) {
-      const layout = s.first.layout, seed = deriveSeed(s.decision.seed, 'cave', 'rock');
-      const rock = await (h.jobs ? h.jobs.caveRock(layout, seed) : Promise.resolve((() => { const field = caveField(layout, seed); return { field, shell: caveShell(field, layout, seed) }; })()));
+      const layout = s.first.layout, seed = caveSeed(s.first);
+      // Its natural features (caveFeatures.ts): the floor kept level where its things lie, its water and shafts drawn.
+      const keep = keepSpots(s.first), feat = caveFeatures(layout, seed, keep);
+      const rock = await (h.jobs ? h.jobs.caveRock(layout, seed, keep) : Promise.resolve((() => { const field = caveField(layout, seed, feat); return { field, shell: caveShell(field, layout, seed, feat) }; })()));
       view.rock = rock.shell;
-      carved = new CaveSpace(layout, rock.field);
+      view.cave = feat;
+      carved = new CaveSpace(layout, rock.field, feat);
     }
     await view.add(h.stage);
     // A place on the land: back out in front of its doorway, facing away from it.

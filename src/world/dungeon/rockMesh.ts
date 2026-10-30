@@ -81,7 +81,8 @@ function anyIn(f: AnyField, i0: number, j0: number, k0: number, i1: number, j1: 
 /** What the rock looks like where: a triangle's material (null: leave it out) by its middle and how much it faces up; a vertex's tint. */
 export interface RockLook {
   mat(x: number, y: number, z: number, up: number): number | null;
-  tint(x: number, y: number, z: number, mat: number): Tint;
+  /** `up`: how much the vertex's own (smooth) normal faces up. */
+  tint(x: number, y: number, z: number, mat: number, up: number): Tint;
 }
 
 /** Cells per side of the cubes the field is meshed in. */
@@ -120,7 +121,7 @@ export function meshField(f: AnyField, look: RockLook): BuildingMesh {
       nor.push(N[3 * v], N[3 * v + 1], N[3 * v + 2]);
       uv.push(...(axis === 0 ? [z, y] : axis === 1 ? [x, z] : [x, y]));
       mat.push(m);
-      tint.push(...look.tint(x, y, z, m));
+      tint.push(...look.tint(x, y, z, m, N[3 * v + 1]));
       made.set(key, out);
       return out;
     };
