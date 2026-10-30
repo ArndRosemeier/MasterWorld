@@ -628,10 +628,13 @@ export async function start(b: Boot): Promise<void> {
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
     if (chosen) hurry();
     loading.set('Raising the land');
-    await wideSeas;
-    await landReady;
-    await rock;
-    await raised;
+    // Each says when it is done (load.mjs prints it: what 'Raising the land' waits for).
+    const stamp = (what: string) => () => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: ${what}`);
+    void wideSeas.then(stamp('wide water masks made'));
+    void landReady.then(stamp('land round the camera made'));
+    void rock.then(stamp('rock raised'));
+    void raised.then(stamp('town standing'));
+    await Promise.all([wideSeas, landReady, rock, raised]);
     await view.stage.add(view.sky.dome);
     await view.stage.add(sea.mesh);
     if (grass) await view.stage.add(grass.group);
@@ -640,6 +643,7 @@ export async function start(b: Boot): Promise<void> {
     await stock?.enter(view.stage);
     await smallView?.addBirds();
     await view.stage.add(wx.precip);
+    stamp('sky, sea, hero and animals shown')();
     // Spells (plan 10) and the smoke over a raided farm (C10): built once the game is playable, within the
     // shader budget (F3), so they do not lengthen the load (F4, gate C). Neither is needed in the first seconds:
     // until then a spell is reckoned but not drawn, and no smoke rises.
