@@ -98,7 +98,9 @@ export class PortalStoneFx {
       const glow = fl * fl * (3 - 2 * fl);
       if (glow > 0) {
         const at: Vec3 = [g[0], g[1] + 0.04, g[2]];
-        b.hold('circle', at, 1.5 * (0.85 + 0.15 * glow), lit3(hueAt(t * 1.4), 0.9 * glow), { flat: UP, rot: t * 0.6, cover: 0.05 * glow, seed: 0.41 });
+        // Two rings turning against each other (plain rings: no star or sign of any faith).
+        b.hold('ring', at, 1.5 * (0.85 + 0.15 * glow), lit3(hueAt(t * 1.4), 0.9 * glow), { flat: UP, rot: t * 0.6, seed: 0.41 });
+        b.hold('ring', at, 1.0 * (0.85 + 0.15 * glow), lit3(hueAt(t * 1.4 + 2), 0.7 * glow), { flat: UP, rot: -t * 0.9, seed: 0.83 });
         b.hold('glow', at, 2.6, lit3(hueAt(t * 1.4 + 1), 0.3 * glow), { flat: UP });
         const ring = Math.min(1, bm.age / 0.9);
         if (ring < 1) b.hold('ring', at, 0.4 + 2.4 * ring, lit3(WHITE, 1.2 * (1 - ring)), { flat: UP, rot: t, seed: 0.66 });

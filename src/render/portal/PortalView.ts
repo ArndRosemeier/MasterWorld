@@ -50,6 +50,8 @@ export class PortalView {
   private readonly drawnCam = new PerspectiveCamera();
   private readonly from = new Matrix4();
   private readonly to = new Matrix4();
+  private readonly inv = new Matrix4();
+  private readonly eye = new Vector3();
   /** This frame's opening and whether its view was drawn. */
   private pass: PortalPass | null = null;
   private drawn = false;
@@ -116,7 +118,10 @@ export class PortalView {
     frameMatrix(p.here, true, this.from);
     frameMatrix(p.there, true, this.to);
     throughPortal(main, this.from, this.to, this.drawnCam);
-    if (!clipNear(this.drawnCam, openingPlane(this.to))) return;
+    // Seen from the opening's back (its -z side), the view goes on out of the far opening's back: the near plane faces the other way.
+    const plane = openingPlane(this.to);
+    if (this.inv.copy(this.from).invert() && main.getWorldPosition(this.eye).applyMatrix4(this.inv).z < 0) plane.negate();
+    if (!clipNear(this.drawnCam, plane)) return;
     const back = p.beyond();
     // No shadow map is drawn for the view beyond, unless it is the one place that needs it this frame.
     const held = p.shadows ? () => {} : holdShadows(this.view.scene);
