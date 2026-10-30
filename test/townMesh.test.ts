@@ -1,13 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSeed } from '@futuremagic/core';
-import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { townMeshes } from '../src/world/townMesh';
 import { marketStart } from '../src/world/town';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
-const { terrain } = openWorld(parseSeed('masterworld'), classic, SMALL);
+const { terrain } = startWorld();
 
 test('town: its buildings are meshed per cell and their walls stop the walker', () => {
   const town = terrain.towns[0];

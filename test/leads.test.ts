@@ -2,17 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { LEADS, keepPromise, nextPromise, openPromises, occupationOf } from '../src/vgm/leads';
 import { loreOf, placeOf } from '../src/vgm/dungeons';
 import { townsfolk } from '../src/sim/people';
 import { talkCellar, townTalk } from '../src/talk/townTalk';
 import { isEmpty, moveIn, occupantId, outlineCellar } from '../src/world/dungeon/cellar';
 import type { Decision, DecisionLog, DungeonDecision } from '../src/world/decisions';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 const seed = parseSeed('masterworld');
-const { terrain, log: first, home } = openWorld(seed, classic, SMALL);
+const { terrain, log: first, home } = startWorld();
 const town = terrain.towns[0];
 const ctx = (log: DecisionLog, hours: number, purposeOverdue = false) => ({ seed, log, towns: terrain.towns, home, hours, purposeOverdue, inside: () => false, dungeons: classic.dungeons, terrain });
 

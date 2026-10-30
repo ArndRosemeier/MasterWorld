@@ -2,15 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { Wilds, type Land } from '../src/sim/wild';
 import { territoryOf, wildFor } from '../src/vgm/wild';
 import { paceOf, woundOf, type Quarry } from '../src/sim/creatures';
 import { WALK } from '../src/game/walker';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 const seed = parseSeed('masterworld');
-const { terrain } = openWorld(seed, classic, SMALL);
+const { terrain } = startWorld();
 const town = terrain.towns[0];
 const land: Land = { height: (x, z) => terrain.height(x, z), waterDepth: (x, z) => terrain.waterDepth(x, z), blocked: (x, z, r) => town.solid(x, z, r) };
 const places = wildFor({ seed, log: [], towns: terrain.towns, terrain, hours: 0, setting: classic }, town).map(territoryOf);

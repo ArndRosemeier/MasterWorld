@@ -141,8 +141,8 @@ export class Landforms {
     const fx = x / FORM_CELL - 0.5, fz = z / FORM_CELL - 0.5;
     const i = Math.floor(fx), j = Math.floor(fz), tx = fx - i, tz = fz - j;
     // Cells i, i+1 and j, j+1 lie within the 3 x 3 round the sample's cell (nearI - 1 .. nearI + 1).
-    const a = (di: number, dj: number) => this.nearRelief[(j + dj - this.nearJ + 1) * 3 + (i + di - this.nearI + 1)];
-    const amp = (a(0, 0) * (1 - tx) + a(1, 0) * tx) * (1 - tz) + (a(0, 1) * (1 - tx) + a(1, 1) * tx) * tz;
+    const r = this.nearRelief, c = (j - this.nearJ + 1) * 3 + (i - this.nearI + 1);
+    const amp = (r[c] * (1 - tx) + r[c + 1] * tx) * (1 - tz) + (r[c + 3] * (1 - tx) + r[c + 4] * tx) * tz;
     if (amp <= 0) return 0;
     return amp * this.bandAt(x, z);
   }

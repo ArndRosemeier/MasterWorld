@@ -7,9 +7,8 @@ import { plainItem } from '../src/game/items';
 import { abilityPrice, bardTells, GuildBook, guildHouses, houseIn, teach, teachingsOf, teachRefusal } from '../src/game/guilds';
 import type { DecisionLog, RetreatDecision } from '../src/world/decisions';
 import { parseSeed } from '@futuremagic/core';
-import { openWorld } from '../src/vgm/builder';
 import { Township } from '../src/game/township';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 const witch = classic.guilds!.find((g) => g.keeper === 'hedge-witch')!;
 const under = classic.guilds!.find((g) => g.keeper === 'undercroft-keeper')!;
@@ -67,7 +66,7 @@ test('teachers: a save keeps the spells learned and the mana that came with them
 });
 
 test('teachers: the warden keeps watch at a half-ruined tower past the start town’s fields and teaches fire and light', () => {
-  const { terrain, log } = openWorld(parseSeed('masterworld'), classic, SMALL);
+  const { terrain, log } = startWorld();
   const town = terrain.towns[0], d = town.decision;
   const r = log.find((x): x is RetreatDecision => x.kind === 'retreat')!;
   assert.ok(r && r.keeper === 'tower-warden' && r.town === d.id);

@@ -1,12 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { GROUND_PACE, HORSE, Steed, groundPace } from '../src/game/horse';
 import { WALK, type WalkIntent, type WalkWorld } from '../src/game/walker';
 import { CLOCK, cartWay, cartWays, journeyOf } from '../src/vgm/journeys';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 // Plan 5.4 (D37): running 5.2 m/s (1 km in about 3 minutes), a horse about 12 m/s, on the roads (C7).
 const flat: WalkWorld = { height: () => 2, rockSurface: () => null, waterLevel: () => null };
@@ -26,8 +24,7 @@ test('travel: on foot 1 km takes about 3 minutes; a horse gallops 12 m/s where t
 });
 
 test('travel: the land says the pace: full on a road and in town, less over open country, least in the woods', () => {
-  const seed = parseSeed('masterworld');
-  const { terrain } = openWorld(seed, classic, SMALL);
+  const { terrain } = startWorld();
   const pace = groundPace(terrain), town = terrain.towns[0].decision;
   assert.equal(pace(town.x, town.z), GROUND_PACE.road, 'in town');
   // A road out of the town, past its edge.
@@ -59,9 +56,8 @@ test('travel: the cart is quicker than running even by the longer road, and the 
 });
 
 test('travel: the cart goes from an inn to the inns of towns the hero has been to, never to one a band holds', () => {
-  const seed = parseSeed('masterworld');
   const tr = classic.travel!;
-  const { terrain } = openWorld(seed, classic, SMALL);
+  const { terrain } = startWorld();
   const home = terrain.towns[0];
   const inn = { kind: 'inn' };
   const town = (id: string, x: number, z: number, kinds = [inn]) => ({ decision: { kind: 'town', id, x, z, radius: 30, size: 'village' } as const, plan: { buildings: kinds as never } });

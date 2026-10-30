@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { walkFrontier } from '../src/vgm/frontier';
 import { keepPromise } from '../src/vgm/leads';
 import { eventTold, heldBy, lairFor, nextEvent, openBands, refugeOf } from '../src/vgm/events';
@@ -11,10 +10,10 @@ import { Township } from '../src/game/township';
 import { territoryOf, wildFor } from '../src/vgm/wild';
 import { TownLife } from '../src/sim/townLife';
 import { settlementOf, type Decision, type RegionDecision } from '../src/world/decisions';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 const seed = parseSeed('masterworld');
-const { terrain, log: first, home } = openWorld(seed, classic, SMALL);
+const { terrain, log: first, home } = startWorld({ own: true });
 const regions = classic.regions!;
 const town = terrain.towns[0];
 // Walk out from the start until a waystation opens (plan C6: bandits take one), in whichever way has one.

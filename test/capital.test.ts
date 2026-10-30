@@ -13,7 +13,7 @@ import { emptyWater, inChannel } from '../src/world/hydro';
 import { RoadNet } from '../src/world/roads';
 import { EAST, frontierLand } from './frontierLand';
 
-const land = frontierLand(), { first, home, seed, terrain } = land;
+const land = frontierLand({ own: true }), { first, home, seed, terrain } = land;
 // The land as it was opened before harbour towns (S2): the capital's west gate road then ends in a brook (the bridge
 // tests below need that brook; a harbour town by the river mouth north of the start shifts the walk's rolls).
 const regions = { ...land.regions, fills: land.regions.fills.filter((f) => !f.harbour) };

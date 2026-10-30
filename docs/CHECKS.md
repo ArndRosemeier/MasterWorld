@@ -20,11 +20,18 @@ process, not once per file (MW: 47 s down to about 24 s on 4 cores). The shares 
 in `tools/test/times.json` (`npm test -- --save-times` writes it anew; a new file counts as 1 s until then).
 `npm test -- test/town.test.ts` runs the files given, `TEST_PROCS=n npm test` with n processes.
 
-Because files share a process, a test file never changes what another one sees: a fixture a file settles more on is
-its own (`frontierLand()` in test/frontierLand.ts builds one land per file), and module-level state in `src` holds
-only caches. `--test-timeout` holds for each test; setup at a file's top is not timed, so keep it small. The land's
-big rivers' grid costs about 2 s to build: a test that makes a `Terrain` or calls `openWorld` passes `SMALL`
-(test/small.ts) unless it needs the game's own rivers.
+Because files share a process, a test file never changes what another one sees, and module-level state in `src`
+holds only caches. The start's land (seed masterworld, small drainage tiles) is built once per process and shared:
+`frontierLand()` and `startWorld()` (as `openWorld`) in test/frontierLand.ts. Its log is frozen and its terrain
+refuses `settle`, `settleMore`, `addTown` and `addRoad`; a file that settles more on it, or pushes to its log, asks
+for its own with `{ own: true }` (built from the shared first decisions, about 0.5 s instead of 2 s). Building that
+land again in each file took a quarter of all test time. `--test-timeout` holds for each test; setup at a file's top
+is not timed, so keep it small. The land's big rivers' grid costs about 2 s to build: a test that makes its own
+`Terrain` passes `SMALL` (test/small.ts) unless it needs the game's own rivers.
+
+The test loader (tsx) keeps function names, so every closure made in a function wraps its name on (a
+`defineProperty`): in the land's hot paths (heights, asked millions of times) a closure made per call cost a tenth of
+all test time. Write such helpers out there (the built game has no such cost, but tests run the land a lot).
 
 ## CI time
 
