@@ -276,7 +276,7 @@ const SESSIONS = [
   { id: 'sea-harbour', query: `${still}&hour=11&weather=fair&site=harbour`, shots: [
     { name: 'sea-harbour', act: seaLook({ pitch: 0.15 }) },
     { name: 'sea-harbour-aloft', act: seaLook({ out: 70, up: 16, side: 20, back: true, pitch: -8 }) },
-    { name: 'sea-harbour-evening', act: async (p) => { await turn(20.5, 'fair')(p); await seaLook({ out: 40, up: 6, back: true, pitch: -3 })(p); } },
+    { name: 'sea-harbour-evening', act: async (p) => { await turn(19, 'fair')(p); await seaLook({ out: 40, up: 6, back: true, pitch: -3 })(p); } },
   ] },
   // Gate C: what phase C gave the world, seen. A hurt traveller by the way (they cry out once seen), then a
   // farm the bandits raided: its barn burnt, smoke over it, its paddock empty.

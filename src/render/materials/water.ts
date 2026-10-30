@@ -126,7 +126,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     // A wind-roughened sea is no mirror: at grazing angles its facets tilt toward the viewer, so the
     // reflection never reaches full strength and comes from higher, bluer sky than the pale horizon.
     const rough = smoothstep(20.0, 400.0, camDist);
-    const fres = float(0.02).add(pow(float(1).sub(ndv), 5).mul(0.98)).min(mix(float(0.55), float(0.45), rough));
+    const fres = float(0.02).add(pow(float(1).sub(ndv), 5).mul(0.98)).min(mix(float(0.42), float(0.34), rough));
     const depth = max(vDepth, 0);
     const sunUp = clamp(W.sunDir.y.mul(3).add(0.2), 0, 1);
 
@@ -160,7 +160,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     // Near the shore by distance, not depth alone: over a wide shallow shelf (a lake's flat edge) a depth test turned
     // a band tens of metres wide white. The metres to the shore: depth over how fast it deepens across the pixels.
     const deepens = fwidth(depth).div(max(fwidth(p.x).add(fwidth(p.z)), 1e-3));
-    const nearShore = float(1).sub(smoothstep(2.0, 7.0, depth.div(max(deepens, 0.02))));
+    // (Wobbled by the noise: the estimate steps from one pixel block to the next, and a clean cut showed the steps.)
+    const nearShore = float(1).sub(smoothstep(1.0, mix(float(2.5), float(4.5), n), depth.div(max(deepens, 0.04))));
     const shore = float(1).sub(smoothstep(0.0, 1.6, depth)).mul(still).mul(nearShore);
     // Surf rolls in from the sea only: a lake has no breakers, and over its long flat shelves the bands stood still as
     // one solid white strip along the shore (gate W). The sea's surface is at 0 m, a lake's well above it.
@@ -191,7 +192,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
       .add(mx_noise_float(vec3(sideways.mul(4.0), p.y.mul(0.5).add(t.mul(6.0)), 3.1)).mul(0.15)).add(0.5);
     const bands = sin(depth.mul(4.2).sub(t.mul(1.7)).add(n.mul(5))).mul(0.5).add(0.5);
     const foam = clamp(
-      surf.mul(smoothstep(0.45, 0.85, bands.mul(n.mul(0.8).add(0.6))))
+      surf.mul(smoothstep(0.55, 0.9, bands.mul(n.mul(0.8).add(0.6)))).mul(smoothstep(0.3, 0.7, mx_noise_float(vec3(p.xz.mul(0.12), t.mul(0.1))).mul(0.5).add(0.5)))
         // The wet rim, on still water only: running water's depth comes from masks too coarse for a brook, which is
         // shallow all across and would turn white; its edge is where the surface meets the bank.
         // Faint: at 0.6 it drew every lake's flat shore as a hard white line (gate W shots).
