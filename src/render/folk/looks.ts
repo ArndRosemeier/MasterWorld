@@ -127,8 +127,9 @@ const CLIP: Record<ActivityKind, string> = {
   hurt: 'crouch', mark: 'interact',
 };
 
-/** The clip that shows `act` (`id` varies a few between people). */
-export function clipOf(act: ActivityKind, id: number): string {
+/** The clip that shows `act` (`id` varies a few between people; `talking`: held for a talk with the hero). */
+export function clipOf(act: ActivityKind, id: number, talking = false): string {
+  if (act === 'sit' && talking) return 'sit and talk';
   if (act === 'garden' && id % 2) return 'plant seeds';
   if (act === 'chat' && id % 3 === 0) return 'nod';
   // Drinking stands (at the counter, at a table out of doors); sitting talks now and then.

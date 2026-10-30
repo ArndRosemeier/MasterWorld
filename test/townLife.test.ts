@@ -177,6 +177,22 @@ test('town life: someone at work behind a barrel comes round it to talk, and is 
   assert.ok(!a.held);
 });
 
+test('town life: someone sitting on a bench talks sitting, as they sat, and gets up after', () => {
+  const life = new TownLife(plan, 7, 10);
+  let a: Agent | undefined;
+  for (let i = 0; i < 400 && !a; i++) {
+    life.step(5, 10 + i / 720);
+    a = life.agents.find((x) => x.act === 'sit' && !x.hidden);
+  }
+  assert.ok(a, 'someone sits');
+  const { x, z, dir } = a;
+  life.hold(a, x + 1.5, z + 0.5);
+  for (let i = 0; i < 8; i++) life.step(0.25, 11);
+  assert.deepEqual([a.act, a.x, a.z, a.dir], ['sit', x, z, dir], 'still on their seat, not stood up in the bench');
+  life.letGo(a);
+  assert.ok(!a.held);
+});
+
 test('town life: a gate opens at night for someone on their way through it, not for someone going along the wall', () => {
   // A gateway at the origin; the wall runs along x.
   const walker = (x: number, z: number, path: number[]) => ({ x, z, act: 'walk', hidden: false, path, pi: 0 }) as unknown as Agent;

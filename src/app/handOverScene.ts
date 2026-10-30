@@ -76,8 +76,8 @@ export class HandOverScene implements HandOverStage, Puppet {
     const R = this.limbs.R!, out = Math.min(REACH, d * 0.45);
     R.p.set(this.pos.x + fx * out - fz * RIGHT, this.pos.y + CHEST, this.pos.z + fz * out + fx * RIGHT);
     R.w = heroReach(t);
-    // The teller marks it, the sheet in their hands (only while they still stand for the talk).
-    if (a?.held) a.act = t >= MARKED && t < MARKED + MARK ? 'mark' : 'chat';
+    // The teller marks it, the sheet in their hands (only while they still stand for the talk; one sitting marks it sitting).
+    if (a?.held && a.act !== 'sit') a.act = t >= MARKED && t < MARKED + MARK ? 'mark' : 'chat';
     const by = sheetHeldBy(t);
     if (!by) { this.sheet.stow(); return; }
     if (by === 'hero' || !a) {
@@ -94,7 +94,7 @@ export class HandOverScene implements HandOverStage, Puppet {
 
   handedBack(): void {
     this.sheet.stow();
-    if (this.with?.held) this.with.act = 'chat';
+    if (this.with?.held && this.with.act !== 'sit') this.with.act = 'chat';
     this.with = null;
     this.shot = null;
     this.limbs.R!.w = 0;
