@@ -1415,6 +1415,9 @@ export async function start(b: Boot): Promise<void> {
       const b = a.hidden && s && s.building >= 0 ? t?.town.plan.buildings[s.building] : undefined;
       if (t && b && rooms) {
         if (rooms.door?.town !== t || rooms.door.b.id !== b.id) await rooms.enter({ town: t, b }, true);
+        // Its people are placed by the rooms' update, and at the start (`?talk`) the frame loop does not run yet: placed
+        // now, or the hero stood at the person's town spot, a storey up, and the talk was framed from the roof.
+        if (!rooms.people()?.some((x) => x.agent === a)) rooms.update(0);
         const p = rooms.people()?.find((x) => x.agent === a);
         if (p) { player.teleport(p.x + Math.cos(p.dir) * 1.3, p.y, p.z + Math.sin(p.dir) * 1.3, Math.atan2(Math.cos(p.dir), Math.sin(p.dir))); return; }
       }
