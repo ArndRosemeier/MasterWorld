@@ -20,6 +20,7 @@ import { cleanStoneSave } from './game/portalStone';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
+import { nearestCoast } from './world/coast';
 import { Rocks } from './world/rocks';
 import { RockView } from './render/rocks/RockView';
 import { woodsOf } from './world/flora';
@@ -832,6 +833,9 @@ export async function start(b: Boot): Promise<void> {
     // `kind=<id>`: out in the nearest stretch of that kind of country (L7), looking across it.
     const inKind = params.kind ? terrain.skeleton.nearestKind(params.kind, player.walker.pos.x, player.walker.pos.z) : null;
     if (inKind) player.teleport(inKind.x, undefined, inKind.z, 0);
+    // `coast=<beach|cliff|under>`: by the nearest sea (S1), facing out to it.
+    const atSea = params.coast ? nearestCoast(terrain, params.coast, player.walker.pos.x, player.walker.pos.z) : null;
+    if (atSea) player.teleport(atSea.x, undefined, atSea.z, Math.atan2(-atSea.seaX, -atSea.seaZ));
     // Portals (app/portals.ts): openings joining two places, walked through and looked through.
     const portalView = new PortalView(view);
     await view.stage.add(portalView.group);

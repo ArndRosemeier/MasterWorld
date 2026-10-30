@@ -6,6 +6,7 @@
  * Units are metres. x runs east, z runs south (three.js), y is up; the sea surface is y = 0.
  */
 import { Noise, deriveSeed, clamp, smoothstep, lerp, smax, hash2i, hashToFloat } from '@futuremagic/core';
+import { spiralFind } from './spiral';
 import type { BiomeDef, LandscapeKindDef, MesaDef, WorldShape } from '../setting/contract';
 
 /** Everything the skeleton knows about one point. */
@@ -211,12 +212,7 @@ export class Skeleton {
   nearestKind(id: string, x: number, z: number, share = 0.99): { x: number; z: number } | null {
     const k = this.kinds.findIndex((d) => d.id === id);
     if (k < 0) return null;
-    for (let a = 0, s = 0; s < 12000; s++) {
-      const r = 1000 + (a * 2000) / (2 * Math.PI), px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
-      a += 250 / r;
-      if (this.elevation(px, pz) >= 5 && this.kindWeights(px, pz)[k] > share) return { x: px, z: pz };
-    }
-    return null;
+    return spiralFind(x, z, (px, pz) => (this.elevation(px, pz) >= 5 && this.kindWeights(px, pz)[k] > share ? { x: px, z: pz } : null), 1000, 2000, 250, 12000);
   }
 
   /** How much of mesa country is at (x, z), 0..1. */
