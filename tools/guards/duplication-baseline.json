@@ -88,7 +88,7 @@
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
   },
   {
-    "key": "same name: masterworld/sim/dungeonNav.ts#sees + masterworld/sim/wild.ts#sees",
+    "key": "same name: masterworld/sim/dungeonNav.ts#free + masterworld/sim/wild.ts#free",
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
   },
   {
@@ -208,8 +208,8 @@
     "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
   },
   {
-    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/townLife.ts#step",
-    "reason": "Each simulation steps its own agents (a den's creatures, the townsfolk) by dt; the finder paired them anew as files changed."
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/creatures.ts#step",
+    "reason": "Each simulation steps its own agents (a den's creatures, a cellar's owner coming down) by dt; the finder paired them anew as files changed."
   },
   {
     "key": "idiom: [.fbm3 .sin Math] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
