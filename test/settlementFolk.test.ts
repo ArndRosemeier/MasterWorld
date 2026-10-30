@@ -140,10 +140,11 @@ test('settlements: at night every guild teacher lies asleep in a bed of their ow
   const life = start.life;
   start.keepMarked(life, []);
   for (let s = 0; s < 300; s++) life.step(1, 2);
-  const housed = start.guilds.map(({ guild, b }) => ({ b, a: life.agents.find((x) => x.person.work === b.id && x.person.trade === guild.keeper) })).filter((t) => t.a && !t.a.post);
+  const housed = start.guilds.map((g) => ({ ...g, a: life.agents.find((x) => x.person.work === g.b.id && x.person.trade === g.guild.keeper) })).filter((t) => t.a && !t.a.post);
   assert.ok(housed.some((t) => t.a!.person.trade === 'hedge-witch'));
-  for (const { a, b } of housed) {
-    const room = planInterior(b, { hatch: false, hall: true });
+  // Laid out as the game opens them (interiorVisit): a hall where fighting is taught, a home for the witch.
+  for (const { a, b, guild, out } of housed) {
+    const room = planInterior(b, { hatch: false, hall: !!guild.hall && !out });
     const c = roomCast(life.agents, life.spots, b.id, room).find((x) => x.agent === a);
     assert.equal(c?.act, 'sleep', `${a!.person.trade} abed`);
     assert.equal(room.spots[c!.spot].kind, 'sleep');
