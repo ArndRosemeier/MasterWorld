@@ -59,6 +59,9 @@ export class Portals {
     host.player.heroCam.lens = (head, p) => this.lens(head, p);
   }
 
+  /** `o` samples the view through the openings (a rift's haze): kept out of the view while it is drawn. */
+  readsView(o: Object3D): void { this.host.view.readers.add(o); }
+
   /** Open a portal (again: moved). */
   add(portal: Portal): void {
     const was = this.held.get(portal.id);

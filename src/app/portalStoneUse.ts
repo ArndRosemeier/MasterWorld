@@ -117,7 +117,7 @@ export class PortalStoneUse {
   async addToStage(): Promise<void> {
     await this.host.stage.add(this.mesh);
     this.mesh.visible = false;
-    for (const h of this.haze) { await this.host.stage.add(h); h.visible = false; }
+    for (const h of this.haze) { await this.host.stage.add(h); h.visible = false; this.host.portals.readsView(h); }
   }
 
   /** Held up now (or coming, or going). */
