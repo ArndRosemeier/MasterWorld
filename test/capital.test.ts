@@ -35,6 +35,11 @@ test('capital: one, a few km out, a decision in the log; walled, with its ruler,
   // No house up a mesa wall or a hillside (one cottage once spanned 68 m of rise): the planner leaves such plots empty.
   const steep = plan.buildings.filter((b) => tooSteep(b.poly, terrain.height.bind(terrain)));
   assert.deepEqual(steep.map((b) => `${b.kind}@${b.cx.toFixed(0)},${b.cz.toFixed(0)}`), [], 'no building on steep ground');
+  // Wall, towers and gates stand dry: a brook between two of the outline's rays once ran under a gate tower (Arnd).
+  const brookIn = (x: number, z: number, r: number) => { const q = terrain.hydro.query(x, z); return q.river && q.dist < q.half + r; };
+  for (let i = 0; i < R.length; i += 2) assert.ok(!brookIn(R[i], R[i + 1], w.thick / 2), `the wall in water at ${R[i].toFixed(0)},${R[i + 1].toFixed(0)}`);
+  for (const tw of w.towers) assert.ok(!brookIn(tw.x, tw.z, w.towerHalf), `a tower in water at ${tw.x.toFixed(0)},${tw.z.toFixed(0)}`);
+  for (const f of plan.fixtures) assert.ok(!brookIn(f.x, f.z, 1), `a ${f.kind} in water`);
   // Its seat of rule has its ruler; the guilds keep big halls; its armourer and jeweller keep shop.
   const folk = townsfolk(plan, d.seed);
   const seat = plan.buildings.find((b) => b.trade === 'ruler')!;
