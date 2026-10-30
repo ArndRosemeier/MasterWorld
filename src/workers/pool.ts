@@ -3,6 +3,7 @@
  * come back as promises. Each worker script handles `{ id, job }` and answers `{ id, result }` or `{ id, error }`.
  */
 import { joinPieces, maskPieces } from '../world/water';
+import { adoptTiles, type Hydrology, type TracedTile } from '../world/hydro';
 
 /** A wide water mask is made in this many pieces a side, spread over the terrain workers. */
 const WATER_PIECES = 4;
@@ -104,6 +105,25 @@ export class TerrainJobs {
   private job<T>(job: DistributiveOmit<import('./terrain.worker').TerrainJob, 'seed' | 'setting'>): Promise<T> {
     return this.pool.run({ ...job, seed: this.seed, setting: this.setting } as import('./terrain.worker').TerrainJob) as Promise<T>;
   }
+  /**
+   * Every river and brook tile over a rectangle, traced once (each in one worker, side by side) and handed to every
+   * worker and this thread. Built from the land without them, each worker traced the tiles its chunks touched on its
+   * own: the far chunks touch them all, and the four workers spent 7-10 s each tracing the same tiles at the start.
+   */
+  async shareTiles(hydro: Hydrology, x0: number, z0: number, x1: number, z1: number): Promise<void> {
+    const trace = async (brook: boolean, tiles: [number, number][]) => {
+      const seen = new Set<string>();
+      const unique = tiles.filter(([tx, tz]) => !seen.has(`${tx},${tz}`) && !!seen.add(`${tx},${tz}`));
+      const traced = await Promise.all(unique.map(([tx, tz]) => this.job<TracedTile>({ kind: 'trace', brook, tx, tz })));
+      // Every worker takes them before any job sent after (each answers its jobs in order).
+      void this.pool.broadcast({ kind: 'tiles', tiles: traced, seed: this.seed, setting: this.setting }).catch(() => {});
+      adoptTiles(traced);
+    };
+    // The rivers first: a brook tile is traced over the land its river tile shaped.
+    await trace(false, [...hydro.tilesOver(x0, z0, x1, z1, false), ...hydro.feedsOver(x0, z0, x1, z1)]);
+    await trace(true, hydro.tilesOver(x0, z0, x1, z1, true));
+  }
+
   /** A water mask over a square (`res` samples a side): the terrain workers share the masks the world worker made alone. */
   water(x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
     // In pieces, side by side in the workers (one worker made a wide mask alone, for seconds, while the start waited).

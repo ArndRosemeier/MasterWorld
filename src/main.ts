@@ -30,6 +30,7 @@ import type { Agent, TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
+import { ROOT_LEVEL, chunkSize } from './render/terrain/lod';
 import { VolumeView } from './render/terrain/VolumeView';
 import { TerrainJobs, WorldJobs, createTerrainPool, createTexturePool, createWorldPool } from './workers/pool';
 import { WaterView } from './render/water/WaterView';
@@ -155,6 +156,8 @@ declare global {
   }
 }
 
+/** Metres past the start's land (3 × 3 root chunks) whose river and brook tiles are traced for every worker at once. */
+const TILE_PAD = 1000;
 /** The longest the start waits for the people round the hero to be dressed (ms). */
 const DRESS_WAIT = 15000;
 /** Seconds after the VGM answered an overdue need before it answers again (C9): time to come upon the first. */
@@ -414,7 +417,12 @@ export async function start(b: Boot): Promise<void> {
     // chunks build while the hero and the town load; it is shown once its shader is warm.
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
     // (Once the ground's textures are made: their workers come first, as the warm-up waits for them.)
-    void painted.then(() => ground.prefetch(view.camera));
+    // (And once every river and brook tile under the land drawn at the start is traced, each once, side by side.)
+    const rootSide = chunkSize(ROOT_LEVEL), cam = view.camera.position;
+    const rx = Math.floor(cam.x / rootSide), rz = Math.floor(cam.z / rootSide);
+    const tilesShared = terrainJobs.shareTiles(terrain.hydro, (rx - 1) * rootSide - TILE_PAD, (rz - 1) * rootSide - TILE_PAD, (rx + 2) * rootSide + TILE_PAD, (rz + 2) * rootSide + TILE_PAD)
+      .then(() => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: rivers and brooks traced`), (e: unknown) => console.error('[load] tracing the tiles failed', e));
+    void Promise.all([painted, tilesShared]).then(() => ground.prefetch(view.camera));
     // Every town: the start's, and the hamlets and villages founded out on the land (plan B3), all alike (B3a).
     // A town's words are tied into the game (how its people take the hero, what they offer) once the game's
     // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.
