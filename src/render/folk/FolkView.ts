@@ -14,10 +14,11 @@ import type { Agent, TownLife } from '../../sim/townLife';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
-import { castShadows, eachMesh, handOf, seatOf } from '../hero/play';
+import { castShadows, eachMesh, FADE, handOf, seatOf } from '../hero/play';
 import { SHADOW_ONLY } from '../sky';
 import { clipOf, coveringLooks, LIE, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 import { Held, Steady } from '../steady';
+import { Repertoire } from './repertoire';
 import type { LimbGoals } from '@futuremagic/figure';
 import { BodyRig, applyPuppet, limbGoals, type HeroPuppet } from '../hero/puppet';
 
@@ -119,7 +120,10 @@ interface Slot {
   since: number;
   /** What is drawn follows the agent smoothly, and its clip changes only once wanted a moment (render/steady.ts). */
   st: Steady;
-  held: Held<string>;
+  /** The activity shown, changed only once wanted a moment (render/steady.ts). */
+  held: Held<ActivityKind>;
+  /** What they do with themselves while standing about (repertoire.ts). */
+  rep: Repertoire;
   /** Hands-on control of its bones, made when a scene first plays it (null: none yet), and whether it turned any last frame. */
   readonly rig: BodyRig;
   rigged: boolean;
@@ -144,7 +148,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0, st: new Steady(), held: new Held(''), rig: new BodyRig(place), rigged: false, goals: limbGoals() };
+      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0, st: new Steady(), held: new Held<ActivityKind>('wait'), rep: new Repertoire(0), rig: new BodyRig(place), rigged: false, goals: limbGoals() };
       this.slots.push(slot);
     }
   }
@@ -345,12 +349,14 @@ export class FolkView {
       o.position.set(st.x, st.y, st.z);
       o.rotation.y = st.yaw;
       this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
-      const clip = p?.puppet?.clip ?? s.held.pick(dt, clipOf(p ? p.act : a.act, a.person.id, !!a.held));
+      const act = s.held.pick(dt, p ? p.act : a.act);
+      const clip = p?.puppet?.clip ?? s.rep.play(dt, act) ?? clipOf(act, a.person.id, !!a.held);
       if (clip !== s.clip) {
         s.clip = clip;
         s.since = 0;
-        // Into bed at once (a fade would hold half the last clip while the lying pose stands still).
-        void s.ch.play(clip, clip === LIE ? 0 : undefined);
+        // Blended (one idle into the next, standing into walking); into bed at once (a fade would hold half the
+        // last clip while the lying pose stands still).
+        void s.ch.play(clip, clip === LIE ? 0 : FADE.loop);
       } else s.since += dt;
       // Asleep: the lying pose held still, not getting up over and over.
       if (s.ch.paused !== (clip === LIE)) s.ch.seek(clip === LIE ? 0 : null);
@@ -404,7 +410,8 @@ export class FolkView {
     s.rigged = false;
     s.clip = clipOf(a.act, a.person.id);
     s.st = new Steady();
-    s.held = new Held(s.clip);
+    s.held = new Held(a.act);
+    s.rep = new Repertoire(a.person.seed);
     s.since = SETTLE; // dressed already in the clip (no fade)
     this.shown.set(a, s);
     this.dressing++;

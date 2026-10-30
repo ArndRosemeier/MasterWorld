@@ -18,9 +18,9 @@ export const PACK_HAIR = [
   'hair-short02', 'hair-short03', 'hair-short04', 'hair-short-messy', 'hair-shaggy', 'hair-short-grump', 'hair-swept-back', 'hair-short-curls',
   'hair-long01', 'hair-braid01', 'hair-ponytail01', 'hair-french-braid', 'hair-double-braid', 'hair-braid-bun', 'hair-bun', 'hair-unkempt-braid',
 ];
-/** Clips (every name in CLIP below). */
+/** Clips (every name in CLIP below and in the standing repertoires, repertoire.ts). */
 export const PACK_CLIPS = [
-  'idle', 'talk', 'arms folded', 'nod', 'walk', 'walk carrying', 'sit', 'sit and talk', 'pick up', 'interact', 'eat or drink',
+  'idle', 'talk', 'arms folded', 'nod', 'shake head', 'dance', 'walk', 'walk carrying', 'sit', 'sit and talk', 'pick up', 'interact', 'eat or drink',
   'repair (kneeling)', 'harvest', 'plant seeds', 'water plants', 'chop wood', 'crouch', 'get up from lying',
 ];
 
@@ -119,11 +119,14 @@ export function lookOf(p: Person): CharacterPatch {
   };
 }
 
-/** The clip for each activity (looped); `walk` while on the way. Indoors and away are not drawn, sleep only in bed. */
+/**
+ * The clip for each activity (looped); `walk` while on the way. Indoors and away are not drawn, sleep only in bed.
+ * Standing about (selling, chatting, waiting) goes through a repertoire of clips (repertoire.ts) that rests on this one.
+ */
 const CLIP: Record<ActivityKind, string> = {
   sleep: LIE, indoors: 'idle', away: 'idle', walk: 'walk', wait: 'idle', stroll: 'walk', gather: 'idle',
   smith: 'chop wood', stoke: 'interact', quench: 'pick up', bake: 'interact', craft: 'repair (kneeling)',
-  sell: 'talk', serve: 'talk', tend: 'water plants',
+  sell: 'idle', serve: 'idle', tend: 'water plants',
   fetchWater: 'pick up', fetchWood: 'pick up', chop: 'chop wood', garden: 'harvest', washing: 'interact', feedHens: 'plant seeds',
   browse: 'arms folded', sit: 'sit', chat: 'talk', drink: 'eat or drink', pray: 'crouch', mourn: 'arms folded', play: 'idle',
   plough: 'harvest', sow: 'plant seeds', hoe: 'harvest', reap: 'harvest', tendStock: 'interact', muckOut: 'pick up',
@@ -134,7 +137,6 @@ const CLIP: Record<ActivityKind, string> = {
 export function clipOf(act: ActivityKind, id: number, talking = false): string {
   if (act === 'sit' && talking) return 'sit and talk';
   if (act === 'garden' && id % 2) return 'plant seeds';
-  if (act === 'chat' && id % 3 === 0) return 'nod';
   // Drinking stands (at the counter, at a table out of doors); sitting talks now and then.
   if (act === 'sit' && id % 2) return 'sit and talk';
   return CLIP[act];
