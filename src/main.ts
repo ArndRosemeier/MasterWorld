@@ -288,9 +288,10 @@ export async function start(b: Boot): Promise<void> {
       height: (x, z) => terrain.height(x, z),
       // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
       floor: (x, z) => towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null,
-      rockSurface: (x, y, z) => surfaceAt(x, y, z, false),
+      // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
+      rockSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, false)),
       // In a building the camera stays in the room (its doorway shut to it).
-      sightSurface: (x, y, z) => surfaceAt(x, y, z, !!rooms?.inside),
+      sightSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, !!rooms?.inside)),
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => water?.surfaceAt(x, z) ?? null,
       // Rock faces with holds (D56).
@@ -1978,8 +1979,9 @@ export async function start(b: Boot): Promise<void> {
           throatLamp = deep > 0 || L.intensity > 0.05;
           if (!throatLamp) L.intensity = 0;
         } else throatLamp = false;
-        const camDeep = seen === 'land' ? cellars?.throatDepth(view.camera.position.x, view.camera.position.z) ?? 0 : 0;
-        view.sky.eye = seen === heroIn && camDeep < 0.6 ? null : { indoors: seen !== 'land' || camDeep >= 0.6 };
+        // The eye adapts to the dark as the camera goes into the throat, all the way by its portal.
+        const camDeep = seen === 'land' ? cellars?.throatDepth(view.camera.position.x, view.camera.position.z) ?? 0 : 1;
+        view.sky.eye = seen === heroIn && (seen !== 'land' || camDeep === 0) ? null : { dark: camDeep };
         view.sky.shadowFocus = seen === 'land' ? null : through.landSide(view.camera.position);
       }
       creator?.orbit(dt);

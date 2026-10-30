@@ -31,7 +31,7 @@ import { THROAT_OPENING, caveThroat, type ThroatFrame } from '../world/dungeon/c
 import type { Portal } from '../game/portal';
 import { caveFeatures, keepSpots } from '../world/dungeon/caveFeatures';
 import { caveSeed } from '../world/dungeon/torches';
-import { MOUTH_WAY_DOWN, mouthOnLand, throatShare, throatWalk, type CaveMouth } from '../world/dungeon/caveMouth';
+import { MOUTH_WAY_DOWN, mouthOnLand, throatWalk, type CaveMouth } from '../world/dungeon/caveMouth';
 import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
@@ -250,15 +250,29 @@ export class Cellars {
     return null;
   }
 
-  /** How far into a cave mouth's throat on the land (x, z) is: 0 outside, 1 deep in (the lantern is lit as one goes in). */
+  /**
+   * How far into a cave mouth's throat on the land (x, z) is: 0 at its face and outside, 1 at its portal (the lantern
+   * is lit and the eye adapts as one goes in).
+   */
   throatDepth(x: number, z: number): number {
     for (const s of this.sites.values()) {
       const m = s.mound, t = m?.throat;
       if (!m || !t || !s.throat || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
       const [fx, fz] = inFrame(m, x, z);
-      if (Math.abs(fx) < 2.5 && fz > t.z - 1.5 && fz < 1) return throatShare(fz);
+      if (Math.abs(fx) < 2.5 && fz > t.z - 1.5 && fz < 1) return Math.max(0, Math.min(1, (0.5 - fz) / (0.5 - t.z)));
     }
     return 0;
+  }
+
+  /** Is (x, y, z) in the air of a cave mouth's throat on the land (where the land's own rock, carved by the crag, is not)? */
+  throatAir(x: number, y: number, z: number): boolean {
+    for (const s of this.sites.values()) {
+      const m = s.mound, t = m?.throat;
+      if (!m || !t || !s.throat || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
+      const [fx, fz] = inFrame(m, x, z), floor = t.walk(fx, fz);
+      if (floor !== null && y > t.y + floor - 0.2 && y < t.y + floor + 2.5) return true;
+    }
+    return false;
   }
 
   /** The realm the hero is in (app/portals.ts): the place below by its id, else the land. */

@@ -24,10 +24,6 @@
     "reason": "Both implement the WalkWorld interface (game/walker.ts): the evening check's land, and the game's land (out of doors only)."
   },
   {
-    "key": "same name: masterworld/game/evening.ts#rockSurface + masterworld/main.ts#rockSurface",
-    "reason": "Both implement the WalkWorld interface (game/walker.ts): the evening check's land, and the game's land with the open building in it."
-  },
-  {
     "key": "same name: masterworld/app/loading.ts#fail + masterworld/app/title/TitleScreen.ts#fail",
     "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
   },

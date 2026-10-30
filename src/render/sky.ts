@@ -119,7 +119,7 @@ export class SkyView {
    * Where the camera is, when not where the hero is (a cave's portal: the camera trails behind, still on the
    * land while the hero is in the throat below, or the other way round): the eye adapts to its light.
    */
-  eye: { readonly indoors: boolean } | null = null;
+  eye: { readonly dark: number } | null = null;
   /** Where the sun's shadow box is centred instead of the camera (from a cave, the land beyond its portal). */
   shadowFocus: { readonly x: number; readonly y: number; readonly z: number } | null = null;
   /** The eye's exposure, eased (from a dark cave out into the day, and back in, the eye adapts over a moment). */
@@ -311,7 +311,7 @@ export class SkyView {
     this.U.moonBright.value = L.moonBright;
     this.envU.moonDir.value.set(...moon.dir);
     // The light is the hero's realm's (a portal's view into the other sets its own: `shade`); the eye's exposure is the camera's.
-    const indoors = this.eye?.indoors ?? this.indoors;
+    const dark = this.eye ? this.eye.dark : this.indoors ? 1 : 0, indoors = dark >= 0.5;
     (this.stars.material as { opacity: number }).opacity = this.indoors || this.underwater ? 0 : L.stars;
     this.U.time.value = this.time;
     this.U.flash.value = this.flash;
@@ -371,7 +371,7 @@ export class SkyView {
     this.sunLight.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
     this.open = this.held();
     if (this.indoors) this.below(this.cave);
-    if (indoors) this.renderer.toneMappingExposure = 1.4 * this.exposure / EXPOSURE;
+    if (dark > 0) this.renderer.toneMappingExposure += (1.4 * this.exposure / EXPOSURE - this.renderer.toneMappingExposure) * dark;
     // The eye adapts over a moment when the light changes much (out of a cave into the day); at once on the first frame.
     const want = this.renderer.toneMappingExposure;
     this.seen = this.seen < 0 || dt === 0 ? want : this.seen + (want - this.seen) * Math.min(1, dt * ADAPT);
