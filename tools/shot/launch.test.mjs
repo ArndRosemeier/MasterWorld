@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pinSeed, stalePacks } from './launch.mjs';
+import { hidePanel, pinSeed, stalePacks } from './launch.mjs';
 
 const installed = JSON.parse(readFileSync('node_modules/@actors/generator/package.json', 'utf8')).version;
 const dist = (version) => {
@@ -33,4 +33,18 @@ test('every page a check opens starts in a pinned world', async () => {
   const free = { newContext: async () => ({}) }, before = free.newContext;
   pinSeed(free, 'fresh');
   assert.equal(free.newContext, before);
+});
+
+test('the checks start with the VGM panel hidden, unless a player chose otherwise', async () => {
+  const scripts = [];
+  const fake = { newContext: async () => ({ addInitScript: async (s) => scripts.push(s) }) };
+  hidePanel(fake);
+  await fake.newContext({});
+  const store = new Map();
+  const localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  new Function('localStorage', scripts[0])(localStorage);
+  assert.deepEqual(JSON.parse(store.get('masterworld.settings')), { vgmPanel: false });
+  store.set('masterworld.settings', '{"vgmPanel":true}');
+  new Function('localStorage', scripts[0])(localStorage);
+  assert.equal(store.get('masterworld.settings'), '{"vgmPanel":true}');
 });
