@@ -733,6 +733,10 @@ export async function start(b: Boot): Promise<void> {
     let portals: Portals | null = null;
     /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts throatDepth). */
     let throatLamp = false;
+    /** The place below whose lights are lit from out on the land, near its portal. */
+    let caveLit: string | null = null;
+    /** A cave's own lights are lit once the hero on the land is this near its portal (m). */
+    const CAVE_LIGHTS_NEAR = 60;
     /** The portals' HUD line (empty away from them). */
     let portalHud = '';
     const portalsDue: Portal[] = [];
@@ -820,6 +824,7 @@ export async function start(b: Boot): Promise<void> {
         const v = cellars?.visitOf(to === 'land' ? from : to);
         if (!v) return;
         if (to === 'land') v.depart(); else v.arrive();
+        caveLit = null;
         v.onSwap?.();
       },
       // One realm shown for a view: the land (what left the frame below comes back, the places below go) or a place
@@ -838,12 +843,12 @@ export async function start(b: Boot): Promise<void> {
           for (const o of mine) set(o, true);
         }
         const back = view.sky.shade(realm === 'land' ? 'open' : cellars?.visitOf(realm)?.cellar.form.space.carved ? 'cave' : 'below');
-        // The other realm's shadow maps are not drawn of this one (a cave's torch over the land's plants would build
-        // shaders in play); only the sun's of the land, which a view out of a cave draws.
+        // Each realm's own shadow maps only: the land's the sun's, a place below's its torches' (a cave's torch over the
+        // land's plants would build shaders in play, and the sun's map of a cave is of nothing it lights).
         const held: { needsUpdate: boolean }[] = [];
         for (const o of view.scene.children) {
           const l = o as Light & { shadow?: { needsUpdate: boolean } };
-          if (l.isLight && l.shadow?.needsUpdate && !(realm === 'land' && l === view.sun)) { l.shadow.needsUpdate = false; held.push(l.shadow); }
+          if (l.isLight && l.shadow?.needsUpdate && (realm === 'land') !== (l === view.sun)) { l.shadow.needsUpdate = false; held.push(l.shadow); }
         }
         return () => { for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; for (const s of held) s.needsUpdate = true; back(); };
       },
@@ -1982,6 +1987,13 @@ export async function start(b: Boot): Promise<void> {
           throatLamp = deep > 0 || L.intensity > 0.05;
           if (!throatLamp) L.intensity = 0;
         } else throatLamp = false;
+        // Near a cave's portal on the land its own lights are lit already (out in the wild no doorway's light is near),
+        // so the view in through it is lit as it will be inside; the doorways' again once away.
+        const lit = heroIn === 'land' ? through.nearBeyond('land', w, CAVE_LIGHTS_NEAR) : null;
+        if (lit !== caveLit) {
+          caveLit = lit;
+          if (lit) cellars?.visitOf(lit)?.light(); else if (heroIn === 'land') view.warm.lightTorches(null);
+        }
         // The eye adapts to the dark as the camera goes into the throat, all the way by its portal.
         // (The hero's way in sets it: the camera trails a few metres behind, still out in the day.)
         const camDeep = seen === 'land' ? Math.max(deep, heroIn === 'land' ? 0 : 1, cellars?.throatDepth(view.camera.position.x, view.camera.position.z) ?? 0) : 1;

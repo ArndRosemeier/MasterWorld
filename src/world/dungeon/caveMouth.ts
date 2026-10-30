@@ -62,7 +62,7 @@ const PORTAL_IN = 7, CLIFF_PORTAL_IN = 4.5;
  * The mouth's side of the throat goes darker than the cave's by its portal: the day's light still reaches it (the
  * cave's side has only its own dim fill and the lantern), so the same rock reads alike on both sides.
  */
-const DAY_IN = 0.5;
+const DAY_IN = 0.2;
 
 /** Where the mouth's own way in turns into the throat (frame z): over these metres, from the face on in. */
 const INTO_FROM = 0.5, INTO_TO = -2;
@@ -218,7 +218,7 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
     tint: (x, y, z, m) => {
       // Deeper in the way, darker, until it is black where it goes on down.
       // Deeper in the way, darker: at the portal as dark as the cave's throat on its side (caveThroat.ts).
-      const inside = Math.max(crag.tunnel(x, y, z), throat(x, y, z)) > -0.7 ? smoothstep(0.3, -pz, -z) : 0;
+      const inside = Math.max(crag.tunnel(x, y, z), throat(x, y, z)) > -0.7 ? smoothstep(0.3, -pz * 0.8, -z) : 0;
       const tone = (0.85 + 0.3 * (look.fbm3(x / 4, y / 4, z / 4, 2) * 0.5 + 0.5)) * (1 - (1 - THROAT_DARK * DAY_IN) * inside);
       return scaleTint(m === WildMat.Grass ? GRASS : cliff ? WALL : ROCK, tone);
     },

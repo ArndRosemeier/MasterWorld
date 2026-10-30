@@ -132,6 +132,16 @@ export class Portals {
     this.viaCamera = { here: from, there: to };
   }
 
+  /** The realm beyond the nearest opening within `within` metres of `p` in `realm`, else null. */
+  nearBeyond(realm: string, p: P3, within: number): string | null {
+    let best: string | null = null, d = within;
+    for (const h of this.held.values()) for (const s of sidesFrom(h.portal, realm)) {
+      const dd = apart(p, s.here.frame);
+      if (dd < d) { d = dd; best = s.there.realm; }
+    }
+    return best;
+  }
+
   /** Below (the camera's realm not the land): the land side of the nearest opening out to it, else null. */
   landSide(camera: P3): PortalFrame | null {
     let best: PortalFrame | null = null, d = Infinity;
@@ -155,7 +165,8 @@ export class Portals {
         d,
         pass: {
           here: f, there: there.frame, mesh,
-          shadows: there.realm === 'land' && realm !== 'land',
+          // Another realm's view draws its own shadow maps due this frame (the host's `showRealm` says whose).
+          shadows: there.realm !== realm,
           beyond: () => {
             const back = this.host.showRealm(there.realm);
             const hero = this.heroIn(there.realm, heroRealm);

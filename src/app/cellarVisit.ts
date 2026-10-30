@@ -104,10 +104,17 @@ export class CellarVisit {
     this.view.group.visible = true;
     this.sky.indoors = true;
     this.onDepth?.(true);
-    const O = this.view.origin, inWorld = (t: { x: number; y: number; z: number }) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z });
-    // A natural cave has no torches: daylight falls into its caverns through cracks in their roofs (D57).
-    const glows = caveGlows(this.cellar);
     this.sky.cave = !!this.cellar.form.space.carved;
+    this.light();
+  }
+
+  /**
+   * Its own lights lit (the warm lights: its torches, or a natural cave's daylight through cracks, D57); also from
+   * out on the land before its portal, so the view in through it is lit as it will be inside.
+   */
+  light(): void {
+    const O = this.view.origin, inWorld = (t: { x: number; y: number; z: number }) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z });
+    const glows = caveGlows(this.cellar);
     if (glows.length) this.warm.lightTorches(glows.map(inWorld), DAYLIGHT_BELOW);
     else this.warm.lightTorches(torchSpots(this.cellar).map(inWorld));
   }
