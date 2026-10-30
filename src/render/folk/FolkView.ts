@@ -16,7 +16,7 @@ import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
 import { castShadows, eachMesh, handOf, seatOf } from '../hero/play';
 import { SHADOW_ONLY } from '../sky';
-import { clipOf, coveringLooks, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
+import { clipOf, coveringLooks, LIE, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 import { Held, Steady } from '../steady';
 import type { LimbGoals } from '@futuremagic/figure';
 import { BodyRig, applyPuppet, limbGoals, type HeroPuppet } from '../hero/puppet';
@@ -48,7 +48,9 @@ const SHADOW_RANGE = 35;
 const ALOFT = 120;
 /** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
 const CLOSE = 40;
-const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3(), BALL = new Sphere();
+const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3(), BALL = new Sphere(), HEAD = new Vector3(), FEET = new Vector3(), FOOT = new Vector3();
+/** Lying in bed: the head and the hips this far over the bedding (their bones are in the body, not on its back). */
+const ABED = 0.1;
 /** Round a person's middle, the sphere that tells whether they are in view (m: arms, a carried load, a clip's reach). */
 const REACH = 1.6;
 /** Seconds between two checks of every character's layers, for meshes Actors made since (a merged crowd mesh). */
@@ -82,6 +84,8 @@ export interface Placed {
   act: ActivityKind;
   /** Sitting on a bench: the height of its top (the sitter's seat goes there, whatever their size). */
   seat?: number;
+  /** Asleep in bed: the height of its bedding (they lie along it there, the head at the end behind `dir`). */
+  bed?: number;
   /** Played by a scene (down a cellar's ladder): its pose and clip over the act's, placed exactly where it says. */
   puppet?: HeroPuppet;
 }
@@ -343,13 +347,17 @@ export class FolkView {
       if (clip !== s.clip) {
         s.clip = clip;
         s.since = 0;
-        void s.ch.play(clip);
+        // Into bed at once (a fade would hold half the last clip while the lying pose stands still).
+        void s.ch.play(clip, clip === LIE ? 0 : undefined);
       } else s.since += dt;
+      // Asleep: the lying pose held still, not getting up over and over.
+      if (s.ch.paused !== (clip === LIE)) s.ch.seek(clip === LIE ? 0 : null);
       // Bones a scene turned last frame go back as bound before the clip plays on.
       if (s.rigged) { s.rig.current?.relax(); s.rigged = false; }
       s.ch.update(dt);
       if (p?.puppet) { const rig = s.rig.of(s.ch, s.ch.height || 1.75); if (rig) s.rigged = applyPuppet(rig, o, s.goals, p.puppet); }
       if (p?.seat !== undefined && clip.startsWith('sit')) this.seatOn(s, p.x, p.seat, p.z);
+      else if (p?.bed !== undefined && clip === LIE) this.bedOn(s, p.x, p.bed, p.z, p.dir);
       // Out of doors one sits on a bench (the town's fixtures, drawn with the houses).
       else if (!p && a.act === 'sit' && clip.startsWith('sit')) this.seatOn(s, a.x, this.height(a.x, a.z) + BENCH_SEAT, a.z);
     }
@@ -466,6 +474,32 @@ export class FolkView {
     s.place.position.x += (x - w.x) * k;
     s.place.position.y += (y - w.y) * k;
     s.place.position.z += (z - w.z) * k;
+  }
+
+  /**
+   * Lays a sleeper along the bed whose bedding is at height `top`, the middle of the body at (x, z) and the head
+   * towards the end behind `dir` (the bed's spot faces its foot). Done from the pose's own head and feet, so it fits
+   * however the clip lies and however tall the sleeper is.
+   */
+  private bedOn(s: Slot, x: number, top: number, z: number, dir: number): void {
+    const bones = s.ch.actor.bones, bone = (n: string) => bones.find((b) => b?.name === n);
+    const head = bone('head'), fl = bone('foot_l'), fr = bone('foot_r'), hips = bone('pelvis');
+    const o = s.place, up = o.parent;
+    if (!head || !fl || !fr || !hips || !up) return;
+    const measure = () => {
+      o.updateMatrixWorld(true);
+      up.worldToLocal(head.getWorldPosition(HEAD));
+      up.worldToLocal(fl.getWorldPosition(FEET)).add(up.worldToLocal(fr.getWorldPosition(FOOT))).multiplyScalar(0.5);
+    };
+    measure();
+    // Turned so that feet to head runs to the bed's head, against the facing (a character facing `dir` turns
+    // π/2 − dir; a turn about y adds to atan2(x, z)).
+    o.rotation.y += 1.5 * Math.PI - dir - Math.atan2(HEAD.x - FEET.x, HEAD.z - FEET.z);
+    measure();
+    const hipY = up.worldToLocal(hips.getWorldPosition(FOOT)).y;
+    o.position.x += x - (HEAD.x + FEET.x) / 2;
+    o.position.z += z - (HEAD.z + FEET.z) / 2;
+    o.position.y += top + ABED - (HEAD.y + hipY) / 2;
   }
 
   /** What never shows casts no shadow (Actors flips its garments' polygon offsets for reversed depth itself). */

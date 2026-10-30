@@ -21,8 +21,11 @@ export const PACK_HAIR = [
 /** Clips (every name in CLIP below). */
 export const PACK_CLIPS = [
   'idle', 'talk', 'arms folded', 'nod', 'walk', 'walk carrying', 'sit', 'sit and talk', 'pick up', 'interact', 'eat or drink',
-  'repair (kneeling)', 'harvest', 'plant seeds', 'water plants', 'chop wood', 'crouch',
+  'repair (kneeling)', 'harvest', 'plant seeds', 'water plants', 'chop wood', 'crouch', 'get up from lying',
 ];
+
+/** Asleep in bed: the first frame of getting up from lying, held still (FolkView lays it along the bed). */
+export const LIE = 'get up from lying';
 
 export const MEN_HAIR = PACK_HAIR.slice(0, 8);
 export const WOMEN_HAIR = PACK_HAIR.slice(8);
@@ -116,9 +119,9 @@ export function lookOf(p: Person): CharacterPatch {
   };
 }
 
-/** The clip for each activity (looped); `walk` while on the way. Sleep, indoors and away are not drawn. */
+/** The clip for each activity (looped); `walk` while on the way. Indoors and away are not drawn, sleep only in bed. */
 const CLIP: Record<ActivityKind, string> = {
-  sleep: 'idle', indoors: 'idle', away: 'idle', walk: 'walk', wait: 'idle', stroll: 'walk', gather: 'idle',
+  sleep: LIE, indoors: 'idle', away: 'idle', walk: 'walk', wait: 'idle', stroll: 'walk', gather: 'idle',
   smith: 'chop wood', stoke: 'interact', quench: 'pick up', bake: 'interact', craft: 'repair (kneeling)',
   sell: 'talk', serve: 'talk', tend: 'water plants',
   fetchWater: 'pick up', fetchWood: 'pick up', chop: 'chop wood', garden: 'harvest', washing: 'interact', feedHens: 'plant seeds',

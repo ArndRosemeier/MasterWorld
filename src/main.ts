@@ -1211,7 +1211,8 @@ export async function start(b: Boot): Promise<void> {
         const t = talk!.place;
         return t.talk.toldSafe(a.person.id, id, paidFor(id, t));
       },
-      get roomPeople() { return rooms?.inside ? rooms.people() : null; },
+      // Sleepers lie in their beds, not to be talked to.
+      get roomPeople() { return rooms?.inside ? rooms.people()?.filter((p) => p.act !== 'sleep') ?? null : null; },
     }) : null;
     // A room at the inn and the smith's mending (plan 11.5): two more services, in whichever town.
     const upkeep = new UpkeepUi(character, setting, {

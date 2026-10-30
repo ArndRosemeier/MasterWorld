@@ -3,8 +3,8 @@
  * the room's spots (@futuremagic/settlement planInterior) by what they are there for. Those working
  * there take the work spots (the innkeeper the counter, the smith the anvil, the keeper the basin); the
  * rest sit, drink, pray or warm themselves. Those drinking at the inn's tables or praying at the temple's
- * offering are drawn inside while the player is (the room is where one would look for them). Sleepers are
- * abed upstairs and not cast. Pure.
+ * offering are drawn inside while the player is (the room is where one would look for them). Those asleep at home
+ * lie in its beds (the master of the house first; more sleepers than beds: the rest are not drawn). Pure.
  */
 import type { InteriorFixture, InteriorPlan, InteriorSpot, InteriorSpotKind } from '@futuremagic/settlement';
 import type { ActivityKind } from './spots';
@@ -34,9 +34,9 @@ export function inRoom(a: Agent, s: { building: number; door?: boolean }): boole
   return s.door ? a.hidden && a.act !== 'sleep' : a.act === 'drink' || a.act === 'pray';
 }
 
-/** The bench a spot is on (people sit there, on its top), if any. */
-export function benchUnder(plan: InteriorPlan, s: InteriorSpot): InteriorFixture | undefined {
-  return plan.fixtures.find((f) => f.kind === 'bench' && f.storey === s.storey && Math.abs(s.a - f.a) <= f.w / 2 && Math.abs(s.b - f.b) <= f.d / 2);
+/** The bench a spot is on (people sit there, on its top), or with `kind` 'bed' the bed (they lie on it), if any. */
+export function benchUnder(plan: InteriorPlan, s: InteriorSpot, kind: 'bench' | 'bed' = 'bench'): InteriorFixture | undefined {
+  return plan.fixtures.find((f) => f.kind === kind && f.storey === s.storey && Math.abs(s.a - f.a) <= f.w / 2 && Math.abs(s.b - f.b) <= f.d / 2);
 }
 
 /**
@@ -44,13 +44,15 @@ export function benchUnder(plan: InteriorPlan, s: InteriorSpot): InteriorFixture
  * drawn): they keep it while it is theirs to keep, so one coming in or going does not send the rest to other seats.
  */
 export function roomCast(agents: readonly Agent[], spots: readonly { building: number; door?: boolean }[], building: number, plan: InteriorPlan, kept?: ReadonlyMap<Agent, number>): Cast[] {
+  const at = (a: Agent) => (a.spot >= 0 ? spots[a.spot] : null);
   const inside = agents.filter((a) => {
-    const s = a.spot >= 0 ? spots[a.spot] : null;
+    const s = at(a);
     // Someone held for a talk in the room stays in it (holding shows them, as out of doors); someone stopped
     // out of doors on the way in stays out there with the hero.
     return !!s && s.building === building && (a.held ? !!a.heldIn : inRoom(a, s));
   });
   const free = plan.spots.map((s, i) => ({ kind: s.kind, i })).filter((s) => s.kind !== 'sleep');
+  const beds = plan.spots.map((s, i) => ({ kind: s.kind, i })).filter((s) => s.kind === 'sleep');
   const held = new Map<number, Agent>();
   for (const a of inside) { const i = kept?.get(a); if (i !== undefined) held.set(i, a); }
   const take = (ok: (k: InteriorSpotKind) => boolean, a: Agent): number => {
@@ -84,5 +86,11 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
     if (i < 0) for (const k of REST) if ((i = take((x) => x === k, a)) >= 0) break;
     if (i >= 0) out.push({ agent: a, spot: i, act: actAt(i) });
   }
+  // Asleep at home: in bed, the one working there first (the hedge witch in her own bed), each in the bed they had.
+  const sleepers = agents.filter((a) => !a.held && a.act === 'sleep' && !!at(a)?.door && at(a)!.building === building)
+    .sort((x, y) => Number(y.person.work === building) - Number(x.person.work === building) || x.person.id - y.person.id);
+  const abed = (a: Agent, k: number) => { out.push({ agent: a, spot: beds[k].i, act: 'sleep' }); beds.splice(k, 1); };
+  const newcomers = sleepers.filter((a) => { const k = beds.findIndex((s) => s.i === kept?.get(a)); if (k >= 0) abed(a, k); return k < 0; });
+  for (const a of newcomers) if (beds.length) abed(a, 0);
   return out.sort((x, y) => x.agent.person.id - y.agent.person.id);
 }

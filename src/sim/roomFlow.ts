@@ -1,8 +1,9 @@
 /**
  * People coming and going in a room drawn open (D48): who comes in walks from the door to their place, who leaves
- * walks from it to the door (or to the foot of the stairs, going up to bed), and who is sent to another place walks
- * over to it, round the furniture (@futuremagic/settlement roomPath). Without this they appeared on their seats and
- * vanished from them. Those already in when the room opens are at their places at once. Room coordinates; pure.
+ * walks from it to the door (or to the foot of the stairs, going up to bed, and is then drawn abed upstairs), and
+ * who is sent to another place walks over to it, round the furniture (@futuremagic/settlement roomPath). Without
+ * this they appeared on their seats and vanished from them. Those already in when the room opens are at their
+ * places at once. Room coordinates; pure.
  */
 import { roomPath, type InteriorPlan } from '@futuremagic/settlement';
 import { benchUnder, type Cast } from './roomCast';
@@ -21,6 +22,8 @@ export interface RoomPlace {
   act: ActivityKind;
   /** Sitting: the seat's height over the storey's floor (the bench top). */
   seat?: number;
+  /** Asleep: the bed's height over the storey's floor (the top of its bedding). */
+  bed?: number;
 }
 
 /** Indoors one walks no faster than this (m/s): between tables, not down the street. */
@@ -78,9 +81,18 @@ export class RoomFlow {
     // Come in, or sent to another place: walk there from where they are drawn (from the door if not).
     for (const c of cast) {
       const s = this.plan.spots[c.spot], w = this.walks.get(c.agent), was = this.drawn.get(c.agent);
-      if (s.storey !== 0 || first) { this.walks.delete(c.agent); continue; }
+      if (first) { this.walks.delete(c.agent); continue; }
+      // Off to a place upstairs (to bed): from the ground floor up the stairs first, then there.
+      const below = !!w || !was || was.spot < 0 || this.plan.spots[was.spot].storey === 0;
+      if (s.storey !== 0) {
+        if (w?.to === UP) continue;
+        if (!below || !this.stair) { this.walks.delete(c.agent); continue; }
+        this.walk(c.agent, w ? [w.a, w.b] : was ? [was.a, was.b] : this.door, this.stair, UP);
+        continue;
+      }
       if (w ? w.to === c.spot : was?.spot === c.spot) continue;
-      const from: [number, number] = w ? [w.a, w.b] : was ? [was.a, was.b] : this.door;
+      // Down from upstairs (up from bed): from the foot of the stairs.
+      const from: [number, number] = w ? [w.a, w.b] : was && !below && this.stair ? this.stair : was ? [was.a, was.b] : this.door;
       this.walk(c.agent, from, [s.a, s.b], c.spot);
     }
     // Gone from the cast: out of the door, or up to bed; anyone else (away to another building) just goes.
@@ -113,7 +125,8 @@ export class RoomFlow {
     for (const c of cast) {
       if (this.walks.has(c.agent)) continue;
       const s = this.plan.spots[c.spot], bench = c.act === 'sit' ? benchUnder(this.plan, s) : undefined;
-      out.push({ agent: c.agent, a: s.a, b: s.b, storey: s.storey, yaw: s.yaw, act: c.act, ...(bench ? { seat: bench.h } : {}) });
+      const bed = c.act === 'sleep' ? benchUnder(this.plan, s, 'bed') : undefined;
+      out.push({ agent: c.agent, a: s.a, b: s.b, storey: s.storey, yaw: s.yaw, act: c.act, ...(bench ? { seat: bench.h } : {}), ...(bed ? { bed: bed.h } : {}) });
       this.drawn.set(c.agent, { spot: c.spot, a: s.a, b: s.b, yaw: s.yaw });
     }
     return out;
