@@ -13,6 +13,8 @@ import { Portals } from './app/portals';
 import { CAVE_LANTERN } from './app/cellarVisit';
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
+import { PortalStoneUse } from './app/portalStoneUse';
+import { cleanStoneSave } from './game/portalStone';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
@@ -745,6 +747,8 @@ export async function start(b: Boot): Promise<void> {
     /** The portals' HUD line (empty away from them). */
     let portalHud = '';
     const portalsDue: Portal[] = [];
+    /** The portal stone as held up (set once the portals are): it goes below ground with the hero. */
+    let stoneMesh: Object3D | null = null;
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
       fight: fightHost,
@@ -760,7 +764,7 @@ export async function start(b: Boot): Promise<void> {
       // The hero, what they leave lying and their spells go down with them.
       depth: (down, keep) => {
         if (!down) { for (const o of hidden) o.visible = true; hidden.length = 0; return; }
-        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group, spellView.group]);
+        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group, spellView.group, ...(stoneMesh ? [stoneMesh] : [])]);
         for (const o of view.scene.children) if (o.visible && !kept.has(o) && !(o as Light).isLight) { o.visible = false; hidden.push(o); }
       },
     }, terrain.towns, save?.cellars ?? {});
@@ -852,7 +856,7 @@ export async function start(b: Boot): Promise<void> {
           for (const o of cellars?.drawnBelow() ?? []) set(o, false);
         } else {
           const mine = cellars?.drawnOf(realm) ?? [];
-          const kept = new Set<Object3D>([...mine, hero.object, view.camera, remainsView.group, spellView.group, portalView.group]);
+          const kept = new Set<Object3D>([...mine, hero.object, view.camera, remainsView.group, spellView.group, portalView.group, ...(stoneMesh ? [stoneMesh] : [])]);
           for (const o of view.scene.children) if (!kept.has(o) && !(o as Light).isLight) set(o, false);
           for (const o of mine) set(o, true);
         }
@@ -864,6 +868,35 @@ export async function start(b: Boot): Promise<void> {
     for (const p of portalsDue.splice(0)) portals.add(p);
     const through = portals;
     view.slot = () => through.hooks(view.camera.position);
+    // The hero's hands raised (a spell gathering, the portal stone held up), thrown out (let go) or lowered, for `dur` s.
+    const castHands = (what: 'charge' | 'release' | 'stop', dur: number): void => {
+      const h = player.hero;
+      if (h) player.stance = { ...player.stance, action: what === 'stop' ? undefined : { id: what === 'charge' ? 'spell_charge' : 'spell_release', t0: h.clock, dur } };
+    };
+    // The portal stone (game/portalStone.ts): held up from the pack, its glyphs mark home and open a portal back to it.
+    const stoneUse = new PortalStoneUse({
+      stage: view.stage, camera: view.camera, canvas, player, portals,
+      probe: {
+        standFloor: (x, z) => landWorld.floor!(x, z) ?? landWorld.height(x, z),
+        blocksAt: (x, z, r, y) => landWorld.wall!(x, z, r, y),
+        rockGapAt: (x, y, z) => landWorld.rockSurface(x, y, z),
+        wetAt: (x, z) => landWorld.waterLevel(x, z),
+      },
+      onLand: () => !visit(),
+      playing: () => open === 0 && playing,
+      sound: (what, at) => {
+        if (what === 'raise') sounds?.spell('gather', 'shade', at);
+        else if (what === 'beam') sounds?.spell('loose', 'radiance', at);
+        else if (what === 'open') sounds?.spell('hit', 'shade', at);
+        else if (what === 'close') sounds?.spell('loose', 'shade', at);
+        else sounds?.spell('hit', 'flame', at);
+      },
+      gesture: (what) => castHands(what === 'raise' ? 'charge' : 'release', what === 'raise' ? 0.9 : 0.8),
+      changed: () => autosave(),
+    }, cleanStoneSave(save?.portalStone));
+    await stoneUse.addToStage();
+    stoneMesh = stoneUse.mesh;
+    spellView.also = (b, dt) => stoneUse.stoneLight(b, dt);
     if (params.portal) {
       // `portal`: an opening 6 m ahead, joined to one 30 m to the right, turned a quarter.
       const w = player.walker.pos, yaw = player.walker.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
@@ -1283,6 +1316,7 @@ export async function start(b: Boot): Promise<void> {
       get bindings() { return settings.current.bindings; },
       changed: learnedAbility,
       drank: (n) => { if (n > 0) fightHud.healed(); },
+      raised: () => stoneUse.holdUp(),
       readOut: (why, id) => {
         const a = abilityOf(setting, id);
         notes.say(why ?? `You read it through, and ${a?.name ?? id} is yours. The page crumbles to dust.`, 7);
@@ -1300,10 +1334,7 @@ export async function start(b: Boot): Promise<void> {
     // Spells gather in the hand the cast clip holds up (the left).
     spellView.handOf = (out) => player.hero?.handAt('l', out) ?? null;
     spellView.listener = {
-      hands: (what, dur) => {
-        const h = player.hero;
-        if (h) player.stance = { ...player.stance, action: what === 'stop' ? undefined : { id: what === 'charge' ? 'spell_charge' : 'spell_release', t0: h.clock, dur } };
-      },
+      hands: castHands,
       sound: (what, motif, at) => sounds?.spell(what, motif, at),
     };
     // Bird form (plan 10): the hero becomes a pheasant and flies; the change takes its time and never in a fight.
@@ -1465,6 +1496,7 @@ export async function start(b: Boot): Promise<void> {
           character: character.save(),
           standing: standing.save(),
           guilds: guildBook.bookSave(),
+          portalStone: stoneUse.stoneSave(),
           ...(hold?.diff() ? { hold: hold.diff() } : {}),
           looks: { name: heroName, look: hero.look },
           director: director.snapshot(),
@@ -1695,7 +1727,7 @@ export async function start(b: Boot): Promise<void> {
       places: placesFor(seedText, home),
       spots,
       seed: seedText,
-      game: { player, view, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
@@ -2093,6 +2125,7 @@ export async function start(b: Boot): Promise<void> {
           sounds?.chime();
           if (cheer.gesture && h) player.stance = { ...player.stance, action: { ...CHEER, t0: h.clock } };
         }
+        stoneUse.stoneFrame(dt);
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }

@@ -10,6 +10,7 @@ import { remainsLead, type GameMode, type Remains } from '../game/death';
 import type { DelveSave } from '../game/delve';
 import type { StandingSave } from '../game/standing';
 import type { KnownLandSave } from '../game/knownLand';
+import type { PortalStoneSave } from '../game/portalStone';
 import type { GuildBookSave } from '../game/guilds';
 import type { MarketSave } from '../game/trade';
 import type { TownshipSave } from '../game/township';
@@ -77,6 +78,8 @@ export interface SaveData {
   readonly standing?: StandingSave;
   /** The hero's dealings with the guild houses (D49: the tasks given); absent in older saves. */
   readonly guilds?: GuildBookSave;
+  /** The portal stone's home and far portal (none in older saves: nothing marked). */
+  readonly portalStone?: PortalStoneSave;
   /** A people's hold: who of its wardens fell, was searched (none: all at their posts). */
   readonly hold?: DelveSave;
   /** Why the VGM made its latest moves (its log's reasons; none in older saves: their decisions say what they are). */
@@ -134,7 +137,8 @@ export function remainsEntry(r: Remains): Lead {
  */
 export function heirSave(s: SaveData, grave: Remains, start: SaveData['hero']): SaveData {
   // The next hero knows the land only as a new hero does (the map key is left out).
-  const { map: _known, ...world } = s;
+  // Nor does it find the last one's portals open.
+  const { map: _known, portalStone: _stone, ...world } = s;
   return {
     ...world, mode: 'roguelike', heir: true, hero: start, character: null, looks: null,
     remains: [...s.remains, grave], journal: [remainsEntry(grave)],

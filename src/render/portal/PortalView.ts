@@ -90,6 +90,12 @@ export class PortalView {
     mesh.updateMatrix();
   }
 
+  /** Stretch an opening's mesh across (`sx`) and up (`sy`) about its foot. */
+  stretchOpening(mesh: Mesh, sx: number, sy: number): void {
+    mesh.scale.set(sx, sy, 1);
+    mesh.updateMatrix();
+  }
+
   /** The hooks for this frame's draw (Post.draw): the opening `pass` (null: none). */
   hooks(pass: PortalPass | null): PostHooks {
     this.pass = this.twin ? pass : null;

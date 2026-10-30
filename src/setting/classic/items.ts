@@ -34,6 +34,7 @@ export const items: ItemCatalog = {
     { id: 'cheese', name: 'Wedge of cheese', kind: 'food', heal: 8, value: 4, weight: 0.3 },
     { id: 'torch', name: 'Torch', kind: 'tool', value: 2, weight: 0.5 },
     { id: 'rope', name: 'Coil of rope', kind: 'tool', value: 6, weight: 2 },
+    { id: 'portal-stone', name: 'Portal stone', kind: 'tool', portal: true, value: 0, weight: 0.3, lore: 'Smooth and cold, it hums when held. One glyph remembers a place; the other opens the way back to it.' },
     { id: 'lockpicks', name: 'Lockpicks', kind: 'tool', value: 40, weight: 0.1 },
     { id: 'old-coin', name: 'Coin of the old realm', kind: 'valuable', value: 30, weight: 0.01, lore: 'A crowned hammer on one side, a tower on the other. Nobody mints these any more.' },
     { id: 'candlestick', name: 'Silver candlestick', kind: 'valuable', value: 90, weight: 0.8 },

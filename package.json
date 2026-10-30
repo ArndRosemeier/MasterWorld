@@ -52,7 +52,8 @@
     "shot:goto": "node tools/shot/goto.mjs",
     "shot:grounded": "node tools/shot/grounded.mjs",
     "shot:hitches": "node tools/shot/hitches.mjs",
-    "shot:vgm": "node tools/shot/vgm.mjs"
+    "shot:vgm": "node tools/shot/vgm.mjs",
+    "shot:stone": "node tools/shot/stone.mjs"
   },
   "dependencies": {
     "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.3/actors-animal-0.19.3.tgz",

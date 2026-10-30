@@ -80,6 +80,17 @@ export class Portals {
     this.held.delete(id);
   }
 
+  /**
+   * Stretch a portal's openings as drawn (a portal whose edge wavers, or one still opening): `a` and `b` are each
+   * side's stretch across and up. Walking through goes by its shape as made.
+   */
+  stretch(id: string, a: readonly [number, number], b: readonly [number, number]): void {
+    const h = this.held.get(id);
+    if (!h) return;
+    this.host.view.stretchOpening(h.meshes.a, a[0], a[1]);
+    this.host.view.stretchOpening(h.meshes.b, b[0], b[1]);
+  }
+
   get portals(): Portal[] { return [...this.held.values()].map((h) => h.portal); }
 
   /**
