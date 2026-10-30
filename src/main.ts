@@ -151,7 +151,6 @@ import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
 import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
-import { bridgesNear } from './world/bridges';
 import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
@@ -271,7 +270,8 @@ export async function start(b: Boot): Promise<void> {
     // Every town (the start's and each settlement's): their cores and their buildings (set once the workers run).
     let towns: Towns | null = null;
     // The land, and the steps and porches before the doors (where the townsfolk stand).
-    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), towns?.stand(x, z) ?? -Infinity);
+    // (Over a brook on a town's street the bridge's deck: folk walk out to their fields over it.)
+    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), towns?.stand(x, z) ?? -Infinity, bridgeView.deck(x, z) ?? -Infinity);
     // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
     const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
     // Rocks one walks round (D55), asked ahead the same way.
@@ -1671,7 +1671,7 @@ export async function start(b: Boot): Promise<void> {
       answerFor: (need) => answerNow(need),
       event: (id) => storyEventNow(id),
       goodDay: () => goodDayNow(),
-      bridges: (x, z) => bridgesNear(terrain.roads, terrain.hydro, x, z, 4000, (px, pz) => terrain.hydro.hasBrooks(px, pz)),
+      bridges: (x, z) => bridgeView.around(x, z, 4000),
     });
     // The VGM seen at work (a developer's aid; D53 keeps it out of play): its panel (F9), docked at the right while
     // the hero plays, with its moves live, filtered by kind, each placed one shown on the minimap when clicked.
