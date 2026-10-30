@@ -25,7 +25,7 @@ const DOOR = '#7a4a22';
 const EXIT = '#2f7a46';
 
 /** Cells from the hero to the round's edge: a built dungeon's 2 m cells, a cave's bigger ones and wider halls. */
-const BELOW_CELLS = 8, BELOW_CELLS_CAVE = 10;
+const BELOW_CELLS = 5, BELOW_CELLS_CAVE = 8;
 
 /** Metres from the hero to the edge of the round below ground. */
 export function belowRange(space: DungeonSpace, carved: boolean): number {
@@ -93,9 +93,9 @@ export function paintBelow(canvas: HTMLCanvasElement, b: BelowSheet, x: number, 
   g.strokeStyle = DOOR;
   g.lineWidth = Math.max(1.2, s * 0.22);
   g.stroke(doors);
-  // The way out, where the hero came in.
-  const e = b.exit;
-  if (b.space.levelAt(e.y) === level) {
+  // The way out, where the hero came in (once its cell is seen: a start deeper in does not show it).
+  const e = b.exit, [ei, ej] = b.space.cellAt(e.x, e.z), el = b.space.levelAt(e.y);
+  if (el === level && b.seen.has(ei, ej, el)) {
     const r = Math.max(3, s * 0.45);
     g.fillStyle = EXIT;
     g.strokeStyle = '#e8f3d0';
