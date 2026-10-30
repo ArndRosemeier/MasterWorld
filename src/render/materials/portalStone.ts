@@ -52,7 +52,7 @@ export const PORTAL_STONE = defineKind('portal-stone', ['position', 'normal', 'c
     .add(mix(light, vec3(1.0, 1.0, 1.0), 0.35).mul(glyph))
     .add(mix(teal, vec3(1.2, 1.1, 1.6), 0.5).mul(edge).mul(4.0));
   return m;
-}, { cast: false, receive: false });
+}, { cast: false, receive: false }, true);
 
 /** The stone's half sizes (m): across, up and through, and how far out its polished face stands. */
 export const STONE_SIZE = { x: 0.24, y: 0.32, z: 0.12, face: 0.075 } as const;
