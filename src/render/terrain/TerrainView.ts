@@ -112,7 +112,10 @@ export class TerrainView {
     const size = chunkSize(k.level);
     let index = this.indices.get(m.segs);
     if (!index) this.indices.set(m.segs, (index = new BufferAttribute(chunkIndex(m.segs), 1)));
-    const mesh = groundMesh(m, index, k.x * size, k.z * size);
+    // A chunk cut along its steep edges has its own list (freed with it).
+    const own = !!m.index;
+    const mesh = groundMesh(m, own ? new BufferAttribute(m.index!, 1) : index, k.x * size, k.z * size);
+    mesh.userData.ownIndex = own;
     mesh.name = `terrain ${chunkId(k)}`;
     return mesh;
   }
@@ -139,9 +142,9 @@ export class TerrainView {
   }
 }
 
-/** The index is shared by every chunk: detach it first, so disposing frees only this chunk's buffers. */
+/** The index is shared by chunks of a size: detach it first, so disposing frees only this chunk's buffers. */
 function freeChunk(m: Mesh): void {
-  m.geometry.setIndex(null);
+  if (!m.userData.ownIndex) m.geometry.setIndex(null);
   m.geometry.dispose();
 }
 

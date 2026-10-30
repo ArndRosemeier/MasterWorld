@@ -198,6 +198,12 @@ export class Terrain {
     return TownGround.None;
   }
 
+  /** Whether (x, z) is within a town's wall (Town.walled). */
+  townWalled(x: number, z: number): boolean {
+    for (const town of this.towns) if (town.near(x, z, 0) && town.walled(x, z)) return true;
+    return false;
+  }
+
   /** The field at a point (its crop and rows), or null. */
   fieldAt(x: number, z: number): Field | null {
     for (const town of this.towns) if (town.near(x, z, 0)) { const f = town.fieldAt(x, z); if (f) return f; }

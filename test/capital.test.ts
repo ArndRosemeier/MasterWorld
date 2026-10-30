@@ -6,6 +6,8 @@ import { settlementOf } from '../src/world/decisions';
 import { townsfolk } from '../src/sim/people';
 import { guildHouses } from '../src/game/guilds';
 import { tooSteep } from '@futuremagic/settlement';
+import { TownGround } from '../src/world/town';
+import { grassMask } from '../src/world/grass';
 import { EAST, frontierLand } from './frontierLand';
 
 const { first, home, regions, seed, terrain } = frontierLand();
@@ -33,6 +35,11 @@ test('capital: one, a few km out, a decision in the log; walled, with its ruler,
   // No house up a mesa wall or a hillside (one cottage once spanned 68 m of rise): the planner leaves such plots empty.
   const steep = plan.buildings.filter((b) => tooSteep(b.poly, terrain.height.bind(terrain)));
   assert.deepEqual(steep.map((b) => `${b.kind}@${b.cx.toFixed(0)},${b.cz.toFixed(0)}`), [], 'no building on steep ground');
+  // Wall, towers and gates stand dry: a brook between two of the outline's rays once ran under a gate tower (Arnd).
+  const brookIn = (x: number, z: number, r: number) => { const q = terrain.hydro.query(x, z); return q.river && q.dist < q.half + r; };
+  for (let i = 0; i < R.length; i += 2) assert.ok(!brookIn(R[i], R[i + 1], w.thick / 2), `the wall in water at ${R[i].toFixed(0)},${R[i + 1].toFixed(0)}`);
+  for (const tw of w.towers) assert.ok(!brookIn(tw.x, tw.z, w.towerHalf), `a tower in water at ${tw.x.toFixed(0)},${tw.z.toFixed(0)}`);
+  for (const f of plan.fixtures) assert.ok(!brookIn(f.x, f.z, 1), `a ${f.kind} in water`);
   // Its seat of rule has its ruler; the guilds keep big halls; its armourer and jeweller keep shop.
   const folk = townsfolk(plan, d.seed);
   const seat = plan.buildings.find((b) => b.trade === 'ruler')!;
@@ -43,4 +50,16 @@ test('capital: one, a few km out, a decision in the log; walled, with its ruler,
   for (const s of ['armourer', 'jeweller']) assert.ok(plan.buildings.some((b) => b.trade === s) && classic.shops.some((x) => x.keeper === s), s);
   // About 2700 people: the simulation keeps its budget only by drawing few of them (D41).
   assert.ok(folk.length > 1500, `${folk.length} people`);
+  // Within its wall the yards are trodden, not a meadow: little grass and short (Arnd: "too much grass everywhere").
+  assert.ok(town.walled(seat.cx, seat.cz) && !town.walled(w.gates[0].x + Math.cos(w.gates[0].angle) * 60, w.gates[0].z + Math.sin(w.gates[0].angle) * 60), 'the seat within the wall, the land before a gate outside it');
+  // Every yard cell within 60 m of the seat of rule.
+  const x0 = seat.cx - 60, z0 = seat.cz - 60, mask = grassMask(terrain, { seed, setting: classic.id, x0, z0, size: 120, res: 60 });
+  let dens = 0, tall = 0, yards = 0;
+  for (let j = 0; j < 60; j++) for (let i = 0; i < 60; i++) {
+    const x = x0 + i * 2 + 1, z = z0 + j * 2 + 1, k = (j * 60 + i) * 4;
+    if (terrain.townGround(x, z) !== TownGround.Yard || !town.walled(x, z)) continue;
+    yards++; dens = Math.max(dens, mask[k + 1]); if (mask[k + 1] > 0) tall = Math.max(tall, mask[k + 2]);
+  }
+  assert.ok(yards > 50, `${yards} yard cells`);
+  assert.ok(dens <= 0.15 && tall < 0.3, `yards within the wall: grass ${dens.toFixed(2)}, ${tall.toFixed(2)} m`);
 });

@@ -399,12 +399,26 @@ export class Walker {
     }
     const at = this.faceAt(ax, az, y, F.nx, F.nz);
     const c = at && (rock ? this.holds(at[0] - F.nx * 0.2, at[1] - F.nz * 0.2, y) : this.holds(at[0] + F.nx * 0.2, at[1] + F.nz * 0.2, y));
+    // No holds at the chest, but a ledge above within the arms' reach (an opening in a cave's wall, a bench, the top):
+    // the hands are on its lip, and the body goes on up by them to where it pulls itself over. Without this the
+    // climber hung below the lip for good (the holds end at the chest, the pull-up starts at the waist).
+    if ((!at || !c) && intent.forward > 0 && this.lipAbove(tx, tz, y)) { p.y = y; return; }
     // No holds there (the broken rock ends), or the head at the roof: the body stays where it is.
     if (!at || !c) return;
     if (rock && intent.forward > 0 && (this.world.rockSurface(at[0] - c.nx * OFF_FACE, y + this.height + 0.05, at[1] - c.nz * OFF_FACE) ?? 1) < 0.1) return;
     F.nx = c.nx; F.nz = c.nz;
     p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE; p.y = y;
     this.yaw = Math.atan2(-c.nx, -c.nz);
+  }
+
+  /** A ledge to pull up onto at (x, z), in from the face, with its top above the feet `y` and within the arms' reach. */
+  private lipAbove(x: number, z: number, y: number): boolean {
+    if (!this.inRock()) {
+      const top = this.world.height(x, z);
+      return top > y && top - y < this.height && this.groundSlope(x, z) <= this.spec.maxSlope;
+    }
+    const top = this.support(x, z, y + this.height);
+    return top > y && top - y < this.height && !this.bodyInRock(x, top, z);
   }
 
   /** The gait for the animator. */

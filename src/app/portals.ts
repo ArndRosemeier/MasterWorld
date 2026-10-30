@@ -68,8 +68,11 @@ export class Portals {
       this.held.set(portal.id, { portal, meshes: was.meshes });
       return;
     }
-    const outline = openingOutline(portal.shape);
-    this.held.set(portal.id, { portal, meshes: { a: this.host.view.opening(outline, portal.a.frame), b: this.host.view.opening(outline, portal.b.frame) } });
+    const v = this.host.view, outline = openingOutline(portal.shape);
+    const meshes = portal.rift
+      ? { a: v.riftOpening(portal.shape, portal.a.frame, 0), b: v.riftOpening(portal.shape, portal.b.frame, 1) }
+      : { a: v.opening(outline, portal.a.frame), b: v.opening(outline, portal.b.frame) };
+    this.held.set(portal.id, { portal, meshes });
   }
 
   /** Close a portal. */
@@ -78,17 +81,6 @@ export class Portals {
     if (!h) return;
     for (const m of [h.meshes.a, h.meshes.b]) { m.removeFromParent(); m.geometry.dispose(); }
     this.held.delete(id);
-  }
-
-  /**
-   * Stretch a portal's openings as drawn (a portal whose edge wavers, or one still opening): `a` and `b` are each
-   * side's stretch across and up. Walking through goes by its shape as made.
-   */
-  stretch(id: string, a: readonly [number, number], b: readonly [number, number]): void {
-    const h = this.held.get(id);
-    if (!h) return;
-    this.host.view.stretchOpening(h.meshes.a, a[0], a[1]);
-    this.host.view.stretchOpening(h.meshes.b, b[0], b[1]);
   }
 
   get portals(): Portal[] { return [...this.held.values()].map((h) => h.portal); }

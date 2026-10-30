@@ -295,7 +295,12 @@ export async function start(b: Boot): Promise<void> {
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
       rockSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, false)),
       // In a building the camera stays in the room (its doorway shut to it).
-      sightSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, !!rooms?.inside)),
+      // Out of doors also a stall's awning, a well's roof (the talk view stood on an awning).
+      sightSurface: (x, y, z) => {
+        if (cellars?.throatAir(x, y, z)) return null;
+        const s = surfaceAt(x, y, z, !!rooms?.inside), f = rooms?.inside ? null : towns?.fixtureSight(x, y, z) ?? null;
+        return s === null ? f : f === null ? s : Math.min(s, f);
+      },
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => water?.surfaceAt(x, z) ?? null,
       // Rock faces with holds (D56).
@@ -829,12 +834,15 @@ export async function start(b: Boot): Promise<void> {
       player, view: portalView, hero: hero.object, lamp: view.lantern,
       realm: () => cellars?.realm ?? 'land',
       // Walked through a cave's portal: down in it now (or out again), with no fade; the game saves as after a fade.
+      // A portal stone's pair may join two places below, or one with itself.
       crossed: (to, from) => {
-        const v = cellars?.visitOf(to === 'land' ? from : to);
-        if (!v) return;
-        if (to === 'land') v.depart(); else v.arrive();
+        if (to === from) return;
+        const out = from === 'land' ? null : cellars?.visitOf(from), into = to === 'land' ? null : cellars?.visitOf(to);
+        if (!out && !into) return;
+        out?.depart();
+        into?.arrive();
         caveLit = null;
-        v.onSwap?.();
+        (into ?? out)?.onSwap?.();
       },
       // One realm shown for a view: the land (what left the frame below comes back, the places below go) or a place
       // below (the land leaves the frame; the hero, what lies about and the spells stay), and its light.
@@ -876,13 +884,15 @@ export async function start(b: Boot): Promise<void> {
     // The portal stone (game/portalStone.ts): held up from the pack, its glyphs mark home and open a portal back to it.
     const stoneUse = new PortalStoneUse({
       stage: view.stage, camera: view.camera, canvas, player, portals,
+      // Where the hero is: the land, or the place below they are in (its floor, walls and rock).
       probe: {
-        standFloor: (x, z) => landWorld.floor!(x, z) ?? landWorld.height(x, z),
-        blocksAt: (x, z, r, y) => landWorld.wall!(x, z, r, y),
-        rockGapAt: (x, y, z) => landWorld.rockSurface(x, y, z),
-        wetAt: (x, z) => landWorld.waterLevel(x, z),
+        standFloor: (x, z) => world.floor!(x, z) ?? world.height(x, z),
+        blocksAt: (x, z, r, y) => world.wall!(x, z, r, y),
+        rockGapAt: (x, y, z) => world.rockSurface(x, y, z),
+        wetAt: (x, z) => world.waterLevel(x, z),
       },
-      onLand: () => !visit(),
+      realm: () => cellars?.realm ?? 'land',
+      ready: async (realm) => realm === 'land' || !!(await cellars?.build(realm)),
       playing: () => open === 0 && playing,
       sound: (what, at) => {
         if (what === 'raise') sounds?.spell('gather', 'shade', at);
@@ -1453,7 +1463,8 @@ export async function start(b: Boot): Promise<void> {
         if (p) { player.teleport(p.x + Math.cos(p.dir) * 1.3, p.y, p.z + Math.sin(p.dir) * 1.3, Math.atan2(Math.cos(p.dir), Math.sin(p.dir))); return; }
       }
       // Clear of walls: a building's corner beside the hero filled the talk's shot.
-      const at = standingPlace(a.x, a.z, a.dir, (x, z, r) => !!towns?.solid(x, z, r));
+      // Not across a stall's counter or a coop either: the shot looked over its wares at the top of a head.
+      const at = standingPlace(a.x, a.z, a.dir, (x, z, r) => !!towns?.solid(x, z, r), (x, z) => !!towns?.fixtureAt(x, z, 0.1));
       player.teleport(at.x, undefined, at.z, Math.atan2(at.x - a.x, at.z - a.z));
     };
     // `talk=house|smith|inn`: straight into a talk in the town the hero is in (`house`: the first cellar's household).
