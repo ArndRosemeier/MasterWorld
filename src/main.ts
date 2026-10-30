@@ -293,6 +293,8 @@ export async function start(b: Boot): Promise<void> {
       waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
       // Rock faces with holds (D56): out of doors only.
       climbable: (x, z) => (below() ? null : terrain.climbable(x, z)),
+      // Down in a cave its rock walls (D56, P1): a drop is climbed back up, not jumped.
+      rockHolds: () => !!below()?.rockHolds?.(),
       // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
       wall: (x, z, r, y) => {
         const b = below();

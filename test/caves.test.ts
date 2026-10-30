@@ -15,6 +15,9 @@ import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { DIRS } from '@futuremagic/dungeon';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { DungeonNav, navKey } from '../src/sim/dungeonNav';
+import { dungeonWorld } from '../src/game/dungeonWorld';
+import { Walker } from '../src/game/walker';
+import { Rng } from '@futuremagic/core';
 
 const cave = (n: number) => outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
 
@@ -203,4 +206,21 @@ test('cave (P1): natural floors, water and a shaft; level where things lie; the 
     checked++;
   }
   assert.ok(checked > 30, `${checked} spots`);
+});
+
+test('cave: a body running and jumping about its rooms never ends in the rock, nor is lifted up a face', () => {
+  const c = cave(5), feat = caveFeatures(c.layout, 5, keepSpots(c)), space = new CaveSpace(c.layout, caveField(c.layout, 5, feat), feat);
+  const { cell: C, storey: S } = c.layout.scale, w = new Walker(dungeonWorld(space, { x: 0, y: 0, z: 0 })), rng = new Rng(5);
+  w.tire = () => true;
+  for (const r of c.layout.rooms.slice(0, 6)) {
+    w.place((r.x + r.w / 2) * C, (r.z + r.d / 2) * C, r.level * S + 1);
+    let heading = 0;
+    for (let i = 0; i < 900; i++) {
+      if (i % 90 === 0) heading = rng.range(0, Math.PI * 2);
+      const y0 = w.pos.y, was = w.mode;
+      w.step({ forward: 1, strafe: 0, heading, walk: false, up: i % 37 === 0, down: false }, 1 / 60);
+      assert.ok(space.sdf(w.pos.x, w.pos.y + 1, w.pos.z) > 0, `room ${r.id}: in the rock at ${w.pos.x.toFixed(1)}, ${w.pos.y.toFixed(1)}, ${w.pos.z.toFixed(1)}`);
+      if (was !== 'pull') assert.ok(w.pos.y - y0 < 0.5, `room ${r.id}: lifted ${(w.pos.y - y0).toFixed(2)} m in a frame (${was} to ${w.mode})`);
+    }
+  }
 });

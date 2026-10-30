@@ -66,3 +66,34 @@ test('walker: a building wall stops it, and it slides along', () => {
   assert.ok(w.pos.z <= 5 - WALK.radius + 1e-6 && w.pos.z > 4, `z ${w.pos.z}`);
   assert.ok(w.pos.x < -1 || w.pos.x > 1, `slid along the wall: x ${w.pos.x}`);
 });
+
+/** A cave's floor at 0 and a ledge 2.6 m up from x 2 on, its foot rounded into the floor as the rock is (smin). */
+const ledge = (rockHolds: boolean): WalkWorld => ({
+  height: () => -1000,
+  rockSurface: (x, y) => {
+    const up = Math.max(2 - x, y - 2.6), k = Math.max(1 - Math.abs(y - up), 0);
+    return Math.min(y, up) - k * k * 0.25;
+  },
+  waterLevel: () => null,
+  rockHolds: () => rockHolds,
+});
+const east = (o: Partial<WalkIntent> = {}) => go({ forward: 1, heading: -Math.PI / 2, ...o });
+
+test('walker: a ledge over its jump stays out of reach, and the body never walks into its rock', () => {
+  const w = new Walker(ledge(false));
+  w.place(0, 0);
+  for (let t = 0; t < 8; t += 1 / 60) {
+    w.step(east({ up: Math.round(t * 60) % 40 === 20 }), 1 / 60);
+    assert.ok(w.pos.y < 1.3, `lifted to ${w.pos.y.toFixed(2)} at x ${w.pos.x.toFixed(2)}`);
+    assert.ok(w.pos.x < 2 - WALK.radius + 0.1, `into the rock: x ${w.pos.x.toFixed(2)}`);
+  }
+});
+
+test('walker: in a cave it climbs the ledge\'s face and pulls up over its top', () => {
+  const w = new Walker(ledge(true)), seen = new Set<string>();
+  w.place(0, 0);
+  for (let t = 0; t < 12; t += 1 / 60) { w.step(east(), 1 / 60); seen.add(w.mode); }
+  assert.ok(seen.has('climb') && seen.has('pull'), [...seen].join(' '));
+  assert.equal(w.mode, 'ground');
+  assert.ok(Math.abs(w.pos.y - 2.6) < 0.05 && w.pos.x > 3, `at ${w.pos.x.toFixed(2)}, ${w.pos.y.toFixed(2)}`);
+});
