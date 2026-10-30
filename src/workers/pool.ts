@@ -12,7 +12,7 @@ export class WorkerPool<Job, Result> {
   static heard: ((what: string) => void) | null = null;
   private readonly workers: Worker[] = [];
   private readonly busy: number[] = [];
-  private readonly waiting = new Map<number, { resolve: (r: Result) => void; reject: (e: Error) => void; worker: number; kind: string }>();
+  private readonly waiting = new Map<number, { resolve: (r: Result) => void; reject: (e: Error) => void; worker: number; kind: string; sent: number }>();
   private nextId = 1;
 
   constructor(make: () => Worker, private readonly name = 'worker', size = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1))) {
@@ -24,6 +24,7 @@ export class WorkerPool<Job, Result> {
         this.waiting.delete(e.data.id);
         this.busy[p.worker]--;
         WorkerPool.heard?.(`${this.name}:${p.kind}`);
+        jobLog()?.push({ pool: this.name, kind: p.kind, worker: p.worker, sent: p.sent, done: performance.now() });
         if (e.data.error !== undefined) p.reject(new Error(e.data.error));
         else p.resolve(e.data.result as Result);
       };
@@ -40,7 +41,7 @@ export class WorkerPool<Job, Result> {
     const id = this.nextId++;
     this.busy[w]++;
     return new Promise((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job) });
+      this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job), sent: performance.now() });
       this.workers[w].postMessage({ id, job }, transfer);
     });
   }
@@ -51,7 +52,7 @@ export class WorkerPool<Job, Result> {
       const id = this.nextId++;
       this.busy[w]++;
       return new Promise<Result>((resolve, reject) => {
-        this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job) });
+        this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job), sent: performance.now() });
         worker.postMessage({ id, job });
       });
     }));
@@ -63,6 +64,10 @@ export class WorkerPool<Job, Result> {
     this.waiting.clear();
   }
 }
+
+/** Every answered job, when a load probe asks for them (`window.__mwJobLog = []`, tools/shot/load.mjs LOAD_JOBS). */
+type JobRecord = { pool: string; kind: string; worker: number; sent: number; done: number };
+const jobLog = (): JobRecord[] | undefined => (globalThis as { __mwJobLog?: JobRecord[] }).__mwJobLog;
 
 /** A job's kind for the hitch log (`{ kind: 'chunk' }` → chunk). */
 function kindOf(job: unknown): string {
