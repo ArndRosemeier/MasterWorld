@@ -1,4 +1,4 @@
-import type { Light, Object3D } from 'three/webgpu';
+import { Vector3, type Light, type Object3D } from 'three/webgpu';
 import { GraphicsUnavailable } from '@futuremagic/stage';
 import { deriveSeed, parseSeed } from '@futuremagic/core';
 import { LoadingScreen } from './app/loading';
@@ -737,6 +737,9 @@ export async function start(b: Boot): Promise<void> {
     let caveLit: string | null = null;
     /** A cave's own lights are lit once the hero on the land is this near its portal (m). */
     const CAVE_LIGHTS_NEAR = 60;
+    /** The realm the warm lights are lit in: the place below the hero is in, or whose portal they are near, else the land. */
+    const lampsAt = new Vector3();
+    const warmRealm = (): string => { const r = cellars?.realm ?? 'land'; return r !== 'land' ? r : caveLit ?? 'land'; };
     /** The portals' HUD line (empty away from them). */
     let portalHud = '';
     const portalsDue: Portal[] = [];
@@ -830,7 +833,16 @@ export async function start(b: Boot): Promise<void> {
       // One realm shown for a view: the land (what left the frame below comes back, the places below go) or a place
       // below (the land leaves the frame; the hero, what lies about and the spells stay), and its light.
       showRealm: (realm) => {
-        if (realm === (cellars?.realm ?? 'land')) return () => {};
+        // Each realm's own shadow maps only: the land's the sun's, the torches' those of the place below whose lights
+        // are lit (a cave's torch over the land's plants would build shaders in play; the sun's map of a cave is of
+        // nothing it lights).
+        const held: { needsUpdate: boolean }[] = [], warmIn = warmRealm();
+        for (const o of view.scene.children) {
+          const l = o as Light & { shadow?: { needsUpdate: boolean } };
+          if (l.isLight && l.shadow?.needsUpdate && (l === view.sun ? realm !== 'land' : warmIn !== realm)) { l.shadow.needsUpdate = false; held.push(l.shadow); }
+        }
+        const unhold = (): void => { for (const s of held) s.needsUpdate = true; };
+        if (realm === (cellars?.realm ?? 'land')) return unhold;
         const changed: [Object3D, boolean][] = [];
         const set = (o: Object3D, on: boolean): void => { if (o.visible !== on) { changed.push([o, o.visible]); o.visible = on; } };
         if (realm === 'land') {
@@ -843,14 +855,7 @@ export async function start(b: Boot): Promise<void> {
           for (const o of mine) set(o, true);
         }
         const back = view.sky.shade(realm === 'land' ? 'open' : cellars?.visitOf(realm)?.cellar.form.space.carved ? 'cave' : 'below');
-        // Each realm's own shadow maps only: the land's the sun's, a place below's its torches' (a cave's torch over the
-        // land's plants would build shaders in play, and the sun's map of a cave is of nothing it lights).
-        const held: { needsUpdate: boolean }[] = [];
-        for (const o of view.scene.children) {
-          const l = o as Light & { shadow?: { needsUpdate: boolean } };
-          if (l.isLight && l.shadow?.needsUpdate && (realm === 'land') !== (l === view.sun)) { l.shadow.needsUpdate = false; held.push(l.shadow); }
-        }
-        return () => { for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; for (const s of held) s.needsUpdate = true; back(); };
+        return () => { for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; unhold(); back(); };
       },
       world: (realm) => (realm === 'land' ? landWorld : cellars?.visitOf(realm)?.world ?? null),
     });
@@ -2151,7 +2156,9 @@ export async function start(b: Boot): Promise<void> {
       }
       // Doorways at night above, torches below, a soft fill on the hero in a room.
       part('warm lights');
-      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
+      // The lights are picked near the camera as it stands in their realm (from the land, through a cave's portal).
+      const warmIn = warmRealm(), lampsSeen = warmIn !== through.cameraRealm ? through.carry(view.camera.position, through.cameraRealm, warmIn) : null;
+      view.warm.shine(lampsSeen ? lampsAt.set(lampsSeen.x, lampsSeen.y, lampsSeen.z) : view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
       // Every town's people near the hero live (and are drawn), and its animals graze.
       const cam = view.camera.position;
       part('towns.live');

@@ -132,6 +132,17 @@ export class Portals {
     this.viaCamera = { here: from, there: to };
   }
 
+  /** A point in `from` as seen in `to`, through the nearest opening joining them; null when none does. */
+  carry(p: P3, from: string, to: string): P3 | null {
+    let best: P3 | null = null, d = Infinity;
+    for (const h of this.held.values()) for (const s of sidesFrom(h.portal, from)) {
+      if (s.there.realm !== to) continue;
+      const dd = apart(p, s.here.frame);
+      if (dd < d) { d = dd; best = stepPoint(s.here.frame, s.there.frame, p); }
+    }
+    return best;
+  }
+
   /** The realm beyond the nearest opening within `within` metres of `p` in `realm`, else null. */
   nearBeyond(realm: string, p: P3, within: number): string | null {
     let best: string | null = null, d = within;
