@@ -20,6 +20,8 @@ const SHADOW_EXTENT = 160;
 const SHADOW_MAP = 4096;
 /** Metres the shadow box may move between two draws of the map before it is drawn at once (a teleport). */
 const SHADOW_JUMP = 4;
+/** Metres the hero may go between two draws of the map before it is drawn again (its shadow no further behind). */
+const SHADOW_LAG = 0.1;
 /**
  * The layer of what is drawn into the sun's shadow map but not into the view (three draws an object for a camera that
  * shares a layer with it; the shadow camera takes this one and the view's): casters out of view whose shadows may
@@ -133,11 +135,15 @@ export class SkyView {
    * The sun's shadow map is drawn every this many frames (and at once after a jump): drawing it took about 7 ms of
    * a town frame on the reference machine (every caster drawn again). A shadow a frame or two late does not show.
    * Every third frame: about 1.5-2 ms off a town frame at dusk and in rain against every second (gate G); at 90 fps
-   * a running hero's shadow is then at most 0.1 m behind.
+   * a running hero's shadow is then at most 0.1 m behind. Riding at a gallop (12 m/s) it fell 0.3 m behind and
+   * caught up in steps, a judder at the hero's feet: once the hero has gone SHADOW_LAG since the map was drawn, it is
+   * drawn again at once (every frame at a gallop, every second at a run; townsfolk walk too slowly to show it).
    */
   shadowEvery = 3;
   private shadowFrame = 0;
   private readonly shadowAt = { x: Infinity, z: Infinity };
+  /** Where the camera (following the hero; unsnapped) was when the map was last drawn. */
+  private readonly shadowFocus = { x: Infinity, z: Infinity };
   private shadowSteps = -1;
 
   constructor(
@@ -333,9 +339,11 @@ export class SkyView {
     // A step of the floating origin moves the scene under the map's old box: drawn again at once too.
     const jumped = Math.hypot(fx - this.shadowAt.x, fz - this.shadowAt.z) > SHADOW_JUMP || ORIGIN.steps !== this.shadowSteps;
     this.shadowSteps = ORIGIN.steps;
-    if (jumped || ++this.shadowFrame >= this.shadowEvery) {
+    const lagging = Math.hypot(focus.x - this.shadowFocus.x, focus.z - this.shadowFocus.z) > SHADOW_LAG;
+    if (jumped || lagging || ++this.shadowFrame >= this.shadowEvery) {
       this.shadowFrame = 0;
       this.shadowAt.x = fx; this.shadowAt.z = fz;
+      this.shadowFocus.x = focus.x; this.shadowFocus.z = focus.z;
       this.sun.shadow.needsUpdate = true;
     }
 
