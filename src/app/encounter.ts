@@ -161,6 +161,16 @@ export class Encounter {
     return { recipes: this.fight.recipes, offset: { x: O.x, y: O.y, z: O.z }, me, yaw: me.yaw, cues: this.spellCues.splice(0) };
   }
 
+  /**
+   * Does a walker of radius `r` at (x, z) in the world, feet at `y`, press into one of its living bodies (those
+   * shown)? One it already touches where it stands, (ax, az), lets it go.
+   */
+  pressedBy(x: number, z: number, r: number, y: number, ax: number, az: number): boolean {
+    if (this.retired || !this.arena.shown) return false;
+    const O = this.creatures.group.position;
+    return this.delve.den.pressedBy(x - O.x, y - O.y, z - O.z, r, ax - O.x, az - O.z);
+  }
+
   /** It owns the keys and the HUD now (the one playing). */
   get leading(): boolean { return this.active; }
 
@@ -376,12 +386,14 @@ export function stepEncounters(dt: number, all: readonly Encounter[], calm: { re
   // A bird in the hero's place (bird form) is nothing the dwellers fight: every encounter rests meanwhile.
   const flown = !!calm.player.shape?.aloft;
   for (const e of all) if (!flown && e.stir >= 0 && (!best || e.stir > best.stir)) best = e;
+  // Out on the land, the bodies of different groups block each other too (cellars have frames of their own).
   const open: Den[] = [];
+  for (const e of all) if (!flown && e.stir >= 0 && !e.arena.enclosed) open.push(e.delve.den);
+  for (const d of open) d.neighbours = open.filter((o) => o !== d);
   for (const e of all) {
-    if (flown || e.stir < 0) e.rest();
-    else { e.play(dt, e === best); if (!e.arena.enclosed) open.push(e.delve.den); }
+    if (flown || e.stir < 0) { e.rest(); e.delve.den.neighbours = []; }
+    else e.play(dt, e === best);
   }
-  // Out on the land, the bodies of different groups keep apart too (cellars have frames of their own).
   keepApart(open);
   if (best) return;
   // Out of a fight: no fighting stance, but a spell's hands (or any action) play out.

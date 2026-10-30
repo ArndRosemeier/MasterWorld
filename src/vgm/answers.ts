@@ -158,7 +158,8 @@ function wayside(c: NeedContext, r: Rng, apart: readonly { readonly x: number; r
   for (let k = 0; k < 40; k++) {
     // On the way while it can be; later tries swing wider round the hero.
     const a = way + (k < 20 ? 0 : r.range(-1, 1) * Math.min(Math.PI, (k - 19) * 0.2));
-    const d = Math.min(far, (k < 20 ? clear : 0) + r.range(AHEAD[0], AHEAD[1]));
+    // Past the town's fields either way (the wider tries too: in the fields nothing fits).
+    const d = Math.min(far, clear + r.range(AHEAD[0], AHEAD[1]));
     if (d < AHEAD[0] * 0.6) continue;
     const side = r.range(ASIDE[0], ASIDE[1]) * (r.chance(0.5) ? 1 : -1);
     const x = c.hero.x + Math.cos(a) * d - Math.sin(a) * side, z = c.hero.z + Math.sin(a) * d + Math.cos(a) * side, h = t.height(x, z);

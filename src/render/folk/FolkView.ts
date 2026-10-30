@@ -10,7 +10,7 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import { BENCH_SEAT } from '@futuremagic/settlement';
-import type { Agent, TownLife } from '../../sim/townLife';
+import { waitsInWay, type Agent, type TownLife } from '../../sim/townLife';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
@@ -352,7 +352,7 @@ export class FolkView {
       o.position.set(st.x, st.y, st.z);
       o.rotation.y = st.yaw;
       this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
-      const act = s.held.pick(dt, p ? p.act : a.act);
+      const act = s.held.pick(dt, p ? p.act : waitsInWay(a) ? 'wait' : a.act);
       const own = s.rep.play(dt, act) ?? clipOf(act, a.person.id, !!a.held);
       const clip = p?.puppet?.clip ?? (own === 'walk' ? s.gait : own);
       if (clip !== s.clip) {
