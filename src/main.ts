@@ -92,6 +92,7 @@ import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
+import { ShipsView } from './render/ships';
 import type { Township } from './game/township';
 import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
@@ -468,6 +469,8 @@ export async function start(b: Boot): Promise<void> {
     // between its grass, rocks and plants: 'Raising the land' waited on them).
     const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
+    // The harbours' ships and boats, riding the swell and out fishing by day (S2).
+    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z) });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
     compileEarly([sea.mesh]);
@@ -2233,6 +2236,7 @@ export async function start(b: Boot): Promise<void> {
       if (above) {
         part('sea');
         sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
+        ships.float(view.camera.position, hours(), dt);
         part('ground');
         ground.update(view.camera);
         part('roads+horizon');

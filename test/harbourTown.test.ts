@@ -5,6 +5,7 @@ import { settlementOf } from '../src/world/decisions';
 import { townsfolk } from '../src/sim/people';
 import { townSpots } from '../src/sim/spots';
 import { nearestCoast } from '../src/world/coast';
+import { afloatAt, fleetOf } from '../src/world/fleet';
 import { frontierLand } from './frontierLand';
 
 const { first, home, regions, seed, terrain } = frontierLand();
@@ -32,6 +33,19 @@ test('harbour town: opened by a river mouth, with its quay, piers, berths and ha
   for (const trade of ['harbourmaster']) assert.ok(folk.some((p) => p.trade === trade && p.role === 'trade'), `no ${trade}`);
   const spots = townSpots(plan);
   assert.ok(spots.some((s) => s.activity === 'haul'), 'a crane to work');
+  // Its fleet (S2): every vessel at its mooring at night; the fishing boats out at sea by mid-morning, sails set or
+  // lying at their grounds, and home again by evening. Where each is follows from the seed and the hour alone.
+  const water = terrain.waterDepth.bind(terrain), fleet = fleetOf(h, t.seed ?? seed, water);
+  const boats = fleet.filter((v) => v.trip);
+  assert.ok(boats.length >= 1, 'fishing boats');
+  for (const v of fleet) { const a = afloatAt(v, 26); assert.deepEqual([a.x, a.z, a.sailing], [v.mooring.x, v.mooring.z, false], 'moored at 2 at night'); }
+  for (const v of boats) {
+    const a = afloatAt(v, 24 + 10);
+    assert.ok(Math.hypot(a.x - v.mooring.x, a.z - v.mooring.z) > 200 && water(a.x, a.z) > 2, 'out at sea at 10');
+    assert.deepEqual(afloatAt(v, 24 * 3 + 21), afloatAt(v, 21), 'home at 21, each day alike');
+    assert.equal(afloatAt(v, 21).x, v.mooring.x);
+  }
+  assert.deepEqual(fleetOf(h, t.seed ?? seed, water), fleet, 'the same fleet from the same seed');
 });
 
 test('coast: a beach, a sea cliff and the bed off the beach near the start, each facing the sea (S1)', () => {
