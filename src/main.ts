@@ -111,6 +111,7 @@ import { HandOverScene } from './app/handOverScene';
 import { MapSheet } from './render/hero/MapSheet';
 import { HOME_SIGHT, KnownLand } from './game/knownLand';
 import { Minimap, type SkyGlyph } from './app/minimap';
+import { belowRange, paintBelow } from './app/dungeonSheet';
 import { fill } from './talk/folk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
@@ -1292,9 +1293,15 @@ export async function start(b: Boot): Promise<void> {
       signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) }))),
     }) : null;
     // The minimap at the top (plan 17.1, G4): the known land round the hero on the map's own parchment, turning
-    // with the camera and always true; the townsfolk near as dots (below ground: the land above, at its door).
+    // with the camera and always true; the townsfolk near as dots. Below ground: the dungeon's own plan, as far
+    // as the hero has seen it (app/dungeonSheet.ts).
     const minimap = new Minimap(map ? (canvas, x, z, across) => {
-      const t = visit() ? null : here(), r = across / 2;
+      const v = visit();
+      if (v) {
+        const O = v.origin;
+        return paintBelow(canvas, { space: v.space, seen: v.seen, carved: !!v.cellar.form.space.carved, exit: v.cellar.hatch }, x - O.x, z - O.z, v.space.levelAt(player.walker.pos.y - O.y), across);
+      }
+      const t = here(), r = across / 2;
       const dots = (t?.life.agents ?? []).filter((a) => !a.hidden && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);
       return map.paintAround(canvas, x, z, across, dots);
     } : null);
@@ -1983,9 +1990,17 @@ export async function start(b: Boot): Promise<void> {
       if (!visit() && (!seenAt || Math.hypot(at.x - seenAt[0], at.z - seenAt[1]) > 16)) { seenAt = [at.x, at.z]; known.see(at.x, at.z); }
       for (const l of journal.open) if (!known.told(l.id)) known.tell(l.id, rooms?.outside ? [rooms.outside.x, rooms.outside.z] : [at.x, at.z], [l.mark.x, l.mark.z]);
       if (minimap.showWhile(!title?.holding && !creator?.showing && !!window.__mwReady)) {
-        const look = player.flying ? player.fly.yaw : player.heroCam.yaw, me = heroAt(player.walker.yaw);
-        minimap.read({ x: me.x, z: me.z, look, yaw: me.yaw, hour: view.sky.hour, sky: skyGlyph(), marks: journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })) });
-        minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark);
+        const look = player.flying ? player.fly.yaw : player.heroCam.yaw, me = heroAt(player.walker.yaw), v = visit(), w = player.walker;
+        const marks = journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })), sky = skyGlyph();
+        if (v) {
+          // Below ground the round is the dungeon round the hero; the land's marks ride the rim from its door.
+          const lv = v.space.levelAt(w.pos.y - v.origin.y), range = belowRange(v.space, !!v.cellar.form.space.carved);
+          minimap.read({ x: w.pos.x, z: w.pos.z, look, yaw: w.yaw, hour: view.sky.hour, sky, marks, below: { sheet: `${v.origin.x},${v.origin.z}:${lv}:${v.seen.version}`, range, from: me } });
+          minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark, 0);
+        } else {
+          minimap.read({ x: me.x, z: me.z, look, yaw: me.yaw, hour: view.sky.hour, sky, marks });
+          minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark);
+        }
       }
       part('vgm direct');
       direct(dt);
