@@ -733,6 +733,8 @@ export async function start(b: Boot): Promise<void> {
     let portals: Portals | null = null;
     /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts throatDepth). */
     let throatLamp = false;
+    /** The portals' HUD line (empty away from them). */
+    let portalHud = '';
     const portalsDue: Portal[] = [];
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
@@ -1983,6 +1985,8 @@ export async function start(b: Boot): Promise<void> {
         const camDeep = seen === 'land' ? cellars?.throatDepth(view.camera.position.x, view.camera.position.z) ?? 0 : 1;
         view.sky.eye = seen === heroIn && (seen !== 'land' || camDeep === 0) ? null : { dark: camDeep };
         view.sky.shadowFocus = seen === 'land' ? null : through.landSide(view.camera.position);
+        // For the HUD (checks): near a portal, the realms of the hero and the camera and the throat's light.
+        portalHud = through.portals.length ? `\nportals ${through.portals.length} · hero ${heroIn} · camera ${seen} · in ${deep.toFixed(2)}/${camDeep.toFixed(2)} · lamp ${view.lantern.intensity.toFixed(1)} · exposure ${view.renderer.toneMappingExposure.toFixed(2)} · through ${through.passed}` : '';
       }
       creator?.orbit(dt);
       part('cellars+wild');
@@ -2199,7 +2203,7 @@ export async function start(b: Boot): Promise<void> {
       part('hud+ready');
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · seed ${seedText} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${towns.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
+        hud.textContent = `${view.backend} · seed ${seedText} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${portalHud}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${towns.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }
