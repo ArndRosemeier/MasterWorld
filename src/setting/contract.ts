@@ -593,6 +593,8 @@ export interface RegionFillDef {
   readonly ring?: readonly [number, number?];
   /** Places of this fill keep at least this far apart, metres. */
   readonly apart?: number;
+  /** A harbour town (phase D, S2): the settlement stands where a river meets the sea, with a quay and piers. */
+  readonly harbour?: boolean;
 }
 
 /** The regions the VGM opens as the hero walks (plan 5.5): the fills, which is plain country, and the start's. */

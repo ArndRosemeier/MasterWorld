@@ -9,6 +9,7 @@ import { warmKinds } from './materials';
 import { WarmLights } from './warmLights';
 import './materials/flame';
 import { ORIGIN } from './origin';
+import { waterVeil } from './underwater';
 
 export interface View {
   readonly renderer: WebGPURenderer;
@@ -71,7 +72,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const sky = new SkyView(renderer, scene, sun, hemi, { ...opts, exposure: (opts.tone ?? 'graded') === 'aces' ? 1 : (opts.tone ?? 'graded') === 'agx' ? 1.5 : 1.6 });
   // Bloom: a soft glow round the sun, lit windows and fire. Its threshold follows the exposure (frame()).
   // Ambient occlusion: contact shade in corners, under eaves, round feet and stones.
-  const post = opts.post === false ? null : createPost(renderer, scene, drawn, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth });
+  const post = opts.post === false ? null : createPost(renderer, scene, drawn, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth, veil: waterVeil });
   const draw = (hooks?: PostHooks): void => {
     ORIGIN.view(camera, drawn);
     if (!post) { renderer.render(scene, drawn); return; }
