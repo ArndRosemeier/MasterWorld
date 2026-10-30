@@ -44,6 +44,32 @@ if (process.env.HITCH_UNBOX === '1') console.log(`--- unboxed matrices: ${await 
   window.game.view.scene.traverse((o) => { fresh(o.matrix); fresh(o.matrixWorld); for (const b of o.skeleton?.bones ?? []) { fresh(b.matrix); fresh(b.matrixWorld); } });
   return n;
 })}`);
+// HITCH_REVERT=1 (with HITCH_ELEMENTS=1): unboxed as above, then after one frame and after a second, which objects'
+// matrices are boxed again, and any matrix number or position, scale or turn that is not a number at all.
+if (process.env.HITCH_REVERT === '1') console.log(`--- boxed again:\n${await page.evaluate(async () => {
+  const kind = new Function('a', 'return %HasDoubleElements(a) ? "double" : %HasSmiElements(a) ? "smi" : %HasObjectElements(a) ? "object" : "other"');
+  const fresh = (m) => { const e = m.elements, a = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; for (let i = 0; i < 16; i++) a[i] = e[i]; m.elements = a; };
+  const name = (o) => { const n = []; for (let p = o; p && n.length < 4; p = p.parent) n.push(p.name || p.type); return n.join('<'); };
+  const look = (when) => {
+    const boxed = new Map(), odd = [];
+    window.game.view.scene.traverse((o) => {
+      for (const [k, m] of [['matrix', o.matrix], ['matrixWorld', o.matrixWorld]]) {
+        if (kind(m.elements) !== 'double') { const key = `${k} ${name(o)}${o.matrixAutoUpdate ? '' : ' (no auto)'}`; boxed.set(key, (boxed.get(key) ?? 0) + 1); }
+        m.elements.forEach((v, i) => { if (typeof v !== 'number' && odd.length < 20) odd.push(`${k}[${i}]=${typeof v} ${String(v)} on ${name(o)}`); });
+      }
+      for (const [k, v] of [['position', o.position], ['scale', o.scale]]) for (const c of ['x', 'y', 'z']) if (typeof v[c] !== 'number' && odd.length < 40) odd.push(`${k}.${c}=${typeof v[c]} ${String(v[c])} on ${name(o)}`);
+      for (const c of ['_x', '_y', '_z', '_w']) if (typeof o.quaternion[c] !== 'number' && odd.length < 60) odd.push(`quaternion.${c}=${typeof o.quaternion[c]} on ${name(o)}`);
+    });
+    const top = [...boxed].sort((a, b) => b[1] - a[1]).slice(0, 30).map(([k, n]) => `    ${n}x ${k}`).join('\n');
+    return `  ${when}: ${[...boxed.values()].reduce((a, b) => a + b, 0)} boxed\n${top}${odd.length ? `\n  not numbers:\n    ${odd.join('\n    ')}` : ''}`;
+  };
+  window.game.view.scene.traverse((o) => { fresh(o.matrix); fresh(o.matrixWorld); });
+  const a = look('right after');
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const b = look('after a frame');
+  await new Promise((r) => setTimeout(r, 1000));
+  return `${a}\n${b}\n${look('after a second')}`;
+})}`);
 // HITCH_KEYS=1: who has three work out their material's cache key again (a material's version bumped, the lights changed),
 // counted by object and material during the fight.
 if (process.env.HITCH_KEYS === '1') await page.evaluate(() => {
