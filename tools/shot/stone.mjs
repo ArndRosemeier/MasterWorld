@@ -50,6 +50,19 @@ const move = (ahead, side, turn = 0) => page.evaluate(([ahead, side, turn]) => {
   const p = window.game.player, w = p.walker, fx = -Math.sin(w.yaw), fz = -Math.cos(w.yaw);
   p.teleport(w.pos.x + fx * ahead - fz * side, undefined, w.pos.z + fz * ahead + fx * side, w.yaw + turn);
 }, [ahead, side, turn]);
+/**
+ * Stand where a portal has room, `near`..`far` m ahead (and up to 12 m to either side), facing `turn` rad from
+ * the hero's way: also with room 4 m back (the camera's place behind the hero). False if none is found.
+ */
+const standClear = (near, far, turn = 0) => page.evaluate(([near, far, turn]) => {
+  const g = window.game, p = g.player, w = p.walker, yaw = w.yaw + turn, fx = -Math.sin(w.yaw), fz = -Math.cos(w.yaw);
+  for (let d = near; d <= far; d += 3) for (const side of [0, 4, -4, 8, -8, 12, -12]) {
+    const x = w.pos.x + fx * d - fz * side, z = w.pos.z + fz * d + fx * side, y = g.terrain.height(x, z);
+    const bx = x + Math.sin(yaw) * 4, bz = z + Math.cos(yaw) * 4;
+    if (g.stone.wouldOpen({ x, y, z }, yaw) && g.stone.wouldOpen({ x: bx, y: g.terrain.height(bx, bz), z: bz }, yaw)) { p.teleport(x, undefined, z, yaw); return true; }
+  }
+  return false;
+}, [near, far, turn]);
 /** Click a glyph where it is on the screen. */
 const press = async (glyph) => {
   const at = await page.evaluate((g) => window.game.stone.glyphOnScreen(g), glyph);
@@ -88,7 +101,7 @@ if (s1.raised) fail('the stone stayed up after the glyph');
 if (s1.counts.home !== 1 || !s1.home) fail(`home not marked (${JSON.stringify(s1.counts)})`);
 // Away from home: turn round, go 30 m off, open a portal there (it leads home).
 await move(-6, 0, Math.PI);
-await move(24, 0, 0);
+if (!(await standClear(18, 60))) fail('no spot with room for a portal 24-66 m from home');
 await page.waitForTimeout(2500);
 await raise(false);
 await press(2);
@@ -128,7 +141,7 @@ await page.waitForTimeout(1200);
 const s4 = await state();
 if (s4.counts.fizzled < 1) fail('opening by home did not fizzle');
 // Elsewhere: the old far portal closes, home leads to the new one.
-await move(0, 20, Math.PI / 2);
+if (!(await standClear(15, 50, Math.PI / 2))) fail('no second spot with room for a portal');
 await page.waitForTimeout(2000);
 await raise(false);
 await press(2);

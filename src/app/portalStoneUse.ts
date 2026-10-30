@@ -167,6 +167,12 @@ export class PortalStoneUse {
     return best;
   }
 
+  /** Would a portal open for a hero standing at `feet` facing `yaw` (checks and shots look for a spot with room)? */
+  wouldOpen(feet: { x: number; y: number; z: number }, yaw: number): boolean {
+    const f = beyondFrame(stoneSpot(feet, yaw), yaw, (x, z) => this.host.probe.standFloor(x, z));
+    return this.host.onLand() && this.stone.canOpen(f, this.host.probe);
+  }
+
   /** The first glyph: a beam down to the floor under the stone, which becomes home. */
   private markHome(): void {
     const foot: Vec3 = [this.at.x, this.at.y - STONE_SIZE.y * SHOWN, this.at.z];
