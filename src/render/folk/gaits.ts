@@ -1,7 +1,7 @@
 /**
  * How the townsfolk walk (Arnd 2026-10-30: more walking styles). Besides the pack's own walk, loops cut out of the
  * CMU motion-capture takes in the Actors pack (`npm run packs`: tools/packs/actors.mjs with tools/packs/cutLoop.mjs):
- * the old shuffle or stoop, a heavy tread, an upright stride, a stroll, a child's quick step. `GAIT_CUTS` is what the
+ * the old shuffle or hobble, a heavy tread, an upright stride, a stroll, a child's quick step. `GAIT_CUTS` is what the
  * pack step cuts: keep each entry on one line with plain quoted `clip` and `take`. `pace` is the ground speed (m/s)
  * the loop shows at its own speed, as the pack step measures it (it says when one is off).
  */
@@ -19,9 +19,8 @@ export interface GaitCut {
 }
 
 export const GAIT_CUTS: readonly GaitCut[] = [
-  { clip: 'walk old', take: 'cmu 105_21', pace: 0.68 },
+  { clip: 'walk old', take: 'cmu 105_21', pace: 0.69 },
   { clip: 'walk hobble', take: 'cmu 17_05', pace: 0.98 },
-  { clip: 'walk stooped', take: 'cmu 136_01', pace: 1.33 },
   { clip: 'walk heavy', take: 'cmu 17_08', pace: 0.88 },
   { clip: 'walk proud', take: 'cmu 82_09', pace: 1.25 },
   { clip: 'walk stroll', take: 'cmu 104_35', pace: 1.23 },
@@ -36,7 +35,7 @@ export const GAIT_CLIPS = GAIT_CUTS.map((g) => g.clip);
 export const GAIT_PACE: Readonly<Record<string, number>> = { walk: PACE.walk, ...Object.fromEntries(GAIT_CUTS.map((g) => [g.clip, g.pace])) };
 
 /** Who walks which ways (each person one of them, from their seed). */
-const OLD = ['walk old', 'walk hobble', 'walk stooped'];
+const OLD = ['walk old', 'walk hobble'];
 const CHILD = ['walk quick', 'walk'];
 const UPRIGHT = ['walk proud', 'walk easy'];
 const HEAVY = ['walk heavy', 'walk'];

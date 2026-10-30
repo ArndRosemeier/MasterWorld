@@ -14,7 +14,7 @@ test('gaits: the town walks many ways; the old like the old, children quick, eac
     assert.ok(GAIT_PACE[g], `${g} has a pace`);
     assert.equal(gaitOf(p), g);
     if (p.role === 'child') assert.ok(['walk quick', 'walk'].includes(g), g);
-    else if (p.race !== 'elf' && p.age >= OLD_AGE) assert.ok(['walk old', 'walk hobble', 'walk stooped'].includes(g), `${p.age}: ${g}`);
+    else if (p.race !== 'elf' && p.age >= OLD_AGE) assert.ok(['walk old', 'walk hobble'].includes(g), `${p.age}: ${g}`);
   }
   // The old walk slower than the rest.
   const old = folk.filter((p) => p.role !== 'child' && p.race !== 'elf' && p.age >= OLD_AGE), young = folk.filter((p) => p.role !== 'child' && p.age < OLD_AGE);
