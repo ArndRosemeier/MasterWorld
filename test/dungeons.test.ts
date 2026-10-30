@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { deriveSeed } from '@futuremagic/core';
 import { nextSetPiece } from '../src/vgm/dungeons';
 import { setPiecesFor } from '../src/world/dungeon/setPieces';
+import { startWorld } from './frontierLand';
 
 const SET_PIECES = setPiecesFor('cellar');
 
@@ -18,12 +19,10 @@ test('vgm: no set piece repeats until the library has been used through', () => 
 test('vgm: dungeonFor gives a place of a kind for the purpose, with the dwellers asked for', async () => {
   const { parseSeed } = await import('@futuremagic/core');
   const { classic } = await import('../src/setting/classic/index');
-  const { openWorld } = await import('../src/vgm/builder');
   const { dungeonFor, loreOf, placeOf } = await import('../src/vgm/dungeons');
   const { sketchCellar } = await import('../src/world/dungeon/cellar');
-  const { SMALL } = await import('./small');
   const seed = parseSeed('masterworld');
-  const { terrain, log, home } = openWorld(seed, classic, SMALL);
+  const { terrain, log, home } = startWorld();
   const town = terrain.towns[0];
   const c = { seed, terrain, log, home, dungeons: classic.dungeons };
   const d = dungeonFor({ purpose: 'hideout', town, dwellers: 'highwaymen', kinds: ['hideout'] }, c)!;
@@ -43,13 +42,11 @@ test('vgm: dungeonFor gives a place of a kind for the purpose, with the dwellers
 test('vgm: a retake changes who lives in a place and keeps its layout', async () => {
   const { parseSeed } = await import('@futuremagic/core');
   const { classic } = await import('../src/setting/classic/index');
-  const { openWorld } = await import('../src/vgm/builder');
   const { dungeonFor, loreOf, placeOf, retakeOf } = await import('../src/vgm/dungeons');
   const { dwellersOf } = await import('../src/vgm/leads');
   const { moveIn, outlineCellar, sketchCellar } = await import('../src/world/dungeon/cellar');
-  const { SMALL } = await import('./small');
   const seed = parseSeed('masterworld');
-  const { terrain, log, home } = openWorld(seed, classic, SMALL);
+  const { terrain, log, home } = startWorld();
   const d = dungeonFor({ purpose: 'hideout', town: terrain.towns[0], dwellers: 'smugglers', kinds: ['hideout'] }, { seed, terrain, log, home, dungeons: classic.dungeons })!;
   const lore = loreOf(classic, d.template), house = placeOf(d, terrain.towns, classic.dungeons)!;
   const withD = [...log, d];

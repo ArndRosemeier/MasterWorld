@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { caveFor } from '../src/vgm/caves';
 import { dungeonFor, loreOf, placeOf } from '../src/vgm/dungeons';
 import { answerNeed } from '../src/vgm/toolbox';
@@ -10,11 +9,11 @@ import { siteInCliff } from '../src/world/dungeon/caveMouth';
 import { isEmpty, outlineCellar, sketchCellar } from '../src/world/dungeon/cellar';
 import { caveGlows, caveSeed, torchSpots } from '../src/world/dungeon/torches';
 import { caveFeatures } from '../src/world/dungeon/caveFeatures';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 test('cave tool: Discovery overdue near a cliff opens a cave in it, one at a time', () => {
   const seed = parseSeed('masterworld');
-  const { terrain, log, home } = openWorld(seed, classic, SMALL);
+  const { terrain, log, home } = startWorld();
   const town = terrain.towns[0], height = (x: number, z: number) => terrain.height(x, z);
   // A cliff near the town (the way the Builder finds one), and the hero out on the land before it.
   const cliff = dungeonFor({ purpose: 'lead', town, kinds: ['cave'] }, { seed, terrain, log: [], home, dungeons: classic.dungeons });
@@ -36,7 +35,7 @@ test('cave tool: Discovery overdue near a cliff opens a cave in it, one at a tim
 
 test('caves: a share stand empty, sights with nobody in them; asked-for dwellers are always there', () => {
   const seed = parseSeed('masterworld');
-  const { terrain, home } = openWorld(seed, classic, SMALL);
+  const { terrain, home } = startWorld();
   const town = terrain.towns[0], lore = loreOf(classic, 'cave');
   const base = dungeonFor({ purpose: 'lead', town, kinds: ['cave'] }, { seed, terrain, log: [], home, dungeons: classic.dungeons })!;
   const place = placeOf(base, terrain.towns, classic.dungeons)!;

@@ -2,17 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { keepPromise, nextPromise, openPromises } from '../src/vgm/leads';
 import { eventTold, gatherFor, nextEvent, openBands, openEvents, takenFrom } from '../src/vgm/events';
 import { Wilds } from '../src/sim/wild';
 import { territoryOf, wildFor } from '../src/vgm/wild';
 import { Herds } from '../src/sim/livestock';
 import type { Decision } from '../src/world/decisions';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 const seed = parseSeed('masterworld');
-const { terrain, log: first, home } = openWorld(seed, classic, SMALL);
+const { terrain, log: first, home } = startWorld();
 const towns = terrain.towns;
 const after = classic.events![0].after;
 

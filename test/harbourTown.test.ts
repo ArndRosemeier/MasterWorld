@@ -8,7 +8,7 @@ import { nearestCoast } from '../src/world/coast';
 import { afloatAt, fleetOf } from '../src/world/fleet';
 import { frontierLand } from './frontierLand';
 
-const { first, home, regions, seed, terrain } = frontierLand();
+const { first, home, regions, seed, terrain } = frontierLand({ own: true });
 
 /** S2: where a river meets the sea, the VGM opens a harbour town; it replays from the log. */
 test('harbour town: opened by a river mouth, with its quay, piers, berths and harbour folk', () => {

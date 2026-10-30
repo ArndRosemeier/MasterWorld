@@ -1,17 +1,15 @@
 import { townsfolk } from '../src/sim/people';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSeed } from '@futuremagic/core';
 import { pointInPoly, polyCentroid } from '@futuremagic/settlement';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { TOWN_RASTER, TownGround, type Town } from '../src/world/town';
 import { inWindow, maskWindow, townMaskData } from '../src/world/townMask';
 import { floraPlacement, FLORA_STRIDE } from '../src/world/flora';
 import { Walker, type WalkWorld } from '../src/game/walker';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
-const { terrain, log, home } = openWorld(parseSeed('masterworld'), classic, SMALL);
+const { terrain, log, home } = startWorld();
 
 test('town: the VGM founds the start town near the start, on dry land, clear of the arch', () => {
   const d = log.find((x) => x.kind === 'town');
