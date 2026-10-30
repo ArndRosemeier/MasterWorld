@@ -44,10 +44,6 @@
     "reason": "Each set piece is a data entry with its own find/dress method (plan 8.1: a library of hand-designed moments); the methods share a name and a shape by design, the content differs."
   },
   {
-    "key": "same name: masterworld/render/folk/FolkView.ts#dress + masterworld/world/dungeon/setPieces.ts#dress",
-    "reason": "Dressing townsfolk in clothes vs dressing a dungeon room with a set piece's props; only the word matches."
-  },
-  {
     "key": "same name: masterworld/render/hero/HeroView.ts#dress + masterworld/world/dungeon/setPieces.ts#dress",
     "reason": "Dressing the hero in clothes vs dressing a dungeon room with a set piece's props; only the word matches."
   },
@@ -486,10 +482,6 @@
   {
     "key": "idiom: [.seed .terrain] in masterworld/app/regionSites.ts + masterworld/vgm/caves.ts + masterworld/vgm/events.ts",
     "reason": "Reading the world's seed and terrain off a context object is how every VGM tool starts, not a copied helper; the cave tool (L6) was the third."
-  },
-  {
-    "key": "idiom: [.weighted] in masterworld/app/title/draw.ts + masterworld/vgm/answers.ts + masterworld/world/landforms.ts",
-    "reason": "The seeded weighted pick (@futuremagic/core) in three unrelated choices: the title's scenery, the VGM's answer to a need, and a cell's landform. The pick is shared; the choices are not."
   },
   {
     "key": "idiom: [.some .towns] in masterworld/game/horse.ts + masterworld/vgm/answers.ts + masterworld/vgm/roads.ts",
