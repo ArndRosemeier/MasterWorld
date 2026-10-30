@@ -270,6 +270,15 @@ export class Towns {
     return false;
   }
 
+  private readonly landHeight = (x: number, z: number): number => this.h.terrain.height(x, z);
+
+  /** How far (x, y, z) is from a fixture's part in the eye's way (a stall's awning, a well's roof), null with none near: for the camera. */
+  fixtureSight(x: number, y: number, z: number): number | null {
+    let d = Infinity;
+    for (const t of this.near(x, z, 3)) d = Math.min(d, t.town.fixtureSightAt(x, y, z, this.landHeight) ?? Infinity);
+    return d === Infinity ? null : d;
+  }
+
   /** Is a body of radius `r` at (x, z), coming from (ax, az), stepping into somebody out in a town? */
   touches(x: number, z: number, r: number, ax: number, az: number): boolean {
     for (const t of this.near(x, z, r + 1)) if (t.living && t.life.touches(x, z, r, ax, az)) return true;
