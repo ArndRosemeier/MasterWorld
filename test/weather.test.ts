@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { Skeleton } from '../src/world/skeleton';
-import { PRESETS, Weather, calm, type Climate, lightning, orderWeight, prevailingWind, type WeatherState } from '../src/world/weather';
+import { PRESETS, Weather, calm, freshSnow, type Climate, lightning, orderWeight, prevailingWind, type WeatherState } from '../src/world/weather';
 
 const seed = parseSeed('masterworld');
 const temperate = () => ({ temperature: 11, moisture: 0.5 });
@@ -119,4 +119,19 @@ test('lightning: only in storms, deterministic, brief', () => {
     if (f.light > 0.2) lit++;
   }
   assert.ok(lit > 5 && lit / n < 0.03, `${lit} of ${n} moments lit`);
+});
+
+test('weather: fresh snow follows each spot\'s height, so a snowy peak does not snow in the valley below', () => {
+  // A cold front over mountains: -6 °C at the 2000 m peak, so about +7 °C at sea level.
+  const w = weather(() => ({ temperature: -6, moisture: 0.6, elevation: 2000 }));
+  w.order({ kind: 'rain', from: 10, to: 20, ramp: 0.5 });
+  const s = w.state(0, 0, 15);
+  assert.ok(s.lying > 0.5, 'snow lies on the peak');
+  assert.ok(freshSnow(s, 2000) > 0.5, 'the peak is drawn snowed in');
+  assert.ok(freshSnow(s, 200) < 0.01, 'the valley 1800 m below stays green');
+  assert.ok(s.snowLine > 200 && s.snowLine < 2000, `the snow line lies between (${s.snowLine.toFixed(0)} m)`);
+  // A snow order makes it snow at every height.
+  const v = weather(() => ({ temperature: 11, moisture: 0.5 }));
+  v.order({ kind: 'snow', from: 10, to: 20, ramp: 0.5 });
+  assert.ok(freshSnow(v.state(0, 0, 15), 0) > 0.5, 'ordered snow lies in the lowlands too');
 });

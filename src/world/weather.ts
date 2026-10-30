@@ -14,6 +14,7 @@
  */
 import { Noise, clamp, deriveSeed, hash2f, lerp, smoothstep, Rng } from '@futuremagic/core';
 import type { WeatherDef } from '../setting/contract';
+import { LAPSE } from './skeleton';
 
 export interface WeatherState {
   /** Cloud cover 0..1. */
@@ -42,13 +43,21 @@ export interface WeatherState {
   wet: number;
   /** Snow lying on the ground 0..1: from recent snowfall, melting over hours. */
   lying: number;
+  /**
+   * Fresh snow by height, for drawing the land far below or above this spot: up to `snowCover` (0..1) lies
+   * where it is cold enough, half of it at `snowLine` (m), and the share runs from none to all over
+   * 2 * SNOW_BAND around it. The air is colder up high (LAPSE), so a peak can be snowed in while the
+   * valley it looks down on is green.
+   */
+  snowCover: number;
+  snowLine: number;
 }
 
 /** The kinds of weather the VGM can order (and a URL can ask for). */
 export const WEATHER_KINDS = ['clear', 'fair', 'overcast', 'rain', 'storm', 'fog', 'snow'] as const;
 export type WeatherKind = (typeof WEATHER_KINDS)[number];
 
-type Preset = Omit<WeatherState, 'windDir' | 'wet' | 'lying' | 'snow'> & { snow?: number };
+type Preset = Omit<WeatherState, 'windDir' | 'wet' | 'lying' | 'snow' | 'snowCover' | 'snowLine'> & { snow?: number };
 
 /** What each kind looks like at its height. Snow follows the temperature unless a kind sets it. */
 export const PRESETS: Readonly<Record<WeatherKind, Readonly<Preset>>> = {
@@ -74,8 +83,22 @@ export interface WeatherOrder {
   readonly strength?: number;
 }
 
-/** The climate at a place: what the skeleton says (mean annual temperature °C, moisture 0..1). */
-export interface Climate { temperature: number; moisture: number }
+/**
+ * The climate at a place: what the skeleton says (mean annual temperature °C, moisture 0..1), and the
+ * height (m) the temperature is for (absent: sea level).
+ */
+export interface Climate { temperature: number; moisture: number; elevation?: number }
+
+/** Half the height band (m) over which falling snow turns from none to all: 1.25 °C of air either side. */
+export const SNOW_BAND = 1.25 / LAPSE;
+/** The snow line when no snow lies anywhere (m): above every peak. */
+const NO_SNOW_LINE = 9000;
+
+/**
+ * One moment of the ground's memory, for the snow by height: how much it fell (0..1, faded by age), the
+ * air's temperature at sea level then (°C) and how the VGM's orders bent the snow share (share * a + b).
+ */
+interface SnowFit { fell: number; t: number; a: number; b: number }
 
 /** Hours of past rain that wet ground remembers, and the step between the samples. */
 const MEMORY = 6, MEMORY_STEP = 0.5;
@@ -89,6 +112,7 @@ export class Weather {
   readonly prevailing: number;
   private readonly orders: WeatherOrder[] = [];
   private readonly climates = new Map<string, Climate>();
+  private readonly fits: SnowFit[] = Array.from({ length: MEMORY / MEMORY_STEP + 1 }, () => ({ fell: 0, t: 0, a: 1, b: 0 }));
 
   constructor(readonly seed: number, readonly def: WeatherDef, private readonly climateAt: (x: number, z: number) => Climate) {
     this.air = new Noise(deriveSeed(seed, 'weather', 'air'));
@@ -121,33 +145,43 @@ export class Weather {
 
   /** The weather at world (x, z) at `hours` (absolute game time: day * 24 + hour of the day). */
   state(x: number, z: number, hours: number, out: WeatherState = calm()): WeatherState {
-    this.now(x, z, hours, out);
+    const fits = this.fits;
+    this.now(x, z, hours, out, fits[0]);
+    fits[0].fell = Math.min(1, out.rain * 2);
     // Wet ground: the strongest recent rain, fading as it dries (snow lies dry here).
     let wet = out.rain * (1 - out.snow), lying = out.rain * out.snow;
     const s = calm();
-    for (let k = 1; k <= MEMORY / MEMORY_STEP; k++) {
+    for (let k = 1; k < fits.length; k++) {
       const ago = k * MEMORY_STEP;
-      this.now(x, z, hours - ago, s);
+      this.now(x, z, hours - ago, s, fits[k]);
       // Older than the memory counts for nothing; fade towards it so nothing snaps away.
       const keep = smoothstep(MEMORY, MEMORY * 0.6, ago);
       wet = Math.max(wet, Math.min(1, s.rain * 1.6) * (1 - s.snow) * Math.exp(-ago / this.def.drying) * keep);
-      lying = Math.max(lying, Math.min(1, s.rain * 2) * s.snow * Math.exp(-ago / (this.def.drying * 3)) * keep);
+      fits[k].fell = Math.min(1, s.rain * 2) * Math.exp(-ago / (this.def.drying * 3)) * keep;
+      lying = Math.max(lying, fits[k].fell * s.snow);
     }
     out.wet = clamp(wet, 0, 1);
-    out.lying = clamp(Math.max(lying, Math.min(1, out.rain * 2) * out.snow), 0, 1);
+    out.lying = clamp(Math.max(lying, fits[0].fell * out.snow), 0, 1);
+    snowByHeight(fits, out);
     return out;
   }
 
   /** The weather at a moment, without the ground's memory. */
-  private now(x: number, z: number, hours: number, out: WeatherState): void {
-    this.natural(x, z, hours, out);
+  private now(x: number, z: number, hours: number, out: WeatherState, fit?: SnowFit): void {
+    this.natural(x, z, hours, out, fit);
+    let a = 1, b = 0;
     for (const o of this.orders) {
       const w = orderWeight(o, x, z, hours);
-      if (w > 0) blendTowards(out, PRESETS[o.kind], w);
+      if (w <= 0) continue;
+      const p = PRESETS[o.kind];
+      blendTowards(out, p, w);
+      // The order bends the snow share the same at every height: share * (1 - w) + snow * w.
+      if (p.snow !== undefined) { a *= 1 - w; b = lerp(b, p.snow, w); }
     }
+    if (fit) { fit.a = a; fit.b = b; }
   }
 
-  private natural(x: number, z: number, hours: number, out: WeatherState): void {
+  private natural(x: number, z: number, hours: number, out: WeatherState, fit?: SnowFit): void {
     const d = this.def, c = this.climate(x, z);
     // The air mass drifts with the prevailing wind and changes as it goes.
     const px = x - Math.cos(this.prevailing) * d.frontSpeed * hours, pz = z - Math.sin(this.prevailing) * d.frontSpeed * hours;
@@ -174,7 +208,9 @@ export class Weather {
     out.fog = clamp(out.mist * 0.35 + out.rain * 0.22 + out.cover * 0.04, 0, 1);
     // Snow where it is cold: the mean temperature, colder at night, and rain cools the air.
     const daily = -Math.cos(((hour - 3) / 24) * Math.PI * 2) * 4;
-    out.snow = smoothstep(1.5, -1, c.temperature + daily - out.rain * 2);
+    const air = c.temperature + daily - out.rain * 2;
+    out.snow = snowShare(air);
+    if (fit) fit.t = air + (c.elevation ?? 0) * LAPSE;
     out.wet = 0;
     out.lying = 0;
   }
@@ -185,11 +221,42 @@ export class Weather {
     if (!c) {
       if (this.climates.size > 4096) this.climates.clear();
       const got = this.climateAt(i * CLIMATE_CELL, j * CLIMATE_CELL);
-      c = { temperature: got.temperature, moisture: got.moisture };
+      c = { temperature: got.temperature, moisture: got.moisture, elevation: got.elevation ?? 0 };
       this.climates.set(key, c);
     }
     return c;
   }
+}
+
+/** Fresh snow lying on ground at height `y` (m), 0..1: what the shaders draw (render/materials/weather.ts freshSnowAt). */
+export function freshSnow(s: Readonly<WeatherState>, y: number): number {
+  return s.snowCover * smoothstep(s.snowLine - SNOW_BAND, s.snowLine + SNOW_BAND, y);
+}
+
+/** The share of precipitation that falls as snow at an air temperature (°C). */
+const snowShare = (t: number): number => smoothstep(1.5, -1, t);
+
+/**
+ * The fresh snow by height from the ground's memory: lying at height h is the most any recent snowfall left
+ * there (max over the moments of fell * share at h's temperature). That rises with height, so it is found as
+ * the most it can be (`snowCover`, on the coldest peaks) and the height where half of that lies (`snowLine`).
+ */
+function snowByHeight(fits: readonly SnowFit[], out: WeatherState): void {
+  const lyingAt = (h: number): number => {
+    let most = 0;
+    for (const f of fits) if (f.fell > 0) most = Math.max(most, f.fell * (snowShare(f.t - h * LAPSE) * f.a + f.b));
+    return most;
+  };
+  const top = lyingAt(NO_SNOW_LINE);
+  out.snowCover = clamp(top, 0, 1);
+  if (top < 1e-3) { out.snowLine = NO_SNOW_LINE; return; }
+  let lo = -1000, hi = NO_SNOW_LINE;
+  if (lyingAt(lo) >= top * 0.5) { out.snowLine = lo; return; }
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (lyingAt(mid) >= top * 0.5) hi = mid; else lo = mid;
+  }
+  out.snowLine = (lo + hi) / 2;
 }
 
 /** The prevailing wind of a world (radians): the same for the swell, the clouds and the weather. */
@@ -197,7 +264,7 @@ export function prevailingWind(seed: number): number {
   return new Rng(deriveSeed(seed, 'wind')).float() * Math.PI * 2;
 }
 
-const CALM: Readonly<WeatherState> = { cover: 0, density: 0, dark: 0, sun: 1, fog: 0, mist: 0, rain: 0, snow: 0, wind: 0, windDir: 0, storm: 0, wet: 0, lying: 0 };
+const CALM: Readonly<WeatherState> = { cover: 0, density: 0, dark: 0, sun: 1, fog: 0, mist: 0, rain: 0, snow: 0, wind: 0, windDir: 0, storm: 0, wet: 0, lying: 0, snowCover: 0, snowLine: NO_SNOW_LINE };
 
 /** A still, cloudless moment (a state to fill). */
 export const calm = (): WeatherState => ({ ...CALM });

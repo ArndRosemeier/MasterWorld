@@ -25,7 +25,7 @@ export interface SkeletonSample {
   biome: number;
 }
 
-const LAPSE = 0.0065; // °C per metre of height
+export const LAPSE = 0.0065; // °C per metre of height
 
 /**
  * The shore: the ground runs through the waterline at one slope, levelling off to a berm on land and a

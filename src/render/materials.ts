@@ -16,7 +16,7 @@ import type { Surface } from '../setting/contract';
 import { WATER, waterAt } from './materials/waterInputs';
 import { ROAD } from './materials/roads';
 import { inside, sampleMask } from './materials/masks';
-import { WEATHER, rainRings } from './materials/weather';
+import { WEATHER, freshSnowAt, rainRings } from './materials/weather';
 import type { StageKind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 import { woodsFromAfar } from '@futuremagic/vegetation/node';
@@ -291,8 +291,9 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // Snow above a ragged line, only where it can lie.
   const snow = layer('snow', p.xz);
   const snowLine = float(1900).add(broad.mul(350));
-  // Fresh snow (the weather's) lies on level ground at any height, patchy where it is thin.
-  const fresh = smoothstep(0.25, 0.6, WEATHER.lying.add(broad.mul(0.25)).add(fine.mul(0.08))).mul(WEATHER.lying.mul(4).min(1));
+  // Fresh snow (the weather's) lies on level ground where the air at this height is cold enough, patchy where it is thin.
+  const lying = freshSnowAt(p.y);
+  const fresh = smoothstep(0.25, 0.6, lying.add(broad.mul(0.25)).add(fine.mul(0.08))).mul(lying.mul(4).min(1));
   const snowT = smoothstep(snowLine, snowLine.add(250), p.y).max(fresh).mul(smoothstep(0.5, 0.72, up));
   const snowB = hblend(snowT, h.sub(snow.n.b), 1.5);
   col = mix(col, snow.a.rgb, snowB); rough = mix(rough, snow.a.a, snowB); ao = mix(ao, snow.n.a, snowB);
