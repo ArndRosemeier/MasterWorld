@@ -87,9 +87,10 @@ function marketDayFor(c: FestivityContext): FestivityDecision | null {
   return { kind: 'festivity', id: `festivity-${festivitiesOf(c.log).length + 1}`, festivity: def.id, town, at: c.hours, ...at };
 }
 
-/** Its people gather at the market for it. */
-export function festivityOrder(towns: readonly Town[], d: FestivityDecision): TownOrder | null {
-  return gatherAt(towns, d.town, 16, d.from, d.to);
+/** Its people gather at the market for it: to feast there (dancing, drinking, children at play), or round the stalls on a market day. */
+export function festivityOrder(towns: readonly Town[], d: FestivityDecision, setting: FestivityContext['setting']): TownOrder | null {
+  const kind = setting.festivities?.find((f) => f.id === d.festivity)?.kind;
+  return gatherAt(towns, d.town, 16, d.from, d.to, kind === 'feast' || kind === 'market' ? kind : undefined);
 }
 
 /** How a festivity is told (its setting's words filled in). */

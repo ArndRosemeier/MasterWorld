@@ -606,6 +606,11 @@ export async function start(b: Boot): Promise<void> {
       log = [...log, townOrder(log, t.id, o)];
       t.obey(o);
     };
+    // `feast`: the start town holds a feast at its market now (for looking at it; the debug menu has it too).
+    if (params.feast && startTown) {
+      const [x, z] = startTown.town.plan.centre;
+      orderTown(startTown, { kind: 'gather', x, z, radius: 16, from: hours(), to: hours() + 3, mood: 'feast' });
+    }
     // Saddled horses waiting by the start (Actors' horse): the mount key gets on.
     let horses: HorseView | null = null;
     if (params.horses > 0) {
@@ -1754,8 +1759,9 @@ export async function start(b: Boot): Promise<void> {
         const t = here() ?? startTown;
         if (!t) return 'no town';
         const [x, z] = t.town.plan.centre;
-        orderTown(t, kind === 'gather' ? { kind, x, z, radius: 14, from: hours(), to: hours() + 2 } : { kind, from: hours(), to: hours() + 2 });
-        return kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
+        const from = hours(), to = from + 2;
+        orderTown(t, kind === 'feast' ? { kind: 'gather', x, z, radius: 16, from, to, mood: 'feast' } : kind === 'gather' ? { kind, x, z, radius: 14, from, to } : { kind, from, to });
+        return kind === 'feast' ? 'a feast at the market for 2 game hours' : kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
       },
       get viewParams() { return player.viewParams; },
       // Abilities a teacher opens (D49), learned or forgotten here so they can be tried.
@@ -1978,7 +1984,7 @@ export async function start(b: Boot): Promise<void> {
       } else if (d.kind === 'festivity') {
         // A good day (C11): the town gathers at its market; a feast for the hero's deed is told to them.
         console.info(`[vgm] ${d.id} (${d.festivity}) in ${d.town}, ${d.from.toFixed(1)} to ${d.to.toFixed(1)} h`);
-        const t = towns?.get(d.town), order = festivityOrder(terrain.towns, d);
+        const t = towns?.get(d.town), order = festivityOrder(terrain.towns, d, setting);
         if (t && order) orderTown(t, order);
         t?.promised(d);
         // Seen, not told (rule 11): the town gathers at its market; asked, its folk tell of the feast.

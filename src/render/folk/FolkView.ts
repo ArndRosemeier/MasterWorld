@@ -10,7 +10,7 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
 import { BENCH_SEAT } from '@futuremagic/settlement';
-import { waitsInWay, type Agent, type TownLife } from '../../sim/townLife';
+import { paceOf, waitsInWay, type Agent, type TownLife } from '../../sim/townLife';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
@@ -20,6 +20,7 @@ import { clipOf, coveringLooks, LIE, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAI
 import { Held, Steady } from '../steady';
 import { Repertoire } from './repertoire';
 import { GAIT_CLIPS, gaitOf, gaitScale } from './gaits';
+import { MOVE_CLIPS } from './moves';
 import type { LimbGoals } from '@futuremagic/figure';
 import { BodyRig, applyPuppet, limbGoals, type HeroPuppet } from '../hero/puppet';
 
@@ -167,7 +168,7 @@ export class FolkView {
       ...c,
       garments: c.garments.filter((g) => PACK_GARMENTS.includes(g.id)),
       hair: c.hair.filter((h) => PACK_HAIR.includes(h.id)),
-      animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id) || GAIT_CLIPS.includes(a.id)),
+      animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id) || GAIT_CLIPS.includes(a.id) || MOVE_CLIPS.includes(a.id)),
     });
     // The first loads the pack; the others share it (and the garments any of them loads).
     const first = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, worker, catalog });
@@ -354,7 +355,8 @@ export class FolkView {
       this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
       const act = s.held.pick(dt, p ? p.act : waitsInWay(a) ? 'wait' : a.act);
       const own = s.rep.play(dt, act) ?? clipOf(act, a.person.id, !!a.held);
-      const clip = p?.puppet?.clip ?? (own === 'walk' ? s.gait : own);
+      // On the way: their own walk, or a run (children at a feast).
+      const clip = p?.puppet?.clip ?? (own === 'walk' ? (a.run ? 'jog' : s.gait) : own);
       if (clip !== s.clip) {
         s.clip = clip;
         s.since = 0;
@@ -368,7 +370,7 @@ export class FolkView {
       if (s.rigged) { s.rig.current?.relax(); s.rigged = false; }
       // A walk keeps step with their pace (their own walk at its own speed would slide its feet).
       const going = s.ch.actor.currentAction;
-      if (going) going.timeScale = clip === LIE || p?.puppet ? 1 : gaitScale(clip, a.person.speed);
+      if (going) going.timeScale = clip === LIE || p?.puppet ? 1 : gaitScale(clip, paceOf(a));
       s.ch.update(dt);
       if (p?.puppet) { const rig = s.rig.of(s.ch, s.ch.height || 1.75); if (rig) s.rigged = applyPuppet(rig, o, s.goals, p.puppet); }
       // On a room's bench they sit back on its rear edge, so a long coat's tail hangs down behind it, not through it.
