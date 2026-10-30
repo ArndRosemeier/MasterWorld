@@ -312,7 +312,9 @@ export async function start(b: Boot): Promise<void> {
       sightSurface: (x, y, z) => {
         if (cellars?.throatAir(x, y, z)) return null;
         const s = surfaceAt(x, y, z, !!rooms?.inside), f = rooms?.inside ? null : towns?.fixtureSight(x, y, z) ?? null;
-        return s === null ? f : f === null ? s : Math.min(s, f);
+        // A ship's cabins and lower deck keep the camera in them; out on deck, out of its hull and castles.
+        const d = decks.sight(x, y, z);
+        return [s, f, d].reduce<number | null>((m, v) => (v === null ? m : m === null ? v : Math.min(m, v)), null);
       },
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => water?.surfaceAt(x, z) ?? null,
