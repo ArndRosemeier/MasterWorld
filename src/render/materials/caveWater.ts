@@ -14,18 +14,20 @@ import { WEATHER } from './weather';
 import type { CaveFeatures } from '../../world/dungeon/caveFeatures';
 
 export const CAVE_WATER = defineKind('cave water', ['position', 'normal', 'uv'], () => {
-  const m = new MeshPhysicalNodeMaterial({ color: new Color(0x0d1c1e), roughness: 0.05, metalness: 0, transparent: true, specularIntensity: 1 });
+  const m = new MeshPhysicalNodeMaterial({ color: new Color(0x080d0e), roughness: 0.05, metalness: 0, transparent: true, depthWrite: false, specularIntensity: 1 });
   const t = WEATHER.time;
-  // uv.x: along the stream (m; 0 on a pool), uv.y: 1 on a stream, 0 on a pool.
+  // uv.x: along the stream (m), or out from a pool's middle (0) to its rim (1); uv.y: 1 on a stream, 0 on a pool.
   const flow = uv().y;
   const p = WORLD.xz;
   const ripple = mx_noise_float(vec3(uv().x.mul(2.4).sub(t.mul(flow.mul(1.6))).add(p.x.mul(1.7)), p.y.mul(1.7), t.mul(0.35)));
   const drip = sin(p.x.mul(3.1).add(p.y.mul(2.3)).add(t.mul(2.2))).mul(0.25);
   const n = ripple.add(drip.mul(float(1).sub(flow))).mul(mix(float(0.05), float(0.14), flow));
   m.normalNode = normalize(cameraViewMatrix.mul(vec4(normalize(vec3(n, 1, n.mul(0.7))), 0)).xyz);
-  // Seen steeply it is clear over the stones; seen low it shows only the glint.
+  // Seen steeply it is clear over the stones; seen low it shows only the dark and the glint. A pool thins out to
+  // nothing at its rim, so its shore is the wet stone, not the edge of a disc.
   const view = normalize(positionView.negate());
-  m.opacityNode = mix(float(0.97), float(0.7), pow(abs(dot(view, normalView)), 2));
+  const shore = mix(smoothstep(1, 0.55, uv().x), float(1), flow);
+  m.opacityNode = mix(float(0.9), float(0.3), pow(abs(dot(view, normalView)), 1.5)).mul(shore);
   return m;
 }, { cast: false, receive: true }, true);
 
@@ -50,12 +52,14 @@ const RIM = 28, SIDES = 18;
 export function caveWaterMesh(f: CaveFeatures, x: number, y: number, z: number): Mesh | null {
   const pos: number[] = [], uvs: number[] = [], idx: number[] = [];
   for (const p of f.pools) {
+    // The middle, a ring halfway out (so the shore fades over its outer half), and the rim.
     const o = pos.length / 3;
     pos.push(p.x, p.top, p.z); uvs.push(0, 0);
     for (let k = 0; k < RIM; k++) {
-      const a = (k / RIM) * Math.PI * 2;
-      pos.push(p.x + Math.cos(a) * p.r, p.top, p.z + Math.sin(a) * p.r); uvs.push(0, 0);
-      idx.push(o, o + 1 + ((k + 1) % RIM), o + 1 + k);
+      const a = (k / RIM) * Math.PI * 2, c = Math.cos(a), n = Math.sin(a);
+      pos.push(p.x + c * p.r * 0.55, p.top, p.z + n * p.r * 0.55, p.x + c * p.r, p.top, p.z + n * p.r); uvs.push(0.55, 0, 1, 0);
+      const i = o + 1 + k * 2, j = o + 1 + ((k + 1) % RIM) * 2;
+      idx.push(o, j, i, i, j, i + 1, i + 1, j, j + 1);
     }
   }
   for (const s of f.streams) {

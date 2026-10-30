@@ -417,6 +417,27 @@ export const ROCKS = defineKind('rocks', ['position', 'normal', 'color'], () => 
   // instanced one behind the loading screen (as the trees' are).
 }, { cast: true, receive: true }, true);
 
+/**
+ * A natural cave's rock (world/dungeon/caveRock.ts): the stone of the cliffs and tors above (rockFaces), its beds
+ * on the walls and weathered rock on floors and roofs, so the cave is cut into the same rock as the land. The mesh's
+ * tint (sRGB, building format) carries the silt on the floors, the damp by the water and the darker stretches.
+ * A late kind: built under the shader cap when the first cave is built.
+ */
+export const CAVE_ROCK = defineKind('cave rock', ['position', 'normal', 'tint'], () => {
+  if (!ground) throw new Error('cave rock built before the ground textures were loaded');
+  const m = new MeshStandardNodeMaterial({ roughness: 0.9, metalness: 0 });
+  const p = WORLD, n = normalWorld;
+  const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n);
+  // The tint is about 0.4 (linear) on bare rock: brought back to the rock's own colour, a little darker underground.
+  const tint = pow(attribute('tint', 'vec3'), vec3(2.2)).mul(1.9);
+  const broad = mx_fractal_noise_float(p.mul(0.05), 2, 2.0, 0.5);
+  m.colorNode = rockA.rgb.mul(macro).mul(float(1).add(broad.mul(0.2))).mul(tint).mul(0.85);
+  m.roughnessNode = max(rockA.a, float(0.7));
+  m.aoNode = rockN.a;
+  m.normalNode = normalize(cameraViewMatrix.mul(vec4(normalize(n.add(rockP.mul(0.9))), 0)).xyz);
+  return m;
+}, { cast: true, receive: true }, true);
+
 /** Which texgen layer draws each biome surface. */
 const SURFACE_LAYER: Record<Surface, string> = { grass: 'wildGrass', forest: 'forestFloor', sand: 'sand', scree: 'scree' };
 

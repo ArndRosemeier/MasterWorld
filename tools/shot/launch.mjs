@@ -33,7 +33,7 @@ export function stalePacks(dist = join(root, 'dist')) {
   return have === want ? '' : `dist/packs are from Actors ${have}, installed is ${want}`;
 }
 
-export async function launch({ headed = false, args: extra = [] } = {}) {
+export async function launch({ headed = false, args: extra = [], vgmPanel = false } = {}) {
   const missing = missingPacks();
   if (missing.length) throw new Error(`dist/packs has no ${missing.join(', ')}: run \`npm run packs\` and \`npm run build\` first`);
   const stale = stalePacks();
@@ -50,6 +50,7 @@ export async function launch({ headed = false, args: extra = [] } = {}) {
       : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist']), ...MUTE, ...extra],
   });
   pinSeed(browser);
+  if (!vgmPanel) hidePanel(browser);
   return { server, base, browser };
 }
 
@@ -73,5 +74,22 @@ export function pinSeed(browser, seed = process.env.SHOT_SEED ?? 'masterworld') 
     const page = await context.newPage();
     page.on('close', () => void context.close().catch(() => undefined));
     return page;
+  };
+}
+
+/** The settings' key in local storage (src/persist/local.ts PREFIX + src/app/settings.ts KEY). */
+const SETTINGS_KEY = 'masterworld.settings';
+
+/**
+ * The VGM's panel (a developer's aid, on by default while the game is built) covers a fifth of every picture: the
+ * checks start with it off (`launch({ vgmPanel: true })` keeps it, for the VGM's own shots), as a player who hid it.
+ */
+export function hidePanel(browser) {
+  const script = `try { if (!localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})) localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, JSON.stringify({ vgmPanel: false })); } catch {}`;
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (options) => {
+    const context = await newContext(options);
+    await context.addInitScript(script);
+    return context;
   };
 }

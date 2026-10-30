@@ -203,7 +203,10 @@ else {
   }, [g, cap.market, d]);
   const open = () => page.evaluate(([id, i]) => window.game.towns.gatesOf(id)?.[i] ?? -1, [cap.id, gi]);
   await page.evaluate(() => { window.game.view.sky.hour = 22.5; });
-  await before(44);
+  // Nearer than by day (a beast grazing by the road stood in front of the arch from 44 m), still past the 22 m at
+  // which the gate opens for one coming (render/town/GateView.ts COME), and from a little higher.
+  await before(30);
+  await page.evaluate(() => { window.game.player.heroCam.pitch = 0.14; });
   // The hour jumped: let the town's people get home first (one coming through holds the gate open).
   let shut = -1;
   for (let i = 0; i < 20 && (shut = await open()) !== 0; i++) await page.waitForTimeout(1000);
