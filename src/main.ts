@@ -569,15 +569,18 @@ export async function start(b: Boot): Promise<void> {
     if (setting.regions && params.regions) {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights, jobs: { frontier: (a) => jobs.frontier(a), site: (j) => terrainJobs.site(j) } }, log);
       for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
-      // `site=<place>`: walk out from the start until one opens, then stand before it.
-      const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
+      // `site=<place or fill>`: walk out from the start until one opens, then stand before it (a harbour town: on
+      // its quay, facing the sea).
+      const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind || f.id === kind).map((f) => f.id));
       for (let dir = 0; kind && dir < 8; dir++) {
         const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: start?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
         for (const d of walked) regionOpened(d);
         const s = found.site, d = s.r + (params.siteAt ?? (kind === 'capital' ? 60 : 14)); // a capital's wall stands out past its houses
-        player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
+        const quay = s.harbour, back = params.siteAt ?? 4;
+        if (quay) player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
+        else player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
         break;
       }
     }

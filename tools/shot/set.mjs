@@ -271,6 +271,13 @@ const SESSIONS = [
     { name: 'sea-waterline', act: seaLook({ out: -6, level: 0, back: true, pitch: 0 }) },
     { name: 'sea-swim', act: seaLook({ swim: true, pitch: 0.1 }) },
   ] },
+  // S2: a harbour town the VGM founded by a river's mouth. On its quay at late morning looking out over the piers,
+  // then from out over the water back at the town, then the quay in the evening, its tavern lit.
+  { id: 'sea-harbour', query: `${still}&hour=11&weather=fair&site=harbour`, shots: [
+    { name: 'sea-harbour', act: seaLook({ pitch: 0.15 }) },
+    { name: 'sea-harbour-aloft', act: seaLook({ out: 70, up: 16, side: 20, back: true, pitch: -8 }) },
+    { name: 'sea-harbour-evening', act: async (p) => { await turn(20.5, 'fair')(p); await seaLook({ out: 40, up: 6, back: true, pitch: -3 })(p); } },
+  ] },
   // Gate C: what phase C gave the world, seen. A hurt traveller by the way (they cry out once seen), then a
   // farm the bandits raided: its barn burnt, smoke over it, its paddock empty.
   { id: 'situations', query: `${still}&hour=10&weather=fair`, shots: [
