@@ -1,15 +1,15 @@
 /**
- * What the town's frame costs, part by part (a slow check, run by hand on a machine with a GPU): `SHOT_GPU=1 node
+ * Where the town's frame goes (a slow check, run by hand on a machine with a GPU): `SHOT_GPU=1 node
  * tools/shot/townframe.mjs` after `npm run build` (SET_GL=1 for WebGL 2). It loads the town as the shot set does
- * (1920×1080, no frame cap), and at noon, dusk and in rain measures the frame (p50, p95), the main thread's time in
- * `renderer.render` and the draw calls; then the same with each top-level part of the scene hidden in turn, and with
- * no mesh casting a shadow (the shadow pass left empty; no shader is built for either). What a part's hiding saves
- * is what it costs.
+ * (1920×1080, no frame cap) and at noon, dusk and in rain counts, over TF_FRAMES frames, the draws per frame: by
+ * render call (which camera and target), by pass (the view or a shadow map), and by the part of the scene they belong
+ * to (its top-level group, a big group's children instead), and how many distinct objects make them. Counts do not
+ * drift as timings do; the frame time (p50, p95) and the main thread's time in `renderer.render` are given beside.
  */
 import { launch } from './launch.mjs';
 import { drawnNear, measureFrames, shadersQuiet } from './wait.mjs';
 
-const MEASURE = Number(process.env.TF_MEASURE ?? 2000);
+const FRAMES = Number(process.env.TF_FRAMES ?? 120);
 const gl = process.env.SET_GL === '1';
 const turn = (page, hour, kind) => page.evaluate(([hour, kind]) => {
   const g = window.game, now = g.view.sky.day * 24 + g.view.sky.hour;
@@ -28,59 +28,73 @@ await page.addStyleTag({ content: '#loading{display:none!important}#hud{visibili
 await drawnNear(page, 15000);
 await shadersQuiet(page, 6000);
 
-// The main thread's time in render and the draw calls, per frame, while the frames are measured.
+// Tally every draw while `window.__tf.on`: by render call, by pass, by part of the scene.
 await page.evaluate(() => {
-  const r = window.game.view.renderer, f = r.render;
-  window.__tf = { ms: 0, calls: 0, renders: 0 };
-  r.render = function (...a) {
-    const t = performance.now();
-    try { return f.apply(this, a); } finally {
-      const tf = window.__tf; tf.ms += performance.now() - t; tf.renders++;
-      tf.calls += r.info?.render?.drawCalls ?? r.info?.render?.calls ?? 0;
-    }
-  };
-});
-const measure = async () => {
-  await page.evaluate(() => { window.__tf.ms = 0; window.__tf.calls = 0; window.__tf.renders = 0; });
-  const ft = await measureFrames(page, MEASURE);
-  const tf = await page.evaluate(() => window.__tf);
-  return { p50: ft.p50, p95: ft.p95, renderMs: tf.ms / ft.frames, calls: tf.calls / ft.frames };
-};
-// The scene's parts: its children, and a big child's children instead (the floating origin's root holds most).
-const parts = await page.evaluate(() => {
+  const g = window.game, r = g.view.renderer, scene = g.view.scene;
+  const tf = (window.__tf = { on: false, ms: 0, renders: new Map(), passes: new Map(), parts: new Map(), objects: new Set(), call: '' });
+  const bump = (m, k, n = 1) => m.set(k, (m.get(k) ?? 0) + n);
+  const nameOf = (o) => o.name || o.type;
+  // The part an object belongs to: the scene's child, or a big child's child (the origin's root holds most).
   const count = (c) => { let n = 0; c.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine) n++; }); return n; };
-  const out = [];
-  const visit = (c, path, depth) => {
-    const n = count(c);
-    if (!c.visible || n === 0) return;
-    if (depth < 3 && n > 150 && c.children.length > 1) c.children.forEach((k, i) => visit(k, [...path, i], depth + 1));
-    else out.push({ path, name: c.name || c.type, meshes: n });
+  const big = new WeakMap();
+  const isBig = (o) => { if (!big.has(o)) big.set(o, count(o) > 150 && o.children.length > 1); return big.get(o); };
+  const partOf = (o) => {
+    const chain = [];
+    for (let q = o; q && q !== scene; q = q.parent) chain.unshift(q);
+    if (!chain.length) return '(not in the scene)';
+    let i = 0;
+    while (i < 2 && i + 1 < chain.length && isBig(chain[i]) && chain[i + 1].children.length > 0) i++;
+    return chain.slice(0, i + 1).map(nameOf).join('/');
   };
-  window.game.view.scene.children.forEach((c, i) => visit(c, [i], 0));
-  window.__at = (path) => path.reduce((o, i) => o.children[i], window.game.view.scene);
-  return out;
+  const render = r.render;
+  r.render = function (s, cam, ...a) {
+    const t = performance.now();
+    const target = r.getRenderTarget?.();
+    tf.call = `${nameOf(s)} · ${cam.isOrthographicCamera ? 'ortho' : 'persp'} ${nameOf(cam)}${target ? ' → target' : ''}`;
+    try { return render.call(this, s, cam, ...a); } finally { if (tf.on) { tf.ms += performance.now() - t; bump(tf.renders, tf.call + ' (calls)'); } }
+  };
+  const direct = r._renderObjectDirect;
+  r._renderObjectDirect = function (object, material, sc, camera, ...a) {
+    if (tf.on) {
+      const shadow = !!camera.isOrthographicCamera && camera !== g.view.camera;
+      const pass = shadow ? 'shadow' : tf.call;
+      bump(tf.renders, tf.call);
+      bump(tf.passes, pass);
+      bump(tf.parts, `${shadow ? '[shadow] ' : ''}${partOf(object)}`);
+      tf.objects.add(object);
+    }
+    return direct.call(this, object, material, sc, camera, ...a);
+  };
 });
-const row = (name, m, base) => console.log(`${name.padEnd(28)} p50 ${m.p50.toFixed(1).padStart(5)} · p95 ${m.p95.toFixed(1).padStart(5)} · render ${m.renderMs.toFixed(1).padStart(5)} ms · ${m.calls.toFixed(0).padStart(5)} calls${base ? ` · saves ${(base.p50 - m.p50).toFixed(1)} ms` : ''}`);
+
+const section = async (label) => {
+  await shadersQuiet(page, 6000);
+  const ft = await measureFrames(page, 2000);
+  const tf = await page.evaluate((frames) => new Promise((done) => {
+    const tf = window.__tf;
+    tf.ms = 0; tf.renders.clear(); tf.passes.clear(); tf.parts.clear(); tf.objects.clear(); tf.on = true;
+    let n = 0;
+    const step = () => {
+      if (++n <= frames) return requestAnimationFrame(step);
+      tf.on = false;
+      const per = (m) => [...m].map(([k, v]) => [k, v / frames]).sort((a, b) => b[1] - a[1]);
+      done({ ms: tf.ms / frames, objects: tf.objects.size, renders: per(tf.renders), passes: per(tf.passes), parts: per(tf.parts) });
+    };
+    requestAnimationFrame(step);
+  }), FRAMES);
+  const total = tf.passes.reduce((a, [, v]) => a + v, 0);
+  console.log(`\n== ${label}: p50 ${ft.p50.toFixed(1)} ms · p95 ${ft.p95.toFixed(1)} ms · render ${tf.ms.toFixed(1)} ms/frame · ${total.toFixed(0)} draws/frame from ${tf.objects} objects`);
+  console.log('render calls (draws per frame; "(calls)" = how often per frame):');
+  for (const [k, v] of tf.renders) console.log(`  ${v.toFixed(1).padStart(8)}  ${k}`);
+  console.log('passes:');
+  for (const [k, v] of tf.passes) console.log(`  ${v.toFixed(1).padStart(8)}  ${k}`);
+  console.log('parts (top 40):');
+  for (const [k, v] of tf.parts.slice(0, 40)) console.log(`  ${v.toFixed(1).padStart(8)}  ${k}`);
+};
 
 for (const [label, hour, kind] of [['noon', 12, 'clear'], ['dusk', 18.3, 'fair'], ['rain', 14, 'rain']]) {
   await turn(page, hour, kind);
-  await shadersQuiet(page, 6000);
-  const all = await measure();
-  console.log(`\n== ${label}`);
-  row('everything', all);
-  for (const p of parts) {
-    await page.evaluate((i) => { window.__at(i).visible = false; }, p.path);
-    await page.waitForTimeout(300);
-    row(`- ${p.name} (${p.meshes})`, await measure(), all);
-    await page.evaluate((i) => { window.__at(i).visible = true; }, p.path);
-  }
-  await page.evaluate(() => {
-    window.__casters = [];
-    window.game.view.scene.traverse((o) => { if (o.castShadow && !o.isLight) { o.castShadow = false; window.__casters.push(o); } });
-  });
-  await page.waitForTimeout(300);
-  row('- shadow casters', await measure(), all);
-  await page.evaluate(() => { for (const o of window.__casters) o.castShadow = true; });
+  await section(label);
 }
 await browser.close();
 await server.close();
