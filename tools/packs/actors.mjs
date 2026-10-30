@@ -14,7 +14,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import * as core from '@actors/core';
-import { cutLoop, findLoop, framesOf } from './cutLoop.mjs';
+import { cutLoop, findLoop, findStill, framesOf } from './cutLoop.mjs';
 
 /** A cut whose ends differ more than this (cutLoop's measure) is refused: it would hitch at the seam. */
 const MAX_SEAM = 0.06;
@@ -33,6 +33,12 @@ const heroLooks = readFileSync(join(root, 'src/setting/classic/hero.ts'), 'utf8'
 const gaitText = readFileSync(join(root, 'src/render/folk/gaits.ts'), 'utf8');
 const cuts = [...gaitText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', pace: ([\d.]+) \}/g)].map((m) => ({ clip: m[1], take: m[2], pace: Number(m[3]) }));
 if (!cuts.length) throw new Error('no GAIT_CUTS in src/render/folk/gaits.ts');
+// Moves on the spot cut out of the CMU takes (src/render/folk/moves.ts), one `{ clip, take, secs, seam, travel }` a line.
+const moveText = readFileSync(join(root, 'src/render/folk/moves.ts'), 'utf8');
+for (const m of moveText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', secs: \[([\d.]+), ([\d.]+)\], seam: ([\d.]+), travel: ([\d.]+) \}/g)) {
+  cuts.push({ clip: m[1], take: m[2], still: { secs: [Number(m[3]), Number(m[4])], seam: Number(m[5]), travel: Number(m[6]) } });
+}
+if (!cuts.some((c) => c.still)) throw new Error('no MOVE_CUTS in src/render/folk/moves.ts');
 // The pack's walk at its own speed (m/s): the cuts' paces are measured against it.
 const walkPace = Number(heroClips.match(/PACE[^=]*=\s*\{[^}]*\bwalk: ([\d.]+)/)?.[1]);
 if (!walkPace) throw new Error('no PACE.walk in src/render/hero/clips.ts');
@@ -48,7 +54,7 @@ const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK
 const dest = join(root, 'public/packs/human');
 const stamp = join(dest, '.selection');
 const ANIMALS = ['horse', 'dog', 'deer', 'cow', 'squirrel'];
-const want = JSON.stringify({ version, themes, animals: ANIMALS, cuts: cuts.map((c) => [c.clip, c.take]), cutter: readFileSync(join(root, 'tools/packs/cutLoop.mjs'), 'utf8').length, keep: Object.fromEntries(Object.entries(keep).map(([k, v]) => [k, [...v].sort()])) });
+const want = JSON.stringify({ version, themes, animals: ANIMALS, cuts, cutter: readFileSync(join(root, 'tools/packs/cutLoop.mjs'), 'utf8').length, keep: Object.fromEntries(Object.entries(keep).map(([k, v]) => [k, [...v].sort()])) });
 if (!process.argv.includes('--force') && existsSync(stamp) && readFileSync(stamp, 'utf8') === want && ANIMALS.every((k) => existsSync(join(root, 'public/packs', k, 'manifest.json')))) {
   console.log(`public/packs/human already has the Actors ${version} selection`);
   process.exit(0);
@@ -108,8 +114,8 @@ for (const f of files) {
   copyFileSync(join(src, f), join(dest, f));
   bytes += readFileSync(join(dest, f)).length;
 }
-// The walks cut from the CMU takes, each its own clip in the pack.
-const cutDefs = cutWalks(src, manifest);
+// The walks and moves cut from the CMU takes, each its own clip in the pack.
+const cutDefs = cutTakes(src, manifest);
 // The manifest as shipped, but without the CMU library (not copied), with the cuts.
 writeFileSync(join(dest, 'manifest.json'), JSON.stringify({ ...manifest, clips: [...manifest.clips, ...cutDefs], clipLibraries: [] }));
 writeFileSync(stamp, want);
@@ -119,7 +125,7 @@ console.log(`public/packs/human: ${files.size} files, ${(bytes / 1e6).toFixed(0)
  * Cuts each of `cuts` out of its take (tools/packs/cutLoop.mjs) into dest/clips/cut: a loop facing +z on the spot,
  * its feet as low as the pack's walk's, and its pace measured from the planted feet against the pack's walk.
  */
-function cutWalks(src, manifest) {
+function cutTakes(src, manifest) {
   const { decodeClip, encodeClipI16, fitSkeleton, measureGait, Retargeter, createPose, poseWorld } = core;
   const buf = (f) => { const b = readFileSync(f); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
   const skeleton = fitSkeleton(manifest.skeleton, new Float32Array(buf(join(src, manifest.basePositions.file ?? manifest.blob ?? 'base.bin')), manifest.basePositions.offset ?? 0, manifest.basePositions.count));
@@ -146,18 +152,18 @@ function cutWalks(src, manifest) {
     if (!entry) throw new Error(`no ${c.take} in the CMU library`);
     const def = { ...lib.rigs[entry.rig], ...entry };
     const frames = framesOf(def, decodeClip(def, buf(join(src, 'clips/cmu', entry.file))));
-    const loop = findLoop(def, frames);
-    if (!loop || loop.score > MAX_SEAM) throw new Error(`${c.take}: no clean walking loop (${loop ? `seam ${loop.score.toFixed(3)}` : 'no straight stretch'})`);
+    const loop = c.still ? findStill(def, frames, c.still) : findLoop(def, frames);
+    if (!loop || (!c.still && loop.score > MAX_SEAM)) throw new Error(`${c.take}: no clean loop (${loop ? `seam ${loop.score.toFixed(3)}` : 'no fitting stretch'})`);
     const out = { ...def, loop: true, frameCount: loop.len + 1 };
     let data = cutLoop(def, frames, loop);
     data = cutLoop(def, frames, loop, (ground.lo - lowest({ def: out, data }).lo) / ground.hip);
-    const pace = (walkPace * measureGait(skeleton, { def: out, data }).speed) / walkFeet;
-    if (Math.abs(pace - c.pace) > 0.05 * c.pace) console.warn(`${c.clip}: paces ${pace.toFixed(2)} m/s, src/render/folk/gaits.ts says ${c.pace}`);
+    const pace = c.still ? 0 : (walkPace * measureGait(skeleton, { def: out, data }).speed) / walkFeet;
+    if (!c.still && Math.abs(pace - c.pace) > 0.05 * c.pace) console.warn(`${c.clip}: paces ${pace.toFixed(2)} m/s, src/render/folk/gaits.ts says ${c.pace}`);
     const file = `clips/cut/${c.clip.replace(/[^a-z0-9]+/g, '-')}.bin`;
     writeFileSync(join(dest, file), new Uint8Array(encodeClipI16(def.bones.length, out.frameCount, data)));
-    console.log(`  ${c.clip}: ${c.take} frames ${loop.start}-${loop.start + loop.len} (${(loop.len / def.fps).toFixed(2)} s), seam ${loop.score.toFixed(3)}, ${pace.toFixed(2)} m/s`);
+    console.log(`  ${c.clip}: ${c.take} frames ${loop.start}-${loop.start + loop.len} (${(loop.len / def.fps).toFixed(2)} s), seam ${loop.score.toFixed(3)}, ${c.still ? 'on the spot' : `${pace.toFixed(2)} m/s`}`);
     return { name: c.clip, file, fps: def.fps, frameCount: out.frameCount, loop: true, bones: def.bones, refDirs: def.refDirs, rootBone: def.rootBone,
-      source: `${def.source}, frames ${loop.start}-${loop.start + loop.len} cut into a loop`, category: 'Locomotion', description: def.description, encoding: 'i16' };
+      source: `${def.source}, frames ${loop.start}-${loop.start + loop.len} cut into a loop`, category: c.still ? 'Actions' : 'Locomotion', description: def.description, encoding: 'i16' };
   });
 }
 

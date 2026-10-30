@@ -351,10 +351,13 @@ export function gatherFor(setting: Pick<SettingModule, 'events'>, towns: readonl
   return def?.gather ? gatherAt(towns, e.town, 14, e.at, e.at + def.gather) : null;
 }
 
-/** Everyone awake in town `id` gathers within `radius` of its market's middle from game hour `from` to `to` (null: no such town). */
-export function gatherAt(towns: readonly Town[], id: string, radius: number, from: number, to: number): TownOrder | null {
+/**
+ * Everyone awake in town `id` gathers within `radius` of its market's middle from game hour `from` to `to`, in the
+ * `mood` of the day (TownOrder: a feast, a market day; none: to talk something over) (null: no such town).
+ */
+export function gatherAt(towns: readonly Town[], id: string, radius: number, from: number, to: number, mood?: 'feast' | 'market'): TownOrder | null {
   const town = townById(towns, id);
   if (!town) return null;
   const [x, z] = town.plan.centre;
-  return { kind: 'gather', x, z, radius, from, to };
+  return mood ? { kind: 'gather', x, z, radius, from, to, mood } : { kind: 'gather', x, z, radius, from, to };
 }

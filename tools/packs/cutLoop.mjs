@@ -75,6 +75,33 @@ export function findLoop(def, frames, { cycle = [0.8, 1.9], minPace = 0.25, maxT
 }
 
 /**
+ * Finds a loop done on the spot (a dance, a laugh, a cheer): of the windows `secs` long whose ends match within
+ * `seam` and that keep within `travel` hip heights of where they began, the one with the most going on (so not a
+ * stretch of standing still before or after the act).
+ */
+export function findStill(def, frames, { secs = [2, 4], seam = 0.08, travel = 0.4 } = {}) {
+  const fps = def.fps, n = frames.length;
+  const lo = Math.round(secs[0] * fps), hi = Math.round(secs[1] * fps);
+  // How much the body moves from each frame to the next (summed, so a window's motion is one difference).
+  const moved = new Float64Array(n);
+  for (let f = 1; f < n; f++) moved[f] = moved[f - 1] + unlike(frames[f - 1], frames[f], true);
+  let best = null;
+  for (let a = 0; a + lo < n; a++) {
+    for (let len = lo; len <= hi && a + len < n; len += 2) {
+      const b = a + len, A = frames[a], B = frames[b];
+      const score = unlike(A, B);
+      if (score > seam) continue;
+      let far = false;
+      for (let f = a; f <= b && !far; f += 3) if (Math.hypot(frames[f].root[0] - A.root[0], frames[f].root[2] - A.root[2]) > travel) far = true;
+      if (far) continue;
+      const busy = (moved[b] - moved[a]) / len;
+      if (!best || busy > best.busy) best = { start: a, len, score, pace: 0, busy };
+    }
+  }
+  return best;
+}
+
+/**
  * The loop as clip data (frameCount len + 1, the last frame the first again): facing +z, on the spot, the seam
  * closed by spreading the ends' difference over the loop, the root lifted by `lift` hip heights.
  */

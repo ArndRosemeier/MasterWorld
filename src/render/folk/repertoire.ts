@@ -18,6 +18,8 @@ export interface Turn {
 export const CLIP_SECS: Readonly<Record<string, number>> = {
   idle: 76 / 30, talk: 89 / 30, 'arms folded': 76 / 30, nod: 76 / 30, 'shake head': 76 / 30, interact: 61 / 30,
   'pick up': 26 / 30, 'eat or drink': 41 / 30, crouch: 89 / 30, dance: 31 / 30,
+  // Cut from motion capture (render/folk/moves.ts): as long as `npm run packs` prints them.
+  'dance folk': 69 / 30, 'dance stamp': 63 / 30, laugh: 45 / 30, cheer: 49 / 30,
 };
 
 const rest = (clip: string, weight = 4, plays: readonly [number, number] = [2, 5]): Turn => ({ clip, weight, plays });
@@ -42,6 +44,10 @@ export const REPERTOIRE: Partial<Readonly<Record<ActivityKind, readonly Turn[]>>
   gather: [rest('idle', 5, [2, 6]), now('arms folded', 2, [2, 4]), now('nod', 1), now('talk', 0.5)],
   // At a grave: still, arms folded, now and then down on one knee.
   mourn: [rest('arms folded', 4, [2, 5]), now('idle', 2, [2, 3]), now('crouch', 1, [1, 2])],
+  // At a feast, in the ring: one folk dance after another, a whoop now and then.
+  dance: [rest('dance folk', 3, [2, 4]), now('dance stamp', 3, [2, 4]), now('dance', 2, [3, 6]), now('cheer', 0.7)],
+  // Round the ring: a drink raised, a laugh, a cheer for the dancers, a word with the neighbour.
+  revel: [rest('idle', 3, [1, 3]), now('eat or drink', 2.5), now('laugh', 2), now('cheer', 2), now('talk', 2, [1, 2]), now('nod', 1), now('arms folded', 1, [1, 2])],
   // Children at play: dancing a round, standing a while, crouching down to something.
   play: [rest('idle', 2, [1, 3]), now('dance', 3, [2, 6]), now('crouch', 1, [1, 2])],
 };

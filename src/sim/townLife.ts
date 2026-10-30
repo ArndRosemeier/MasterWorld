@@ -12,18 +12,23 @@ import { Footprints, distSqPointSeg, polyCentroid, wayRound, type TownPlan } fro
 import { NavGraph, aroundHouse } from './nav';
 import type { DayTask, RoutinesDef } from '../setting/contract';
 import { routines as classicRoutines } from '../setting/classic/routines';
-import { away, buildingOf, townsfolk, type Person } from './people';
+import { away, buildingOf, OLD_AGE, townsfolk, type Person } from './people';
 import { dayPlan, taskAt, type DayPlan } from './routines';
 import { seatAt, seatDir, townSpots, type ActivityKind, type Spot } from './spots';
 import { inRoom } from './roomCast';
+import { onCircle } from '../world/sites';
 
 /** What someone is about: their plan's task, a VGM order, or out of town. */
 export type Task = DayTask | 'order' | 'away';
 
 /** A VGM order for the town (plain data, logged with the decisions): times in game hours since the start (day × 24 + hour). */
 export type TownOrder =
-  /** Everyone awake comes together around a place (a festival, a speech, a hanging). */
-  | { kind: 'gather'; x: number; z: number; radius: number; from: number; to: number }
+  /**
+   * Everyone awake comes together around a place (a festival, a speech, a hanging). `mood` says what they do there:
+   * at a feast they dance in a ring round it, drink and cheer round the ring, and the children run about; on a
+   * market day they go round the stalls; otherwise they stand and talk it over.
+   */
+  | { kind: 'gather'; x: number; z: number; radius: number; from: number; to: number; mood?: 'feast' | 'market' }
   /** Everyone stays indoors (a curfew, a storm). */
   | { kind: 'stayIn'; from: number; to: number };
 
@@ -69,6 +74,10 @@ export interface Agent {
   stay?: number;
   /** Held in a building's room (they were in it when the talk began): drawn there, not where they stand outside (read only while `held`). */
   heldIn?: boolean;
+  /** Running, not walking (children at play at a feast): RUN times their pace. */
+  run?: boolean;
+  /** Turns to face this point on arrival (a feast's ring faces its middle). */
+  faceTo?: { x: number; z: number };
   /** Sent over by the VGM (plan D27): walks up to (x, z), then waits there facing `face` until let go or `until`. */
   seek?: { x: number; z: number; face: { x: number; z: number } };
   /** Keeps watch at a place of their own out on the land (C3: the warden at the tower's door), day and night. */
@@ -165,6 +174,13 @@ const SKIP_HOURS = 0.5;
 const DETAIL = 260;
 /** A child at play keeps this far off a wall (m). */
 const PLAY_CLEAR = 0.6;
+/** Running is this many times one's walking pace. */
+export const RUN = 2.3;
+/** A feast (TownOrder mood 'feast'): the ring dances this far from the middle (m), the share of the grown who dance in it, revellers stand round it from REVEL out. */
+const FEAST = { ring: 3.6, dancers: 0.35, revel: 5.5 } as const;
+
+/** How fast `a` goes when on the move (m/s). */
+export const paceOf = (a: Agent): number => a.person.speed * (a.run ? RUN : 1);
 
 export class TownLife {
   readonly nav: NavGraph;
@@ -462,15 +478,43 @@ export class TownLife {
     }
     const [tx, tz] = s ? seatAt(s, a.seat) : [pick.x, pick.z];
     a.next = pick.act;
+    a.run = pick.run;
+    a.faceTo = pick.face;
     a.until = this.time + a.rng.range(pick.secs[0], pick.secs[1]) * (s?.outside && (this.weather.rain > 0.5 || this.dark) ? 0.5 : 1);
     if (here || this.skipping || (s && s === was) || (Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > DETAIL && Math.hypot(tx - this.focus.x, tz - this.focus.z) > DETAIL)) {
-      this.arrive(a, tx, tz, s ? seatDir(s, a.seat) : a.dir);
+      this.arrive(a, tx, tz, s ? seatDir(s, a.seat) : pick.face ? Math.atan2(pick.face.z - tz, pick.face.x - tx) : a.dir);
       return;
     }
     a.path = this.wayTo(a, was, tx, tz, s);
     a.pi = 0;
     a.act = 'walk';
     a.hidden = false;
+  }
+
+  /**
+   * At a feast round (order.x, order.z): children run from one place to the next and play there a moment; some of
+   * the grown (not the old) dance in a ring facing its middle; the rest stand round the ring, facing it, drinking,
+   * laughing and cheering. Each finds open ground (never inside a stall or a house).
+   */
+  private feast(a: Agent, order: { x: number; z: number; radius: number }): ReturnType<TownLife['pick']> {
+    const r = a.rng, p = a.person, face = { x: order.x, z: order.z };
+    const openSpot = (from: number, to: number): [number, number] => {
+      for (let k = 0; k < 8; k++) {
+        const [x, z] = onCircle(order, r.range(0, Math.PI * 2), r.range(from, to));
+        if (this.freeGround(x, z)) return [x, z];
+      }
+      return [order.x + r.range(-1, 1), order.z + r.range(-1, 1)];
+    };
+    if (p.role === 'child') {
+      const [x, z] = openSpot(1, order.radius * 0.8);
+      return { spot: -1, x, z, act: 'play', secs: [3, 9], run: true };
+    }
+    if (p.age < OLD_AGE && r.chance(FEAST.dancers)) {
+      const [x, z] = openSpot(FEAST.ring - 0.4, FEAST.ring + 0.4);
+      return { spot: -1, x, z, act: 'dance', secs: [60, 180], face };
+    }
+    const [x, z] = openSpot(FEAST.revel, Math.max(FEAST.revel + 1, order.radius));
+    return { spot: -1, x, z, act: 'revel', secs: [60, 200], face };
   }
 
   /** Open ground: no house there, nor a wall within a child's reach. */
@@ -527,7 +571,7 @@ export class TownLife {
         const o = this.agents[k];
         if (o === a || o.hidden) continue;
         // One walking on is judged where it will be (else who follows whom in a file hangs on the order of the steps).
-        const go = o.act === 'walk' && !o.stalled && o.stepped !== this.time ? o.person.speed * this.dt : 0;
+        const go = o.act === 'walk' && !o.stalled && o.stepped !== this.time ? paceOf(o) * this.dt : 0;
         if (pressesInto(a, x, z, o.x + Math.cos(o.dir) * go, o.z + Math.sin(o.dir) * go, BODY * 2, min, share)) return true;
       }
     }
@@ -588,7 +632,7 @@ export class TownLife {
 
   private walk(a: Agent, dt: number): void {
     a.stepped = this.time;
-    let left = a.person.speed * dt;
+    let left = paceOf(a) * dt;
     const minded = Math.abs(a.x - this.focus.x) < CROWD.near && Math.abs(a.z - this.focus.z) < CROWD.near;
     while (left > 0 && a.pi * 2 < a.path.length) {
       const px = a.path[a.pi * 2], pz = a.path[a.pi * 2 + 1];
@@ -611,7 +655,7 @@ export class TownLife {
       const s = a.spot >= 0 ? this.spots[a.spot] : null;
       // The turn starts on arrival: its length counts from now.
       const length = a.until - this.time;
-      const f = a.seek?.face;
+      const f = a.seek?.face ?? a.faceTo;
       this.arrive(a, a.x, a.z, f ? facing(a, f.x, f.z) : s ? seatDir(s, a.seat) : a.dir);
       a.until = this.time + Math.max(length, 5);
     }
@@ -636,7 +680,7 @@ export class TownLife {
   }
 
   /** What to do next for the task at hand: a spot (or a free point), the activity and how long. */
-  private pick(a: Agent): { spot: number; x: number; z: number; act: ActivityKind; secs: [number, number] } {
+  private pick(a: Agent): { spot: number; x: number; z: number; act: ActivityKind; secs: [number, number]; run?: boolean; face?: { x: number; z: number } } {
     const p = a.person, r = a.rng, rain = this.weather.rain, dark = this.dark;
     const home = this.doorOf(p.home);
     const at = (spot: number, act?: ActivityKind, secs?: [number, number]) => ({ spot, x: 0, z: 0, act: act ?? this.spots[spot].activity, secs: secs ?? this.spots[spot].secs });
@@ -653,9 +697,15 @@ export class TownLife {
     if (task === 'order') {
       const order = this.activeOrder();
       if (order?.kind === 'stayIn') return inside(home);
+      if (order?.mood === 'feast') return this.feast(a, order);
+      if (order?.mood === 'market') {
+        // Round the stalls (where one is free), else about the market looking on.
+        const stalls = (this.spotsBy.get('browse') ?? []).filter((s) => s.market && s.users < s.cap);
+        if (stalls.length && r.chance(0.7)) return at(r.pick(stalls).id);
+      }
       if (order) {
         const ang = r.range(0, Math.PI * 2), rr = order.radius * Math.sqrt(r.float());
-        return free(order.x + Math.cos(ang) * rr, order.z + Math.sin(ang) * rr, 'gather', [60, 200]);
+        return free(order.x + Math.cos(ang) * rr, order.z + Math.sin(ang) * rr, order.mood === 'market' ? 'browse' : 'gather', [60, 200]);
       }
       task = 'home';
     }

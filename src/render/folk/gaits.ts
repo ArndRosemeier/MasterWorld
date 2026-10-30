@@ -31,8 +31,8 @@ export const GAIT_CUTS: readonly GaitCut[] = [
 /** The cut clips' names (shipped beside PACK_CLIPS). */
 export const GAIT_CLIPS = GAIT_CUTS.map((g) => g.clip);
 
-/** Ground speed (m/s) of every walk at its own speed: the pack's walk and the cuts. */
-export const GAIT_PACE: Readonly<Record<string, number>> = { walk: PACE.walk, ...Object.fromEntries(GAIT_CUTS.map((g) => [g.clip, g.pace])) };
+/** Ground speed (m/s) of every walk at its own speed: the pack's walk and jog (children running at a feast) and the cuts. */
+export const GAIT_PACE: Readonly<Record<string, number>> = { walk: PACE.walk, jog: PACE.jog, ...Object.fromEntries(GAIT_CUTS.map((g) => [g.clip, g.pace])) };
 
 /** Who walks which ways (each person one of them, from their seed). */
 const OLD = ['walk old', 'walk hobble'];
