@@ -58,7 +58,8 @@ export class Decks {
   private aboard: { id: string; a: number; h: number; b: number; x: number; y: number; z: number } | null = null;
 
   /** `rider`: the body carried along by a deck it stands on (the hero's walker's position). */
-  constructor(private readonly riding: () => At | null = () => null) {}
+  /** `radius`: the rider's body (game/walker.ts WALK.radius), kept out of the hulls. */
+  constructor(private readonly riding: () => At | null = () => null, private readonly radius = 0.32) {}
 
   /**
    * A ship at its new pose this frame; a body standing on it goes with it. `moored`: lying at its mooring, its
@@ -89,10 +90,25 @@ export class Decks {
     const r = this.riding();
     this.aboard = null;
     if (!r) return;
+    this.outOfHulls(r);
     for (const [id, s] of this.ships) {
       const f = this.deckFloor(s, r.x, r.z, r.y);
       // Over the deck, on it or jumping (a jump goes with the ship's way), not fallen below it.
       if (f !== null && r.y > f - 0.3 && r.y < f + 2.5) { const l = toShip(s.pose, r.x, r.y, r.z); this.aboard = { id, ...l, x: r.x, y: r.y, z: r.z }; return; }
+    }
+  }
+
+  /**
+   * A body in the water inside a hull (fallen in between the hull and the pier, or a hull that rolled onto it) is put
+   * out beside it, at its side: the walker only keeps a body from walking into a wall, not out of one it is already in.
+   */
+  private outOfHulls(r: At): void {
+    for (const s of this.ships.values()) {
+      const l = toShip(s.pose, r.x, r.y, r.z), p = s.plan;
+      if (l.h > p.deckY - 0.5 || !shipWall(p, l.a, l.b, this.radius, l.h)) continue;
+      const half = hullHalf(p, l.a, Math.min(p.deckY - 0.1, l.h + 1.7)), side = l.b < 0 ? -1 : 1;
+      const w = toWorld(s.pose, l.a, l.h, side * (half + this.radius + 0.02));
+      r.x = w.x; r.z = w.z;
     }
   }
 

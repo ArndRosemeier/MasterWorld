@@ -160,6 +160,15 @@ export class Walker {
     return f !== null && f >= this.world.height(x, z);
   }
 
+  /** How deep the body is in a wall at (x, z), feet at y (m; 0: clear): its radius less the widest that is clear there. */
+  private wallDepth(x: number, y: number, z: number): number {
+    const w = this.world.wall, r = this.spec.radius;
+    if (!w || !w(x, z, r, y)) return 0;
+    let lo = 0, hi = r;
+    for (let i = 0; i < 7; i++) { const m = (lo + hi) / 2; if (w(x, z, m, y)) hi = m; else lo = m; }
+    return r - lo;
+  }
+
   /** Whether the body would be in rock at (x, z) with its feet at y. */
   private bodyInRock(x: number, y: number, z: number): boolean {
     if (this.world.wall?.(x, z, this.spec.radius, y)) return true;
@@ -215,10 +224,13 @@ export class Walker {
     // Across: blocked by rock (try each axis alone, to slide along a wall) and by too steep a slope. A body
     // already in something (placed against a tree) may move, so it can walk out.
     const stuck = this.bodyInRock(p.x, p.y, p.z), held = stuck ? this.clearance(p.x, p.y, p.z) : Infinity;
+    const walled = stuck ? this.wallDepth(p.x, p.y, p.z) : 0;
     const tryMove = (nx: number, nz: number): boolean => {
       // Out, not further in (else it walks into the rock and up its face, or into the wall itself), unless going down
       // a step (the body sinks as it moves on: a tall head under a low edge on the way down a stair).
       if (stuck && this.clearance(nx, p.y, nz) < held - 1e-4 && !(this.mode === 'ground' && this.floorAhead(nx, nz) < p.y - 0.01)) return false;
+      // In a wall (a ship's rail or hull that moved onto it): out of it, never on through it.
+      if (stuck && walled > 0 && this.wallDepth(nx, p.y, nz) > walled + 1e-3) return false;
       // Going down a step the body sinks as it moves on, so the head is tested at the lower floor too
       // (else a tall body under a low edge climbs a stair it can never come down again).
       if (!stuck && this.bodyInRock(nx, p.y, nz)) {

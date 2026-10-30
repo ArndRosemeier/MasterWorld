@@ -100,9 +100,31 @@ test('deck: a deck is no floor to a swimmer below it (never lifted 2 m onto it);
     assert.ok(w.pos.y < 0.5, `lifted to ${w.pos.y.toFixed(2)} m`);
   }
   assert.equal(w.mode, 'swim');
+  // Fallen in between the hull and the pier, inside the hull's flare: put out beside it, not left inside it.
+  w.place(0, -(hullHalf(plan, 0, 1.2) + 0.05));
+  decks.boarded();
+  assert.ok(!decks.hull(w.pos.x, w.pos.z, w.spec.radius, w.pos.y), 'out of the hull');
   // Aboard, then put on the pier: the next swell does not carry it back.
   w.place(1.8, 0); decks.boarded();
   assert.equal(decks.ship, 's');
   w.place(1.8, pierEdge - 3); decks.move('s', plan, swell(1, 0));
   assert.ok(w.pos.z < pierEdge, 'stays where it was put');
+});
+
+test('deck: running and jumping at the forecastle front on a rolling deck never takes the body into it', () => {
+  let walker: Walker | null = null;
+  const decks = new Decks(() => walker?.pos ?? null), w = (walker = new Walker(sea(decks))), dt = 1 / 60, c = plan.fore!;
+  decks.move('s', plan, swell(0, 2));
+  w.place(c.a0 - 3, 0.5);
+  decks.boarded();
+  for (let i = 0; i < 6 * 60; i++) {
+    const pose = swell(i * dt, 2);
+    decks.move('s', plan, pose);
+    // Forward along the ship (+x: heading -π/2), jumping now and then.
+    w.step({ forward: 1, strafe: 0, heading: -Math.PI / 2, walk: false, up: i % 45 === 30, down: false }, dt);
+    decks.boarded();
+    const l = toShip(pose, w.pos.x, w.pos.y, w.pos.z);
+    if (l.h < c.y - 0.5) assert.ok(l.a + w.spec.radius < c.a0 + 0.08, `into the forecastle at ${(i * dt).toFixed(2)} s (a ${l.a.toFixed(2)}, its front ${c.a0.toFixed(2)})`);
+  }
+  assert.equal(decks.ship, 's');
 });
