@@ -9,6 +9,11 @@ import { layOutSight, layOutSite, type Place } from '../src/world/sites';
 import type { RegionDecision, SightDecision } from '../src/world/decisions';
 import type { SightShape } from '../src/setting/contract';
 import { seenFights, zFights, zFightSpots, type ZMesh } from '../src/world/zFight';
+import { buildingMesh } from '@futuremagic/settlement';
+import { startWorld } from './frontierLand';
+
+// The start's land, shared by the test files of a process (test/frontierLand.ts).
+const { terrain } = startWorld();
 
 const STONE = [170, 160, 150] as const, DARK = [90, 80, 70] as const;
 
@@ -89,4 +94,17 @@ test('z-fighting: the barrows, the hold\'s warden and every place and sight the 
     const l = layOutSight(d, shape, slope), [ox, oy, oz] = l.origin;
     noFights(l.mesh, shape, (x, z) => slope(x + ox, z + oz) - oy);
   }
+});
+
+test('z-fighting: the start town\'s houses, seen from outside, have none (their timber frames\' braces and joists fought)', () => {
+  const town = terrain.towns[0];
+  // One of each kind and wall, a few of each: the same few dozen shapes make up every town.
+  const seen = new Map<string, number>();
+  for (const b of town.plan.buildings) {
+    const key = `${b.kind} ${b.wall}`, n = seen.get(key) ?? 0;
+    if (n >= 3) continue;
+    seen.set(key, n + 1);
+    noFights(buildingMesh(b, [b.cx, 0, b.cz], true), `${key} #${b.id}`, (x, z) => terrain.height(x + b.cx, z + b.cz));
+  }
+  assert.ok(seen.size >= 5, `${seen.size} kinds looked at`);
 });
