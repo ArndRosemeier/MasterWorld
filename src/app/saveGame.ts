@@ -79,6 +79,8 @@ export interface SaveData {
   readonly hold?: DelveSave;
   /** Why the VGM made its latest moves (its log's reasons; none in older saves: their decisions say what they are). */
   readonly vgm?: readonly VgmWhy[];
+  /** The VGM panel was cleared when the log was this long (none: never). */
+  readonly vgmCleared?: number;
   /** A roguelike hero fell: the world goes on and the next start makes a new hero in it. */
   readonly heir?: boolean;
 }
