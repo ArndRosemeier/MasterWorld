@@ -2,6 +2,10 @@
  * The worker pool: the one place workers are created (guarded). Jobs go to the least busy worker; results
  * come back as promises. Each worker script handles `{ id, job }` and answers `{ id, result }` or `{ id, error }`.
  */
+import { joinPieces, maskPieces } from '../world/water';
+
+/** A wide water mask is made in this many pieces a side, spread over the terrain workers. */
+const WATER_PIECES = 4;
 
 export class WorkerPool<Job, Result> {
   /** Told of every answer as it reaches the main thread (the hitch log): the pool's name and the job's kind. */
@@ -97,7 +101,11 @@ export class TerrainJobs {
   }
   /** A water mask over a square (`res` samples a side): the terrain workers share the masks the world worker made alone. */
   water(x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
-    return this.job<Float32Array>({ kind: 'water', x0, z0, size, res });
+    // In pieces, side by side in the workers (one worker made a wide mask alone, for seconds, while the start waited).
+    const pieces = maskPieces(x0, z0, size, res, res >= 256 ? WATER_PIECES : 1);
+    if (pieces.length === 1) return this.job<Float32Array>({ kind: 'water', x0, z0, size, res });
+    return Promise.all(pieces.map((p) => this.job<Float32Array>({ kind: 'water', x0: p.x0, z0: p.z0, size, res, cols: p.cols, rows: p.rows })))
+      .then((made) => joinPieces(res, pieces, made));
   }
 
 
