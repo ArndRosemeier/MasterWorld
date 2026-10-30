@@ -73,6 +73,41 @@ test('hydro: a lake lies in the land, at the height where it runs out over its r
   assert.ok(ends > 0, 'rivers run into and out of lakes');
 });
 
+test('hydro: a river begins and ends at a lake\'s shore, never runs on over its water', () => {
+  const tl = terrain.hydro.tileAt(-32000, 32000);
+  let ends = 0;
+  for (const r of tl.rivers) {
+    const n = r.level.length;
+    for (let k = 0; k < n; k++) {
+      const x = r.xz[k * 2], z = r.xz[k * 2 + 1], l = tl.lakeNear(x, z), sh = l ? l.shore(x, z) : Infinity;
+      if (k === 0 || k === n - 1) { if (sh < 100) { ends++; assert.ok(sh > 40, `end ${sh.toFixed(0)} m from the water`); } }
+      else assert.ok(sh > 49, `river point in a lake at ${x.toFixed(0)},${z.toFixed(0)}`);
+    }
+  }
+  assert.ok(ends > 0, 'rivers run into and out of lakes');
+});
+
+test('water mask: a river\'s current dies away where it meets a lake, the lake lies still', () => {
+  const tl = terrain.hydro.tileAt(-32000, 32000);
+  // The widest river into a lake, round its mouth at 8 m pixels.
+  let mouth: [number, number] | null = null, widest = 0;
+  for (const r of tl.rivers) {
+    const e = r.level.length - 1, x = r.xz[e * 2], z = r.xz[e * 2 + 1];
+    if ((tl.lakeNear(x, z)?.shore(x, z) ?? Infinity) < 100 && r.half[e] > widest) { widest = r.half[e]; mouth = [x, z]; }
+  }
+  assert.ok(mouth, 'a river runs into a lake');
+  const size = 512, res = 64, step = size / res, x0 = mouth[0] - size / 2, z0 = mouth[1] - size / 2;
+  const m = waterMask(terrain, { seed, setting: classic.id, x0, z0, size, res });
+  let still = 0, running = 0;
+  for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
+    const x = x0 + (i + 0.5) * step, z = z0 + (j + 0.5) * step, p = (j * res + i) * 4, l = tl.lakeNear(x, z);
+    const flow = Math.hypot(m[p + 2], m[p + 3]);
+    if (l && l.shore(x, z) <= 50 && m[p + 1] > 0) { still++; assert.equal(flow, 0, `current on the lake at ${x.toFixed(0)},${z.toFixed(0)}`); }
+    else if (flow > 0.3) running++;
+  }
+  assert.ok(still > 20 && running > 5, `still ${still}, running ${running}`);
+});
+
 test('hydro: the same seed gives the same rivers', () => {
   const again = new HydroTile(new Skeleton(seed, classic.world), -1, 0, SMALL);
   assert.equal(again.rivers.length, tile.rivers.length);
