@@ -12,7 +12,8 @@ import { launch } from './launch.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 180000);
 const secs = Number(process.argv[2] ?? 40), over = Number(process.env.HITCH_OVER ?? 50);
-const { server, base, browser } = await launch({ args: ['--enable-precise-memory-info'] });
+const elements = process.env.HITCH_ELEMENTS === '1';
+const { server, base, browser } = await launch({ args: ['--enable-precise-memory-info', ...(elements ? ['--js-flags=--allow-natives-syntax'] : [])] });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 page.on('pageerror', (e) => console.log(`PAGE ERROR: ${e.message}`));
 await page.goto(`${base}?title=0&day=0&hour=11&weather=fair&hold=hated${process.env.SET_GL === '1' ? '&gl' : ''}`);
@@ -92,6 +93,20 @@ console.log(`--- materials new since the fight began (type, then the object's na
     }
   });
   return [...out].map(([k, n]) => `  ${n}x ${k}`).join('\n') || '  none';
+})}`);
+// HITCH_ELEMENTS=1: how V8 holds the matrices' numbers. Doubles in place are free to write; boxed ("object"
+// elements) allocate a number on every write, which three does for every object's matrices every frame.
+if (elements) console.log(`--- matrix elements kinds (V8):\n${await page.evaluate(() => {
+  const kind = new Function('a', 'return %HasDoubleElements(a) ? "double" : %HasSmiElements(a) ? "smi" : %HasObjectElements(a) ? "object" : "other"');
+  const count = new Map(), add = (k) => count.set(k, (count.get(k) ?? 0) + 1);
+  let M4 = null, M3 = null;
+  window.game.view.scene.traverse((o) => {
+    M4 ??= o.matrix.constructor; M3 ??= o.normalMatrix.constructor;
+    add(`matrix ${kind(o.matrix.elements)}`); add(`matrixWorld ${kind(o.matrixWorld.elements)}`); add(`normalMatrix ${kind(o.normalMatrix.elements)}`);
+    for (const b of o.skeleton?.bones ?? []) add(`bone matrixWorld ${kind(b.matrixWorld.elements)}`);
+  });
+  add(`a new Matrix4 ${kind(new M4().elements)}`); add(`a new Matrix3 ${kind(new M3().elements)}`);
+  return [...count].map(([k, n]) => `  ${n}x ${k}`).join('\n');
 })}`);
 if (process.env.HITCH_KEYS === '1') console.log(`--- material cache keys worked out during the fight (calls, by what):\n${await page.evaluate(() => [...window.__keyCounts].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([k, n]) => `  ${n} ${k}`).join('\n'))}`);
 if (profiling) report((await cdp.send('Profiler.stop')).profile);
