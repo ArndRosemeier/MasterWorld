@@ -496,7 +496,8 @@ export class Cellars {
       quietLine: fill(words.quiet, { place }),
     };
     b.fight = new Encounter(arena, b.delve, b.creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight, !!mine?.paid || this.kept.has(own));
-    b.fight.onCue = (c) => h.cue(c);
+    // A door a dweller unbars is seen swinging away from it (as one the hero opens).
+    b.fight.onCue = (c) => { if (c.kind === 'unbarred') b.view.opened(c.link, c.from); h.cue(c); };
     // The chests stand open that were opened (before these dwellers too), shut the rest; searched, a lid lifts.
     for (const x of hoardsOf(cellar, h.setting.creatures)) if (x.prop) b.view.lidUp(x.id, b.delve.hasOpened(x) ? 1 : 0);
     b.fight.onLid = (id, k) => b.view.lidUp(id, k);

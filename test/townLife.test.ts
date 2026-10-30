@@ -201,3 +201,13 @@ test('town life: a gate opens at night for someone on their way through it, not 
   assert.ok(!goingThrough(walker(0, -30, [0, 10]), 0, 0, 22), 'still too far off');
   assert.ok(!goingThrough({ ...walker(0, -5, [0, 10]), act: 'chat' } as Agent, 0, 0, 22), 'standing by it');
 });
+
+test('town life: when the clock skips ahead (a night\'s sleep, a wait), everyone is already where that time took them', () => {
+  const life = new TownLife(plan, 7, 11);
+  for (let s = 0; s < 120; s++) life.step(1, 11 + s / 3600);
+  life.focus = { x: plan.centre[0], z: plan.centre[1] };
+  // From late morning to half past ten at night in one step: nobody is left walking home across the dark town.
+  life.step(1, 22.5);
+  const walking = life.agents.filter((a) => a.act === 'walk' && !a.held);
+  assert.ok(walking.length < life.agents.length * 0.02, `${walking.length} of ${life.agents.length} still walking after the skip`);
+});

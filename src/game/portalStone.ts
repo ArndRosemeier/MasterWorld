@@ -38,8 +38,8 @@ export interface Spot { readonly x: number; readonly y: number; readonly z: numb
 
 /** What a portal's spot is checked against. */
 export interface RoomProbe {
-  /** The floor here (ground, a deck, a step), world y. */
-  standFloor(x: number, z: number): number;
+  /** The floor here (ground, a deck, a step, a cave's rock floor), world y: the first going down from a step over `near`. */
+  standFloor(x: number, z: number, near: number): number;
   /** Walls, trunks, rocks: does a body of radius `r` at (x, z), its feet at `y`, touch one? */
   blocksAt(x: number, z: number, r: number, y: number): boolean;
   /** Rock as a signed distance (positive in air); null away from it. */
@@ -61,14 +61,14 @@ export function stoneSpot(feet: Spot, yaw: number): Spot {
 }
 
 /** Home: the floor the beam strikes under the stone, facing the way the hero faced. */
-export function homeFrame(stone: Spot, yaw: number, floor: (x: number, z: number) => number): PortalFrame {
-  return { x: stone.x, y: floor(stone.x, stone.z), z: stone.z, yaw };
+export function homeFrame(stone: Spot, yaw: number, floor: (x: number, z: number, near: number) => number): PortalFrame {
+  return { x: stone.x, y: floor(stone.x, stone.z, stone.y - STONE_UP), z: stone.z, yaw };
 }
 
 /** The far portal's frame: on the floor just beyond the stone, its way through the way the hero faces. */
-export function beyondFrame(stone: Spot, yaw: number, floor: (x: number, z: number) => number): PortalFrame {
+export function beyondFrame(stone: Spot, yaw: number, floor: (x: number, z: number, near: number) => number): PortalFrame {
   const [fx, fz] = ahead(yaw), x = stone.x + fx * PORTAL_BEYOND, z = stone.z + fz * PORTAL_BEYOND;
-  return { x, y: floor(x, z), z, yaw };
+  return { x, y: floor(x, z, stone.y - STONE_UP), z, yaw };
 }
 
 /** How far the floor may rise or fall under the arch before it does not stand there (m). */
@@ -83,7 +83,7 @@ export function hasRoom(f: PortalFrame, shape: PortalShape, probe: RoomProbe): b
   const w = shape.halfWidth;
   for (const along of [-0.6, 0, 0.6]) for (const k of [-1, -0.5, 0, 0.5, 1]) {
     const x = f.x + rx * w * k + fx * along, z = f.z + rz * w * k + fz * along;
-    const y = probe.standFloor(x, z);
+    const y = probe.standFloor(x, z, f.y);
     if (!Number.isFinite(y) || Math.abs(y - f.y) > LEVEL) return false;
     const water = probe.wetAt(x, z);
     if (water !== null && water > y + 0.25) return false;

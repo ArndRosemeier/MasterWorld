@@ -313,11 +313,11 @@ export class InteriorVisit {
     const places = o.flow.frame(cast, dt);
     // Those walking out wait on the doorstep until they reach it (else they would be in the street already).
     for (const a of o.flow.leaving) life.linger(a, 0.25);
-    this.placed = places.map(({ agent, a, b, storey, yaw, act, seat }) => {
+    this.placed = places.map(({ agent, a, b, storey, yaw, act, seat, bed }) => {
       const p = o.walk.floorAt(a, b, storey);
       // The small folk serve from a step behind the counter (unseen behind it): else only their hair shows.
       const step = act === 'serve' && SMALL.has(agent.person.race) ? SERVE_STEP : 0;
-      return { agent, x: p.x, y: p.y + step, z: p.z, dir: o.walk.frame.dirOf(yaw), act, ...(seat !== undefined ? { seat: p.y + seat } : {}) };
+      return { agent, x: p.x, y: p.y + step, z: p.z, dir: o.walk.frame.dirOf(yaw), act, ...(seat !== undefined ? { seat: p.y + seat } : {}), ...(bed !== undefined ? { bed: p.y + bed } : {}) };
     });
   }
 

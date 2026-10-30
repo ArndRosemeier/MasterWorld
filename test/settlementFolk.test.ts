@@ -14,6 +14,8 @@ import { houseKey } from '../src/world/town';
 import { Terrain } from '../src/world/terrain';
 import { settlementOf, type Decision, type DecisionLog } from '../src/world/decisions';
 import { SMALL } from './small';
+import { planInterior } from '@futuremagic/settlement';
+import { roomCast } from '../src/sim/roomCast';
 
 const seed = parseSeed('masterworld');
 // The start's land with small drainage tiles (as the frontier test): the same town, faster.
@@ -131,4 +133,20 @@ test('settlements: every guild house keeps its teacher at home while awake (the 
     for (const { a, b } of housed) if (a!.act === 'walk' || a!.spot < 0 || life.spots[a!.spot].building !== b.id) out.set(a!.person.id, (out.get(a!.person.id) ?? 0) + 1);
   }
   assert.deepEqual([...out], [], 'teachers out of their houses');
+});
+
+test('settlements: at night every guild teacher lies asleep in a bed of their own house (the hedge witch is found in hers)', () => {
+  const start = new Township(terrain.towns[0], { seed, setting: classic, log: () => walked, hours: () => 2 });
+  const life = start.life;
+  start.keepMarked(life, []);
+  for (let s = 0; s < 300; s++) life.step(1, 2);
+  const housed = start.guilds.map((g) => ({ ...g, a: life.agents.find((x) => x.person.work === g.b.id && x.person.trade === g.guild.keeper) })).filter((t) => t.a && !t.a.post);
+  assert.ok(housed.some((t) => t.a!.person.trade === 'hedge-witch'));
+  // Laid out as the game opens them (interiorVisit): a hall where fighting is taught, a home for the witch.
+  for (const { a, b, guild, out } of housed) {
+    const room = planInterior(b, { hatch: false, hall: !!guild.hall && !out });
+    const c = roomCast(life.agents, life.spots, b.id, room).find((x) => x.agent === a);
+    assert.equal(c?.act, 'sleep', `${a!.person.trade} abed`);
+    assert.equal(room.spots[c!.spot].kind, 'sleep');
+  }
 });

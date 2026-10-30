@@ -1,5 +1,5 @@
 /**
- * Bridges where roads cross brooks (world/bridges.ts), drawn round the hero in the town's building shader
+ * Bridges where roads and towns' streets cross brooks (world/bridges.ts), drawn round the hero in the town's building shader
  * (no compiles of their own). Found again as the hero moves on, a road is laid or a brook tile arrives:
  * only where the brooks are known here (BrookPrefetch), so finding them never traces a tile on the main thread.
  * Their decks are floors the hero walks on (`deck`).
@@ -7,7 +7,7 @@
 import { Group, type Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { Terrain } from '../world/terrain';
-import { bridgeMesh, bridgeSideAt, bridgesNear, deckAt, type Bridge } from '../world/bridges';
+import { bridgeMesh, bridgeSideAt, bridgesNear, deckAt, townBridges, type Bridge } from '../world/bridges';
 import { buildingMeshAt } from './materials/building';
 
 /** Bridges within this of the hero are drawn, m; they go again past FORGET. */
@@ -22,8 +22,30 @@ export class BridgeView {
   private lastZ = Infinity;
   private known = '';
   private adding: Promise<void> | null = null;
+  /** Each town's bridges, found once its brooks are known (again when a road is laid: one may continue a road out). */
+  private readonly byTown = new Map<string, Bridge[]>();
+  private townsRoads = -1;
 
   constructor(private readonly stage: Stage, private readonly terrain: Terrain) {}
+
+  /** Every bridge round (x, z) whose brooks are known here: on the roads and on the towns' streets. */
+  around(x: number, z: number, reach: number): Bridge[] {
+    const t = this.terrain, hydro = t.hydro, ready = (px: number, pz: number) => hydro.hasBrooks(px, pz);
+    if (t.roads.roads.length !== this.townsRoads) { this.byTown.clear(); this.townsRoads = t.roads.roads.length; }
+    const out = bridgesNear(t.roads, hydro, x, z, reach, ready, t);
+    for (const town of t.towns) {
+      const d = town.decision;
+      if (Math.hypot(d.x - x, d.z - z) > reach + d.radius * 4) continue;
+      let bs = this.byTown.get(d.id);
+      if (!bs) {
+        const found = townBridges(town, t.roads, hydro, (px, pz) => t.height(px, pz), ready);
+        if (!found) continue;
+        this.byTown.set(d.id, (bs = found));
+      }
+      out.push(...bs.filter((b) => Math.hypot(b.x - x, b.z - z) < reach));
+    }
+    return out;
+  }
 
   /** The bridges drawn now (shots and checks). */
   get bridges(): Bridge[] { return [...this.drawn.values()].map((d) => d.b); }
@@ -62,7 +84,13 @@ export class BridgeView {
       if (Math.hypot(d.x - x, d.z - z) < FORGET) continue;
       d.mesh.removeFromParent(); d.mesh.geometry.dispose(); this.drawn.delete(id);
     }
-    const fresh = bridgesNear(this.terrain.roads, hydro, x, z, REACH, (px, pz) => hydro.hasBrooks(px, pz)).filter((b) => !this.drawn.has(b.id));
+    const all = this.around(x, z, REACH), ids = new Set(all.map((b) => b.id));
+    // A bridge gone (a road laid on from a town's road out that ended in a brook takes over its bridge).
+    for (const [id, d] of this.drawn) {
+      if (ids.has(id) || Math.hypot(d.x - x, d.z - z) > REACH * 0.9) continue;
+      d.mesh.removeFromParent(); d.mesh.geometry.dispose(); this.drawn.delete(id);
+    }
+    const fresh = all.filter((b) => !this.drawn.has(b.id));
     if (!fresh.length) return;
     if (!this.group.parent && !this.adding) this.adding = this.stage.add(this.group);
     for (const b of fresh) {

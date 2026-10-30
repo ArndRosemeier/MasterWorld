@@ -88,7 +88,7 @@
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
   },
   {
-    "key": "same name: masterworld/sim/dungeonNav.ts#sees + masterworld/sim/wild.ts#sees",
+    "key": "same name: masterworld/sim/dungeonNav.ts#free + masterworld/sim/wild.ts#free",
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
   },
   {
@@ -152,10 +152,6 @@
     "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
   },
   {
-    "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/sim/townLife.ts#step",
-    "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
-  },
-  {
     "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/sim/wild.ts#step",
     "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
   },
@@ -208,8 +204,8 @@
     "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
   },
   {
-    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/townLife.ts#step",
-    "reason": "Each simulation steps its own agents (a den's creatures, the townsfolk) by dt; the finder paired them anew as files changed."
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/creatures.ts#step",
+    "reason": "Each simulation steps its own agents (a den's creatures, a cellar's owner coming down) by dt; the finder paired them anew as files changed."
   },
   {
     "key": "idiom: [.fbm3 .sin Math] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
@@ -626,5 +622,17 @@
   {
     "key": "idiom: [.setAttribute .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/materials/portal.ts + masterworld/render/portal/PortalView.ts + masterworld/render/water/WaterView.ts + stage/stage.ts",
     "reason": "Three's BufferGeometry built by hand (attributes, then the index); each mesh builds its own shape."
+  },
+  {
+    "key": "same name: masterworld/lab/spellLab.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
+  },
+  {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
+  },
+  {
+    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/townLife.ts#step",
+    "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
   }
 ]

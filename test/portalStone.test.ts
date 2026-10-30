@@ -4,6 +4,12 @@ import { beyondFrame, cleanStoneSave, hasRoom, homeFrame, NEAR_HOME, PortalStone
 import { passesThrough, stepPoint, toFrame } from '../src/game/portal';
 import { classic as setting } from '../src/setting/classic/index';
 import { Character } from '../src/game/character';
+import { outlineCellar } from '../src/world/dungeon/cellar';
+import { CaveSpace, caveField } from '../src/world/dungeon/caveRock';
+import { caveFeatures, keepSpots } from '../src/world/dungeon/caveFeatures';
+import { testDecision, testHouse } from '../src/world/dungeon/variety';
+import { dungeonWorld } from '../src/game/dungeonWorld';
+import { Walker } from '../src/game/walker';
 
 const flat: RoomProbe = { standFloor: () => 10, blocksAt: () => false, rockGapAt: () => null, wetAt: () => null };
 const floor = () => 10;
@@ -100,4 +106,24 @@ test('every new hero carries a portal stone', () => {
     c.beginAs(bg);
     assert.ok(c.pack.some((it) => setting.items.items.find((d) => d.id === it.def)?.portal), bg.id);
   }
+});
+
+test('down in a cave a portal finds the rock floor and has room in a cavern', () => {
+  const c = outlineCellar(testDecision(3, 1, 'cave'), testHouse(3), setting.dungeons.cave!);
+  const feat = caveFeatures(c.layout, 3, keepSpots(c)), space = new CaveSpace(c.layout, caveField(c.layout, 3, feat), feat);
+  const world = dungeonWorld(space, { x: 0, y: 0, z: 0 }), w = new Walker(world), { cell, storey } = c.layout.scale;
+  const probe: RoomProbe = { standFloor: (x, z, near) => w.support(x, z, near), blocksAt: () => false, rockGapAt: world.rockSurface, wetAt: () => null };
+  const st = new PortalStone();
+  st.markHome(homeFrame({ x: 0, y: 10, z: 0 }, 0, floor));
+  let opened = 0;
+  for (const r of c.layout.rooms) {
+    const x = (r.x + r.w / 2) * cell, z = (r.z + r.d / 2) * cell, feet = { x, y: w.support(x, z, r.level * storey + 1), z };
+    for (let i = 0; i < 8 && !opened; i++) {
+      const yaw = (i * Math.PI) / 4;
+      const f = beyondFrame(stoneSpot(feet, yaw), yaw, probe.standFloor);
+      assert.ok(Math.abs(f.y - feet.y) < 2, `room ${r.id}: the floor beyond at ${f.y.toFixed(1)}, feet at ${feet.y.toFixed(1)}`);
+      if (st.canOpen(f, probe, 'cave-3') !== null) opened++;
+    }
+  }
+  assert.ok(opened > 0, 'no cavern had room for a portal');
 });

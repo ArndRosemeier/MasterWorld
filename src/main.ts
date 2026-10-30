@@ -154,7 +154,6 @@ import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/s
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
 import { GroundCache } from './world/groundCache';
-import { bridgesNear } from './world/bridges';
 import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
@@ -274,7 +273,8 @@ export async function start(b: Boot): Promise<void> {
     // Every town (the start's and each settlement's): their cores and their buildings (set once the workers run).
     let towns: Towns | null = null;
     // The land, and the steps and porches before the doors (where the townsfolk stand).
-    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), towns?.stand(x, z) ?? -Infinity);
+    // (Over a brook on a town's street the bridge's deck: folk walk out to their fields over it.)
+    const outdoors = (x: number, z: number) => Math.max(terrain.height(x, z), towns?.stand(x, z) ?? -Infinity, bridgeView.deck(x, z) ?? -Infinity);
     // Tree trunks one walks round, asked ahead from the world workers (`jobs`, below) around the hero.
     const trunks = new Trunks(terrain, (x0, z0, size, spacing) => jobs.flora(x0, z0, size, spacing));
     // Rocks one walks round (D55), asked ahead the same way.
@@ -891,7 +891,8 @@ export async function start(b: Boot): Promise<void> {
       stage: view.stage, camera: view.camera, canvas, player, portals,
       // Where the hero is: the land, or the place below they are in (its floor, walls and rock).
       probe: {
-        standFloor: (x, z) => world.floor!(x, z) ?? world.height(x, z),
+        // As the walker finds it: a cave's rock floor, a deck, a step (from a step over `near` down).
+        standFloor: (x, z, near) => player.walker.support(x, z, near),
         blocksAt: (x, z, r, y) => world.wall!(x, z, r, y),
         rockGapAt: (x, y, z) => world.rockSurface(x, y, z),
         wetAt: (x, z) => world.waterLevel(x, z),
@@ -1216,7 +1217,8 @@ export async function start(b: Boot): Promise<void> {
         const t = talk!.place;
         return t.talk.toldSafe(a.person.id, id, paidFor(id, t));
       },
-      get roomPeople() { return rooms?.inside ? rooms.people() : null; },
+      // Sleepers lie in their beds, not to be talked to.
+      get roomPeople() { return rooms?.inside ? rooms.people()?.filter((p) => p.act !== 'sleep') ?? null : null; },
     }) : null;
     // A room at the inn and the smith's mending (plan 11.5): two more services, in whichever town.
     const upkeep = new UpkeepUi(character, setting, {
@@ -1676,7 +1678,7 @@ export async function start(b: Boot): Promise<void> {
       answerFor: (need) => answerNow(need),
       event: (id) => storyEventNow(id),
       goodDay: () => goodDayNow(),
-      bridges: (x, z) => bridgesNear(terrain.roads, terrain.hydro, x, z, 4000, (px, pz) => terrain.hydro.hasBrooks(px, pz)),
+      bridges: (x, z) => bridgeView.around(x, z, 4000),
     });
     // The VGM seen at work (a developer's aid; D53 keeps it out of play): its panel (F9), docked at the right while
     // the hero plays, with its moves live, filtered by kind, each placed one shown on the minimap when clicked.

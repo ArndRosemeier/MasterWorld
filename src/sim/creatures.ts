@@ -119,7 +119,9 @@ export type DenEvent =
   | { readonly kind: 'died'; readonly who: Creature }
   | { readonly kind: 'plea'; readonly who: Creature; readonly text: string }
   | { readonly kind: 'spared'; readonly who: Creature }
-  | { readonly kind: 'home'; readonly who: Creature };
+  | { readonly kind: 'home'; readonly who: Creature }
+  /** It lifted the bar of a barred door from its bar's side (link): the door is seen opening away from it. */
+  | { readonly kind: 'unbarred'; readonly who: Creature; readonly link: number };
 
 /** Body radius by kind and size, metres. */
 export function radiusOf(def: CreatureDef): number {
@@ -128,6 +130,10 @@ export function radiusOf(def: CreatureDef): number {
 
 /** Hero's body radius, metres. */
 const HERO_R = 0.35;
+/** Does it have hands to lift a door's bar (a rat or a spider goes round)? */
+const hands = (c: Creature): boolean => c.def.body.kind === 'humanoid';
+/** It stands this long at a door it unbars (s): the bar lifted off and the door swung most of the way (CellarView). */
+const UNBAR_FOR = 1.8;
 /** A blow lands this long after it starts (the tell a quick hero steps away from). */
 const WINDUP = 0.4;
 /** Lost this long, it gives up the hunt. */
@@ -174,6 +180,10 @@ export class Den {
    * once struck or once the peace is ended (game/hold.ts).
    */
   peace = false;
+  /** Those busy lifting a door's bar: seconds left. */
+  private readonly unbarring = new Map<Creature, number>();
+  /** What happened while they walked (a door unbarred), out with the step's other events. */
+  private readonly walked: DenEvent[] = [];
 
   /** A dungeon's space (its rooms are the homes), or any other ground (open land: sim/wild.ts). */
   constructor(ground: DungeonSpace | DenGround, spawns: readonly Spawn[], defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []) {
@@ -224,6 +234,12 @@ export class Den {
       this.heal(c, dt);
       this.sense(c, q, dt, out);
       if (c.hop) { this.hopping(c, dt); continue; }
+      const busy = this.unbarring.get(c);
+      if (busy !== undefined) {
+        if (busy > dt) this.unbarring.set(c, busy - dt); else this.unbarring.delete(c);
+        c.act = 'stand';
+        continue;
+      }
       switch (c.state) {
         case 'idle': if (this.peace && c.aware > 0.35) this.watch(c, q, dt); else this.idle(c, q, dt); break;
         case 'alert': this.alert(c, q, dt); break;
@@ -235,6 +251,8 @@ export class Den {
       this.progress(c, dt);
     }
     this.spread();
+    out.push(...this.walked);
+    this.walked.length = 0;
     return out;
   }
 
@@ -374,11 +392,12 @@ export class Den {
       if (c.windup <= 0) {
         c.ready = atk.time;
         // Stepped back out of reach: the blow goes wide.
-        if (d < reach + 0.3 && dy < 1.2) out.push({ kind: 'blow', who: c, strike: strike({ damage: atk.damage, kind: atk.kind, prowess: atk.prowess }, q.guard, c.rng) });
+        if (d < reach + 0.3 && dy < 1.2 && this.clear(c, q)) out.push({ kind: 'blow', who: c, strike: strike({ damage: atk.damage, kind: atk.kind, prowess: atk.prowess }, q.guard, c.rng) });
       }
       return;
     }
-    if (d < (c.close ? reach + HOLD : reach) && dy < 1.2) {
+    // In reach with nothing between (a wall, a shut door): it stands and fights; else it finds its way round.
+    if (d < (c.close ? reach + HOLD : reach) && dy < 1.2 && this.clear(c, q)) {
       c.close = true;
       c.path = [];
       c.dir = Math.atan2(dz, dx);
@@ -390,13 +409,18 @@ export class Den {
     // Close in: straight when it sees the hero near, else along the way.
     const target = c.lost < 0.5 ? { x: q.x, y: q.y, z: q.z } : c.seen;
     if (!target) return;
-    if (c.lost < 0.5 && d < 4 && dy < 0.8) {
+    if (c.lost < 0.5 && d < 4 && dy < 0.8 && this.clear(c, q)) {
       c.path = [this.slot(c, q, reach * 0.8)];
       c.pi = 0;
     } else if (c.repath === 0 || c.pi >= c.path.length) { this.headTo(c, target); c.repath = 0.6; }
     if (!this.move(c, dt, 1)) c.act = 'stand';
     // It cannot get to the hero (across a river, up a cliff) and has no hop left: it gives up and goes home.
     if (this.ground.hop && c.pushing > STUCK.giveUp && !c.hop) { this.goHome(c, out); c.spurn = STUCK.spurn; c.pushing = 0; }
+  }
+
+  /** Is the way between it and the hero clear at the height of a blow (no wall or shut door between)? */
+  private clear(c: Creature, q: Quarry): boolean {
+    return this.ground.sees(c.x, c.y, c.z, q.x, q.y, q.z, 0.9);
   }
 
   /**
@@ -527,12 +551,12 @@ export class Den {
 
   private headTo(c: Creature, p: { x: number; y: number; z: number }): void {
     c.pi = 0;
-    c.path = this.ground.way(c, p);
+    c.path = this.ground.way(c, p, hands(c));
   }
 
   /** Off as far from the hero as it can get. */
   private runFrom(c: Creature, q: Quarry): void {
-    const way = this.ground.away(c, q);
+    const way = this.ground.away(c, q, hands(c));
     if (way.length) { c.path = way; c.pi = 0; }
   }
 
@@ -540,6 +564,16 @@ export class Den {
   private move(c: Creature, dt: number, pace: number): boolean {
     if (c.pi >= c.path.length) return false;
     c.wants = true;
+    // A barred door on its way, on the bar's side: it stops and lifts the bar (seen), then walks on through.
+    const doors = hands(c) ? this.ground.unbar?.(c, c.path[c.pi]) ?? [] : [];
+    if (doors.length) {
+      const p = c.path[c.pi];
+      c.dir = Math.atan2(p.z - c.z, p.x - c.x);
+      c.act = 'stand';
+      this.unbarring.set(c, UNBAR_FOR);
+      for (const link of doors) this.walked.push({ kind: 'unbarred', who: c, link });
+      return true;
+    }
     let left = c.def.speed * pace * paceOf(c) * (1 - c.slow) * dt;
     const r = radiusOf(c.def);
     for (let n = 0; left > 1e-4 && c.pi < c.path.length && n < 8; n++) {
