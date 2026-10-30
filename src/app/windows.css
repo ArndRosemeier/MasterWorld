@@ -296,7 +296,8 @@
 @keyframes vgm-in { from { opacity: 0; transform: translateX(40px); } }
 
 /* The VGM window (src/app/vgmUi.ts, a developer's aid): its needs as brass gauges, buttons that make it act, its log. */
-.panel.vgm { width: min(640px, 100%); }
+.panel.vgm { width: min(640px, 100%); max-height: calc(100vh - 290px); }
+.shade:has(.panel.vgm) { padding-top: 190px; }
 .vgm h3 { margin: 12px 0 6px; font: 400 15px/1.2 'Marcellus SC', Georgia, serif; letter-spacing: .05em; color: var(--brass); }
 .vgm .said { margin: 0 0 6px; padding: 6px 12px; border: 1px solid var(--ward); border-radius: 10px; color: var(--ward-hot); font-style: italic; }
 .vgm .needs { display: grid; gap: 4px; }
@@ -317,3 +318,7 @@
 .vgm .move .go { padding: 1px 8px; font: 12px/1.3 'Marcellus SC', Georgia, serif; color: var(--ward); background: transparent; border: 1px solid var(--brass-lo); border-radius: 8px; cursor: pointer; }
 .vgm .move .go:hover { border-color: var(--ward); }
 .vgm .move .why { color: var(--ink-dim); }
+.vgm .move.placed { cursor: pointer; border-radius: 6px; }
+.vgm .move.placed:hover { background: #8fe3ff0d; }
+.vgm .move.picked { background: #8fe3ff1a; box-shadow: inset 3px 0 0 var(--ward); }
+.vgm .move .way:not(:empty) { margin-top: 2px; font-size: 13px; color: var(--ward); }

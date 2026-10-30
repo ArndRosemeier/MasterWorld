@@ -101,6 +101,10 @@
 /* The VGM's places (its show mode, a developer's aid): ward-blue studs with a slow pulse. */
 #compass .stud.vgm { left: -4px; top: -4px; width: 8px; height: 8px; background: radial-gradient(circle at 40% 35%, #fff, var(--ward) 45%, #1d6f8a); box-shadow: 0 0 7px var(--ward); }
 #compass .stud.vgm::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--ward); animation: vgm-stud 2.4s ease-out infinite; opacity: 0; }
+#compass .stud.vgm.picked { z-index: 1; left: -6px; top: -6px; width: 12px; height: 12px; background: radial-gradient(circle at 40% 35%, #fff, var(--brass-hi) 40%, var(--brass)); box-shadow: 0 0 10px var(--ward-hot), 0 0 0 2px var(--ward); }
+#compass .stud.vgm.picked::after { inset: -6px; border-width: 2px; animation-duration: 1.4s; }
+/* While the VGM window is open the minimap stands above its shade (a move picked in the log is lit on it). */
+body.vgm-open #compass { z-index: 11; }
 @keyframes vgm-stud { from { scale: .6; opacity: .9; } to { scale: 2.2; opacity: 0; } }
 @keyframes stud-in { from { scale: 3.5; opacity: 0; } }
 #compass .lubber { position: absolute; left: 50%; top: -4px; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-top: 9px solid var(--brass); filter: drop-shadow(0 1px 1px #000); }

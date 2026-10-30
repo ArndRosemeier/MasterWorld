@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { Director } from '../src/vgm/director';
 import { TOOLS, toolOf, vgmTurn } from '../src/vgm/toolbox';
-import { PACING, toolFor, vgmLines, VgmWatch } from '../src/vgm/vgmLog';
+import { cleanWhys, PACING, toolFor, vgmLines, VgmWatch, wayTo, whyOf } from '../src/vgm/vgmLog';
 import type { Decision, DungeonDecision } from '../src/world/decisions';
 import { EAST, frontierLand } from './frontierLand';
 
@@ -80,4 +80,21 @@ test('vgm log: the watch for its alerts gives each new move once, not what was t
   assert.equal(watch.see(later).length, 0, 'each move once');
   assert.equal(watch.see([sight('other-1')]).length, 0, 'a shorter log (another game) starts over from its end');
   assert.deepEqual(watch.see([sight('other-1'), sight('other-2')]).map((l) => l.tool), ['sight']);
+});
+
+test('vgm log: its reasons survive a save, and a move with a place says which way it lies', () => {
+  const walked = walk(3, EAST);
+  const turn = vgmTurn({ seed, log: walked, towns: terrain.towns, terrain, home, hours: 5, purposeOverdue: true, inside: () => false, setting: classic });
+  assert.ok(turn.length >= 1);
+  const log = [...walked, ...turn.map((m) => m.decision)];
+  // Saved as JSON and read back: the same lines as from the moves themselves.
+  const kept = cleanWhys(JSON.parse(JSON.stringify([...turn.map(whyOf), { id: 'x', tool: 'no-such-tool', reason: 'r', at: 1 }, null, 'junk'])));
+  assert.equal(kept.length, turn.length, 'only well-formed reasons of known tools are kept');
+  assert.deepEqual(vgmLines(log, kept), vgmLines(log, turn));
+  assert.deepEqual(cleanWhys(undefined), []);
+  const promise = vgmLines(log, kept).find((l) => l.id === turn[0].decision.id)!;
+  assert.ok(promise.where, 'a promised place has a place on the land');
+  assert.equal(wayTo([0, 0], [0, -500]), '500 m to the north');
+  assert.equal(wayTo([0, 0], [1500, 1500]), '2.1 km to the south-east');
+  assert.equal(wayTo([0, 0], [5, 5]), 'here');
 });
