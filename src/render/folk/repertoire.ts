@@ -45,7 +45,7 @@ export const REPERTOIRE: Partial<Readonly<Record<ActivityKind, readonly Turn[]>>
   // At a grave: still, arms folded, now and then down on one knee.
   mourn: [rest('arms folded', 4, [2, 5]), now('idle', 2, [2, 3]), now('crouch', 1, [1, 2])],
   // At a feast, in the ring: one folk dance after another, a whoop now and then.
-  dance: [rest('dance folk', 3, [2, 4]), now('dance folk 2', 3, [2, 4]), now('dance', 2, [3, 6]), now('cheer', 0.7)],
+  dance: [rest('dance folk', 3, [2, 4]), now('dance folk 2', 3, [2, 4]), now('cheer', 0.7)],
   // Round the ring: a drink raised, a laugh, a cheer for the dancers, a word with the neighbour.
   revel: [rest('idle', 3, [1, 3]), now('eat or drink', 2.5), now('laugh', 2), now('cheer', 2), now('talk', 2, [1, 2]), now('nod', 1), now('arms folded', 1, [1, 2])],
   // Children at play: dancing a round, standing a while, crouching down to something.

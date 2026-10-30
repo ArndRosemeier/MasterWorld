@@ -20,7 +20,7 @@ test('feast: a ring dances facing its middle, the rest revel round it, the child
   }
   const dancers = life.agents.filter((a) => a.act === 'dance'), revellers = life.agents.filter((a) => a.act === 'revel');
   assert.ok(dancers.length >= 6, `${dancers.length} dancing`);
-  assert.ok(revellers.length > dancers.length, `${revellers.length} revelling`);
+  assert.ok(revellers.length >= 15, `${revellers.length} revelling`);
   for (const a of dancers) {
     const d = Math.hypot(a.x - x, a.z - z);
     assert.ok(d > 6 && d < 8, `a dancer ${d.toFixed(1)} m from the middle`);
@@ -35,6 +35,11 @@ test('feast: a ring dances facing its middle, the rest revel round it, the child
   for (const a of revellers) assert.ok(Math.hypot(a.x - x, a.z - z) > 8.5, 'revellers keep out of the ring');
   assert.ok(revellers.filter(faces).length > revellers.length * 0.9, `${revellers.filter(faces).length} of ${revellers.length} revellers face the ring`);
   assert.ok(dancers.length <= (2 * Math.PI * 7) / 1.1, `${dancers.length} dancers, room for each`);
+  // A ring all round, not a clump: no gap wider than a few dancers' room.
+  const angles = dancers.map((a) => Math.atan2(a.z - z, a.x - x)).sort((p, q) => p - q);
+  const gap = Math.max(...angles.map((t, i) => (i ? t - angles[i - 1] : t + 2 * Math.PI - angles[angles.length - 1])));
+  assert.ok(dancers.length >= 20 && gap < 1, `${dancers.length} dancers, widest gap ${gap.toFixed(2)} rad`);
+  for (const a of life.agents) if (a.act === 'play') assert.ok(Math.hypot(a.x - x, a.z - z) > 8.5, 'children play out of the ring');
   const kids = life.agents.filter((a) => a.person.role === 'child' && !a.hidden);
   assert.ok(kids.length && kids.filter((a) => ran.has(a.person.id)).length > kids.length * 0.6, `${ran.size} of ${kids.length} children ran`);
 });

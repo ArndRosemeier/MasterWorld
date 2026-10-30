@@ -181,7 +181,7 @@ export const RUN = 2.3;
  * the share of the grown who dance in it, each dancer's room along the ring (m), revellers stand round it from
  * `revel` out.
  */
-const FEAST = { ring: 7, dancers: 0.35, room: 1.1, revel: 9.5 } as const;
+const FEAST = { ring: 7, dancers: 0.6, room: 1.1, revel: 9.5 } as const;
 
 /** How fast `a` goes when on the move (m/s). */
 export const paceOf = (a: Agent): number => a.person.speed * (a.run ? RUN : 1);
@@ -510,13 +510,23 @@ export class TownLife {
       return [order.x + r.range(-1, 1), order.z + r.range(-1, 1)];
     };
     if (p.role === 'child') {
-      const [x, z] = openSpot(1, order.radius * 0.8);
+      // Out round the revellers, never through the ring.
+      const [x, z] = openSpot(FEAST.revel, Math.max(FEAST.revel + 2, order.radius));
       return { spot: -1, x, z, act: 'play', secs: [3, 9], run: true };
     }
-    const dancing = this.agents.filter((o) => o !== a && (o.act === 'dance' || o.next === 'dance')).length;
-    if (p.age < OLD_AGE && r.chance(FEAST.dancers) && dancing < (2 * Math.PI * FEAST.ring) / FEAST.room) {
-      const [x, z] = openSpot(FEAST.ring - 0.3, FEAST.ring + 0.3);
-      return { spot: -1, x, z, act: 'dance', secs: [60, 180], face };
+    if (p.age < OLD_AGE && r.chance(FEAST.dancers)) {
+      // A free place in the ring, evenly spaced (where the others dance, or are on their way to).
+      const n = Math.floor((2 * Math.PI * FEAST.ring) / FEAST.room), taken = new Set<number>();
+      for (const o of this.agents) {
+        if (o === a || (o.act !== 'dance' && o.next !== 'dance')) continue;
+        const [ox, oz] = o.act === 'dance' ? [o.x, o.z] : [o.path[o.path.length - 2], o.path[o.path.length - 1]];
+        taken.add(((Math.round((Math.atan2(oz - order.z, ox - order.x) / (2 * Math.PI)) * n) % n) + n) % n);
+      }
+      const free = Array.from({ length: n }, (_, k) => k).filter((k) => !taken.has(k));
+      for (let tries = 0; tries < 6 && free.length; tries++) {
+        const k = free.splice(r.int(0, free.length - 1), 1)[0], [x, z] = onCircle(order, (k / n) * 2 * Math.PI, FEAST.ring);
+        if (this.freeGround(x, z)) return { spot: -1, x, z, act: 'dance', secs: [60, 180], face };
+      }
     }
     const [x, z] = openSpot(FEAST.revel, Math.max(FEAST.revel + 2, order.radius));
     return { spot: -1, x, z, act: 'revel', secs: [60, 200], face };
