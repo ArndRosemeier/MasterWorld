@@ -37,6 +37,8 @@ export interface Portal {
   readonly a: PortalSide;
   readonly b: PortalSide;
   readonly shape: PortalShape;
+  /** Drawn as a rift (a rippling ellipse rimmed with light: the portal stone's) instead of a plain opening. */
+  readonly rift?: boolean;
 }
 
 /** A point (or a direction with `w` 0). */
