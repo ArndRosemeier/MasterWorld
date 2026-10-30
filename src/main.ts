@@ -86,6 +86,7 @@ import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
 import { HatchClimb } from './app/hatchClimb';
+import { ShipClimb } from './app/shipClimb';
 import { UsePrompt } from './app/usePrompt';
 import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
@@ -1867,6 +1868,8 @@ export async function start(b: Boot): Promise<void> {
       // The ground's vertices lie a couple of metres apart: sunk well round the hatch, all of them under it go.
       sink: (at) => { if (at) GROUND_DIP.value.set(at.x, at.z, SINK_REACH, SINK_DEPTH); else GROUND_DIP.value.w = 0; },
     });
+    // A ship's castle ladders, climbed in sight as the ship rides the swell (E; app/shipClimb.ts).
+    const shipClimbs = new ShipClimb({ player, decks });
     // The free camera is a debug tool: its key (F) works only with `?fly` or once the debug menu has flown, and
     // always lands again while flying (a stray F in a cellar flew the camera through its walls).
     let flyKey = params.fly;
@@ -1875,7 +1878,7 @@ export async function start(b: Boot): Promise<void> {
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
       const b = settings.current.bindings;
-      if (b.use.includes(e.code) && playing && climbs.use()) return;
+      if (b.use.includes(e.code) && playing && (climbs.use() || shipClimbs.use())) return;
       if (b.fly.includes(e.code) && (flyKey || player.flying)) player.flying = !player.flying;
       else if (b.mount.includes(e.code)) player.toggleMount();
       else if (b.dive.includes(e.code) && playing && player.walker.mode === 'ground' && !player.flying) {
@@ -2192,7 +2195,7 @@ export async function start(b: Boot): Promise<void> {
       { const t = here(); if (t) { if (!t.been) director.met('discovery'); character.earn(`town:${t.town.decision.id}`, 'town'); t.been = true; if (talk) talk.place = t; } }
       talk?.watch();
       // The key for what the hero stands by (a hatch, the ladder up): only the key and the deed, the climb is seen.
-      { const o = playing && open === 0 && !ended ? climbs.climbOffered : null; usePrompt.keyFor(settings.current.bindings.use[0], o === 'down' ? 'Climb down' : o === 'up' ? 'Climb up' : null); }
+      { const o = playing && open === 0 && !ended ? climbs.climbOffered ?? shipClimbs.climbOffered : null; usePrompt.keyFor(settings.current.bindings.use[0], o === 'down' ? 'Climb down' : o === 'up' ? 'Climb up' : null); }
       part('map+minimap');
       const at = player.walker.pos;
       // The map fills in: the land round the hero as they go (not below ground), and a sketch of the way to each new mark.

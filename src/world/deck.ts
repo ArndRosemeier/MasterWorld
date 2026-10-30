@@ -4,7 +4,7 @@
  * the quay up to its gangway; and a body standing on a deck goes with it as it rises, pitches, rolls and sails (it
  * neither slides off nor sinks through). Pure: the ship's own shape comes from @futuremagic/settlement.
  */
-import { PLANK, hullHalf, shipFloor, shipWall, type Mooring, type ShipPlan } from '@futuremagic/settlement';
+import { PLANK, hullHalf, shipFloor, shipLadders, shipWall, type Mooring, type ShipLadder, type ShipPlan } from '@futuremagic/settlement';
 
 /** A ship's place on the water: its waterline's middle, its heading (unit, bow first), bow up and port side up (rad). */
 export interface Pose {
@@ -153,6 +153,29 @@ export class Decks {
     if (shipFloor(s.plan, c.a, c.b) !== f) return m.y;
     // A castle's deck over the feet (in its cabin, or against its front): the main deck under it.
     return c.y > reach ? m.y : c.y;
+  }
+
+  /** A ship's pose now (null: not near). */
+  poseOf(id: string): Pose | null {
+    return this.ships.get(id)?.pose ?? null;
+  }
+
+  /**
+   * The ladder the rider stands by on the ship it is aboard: at its foot on the main deck (a way up), or on the castle
+   * at its top (a way down). Null: none.
+   */
+  ladderNear(): { id: string; ladder: ShipLadder; way: 'up' | 'down' } | null {
+    const r = this.riding(), on = this.aboard, s = on && this.ships.get(on.id);
+    if (!r || !s) return null;
+    const l = toShip(s.pose, r.x, r.y, r.z);
+    for (const ladder of shipLadders(s.plan)) {
+      const out = (l.a - ladder.a) * ladder.dir, across = Math.abs(l.b - ladder.b);
+      if (across > 0.7) continue;
+      if (Math.abs(l.h - ladder.y0) < 0.3 && out > -0.3 && out < 1.4) return { id: on.id, ladder, way: 'up' };
+      // On the castle, within a step or two of its front (the ladder's top stands a little out from it).
+      if (Math.abs(l.h - ladder.y1) < 0.3 && out < -ladder.lean - 0.45 && out > -ladder.lean - 2.2) return { id: on.id, ladder, way: 'down' };
+    }
+    return null;
   }
 
   /** A ship's gangplank's ends now (its foot on the land, its head at the gangway), for drawing it; null: none out. */
