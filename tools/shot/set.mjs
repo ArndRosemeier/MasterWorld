@@ -283,7 +283,9 @@ const SESSIONS = [
   { id: 'sea-deck', query: `${still}&hour=11&weather=fair&site=harbour&aboard`, shots: [
     { name: 'sea-deck', act: async (p) => {
       await p.waitForFunction(() => window.game?.decks?.ship, null, { timeout: TIMEOUT });
-      await seaLook({ out: -6, hy: 2.4, back: true, pitch: -20 })(p);
+      // The hero's own camera, from behind and above (the free camera lost the hero aboard).
+      await p.evaluate(() => { const pl = window.game.player; pl.flying = false; pl.heroCam.yaw = pl.walker.yaw; pl.heroCam.pitch = -0.4; });
+      await p.waitForTimeout(2000);
     } },
     { name: 'sea-deck-plank', act: async (p) => {
       await p.evaluate(() => {
