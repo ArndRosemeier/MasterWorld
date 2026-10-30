@@ -57,6 +57,11 @@ export class HeroCamera {
   private lmb = false;
   private rmb = false;
   private readonly eye = new Vector3();
+  /**
+   * Through a portal (app/portals.ts): a point behind the head that lies beyond an opening is looked up in the
+   * world on the far side, at the point it joins (null: not beyond one).
+   */
+  lens: ((head: Vector3, p: { x: number; y: number; z: number }) => { world: WalkWorld; p: { x: number; y: number; z: number } } | null) | null = null;
 
   constructor(private readonly camera: PerspectiveCamera, el: HTMLElement, private readonly world: WalkWorld) {
     window.addEventListener('keydown', (e) => { if (this.on && !e.repeat) this.controls.press(e.code); });
@@ -257,9 +262,10 @@ export class HeroCamera {
     const steps = Math.ceil(this.zoom / 0.25);
     for (let i = 1; i <= steps; i++) {
       const d = (i / steps) * this.zoom;
-      const x = head.x - dir.x * d, y = head.y - dir.y * d, z = head.z - dir.z * d;
-      const rock = (this.world.sightSurface ?? this.world.rockSurface)(x, y, z);
-      if (y < this.world.height(x, z) + 0.35 || (rock !== null && rock < 0.35)) { free = Math.max(0, d - 0.3); break; }
+      const at = { x: head.x - dir.x * d, y: head.y - dir.y * d, z: head.z - dir.z * d };
+      const far = this.lens?.(head, at), w = far?.world ?? this.world, { x, y, z } = far?.p ?? at;
+      const rock = (w.sightSurface ?? w.rockSurface)(x, y, z);
+      if (y < w.height(x, z) + 0.35 || (rock !== null && rock < 0.35)) { free = Math.max(0, d - 0.3); break; }
     }
     this.dist = free < this.dist ? free : this.dist + (free - this.dist) * damp(3, dt);
     this.eye.copy(head).addScaledVector(dir, -this.dist);

@@ -9,6 +9,8 @@ import { Menu } from './app/menu';
 import { atDoor, placesFor } from './app/places';
 import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
+import { Portals } from './app/portals';
+import { PortalView } from './render/portal/PortalView';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
@@ -789,6 +791,17 @@ export async function start(b: Boot): Promise<void> {
     // `kind=<id>`: out in the nearest stretch of that kind of country (L7), looking across it.
     const inKind = params.kind ? terrain.skeleton.nearestKind(params.kind, player.walker.pos.x, player.walker.pos.z) : null;
     if (inKind) player.teleport(inKind.x, undefined, inKind.z, 0);
+    // Portals (app/portals.ts): openings joining two places, walked through and looked through.
+    const portalView = new PortalView(view);
+    await view.stage.add(portalView.group);
+    const portals = new Portals({ player, view: portalView, hero: hero.object, realm: () => 'land', crossed: () => {}, show: () => () => {}, world: () => world });
+    view.slot = () => portals.hooks(view.camera.position);
+    if (params.portal) {
+      // `portal`: an opening 6 m ahead, joined to one 30 m to the right, turned a quarter.
+      const w = player.walker.pos, yaw = player.walker.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+      const ax = w.x + fx * 6, az = w.z + fz * 6, bx = w.x - fz * 30, bz = w.z + fx * 30;
+      portals.add({ id: 'test', shape: { halfWidth: 1.3, height: 2.8 }, a: { realm: 'land', frame: { x: ax, y: terrain.height(ax, az), z: az, yaw } }, b: { realm: 'land', frame: { x: bx, y: terrain.height(bx, bz), z: bz, yaw: yaw + Math.PI / 2 } } });
+    }
     // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
     const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
     const lookForm = lookAt ? setting.dungeons[lookAt]?.form : undefined;
@@ -1894,6 +1907,13 @@ export async function start(b: Boot): Promise<void> {
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
+      // Through an opening: on out of the other; the camera stands on whichever side it trails on.
+      if (!title?.holding && !creator?.showing) {
+        const was = portals.passed;
+        portals.walkThrough();
+        if (portals.passed !== was && !player.puppet) player.heroCam.trail(player.headPoint, 0);
+        portals.placeCamera(view.camera, player.headPoint);
+      }
       creator?.orbit(dt);
       part('cellars+wild');
       sounds?.hearTick(dt);

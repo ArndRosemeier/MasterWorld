@@ -104,10 +104,6 @@
     "reason": "A camera's pose along the title's path vs a horse's frame (StockView's Bodies.pose interface); only the name matches. It showed once the horse's fur setup moved to render/furAnimal.ts and its pose got short."
   },
   {
-    "key": "idiom: [.setAttribute .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/water/WaterView.ts + stage/stage.ts",
-    "reason": "Building a BufferGeometry (attributes, then the index) is three.js's own API; each builds a different mesh."
-  },
-  {
     "key": "same name: masterworld/render/horse/HorseView.ts#show + masterworld/render/livestock/StockView.ts#show",
     "reason": "StockView's ActorsHerd and HorseView both implement StockView's Bodies seam (warm, show, hide, pose a fixed set of bodies); the same method names are the interface, the bodies differ (Actors animals vs the horse view)."
   },
@@ -658,5 +654,21 @@
   {
     "key": "same name: masterworld/game/interiorWorld.ts#floorAt + masterworld/world/dungeon/caveRock.ts#floorAt",
     "reason": "CaveSpace.floorAt overrides DungeonSpace.floorAt with the carved floor's relief (plan P1); interiorWorld's is a house's storey floor. Only the name matches."
+  },
+  {
+    "key": "idiom: [.pos .x .y] in masterworld/app/player.ts + masterworld/app/portals.ts + masterworld/main.ts",
+    "reason": "Writing a walker's position by its three axes; each copies a different source (a puppet, a portal's step, a debug go-to)."
+  },
+  {
+    "key": "idiom: [.position .rotation .set .x .y .z] in masterworld/app/portals.ts + masterworld/render/folk/FolkView.ts + masterworld/render/portal/PortalView.ts",
+    "reason": "three.js's own API for placing an object; each places a different thing (the camera through a portal, a person, an opening)."
+  },
+  {
+    "key": "idiom: [.rotation .x .y .z] in masterworld/app/portals.ts + masterworld/render/folk/FolkView.ts + masterworld/render/portal/PortalView.ts",
+    "reason": "three.js's own API for turning an object; each turns a different thing."
+  },
+  {
+    "key": "idiom: [.computeBoundingSphere .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/portal/PortalView.ts + masterworld/render/terrain/TerrainView.ts",
+    "reason": "Finishing a BufferGeometry (its index, then its bounds) is three.js's own API; each builds a different mesh."
   }
 ]

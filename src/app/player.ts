@@ -287,6 +287,9 @@ export class Player {
     return `${this.flying ? 'fly&' : ''}pos=${pos}&look=${((-deg(yaw) % 360) + 360) % 360},${deg(pitch)}`;
   }
 
+  /** The point the camera orbits (the hero's head, or over the saddle). */
+  get headPoint(): Vector3 { return this.toHead(); }
+
   private toHead(): Vector3 {
     // Riding: over the saddle, the rider's head about 0.85 m above the seat.
     if (this.riding && this.horses) {
