@@ -299,10 +299,11 @@
 #vgm-panel .chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; border-bottom: 1px solid var(--brass-lo); }
 #vgm-panel .list { overflow-y: auto; min-height: 60px; scrollbar-width: thin; scrollbar-color: var(--brass-mid) transparent; }
 #vgm-panel .move { padding: 5px 4px 6px; border-bottom: 1px solid #4a351055; }
-#vgm-panel .move .top { display: flex; gap: 8px; align-items: baseline; }
-#vgm-panel .move .tool { font: 13px/1.2 'Marcellus SC', Georgia, serif; color: var(--brass); }
-#vgm-panel .move .need { color: var(--ward); font-style: italic; font-size: 12px; }
-#vgm-panel .move .at { margin-left: auto; color: #a8987a; font-size: 12px; white-space: nowrap; }
+#vgm-panel .move .top { display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
+#vgm-panel .move .tool { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 13px/1.2 'Marcellus SC', Georgia, serif; color: var(--brass); }
+#vgm-panel .move .need { flex: none; color: var(--ward); font-style: italic; font-size: 12px; }
+#vgm-panel .move .at { flex: none; margin-left: auto; color: #a8987a; font-size: 12px; }
+#vgm-panel .move .go { flex: none; white-space: nowrap; }
 #vgm-panel .move .why { color: var(--ink-dim); }
 #vgm-panel .move.placed { cursor: pointer; border-radius: 6px; }
 #vgm-panel .move.placed:hover { background: #8fe3ff0d; }

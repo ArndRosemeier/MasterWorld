@@ -96,7 +96,13 @@ export class VgmPanel {
       this.count.textContent = `${this.lines.length} moves`;
     }
     const t = performance.now();
-    if (this.fold.classList.contains('open') && t - this.needsAt > 1000) { this.needsAt = t; this.drawNeeds(); }
+    if (this.onScreen && t - this.needsAt > 1000) {
+      this.needsAt = t;
+      if (this.fold.classList.contains('open')) this.drawNeeds();
+      // The picked move's way follows the hero.
+      const w = this.picked && this.list.querySelector('.move.picked .way');
+      if (w && this.picked) w.textContent = this.way(this.picked);
+    }
   }
 
   private mark(lines: readonly VgmLine[]): void {
