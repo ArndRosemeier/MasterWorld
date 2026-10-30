@@ -115,7 +115,8 @@ export class PortalView {
     // No shadow map is drawn for the view beyond, unless it is the one place that needs it this frame.
     const held = p.shadows ? () => {} : holdShadows(this.view.scene);
     const prev = r.getRenderTarget(), test = r.getScissorTest();
-    twin.scissor.set(rect.x, twin.height - rect.y - rect.h, rect.w, rect.h);
+    // three's scissor rectangle counts from the top left on both backends (the WebGL one turns it over itself).
+    twin.scissor.set(rect.x, rect.y, rect.w, rect.h);
     r.setScissorTest(true);
     r.setRenderTarget(twin);
     r.render(this.view.scene, this.drawnCam);
