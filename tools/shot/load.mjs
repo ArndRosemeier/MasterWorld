@@ -25,6 +25,26 @@ const LIMIT_TITLE = Number(process.env.LIMIT_TITLE ?? 1), LIMIT_READY = Number(p
 const { server, base, browser } = await launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.error(`[page error] ${e.message}`));
+// `LOAD_PIPELINES=1`: every GPU pipeline built before play, with its material (three's label), its shaders' sizes and
+// how long it took, the slowest listed after the builds (the monitor records them only as "pipeline").
+if (process.env.LOAD_PIPELINES) await page.addInitScript(() => {
+  const D = globalThis.GPUDevice?.prototype;
+  if (!D) return;
+  const size = new WeakMap(), list = (window.__pipelines = []);
+  const mod = D.createShaderModule;
+  D.createShaderModule = function (d, ...a) { const m = mod.call(this, d, ...a); size.set(m, d?.code?.length ?? 0); return m; };
+  const fa = D.createRenderPipelineAsync;
+  D.createRenderPipelineAsync = function (d, ...a) {
+    const t0 = performance.now(), p = fa.call(this, d, ...a);
+    const e = { label: d?.label ?? '', vs: size.get(d?.vertex?.module) ?? 0, fs: size.get(d?.fragment?.module) ?? 0, t: t0, ms: -1 };
+    list.push(e);
+    const end = () => { e.ms = performance.now() - t0; };
+    p.then(end, end);
+    return p;
+  };
+});
+// `LOAD_JOBS=1`: every worker job answered before play (pool, worker, kind, sent, answered), per worker in order.
+if (process.env.LOAD_JOBS) await page.addInitScript(() => { window.__mwJobLog = []; });
 // The game's own loading steps (and pack retries), so a slow start shows where its time goes.
 const steps = [];
 page.on('console', (m) => {
@@ -71,6 +91,34 @@ const builds = came ? await page.evaluate(() => {
 if (builds.length) {
   console.log(`shader builds before play: ${builds.reduce((n, b) => n + b.n, 0)}, ${builds.reduce((n, b) => n + b.ms, 0).toFixed(0)} ms in all; the costliest:`);
   for (const b of builds.slice(0, 15)) console.log(`  ${b.ms.toFixed(0).padStart(6)} ms ${String(b.n).padStart(3)}x ${b.what}`);
+}
+if (process.env.LOAD_PIPELINES && came) {
+  const ps = await page.evaluate(() => window.__pipelines);
+  ps.sort((a, b) => b.ms - a.ms);
+  console.log(`GPU pipelines before play: ${ps.length}, ${ps.reduce((n, p) => n + Math.max(0, p.ms), 0).toFixed(0)} ms summed; the slowest:`);
+  for (const p of ps.slice(0, 25)) console.log(`  ${p.ms.toFixed(0).padStart(6)} ms from ${(p.t / 1000).toFixed(2)} s · vs ${p.vs} fs ${p.fs} chars · ${p.label}`);
+}
+if (process.env.LOAD_JOBS && came) {
+  const jobs = await page.evaluate(() => window.__mwJobLog);
+  const by = new Map();
+  for (const j of jobs) { const k = `${j.pool} ${j.worker}`; if (!by.has(k)) by.set(k, []); by.get(k).push(j); }
+  console.log(`worker jobs before play: ${jobs.length}`);
+  // Chunks by size: how many, and their time in the workers.
+  const sizes = new Map();
+  for (const j of jobs) if (j.kind === 'chunk') { const b = sizes.get(j.size) ?? { n: 0, ms: 0, most: 0 }; b.n++; b.ms += j.ms; b.most = Math.max(b.most, j.ms); sizes.set(j.size, b); }
+  for (const [size, b] of [...sizes].sort((a, b) => a[0] - b[0])) console.log(`  chunks ${size} m: ${b.n}x ${(b.ms / 1000).toFixed(1)} s, slowest ${(b.most / 1000).toFixed(2)} s`);
+  for (const [k, list] of [...by].sort()) {
+    list.sort((a, b) => a.done - b.done);
+    // In one worker the jobs run one after another: each starts when it was sent or the one before was answered.
+    // Each job's own time in the worker (serve's ms) ends when its answer left, a moment before it was heard here.
+    const runs = list.map((j) => ({ ...j, start: j.done - j.ms }));
+    const byKind = new Map();
+    for (const r of runs) { const b = byKind.get(r.kind) ?? { n: 0, ms: 0, last: 0 }; b.n++; b.ms += r.done - r.start; b.last = Math.max(b.last, r.done); byKind.set(r.kind, b); }
+    console.log(`  ${k}: ${[...byKind].map(([kind, b]) => `${kind} ${b.n}x ${(b.ms / 1000).toFixed(1)} s (last ${(b.last / 1000).toFixed(1)})`).join(' · ')}`);
+    for (const r of runs.filter((r) => r.done - r.start > 400)) console.log(`      ${(r.start / 1000).toFixed(1)}–${(r.done / 1000).toFixed(1)} s ${r.kind}${r.size ? ` ${r.size} m` : ''} (sent ${(r.sent / 1000).toFixed(1)})`);
+    const s = list[list.length - 1].stats;
+    if (s) console.log(`      by play: ${Object.entries(s).map(([k, v]) => `${k} ${Math.round(v)}`).join(' · ')}`);
+  }
 }
 if (stopProfile) report(await stopProfile(), steps, 'dist');
 // A moment in the world: music asked for now is "when first needed", and is listed apart.

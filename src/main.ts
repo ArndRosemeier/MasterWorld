@@ -30,6 +30,7 @@ import type { Agent, TownOrder } from './sim/townLife';
 import { createView } from './render/view';
 import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
+import { ROOT_LEVEL, chunkSize } from './render/terrain/lod';
 import { VolumeView } from './render/terrain/VolumeView';
 import { TerrainJobs, WorldJobs, createTerrainPool, createTexturePool, createWorldPool } from './workers/pool';
 import { WaterView } from './render/water/WaterView';
@@ -155,6 +156,8 @@ declare global {
   }
 }
 
+/** Metres past the start's land (3 × 3 root chunks) whose river and brook tiles are traced for every worker at once. */
+const TILE_PAD = 1000;
 /** The longest the start waits for the people round the hero to be dressed (ms). */
 const DRESS_WAIT = 15000;
 /** Seconds after the VGM answered an overdue need before it answers again (C9): time to come upon the first. */
@@ -403,7 +406,7 @@ export async function start(b: Boot): Promise<void> {
     // Brook tiles ahead of the hero come from the world worker (D50).
     const brooks = new BrookPrefetch(terrain.hydro, jobs);
     // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
-    const terrainPool = createTerrainPool();
+    const terrainPool = createTerrainPool(params.workers);
     // First of all they hear of the rivers' and brooks' tiles this thread traced opening the world: each opens it on
     // them instead of tracing them again (since phase W's lakes and valleys, seconds each, while 'Raising the land' waited).
     void terrainPool.broadcast({ kind: 'tiles', tiles: tracedTiles(terrain.skeleton), seed, setting: setting.id }).catch(() => {});
@@ -414,7 +417,12 @@ export async function start(b: Boot): Promise<void> {
     // chunks build while the hero and the town load; it is shown once its shader is warm.
     const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
     // (Once the ground's textures are made: their workers come first, as the warm-up waits for them.)
-    void painted.then(() => ground.prefetch(view.camera));
+    // (And once every river and brook tile under the land drawn at the start is traced, each once, side by side.)
+    const rootSide = chunkSize(ROOT_LEVEL), cam = view.camera.position;
+    const rx = Math.floor(cam.x / rootSide), rz = Math.floor(cam.z / rootSide);
+    const tilesShared = terrainJobs.shareTiles(terrain.hydro, (rx - 1) * rootSide - TILE_PAD, (rz - 1) * rootSide - TILE_PAD, (rx + 2) * rootSide + TILE_PAD, (rz + 2) * rootSide + TILE_PAD)
+      .then(() => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: rivers and brooks traced`), (e: unknown) => console.error('[load] tracing the tiles failed', e));
+    void Promise.all([painted, tilesShared]).then(() => ground.prefetch(view.camera));
     // Every town: the start's, and the hamlets and villages founded out on the land (plan B3), all alike (B3a).
     // A town's words are tied into the game (how its people take the hero, what they offer) once the game's
     // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.
@@ -432,6 +440,9 @@ export async function start(b: Boot): Promise<void> {
     // between its grass, rocks and plants: 'Raising the land' waited on them).
     const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
+    // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
+    // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
+    compileEarly([sea.mesh]);
     // The near one first, while the hero is made here (the hero's water; the horses keep out of it).
     const seas = sea.prime(view.camera.position, 1).then(() => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: near water mask made`));
     loading.set('Dressing the hero');
@@ -625,10 +636,13 @@ export async function start(b: Boot): Promise<void> {
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
     if (chosen) hurry();
     loading.set('Raising the land');
-    await wideSeas;
-    await landReady;
-    await rock;
-    await raised;
+    // Each says when it is done (load.mjs prints it: what 'Raising the land' waits for).
+    const stamp = (what: string) => () => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: ${what}`);
+    void wideSeas.then(stamp('wide water masks made'));
+    void landReady.then(stamp('land round the camera made'));
+    void rock.then(stamp('rock raised'));
+    void raised.then(stamp('town standing'));
+    await Promise.all([wideSeas, landReady, rock, raised]);
     await view.stage.add(view.sky.dome);
     await view.stage.add(sea.mesh);
     if (grass) await view.stage.add(grass.group);
@@ -637,6 +651,7 @@ export async function start(b: Boot): Promise<void> {
     await stock?.enter(view.stage);
     await smallView?.addBirds();
     await view.stage.add(wx.precip);
+    stamp('sky, sea, hero and animals shown')();
     // Spells (plan 10) and the smoke over a raided farm (C10): built once the game is playable, within the
     // shader budget (F3), so they do not lengthen the load (F4, gate C). Neither is needed in the first seconds:
     // until then a spell is reckoned but not drawn, and no smoke rises.

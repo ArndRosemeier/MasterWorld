@@ -32,6 +32,51 @@ export interface MaskJob {
   z0: number;
   size: number;
   res: number;
+  /** A piece of a mask (maskPieces): samples across and down from (x0, z0), at the mask's spacing (size / res). */
+  cols?: number;
+  rows?: number;
+}
+
+/** One piece of a mask made apart (in its own worker): the samples it makes, and the part of them the mask keeps. */
+export interface MaskPiece {
+  /** Its first sample's corner, and how many samples it makes across and down. */
+  readonly x0: number;
+  readonly z0: number;
+  readonly cols: number;
+  readonly rows: number;
+  /** Where its kept part starts in its own samples, and in the whole mask's; how big that part is. */
+  readonly ci: number;
+  readonly cj: number;
+  readonly i0: number;
+  readonly j0: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * A mask cut into `k` × `k` pieces, so several workers make it side by side. Each piece makes MARGIN samples more
+ * on each side inside the mask: the levels carried onto the land (DILATE passes) reach that far, so the part it keeps
+ * comes out exactly as in the mask made whole.
+ */
+export function maskPieces(x0: number, z0: number, size: number, res: number, k: number): MaskPiece[] {
+  const step = size / res, m = DILATE + HIDDEN_DILATE, out: MaskPiece[] = [];
+  const edge = (n: number) => Math.round((n * res) / k);
+  for (let b = 0; b < k; b++) for (let a = 0; a < k; a++) {
+    const i0 = edge(a), j0 = edge(b), w = edge(a + 1) - i0, h = edge(b + 1) - j0;
+    const s0 = Math.max(0, i0 - m), t0 = Math.max(0, j0 - m), s1 = Math.min(res, i0 + w + m), t1 = Math.min(res, j0 + h + m);
+    out.push({ x0: x0 + s0 * step, z0: z0 + t0 * step, cols: s1 - s0, rows: t1 - t0, ci: i0 - s0, cj: j0 - t0, i0, j0, w, h });
+  }
+  return out;
+}
+
+/** The whole mask (`res` samples a side) from its pieces' samples, in maskPieces' order. */
+export function joinPieces(res: number, pieces: readonly MaskPiece[], made: readonly Float32Array[]): Float32Array {
+  const out = new Float32Array(res * res * 4);
+  pieces.forEach((p, n) => {
+    const d = made[n];
+    for (let j = 0; j < p.h; j++) out.set(d.subarray(((p.cj + j) * p.cols + p.ci) * 4, ((p.cj + j) * p.cols + p.ci + p.w) * 4), ((p.j0 + j) * res + p.i0) * 4);
+  });
+  return out;
 }
 
 /**
@@ -40,13 +85,14 @@ export interface MaskJob {
  */
 export function waterMask(t: Terrain, job: MaskJob): Float32Array {
   const { x0, z0, size, res } = job;
-  const out = new Float32Array(res * res * 4);
-  const wet = new Uint8Array(res * res);
-  const ground = new Float32Array(res * res);
+  const cols = job.cols ?? res, rows = job.rows ?? res;
+  const out = new Float32Array(cols * rows * 4);
+  const wet = new Uint8Array(cols * rows);
+  const ground = new Float32Array(cols * rows);
   const step = size / res;
   const w = emptyWater();
-  for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
-    const x = x0 + (i + 0.5) * step, z = z0 + (j + 0.5) * step, p = j * res + i;
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const x = x0 + (i + 0.5) * step, z = z0 + (j + 0.5) * step, p = j * cols + i;
     const h = t.height(x, z);
     ground[p] = h;
     let level = NaN, fx = 0, fz = 0;
@@ -71,14 +117,14 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
   // Carry levels a few pixels onto the land (depth stays negative there).
   for (let pass = 0; pass < DILATE + HIDDEN_DILATE; pass++) {
     const next = wet.slice();
-    for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
-      const p = j * res + i;
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const p = j * cols + i;
       if (wet[p]) continue;
       let sum = 0, cnt = 0, fx = 0, fz = 0;
       for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
         const a = i + di, b = j + dj;
-        if (a < 0 || b < 0 || a >= res || b >= res) continue;
-        const q = b * res + a;
+        if (a < 0 || b < 0 || a >= cols || b >= rows) continue;
+        const q = b * cols + a;
         if (wet[q]) { sum += out[q * 4]; fx += out[q * 4 + 2]; fz += out[q * 4 + 3]; cnt++; }
       }
       if (!cnt) continue;

@@ -5,7 +5,7 @@ import { Terrain } from '../src/world/terrain';
 import { Skeleton } from '../src/world/skeleton';
 import { HydroTile, riverDepth } from '../src/world/hydro';
 import { classic } from '../src/setting/classic/index';
-import { DRY, SEA_LEVEL, waterMask } from '../src/world/water';
+import { DRY, SEA_LEVEL, joinPieces, maskPieces, waterMask } from '../src/world/water';
 import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
@@ -196,4 +196,16 @@ test('hydro: a river that leaves a lake starts in it (it never begins on dry gro
     for (let nb = 0; nb < n * n; nb++) if (recv[nb] === c) assert.ok(Number.isNaN(lake[nb]), `river at ${r.xz[0]},${r.xz[1]} begins below a lake`);
   }
   assert.ok(fed > 0, 'some rivers leave lakes');
+});
+
+test('water: a mask made in pieces (side by side in the workers) is the mask made whole', () => {
+  const job = { seed, setting: classic.id, x0: -32500, z0: 30000, size: 1024, res: 48 };
+  const whole = waterMask(terrain, job);
+  const pieces = maskPieces(job.x0, job.z0, job.size, job.res, 4);
+  const made = pieces.map((p) => waterMask(terrain, { ...job, x0: p.x0, z0: p.z0, cols: p.cols, rows: p.rows }));
+  const joined = joinPieces(job.res, pieces, made);
+  let wet = 0;
+  for (let k = 0; k < whole.length; k += 4) if (whole[k + 1] > 0) wet++;
+  assert.ok(wet > 20 && wet < job.res * job.res - 20, `${wet} wet samples: the test needs a shore`);
+  assert.deepEqual(joined, whole);
 });

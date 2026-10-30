@@ -2,24 +2,30 @@
  * The worker pool: the one place workers are created (guarded). Jobs go to the least busy worker; results
  * come back as promises. Each worker script handles `{ id, job }` and answers `{ id, result }` or `{ id, error }`.
  */
+import { joinPieces, maskPieces } from '../world/water';
+import { adoptTiles, type Hydrology, type TracedTile } from '../world/hydro';
+
+/** A wide water mask is made in this many pieces a side, spread over the terrain workers. */
+const WATER_PIECES = 4;
 
 export class WorkerPool<Job, Result> {
   /** Told of every answer as it reaches the main thread (the hitch log): the pool's name and the job's kind. */
   static heard: ((what: string) => void) | null = null;
   private readonly workers: Worker[] = [];
   private readonly busy: number[] = [];
-  private readonly waiting = new Map<number, { resolve: (r: Result) => void; reject: (e: Error) => void; worker: number; kind: string }>();
+  private readonly waiting = new Map<number, { resolve: (r: Result) => void; reject: (e: Error) => void; worker: number; kind: string; sent: number; size?: number }>();
   private nextId = 1;
 
   constructor(make: () => Worker, private readonly name = 'worker', size = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1))) {
     for (let w = 0; w < size; w++) {
       const worker = make();
-      worker.onmessage = (e: MessageEvent<{ id: number; result?: Result; error?: string }>) => {
+      worker.onmessage = (e: MessageEvent<{ id: number; result?: Result; error?: string; ms?: number; stats?: Record<string, number> }>) => {
         const p = this.waiting.get(e.data.id);
         if (!p) return;
         this.waiting.delete(e.data.id);
         this.busy[p.worker]--;
         WorkerPool.heard?.(`${this.name}:${p.kind}`);
+        jobLog()?.push({ pool: this.name, kind: p.kind, worker: p.worker, sent: p.sent, done: performance.now(), ms: e.data.ms ?? 0, stats: e.data.stats, size: p.size });
         if (e.data.error !== undefined) p.reject(new Error(e.data.error));
         else p.resolve(e.data.result as Result);
       };
@@ -36,7 +42,7 @@ export class WorkerPool<Job, Result> {
     const id = this.nextId++;
     this.busy[w]++;
     return new Promise((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job) });
+      this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job), sent: performance.now(), size: (job as { size?: number }).size });
       this.workers[w].postMessage({ id, job }, transfer);
     });
   }
@@ -47,7 +53,7 @@ export class WorkerPool<Job, Result> {
       const id = this.nextId++;
       this.busy[w]++;
       return new Promise<Result>((resolve, reject) => {
-        this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job) });
+        this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job), sent: performance.now() });
         worker.postMessage({ id, job });
       });
     }));
@@ -59,6 +65,10 @@ export class WorkerPool<Job, Result> {
     this.waiting.clear();
   }
 }
+
+/** Every answered job, when a load probe asks for them (`window.__mwJobLog = []`, tools/shot/load.mjs LOAD_JOBS). */
+type JobRecord = { pool: string; kind: string; worker: number; sent: number; done: number; ms: number; stats?: Record<string, number>; size?: number };
+const jobLog = (): JobRecord[] | undefined => (globalThis as { __mwJobLog?: JobRecord[] }).__mwJobLog;
 
 /** A job's kind for the hitch log (`{ kind: 'chunk' }` → chunk). */
 function kindOf(job: unknown): string {
@@ -95,9 +105,32 @@ export class TerrainJobs {
   private job<T>(job: DistributiveOmit<import('./terrain.worker').TerrainJob, 'seed' | 'setting'>): Promise<T> {
     return this.pool.run({ ...job, seed: this.seed, setting: this.setting } as import('./terrain.worker').TerrainJob) as Promise<T>;
   }
+  /**
+   * Every river and brook tile over a rectangle, traced once (each in one worker, side by side) and handed to every
+   * worker and this thread. Built from the land without them, each worker traced the tiles its chunks touched on its
+   * own: the far chunks touch them all, and the four workers spent 7-10 s each tracing the same tiles at the start.
+   */
+  async shareTiles(hydro: Hydrology, x0: number, z0: number, x1: number, z1: number): Promise<void> {
+    const trace = async (brook: boolean, tiles: [number, number][]) => {
+      const seen = new Set<string>();
+      const unique = tiles.filter(([tx, tz]) => !seen.has(`${tx},${tz}`) && !!seen.add(`${tx},${tz}`));
+      const traced = await Promise.all(unique.map(([tx, tz]) => this.job<TracedTile>({ kind: 'trace', brook, tx, tz })));
+      // Every worker takes them before any job sent after (each answers its jobs in order).
+      void this.pool.broadcast({ kind: 'tiles', tiles: traced, seed: this.seed, setting: this.setting }).catch(() => {});
+      adoptTiles(traced);
+    };
+    // The rivers first: a brook tile is traced over the land its river tile shaped.
+    await trace(false, [...hydro.tilesOver(x0, z0, x1, z1, false), ...hydro.feedsOver(x0, z0, x1, z1)]);
+    await trace(true, hydro.tilesOver(x0, z0, x1, z1, true));
+  }
+
   /** A water mask over a square (`res` samples a side): the terrain workers share the masks the world worker made alone. */
   water(x0: number, z0: number, size: number, res: number): Promise<Float32Array> {
-    return this.job<Float32Array>({ kind: 'water', x0, z0, size, res });
+    // In pieces, side by side in the workers (one worker made a wide mask alone, for seconds, while the start waited).
+    const pieces = maskPieces(x0, z0, size, res, res >= 256 ? WATER_PIECES : 1);
+    if (pieces.length === 1) return this.job<Float32Array>({ kind: 'water', x0, z0, size, res });
+    return Promise.all(pieces.map((p) => this.job<Float32Array>({ kind: 'water', x0: p.x0, z0: p.z0, size, res, cols: p.cols, rows: p.rows })))
+      .then((made) => joinPieces(res, pieces, made));
   }
 
 

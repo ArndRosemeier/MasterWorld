@@ -1182,6 +1182,9 @@ export function adoptTiles(tiles: readonly TracedTile[]): void {
   for (const t of tiles) adopted.set(t.key, t.data);
 }
 
+/** Tiles traced in this thread so far and the time it took (ms): the load probe reads a worker's (serve stats). */
+export const traced = { rivers: 0, riverMs: 0, brooks: 0, brookMs: 0 };
+
 export class Hydrology {
   private readonly tiles = new Map<string, HydroTile>();
   private readonly brookTiles = new Map<string, HydroTile>();
@@ -1266,18 +1269,57 @@ export class Hydrology {
     const key = `${tx},${tz}`;
     let t = tiles.get(key);
     if (!t) {
-      const k = `${worldKey(this.skeleton)}|${JSON.stringify(o)}|${tiles === this.tiles ? '' : JSON.stringify(this.o)}|${key}`;
+      const k = this.keyOf(tiles === this.brookTiles, key);
       t = shared.get(k);
       const given = t ? undefined : adopted.get(k);
       if (t) shared.delete(k);
       else if (given) { adopted.delete(k); t = new HydroTile(this.skeleton, tx, tz, o, null, unpackTile(given, (o.core + 2 * o.margin) ** 2)); }
-      else t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz));
+      else {
+        const t0 = performance.now();
+        t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz));
+        if (tiles === this.tiles) { traced.rivers++; traced.riverMs += performance.now() - t0; } else { traced.brooks++; traced.brookMs += performance.now() - t0; }
+      }
       shared.set(k, t);
       if (shared.size > SHARED_TILES) shared.delete(shared.keys().next().value!);
       tiles.set(key, t);
     }
     if (tiles === this.tiles) this.lastRiver = t; else this.lastBrook = t;
     return t;
+  }
+
+  /** A tile's key in `shared` and `adopted`: its world, its grid (a brook tile's with the rivers' it drains into), where. */
+  private keyOf(brook: boolean, key: string): string {
+    return `${worldKey(this.skeleton)}|${JSON.stringify(brook ? this.brooks : this.o)}|${brook ? JSON.stringify(this.o) : ''}|${key}`;
+  }
+
+  /** The river tiles (`brook` false) or brook tiles over a rectangle of the world, by their grid coordinates. */
+  tilesOver(x0: number, z0: number, x1: number, z1: number, brook: boolean): [number, number][] {
+    const o = brook ? this.brooks : this.o;
+    if (!o) return [];
+    const side = o.core * o.cell, out: [number, number][] = [];
+    for (let tz = Math.floor(z0 / side); tz <= Math.floor(z1 / side); tz++) for (let tx = Math.floor(x0 / side); tx <= Math.floor(x1 / side); tx++) out.push([tx, tz]);
+    return out;
+  }
+
+  /** The river tiles the brook tiles over a rectangle drain into (tilesOver), besides those over it. */
+  feedsOver(x0: number, z0: number, x1: number, z1: number): [number, number][] {
+    const b = this.brooks;
+    if (!b) return [];
+    const bs = b.core * b.cell, rs = this.o.core * this.o.cell, out = new Map<string, [number, number]>();
+    for (const [tx, tz] of this.tilesOver(x0, z0, x1, z1, true)) {
+      const k: [number, number] = [Math.floor(((tx + 0.5) * bs) / rs), Math.floor(((tz + 0.5) * bs) / rs)];
+      out.set(`${k[0]},${k[1]}`, k);
+    }
+    return [...out.values()];
+  }
+
+  /** A tile traced here (or taken from another thread), packed for the others (`adoptTiles`). */
+  traceTile(brook: boolean, tx: number, tz: number): TracedTile {
+    const o = brook ? this.brooks : this.o;
+    if (!o) throw new Error('no brooks in this world');
+    const side = o.core * o.cell, x = (tx + 0.5) * side, z = (tz + 0.5) * side;
+    const t = brook ? this.brookTileAt(x, z)! : this.tileAt(x, z);
+    return { key: this.keyOf(brook, `${tx},${tz}`), data: packTile(t) };
   }
 
   /** The water at (x, z): the nearest river or brook relative to its valley, and the lake here. */

@@ -208,3 +208,13 @@ test('brooks: none dams a river (its bed stays under its water where brooks cros
   }
   assert.ok(n > 50, `${n} river points`);
 });
+
+test('tiles traced for every worker go by the keys a worker looks them up by', () => {
+  const keys = new Set(tracedTiles(terrain.skeleton).map((t) => t.key));
+  const main = terrain.hydro.tileAt(-30000, 34000);
+  assert.ok(keys.has(terrain.hydro.traceTile(true, tile.tx, tile.tz).key));
+  assert.ok(keys.has(terrain.hydro.traceTile(false, main.tx, main.tz).key));
+  // Over the brook tile: itself, and the river tile it drains into.
+  assert.deepEqual(terrain.hydro.tilesOver(x0 + 10, z0 + 10, x0 + side - 10, z0 + side - 10, true), [[tile.tx, tile.tz]]);
+  assert.deepEqual(terrain.hydro.feedsOver(x0 + 10, z0 + 10, x0 + side - 10, z0 + side - 10), [[main.tx, main.tz]]);
+});
