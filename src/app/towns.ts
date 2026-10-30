@@ -187,7 +187,8 @@ export class Towns {
     const [i0, j0] = maskWindow(t, w, h, cam.x, cam.z);
     this.moving = true;
     void this.h.land.townMask(t.decision.id, w, h, i0, j0).then((data) => {
-      moveTownMasks(t.x0 + i0 * TOWN_RASTER, t.z0 + j0 * TOWN_RASTER, data);
+      // A walled city is paved wall to wall (P4: no grass between its cobbles); a village's stones lie where the traffic is.
+      moveTownMasks(t.x0 + i0 * TOWN_RASTER, t.z0 + j0 * TOWN_RASTER, data, t.plan.wall ? 1 : 0);
       this.masked = t.decision.id;
       this.maskedAt = t.nx > w || t.nz > h ? [i0, j0] : null;
     }).finally(() => { this.moving = false; });

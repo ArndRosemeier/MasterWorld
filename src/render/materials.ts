@@ -190,9 +190,11 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   // the market break up into earth and grass, mud stands in patches, and worn lanes run across the
   // square (where the noise crosses zero), trodden into earth between the stones.
   const patchy = mx_fractal_noise_float(p.xz.mul(0.09), 2, 2.0, 0.5);
-  const laid = (t: Node<'float'>) => smoothstep(0.3, 0.7, t.add(patchy.mul(0.45)).sub(float(1).sub(t).mul(0.25)));
-  const lane = float(1).sub(smoothstep(0.02, 0.07, abs(mx_noise_float(p.xz.mul(0.035)).add(mid.mul(0.2)))));
-  const mud = smoothstep(0.16, 0.36, mx_fractal_noise_float(p.xz.mul(0.07).add(17.3), 2, 2.0, 0.5)).mul(0.75);
+  // A city's (TOWN_MASKS.paved) are laid wall to wall: no earth or grass between them, few worn lanes, little mud.
+  const laid = (t: Node<'float'>) => mix(smoothstep(0.3, 0.7, t.add(patchy.mul(0.45)).sub(float(1).sub(t).mul(0.25))), smoothstep(0.2, 0.45, t), TOWN_MASKS.paved);
+  const cityWorn = float(1).sub(TOWN_MASKS.paved.mul(0.85));
+  const lane = float(1).sub(smoothstep(0.02, 0.07, abs(mx_noise_float(p.xz.mul(0.035)).add(mid.mul(0.2))))).mul(cityWorn);
+  const mud = smoothstep(0.16, 0.36, mx_fractal_noise_float(p.xz.mul(0.07).add(17.3), 2, 2.0, 0.5)).mul(0.75).mul(cityWorn);
   const stones = tg.r.max(tg.g);
   // Yards: trodden earth in patches; streets and the market: small cobbles (fist-sized), the market's a
   // shade darker; on top, the earth of the worn lanes and mud patches among the stones.
