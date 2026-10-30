@@ -71,10 +71,13 @@ export function stepDir(from: PortalFrame, to: PortalFrame, v: P3): P3 {
   return { x, y: v.y, z };
 }
 
+/** How far the opening's feet reach below its floor: its bottom edge lies in the ground, never on it (a light seam). */
+const FOOT = 0.3;
+
 /** Is a point (in the frame's axes, on its plane) inside the opening, `margin` metres in from its edge? */
 export function inOpening(shape: PortalShape, u: number, v: number, margin = 0): boolean {
   const w = shape.halfWidth - margin, top = shape.height - margin;
-  if (v < -0.3 || v > top || Math.abs(u) > w) return false;
+  if (v < -FOOT || v > top || Math.abs(u) > w) return false;
   // The rounded top: a half ellipse over the last `halfWidth` metres.
   const spring = top - w;
   if (v <= spring) return true;
@@ -84,12 +87,12 @@ export function inOpening(shape: PortalShape, u: number, v: number, margin = 0):
 
 /** The opening's outline (in its plane: u across, v up), `n` points over its rounded top, round from the right foot. */
 export function openingOutline(shape: PortalShape, n = 12): [number, number][] {
-  const w = shape.halfWidth, spring = shape.height - w, out: [number, number][] = [[w, 0]];
+  const w = shape.halfWidth, spring = shape.height - w, out: [number, number][] = [[w, -FOOT]];
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * Math.PI;
     out.push([Math.cos(a) * w, spring + Math.sin(a) * (shape.height - spring)]);
   }
-  out.push([-w, 0]);
+  out.push([-w, -FOOT]);
   return out;
 }
 

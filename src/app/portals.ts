@@ -11,6 +11,7 @@
 import type { Object3D } from 'three/webgpu';
 import { Vector3 } from 'three/webgpu';
 import type { PostHooks } from '@futuremagic/stage';
+import { dist3 } from '@futuremagic/core';
 import { openingOutline, sidesFrom, stepDir, stepPoint, stepYaw, through, toFrame, type P3, type Portal, type PortalFrame } from '../game/portal';
 import type { WalkWorld } from '../game/walker';
 import type { PortalPass, PortalView } from '../render/portal/PortalView';
@@ -26,10 +27,13 @@ export interface PortalsHost {
   /** The hero walked through into `to` (from `from`): the walk world, the sky and the music follow. */
   crossed(to: string, from: string): void;
   /** Show `realm` (its objects and its light) for a view; returns what puts the shown realm back. */
-  show(realm: string): () => void;
+  showRealm(realm: string): () => void;
   /** The walker's world in a realm (the camera keeps out of its rock through an opening). */
   world(realm: string): WalkWorld | null;
 }
+
+/** How far apart two points are (`lift`: the second one raised by that much). */
+const apart = (a: P3, b: P3, lift = 0): number => dist3([a.x, a.y, a.z], [b.x, b.y + lift, b.z]);
 
 /** An opening further than this from the camera is not looked through (m). */
 const SEEN = 90;
@@ -126,12 +130,23 @@ export class Portals {
     this.viaCamera = { here: from, there: to };
   }
 
+  /** Below (the camera's realm not the land): the land side of the nearest opening out to it, else null. */
+  landSide(camera: P3): PortalFrame | null {
+    let best: PortalFrame | null = null, d = Infinity;
+    for (const h of this.held.values()) for (const s of sidesFrom(h.portal, this.cameraRealm)) {
+      if (s.there.realm !== 'land') continue;
+      const f = s.here.frame, dd = apart(camera, f);
+      if (dd < d) { d = dd; best = s.there.frame; }
+    }
+    return best;
+  }
+
   /** This frame's draw: the camera's realm shown, and the nearest opening in sight looked through. */
   hooks(camera: Vector3): PostHooks {
     const realm = this.cameraRealm, heroRealm = this.host.realm();
     let best: { pass: PortalPass; d: number } | null = null;
     for (const h of this.held.values()) for (const s of sidesFrom(h.portal, realm)) {
-      const f = s.here.frame, d = Math.hypot(camera.x - f.x, camera.y - f.y - 1, camera.z - f.z);
+      const f = s.here.frame, d = apart(camera, f, 1);
       if (d > SEEN || (best && best.d <= d)) continue;
       const mesh = s.here === h.portal.a ? h.meshes.a : h.meshes.b, there = s.there;
       best = {
@@ -140,7 +155,7 @@ export class Portals {
           here: f, there: there.frame, mesh,
           shadows: there.realm === 'land' && realm !== 'land',
           beyond: () => {
-            const back = this.host.show(there.realm);
+            const back = this.host.showRealm(there.realm);
             const hero = this.heroIn(there.realm, heroRealm);
             return () => { hero(); back(); };
           },
@@ -152,7 +167,7 @@ export class Portals {
     return {
       before: () => {
         inner.before?.();
-        back = this.host.show(realm);
+        back = this.host.showRealm(realm);
         const hero = this.heroIn(realm, heroRealm);
         const shown = back;
         back = () => { hero(); shown(); };
@@ -174,7 +189,7 @@ export class Portals {
       let d = Infinity;
       for (const h of this.held.values()) for (const s of sidesFrom(h.portal, heroRealm)) {
         if (s.there.realm !== realm) continue;
-        const q = toFrame(s.here.frame, o.position), dd = Math.hypot(q.x, q.y, q.z);
+        const q = toFrame(s.here.frame, o.position), dd = apart(q, { x: 0, y: 0, z: 0 });
         if (dd < d) { d = dd; pair = { here: s.here.frame, there: s.there.frame }; }
       }
     }

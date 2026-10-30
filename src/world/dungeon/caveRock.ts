@@ -17,6 +17,8 @@ import type { ScaledLayout } from './cellar';
 import { WildMat, scaleTint, type Tint } from './meshKit';
 import { brickField, fieldAt, meshField, setSample, type BrickField } from './rockMesh';
 import { DungeonSpace } from './space';
+import { THROAT_BEYOND, throatAir, throatNoise, throatShade, type ThroatFrame } from './caveThroat';
+import { inFrame } from './site';
 import { blockAt, caveFeatures, domeAt, hallAt, miteAt, floorLift, toCourse, type CaveBlock, type CaveFeatures, type CaveMite } from './caveFeatures';
 
 /** Sample spacing of the cave's field, metres: a sixth of a cell, 0.4 m at least (a cellar-sized cave's). */
@@ -33,7 +35,7 @@ export type CaveField = BrickField;
 interface Stalactite { readonly x: number; readonly z: number; readonly len: number; readonly r: number }
 
 /** The field around every room and way of the layout, a cell of rock beyond. */
-export function caveField(layout: ScaledLayout, seed: number, feat = caveFeatures(layout, seed), step = caveStep(layout.scale.cell)): CaveField {
+export function caveField(layout: ScaledLayout, seed: number, feat = caveFeatures(layout, seed), step = caveStep(layout.scale.cell), throat: CaveThroat | null = null): CaveField {
   const space = new DungeonSpace(layout, true), { cell: CELL, storey: STOREY } = layout.scale;
   // Everything that is a length in a cellar-sized cave grows with the cell.
   const g = CELL / 2;
@@ -96,6 +98,7 @@ export function caveField(layout: ScaledLayout, seed: number, feat = caveFeature
   for (const m of feat.mites) mites.set(m.hall, [...(mites.get(m.hall) ?? []), m]);
   const shaftAt = (x: number, z: number) => feat.shafts.find((s) => Math.hypot(x - s.x, z - s.z) < s.r * 1.5 + 1);
   const f = brickField(ox, oy, oz, step, nx, ny, nz);
+  const gullet = throat ? throatNoise(throat.seed) : null;
   for (let k = 0; k < nz; k++) {
     const z = oz + k * step;
     for (let i = 0; i < nx; i++) {
@@ -165,12 +168,33 @@ export function caveField(layout: ScaledLayout, seed: number, feat = caveFeature
           const air = Math.min(r - Math.hypot(x - shaft.x, z - shaft.z), shaft.top - y);
           d = -smin(-d, -air, 0.8);
         }
+        // The throat out of the entrance room's wall, to the portal from the mouth and a little past it (caveThroat.ts).
+        if (throat && gullet) d = Math.max(d, inThroat(throat, gullet, x, y, z));
         setSample(f, i, j, k, d);
       }
     }
   }
   return f;
 }
+
+/** Where a cave's throat leaves its entrance room (caveThroat.ts), and the seed its mouth's side makes its lumps from. */
+export type CaveThroat = ThroatFrame & { readonly seed: number };
+
+/** The throat's air at a point of the cave's frame: from a little into the entrance room to a little past the portal. */
+function inThroat(t: ThroatFrame, noise: ReturnType<typeof throatNoise>, x: number, y: number, z: number): number {
+  const [u, w] = inFrame(t, x, z), v = y - t.y;
+  if (Math.abs(u) > 3 || v < -1.5 || v > 4.5 || w > THROAT_BEYOND + 1.5 || w < -THROAT_IN - 1.5) return -1;
+  return Math.min(throatAir(noise, u, v, w), THROAT_BEYOND - w, w + THROAT_IN);
+}
+
+/** The throat's darkening at a point of the cave's frame (1 away from it). */
+function throatDark(t: ThroatFrame, x: number, y: number, z: number): number {
+  const [u, w] = inFrame(t, x, z);
+  return Math.abs(u) > 3.5 || y - t.y > 5 ? 1 : throatShade(w);
+}
+
+/** How far the throat reaches on into the cave past its portal (m): through the rock to the wall and well into the room. */
+const THROAT_IN = 4;
 
 /** The field at a point (trilinear); solid rock outside it. */
 export const caveAt = (f: CaveField, x: number, y: number, z: number): number => fieldAt(f, x, y, z);
@@ -203,7 +227,7 @@ const ROCK: Tint = [168, 160, 148], SILT: Tint = [150, 132, 110];
 const BARE: Tint = [128, 126, 122];
 
 /** The cave's rock as one mesh in the building format (its own frame). */
-export function caveShell(f: CaveField, layout: ScaledLayout, seed: number, feat = caveFeatures(layout, seed)): BuildingMesh {
+export function caveShell(f: CaveField, layout: ScaledLayout, seed: number, feat = caveFeatures(layout, seed), throat: CaveThroat | null = null): BuildingMesh {
   const space = new DungeonSpace(layout, true);
   const noise = new Noise(deriveSeed(seed, 'cave', 'tint'));
   // Damp: by the water, and where a shaft lets the rain in.
@@ -225,7 +249,9 @@ export function caveShell(f: CaveField, layout: ScaledLayout, seed: number, feat
       const hall = hallAt(feat, space, x, y + 0.05, z), over = hall ? y - hall.floor : 0;
       const band = 0.9 + 0.1 * Math.sin(y * 1.7 + noise.fbm3(x / 6, y / 6, z / 6, 2) * 3);
       const damp = 1 - 0.35 * wetness(x, z) * (1 - smoothstep(0.5, 2.5, floor));
-      const s = (0.62 + 0.38 * smoothstep(0, 0.9, floor)) * band * damp * (0.85 + 0.3 * (noise.fbm3(x / 5, y / 5, z / 5, 2) * 0.5 + 0.5));
+      // Near the portal the throat is as dark as the mouth's way in at that depth (caveThroat.ts).
+      const dark = throat ? throatDark(throat, x, y, z) : 1;
+      const s = (0.62 + 0.38 * smoothstep(0, 0.9, floor)) * band * damp * dark * (0.85 + 0.3 * (noise.fbm3(x / 5, y / 5, z / 5, 2) * 0.5 + 0.5));
       // Walls are bare rock; the floor (lying level, `up`) is silted, thin silt showing the grey of the rock under it.
       const flat = smoothstep(0.7, 0.92, up);
       if (flat <= 0) return scaleTint(ROCK, s);

@@ -14,6 +14,7 @@ import type { SkyView } from '../render/sky';
 import type { BelowLight, WarmLights } from '../render/warmLights';
 import { caveGlows, torchSpots } from '../world/dungeon/torches';
 import type { Cellar } from '../world/dungeon/cellar';
+import type { ThroatFrame } from '../world/dungeon/caveThroat';
 import { DungeonSpace, keySpot, type SpaceEvent } from '../world/dungeon/space';
 import { SearchKneel } from './searchKneel';
 import { WalkTo } from './walkTo';
@@ -37,6 +38,8 @@ export class CellarVisit {
   onDepth: ((below: boolean) => void) | null = null;
   /** The house above, whose hatch the ladder climbs up to (null: a barrow's way out, walked to). */
   above: { readonly town: string; readonly house: TownBuilding } | null = null;
+  /** A cave walked into through its throat from its mouth (a portal, app/portals.ts): no way out at its hatch, no fade. */
+  throat: ThroatFrame | null = null;
 
   constructor(
     readonly cellar: Cellar,
@@ -155,7 +158,7 @@ export class CellarVisit {
     }
     // A barrow's way out is walked to; a house's ladder is climbed (app/hatchClimb.ts).
     const h = this.cellar.hatch;
-    if (!this.above && this.cooldown === 0 && Math.hypot(h.x - lx, h.z - lz) < 0.75 && Math.abs(h.y - ly) < 1) void this.leave();
+    if (!this.above && !this.throat && this.cooldown === 0 && Math.hypot(h.x - lx, h.z - lz) < 0.75 && Math.abs(h.y - ly) < 1) void this.leave();
   }
 
   /** What changed down here, for the save. */

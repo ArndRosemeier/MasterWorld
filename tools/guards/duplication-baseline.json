@@ -540,14 +540,6 @@
     "reason": "Reading the world's seed and terrain off a context object is how every VGM tool starts, not a copied helper; the cave tool (L6) was the third."
   },
   {
-    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/holdRock.ts",
-    "reason": "Rock beds and faces shaped by fbm3 noise: one line of shaping in each rock field, with its own scales and amplitudes (the finder pairs them anew as other files change)."
-  },
-  {
-    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/holdRock.ts + masterworld/world/volumes.ts",
-    "reason": "Rock beds and faces shaped by fbm3 noise: one line of shaping in each rock field, with its own scales and amplitudes (the finder pairs them anew as other files change)."
-  },
-  {
     "key": "idiom: [.weighted] in masterworld/app/title/draw.ts + masterworld/vgm/answers.ts + masterworld/world/landforms.ts",
     "reason": "The seeded weighted pick (@futuremagic/core) in three unrelated choices: the title's scenery, the VGM's answer to a need, and a cell's landform. The pick is shared; the choices are not."
   },
@@ -670,5 +662,9 @@
   {
     "key": "idiom: [.computeBoundingSphere .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/portal/PortalView.ts + masterworld/render/terrain/TerrainView.ts",
     "reason": "Finishing a BufferGeometry (its index, then its bounds) is three.js's own API; each builds a different mesh."
+  },
+  {
+    "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",
+    "reason": "WalkWorld's rockSurface as main's land and below-ground walk worlds give it (they ask the terrain's own and the open building's); the terrain's is the rock itself."
   }
 ]

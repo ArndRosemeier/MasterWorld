@@ -35,6 +35,8 @@ export class CellarView {
   rock: BuildingMesh | null = null;
   /** A cave's water and shafts of daylight (world/dungeon/caveFeatures.ts); set before `add`. */
   cave: CaveFeatures | null = null;
+  /** Walked into through a throat from its mouth (a portal): no ladder up stands at its way out; set before `add`. */
+  throat = false;
 
   constructor(readonly cellar: Cellar, readonly origin: { x: number; y: number; z: number }) {
     this.group.name = `cellar ${cellar.decision.id}`;
@@ -43,7 +45,7 @@ export class CellarView {
 
   /** Built (once the props have loaded) and into the scene (shaders are the town's, already built). */
   async add(stage: Stage): Promise<void> {
-    const m = cellarMeshes(this.cellar, await loadCellarProps());
+    const m = cellarMeshes(this.cellar, await loadCellarProps(), this.throat);
     this.group.add(this.piece(m.shell, 'shell'), this.piece(m.props, 'props'));
     if (this.rock) this.group.add(this.piece(this.rock, 'rock'));
     const O = this.origin;

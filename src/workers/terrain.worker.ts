@@ -14,7 +14,7 @@ import { serve } from './serve';
 import { townMaskData } from '../world/townMask';
 import type { Decision } from '../world/decisions';
 import type { BuildingMesh, TownBuilding, TownPlan } from '@futuremagic/settlement';
-import { caveField, caveShell, type CaveField } from '../world/dungeon/caveRock';
+import { caveField, caveShell, type CaveField, type CaveThroat } from '../world/dungeon/caveRock';
 import { caveFeatures } from '../world/dungeon/caveFeatures';
 import { mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
 import type { Site } from '../world/dungeon/site';
@@ -22,7 +22,7 @@ import type { ScaledLayout } from '../world/dungeon/cellar';
 import { holdRockOnLand, type HoldRock } from '../world/holdRock';
 import { layOut, type SiteJob, type SiteLayout } from '../world/sites';
 
-export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number; i0: number; j0: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: ScaledLayout; cave: number; keep: readonly (readonly [number, number])[] } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] } | { kind: 'tiles'; tiles: readonly TracedTile[] } | { kind: 'trace'; brook: boolean; tx: number; tz: number } | ({ kind: 'water' } & Omit<MaskJob, 'seed' | 'setting'>));
+export type TerrainJob = { seed: number; setting: string } & (({ kind: 'chunk' } & ChunkSpec) | { kind: 'volumes' } | { kind: 'town'; id: string; plan: boolean } | { kind: 'townMask'; id: string; w: number; h: number; i0: number; j0: number } | ({ kind: 'horizon' } & HorizonSpec) | { kind: 'caveRock'; layout: ScaledLayout; cave: number; keep: readonly (readonly [number, number])[]; throat: CaveThroat | null } | { kind: 'caveMouth'; site: Site; cave: number } | { kind: 'holdRock'; site: Site & { readonly level: number }; rock: number } | { kind: 'site'; site: SiteJob } | { kind: 'house'; b: TownBuilding; hatch: boolean; hall: boolean; sign?: [number, number, number] } | { kind: 'decisions'; decisions: readonly Decision[] } | { kind: 'tiles'; tiles: readonly TracedTile[] } | { kind: 'trace'; brook: boolean; tx: number; tz: number } | ({ kind: 'water' } & Omit<MaskJob, 'seed' | 'setting'>));
 export type TerrainResult = TracedTile | Float32Array | ChunkMesh | VolumeMesh[] | TownMeshes | Uint8Array | CaveRock | CaveMouth | HoldRock | SiteLayout | OpenHouse | null;
 
 /** A town's buildings merged per cell, and its plan when asked for (a settlement founded while playing is planned here). */
@@ -60,7 +60,7 @@ serve<TerrainJob, TerrainResult>((job) => {
     return { result: data, transfer: [data.buffer] };
   }
   if (job.kind === 'caveRock') {
-    const feat = caveFeatures(job.layout, job.cave, job.keep), field = caveField(job.layout, job.cave, feat), shell = caveShell(field, job.layout, job.cave, feat);
+    const feat = caveFeatures(job.layout, job.cave, job.keep), field = caveField(job.layout, job.cave, feat, undefined, job.throat), shell = caveShell(field, job.layout, job.cave, feat, job.throat);
     return { result: { field, shell }, transfer: [...field.bricks.flatMap((b) => (b ? [b.buffer as ArrayBuffer] : [])), ...meshBuffers(shell)] };
   }
   if (job.kind === 'caveMouth') {
