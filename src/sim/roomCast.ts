@@ -78,7 +78,8 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
     const ok = (k: InteriorSpotKind) => WORK.has(k) || (a.person.role === 'keeper' && k === 'pray');
     const i = take(ok, a);
     if (i >= 0) out.push({ agent: a, spot: i, act: actAt(i) });
-    else rest.push(a);
+    // No work spot here (the hedge witch's cottage): the first of the seats, before the household takes them all.
+    else rest.unshift(a);
   }
   for (const a of rest) {
     // The place they had, whatever kind of rest it is; else the likeliest free one.

@@ -317,7 +317,6 @@ export class InteriorVisit {
     const o = this.open;
     if (!o) { this.placed = null; return; }
     const life = o.door.town.life;
-    // Only those drawn (Actors makes adults): a child would hold a seat and show nobody.
     const cast = roomCast(life.agents, life.spots, o.b.id, o.plan, o.flow.kept);
     const places = o.flow.frame(cast, dt);
     // Those walking out wait on the doorstep until they reach it (else they would be in the street already).

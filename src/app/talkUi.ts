@@ -113,17 +113,22 @@ export class TalkUi {
     return this.host.roomPeople ?? this.folk.agents.filter((a) => !a.hidden).map((a) => ({ agent: a, x: a.x, z: a.z }));
   }
 
-  /** The grown-up nearest in front of the hero, within reach. */
+  /**
+   * The grown-up in front of the hero within reach whom the hero faces most: near and straight ahead (two at one
+   * table half a metre apart: the one the hero turns to, not always the nearer).
+   */
   private inFront(): Agent | null {
     const w = this.player.walker;
-    let best: Agent | null = null, bd = REACH;
+    let best: Agent | null = null, bs = Infinity;
     for (const { agent: a, x, z } of this.about()) {
       if (a.person.role === 'child') continue;
       const dx = x - w.pos.x, dz = z - w.pos.z, d = Math.hypot(dx, dz);
-      if (d >= bd) continue;
+      if (d >= REACH) continue;
       // The walker's yaw faces −z at 0 (walker.ts); the direction to them as the same kind of angle.
-      if (Math.abs(angleDiff(Math.atan2(-dx, -dz), w.yaw)) > FRONT) continue;
-      best = a; bd = d;
+      const off = Math.abs(angleDiff(Math.atan2(-dx, -dz), w.yaw));
+      if (off > FRONT) continue;
+      const score = d * (1 + 2 * off);
+      if (score < bs) { best = a; bs = score; }
     }
     return best;
   }
