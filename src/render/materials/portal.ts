@@ -6,7 +6,7 @@
  * this side hides it.
  */
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, MeshBasicNodeMaterial, Texture, Vector4 } from 'three/webgpu';
-import { abs, attribute, float, length, max, mix, mx_noise_float, mx_noise_vec3, mx_worley_noise_float, screenUV, smoothstep, texture, uniformArray, vec3, vec4 } from 'three/tsl';
+import { abs, attribute, float, length, max, mix, mx_noise_float, mx_noise_vec3, mx_worley_noise_float, screenUV, smoothstep, texture, uniformArray, vec2, vec3, vec4 } from 'three/tsl';
 import { defineKind } from '../materials';
 
 /** The view through the openings: the twin target's texture once the view is made (view.ts sets it before the warm-up). */
@@ -49,12 +49,12 @@ export const PORTAL_RIFT = defineKind('portal-rift', ['position', 'uv', 'color']
   const shimmer = mx_noise_vec3(vec3(q.mul(2.5), age.mul(0.7))).xy.mul(float(1.0).sub(open).mul(0.25).add(0.02)).mul(0.06);
   const seen = PORTAL_VIEW.sample(screenUV.add(shimmer)).rgb;
   // The haze that stands in: slow swirls of the rim's colour in the dark.
-  const swirl = mx_noise_float(vec3(q.mul(1.6).add(vec3(age.mul(0.05), age.mul(-0.08), 0.0)), age.mul(0.25))).mul(0.5).add(0.5);
+  const swirl = mx_noise_float(vec3(q.mul(1.6).add(vec2(age.mul(0.05), age.mul(-0.08))), age.mul(0.25))).mul(0.5).add(0.5);
   const haze = mix(vec3(0.02, 0.015, 0.04), rimC.mul(0.35), swirl);
   const inside = mix(haze, seen, view);
   // Towards the edge it fades into the rim's haze; motes drift in it.
   const toward = smoothstep(0.55, 0.95, edge).mul(0.55);
-  const motes = smoothstep(0.07, 0.0, mx_worley_noise_float(vec3(q.mul(3.5).add(vec3(0.0, age.mul(-0.15), 0.0)), age.mul(0.2))));
+  const motes = smoothstep(0.07, 0.0, mx_worley_noise_float(vec3(q.mul(3.5).add(vec2(0.0, age.mul(-0.15))), age.mul(0.2))));
   m.colorNode = mix(inside, rimC.mul(0.7), toward).mul(mask).add(rimC.mul(motes.mul(mask).mul(0.9))).add(rimC.mul(rim.mul(1.8)));
   m.opacityNode = max(mask.mul(mix(float(0.55), float(0.95), view)), rim).mul(open.greaterThan(0.001).select(float(1.0), float(0.0)));
   return m;
