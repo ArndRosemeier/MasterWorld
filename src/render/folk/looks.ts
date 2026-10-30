@@ -21,7 +21,7 @@ export const PACK_HAIR = [
 /** Clips (every name in CLIP below and in the standing repertoires, repertoire.ts). */
 export const PACK_CLIPS = [
   'idle', 'talk', 'arms folded', 'nod', 'shake head', 'dance', 'walk', 'walk carrying', 'sit', 'sit and talk', 'pick up', 'interact', 'eat or drink',
-  'repair (kneeling)', 'harvest', 'plant seeds', 'water plants', 'chop wood', 'crouch', 'get up from lying',
+  'repair (kneeling)', 'harvest', 'plant seeds', 'water plants', 'chop wood', 'crouch', 'get up from lying', 'jog',
 ];
 
 /** Asleep in bed: the first frame of getting up from lying, held still (FolkView lays it along the bed). */
@@ -128,6 +128,7 @@ const CLIP: Record<ActivityKind, string> = {
   smith: 'chop wood', stoke: 'interact', quench: 'pick up', bake: 'interact', craft: 'repair (kneeling)',
   sell: 'idle', serve: 'idle', tend: 'water plants',
   fetchWater: 'pick up', fetchWood: 'pick up', chop: 'chop wood', garden: 'harvest', washing: 'interact', feedHens: 'plant seeds',
+  dance: 'dance folk', revel: 'idle',
   browse: 'arms folded', sit: 'sit', chat: 'talk', drink: 'eat or drink', pray: 'crouch', mourn: 'arms folded', play: 'idle',
   plough: 'harvest', sow: 'plant seeds', hoe: 'harvest', reap: 'harvest', tendStock: 'interact', muckOut: 'pick up',
   hurt: 'crouch', mark: 'interact',

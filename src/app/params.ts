@@ -105,6 +105,8 @@ export const params = {
   holdTier: (['hated', 'unwelcome', 'stranger', 'friend', 'honoured'] as const).find((k) => k === q.get('hold')) ?? null,
   /** How many terrain workers (`workers=6`; for timing the load): by default one less than the cores, at most 4. */
   workers: q.get('workers') ? Math.max(1, Math.min(16, Number(q.get('workers')) || 4)) : undefined,
+  /** The start town holds a feast at its market from the start (`feast`), its people dancing, drinking and playing there. */
+  feast: q.has('feast'),
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
   /** Open character creation at once, without the title (`create`; with the title it follows New game). */

@@ -27,7 +27,7 @@ export interface DebugHost {
   readonly weatherKinds: readonly string[];
   weather(kind: string | null): string;
   /** A VGM order to the town, here and now: everyone to the market, or everyone indoors. */
-  town(kind: 'gather' | 'stayIn'): string;
+  town(kind: 'gather' | 'feast' | 'stayIn'): string;
   /** The view as URL parameters (`pos=…&look=…`). */
   readonly viewParams: string;
   /** Abilities a teacher opens (D49): learn or forget them here, to try them. */
@@ -122,6 +122,7 @@ export class DebugMenu {
       ]],
       ['Town', [
         { label: 'Everyone to the market', run: () => h.town('gather') },
+        { label: 'A feast at the market now', run: () => h.town('feast') },
         { label: 'A story event now', run: () => h.storyEvent() },
         ...h.events.map((e) => ({ label: `Story event: ${e.kind} (${e.id})`, run: () => h.storyEvent(e.id) })),
         { label: 'Curfew', run: () => h.town('stayIn') },

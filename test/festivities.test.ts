@@ -30,8 +30,8 @@ test('festivities: the town the hero did a deed for feasts them the next evening
   assert.equal(festivityFor(ctx(log, 30 + 30)), null, 'not for a deed long past');
   const faded: Decision[] = [...base, promise, { ...keepPromise([...base, promise], promise.id, 30)!, faded: true }];
   assert.equal(festivityFor(ctx(faded, 30.5)), null, 'not for a thing that ran its course');
-  const order = festivityOrder(terrain.towns, d)!;
-  assert.ok(order.kind === 'gather' && order.from === d.from && order.to === d.to);
+  const order = festivityOrder(terrain.towns, d, classic)!;
+  assert.ok(order.kind === 'gather' && order.from === d.from && order.to === d.to && order.mood === 'feast', 'a feast');
   const told = festivityTold(classic, [...log, d], terrain.towns, d)!;
   assert.ok(told && !/\{/.test(told.title + told.news + told.told + told.done) && /cleared/.test(told.news), told?.news);
   // Its people know of it, and once it is over they tell it as past.
