@@ -41,6 +41,10 @@ export interface Person {
 /** Buildings whose whole household works there. */
 const FAMILY_TRADES = new Set<string>(['inn', 'farmhouse']);
 
+/** From this age people are old: they walk slower, by OLD_PACE (elves age slowly and never are). */
+export const OLD_AGE = 58;
+const OLD_PACE = 0.72;
+
 /** Everyone living in a town. */
 export function townsfolk(plan: TownPlan, seed: number): Person[] {
   const r = new Rng(deriveSeed(seed, 'townsfolk'));
@@ -49,7 +53,10 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     const id = people.length, s = deriveSeed(seed, 'person', id), pr = new Rng(s);
     const child = role === 'child';
     const traits = { social: pr.float(), diligent: pr.float(), pious: pr.float(), early: pr.float(), speed: child ? pr.range(1.4, 1.8) : pr.range(1.1, 1.45) };
-    people.push({ id, home, work, role, trade, ...traits, female: pr.chance(0.5), race: 'human', age: Math.round(child ? pr.range(4, 15) : pr.range(18, 68)), seed: s });
+    const female = pr.chance(0.5), age = Math.round(child ? pr.range(4, 15) : pr.range(18, 68));
+    // The old walk slower (and are drawn with an old walk: render/folk/gaits.ts).
+    if (age >= OLD_AGE) traits.speed *= OLD_PACE;
+    people.push({ id, home, work, role, trade, ...traits, female, race: 'human', age, seed: s });
     return people[id];
   };
   const trades = plan.buildings.filter((b) => b.trade && b.kind !== 'temple');

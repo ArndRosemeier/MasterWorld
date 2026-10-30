@@ -14,10 +14,12 @@ import type { Agent, TownLife } from '../../sim/townLife';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 import { FAR, FarFolk } from './FarFolk';
-import { castShadows, eachMesh, handOf, seatOf } from '../hero/play';
+import { castShadows, eachMesh, FADE, handOf, seatOf } from '../hero/play';
 import { SHADOW_ONLY } from '../sky';
 import { clipOf, coveringLooks, LIE, lookOf, PACK_CLIPS, PACK_GARMENTS, PACK_HAIR } from './looks';
 import { Held, Steady } from '../steady';
+import { Repertoire } from './repertoire';
+import { GAIT_CLIPS, gaitOf, gaitScale } from './gaits';
 import type { LimbGoals } from '@futuremagic/figure';
 import { BodyRig, applyPuppet, limbGoals, type HeroPuppet } from '../hero/puppet';
 
@@ -119,7 +121,12 @@ interface Slot {
   since: number;
   /** What is drawn follows the agent smoothly, and its clip changes only once wanted a moment (render/steady.ts). */
   st: Steady;
-  held: Held<string>;
+  /** The activity shown, changed only once wanted a moment (render/steady.ts). */
+  held: Held<ActivityKind>;
+  /** What they do with themselves while standing about (repertoire.ts). */
+  rep: Repertoire;
+  /** How they walk (gaits.ts). */
+  gait: string;
   /** Hands-on control of its bones, made when a scene first plays it (null: none yet), and whether it turned any last frame. */
   readonly rig: BodyRig;
   rigged: boolean;
@@ -144,7 +151,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0, st: new Steady(), held: new Held(''), rig: new BodyRig(place), rigged: false, goals: limbGoals() };
+      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0, st: new Steady(), held: new Held<ActivityKind>('wait'), rep: new Repertoire(0), gait: 'walk', rig: new BodyRig(place), rigged: false, goals: limbGoals() };
       this.slots.push(slot);
     }
   }
@@ -160,7 +167,7 @@ export class FolkView {
       ...c,
       garments: c.garments.filter((g) => PACK_GARMENTS.includes(g.id)),
       hair: c.hair.filter((h) => PACK_HAIR.includes(h.id)),
-      animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id)),
+      animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id) || GAIT_CLIPS.includes(a.id)),
     });
     // The first loads the pack; the others share it (and the garments any of them loads).
     const first = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, worker, catalog });
@@ -345,17 +352,23 @@ export class FolkView {
       o.position.set(st.x, st.y, st.z);
       o.rotation.y = st.yaw;
       this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
-      const clip = p?.puppet?.clip ?? s.held.pick(dt, clipOf(p ? p.act : a.act, a.person.id, !!a.held));
+      const act = s.held.pick(dt, p ? p.act : a.act);
+      const own = s.rep.play(dt, act) ?? clipOf(act, a.person.id, !!a.held);
+      const clip = p?.puppet?.clip ?? (own === 'walk' ? s.gait : own);
       if (clip !== s.clip) {
         s.clip = clip;
         s.since = 0;
-        // Into bed at once (a fade would hold half the last clip while the lying pose stands still).
-        void s.ch.play(clip, clip === LIE ? 0 : undefined);
+        // Blended (one idle into the next, standing into walking); into bed at once (a fade would hold half the
+        // last clip while the lying pose stands still).
+        void s.ch.play(clip, clip === LIE ? 0 : FADE.loop);
       } else s.since += dt;
       // Asleep: the lying pose held still, not getting up over and over.
       if (s.ch.paused !== (clip === LIE)) s.ch.seek(clip === LIE ? 0 : null);
       // Bones a scene turned last frame go back as bound before the clip plays on.
       if (s.rigged) { s.rig.current?.relax(); s.rigged = false; }
+      // A walk keeps step with their pace (their own walk at its own speed would slide its feet).
+      const going = s.ch.actor.currentAction;
+      if (going) going.timeScale = clip === LIE || p?.puppet ? 1 : gaitScale(clip, a.person.speed);
       s.ch.update(dt);
       if (p?.puppet) { const rig = s.rig.of(s.ch, s.ch.height || 1.75); if (rig) s.rigged = applyPuppet(rig, o, s.goals, p.puppet); }
       // On a room's bench they sit back on its rear edge, so a long coat's tail hangs down behind it, not through it.
@@ -402,9 +415,12 @@ export class FolkView {
     // A new body: its rig is fitted again when a scene plays it.
     s.rig.reset();
     s.rigged = false;
-    s.clip = clipOf(a.act, a.person.id);
+    const first = clipOf(a.act, a.person.id);
+    s.clip = first === 'walk' ? gaitOf(a.person) : first;
     s.st = new Steady();
-    s.held = new Held(s.clip);
+    s.held = new Held(a.act);
+    s.rep = new Repertoire(a.person.seed);
+    s.gait = gaitOf(a.person);
     s.since = SETTLE; // dressed already in the clip (no fade)
     this.shown.set(a, s);
     this.dressing++;
