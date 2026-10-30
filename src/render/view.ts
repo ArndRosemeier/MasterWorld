@@ -3,7 +3,7 @@
  */
 import { PerspectiveCamera, PCFSoftShadowMap, Scene, DirectionalLight, HemisphereLight, PointLight, type WebGPURenderer } from 'three/webgpu';
 import { SkyView } from './sky';
-import { GRADE, Stage, createPost, createRenderer, type Post } from '@futuremagic/stage';
+import { GRADE, Stage, createPost, createRenderer, type Post, type PostHooks } from '@futuremagic/stage';
 import { Float32BufferAttribute, type BufferGeometry } from 'three/webgpu';
 import { warmKinds } from './materials';
 import { WarmLights } from './warmLights';
@@ -27,8 +27,10 @@ export interface View {
   readonly sky: SkyView;
   /** The post chain (bloom), or null when drawing straight to the screen (`post=0`). */
   readonly post: Post | null;
-  /** Draws one frame. */
-  draw(): void;
+  /** Draws one frame (`hooks`, else `slot`'s: work slotted in round the scene pass, a portal's view: render/portal/PortalView.ts). */
+  draw(hooks?: PostHooks): void;
+  /** Gives each frame's hooks when `draw` is called without (the Stage calls it so). */
+  slot: (() => PostHooks | undefined) | null;
 }
 
 /** What glows: brighter than this on screen (after exposure, before the tone curve). */
@@ -70,7 +72,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   // Bloom: a soft glow round the sun, lit windows and fire. Its threshold follows the exposure (frame()).
   // Ambient occlusion: contact shade in corners, under eaves, round feet and stones.
   const post = opts.post === false ? null : createPost(renderer, scene, drawn, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth });
-  const draw = (): void => {
+  const draw = (hooks?: PostHooks): void => {
     ORIGIN.view(camera, drawn);
     if (!post) { renderer.render(scene, drawn); return; }
     const day = sky.indoors ? 0 : sky.light.day;
@@ -79,7 +81,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
       post.bloom!.strength.value = BLOOM_STRENGTH_NIGHT + (BLOOM_STRENGTH - BLOOM_STRENGTH_NIGHT) * day;
       post.bloom!.radius.value = BLOOM_RADIUS_NIGHT + (BLOOM_RADIUS - BLOOM_RADIUS_NIGHT) * day;
     }
-    post.draw();
+    post.draw(hooks ?? out.slot?.());
   };
   const stage = new Stage(renderer, scene, drawn, { kinds: warmKinds, attribute: standInAttribute, target: post ? post.target : undefined, draw });
   const fit = (): void => {
@@ -91,7 +93,8 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   fit();
   window.addEventListener('resize', fit);
   stage.shadowCamera = sun.shadow.camera;
-  return { renderer, backend, scene, camera, drawn, stage, sun, lantern, warm, sky, post, draw };
+  const out: View = { renderer, backend, scene, camera, drawn, stage, sun, lantern, warm, sky, post, draw, slot: null };
+  return out;
 }
 
 /** Our own vertex attributes on the Stage's warm-up stand-ins (same size as on real meshes). */

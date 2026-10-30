@@ -12,11 +12,12 @@
  * cellar room at the origin, storey 0 the house's cellar, storey −1 what lay there before.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { cyclicGraph, layoutDungeon, pace, PATTERNS, DIRS, type DungeonGraph, type DungeonLayout, type Pace, type Room } from '@futuremagic/dungeon';
+import { cyclicGraph, layoutDungeon, pace, PATTERNS, DIRS, LayoutGrid, type DungeonGraph, type DungeonLayout, type Pace, type Room } from '@futuremagic/dungeon';
 import type { CellarLore, DungeonForm, DungeonProp, DungeonScale, DungeonSpace as SpaceDef, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
 import type { DungeonDecision, MoveInDecision, RetakeDecision } from '../decisions';
 import { depthOf, entranceOf } from './kinds';
 import { setPieceById, type SetPieceDef } from './setPieces';
+import { wayOutFree } from './caveThroat';
 
 /** Metres per layout cell, per storey, and stairs per storey (cells): a built cellar's. */
 export const CELL = 2;
@@ -400,6 +401,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: ScaledLayout
   const clues: Clue[] = [];
   const doorsOf = (room: number) => layout.links.flatMap((pl) => pl.doors.filter((dr) => dr.room === room));
   const placed = layout.rooms;
+  const grid = shape.carved ? new LayoutGrid(layout) : { cells: new Map<string, unknown>() };
   /** Spots along a room's walls (not a doorway's own), as cell + wall side; `put` keeps the floor before doors clear. */
   const wallSpots = (room: number) => {
     const R = placed[room], out: { x: number; z: number; dir: number }[] = [];
@@ -431,7 +433,9 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: ScaledLayout
     // out must stand somewhere: in a small room with a door in every cell, beside a door.
     const all = wallSpots(room);
     let spot: ReturnType<typeof standAt> | null = null;
-    for (const [spots, doorsClear] of [[all.filter(roomy), true], [all, true], [kind === shape.way ? all : [], false]] as const) {
+    // A carved cave's way out leads on into a throat behind its wall (caveThroat.ts): a wall with free rock behind it first.
+    const behind = kind === shape.way && shape.carved ? all.filter((w) => wayOutFree(grid, w.x, w.z, R.level, w.dir)) : [];
+    for (const [spots, doorsClear] of [[behind.filter(roomy), true], [behind, true], [all.filter(roomy), true], [all, true], [kind === shape.way ? all : [], false]] as const) {
       for (const s of rng.shuffle(spots.slice())) { const p = standAt(s); if (fits(p, doorsClear)) { spot = p; break; } }
       if (spot) break;
     }

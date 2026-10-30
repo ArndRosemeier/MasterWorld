@@ -129,7 +129,7 @@ const ASHLAR: Tint = [196, 186, 170];
  * dungeon (a cave, world/dungeon/caveRock.ts) has no built shell: only its doors, props and what stands in
  * its ways are made here.
  */
-export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
+export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): CellarMeshes {
   const shell = new MeshKit(), propKit = new MeshKit();
   const L = c.layout, { cell: CELL, storey: STOREY, passage: PASSAGE_H } = L.scale;
   const shape = c.form.space, carved = shape.carved, tower = shape.walls === 'dressed';
@@ -337,6 +337,8 @@ export function cellarMeshes(c: Cellar, models?: PropModels): CellarMeshes {
 
   const lids: ChestLid[] = [];
   for (const p of c.props) {
+    // A cave walked into through its throat (caveThroat.ts) has no ladder up: its way out is the throat itself.
+    if (throat && p === c.hatch) continue;
     if (p.kind === 'chest') lids.push(chest(propKit, p, models));
     else if (!models || !modelProp(propKit, p, models)) prop(propKit, p);
   }

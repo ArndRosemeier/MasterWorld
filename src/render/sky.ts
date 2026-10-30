@@ -72,6 +72,16 @@ export function lowSunSky(sunUp: number): number {
   return Math.min(3, Math.sqrt(SKY_E[SKY_E.length - 1][1] / e));
 }
 
+/** How fast the eye adapts to a change of light (per second: about a second from a cave out into the day). */
+const ADAPT = 3;
+
+/** The light set for one view (SkyView.shade). */
+interface SkyShade {
+  readonly sun: number; readonly sunLight: Color; readonly hemi: Color; readonly ground: Color; readonly fill: number; readonly env: number;
+  readonly dome: boolean; readonly stars: number; readonly fog: Color; readonly density: number; readonly mist: number; readonly flat: number;
+  readonly fogBack: boolean; readonly windows: number;
+}
+
 /** In a natural cave: the faint fill of the day's light through its cracks, and the darkness's density (a cellar's 0.06). */
 const CAVE_FILL = 0.16;
 const CAVE_FOG = 0.022;
@@ -105,6 +115,17 @@ export class SkyView {
    */
   sheltered = false;
   private shelter = 0;
+  /**
+   * Where the camera is, when not where the hero is (a cave's portal: the camera trails behind, still on the
+   * land while the hero is in the throat below, or the other way round): the eye adapts to its light.
+   */
+  eye: { readonly dark: number } | null = null;
+  /** Where the sun's shadow box is centred instead of the camera (from a cave, the land beyond its portal). */
+  shadowFocus: { readonly x: number; readonly y: number; readonly z: number } | null = null;
+  /** The eye's exposure, eased (from a dark cave out into the day, and back in, the eye adapts over a moment). */
+  private seen = -1;
+  /** The open sky's light of this frame (before a below-ground light replaced it), for a portal's view out. */
+  private open: SkyShade | null = null;
   /** Mist in the low ground 0..1, and the height it lies at (the weather sets both). */
   mist = 0;
   mistBase = 0;
@@ -201,6 +222,58 @@ export class SkyView {
     this.update(0, null);
   }
 
+  /** Below ground's light (no sun or sky, a faint fill, darkness closing in): a cellar's, or a natural cave's. */
+  private below(cave: boolean): void {
+    this.sun.intensity = 0;
+    this.sunLight.value.setRGB(0, 0, 0);
+    WINDOWS.glow.value = 0;
+    if (cave) {
+      this.hemi.color.setRGB(0.42, 0.47, 0.55);
+      this.hemi.groundColor.setRGB(0.1, 0.09, 0.08);
+      this.hemi.intensity = CAVE_FILL;
+    } else {
+      this.hemi.color.setRGB(0.55, 0.42, 0.3);
+      this.hemi.groundColor.setRGB(0.12, 0.09, 0.07);
+      this.hemi.intensity = 0.05;
+    }
+    this.scene.environmentIntensity = 0.01;
+    this.dome.visible = false;
+    (this.stars.material as { opacity: number }).opacity = 0;
+    const fog = FOG.color.value;
+    fog.setRGB(0.008, 0.006, 0.005);
+    FOG.density.value = cave ? CAVE_FOG : 0.06;
+    FOG.mist.value = 0;
+    FOG.flat.value = 1;
+    this.scene.background = fog;
+  }
+
+  /** The light as it is set now (all but the exposure, which the whole frame shares). */
+  private held(): SkyShade {
+    const stars = this.stars.material as { opacity: number };
+    return {
+      sun: this.sun.intensity, sunLight: this.sunLight.value.clone(), hemi: this.hemi.color.clone(), ground: this.hemi.groundColor.clone(), fill: this.hemi.intensity,
+      env: this.scene.environmentIntensity, dome: this.dome.visible, stars: stars.opacity, fog: FOG.color.value.clone(), density: FOG.density.value, mist: FOG.mist.value,
+      flat: FOG.flat.value, fogBack: this.scene.background === FOG.color.value, windows: WINDOWS.glow.value,
+    };
+  }
+
+  private put(h: SkyShade): void {
+    this.sun.intensity = h.sun; this.sunLight.value.copy(h.sunLight); this.hemi.color.copy(h.hemi); this.hemi.groundColor.copy(h.ground); this.hemi.intensity = h.fill;
+    this.scene.environmentIntensity = h.env; this.dome.visible = h.dome; (this.stars.material as { opacity: number }).opacity = h.stars;
+    FOG.color.value.copy(h.fog); FOG.density.value = h.density; FOG.mist.value = h.mist; FOG.flat.value = h.flat;
+    this.scene.background = h.fogBack ? FOG.color.value : null; WINDOWS.glow.value = h.windows;
+  }
+
+  /**
+   * For one view (a portal's, into another realm): the open sky's light, or below ground's (a cave's when `cave`),
+   * at once; returns what puts this frame's light back. The exposure stays the frame's (the eye's).
+   */
+  shade(where: 'open' | 'below' | 'cave'): () => void {
+    const was = this.held();
+    if (where === 'open') { if (this.open) this.put(this.open); } else this.below(where === 'cave');
+    return () => this.put(was);
+  }
+
   /** The sky's environment map (reflections). */
   get envTexture() { return this.envRT.texture; }
 
@@ -237,6 +310,8 @@ export class SkyView {
     this.U.moonSun.value.set(...moon.sunSide);
     this.U.moonBright.value = L.moonBright;
     this.envU.moonDir.value.set(...moon.dir);
+    // The light is the hero's realm's (a portal's view into the other sets its own: `shade`); the eye's exposure is the camera's.
+    const dark = this.eye ? this.eye.dark : this.indoors ? 1 : 0, indoors = dark >= 0.5;
     (this.stars.material as { opacity: number }).opacity = this.indoors || this.underwater ? 0 : L.stars;
     this.U.time.value = this.time;
     this.U.flash.value = this.flash;
@@ -281,46 +356,30 @@ export class SkyView {
     if (this.look.length) {
       // Indoors the lamps set the colour: the day key (neutral).
       // In a building's room the same, as far as one is in (its lamp, not the night outside).
-      const g = gradeAt(this.look, this.indoors ? 1 : sun[1] + (1 - sun[1]) * this.shelter);
+      const g = gradeAt(this.look, indoors ? 1 : sun[1] + (1 - sun[1]) * this.shelter);
       GRADE.slope.value.set(...g.slope);
       GRADE.saturation.value = g.saturation;
     }
     this.shelter += ((this.sheltered ? 1 : 0) - this.shelter) * Math.min(1, dt * 2.5);
-    if (this.shelter > 1e-3 && !this.indoors) {
+    if (this.shelter > 1e-3 && !indoors) {
       const k = this.shelter, dim = 1 - k * (1 - SHELTER_SKY);
       this.scene.environmentIntensity *= dim;
       this.hemi.intensity *= dim;
       const room = Math.min(L.exposure, SHELTER_EXPOSURE_CAP) * this.exposure * SHELTER_EXPOSURE;
       this.renderer.toneMappingExposure += (room - this.renderer.toneMappingExposure) * k;
     }
-    if (this.indoors) {
-      this.sun.intensity = 0;
-      WINDOWS.glow.value = 0;
-      if (this.cave) {
-        this.hemi.color.setRGB(0.42, 0.47, 0.55);
-        this.hemi.groundColor.setRGB(0.1, 0.09, 0.08);
-        this.hemi.intensity = CAVE_FILL;
-      } else {
-        this.hemi.color.setRGB(0.55, 0.42, 0.3);
-        this.hemi.groundColor.setRGB(0.12, 0.09, 0.07);
-        this.hemi.intensity = 0.05;
-      }
-      this.scene.environmentIntensity = 0.01;
-      this.renderer.toneMappingExposure = 1.4 * this.exposure / EXPOSURE;
-      this.dome.visible = false;
-      (this.stars.material as { opacity: number }).opacity = 0;
-      fog.setRGB(0.008, 0.006, 0.005);
-      FOG.density.value = this.cave ? CAVE_FOG : 0.06;
-      FOG.mist.value = 0;
-      FOG.flat.value = 1;
-      this.scene.background = fog;
-    }
-
     this.sunLight.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
+    this.open = this.held();
+    if (this.indoors) this.below(this.cave);
+    if (dark > 0) this.renderer.toneMappingExposure += (1.4 * this.exposure / EXPOSURE - this.renderer.toneMappingExposure) * dark;
+    // The eye adapts over a moment when the light changes much (out of a cave into the day); at once on the first frame.
+    const want = this.renderer.toneMappingExposure;
+    this.seen = this.seen < 0 || dt === 0 ? want : this.seen + (want - this.seen) * Math.min(1, dt * ADAPT);
+    this.renderer.toneMappingExposure = this.seen;
     this.lightDir.value.set(...L.lightDir);
 
     // The shadow box follows the camera, snapped to texels so edges do not shimmer.
-    const focus = camera?.position ?? { x: 0, y: 0, z: 0 };
+    const focus = this.shadowFocus ?? camera?.position ?? { x: 0, y: 0, z: 0 };
     const texel = (SHADOW_EXTENT * 2) / SHADOW_MAP;
     const fx = Math.round(focus.x / texel) * texel, fz = Math.round(focus.z / texel) * texel;
     const d = L.lightDir, r = SHADOW_EXTENT * 6;

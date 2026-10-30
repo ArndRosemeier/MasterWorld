@@ -153,8 +153,8 @@ export class TerrainJobs {
   }
 
   /** A cave's rock (its field and mesh) for its layout: a few hundred milliseconds of work. */
-  caveRock(layout: import('../world/dungeon/cellar').ScaledLayout, cave: number, keep: readonly (readonly [number, number])[]): Promise<import('./terrain.worker').CaveRock> {
-    return this.job({ kind: 'caveRock', layout, cave, keep });
+  caveRock(layout: import('../world/dungeon/cellar').ScaledLayout, cave: number, keep: readonly (readonly [number, number])[], throat: import('../world/dungeon/caveRock').CaveThroat | null = null): Promise<import('./terrain.worker').CaveRock> {
+    return this.job({ kind: 'caveRock', layout, cave, keep, throat });
   }
 
   /** A cave's mouth on the land at its site. */

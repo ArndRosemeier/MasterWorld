@@ -15,6 +15,7 @@ import type { SkyView } from '../render/sky';
 import type { BelowLight, WarmLights } from '../render/warmLights';
 import { caveGlows, torchSpots } from '../world/dungeon/torches';
 import type { Cellar } from '../world/dungeon/cellar';
+import type { ThroatFrame } from '../world/dungeon/caveThroat';
 import { DungeonSpace, keySpot, type SpaceEvent } from '../world/dungeon/space';
 import { SearchKneel } from './searchKneel';
 import { WalkTo } from './walkTo';
@@ -40,6 +41,8 @@ export class CellarVisit {
   onDepth: ((below: boolean) => void) | null = null;
   /** The house above, whose hatch the ladder climbs up to (null: a barrow's way out, walked to). */
   above: { readonly town: string; readonly house: TownBuilding } | null = null;
+  /** A cave walked into through its throat from its mouth (a portal, app/portals.ts): no way out at its hatch, no fade. */
+  throat: ThroatFrame | null = null;
 
   constructor(
     readonly cellar: Cellar,
@@ -105,10 +108,17 @@ export class CellarVisit {
     this.view.group.visible = true;
     this.sky.indoors = true;
     this.onDepth?.(true);
-    const O = this.view.origin, inWorld = (t: { x: number; y: number; z: number }) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z });
-    // A natural cave has no torches: daylight falls into its caverns through cracks in their roofs (D57).
-    const glows = caveGlows(this.cellar);
     this.sky.cave = !!this.cellar.form.space.carved;
+    this.light();
+  }
+
+  /**
+   * Its own lights lit (the warm lights: its torches, or a natural cave's daylight through cracks, D57); also from
+   * out on the land before its portal, so the view in through it is lit as it will be inside.
+   */
+  light(): void {
+    const O = this.view.origin, inWorld = (t: { x: number; y: number; z: number }) => ({ x: O.x + t.x, y: O.y + t.y, z: O.z + t.z });
+    const glows = caveGlows(this.cellar);
     if (glows.length) this.warm.lightTorches(glows.map(inWorld), DAYLIGHT_BELOW);
     else this.warm.lightTorches(torchSpots(this.cellar).map(inWorld));
   }
@@ -147,7 +157,9 @@ export class CellarVisit {
     this.view.step(dt);
     if (this.kneel?.done) { if (this.player.puppet === this.kneel) this.player.puppet = null; this.kneel = null; }
     // The lantern, held up and a little ahead (brighter in a cave: its rock is dark, its halls wide).
-    this.lantern.intensity = this.cellar.form.space.carved ? 13 : 8;
+    // Walked in through a throat, it brightens over a moment as the day behind fades (else it is lit in the dark of a fade).
+    const lit = this.cellar.form.space.carved ? CAVE_LANTERN : 8;
+    this.lantern.intensity = this.throat ? this.lantern.intensity + (lit - this.lantern.intensity) * Math.min(1, dt * LANTERN_UP) : lit;
     this.lantern.position.set(w.pos.x - Math.sin(w.yaw) * 0.4, w.pos.y + 1.9, w.pos.z - Math.cos(w.yaw) * 0.4);
     const lx = w.pos.x - O.x, ly = w.pos.y - O.y, lz = w.pos.z - O.z;
     for (const e of this.space.touch(lx, ly, lz, dt)) this.event(e);
@@ -160,7 +172,7 @@ export class CellarVisit {
     }
     // A barrow's way out is walked to; a house's ladder is climbed (app/hatchClimb.ts).
     const h = this.cellar.hatch;
-    if (!this.above && this.cooldown === 0 && Math.hypot(h.x - lx, h.z - lz) < 0.75 && Math.abs(h.y - ly) < 1) void this.leave();
+    if (!this.above && !this.throat && this.cooldown === 0 && Math.hypot(h.x - lx, h.z - lz) < 0.75 && Math.abs(h.y - ly) < 1) void this.leave();
   }
 
   /** What changed down here, for the save. */
@@ -210,6 +222,12 @@ export class CellarVisit {
 
 /** Daylight through a crack in a cavern's roof: cool, steady, reaching down to its floor and walls. */
 const DAYLIGHT_BELOW: BelowLight = { color: 0xc4d4ff, strength: 70, reach: 48, decay: 1.25, flicker: false };
+
+/** The lantern's strength in a cave (its rock is dark, its halls wide). */
+export const CAVE_LANTERN = 13;
+
+/** How fast the lantern brightens in a throat (per second). */
+const LANTERN_UP = 1.5;
 
 /** A place on the land is walked out of from this far inside its doorway, metres. */
 const WALK_OUT = 1.0;

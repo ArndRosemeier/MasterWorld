@@ -13,6 +13,7 @@ import type { BuildingMesh } from '@futuremagic/settlement';
 import { WildMat, scaleTint, type Tint } from './meshKit';
 import { cragMat, meshField, walkRaster, type Field, type WalkRaster } from './rockMesh';
 import { groundIn, type Site } from './site';
+import { THROAT_BEYOND, THROAT_DARK, throatAir, throatNoise } from './caveThroat';
 
 /** Where in the mouth the hero goes down (its frame): a hillside's, a cliff's (its way in is bigger). */
 export const MOUTH_WAY_DOWN = { x: 0, z: -3.2 } as const;
@@ -48,7 +49,65 @@ export interface CaveMouth {
   readonly way: { readonly x: number; readonly z: number };
   /** In a cliff (a wall rises behind it), not a hillside. */
   readonly cliff: boolean;
+  /**
+   * Where the way in becomes the cave's throat (caveThroat.ts) and the portal into the cave stands: z of its frame,
+   * and the throat's floor (heights from the ground at the mouth, as the frame's).
+   */
+  readonly portal: { readonly z: number; readonly floor: number };
 }
+
+/** How far in the portal stands (m from the mouth): on a hillside, in a cliff (short of the wall's own face, CLIFF_FACE). */
+const PORTAL_IN = 7, CLIFF_PORTAL_IN = 4.5;
+/**
+ * The mouth's side of the throat goes darker than the cave's by its portal: the day's light still reaches it (the
+ * cave's side has only its own dim fill and the lantern), so the same rock reads alike on both sides.
+ */
+const DAY_IN = 0.15;
+
+/** Where the mouth's own way in turns into the throat (frame z): over these metres, from the face on in. */
+const INTO_FROM = 0.5, INTO_TO = -2;
+/** Over how many metres before the portal the throat's floor levels out onto the portal's. */
+const LEVEL_OUT = 2.5;
+
+/** The highest ground across the throat near z (frame heights), a little over it: its floor, so no ground shows through. */
+function groundTop(ground: (x: number, z: number) => number, z0: number, z1: number): number {
+  let top = -Infinity;
+  for (let z = z0; z <= z1; z += 0.25) for (let x = -1.8; x <= 1.8; x += 0.3) top = Math.max(top, ground(x, z));
+  return top + 0.03;
+}
+
+/** The throat's floor at the portal (frame heights): level over the highest ground round it. */
+export function throatFloor(ground: (x: number, z: number) => number, portalZ: number): number {
+  return groundTop(ground, portalZ - THROAT_BEYOND - 0.5, portalZ + LEVEL_OUT + 0.5);
+}
+
+/**
+ * The throat's floor at z along the way in (frame heights): over the ground across it, rising with the hillside,
+ * and level onto the portal's floor over its last metres (the cave's side of the throat is level).
+ */
+export function throatRamp(ground: (x: number, z: number) => number, portal: { readonly z: number; readonly floor: number }, z: number): number {
+  if (z <= portal.z + 0.6) return portal.floor;
+  const top = groundTop(ground, z - 0.5, z + 0.5), k = smoothstep(portal.z + LEVEL_OUT, portal.z + 0.6, z);
+  return top + (Math.max(top, portal.floor) - top) * k;
+}
+
+/** Half the width of the throat's floor that is walked (m). */
+const THROAT_WALK = 1.6;
+
+/**
+ * The floor of the way in where it turns into the throat (frame heights, `ground` in the frame): the land's
+ * ground giving way to the throat's floor; null outside it (the land's own ground there).
+ */
+export function throatWalk(ground: (x: number, z: number) => number, portal: { readonly z: number; readonly floor: number }, x: number, z: number): number | null {
+  if (Math.abs(x) > THROAT_WALK || z < portal.z - THROAT_BEYOND || z > INTO_FROM) return null;
+  const k = throatShare(z);
+  if (k <= 0) return null;
+  const h = ground(x, z);
+  return h + (throatRamp(ground, portal, z) - h) * k;
+}
+
+/** How much of the way in at z is the throat already (0 out at the face .. 1 a couple of metres in and on). */
+export const throatShare = (z: number): number => smoothstep(INTO_FROM, INTO_TO, z);
 
 /**
  * The crag's rock (positive in air), without the ground; and the tunnel's air (positive inside). The rock is
@@ -123,30 +182,44 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
     return g[k * nx + i];
   };
   const crag = new Crag(seed, groundUnder, EXTENT, cliff);
+  // The portal into the cave, and the throat it stands in (the cave carves the same throat on its side).
+  const pz = -(cliff ? CLIFF_PORTAL_IN : PORTAL_IN), pf = throatFloor(groundUnder, pz), gullet = throatNoise(seed);
+  const portal = { z: pz, floor: pf };
+  // The throat's floor along the way in, once per row of the field (it depends on z alone).
+  const ramp = new Float32Array(nz);
+  for (let k = 0; k < nz; k++) ramp[k] = throatRamp(groundUnder, portal, EXTENT.back + k * STEP);
+  const rampAt = (z: number) => ramp[Math.max(0, Math.min(nz - 1, Math.round((z - EXTENT.back) / STEP)))];
+  const throat = (x: number, y: number, z: number) => Math.min(throatAir(gullet, x, y - rampAt(z), z - pz), z - pz + THROAT_BEYOND);
   const oy = low - 2, ny = Math.ceil((EXTENT.top - oy) / STEP) + 1;
   const air = (i: number, y: number, k: number) => {
     const x = -EXTENT.half + i * STEP, z = EXTENT.back + k * STEP, h = g[k * nx + i];
     const above = y - h;
     const rock = smin(crag.rock(x, y, z), above, 1.8);
-    // The tunnel never digs below the ground: its floor is the land's.
-    return Math.max(rock, Math.min(crag.tunnel(x, y, z), above + 0.02));
+    // The tunnel never digs below the ground (its floor is the land's), until it turns into the throat.
+    const share = throatShare(z), way = Math.min(crag.tunnel(x, y, z), above + 0.02);
+    return Math.max(rock, share <= 0 ? way : share >= 1 ? throat(x, y, z) : way + (throat(x, y, z) - way) * share);
   };
   const d = new Float32Array(nx * ny * nz);
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) d[i + nx * (j + ny * k)] = air(i, oy + j * STEP, k);
   const field: Field = { ox: -EXTENT.half, oy, oz: EXTENT.back, step: STEP, nx, ny, nz, d };
   const look = new Noise(deriveSeed(seed, 'cave', 'mouth-look'));
+  const craggy = cragMat(
+    (x, _y, z) => Math.abs(x) < EXTENT.half - 0.6 && z > EXTENT.back + 0.6 && z < EXTENT.front - 0.6,
+    (x, y, z) => crag.rock(x, y, z), groundUnder,
+    (x, y, z, up) => up > 0.45 && (up > 0.75 || y > groundUnder(x, z) + crag.top(x, z) - 0.7),
+  );
+  // The throat's own faces are always drawn (bare rock), also where it runs under the land beyond the crag's own rock.
+  const inThroatOrCrag = (x: number, y: number, z: number, up: number) => (Math.abs(x) < 3 && throatShare(z) > 0.3 && throat(x, y, z) > -0.6 ? WildMat.Rock : craggy(x, y, z, up));
   const mesh = meshField(field, {
     // Only the crag and its fillet (the plain ground around and the floor of the way in are the land's own), not
     // the field's own edges (where it is cut off); turf on the knoll's top and flanks, bare rock on its face.
-    mat: cragMat(
-      (x, _y, z) => Math.abs(x) < EXTENT.half - 0.6 && z > EXTENT.back + 0.6 && z < EXTENT.front - 0.6,
-      (x, y, z) => crag.rock(x, y, z), groundUnder,
-      (x, y, z, up) => up > 0.45 && (up > 0.75 || y > groundUnder(x, z) + crag.top(x, z) - 0.7),
-    ),
+    // The throat's own floor is the crag's (level, over the ground), so it meets the cave's floor at the portal.
+    mat: inThroatOrCrag,
     tint: (x, y, z, m) => {
       // Deeper in the way, darker, until it is black where it goes on down.
-      const inside = crag.tunnel(x, y, z) > -0.7 ? smoothstep(0.3, cliff ? 5.5 : 7.5, -z) : 0;
-      const tone = (0.85 + 0.3 * (look.fbm3(x / 4, y / 4, z / 4, 2) * 0.5 + 0.5)) * (1 - 0.94 * inside);
+      // Deeper in the way, darker: at the portal as dark as the cave's throat on its side (caveThroat.ts).
+      const inside = Math.max(crag.tunnel(x, y, z), throat(x, y, z)) > -0.7 ? smoothstep(0.3, -pz * 0.8, -z) : 0;
+      const tone = (0.85 + 0.3 * (look.fbm3(x / 4, y / 4, z / 4, 2) * 0.5 + 0.5)) * (1 - (1 - THROAT_DARK * DAY_IN) * inside);
       return scaleTint(m === WildMat.Grass ? GRASS : cliff ? WALL : ROCK, tone);
     },
   });
@@ -162,10 +235,10 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
     return air(i, y, k);
   };
   const walk = walkRaster(-EXTENT.half, EXTENT.half, EXTENT.back, EXTENT.front, RASTER, (x, z) => {
-    const h = groundUnder(x, z);
+    const h = throatWalk(groundUnder, portal, x, z) ?? groundUnder(x, z);
     return airNear(x, h + 0.8, z) < BODY || airNear(x, h + 1.4, z) < BODY;
   });
-  return { mesh, walk, way: cliff ? CLIFF_WAY_DOWN : MOUTH_WAY_DOWN, cliff };
+  return { mesh, walk, way: cliff ? CLIFF_WAY_DOWN : MOUTH_WAY_DOWN, cliff, portal };
 }
 
 /** The land rises a cliff's height over the 20 m behind a mouth's site (`ground` in its frame, from the mouth). */

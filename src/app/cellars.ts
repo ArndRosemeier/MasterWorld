@@ -26,10 +26,12 @@ import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { occupationOf } from '../vgm/leads';
 import type { DecisionLog, DungeonDecision, MoveInDecision, RetakeDecision } from '../world/decisions';
 import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh';
-import { CaveSpace, caveField, caveShell } from '../world/dungeon/caveRock';
+import { CaveSpace, caveField, caveShell, type CaveThroat } from '../world/dungeon/caveRock';
+import { THROAT_OPENING, caveThroat, type ThroatFrame } from '../world/dungeon/caveThroat';
+import type { Portal } from '../game/portal';
 import { caveFeatures, keepSpots } from '../world/dungeon/caveFeatures';
 import { caveSeed } from '../world/dungeon/torches';
-import { MOUTH_WAY_DOWN, mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
+import { MOUTH_WAY_DOWN, mouthOnLand, throatWalk, type CaveMouth } from '../world/dungeon/caveMouth';
 import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
@@ -76,8 +78,10 @@ export interface CellarsHost {
   /** The land's height (a barrow, a cave's crag, a tower stand on it). */
   ground(x: number, z: number): number;
   /** The terrain workers, for a cave's rock and mouth (none: built here, a moment's stall). */
+  /** A portal opened (a cave's mouth joined to its throat below: app/portals.ts). */
+  readonly portal?: (p: Portal) => void;
   readonly jobs?: {
-    caveRock(layout: ScaledLayout, cave: number, keep: readonly (readonly [number, number])[]): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
+    caveRock(layout: ScaledLayout, cave: number, keep: readonly (readonly [number, number])[], throat?: CaveThroat | null): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
     caveMouth(site: LandSite, cave: number): Promise<CaveMouth>;
   };
   /** A place out on the land opens: the trees round it go (the land's views are built again there). */
@@ -98,6 +102,11 @@ interface Mound extends LandSite {
   out: number;
   /** Seconds before walking into the doorway goes in again (after coming out). */
   cool: number;
+  /**
+   * A cave's throat on the land (its frame's z and floor height, world y of its ground at the site): where its
+   * portal stands, once the mouth is made; and the floor of the way in there (frame heights), else null.
+   */
+  throat?: { readonly z: number; readonly floor: number; readonly y: number; walk(x: number, z: number): number | null };
 }
 
 /** A place on the land is built (rooms, dwellers) once the hero is this near, metres. */
@@ -119,6 +128,8 @@ interface Site {
   readonly mound: Mound | null;
   /** As outlined for its first dwellers (the rooms never change). */
   readonly first: Cellar;
+  /** A cave's throat in its own frame, where the portal from its mouth comes out (null: walked in with a fade). */
+  readonly throat: ThroatFrame | null;
   /** Who lives there now. */
   cellar: Cellar;
   built: Promise<Built> | null;
@@ -202,7 +213,8 @@ export class Cellars {
       if (Math.hypot(x - m.x, z - m.z) > BARROW_NEAR) continue;
       if (!s.built) void this.ensure(s);
       const [wx, wz] = onLand(m, m.way.x, m.way.z);
-      if (s.ready && !s.ready.visit.inside && m.cool === 0 && !this.host.player.puppet && Math.hypot(x - wx, z - wz) < 0.9) {
+      // A cave with a throat is walked into through its portal (join): no fade.
+      if (s.ready && !s.throat && !s.ready.visit.inside && m.cool === 0 && !this.host.player.puppet && Math.hypot(x - wx, z - wz) < 0.9) {
         m.cool = 3;
         // On into the dark of the doorway, seen from out in front; then down (the scene let go once the screen is dark).
         const visit = s.ready.visit, p = this.host.player, [ix, iz] = onLand(m, m.way.x, m.way.z - WALK_IN);
@@ -210,6 +222,79 @@ export class Cellars {
         p.puppet = new WalkTo(p.walker.pos, { x: ix, z: iz }, null, () => void visit.enter(false, undefined, () => { p.puppet = null; }), { round: { x: ox, y: this.host.ground(ox, oz), z: oz }, front });
       }
     }
+  }
+
+  /**
+   * A cave's portal, once both its mouth on the land and its rooms below are made: its mouth's throat on the land
+   * joined to the throat out of its entrance room (caveThroat.ts), so walking in goes on into the cave unseen.
+   */
+  private join(id: string): void {
+    const s = this.sites.get(id), m = s?.mound, t = m?.throat, f = s?.throat, visit = s?.ready?.visit;
+    if (!s || !m || !t || !f || !visit) return;
+    const [ax, az] = onLand(m, 0, t.z), O = visit.origin;
+    this.host.portal?.({
+      id: `cave:${id}`, shape: THROAT_OPENING,
+      a: { realm: 'land', frame: { x: ax, y: t.y + t.floor, z: az, yaw: m.yaw } },
+      b: { realm: id, frame: { x: O.x + f.x, y: O.y + f.y, z: O.z + f.z, yaw: f.yaw } },
+    });
+  }
+
+  /** The floor of a cave's way in where it turns into its throat (world y), else null. */
+  floor(x: number, z: number): number | null {
+    for (const s of this.sites.values()) {
+      const m = s.mound, t = m?.throat;
+      if (!m || !t || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
+      const [fx, fz] = inFrame(m, x, z), y = t.walk(fx, fz);
+      if (y !== null) return t.y + y;
+    }
+    return null;
+  }
+
+  /**
+   * How far into a cave mouth's throat on the land (x, z) is: 0 at its face and outside, 1 at its portal (the lantern
+   * is lit and the eye adapts as one goes in).
+   */
+  throatDepth(x: number, z: number): number {
+    for (const s of this.sites.values()) {
+      const m = s.mound, t = m?.throat;
+      if (!m || !t || !s.throat || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
+      const [fx, fz] = inFrame(m, x, z);
+      if (Math.abs(fx) < 2.5 && fz > t.z - 1.5 && fz < 1) return Math.max(0, Math.min(1, (0.5 - fz) / (0.5 - t.z)));
+    }
+    return 0;
+  }
+
+  /** Is (x, y, z) in the air of a cave mouth's throat on the land (where the land's own rock, carved by the crag, is not)? */
+  throatAir(x: number, y: number, z: number): boolean {
+    for (const s of this.sites.values()) {
+      const m = s.mound, t = m?.throat;
+      if (!m || !t || !s.throat || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
+      const [fx, fz] = inFrame(m, x, z), floor = t.walk(fx, fz);
+      if (floor !== null && y > t.y + floor - 0.2 && y < t.y + floor + 2.5) return true;
+    }
+    return false;
+  }
+
+  /** The realm the hero is in (app/portals.ts): the place below by its id, else the land. */
+  get realm(): string {
+    for (const s of this.sites.values()) if (s.ready?.visit.inside) return s.decision.id;
+    return 'land';
+  }
+
+  /** A place's visit by its id (once built). */
+  visitOf(id: string): CellarVisit | null {
+    return this.sites.get(id)?.ready?.visit ?? null;
+  }
+
+  /** What a place below draws (its rooms and its dwellers), by its id: shown only while it is looked at. */
+  drawnOf(id: string): Object3D[] {
+    const b = this.sites.get(id)?.ready;
+    return b ? [b.view.group, b.creatures.group] : [];
+  }
+
+  /** Every place below's drawn parts (hidden on the land's views). */
+  *drawnBelow(): Iterable<Object3D> {
+    for (const s of this.sites.values()) if (s.ready) { yield s.ready.view.group; yield s.ready.creatures.group; }
   }
 
   /** Is a body of radius `r` at (x, z) on the land inside a place's piece (a barrow's mound, a crag, a tower's walls)? */
@@ -288,7 +373,8 @@ export class Cellars {
     const m = occupationOf(this.log, d.id);
     const mound = d.site ? this.heap(d, d.site, first.layout) : null;
     if (d.site) this.host.cleared?.(d);
-    const s: Site = { decision: d, house, place, mound, first, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
+    const throat = mound && first.form.space.carved && loreOf(this.host.setting, d.template).form.shell === 'mouth' ? caveThroat(first) : null;
+    const s: Site = { decision: d, house, place, mound, first, throat, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;
     this.down.set(houseKey(d.town, house.id), async () => (await this.ensure(s)).visit);
@@ -318,6 +404,8 @@ export class Cellars {
         // A cliff's way in is bigger: it goes down further in, and the hero comes out further before it.
         mound.way = mouth.way;
         if (mouth.cliff) mound.out = 4.5;
+        mound.throat = { ...mouth.portal, y, walk: (x, z) => throatWalk(land, mouth.portal, x, z) };
+        this.join(d.id);
       });
       return mound;
     }
@@ -340,7 +428,7 @@ export class Cellars {
   }
 
   private ensure(s: Site): Promise<Built> {
-    s.built ??= this.assemble(s).then((b) => (s.ready = b));
+    s.built ??= this.assemble(s).then((b) => { s.ready = b; this.join(s.decision.id); return b; });
     return s.built;
   }
 
@@ -355,7 +443,10 @@ export class Cellars {
       const layout = s.first.layout, seed = caveSeed(s.first);
       // Its natural features (caveFeatures.ts): the floor kept level where its things lie, its water and shafts drawn.
       const keep = keepSpots(s.first), feat = caveFeatures(layout, seed, keep);
-      const rock = await (h.jobs ? h.jobs.caveRock(layout, seed, keep) : Promise.resolve((() => { const field = caveField(layout, seed, feat); return { field, shell: caveShell(field, layout, seed, feat) }; })()));
+      // Its throat: the passage the mouth on the land runs into, through a portal (caveThroat.ts); its noise is the mouth's.
+      const throat = s.throat ? { ...s.throat, seed: deriveSeed(s.decision.seed, 'cave') } : null;
+      view.throat = !!throat;
+      const rock = await (h.jobs ? h.jobs.caveRock(layout, seed, keep, throat) : Promise.resolve((() => { const field = caveField(layout, seed, feat, undefined, throat); return { field, shell: caveShell(field, layout, seed, feat, throat) }; })()));
       view.rock = rock.shell;
       view.cave = feat;
       carved = new CaveSpace(layout, rock.field, feat);
@@ -366,6 +457,7 @@ export class Cellars {
     const out = m ? { get door() { return [...onLand(m, 0, m.out), m.yaw + Math.PI] as const; } } : s.house;
     const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, carved);
     if (!m) visit.above = { town: s.decision.town, house: s.house };
+    visit.throat = s.throat;
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
     visit.onDepth = (below) => {
       // The first time down a place meets the Director's Discovery (plan 4.1, C9); a saved visit was found before.

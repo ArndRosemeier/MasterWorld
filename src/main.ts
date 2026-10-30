@@ -1,4 +1,4 @@
-import type { Light, Object3D } from 'three/webgpu';
+import { Vector3, type Light, type Object3D } from 'three/webgpu';
 import { GraphicsUnavailable } from '@futuremagic/stage';
 import { deriveSeed, parseSeed } from '@futuremagic/core';
 import { LoadingScreen } from './app/loading';
@@ -9,6 +9,10 @@ import { Menu } from './app/menu';
 import { atDoor, placesFor } from './app/places';
 import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
+import { Portals } from './app/portals';
+import { CAVE_LANTERN } from './app/cellarVisit';
+import type { Portal } from './game/portal';
+import { PortalView } from './render/portal/PortalView';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
@@ -273,37 +277,46 @@ export async function start(b: Boot): Promise<void> {
     const below = () => visit()?.world ?? null;
     // The building drawn open (its storeys, stairs and furniture where it stands).
     const openHouse = () => (visit() ? null : rooms?.walk ?? null);
-    // Rock, and the open building's floors, walls and stairs (`shut`: its doorway too).
+    // Rock, and the open building's floors, walls and stairs (`shut`: its doorway too), on the land.
     const surfaceAt = (x: number, y: number, z: number, shut: boolean): number | null => {
-      const b = below();
-      if (b) return b.rockSurface(x, y, z);
       const t = terrain.rockSurface(x, y, z), h = openHouse()?.rockSurface(x, y, z, shut) ?? null;
       return t === null ? h : h === null ? t : Math.min(t, h);
     };
     // Bridges where roads cross brooks, round the hero: their decks are floors.
     const bridgeView = new BridgeView(view.stage, terrain);
-    const world: WalkWorld = {
-      // Out of doors also the steps and porches before the doors (as floors: climbed a step at a time).
-      height: (x, z) => below()?.height(x, z) ?? terrain.height(x, z),
-      floor: (x, z) => (below() ? null : towns?.stand(x, z) ?? bridgeView.deck(x, z)),
-      rockSurface: (x, y, z) => surfaceAt(x, y, z, false),
+    // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
+    const landWorld: WalkWorld = {
+      // In a cave mouth's throat its own floor (it runs under the land's ground, which the crag carves).
+      height: (x, z) => cellars?.floor(x, z) ?? terrain.height(x, z),
+      // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
+      floor: (x, z) => towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null,
+      // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
+      rockSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, false)),
       // In a building the camera stays in the room (its doorway shut to it).
-      sightSurface: (x, y, z) => { const b = below(); return b?.sightSurface ? b.sightSurface(x, y, z) : surfaceAt(x, y, z, !!rooms?.inside); },
+      sightSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, !!rooms?.inside)),
       // The surface as drawn, waves and all: a swimmer rides the swell.
-      waterLevel: (x, z) => (below() ? null : water?.surfaceAt(x, z) ?? null),
-      // Rock faces with holds (D56): out of doors only.
-      climbable: (x, z) => (below() ? null : terrain.climbable(x, z)),
-      // Down in a cave its rock walls (D56, P1): a drop is climbed back up, not jumped.
-      rockHolds: () => !!below()?.rockHolds?.(),
-      // Out of doors the buildings, the tree trunks and the townsfolk (whom one walks around, not through).
+      waterLevel: (x, z) => water?.surfaceAt(x, z) ?? null,
+      // Rock faces with holds (D56).
+      climbable: (x, z) => terrain.climbable(x, z),
+      // The buildings, the tree trunks and the townsfolk (whom one walks around, not through).
       wall: (x, z, r, y) => {
-        const b = below();
-        if (b) return !!b.wall?.(x, z, r);
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
         return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
+    };
+    // Down in a cellar the walker walks its space, else the land.
+    const world: WalkWorld = {
+      height: (x, z) => below()?.height(x, z) ?? landWorld.height(x, z),
+      floor: (x, z) => (below() ? null : landWorld.floor!(x, z)),
+      rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : landWorld.rockSurface(x, y, z); },
+      sightSurface: (x, y, z) => { const b = below(); return b ? (b.sightSurface ?? b.rockSurface)(x, y, z) : landWorld.sightSurface!(x, y, z); },
+      waterLevel: (x, z) => (below() ? null : landWorld.waterLevel(x, z)),
+      climbable: (x, z) => (below() ? null : landWorld.climbable!(x, z)),
+      // Down in a cave its rock walls (D56, P1): a drop is climbed back up, not jumped.
+      rockHolds: () => !!below()?.rockHolds?.(),
+      wall: (x, z, r, y) => { const b = below(); return b ? !!b.wall?.(x, z, r) : landWorld.wall!(x, z, r, y); },
     };
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? (resume ? [resume.x, resume.z] : [home.x, home.z]), params.look);
@@ -718,6 +731,20 @@ export async function start(b: Boot): Promise<void> {
     };
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
+    // The portals (app/portals.ts: a cave's mouth joined to its throat below), and those opened before they were set up.
+    let portals: Portals | null = null;
+    /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts throatDepth). */
+    let throatLamp = false;
+    /** The place below whose lights are lit from out on the land, near its portal. */
+    let caveLit: string | null = null;
+    /** A cave's own lights are lit once the hero on the land is this near its portal (m). */
+    const CAVE_LIGHTS_NEAR = 60;
+    /** The realm the warm lights are lit in: the place below the hero is in, or whose portal they are near, else the land. */
+    const lampsAt = new Vector3();
+    const warmRealm = (): string => { const r = cellars?.realm ?? 'land'; return r !== 'land' ? r : caveLit ?? 'land'; };
+    /** The portals' HUD line (empty away from them). */
+    let portalHud = '';
+    const portalsDue: Portal[] = [];
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
       fight: fightHost,
@@ -726,6 +753,7 @@ export async function start(b: Boot): Promise<void> {
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
       jobs: terrainJobs,
+      portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
       cleared: (d) => void roadWork.clear(d),
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
@@ -790,6 +818,58 @@ export async function start(b: Boot): Promise<void> {
     // `kind=<id>`: out in the nearest stretch of that kind of country (L7), looking across it.
     const inKind = params.kind ? terrain.skeleton.nearestKind(params.kind, player.walker.pos.x, player.walker.pos.z) : null;
     if (inKind) player.teleport(inKind.x, undefined, inKind.z, 0);
+    // Portals (app/portals.ts): openings joining two places, walked through and looked through.
+    const portalView = new PortalView(view);
+    await view.stage.add(portalView.group);
+    portals = new Portals({
+      player, view: portalView, hero: hero.object, lamp: view.lantern,
+      realm: () => cellars?.realm ?? 'land',
+      // Walked through a cave's portal: down in it now (or out again), with no fade; the game saves as after a fade.
+      crossed: (to, from) => {
+        const v = cellars?.visitOf(to === 'land' ? from : to);
+        if (!v) return;
+        if (to === 'land') v.depart(); else v.arrive();
+        caveLit = null;
+        v.onSwap?.();
+      },
+      // One realm shown for a view: the land (what left the frame below comes back, the places below go) or a place
+      // below (the land leaves the frame; the hero, what lies about and the spells stay), and its light.
+      showRealm: (realm) => {
+        // Each realm's own shadow maps only: the land's the sun's, the torches' those of the place below whose lights
+        // are lit (a cave's torch over the land's plants would build shaders in play; the sun's map of a cave is of
+        // nothing it lights).
+        const held: { needsUpdate: boolean }[] = [], warmIn = warmRealm();
+        for (const o of view.scene.children) {
+          const l = o as Light & { shadow?: { needsUpdate: boolean } };
+          if (l.isLight && l.shadow?.needsUpdate && (l === view.sun ? realm !== 'land' : warmIn !== realm)) { l.shadow.needsUpdate = false; held.push(l.shadow); }
+        }
+        const unhold = (): void => { for (const s of held) s.needsUpdate = true; };
+        if (realm === (cellars?.realm ?? 'land')) return unhold;
+        const changed: [Object3D, boolean][] = [];
+        const set = (o: Object3D, on: boolean): void => { if (o.visible !== on) { changed.push([o, o.visible]); o.visible = on; } };
+        if (realm === 'land') {
+          for (const o of hidden) set(o, true);
+          for (const o of cellars?.drawnBelow() ?? []) set(o, false);
+        } else {
+          const mine = cellars?.drawnOf(realm) ?? [];
+          const kept = new Set<Object3D>([...mine, hero.object, view.camera, remainsView.group, spellView.group, portalView.group]);
+          for (const o of view.scene.children) if (!kept.has(o) && !(o as Light).isLight) set(o, false);
+          for (const o of mine) set(o, true);
+        }
+        const back = view.sky.shade(realm === 'land' ? 'open' : cellars?.visitOf(realm)?.cellar.form.space.carved ? 'cave' : 'below');
+        return () => { for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; unhold(); back(); };
+      },
+      world: (realm) => (realm === 'land' ? landWorld : cellars?.visitOf(realm)?.world ?? null),
+    });
+    for (const p of portalsDue.splice(0)) portals.add(p);
+    const through = portals;
+    view.slot = () => through.hooks(view.camera.position);
+    if (params.portal) {
+      // `portal`: an opening 6 m ahead, joined to one 30 m to the right, turned a quarter.
+      const w = player.walker.pos, yaw = player.walker.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+      const ax = w.x + fx * 6, az = w.z + fz * 6, bx = w.x - fz * 30, bz = w.z + fx * 30;
+      portals.add({ id: 'test', shape: { halfWidth: 1.3, height: 2.8 }, a: { realm: 'land', frame: { x: ax, y: terrain.height(ax, az), z: az, yaw } }, b: { realm: 'land', frame: { x: bx, y: terrain.height(bx, bz), z: bz, yaw: yaw + Math.PI / 2 } } });
+    }
     // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
     const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
     const lookForm = lookAt ? setting.dungeons[lookAt]?.form : undefined;
@@ -1901,6 +1981,40 @@ export async function start(b: Boot): Promise<void> {
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
+      // Through an opening: on out of the other; the camera stands on whichever side it trails on.
+      if (!title?.holding && !creator?.showing) {
+        const was = through.passed;
+        through.walkThrough();
+        if (through.passed !== was && !player.puppet) player.heroCam.trail(player.headPoint, 0);
+        through.placeCamera(view.camera, player.headPoint);
+        // The eye adapts to where the camera is; from below, the sun's shadows are cast round the land beyond the portal.
+        const seen = through.cameraRealm, heroIn = cellars?.realm ?? 'land';
+        // Walking into a cave's mouth the hero's lantern is lit (it is already burning at its portal), and deep in the
+        // throat the eye adapts to its dark before the cave.
+        const w = player.walker.pos, deep = heroIn === 'land' ? cellars?.throatDepth(w.x, w.z) ?? 0 : 0;
+        if (heroIn === 'land' && (deep > 0 || throatLamp)) {
+          const L = view.lantern;
+          // As deep in as the hero is (the walk sets the pace), easing out again when they turn back.
+          L.intensity = deep > 0 ? CAVE_LANTERN * deep : L.intensity * Math.max(0, 1 - dt * 2);
+          L.position.set(w.x - Math.sin(player.walker.yaw) * 0.4, w.y + 1.9, w.z - Math.cos(player.walker.yaw) * 0.4);
+          throatLamp = deep > 0 || L.intensity > 0.05;
+          if (!throatLamp) L.intensity = 0;
+        } else throatLamp = false;
+        // Near a cave's portal on the land its own lights are lit already (out in the wild no doorway's light is near),
+        // so the view in through it is lit as it will be inside; the doorways' again once away.
+        const lit = heroIn === 'land' ? through.nearBeyond('land', w, CAVE_LIGHTS_NEAR) : null;
+        if (lit !== caveLit) {
+          caveLit = lit;
+          if (lit) cellars?.visitOf(lit)?.light(); else if (heroIn === 'land') view.warm.lightTorches(null);
+        }
+        // The eye adapts to the dark as the camera goes into the throat, all the way by its portal.
+        // (The hero's way in sets it: the camera trails a few metres behind, still out in the day.)
+        const camDeep = seen === 'land' ? Math.max(deep, heroIn === 'land' ? 0 : 1, cellars?.throatDepth(view.camera.position.x, view.camera.position.z) ?? 0) : 1;
+        view.sky.eye = seen === heroIn && (seen !== 'land' || camDeep === 0) ? null : { dark: camDeep };
+        view.sky.shadowFocus = seen === 'land' ? null : through.landSide(view.camera.position);
+        // For the HUD (checks): near a portal, the realms of the hero and the camera and the throat's light.
+        portalHud = through.portals.length ? `\nportals ${through.portals.length} · hero ${heroIn} · camera ${seen} · in ${deep.toFixed(2)}/${camDeep.toFixed(2)} · lamp ${view.lantern.intensity.toFixed(1)} · exposure ${view.renderer.toneMappingExposure.toFixed(2)} · through ${through.passed}` : '';
+      }
       creator?.orbit(dt);
       part('cellars+wild');
       sounds?.hearTick(dt);
@@ -2058,7 +2172,9 @@ export async function start(b: Boot): Promise<void> {
       }
       // Doorways at night above, torches below, a soft fill on the hero in a room.
       part('warm lights');
-      view.warm.shine(view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
+      // The lights are picked near the camera as it stands in their realm (from the land, through a cave's portal).
+      const warmIn = warmRealm(), lampsSeen = warmIn !== through.cameraRealm ? through.carry(view.camera.position, through.cameraRealm, warmIn) : null;
+      view.warm.shine(lampsSeen ? lampsAt.set(lampsSeen.x, lampsSeen.y, lampsSeen.z) : view.camera.position, WINDOWS.glow.value, WINDOWS.share.value, dt, rooms?.inside ? player.walker.pos : null);
       // Every town's people near the hero live (and are drawn), and its animals graze.
       const cam = view.camera.position;
       part('towns.live');
@@ -2124,7 +2240,7 @@ export async function start(b: Boot): Promise<void> {
       part('hud+ready');
       if (hud && showHud) {
         const p = view.camera.position, t = ground.stats;
-        hud.textContent = `${view.backend} · seed ${seedText} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${towns.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
+        hud.textContent = `${view.backend} · seed ${seedText} · ${(now - last).toFixed(1)} ms · ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · chunks ${t.shown} (+${t.building})${grass ? ` · ${grass.stats}` : ''}${folk ? ` · ${folk.hudText}` : ''}\n${wx.summary}\n${view.stage.hudLine()}${portalHud}${visit() ? `\n${cellars.hudText}` : ''}${wild ? ` · ${wild.hudText}` : ''}${regionSites ? ` · ${regionSites.status} · ${towns.tally}` : ''}${smallView ? ` · ${smallView.hudText}` : ''}${rooms?.inside ? `\n${rooms.roomText}` : ''}${sounds ? `\n${sounds.summary}` : ''}`;
       }
       last = now;
       if (landed && title && !title.live && !title.calm) { title.landReady(); shown(); }
