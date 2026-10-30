@@ -285,7 +285,8 @@ export async function start(b: Boot): Promise<void> {
     const bridgeView = new BridgeView(view.stage, terrain);
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
     const landWorld: WalkWorld = {
-      height: (x, z) => terrain.height(x, z),
+      // In a cave mouth's throat its own floor (it runs under the land's ground, which the crag carves).
+      height: (x, z) => cellars?.floor(x, z) ?? terrain.height(x, z),
       // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
       floor: (x, z) => towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null,
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
