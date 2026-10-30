@@ -886,7 +886,8 @@ export async function start(b: Boot): Promise<void> {
       stage: view.stage, camera: view.camera, canvas, player, portals,
       // Where the hero is: the land, or the place below they are in (its floor, walls and rock).
       probe: {
-        standFloor: (x, z) => world.floor!(x, z) ?? world.height(x, z),
+        // As the walker finds it: a cave's rock floor, a deck, a step (from a step over `near` down).
+        standFloor: (x, z, near) => player.walker.support(x, z, near),
         blocksAt: (x, z, r, y) => world.wall!(x, z, r, y),
         rockGapAt: (x, y, z) => world.rockSurface(x, y, z),
         wetAt: (x, z) => world.waterLevel(x, z),
