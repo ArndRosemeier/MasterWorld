@@ -87,6 +87,8 @@ export const params = {
   portal: q.has('portal'),
   /** Start out in the nearest stretch of a kind of country (`kind=downs`, moor, karst, badlands, mesa, open; L7). */
   kind: q.get('kind'),
+  /** Start by the nearest sea (`coast=beach`, `cliff` on a sea cliff's top, `under` on the bed off that beach; S1), facing out to sea. */
+  coast: q.get('coast') as 'beach' | 'cliff' | 'under' | null,
   /**
    * Start in the court of the first people's hold, facing its gate (`hold`); `hold=friend` (or another
    * tier: hated, unwelcome, stranger, honoured) sets the hero's standing with that people to it.

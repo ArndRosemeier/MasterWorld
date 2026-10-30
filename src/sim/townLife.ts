@@ -76,7 +76,7 @@ export interface TownWeather {
 const facing = (a: Agent, x: number, z: number): number => Math.atan2(z - a.z, x - a.x);
 
 /** Work done facing a thing that stands between the worker and whoever comes up to them (the thing 0.9 m before them). */
-const AT_A_THING = new Set<ActivityKind>(['smith', 'stoke', 'quench', 'bake', 'craft', 'tend', 'serve']);
+const AT_A_THING = new Set<ActivityKind>(['smith', 'stoke', 'quench', 'bake', 'craft', 'tend', 'serve', 'haul', 'carry', 'mendNets']);
 
 /** A walker going through a gateway passes this close to its middle (m); their way is looked at this many points ahead. */
 const GATEWAY = 4, AHEAD = 4;

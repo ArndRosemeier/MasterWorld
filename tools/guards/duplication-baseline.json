@@ -628,67 +628,15 @@
     "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
+    "key": "idiom: [.add .mul .x] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/underwater.ts",
+    "reason": "TSL vector arithmetic on a node's x component (shader maths written as method chains), not a copied helper; each shader computes its own quantity."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
+    "key": "idiom: [.d .sort] in masterworld/sim/smallLife.ts + masterworld/vgm/hints.ts + masterworld/world/coast.ts",
+    "reason": "Sorting found candidates nearest first by a distance field is a language idiom; the candidates (small life spots, hints, river mouths) and what follows differ."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/building.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder statistics shifted with render/folk/repertoire.ts, which has no such chain."
+    "key": "same name: masterworld/app/towns.ts#stand + masterworld/main.ts#stand",
+    "reason": "Unrelated: the towns' floor height at a point (steps, quay, piers) vs the shot hook that puts the hero at a spot; only the name matches."
   }
 ]

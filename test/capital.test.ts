@@ -13,7 +13,10 @@ import { emptyWater, inChannel } from '../src/world/hydro';
 import { RoadNet } from '../src/world/roads';
 import { EAST, frontierLand } from './frontierLand';
 
-const { first, home, regions, seed, terrain } = frontierLand();
+const land = frontierLand(), { first, home, seed, terrain } = land;
+// The land as it was opened before harbour towns (S2): the capital's west gate road then ends in a brook (the bridge
+// tests below need that brook; a harbour town by the river mouth north of the start shifts the walk's rolls).
+const regions = { ...land.regions, fills: land.regions.fills.filter((f) => !f.harbour) };
 
 /** The capital (C15, D41): the VGM founds one a few km out as the hero walks, and it replays from the log. */
 test('capital: one, a few km out, a decision in the log; walled, with its ruler, guild halls and shops', () => {

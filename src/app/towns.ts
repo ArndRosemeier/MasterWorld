@@ -57,6 +57,9 @@ const LOOK = 1;
 /** A walled town's gates are drawn while the camera is within this of its edge (m). */
 const GATES_SEEN = 600;
 
+/** How far past a town's bounds its floors may reach (m): a harbour's piers out over the water. */
+const PIER_REACH = 80;
+
 export class Towns {
   private readonly cores = new Map<string, Township>();
   private readonly views = new Map<string, TownView>();
@@ -257,10 +260,10 @@ export class Towns {
     return false;
   }
 
-  /** The steps and porches before the doors at (x, z) (null: none). */
+  /** The steps and porches before the doors at (x, z), and a harbour's quay and piers (null: none). */
   stand(x: number, z: number): number | null {
     let best: number | null = null;
-    for (const t of this.near(x, z, 2)) { const h = t.town.stand(x, z); if (h !== null && (best === null || h > best)) best = h; }
+    for (const t of this.near(x, z, PIER_REACH)) { const h = t.town.stand(x, z); if (h !== null && (best === null || h > best)) best = h; }
     return best;
   }
 

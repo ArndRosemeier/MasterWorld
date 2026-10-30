@@ -3,7 +3,7 @@
  * building (and each fence and haystack of its farmland), and those of one square cell are merged into
  * one mesh near and one far (fewer draws).
  */
-import { buildingMesh, fixtureMesh, wallMesh, doorLeaves, hatchLadderTopMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type DoorLeaf, type InteriorFixture, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
+import { buildingMesh, fixtureMesh, harbourMesh, wallMesh, doorLeaves, hatchLadderTopMesh, hatchLidMesh, interiorMesh, planInterior, propMesh, type BuildingMesh, type DoorLeaf, type InteriorFixture, type InteriorPlan, type TownBuilding, type TownProp } from '@futuremagic/settlement';
 import type { Town } from './town';
 
 /** Side of a merge cell, metres. */
@@ -43,12 +43,17 @@ export function townMeshes(town: Town, signs: ReadonlyMap<number, [number, numbe
   }
   // The fixtures out of doors (stalls, wells, benches, anvils ...): where people do what they do.
   if (height) for (const f of town.plan.fixtures) cellAt(f.x, f.z);
-  return [...cells.values()].map(({ i, j, list, props }) => {
+  // A harbour town's quay and piers (S2): all in the cell of the quay's middle.
+  const harbour = height ? town.plan.harbour : undefined, hn = harbour ? harbour.edge.length >> 2 : 0;
+  const harbourCell = harbour ? cellAt(harbour.edge[hn * 2], harbour.edge[hn * 2 + 1]) : null;
+  return [...cells.values()].map((cell) => {
+    const { i, j, list, props } = cell;
     const x = (i + 0.5) * TOWN_CELL, z = (j + 0.5) * TOWN_CELL;
     const meshes = (detail: boolean) => {
       const parts = list.map((b) => buildingMesh(b, [x, 0, z], detail, { sign: signs.get(b.id) }));
       const walls = wall ? [wallMesh(wall, [x, 0, z], detail, inCell(i, j))] : [];
       if (height) walls.push(fixtureMesh(town.plan.fixtures, height, [x, 0, z], detail, inCell(i, j)));
+      if (harbour && height && cell === harbourCell) walls.push(harbourMesh(harbour, height, [x, 0, z], detail));
       return { mesh: mergeMeshes([...parts, ...props.map((p) => propMesh(p, [x, 0, z], detail)), ...walls]), ranges: rangesOf(list, parts) };
     };
     const near = meshes(true), far = meshes(false);

@@ -20,6 +20,8 @@ import { cleanStoneSave } from './game/portalStone';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
+import { nearestCoast } from './world/coast';
+import { UNDER_LENS, updateVeil } from './render/underwater';
 import { Rocks } from './world/rocks';
 import { RockView } from './render/rocks/RockView';
 import { woodsOf } from './world/flora';
@@ -567,15 +569,18 @@ export async function start(b: Boot): Promise<void> {
     if (setting.regions && params.regions) {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights, jobs: { frontier: (a) => jobs.frontier(a), site: (j) => terrainJobs.site(j) } }, log);
       for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
-      // `site=<place>`: walk out from the start until one opens, then stand before it.
-      const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
+      // `site=<place or fill>`: walk out from the start until one opens, then stand before it (a harbour town: on
+      // its quay, facing the sea).
+      const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind || f.id === kind).map((f) => f.id));
       for (let dir = 0; kind && dir < 8; dir++) {
         const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: start?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
         for (const d of walked) regionOpened(d);
         const s = found.site, d = s.r + (params.siteAt ?? (kind === 'capital' ? 60 : 14)); // a capital's wall stands out past its houses
-        player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
+        const quay = s.harbour, back = params.siteAt ?? 4;
+        if (quay) player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
+        else player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
         break;
       }
     }
@@ -832,6 +837,9 @@ export async function start(b: Boot): Promise<void> {
     // `kind=<id>`: out in the nearest stretch of that kind of country (L7), looking across it.
     const inKind = params.kind ? terrain.skeleton.nearestKind(params.kind, player.walker.pos.x, player.walker.pos.z) : null;
     if (inKind) player.teleport(inKind.x, undefined, inKind.z, 0);
+    // `coast=<beach|cliff|under>`: by the nearest sea (S1), facing out to it.
+    const atSea = params.coast ? nearestCoast(terrain, params.coast, player.walker.pos.x, player.walker.pos.z) : null;
+    if (atSea) player.teleport(atSea.x, undefined, atSea.z, Math.atan2(-atSea.seaX, -atSea.seaZ));
     // Portals (app/portals.ts): openings joining two places, walked through and looked through.
     const portalView = new PortalView(view);
     await view.stage.add(portalView.group);
@@ -2189,7 +2197,10 @@ export async function start(b: Boot): Promise<void> {
       // The floating origin steps once the camera strays from it, before anything writes origin-relative data.
       part('origin+weather');
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
-      view.sky.underwater = sea.submerged(view.camera.position);
+      // Under the sea, or in the waterline (render/underwater.ts): the camera's height over the surface at it, waves and all.
+      const camAt = view.camera.position, surf = sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
+      view.sky.underwater = overSea < -UNDER_LENS;
+      updateVeil(view.camera, overSea, view.sky.underwater, view.sky.murk, dt);
       wx.apply(dt, view.camera.position, hours(), view.sky);
       // Raided farms' barns smoulder (C10): looked up now and then, the puffs rise every frame.
       part('smoke+barns');

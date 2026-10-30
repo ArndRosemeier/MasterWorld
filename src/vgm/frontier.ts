@@ -7,6 +7,7 @@
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { RegionFillDef, RegionsDef } from '../setting/contract';
+import { harbourSpots, riverMouths } from '../world/coast';
 import { HOUSE_SCALE } from '@futuremagic/settlement';
 import { settlementOf, sitesIn, type DecisionLog, type RegionDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
@@ -155,6 +156,8 @@ function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number 
   if (f.ring && (d < f.ring[0] || (f.ring[1] !== undefined && d > f.ring[1]))) return false;
   const apart = f.apart ?? 0;
   if (done.some((o) => o.fill === f.id && o.site && Math.hypot(o.site.x - p.x, o.site.z - p.z) < apart)) return false;
+  // A harbour town needs a river's mouth (D50: the river its fresh water, the sea its harbour).
+  if (f.harbour) return riverMouths(t, p.x, p.z, Math.min(sizeOf(f.level) * 1.5, 1500)).length > 0;
   // A settlement needs fresh water (D50): a brook, river or lake somewhere in the squares it may take.
   return !SETTLES[f.place] || freshWaterEdge(t, p.x, p.z, Math.min(sizeOf(f.level) * 1.5, 1500)) < Infinity;
 }
@@ -189,6 +192,16 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
     ...t.towns.map((w) => ({ x: w.decision.x, z: w.decision.z, r: w.decision.radius * 2.4 })),
     ...sitesIn(c.log, 40),
   ];
+  if (f.harbour) {
+    // By a river's mouth in the square, on the bank with the most dry ground (world/coast.ts), facing the start.
+    for (const m of riverMouths(t, x0 + size / 2, z0 + size / 2, size * 0.75)) for (const h of harbourSpots(t, m, r)) {
+      if (h.x < x0 + margin || h.x > x0 + size - margin || h.z < z0 + margin || h.z > z0 + size - margin) continue;
+      if (f.ring && Math.hypot(h.x - c.home.x, h.z - c.home.z) < f.ring[0]) continue;
+      if (away.some((o) => Math.hypot(o.x - h.x, o.z - h.z) < o.r + r + 30)) continue;
+      return { at: { x: h.x, z: h.z, yaw: Math.atan2(-(c.home.x - h.x), -(c.home.z - h.z)), r, harbour: h.harbour }, open: true };
+    }
+    return null;
+  }
   const wood = woods.get(t) ?? woods.set(t, woodsOf(t)).get(t)!;
   // The best spot so far (lowest score).
   let bx = NaN, bz = NaN, low = Infinity, open = false;
