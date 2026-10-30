@@ -3,7 +3,7 @@
  * (@futuremagic/settlement), and what the ground is at a point of it (street, building, yard) for
  * the terrain, the plants and later the ground's look. Pure, runs in workers.
  */
-import { buildingEntrance, distToPoly, fixtureBlocks, wallBlocks, type Fixture, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
+import { buildingEntrance, distToPoly, fixtureBlocks, fixtureSight, wallBlocks, type Fixture, planTown, pointInPoly, polyBounds, polyCentroid, type Entrance, type Field, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import type { TownDecision } from './decisions';
 import type { Terrain } from './terrain';
 
@@ -30,6 +30,8 @@ export type TownGround = (typeof TownGround)[keyof typeof TownGround];
 
 /** Raster cell size, metres. */
 export const TOWN_RASTER = 1;
+/** The cell (m) by which `walled` tells what lies within a town wall (its line is a few metres thick anyway). */
+const WALLED_CELL = 4;
 
 export class Town {
   readonly plan: TownPlan;
@@ -65,6 +67,24 @@ export class Town {
     const i = Math.floor((x - this.x0) / TOWN_RASTER), j = Math.floor((z - this.z0) / TOWN_RASTER);
     if (i < 0 || j < 0 || i >= this.nx || j >= this.nz) return TownGround.None;
     return this.ground[i + j * this.nx] as TownGround;
+  }
+
+  /** Inside the town wall, by WALLED_CELL square (made when first asked; null: not yet). */
+  private walledCells: Uint8Array | null = null;
+
+  /** Whether (x, z) is within the town's wall (a city's streets and yards, trodden and swept); false for a town without one. */
+  walled(x: number, z: number): boolean {
+    const w = this.plan.wall;
+    if (!w) return false;
+    const C = WALLED_CELL, nx = Math.ceil((this.nx * TOWN_RASTER) / C), nz = Math.ceil((this.nz * TOWN_RASTER) / C);
+    const i = Math.floor((x - this.x0) / C), j = Math.floor((z - this.z0) / C);
+    if (i < 0 || j < 0 || i >= nx || j >= nz) return false;
+    if (!this.walledCells) {
+      const cells = new Uint8Array(nx * nz);
+      for (let b = 0; b < nz; b++) for (let a = 0; a < nx; a++) if (pointInPoly(w.ring, this.x0 + (a + 0.5) * C, this.z0 + (b + 0.5) * C)) cells[a + b * nx] = 1;
+      this.walledCells = cells;
+    }
+    return this.walledCells[i + j * nx] === 1;
   }
 
   /** The field at a point (crop and rows), or null. */
@@ -107,7 +127,25 @@ export class Town {
 
   /** Does a body of radius `r` at (x, z) run into a fixture out of doors (a well, a stall, a woodpile ...)? The hero's; townsfolk use them. */
   fixtureAt(x: number, z: number, r: number): boolean {
-    if (!this.near(x, z, r)) return false;
+    return this.near(x, z, r) && [...this.fixturesNear(x, z)].some((f) => fixtureBlocks(f, x, z, r));
+  }
+
+  /**
+   * How far (x, y, z) is from what of a fixture out of doors stands in the eye's way (a stall's awning, a well's roof:
+   * fixtureSight), each standing on the ground at its middle (`height`); null with none near.
+   */
+  fixtureSightAt(x: number, y: number, z: number, height: (x: number, z: number) => number): number | null {
+    if (!this.near(x, z, 0)) return null;
+    let d: number | null = null;
+    for (const f of this.fixturesNear(x, z)) {
+      const s = fixtureSight(f, height(f.x, f.z), x, y, z);
+      if (s !== Infinity && (d === null || s < d)) d = s;
+    }
+    return d;
+  }
+
+  /** The fixtures out of doors in the 8 m squares round (x, z). */
+  private *fixturesNear(x: number, z: number): Generator<Fixture> {
     if (!this.fixtureGrid) {
       this.fixtureGrid = new Map();
       for (const f of this.plan.fixtures) {
@@ -116,10 +154,7 @@ export class Town {
       }
     }
     const i = Math.floor(x / 8), j = Math.floor(z / 8);
-    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
-      for (const f of this.fixtureGrid.get(`${i + di},${j + dj}`) ?? []) if (fixtureBlocks(f, x, z, r)) return true;
-    }
-    return false;
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) yield* this.fixtureGrid.get(`${i + di},${j + dj}`) ?? [];
   }
 
   /** Does a body of radius `r` standing at (x, z) touch a building's walls (or the temple's sanctuary, a fence, or the town wall away from its gates)? */

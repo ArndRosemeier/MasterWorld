@@ -388,30 +388,6 @@
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/building.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
     "key": "same name: masterworld/render/town/HouseView.ts#hide + masterworld/render/town/TownView.ts#hide",
     "reason": "Taking an open house's meshes (lid, ladder, door leaves) out of the stage vs hiding one building of a town's merged mesh."
   },
@@ -474,10 +450,6 @@
   {
     "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/spots.ts + masterworld/sim/townLife.ts + masterworld/world/rocks.ts + masterworld/world/sites.ts",
     "reason": "A point at an angle and a distance from a middle (x + cos a * r, z + sin a * r): plain trigonometry, each placing its own things; rocks.ts added a fifth use (rocks round a tor's crown)."
-  },
-  {
-    "key": "idiom: [.from Array] in masterworld/render/terrain/groundTextures.ts + masterworld/vgm/encounters.ts + masterworld/world/flora.ts + masterworld/world/rocks.ts",
-    "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper (rocks.ts: the rock models, variants of each shape)."
   },
   {
     "key": "same name: masterworld/render/flora/FloraView.ts#placeStart + masterworld/render/rocks/RockView.ts#placeStart",
@@ -596,18 +568,6 @@
     "reason": "Unrelated: Cellars.keep marks a promise kept and says what its household pays; TownLife.keep sends people to the buildings they keep to (sim/marked.ts). Only the name matches."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic and blending in shader code (render/materials/caveWater.ts, plan P1): how the shading language is written, not a copied routine."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic and blending in shader code (render/materials/caveWater.ts, plan P1): how the shading language is written, not a copied routine."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic and blending in shader code (render/materials/caveWater.ts, plan P1): how the shading language is written, not a copied routine."
-  },
-  {
     "key": "idiom: [.blending] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/feathers.ts + masterworld/render/materials/flame.ts",
     "reason": "Each glowing kind sets additive blending on its own material (a material property, one line); nothing to share."
   },
@@ -636,14 +596,6 @@
     "reason": "three.js's own API for placing an object; each places a different thing (the camera through a portal, a person, an opening)."
   },
   {
-    "key": "idiom: [.rotation .x .y .z] in masterworld/app/portals.ts + masterworld/render/folk/FolkView.ts + masterworld/render/portal/PortalView.ts",
-    "reason": "three.js's own API for turning an object; each turns a different thing."
-  },
-  {
-    "key": "idiom: [.computeBoundingSphere .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/portal/PortalView.ts + masterworld/render/terrain/TerrainView.ts",
-    "reason": "Finishing a BufferGeometry (its index, then its bounds) is three.js's own API; each builds a different mesh."
-  },
-  {
     "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",
     "reason": "WalkWorld's rockSurface as main's land and below-ground walk worlds give it (they ask the terrain's own and the open building's); the terrain's is the rock itself."
   },
@@ -656,30 +608,6 @@
     "reason": "TSL arithmetic (.add/.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the cave pool's sheen (phase P fixes)."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/portalStone.ts + masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
     "key": "idiom: [.burst] in masterworld/app/spellFx/levelRing.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
     "reason": "Calls into the spells' particle bits (spellFx/particles.ts SpellBits): each effect throws its own sprites; the shared part is SpellBits itself."
   },
@@ -690,5 +618,13 @@
   {
     "key": "idiom: [.emit] in masterworld/app/spellFx/levelRing.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
     "reason": "Calls into the spells' particle bits (spellFx/particles.ts SpellBits): each effect throws its own sprites; the shared part is SpellBits itself."
+  },
+  {
+    "key": "idiom: [.from Array] in masterworld/app/spellFx/portalStoneFx.ts + masterworld/render/terrain/groundTextures.ts + masterworld/vgm/encounters.ts + masterworld/world/flora.ts + masterworld/world/rocks.ts",
+    "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper (rocks.ts: the rock models, variants of each shape)."
+  },
+  {
+    "key": "idiom: [.setAttribute .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/materials/portal.ts + masterworld/render/portal/PortalView.ts + masterworld/render/water/WaterView.ts + stage/stage.ts",
+    "reason": "Three's BufferGeometry built by hand (attributes, then the index); each mesh builds its own shape."
   }
 ]

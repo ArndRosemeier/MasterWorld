@@ -437,10 +437,12 @@ export const CAVE_ROCK = defineKind('cave rock', ['position', 'normal', 'tint'],
   const tile = mix(float(1 / NATURAL_TILE_METERS[roofL]), float(1 / NATURAL_TILE_METERS[floorL]), below);
   const st = vec2(p.x.add(mx_noise_float(p.xz.mul(0.07)).mul(1.5)), p.z).mul(tile);
   const topA = texture(ground.albedo).sample(st).depth(li), topN = texture(ground.normal).sample(st).depth(li);
-  // The rubble takes the walls' stone colour (cliffStrata's, about 0.30, 0.22, 0.14 linear) at its own lightness: the
-  // scree's greys, merely warmed, still read cold beside the walls.
+  // The rubble takes the walls' colour at its own lightness. The walls are the beds times their macro (the strata's
+  // colour squared: about 1 : 0.49 : 0.17 after their grey tint), the floor's silt tint is warmer (1 : 0.77 : 0.51):
+  // the rubble is set so the two meet at the walls' hue and lightness. Warmed only to the strata's own colour
+  // (1 : 0.74 : 0.47), it stood pale and grey-lilac against them (gate P shots).
   const lum = dot(topA.rgb, vec3(0.2126, 0.7152, 0.0722));
-  const topC = mix(topA.rgb, vec3(1.36, 1.0, 0.64).mul(lum), below);
+  const topC = mix(topA.rgb, vec3(1.15, 0.73, 0.38).mul(lum), below);
   const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n, { a: vec4(topC, topA.a), n: topN });
   // The tint is about 0.4 (linear) on bare rock: brought back to the rock's own colour, a little darker underground.
   const tint = pow(attribute('tint', 'vec3'), vec3(2.2)).mul(1.9);

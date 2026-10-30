@@ -5,7 +5,8 @@
  * off, the second glyph tears a portal open beyond the stone, its twin at home; the hero walks through and comes out
  * at home, looks back through; opening one by home fizzles; one opened elsewhere closes the old far one. Checks:
  * the pack card raises it, each glyph takes, the hero crosses, the counts, no shader built in play (no VIOLATION),
- * no page errors. JPEGs into `<out dir>` (default `shots/stone/<date>-<commit>/`). A slow check (docs/CHECKS.md).
+ * no page errors. Then two tight spots: in the capital's gate passage the portal shrinks to fit (it opens, smaller),
+ * and down in a cave one opens back to home on the land. JPEGs into `<out dir>` (default `shots/stone/<date>-<commit>/`). A slow check (docs/CHECKS.md).
  */
 import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -150,6 +151,63 @@ await shoot('12-second-portal');
 const s5 = await state();
 if (s5.counts.opened !== 2 || !s5.far || (s2.far && Math.hypot(s5.far.x - s2.far.x, s5.far.z - s2.far.z) < 1)) fail(`the second portal did not replace the first (${JSON.stringify(s5)})`);
 if (Math.hypot(s5.home.x - s1.home.x, s5.home.z - s1.home.z) > 1e-6) fail('home moved');
+// Tight spots: the capital's gate passage (it shrinks to fit), then down in a cave (it leads back up to home).
+const go = (label) => page.evaluate((l) => Promise.resolve(window.game.go(l)).then(String, (e) => `THREW ${e}`), label);
+/** Open a portal where the hero stands; the size it opened at, or null if it fizzled. */
+const openHere = async (name) => {
+  const before = (await state()).counts.opened;
+  await raise(false);
+  await press(2);
+  await page.waitForTimeout(1900);
+  await shoot(name);
+  const s = await state();
+  return s.counts.opened > before ? await page.evaluate(() => window.game.stone.stone.size) : null;
+};
+console.log('gate:', await go('Capital gate'));
+await page.waitForTimeout(6000);
+// Walk the hero up the road into the gate: the first spot that only fits a smaller portal.
+const gate = await page.evaluate(() => {
+  const g = window.game, p = g.player, w = p.walker, fx = -Math.sin(w.yaw), fz = -Math.cos(w.yaw), seen = [];
+  for (let d = 0; d <= 50; d += 0.5) {
+    const x = w.pos.x + fx * d, z = w.pos.z + fz * d, y = g.terrain.height(x, z), k = g.stone.wouldOpen({ x, y, z }, w.yaw);
+    seen.push(k === null ? '-' : k.toFixed(2));
+    if (k !== null && k < 1) { p.teleport(x, undefined, z, w.yaw); return { d, k, seen: seen.join(' ') }; }
+  }
+  return { d: null, k: null, seen: seen.join(' ') };
+});
+console.log('gate scan', JSON.stringify(gate));
+if (gate.d === null) console.log('note: no spot by the gate that needs a smaller portal (nothing to shrink for)');
+else {
+  await page.waitForTimeout(1500);
+  const k = await openHere('13-gate-portal');
+  if (k === null) fail('the portal fizzled in the gate passage');
+  else if (k >= 1) fail(`the gate portal did not shrink (${k})`);
+  else console.log(`gate portal at ${k}`);
+}
+console.log('cave:', await go('Down in: cave'));
+await page.waitForTimeout(8000);
+const realm = await page.evaluate(() => window.game.stone.host?.realm?.() ?? null);
+console.log('realm', realm);
+// Turn to where there is room (eight ways round, then a few steps on).
+console.log('cave spot', await page.evaluate(() => {
+  const g = window.game, p = g.player, w = p.walker, x0 = w.pos.x, z0 = w.pos.z;
+  for (const d of [0, 2, 4, 6]) for (let i = 0; i < 8; i++) {
+    const yaw = w.yaw + (i * Math.PI) / 4, x = x0 - Math.sin(yaw) * d, z = z0 - Math.cos(yaw) * d;
+    const k = g.stone.wouldOpen({ x, y: w.pos.y, z }, yaw);
+    if (k !== null) { p.teleport(x, undefined, z, yaw); return `${d} m, ${i}/8 round, size ${k}`; }
+  }
+  return 'none found';
+}));
+await page.waitForTimeout(1000);
+await look();
+const k = await openHere('14-cave-portal');
+if (k === null) fail('the portal fizzled down in the cave');
+else {
+  await look(0.9, 4, -0.12);
+  await page.waitForTimeout(600);
+  await shoot('15-cave-portal-side');
+}
+
 const report = await page.evaluate(() => window.game.view.stage.hudLine?.() ?? '');
 console.log(report);
 if (/VIOLATION/.test(report)) fail(report);

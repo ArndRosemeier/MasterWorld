@@ -13,7 +13,7 @@
 import { BufferGeometry, Float32BufferAttribute, Group, Matrix4, PerspectiveCamera, Quaternion, Vector3, type Light, type Mesh, type Object3D, type RenderTarget } from 'three/webgpu';
 import { clipNear, openingPlane, screenRect, throughPortal, type PostHooks } from '@futuremagic/stage';
 import { kindMesh } from '../materials';
-import { PORTAL, PORTAL_VIEW } from '../materials/portal';
+import { PORTAL, PORTAL_RIFT, PORTAL_VIEW, riftGeometry } from '../materials/portal';
 import { ORIGIN } from '../origin';
 import type { View } from '../view';
 
@@ -76,26 +76,26 @@ export class PortalView {
     g.setAttribute('position', new Float32BufferAttribute(pos, 3));
     g.setIndex(idx);
     g.computeBoundingSphere();
-    const m = kindMesh(g, PORTAL, at.x, at.y, at.z);
-    m.rotation.y = at.yaw;
-    m.updateMatrix();
+    return this.setOpening(kindMesh(g, PORTAL), at);
+  }
+
+  /** An opening's mesh set at `at`, hidden until its view is laid in. */
+  private setOpening(m: Mesh, at: FrameXYZ): Mesh {
+    standAt(m, at);
     m.name = 'portal opening';
     m.visible = false;
     this.group.add(m);
     return m;
   }
 
-  /** Move an opening's mesh to `at` (world). */
-  moveOpening(mesh: Mesh, at: FrameXYZ): void {
-    mesh.position.set(at.x, at.y, at.z);
-    mesh.rotation.y = at.yaw;
-    mesh.updateMatrix();
+  /** A rift's opening (materials/portal.ts PORTAL_RIFT): its view drawn in its rippling ellipse; `slot` in RIFT_STATE. */
+  riftOpening(shape: { readonly halfWidth: number; readonly height: number }, at: FrameXYZ, slot: number): Mesh {
+    return this.setOpening(kindMesh(riftGeometry(shape, slot, 1), PORTAL_RIFT), at);
   }
 
-  /** Stretch an opening's mesh across (`sx`) and up (`sy`) about its foot. */
-  stretchOpening(mesh: Mesh, sx: number, sy: number): void {
-    mesh.scale.set(sx, sy, 1);
-    mesh.updateMatrix();
+  /** Move an opening's mesh to `at` (world). */
+  moveOpening(mesh: Mesh, at: FrameXYZ): void {
+    standAt(mesh, at);
   }
 
   /** The hooks for this frame's draw (Post.draw): the opening `pass` (null: none). */
@@ -157,6 +157,13 @@ export class PortalView {
     this.group.visible = false;
     for (const o of hidden) o.visible = true;
   }
+}
+
+/** Stand `o` on a frame (world): at its point, turned by its yaw. */
+export function standAt(o: Object3D, at: FrameXYZ): void {
+  o.position.set(at.x, at.y, at.z);
+  o.rotation.set(0, at.yaw, 0);
+  o.updateMatrix();
 }
 
 /** The opening's outline corners (relative to the floating origin), from its mesh. */

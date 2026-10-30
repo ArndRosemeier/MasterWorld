@@ -16,6 +16,8 @@ const TRACK = WAYS.indexOf('track');
 
 /** Town ground where no grass grows: streets, the market, under buildings, tracks. */
 const BARE = new Set<number>([TownGround.Street, TownGround.Market, TownGround.Building, TownGround.Path]);
+/** How much of the land's grass grows within a city's wall (the capital stood in a meadow between its houses). */
+const URBAN = 0.15;
 
 /** The blades of each crop: density, height (m), dryness. Zero density: the ground's own look shows (rows, furrows). */
 const CROP_GRASS: Readonly<Record<CropKind, [number, number, number]>> = {
@@ -105,15 +107,17 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
     if (BARE.has(built)) continue;
     let dens = at(x, z, 0);
     if (dens <= 0) continue;
-    // Roads are bare earth, but for the grass between a cart track's ruts; their verges are thin and short.
+    // Within a city's wall the yards and gaps are trodden and kept: a little short grass, no meadow.
     let short = 1;
+    if (t.townWalled(x, z)) { dens *= URBAN; short = 0.4; }
+    // Roads are bare earth, but for the grass between a cart track's ruts; their verges are thin and short.
     const rd = roads?.nearest(x, z, road);
     if (rd && rd.edge < 1.5) {
       if (rd.edge < 0) {
         if (rd.way !== TRACK || Math.abs(rd.across) > 0.4) continue;
-        dens *= 0.8; short = 0.45;
+        dens *= 0.8; short = Math.min(short, 0.45);
       } else {
-        dens *= smoothstep(-0.2, 1.5, rd.edge); short = 0.6 + 0.4 * smoothstep(0, 1.5, rd.edge);
+        dens *= smoothstep(-0.2, 1.5, rd.edge); short = Math.min(short, 0.6 + 0.4 * smoothstep(0, 1.5, rd.edge));
       }
     }
     // Patches: meadows and bare spots a few metres across, and thicker and thinner stretches.

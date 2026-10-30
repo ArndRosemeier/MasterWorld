@@ -97,3 +97,26 @@ test('walker: in a cave it climbs the ledge\'s face and pulls up over its top', 
   assert.equal(w.mode, 'ground');
   assert.ok(Math.abs(w.pos.y - 2.6) < 0.05 && w.pos.x > 3, `at ${w.pos.x.toFixed(2)}, ${w.pos.y.toFixed(2)}`);
 });
+
+/** A cave's floor at 0 and a wall 8 m high from x 2 on, with an opening in it: a passage 2.2 m high whose floor is 2.6 m up. */
+const opening: WalkWorld = {
+  height: () => -1000,
+  rockSurface: (x, y) => {
+    // The wall's rock is everywhere at x > 2 but in the passage (2.6 < y < 4.8): its distance, then the floor's.
+    const wall = Math.max(2 - x, y - 8), inside = Math.min(y - 2.6, 4.8 - y);
+    return Math.min(y, Math.max(wall, inside));
+  },
+  waterLevel: () => null,
+  rockHolds: () => true,
+};
+
+test('walker: in a cave it climbs up to an opening in a wall and pulls itself up into it, short as it is', () => {
+  // A short body: its holds end at the chest (the opening) well before the lip is down at its waist.
+  const w = new Walker(opening), seen = new Set<string>();
+  w.height = 1.5;
+  w.place(0, 0);
+  for (let t = 0; t < 14; t += 1 / 60) { w.step(east(), 1 / 60); seen.add(w.mode); }
+  assert.ok(seen.has('climb') && seen.has('pull'), [...seen].join(' '));
+  assert.equal(w.mode, 'ground');
+  assert.ok(Math.abs(w.pos.y - 2.6) < 0.05 && w.pos.x > 3, `at ${w.pos.x.toFixed(2)}, ${w.pos.y.toFixed(2)}`);
+});

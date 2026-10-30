@@ -4,9 +4,10 @@
  * floor's glow fading there, a portal tearing open (or fizzling where there is no room), and the eerie border
  * of every open portal: wisps of violet and sea-green light crawling round its edge, shedding sparks. Pure.
  */
-import { openingOutline, type PortalFrame, type PortalShape } from '../../game/portal';
+import type { PortalFrame, PortalShape } from '../../game/portal';
 import { v3lerp } from '@futuremagic/core';
 import { onLand } from '../../world/dungeon/site';
+import { riftEllipse } from '../../render/materials/portal';
 import type { SpellBits, Vec3 } from './particles';
 
 /** The light not of this world: violet and sea green (linear, over 1: it glows). */
@@ -22,13 +23,19 @@ const lit3 = (c: Vec3, s: number): Vec3 => [c[0] * s, c[1] * s, c[2] * s];
 /** The colour at a phase: drifting between violet and sea green. */
 const hueAt = (p: number): Vec3 => v3lerp([...VIOLET], [...TEAL], 0.5 + 0.5 * Math.sin(p));
 
-/** One open portal's border, as the controller hands it: its frame, shape, how it is stretched now (opening included) and how far open. */
-export interface Rim { readonly frame: PortalFrame; readonly shape: PortalShape; readonly sx: number; readonly sy: number; readonly open: number }
+/** One open portal's border, as the controller hands it: its frame, shape, how far open, its rim's colour. */
+export interface Rim { readonly frame: PortalFrame; readonly shape: PortalShape; readonly open: number; readonly color: Vec3 }
 
 /** A point on a frame's plane (u across, v up) in the world, `out` metres out of the plane (towards its back). */
 function onPlane(f: PortalFrame, u: number, v: number, out = 0): Vec3 {
   const [x, z] = onLand(f, u, out);
   return [x, f.y + v, z];
+}
+
+/** `n` points round a rift's rim (u across, v up, in its plane). */
+function rimPoints(shape: PortalShape, n: number): [number, number][] {
+  const { cy, rx, ry } = riftEllipse(shape);
+  return Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2; return [Math.cos(a) * rx, cy + Math.sin(a) * ry] as [number, number]; });
 }
 
 export class PortalStoneFx {
@@ -45,7 +52,7 @@ export class PortalStoneFx {
   /** A portal tears open: a flash, and sparks thrown off its outline. */
   tearOpen(b: SpellBits, f: PortalFrame, shape: PortalShape): void {
     b.streak('glow', onPlane(f, 0, shape.height * 0.5), [shape.height * 1.6, shape.height * 0.6], 0.8, lit3(WHITE, 0.9), lit3(VIOLET, 0));
-    for (const [u, v] of openingOutline(shape, 10)) {
+    for (const [u, v] of rimPoints(shape, 14)) {
       b.burst({ sprite: 'spark', life: [0.4, 1], size: [0.08, 0.02], spread: 0.08, speed: [0.5, 2], cone: Math.PI, drag: 1.6, gravity: -0.3, color: lit3(WHITE, 1.5), to: hueAt(u * 3 + v), stretch: 0.05 }, 4, onPlane(f, u, Math.max(0.05, v)));
     }
   }
@@ -54,7 +61,7 @@ export class PortalStoneFx {
   shutDown(b: SpellBits, f: PortalFrame, shape: PortalShape): void {
     const mid = onPlane(f, 0, shape.height * 0.45);
     b.streak('glow', mid, [shape.height * 1.2, 0.05], 0.6, lit3(TEAL, 0.8), lit3(VIOLET, 0));
-    for (const [u, v] of openingOutline(shape, 8)) {
+    for (const [u, v] of rimPoints(shape, 10)) {
       const at = onPlane(f, u, Math.max(0.05, v)), to: Vec3 = [mid[0] - at[0], mid[1] - at[1], mid[2] - at[2]];
       b.burst({ sprite: 'spark', life: [0.3, 0.6], size: [0.06, 0.01], speed: [1.5, 3], cone: 0.3, drag: 0.5, color: lit3(TEAL, 1.4), to: VIOLET, stretch: 0.06 }, 3, at, to);
     }
@@ -123,22 +130,16 @@ export class PortalStoneFx {
   /** An open portal's border: wisps crawl round the edge (just outside it: inside, the view beyond covers them), shedding sparks. */
   private edgeLight(b: SpellBits, dt: number, r: Rim): void {
     if (r.open <= 0.01) return;
-    const t = this.t, f = r.frame, sh = r.shape, o = r.open;
-    const outline = openingOutline(sh, 14).slice(1, -1);
-    // Along the sides down to the floor as well as round the top.
-    const pts: [number, number][] = [[sh.halfWidth, 0.05], [sh.halfWidth, (sh.height - sh.halfWidth) * 0.5], ...outline, [-sh.halfWidth, (sh.height - sh.halfWidth) * 0.5], [-sh.halfWidth, 0.05]];
-    const mx = 0, my = sh.height * 0.45 * r.sy;
-    pts.forEach(([u0, v0], i) => {
-      const su = u0 * r.sx, sv = v0 * r.sy;
-      // Out from the middle a little, wavering.
-      const du = su - mx, dv = sv - my, l = Math.hypot(du, dv) || 1, wob = 0.07 + 0.05 * Math.sin(t * 3.1 + i * 1.7);
-      const at = onPlane(f, su + (du / l) * wob, Math.max(0.03, sv + (dv / l) * wob));
-      const ph = t * 1.6 + i * 0.55;
-      b.hold('wisp', at, (0.42 + 0.12 * Math.sin(t * 2.3 + i)) * o, lit3(hueAt(ph), 0.9 * o), { rot: t * (i % 2 ? 1.3 : -1.1) + i, seed: (i * 0.137) % 1, age: (t * 0.4 + i * 0.07) % 1 });
-      if (i % 3 === 0) b.hold('glow', at, 0.9 * o, lit3(hueAt(ph + 1), 0.16 * o), { seed: (i * 0.29) % 1 });
-    });
-    // Sparks crawl off the edge, now here, now there.
-    const pick = pts[Math.floor((t * 37) % pts.length)]!;
-    b.emit({ sprite: 'spark', life: [0.5, 1.1], size: [0.06, 0.01], spread: 0.1, speed: [0.1, 0.5], up: [0.1, 0.5], drag: 1.2, swirl: 0.8, color: lit3(WHITE, 1.3), to: hueAt(t), stretch: 0.04 }, 26 * o, dt, onPlane(f, pick[0] * r.sx, Math.max(0.05, pick[1] * r.sy)));
+    const t = this.t, f = r.frame, o = r.open, { cy, rx, ry } = riftEllipse(r.shape), n = 20;
+    // Round the ellipse as far as it has opened (the window opens from its middle), a little outside its rim.
+    const rimAt = (a: number, out: number): Vec3 => onPlane(f, Math.cos(a) * rx * o * out, cy + Math.sin(a) * ry * o * out);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + t * 0.07, wob = 1.04 + 0.03 * Math.sin(t * 2.7 + i * 1.9);
+      const c = v3lerp([...r.color], [...hueAt(t * 0.8 + i * 0.6)], 0.35);
+      b.hold('wisp', rimAt(a, wob), (0.28 + 0.08 * Math.sin(t * 2.3 + i)) * o, lit3(c, 0.5 * o), { rot: t * (i % 2 ? 1.2 : -1) + i, seed: (i * 0.137) % 1, age: (t * 0.35 + i * 0.07) % 1 });
+      if (i % 4 === 0) b.hold('glow', rimAt(a, 1.05), 0.8 * o, lit3(r.color, 0.12 * o), { seed: (i * 0.29) % 1 });
+    }
+    // Motes drift off the rim, now here, now there.
+    b.emit({ sprite: 'spark', life: [0.7, 1.4], size: [0.05, 0.01], spread: 0.08, speed: [0.05, 0.3], up: [0.05, 0.35], drag: 1.2, swirl: 0.6, color: lit3(r.color, 1.6), to: hueAt(t), stretch: 0.03 }, 18 * o, dt, rimAt(t * 2.9, 1.02));
   }
 }
