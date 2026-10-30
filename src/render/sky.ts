@@ -131,9 +131,11 @@ export class SkyView {
   private lastEnvWx = '';
   /**
    * The sun's shadow map is drawn every this many frames (and at once after a jump): drawing it took about 7 ms of
-   * a town frame on the reference machine (every caster drawn again). A shadow a frame late does not show.
+   * a town frame on the reference machine (every caster drawn again). A shadow a frame or two late does not show.
+   * Every third frame: about 1.5-2 ms off a town frame at dusk and in rain against every second (gate G); at 90 fps
+   * a running hero's shadow is then at most 0.1 m behind.
    */
-  shadowEvery = 2;
+  shadowEvery = 3;
   private shadowFrame = 0;
   private readonly shadowAt = { x: Infinity, z: Infinity };
   private shadowSteps = -1;
