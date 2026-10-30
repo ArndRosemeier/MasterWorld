@@ -8,7 +8,7 @@ import { townPlanOf } from '../src/world/town';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement, woodsOf } from '../src/world/flora';
 import { EAST, SOUTH, WEST, frontierLand } from './frontierLand';
 
-const { along, first, home, regions, seed, terrain } = frontierLand();
+const { along, first, home, regions, seed, terrain } = frontierLand({ own: true });
 
 test('frontier: waystations, hamlets and villages are towns of their size from the one planner, settled from the log', () => {
   // Each walk numbers its regions from the start's: their places are named apart here (one region-16 a waystation

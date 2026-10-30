@@ -8,7 +8,7 @@ import { keepPromise, nextPromise } from '../src/vgm/leads';
 import type { Decision } from '../src/world/decisions';
 import { EAST, frontierLand } from './frontierLand';
 
-const { home, seed, terrain, walk } = frontierLand();
+const { home, seed, terrain, walk } = frontierLand({ own: true });
 
 const town = terrain.towns[0];
 const base = walk(1, EAST);

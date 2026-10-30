@@ -554,9 +554,14 @@ export class HydroTile {
     const i = Math.floor(u), j = Math.floor(v);
     if (i < 0 || j < 0 || i >= n - 1 || j >= n - 1) return h;
     const fu = u - i, fv = v - j, k = j * n + i;
+    // (Written out: a closure made on every call costs where the land is asked for millions of times.)
+    const p0 = plain[k], p1 = plain[k + 1], p2 = plain[k + n], p3 = plain[k + n + 1];
+    const w0 = (1 - fu) * (1 - fv), w1 = fu * (1 - fv), w2 = (1 - fu) * fv, w3 = fu * fv;
     let w = 0, sum = 0;
-    const take = (cell: number, wt: number) => { const p = plain[cell]; if (!Number.isNaN(p)) { w += wt; sum += p * wt; } };
-    take(k, (1 - fu) * (1 - fv)); take(k + 1, fu * (1 - fv)); take(k + n, (1 - fu) * fv); take(k + n + 1, fu * fv);
+    if (!Number.isNaN(p0)) { w += w0; sum += p0 * w0; }
+    if (!Number.isNaN(p1)) { w += w1; sum += p1 * w1; }
+    if (!Number.isNaN(p2)) { w += w2; sum += p2 * w2; }
+    if (!Number.isNaN(p3)) { w += w3; sum += p3 * w3; }
     if (w <= 0) return h;
     return h + w * Math.max(0, sum / w - h);
   }

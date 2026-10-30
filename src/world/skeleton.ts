@@ -248,11 +248,11 @@ export class Skeleton {
     if (!m) return 0;
     const n = this.mesaNoise, s = 1 / m.size;
     const wx = n.fbm2(x / 1100 + 3.3, z / 1100 - 1.4, 1) * 160, wz = n.fbm2(x / 1100 - 7.6, z / 1100 + 5.2, 1) * 160;
-    const field = (px: number, pz: number) => n.fbm2(px * s, pz * s, 3, 2, 0.5);
-    const D = 40, f = field(x + wx, z + wz), t = (0.5 - m.cover) * 0.5;
+    // (The plateaus' field: n.fbm2(px * s, pz * s, 3, 2, 0.5), written out, as no closure is made on every call.)
+    const D = 40, f = n.fbm2((x + wx) * s, (z + wz) * s, 3, 2, 0.5), t = (0.5 - m.cover) * 0.5;
     // Quick out: far down in a valley (some hundreds of metres from any wall or pass).
     if (f < t - 0.25) return 0;
-    const gx = (field(x + wx + D, z + wz) - f) / D, gz = (field(x + wx, z + wz + D) - f) / D;
+    const gx = (n.fbm2((x + wx + D) * s, (z + wz) * s, 3, 2, 0.5) - f) / D, gz = (n.fbm2((x + wx) * s, (z + wz + D) * s, 3, 2, 0.5) - f) / D;
     const g = Math.max(1e-7, Math.hypot(gx, gz));
     // Bays and buttresses (hundreds of metres), alcoves and spurs (tens).
     const edge = n.fbm2(x / 320 + 9.1, z / 320 - 2.2, 2) * 26 + n.fbm2(x / 60 - 4.7, z / 60 + 8.3, 2) * 4;

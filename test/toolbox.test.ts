@@ -3,11 +3,10 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { NEEDS } from '../src/vgm/director';
 import { TOOLS, toolOf, vgmTurn } from '../src/vgm/toolbox';
 import type { Decision } from '../src/world/decisions';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 /** Every kind of decision the log can hold (the compiler checks the list is whole). */
 const KINDS = { festivity: 1, stray: 1, traveller: 1, sight: 1, journey: 1, retake: 1, wild: 1, event: 1, town: 1, volume: 1, dungeon: 1, order: 1, kept: 1, 'move-in': 1, road: 1, region: 1, hold: 1, retreat: 1 } satisfies Record<Decision['kind'], 1>;
@@ -31,7 +30,7 @@ test('toolbox: every tool has its row in docs/design/vgm.md', { skip: !existsSyn
 
 test('toolbox: the Builder\'s turn asks its tools in order, each seeing the ones before', () => {
   const seed = parseSeed('masterworld');
-  const { terrain, log, home } = openWorld(seed, classic, SMALL);
+  const { terrain, log, home } = startWorld();
   const c = { seed, log, towns: terrain.towns, terrain, home, hours: 0, purposeOverdue: false, inside: () => false, setting: classic };
   const made = vgmTurn(c);
   assert.ok(made.length >= 1 && made.every((m) => m.tool === 'promise' && toolOf('promise').writes.includes(m.decision.kind)), 'a fresh world gets a promise');

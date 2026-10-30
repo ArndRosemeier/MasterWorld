@@ -4,18 +4,17 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic';
 import { Character } from '../src/game/character';
 import { GuildBook, questDue, questGift, teach, teachingsOf, teachRefusal } from '../src/game/guilds';
-import { openWorld } from '../src/vgm/builder';
 import { questFor, questOf, questReward } from '../src/vgm/quests';
 import { keepPromise } from '../src/vgm/leads';
 import type { DecisionLog } from '../src/world/decisions';
-import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 
 const under = classic.guilds!.find((g) => g.keeper === 'undercroft-keeper')!;
 const bird = under.quest!.reward;
 
 test('quests: bird form is gained only through the Undercroft keeper\'s deed', () => {
   const seed = parseSeed('masterworld');
-  const { terrain, log: first, home } = openWorld(seed, classic, SMALL);
+  const { terrain, log: first, home } = startWorld();
   const town = terrain.towns[0], c = { seed, terrain, home, dungeons: classic.dungeons };
   const hero = new Character(classic);
   hero.coins = 1e6;
