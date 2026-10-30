@@ -162,7 +162,10 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
     const clay = float(1).sub(step(0.5, abs(kg.x.sub(LAYER('clay')))));
     const bed = fract(p.y.mul(0.31).add(broad.mul(1.5)).add(fine.mul(0.05)));
     const beds = mix(mix(vec3(1.05, 0.62, 0.42), vec3(0.92, 0.88, 0.8), smoothstep(0.2, 0.32, bed)), mix(vec3(1.1, 0.8, 0.52), vec3(0.72, 0.42, 0.34), smoothstep(0.62, 0.74, bed)), step(0.5, bed));
-    const kc = mix(ka.rgb, ka.rgb.mul(beds), clay).mul(float(1).add(mid.mul(0.12)));
+    // The beds show where the ground is cut (gully sides, scarps); on the level and gentle swells they drew contour
+    // lines from above, so there only a hint of them.
+    const cut = float(1).sub(smoothstep(0.8, 0.97, up).mul(0.75));
+    const kc = mix(ka.rgb, ka.rgb.mul(mix(vec3(1), beds, cut)), clay).mul(float(1).add(mid.mul(0.12)));
     const kb = hblend(clamp(kg.y.mul(drift), 0, 1), kn.b.sub(h), 2);
     col = mix(col, kc, kb); rough = mix(rough, ka.a, kb); ao = mix(ao, kn.a, kb);
     pert = mix(pert, vec3(tn(kn).x, 0, tn(kn).y), kb); h = mix(h, kn.b, kb);
@@ -366,7 +369,7 @@ const tn = (s: Node<'vec4'>) => s.xy.mul(2).sub(1);
  * and the strata nine times larger (`macro`), so cliffs keep their structure from far away. Cliffs (the terrain)
  * and the rocks on the land (ROCKS) share it, so a boulder is of the stone of the scarp it fell from.
  */
-function rockFaces(g: GroundTextures, p: Node<'vec3'>, n: Node<'vec3'>) {
+function rockFaces(g: GroundTextures, p: Node<'vec3'>, n: Node<'vec3'>, top0?: { a: Node<'vec4'>; n: Node<'vec4'> }) {
   const layer = (name: string, uv: Node<'vec2'>) => groundLayer(g, name, uv);
   // Top or side first (a sharp blend: a slope of 45 degrees and more takes the walls' strata, whichever way it
   // faces, not the pale weathered top stone), then the side between its two projections.
@@ -380,7 +383,7 @@ function rockFaces(g: GroundTextures, p: Node<'vec3'>, n: Node<'vec3'>) {
   const sy = p.y.add(bend).div(thick);
   // (Slowly with height: a quick shift shears the beds into swirls, wood grain up close.)
   const shift = mx_noise_float(vec2(sy.mul(0.12), 0.5)).mul(2);
-  const rx = layer('cliffStrata', vec2(p.z.add(shift), sy)), rz = layer('cliffStrata', vec2(p.x.add(shift), sy)), ry = layer('rockFace', p.xz);
+  const rx = layer('cliffStrata', vec2(p.z.add(shift), sy)), rz = layer('cliffStrata', vec2(p.x.add(shift), sy)), ry = top0 ?? layer('rockFace', p.xz);
   const big = 1 / 9;
   const mx = layer('cliffStrata', vec2(p.z, sy).mul(big)), mz = layer('cliffStrata', vec2(p.x, sy).mul(big));
   const macro = mx.a.rgb.mul(bw.x).add(mz.a.rgb.mul(bw.z)).add(vec3(0.45).mul(bw.y)).div(0.45);
@@ -427,7 +430,15 @@ export const CAVE_ROCK = defineKind('cave rock', ['position', 'normal', 'tint'],
   if (!ground) throw new Error('cave rock built before the ground textures were loaded');
   const m = new MeshStandardNodeMaterial({ roughness: 0.9, metalness: 0 });
   const p = WORLD, n = normalWorld;
-  const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n);
+  // Floors are rubble (scree: angular stones over grit, warmed to the walls' stone), roofs the beds seen from
+  // below; the land's weathered top stone (a net of cracks) read as dried mud underground, pale beside the walls.
+  const below = step(0, n.y), floorL = LAYER('scree'), roofL = LAYER('cliffStrata');
+  const li = int(mix(float(roofL), float(floorL), below));
+  const tile = mix(float(1 / NATURAL_TILE_METERS[roofL]), float(1 / NATURAL_TILE_METERS[floorL]), below);
+  const st = vec2(p.x.add(mx_noise_float(p.xz.mul(0.07)).mul(1.5)), p.z).mul(tile);
+  const topA = texture(ground.albedo).sample(st).depth(li), topN = texture(ground.normal).sample(st).depth(li);
+  const warm = mix(vec3(1), vec3(1.25, 1.08, 0.88), below);
+  const { rockA, rockN, rockP, macro } = rockFaces(ground, p, n, { a: vec4(topA.rgb.mul(warm), topA.a), n: topN });
   // The tint is about 0.4 (linear) on bare rock: brought back to the rock's own colour, a little darker underground.
   const tint = pow(attribute('tint', 'vec3'), vec3(2.2)).mul(1.9);
   const broad = mx_fractal_noise_float(p.mul(0.05), 2, 2.0, 0.5);

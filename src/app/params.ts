@@ -60,8 +60,8 @@ export const params = {
   envGround: q.has('envGround') ? Number(q.get('envGround')) : undefined,
   /** Draw the town's buildings (`town=0` leaves them out, for comparisons). */
   town: q.get('town') !== '0',
-  /** How many townsfolk are drawn at most (`folk=0`: none); past these, plain figures (40: a capital's market at noon). */
-  folk: Number(q.get('folk') ?? 40),
+  /** How many townsfolk are drawn at most (`folk=0`: none); past these, plain figures (40 put the capital's market at 19-27 ms). */
+  folk: Number(q.get('folk') ?? 30),
   /** How many of the farms' grazing animals are drawn at most, the nearest (`stock=0`: none). */
   stock: Number(q.get('stock') ?? 6),
   /** How many saddled horses wait near the start (`horses=0`: none). */

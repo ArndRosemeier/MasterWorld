@@ -14,7 +14,7 @@ import { WEATHER } from './weather';
 import type { CaveFeatures } from '../../world/dungeon/caveFeatures';
 
 export const CAVE_WATER = defineKind('cave water', ['position', 'normal', 'uv'], () => {
-  const m = new MeshPhysicalNodeMaterial({ color: new Color(0x080d0e), roughness: 0.05, metalness: 0, transparent: true, depthWrite: false, specularIntensity: 1 });
+  const m = new MeshPhysicalNodeMaterial({ color: new Color(0x123036), roughness: 0.14, metalness: 0, transparent: true, depthWrite: false, specularIntensity: 1 });
   const t = WEATHER.time;
   // uv.x: along the stream (m), or out from a pool's middle (0) to its rim (1); uv.y: 1 on a stream, 0 on a pool.
   const flow = uv().y;
@@ -27,7 +27,11 @@ export const CAVE_WATER = defineKind('cave water', ['position', 'normal', 'uv'],
   // nothing at its rim, so its shore is the wet stone, not the edge of a disc.
   const view = normalize(positionView.negate());
   const shore = mix(smoothstep(1, 0.55, uv().x), float(1), flow);
-  m.opacityNode = mix(float(0.9), float(0.3), pow(abs(dot(view, normalView)), 1.5)).mul(shore);
+  const facing = abs(dot(view, normalView));
+  m.opacityNode = mix(float(0.9), float(0.45), pow(facing, 1.5)).mul(shore);
+  // Underground the sky is not there to mirror: seen low, a faint sheen of the cave's own light marks the surface,
+  // rippled with it, so the pool reads as water and not as a dark stain.
+  m.emissiveNode = vec3(0.035, 0.06, 0.065).mul(pow(float(1).sub(facing), 3)).mul(float(1).add(n.mul(6))).mul(shore);
   return m;
 }, { cast: false, receive: true }, true);
 

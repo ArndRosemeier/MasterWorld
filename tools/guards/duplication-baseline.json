@@ -662,5 +662,13 @@
   {
     "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/building.ts + masterworld/render/materials/spellFx.ts",
     "reason": "TSL arithmetic (.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the city's paving (P4)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.add/.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the cave pool's sheen (phase P fixes)."
+  },
+  {
+    "key": "idiom: [.mul .sub] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/smoke.ts",
+    "reason": "TSL arithmetic (.add/.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the cave pool's sheen (phase P fixes)."
   }
 ]
