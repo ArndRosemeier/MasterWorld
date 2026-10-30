@@ -174,11 +174,17 @@ export interface LandscapeKindDef {
   readonly wears?: KindGround;
 }
 
-/** A kind of country's own ground (D55): its colour, surface and grass, over the biome's where it holds. */
+/**
+ * A kind of country's own ground (D55), over the biome's where it holds: its colour, surface and grass (each left out:
+ * the biome's stays), and a ground layer of its own (a texgen natural layer: a moor's heather, badlands' clay) laid over
+ * `share` of it in drifts (1: all of it).
+ */
 export interface KindGround {
-  readonly color: number;
-  readonly surface: Surface;
-  readonly grass: GrassDef;
+  readonly color?: number;
+  readonly surface?: Surface;
+  readonly grass?: GrassDef;
+  readonly layer?: string;
+  readonly share?: number;
 }
 
 /** A landscape kind's big shapes (D55): hills `height` metres high, `size` metres across; `sharp`: knife ridges with gullies between instead of rounded hills. */

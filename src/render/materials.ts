@@ -7,7 +7,7 @@
  * vertex attributes or uniforms, never into a new material.
  */
 import { DoubleSide, Mesh, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial, Vector2, Vector4, type BufferGeometry, type Material } from 'three/webgpu';
-import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorld, normalWorldGeometry, positionWorld, pow, sin, cos, smoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
+import { Fn, If, vec2, abs, attribute, cameraPosition, cameraViewMatrix, modelWorldMatrix, positionLocal, uniform, varying, length, clamp, dot, exp, float, mx_worley_noise_vec2, int, max, mix, mx_fractal_noise_float, mx_noise_float, normalize, normalWorld, normalWorldGeometry, positionWorld, pow, sin, cos, smoothstep, step, fract, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import { TOWN_GROUND_LAYER, TOWN_TILE_METERS, type GroundTextures } from './terrain/groundTextures';
@@ -23,7 +23,7 @@ import { woodsFromAfar } from '@futuremagic/vegetation/node';
 import { ORIGIN, WORLD } from './origin';
 import { geometryInstancing } from '@futuremagic/instances/node';
 
-export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy' | 'mat' | 'tint' | 'look' | 'fx';
+export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy' | 'ground' | 'mat' | 'tint' | 'look' | 'fx';
 
 export interface MaterialKind extends StageKind {
   readonly attributes: readonly Attribute[];
@@ -109,7 +109,7 @@ const UNDER_CROWNS = 0.15;
  */
 export const GROUND_DIP = uniform(new Vector4(0, 0, 0, 0));
 
-export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level', 'canopy'], () => {
+export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level', 'canopy', 'ground'], () => {
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');
   // Double-sided so chunk skirts close cracks seen from either side.
   // Physical, for its specular strength: soil and grass reflect little of the bright sky, even at a low angle.
@@ -149,6 +149,24 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const tint = mix(vec3(1), hue, float(0.5).add(mid.mul(0.15))).mul(float(1).add(broad.mul(0.3)).add(mid.mul(0.22)));
   let col: Node<'vec3'> = soilA.rgb.mul(tint), rough: Node<'float'> = soilA.a, ao: Node<'float'> = soilN.a, h: Node<'float'> = soilN.b;
   let pert: Node<'vec3'> = vec3(tn(soilN).x, 0, tn(soilN).y);
+
+  // A kind of country's own ground (attribute `ground`: its layer, how much it holds, its share, 1 / tile; world/chunkMesh.ts
+  // groundLook): a moor's heather, karst's pavement, the downs' chalk turf, a valley's gravel, laid in drifts over its
+  // share; badlands' clay in beds of colour a few metres high (by height, wavering), so its gullies' sides show the bands.
+  {
+    const kg = attribute('ground', 'vec4');
+    const st = p.xz.mul(kg.w), li = int(kg.x.add(0.5));
+    const ka = texture(ground!.albedo).sample(st).depth(li), kn = texture(ground!.normal).sample(st).depth(li);
+    const bare = float(1).sub(kg.z);
+    const drift = smoothstep(bare.sub(0.12), bare.add(0.12), mid.mul(0.5).add(0.5).add(fine.mul(0.08)));
+    const clay = float(1).sub(step(0.5, abs(kg.x.sub(LAYER('clay')))));
+    const bed = fract(p.y.mul(0.31).add(broad.mul(1.5)).add(fine.mul(0.05)));
+    const beds = mix(mix(vec3(1.05, 0.62, 0.42), vec3(0.92, 0.88, 0.8), smoothstep(0.2, 0.32, bed)), mix(vec3(1.1, 0.8, 0.52), vec3(0.72, 0.42, 0.34), smoothstep(0.62, 0.74, bed)), step(0.5, bed));
+    const kc = mix(ka.rgb, ka.rgb.mul(beds), clay).mul(float(1).add(mid.mul(0.12)));
+    const kb = hblend(clamp(kg.y.mul(drift), 0, 1), kn.b.sub(h), 2);
+    col = mix(col, kc, kb); rough = mix(rough, ka.a, kb); ao = mix(ao, kn.a, kb);
+    pert = mix(pert, vec3(tn(kn).x, 0, tn(kn).y), kb); h = mix(h, kn.b, kb);
+  }
 
   // Shore sand, up to where rock takes over (no strip of grass between a beach and its cliff).
   const sand = layer('sand', p.xz);
