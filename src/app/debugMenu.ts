@@ -41,9 +41,8 @@ export interface DebugHost {
   readonly events: readonly { readonly id: string; readonly kind: string }[];
   /** A story event now (C6), whatever its wait (one of `events` by id, or the first that can): what the town hears, or why none came. */
   storyEvent(id?: string): string;
-  /** The VGM window (its needs, its moves, buttons that make it act), and its moves on screen on or off. */
-  openVgm(): void;
-  vgmAlerts: boolean;
+  /** The VGM panel (its moves live, filtered by kind; its needs and buttons that make it act) shown or not. */
+  vgmPanel: boolean;
   /** The experience to the next level, so its celebration plays (G3): the level reached. */
   gainLevel(): string;
   /** The VGM's log (D53, C8): its moves, oldest first (the tool, the need, why). */
@@ -128,8 +127,7 @@ export class DebugMenu {
         { label: 'Curfew', run: () => h.town('stayIn') },
       ]],
       ['VGM', [
-        { label: 'The VGM window (F9): needs, moves, make it act', run: () => h.openVgm() },
-        { label: 'Its moves on screen on / off', run: () => { h.vgmAlerts = !h.vgmAlerts; return h.vgmAlerts ? 'alerts on' : 'alerts off'; } },
+        { label: 'The VGM panel on / off (F9): its moves live, make it act', run: () => { h.vgmPanel = !h.vgmPanel; return h.vgmPanel ? 'panel shown' : 'panel hidden'; } },
         { label: 'Every move (printed, to copy)', run: () => this.lines(h.vgmLog()) },
       ]],
       ['Weather', [

@@ -40,8 +40,10 @@ export interface Settings {
   calm: boolean;
   /** How eventful the game master makes the world (D53: the one place the VGM shows; vgm/vgmLog.ts PACING). */
   pacing: Pacing;
-  /** A developer's aid (D53 keeps the VGM out of play): each move of the VGM shown as a brass slip on screen. On while the game is built. */
-  vgmAlerts: boolean;
+  /** A developer's aid (D53 keeps the VGM out of play): the VGM panel with its moves, live, docked at the right (F9). On while the game is built. */
+  vgmPanel: boolean;
+  /** The kinds of move the VGM panel shows (tool ids; none: all). */
+  vgmKinds: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -63,7 +65,8 @@ export const DEFAULT_SETTINGS: Settings = {
   muted: false,
   calm: false,
   pacing: 'normal',
-  vgmAlerts: true,
+  vgmPanel: true,
+  vgmKinds: [],
 };
 
 /** The ranges the dialog offers (and stored values are held to). */
@@ -86,7 +89,7 @@ export function cleanSettings(raw: unknown): Settings {
     const v = s[k];
     return typeof v === 'number' && Number.isFinite(v) ? clamp(v, RANGES[k][0], RANGES[k][1]) : DEFAULT_SETTINGS[k];
   };
-  const flag = (k: 'invertMouse' | 'trees' | 'grass' | 'webgl' | 'hud' | 'calm' | 'muted' | 'vgmAlerts'): boolean => (typeof s[k] === 'boolean' ? (s[k] as boolean) : DEFAULT_SETTINGS[k]);
+  const flag = (k: 'invertMouse' | 'trees' | 'grass' | 'webgl' | 'hud' | 'calm' | 'muted' | 'vgmPanel'): boolean => (typeof s[k] === 'boolean' ? (s[k] as boolean) : DEFAULT_SETTINGS[k]);
   return {
     mouseSpeed: num('mouseSpeed'),
     invertMouse: flag('invertMouse'),
@@ -106,7 +109,8 @@ export function cleanSettings(raw: unknown): Settings {
     muted: flag('muted'),
     calm: flag('calm'),
     pacing: typeof s.pacing === 'string' && s.pacing in PACING ? (s.pacing as Pacing) : DEFAULT_SETTINGS.pacing,
-    vgmAlerts: flag('vgmAlerts'),
+    vgmPanel: flag('vgmPanel'),
+    vgmKinds: Array.isArray(s.vgmKinds) ? s.vgmKinds.filter((k): k is string => typeof k === 'string').slice(0, 40) : [],
   };
 }
 
