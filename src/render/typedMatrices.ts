@@ -17,9 +17,8 @@ import { Matrix4 } from 'three/webgpu';
 
 /** A Float64Array whose `map` gives a plain array, as three's shader constants expect (`elements.map(...).join()`). */
 class Elements extends Float64Array {}
-Object.defineProperty(Elements.prototype, 'map', {
-  value(this: Float64Array, f: (v: number, i: number) => unknown): unknown[] { return Array.from(this, f); },
-});
+const plainMap = function (this: Float64Array, f: (v: number, i: number) => unknown): unknown[] { return Array.from(this, f); };
+Object.defineProperty(Elements.prototype, 'map', { value: plainMap });
 
 /** How long methods turn the matrices made before the install typed (ms): the load and the first moments of play. */
 const SWEEP_MS = 30_000;
