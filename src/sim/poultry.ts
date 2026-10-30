@@ -18,6 +18,8 @@ export interface Hen {
   readonly flock: number;
   /** A cock (else a hen). */
   readonly cock: boolean;
+  /** Of a farmyard's flock (else a town back yard's). */
+  readonly farm: boolean;
   x: number;
   z: number;
   /** Facing (radians, xz atan2). */
@@ -59,7 +61,7 @@ export class Poultry {
 
   constructor(plan: TownPlan, seed: number, def: PoultryDef) {
     const rng = new Rng(deriveSeed(seed, 'poultry'));
-    const keep = (yard: Yard, hens: number, cock: boolean): void => {
+    const keep = (yard: Yard, hens: number, cock: boolean, farm: boolean): void => {
       // A yard with no open ground (all shed and edge) keeps none.
       if (!this.openIn(yard, new Rng(deriveSeed(seed, 'yard', this.yards.length)))) return;
       const f = this.yards.length;
@@ -67,13 +69,13 @@ export class Poultry {
       for (let k = 0; k < hens + (cock ? 1 : 0); k++) {
         const id = this.hens.length, r = new Rng(deriveSeed(seed, 'hen', id));
         const [x, z] = this.openIn(yard, r) ?? polyCentroid(yard.outer);
-        this.hens.push({ id, flock: f, cock: k === hens, x, z, dir: r.range(-Math.PI, Math.PI), act: 'peck', speed: 0, tx: x, tz: z, until: r.range(0, 8), rng: r });
+        this.hens.push({ id, flock: f, cock: k === hens, farm, x, z, dir: r.range(-Math.PI, Math.PI), act: 'peck', speed: 0, tx: x, tz: z, until: r.range(0, 8), rng: r });
       }
     };
-    for (const farm of plan.farms) keep({ outer: farm.yard, holes: [] }, rng.int(def.farmHens[0], def.farmHens[1]), true);
+    for (const farm of plan.farms) keep({ outer: farm.yard, holes: [] }, rng.int(def.farmHens[0], def.farmHens[1]), true, true);
     for (const y of plan.yards) {
       if (Math.abs(polyArea(y.outer)) < def.yardArea || !rng.chance(def.yardShare)) continue;
-      keep({ outer: y.outer, holes: y.holes }, rng.int(def.yardHens[0], def.yardHens[1]), rng.chance(def.yardCock));
+      keep({ outer: y.outer, holes: y.holes }, rng.int(def.yardHens[0], def.yardHens[1]), rng.chance(def.yardCock), false);
     }
   }
 
@@ -82,16 +84,14 @@ export class Poultry {
    * wall or shed in the way of a bird of radius r at (x, z).
    */
   step(dt: number, hour: number, def: PoultryDef, near: { x: number; z: number } | null, blocked?: (x: number, z: number, r: number) => boolean): void {
+    const first = this.time === 0;
     this.time += dt;
     this.heard.length = 0;
     const h = ((hour % 24) + 24) % 24, awake = h >= def.awake[0] && h < def.awake[1];
     for (const a of this.hens) {
-      // Dusk: each sits down where it is (at its own moment); dawn: up again.
-      if (!awake) {
-        if (a.act !== 'roost' && a.rng.chance(dt / 8)) Object.assign(a, { act: 'roost', speed: 0, until: 0 });
-        continue;
-      }
-      if (a.act === 'roost') { if (a.rng.chance(dt / 15)) this.standAbout(a, h, def); continue; }
+      // Dusk: each sits down where it is, at its own moment (a flock first met at night is already sitting); dawn: up again.
+      if (a.act === 'roost') { if (awake && a.rng.chance(dt / 15)) this.standAbout(a, h, def); continue; }
+      if (!awake && (first || a.rng.chance(dt / 8))) { Object.assign(a, { act: 'roost', speed: 0 }); continue; }
       // Someone walking into the flock: it squawks and runs off.
       if (near && a.act !== 'run' && Math.hypot(near.x - a.x, near.z - a.z) < SHY) { this.scatter(a, near); continue; }
       if (a.act === 'walk' || a.act === 'run') {

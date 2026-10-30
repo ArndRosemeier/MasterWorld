@@ -2248,7 +2248,8 @@ export async function start(b: Boot): Promise<void> {
         const w = player.walker.pos, onFoot = above && !rooms?.inside && !player.flying ? { x: w.x, z: w.z } : null;
         const flocks = towns.peck(dt, cam.x, cam.z, onFoot);
         if (lookHens) {
-          const near = flocks.flatMap((f) => f.hens).filter((a) => !a.cock).sort((a, b) => Math.hypot(a.x - w.x, a.z - w.z) - Math.hypot(b.x - w.x, b.z - w.z))[0];
+          // A farmyard's hen: the yard is open ground (a back yard's garden can hide it behind a bush).
+          const near = flocks.flatMap((f) => f.hens).filter((a) => !a.cock && a.farm).sort((a, b) => Math.hypot(a.x - w.x, a.z - w.z) - Math.hypot(b.x - w.x, b.z - w.z))[0];
           if (near) { standBeside(near, 3.2); lookHens = false; }
         }
         if (above) for (const f of flocks) for (const e of f.heard) sounds?.hen(e);

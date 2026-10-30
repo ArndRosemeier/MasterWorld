@@ -37,3 +37,9 @@ test('hens: deterministic; they scatter from someone close, sit at night, and th
   for (let i = 0; i < 3000; i++) { a.step(0.1, 6.5, def, null); crows += a.heard.filter((e) => e.kind === 'crow').length; }
   assert.ok(crows > 0);
 });
+
+test('hens: a flock first met at night is already sitting', () => {
+  const p = new Poultry(plan, 5, def);
+  p.step(0.1, 23, def, null);
+  assert.ok(p.hens.every((h) => h.act === 'roost'));
+});
