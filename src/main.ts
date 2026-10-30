@@ -53,7 +53,7 @@ import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
-import { distSqPointSeg } from '@futuremagic/settlement';
+import { distSqPointSeg, harbourMoorings } from '@futuremagic/settlement';
 import { abilityOf, validateSetting, type BackgroundDef, type GrowthSource, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
@@ -86,6 +86,7 @@ import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
 import { HatchClimb } from './app/hatchClimb';
+import { ShipClimb } from './app/shipClimb';
 import { UsePrompt } from './app/usePrompt';
 import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
@@ -93,6 +94,7 @@ import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
 import { ShipsView } from './render/ships';
+import { Decks } from './world/deck';
 import type { Township } from './game/township';
 import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
@@ -293,12 +295,16 @@ export async function start(b: Boot): Promise<void> {
     };
     // Bridges where roads cross brooks, round the hero: their decks are floors.
     const bridgeView = new BridgeView(view.stage, terrain);
+    // The decks of the ships near the hero (S3): floors and walls that move with the waves, carrying the hero on them.
+    const decks = new Decks(() => player.walker.pos);
+    // A pier's deck or a bridge's high over the feet (a swimmer under it) is not under them: never lifted onto it.
+    const overhead = (f: number | null, y: number | undefined): number | null => (f !== null && y !== undefined && f > y + 1.6 ? null : f);
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
     const landWorld: WalkWorld = {
       // In a cave mouth's throat its own floor (it runs under the land's ground, which the crag carves).
       height: (x, z) => cellars?.floor(x, z) ?? terrain.height(x, z),
       // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
-      floor: (x, z) => towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null,
+      floor: (x, z, y) => decks.underfoot(x, z, y) ?? overhead(towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null, y),
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
       rockSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, false)),
       // In a building the camera stays in the room (its doorway shut to it).
@@ -317,13 +323,13 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return decks.hull(x, z, r, y ?? 0) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     // Down in a cellar the walker walks its space, else the land.
     const world: WalkWorld = {
       height: (x, z) => below()?.height(x, z) ?? landWorld.height(x, z),
-      floor: (x, z) => (below() ? null : landWorld.floor!(x, z)),
+      floor: (x, z, y) => (below() ? null : landWorld.floor!(x, z, y)),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : landWorld.rockSurface(x, y, z); },
       sightSurface: (x, y, z) => { const b = below(); return b ? (b.sightSurface ?? b.rockSurface)(x, y, z) : landWorld.sightSurface!(x, y, z); },
       waterLevel: (x, z) => (below() ? null : landWorld.waterLevel(x, z)),
@@ -473,7 +479,7 @@ export async function start(b: Boot): Promise<void> {
     const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
     // The harbours' ships and boats, riding the swell and out fishing by day (S2).
-    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z) });
+    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
     compileEarly([sea.mesh]);
@@ -588,6 +594,11 @@ export async function start(b: Boot): Promise<void> {
         const quay = s.harbour, back = params.siteAt ?? 4;
         if (quay) player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
         else player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
+        // Aboard its first ship once the town stands: on the main deck amidships, looking along it to the bow.
+        if (quay && params.aboard) void roading.then(() => {
+          const h = terrain.town(found.id)?.plan.harbour, m = h && harbourMoorings(h, terrain.town(found.id)!.decision.seed ?? 0).find((x) => x.plan.kind === 'ship');
+          if (m) player.teleport(m.x + m.ux * 2, m.plan.deckY + 0.6, m.z + m.uz * 2, Math.atan2(-m.ux, -m.uz));
+        });
         break;
       }
     }
@@ -596,6 +607,11 @@ export async function start(b: Boot): Promise<void> {
       log = [...log, townOrder(log, t.id, o)];
       t.obey(o);
     };
+    // `feast`: the start town holds a feast at its market now (for looking at it; the debug menu has it too).
+    if (params.feast && startTown) {
+      const [x, z] = startTown.town.plan.centre;
+      orderTown(startTown, { kind: 'gather', x, z, radius: 16, from: hours(), to: hours() + 3, mood: 'feast' });
+    }
     // Saddled horses waiting by the start (Actors' horse): the mount key gets on.
     let horses: HorseView | null = null;
     if (params.horses > 0) {
@@ -1744,8 +1760,9 @@ export async function start(b: Boot): Promise<void> {
         const t = here() ?? startTown;
         if (!t) return 'no town';
         const [x, z] = t.town.plan.centre;
-        orderTown(t, kind === 'gather' ? { kind, x, z, radius: 14, from: hours(), to: hours() + 2 } : { kind, from: hours(), to: hours() + 2 });
-        return kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
+        const from = hours(), to = from + 2;
+        orderTown(t, kind === 'feast' ? { kind: 'gather', x, z, radius: 16, from, to, mood: 'feast' } : kind === 'gather' ? { kind, x, z, radius: 14, from, to } : { kind, from, to });
+        return kind === 'feast' ? 'a feast at the market for 2 game hours' : kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
       },
       get viewParams() { return player.viewParams; },
       // Abilities a teacher opens (D49), learned or forgotten here so they can be tried.
@@ -1769,7 +1786,7 @@ export async function start(b: Boot): Promise<void> {
       places: placesFor(seedText, home),
       spots,
       seed: seedText,
-      game: { player, view, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, decks, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
@@ -1857,6 +1874,8 @@ export async function start(b: Boot): Promise<void> {
       // The ground's vertices lie a couple of metres apart: sunk well round the hatch, all of them under it go.
       sink: (at) => { if (at) GROUND_DIP.value.set(at.x, at.z, SINK_REACH, SINK_DEPTH); else GROUND_DIP.value.w = 0; },
     });
+    // A ship's castle ladders, climbed in sight as the ship rides the swell (E; app/shipClimb.ts).
+    const shipClimbs = new ShipClimb({ player, decks });
     // The free camera is a debug tool: its key (F) works only with `?fly` or once the debug menu has flown, and
     // always lands again while flying (a stray F in a cellar flew the camera through its walls).
     let flyKey = params.fly;
@@ -1865,7 +1884,7 @@ export async function start(b: Boot): Promise<void> {
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
       const b = settings.current.bindings;
-      if (b.use.includes(e.code) && playing && climbs.use()) return;
+      if (b.use.includes(e.code) && playing && (climbs.use() || shipClimbs.use())) return;
       if (b.fly.includes(e.code) && (flyKey || player.flying)) player.flying = !player.flying;
       else if (b.mount.includes(e.code)) player.toggleMount();
       else if (b.dive.includes(e.code) && playing && player.walker.mode === 'ground' && !player.flying) {
@@ -1968,7 +1987,7 @@ export async function start(b: Boot): Promise<void> {
       } else if (d.kind === 'festivity') {
         // A good day (C11): the town gathers at its market; a feast for the hero's deed is told to them.
         console.info(`[vgm] ${d.id} (${d.festivity}) in ${d.town}, ${d.from.toFixed(1)} to ${d.to.toFixed(1)} h`);
-        const t = towns?.get(d.town), order = festivityOrder(terrain.towns, d);
+        const t = towns?.get(d.town), order = festivityOrder(terrain.towns, d, setting);
         if (t && order) orderTown(t, order);
         t?.promised(d);
         // Seen, not told (rule 11): the town gathers at its market; asked, its folk tell of the feast.
@@ -2052,9 +2071,13 @@ export async function start(b: Boot): Promise<void> {
         if (title.holding) giant.view.frame(dt, giantPose(orbit, title.draw.seed, (giant.t += dt)));
         else { giant.view.dispose(); giant = null; }
       }
+      // The ships on the waves first: a hero on a deck goes with it before taking a step.
+      part('ships');
+      ships.float(view.camera.position, hours(), dt);
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
+      decks.boarded();
       // Through an opening: on out of the other; the camera stands on whichever side it trails on.
       if (!title?.holding && !creator?.showing) {
         const was = through.passed;
@@ -2178,7 +2201,7 @@ export async function start(b: Boot): Promise<void> {
       { const t = here(); if (t) { if (!t.been) director.met('discovery'); character.earn(`town:${t.town.decision.id}`, 'town'); t.been = true; if (talk) talk.place = t; } }
       talk?.watch();
       // The key for what the hero stands by (a hatch, the ladder up): only the key and the deed, the climb is seen.
-      { const o = playing && open === 0 && !ended ? climbs.climbOffered : null; usePrompt.keyFor(settings.current.bindings.use[0], o === 'down' ? 'Climb down' : o === 'up' ? 'Climb up' : null); }
+      { const o = playing && open === 0 && !ended ? climbs.climbOffered ?? shipClimbs.climbOffered : null; usePrompt.keyFor(settings.current.bindings.use[0], o === 'down' ? 'Climb down' : o === 'up' ? 'Climb up' : null); }
       part('map+minimap');
       const at = player.walker.pos;
       // The map fills in: the land round the hero as they go (not below ground), and a sketch of the way to each new mark.
@@ -2240,7 +2263,6 @@ export async function start(b: Boot): Promise<void> {
       if (above) {
         part('sea');
         sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
-        ships.float(view.camera.position, hours(), dt);
         part('ground');
         ground.update(view.camera);
         part('roads+horizon');

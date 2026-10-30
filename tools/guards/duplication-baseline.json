@@ -568,8 +568,8 @@
     "reason": "Writing a walker's position by its three axes; each copies a different source (a puppet, a portal's step, a debug go-to)."
   },
   {
-    "key": "idiom: [.position .rotation .set .x .y .z] in masterworld/app/portals.ts + masterworld/render/folk/FolkView.ts + masterworld/render/portal/PortalView.ts",
-    "reason": "three.js's own API for placing an object; each places a different thing (the camera through a portal, a person, an opening)."
+    "key": "idiom: [.position .rotation .set .x .y .z] in masterworld/app/portals.ts + masterworld/render/folk/FolkView.ts + masterworld/render/portal/PortalView.ts + masterworld/render/ships.ts",
+    "reason": "three.js's own API for placing an object; each places a different thing (the camera through a portal, a person, an opening, a ship on the waves)."
   },
   {
     "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",
@@ -678,5 +678,61 @@
   {
     "key": "same name: masterworld/app/towns.ts#stand + masterworld/main.ts#stand",
     "reason": "Unrelated: the towns' floor height at a point (steps, quay, piers) vs the shot hook that puts the hero at a spot; only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#busy + masterworld/app/shipClimb.ts#busy",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#climbOffered + masterworld/app/shipClimb.ts#climbOffered",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#finish + masterworld/app/shipClimb.ts#finish",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#limbs + masterworld/app/shipClimb.ts#limbs",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#pos + masterworld/app/shipClimb.ts#pos",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#pose + masterworld/app/shipClimb.ts#pose",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#vel + masterworld/app/shipClimb.ts#vel",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#walking + masterworld/app/shipClimb.ts#walking",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#yaw + masterworld/app/shipClimb.ts#yaw",
+    "reason": "Both implement the Puppet seam (app/player.ts) and offer a climb on E: a cellar's hatch ladder, and a ship's castle ladders played in the moving ship's frame; the same names are the interface, the climbs differ."
+  },
+  {
+    "key": "same name: masterworld/app/shipClimb.ts#busy + masterworld/game/birdForm.ts#busy",
+    "reason": "Only the name matches: a ship's ladder climb (app/shipClimb.ts, the Puppet seam) and an unrelated system's member of the same name."
+  },
+  {
+    "key": "same name: masterworld/app/shipClimb.ts#pos + masterworld/game/horse.ts#pos",
+    "reason": "Only the name matches: a ship's ladder climb (app/shipClimb.ts, the Puppet seam) and an unrelated system's member of the same name."
+  },
+  {
+    "key": "same name: masterworld/app/shipClimb.ts#step + masterworld/app/walkTo.ts#step",
+    "reason": "Only the name matches: a ship's ladder climb (app/shipClimb.ts, the Puppet seam) and an unrelated system's member of the same name."
+  },
+  {
+    "key": "same name: masterworld/app/shipClimb.ts#step + masterworld/sim/wild.ts#step",
+    "reason": "Only the name matches: a ship's ladder climb (app/shipClimb.ts, the Puppet seam) and an unrelated system's member of the same name."
+  },
+  {
+    "key": "same name: masterworld/app/shipClimb.ts#yaw + masterworld/game/horse.ts#yaw",
+    "reason": "Only the name matches: a ship's ladder climb (app/shipClimb.ts, the Puppet seam) and an unrelated system's member of the same name."
   }
 ]

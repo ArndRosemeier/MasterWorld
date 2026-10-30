@@ -11,7 +11,7 @@
  * the town at noon (F2). Four slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
  * `--part=caves` is mesa country (a valley, a plateau top, a tor, a climb; gate L) and a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
- * `--part=sea` is the nearest beach, sea cliff and the bed off the beach, the camera in the waterline and the hero swimming (S1);
+ * `--part=sea` is the nearest beach, sea cliff and the bed off the beach, the camera in the waterline and the hero swimming (S1), a harbour town (S2) and aboard a ship at its berth (S3);
  * `--part=capital` runs tools/shot/capital.mjs (its gate by day and night, its market; gate P) into `<out root>/capital`;
  * without `--part` all six run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
@@ -277,6 +277,28 @@ const SESSIONS = [
     { name: 'sea-harbour', act: seaLook({ pitch: 0.15 }) },
     { name: 'sea-harbour-aloft', act: seaLook({ out: 70, up: 16, side: 20, back: true, pitch: -8 }) },
     { name: 'sea-harbour-evening', act: async (p) => { await turn(17.8, 'fair')(p); await seaLook({ out: 40, up: 6, back: true, pitch: -3 })(p); } },
+  ] },
+  // S3: aboard a ship at its berth (the hero on its main deck, looking to the bow), then from beside it at the pier:
+  // the gangplank up to its gangway, the hull on the swell.
+  { id: 'sea-deck', query: `${still}&hour=11&weather=fair&site=harbour&aboard`, shots: [
+    { name: 'sea-deck', act: async (p) => {
+      await p.waitForFunction(() => window.game?.decks?.ship, null, { timeout: TIMEOUT });
+      // The hero's own camera, from behind and above (the free camera lost the hero aboard).
+      await p.evaluate(() => { const pl = window.game.player; pl.flying = false; pl.heroCam.yaw = pl.walker.yaw; pl.heroCam.pitch = -0.4; });
+      await p.waitForTimeout(2000);
+    } },
+    { name: 'sea-deck-plank', act: async (p) => {
+      await p.evaluate(() => {
+        const g = window.game, e = g.decks.plankOf(g.decks.ship);
+        if (!e) throw new Error('sea-deck-plank: no gangplank out');
+        const dx = e.foot.x - e.head.x, dz = e.foot.z - e.head.z, l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l;
+        // Along the pier from the plank's foot, a little out from the ship, looking across at its middle.
+        const x = e.foot.x + ux * 1.5 - uz * 5, z = e.foot.z + uz * 1.5 + ux * 5, mx = (e.foot.x + e.head.x) / 2, mz = (e.foot.z + e.head.z) / 2;
+        g.player.flying = true;
+        g.player.goTo([x, e.foot.y + 1.3, z], [(Math.atan2(mx - x, z - mz) * 180) / Math.PI, -8]);
+      });
+      await p.waitForTimeout(2000);
+    } },
   ] },
   // Gate C: what phase C gave the world, seen. A hurt traveller by the way (they cry out once seen), then a
   // farm the bandits raided: its barn burnt, smoke over it, its paddock empty.

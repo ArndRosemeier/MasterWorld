@@ -12,6 +12,8 @@ export type ActivityKind =
   | 'smith' | 'stoke' | 'quench' | 'bake' | 'craft' | 'sell' | 'serve' | 'tend'
   | 'fetchWater' | 'fetchWood' | 'chop' | 'garden' | 'washing' | 'feedHens'
   | 'browse' | 'sit' | 'chat' | 'drink' | 'pray' | 'mourn' | 'play' | 'stroll' | 'gather'
+  /** At a feast: dancing in the ring, or round it drinking, laughing and cheering. */
+  | 'dance' | 'revel'
   /** Farm work: in the fields by what grows there, with the animals in the paddock, hay and dung in the stable. */
   | 'plough' | 'sow' | 'hoe' | 'reap' | 'tendStock' | 'muckOut'
   /** Hurt, sitting on the ground (a situation, C10). */

@@ -82,6 +82,8 @@ export const params = {
   site: q.get('site'),
   /** With `site`: stand this far (m) outside its edge (default 14; a capital's 60, outside its wall). */
   siteAt: q.has('siteAt') ? Number(q.get('siteAt')) : null,
+  /** With `site=harbour`: start aboard the first ship moored there, on its main deck by the gangway (S3). */
+  aboard: q.has('aboard'),
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
   /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
@@ -103,6 +105,8 @@ export const params = {
   holdTier: (['hated', 'unwelcome', 'stranger', 'friend', 'honoured'] as const).find((k) => k === q.get('hold')) ?? null,
   /** How many terrain workers (`workers=6`; for timing the load): by default one less than the cores, at most 4. */
   workers: q.get('workers') ? Math.max(1, Math.min(16, Number(q.get('workers')) || 4)) : undefined,
+  /** The start town holds a feast at its market from the start (`feast`), its people dancing, drinking and playing there. */
+  feast: q.has('feast'),
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
   /** Open character creation at once, without the title (`create`; with the title it follows New game). */
