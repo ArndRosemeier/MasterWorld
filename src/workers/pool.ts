@@ -12,19 +12,19 @@ export class WorkerPool<Job, Result> {
   static heard: ((what: string) => void) | null = null;
   private readonly workers: Worker[] = [];
   private readonly busy: number[] = [];
-  private readonly waiting = new Map<number, { resolve: (r: Result) => void; reject: (e: Error) => void; worker: number; kind: string; sent: number }>();
+  private readonly waiting = new Map<number, { resolve: (r: Result) => void; reject: (e: Error) => void; worker: number; kind: string; sent: number; size?: number }>();
   private nextId = 1;
 
   constructor(make: () => Worker, private readonly name = 'worker', size = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1))) {
     for (let w = 0; w < size; w++) {
       const worker = make();
-      worker.onmessage = (e: MessageEvent<{ id: number; result?: Result; error?: string }>) => {
+      worker.onmessage = (e: MessageEvent<{ id: number; result?: Result; error?: string; ms?: number; stats?: Record<string, number> }>) => {
         const p = this.waiting.get(e.data.id);
         if (!p) return;
         this.waiting.delete(e.data.id);
         this.busy[p.worker]--;
         WorkerPool.heard?.(`${this.name}:${p.kind}`);
-        jobLog()?.push({ pool: this.name, kind: p.kind, worker: p.worker, sent: p.sent, done: performance.now() });
+        jobLog()?.push({ pool: this.name, kind: p.kind, worker: p.worker, sent: p.sent, done: performance.now(), ms: e.data.ms ?? 0, stats: e.data.stats, size: p.size });
         if (e.data.error !== undefined) p.reject(new Error(e.data.error));
         else p.resolve(e.data.result as Result);
       };
@@ -41,7 +41,7 @@ export class WorkerPool<Job, Result> {
     const id = this.nextId++;
     this.busy[w]++;
     return new Promise((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job), sent: performance.now() });
+      this.waiting.set(id, { resolve, reject, worker: w, kind: kindOf(job), sent: performance.now(), size: (job as { size?: number }).size });
       this.workers[w].postMessage({ id, job }, transfer);
     });
   }
@@ -66,7 +66,7 @@ export class WorkerPool<Job, Result> {
 }
 
 /** Every answered job, when a load probe asks for them (`window.__mwJobLog = []`, tools/shot/load.mjs LOAD_JOBS). */
-type JobRecord = { pool: string; kind: string; worker: number; sent: number; done: number };
+type JobRecord = { pool: string; kind: string; worker: number; sent: number; done: number; ms: number; stats?: Record<string, number>; size?: number };
 const jobLog = (): JobRecord[] | undefined => (globalThis as { __mwJobLog?: JobRecord[] }).__mwJobLog;
 
 /** A job's kind for the hitch log (`{ kind: 'chunk' }` → chunk). */

@@ -1182,6 +1182,9 @@ export function adoptTiles(tiles: readonly TracedTile[]): void {
   for (const t of tiles) adopted.set(t.key, t.data);
 }
 
+/** Tiles traced in this thread so far and the time it took (ms): the load probe reads a worker's (serve stats). */
+export const traced = { rivers: 0, riverMs: 0, brooks: 0, brookMs: 0 };
+
 export class Hydrology {
   private readonly tiles = new Map<string, HydroTile>();
   private readonly brookTiles = new Map<string, HydroTile>();
@@ -1271,7 +1274,11 @@ export class Hydrology {
       const given = t ? undefined : adopted.get(k);
       if (t) shared.delete(k);
       else if (given) { adopted.delete(k); t = new HydroTile(this.skeleton, tx, tz, o, null, unpackTile(given, (o.core + 2 * o.margin) ** 2)); }
-      else t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz));
+      else {
+        const t0 = performance.now();
+        t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz));
+        if (tiles === this.tiles) { traced.rivers++; traced.riverMs += performance.now() - t0; } else { traced.brooks++; traced.brookMs += performance.now() - t0; }
+      }
       shared.set(k, t);
       if (shared.size > SHARED_TILES) shared.delete(shared.keys().next().value!);
       tiles.set(key, t);

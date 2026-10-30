@@ -6,7 +6,7 @@ import { openHouse, townMeshBuffers, townMeshes, type OpenHouse, type TownCellMe
 import { guildHouses, guildSigns } from '../game/guilds';
 import type { Terrain } from '../world/terrain';
 import { openWorld } from '../vgm/builder';
-import { adoptTiles, type TracedTile } from '../world/hydro';
+import { adoptTiles, traced, type TracedTile } from '../world/hydro';
 import { waterMask, type MaskJob } from '../world/water';
 import { settingById } from '../setting/index';
 import { horizonMap, type HorizonSpec } from '../world/horizon';
@@ -33,11 +33,13 @@ export interface CaveRock { readonly field: CaveField; readonly shell: BuildingM
 const meshBuffers = (m: BuildingMesh): ArrayBuffer[] => Object.values(m).flatMap((v) => (ArrayBuffer.isView(v) ? [v.buffer as ArrayBuffer] : []));
 
 let terrain: Terrain | null = null;
+/** Time spent opening the world here (ms). */
+let openMs = 0;
 
 serve<TerrainJob, TerrainResult>((job) => {
   // The rivers' and brooks' tiles the main thread traced: this worker opens the world on them instead of tracing them.
   if (job.kind === 'tiles') { adoptTiles(job.tiles); return { result: null, transfer: [] }; }
-  if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) terrain = openWorld(job.seed, settingById(job.setting)).terrain;
+  if (!terrain || terrain.seed !== job.seed || terrain.setting.id !== job.setting) { const t0 = performance.now(); terrain = openWorld(job.seed, settingById(job.setting)).terrain; openMs += performance.now() - t0; }
   if (job.kind === 'water') { const out = waterMask(terrain, job); return { result: out, transfer: [out.buffer] }; }
   if (job.kind === 'decisions') { terrain.settleMore(job.decisions); return { result: new Uint8Array(0), transfer: [] }; }
   if (job.kind === 'volumes') {
@@ -83,5 +85,4 @@ serve<TerrainJob, TerrainResult>((job) => {
   }
   const mesh = buildChunk(terrain, { ...job, segs: finerFor(terrain, job) });
   return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer, mesh.level.buffer, mesh.canopy.buffer] };
-});
-
+}, () => ({ ...traced, openMs }));

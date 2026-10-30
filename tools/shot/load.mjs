@@ -103,15 +103,21 @@ if (process.env.LOAD_JOBS && came) {
   const by = new Map();
   for (const j of jobs) { const k = `${j.pool} ${j.worker}`; if (!by.has(k)) by.set(k, []); by.get(k).push(j); }
   console.log(`worker jobs before play: ${jobs.length}`);
+  // Chunks by size: how many, and their time in the workers.
+  const sizes = new Map();
+  for (const j of jobs) if (j.kind === 'chunk') { const b = sizes.get(j.size) ?? { n: 0, ms: 0, most: 0 }; b.n++; b.ms += j.ms; b.most = Math.max(b.most, j.ms); sizes.set(j.size, b); }
+  for (const [size, b] of [...sizes].sort((a, b) => a[0] - b[0])) console.log(`  chunks ${size} m: ${b.n}x ${(b.ms / 1000).toFixed(1)} s, slowest ${(b.most / 1000).toFixed(2)} s`);
   for (const [k, list] of [...by].sort()) {
     list.sort((a, b) => a.done - b.done);
     // In one worker the jobs run one after another: each starts when it was sent or the one before was answered.
-    let prev = 0;
-    const runs = list.map((j) => { const start = Math.max(j.sent, prev); prev = j.done; return { ...j, start }; });
+    // Each job's own time in the worker (serve's ms) ends when its answer left, a moment before it was heard here.
+    const runs = list.map((j) => ({ ...j, start: j.done - j.ms }));
     const byKind = new Map();
     for (const r of runs) { const b = byKind.get(r.kind) ?? { n: 0, ms: 0, last: 0 }; b.n++; b.ms += r.done - r.start; b.last = Math.max(b.last, r.done); byKind.set(r.kind, b); }
     console.log(`  ${k}: ${[...byKind].map(([kind, b]) => `${kind} ${b.n}x ${(b.ms / 1000).toFixed(1)} s (last ${(b.last / 1000).toFixed(1)})`).join(' · ')}`);
-    for (const r of runs.filter((r) => r.done - r.start > 400)) console.log(`      ${(r.start / 1000).toFixed(1)}–${(r.done / 1000).toFixed(1)} s ${r.kind} (sent ${(r.sent / 1000).toFixed(1)})`);
+    for (const r of runs.filter((r) => r.done - r.start > 400)) console.log(`      ${(r.start / 1000).toFixed(1)}–${(r.done / 1000).toFixed(1)} s ${r.kind}${r.size ? ` ${r.size} m` : ''} (sent ${(r.sent / 1000).toFixed(1)})`);
+    const s = list[list.length - 1].stats;
+    if (s) console.log(`      by play: ${Object.entries(s).map(([k, v]) => `${k} ${Math.round(v)}`).join(' · ')}`);
   }
 }
 if (stopProfile) report(await stopProfile(), steps, 'dist');
