@@ -2250,7 +2250,12 @@ export async function start(b: Boot): Promise<void> {
         if (lookHens) {
           // A farmyard's hen: the yard is open ground (a back yard's garden can hide it behind a bush).
           const near = flocks.flatMap((f) => f.hens).filter((a) => !a.cock && a.farm).sort((a, b) => Math.hypot(a.x - w.x, a.z - w.z) - Math.hypot(b.x - w.x, b.z - w.z))[0];
-          if (near) { standBeside(near, 3.2); lookHens = false; }
+          if (near) {
+            // Facing a little past it: the camera behind the hero then sees the hen beside them, not behind their back.
+            standBeside(near, 3.2);
+            player.teleport(player.walker.pos.x, undefined, player.walker.pos.z, player.walker.yaw + 0.5);
+            lookHens = false;
+          }
         }
         if (above) for (const f of flocks) for (const e of f.heard) sounds?.hen(e);
         hens?.showFlocks(dt, cam, above ? flocks : []);

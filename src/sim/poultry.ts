@@ -31,6 +31,8 @@ export interface Hen {
   tz: number;
   /** When the current act ends (sim seconds). */
   until: number;
+  /** A cock crows again no sooner than this (sim seconds). */
+  quiet: number;
   readonly rng: Rng;
 }
 
@@ -51,6 +53,8 @@ export interface HenSound {
 const PACE = 0.35, RUN = 2, EDGE = 0.5, SHY = 1.8;
 /** A crow lasts as long as the cock's Idle_4 (s). */
 const CROW = 4.5;
+/** Seconds between one cock's crows (a cock crows a few times an hour of a morning, more often near dawn in life; here every minute or two). */
+const CROW_GAP: [number, number] = [60, 150];
 
 export class Poultry {
   readonly hens: Hen[] = [];
@@ -69,7 +73,7 @@ export class Poultry {
       for (let k = 0; k < hens + (cock ? 1 : 0); k++) {
         const id = this.hens.length, r = new Rng(deriveSeed(seed, 'hen', id));
         const [x, z] = this.openIn(yard, r) ?? polyCentroid(yard.outer);
-        this.hens.push({ id, flock: f, cock: k === hens, farm, x, z, dir: r.range(-Math.PI, Math.PI), act: 'peck', speed: 0, tx: x, tz: z, until: r.range(0, 8), rng: r });
+        this.hens.push({ id, flock: f, cock: k === hens, farm, x, z, dir: r.range(-Math.PI, Math.PI), act: 'peck', speed: 0, tx: x, tz: z, until: r.range(0, 8), quiet: r.range(0, 60), rng: r });
       }
     };
     for (const farm of plan.farms) keep({ outer: farm.yard, holes: [] }, rng.int(def.farmHens[0], def.farmHens[1]), true, true);
@@ -115,8 +119,8 @@ export class Poultry {
   /** Peck where it is, or stand and look about (a cock of a morning may crow). */
   private standAbout(a: Hen, h: number, def: PoultryDef): void {
     a.speed = 0;
-    if (a.cock && h < def.crowUntil && a.rng.chance(0.3)) {
-      Object.assign(a, { act: 'crow', until: this.time + CROW });
+    if (a.cock && h < def.crowUntil && this.time >= a.quiet && a.rng.chance(0.3)) {
+      Object.assign(a, { act: 'crow', until: this.time + CROW, quiet: this.time + a.rng.range(...CROW_GAP) });
       this.heard.push({ kind: 'crow', x: a.x, z: a.z });
       return;
     }
