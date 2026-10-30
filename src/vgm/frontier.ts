@@ -8,7 +8,7 @@
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { RegionFillDef, RegionsDef } from '../setting/contract';
 import { harbourSpots, riverMouths } from '../world/coast';
-import { HOUSE_SCALE } from '@futuremagic/settlement';
+import { HOUSE_SCALE, sizeRules, type SettlementSize } from '@futuremagic/settlement';
 import { settlementOf, sitesIn, type DecisionLog, type RegionDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import { bankSpots, freshWaterEdge, WATER_REACH } from '../world/freshWater';
@@ -162,6 +162,9 @@ function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number 
   return !SETTLES[f.place] || freshWaterEdge(t, p.x, p.z, Math.min(sizeOf(f.level) * 1.5, 1500)) < Infinity;
 }
 
+/** A walled place's middle keeps this share of its radius from fresh water. */
+const WALL_DRY = 0.6;
+
 /** The places people live in, which stand by fresh water (D50): their squares' banks are tried too. */
 const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, waystation: true, hamlet: true, village: true, capital: true, camp: false, ruin: false, barrows: false };
 
@@ -206,7 +209,7 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
   // The best spot so far (lowest score).
   let bx = NaN, bz = NaN, low = Infinity, open = false;
   // A grid of spots through the square; a settlement also tries the banks in it, and needs water.
-  const N = 7, settles = SETTLES[f.place];
+  const N = 7, settles = SETTLES[f.place], walled = settles && !!sizeRules(f.place as SettlementSize).wall;
   const spots: [number, number][] = [];
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) spots.push([
     x0 + margin + (size - 2 * margin) * ((i + hash2f(s, i, j + 40)) / N),
@@ -231,6 +234,9 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
       steep = Math.max(steep, Math.abs(ph - h) / rr);
     }
     if (!ok || steep > STEEP[f.place]) continue;
+    // A walled place needs dry ground round its middle: its wall and gates keep off the water, and a river close by
+    // would draw them back to the market (a capital hemmed in by brooks kept a few dozen houses, its wall still wet).
+    if (walled && freshWaterEdge(t, x, z, r * WALL_DRY) <= r * WALL_DRY) continue;
     // Open ground first (the place is seen from afar); woodland only when the square has none.
     // How wooded the place's footprint is, on the whole (its clearing opens the rest round it).
     let woods = wood(x, z);
