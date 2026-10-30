@@ -730,7 +730,7 @@ export async function start(b: Boot): Promise<void> {
     const hidden: Object3D[] = [];
     // The portals (app/portals.ts: a cave's mouth joined to its throat below), and those opened before they were set up.
     let portals: Portals | null = null;
-    /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts inThroat). */
+    /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts throatDepth). */
     let throatLamp = false;
     const portalsDue: Portal[] = [];
     cellars = new Cellars({
@@ -1970,7 +1970,7 @@ export async function start(b: Boot): Promise<void> {
         const seen = through.cameraRealm, heroIn = cellars?.realm ?? 'land';
         // Walking into a cave's mouth the hero's lantern is lit (it is already burning at its portal), and deep in the
         // throat the eye adapts to its dark before the cave.
-        const w = player.walker.pos, deep = heroIn === 'land' ? cellars?.inThroat(w.x, w.z) ?? 0 : 0;
+        const w = player.walker.pos, deep = heroIn === 'land' ? cellars?.throatDepth(w.x, w.z) ?? 0 : 0;
         if (heroIn === 'land' && (deep > 0 || throatLamp)) {
           const L = view.lantern;
           L.intensity += (CAVE_LANTERN * deep - L.intensity) * Math.min(1, dt * 2);
@@ -1978,7 +1978,7 @@ export async function start(b: Boot): Promise<void> {
           throatLamp = deep > 0 || L.intensity > 0.05;
           if (!throatLamp) L.intensity = 0;
         } else throatLamp = false;
-        const camDeep = seen === 'land' ? cellars?.inThroat(view.camera.position.x, view.camera.position.z) ?? 0 : 0;
+        const camDeep = seen === 'land' ? cellars?.throatDepth(view.camera.position.x, view.camera.position.z) ?? 0 : 0;
         view.sky.eye = seen === heroIn && camDeep < 0.6 ? null : { indoors: seen !== 'land' || camDeep >= 0.6 };
         view.sky.shadowFocus = seen === 'land' ? null : through.landSide(view.camera.position);
       }

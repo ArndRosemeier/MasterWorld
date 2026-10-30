@@ -251,7 +251,7 @@ export class Cellars {
   }
 
   /** How far into a cave mouth's throat on the land (x, z) is: 0 outside, 1 deep in (the lantern is lit as one goes in). */
-  inThroat(x: number, z: number): number {
+  throatDepth(x: number, z: number): number {
     for (const s of this.sites.values()) {
       const m = s.mound, t = m?.throat;
       if (!m || !t || !s.throat || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
