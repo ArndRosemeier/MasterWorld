@@ -49,6 +49,8 @@ const ALOFT = 120;
 /** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
 const CLOSE = 40;
 const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3(), BALL = new Sphere(), HEAD = new Vector3(), FEET = new Vector3(), FOOT = new Vector3();
+/** A room's benches are 0.3 m deep: the seat bones this far behind the middle, near the rear edge (m). */
+const SIT_BACK = 0.1;
 /** Lying in bed: the head and the hips this far over the bedding (their bones are in the body, not on its back). */
 const ABED = 0.1;
 /** Round a person's middle, the sphere that tells whether they are in view (m: arms, a carried load, a clip's reach). */
@@ -356,7 +358,8 @@ export class FolkView {
       if (s.rigged) { s.rig.current?.relax(); s.rigged = false; }
       s.ch.update(dt);
       if (p?.puppet) { const rig = s.rig.of(s.ch, s.ch.height || 1.75); if (rig) s.rigged = applyPuppet(rig, o, s.goals, p.puppet); }
-      if (p?.seat !== undefined && clip.startsWith('sit')) this.seatOn(s, p.x, p.seat, p.z);
+      // On a room's bench they sit back on its rear edge, so a long coat's tail hangs down behind it, not through it.
+      if (p?.seat !== undefined && clip.startsWith('sit')) this.seatOn(s, p.x - Math.cos(p.dir) * SIT_BACK, p.seat, p.z - Math.sin(p.dir) * SIT_BACK);
       else if (p?.bed !== undefined && clip === LIE) this.bedOn(s, p.x, p.bed, p.z, p.dir);
       // Out of doors one sits on a bench (the town's fixtures, drawn with the houses).
       else if (!p && a.act === 'sit' && clip.startsWith('sit')) this.seatOn(s, a.x, this.height(a.x, a.z) + BENCH_SEAT, a.z);
