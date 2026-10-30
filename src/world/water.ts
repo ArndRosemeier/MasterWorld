@@ -113,7 +113,7 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
       level = w.level; fx = w.fx * v; fz = w.fz * v;
     }
     else if (!Number.isNaN(w.lake) && h < w.lake) level = w.lake;
-    else if (h < t.landforms.pondAt(x, z)) level = t.landforms.pondAt(x, z);
+    else if (h < t.pondAt(x, z)) level = t.pondAt(x, z);
     else if (h < SEA_LEVEL) level = SEA_LEVEL;
     if (!Number.isNaN(level)) {
       wet[p] = 1;
