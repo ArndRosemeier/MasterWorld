@@ -2,7 +2,7 @@
  * Terrain chunk meshes (pure data, built in workers): a square of `segs × segs` quads with a skirt around
  * its edge that hides cracks between chunks of different detail. Every chunk shares one index buffer.
  */
-import { srgbToLinear, clamp } from '@futuremagic/core';
+import { srgbToLinear, clamp, smoothstep } from '@futuremagic/core';
 import { SURFACES } from '../setting/contract';
 import type { Terrain } from './terrain';
 import { canopySampler, type Canopy } from './canopy';
@@ -155,8 +155,10 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     level[v] = 1 / Math.sqrt(1 + sx * sx + sz * sz);
     // Far out, the normal over two cells each way, as the level: a wall running slantwise through vertices
     // 16 m apart and more lit in a saw of light and dark teeth with the normal over one.
-    const far = step >= SMOOTH_STEP;
-    const nx = far ? -sx : -dx, ny = far ? 1 : 2 * step, nz = far ? -sz : -dz, l = Math.hypot(nx, ny, nz);
+    // On a steep face (a mesa's wall, a scarp) near by too: there the normal over one cell flips from column to
+    // column of vertices and lit the wall, and turned its rock's projection, in vertical stripes like a comb (P2).
+    const far = step >= SMOOTH_STEP ? 1 : smoothstep(0.75, 0.45, level[v]);
+    const nx = -(sx * far + (dx / (2 * step)) * (1 - far)), nz = -(sz * far + (dz / (2 * step)) * (1 - far)), ny = 1, l = Math.hypot(nx, ny, nz);
     normal[v * 3] = nx / l;
     normal[v * 3 + 1] = ny / l;
     normal[v * 3 + 2] = nz / l;
