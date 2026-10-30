@@ -8,15 +8,17 @@
  *   and seen through either way); where there is no room, or no home, it fizzles.
  *
  * Either way the stone then dissolves back into the pack. Walking off from it puts it away too. The open portals'
- * edges waver and their borders crawl with light.
+ * rifts (after Dunfinity's thin places) open from their middles, their ragged rims rippling and glowing.
  */
-import { Vector3, type Mesh, type PerspectiveCamera } from 'three/webgpu';
+import { Vector3, type Mesh, type PerspectiveCamera, type Vector4 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import { smoothstep } from '@futuremagic/core';
 import { beyondFrame, homeFrame, PortalStone, STONE_PORTAL, STONE_SHAPE, stoneSpot, type PortalStoneSave, type RoomProbe } from '../game/portalStone';
 import type { PortalFrame } from '../game/portal';
 import { kindMesh } from '../render/materials';
 import { GLYPH_REACH, GLYPHS, PORTAL_STONE, STONE_LOOK, STONE_SIZE, stoneGeometry } from '../render/materials/portalStone';
+import { PORTAL_RIFT, RIFT_STATE, riftGeometry } from '../render/materials/portal';
+import { standAt } from '../render/portal/PortalView';
 import type { SpellBits, Vec3 } from './spellFx/particles';
 import { PortalStoneFx, type Rim } from './spellFx/portalStoneFx';
 import type { Player } from './player';
@@ -49,8 +51,11 @@ export interface StoneHost {
 const COME = 0.9, GO = 0.8;
 /** How long the pressed glyph flashes before the stone starts to go (s). */
 const PRESS = 0.25;
-/** How long a portal takes to tear fully open (s). */
-const OPENING = 0.9;
+/** How long a portal takes to open fully from its middle (s). */
+const OPENING = 1.8;
+/** The rifts' rims (as their shader's): home's green, the far side's blue, a little brighter for the sprites. */
+const RIM_HOME: Vec3 = [0.5, 1.4, 0.85];
+const RIM_FAR: Vec3 = [0.45, 0.9, 1.6];
 /** Drawn this much bigger than it is (it floats near the hero, seen from the camera behind). */
 const SHOWN = 1.3;
 /** Walking this far from where it was raised puts it away (m). */
@@ -75,6 +80,8 @@ export class PortalStoneUse {
   /** How far each side of the open pair is open (0..1): the home one stays open when a new far one opens. */
   private openA = 0;
   private openB = 0;
+  /** Each side's rift as seen when its view is not drawn (another opening is looked through): its rim and haze. */
+  private readonly haze: Mesh[];
   /** Things to do at the next fx frame (they need the bits). */
   private readonly due: ((b: SpellBits) => void)[] = [];
   /** For checks: home marks, portals opened, fizzles. */
@@ -89,6 +96,13 @@ export class PortalStoneUse {
     this.mesh.scale.setScalar(SHOWN);
     const p = this.stone.portal;
     if (p) { host.portals.add(p); this.openA = this.openB = 1; }
+    this.haze = [0, 1].map((slot) => {
+      const h = kindMesh(riftGeometry(STONE_SHAPE, slot, 0), PORTAL_RIFT);
+      h.name = slot ? 'portal stone rift (far)' : 'portal stone rift (home)';
+      h.matrixAutoUpdate = true;
+      h.visible = false;
+      return h;
+    });
     const c = host.canvas;
     onClick(c, (x, y) => this.click(x, y));
     c.addEventListener('pointermove', (e) => {
@@ -101,6 +115,7 @@ export class PortalStoneUse {
   async addToStage(): Promise<void> {
     await this.host.stage.add(this.mesh);
     this.mesh.visible = false;
+    for (const h of this.haze) { await this.host.stage.add(h); h.visible = false; }
   }
 
   /** Held up now (or coming, or going). */
@@ -256,21 +271,20 @@ export class PortalStoneUse {
       const flash = this.state === 'pressed' ? 1 - this.age / PRESS : this.state === 'going' && this.pressedGlyph ? Math.max(0, 0.5 - this.age) : 0;
       STONE_LOOK.value.set(smoothstep(0, 1, this.there), this.state === 'up' ? this.hover : this.pressedGlyph, flash, 0);
     }
-    // The pair's openings: torn open, then their edges waver (each side out of step with the other).
+    // The pair's rifts: opening from their middles, rippling (their shader's clock), the haze standing in for a view not drawn.
     const p = this.stone.portal;
     if (p) {
       this.openA = Math.min(1, this.openA + dt / OPENING);
       this.openB = Math.min(1, this.openB + dt / OPENING);
-      this.host.portals.stretch(STONE_PORTAL, this.waver(0, this.openA), this.waver(2.1, this.openB));
     }
-  }
-
-  /** A side's stretch across and up: opening (a slit widening and rising), then gently wavering. */
-  private waver(phase: number, open: number): [number, number] {
-    const t = this.t + phase, o = smoothstep(0, 1, open);
-    const sx = 1 + 0.045 * Math.sin(t * 1.7) + 0.02 * Math.sin(t * 4.3 + 1);
-    const sy = 1 + 0.03 * Math.sin(t * 1.3 + 2) + 0.015 * Math.sin(t * 3.7);
-    return [Math.max(0.02, sx * (0.15 + 0.85 * o)), Math.max(0.02, sy * o)];
+    const sides = p ? [p.a.frame, p.b.frame] : [];
+    const opens = [this.openA, this.openB];
+    this.haze.forEach((h, i) => {
+      const f = sides[i];
+      h.visible = !!f;
+      if (f) standAt(h, f);
+      (RIFT_STATE.array[i] as Vector4).set(f ? smoothstep(0, 1, opens[i]!) : 0, this.t + i * 7.3, 0, 0);
+    });
   }
 
   /** Its light (with the spells' bits, every frame). */
@@ -279,9 +293,8 @@ export class PortalStoneUse {
     const rims: Rim[] = [];
     const p = this.stone.portal;
     if (p) {
-      const [ax, ay] = this.waver(0, this.openA), [bx, by] = this.waver(2.1, this.openB);
-      rims.push({ frame: p.a.frame, shape: p.shape, sx: ax, sy: ay, open: smoothstep(0, 1, this.openA) });
-      rims.push({ frame: p.b.frame, shape: p.shape, sx: bx, sy: by, open: smoothstep(0, 1, this.openB) });
+      rims.push({ frame: p.a.frame, shape: p.shape, open: smoothstep(0, 1, this.openA), color: RIM_HOME });
+      rims.push({ frame: p.b.frame, shape: p.shape, open: smoothstep(0, 1, this.openB), color: RIM_FAR });
     }
     this.fx.glowFrame(b, dt, this.state === 'away' ? null : { at: [this.at.x, this.at.y, this.at.z], there: this.there }, rims);
   }

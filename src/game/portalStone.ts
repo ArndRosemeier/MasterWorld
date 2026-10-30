@@ -12,8 +12,8 @@ import type { Portal, PortalFrame, PortalShape, PortalSide } from './portal';
 
 /** The stone's pair of portals goes by this id. */
 export const STONE_PORTAL = 'portal-stone';
-/** The stone's portals: a narrow arch a little taller than a person. */
-export const STONE_SHAPE: PortalShape = { halfWidth: 0.95, height: 2.6 };
+/** The stone's portals: a tall rift (an upright ellipse, materials/portal.ts) a head over a person. */
+export const STONE_SHAPE: PortalShape = { halfWidth: 1.2, height: 3.2 };
 
 /**
  * Where the stone floats: this far ahead of the feet, this far to their right and this high over them (m): over
@@ -124,7 +124,7 @@ export class PortalStone {
   get portal(): Portal | null {
     if (!this.home || !this.far) return null;
     const side = (frame: PortalFrame): PortalSide => ({ realm: REALM, frame });
-    return { id: STONE_PORTAL, shape: STONE_SHAPE, a: side(this.home), b: side(this.far) };
+    return { id: STONE_PORTAL, shape: STONE_SHAPE, a: side(this.home), b: side(this.far), rift: true };
   }
 
   /** Home is marked at `f`: the pair that was open (if any) is closed. Returns whether one was. */
