@@ -62,7 +62,7 @@ const PORTAL_IN = 7, CLIFF_PORTAL_IN = 4.5;
  * The mouth's side of the throat goes darker than the cave's by its portal: the day's light still reaches it (the
  * cave's side has only its own dim fill and the lantern), so the same rock reads alike on both sides.
  */
-const DAY_IN = 0.2;
+const DAY_IN = 0.15;
 
 /** Where the mouth's own way in turns into the throat (frame z): over these metres, from the face on in. */
 const INTO_FROM = 0.5, INTO_TO = -2;

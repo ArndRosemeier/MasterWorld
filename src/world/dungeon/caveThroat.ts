@@ -23,7 +23,7 @@ export const THROAT_OPENING = { halfWidth: HALF + 0.3, height: HIGH + 0.3 };
 /** How far the throat goes on past the portal on each side before the side's own rock takes over (m). */
 export const THROAT_BEYOND = 1.2;
 /** How dark the throat's rock is at the portal (its tint times this): the day reaches no further in. */
-export const THROAT_DARK = 0.12;
+export const THROAT_DARK = 0.3;
 /** Over how many metres past the portal a cave's own rock gets its colour back. */
 const LIGHT_BACK = 5;
 
