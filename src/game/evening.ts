@@ -757,9 +757,13 @@ export class LandWalk {
     if (from[b] < 0 && a !== b) return null;
     const cells: number[] = [];
     for (let c = b; c !== a && c >= 0; c = from[c]) cells.push(c);
-    // Every third metre-cell is enough to steer by (every coarse one); the end itself last.
+    // Every third metre-cell is enough to steer by (every coarse one), and every cell where the way turns (the
+    // straight line from one kept cell to the next cut a house's corner, and the bot stood pressed against it);
+    // the end itself last.
     const every = size > 1 ? 1 : 3;
-    const out = cells.reverse().filter((_, k) => k % every === every - 1).map(cellCentre);
+    cells.reverse();
+    const turns = (k: number) => k > 0 && k < cells.length - 1 && cells[k] - cells[k - 1] !== cells[k + 1] - cells[k];
+    const out = cells.filter((_, k) => k % every === every - 1 || turns(k)).map(cellCentre);
     out.push([bx, bz]);
     return out;
   }
