@@ -107,8 +107,8 @@ export function seatDir(s: Spot, seat: number): number {
   return s.activity === 'chat' && !s.door ? s.dir + (seat * 2 * Math.PI) / s.cap + Math.PI : s.dir;
 }
 
-/** On a market, a knot of people talking for about every this many square metres of open ground. */
-const CHAT_EVERY = 110;
+/** On a market, a knot of people talking for about every this many square metres of open ground (a walled city's market: busier). */
+const CHAT_EVERY = 110, CITY_CHAT_EVERY = 70;
 /** A knot keeps this far from the stalls, the well and the benches (m), and from the market's edge. */
 const CHAT_CLEAR = 3;
 
@@ -118,7 +118,7 @@ export function marketChats(plan: TownPlan, first: number): Spot[] {
   if (!plan.fixtures.some((f) => f.kind === 'stall') || m.length < 6) return [];
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (let i = 0; i < m.length; i += 2) { x0 = Math.min(x0, m[i]); x1 = Math.max(x1, m[i]); z0 = Math.min(z0, m[i + 1]); z1 = Math.max(z1, m[i + 1]); }
-  const step = Math.sqrt(CHAT_EVERY), near = plan.fixtures.filter((f) => f.x > x0 - 9 && f.x < x1 + 9 && f.z > z0 - 9 && f.z < z1 + 9);
+  const step = Math.sqrt(plan.wall ? CITY_CHAT_EVERY : CHAT_EVERY), near = plan.fixtures.filter((f) => f.x > x0 - 9 && f.x < x1 + 9 && f.z > z0 - 9 && f.z < z1 + 9);
   const edge = (x: number, z: number) => { let d = Infinity; for (let i = 0; i < m.length; i += 2) { const j = (i + 2) % m.length; d = Math.min(d, distSqPointSeg(x, z, m[i], m[i + 1], m[j], m[j + 1])); } return Math.sqrt(d); };
   const out: Spot[] = [];
   for (let z = z0 + step / 2; z < z1; z += step) for (let x = x0 + step / 2; x < x1; x += step) {

@@ -658,5 +658,9 @@
   {
     "key": "same name: masterworld/game/interiorWorld.ts#floorAt + masterworld/world/dungeon/caveRock.ts#floorAt",
     "reason": "CaveSpace.floorAt overrides DungeonSpace.floorAt with the carved floor's relief (plan P1); interiorWorld's is a house's storey floor. Only the name matches."
+  },
+  {
+    "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/building.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the city's paving (P4)."
   }
 ]

@@ -45,6 +45,8 @@ export const TOWN_MASKS = {
   size: uniform(new Vector2(1, 1)),
   /** Half a texel of one mask, as a share of it (reads are kept inside their own half). */
   half: uniform(new Vector2(0.5, 0.5)),
+  /** How wholly its streets and market are paved: 0, a village's stones laid where the traffic is; 1, a city's wall to wall. */
+  paved: uniform(0),
 };
 
 export { CROP_STEP } from '../../world/townMask';
@@ -64,14 +66,16 @@ export function useTownMasks(town: Town): void {
 
 /**
  * The masks move to another settlement (the one the hero is nearest): its masks (townMaskData, baked in a
- * worker at townMaskSize) go into the same texture, so the shader keeps reading it and nothing compiles.
+ * worker at townMaskSize) go into the same texture, so the shader keeps reading it and nothing compiles. `paved`:
+ * how wholly its streets are paved (TOWN_MASKS.paved; a uniform, so nothing compiles either).
  */
-export function moveTownMasks(x0: number, z0: number, data: Uint8Array): void {
+export function moveTownMasks(x0: number, z0: number, data: Uint8Array, paved = 0): void {
   const img = TOWN_MASKS.mask.image as { data: Uint8Array; width: number; height: number };
   img.data.set(data);
   TOWN_MASKS.mask.needsUpdate = true;
   TOWN_MASKS.origin.value.set(x0, z0);
   TOWN_MASKS.size.value.set((img.width / 2) * TOWN_RASTER, img.height * TOWN_RASTER);
+  TOWN_MASKS.paved.value = paved;
 }
 
 /** The masks' texels a side (one mask): a settlement's masks are baked at this size to move in. */
