@@ -27,6 +27,11 @@ export interface WalkWorld {
   climbable?(x: number, z: number): { readonly nx: number; readonly nz: number } | null;
   /** The rock itself offers holds wherever it stands as a wall (a cave's broken rock): climbed by its faces in `rockSurface`. */
   rockHolds?(): boolean;
+  /**
+   * Living bodies (foes, wardens): does a body of radius `r` at (x, z), feet at `y`, press into one? One already
+   * touching where the asker stands now, (ax, az), lets it go, so a walker is never stuck in another.
+   */
+  bodies?(x: number, z: number, r: number, y: number, ax: number, az: number): boolean;
 }
 
 /** What the player wants this frame. */
@@ -154,6 +159,7 @@ export class Walker {
   /** Whether the body would be in rock at (x, z) with its feet at y. */
   private bodyInRock(x: number, y: number, z: number): boolean {
     if (this.world.wall?.(x, z, this.spec.radius, y)) return true;
+    if (this.world.bodies?.(x, z, this.spec.radius, y, this.pos.x, this.pos.z)) return true;
     return this.clearance(x, y, z) < this.spec.radius;
   }
 

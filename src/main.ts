@@ -331,7 +331,10 @@ export async function start(b: Boot): Promise<void> {
       // Down in a cave its rock walls (D56, P1): a drop is climbed back up, not jumped.
       rockHolds: () => !!below()?.rockHolds?.(),
       wall: (x, z, r, y) => { const b = below(); return b ? !!b.wall?.(x, z, r) : landWorld.wall!(x, z, r, y); },
+      // The living bodies of every encounter (foes, wardens): walked round, never through (set once they stand).
+      bodies: (x, z, r, y, ax, az) => bodiesBlock(x, z, r, y, ax, az),
     };
+    let bodiesBlock: NonNullable<WalkWorld['bodies']> = () => false;
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? (resume ? [resume.x, resume.z] : [home.x, home.z]), params.look);
     // The floating origin starts where the camera does (everything drawn is relative to it: render/origin.ts).
@@ -1359,6 +1362,7 @@ export async function start(b: Boot): Promise<void> {
     });
     // The action bar (plan 17.1): always there in play, its keys 1 to 0; the ability book (K) arranges it.
     const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
+    bodiesBlock = (x, z, r, y, ax, az) => encounters().some((e) => e.pressedBy(x, z, r, y, ax, az));
     const leading = () => encounters().find((e) => e.leading) ?? null;
     const potions = () => character.pack.filter((i) => setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
     // Out of a fight the hero's own spells still work (healing, wards): the recipe runner with nobody else about.
@@ -2253,7 +2257,7 @@ export async function start(b: Boot): Promise<void> {
       // Every town's people near the hero live (and are drawn), and its animals graze.
       const cam = view.camera.position;
       part('towns.live');
-      const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain }, journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })));
+      const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain }, journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })), below() ? null : player.walker.pos);
       if (folk) folk.lives = lives;
       part('herds');
       stock?.herd(dt, cam, towns.graze(dt, cam.x, cam.z));
