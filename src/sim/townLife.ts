@@ -54,6 +54,14 @@ export interface Agent {
   rng: Rng;
   /** Stopped for a talk with the player: stands, faces them, and goes on with the day when let go. */
   held?: boolean;
+  /** Waiting for someone in the way to move (s): after `CROWD.wait` they squeeze past (never through the hero). */
+  waited?: number;
+  /** Stood still this step, held up by someone in the way. */
+  stalled?: boolean;
+  /** The sim time of their last walked step (who walked already this step). */
+  stepped?: number;
+  /** Stepped aside off their way since the last point of it they reached. */
+  off?: boolean;
   /**
    * Still crossing a room drawn open on the way out (sim seconds): they set off from its doorstep once the time
    * passes this (app/interiorVisit keeps it ahead while they walk to the door).
@@ -112,8 +120,37 @@ export function roundTheWork(s: Spot, a: { x: number; z: number }, x: number, z:
   return [a.x + px * side * 1.1, a.z + pz * side * 1.1, fx + px * side * 1.1 + (hx / hl) * 0.5, fz + pz * side * 1.1 + (hz / hl) * 0.5];
 }
 
+/** Held up by someone in the way (on a walk, not moving): seen standing, not walking on the spot. */
+export function waitsInWay(a: Agent): boolean {
+  return a.act === 'walk' && !!a.stalled;
+}
+
+/**
+ * Would one at (ax, az) stepping to (x, z) come nearer a body at (ox, oz): within `touch` at all, or within
+ * `min` by more than `share` of the step?
+ */
+function pressesInto(a: { x: number; z: number }, x: number, z: number, ox: number, oz: number, touch: number, min: number, share: number): boolean {
+  const ex = ox - x, ez = oz - z, e2 = ex * ex + ez * ez;
+  if (e2 >= min * min) return false;
+  const fx = ox - a.x, fz = oz - a.z, closes = Math.sqrt(fx * fx + fz * fz) - Math.sqrt(e2);
+  return closes > (e2 < touch * touch ? 1e-4 : Math.max(1e-4, share * Math.hypot(x - a.x, z - a.z)));
+}
+
 /** A townsperson's radius as an obstacle (m). */
 const BODY = 0.28;
+/**
+ * Bodies in the streets (Arnd 2026-10-30: nobody walks through another): the hero's radius (m), the room a walker
+ * keeps to others beyond touching (m), the turns tried to get round one (radians, all the same hand first, so
+ * two meeting both step to the same side and pass), the share of the pace a step aside goes, how long one waits
+ * for a body that will not move before squeezing past (s), the size of the lookup grid (m), how near the focus it
+ * is minded (m; FolkView draws them within 70), how near a bend of the way one crowded there takes it as passed
+ * (m), how much of a step must close on someone short of touching for it to be heading at them, how a step round someone counts
+ * towards the wait (a share of a second stood), and how near a door one going in (or coming out) walks on through
+ * a crowd at it (m).
+ */
+const CROWD = { hero: 0.35, space: 0.2, turns: [-0.3, -0.6, -1.2, -1.65, 0.3, 0.6, 1.2, 1.65], aside: 1, wait: 4, cell: 2, near: 75, pass: 1.5, heading: 0.3, round: 0.25, door: 2.5 } as const;
+/** Cells along each side of the crowd grid round the focus (a margin of a cell and more beyond `CROWD.near`). */
+const CROWD_CELLS = Math.ceil((2 * CROWD.near) / CROWD.cell) + 4;
 
 /** Trades one goes into on an errand (to buy bread, have shoes mended ...). */
 const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'potter', 'weaver', 'cooper', 'smith', 'miller', 'fletcher', 'bowyer', 'armourer', 'jeweller', 'bookbinder', 'glazier']);
@@ -142,6 +179,16 @@ export class TownLife {
   time = 0;
   /** Where detail matters (the player). */
   focus = { x: 0, z: 0 };
+  /** The hero on foot among them: a body they walk round like anyone (null: not in the town). */
+  hero: { readonly x: number; readonly z: number } | null = null;
+  /** This step's length (s). */
+  private dt = 0;
+  /** Those out of doors by grid cell, for who is in whose way (made each step). */
+  private readonly crowdHead = new Int32Array(CROWD_CELLS * CROWD_CELLS);
+  private crowdNext = new Int32Array(0);
+  /** The crowd grid's corner (world x, z). */
+  private crowdX = 0;
+  private crowdZ = 0;
   /** Within a step after skipped time: walks are not walked, everyone arrives (`step`). */
   private skipping = false;
   private readonly orders: TownOrder[] = [];
@@ -254,6 +301,8 @@ export class TownLife {
     this.hour = ((hours % 24) + 24) % 24;
     this.weather = weather;
     if (skipped) this.skipAhead();
+    this.dt = dt;
+    this.placeCrowd();
     for (const a of this.agents) {
       // Held for a talk, one coming round their work walks on (`hold`).
       if (a.held) { if (a.act === 'walk') this.walk(a, dt); continue; }
@@ -442,12 +491,119 @@ export class TownLife {
     a.path = [];
   }
 
+  /** Who is out of doors where, near the focus (the grid `inWay` looks in). */
+  private placeCrowd(): void {
+    this.crowdHead.fill(-1);
+    if (this.crowdNext.length < this.agents.length) this.crowdNext = new Int32Array(this.agents.length * 2);
+    this.crowdX = this.focus.x - (CROWD_CELLS / 2) * CROWD.cell;
+    this.crowdZ = this.focus.z - (CROWD_CELLS / 2) * CROWD.cell;
+    this.agents.forEach((a, i) => {
+      if (a.hidden) return;
+      const c = this.cellOf(a.x, a.z);
+      if (c < 0) return;
+      this.crowdNext[i] = this.crowdHead[c];
+      this.crowdHead[c] = i;
+    });
+  }
+
+  /** The crowd grid's cell holding (x, z), or -1 off the grid. */
+  private cellOf(x: number, z: number): number {
+    const i = Math.floor((x - this.crowdX) / CROWD.cell), j = Math.floor((z - this.crowdZ) / CROWD.cell);
+    return i < 0 || j < 0 || i >= CROWD_CELLS || j >= CROWD_CELLS ? -1 : i * CROWD_CELLS + j;
+  }
+
+  /**
+   * Would `a` stepping to (x, z) come nearer someone within `space` of touching there: another out of doors
+   * (`people`), or the hero? Moving apart, or past, is always let.
+   */
+  private inWay(a: Agent, x: number, z: number, space: number, people = true): boolean {
+    // Short of touching only heading at them counts (walking beside, or behind one as fast, is no reason to step aside).
+    const h = this.hero, share = space > 0 ? CROWD.heading : 0;
+    if (h && pressesInto(a, x, z, h.x, h.z, BODY + CROWD.hero, BODY + CROWD.hero + space, share)) return true;
+    if (!people) return false;
+    const min = BODY * 2 + space, i0 = Math.floor((x - this.crowdX) / CROWD.cell), j0 = Math.floor((z - this.crowdZ) / CROWD.cell);
+    for (let i = Math.max(0, i0 - 1); i <= Math.min(CROWD_CELLS - 1, i0 + 1); i++) for (let j = Math.max(0, j0 - 1); j <= Math.min(CROWD_CELLS - 1, j0 + 1); j++) {
+      for (let k = this.crowdHead[i * CROWD_CELLS + j]; k >= 0; k = this.crowdNext[k]) {
+        const o = this.agents[k];
+        if (o === a || o.hidden) continue;
+        // One walking on is judged where it will be (else who follows whom in a file hangs on the order of the steps).
+        const go = o.act === 'walk' && !o.stalled && o.stepped !== this.time ? o.person.speed * this.dt : 0;
+        if (pressesInto(a, x, z, o.x + Math.cos(o.dir) * go, o.z + Math.sin(o.dir) * go, BODY * 2, min, share)) return true;
+      }
+    }
+    return false;
+  }
+
+  /** A step aside of `len` off (ux, uz), keeping `space` to all and never into a house: true if it took one. */
+  private aside(a: Agent, ux: number, uz: number, len: number, space: number): boolean {
+    for (const t of CROWD.turns) {
+      const c = Math.cos(t), s = Math.sin(t), vx = ux * c - uz * s, vz = ux * s + uz * c, l = len * CROWD.aside;
+      const x = a.x + vx * l, z = a.z + vz * l;
+      if (this.footprints.blocked(x, z, BODY) || this.inWay(a, x, z, space)) continue;
+      a.x = x; a.z = z; a.dir = Math.atan2(vz, vx);
+      a.off = true;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Someone in the way of a step of `len` along (ux, uz): with room to spare a step aside round them; else
+   * straight on while not touching; else a closer step aside, else standing to wait. One waited on too long is
+   * squeezed past (a jam never holds for ever), but never the hero. True if it took the step (or a way round).
+   */
+  private giveWay(a: Agent, ux: number, uz: number, len: number, dt: number): boolean {
+    const x = a.x + ux * len, z = a.z + uz * len;
+    a.stalled = false;
+    // Inside a house (between its door and their place) its walls hide them: nobody is minded there.
+    if (!this.inWay(a, x, z, CROWD.space) || this.footprints.blocked(a.x, a.z, 0)) { a.waited = 0; return false; }
+    // Held up too long (round and round a crowd, or stood): straight on through, but never through the hero.
+    if ((a.waited ?? 0) >= CROWD.wait && !this.inWay(a, x, z, 0, false)) return false;
+    // Round them counts as held up too, a little (never round and round a crowd for ever).
+    if (this.aside(a, ux, uz, len, CROWD.space)) { a.waited = (a.waited ?? 0) + dt * CROWD.round; return true; }
+    if (!this.inWay(a, x, z, 0)) return false;
+    if (this.aside(a, ux, uz, len, 0)) { a.waited = (a.waited ?? 0) + dt * CROWD.round; return true; }
+    a.waited = (a.waited ?? 0) + dt;
+    a.stalled = true;
+    a.dir = Math.atan2(uz, ux);
+    return true;
+  }
+
+  /**
+   * In a doorway, going in or coming out: through whoever crowds it (one going in is out of the way at once,
+   * one coming out cannot wait in the door for a crowd that waits for them).
+   */
+  private atDoor(a: Agent): boolean {
+    const p = a.path, n = p.length;
+    const goingIn = (a.next === 'indoors' || a.next === 'sleep') && Math.hypot(a.x - p[n - 2], a.z - p[n - 1]) < CROWD.door;
+    return goingIn || (a.pi <= 1 && Math.hypot(a.x - p[0], a.z - p[1]) < CROWD.door && this.footprints.blocked(p[0], p[1], 0.05));
+  }
+
+  /** No house on the straight way from (x0, z0) to (x1, z1) (a bend cut short never cuts through one). */
+  private openLine(x0: number, z0: number, x1: number, z1: number): boolean {
+    const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.4);
+    for (let i = 1; i <= n; i++) if (this.footprints.blocked(x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n, BODY * 0.5)) return false;
+    return true;
+  }
+
   private walk(a: Agent, dt: number): void {
+    a.stepped = this.time;
     let left = a.person.speed * dt;
+    const minded = Math.abs(a.x - this.focus.x) < CROWD.near && Math.abs(a.z - this.focus.z) < CROWD.near;
     while (left > 0 && a.pi * 2 < a.path.length) {
       const px = a.path[a.pi * 2], pz = a.path[a.pi * 2 + 1];
       const dx = px - a.x, dz = pz - a.z, d = Math.hypot(dx, dz);
-      if (d <= left) { a.x = px; a.z = pz; left -= d; a.pi++; continue; }
+      // Stepped aside, the straight way on to the next point would cut through a house's corner: back to the last first.
+      if (a.off && a.pi > 0 && d > 1e-6 && this.footprints.blocked(a.x + (dx / d) * Math.min(left, d), a.z + (dz / d) * Math.min(left, d), BODY * 0.5)) { a.pi--; a.off = false; continue; }
+      if (minded && d > 1e-6 && !this.atDoor(a)) {
+        // A bend of the way with someone at it: on to the next point already (everyone's way meets at the
+        // street graph's points; held to them exactly, a crowd knots there).
+        const l = Math.min(left, d);
+        if (d < CROWD.pass && a.pi * 2 + 2 < a.path.length && this.inWay(a, a.x + (dx / d) * l, a.z + (dz / d) * l, CROWD.space) && this.openLine(a.x, a.z, a.path[a.pi * 2 + 2], a.path[a.pi * 2 + 3])) { a.pi++; continue; }
+        // Someone in the way: round them, or wait.
+        if (this.giveWay(a, dx / d, dz / d, l, dt)) return;
+      }
+      if (d <= left) { a.x = px; a.z = pz; left -= d; a.pi++; a.off = false; continue; }
       a.x += (dx / d) * left; a.z += (dz / d) * left; a.dir = Math.atan2(dz, dx);
       left = 0;
     }

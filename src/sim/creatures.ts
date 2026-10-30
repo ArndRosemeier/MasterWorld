@@ -129,7 +129,13 @@ export function radiusOf(def: CreatureDef): number {
 }
 
 /** Hero's body radius, metres. */
-const HERO_R = 0.35;
+export const HERO_R = 0.35;
+/** Bodies smaller than this (m) let the hero step through, and step through the hero (Arnd 2026-10-30: a rat). */
+const SMALL = 0.2;
+/** Does it block the hero, and the hero it (everything alive but small critters)? */
+export function blocksHero(def: CreatureDef): boolean { return radiusOf(def) >= SMALL; }
+/** Bodies farther apart in height than this (m) pass over and under each other (a stair, a ledge). */
+const ABOVE = 1;
 /** Does it have hands to lift a door's bar (a rat or a spider goes round)? */
 const hands = (c: Creature): boolean => c.def.body.kind === 'humanoid';
 /** It stands this long at a door it unbars (s): the bar lifted off and the door swung most of the way (CellarView). */
@@ -184,6 +190,15 @@ export class Den {
   private readonly unbarring = new Map<Creature, number>();
   /** What happened while they walked (a door unbarred), out with the step's other events. */
   private readonly walked: DenEvent[] = [];
+  /**
+   * Other dens on the same ground and frame (bands out on the land): their bodies block this den's as its own
+   * do. Set by whoever steps them together (app/encounter.ts).
+   */
+  neighbours: readonly Den[] = [];
+  /** The hero this step (a body in the way like any other). */
+  private quarry: Quarry | null = null;
+  /** Those held up this step by another body (not stuck: it is not counted towards a hop). */
+  private readonly waiting = new Set<Creature>();
 
   /** A dungeon's space (its rooms are the homes), or any other ground (open land: sim/wild.ts). */
   constructor(ground: DungeonSpace | DenGround, spawns: readonly Spawn[], defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []) {
@@ -222,6 +237,8 @@ export class Den {
 
   step(dt: number, q: Quarry): DenEvent[] {
     this.time += dt;
+    this.quarry = q;
+    this.waiting.clear();
     const out: DenEvent[] = [];
     for (const c of this.creatures) {
       if (c.state === 'dead') continue;
@@ -410,7 +427,10 @@ export class Den {
     const target = c.lost < 0.5 ? { x: q.x, y: q.y, z: q.z } : c.seen;
     if (!target) return;
     if (c.lost < 0.5 && d < 4 && dy < 0.8 && this.clear(c, q)) {
-      c.path = [this.slot(c, q, reach * 0.8)];
+      const at = this.slot(c, q, reach * 0.8);
+      // Already there (waiting behind a full ring): it stands and watches, not stuck.
+      if (Math.hypot(at.x - c.x, at.z - c.z) < 0.05) { c.path = []; c.dir = Math.atan2(dz, dx); c.act = 'stand'; return; }
+      c.path = [at];
       c.pi = 0;
     } else if (c.repath === 0 || c.pi >= c.path.length) { this.headTo(c, target); c.repath = 0.6; }
     if (!this.move(c, dt, 1)) c.act = 'stand';
@@ -434,7 +454,9 @@ export class Den {
       const taken = this.creatures.some((o) => o !== c && o.state !== 'dead' && Math.hypot(o.x - x, o.z - z) < r + radiusOf(o.def) + 0.1);
       if (!taken) return { x, y: q.y, z };
     }
-    return { x: q.x + Math.cos(base) * ring, y: q.y, z: q.z + Math.sin(base) * ring };
+    // The ring round the hero is full: it waits behind it, on its own side, for a place to come free.
+    const back = ring + r * 2 + 0.3;
+    return { x: q.x + Math.cos(base) * back, y: q.y, z: q.z + Math.sin(base) * back };
   }
 
   /** Off to the room farthest from the hero; cornered there, it fights. */
@@ -582,8 +604,15 @@ export class Den {
       const k = Math.min(1, left / d);
       left -= d * k;
       // Along the walls, never through them; stuck, it looks for another way.
-      const to = this.ground.slide(c.x, c.y, c.z, dx * k, dz * k, r);
+      let to = this.ground.slide(c.x, c.y, c.z, dx * k, dz * k, r);
       if (!to) { c.pi = c.path.length; c.repath = 0; c.balked = STUCK.balk; return false; }
+      // Another body in the way (the hero, one of its own, one of another band): round it, else it waits.
+      if (this.pressesOn(c, to.x, to.z)) {
+        // Jostled in a crowd it is not stuck (no leap over the others).
+        this.waiting.add(c);
+        to = this.round(c, dx * k, dz * k, r);
+        if (!to) { c.dir = Math.atan2(dz, dx); c.act = 'stand'; return true; }
+      }
       c.dir = Math.atan2(dz, dx);
       // Made good towards the point (sliding along a river bank, away from it, is not getting anywhere).
       c.made += ((to.x - c.x) * dx + (to.z - c.z) * dz) / d;
@@ -607,7 +636,7 @@ export class Den {
     if (c.state === 'dead') return;
     if (c.made >= PROGRESS) { c.made = 0; c.pushing = 0; return; }
     c.balked = Math.max(0, c.balked - dt);
-    if (c.wants || c.balked > 0) c.pushing += dt;
+    if ((c.wants && !this.waiting.has(c)) || c.balked > 0) c.pushing += dt;
     else c.pushing = Math.max(0, c.pushing - dt * 0.25);
     if (c.pushing < STUCK.time || c.hopIn > 0 || c.stagger > 0 || c.windup > 0 || !this.ground.hop) return;
     const goal = c.path.length ? c.path[c.path.length - 1] : c.state === 'fight' ? c.seen : null;
@@ -640,6 +669,49 @@ export class Den {
     c.repath = 0;
     c.until = 0;
     c.act = 'stand';
+  }
+
+  /**
+   * Would it press into another living body at (x, z): come nearer one it overlaps there? (Moving apart, or
+   * past, is always let.) The hero counts unless one of them is a small critter.
+   */
+  private pressesOn(c: Creature, x: number, z: number): boolean {
+    const r = radiusOf(c.def);
+    const into = (ox: number, oy: number, oz: number, or: number) => {
+      if (Math.abs(oy - c.y) > ABOVE) return false;
+      const d = Math.hypot(ox - x, oz - z);
+      return d < r + or && d < Math.hypot(ox - c.x, oz - c.z) - 1e-4;
+    };
+    const q = this.quarry;
+    if (q?.alive && blocksHero(c.def) && into(q.x, q.y, q.z, HERO_R)) return true;
+    for (const den of [this, ...this.neighbours]) {
+      for (const o of den.creatures) if (o !== c && o.state !== 'dead' && !o.hop && into(o.x, o.y, o.z, radiusOf(o.def))) return true;
+    }
+    return false;
+  }
+
+  /** A step round a body in its way: turned a little, then more, up to along it (past square: never into it), its own side first (seeded by who it is). */
+  private round(c: Creature, sx: number, sz: number, r: number): { x: number; z: number } | null {
+    const side = c.id % 2 ? 1 : -1;
+    for (const t of [0.7, -0.7, 1.4, -1.4, 1.65, -1.65]) {
+      const a = t * side, cs = Math.cos(a), sn = Math.sin(a);
+      const to = this.ground.slide(c.x, c.y, c.z, sx * cs - sz * sn, sx * sn + sz * cs, r);
+      if (to && !this.pressesOn(c, to.x, to.z)) return to;
+    }
+    return null;
+  }
+
+  /**
+   * Does a body of radius `r` at (x, z), feet at `y`, press into one of the den that blocks the hero? One it
+   * already touches where it stands now, (ax, az), lets it go (never stuck in another).
+   */
+  pressedBy(x: number, y: number, z: number, r: number, ax: number, az: number): boolean {
+    for (const c of this.creatures) {
+      if (c.state === 'dead' || c.hop || !blocksHero(c.def) || Math.abs(c.y - y) > ABOVE) continue;
+      const min = r + radiusOf(c.def);
+      if (Math.hypot(c.x - x, c.z - z) < min && Math.hypot(c.x - ax, c.z - az) >= min) return true;
+    }
+    return false;
   }
 
   /** Bodies keep apart (a few at most share a room, so all pairs are cheap). */
