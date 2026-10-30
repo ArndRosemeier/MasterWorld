@@ -163,9 +163,11 @@ export class Minimap {
 
   /**
    * Each frame while shown: where the VGM placed something lately (its show mode, a developer's aid), as
-   * ward-blue studs at their spot inside the round when near, on the band when farther; none: no studs.
+   * ward-blue studs at their spot inside the round when near, on the band when farther; none: no studs. The move
+   * picked in the VGM window's log (`picked`) is lit brighter and larger, whether or not it is among them.
    */
-  vgmMarks(marks: readonly { readonly id: string; readonly x: number; readonly z: number }[], x: number, z: number): void {
+  vgmMarks(placed: readonly { readonly id: string; readonly x: number; readonly z: number }[], x: number, z: number, picked: { readonly id: string; readonly x: number; readonly z: number } | null = null): void {
+    const marks = picked && !placed.some((m) => m.id === picked.id) ? [...placed, picked] : placed;
     const now = new Set(marks.map((m) => m.id));
     for (const [id, s] of this.vgmAt) if (!now.has(id)) { s.el.remove(); this.vgmAt.delete(id); }
     for (const m of marks) {
@@ -175,6 +177,7 @@ export class Minimap {
       const out = d > RANGE ? BAND_PX : (d / RANGE) * LAND_PX;
       const at = `rotate(${deg.toFixed(1)}deg) translateY(-${out.toFixed(1)}px)`;
       if (at !== s.at) { s.at = at; s.el.style.transform = at; }
+      s.el.classList.toggle('picked', m.id === picked?.id);
     }
   }
 }

@@ -7,7 +7,7 @@
  */
 import type { Decision, DecisionLog } from '../world/decisions';
 import type { Need } from './director';
-import { toolOf, type Made } from './toolbox';
+import { TOOLS, toolOf, type Made } from './toolbox';
 
 /** How eventful the VGM makes the world (the game settings): its needs grow at this times the setting's rates. */
 export const PACING = { calm: 0.6, normal: 1, eventful: 1.6 } as const;
@@ -107,9 +107,28 @@ export function decisionSays(d: Decision): string {
   }
 }
 
+/** Why the VGM made a decision, kept in the save (a `Made` without its decision), so its log reads the same after a reload. */
+export interface VgmWhy {
+  readonly id: string;
+  readonly tool: string;
+  readonly reason: string;
+  readonly at: number;
+}
+
+/** The reasons a save keeps (the newest; older moves fall back to what their decision says). */
+export const WHY_KEPT = 1000;
+
+export const whyOf = (m: Made): VgmWhy => ({ id: m.decision.id, tool: m.tool, reason: m.reason, at: m.at });
+
+/** A save's reasons, checked (anything else is dropped). */
+export function cleanWhys(raw: unknown): VgmWhy[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((w): w is VgmWhy => !!w && typeof w === 'object' && typeof w.id === 'string' && typeof w.tool === 'string' && typeof w.reason === 'string' && typeof w.at === 'number' && TOOLS.some((t) => t.id === w.tool)).slice(-WHY_KEPT);
+}
+
 /** One line per decision in the log (from the `from`th on), oldest first, with the tool, its need and why. */
-export function vgmLines(log: DecisionLog, made: readonly Made[] = [], from = 0): VgmLine[] {
-  const why = new Map(made.map((m) => [m.decision.id, m]));
+export function vgmLines(log: DecisionLog, made: readonly (Made | VgmWhy)[] = [], from = 0): VgmLine[] {
+  const why = new Map(made.map((m) => ['decision' in m ? m.decision.id : m.id, m]));
   return log.slice(from).map((d) => {
     const m = why.get(d.id), tool = toolOf(m?.tool ?? toolFor(d, log));
     const at = m?.at ?? ('at' in d ? d.at : undefined);
@@ -126,11 +145,21 @@ export function vgmLines(log: DecisionLog, made: readonly Made[] = [], from = 0)
 export class VgmWatch {
   constructor(private seen: number) {}
 
-  see(log: DecisionLog, made: readonly Made[] = []): VgmLine[] {
+  see(log: DecisionLog, made: readonly (Made | VgmWhy)[] = []): VgmLine[] {
     if (log.length < this.seen) this.seen = log.length;
     if (log.length === this.seen) return [];
     const lines = vgmLines(log, made, this.seen);
     this.seen = log.length;
     return lines;
   }
+}
+
+const WAYS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+
+/** How far and which way a place lies from the hero (north is −z), for the VGM window: "1.2 km to the south-east", "here". */
+export function wayTo(from: readonly [number, number], to: readonly [number, number]): string {
+  const dx = to[0] - from[0], dz = to[1] - from[1], d = Math.hypot(dx, dz);
+  if (d < 15) return 'here';
+  const way = WAYS[(Math.round((Math.atan2(dx, -dz) / (2 * Math.PI)) * 8) + 8) % 8];
+  return `${d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).toFixed(1)} km`} to the ${way}`;
 }

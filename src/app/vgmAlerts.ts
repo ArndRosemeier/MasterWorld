@@ -8,8 +8,7 @@
 import './windows.css';
 import { el, overlay } from './dom';
 import type { DecisionLog } from '../world/decisions';
-import type { Made } from '../vgm/toolbox';
-import { VgmWatch, type VgmLine } from '../vgm/vgmLog';
+import { VgmWatch, type VgmLine, type VgmWhy } from '../vgm/vgmLog';
 
 /** Slips on screen at once, and how long each stays (s). */
 const MOST = 4;
@@ -39,7 +38,7 @@ export class VgmAlerts {
   get marks(): readonly { id: string; x: number; z: number }[] { return this.on ? this.placed : []; }
 
   /** Each frame: the log now, and whether the game is in play (moves made over the title are not shown). */
-  seeLog(log: DecisionLog, made: readonly Made[], playing: boolean, dt: number): void {
+  seeLog(log: DecisionLog, made: readonly VgmWhy[], playing: boolean, dt: number): void {
     const fresh = this.watch.see(log, made);
     if (fresh.length) this.mark(fresh);
     if (this.on && playing) for (const l of fresh.slice(-MOST)) this.slip(l);

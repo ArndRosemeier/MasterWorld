@@ -2,7 +2,7 @@
  * The VGM seen at work (a developer's aid): `node tools/shot/vgm.mjs [out dir]` after `npm run build`, SHOT_GPU=1 on
  * the reference machine. Out on the land east of the start town the VGM answers Discovery: its move must slide in
  * as a slip at the top right and its place must get a ward-blue stud on the minimap (01-alert). F9 opens its window
- * (02-window); its newest move's Go there puts the hero beside the place (03-there). JPEGs into `<out dir>`
+ * (02-window); a move clicked in its log lights up on the minimap above it (02b-picked); its newest move's Go there puts the hero beside the place (03-there). JPEGs into `<out dir>`
  * (default `shots/vgm/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  */
 import { execSync } from 'node:child_process';
@@ -44,6 +44,13 @@ await page.keyboard.press('F9');
 await page.waitForTimeout(1800);
 check(await page.locator('.panel.vgm .move').count() > 0, 'F9 opened the VGM window with its moves');
 await shoot('02-window');
+
+// A move clicked in the log lights up on the minimap, which stands above the window.
+await page.locator('.panel.vgm .move.placed .why').first().click();
+await page.waitForTimeout(800);
+check(await page.locator('#compass .stud.vgm.picked').count() === 1, 'the clicked move is lit on the minimap');
+check(((await page.locator('.panel.vgm .move.picked .way').textContent()) ?? '').includes('on the minimap'), 'its row says which way it lies');
+await shoot('02b-picked');
 
 await page.locator('.panel.vgm .move .go').first().click();
 await page.waitForTimeout(3000);

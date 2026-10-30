@@ -120,8 +120,12 @@
     "reason": "StockView's ActorsHerd and HorseView both implement StockView's Bodies seam (warm, show, hide, pose a fixed set of bodies); the same method names are the interface, the bodies differ (Actors animals vs the horse view)."
   },
   {
-    "key": "same name: masterworld/app/savesUi.ts#opened + masterworld/app/vgmUi.ts#opened",
-    "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
+    "key": "same name: masterworld/app/journalUi.ts#closed + masterworld/app/vgmUi.ts#closed",
+    "reason": "KeyWindow's hook when a window closes (window.ts): each window tidies its own state; the name is the seam, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/mapUi.ts#closed + masterworld/app/vgmUi.ts#closed",
+    "reason": "KeyWindow's hook when a window closes (window.ts): each window tidies its own state; the name is the seam, not a copy."
   },
   {
     "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/repairUi.ts#opened",
