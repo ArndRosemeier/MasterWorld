@@ -121,6 +121,9 @@ const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'pot
 /** Market spots weigh as if this many metres away per step of 1 (25 for the rest): the market draws from all over the town. */
 const MARKET_REACH = 110;
 
+/** A step whose clock moves more than this (game hours) skipped time: everyone goes straight to what they do now. */
+const SKIP_HOURS = 0.5;
+
 /** Agents farther than this from the focus skip their walks (m). */
 const DETAIL = 260;
 /** A child at play keeps this far off a wall (m). */
@@ -139,6 +142,8 @@ export class TownLife {
   time = 0;
   /** Where detail matters (the player). */
   focus = { x: 0, z: 0 };
+  /** Within a step after skipped time: walks are not walked, everyone arrives (`step`). */
+  private skipping = false;
   private readonly orders: TownOrder[] = [];
   /** Everyone has fled (a band holds the place, vgm/events.ts take): all are away until it is false again. */
   gone = false;
@@ -241,9 +246,14 @@ export class TownLife {
   /** Advance `dt` real seconds at `hours` game hours since the start (day × 24 + hour). */
   step(dt: number, hours: number, weather: TownWeather = this.weather): void {
     this.time += dt;
+    // The clock skipped ahead (a night's sleep, a wait, the hour set): in the hours nobody saw, everyone got where
+    // that time took them, so each goes straight to what they do now, unseen, and nobody is left walking home
+    // across the town at night (a farmhand coming in from the fields held the capital's gate open).
+    const skipped = Math.abs(hours - this.hours) > SKIP_HOURS;
     this.hours = hours;
     this.hour = ((hours % 24) + 24) % 24;
     this.weather = weather;
+    if (skipped) this.skipAhead();
     for (const a of this.agents) {
       // Held for a talk, one coming round their work walks on (`hold`).
       if (a.held) { if (a.act === 'walk') this.walk(a, dt); continue; }
@@ -256,6 +266,13 @@ export class TownLife {
       else if (a.seek && this.time < a.until) continue;
       else if (this.time >= a.until || this.taskOf(a) !== a.task) this.choose(a, false);
     }
+  }
+
+  /** After skipped time: everyone not held goes straight to what they do now, without walking there. */
+  private skipAhead(): void {
+    this.skipping = true;
+    for (const a of this.agents) if (!a.held && !a.post) { a.stay = undefined; this.choose(a, false); }
+    this.skipping = false;
   }
 
   /**
@@ -397,7 +414,7 @@ export class TownLife {
     const [tx, tz] = s ? seatAt(s, a.seat) : [pick.x, pick.z];
     a.next = pick.act;
     a.until = this.time + a.rng.range(pick.secs[0], pick.secs[1]) * (s?.outside && (this.weather.rain > 0.5 || this.dark) ? 0.5 : 1);
-    if (here || (s && s === was) || (Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > DETAIL && Math.hypot(tx - this.focus.x, tz - this.focus.z) > DETAIL)) {
+    if (here || this.skipping || (s && s === was) || (Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > DETAIL && Math.hypot(tx - this.focus.x, tz - this.focus.z) > DETAIL)) {
       this.arrive(a, tx, tz, s ? seatDir(s, a.seat) : a.dir);
       return;
     }
