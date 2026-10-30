@@ -1,5 +1,5 @@
 /**
- * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves|kinds]` after `npm run build`,
+ * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves|kinds|capital]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night, in rain and wet toward the afternoon sun, a cellar, a barrow, the wild, a fight, a fight with magic, a hurt traveller, a raided farm, the pack,
  * the map, the trade window, talk, a people's hold) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
@@ -11,7 +11,8 @@
  * the town at noon (F2). Four slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
  * `--part=caves` is mesa country (a valley, a plateau top, a tor, a climb; gate L) and a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
- * without `--part` all four run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
+ * `--part=capital` runs tools/shot/capital.mjs (its gate by day and night, its market; gate P) into `<out root>/capital`;
+ * without `--part` all five run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
  * Exits 1 when a page failed or a shot breaks F2 or F3 (what was still waiting to be drawn is noted).
  */
@@ -344,9 +345,15 @@ function atHold(u, v, lu, lv) {
 const args = process.argv.slice(2), part = args.find((a) => a.startsWith('--part='))?.slice(7) ?? null;
 const root = args.find((a) => !a.startsWith('--')) ?? 'shots/set';
 // Both parts: each its own run (its own browser, its own time), one after the other.
+// The capital (gate P: its gate by day and night, its market at noon) is tools/shot/capital.mjs, run as a part.
+const capital = (out) => execFileSync(process.execPath, [fileURLToPath(new URL('./capital.mjs', import.meta.url)), out], { stdio: 'inherit' });
+if (part === 'capital') {
+  try { capital(join(root, 'capital')); } catch { process.exit(1); }
+  process.exit(0);
+}
 if (!part) {
   let bad = false;
-  for (const p of ['town', 'land', 'caves', 'kinds']) {
+  for (const p of ['town', 'land', 'caves', 'kinds', 'capital']) {
     try { execFileSync(process.execPath, [fileURLToPath(import.meta.url), root, `--part=${p}`], { stdio: 'inherit' }); } catch { bad = true; }
   }
   process.exit(bad ? 1 : 0);
