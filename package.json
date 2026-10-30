@@ -35,6 +35,7 @@
     "shot:hits": "node tools/shot/hits.mjs",
     "shot:limp": "node tools/shot/limp.mjs",
     "variety": "node --import tsx tools/variety/cellars.ts",
+    "zfight": "node --import tsx tools/zfight/scan.ts",
     "loop": "node --import tsx tools/loop/evening.ts",
     "water:fit": "node --import tsx tools/water/fit.ts",
     "walk:landforms": "node --import tsx tools/loop/landformWalk.ts masterworld && node --import tsx tools/loop/landformWalk.ts alpha && node --import tsx tools/loop/landformWalk.ts x4",
