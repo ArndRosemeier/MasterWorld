@@ -25,6 +25,24 @@ const LIMIT_TITLE = Number(process.env.LIMIT_TITLE ?? 1), LIMIT_READY = Number(p
 const { server, base, browser } = await launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.error(`[page error] ${e.message}`));
+// `LOAD_PIPELINES=1`: every GPU pipeline built before play, with its material (three's label), its shaders' sizes and
+// how long it took, the slowest listed after the builds (the monitor records them only as "pipeline").
+if (process.env.LOAD_PIPELINES) await page.addInitScript(() => {
+  const D = globalThis.GPUDevice?.prototype;
+  if (!D) return;
+  const size = new WeakMap(), list = (window.__pipelines = []);
+  const mod = D.createShaderModule;
+  D.createShaderModule = function (d, ...a) { const m = mod.call(this, d, ...a); size.set(m, d?.code?.length ?? 0); return m; };
+  const fa = D.createRenderPipelineAsync;
+  D.createRenderPipelineAsync = function (d, ...a) {
+    const t0 = performance.now(), p = fa.call(this, d, ...a);
+    const e = { label: d?.label ?? '', vs: size.get(d?.vertex?.module) ?? 0, fs: size.get(d?.fragment?.module) ?? 0, t: t0, ms: -1 };
+    list.push(e);
+    const end = () => { e.ms = performance.now() - t0; };
+    p.then(end, end);
+    return p;
+  };
+});
 // The game's own loading steps (and pack retries), so a slow start shows where its time goes.
 const steps = [];
 page.on('console', (m) => {
@@ -71,6 +89,12 @@ const builds = came ? await page.evaluate(() => {
 if (builds.length) {
   console.log(`shader builds before play: ${builds.reduce((n, b) => n + b.n, 0)}, ${builds.reduce((n, b) => n + b.ms, 0).toFixed(0)} ms in all; the costliest:`);
   for (const b of builds.slice(0, 15)) console.log(`  ${b.ms.toFixed(0).padStart(6)} ms ${String(b.n).padStart(3)}x ${b.what}`);
+}
+if (process.env.LOAD_PIPELINES && came) {
+  const ps = await page.evaluate(() => window.__pipelines);
+  ps.sort((a, b) => b.ms - a.ms);
+  console.log(`GPU pipelines before play: ${ps.length}, ${ps.reduce((n, p) => n + Math.max(0, p.ms), 0).toFixed(0)} ms summed; the slowest:`);
+  for (const p of ps.slice(0, 25)) console.log(`  ${p.ms.toFixed(0).padStart(6)} ms from ${(p.t / 1000).toFixed(2)} s · vs ${p.vs} fs ${p.fs} chars · ${p.label}`);
 }
 if (stopProfile) report(await stopProfile(), steps, 'dist');
 // A moment in the world: music asked for now is "when first needed", and is listed apart.
