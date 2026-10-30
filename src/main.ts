@@ -1,3 +1,5 @@
+// First: every three.js matrix made from here on keeps its numbers unboxed (render/typedMatrices.ts).
+import './render/typedMatrices';
 import { Vector3, type Light, type Object3D } from 'three/webgpu';
 import { GraphicsUnavailable } from '@futuremagic/stage';
 import { deriveSeed, parseSeed } from '@futuremagic/core';
@@ -151,6 +153,7 @@ import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
 import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
+import { GroundCache } from './world/groundCache';
 import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
@@ -607,10 +610,12 @@ export async function start(b: Boot): Promise<void> {
       loading.set('Turning out the herds');
       stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => terrain.height(x, z));
     }
+    // The ground under birds' and creatures' feet: off a fine grid of exact heights (the land's own is costly, asked every frame).
+    const feet = new GroundCache((x, z) => terrain.height(x, z), () => terrain.version);
     // Birds and squirrels about the land (plan 9.3): their squares are the trunks' cells.
     const woods = woodsOf(terrain);
     const small = setting.smallLife && params.small ? new SmallLife(seed, {
-      height: (x, z) => bridgeView.ground(x, z, terrain.height(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
       // The town's farmland and fields are open land whatever the woods round them.
       woods: (x, z) => (terrain.townGround(x, z) >= TownGround.Street ? 0 : woods(x, z)),
@@ -796,7 +801,7 @@ export async function start(b: Boot): Promise<void> {
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
     }, start, {
-      height: (x, z) => bridgeView.ground(x, z, terrain.height(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
@@ -812,7 +817,7 @@ export async function start(b: Boot): Promise<void> {
         changed: (c) => notes.say(changeLine(c), 6),
         jobs: terrainJobs,
       }, holdSite, holdPeople, {
-        height: (x, z) => bridgeView.ground(x, z, terrain.height(x, z)),
+        height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
         waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
         blocked: (x, z, r) => !!hold?.solid(x, z, r) || bridgeView.side(x, z, r),
       }, save?.hold);
