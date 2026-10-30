@@ -91,6 +91,8 @@ export interface EveningOptions {
    * the nearest a walk out from the start finds, as if the game began there; none: the start town.
    */
   readonly settlement?: SettlementSize;
+  /** With `settlement`: a harbour town of that size (S2), else one without a harbour. */
+  readonly harbour?: boolean;
   /**
    * A mage (plan C3): before the first evening the hero asks the bard where to learn, learns a first spell
    * at a teacher the bard names (mana comes with it, D59) and casts it in the first place; later evenings it
@@ -135,7 +137,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   let log: Decision[] = [...first];
   let hours = START_HOUR;
   const say = (what: string) => { const s = { hour: hours, what }; steps.push(s); opts.log?.(s); };
-  const town = opts.settlement ? settlementOut(seed, setting, terrain, start, opts.settlement, (walked) => { log = [...log, ...walked]; }) : start;
+  const town = opts.settlement ? settlementOut(seed, setting, terrain, start, opts.settlement, !!opts.harbour, (walked) => { log = [...log, ...walked]; }) : start;
   if (town !== start) say(`plays in ${town.decision.size} ${town.decision.id}, ${Math.hypot(town.decision.x - start.decision.x, town.decision.z - start.decision.z).toFixed(0)} m from the start (${town.plan.buildings.length} buildings)`);
   // The town's core, as the game has it for every town: its people, their words, its merchants.
   const township = new Township(town, { seed, setting, log: () => log, hours: () => hours });
@@ -456,23 +458,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (mend.mended.length) say(`the smith mends ${mend.mended.length} things for ${mend.spent} copper`);
       earned += sellAt(trader);
       if (keeper) earned += sellAt(keeper);
-      // The best upgrade the purse allows, at the smith's (and the market's).
-      for (const m of [smith, trader]) {
-        if (!m) continue;
-        const up = market.upgradeFor(hero, m);
-        if (!up) continue;
-        const w = workplace(m);
-        walkTo(w.name, ...w.at);
-        const was = hero.power;
-        const before = hero.coins;
-        if (market.buy(hero, m, up.item)) continue;
-        paid += before - hero.coins;
-        hero.equip(up.item);
-        bought.push(up.item.name);
-        say(`bought ${up.item.name} from the ${m.shop.keeper}: power ${was} -> ${hero.power}`);
-        break;
-      }
-      // Abilities with what is left above a night's room and a mending (D59): at each guild house on the map, the
+      // Abilities first, with what is left above a night's room and a mending (D59; gear takes the rest): at each guild house on the map, the
       // cheapest first; a mage keeps to its teacher's spells and the fighting houses' arts, a fighter to the arts.
       const reserve = setting.upkeep.room + LESSON_RESERVE;
       for (const h of [...township.guilds].sort((x, y) => Number(y.guild === school?.guild) - Number(x.guild === school?.guild))) {
@@ -495,6 +481,22 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
           taught.push(a.name);
           say(`${g.name} teaches ${a.name} (level ${a.level ?? 1}) for ${before - hero.coins} copper`);
         }
+      }
+      // The best upgrade the purse allows, at the smith's (and the market's).
+      for (const m of [smith, trader]) {
+        if (!m) continue;
+        const up = market.upgradeFor(hero, m);
+        if (!up) continue;
+        const w = workplace(m);
+        walkTo(w.name, ...w.at);
+        const was = hero.power;
+        const before = hero.coins;
+        if (market.buy(hero, m, up.item)) continue;
+        paid += before - hero.coins;
+        hero.equip(up.item);
+        bought.push(up.item.name);
+        say(`bought ${up.item.name} from the ${m.shop.keeper}: power ${was} -> ${hero.power}`);
+        break;
       }
       spent.push(paid);
       if (shops && e > 0 && !paid && !spent[e - 1]) throw new Broke(`two evenings with nothing bought and no ability learned (${hero.coins} copper)`);
@@ -538,14 +540,15 @@ function front(b: TownBuilding): [number, number] {
  * Walks out from the start until the VGM founds a settlement of `size` (the frontier, as the hero walks in
  * the game), settles it on the land and hands the regions opened on the way to `opened` (for the log).
  */
-function settlementOut(seed: number, setting: SettingModule, terrain: Terrain, start: Town, size: SettlementSize, opened: (walked: Decision[]) => void): Town {
+function settlementOut(seed: number, setting: SettingModule, terrain: Terrain, start: Town, size: SettlementSize, harbour: boolean, opened: (walked: Decision[]) => void): Town {
   const regions = setting.regions;
   if (!regions) throw new Error('the setting opens no regions: no settlement to play in');
+  const wanted = (d: RegionDecision) => { const t = settlementOf(d, regions.fills); return t?.size === size && !!t.harbour === harbour; };
   // The nearest one a walk out finds, whichever way (danger grows with distance, D29).
   let best: { walked: RegionDecision[]; found: RegionDecision; d: number } | null = null;
   for (let dir = 0; dir < 8; dir++) {
-    const walked = walkFrontier({ seed, log: [start.decision], terrain, regions, home: start.decision }, (dir * Math.PI) / 4, 8, (d) => settlementOf(d, regions.fills)?.size === size);
-    const found = regionDecisions(walked).find((d) => settlementOf(d, regions.fills)?.size === size);
+    const walked = walkFrontier({ seed, log: [start.decision], terrain, regions, home: start.decision }, (dir * Math.PI) / 4, 8, wanted);
+    const found = regionDecisions(walked).find(wanted);
     const d = found?.site ? Math.hypot(found.site.x - start.decision.x, found.site.z - start.decision.z) : Infinity;
     if (found && (!best || d < best.d)) best = { walked, found, d };
   }
@@ -555,7 +558,7 @@ function settlementOut(seed: number, setting: SettingModule, terrain: Terrain, s
     const town = terrain.town(best.found.id);
     if (town) return town;
   }
-  throw new Error(`no ${size} found within 8 km of the start`);
+  throw new Error(`no ${harbour ? 'harbour ' : ''}${size} found within 8 km of the start`);
 }
 
 /** How often a walk finds its way again from where it got stuck. */
@@ -754,9 +757,13 @@ export class LandWalk {
     if (from[b] < 0 && a !== b) return null;
     const cells: number[] = [];
     for (let c = b; c !== a && c >= 0; c = from[c]) cells.push(c);
-    // Every third metre-cell is enough to steer by (every coarse one); the end itself last.
+    // Every third metre-cell is enough to steer by (every coarse one), and every cell where the way turns (the
+    // straight line from one kept cell to the next cut a house's corner, and the bot stood pressed against it);
+    // the end itself last.
     const every = size > 1 ? 1 : 3;
-    const out = cells.reverse().filter((_, k) => k % every === every - 1).map(cellCentre);
+    cells.reverse();
+    const turns = (k: number) => k > 0 && k < cells.length - 1 && cells[k] - cells[k - 1] !== cells[k + 1] - cells[k];
+    const out = cells.filter((_, k) => k % every === every - 1 || turns(k)).map(cellCentre);
     out.push([bx, bz]);
     return out;
   }

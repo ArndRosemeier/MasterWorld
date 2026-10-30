@@ -10,6 +10,7 @@ import type { TownBuilding } from '@futuremagic/settlement';
 import type { Stage } from '@futuremagic/stage';
 import { goingThrough, type Agent, type TownLife, type TownWeather } from '../sim/townLife';
 import type { Herds } from '../sim/livestock';
+import type { Poultry } from '../sim/poultry';
 import { Township, type TownshipContext, type TownshipSave } from '../game/township';
 import type { RegionDecision } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
@@ -46,6 +47,8 @@ export interface TownDoor {
 
 /** People live (their walks, their day) while the hero is within this of the town's edge (m). */
 const LIVE = 400;
+/** Hens farther than this (m) from a town's ground are left be (they are neither seen nor heard). */
+const HENS = 200;
 /** The hero is in a town (talks there, hears its leads) within this of its edge (m). */
 const IN = 60;
 /** The hero at a teacher's tower out on the land is with that town's people within this of it (m). */
@@ -56,6 +59,9 @@ const WARM_AHEAD = 300, WARM_MS = 4;
 const LOOK = 1;
 /** A walled town's gates are drawn while the camera is within this of its edge (m). */
 const GATES_SEEN = 600;
+
+/** How far past a town's bounds its floors may reach (m): a harbour's piers out over the water. */
+const PIER_REACH = 80;
 
 export class Towns {
   private readonly cores = new Map<string, Township>();
@@ -251,16 +257,29 @@ export class Towns {
     return out;
   }
 
+  /** The hens of every town near (x, z), scratching about; `near`: the hero on foot (they scatter from them), null: none. */
+  peck(dt: number, x: number, z: number, near: { x: number; z: number } | null): Poultry[] {
+    const out: Poultry[] = [], def = this.h.setting.world.poultry;
+    if (!def) return out;
+    for (const t of this.near(x, z, HENS)) {
+      const p = t.poultry;
+      if (!p) continue;
+      p.step(dt, this.h.hours(), def, near, (px, pz, r) => t.town.solid(px, pz, r));
+      out.push(p);
+    }
+    return out;
+  }
+
   /** Does a body of radius `r` at (x, z) touch a town's walls or fences (`open`: the building drawn open, which is walked in)? */
   solid(x: number, z: number, r: number, open?: TownDoor | null): boolean {
     for (const t of this.near(x, z, r + 1)) if (t.town.solid(x, z, r, open?.town === t ? open.b.id : undefined)) return true;
     return false;
   }
 
-  /** The steps and porches before the doors at (x, z) (null: none). */
+  /** The steps and porches before the doors at (x, z), and a harbour's quay and piers (null: none). */
   stand(x: number, z: number): number | null {
     let best: number | null = null;
-    for (const t of this.near(x, z, 2)) { const h = t.town.stand(x, z); if (h !== null && (best === null || h > best)) best = h; }
+    for (const t of this.near(x, z, PIER_REACH)) { const h = t.town.stand(x, z); if (h !== null && (best === null || h > best)) best = h; }
     return best;
   }
 

@@ -11,8 +11,9 @@
  * the town at noon (F2). Four slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
  * `--part=caves` is mesa country (a valley, a plateau top, a tor, a climb; gate L) and a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
+ * `--part=sea` is the nearest beach, sea cliff and the bed off the beach, the camera in the waterline and the hero swimming (S1);
  * `--part=capital` runs tools/shot/capital.mjs (its gate by day and night, its market; gate P) into `<out root>/capital`;
- * without `--part` all five run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
+ * without `--part` all six run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
  * Exits 1 when a page failed or a shot breaks F2 or F3 (what was still waiting to be drawn is noted).
  */
@@ -253,6 +254,30 @@ const SESSIONS = [
     { name: 'hold-crag', act: atHold(10, 21, -14, -2) },
     { name: 'hold-warden', act: atHold(3, 10, 7.6, 4) },
   ] },
+  // S1: the sea (D25). On the nearest beach at mid-afternoon facing out to sea, then from the free camera over the
+  // surf; on the nearest sea cliff's top looking out, then its face from the sea; under the sea off that beach,
+  // across the bed towards the shore, then with the camera in the waterline itself (half above, half below), and
+  // the hero swimming there from the usual camera.
+  { id: 'sea-beach', query: `${still}&hour=15&weather=fair&coast=beach`, shots: [
+    { name: 'sea-beach', act: seaLook({ pitch: 0.12 }) },
+    { name: 'sea-beach-aloft', act: seaLook({ out: -14, up: 9, pitch: -12 }) },
+  ] },
+  { id: 'sea-cliff', query: `${still}&hour=15&weather=fair&coast=cliff`, shots: [
+    { name: 'sea-cliff', act: seaLook({ out: 16, side: 26, hy: 1, back: true, pitch: -4 }) },
+    { name: 'sea-cliff-face', act: seaLook({ out: 110, up: 6, side: 60, back: true, pitch: 10 }) },
+  ] },
+  { id: 'sea-under', query: `${still}&hour=13&weather=fair&coast=under`, shots: [
+    { name: 'sea-under', act: seaLook({ out: 0, bed: 1.6, back: true, pitch: 2 }) },
+    { name: 'sea-waterline', act: seaLook({ out: -6, level: 0, back: true, pitch: 0 }) },
+    { name: 'sea-swim', act: seaLook({ swim: true, pitch: 0.1 }) },
+  ] },
+  // S2: a harbour town the VGM founded by a river's mouth. On its quay at late morning looking out over the piers,
+  // then from out over the water back at the town, then the quay in the evening, its tavern lit.
+  { id: 'sea-harbour', query: `${still}&hour=11&weather=fair&site=harbour`, shots: [
+    { name: 'sea-harbour', act: seaLook({ pitch: 0.15 }) },
+    { name: 'sea-harbour-aloft', act: seaLook({ out: 70, up: 16, side: 20, back: true, pitch: -8 }) },
+    { name: 'sea-harbour-evening', act: async (p) => { await turn(19, 'fair')(p); await seaLook({ out: 40, up: 6, back: true, pitch: -3 })(p); } },
+  ] },
   // Gate C: what phase C gave the world, seen. A hurt traveller by the way (they cry out once seen), then a
   // farm the bandits raided: its barn burnt, smoke over it, its paddock empty.
   { id: 'situations', query: `${still}&hour=10&weather=fair`, shots: [
@@ -281,7 +306,7 @@ const SESSIONS = [
 ];
 /** The sessions of each part (each part one run, under 5 min). */
 const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave', 'mesa']);
-const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : 'land');
+const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : s.id.startsWith('sea-') ? 'sea' : 'land');
 
 /**
  * The free camera in the start cave's highest cavern (cave-cavern went in): from its floor at eye height across it,
@@ -323,6 +348,32 @@ function caveLook(what) {
   };
 }
 
+/**
+ * A view by the sea, from where `coast=` put the hero (facing out to sea). Without `out` and `bed` the usual camera
+ * behind the hero at `pitch` (radians; `swim`: first the hero is put 25 m further out, swimming). Otherwise the free
+ * camera `out` metres seaward of the hero (negative: inland), `side` to its left, and `up` over the ground, `bed`
+ * over the sea bed, at the height `level` or `hy` over the hero's feet, looking out to sea (or `back` towards the hero) at `pitch` degrees.
+ */
+function seaLook({ out, side = 0, up, bed, level, hy, back = false, pitch = 0, swim = false }) {
+  return async (p) => {
+    await p.waitForFunction(() => window.game?.player, null, { timeout: TIMEOUT });
+    await p.evaluate(([out, side, up, bed, level, hy, back, pitch, swim]) => {
+      const g = window.game, pl = g.player, w = pl.walker, yaw = w.yaw, sx = -Math.sin(yaw), sz = -Math.cos(yaw);
+      if (out === null) {
+        if (swim) pl.teleport(w.pos.x + sx * 25, undefined, w.pos.z + sz * 25, yaw);
+        pl.heroCam.pitch = pitch;
+        return;
+      }
+      const x = w.pos.x + sx * out - sz * side, z = w.pos.z + sz * out + sx * side, ground = g.terrain.height(x, z);
+      const y = hy !== null ? w.pos.y + hy : level !== null ? level : bed !== null ? ground + bed : Math.max(ground, 0) + up;
+      const look = back ? Math.atan2(w.pos.x - x, z - w.pos.z) : Math.atan2(sx, -sz);
+      pl.flying = true;
+      pl.goTo([x, y, z], [(look * 180) / Math.PI, pitch]);
+    }, [out ?? null, side, up ?? 0, bed ?? null, level ?? null, hy ?? null, back, pitch, swim]);
+    await p.waitForTimeout(2000);
+  };
+}
+
 /** Puts the hero at (x, z) facing along (dx, dz), the camera behind at `pitch` (up positive) and `zoom` metres. */
 function stand(x, z, dx, dz, pitch, zoom) {
   return (p) => p.evaluate(([x, z, dx, dz, pitch, zoom]) => {
@@ -353,7 +404,7 @@ if (part === 'capital') {
 }
 if (!part) {
   let bad = false;
-  for (const p of ['town', 'land', 'caves', 'kinds', 'capital']) {
+  for (const p of ['town', 'land', 'caves', 'kinds', 'sea', 'capital']) {
     try { execFileSync(process.execPath, [fileURLToPath(import.meta.url), root, `--part=${p}`], { stdio: 'inherit' }); } catch { bad = true; }
   }
   process.exit(bad ? 1 : 0);

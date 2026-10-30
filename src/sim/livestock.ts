@@ -6,6 +6,7 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { pointInPoly, polyBounds, polyCentroid, type Paddock, type TownPlan } from '@futuremagic/settlement';
+import { seededSpot } from './seededSpot';
 
 /** What an animal is doing (a renderer maps it to a clip). */
 export type GrazerAct = 'eat' | 'idle' | 'walk';
@@ -172,10 +173,6 @@ export class Herds {
   /** A seeded spot of grass well inside the paddock. */
   private grassIn(pd: Paddock, r: Rng): [number, number] {
     const [x0, z0, x1, z1] = polyBounds(pd.poly);
-    for (let k = 0; k < 40; k++) {
-      const x = r.range(x0, x1), z = r.range(z0, z1);
-      if (this.inside(pd, x, z)) return [x, z];
-    }
-    return [(x0 + x1) / 2, (z0 + z1) / 2];
+    return seededSpot(pd.poly, (x, z) => this.inside(pd, x, z), r) ?? [(x0 + x1) / 2, (z0 + z1) / 2];
   }
 }

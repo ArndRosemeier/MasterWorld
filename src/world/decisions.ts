@@ -20,7 +20,12 @@ export interface TownDecision {
   readonly size?: SettlementSize;
   /** Its own seed (default: the world's, as the start town's). */
   readonly seed?: number;
+  /** A harbour town's shore (S2): a point on it near the town and the way out to sea (AssetGenerator HarbourSite). */
+  readonly harbour?: HarbourAt;
 }
+
+/** A point on the shore and the way out to sea from it (a unit vector). */
+export interface HarbourAt { readonly x: number; readonly z: number; readonly dx: number; readonly dz: number }
 
 /** A rock volume stands here (plan 5.6): milestone 1's arch. */
 export interface VolumeDecision {
@@ -157,7 +162,7 @@ export interface RegionDecision {
   readonly fill: string;
   readonly seed: number;
   /** What the fill placed: its middle (world metres), the way it faces (yaw) and its footprint's radius (m). */
-  readonly site?: { readonly x: number; readonly z: number; readonly yaw: number; readonly r: number };
+  readonly site?: { readonly x: number; readonly z: number; readonly yaw: number; readonly r: number; readonly harbour?: HarbourAt };
   /** Game hours since the world began. */
   readonly at: number;
 }
@@ -193,7 +198,7 @@ export const settles = (place: RegionFillDef['place']): place is 'waystation' | 
 export function settlementOf(d: RegionDecision, fills: readonly RegionFillDef[]): TownDecision | null {
   const f = d.site ? fills.find((x) => x.id === d.fill) : undefined;
   if (!f || !d.site || !settles(f.place)) return null;
-  return { kind: 'town', id: d.id, x: d.site.x, z: d.site.z, radius: d.site.r, size: f.place, seed: d.seed };
+  return { kind: 'town', id: d.id, x: d.site.x, z: d.site.z, radius: d.site.r, size: f.place, seed: d.seed, ...(d.site.harbour ? { harbour: d.site.harbour } : {}) };
 }
 
 /**

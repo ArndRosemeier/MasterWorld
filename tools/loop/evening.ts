@@ -20,6 +20,8 @@ const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   { seed: seeds[0], opts: { evenings: 1, reckless: true }, what: 'a reckless evening (a fall)' },
   // A second town (plan B3a): the same game in a village out on the land, through the same code.
   { seed: seeds[0], opts: { evenings: 3, settlement: 'village' }, what: '3 evenings in a village' },
+  // A harbour town (S2): the same game by the sea, its tavern on the quay.
+  { seed: seeds[0], opts: { evenings: 3, settlement: 'village', harbour: true }, what: '3 evenings in a harbour town' },
   { seed: seeds[1] ?? seeds[0], opts: { evenings: 2, settlement: 'hamlet' }, what: '2 evenings in a hamlet' },
   // The capital (C15): an evening in the first city, its 700 houses and 2700 people.
   { seed: seeds[0], opts: { evenings: 1, settlement: 'capital' }, what: 'an evening in the capital' },

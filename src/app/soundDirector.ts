@@ -12,6 +12,7 @@ import { hash3i, hashToFloat, smoothstep } from '@futuremagic/core';
 import { MusicPicker, Stride, strideAt } from '@futuremagic/audio';
 import type { AudioEngine } from '@futuremagic/audio/web';
 import type { LifeEvent } from '../sim/smallLife';
+import type { HenSound } from '../sim/poultry';
 import { MUSIC, daylight, hoofSound, musicMood, soundscape, stepSound, type Footing, type Hearing, type Place, type Threat } from '../game/soundscape';
 import type { Walker } from '../game/walker';
 import type { Steed } from '../game/horse';
@@ -95,6 +96,8 @@ export class SoundDirector {
   private air = 0;
   private fallSpeed = 0;
   private nextCall = 4;
+  /** When the next cluck may be heard. */
+  private nextCluck = 0;
   private calls = 0;
   private flashed = -Infinity;
   private thunders = 0;
@@ -150,6 +153,19 @@ export class SoundDirector {
   /** Small birds taking wing (sim/smallLife.ts): a flurry from where they rose, fuller the more they are. */
   wings(e: LifeEvent): void {
     this.host.engine.play('title/birds', { at: [e.x, e.y + 0.5, e.z], gain: Math.min(0.9, 0.3 + e.count * 0.04), pitch: e.count > 12 ? 0.9 : 1.15 });
+  }
+
+  /** A hen clucks, squawks as it scatters, or the cock crows (sim/poultry.ts): from the bird itself, if near enough to hear. */
+  hen(e: HenSound): void {
+    const cam = this.host.camera.position, d = Math.hypot(e.x - cam.x, e.z - cam.z);
+    const crow = e.kind === 'crow', reach = crow ? 300 : e.kind === 'squawk' ? 40 : 25;
+    if (d > reach || this.host.where().place === 'cellar') return;
+    // Clucks a little apart, so a yard full of hens is a murmur, not a din.
+    if (e.kind === 'cluck') { if (this.clock < this.nextCluck) return; this.nextCluck = this.clock + 0.7; }
+    const pitch = 0.9 + hashToFloat(hash3i(this.host.seed, Math.round(e.x * 10), Math.round(e.z * 10), 0x4e9)) * 0.25;
+    const id = crow ? 'call/rooster' : e.kind === 'squawk' ? 'call/hen-squawk' : 'call/hen';
+    const inside = this.host.where().place === 'room';
+    this.host.engine.play(id, { at: [e.x, this.host.terrain.height(e.x, e.z) + (crow ? 0.6 : 0.3), e.z], ref: crow ? 25 : 4, gain: (crow ? 0.8 : 0.6) * (inside ? 0.4 : 1), pitch, late: 0.5 });
   }
 
   /** A fight's cue (Encounter.onCue): blows, cries and falls from where they happen. */
@@ -383,7 +399,7 @@ export class SoundDirector {
     this.host.engine.play(delay < 1.6 ? 'thunder/near' : 'thunder/far', { at, ref: 500, delay, gain: inside ? 0.5 : 1, late: 2 });
   }
 
-  /** Birds, gulls, owls, a dog and the rooster, each from a place round about; the town's bell on the hour; drips in the cellar. */
+  /** Birds, gulls, owls and a dog, each from a place round about; the town's bell on the hour; drips in the cellar. */
   private wildlife(): void {
     const h = this.hearing;
     if (!h || h.place === 'room' || h.under) return;
@@ -415,14 +431,13 @@ export class SoundDirector {
       else if (h.town < 0.2) who.push('call/lark', 'call/robin', 'call/pigeon');
       if (h.sea < 150) who.push('call/gull', 'call/gull');
       if (h.town > 0.3) who.push('call/dog', 'call/pigeon');
-      if (h.town > 0.2 && h.hour < 8.5) who.push('call/rooster');
     } else {
       if (h.woods > 0.2) who.push('call/owl');
       if (h.town > 0.3) who.push('call/dog');
     }
     if (!who.length || dry < 0.3 || h.snow > 0.5) return;
     const id = who[Math.floor(draw(1) * who.length) % who.length];
-    const a = draw(2) * Math.PI * 2, d = 12 + draw(3) * 40, up = id === 'call/gull' ? 15 : id === 'call/dog' || id === 'call/rooster' ? 0.5 : 4 + draw(4) * 8;
+    const a = draw(2) * Math.PI * 2, d = 12 + draw(3) * 40, up = id === 'call/gull' ? 15 : id === 'call/dog' ? 0.5 : 4 + draw(4) * 8;
     e.play(id, { at: [cam.x + Math.cos(a) * d, cam.y + up, cam.z + Math.sin(a) * d], ref: 10, gain: 0.7, late: 1 });
   }
 }

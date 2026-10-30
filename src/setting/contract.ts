@@ -147,6 +147,8 @@ export interface WorldShape {
   readonly weather: WeatherDef;
   /** What grazes the farms' paddocks (the game draws each kind its own way). */
   readonly livestock: LivestockKind;
+  /** The hens and cocks scratching in the farmyards and the town's back yards (none if absent). */
+  readonly poultry?: PoultryDef;
   /** The landforms the biomes' mixes name (D55); none if absent. */
   readonly landforms?: readonly LandformDef[];
   /** The kinds of country (D55, plan 5.9), each stretch of 5-20 km one of them; all open country if absent. */
@@ -214,6 +216,22 @@ export interface MesaDef {
 
 /** Farm animals the game can draw. Sheep and pigs join when Actors has them. */
 export type LivestockKind = 'horse' | 'cow';
+
+/** Hens about the yards (sim/poultry.ts): how many, where, and when the cock crows. */
+export interface PoultryDef {
+  /** Hens in a farm's yard, at least and at most; each farm keeps a cock too. */
+  readonly farmHens: readonly [number, number];
+  /** Share of the town's back yards (of at least `yardArea` m²) that keep a few hens. */
+  readonly yardShare: number;
+  readonly yardArea: number;
+  /** Hens in such a yard, at least and at most, and the chance one has a cock too. */
+  readonly yardHens: readonly [number, number];
+  readonly yardCock: number;
+  /** Hours awake (sunrise to dusk): outside them they sit and doze where they are. */
+  readonly awake: readonly [number, number];
+  /** Until this hour the cock crows now and then. */
+  readonly crowUntil: number;
+}
 
 export interface StartSpec {
   /** Biome ids the start town may lie in, in order of preference. */
@@ -575,6 +593,8 @@ export interface RegionFillDef {
   readonly ring?: readonly [number, number?];
   /** Places of this fill keep at least this far apart, metres. */
   readonly apart?: number;
+  /** A harbour town (phase D, S2): the settlement stands where a river meets the sea, with a quay and piers. */
+  readonly harbour?: boolean;
 }
 
 /** The regions the VGM opens as the hero walks (plan 5.5): the fills, which is plain country, and the start's. */

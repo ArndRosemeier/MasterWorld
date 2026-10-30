@@ -112,6 +112,16 @@ export const routines: RoutinesDef = {
       { at: 0, do: 'sleep' }, { at: 4.75, do: 'rise' }, { at: 5.5, do: 'work' }, { at: 12, do: 'meal' }, { at: 12.75, do: 'work' },
       { at: 17.75, do: 'meal' }, { at: 18.5, do: 'home' }, { at: 21, do: 'sleep' },
     ] },
+    // Fisherfolk (S2) are up before the light with their nets, and like the tavern of an evening.
+    fisher: { workday: [
+      { at: 0, do: 'sleep' }, { at: 4, do: 'rise' }, { at: 4.5, do: 'work' }, { at: 11.5, do: 'meal' }, { at: 12.5, do: 'chores' },
+      { at: 14, do: 'work' }, ...evening(17.5, 0.55, 21.5),
+    ] },
+    // Dockhands load and unload at the warehouses' cranes from first light, a long day while ships are in.
+    warehouse: { workday: [
+      { at: 0, do: 'sleep' }, { at: 5, do: 'rise' }, { at: 5.75, do: 'work' }, { at: 12, do: 'meal' }, { at: 12.75, do: 'work' },
+      { at: 17.5, do: 'chores' }, ...evening(18.25, 0.5, 22.25),
+    ] },
     // The carter sees to the horses at first light and last thing.
     carter: { workday: [
       { at: 0, do: 'sleep' }, { at: 5, do: 'work' }, { at: 7, do: 'meal' }, { at: 7.5, do: 'work' }, { at: 12, do: 'meal' },

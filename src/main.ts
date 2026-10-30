@@ -20,6 +20,8 @@ import { cleanStoneSave } from './game/portalStone';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
+import { nearestCoast } from './world/coast';
+import { UNDER_LENS, updateVeil } from './render/underwater';
 import { Rocks } from './world/rocks';
 import { RockView } from './render/rocks/RockView';
 import { woodsOf } from './world/flora';
@@ -32,6 +34,7 @@ import { GIANT_SPEED, giantPose, type Orbit } from './app/title/route';
 import { FolkView } from './render/folk/FolkView';
 import { HorseView } from './render/horse/HorseView';
 import { StockView } from './render/livestock/StockView';
+import { PoultryView } from './render/livestock/PoultryView';
 import { Steed, groundPace, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import type { Agent, TownOrder } from './sim/townLife';
@@ -567,15 +570,18 @@ export async function start(b: Boot): Promise<void> {
     if (setting.regions && params.regions) {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights, jobs: { frontier: (a) => jobs.frontier(a), site: (j) => terrainJobs.site(j) } }, log);
       for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
-      // `site=<place>`: walk out from the start until one opens, then stand before it.
-      const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind).map((f) => f.id));
+      // `site=<place or fill>`: walk out from the start until one opens, then stand before it (a harbour town: on
+      // its quay, facing the sea).
+      const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind || f.id === kind).map((f) => f.id));
       for (let dir = 0; kind && dir < 8; dir++) {
         const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: start?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
         for (const d of walked) regionOpened(d);
         const s = found.site, d = s.r + (params.siteAt ?? (kind === 'capital' ? 60 : 14)); // a capital's wall stands out past its houses
-        player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
+        const quay = s.harbour, back = params.siteAt ?? 4;
+        if (quay) player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
+        else player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
         break;
       }
     }
@@ -623,6 +629,9 @@ export async function start(b: Boot): Promise<void> {
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r),
     }, setting.smallLife) : null;
     const smallView = small ? new SmallLifeView(small, view.stage, view.renderer) : null;
+    // The yards' hens (the private library's chicken and rooster): bodies for the nearest; none without the library.
+    const hens = params.hens > 0 && setting.world.poultry ? await PoultryView.pool(params.hens, Math.max(1, Math.round(params.hens / 5)), (x, z) => feet.footing(x, z)) : null;
+    if (hens) compileEarly(hens.toWarm());
     if (stock) compileEarly(stock.toWarm());
     if (smallView) compileEarly(smallView.toWarm());
     let folk: FolkView | null = null;
@@ -657,7 +666,7 @@ export async function start(b: Boot): Promise<void> {
     // what changed since, such as the hero's arms), and its shadow casters drawn once (Stage.prepare).
     await Promise.all(compiling);
     console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: every early compile done; their shadows next`);
-    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
+    await Promise.all([...(grass ? [grass.group] : []), hero.object, wx.precip, ...(horses ? horses.warmObjects() : []), ...(stock ? stock.toWarm() : []), ...(hens ? hens.toWarm() : []), ...(smallView ? smallView.toWarm() : []), ...folkWarm].map((o) => view.stage.prepare(o)));
     let hurried = false;
     const shown = () => { view.stage.cap.share = hurried && !window.__mwReady ? 1 : capShare; view.stage.monitor.phase = hurried && !window.__mwReady ? 'warmup' : 'run'; };
     hurry = () => { hurried = true; if (!window.__mwReady) { view.stage.cap.share = 1; view.stage.monitor.phase = 'warmup'; } };
@@ -676,6 +685,7 @@ export async function start(b: Boot): Promise<void> {
     await view.stage.add(hero.object);
     await horses?.show(view.stage);
     await stock?.enter(view.stage);
+    await hens?.enter(view.stage);
     await smallView?.addBirds();
     await view.stage.add(wx.precip);
     stamp('sky, sea, hero and animals shown')();
@@ -832,6 +842,9 @@ export async function start(b: Boot): Promise<void> {
     // `kind=<id>`: out in the nearest stretch of that kind of country (L7), looking across it.
     const inKind = params.kind ? terrain.skeleton.nearestKind(params.kind, player.walker.pos.x, player.walker.pos.z) : null;
     if (inKind) player.teleport(inKind.x, undefined, inKind.z, 0);
+    // `coast=<beach|cliff|under>`: by the nearest sea (S1), facing out to it.
+    const atSea = params.coast ? nearestCoast(terrain, params.coast, player.walker.pos.x, player.walker.pos.z) : null;
+    if (atSea) player.teleport(atSea.x, undefined, atSea.z, Math.atan2(-atSea.seaX, -atSea.seaZ));
     // Portals (app/portals.ts): openings joining two places, walked through and looked through.
     const portalView = new PortalView(view);
     await view.stage.add(portalView.group);
@@ -939,6 +952,7 @@ export async function start(b: Boot): Promise<void> {
     let lookWild = by ? by.kind : null;
     // `small=squirrel` / `birds` / `flock`: beside the first that is about (for looking at them).
     let lookSmall = params.smallAt;
+    let lookHens = params.henShot;
     /** With `fly`: the one the free camera follows, and how far off. */
     let watchSmall: { it: { x: number; y: number; z: number }; d: number } | null = null;
     /** The hero `d` metres from `seen`, on the side they are on, facing it. */
@@ -2189,7 +2203,10 @@ export async function start(b: Boot): Promise<void> {
       // The floating origin steps once the camera strays from it, before anything writes origin-relative data.
       part('origin+weather');
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
-      view.sky.underwater = sea.submerged(view.camera.position);
+      // Under the sea, or in the waterline (render/underwater.ts): the camera's height over the surface at it, waves and all.
+      const camAt = view.camera.position, surf = sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
+      view.sky.underwater = overSea < -UNDER_LENS;
+      updateVeil(view.camera, overSea, view.sky.underwater, view.sky.murk, dt);
       wx.apply(dt, view.camera.position, hours(), view.sky);
       // Raided farms' barns smoulder (C10): looked up now and then, the puffs rise every frame.
       part('smoke+barns');
@@ -2236,6 +2253,24 @@ export async function start(b: Boot): Promise<void> {
       if (folk) folk.lives = lives;
       part('herds');
       stock?.herd(dt, cam, towns.graze(dt, cam.x, cam.z));
+      part('hens');
+      {
+        // The yards' hens scratch about whether drawn or not (they are heard); they scatter from the hero on foot out of doors.
+        const w = player.walker.pos, onFoot = above && !rooms?.inside && !player.flying ? { x: w.x, z: w.z } : null;
+        const flocks = towns.peck(dt, cam.x, cam.z, onFoot);
+        if (lookHens) {
+          // A farmyard's hen: the yard is open ground (a back yard's garden can hide it behind a bush).
+          const near = flocks.flatMap((f) => f.hens).filter((a) => !a.cock && a.farm).sort((a, b) => Math.hypot(a.x - w.x, a.z - w.z) - Math.hypot(b.x - w.x, b.z - w.z))[0];
+          if (near) {
+            // Facing a little past it: the camera behind the hero then sees the hen beside them, not behind their back.
+            standBeside(near, 3.2);
+            player.teleport(player.walker.pos.x, undefined, player.walker.pos.z, player.walker.yaw + 0.5);
+            lookHens = false;
+          }
+        }
+        if (above) for (const f of flocks) for (const e of f.heard) sounds?.hen(e);
+        hens?.showFlocks(dt, cam, above ? flocks : []);
+      }
       part('small life');
       if (small && smallView) {
         // Out of doors only: below or inside, the land's small life waits.
