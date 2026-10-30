@@ -15,6 +15,15 @@ const secs = Number(process.argv[2] ?? 40), over = Number(process.env.HITCH_OVER
 const elements = process.env.HITCH_ELEMENTS === '1';
 const { server, base, browser } = await launch({ args: ['--enable-precise-memory-info', ...(elements || process.env.HITCH_JSFLAGS ? [`--js-flags=${[elements ? '--allow-natives-syntax' : '', process.env.HITCH_JSFLAGS ?? ''].join(' ').trim()}`] : [])] });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+// HITCH_UNBOXALL=1 (with HITCH_ELEMENTS=1): every matrix the page makes is kept track of from the first, and before the
+// fight all of them are unboxed at once: do they stay doubles (boxed once while loading) or box again (boxed all along)?
+if (process.env.HITCH_UNBOXALL === '1') await page.addInitScript(() => {
+  const all = (window.__allMatrices = []);
+  Object.defineProperty(Object.prototype, 'elements', { configurable: true, set(v) {
+    Object.defineProperty(this, 'elements', { value: v, writable: true, enumerable: true, configurable: true });
+    if (this.constructor?.name === 'Matrix4') all.push(new WeakRef(this));
+  } });
+});
 page.on('pageerror', (e) => console.log(`PAGE ERROR: ${e.message}`));
 await page.goto(`${base}?title=0&day=0&hour=11&weather=fair&hold=hated${process.env.SET_GL === '1' ? '&gl' : ''}`);
 await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT });
@@ -43,6 +52,18 @@ if (process.env.HITCH_UNBOX === '1') console.log(`--- unboxed matrices: ${await 
   const fresh = (m) => { const e = m.elements, a = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; for (let i = 0; i < 16; i++) a[i] = e[i]; m.elements = a; n++; };
   window.game.view.scene.traverse((o) => { fresh(o.matrix); fresh(o.matrixWorld); for (const b of o.skeleton?.bones ?? []) { fresh(b.matrix); fresh(b.matrixWorld); } });
   return n;
+})}`);
+if (process.env.HITCH_UNBOXALL === '1') console.log(`--- every matrix unboxed: ${await page.evaluate(async () => {
+  const isObj = new Function('a', 'return %HasObjectElements(a)');
+  const live = () => window.__allMatrices.map((r) => r.deref()).filter(Boolean);
+  const count = () => { let b = 0, n = 0; for (const m of live()) { n++; if (isObj(m.elements)) b++; } return `${b} boxed of ${n}`; };
+  const before = count();
+  for (const m of live()) { const e = m.elements, a = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; for (let i = 0; i < 16; i++) a[i] = e[i]; m.elements = a; }
+  const after = count();
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const frame = count();
+  await new Promise((r) => setTimeout(r, 3000));
+  return `before ${before}; unboxed ${after}; two frames later ${frame}; 3 s later ${count()}`;
 })}`);
 // HITCH_REVERT=1 (with HITCH_ELEMENTS=1): unboxed as above, then after one frame and after a second, which objects'
 // matrices are boxed again, and any matrix number or position, scale or turn that is not a number at all.
