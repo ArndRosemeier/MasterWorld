@@ -38,6 +38,8 @@ export interface ChunkMesh {
   level: Float32Array;
   /** Quads per side it was built with (the worker may build finer than asked: `finerFor`). */
   segs: number;
+  /** Its own triangle list where some quads are cut along their other diagonal (`followEdges`); else the shared one. */
+  index?: Uint16Array | Uint32Array;
   minY: number;
   maxY: number;
 }
@@ -62,6 +64,9 @@ export function finerFor(t: Terrain, spec: ChunkSpec): number {
 }
 
 
+/** Vertex spacing (m) from which normals are taken over two cells each way (smoothNormals). */
+const SMOOTH_STEP = 4;
+
 export const vertexCount = (segs: number): number => (segs + 1) * (segs + 1) + 4 * segs;
 
 /** The triangle list shared by every chunk of `segs` (grid, then skirt walls). */
@@ -80,6 +85,27 @@ export function chunkIndex(segs: number): Uint32Array {
     out.push(a, b, sa, b, sb, sa);
   }
   return new Uint32Array(out);
+}
+
+/**
+ * A far chunk's own triangle list, where a quad is cut along the diagonal whose corners lie nearer in height: a steep
+ * edge (a scarp's or a mesa's rim) running slantwise through vertices 4 m apart and more stood in a saw of teeth along
+ * the shared list's one diagonal, the same way in every quad. Null when no quad needs it (the shared list serves).
+ * Near chunks keep the shared cut (2 m cells: their teeth are small, and every chunk there drawing the shared list keeps it cheap).
+ */
+export function followEdges(h: (i: number, j: number) => number, segs: number, step: number): Uint16Array | Uint32Array | null {
+  if (step < SMOOTH_STEP) return null;
+  const n = segs + 1;
+  let out: Uint16Array | Uint32Array | null = null;
+  for (let j = 0; j < segs; j++) for (let i = 0; i < segs; i++) {
+    // The shared list cuts b-c; a-d instead where its corners differ clearly less (by a third of a cell's width).
+    const bc = Math.abs(h(i + 1, j) - h(i, j + 1)), ad = Math.abs(h(i, j) - h(i + 1, j + 1));
+    if (bc - ad < step / 3) continue;
+    out ??= vertexCount(segs) < 65536 ? new Uint16Array(chunkIndex(segs)) : chunkIndex(segs);
+    const a = j * n + i, b = a + 1, c = a + n, d = c + 1, q = (j * segs + i) * 6;
+    out[q] = a; out[q + 1] = c; out[q + 2] = d; out[q + 3] = a; out[q + 4] = d; out[q + 5] = b;
+  }
+  return out;
 }
 
 function borderRing(segs: number): number[] {
@@ -176,8 +202,6 @@ function layerEverywhere(ground: Float32Array, n: number, cstep: number, segs: n
   for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) { const g = coarse(i, j); if (ground[g] < 0) ground[g] = 0; }
 }
 
-/** Vertex spacing (m) from which normals are taken over two cells each way (smoothNormals). */
-const SMOOTH_STEP = 4;
 
 export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const { x0, z0, size, segs } = spec;
@@ -250,7 +274,8 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     for (let c = 0; c < 4; c++) { surface[v * 4 + c] = surface[g * 4 + c]; canopy[v * 4 + c] = canopy[g * 4 + c]; ground[v * 4 + c] = ground[g * 4 + c]; }
     level[v] = level[g];
   }
-  return { position, normal, color, surface, level, canopy, ground, segs, minY: minY - drop, maxY };
+  const index = followEdges(H, segs, step) ?? undefined;
+  return { position, normal, color, surface, level, canopy, ground, segs, index, minY: minY - drop, maxY };
 }
 
 /** Moves world-space vertices (x, y, z triples) to be relative to their middle (whole metres, xz); returns it. */
