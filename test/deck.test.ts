@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planShip, shipFloor, type Mooring } from '@futuremagic/settlement';
+import { hullHalf, planShip, shipFloor, type Mooring } from '@futuremagic/settlement';
 import { Walker, type WalkWorld } from '../src/game/walker';
 import { Decks, toShip, toWorld, type Pose } from '../src/world/deck';
 
@@ -14,7 +14,7 @@ function sea(decks: Decks): WalkWorld {
     height: (_x, z) => (z < pierEdge ? mooring.landY : -12),
     rockSurface: () => null,
     waterLevel: (_x, z) => (z < pierEdge ? null : 0),
-    floor: (x, z) => decks.underfoot(x, z),
+    floor: (x, z, y) => decks.underfoot(x, z, y),
     wall: (x, z, r, y) => decks.hull(x, z, r, y ?? 0),
   };
 }
@@ -82,4 +82,27 @@ test('deck: up the gangplank from the pier, through the gangway and onto the dec
   assert.equal(decks.ship, 's', `aboard (at z ${w.pos.z.toFixed(2)}, y ${w.pos.y.toFixed(2)})`);
   // And walked on across until the far rail stops it.
   assert.ok(w.pos.z > 0.5 && w.pos.z < plan.beam / 2, `at z ${w.pos.z.toFixed(2)}`);
+});
+
+test('deck: a deck is no floor to a swimmer below it (never lifted 2 m onto it); a hero put elsewhere is not carried back', () => {
+  let walker: Walker | null = null;
+  const decks = new Decks(() => walker?.pos ?? null), w = (walker = new Walker(sea(decks))), dt = 1 / 60;
+  decks.move('s', plan, swell(0, 0));
+  const edge = hullHalf(plan, 0, plan.deckY) - 0.3;
+  assert.ok(Math.abs(decks.underfoot(0, edge, plan.deckY)! - plan.deckY) < 0.05, 'the deck to one on it');
+  assert.equal(decks.underfoot(0, edge, -0.6), null, 'none to one in the water');
+  // Swimming along its side, pressed against it: in the water all the while.
+  w.place(0, hullHalf(plan, 0, 1.2) + w.spec.radius + 0.05);
+  for (let i = 0; i < 3 * 60; i++) {
+    decks.move('s', plan, swell(i * dt, 0));
+    w.step({ forward: 1, strafe: 0.4, heading: Math.PI / 2, walk: false, up: false, down: false }, dt);
+    decks.boarded();
+    assert.ok(w.pos.y < 0.5, `lifted to ${w.pos.y.toFixed(2)} m`);
+  }
+  assert.equal(w.mode, 'swim');
+  // Aboard, then put on the pier: the next swell does not carry it back.
+  w.place(1.8, 0); decks.boarded();
+  assert.equal(decks.ship, 's');
+  w.place(1.8, pierEdge - 3); decks.move('s', plan, swell(1, 0));
+  assert.ok(w.pos.z < pierEdge, 'stays where it was put');
 });

@@ -49,13 +49,13 @@ interface Afloat {
   plank: { readonly foot: At; readonly side: 1 | -1 } | null;
 }
 
-/** How far onto the land a gangplank reaches past its edge (m). */
-const ONTO = 0.9;
+/** How far onto the land a gangplank reaches past its edge (m); a walker's step up (game/walker.ts WALK.step). */
+const ONTO = 0.9, STEP = 0.45;
 
 export class Decks {
   private readonly ships = new Map<string, Afloat>();
   /** The ship the rider stands on (its id), and where on it, in its frame. */
-  private aboard: { id: string; a: number; h: number; b: number } | null = null;
+  private aboard: { id: string; a: number; h: number; b: number; x: number; y: number; z: number } | null = null;
 
   /** `rider`: the body carried along by a deck it stands on (the hero's walker's position). */
   constructor(private readonly riding: () => At | null = () => null) {}
@@ -67,10 +67,12 @@ export class Decks {
   move(id: string, plan: ShipPlan, pose: Pose, moored: Mooring | null = null): void {
     let s = this.ships.get(id);
     if (!s) { s = { plan, pose: { ...pose }, plank: null }; this.ships.set(id, s); }
-    const r = this.riding(), on = r && this.aboard?.id === id ? this.aboard : null;
+    const r = this.riding(), was = r && this.aboard?.id === id ? this.aboard : null;
+    // Put somewhere else since it last stood here (a teleport, a cut scene): not carried back.
+    const on = was && r && Math.abs(r.x - was.x) + Math.abs(r.y - was.y) + Math.abs(r.z - was.z) < 1e-6 ? was : null;
     Object.assign(s.pose, pose);
     s.plank = moored && plan.gangway ? s.plank ?? plankFoot(moored) : null;
-    if (r && on) { const w = toWorld(s.pose, on.a, on.h, on.b); r.x = w.x; r.y = w.y; r.z = w.z; }
+    if (r && on) { const w = toWorld(s.pose, on.a, on.h, on.b); r.x = on.x = w.x; r.y = on.y = w.y; r.z = on.z = w.z; }
   }
 
   /** The ship is gone from near the hero. */
@@ -88,9 +90,9 @@ export class Decks {
     this.aboard = null;
     if (!r) return;
     for (const [id, s] of this.ships) {
-      const f = this.deckFloor(s, r.x, r.z);
+      const f = this.deckFloor(s, r.x, r.z, r.y);
       // Over the deck, on it or jumping (a jump goes with the ship's way), not fallen below it.
-      if (f !== null && r.y > f - 0.3 && r.y < f + 2.5) { const l = toShip(s.pose, r.x, r.y, r.z); this.aboard = { id, ...l }; return; }
+      if (f !== null && r.y > f - 0.3 && r.y < f + 2.5) { const l = toShip(s.pose, r.x, r.y, r.z); this.aboard = { id, ...l, x: r.x, y: r.y, z: r.z }; return; }
     }
   }
 
@@ -99,10 +101,13 @@ export class Decks {
     return this.aboard?.id ?? null;
   }
 
-  /** The floor at (x, z) on a deck or a gangplank, world y (null: none there). */
-  underfoot(x: number, z: number): number | null {
+  /**
+   * The floor at (x, z) on a deck or a gangplank, world y (null: none there). With the feet's height `y`: under a
+   * castle's deck from below it, the cabin's floor; a deck over a body in the water (or falling past it), none.
+   */
+  underfoot(x: number, z: number, y?: number): number | null {
     let top = -Infinity;
-    for (const s of this.ships.values()) top = Math.max(top, this.deckFloor(s, x, z) ?? this.plankFloor(s, x, z) ?? -Infinity);
+    for (const s of this.ships.values()) top = Math.max(top, this.deckFloor(s, x, z, y) ?? this.plankFloor(s, x, z) ?? -Infinity);
     return top > -Infinity ? top : null;
   }
 
@@ -119,15 +124,19 @@ export class Decks {
     return false;
   }
 
-  private deckFloor(s: Afloat, x: number, z: number): number | null {
+  private deckFloor(s: Afloat, x: number, z: number, y?: number): number | null {
     const p = s.pose;
     if (Math.hypot(x - p.x, z - p.z) > s.plan.length / 2 + 1) return null;
     // Where the vertical through (x, z) meets the main deck, the floor there; on a castle or the grating, its own.
     const m = vertical(p, x, z, s.plan.deckY), f = shipFloor(s.plan, m.a, m.b);
     if (f === null) return null;
+    const reach = y === undefined ? Infinity : y + STEP;
+    if (m.y > reach) return null;
     if (f === s.plan.deckY) return m.y;
     const c = vertical(p, x, z, f);
-    return shipFloor(s.plan, c.a, c.b) === f ? c.y : m.y;
+    if (shipFloor(s.plan, c.a, c.b) !== f) return m.y;
+    // A castle's deck over the feet (in its cabin, or against its front): the main deck under it.
+    return c.y > reach ? m.y : c.y;
   }
 
   /** A ship's gangplank's ends now (its foot on the land, its head at the gangway), for drawing it; null: none out. */

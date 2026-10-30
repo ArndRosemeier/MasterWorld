@@ -296,12 +296,14 @@ export async function start(b: Boot): Promise<void> {
     const bridgeView = new BridgeView(view.stage, terrain);
     // The decks of the ships near the hero (S3): floors and walls that move with the waves, carrying the hero on them.
     const decks = new Decks(() => player.walker.pos);
+    // A pier's deck or a bridge's high over the feet (a swimmer under it) is not under them: never lifted onto it.
+    const overhead = (f: number | null, y: number | undefined): number | null => (f !== null && y !== undefined && f > y + 1.6 ? null : f);
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
     const landWorld: WalkWorld = {
       // In a cave mouth's throat its own floor (it runs under the land's ground, which the crag carves).
       height: (x, z) => cellars?.floor(x, z) ?? terrain.height(x, z),
       // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
-      floor: (x, z) => decks.underfoot(x, z) ?? towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null,
+      floor: (x, z, y) => decks.underfoot(x, z, y) ?? overhead(towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null, y),
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
       rockSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, false)),
       // In a building the camera stays in the room (its doorway shut to it).
@@ -326,7 +328,7 @@ export async function start(b: Boot): Promise<void> {
     // Down in a cellar the walker walks its space, else the land.
     const world: WalkWorld = {
       height: (x, z) => below()?.height(x, z) ?? landWorld.height(x, z),
-      floor: (x, z) => (below() ? null : landWorld.floor!(x, z)),
+      floor: (x, z, y) => (below() ? null : landWorld.floor!(x, z, y)),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : landWorld.rockSurface(x, y, z); },
       sightSurface: (x, y, z) => { const b = below(); return b ? (b.sightSurface ?? b.rockSurface)(x, y, z) : landWorld.sightSurface!(x, y, z); },
       waterLevel: (x, z) => (below() ? null : landWorld.waterLevel(x, z)),

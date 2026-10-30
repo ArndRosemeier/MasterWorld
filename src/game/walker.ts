@@ -17,8 +17,12 @@ export interface WalkWorld {
   rockSurface(x: number, y: number, z: number): number | null;
   /** Calm water surface level here, or null where there is no water. */
   waterLevel(x: number, z: number): number | null;
-  /** Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. */
-  floor?(x: number, z: number): number | null;
+  /**
+   * Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. With
+   * `y` (the feet's height) a floor that has another over it (a ship's cabin under its castle's deck) is the one a step
+   * over the feet or below; a floor high over the feet may be left out (a deck over a swimmer is not under them).
+   */
+  floor?(x: number, z: number, y?: number): number | null;
   /** What the camera keeps clear of, if not `rockSurface` (a building one is in: its doorway shut too, so the camera stays in the room). */
   sightSurface?(x: number, y: number, z: number): number | null;
   /** Walls (buildings, furniture): does a body of radius `r` at (x, z), its feet at `y` (the storey it is on), touch one? */
@@ -137,7 +141,7 @@ export class Walker {
    * `y` (so the walker can stand on an arch and walk under it).
    */
   support(x: number, z: number, y: number): number {
-    const h = Math.max(this.world.height(x, z), this.world.floor?.(x, z) ?? -Infinity);
+    const h = Math.max(this.world.height(x, z), this.world.floor?.(x, z, y) ?? -Infinity);
     let s = y + this.spec.step;
     if (s <= h) return h;
     for (let i = 0; i < 48; i++) {

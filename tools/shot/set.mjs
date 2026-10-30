@@ -283,9 +283,20 @@ const SESSIONS = [
   { id: 'sea-deck', query: `${still}&hour=11&weather=fair&site=harbour&aboard`, shots: [
     { name: 'sea-deck', act: async (p) => {
       await p.waitForFunction(() => window.game?.decks?.ship, null, { timeout: TIMEOUT });
-      await seaLook({ pitch: 0.1 })(p);
+      await seaLook({ out: -7, hy: 3, back: true, pitch: -14 })(p);
     } },
-    { name: 'sea-deck-plank', act: seaLook({ out: 2, side: 12, hy: 1, back: true, pitch: -4 }) },
+    { name: 'sea-deck-plank', act: async (p) => {
+      // From the pier, out past the plank's foot and to one side, looking up it at the gangway.
+      await p.evaluate(() => {
+        const g = window.game, e = g.decks.plankOf(g.decks.ship);
+        if (!e) throw new Error('sea-deck-plank: no gangplank out');
+        const dx = e.foot.x - e.head.x, dz = e.foot.z - e.head.z, l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l;
+        const x = e.foot.x + ux * 5 - uz * 3, z = e.foot.z + uz * 5 + ux * 3;
+        g.player.flying = true;
+        g.player.goTo([x, e.foot.y + 1.7, z], [(Math.atan2(e.head.x - x, z - e.head.z) * 180) / Math.PI, -6]);
+      });
+      await p.waitForTimeout(2000);
+    } },
   ] },
   // Gate C: what phase C gave the world, seen. A hurt traveller by the way (they cry out once seen), then a
   // farm the bandits raided: its barn burnt, smoke over it, its paddock empty.
