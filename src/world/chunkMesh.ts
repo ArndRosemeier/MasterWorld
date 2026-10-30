@@ -3,6 +3,7 @@
  * its edge that hides cracks between chunks of different detail. Every chunk shares one index buffer.
  */
 import { srgbToLinear, clamp, smoothstep } from '@futuremagic/core';
+import { NATURAL_NAMES, NATURAL_TILE_METERS } from '@futuremagic/texgen';
 import { SURFACES } from '../setting/contract';
 import type { Terrain } from './terrain';
 import { canopySampler, type Canopy } from './canopy';
@@ -27,6 +28,8 @@ export interface ChunkMesh {
   surface: Float32Array;
   /** The woods from afar per vertex (world/canopy.ts): crown cover, tree height, spacing, conifer share. */
   canopy: Float32Array;
+  /** A kind of country's own ground layer per vertex (groundLook): the layer, how much it holds, its share, 1 / its tile (m). */
+  ground: Float32Array;
   /**
    * How level the ground is around each vertex: the up component of the normal smoothed over a few metres.
    * It changes smoothly from vertex to vertex even across a cliff's edge (where the normal flips between
@@ -95,14 +98,17 @@ const FOREST = SURFACES.indexOf('forest'), GRASS = SURFACES.indexOf('grass');
  * The ground's look at a point, for any mesh drawn with the terrain material: writes the biome's linear
  * ground colour and its surface weights (one-hot, SURFACES order) at vertex `v` of `color` and `surface`.
  */
-export function groundLook(t: Terrain): (x: number, z: number, color: Float32Array, surface: Float32Array, v: number) => void {
+export function groundLook(t: Terrain): (x: number, z: number, color: Float32Array, surface: Float32Array, v: number, ground?: Float32Array) => void {
   const linear = (c: number): number[] => [srgbToLinear(((c >> 16) & 255) / 255), srgbToLinear(((c >> 8) & 255) / 255), srgbToLinear((c & 255) / 255)];
   const lin = t.biomes.map((b) => linear(b.ground));
   const surf = t.biomes.map((b) => SURFACES.indexOf(b.surface));
   // The kinds of country that wear their own ground (downs' turf, badlands' clay), blended in by how much of each is here.
-  const kinds = t.skeleton.kinds, worn = kinds.map((k) => (k.wears ? { color: linear(k.wears.color), surface: SURFACES.indexOf(k.wears.surface) } : null));
+  const kinds = t.skeleton.kinds, worn = kinds.map((k) => (k.wears?.color !== undefined && k.wears.surface ? { color: linear(k.wears.color), surface: SURFACES.indexOf(k.wears.surface) } : null));
   const wears = worn.some((k) => k);
-  return (x, z, color, surface, v) => {
+  // Their own ground layers (a moor's heather, badlands' clay): texgen natural layers.
+  const layers = kinds.map((k) => (k.wears?.layer ? { layer: NATURAL_NAMES.indexOf(k.wears.layer), share: k.wears.share ?? 1 } : null));
+  const laid = layers.some((k) => k);
+  return (x, z, color, surface, v, ground) => {
     const b = clamp(t.biomeAt(x, z), 0, lin.length - 1), c = lin[b];
     // A settlement's ground is kept: grass, not the wood's floor, even where it was cleared from forest.
     const town = t.townGround(x, z) !== TownGround.None, kept = surf[b] === FOREST && town;
@@ -120,7 +126,54 @@ export function groundLook(t: Terrain): (x: number, z: number, color: Float32Arr
     }
     color[v * 3] = r + left * c[0]; color[v * 3 + 1] = g + left * c[1]; color[v * 3 + 2] = bl + left * c[2];
     surface[v * 4 + (kept ? GRASS : surf[b])] += left;
+    if (ground) kindGround(t, layers, laid && !town && t.height(x, z) > 1.5, x, z, ground, v);
   };
+}
+
+/**
+ * The kind of country's own ground layer at (x, z) into `ground` at vertex `v`: the layer of the kind that holds most
+ * here, and by how much more than the next one with a layer (so where two kinds' layers meet, each fades out before
+ * the other comes in, and a triangle never blends two layers' numbers), its share, and 1 / its tile in metres.
+ */
+function kindGround(t: Terrain, layers: readonly ({ layer: number; share: number } | null)[], on: boolean, x: number, z: number, ground: Float32Array, v: number): void {
+  let best = -1, w1 = 0, w2 = 0;
+  if (on) {
+    const w = t.skeleton.kindWeights(x, z);
+    for (let i = 0; i < w.length; i++) {
+      if (!layers[i] || w[i] <= 0) continue;
+      if (w[i] > w1) { w2 = w1; w1 = w[i]; best = i; } else if (w[i] > w2) w2 = w[i];
+    }
+  }
+  const k = best >= 0 ? layers[best]! : null;
+  ground[v * 4] = k ? k.layer : -1;
+  ground[v * 4 + 1] = k ? w1 - w2 : 0;
+  ground[v * 4 + 2] = k ? k.share : 0;
+  ground[v * 4 + 3] = k ? 1 / NATURAL_TILE_METERS[k.layer] : 1;
+}
+
+/**
+ * Where no kind lays its ground (number −1), the number of the nearest coarse sample that has one (else 0), so a
+ * triangle running out of a kind's ground fades by its weight alone and never blends one layer's number into another's.
+ */
+function layerEverywhere(ground: Float32Array, n: number, cstep: number, segs: number): void {
+  const coarse = (i: number, j: number) => (Math.min(segs, j * cstep) * n + Math.min(segs, i * cstep)) * 4;
+  const m = Math.ceil(segs / cstep) + 1;
+  for (let pass = 0; pass < m; pass++) {
+    let left = false;
+    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+      const g = coarse(i, j);
+      if (ground[g] >= 0) continue;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const a = i + di, b = j + dj;
+        if (a < 0 || b < 0 || a >= m || b >= m) continue;
+        const o = coarse(a, b);
+        if (ground[o] >= 0) { ground[g] = ground[o]; ground[g + 2] = ground[o + 2]; ground[g + 3] = ground[o + 3]; break; }
+      }
+      if (ground[g] < 0) left = true;
+    }
+    if (!left) break;
+  }
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) { const g = coarse(i, j); if (ground[g] < 0) ground[g] = 0; }
 }
 
 /** Vertex spacing (m) from which normals are taken over two cells each way (smoothNormals). */
@@ -136,7 +189,7 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
   const H = (i: number, j: number): number => h[(j + 2) * m + i + 2];
   const vc = vertexCount(segs);
   const position = new Float32Array(vc * 3), normal = new Float32Array(vc * 3), color = new Float32Array(vc * 3);
-  const surface = new Float32Array(vc * 4), level = new Float32Array(vc), canopy = new Float32Array(vc * 4);
+  const surface = new Float32Array(vc * 4), level = new Float32Array(vc), canopy = new Float32Array(vc * 4), ground = new Float32Array(vc * 4);
   const look = groundLook(t), woods = canopySampler(t), c: Canopy = { cover: 0, height: 0, spacing: 0, conifer: 0 };
   let minY = Infinity, maxY = -Infinity;
   // Biome colour on a coarser grid (it varies over kilometres), blended per vertex.
@@ -163,12 +216,13 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     normal[v * 3 + 1] = ny / l;
     normal[v * 3 + 2] = nz / l;
     if (i % cstep === 0 && j % cstep === 0) {
-      look(x0 + i * step, z0 + j * step, color, surface, v);
+      look(x0 + i * step, z0 + j * step, color, surface, v, ground);
       woods(x0 + i * step, z0 + j * step, c);
       canopy.set([c.cover, c.height, c.spacing, c.conifer], v * 4);
     }
   }
-  // Fill colours and surfaces between the coarse samples bilinearly.
+  layerEverywhere(ground, n, cstep, segs);
+  // Fill colours and surfaces between the coarse samples bilinearly (the ground layer's number from the corner it holds most at).
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     if (i % cstep === 0 && j % cstep === 0) continue;
     const i0 = Math.floor(i / cstep) * cstep, j0 = Math.floor(j / cstep) * cstep;
@@ -180,6 +234,9 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     for (const [arr, d] of [[color, 3], [surface, 4], [canopy, 4]] as const) {
       for (let k = 0; k < d; k++) arr[v * d + k] = arr[v00 * d + k] * w00 + arr[v10 * d + k] * w10 + arr[v01 * d + k] * w01 + arr[v11 * d + k] * w11;
     }
+    const most = [v00, v10, v01, v11].reduce((a, b) => (ground[b * 4 + 1] > ground[a * 4 + 1] ? b : a));
+    ground[v * 4] = ground[most * 4]; ground[v * 4 + 2] = ground[most * 4 + 2]; ground[v * 4 + 3] = ground[most * 4 + 3];
+    ground[v * 4 + 1] = ground[v00 * 4 + 1] * w00 + ground[v10 * 4 + 1] * w10 + ground[v01 * 4 + 1] * w01 + ground[v11 * 4 + 1] * w11;
   }
   // Skirt: the border dropped by a depth that grows with the chunk's size.
   const drop = Math.max(2, step * 1.5);
@@ -190,10 +247,10 @@ export function buildChunk(t: Terrain, spec: ChunkSpec): ChunkMesh {
     position[v * 3 + 1] = position[g * 3 + 1] - drop;
     position[v * 3 + 2] = position[g * 3 + 2];
     for (let c = 0; c < 3; c++) { normal[v * 3 + c] = normal[g * 3 + c]; color[v * 3 + c] = color[g * 3 + c]; }
-    for (let c = 0; c < 4; c++) { surface[v * 4 + c] = surface[g * 4 + c]; canopy[v * 4 + c] = canopy[g * 4 + c]; }
+    for (let c = 0; c < 4; c++) { surface[v * 4 + c] = surface[g * 4 + c]; canopy[v * 4 + c] = canopy[g * 4 + c]; ground[v * 4 + c] = ground[g * 4 + c]; }
     level[v] = level[g];
   }
-  return { position, normal, color, surface, level, canopy, segs, minY: minY - drop, maxY };
+  return { position, normal, color, surface, level, canopy, ground, segs, minY: minY - drop, maxY };
 }
 
 /** Moves world-space vertices (x, y, z triples) to be relative to their middle (whole metres, xz); returns it. */

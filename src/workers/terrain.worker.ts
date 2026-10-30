@@ -87,5 +87,5 @@ serve<TerrainJob, TerrainResult>((job) => {
     return { result: map, transfer: [map.buffer] };
   }
   const mesh = buildChunk(terrain, { ...job, segs: finerFor(terrain, job) });
-  return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer, mesh.level.buffer, mesh.canopy.buffer] };
+  return { result: mesh, transfer: [mesh.position.buffer, mesh.normal.buffer, mesh.color.buffer, mesh.surface.buffer, mesh.level.buffer, mesh.canopy.buffer, mesh.ground.buffer] };
 }, () => ({ ...traced, openMs }));

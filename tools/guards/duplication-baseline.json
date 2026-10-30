@@ -396,7 +396,7 @@
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
+    "key": "idiom: [.add .mul .y] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
   {

@@ -45,29 +45,31 @@ export const landscapeKinds: readonly LandscapeKindDef[] = [
   // Rolling downs: broad rounded hills of short grass, dry valleys between, old banks and lanes, few trees.
   {
     id: 'downs', share: 0.1, swell: { height: 38, size: 1300 }, bare: 0.99,
-    wears: { color: 0x7c9c48, surface: 'grass', grass: { cover: 1, height: 0.12, dry: 0.2 } },
+    wears: { color: 0x7c9c48, surface: 'grass', grass: { cover: 1, height: 0.12, dry: 0.2 }, layer: 'chalkTurf', share: 0.85 },
     landforms: { perKm2: 34, relief: 5, mix: { dryValley: 4, knoll: 3, bank: 2, sunkenLane: 2, dell: 2, scarp: 1 } },
   },
   // Moor: high, open and treeless, tors of grey rock on the crests, boulders strewn, boggy hollows with pools.
   {
     id: 'moor', share: 0.09, swell: { height: 26, size: 1800 }, bare: 0.995,
-    wears: { color: 0x7a3a8a, surface: 'grass', grass: { cover: 0.55, height: 0.22, dry: 0.4 } },
+    wears: { color: 0x6a5a40, surface: 'grass', grass: { cover: 0.45, height: 0.2, dry: 0.55 }, layer: 'heather', share: 0.8 },
     landforms: { perKm2: 44, relief: 6, mix: { tor: 5, boulders: 4, erratic: 3, dell: 3, knoll: 2, ridge: 1 } },
   },
   // Karst: limestone country pitted with sinkholes and dolines, dry valleys and ravines where the water went under.
   {
     id: 'karst', share: 0.07, swell: { height: 22, size: 900 }, bare: 0.85,
-    wears: { color: 0x8e9670, surface: 'scree', grass: { cover: 0.6, height: 0.12, dry: 0.5 } },
+    wears: { color: 0x8e9670, surface: 'grass', grass: { cover: 0.5, height: 0.12, dry: 0.5 }, layer: 'limestone', share: 0.6 },
     landforms: { perKm2: 72, relief: 6, mix: { doline: 6, sinkhole: 5, dell: 3, ravine: 2, dryValley: 2, tor: 2, knoll: 2, boulders: 1 } },
   },
   // Badlands: bare, crumbling ground cut into knife ridges by countless gullies, scarps and ravines.
   {
     id: 'badlands', share: 0.06, swell: { height: 40, size: 280, sharp: true }, bare: 1,
-    wears: { color: 0x9a4a2a, surface: 'sand', grass: { cover: 0.05, height: 0.08, dry: 0.95 } },
+    wears: { color: 0x9a6a4a, surface: 'scree', grass: { cover: 0.05, height: 0.08, dry: 0.95 }, layer: 'clay', share: 1 },
     landforms: { perKm2: 62, relief: 10, mix: { gully: 6, ravine: 4, ridge: 3, scarp: 3, knoll: 1 } },
   },
   {
     id: 'mesa', share: 0.38,
+    // Its valleys' floors: the biome's own ground, with gravel washed down from the walls in drifts.
+    wears: { layer: 'gravel', share: 0.3 },
     mesa: { height: [40, 200], cover: 0.42, size: 2400, steep: [4.5, 6.5], passes: 0.2, climbable: 0.3, tiers: 2 },
     landforms: { perKm2: 40, relief: 4, mix: { boulders: 4, erratic: 3, gully: 3, dryValley: 2, scarp: 2, knoll: 2, sinkhole: 1, ravine: 1 } },
   },
