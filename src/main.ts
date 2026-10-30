@@ -1,3 +1,5 @@
+// First: every three.js matrix made from here on keeps its numbers unboxed (render/typedMatrices.ts).
+import './render/typedMatrices';
 import { Vector3, type Light, type Object3D } from 'three/webgpu';
 import { GraphicsUnavailable } from '@futuremagic/stage';
 import { deriveSeed, parseSeed } from '@futuremagic/core';
