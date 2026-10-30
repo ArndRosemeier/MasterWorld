@@ -6,6 +6,7 @@
  */
 import type { SettingModule } from '../setting/contract';
 import { Herds } from '../sim/livestock';
+import { Poultry } from '../sim/poultry';
 import { townsfolk, type Person } from '../sim/people';
 import { TownLife, type Agent, type TownOrder } from '../sim/townLife';
 import { NavGraph } from '../sim/nav';
@@ -66,6 +67,7 @@ export class Township {
   private talkOf: TownTalk | null = null;
   private marketOf: Market | null = null;
   private herdsOf: Herds | null | undefined;
+  private poultryOf: Poultry | null | undefined;
   /** The log's length when the herds last read it. */
   private herdsLog = -1;
   /** The log's length when the people last looked whether a band holds the place. */
@@ -364,6 +366,15 @@ export class Township {
       this.herdsOf.driven(takenFrom(log, this.id));
     }
     return this.herdsOf;
+  }
+
+  /** The hens in its farmyards and back yards (null: the setting keeps none, or it has no yards). */
+  get poultry(): Poultry | null {
+    if (this.poultryOf === undefined) {
+      const def = this.c.setting.world.poultry, p = def ? new Poultry(this.town.plan, this.seed, def) : null;
+      this.poultryOf = p?.hens.length ? p : null;
+    }
+    return this.poultryOf;
   }
 
   /** A promise or a story event the VGM made (already in the log): its people hear of it if it is one of theirs. */

@@ -140,10 +140,6 @@
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   },
   {
-    "key": "idiom: [.range .rng .time .until] in masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/townLife.ts",
-    "reason": "Agents waiting a seeded while before their next act (until = time + rng.range(a, b)): the shape of every world-sim agent, not a copy."
-  },
-  {
     "key": "same name: masterworld/app/spellFx/particles.ts#step + masterworld/sim/creatures.ts#step",
     "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
   },
@@ -504,10 +500,6 @@
     "reason": "KeyWindow's abstract hook: every window fills itself in its own opened() (window.ts); the name is the seam, not a copy."
   },
   {
-    "key": "idiom: [.group Promise] in masterworld/app/spellFx/fxView.ts + masterworld/render/grass/GrassView.ts + masterworld/render/rocks/RockView.ts",
-    "reason": "Views that build their pipelines off the render path keep the build's promise beside their group (F4, docs/SHADERS.md); each builds its own meshes."
-  },
-  {
     "key": "same name: masterworld/game/recipe.ts#check + masterworld/setting/contract.ts#check",
     "reason": "Different questions under a common verb: the recipe runner asks whether an ability can be used now; the setting's validation checks a table's numbers."
   },
@@ -634,6 +626,58 @@
   {
     "key": "idiom: [.d .sort] in masterworld/sim/smallLife.ts + masterworld/vgm/hints.ts + masterworld/world/coast.ts",
     "reason": "Sorting found candidates nearest first by a distance field is a language idiom; the candidates (small life spots, hints, river mouths) and what follows differ."
+  },
+  {
+    "key": "idiom: [.atan2 .cos .sin Math] in masterworld/app/encounter.ts + masterworld/sim/livestock.ts + masterworld/sim/poultry.ts",
+    "reason": "Turning a walker towards its goal by the shortest way (angle wrap); each sim turns at its own rate and limits, one line each."
+  },
+  {
+    "key": "idiom: [.cos .dir .x Math] in masterworld/sim/livestock.ts + masterworld/sim/poultry.ts + masterworld/sim/townLife.ts",
+    "reason": "A step along the facing in each animal or person sim (x += cos(dir) v dt); one line each, the paces and checks differ."
+  },
+  {
+    "key": "idiom: [.dir .sin .z Math] in masterworld/sim/livestock.ts + masterworld/sim/poultry.ts + masterworld/sim/townLife.ts",
+    "reason": "A step along the facing in each animal or person sim (z += sin(dir) v dt); one line each, the paces and checks differ."
+  },
+  {
+    "key": "idiom: [.map .place Promise] in masterworld/render/horse/HorseView.ts + masterworld/render/livestock/PoultryView.ts + masterworld/render/livestock/StockView.ts",
+    "reason": "Each animal view hands its body groups to warm-up and the stage (toWarm/enter); the bodies differ (horses, Actors herds, library hens)."
+  },
+  {
+    "key": "idiom: [.range .rng .time .until] in masterworld/sim/livestock.ts + masterworld/sim/poultry.ts + masterworld/sim/smallLife.ts + masterworld/sim/townLife.ts",
+    "reason": "Each sim agent holds its act until a seeded time; the acts and their lengths are each sim's own."
+  },
+  {
+    "key": "idiom: [.sortIn] in masterworld/render/livestock/PoultryView.ts + masterworld/render/livestock/StockView.ts + masterworld/render/wildlife/SmallLifeView.ts",
+    "reason": "Each animal view hands its few bodies to the nearest animals now and then; what is near and how bodies are kept differ (herds, small life, hens by sex)."
+  },
+  {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/poultry.ts#step",
+    "reason": "Poultry.step advances the hens like the other sims' step(dt); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/poultry.ts#step",
+    "reason": "Poultry.step advances the hens like the other sims' step(dt); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/particles.ts#step + masterworld/sim/poultry.ts#step",
+    "reason": "Poultry.step advances the hens like the other sims' step(dt); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/poultry.ts#step",
+    "reason": "Poultry.step advances the hens like the other sims' step(dt); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/lab/spellLab.ts#step + masterworld/sim/poultry.ts#step",
+    "reason": "Poultry.step advances the hens like the other sims' step(dt); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/poultry.ts#step",
+    "reason": "Poultry.step advances the hens like the other sims' step(dt); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/poultry.ts#step",
+    "reason": "Poultry.step advances the hens like the other sims' step(dt); only the name matches."
   },
   {
     "key": "same name: masterworld/app/towns.ts#stand + masterworld/main.ts#stand",
