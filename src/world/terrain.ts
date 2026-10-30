@@ -15,7 +15,7 @@ import { RoadNet } from './roads';
 import { brookCuts } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
-import { Landforms } from './landforms';
+import { Landforms, type Landform } from './landforms';
 import type { Lake } from './lakes';
 
 /**
@@ -24,6 +24,10 @@ import type { Lake } from './lakes';
  */
 /** How far (m) from a brook a dell keeps above its water (`Hydrology.brookFloor`). */
 const DELL_REACH = 120;
+/** Rings (times its half length) on which a dell's rim is looked at; how far (m) its pond keeps below it; least depth (m) it keeps. */
+const POND_RIM = [1, 1.15, 1.4] as const;
+const POND_FREEBOARD = 0.3;
+const POND_MIN_DEPTH = 0.8;
 /** From how far past a brook's edge (m) to how far the land's small shapes ease in beside it. */
 const BROOK_CLEAR = [4, 40] as const;
 const formsOut = (radius: number): number => radius * 2.5 + 130;
@@ -46,7 +50,33 @@ export class Terrain {
     this.detail = new Noise(deriveSeed(seed, 'terrain', 'detail'));
     this.hydro = new Hydrology(this.skeleton, hydro, brooks);
     this.biomes = setting.world.biomes;
-    this.landforms = new Landforms(seed, setting.world, this.skeleton, (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookFloor(x, z, DELL_REACH) < Infinity);
+    this.landforms = new Landforms(
+      seed, setting.world, this.skeleton,
+      (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookFloor(x, z, DELL_REACH) < Infinity,
+      (x, z) => this.erodedLand(x, z),
+    );
+  }
+
+  /** Each pond's level as the land drawn round it holds it (NaN: it holds none), by dell. */
+  private readonly pondLevels = new WeakMap<Landform, number>();
+
+  /**
+   * A dell pond's water level at (x, z), NaN where there is none. The pond was set on the land before towns, roads and
+   * the water's banks shaped it; checked here against the land as drawn: where that rim lies lower, the pond sinks
+   * below it, or holds no water at all (else it floats over the land with its edge hanging down to the ground).
+   */
+  pondAt(x: number, z: number): number {
+    const f = this.landforms.pondOf(x, z);
+    if (!f) return NaN;
+    let level = this.pondLevels.get(f);
+    if (level === undefined) {
+      let rim = Infinity;
+      for (const r of POND_RIM) for (let a = 0; a < 24; a++) rim = Math.min(rim, this.height(f.x + Math.cos((a * Math.PI) / 12) * f.L * r, f.z + Math.sin((a * Math.PI) / 12) * f.L * r));
+      level = Math.min(f.pond, rim - POND_FREEBOARD);
+      if (level - this.height(f.x, f.z) < POND_MIN_DEPTH) level = NaN;
+      this.pondLevels.set(f, level);
+    }
+    return level;
   }
 
   /** The towns' grounds hold no landforms (a town levels its ground). */
@@ -263,7 +293,7 @@ export class Terrain {
     const w = this.hydro.query(x, z, this.here);
     out.river = w.river ? w.dist - w.half : Infinity;
     out.lake = Number.isNaN(w.lake) ? Infinity : h - w.lake;
-    const pond = this.landforms.pondAt(x, z);
+    const pond = this.pondAt(x, z);
     if (!Number.isNaN(pond)) out.lake = Math.min(out.lake, h - pond);
     return out;
   }
