@@ -8,7 +8,8 @@
  * Each row is measured between two runs with everything drawn (the frame time drifts), and a CPU profile of the main
  * thread follows (self time by script and function; PROBE_PROFILE=0 skips it; build with `npx vite build --minify
  * false` for readable names). PROBE_MEASURE=<ms> per measurement (default 2000). Then the slow frames of PROBE_SLOW_MS
- * (default 10000): what each spent its time on, against the other frames.
+ * (default 10000): what each spent its time on, against the other frames. PROBE_SHADOW_EVERY=<n> draws the sun's
+ * shadow map every n frames.
  */
 import { launch } from './launch.mjs';
 
@@ -22,6 +23,8 @@ page.on('pageerror', (e) => console.error(`[page error] ${e.message}`));
 await page.goto(base + (query.startsWith('?') ? query : '?' + query));
 await page.waitForFunction(() => window.__mwReady === true, null, { timeout: 300000 });
 await page.addStyleTag({ content: '#loading{display:none!important}' });
+// `PROBE_SHADOW_EVERY=<n>`: the sun's shadow map drawn every n frames instead of the sky's own (for weighing it).
+if (process.env.PROBE_SHADOW_EVERY) await page.evaluate((n) => { window.game.view.sky.shadowEvery = n; }, Number(process.env.PROBE_SHADOW_EVERY));
 
 // Wrap the render call: main-thread time and draw calls per frame (the post chain draws the scene once, then its passes).
 await page.evaluate(() => {
