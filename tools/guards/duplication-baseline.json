@@ -628,10 +628,6 @@
     "reason": "Unrelated: Cellars.keep marks a promise kept and says what its household pays; TownLife.keep sends people to the buildings they keep to (sim/marked.ts). Only the name matches."
   },
   {
-    "key": "idiom: [.add .mul .y] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic and blending in shader code (render/materials/caveWater.ts, plan P1): how the shading language is written, not a copied routine."
-  },
-  {
     "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
     "reason": "TSL arithmetic and blending in shader code (render/materials/caveWater.ts, plan P1): how the shading language is written, not a copied routine."
   },
