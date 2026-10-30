@@ -4,7 +4,9 @@
  * lights and flames hang on the same spots.
  */
 import { DIRS } from '@futuremagic/dungeon';
+import { deriveSeed } from '@futuremagic/core';
 import { cellIn, type Cellar } from './cellar';
+import { caveFeatures } from './caveFeatures';
 
 export interface TorchSpot {
   /** The flame, in the cellar's frame (metres). */
@@ -58,16 +60,26 @@ export function torchSpots(c: Cellar): TorchSpot[] {
 
 /** A crack's daylight hangs this far under a cavern's roof (m). */
 const CRACK_DOWN = 3;
+/** Under a shaft the daylight hangs this high over the floor (m), so it lies on the floor in a pool. */
+const SHAFT_UP = 7;
+
+/** The seed of a cave's rock and features (cellars.ts carves it with the same). */
+export const caveSeed = (c: Cellar): number => deriveSeed(c.decision.seed, 'cave', 'rock');
 
 /**
- * Where a natural cave's daylight falls in (pure): through a crack high in the roof of each cavern (a room
- * three storeys high or more), over its middle. A cave without caverns has none (the lantern alone).
+ * Where a natural cave's daylight falls in (pure): down the shaft through a cavern's roof onto its floor
+ * (caveFeatures.ts), and through a crack high in the roof of every cavern (a room three storeys high or more)
+ * over its middle. A cave without caverns has none (the lantern alone).
  */
 export function caveGlows(c: Cellar): { x: number; y: number; z: number }[] {
   if (c.form.space.torches || !c.form.space.carved) return [];
   const { cell, storey } = c.layout.scale;
-  return c.layout.rooms.flatMap((r) => {
-    const h = c.graph.rooms[r.id]?.height ?? 1;
-    return h >= 3 ? [{ x: (r.x + r.w / 2) * cell, y: (r.level + h) * storey - CRACK_DOWN, z: (r.z + r.d / 2) * cell }] : [];
-  });
+  const shafts = caveFeatures(c.layout, caveSeed(c)).shafts;
+  return [
+    ...shafts.map((s) => ({ x: s.x, y: s.floor + SHAFT_UP, z: s.z })),
+    ...c.layout.rooms.flatMap((r) => {
+      const h = c.graph.rooms[r.id]?.height ?? 1;
+      return h >= 3 ? [{ x: (r.x + r.w / 2) * cell, y: (r.level + h) * storey - CRACK_DOWN, z: (r.z + r.d / 2) * cell }] : [];
+    }),
+  ];
 }

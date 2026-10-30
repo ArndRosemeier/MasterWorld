@@ -8,7 +8,8 @@ import { dungeonFor, loreOf, placeOf } from '../src/vgm/dungeons';
 import { answerNeed } from '../src/vgm/toolbox';
 import { siteInCliff } from '../src/world/dungeon/caveMouth';
 import { isEmpty, outlineCellar, sketchCellar } from '../src/world/dungeon/cellar';
-import { caveGlows, torchSpots } from '../src/world/dungeon/torches';
+import { caveGlows, caveSeed, torchSpots } from '../src/world/dungeon/torches';
+import { caveFeatures } from '../src/world/dungeon/caveFeatures';
 import { SMALL } from './small';
 
 test('cave tool: Discovery overdue near a cliff opens a cave in it, one at a time', () => {
@@ -48,7 +49,11 @@ test('caves: a share stand empty, sights with nobody in them; asked-for dwellers
   // No torches in a natural cave: daylight falls into its cavern through a crack high in the roof.
   const glows = caveGlows(c), floor = Math.min(...c.layout.rooms.map((r) => r.level)) * c.layout.scale.storey;
   assert.equal(torchSpots(c).length, 0);
-  assert.ok(glows.length >= 1 && glows.every((g) => g.y - floor > 15), `daylight high in the cavern (${glows.map((g) => g.y.toFixed(1)).join(', ')})`);
+  // Daylight through a crack high in each cavern's roof, and down each shaft onto the cavern's floor (P1).
+  const shafts = caveFeatures(c.layout, caveSeed(c)).shafts;
+  assert.ok(shafts.length >= 1, 'a shaft to the day in its highest cavern');
+  assert.ok(glows.some((g) => g.y - floor > 15), `daylight high in the cavern (${glows.map((g) => g.y.toFixed(1)).join(', ')})`);
+  for (const s of shafts) assert.ok(glows.some((g) => Math.hypot(g.x - s.x, g.z - s.z) < 0.1 && g.y > s.floor + 3 && g.y < s.roof), 'daylight down the shaft over its floor');
   assert.equal(c.dweller.id, lore.empty!.def.id);
   const asked = lore.dwellers[0].encounter;
   assert.ok(empty.every((d) => !isEmpty(sketchCellar({ ...d, dwellers: asked }, place, lore))), 'dwellers asked for move in');

@@ -142,8 +142,8 @@ export class CellarVisit {
     if (!this.inside) return;
     this.view.step(dt);
     if (this.kneel?.done) { if (this.player.puppet === this.kneel) this.player.puppet = null; this.kneel = null; }
-    // The lantern, held up and a little ahead.
-    this.lantern.intensity = 8;
+    // The lantern, held up and a little ahead (brighter in a cave: its rock is dark, its halls wide).
+    this.lantern.intensity = this.cellar.form.space.carved ? 13 : 8;
     this.lantern.position.set(w.pos.x - Math.sin(w.yaw) * 0.4, w.pos.y + 1.9, w.pos.z - Math.cos(w.yaw) * 0.4);
     const lx = w.pos.x - O.x, ly = w.pos.y - O.y, lz = w.pos.z - O.z;
     for (const e of this.space.touch(lx, ly, lz, dt)) this.event(e);
