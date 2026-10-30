@@ -432,6 +432,9 @@ export async function start(b: Boot): Promise<void> {
     // between its grass, rocks and plants: 'Raising the land' waited on them).
     const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
+    // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
+    // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
+    compileEarly([sea.mesh]);
     // The near one first, while the hero is made here (the hero's water; the horses keep out of it).
     const seas = sea.prime(view.camera.position, 1).then(() => console.info(`[load] ${(performance.now() / 1000).toFixed(1)} s: near water mask made`));
     loading.set('Dressing the hero');
