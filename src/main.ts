@@ -1458,7 +1458,8 @@ export async function start(b: Boot): Promise<void> {
         if (p) { player.teleport(p.x + Math.cos(p.dir) * 1.3, p.y, p.z + Math.sin(p.dir) * 1.3, Math.atan2(Math.cos(p.dir), Math.sin(p.dir))); return; }
       }
       // Clear of walls: a building's corner beside the hero filled the talk's shot.
-      const at = standingPlace(a.x, a.z, a.dir, (x, z, r) => !!towns?.solid(x, z, r));
+      // Not across a stall's counter or a coop either: the shot looked over its wares at the top of a head.
+      const at = standingPlace(a.x, a.z, a.dir, (x, z, r) => !!towns?.solid(x, z, r), (x, z) => !!towns?.fixtureAt(x, z, 0.1));
       player.teleport(at.x, undefined, at.z, Math.atan2(at.x - a.x, at.z - a.z));
     };
     // `talk=house|smith|inn`: straight into a talk in the town the hero is in (`house`: the first cellar's household).
