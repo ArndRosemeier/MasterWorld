@@ -7,6 +7,7 @@
  * and picked up, and the things worth reading speak through short notes.
  */
 import type { PointLight } from 'three/webgpu';
+import { DungeonSeen } from '../game/dungeonMap';
 import { dungeonWorld } from '../game/dungeonWorld';
 import type { WalkWorld } from '../game/walker';
 import type { CellarView } from '../render/dungeon/CellarView';
@@ -28,6 +29,8 @@ export class CellarVisit {
   inside = false;
   readonly space: DungeonSpace;
   readonly world: WalkWorld;
+  /** What the hero has seen of it, for the minimap. */
+  readonly seen: DungeonSeen;
   private readonly fade = new Fade();
   private cooldown = 0;
   private readonly read = new Set<number>();
@@ -53,6 +56,7 @@ export class CellarVisit {
   ) {
     this.space = space ?? new DungeonSpace(cellar.layout);
     this.world = dungeonWorld(this.space, view.origin, cellar.hatch);
+    this.seen = new DungeonSeen(this.space);
   }
 
   /** Go down (now: at once, no fade); `room` to stand in the middle of that room instead of at the ladder. */
@@ -147,6 +151,7 @@ export class CellarVisit {
     this.lantern.position.set(w.pos.x - Math.sin(w.yaw) * 0.4, w.pos.y + 1.9, w.pos.z - Math.cos(w.yaw) * 0.4);
     const lx = w.pos.x - O.x, ly = w.pos.y - O.y, lz = w.pos.z - O.z;
     for (const e of this.space.touch(lx, ly, lz, dt)) this.event(e);
+    this.seen.see(lx, ly, lz);
     // Things worth reading, when close.
     for (const p of this.cellar.props) {
       if (p.clue === undefined || this.read.has(p.clue) || Math.hypot(p.x - lx, p.z - lz) > 1.5 || Math.abs(p.y - ly) > 1.5) continue;
@@ -160,7 +165,7 @@ export class CellarVisit {
 
   /** What changed down here, for the save. */
   get diff(): CellarDiff {
-    return { open: [...this.space.open], keys: [...this.space.keys], read: [...this.read] };
+    return { open: [...this.space.open], keys: [...this.space.keys], read: [...this.read], seen: this.seen.save() };
   }
 
   /** Lay a saved state over the fresh cellar. */
@@ -168,6 +173,7 @@ export class CellarVisit {
     for (const k of d.keys) { this.space.keys.add(k); this.view.keyTaken(k); }
     for (const l of d.open) { this.space.open.add(l); this.view.opened(l); }
     for (const r of d.read) this.read.add(r);
+    if (d.seen) this.seen.restore(d.seen);
   }
 
   /** Where its frame lies in the world (its space's points plus this). */

@@ -35,6 +35,8 @@ export interface CellarDiff {
   readonly delve?: DelveSave;
   /** The household paid for it made safe. */
   readonly paid?: boolean;
+  /** The cells the hero has seen, for the minimap below ground (game/dungeonMap.ts; none in older saves). */
+  readonly seen?: readonly string[];
 }
 
 export interface SaveData {

@@ -26,6 +26,12 @@ export interface MinimapReading {
   readonly sky: SkyGlyph;
   /** The places marked on the map. */
   readonly marks: readonly { readonly id: string; readonly x: number; readonly z: number }[];
+  /**
+   * Below ground: the dungeon's own plan is the sheet (`sheet` names it, so it is painted afresh when it changes:
+   * another dungeon or storey, or more of it seen), `range` metres to the round's edge, and the marks ride the
+   * rim at their bearing from the way in (`from`) above.
+   */
+  readonly below?: { readonly sheet: string; readonly range: number; readonly from: { readonly x: number; readonly z: number } };
 }
 
 /**
@@ -44,7 +50,6 @@ const BAND_PX = 66;
 export const RANGE = 110;
 /** The sheet covers this much more than the round shows, so it can slide under it between paintings. */
 const SHEET = 1.6;
-const ACROSS = 2 * RANGE * SHEET;
 /** Canvas pixels of the sheet. */
 const SHEET_PX = 320;
 /** Paint again when the hero walked this far from where it was painted (m), or after MOST seconds; never within LEAST. */
@@ -89,7 +94,7 @@ export class Minimap {
   private readonly sheet = el('canvas', { width: SHEET_PX, height: SHEET_PX, className: 'sheet' });
   private readonly arrow = el('div', { className: 'hero' });
   /** Where and when (s) the sheet was last painted. */
-  private painted: { x: number; z: number; t: number; whole: boolean } | null = null;
+  private painted: { x: number; z: number; t: number; whole: boolean; sheet: string } | null = null;
   private slid = '';
   private arrowDeg = NaN;
 
@@ -130,17 +135,19 @@ export class Minimap {
   /** The sheet: painted again now and then round the hero, slid under the round between paintings. */
   private slideSheet(r: MinimapReading): void {
     if (!this.paint) return;
-    const t = performance.now() / 1000, p = this.painted;
-    const due = !p || (t - p.t >= LEAST && (!p.whole || Math.hypot(r.x - p.x, r.z - p.z) > MOVED || t - p.t >= MOST));
-    if (due) this.painted = { x: r.x, z: r.z, t, whole: this.paint(this.sheet, r.x, r.z, ACROSS) };
-    const q = this.painted!, slide = `translate(${((q.x - r.x) / ACROSS * 100).toFixed(2)}%, ${((q.z - r.z) / ACROSS * 100).toFixed(2)}%)`;
+    const t = performance.now() / 1000, p = this.painted, range = r.below?.range ?? RANGE, across = 2 * range * SHEET, sheet = r.below?.sheet ?? '';
+    const due = !p || p.sheet !== sheet || (t - p.t >= LEAST && (!p.whole || Math.hypot(r.x - p.x, r.z - p.z) > MOVED * range / RANGE || t - p.t >= MOST));
+    if (due) this.painted = { x: r.x, z: r.z, t, sheet, whole: this.paint(this.sheet, r.x, r.z, across) };
+    const q = this.painted!, slide = `translate(${((q.x - r.x) / across * 100).toFixed(2)}%, ${((q.z - r.z) / across * 100).toFixed(2)}%)`;
     if (slide !== this.slid) { this.slid = slide; this.sheet.style.transform = slide; }
   }
 
   /** The marks beyond the round as studs on the rim, at their bearing from the hero (nearer ones are on the sheet). */
   private marks(r: MinimapReading): void {
-    const far = r.marks.filter((m) => Math.hypot(m.x - r.x, m.z - r.z) > RANGE * 0.92);
-    r = { ...r, marks: far };
+    // Below ground every mark is up on the land: on the rim, at its bearing from the way in.
+    const at = r.below?.from ?? r;
+    const far = r.marks.filter((m) => r.below || Math.hypot(m.x - r.x, m.z - r.z) > RANGE * 0.92);
+    r = { ...r, x: at.x, z: at.z, marks: far };
     const ids = r.marks.map((m) => m.id).join(',');
     if (ids !== this.studIds) {
       this.studIds = ids;
@@ -165,8 +172,9 @@ export class Minimap {
    * Each frame while shown: where the VGM placed something lately (its show mode, a developer's aid), as
    * ward-blue studs at their spot inside the round when near, on the band when farther; none: no studs. The move
    * picked in the VGM window's log (`picked`) is lit brighter and larger, whether or not it is among them.
+   * `inside`: metres the round shows of the land (0 below ground: every stud on the band, from the way in).
    */
-  vgmMarks(placed: readonly { readonly id: string; readonly x: number; readonly z: number }[], x: number, z: number, picked: { readonly id: string; readonly x: number; readonly z: number } | null = null): void {
+  vgmMarks(placed: readonly { readonly id: string; readonly x: number; readonly z: number }[], x: number, z: number, picked: { readonly id: string; readonly x: number; readonly z: number } | null = null, inside = RANGE): void {
     const marks = picked && !placed.some((m) => m.id === picked.id) ? [...placed, picked] : placed;
     const now = new Set(marks.map((m) => m.id));
     for (const [id, s] of this.vgmAt) if (!now.has(id)) { s.el.remove(); this.vgmAt.delete(id); }
@@ -174,7 +182,7 @@ export class Minimap {
       let s = this.vgmAt.get(m.id);
       if (!s) { s = { el: el('i', { className: 'stud vgm new' }), at: '' }; this.vgmAt.set(m.id, s); this.vgmStuds.append(s.el); }
       const d = Math.hypot(m.x - x, m.z - z), deg = Math.atan2(m.x - x, -(m.z - z)) * DEG;
-      const out = d > RANGE ? BAND_PX : (d / RANGE) * LAND_PX;
+      const out = d > inside ? BAND_PX : (d / inside) * LAND_PX;
       const at = `rotate(${deg.toFixed(1)}deg) translateY(-${out.toFixed(1)}px)`;
       if (at !== s.at) { s.at = at; s.el.style.transform = at; }
       s.el.classList.toggle('picked', m.id === picked?.id);
