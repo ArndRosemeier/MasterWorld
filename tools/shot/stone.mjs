@@ -5,7 +5,7 @@
  * off, the second glyph tears a portal open beyond the stone, its twin at home; the hero walks through and comes out
  * at home, looks back through; opening one by home fizzles; one opened elsewhere closes the old far one. Checks:
  * the pack card raises it, each glyph takes, the hero crosses, the counts, no shader built in play (no VIOLATION),
- * no page errors. Then two tight spots: in the capital's gate passage the portal shrinks to fit (it opens, smaller),
+ * no page errors, no GPU validation errors. Then two tight spots: in the capital's gate passage the portal shrinks to fit (it opens, smaller),
  * and down in a cave one opens back to home on the land. JPEGs into `<out dir>` (default `shots/stone/<date>-<commit>/`). A slow check (docs/CHECKS.md).
  */
 import { execSync } from 'node:child_process';
@@ -14,7 +14,8 @@ import { join } from 'node:path';
 import { launch } from './launch.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 180000);
-const gl = process.env.SET_GL !== '0';
+// On the reference machine (SHOT_GPU=1) the game's own default, WebGPU: the rifts once broke only there.
+const gl = process.env.SET_GL ? process.env.SET_GL !== '0' : !process.env.SHOT_GPU;
 const git = (cmd) => { try { return execSync(`git ${cmd}`, { encoding: 'utf8' }).trim(); } catch { return ''; } };
 const dir = process.argv[2] ?? join('shots/stone', `${new Date().toISOString().slice(0, 10)}-${git('rev-parse --short HEAD') || 'nocommit'}`);
 mkdirSync(dir, { recursive: true });
@@ -23,6 +24,9 @@ const { server, base, browser } = await launch({});
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(`${e.message}\n${e.stack ?? ''}`));
+// A GPU validation error drops the frame's commands (a pass drawing into a target it also reads, say).
+const gpu = new Set();
+page.on('console', (m) => { const t = m.text(); if (/GPUValidationError|Invalid CommandBuffer/.test(t)) gpu.add(t.slice(0, 300)); });
 await page.goto(`${base}?title=0&day=0&hour=${process.env.STONE_HOUR ?? 17}&weather=fair&hud${gl ? '&gl' : ''}`);
 await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT });
 await page.addStyleTag({ content: '#loading{display:none!important}' });
@@ -214,6 +218,7 @@ const report = await page.evaluate(() => window.game.view.stage.hudLine?.() ?? '
 console.log(report);
 if (/VIOLATION/.test(report)) fail(report);
 for (const e of errors) fail(`page error: ${e}`);
+for (const e of gpu) fail(`GPU: ${e}`);
 await browser.close();
 await server.close();
 console.log(failed ? 'stone: FAILED' : 'stone: ok');

@@ -57,6 +57,11 @@ export class PortalView {
   private drawn = false;
   /** How many views were drawn through openings (for checks). */
   views = 0;
+  /**
+   * Things outside the openings that sample the view (a rift's haze, materials/portal.ts PORTAL_RIFT): hidden while
+   * the view is drawn, since a pass may not draw into the twin target and read it too (WebGPU drops the frame).
+   */
+  readonly readers = new Set<Object3D>();
 
   constructor(private readonly view: View) {
     this.group.name = 'portal openings';
@@ -125,6 +130,8 @@ export class PortalView {
     const back = p.beyond();
     // No shadow map is drawn for the view beyond, unless it is the one place that needs it this frame.
     const held = p.shadows ? () => {} : holdShadows(this.view.scene);
+    const readers = [...this.readers].filter((o) => o.visible);
+    for (const o of readers) o.visible = false;
     const prev = r.getRenderTarget(), test = r.getScissorTest();
     // three's scissor rectangle counts from the top left on both backends (the WebGL one turns it over itself).
     twin.scissor.set(rect.x, rect.y, rect.w, rect.h);
@@ -133,6 +140,7 @@ export class PortalView {
     r.render(this.view.scene, this.drawnCam);
     r.setRenderTarget(prev);
     r.setScissorTest(test);
+    for (const o of readers) o.visible = true;
     held();
     back();
     this.drawn = true;
