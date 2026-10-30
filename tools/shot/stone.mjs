@@ -37,7 +37,7 @@ const shoot = async (name) => {
 };
 const state = () => page.evaluate(() => {
   const g = window.game, w = g.player.walker.pos;
-  return { x: w.x, y: w.y, z: w.z, yaw: g.player.walker.yaw, raised: g.stone.raised, counts: { ...g.stone.counts }, home: g.stone.stone.home, far: g.stone.stone.far, passed: g.portals.passed };
+  return { x: w.x, y: w.y, z: w.z, yaw: g.player.walker.yaw, raised: g.stone.raised, counts: { ...g.stone.counts }, home: g.stone.stone.home?.frame ?? null, far: g.stone.stone.far?.frame ?? null, passed: g.portals.passed };
 });
 /** The camera behind the hero, `turn` rad round from behind. */
 const look = (turn = 0, zoom = 3.6, pitch = -0.18) => page.evaluate(([turn, zoom, pitch]) => {
@@ -132,7 +132,9 @@ await shoot('9-out-at-home');
 await look(Math.PI, 4.5, -0.12);
 await page.waitForTimeout(700);
 await shoot('10-looking-back-through');
-// By home a portal fizzles.
+// By home a portal fizzles. Stand on home itself: walking out of the portal may have carried the hero past it.
+await page.evaluate(() => { const g = window.game, h = g.stone.stone.home.frame; g.player.teleport(h.x, undefined, h.z, h.yaw); });
+await page.waitForTimeout(400);
 await look();
 await raise(false);
 await press(2);
