@@ -572,8 +572,8 @@
     "reason": "Writing a walker's position by its three axes; each copies a different source (a puppet, a portal's step, a debug go-to)."
   },
   {
-    "key": "idiom: [.position .rotation .set .x .y .z] in masterworld/app/portals.ts + masterworld/render/folk/FolkView.ts + masterworld/render/portal/PortalView.ts",
-    "reason": "three.js's own API for placing an object; each places a different thing (the camera through a portal, a person, an opening)."
+    "key": "idiom: [.position .rotation .set .x .y .z] in masterworld/app/portals.ts + masterworld/render/folk/FolkView.ts + masterworld/render/portal/PortalView.ts + masterworld/render/ships.ts",
+    "reason": "three.js's own API for placing an object; each places a different thing (the camera through a portal, a person, an opening, a ship on the waves)."
   },
   {
     "key": "same name: masterworld/main.ts#rockSurface + masterworld/world/terrain.ts#rockSurface",

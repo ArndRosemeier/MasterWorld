@@ -93,6 +93,7 @@ import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
 import { ShipsView } from './render/ships';
+import { Decks } from './world/deck';
 import type { Township } from './game/township';
 import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
@@ -293,12 +294,14 @@ export async function start(b: Boot): Promise<void> {
     };
     // Bridges where roads cross brooks, round the hero: their decks are floors.
     const bridgeView = new BridgeView(view.stage, terrain);
+    // The decks of the ships near the hero (S3): floors and walls that move with the waves, carrying the hero on them.
+    const decks = new Decks(() => player.walker.pos);
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
     const landWorld: WalkWorld = {
       // In a cave mouth's throat its own floor (it runs under the land's ground, which the crag carves).
       height: (x, z) => cellars?.floor(x, z) ?? terrain.height(x, z),
       // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
-      floor: (x, z) => towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null,
+      floor: (x, z) => decks.underfoot(x, z) ?? towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null,
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
       rockSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, false)),
       // In a building the camera stays in the room (its doorway shut to it).
@@ -317,7 +320,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return decks.hull(x, z, r, y ?? 0) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     // Down in a cellar the walker walks its space, else the land.
@@ -470,7 +473,7 @@ export async function start(b: Boot): Promise<void> {
     const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
     // The harbours' ships and boats, riding the swell and out fishing by day (S2).
-    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z) });
+    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
     compileEarly([sea.mesh]);
@@ -2048,9 +2051,13 @@ export async function start(b: Boot): Promise<void> {
         if (title.holding) giant.view.frame(dt, giantPose(orbit, title.draw.seed, (giant.t += dt)));
         else { giant.view.dispose(); giant = null; }
       }
+      // The ships on the waves first: a hero on a deck goes with it before taking a step.
+      part('ships');
+      ships.float(view.camera.position, hours(), dt);
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
+      decks.boarded();
       // Through an opening: on out of the other; the camera stands on whichever side it trails on.
       if (!title?.holding && !creator?.showing) {
         const was = through.passed;
@@ -2236,7 +2243,6 @@ export async function start(b: Boot): Promise<void> {
       if (above) {
         part('sea');
         sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
-        ships.float(view.camera.position, hours(), dt);
         part('ground');
         ground.update(view.camera);
         part('roads+horizon');
