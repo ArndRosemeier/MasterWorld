@@ -124,6 +124,11 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       next = m ? { x: x + (m.x - x) * 0.3, z: z + (m.z - z) * 0.3 } : null;
       repath = 0;
     }
+    // A living body in the way (as the game's walker): round it to either side, else wait for it to move.
+    if (next && den.pressedBy(next.x, y, next.z, 0.35, x, z)) {
+      const sx = next.x - x, sz = next.z - z;
+      next = [1, -1].map((s) => den.nav.slide(x, y, z, -sz * s, sx * s, 0.35)).find((n) => n && !den.pressedBy(n.x, y, n.z, 0.35, x, z)) ?? null;
+    }
     if (!next) { speed = 0; return; }
     x = next.x; z = next.z;
     if (Math.hypot(p.x - x, p.z - z) < 0.05) path.shift();
