@@ -17,7 +17,9 @@ export type ActivityKind =
   /** Hurt, sitting on the ground (a situation, C10). */
   | 'hurt'
   /** Marking the hero's map, held in both hands (the hand-over, D35). */
-  | 'mark';
+  | 'mark'
+  /** The harbour (S2): working a crane's winch, carrying cargo, mending nets. */
+  | 'haul' | 'carry' | 'mendNets';
 
 /** Who may use a spot: its building's workers, its household, the market's traders, or anyone. */
 export type SpotUse = 'work' | 'home' | 'trade' | 'any';
@@ -57,6 +59,11 @@ export const SPOT_DEFS: Readonly<Record<FixtureKind, SpotDef>> = {
   field: { activity: 'reap', use: 'work', cap: 2, secs: [120, 300], outside: true },
   paddock: { activity: 'tendStock', use: 'work', cap: 1, secs: [40, 100], outside: true },
   hayrack: { activity: 'muckOut', use: 'work', cap: 1, secs: [40, 110], outside: true },
+  // The harbour (S2): a warehouse's hands work the crane and move the cargo, the fisherfolk mend their nets.
+  crane: { activity: 'haul', use: 'work', cap: 1, secs: [40, 100], outside: true },
+  cargo: { activity: 'carry', use: 'work', cap: 2, secs: [30, 80], outside: true },
+  nets: { activity: 'mendNets', use: 'work', cap: 2, secs: [90, 240], outside: true },
+  fishstall: { activity: 'browse', use: 'any', cap: 2, secs: [15, 45], outside: true },
 };
 
 /** The work a field asks for, by what grows there (the season is not modelled yet: a late summer's mix). */
@@ -142,7 +149,7 @@ export function townSpots(plan: TownPlan): Spot[] {
     }
     out.push(s);
     // A stall also has its seller, behind it, facing the market.
-    if (f.kind === 'stall') { s.market = true; out.push({ id: out.length, activity: 'sell', use: 'trade', cap: 1, secs: [90, 300], outside: true, x: f.x - Math.cos(f.yaw) * 0.9, z: f.z - Math.sin(f.yaw) * 0.9, dir: f.yaw, building: -1, door: false, users: 0, market: true }); }
+    if (f.kind === 'stall' || f.kind === 'fishstall') { s.market = true; out.push({ id: out.length, activity: 'sell', use: 'trade', cap: 1, secs: [90, 300], outside: true, x: f.x - Math.cos(f.yaw) * 0.9, z: f.z - Math.sin(f.yaw) * 0.9, dir: f.yaw, building: -1, door: false, users: 0, market: true }); }
   }
   out.push(...marketChats(plan, out.length));
   for (const b of plan.buildings) {

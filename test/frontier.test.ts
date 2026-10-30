@@ -48,7 +48,7 @@ test('frontier: regions never overlap, and places stand on dry, gentle land insi
   }
 });
 
-test('frontier: standing still opens nothing more; waystations, hamlets, villages and the capital count as settlements', () => {
+test('frontier: standing still opens nothing more; waystations, hamlets, villages, harbour towns and the capital count as settlements', () => {
   let log: Decision[] = [...first];
   // The cheap check (asked each time before a worker looks for a place) agrees with nextRegion.
   for (let i = 0; i < 40; i++) {
@@ -60,7 +60,7 @@ test('frontier: standing still opens nothing more; waystations, hamlets, village
   assert.equal(nextRegion({ seed, log, terrain, regions, home, hero: home, heading: null, hours: 0 }), null);
   const towns = settlementsOf(along(EAST), regions);
   assert.equal(towns[0].id, 'town-1');
-  for (const s of towns.slice(1)) assert.ok(['waystation', 'hamlet', 'village', 'capital'].includes(regionDecisions(along(EAST)).find((d) => d.id === s.id)?.fill ?? ''));
+  for (const s of towns.slice(1)) assert.ok(['waystation', 'hamlet', 'village', 'harbour', 'capital'].includes(regionDecisions(along(EAST)).find((d) => d.id === s.id)?.fill ?? ''));
 });
 
 test('frontier: every place lays out on the land, seeded, with known layers, solid where it stands', () => {

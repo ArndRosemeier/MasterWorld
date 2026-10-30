@@ -34,8 +34,8 @@ export const WATER = {
   ambient: uniform(new Color(0.5, 0.6, 0.7)),
   /** Scattering colour of the water body (deep sea), and the absorption per metre (red goes first). */
   deep: uniform(new Color(0.006, 0.03, 0.045)),
-  shallow: uniform(new Color(0.04, 0.16, 0.17)),
-  absorb: uniform(new Vector3(0.42, 0.11, 0.07)),
+  shallow: uniform(new Color(0.03, 0.14, 0.16)),
+  absorb: uniform(new Vector3(0.45, 0.14, 0.09)),
   /** Environment light strength (for the sky reflection). */
   env: uniform(1),
   near: emptyWaterMask(1024, 512),

@@ -73,3 +73,77 @@ export function nearestCoast(t: Terrain, kind: CoastKind, x: number, z: number):
   const bx = px - sx * back, bz = pz - sz * back;
   return { kind, x: bx, z: bz, y: t.height(bx, bz), seaX: sx, seaZ: sz };
 }
+
+/** A river's mouth: where it meets the sea, the way it flows there (a unit vector) and its half width. */
+export interface RiverMouth {
+  readonly x: number;
+  readonly z: number;
+  readonly fx: number;
+  readonly fz: number;
+  readonly half: number;
+}
+
+/** A river's last point counts as its mouth while its level is this near the sea's (m). */
+const MOUTH_LEVEL = 0.5;
+
+/** The rivers' mouths within `within` metres of (x, z) (brooks have none worth a harbour), nearest first. */
+export function riverMouths(t: Terrain, x: number, z: number, within: number): RiverMouth[] {
+  const out: (RiverMouth & { d: number })[] = [];
+  // Each river met near (x, z) once: its last point, if that is at the sea and within reach (the points the
+  // rivers' lookup visits need not include the very last).
+  const seen = new Set<object>();
+  t.hydro.riverPoints(x, z, within, (r) => {
+    if (seen.has(r)) return;
+    seen.add(r);
+    const n = r.level.length, k = n - 1;
+    if (n < 2 || r.level[k] > MOUTH_LEVEL) return;
+    const d = Math.hypot(r.xz[k * 2] - x, r.xz[k * 2 + 1] - z);
+    if (d > within) return;
+    const dx = r.xz[k * 2] - r.xz[k * 2 - 2], dz = r.xz[k * 2 + 1] - r.xz[k * 2 - 1], l = Math.hypot(dx, dz) || 1;
+    out.push({ x: r.xz[k * 2], z: r.xz[k * 2 + 1], fx: dx / l, fz: dz / l, half: r.half[k], d });
+  }, false);
+  return out.sort((a, b) => a.d - b.d);
+}
+
+/** Where a harbour town by a river's mouth goes: its middle, and the shore its quay runs along (AssetGenerator HarbourSite). */
+export interface HarbourSpot {
+  readonly x: number;
+  readonly z: number;
+  readonly harbour: { readonly x: number; readonly z: number; readonly dx: number; readonly dz: number };
+}
+
+/**
+ * The spots for a harbour town of radius `r` by a river's mouth (D50: the river is its fresh water, the sea its
+ * harbour), on either bank: the quay on the coast beside the mouth, the town's middle inland of it, on dry ground at
+ * least 1.5 m up. Those with more dry ground round the middle first.
+ */
+export function harbourSpots(t: Terrain, m: RiverMouth, r: number): HarbourSpot[] {
+  const [sx, sz] = seaward(t, m.x, m.z), out: (HarbourSpot & { dry: number })[] = [];
+  for (const side of [1, -1]) for (const along of HARBOUR_ALONG) {
+    // Along the coast, one way or the other from the mouth (the river's end lies a little out at sea), past its bank
+    // (nearer or farther: a place must fit in its square); then inland to the shore.
+    const tx = -sz * side, tz = sx * side, off = m.half + 15 + r * along;
+    let hx = NaN, hz = NaN;
+    for (let s = -60; s < 400; s += 4) {
+      const x = m.x + tx * off - sx * s, z = m.z + tz * off - sz * s;
+      if (t.waterDepth(x, z) <= 0) { hx = x; hz = z; break; }
+    }
+    if (Number.isNaN(hx)) continue;
+    const cx = hx - sx * r * 0.6, cz = hz - sz * r * 0.6;
+    if (t.height(cx, cz) < 1.5 || t.waterDepth(cx, cz) > 0) continue;
+    // Dry ground round the middle, on its landward side (the sea before it is the harbour's).
+    let dry = 0, all = 0;
+    for (let a = 0; a < 8; a++) for (const q of [0.4, 0.8]) {
+      const ox = Math.cos((a * Math.PI) / 4) * r * q, oz = Math.sin((a * Math.PI) / 4) * r * q;
+      if (ox * sx + oz * sz > r * 0.3) continue;
+      all++;
+      if (t.waterDepth(cx + ox, cz + oz) <= 0 && t.height(cx + ox, cz + oz) > 0.8) dry++;
+    }
+    if (dry < all * 0.75) continue;
+    out.push({ x: cx, z: cz, harbour: { x: hx, z: hz, dx: sx, dz: sz }, dry });
+  }
+  return out.sort((a, b) => b.dry - a.dry).map(({ x, z, harbour }) => ({ x, z, harbour }));
+}
+
+/** How far along the coast from a river's mouth a harbour town's quay may be centred, in town radii past the bank. */
+const HARBOUR_ALONG = [0.45, 0.9, 1.4];

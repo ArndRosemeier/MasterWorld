@@ -21,6 +21,7 @@ import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
 import { nearestCoast } from './world/coast';
+import { UNDER_LENS, updateVeil } from './render/underwater';
 import { Rocks } from './world/rocks';
 import { RockView } from './render/rocks/RockView';
 import { woodsOf } from './world/flora';
@@ -2193,7 +2194,10 @@ export async function start(b: Boot): Promise<void> {
       // The floating origin steps once the camera strays from it, before anything writes origin-relative data.
       part('origin+weather');
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
-      view.sky.underwater = sea.submerged(view.camera.position);
+      // Under the sea, or in the waterline (render/underwater.ts): the camera's height over the surface at it, waves and all.
+      const camAt = view.camera.position, surf = sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
+      view.sky.underwater = overSea < -UNDER_LENS;
+      updateVeil(view.camera, overSea, view.sky.underwater, view.sky.murk, dt);
       wx.apply(dt, view.camera.position, hours(), view.sky);
       // Raided farms' barns smoulder (C10): looked up now and then, the puffs rise every frame.
       part('smoke+barns');

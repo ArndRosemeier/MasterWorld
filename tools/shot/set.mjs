@@ -263,7 +263,7 @@ const SESSIONS = [
     { name: 'sea-beach-aloft', act: seaLook({ out: -14, up: 9, pitch: -12 }) },
   ] },
   { id: 'sea-cliff', query: `${still}&hour=15&weather=fair&coast=cliff`, shots: [
-    { name: 'sea-cliff', act: seaLook({ pitch: -0.1 }) },
+    { name: 'sea-cliff', act: seaLook({ out: 16, side: 26, hy: 1, back: true, pitch: -4 }) },
     { name: 'sea-cliff-face', act: seaLook({ out: 110, up: 6, side: 60, back: true, pitch: 10 }) },
   ] },
   { id: 'sea-under', query: `${still}&hour=13&weather=fair&coast=under`, shots: [
@@ -345,12 +345,12 @@ function caveLook(what) {
  * A view by the sea, from where `coast=` put the hero (facing out to sea). Without `out` and `bed` the usual camera
  * behind the hero at `pitch` (radians; `swim`: first the hero is put 25 m further out, swimming). Otherwise the free
  * camera `out` metres seaward of the hero (negative: inland), `side` to its left, and `up` over the ground, `bed`
- * over the sea bed or at the height `level`, looking out to sea (or `back` towards the hero) at `pitch` degrees.
+ * over the sea bed, at the height `level` or `hy` over the hero's feet, looking out to sea (or `back` towards the hero) at `pitch` degrees.
  */
-function seaLook({ out, side = 0, up, bed, level, back = false, pitch = 0, swim = false }) {
+function seaLook({ out, side = 0, up, bed, level, hy, back = false, pitch = 0, swim = false }) {
   return async (p) => {
     await p.waitForFunction(() => window.game?.player, null, { timeout: TIMEOUT });
-    await p.evaluate(([out, side, up, bed, level, back, pitch, swim]) => {
+    await p.evaluate(([out, side, up, bed, level, hy, back, pitch, swim]) => {
       const g = window.game, pl = g.player, w = pl.walker, yaw = w.yaw, sx = -Math.sin(yaw), sz = -Math.cos(yaw);
       if (out === null) {
         if (swim) pl.teleport(w.pos.x + sx * 25, undefined, w.pos.z + sz * 25, yaw);
@@ -358,11 +358,11 @@ function seaLook({ out, side = 0, up, bed, level, back = false, pitch = 0, swim 
         return;
       }
       const x = w.pos.x + sx * out - sz * side, z = w.pos.z + sz * out + sx * side, ground = g.terrain.height(x, z);
-      const y = level !== null ? level : bed !== null ? ground + bed : Math.max(ground, 0) + up;
+      const y = hy !== null ? w.pos.y + hy : level !== null ? level : bed !== null ? ground + bed : Math.max(ground, 0) + up;
       const look = back ? Math.atan2(w.pos.x - x, z - w.pos.z) : Math.atan2(sx, -sz);
       pl.flying = true;
       pl.goTo([x, y, z], [(look * 180) / Math.PI, pitch]);
-    }, [out ?? null, side, up ?? 0, bed ?? null, level ?? null, back, pitch, swim]);
+    }, [out ?? null, side, up ?? 0, bed ?? null, level ?? null, hy ?? null, back, pitch, swim]);
     await p.waitForTimeout(2000);
   };
 }

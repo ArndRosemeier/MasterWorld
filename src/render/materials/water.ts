@@ -126,7 +126,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     // A wind-roughened sea is no mirror: at grazing angles its facets tilt toward the viewer, so the
     // reflection never reaches full strength and comes from higher, bluer sky than the pale horizon.
     const rough = smoothstep(20.0, 400.0, camDist);
-    const fres = float(0.02).add(pow(float(1).sub(ndv), 5).mul(0.98)).min(mix(float(0.7), float(0.5), rough));
+    const fres = float(0.02).add(pow(float(1).sub(ndv), 5).mul(0.98)).min(mix(float(0.55), float(0.45), rough));
     const depth = max(vDepth, 0);
     const sunUp = clamp(W.sunDir.y.mul(3).add(0.2), 0, 1);
 
@@ -160,8 +160,8 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     // Near the shore by distance, not depth alone: over a wide shallow shelf (a lake's flat edge) a depth test turned
     // a band tens of metres wide white. The metres to the shore: depth over how fast it deepens across the pixels.
     const deepens = fwidth(depth).div(max(fwidth(p.x).add(fwidth(p.z)), 1e-3));
-    const nearShore = float(1).sub(smoothstep(3.0, 10.0, depth.div(max(deepens, 0.02))));
-    const shore = float(1).sub(smoothstep(0.0, 2.8, depth)).mul(still).mul(nearShore);
+    const nearShore = float(1).sub(smoothstep(2.0, 7.0, depth.div(max(deepens, 0.02))));
+    const shore = float(1).sub(smoothstep(0.0, 1.6, depth)).mul(still).mul(nearShore);
     // Surf rolls in from the sea only: a lake has no breakers, and over its long flat shelves the bands stood still as
     // one solid white strip along the shore (gate W). The sea's surface is at 0 m, a lake's well above it.
     const surf = shore.mul(smoothstep(SEA_SURF_TOP, 0.5, p.y));
