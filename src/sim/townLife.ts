@@ -522,7 +522,8 @@ export class TownLife {
         const [ox, oz] = o.act === 'dance' ? [o.x, o.z] : [o.path[o.path.length - 2], o.path[o.path.length - 1]];
         taken.add(((Math.round((Math.atan2(oz - order.z, ox - order.x) / (2 * Math.PI)) * n) % n) + n) % n);
       }
-      const free = Array.from({ length: n }, (_, k) => k).filter((k) => !taken.has(k));
+      const free: number[] = [];
+      for (let k = 0; k < n; k++) if (!taken.has(k)) free.push(k);
       for (let tries = 0; tries < 6 && free.length; tries++) {
         const k = free.splice(r.int(0, free.length - 1), 1)[0], [x, z] = onCircle(order, (k / n) * 2 * Math.PI, FEAST.ring);
         if (this.freeGround(x, z)) return { spot: -1, x, z, act: 'dance', secs: [60, 180], face };
