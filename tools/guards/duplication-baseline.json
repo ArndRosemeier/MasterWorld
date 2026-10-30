@@ -384,10 +384,6 @@
     "reason": "The player's frame (walk, ride, puppet) and the water's: per-frame updates of different things."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
     "key": "idiom: [.add .mul .y] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
@@ -404,19 +400,7 @@
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
     "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
   {
@@ -668,11 +652,43 @@
     "reason": "TSL arithmetic (.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the city's paving (P4)."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts",
+    "key": "idiom: [.mul .sub] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/smoke.ts",
     "reason": "TSL arithmetic (.add/.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the cave pool's sheen (phase P fixes)."
   },
   {
-    "key": "idiom: [.mul .sub] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/smoke.ts",
-    "reason": "TSL arithmetic (.add/.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the cave pool's sheen (phase P fixes)."
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/portalStone.ts + masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
+  },
+  {
+    "key": "idiom: [.burst] in masterworld/app/spellFx/levelRing.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
+    "reason": "Calls into the spells' particle bits (spellFx/particles.ts SpellBits): each effect throws its own sprites; the shared part is SpellBits itself."
+  },
+  {
+    "key": "idiom: [.computeBoundingSphere .computeVertexNormals] in masterworld/app/spellFx/fxView.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/portalStone.ts",
+    "reason": "Three's BufferGeometry finishing calls after building vertices by hand; each mesh builds its own shape."
+  },
+  {
+    "key": "idiom: [.emit] in masterworld/app/spellFx/levelRing.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
+    "reason": "Calls into the spells' particle bits (spellFx/particles.ts SpellBits): each effect throws its own sprites; the shared part is SpellBits itself."
   }
 ]

@@ -690,6 +690,8 @@ export interface ItemDef {
   readonly lore?: string;
   /** Writings (tomes, scrolls; C3, D49): the taught ability read from it (a first spell brings mana). */
   readonly teaches?: string;
+  /** A portal stone: one glyph marks home, the other opens a portal back to it (game/portalStone.ts). */
+  readonly portal?: boolean;
 }
 
 /** A named legendary item with its place in the canon (plan 11.5). */

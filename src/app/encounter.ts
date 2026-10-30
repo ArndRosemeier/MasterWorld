@@ -20,7 +20,7 @@ import type { RecipeEvent, Recipes } from '../game/recipe';
 import type { SpellFrame } from './spellView';
 import { defOf, type Item, type Loot } from '../game/items';
 import type { Bindings } from '../input/controls';
-import { onKeyDown } from '../input/keys';
+import { onClick, onKeyDown } from '../input/keys';
 import type { CreatureView } from '../render/dungeon/CreatureView';
 import { joltOf } from '../render/jolt';
 import { warning, type Director } from '../vgm/director';
@@ -130,14 +130,7 @@ export class Encounter {
     this.creatures.group.visible = false;
     onKeyDown((e) => this.keyDown(e));
     // A click (not a drag of the camera) picks what is under the pointer.
-    let at: { x: number; y: number; t: number } | null = null;
-    canvas.addEventListener('pointerdown', (e) => { if (e.button === 0) at = { x: e.clientX, y: e.clientY, t: performance.now() }; });
-    canvas.addEventListener('pointerup', (e) => {
-      if (!at || e.button !== 0) return;
-      const click = Math.hypot(e.clientX - at.x, e.clientY - at.y) < 6 && performance.now() - at.t < 350;
-      at = null;
-      if (click && this.active) this.click(e.clientX, e.clientY, canvas);
-    });
+    onClick(canvas, (x, y) => { if (this.active) this.click(x, y, canvas); });
   }
 
   /** It played last frame (it owns the keys, the HUD and the hero's stance). */

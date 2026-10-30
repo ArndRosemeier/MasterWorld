@@ -82,6 +82,8 @@ export class SpellView {
   private ringDue = false;
   /** Where the hero's hand is in the world (main.ts: the body's bone), null while not known. */
   handOf: ((out: Vector3) => Vector3 | null) | null = null;
+  /** More drawn with the same bits every frame, spell or none (the portal stone's light: app/portalStoneUse.ts). */
+  also: ((b: SpellBits, dt: number) => void) | null = null;
 
   constructor(private readonly setting: SettingModule) {}
 
@@ -162,6 +164,7 @@ export class SpellView {
       if (this.ringDue) { this.ring.kindle(b, feet); this.ringDue = false; }
       this.ring.rise(b, feet, dt);
     }
+    this.also?.(b, dt);
     b.step(dt);
     this.shown = { shots: (f?.recipes.shots.length ?? 0) + this.tracers.length, flashes: b.parts.length + b.solids.length, motes: b.held.length + b.heldSolids.length };
     if (this.inScene) this.view.draw(b);
