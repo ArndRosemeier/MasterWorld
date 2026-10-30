@@ -71,3 +71,22 @@ test('town life: someone lingering (still walking out through an open room) stay
   for (let k = 0; k < 30; k++) life.step(0.1, 19);
   assert.equal(a.stay, undefined);
 });
+
+test('room flow: one off to bed upstairs walks to the foot of the stairs first, then lies abed there', () => {
+  const { life, flow } = evening();
+  const cast = roomCast(life.agents, life.spots, inn.id, room, flow.kept);
+  flow.frame(cast, 1 / 60);
+  const bed = room.spots.findIndex((s) => s.kind === 'sleep' && s.storey > 0);
+  assert.ok(bed >= 0, 'the inn has beds upstairs');
+  const goer = cast.find((c) => c.agent.person.work !== inn.id)!;
+  const now = cast.map((c) => (c === goer ? { ...c, spot: bed, act: 'sleep' as const } : c));
+  let at = flow.frame(now, 1 / 60).find((p) => p.agent === goer.agent)!;
+  assert.equal(at.act, 'walk');
+  let last = at;
+  for (let k = 0; k < 60 * 30 && at.act === 'walk'; k++) { last = at; at = flow.frame(now, 1 / 60).find((p) => p.agent === goer.agent)!; }
+  assert.equal(at.act, 'sleep', 'abed within half a minute');
+  const st = room.stairs.find((s) => s.storey === 0)!;
+  assert.ok(Math.hypot(last.a - (st.a - st.da * 0.4), last.b - (st.b - st.db * 0.4)) < 0.1, 'from the foot of the stairs');
+  assert.equal(at.storey, room.spots[bed].storey);
+  assert.equal(at.bed, 0.55);
+});
