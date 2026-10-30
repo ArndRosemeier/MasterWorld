@@ -403,7 +403,7 @@ export async function start(b: Boot): Promise<void> {
     // Brook tiles ahead of the hero come from the world worker (D50).
     const brooks = new BrookPrefetch(terrain.hydro, jobs);
     // The terrain workers (the land, its rock, the houses); they and the world worker hear of the roads first.
-    const terrainPool = createTerrainPool();
+    const terrainPool = createTerrainPool(params.workers);
     // First of all they hear of the rivers' and brooks' tiles this thread traced opening the world: each opens it on
     // them instead of tracing them again (since phase W's lakes and valleys, seconds each, while 'Raising the land' waited).
     void terrainPool.broadcast({ kind: 'tiles', tiles: tracedTiles(terrain.skeleton), seed, setting: setting.id }).catch(() => {});
