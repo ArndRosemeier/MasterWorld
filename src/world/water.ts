@@ -3,7 +3,9 @@
  * camera that the water and terrain shaders read. One surface for everything: the sea at level 0, lakes at
  * their spill level, rivers at their sloping level (hydro.ts).
  */
+import { smoothstep } from '@futuremagic/core';
 import { emptyWater, inChannel } from './hydro';
+import { LAKE_GRID, type Lake } from './lakes';
 import type { Terrain } from './terrain';
 
 export const SEA_LEVEL = 0;
@@ -23,6 +25,9 @@ const HIDDEN_DILATE = 6;
 const FLOW_BANK = 2;
 /** Depth written where no water is near (the surface hides below the ground). */
 export const DRY = -3;
+
+/** How still a river's water is at (x, z) by lake `l`: 1 from the water's edge in, 0 a cell out from it. */
+const stillBy = (l: Lake | null, x: number, z: number): number => (l ? 1 - smoothstep(LAKE_GRID / 2, LAKE_GRID, l.shore(x, z)) : 0);
 
 export interface MaskJob {
   seed: number;
@@ -99,9 +104,12 @@ export function waterMask(t: Terrain, job: MaskJob): Float32Array {
     t.hydro.query(x, z, w);
     // A river shows in a mask only where it is at least a pixel wide (finer masks draw the narrow ones), and only
     // where its surface is above the ground: a coarse pixel smeared over the banks would float a sheet of water.
-    if (inChannel(w, step / 2) && 2 * w.half >= step && h < w.level + 0.3) {
+    // Where a river meets a lake at the lake's level, its current dies away towards the shore and the lake's still
+    // water takes over at the water's edge (its channel, as wide as the river, reaches past its end there).
+    const still = !Number.isNaN(w.lake) && h < w.lake && w.river && w.level <= w.lake + 0.3 ? stillBy(t.hydro.lakeNear(x, z), x, z) : 0;
+    if (still < 1 && inChannel(w, step / 2) && 2 * w.half >= step && h < w.level + 0.3) {
       // Rivers rush over a fall's lip and away from its foot.
-      const v = flowSpeed(w.slope) + (w.fallAt > -15 ? 2.7 * Math.exp(-Math.max(0, w.fallAt) / 25) : 0);
+      const v = (flowSpeed(w.slope) + (w.fallAt > -15 ? 2.7 * Math.exp(-Math.max(0, w.fallAt) / 25) : 0)) * (1 - still);
       level = w.level; fx = w.fx * v; fz = w.fz * v;
     }
     else if (!Number.isNaN(w.lake) && h < w.lake) level = w.lake;
