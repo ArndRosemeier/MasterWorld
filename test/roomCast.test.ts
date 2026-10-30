@@ -81,3 +81,17 @@ test('room cast: a guild hall\'s master stands by the practice post; nobody sits
   }
   assert.ok(seen >= 3, `${seen} halls with somebody in`);
 });
+
+test('room cast: one woken in bed for a talk (a teacher at night) is in the room, up from bed', () => {
+  const life = new TownLife(plan, 7, 2);
+  for (let s = 0; s < 300; s++) life.step(1, 2);
+  const a = life.agents.find((x) => x.act === 'sleep' && x.spot >= 0 && life.spots[x.spot].door && planInterior(plan.buildings[life.spots[x.spot].building]).spots.some((s) => s.kind !== 'sleep'))!;
+  assert.ok(a, 'somebody asleep at home');
+  const b = plan.buildings[life.spots[a.spot].building], room = planInterior(b);
+  assert.equal(roomCast(life.agents, life.spots, b.id, room).find((x) => x.agent === a)?.act, 'sleep');
+  life.hold(a, b.door[0], b.door[1]);
+  assert.equal(a.heldIn, true);
+  const c = roomCast(life.agents, life.spots, b.id, room).find((x) => x.agent === a);
+  assert.ok(c, 'still in the room');
+  assert.notEqual(room.spots[c.spot].kind, 'sleep', 'up from bed');
+});

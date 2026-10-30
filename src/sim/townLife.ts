@@ -331,7 +331,8 @@ export class TownLife {
    */
   hold(a: Agent, x: number, z: number): void {
     const s = a.spot >= 0 ? this.spots[a.spot] : null;
-    a.heldIn = !!s && inRoom(a, s);
+    // Woken in bed (a teacher the hero comes to at night): in the room, getting up to talk.
+    a.heldIn = !!s && (inRoom(a, s) || (a.act === 'sleep' && !!s.door && s.building >= 0));
     a.held = true;
     a.hidden = false;
     if (a.act === 'sit') return;
