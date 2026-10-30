@@ -1,8 +1,9 @@
 /**
  * The VGM seen at work (a developer's aid): `node tools/shot/vgm.mjs [out dir]` after `npm run build`, SHOT_GPU=1 on
- * the reference machine. Out on the land east of the start town the VGM answers Discovery: its move must slide in
- * as a slip at the top right and its place must get a ward-blue stud on the minimap (01-alert). F9 opens its window
- * (02-window); a move clicked in its log lights up on the minimap above it (02b-picked); its newest move's Go there puts the hero beside the place (03-there). JPEGs into `<out dir>`
+ * the reference machine. Out on the land east of the start town the VGM answers Discovery: its move must come in
+ * at the top of the VGM panel docked at the right and its place must get a ward-blue stud on the minimap
+ * (01-panel). Filtered to that move's kind only such moves are listed (02-filtered); the move clicked lights up on
+ * the minimap (03-picked); its Go there puts the hero beside the place (04-there); F9 hides the panel. JPEGs into `<out dir>`
  * (default `shots/vgm/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  */
 import { execSync } from 'node:child_process';
@@ -36,25 +37,37 @@ const made = await page.evaluate(() => { const m = window.game.answerNow('discov
 console.log(`answer: ${made ?? 'none'}`);
 check(!!made, 'the VGM answered Discovery');
 await page.waitForTimeout(1500);
-check(await page.locator('.vgm-slip').count() > 0, 'its move slid in as a slip');
+const P = '#vgm-panel';
+check(await page.locator(`${P}.shown`).count() === 1, 'the VGM panel is docked and open during play');
+const top = (await page.locator(`${P} .move .why`).first().textContent()) ?? '';
+check(made !== null && made.endsWith(top), 'its newest move is at the top of the list');
 check(await page.locator('#compass .stud.vgm').count() > 0, 'the minimap has a VGM stud');
-await shoot('01-alert');
+await shoot('01-panel');
 
-await page.keyboard.press('F9');
-await page.waitForTimeout(1800);
-check(await page.locator('.panel.vgm .move').count() > 0, 'F9 opened the VGM window with its moves');
-await shoot('02-window');
+// Filtered to the newest move's kind: only moves of that kind are listed.
+const tool = (await page.locator(`${P} .move .tool`).first().textContent()) ?? '';
+await page.locator(`${P} .chip`, { hasText: tool }).first().click();
+await page.waitForTimeout(500);
+const tools = await page.locator(`${P} .move .tool`).allTextContents();
+check(tools.length > 0 && tools.every((t) => t === tool), `filtered to ${tool}: ${tools.length} moves, all of that kind`);
+await shoot('02-filtered');
 
-// A move clicked in the log lights up on the minimap, which stands above the window.
-await page.locator('.panel.vgm .move.placed .why').first().click();
+// A move clicked lights up on the minimap; its row says which way it lies.
+await page.locator(`${P} .move.placed .why`).first().click();
 await page.waitForTimeout(800);
 check(await page.locator('#compass .stud.vgm.picked').count() === 1, 'the clicked move is lit on the minimap');
-check(((await page.locator('.panel.vgm .move.picked .way').textContent()) ?? '').includes('on the minimap'), 'its row says which way it lies');
-await shoot('02b-picked');
+check(((await page.locator(`${P} .move.picked .way`).textContent()) ?? '').includes('on the minimap'), 'its row says which way it lies');
+await shoot('03-picked');
 
-await page.locator('.panel.vgm .move .go').first().click();
+await page.locator(`${P} .move .go`).first().click();
 await page.waitForTimeout(3000);
-await shoot('03-there');
+await shoot('04-there');
+
+// Back to every kind (the filter is kept in the settings), and F9 hides the panel.
+await page.locator(`${P} .chip`, { hasText: 'All' }).click();
+await page.keyboard.press('F9');
+await page.waitForTimeout(300);
+check(await page.locator(`${P}.shown`).count() === 0, 'F9 hides the panel');
 
 console.log(errors.length ? `page errors:\n${errors.join('\n')}` : 'no page errors');
 await browser.close();

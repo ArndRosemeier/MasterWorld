@@ -150,7 +150,7 @@ export class Menu {
         el('h3', { textContent: 'The game master' }),
         el('p', { className: 'hint', textContent: 'Out of sight, a game master decides what the land holds and what happens in it: places to find, bands on the roads, trouble in the towns. Calm leaves more time between happenings, eventful less.' }),
         this.pacing(),
-        this.check('Show each of its moves on screen (for building the game)', 'vgmAlerts'),
+        this.check('Show its panel with each of its moves (for building the game; F9)', 'vgmPanel'),
       );
     }
     this.body.replaceChildren(...rows);
