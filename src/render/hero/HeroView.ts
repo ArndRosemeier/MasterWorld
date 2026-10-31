@@ -7,7 +7,7 @@
  * A new look never builds a shader on the render path: it is put on a second, hidden character, compiled
  * (each garment, hairstyle and shadow) and then swapped in, so the old look shows until the new one is ready.
  */
-import { Group, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Group, Matrix4, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed, smoothstep } from '@futuremagic/core';
 import { Character, outfitGarments, randomConfig, type CharacterCatalog, type CharacterConfig, type CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
@@ -86,11 +86,11 @@ const TORCH_HAND = [0.34, 1.12, 0.26] as const;
 const TORCH_RAISE = 0.4;
 /** A held torch's head leans this far ahead of upright (about the body's +x). */
 const TORCH_LEAN = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), 0.25);
-const torchQ = new Quaternion(), handQ = new Quaternion(), chestAt = new Vector3();
+const torchQ = new Quaternion(), handQ = new Quaternion(), chestAt = new Vector3(), chestQ = new Quaternion(), chestS = new Vector3(), calmInv = new Quaternion(), chestM = new Matrix4();
 /** Holding a torch up, the left arm follows its clip this slowly (s): a run's swing all but goes, a turn comes through. */
 const ARM_CALM = 0.8;
 const CALM_BONES = ['clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l'] as const;
-const HELD_BONES = ['upperarm_l', 'lowerarm_l', 'hand_l'] as const;
+const HELD_BONES = ['clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l'] as const;
 /** Which way the torch arm's elbow points (the rig's body frame for this side: out, up, ahead): out, down and back. */
 const TORCH_ELBOW = [0.8, -1, -0.5] as const;
 
@@ -144,7 +144,7 @@ export class HeroView {
   private readonly armCalm = new Map<Object3D, Quaternion>();
   /** The left arm as it held the torch last frame (upper arm, forearm, hand): where the next frame's reach starts. */
   private readonly armHeld = new Map<Object3D, Quaternion>();
-  private chestCalm: Vector3 | null = null;
+  private chestCalm: { at: Vector3; q: Quaternion } | null = null;
   private wanted: CharacterPatch | null = null;
   private dressing: Promise<void> | null = null;
   private readonly seatAt = new Vector3();
@@ -367,12 +367,18 @@ export class HeroView {
       }
       o.updateMatrixWorld(true);
       // The left hand out to the side and ahead at the chest (Actors' people face +z, +x their left), so the
-      // torch stands beside the head, seen from behind as from the front. It rides the chest's bob, not its own.
-      const chest = this.front.actor.bones.find((x) => x.name === 'spine_03');
-      const at = chest ? o.worldToLocal(chest.getWorldPosition(chestAt)) : null;
-      if (at) this.chestCalm = (this.chestCalm ?? at.clone()).lerp(at, follow);
+      // torch stands beside the head, seen from behind as from the front. It rides the chest as the run bobs and
+      // twists it (the chest's place and turn now against their calmed ones), so the arm keeps its shape to the
+      // body: with the hand held still the twist pushed the elbow out and in with every stride.
       g.L!.p.set(TORCH_HAND[0] * k, TORCH_HAND[1] * k, TORCH_HAND[2] * k);
-      if (at && this.chestCalm) g.L!.p.add(at).sub(this.chestCalm);
+      const chest = this.front.actor.bones.find((x) => x.name === 'spine_03');
+      if (chest) {
+        chestM.copy(o.matrixWorld).invert().multiply(chest.matrixWorld).decompose(chestAt, chestQ, chestS);
+        const C = (this.chestCalm ??= { at: chestAt.clone(), q: chestQ.clone() });
+        C.at.lerp(chestAt, follow);
+        C.q.slerp(chestQ, follow);
+        g.L!.p.sub(C.at).applyQuaternion(calmInv.copy(C.q).invert()).applyQuaternion(chestQ).add(chestAt);
+      }
       o.localToWorld(g.L!.p);
       g.L!.w = smooth(T.up); g.L!.pole = TORCH_ELBOW; g.L!.flat = null;
       g.R!.w = 0; g.footL!.w = 0; g.footR!.w = 0;
