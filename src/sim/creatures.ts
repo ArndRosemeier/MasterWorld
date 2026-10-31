@@ -241,7 +241,7 @@ export class Den {
     this.waiting.clear();
     const out: DenEvent[] = [];
     for (const c of this.creatures) {
-      if (c.state === 'dead') continue;
+      if (c.state === 'dead') { c.y = this.ground.floatAt?.(c.x, c.z, c.y) ?? c.y; continue; }
       c.stagger = Math.max(0, c.stagger - dt);
       c.ready = Math.max(0, c.ready - dt);
       c.repath = Math.max(0, c.repath - dt);

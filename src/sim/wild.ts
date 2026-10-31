@@ -59,11 +59,13 @@ const HOP = { near: 1.2, far: 4.5, up: 1.4, down: 3 } as const;
 
 /**
  * A home in water deeper than this (m) makes the ground the sea's (S9): its bodies swim, keep to water at least
- * `shallow` deep, and stay `top` under the waves and `bed` over the bottom, `under` below the feet of a hero who
- * swims (its `prey`; else `cruise` under the surface), rising or sinking at most `rise` (m per step). Kept level
- * with the swimmer, the two never pass through each other (bodies farther apart in height do, sim/creatures.ts).
+ * `shallow` deep, and `bed` over the bottom. Cruising they keep `cruise` under the surface; at a hero who swims
+ * (its `prey`) they come up `over` the hero's feet, at most to `top` under the waves, so the fin cuts the water
+ * (PC round 34: deeper, it could not be seen in the fight). Kept level with the swimmer, the two never pass through
+ * each other (bodies farther apart in height do, sim/creatures.ts). They rise or sink at most `rise` (m per step).
+ * The dead float up to `float` under the waves, `drift` m a step, and ride them once within `riding`.
  */
-const SEA = { home: 3, shallow: 1.8, top: 1.3, bed: 0.6, cruise: 2.5, under: 0.2, rise: 0.08 } as const;
+const SEA = { home: 3, shallow: 1.8, top: 0.6, bed: 0.6, cruise: 2.5, over: 0.4, rise: 0.08, float: 0.25, drift: 0.02, riding: 0.6 } as const;
 
 /** Open land as a den's ground: the territories are its homes; walking is straight, around water and walls. Or the sea, swum. */
 export class OpenGround implements DenGround {
@@ -72,6 +74,14 @@ export class OpenGround implements DenGround {
   /** Its home lies out in deep water: it is swum, not walked (S9). */
   readonly sea: boolean;
   get afloat(): boolean { return this.sea; }
+
+  /** Where a dead body at (x, z), now at `y`, floats next (it rises slowly to under the waves and rides them; null on land). */
+  floatAt(x: number, z: number, y: number): number | null {
+    if (!this.sea) return null;
+    const top = (this.land.surface?.(x, z) ?? this.land.height(x, z) + this.land.waterDepth(x, z)) - SEA.float;
+    // Come up, it rides the swell; deeper, it rises slowly.
+    return y > top - SEA.riding ? top : Math.min(top, y + SEA.drift);
+  }
 
   /** `prey`: the height (y) of the hero's feet while the hero swims, else null (a sea ground's bodies come to it). */
   constructor(private readonly land: Land, private readonly homes: readonly { x: number; z: number; r: number }[], private readonly prey: () => number | null = () => null) {
@@ -83,7 +93,7 @@ export class OpenGround implements DenGround {
   private swimAt(x: number, z: number, y?: number): number {
     const bed = this.land.height(x, z), surface = this.land.surface?.(x, z) ?? bed + this.land.waterDepth(x, z), top = surface - SEA.top;
     const prey = this.prey();
-    const want = Math.max(bed + SEA.bed, Math.min(top, prey === null ? surface - SEA.cruise : prey - SEA.under));
+    const want = Math.max(bed + SEA.bed, Math.min(top, prey === null ? surface - SEA.cruise : prey + SEA.over));
     // Never out of a trough: the waves' fall is followed at once, only its own rising and sinking are slow.
     return y === undefined ? want : Math.max(bed + SEA.bed, Math.min(top, y + SEA.rise, Math.max(y - SEA.rise, want)));
   }

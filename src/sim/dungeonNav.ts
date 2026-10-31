@@ -189,6 +189,8 @@ export interface DenGround {
   hop?(from: P3, toward: P3 | null, r: number): P3 | null;
   /** Its bodies swim (the sea, S9): their height follows the water every step, standing still too. */
   readonly afloat?: boolean;
+  /** Where a dead body at (x, z), now at `y`, floats next (null or none: it lies where it fell). */
+  floatAt?(x: number, z: number, y: number): number | null;
 }
 
 /** A dungeon as a den's ground: its rooms are the homes. */
