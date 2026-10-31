@@ -85,3 +85,16 @@ test('breath: an otter holds it six times as long', () => {
   for (let t = 0; t < BREATH * 4; t += 0.1) lost += b.breathe(0.1, true, false, 100, 6);
   assert.ok(lost > 0 && b.gasping, 'out of it at last');
 });
+
+test('otter swimming: at the surface it rides the waves, floating and paddling, not left under them', () => {
+  let t = 0;
+  const waves = { height: () => 0, waterLevel: () => 5 + 0.4 * Math.sin(t * 2) };
+  const o = new OtterSwim(waves);
+  o.slipIn(0, 0, 0);
+  for (; t < 6; t += 1 / 30) {
+    o.steer({ forward: t > 3 ? 1 : 0, heading: 0, up: false, down: false, walk: false, land: false }, 1 / 30);
+    assert.ok(o.surfaced && !o.under, `at the surface at ${t.toFixed(2)} s`);
+    assert.ok(Math.abs(o.pos.y - (waves.waterLevel() - SWIM.surface)) < 1e-9, 'on the wave');
+  }
+  assert.equal(o.doing, 'paddle');
+});

@@ -16,8 +16,11 @@ export type SwimIntent = FlightIntent;
 export const SWIM = {
   fast: 6.5, slow: 2.4, under: 5.5, accel: 3,
   dive: 2.6, rise: 2.2, turn: 2.6,
-  /** The body's middle under the surface while it lies on it; clear of the bottom by this. */
-  surface: 0.18, bottom: 0.35,
+  /**
+   * Its origin under the surface while it lies on it (the mink's surface clips hang the body some 0.24 m under its
+   * origin and hold the head some 0.22 m over it: head out, body just under); clear of the bottom by `bottom`.
+   */
+  surface: 0.02, bottom: 0.35,
   /** Water shallower than this is the shallows (it stands up there). */
   shallows: 0.7,
 } as const;
@@ -31,6 +34,11 @@ export class OtterSwim {
   doing: OtterDoing = 'float';
   /** Out of breath: it comes up whatever is pressed (game/breath.ts). */
   surfacing = false;
+  /**
+   * How far it is under its line at the surface (m, 0: lying on it). Kept rather than its height, so an otter at the
+   * surface rides the waves as the surface rises and falls under it.
+   */
+  sunk = 0;
 
   constructor(private readonly world: FlightWorld) {}
 
@@ -47,14 +55,12 @@ export class OtterSwim {
 
   /** Lying at the surface. */
   get surfaced(): boolean {
-    const l = this.surfaceAt();
-    return l !== null && this.pos.y >= l - SWIM.surface - 0.05;
+    return this.sunk < 0.05;
   }
 
   /** Its head under water (holding its breath). */
   get under(): boolean {
-    const l = this.surfaceAt();
-    return l !== null && this.pos.y < l - SWIM.surface - 0.25;
+    return this.sunk > 0.25;
   }
 
   /** In the shallows: too little water to swim (the hero stands up). */
@@ -72,6 +78,7 @@ export class OtterSwim {
     const l = this.surfaceAt(x, z) ?? this.world.height(x, z);
     Object.assign(this.pos, { x, y: l - SWIM.surface, z });
     Object.assign(this.vel, { x: 0, y: 0, z: 0 });
+    this.sunk = 0;
     this.yaw = yaw;
     this.pitch = 0;
     this.doing = 'float';
@@ -79,9 +86,9 @@ export class OtterSwim {
 
   steer(i: SwimIntent, dt: number): void {
     dt = Math.min(dt, 0.1);
-    const p = this.pos, v = this.vel, l = this.surfaceAt();
+    const p = this.pos, v = this.vel;
     this.yaw += clamp(angleDiff(this.yaw, i.heading), -SWIM.turn * dt, SWIM.turn * dt);
-    const under = this.under, top = (l ?? p.y) - SWIM.surface;
+    const under = this.under;
     // Ahead: fast along the surface, a little slower under it, slow when asked.
     const want = Math.max(0, i.forward) * (i.walk ? SWIM.slow : under ? SWIM.under : SWIM.fast);
     const sh = Math.sin(this.yaw), ch = Math.cos(this.yaw), k = damp(SWIM.accel, dt);
@@ -95,9 +102,11 @@ export class OtterSwim {
     // Not up onto dry land: it stops at the water's edge.
     if (this.surfaceAt(nx, nz) === null || this.depth(nx, nz) < 0.2) { nx = p.x; nz = p.z; v.x = v.z = 0; }
     p.x = nx; p.z = nz;
-    const floor = this.world.height(p.x, p.z) + SWIM.bottom, lid = (this.surfaceAt() ?? top) - SWIM.surface;
-    p.y = clamp(p.y + v.y * dt, Math.min(floor, lid), lid);
-    if (p.y >= lid - 1e-3 && v.y > 0) v.y = 0;
+    // Its line at the surface (which waves move) and the bed under it bound how far down it is.
+    const lid = (this.surfaceAt() ?? p.y + SWIM.surface) - SWIM.surface, floor = this.world.height(p.x, p.z) + SWIM.bottom;
+    this.sunk = clamp(this.sunk - v.y * dt, 0, Math.max(0, lid - floor));
+    if (this.sunk <= 0 && v.y > 0) v.y = 0;
+    p.y = lid - this.sunk;
     const flat = Math.hypot(v.x, v.z);
     this.pitch += (Math.atan2(v.y, Math.max(0.5, flat)) - this.pitch) * damp(5, dt);
     this.doing = this.surfaced ? (i.down ? 'dive' : flat > 0.6 ? 'paddle' : 'float') : 'swim';
