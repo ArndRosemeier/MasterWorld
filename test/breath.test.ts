@@ -59,3 +59,26 @@ test('breath: diving takes the head under; out of breath the body comes up whate
   for (let i = 0; i < 240; i++) w.step(swim, 1 / 60);
   assert.ok(!w.headUnder, 'up at the air again');
 });
+
+test('breath: swimming forward, the camera looking well down dives, level holds the depth, up rises', () => {
+  const sea: WalkWorld = { height: () => -30, rockSurface: () => null, waterLevel: () => 0 };
+  const w = new Walker(sea);
+  w.place(0, 0);
+  const swim = (look: number, forward = 1) => ({ forward, strafe: 0, heading: 0, walk: false, up: false, down: false, look });
+  const y0 = w.pos.y;
+  for (let i = 0; i < 180; i++) w.step(swim(-0.18), 1 / 60);
+  assert.ok(Math.abs(w.pos.y - y0) < 0.1, 'an ordinary look stays at the surface');
+  for (let i = 0; i < 180; i++) w.step(swim(-0.9), 1 / 60);
+  const deep = w.pos.y;
+  assert.ok(deep < y0 - 2, `dived to ${deep.toFixed(1)}`);
+  for (let i = 0; i < 60; i++) w.step(swim(0), 1 / 60);
+  const held = w.pos.y;
+  assert.ok(Math.abs(held - deep) < 0.5, 'level: it glides to a stop');
+  for (let i = 0; i < 120; i++) w.step(swim(0), 1 / 60);
+  assert.ok(Math.abs(w.pos.y - held) < 0.05, 'and holds the depth');
+  for (let i = 0; i < 120; i++) w.step(swim(0.6), 1 / 60);
+  assert.ok(w.pos.y > held + 1.5, 'looking up rises');
+  const now = w.pos.y;
+  for (let i = 0; i < 120; i++) w.step(swim(-0.9, 0), 1 / 60);
+  assert.ok(w.pos.y > now, 'not going forward, the look does nothing: the body floats up');
+});
