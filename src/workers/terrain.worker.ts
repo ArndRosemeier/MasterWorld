@@ -2,7 +2,7 @@
 /** Terrain meshes: height field chunks, and the rock volumes standing on the land. */
 import { buildChunk, finerFor, type ChunkSpec, type ChunkMesh } from '../world/chunkMesh';
 import { archMesh, type VolumeMesh } from '../world/volumes';
-import { openHouse, townMeshBuffers, townMeshes, type OpenHouse, type TownCellMesh } from '../world/townMesh';
+import { openHouse, readyMesh, townMeshBuffers, townMeshes, type OpenHouse, type TownCellMesh } from '../world/townMesh';
 import { guildHouses, guildSigns } from '../game/guilds';
 import type { Terrain } from '../world/terrain';
 import { openWorld } from '../vgm/builder';
@@ -52,7 +52,8 @@ serve<TerrainJob, TerrainResult>((job) => {
   }
   if (job.kind === 'town') {
     const land = terrain, town = land.town(job.id);
-    const cells = town ? townMeshes(town, guildSigns(guildHouses(town.plan, town.decision.size ?? 'town', land.setting)), (x, z) => land.height(x, z)) : [];
+    // Made ready for the GPU here (floats, spheres), off the main thread.
+    const cells = (town ? townMeshes(town, guildSigns(guildHouses(town.plan, town.decision.size ?? 'town', land.setting)), (x, z) => land.height(x, z)) : []).map((c) => ({ ...c, near: readyMesh(c.near), far: readyMesh(c.far) }));
     return { result: { cells, plan: job.plan && town ? town.plan : null }, transfer: townMeshBuffers(cells) };
   }
   if (job.kind === 'townMask') {
