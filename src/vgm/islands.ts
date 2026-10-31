@@ -9,6 +9,7 @@
 import type { IslandsDef, VoyageDef } from '../setting/contract';
 import { freeBerths, planHarbour } from '@futuremagic/settlement';
 import { harbourSpots } from '../world/coast';
+import { nearestFirst } from '../world/spiral';
 import type { DungeonDecision, RegionDecision, TownDecision } from '../world/decisions';
 import type { Isle } from '../world/skeleton';
 import type { Terrain } from '../world/terrain';
@@ -26,7 +27,7 @@ export function islandsNear(t: Terrain, d: IslandsDef, x: number, z: number, rea
     const isle = t.skeleton.isleOf(i, j, d), far = isle && Math.hypot(isle.x - x, isle.z - z);
     if (isle && far! >= reach[0] && far! <= reach[1]) out.push(isle);
   }
-  return out.sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
+  return nearestFirst(out, x, z);
 }
 
 /** The island a point lies on (within its rise), if any. */

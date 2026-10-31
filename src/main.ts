@@ -21,6 +21,7 @@ import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
 import { nearestCoast } from './world/coast';
+import { nearestFirst } from './world/spiral';
 import { UNDER_LENS, updateVeil } from './render/underwater';
 import { Rocks } from './world/rocks';
 import { RockView } from './render/rocks/RockView';
@@ -343,7 +344,7 @@ export async function start(b: Boot): Promise<void> {
       floor: (x, z, y) => (below() ? null : landWorld.floor!(x, z, y)),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : landWorld.rockSurface(x, y, z); },
       sightSurface: (x, y, z) => { const b = below(); return b ? (b.sightSurface ?? b.rockSurface)(x, y, z) : landWorld.sightSurface!(x, y, z); },
-      waterLevel: (x, z) => (below() ? null : landWorld.waterLevel(x, z)),
+      waterLevel: (x, z) => { const b = below(); return b ? b.waterLevel(x, z) : landWorld.waterLevel(x, z); },
       climbable: (x, z) => (below() ? null : landWorld.climbable!(x, z)),
       // Down in a cave its rock walls (D56, P1): a drop is climbed back up, not jumped.
       rockHolds: () => !!below()?.rockHolds?.(),
@@ -979,8 +980,8 @@ export async function start(b: Boot): Promise<void> {
       const ax = w.x + fx * 6, az = w.z + fz * 6, bx = w.x - fz * 30, bz = w.z + fx * 30;
       portals.add({ id: 'test', shape: { halfWidth: 1.3, height: 2.8 }, a: { realm: 'land', frame: { x: ax, y: terrain.height(ax, az), z: az, yaw } }, b: { realm: 'land', frame: { x: bx, y: terrain.height(bx, bz), z: bz, yaw: yaw + Math.PI / 2 } } });
     }
-    // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
-    const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
+    // `barrow`, `cave`, `tower`, `seacave`: before one, looking at it (one is promised now if there is none).
+    const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : params.seacave ? 'sea-cave' : null;
     const lookForm = lookAt ? setting.dungeons[lookAt]?.form : undefined;
     if (lookAt && lookForm && start) {
       let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === lookAt) ?? null;
@@ -2083,8 +2084,7 @@ export async function start(b: Boot): Promise<void> {
         if (journal.knows(e.id)) continue;
         if (Math.hypot(p.x - e.x, p.z - e.z) < SEEN_BAND) { learnEvent(e.id, 'what you saw'); continue; }
         if (!t || t.id !== e.town || shouted.has(e.id) || !t.living) continue;
-        const who = t.life.agents.filter((a) => !a.hidden && !a.held && Math.hypot(a.x - p.x, a.z - p.z) < SHOUT_R)
-          .sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
+        const who = nearestFirst(t.life.agents.filter((a) => !a.hidden && !a.held && Math.hypot(a.x - p.x, a.z - p.z) < SHOUT_R), p.x, p.z)[0];
         const told = who && eventTold(setting, log, terrain.towns, e);
         if (!who || !told) continue;
         shouted.add(e.id);
@@ -2306,7 +2306,8 @@ export async function start(b: Boot): Promise<void> {
       part('origin+weather');
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
       // Under the sea, or in the waterline (render/underwater.ts): the camera's height over the surface at it, waves and all.
-      const camAt = view.camera.position, surf = sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
+      // Down in a place, its own water (a sea cave's drowned storey), not the sea's.
+      const camAt = view.camera.position, surf = below() ? world.waterLevel(camAt.x, camAt.z) : sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
       view.sky.underwater = overSea < -UNDER_LENS;
       updateVeil(view.camera, overSea, view.sky.underwater, view.sky.murk, dt);
       wx.apply(dt, view.camera.position, hours(), view.sky);

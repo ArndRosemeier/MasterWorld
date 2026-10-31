@@ -11,6 +11,7 @@ import { coinText } from '../game/items';
 import type { VoyageDef } from '../setting/contract';
 import { fill } from '../talk/folk';
 import { riverMouths } from '../world/coast';
+import { nearestFirst } from '../world/spiral';
 import { settlementOf, type DecisionLog, type HarbourAt, type JourneyDecision, type RegionDecision, type TownDecision } from '../world/decisions';
 import { wayLength, type Voyage } from '../world/fleet';
 import { compass } from './dungeons';
@@ -77,9 +78,7 @@ export function seaWay(def: VoyageDef, from: TownDecision, to: TownDecision, rou
 export function seaWays(def: VoyageDef, seed: number, log: DecisionLog, from: TownDecision, towns: readonly TownDecision[], water: (x: number, z: number) => number): SeaWay[] {
   if (!from.harbour) return [];
   const out: SeaWay[] = [];
-  const near = towns
-    .filter((t) => t.id !== from.id && t.harbour && !heldBy(log, t.id) && Math.hypot(t.x - from.x, t.z - from.z) <= def.reach[1])
-    .sort((a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z));
+  const near = nearestFirst(towns.filter((t) => t.id !== from.id && t.harbour && !heldBy(log, t.id) && Math.hypot(t.x - from.x, t.z - from.z) <= def.reach[1]), from.x, from.z);
   for (const t of near) {
     if (out.length >= def.offers) break;
     const route = seaRoute(seed, water, from.harbour, t.harbour!);

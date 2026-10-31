@@ -83,7 +83,7 @@ test('leads: now and then the new place is out on the land (a barrow, a cave, a 
   const kinds = new Set(land.map((d) => d.template));
   assert.ok(kinds.has('barrow') && kinds.has('cave') && kinds.has('tower'), [...kinds].join(', '));
   const people = townsfolk(town.plan, seed);
-  const NAMES = { barrow: 'the barrow', cave: 'the cave', tower: 'the old tower' } as const;
+  const NAMES = { barrow: 'the barrow', cave: 'the cave', tower: 'the old tower', 'sea-cave': 'the sea cave' } as const;
   for (const b of land) {
     const kind = b.template as keyof typeof NAMES;
     const far = Math.hypot(b.site!.x - town.decision.x, b.site!.z - town.decision.z);
@@ -91,7 +91,8 @@ test('leads: now and then the new place is out on the land (a barrow, a cave, a 
     assert.equal(terrain.waterDepth(b.site!.x, b.site!.z), 0);
     const c = outlineCellar(b, placeOf(b, terrain.towns, classic.dungeons)!, loreOf(classic, kind));
     assert.ok(classic.dungeons[kind]!.dwellers.some((w) => w.id === c.dweller.id) || isEmpty(c), `a ${kind} dweller (or an empty cave)`);
-    assert.ok(!c.setPiece.kinds || c.setPiece.kinds.includes(kind), `${c.setPiece.id} fits a ${kind}`);
+    const fits = [kind, ...(classic.dungeons[kind]!.form.pieces ?? [])];
+    assert.ok(!c.setPiece.kinds || c.setPiece.kinds.some((k) => fits.includes(k)), `${c.setPiece.id} fits a ${kind}`);
     assert.match(c.house, new RegExp(`^${NAMES[kind]} (north|south|east|west)`));
     const t = talkCellar(b, classic, town, people, log)!;
     assert.equal(t.sketch.called, c.house);

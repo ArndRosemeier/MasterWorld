@@ -35,7 +35,13 @@ export const scaleOf = (s: SpaceDef): DungeonScale => s.scale ?? BUILT;
 /** A layout with its grid in metres: everything that turns its cells into the world reads it from here. */
 export interface ScaledLayout extends DungeonLayout {
   readonly scale: DungeonScale;
+  /** The water's surface (m, its frame) when its lowest storey is drowned (`SpaceDef.flood`, a sea cave). */
+  readonly flood?: number;
 }
+
+/** The rooms a drowned storey holds: their floors under the water. */
+export const drownedRooms = (l: ScaledLayout): Set<number> =>
+  new Set(l.flood === undefined ? [] : l.rooms.filter((r) => r.level * l.scale.storey < l.flood!).map((r) => r.id));
 
 /**
  * What stands at a wall takes up, as half its size along the wall and out from it (m), with room for the
@@ -275,6 +281,8 @@ export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: Cel
     if (shape.rise && !climb(graph, walk, shape.rise, minLevel < 0 && !!layerOf(sketch, 'older'))) continue;
     const scale = scaleOf(shape), sizes = shape.rooms ?? SIZE;
     if (shape.ways?.rise) wander(graph, shape.ways.rise, minLevel, new Rng(deriveSeed(seed, 'wander')));
+    // A drowned storey that cannot be had (the lair held down there by a drop): the next try's.
+    if (shape.flood !== undefined && !drown(graph, walk, minLevel)) continue;
     const cavern = shape.cavern ? cavernOf(graph, walk, new Rng(deriveSeed(seed, 'cavern'))) : -1;
     if (cavern >= 0) graph.rooms[cavern].height = shape.cavern!.height;
     const laid = layoutDungeon(graph, seed, {
@@ -292,7 +300,8 @@ export function outlineCellar(d: DungeonDecision, house: DungeonPlace, lore: Cel
     if (!laid) continue;
     // A natural cave's ways run long between its chambers: too short a cave is the next try's.
     if (shape.ways && waysLength(laid) * scale.cell < shape.ways.least) continue;
-    return furnish(sketch, graph, { ...laid, scale }, link.id, new Rng(deriveSeed(seed, 'furnish')), lore);
+    const flood = shape.flood !== undefined ? { flood: laid.levels[0] * scale.storey + shape.flood } : {};
+    return furnish(sketch, graph, { ...laid, scale, ...flood }, link.id, new Rng(deriveSeed(seed, 'furnish')), lore);
   }
   throw new Error(`cellar ${d.id}: no layout fits`);
 }
@@ -308,6 +317,30 @@ function wander(graph: DungeonGraph, rise: number, deepest: number, rng: Rng): v
     if (r.id === graph.entrance || fixed.has(r.id)) continue;
     r.level = Math.max(deepest, r.level + rng.int(-rise, rise));
   }
+}
+
+/**
+ * A sea cave's lowest storey goes under water (`SpaceDef.flood`): the way in, the lair and the safe spot come up
+ * off it, and the tensest room on the way to the goal goes down to it, so the way on is dived. Rooms a drop or a
+ * grate joins keep their storeys. Each drowned room stands two storeys high: air over its water. False: it cannot be done (a kept room is held down there; nothing on the way).
+ */
+function drown(graph: DungeonGraph, walk: Pace, deepest: number): boolean {
+  const fixed = new Set(graph.links.filter((l) => l.kind === 'drop' || l.kind === 'grate').flatMap((l) => [l.a, l.b]));
+  const kept = new Set([graph.entrance, graph.goal, walk.safe].filter((id) => id >= 0));
+  for (const id of kept) {
+    const r = graph.rooms[id];
+    if (r.level > deepest) continue;
+    if (fixed.has(id)) return false;
+    r.level = deepest + 1;
+  }
+  if (!graph.rooms.some((r) => r.level <= deepest)) {
+    const on = walk.route.filter((id) => !kept.has(id) && !fixed.has(id));
+    if (!on.length) return false;
+    graph.rooms[on.reduce((a, b) => (walk.tension[b] > walk.tension[a] ? b : a))].level = deepest;
+  }
+  // A drowned room rises two storeys at least: its ways in are dived, and one comes up in the air over its water.
+  for (const r of graph.rooms) if (r.level <= deepest) r.height = Math.max(r.height, 2);
+  return true;
 }
 
 /** How many cells the ways of a layout run in all. */
@@ -469,7 +502,7 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: ScaledLayout
   }
 
   // Who lives where draws from its own stream, so how the rooms are dressed never changes it.
-  const spawns = settle(graph, p, rooms, now, new Rng(deriveSeed(sketch.decision.seed, 'settle')));
+  const spawns = settle(graph, p, rooms, now, new Rng(deriveSeed(sketch.decision.seed, 'settle')), drownedRooms(layout));
 
   const form = layout.rooms.map((r) => `${r.w}x${r.d}x${r.height}@${r.level}`).sort().join(',');
   const signature = `${graph.patterns.join('+')}|${graph.rooms.length}r${graph.links.length}l|${form}`;
@@ -478,16 +511,17 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: ScaledLayout
 
 /**
  * Who lives where (small and dense, plan 8.1): the lair holds most; the two tensest rooms on the way hold
- * a group each, as many as the dwellers crowd into a room; the entrance and the safe spot are quiet.
+ * a group each, as many as the dwellers crowd into a room; the entrance, the safe spot and the rooms under
+ * water (`drowned`) are quiet.
  */
-function settle(graph: DungeonGraph, p: Pace, rooms: readonly CellarRoom[], now: DwellerDef, rng: Rng): Spawn[] {
+function settle(graph: DungeonGraph, p: Pace, rooms: readonly CellarRoom[], now: DwellerDef, rng: Rng, drowned: ReadonlySet<number>): Spawn[] {
   const spawns: Spawn[] = [];
   if (!now.creatures.length) return spawns;
   const [lead, ...rest] = now.creatures;
   const other = () => (rest.length && rng.chance(0.6) ? rest[0] : lead);
   spawns.push({ creature: lead, room: graph.goal });
   for (let i = 1; i < Math.min(now.crowd, 2); i++) spawns.push({ creature: other(), room: graph.goal });
-  const held = rooms.filter((r) => r.id !== graph.goal && r.id !== p.safe && r.id !== graph.entrance && r.tension >= 0.35).sort((a, b) => b.tension - a.tension).slice(0, 2);
+  const held = rooms.filter((r) => r.id !== graph.goal && r.id !== p.safe && r.id !== graph.entrance && !drowned.has(r.id) && r.tension >= 0.35).sort((a, b) => b.tension - a.tension).slice(0, 2);
   for (const r of held) {
     const n = r.tension > 0.7 ? now.crowd : Math.ceil(now.crowd / 2);
     for (let i = 0; i < n; i++) spawns.push({ creature: other(), room: r.id });
@@ -506,7 +540,7 @@ function settle(graph: DungeonGraph, p: Pace, rooms: readonly CellarRoom[], now:
  */
 export function moveIn(c: Cellar, moved: MoveInDecision | RetakeDecision, house: DungeonPlace, lore: CellarLore): Cellar {
   const sketch = sketchCellar(c.decision, house, lore, moved);
-  const spawns = settle(c.graph, c.pace, c.rooms, sketch.dweller, new Rng(deriveSeed(moved.seed, 'move-in')));
+  const spawns = settle(c.graph, c.pace, c.rooms, sketch.dweller, new Rng(deriveSeed(moved.seed, 'move-in')), drownedRooms(c.layout));
   return { ...c, ...sketch, spawns };
 }
 

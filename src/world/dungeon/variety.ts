@@ -6,7 +6,7 @@ import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonForm } from '../../setting/contract';
 import type { DungeonDecision, DungeonTemplate } from '../decisions';
-import { isEmpty, outlineCellar, type Cellar, type DungeonPlace } from './cellar';
+import { drownedRooms, isEmpty, outlineCellar, type Cellar, type DungeonPlace } from './cellar';
 import { setPiecesFor } from './setPieces';
 
 export interface VarietyReport {
@@ -65,6 +65,12 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
     if (!c.clues.length) problems.push(`${where}: nothing to read`);
     if (!c.spawns.length && !isEmpty(c)) problems.push(`${where}: nobody lives there`);
     if (!c.hatch || c.hatch.kind !== lore.form.space.way) problems.push(`${where}: no way back out`);
+    if (lore.form.space.flood !== undefined) {
+      // A drowned storey (a sea cave): some of it under water, never the lair nor anyone living there.
+      const wet = drownedRooms(c.layout);
+      if (!wet.size) problems.push(`${where}: nothing under water`);
+      if (wet.has(c.graph.goal) || c.spawns.some((s) => wet.has(s.room))) problems.push(`${where}: the lair or its dwellers under water`);
+    }
     aspects.layout.push(c.signature);
     aspects.mainPattern.push(c.graph.patterns[0]);
     aspects.pattern.push(...c.graph.patterns.filter((p) => p !== 'shortcut' && p !== 'refuge'));

@@ -381,6 +381,12 @@ export interface DungeonSpace {
   readonly arriveMid: boolean;
   /** Its built walls: rubble and brick (a cellar), or dressed stone with boarded upper floors (a tower). */
   readonly walls: 'rubble' | 'dressed';
+  /**
+   * Its lowest storey stands under water this deep (m over its floor; S8, a sea cave): its ways there are dived,
+   * with breath, a spell, a potion or the otter. The lair, the safe spot and the way in always stay dry, and so do
+   * the dwellers; at least one room on the way to the goal lies under it.
+   */
+  readonly flood?: number;
 }
 
 /**
@@ -390,9 +396,10 @@ export interface DungeonSpace {
 export interface DungeonForm {
   /**
    * Under a house of a town; out on the land on a rise, at the foot of a slope going into its hill, at the
-   * foot of a cliff going into it (a slope where there is none), or on level raised ground.
+   * foot of a cliff going into it (a slope where there is none), on level raised ground, or in a slope by the
+   * sea going into it, the water just below (a sea cave).
    */
-  readonly stands: 'house' | 'rise' | 'slope' | 'cliff' | 'level';
+  readonly stands: 'house' | 'rise' | 'slope' | 'cliff' | 'level' | 'shore';
   /** Metres from the town's market it lies, at least and at most (out on the land). */
   readonly ring?: readonly [number, number];
   /** What people call one out on the land, `{dir}` the way from the town ("the barrow {dir} of the town"). */

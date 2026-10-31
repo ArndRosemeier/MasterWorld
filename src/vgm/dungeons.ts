@@ -133,12 +133,16 @@ type Fit = (x: number, z: number, k: number) => { score: number; yaw?: number; x
 const CLIFF_OUT = CLIFF_FACE;
 /** How deep a cliff's way in reaches (m): the ground up to there stays low. */
 const WAY_IN = 6.5;
+/** A sea cave's mouth has the sea within this of it (m), out the way it faces; it stands this high over the water at least (m). */
+const SEA_NEAR = 80, SHORE_DRY = 0.8;
+/** A sea cave is looked for down to the sea this far from a spot tried (m), along this many ways. */
+const SHORE_LOOK = 600, SHORE_DIRS = 8, SHORE_STEP = 40;
 
 /**
  * What ground a place wants, by how its kind stands (`DungeonForm.stands`): on a rise (a barrow); at the
  * foot of a slope, going into the hill (a cave's mouth); at the foot of a cliff, going into it (a cave's
  * mouth in a mesa's wall; a slope where there is none); on a rise of level ground, its door towards the
- * town (a tower). Places in slopes and on level ground keep out of the woods.
+ * town (a tower); in a slope by the sea, the water below its mouth (a sea cave). Places in slopes and on level ground keep out of the woods.
  */
 const GROUND: Readonly<Record<Exclude<DungeonForm['stands'], 'house'>, (t: Terrain, s: number) => Fit>> = {
   rise: (t, s) => (x, z, k) => {
@@ -185,6 +189,29 @@ const GROUND: Readonly<Record<Exclude<DungeonForm['stands'], 'house'>, (t: Terra
         const f = slope(x, z, k);
         return f && { ...f, score: f.score - 3 };
       };
+  },
+  shore: (t, s) => (x, z, k) => {
+      // Down to the sea the nearest way, then back up off the strand to where the land rises into a hill or a sea
+      // cliff: the mouth stands there, as a cliff cave's does at the foot of its face, the sea just below it.
+      const found: { score: number; yaw: number; x: number; z: number }[] = [];
+      const ways: [number, number, number][] = [];
+      for (let q = 0; q < SHORE_DIRS; q++) {
+        const ux = Math.cos((q / SHORE_DIRS) * Math.PI * 2), uz = Math.sin((q / SHORE_DIRS) * Math.PI * 2);
+        for (let d = SHORE_STEP; d <= SHORE_LOOK; d += SHORE_STEP) if (t.height(x + ux * d, z + uz * d) < -1) { ways.push([d, ux, uz]); break; }
+      }
+      // The two nearest ways down to the sea.
+      for (const [sea, ux, uz] of ways.sort((a, b) => a[0] - b[0]).slice(0, 2)) {
+        const h = (m: number) => t.height(x + ux * m, z + uz * m);
+        let m = sea;
+        while (m > 0 && sea - m <= SEA_NEAR && (h(m) < SHORE_DRY || h(m - CLIFF_OUT) - h(m) < 1)) m -= 2;
+        if (m <= 0 || sea - m > SEA_NEAR) continue;
+        const px = x + ux * m, pz = z + uz * m, y = h(m);
+        const behind = Math.max(h(m - 16), h(m - 20)) - y;
+        if (behind < CLIFF_RISE + 1.5) continue;
+        const score = 2 + Math.min(1, behind / 30) - (sea - m) / SEA_NEAR + hash2f(s, k, 3) * 0.3;
+        found.push({ score, yaw: Math.atan2(ux, uz), x: px, z: pz });
+      }
+      return found.length ? found.reduce((a, b) => (b.score > a.score ? b : a)) : null;
   },
   level: (t, s) => {
       const woods = woodsOf(t);
@@ -241,7 +268,8 @@ function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number]
   // may be kilometres round to a pass.
   const sk = terrain.skeleton, level = sk.mesaRise(at.x, at.z);
   let best: { x: number; z: number; score: number; yaw?: number } | null = null;
-  const dry = (x: number, z: number) => terrain.waterDepth(x, z) <= 0 && terrain.height(x, z) >= 3 && Math.abs(sk.mesaRise(x, z) - level) <= MESA_LEVEL && !avoid.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40);
+  const low = stands === 'shore' ? SHORE_DRY : 3;
+  const dry = (x: number, z: number) => terrain.waterDepth(x, z) <= 0 && terrain.height(x, z) >= low && Math.abs(sk.mesaRise(x, z) - level) <= MESA_LEVEL && !avoid.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40);
   for (let k = 0; k < TRIES; k++) {
     const d = r0 + (r1 - r0) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
     const x = at.x + Math.cos(a) * d, z = at.z + Math.sin(a) * d;
@@ -249,6 +277,8 @@ function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number]
     const f = fit(x, z, k);
     // Ground that moved the spot: the spot it moved to must suit too (dry, on the level asked, clear of others).
     if (!f || (f.x !== undefined && !dry(f.x, f.z!))) continue;
+    // A sea cave found down at the shore keeps as far out as its ring asks.
+    if (stands === 'shore' && Math.hypot(f.x! - at.x, f.z! - at.z) < r0) continue;
     if (!best || f.score > best.score) best = { x, z, ...f };
   }
   return best;

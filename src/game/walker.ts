@@ -300,6 +300,9 @@ export class Walker {
       // Up and down by choice; otherwise the body floats up to the surface.
       const want = intent.up || this.surfacing ? 1.4 : intent.down ? -1.4 : p.y < top - 0.05 ? 0.8 : 0;
       v.y += (want - v.y) * damp(4, dt);
+      // Under a roof (a drowned cave's): the head stops at the rock, in the air caught under it if there is any.
+      const roof = v.y > 0 ? this.world.rockSurface(p.x, p.y + v.y * dt + this.height, p.z) : null;
+      if (roof !== null && roof < 0.1) v.y = 0;
       p.y = Math.min(top, p.y + v.y * dt);
       if (p.y <= ground) { p.y = ground; v.y = Math.max(0, v.y); }
       // Out of the water once the ground is high enough to wade.
