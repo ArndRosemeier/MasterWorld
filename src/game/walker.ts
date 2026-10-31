@@ -77,6 +77,8 @@ const PULL_RISE = 0.5;
 const OFF_FACE = 0.35;
 /** Pushing into a climbable face this long starts a climb (s): no climb by brushing past. */
 const GRIP_ON = 0.25;
+/** How far a swimming body ducks to get under a lower roof ahead (m), tried in turn. */
+const DUCKS = [0.1, 0.25, 0.45, 0.7];
 
 /** The hero's. */
 export const WALK: WalkSpec = {
@@ -201,7 +203,13 @@ export class Walker {
     const w = this.swimLevel(this.pos.x, this.pos.z, this.pos.y);
     if (w !== null) {
       this.mode = 'swim';
-      this.pos.y = Math.max(this.pos.y, this.floatAt(w));
+      // Up to the surface, or as far as the rock over the head lets it (a drowned way's roof).
+      const p = this.pos, top = this.floatAt(w);
+      while (p.y < top) {
+        const y = Math.min(top, p.y + 0.1), over = this.world.rockSurface(p.x, y + this.height, p.z);
+        if (over !== null && over < 0.1) break;
+        p.y = y;
+      }
     }
   }
 
@@ -234,6 +242,13 @@ export class Walker {
       // Going down a step the body sinks as it moves on, so the head is tested at the lower floor too
       // (else a tall body under a low edge climbs a stair it can never come down again).
       if (!stuck && this.bodyInRock(nx, p.y, nz)) {
+        // Swimming under a roof that comes lower ahead (a drowned way's lintel): the body ducks under it.
+        if (this.mode === 'swim') {
+          const duck = DUCKS.find((d) => !this.bodyInRock(nx, p.y - d, nz) && p.y - d >= this.support(nx, nz, p.y - d));
+          if (duck === undefined) return false;
+          p.y -= duck; p.x = nx; p.z = nz;
+          return true;
+        }
         const ahead = this.mode === 'ground' ? this.floorAhead(nx, nz) : p.y;
         if (ahead >= p.y - 1e-3) return false;
         // Sinking up to a step (not into the step ahead's own block, nor deeper than the floor ahead).
