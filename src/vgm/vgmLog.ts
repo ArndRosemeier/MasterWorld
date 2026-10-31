@@ -45,6 +45,7 @@ export function placeOf(d: Decision, log: DecisionLog, depth = 0): readonly [num
     case 'kept': return by(d.promise);
     case 'order': case 'festivity': return by(d.town);
     case 'journey': return by(d.to);
+    case 'delay': return by(d.journey);
     // Open land has nothing placed in it to see.
     case 'region': return d.site ? [d.site.x, d.site.z] : null;
     case 'road': {
@@ -75,6 +76,7 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'retake': return 'retake';
     case 'order': return 'order';
     case 'journey': return 'journey';
+    case 'delay': return 'hold-ship';
     case 'sight': return d.sea ? 'wreck' : d.strand ? 'washed-up' : d.need === 'reward' ? 'cache' : 'sight';
     case 'traveller': return d.situation ? 'hurt-traveller' : 'traveller';
     case 'stray': return 'stray-beast';
@@ -101,6 +103,7 @@ export function decisionSays(d: Decision): string {
     case 'wild': return `${d.encounter} round ${d.town} (${d.members.length})`;
     case 'order': return `${d.order.kind} in ${d.town}`;
     case 'journey': return `the hero takes the cart from ${d.from} to ${d.to}`;
+    case 'delay': return `${d.journey}'s ship held in harbour by a storm until ${Math.round(d.until)} h`;
     case 'sight': return `${d.sight} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
     case 'festivity': return `${d.festivity} in ${d.town}, ${Math.round(d.from)} to ${Math.round(d.to)} h`;
     case 'stray': return `a beast out of its paddock in ${d.town}, wandering to ${Math.round(d.x)}, ${Math.round(d.z)}`;

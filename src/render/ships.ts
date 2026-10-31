@@ -10,6 +10,7 @@ import type { Stage } from '@futuremagic/stage';
 import { gangplankMesh, hullHalf, planShip, ropeMesh, shipMesh, type Mooring, type ShipPlan } from '@futuremagic/settlement';
 import { HULLS, HULL_POSES, HULL_STATIONS, WATER } from './materials/waterInputs';
 import { buildingMeshAt } from './materials/building';
+import { WEATHER } from './materials/weather';
 import { LIE_OVER, afloatAt, farBerth, fleetOf, passageShip, voyageAfloat, wreckLying, type Afloat as Place, type Vessel, type Voyage } from '../world/fleet';
 import type { Decks, Pose } from '../world/deck';
 import type { Town } from '../world/town';
@@ -67,6 +68,8 @@ export interface ShipsHost {
   readonly ground?: (x: number, z: number) => number;
 }
 
+/** Wind (0 calm .. 1 gale) in which a ship under way takes her sails in (S10). */
+const REEF_WIND = 0.72;
 /** How far an upturned boat's keel stands out of the water (m). */
 const KEEL_OUT = 0.3;
 /** How far a boat washed up lies over on her side (rad), and how deep in the sand (share of her draft). */
@@ -116,7 +119,8 @@ export class ShipsView {
         // (The ship the hero stands on counts as here: after a sleep through the crossing she is far from where the camera
         // was, and must carry them on.)
         const at = out ?? afloatAt(a.v, hours), d = this.h.decks.ship === a.id ? 0 : Math.hypot(at.x - cam.x, at.z - cam.z);
-        const want = d < SEEN ? (at.sailing ? 'set' : 'furled') : null;
+        // In a gale her crew have the sails in (reefed, S10): she runs under bare yards.
+        const want = d < SEEN ? (at.sailing && WEATHER.wind.value < REEF_WIND ? 'set' : 'furled') : null;
         if (want && !a[want] && !built) { a[want] = this.build(a.v, want); built = true; }
         for (const k of ['furled', 'set'] as const) { const m = a[k]; if (m) m.visible = want === k; }
         if (!want) { this.h.decks.drop(a.id); if (a.plank) a.plank.visible = false; continue; }

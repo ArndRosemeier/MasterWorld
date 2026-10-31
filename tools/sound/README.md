@@ -21,3 +21,5 @@ NODE_USE_ENV_PROXY=1 node vendor/assetgenerator/packages/audio/tools/make.mjs --
 What plays when is decided in `src/game/soundscape.ts` (pure, tested) and played by `src/app/soundDirector.ts`.
 - 2026-10-27: 13 spell takes (`spell/gather`, and `spell/<motif>-loose` / `-hit` for each school's motif) for a few
   cents. Seed Audio's moderation refused "magic gathering in a raised hand"; the gather prompt is a singing bowl.
+- 2026-10-31: `bed/ship-creak` (a ship's timbers and rigging working at sea) and `bed/sea-storm` (a stormy open sea) for
+  S10, for under a cent; a listening model heard no speech or music in either.

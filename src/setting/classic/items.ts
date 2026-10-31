@@ -134,6 +134,7 @@ export const voyage: VoyageDef = {
     topic: 'Passage by ship to {place} ({price})',
     given: '{price}. She lies at the pier: go aboard by the gangplank, she casts off directly.',
     tooDear: 'Passage is {price}, and the master takes no promises. Come back with the coin.',
+    held: "{price}. But nothing leaves this harbour in weather like this: she waits at the pier till it blows over, {hours} or so. Go aboard when you like.",
     arrived: 'The ship comes in to {place}, {hours} at sea.',
     island: 'Sailors talk of an island out at sea, {place}: passage there ({price})',
   },

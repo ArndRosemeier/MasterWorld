@@ -12,9 +12,9 @@ import { coinText, type Item } from '../game/items';
 import { takeRoom, wakePlace } from '../game/upkeep';
 import { buildingOf, type Person } from '../sim/people';
 import { cartArrived, cartTopic, cartWays, journeyOf, type CartWay } from '../vgm/journeys';
-import { settlementOf, type DecisionLog, type JourneyDecision, type RegionDecision, type TownDecision } from '../world/decisions';
+import { settlementOf, type DecisionLog, type DelayDecision, type JourneyDecision, type RegionDecision, type TownDecision } from '../world/decisions';
 import type { FrontierContext } from '../vgm/frontier';
-import { farHarbourFor, seaWays, voyageOf, voyageTopic, type SeaWay } from '../vgm/voyages';
+import { farHarbourFor, holdFor, seaWays, voyageOf, voyageTopic, type SeaWay, type SeaWeather } from '../vgm/voyages';
 import { islandFor } from '../vgm/islands';
 import { cap, fill } from '../talk/folk';
 import type { Service } from '../talk/townTalk';
@@ -29,6 +29,8 @@ const CART_IDS = UPKEEP_SERVICES.filter((id) => id.startsWith('cart-'));
 const SEA_IDS = UPKEEP_SERVICES.filter((id) => id.startsWith('sea-'));
 /** The ship casts off this long after passage is bought (game hours: some 45 s, to walk to her and go aboard). */
 const BOARDING = 0.3;
+/** "3 hours", "1 hour" (at least one). */
+const hoursText = (h: number): string => { const n = Math.max(1, Math.round(h)); return `${n} hour${n === 1 ? '' : 's'}`; };
 
 export interface UpkeepHost extends WindowHost {
   /** The town of whoever the hero talks with (null: none). */
@@ -42,6 +44,9 @@ export interface UpkeepHost extends WindowHost {
   /** The decision log now, and a journey into it (the VGM knows where the hero goes). */
   log(): DecisionLog;
   journey(d: JourneyDecision): void;
+  /** A ship held in harbour by a storm (S10, the VGM's `hold-ship`) into the log, and the weather the harbour master reads. */
+  hold(d: DelayDecision): void;
+  readonly weather: SeaWeather;
   /** The frontier as the VGM sees it now (for a harbour across the water), and a region it opens into the log. */
   frontier(): FrontierContext;
   openRegion(d: RegionDecision): void;
@@ -109,9 +114,16 @@ export class UpkeepUi {
       this.voyagesFor = { town: town.id, log: this.host.log() };
     }
     return this.voyages.map((w, i) => {
-      const price = coinText(w.fare);
-      return { id: SEA_IDS[i], label: voyageTopic(def, w), line: this.hero.coins >= w.fare ? fill(def.words.given, { price: cap(price) }) : fill(def.words.tooDear, { price }) };
+      const price = coinText(w.fare), held = this.holdOf(w);
+      const given = held ? fill(def.words.held, { price: cap(price), hours: hoursText(held.until - this.host.hours()) }) : fill(def.words.given, { price: cap(price) });
+      return { id: SEA_IDS[i], label: voyageTopic(def, w), line: this.hero.coins >= w.fare ? given : fill(def.words.tooDear, { price }) };
     });
+  }
+
+  /** The voyage `w` as it would be bought now, and the VGM's hold on it if a storm keeps her in (S10). */
+  private holdOf(w: SeaWay, j = voyageOf(this.host.log(), this.host.town?.id ?? '', w, this.host.hours() + BOARDING)): DelayDecision | null {
+    const at = this.host.town?.town.decision;
+    return at ? holdFor(this.host.log(), j, at.x, at.z, this.host.weather) : null;
   }
 
   /** Passage was bought: paid, and the voyage logged; her crew make ready and she casts off a little later. */
@@ -119,7 +131,10 @@ export class UpkeepUi {
     const from = this.host.town;
     if (!from || this.hero.coins < w.fare) return;
     this.hero.coins -= w.fare;
-    this.host.journey(voyageOf(this.host.log(), from.id, w, this.host.hours() + BOARDING));
+    const j = voyageOf(this.host.log(), from.id, w, this.host.hours() + BOARDING);
+    this.host.journey(j);
+    const held = this.holdOf(w, j);
+    if (held) this.host.hold(held);
   }
 
   /** The innkeeper's seats on the cart, to the nearest towns the hero has been to (none in a town without carts). */

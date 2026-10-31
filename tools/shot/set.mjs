@@ -348,6 +348,14 @@ const SESSIONS = [
     { name: 'sea-harbour-aloft', act: seaLook({ out: 70, up: 16, side: 20, back: true, pitch: -8 }) },
     { name: 'sea-harbour-evening', act: async (p) => { await turn(17.8, 'fair')(p); await seaLook({ out: 40, up: 6, back: true, pitch: -3 })(p); } },
   ] },
+  // S10: a storm at sea from the deck of a ship held at her berth (the sea's swell high, the sky dark, rain).
+  { id: 'sea-storm', query: `${still}&hour=15&weather=storm&site=harbour&aboard`, shots: [
+    { name: 'sea-storm-deck', act: async (p) => {
+      await p.waitForFunction(() => window.game?.decks?.ship, null, { timeout: TIMEOUT });
+      await p.evaluate(() => { const pl = window.game.player; pl.flying = false; pl.heroCam.yaw = pl.walker.yaw + Math.PI / 2; pl.heroCam.pitch = -0.15; pl.heroCam.zoom = 4; });
+      await p.waitForTimeout(4000);
+    } },
+  ] },
   // S3: aboard a ship at its berth (the hero on its main deck, looking to the bow), then from beside it at the pier:
   // the gangplank up to its gangway, the hull on the swell.
   { id: 'sea-deck', query: `${still}&hour=11&weather=fair&site=harbour&aboard`, shots: [
