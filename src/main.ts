@@ -2458,17 +2458,16 @@ export async function start(b: Boot): Promise<void> {
         const dark = under || (WINDOWS.glow.value > TORCH_DUSK && !rooms?.inside);
         if (h) h.torchLit = h.holdsTorch && dark && !player.hideHero && player.walker.mode !== 'swim';
         const at = h?.flameAt(flamePoint) ?? null;
-        if (at) {
-          // A little beyond the flame, away from the body (right beside it, it burned the hero's own clothes white).
+        // Out of doors at night the lantern is the torch's alone: a little beyond the flame, away from the body (right
+        // beside it, it burned the hero's own clothes white), in firelight's orange. Below and in a throat their own
+        // walks light it as before, head-high just ahead (about where the flame burns), as the places were tuned.
+        const night = !!at && !under;
+        if (night) {
           const w = player.walker.pos, dx = at.x - w.x, dz = at.z - w.z, d = Math.hypot(dx, dz) || 1;
           L.position.set(at.x + (dx / d) * TORCH_LIGHT_OUT, at.y + TORCH_LIGHT_UP, at.z + (dz / d) * TORCH_LIGHT_OUT);
-        }
-        // Firelight's own orange while the torch burns, the lantern's paler gold otherwise.
-        L.color.setHex(at ? TORCHLIGHT.color : LANTERN_COLOR);
-        // Out of doors at night the lantern is the torch's alone (below and in a throat their own walks light it).
-        const night = !!at && !under;
-        if (night) L.intensity = TORCH_NIGHT * flameFlicker(h!.clock);
-        else if (torchLamp && !under && !rooms?.inside) L.intensity = 0;
+          L.intensity = TORCH_NIGHT * flameFlicker(h!.clock);
+        } else if (torchLamp && !under && !rooms?.inside) L.intensity = 0;
+        L.color.setHex(night ? TORCHLIGHT.color : LANTERN_COLOR);
         torchLamp = night;
       }
       // Doorways at night above, torches below, a soft fill on the hero in a room.
