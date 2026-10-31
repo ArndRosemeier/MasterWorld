@@ -30,6 +30,8 @@ export interface LessonsHost extends WindowHost {
   readonly standing: Standing;
   /** A master speaks of their one deed (C14): the VGM makes its place; what it is called, or null if none fits. */
   quest(g: GuildDef): string | null;
+  /** The guild's task in the journal: given (its words, who asked) and open, or done (closed). */
+  taskNoted(g: GuildDef, who: string, done: boolean): void;
 }
 
 export class LessonsUi extends BodyWindow {
@@ -38,6 +40,8 @@ export class LessonsUi extends BodyWindow {
   private rose: string | null = null;
   /** The trainer's guild. */
   private guild: GuildDef | null = null;
+  /** The trainer's name. */
+  private who = '';
 
   constructor(private readonly hero: Character, private readonly setting: SettingModule, private readonly lessonsHost: LessonsHost) {
     super('Lessons', 'lessons', null, lessonsHost);
@@ -46,18 +50,24 @@ export class LessonsUi extends BodyWindow {
   /** Open with this trainer (`who`: their name, `people`: their people). */
   teach(g: GuildDef, who: string, people: string): void {
     this.guild = g;
+    this.who = who;
     this.said = `“${g.line}”`;
     // The guild's task done: thanked for once, a good deed (D54) and experience (D58); the trainer's people think better of the hero.
-    const h = this.lessonsHost;
+    const h = this.lessonsHost, said: string[] = [];
     if (h.book.thank(g, h.log())) {
       h.standing.deed(`task:${g.keeper}`, people, this.setting.standing.task);
       this.hero.earn(`task:${g.keeper}`, 'task');
-      this.said = `“${g.task.done}”`;
-    } else if (g.quest && questDue(g, this.hero, h.log())) {
-      // A student of the level it asks: the master speaks of the deed for what no trainer sells (C14).
-      const place = h.quest(g);
-      if (place) this.said = `“${fill(g.quest.ask, { place })}”`;
+      said.push(`“${g.task.done}”`);
     }
+    // A task given (also in a save from before tasks went in the journal) stays in the journal until it is done.
+    if (h.book.asked(g.keeper)) h.taskNoted(g, who, h.book.taskDone(g, h.log()));
+    if (g.quest && questDue(g, this.hero, h.log())) {
+      // A student of the level it asks: the master speaks of the deed for what no trainer sells (C14), on the
+      // same visit as the thanks if both come at once.
+      const place = h.quest(g);
+      if (place) said.push(`“${fill(g.quest.ask, { place })}”`);
+    }
+    if (said.length) this.said = said.join(' ');
     this.rose = null;
     const h2 = this.body.parentElement?.querySelector('.head h2');
     if (h2) h2.textContent = fill(g.title, { name: who });
@@ -73,7 +83,7 @@ export class LessonsUi extends BodyWindow {
     const foot: Node[] = [el('span', { className: 'purse', textContent: `Your purse: ${coinText(this.hero.coins)}` })];
     if (!h.book.asked(g.keeper)) {
       const ask = el('button', { textContent: 'Is there work for the guild?' });
-      ask.addEventListener('click', () => { h.book.assign(g.keeper, h.hours()); this.said = `“${g.task.ask}”`; this.opened(); });
+      ask.addEventListener('click', () => { h.book.assign(g.keeper, h.hours()); h.taskNoted(g, this.who, false); this.said = `“${g.task.ask}”`; this.opened(); });
       foot.push(ask);
     }
     foot.push(el('span', { className: 'standing', textContent: `Your level: ${this.hero.level}${h.book.asked(g.keeper) ? (h.book.taskDone(g, h.log()) ? ' · task done' : ' · task open') : ''}` }));
@@ -107,7 +117,7 @@ export class LessonsUi extends BodyWindow {
       : no === 'level' ? `“${fill(g.distrust, { ability: a.name.toLowerCase() })}”`
       : no === 'coin' ? '“Come back when your purse is heavier.”'
       : no === 'known' ? '“You know that one already.”' : '“That is not mine to teach.”';
-    if (no === 'task') h.book.assign(g.keeper, h.hours());
+    if (no === 'task') { h.book.assign(g.keeper, h.hours()); h.taskNoted(g, this.who, false); }
     this.rose = no === null ? a.id : null;
     if (no === null) { h.taught(g.hours); h.changed(); }
     this.opened();

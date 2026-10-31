@@ -1416,11 +1416,20 @@ export async function start(b: Boot): Promise<void> {
         if (!t || !house || !start || !g.quest) return null;
         const d = questFor({ guild: g, town: t.town, building: house.b.id, hours: hours() }, { seed, terrain, log, home: start.decision, dungeons: setting.dungeons, avoid: wild?.territories ?? [] });
         const place = d && placeOf(d, terrain.towns, setting.dungeons)?.name;
-        if (!d?.site || !place) return null;
+        if (!d?.site || !place) { console.warn(`[vgm] no place for ${g.keeper}'s deed (${g.quest.kinds.join(', ')}) near ${t.town.decision.id}`); return null; }
         applied(madeBy('quest', d, `${g.keeper}'s deed, for ${g.quest.reward}: the hero is a student and known well enough`, hours()));
         const from = t.talk.nameOf(t.residents.find((p) => p.trade === g.keeper)?.id ?? -1) || g.name;
         journal.hear(d.id, fill(setting.talk.lead, { cellar: place }), { text: fill(g.quest.ask, { place }), from }, { x: d.site.x, z: d.site.z, label: place });
         return place;
+      },
+      // The guild's task (D49): in the journal while open, its mark at the guild's house.
+      taskNoted: (g, who, done) => {
+        const id = `task:${g.keeper}`;
+        if (done) { journal.fulfil(id); return; }
+        const house = talkTown()?.guilds.find((h) => h.guild.keeper === g.keeper);
+        if (!house || journal.knows(id)) return;
+        const at = whereOf(house);
+        journal.hear(id, `${cap(g.name)}: the guild's task`, { text: g.task.ask, from: who || g.name }, { x: at.x, z: at.z, label: g.name });
       },
     });
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id), a.person.race); });
