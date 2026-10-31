@@ -102,7 +102,7 @@ export function decisionSays(d: Decision): string {
     case 'region': return `${d.fill} ${at(d.x, d.z)}${d.site ? '' : ' (open land)'}`;
     case 'wild': return `${d.encounter} round ${d.town} (${d.members.length})`;
     case 'order': return `${d.order.kind} in ${d.town}`;
-    case 'journey': return `the hero takes the cart from ${d.from} to ${d.to}`;
+    case 'journey': return `the hero takes ${d.by === 'sea' ? 'ship' : 'the cart'} from ${d.from} to ${d.to}`;
     case 'delay': return `${d.journey}'s ship held in harbour by a storm until ${Math.round(d.until)} h`;
     case 'sight': return `${d.sight} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
     case 'festivity': return `${d.festivity} in ${d.town}, ${Math.round(d.from)} to ${Math.round(d.to)} h`;
