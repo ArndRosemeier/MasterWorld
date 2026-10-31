@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hullHalf, planShip, shipFloor, type Mooring } from '@futuremagic/settlement';
+import { hullHalf, planShip, shipFixtures, shipFloor, shipHold, type Mooring } from '@futuremagic/settlement';
 import { Walker, type WalkWorld } from '../src/game/walker';
-import { Decks, toShip, toWorld, type Pose } from '../src/world/deck';
+import { Decks, byBunk, toShip, toWorld, type Pose } from '../src/world/deck';
 
 const plan = planShip(4, 'ship', 26);
 // Moored heading +x, its port side (+b) along +z; the pier on its starboard side, off -z.
@@ -150,4 +150,14 @@ test('deck: into the captain\'s cabin through its door on a rolling deck, standi
   assert.equal(decks.ship, 's');
   // In, up to the captain's table in the middle of the cabin.
   assert.ok(inside > 1.2, `only ${inside.toFixed(2)} m in`);
+});
+
+test('deck: by each bunk, in the cabins and below deck, one may lie down; at the mast or on the castle above, not', () => {
+  const cabin = shipFixtures(plan).filter((f) => f.kind === 'bed'), below = shipHold(plan).fixtures.filter((f) => f.kind === 'bed');
+  assert.ok(cabin.length > 0 && below.length > 0, 'bunks aboard');
+  for (const f of cabin) assert.ok(byBunk(plan, f.a, plan.deckY, f.b), `cabin bunk at ${f.a.toFixed(1)}`);
+  for (const f of below) assert.ok(byBunk(plan, f.a, plan.hold!.y, f.b), `berth at ${f.a.toFixed(1)}`);
+  const m = plan.masts[0]!;
+  assert.ok(!byBunk(plan, m.a, plan.deckY, 0), 'not at the mast');
+  assert.ok(!byBunk(plan, cabin[0]!.a, plan.deckY + 2.5, cabin[0]!.b), 'not on the castle deck over a cabin');
 });

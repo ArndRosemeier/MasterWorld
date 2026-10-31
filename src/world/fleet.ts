@@ -128,12 +128,14 @@ export function passageShip(fleet: readonly Vessel[]): Vessel | null {
 
 /** A ship from elsewhere may lie this much longer than a berth (m): her bow or stern a little past its end. */
 const OVERHANG = 2;
+/** Water under her keel at a far berth, at the least (m). */
+const KEEL = 0.1;
 
 /**
  * Where ship `plan` comes in at harbour `h` (its town's `seed`): the first berth its own ships leave free that takes
  * her (water enough under her keel, the berth about her length).
  */
 export function farBerth(h: HarbourPlan, seed: number, plan: ShipPlan): Mooring | null {
-  const i = freeBerths(h, seed).find((k) => h.berths[k].length >= plan.length - OVERHANG && h.berths[k].depth >= plan.draft + 0.25);
+  const i = freeBerths(h, seed).find((k) => h.berths[k].length >= plan.length - OVERHANG && h.berths[k].depth >= plan.draft + KEEL);
   return i === undefined ? null : berthMooring(h, i, plan);
 }

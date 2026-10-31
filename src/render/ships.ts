@@ -95,7 +95,9 @@ export class ShipsView {
       const passage = voyage ? passageShip(fleet.map((a) => a.v)) : null;
       for (const a of fleet) {
         const out = passage === a.v && voyage ? this.sail(voyage, a.v, towns, hours) : null;
-        const at = out ?? afloatAt(a.v, hours), d = Math.hypot(at.x - cam.x, at.z - cam.z);
+        // (The ship the hero stands on counts as here: after a sleep through the crossing she is far from where the camera
+        // was, and must carry them on.)
+        const at = out ?? afloatAt(a.v, hours), d = this.h.decks.ship === a.id ? 0 : Math.hypot(at.x - cam.x, at.z - cam.z);
         const want = d < SEEN ? (at.sailing ? 'set' : 'furled') : null;
         if (want && !a[want] && !built) { a[want] = this.build(a.v, want); built = true; }
         for (const k of ['furled', 'set'] as const) { const m = a[k]; if (m) m.visible = want === k; }
