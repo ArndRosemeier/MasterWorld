@@ -10,7 +10,7 @@ import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
 import { caveFor } from './caves';
-import { wreckFor } from './wrecks';
+import { washedUpFor, wreckFor } from './wrecks';
 import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { festivityFor } from './festivities';
 import { castawayFor, hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
@@ -85,6 +85,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
   { id: 'cave', name: 'A cave in the cliffs', writes: ['dungeon'], need: 'discovery', asked: 'need', answer: caveFor },
   { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
+  { id: 'washed-up', name: 'A wreck washed up', writes: ['sight'], need: 'reward', asked: 'need', answer: washedUpFor },
   { id: 'wreck', name: 'A wreck off the coast', writes: ['sight'], need: 'reward', asked: 'need', answer: wreckFor },
   { id: 'cache', name: 'A find by the way', writes: ['sight'], need: 'reward', asked: 'need', answer: (c) => sightFor(c, 'reward') },
   { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },

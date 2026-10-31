@@ -62,10 +62,15 @@ export interface ShipsHost {
   readonly wrecks: () => readonly { readonly id: string; readonly x: number; readonly z: number; readonly yaw: number; readonly seed: number }[];
   /** The boats gone over (S9, castaways): where each floats keel up, which way, its seed. */
   readonly capsized?: () => readonly { readonly id: string; readonly x: number; readonly z: number; readonly yaw: number; readonly seed: number }[];
+  /** The boats the sea threw up on a strand (S9, sights `strand`), and the ground there. */
+  readonly beached?: () => readonly { readonly id: string; readonly x: number; readonly z: number; readonly yaw: number; readonly seed: number }[];
+  readonly ground?: (x: number, z: number) => number;
 }
 
 /** How far an upturned boat's keel stands out of the water (m). */
 const KEEL_OUT = 0.3;
+/** How far a boat washed up lies over on her side (rad), and how deep in the sand (share of her draft). */
+const BEACHED_LIST = 1.25, BEACHED_SUNK = 0.35;
 
 export class ShipsView {
   private readonly group = new Group();
@@ -78,8 +83,9 @@ export class ShipsView {
 
   /** The wrecks drawn now (near the camera), by id: her mesh, plan and pose on the bed. */
   private readonly sunk = new Map<string, { mesh: Mesh; plan: ShipPlan; pose: Pose }>();
-  /** The boats gone over drawn now, by id. */
+  /** The boats gone over and the boats washed up drawn now, by id. */
   private readonly upturned = new Map<string, { mesh: Mesh; plan: ShipPlan }>();
+  private readonly ashore = new Map<string, Mesh>();
 
   constructor(private readonly h: ShipsHost) {}
 
@@ -127,11 +133,30 @@ export class ShipsView {
     }
     this.cut(hulls);
     built = this.wrecked(cam, built);
-    this.overturned(cam, built);
+    built = this.overturned(cam, built);
+    this.washedUp(cam, built);
+  }
+
+  /** The boats the sea threw up on a strand near the camera (S9): on her side, half in the sand; one built a frame at most. */
+  private washedUp(cam: Vector3, built: boolean): void {
+    for (const b of this.h.beached?.() ?? []) {
+      const near = Math.hypot(b.x - cam.x, b.z - cam.z) < SEEN, m = this.ashore.get(b.id);
+      if (!near) { if (m) { this.group.remove(m); m.geometry.dispose(); this.ashore.delete(b.id); } continue; }
+      if (m || built) continue;
+      built = true;
+      const plan = planShip(b.seed, 'boat');
+      const mesh = buildingMeshAt(shipMesh(plan, 0, 0, 1, 0, 0, [0, 0, 0], 'furled', true), 0, 0, 0, 'boat washed up');
+      mesh.rotation.order = 'YZX';
+      mesh.position.set(b.x, (this.h.ground?.(b.x, b.z) ?? 0) + plan.draft * (1 - BEACHED_SUNK) * Math.cos(BEACHED_LIST), b.z);
+      mesh.rotation.set(-BEACHED_LIST, -b.yaw, 0);
+      mesh.updateMatrix();
+      this.group.add(mesh);
+      this.ashore.set(b.id, mesh);
+    }
   }
 
   /** The boats gone over near the camera (S9): keel up, riding the waves where they float; one built a frame at most. */
-  private overturned(cam: Vector3, built: boolean): void {
+  private overturned(cam: Vector3, built: boolean): boolean {
     const now = this.h.capsized?.() ?? [];
     for (const [id, u] of this.upturned) if (!now.some((c) => c.id === id)) { this.group.remove(u.mesh); u.mesh.geometry.dispose(); this.upturned.delete(id); }
     for (const c of now) {
@@ -151,6 +176,7 @@ export class ShipsView {
       u.mesh.rotation.set(-Math.PI, -c.yaw, 0);
       u.mesh.updateMatrix();
     }
+    return built;
   }
 
   /** The wrecks near the camera on the bed (S8), their decks walked (swum) near the hero; one built a frame at most. */

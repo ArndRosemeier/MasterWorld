@@ -836,7 +836,7 @@ export interface UpkeepDef {
 }
 
 /** How a sight stands on the land (world/sites.ts `layOutSight`); `wreck`, a ship lying on the sea bed (S8). */
-export const SIGHT_SHAPES = ['stones', 'waystone', 'cairn', 'stash', 'wreck'] as const;
+export const SIGHT_SHAPES = ['stones', 'waystone', 'cairn', 'stash', 'wreck', 'washed-up'] as const;
 export type SightShape = (typeof SIGHT_SHAPES)[number];
 
 /**
@@ -860,6 +860,11 @@ export interface SightDef {
    * by a way on the land, and it is come upon by diving down to it.
    */
   readonly sea?: true;
+  /**
+   * It lies on a strand (S9, a wreck washed up): the VGM puts it on the strand near a hero walking by the sea
+   * (`vgm/wrecks.ts` washedUpFor), never by a way inland.
+   */
+  readonly strand?: true;
 }
 
 /** The situations the engine knows how to stage (C10). */

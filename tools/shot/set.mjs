@@ -335,6 +335,10 @@ const SESSIONS = [
   { id: 'sea-castaway', query: `${still}&hour=11&weather=fair&castaway&wild=0`, shots: [
     { name: 'sea-castaway', act: async (p) => { await p.waitForTimeout(2500); } },
   ] },
+  // S9: a boat the sea threw up on a strand, broken on her side, her casks and sea chest in the wrack.
+  { id: 'sea-washed-up', query: `${still}&hour=11&weather=fair&washedup&wild=0`, shots: [
+    { name: 'sea-washed-up', act: async (p) => { await p.waitForTimeout(1500); } },
+  ] },
   // S2: a harbour town the VGM founded by a river's mouth. On its quay at late morning looking out over the piers,
   // then from out over the water back at the town, then the quay in the evening, its tavern lit.
   { id: 'sea-harbour', query: `${still}&hour=11&weather=fair&site=harbour`, shots: [

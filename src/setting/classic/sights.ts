@@ -11,5 +11,7 @@ export const sights: readonly SightDef[] = [
   { id: 'stash', shape: 'stash', need: 'reward', loot: 'stash', seen: 'Under a flat stone against a boulder someone hid a bundle in oilcloth, and never came back for it.' },
   // Reward's answer at sea (S8): a ship gone down off the coast, her strongbox still in her hold.
   { id: 'wreck', shape: 'wreck', need: 'reward', loot: 'wreck', sea: true, seen: 'A ship lies on her side on the bed, her hold broken open; a sea chest is still lashed in it.' },
+  // Reward's answer on the strand (S9): a boat the sea threw up, broken, her casks and a sea chest in the wrack.
+  { id: 'washed-up', shape: 'washed-up', need: 'reward', loot: 'washed-up', strand: true, seen: 'A boat lies broken on the strand where the sea threw her up, her planks sprung. Casks and a sea chest lie in the wrack round her.' },
   { id: 'cairn', shape: 'cairn', seen: 'A cairn of field stones, piled higher than a man. Something lies under it, or something was marked here long ago.', weight: 1.2 },
 ];

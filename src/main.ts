@@ -70,7 +70,7 @@ import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/event
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
 import { cleanWhys, PACING, vgmLines, whyOf, WHY_KEPT, type VgmWhy } from './vgm/vgmLog';
 import { findIn, travellerFor } from './vgm/answers';
-import { offTheCoast, wreckFor } from './vgm/wrecks';
+import { offTheCoast, washedUpFor, wreckFor } from './vgm/wrecks';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
@@ -499,11 +499,15 @@ export async function start(b: Boot): Promise<void> {
     // (The voyages in the log, read again only when the log has changed.)
     let voyages: { log: readonly Decision[] | null; list: ReturnType<typeof voyagesIn> } = { log: null, list: [] };
     let shipClock = -1;
-    // The wrecks on the sea bed (S8): the log's sea sights.
-    let wrecks: { log: readonly Decision[]; list: SightDecision[] } = { log: [], list: [] };
-    const wrecksNow = () => (wrecks.log === log ? wrecks.list : (wrecks = { log, list: log.filter((d): d is SightDecision => d.kind === 'sight' && !!d.sea) }).list);
+    // The wrecks on the sea bed (S8) and the boats washed up on the strands (S9): the log's sea and strand sights,
+    // looked up again only when the log has changed.
+    const sightsWhere = (which: 'sea' | 'strand') => {
+      let kept: { log: readonly Decision[]; list: SightDecision[] } = { log: [], list: [] };
+      return () => (kept.log === log ? kept.list : (kept = { log, list: log.filter((d): d is SightDecision => d.kind === 'sight' && !!d[which]) }).list);
+    };
+    const wrecksNow = sightsWhere('sea'), beachedNow = sightsWhere('strand');
     const voyagesNow = () => (voyages.log === log ? voyages.list : (voyages = { log, list: voyagesIn(log) }).list);
-    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks, voyages: voyagesNow, wrecks: () => wrecksNow(), capsized: () => { const h = hours(); return log.filter((d): d is CastawayDecision => d.kind === 'castaway' && h >= d.at && h < d.until); } });
+    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks, voyages: voyagesNow, wrecks: () => wrecksNow(), capsized: () => { const h = hours(); return log.filter((d): d is CastawayDecision => d.kind === 'castaway' && h >= d.at && h < d.until); }, beached: () => beachedNow(), ground: (x, z) => terrain.height(x, z) });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
     compileEarly([sea.mesh]);
@@ -1023,6 +1027,16 @@ export async function start(b: Boot): Promise<void> {
         let s = 0;
         while (s < k && terrain.height(d.x + ux * s, d.z + uz * s) < 0.3) s += 1;
         player.teleport(d.x + ux * (s + 2), undefined, d.z + uz * (s + 2), Math.atan2(ux, uz));
+      }
+    }
+    // `washedup`: on a strand by the start (the giant crabs' ground), a dozen metres from a boat the sea threw up there.
+    if (params.washedUp && start) {
+      const shore = wildFor({ seed, log: [], towns: terrain.towns, terrain, hours: 0, setting }, start).find((t) => t.group === 'crabs');
+      const d = shore && washedUpFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: shore, toward: null });
+      if (shore && d) {
+        log = [...log, d];
+        const k = Math.hypot(shore.x - d.x, shore.z - d.z) || 1, ux = (shore.x - d.x) / k, uz = (shore.z - d.z) / k;
+        player.teleport(d.x + ux * 12, undefined, d.z + uz * 12, Math.atan2(ux, uz));
       }
     }
     // `wild=<kind>`: beside its first group (for looking at them).

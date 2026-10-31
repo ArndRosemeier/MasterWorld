@@ -78,6 +78,7 @@ export const items: ItemCatalog = {
     { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30] },
     { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25] },
     // What the sea leaves (S5, for the wrecks and sea caves of S8): a drowned sailor's chest, a diver's draughts in it.
+    { id: 'washed-up', items: [['rope', 1], ['old-coin', 2], ['deep-draught', 1], ['ring', 0.4]], count: [1, 2], coins: [2, 18] },
     { id: 'wreck', items: [['deep-draught', 2], ['old-coin', 3], ['rope', 1], ['ring', 1], ['amulet', 0.5], ['garnet', 0.5]], count: [1, 2], coins: [5, 40] },
     {
       id: 'lair', count: [2, 3], coins: [20, 80],
