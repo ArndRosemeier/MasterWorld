@@ -80,6 +80,13 @@ export const creatures: readonly CreatureDef[] = [
     attacks: [{ name: 'tusks', damage: [4, 9], kind: 'pierce', reach: 0.8, time: 1.8, prowess: 28 }],
     loot: 'boar', tell: 'The earth turned over under the oaks, and a grunting in the undergrowth.',
   },
+  // The strand (S9): crabs as big as a dog, sidling out of the wrack at low water.
+  {
+    id: 'giant crab', name: 'giant crab', plural: 'giant crabs', body: { kind: 'beast', species: 'crab', length: 1.1, color: '#9a4a2c' },
+    health: 36, armour: 6, defence: 18, speed: 3.6, senses: { sight: 12, hearing: 14 }, temper: 'hostile', morale: 0.8, pack: true, role: 'melee', danger: 8,
+    attacks: [{ name: 'claws', damage: [3, 8], kind: 'pierce', reach: 0.8, time: 1.7, prowess: 26 }],
+    loot: 'crab', tell: 'Scratching among the wrack on the strand, and shells that are far too big.',
+  },
   {
     id: 'deer', name: 'deer', plural: 'deer', body: { kind: 'beast', species: 'deer', length: 1.5, color: '#8a6a48' },
     health: 22, armour: 0, defence: 30, speed: 9, senses: { sight: 34, hearing: 40 }, temper: 'skittish', wary: 22, morale: 0.2, pack: true, role: 'swarm', danger: 2,

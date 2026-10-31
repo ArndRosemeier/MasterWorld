@@ -24,6 +24,7 @@ mkdirSync(dir, { recursive: true });
 const SCENES = [
   { id: 'wolves', query: '&hour=10&weather=fair', wild: 'wolves' },
   { id: 'boar', query: '&hour=10&weather=fair', wild: 'boar' },
+  { id: 'crab', query: '&hour=10&weather=fair', wild: 'crabs' },
   { id: 'bandits', query: '&hour=10&weather=fair', wild: 'bandits' },
   { id: 'goblins', query: '&hour=12&cellar=2&dweller=goblins' },
   { id: 'rats', query: '&hour=12&cellar=2&dweller=rats' },

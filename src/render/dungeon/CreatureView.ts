@@ -69,17 +69,18 @@ interface Shown {
 const yawOf = (dir: number) => Math.atan2(-Math.cos(dir), -Math.sin(dir));
 
 /** How each beast of the land is grown: a hunter's lean build, a grazer's long legs and neck, a rooting brute. */
-const BEAST: Record<'wolf' | 'deer' | 'boar', { role: CritterRole; integument: Integument }> = {
+const BEAST: Record<'wolf' | 'deer' | 'boar' | 'crab', { role: CritterRole; integument: Integument; plan?: BodyPlan }> = {
   wolf: { role: 'hunter', integument: 'fur' },
   deer: { role: 'grazer', integument: 'fur' },
   boar: { role: 'brute', integument: 'hide' },
+  crab: { role: 'brute', integument: 'chitin', plan: 'crab' },
 };
 
 /** The animal a rat, spider or beast is (one species per creature kind, from the seed). */
 function speciesFor(def: CreatureDef, seed: number) {
   const b = def.body;
   const spider = b.kind === 'spider', beast = b.kind === 'beast' ? BEAST[b.species] : null;
-  const force: { plan: BodyPlan; integument: Integument } = spider ? { plan: 'octopod', integument: 'chitin' } : { plan: 'quadruped', integument: beast?.integument ?? 'fur' };
+  const force: { plan: BodyPlan; integument: Integument } = spider ? { plan: 'octopod', integument: 'chitin' } : { plan: beast?.plan ?? 'quadruped', integument: beast?.integument ?? 'fur' };
   const sp = grow(new Rng(deriveSeed(seed, 'creature', def.id)), spider ? 'hunter' : beast?.role ?? 'scuttler', 0, def.id, force);
   const tone = hexToRgb(parseInt((b.kind === 'humanoid' ? '#000000' : b.color).slice(1), 16));
   // The setting's colour over the grown coat, its pattern kept.

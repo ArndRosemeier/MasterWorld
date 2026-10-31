@@ -57,6 +57,11 @@ export const LIBRARY_KINDS = {
     ids: ['pheasant'],
     clips: { idle: ['Idle', 'Idle_Breathing'], feed: ['StandGrazingA'], walk: ['WalkMedium_NoRootMotion'], run: ['RunFast_NoRootMotion'] },
   },
+  crab: {
+    // A big red stylized crab (1.1 m across its legs at scale 1): its own sidle, pinches, flinch and fall.
+    ids: ['crab-stylized'],
+    clips: { idle: ['Idle'], alert: ['Idle'], feed: ['Idle'], walk: ['Walk'], run: ['Walk'], blow: ['Attack1', 'Attack2'], hurt: ['HitBack'], dead: ['Die'] },
+  },
   otter: {
     // The hero's otter form (S6, game/birdForm.ts): WildMesh3D's American mink, which swims at the surface and under
     // it (OTTER_CLIPS), grown to an otter's size (its model is some 2 m long).
