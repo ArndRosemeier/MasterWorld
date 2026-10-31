@@ -90,6 +90,8 @@ const torchQ = new Quaternion(), handQ = new Quaternion(), chestAt = new Vector3
 /** Holding a torch up, the left arm follows its clip this slowly (s): a run's swing all but goes, a turn comes through. */
 const ARM_CALM = 0.8;
 const CALM_BONES = ['clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l'] as const;
+/** How much of the chest's bob the torch hand follows up and down (it follows the twist in full). */
+const TORCH_BOB = 0.4;
 const HELD_BONES = ['clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l'] as const;
 /** Which way the torch arm's elbow points (the rig's body frame for this side: out, up, ahead): out, down and back. */
 const TORCH_ELBOW = [0.8, -1, -0.5] as const;
@@ -377,7 +379,10 @@ export class HeroView {
         const C = (this.chestCalm ??= { at: chestAt.clone(), q: chestQ.clone() });
         C.at.lerp(chestAt, follow);
         C.q.slerp(chestQ, follow);
+        const y = g.L!.p.y;
         g.L!.p.sub(C.at).applyQuaternion(calmInv.copy(C.q).invert()).applyQuaternion(chestQ).add(chestAt);
+        // Up and down only part of the chest's bob: a steady hand evens out the stride.
+        g.L!.p.y = y + (g.L!.p.y - y) * TORCH_BOB;
       }
       o.localToWorld(g.L!.p);
       g.L!.w = smooth(T.up); g.L!.pole = TORCH_ELBOW; g.L!.flat = null;
