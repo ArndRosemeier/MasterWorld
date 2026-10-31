@@ -588,23 +588,28 @@ export async function start(b: Boot): Promise<void> {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights, jobs: { frontier: (a) => jobs.frontier(a), site: (j) => terrainJobs.site(j) } }, log);
       for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
       // `site=<place or fill>`: walk out from the start until one opens, then stand before it (a harbour town: on
-      // its quay, facing the sea).
+      // its quay, facing the sea). `site=harbour` with a start town by the sea: its own quay.
       const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind || f.id === kind).map((f) => f.id));
-      for (let dir = 0; kind && dir < 8; dir++) {
-        const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: start?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
+      const onQuay = (id: string, quay: { x: number; z: number; dx: number; dz: number }): void => {
+        const back = params.siteAt ?? 4;
+        player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
+        // Aboard its first ship once the town stands: on the main deck abaft the mainmast (forward of it the cargo
+        // hatch stands open), looking along it to the bow.
+        if (params.aboard) void roading.then(() => {
+          const t = terrain.town(id), h = t?.plan.harbour, m = h && harbourMoorings(h, t.decision.seed ?? 0).find((x) => x.plan.kind === 'ship');
+          if (m) player.teleport(m.x - m.ux * 2, m.plan.deckY + 0.6, m.z - m.uz * 2, Math.atan2(-m.ux, -m.uz));
+        });
+      };
+      const home = start?.decision;
+      if (kind === 'harbour' && home?.harbour) onQuay(home.id, home.harbour);
+      else for (let dir = 0; kind && dir < 8; dir++) {
+        const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: home ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
         for (const d of walked) regionOpened(d);
         const s = found.site, d = s.r + (params.siteAt ?? (kind === 'capital' ? 60 : 14)); // a capital's wall stands out past its houses
-        const quay = s.harbour, back = params.siteAt ?? 4;
-        if (quay) player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
+        if (s.harbour) onQuay(found.id, s.harbour);
         else player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
-        // Aboard its first ship once the town stands: on the main deck abaft the mainmast (forward of it the cargo
-        // hatch stands open), looking along it to the bow.
-        if (quay && params.aboard) void roading.then(() => {
-          const h = terrain.town(found.id)?.plan.harbour, m = h && harbourMoorings(h, terrain.town(found.id)!.decision.seed ?? 0).find((x) => x.plan.kind === 'ship');
-          if (m) player.teleport(m.x - m.ux * 2, m.plan.deckY + 0.6, m.z - m.uz * 2, Math.atan2(-m.ux, -m.uz));
-        });
         break;
       }
     }
