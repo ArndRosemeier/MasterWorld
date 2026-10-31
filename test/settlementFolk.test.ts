@@ -137,6 +137,20 @@ test('settlements: every guild house keeps its teacher at home while awake (the 
   assert.deepEqual([...out], [], 'teachers out of their houses');
 });
 
+test('settlements: a market day, a feast or a gathering does not take a teacher from their house (the witch is found at home)', () => {
+  for (const mood of ['market', 'feast', undefined] as const) {
+    const start = new Township(terrain.towns[0], { seed, setting: classic, log: () => walked, hours: () => 10 });
+    const life = start.life;
+    start.keepMarked(life, []);
+    const [x, z] = terrain.towns[0].plan.centre;
+    life.order({ kind: 'gather', x, z, radius: 16, from: 10, to: 13, ...(mood ? { mood } : {}) });
+    const housed = start.guilds.map((g) => ({ b: g.b, a: life.agents.find((y) => y.person.work === g.b.id && y.person.trade === g.guild.keeper) })).filter((t) => t.a && !t.a.post);
+    assert.ok(housed.some((t) => t.a!.person.trade === 'hedge-witch'));
+    for (let s = 0; s < 300; s++) life.step(1, 10.1 + s / 600);
+    for (const { a, b } of housed) assert.ok(a!.act !== 'walk' && a!.spot >= 0 && life.spots[a!.spot].building === b.id, `${a!.person.trade} at home on a ${mood ?? 'gathering'}`);
+  }
+});
+
 test('settlements: at night every guild teacher lies asleep in a bed of their own house (the hedge witch is found in hers)', () => {
   const start = new Township(terrain.towns[0], { seed, setting: classic, log: () => walked, hours: () => 2 });
   const life = start.life;

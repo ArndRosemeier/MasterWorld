@@ -715,6 +715,10 @@ export class TownLife {
     const stroll = () => { const n = r.int(0, this.nav.xs.length - 1); return free(this.nav.xs[n], this.nav.zs[n], 'stroll', [20, 60]); };
     let task = a.task;
     if (task === 'sleep') return at(home, 'sleep', [600, 1200]);
+    // Marked on the hero's map (a teacher, one a mark sends the hero to): in that building while awake, where the
+    // hero was sent to find them; a gathering, a feast or a market day does not take them from it.
+    const kept = this.kept.get(p.id);
+    if (kept !== undefined && this.doorOf(kept) >= 0) return inside(this.doorOf(kept));
     if (task === 'away') {
       // On the road: gone where it leaves the town (or still there).
       const [x, z] = this.roadEnds.length ? r.pick(this.roadEnds) : [this.spots[home].x, this.spots[home].z];
@@ -735,9 +739,6 @@ export class TownLife {
       }
       task = 'home';
     }
-    // Marked on the hero's map: in that building while awake, where the hero was sent to find them.
-    const kept = this.kept.get(p.id);
-    if (kept !== undefined && this.doorOf(kept) >= 0) return inside(this.doorOf(kept));
     // In the dark only the lit inn and the way home are out of doors.
     if (dark && (task === 'play' || task === 'leisure' || task === 'errands')) task = 'home';
     if (task === 'home') return inside(home);
