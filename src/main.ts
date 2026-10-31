@@ -465,13 +465,15 @@ export async function start(b: Boot): Promise<void> {
     // A town's words are tied into the game (how its people take the hero, what they offer) once the game's
     // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.
     let tieTalk: ((t: Township, words: TownTalk) => void) | null = null;
-    const lit: Township[] = [];
+    const lit = new Set<Township>();
+    const lightDoors = (): void => { const l = [...lit]; view.warm.atDoors(l.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z), l.flatMap((x) => x.town.plan.wall ?? [])); };
     towns = new Towns({
       stage: view.stage, terrain, land: terrainJobs, roads: roadWork, masks: !!start && params.town, drawn: params.town,
       setting, seed, hours, log: () => log, get standing() { return standing; }, towns: () => terrain.towns,
       saved: townSaves(save, start?.decision.id ?? null),
       made: (t) => { t.onTalk = (words) => tieTalk?.(t, words); },
-      raised: (t) => { lit.push(t); view.warm.atDoors(lit.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z), lit.flatMap((x) => x.town.plan.wall ?? [])); },
+      raised: (t) => { lit.add(t); lightDoors(); },
+      lowered: (t) => { lit.delete(t); lightDoors(); },
     });
     const startTown = towns.start;
     // Its masks come from the terrain workers, four of them (the world worker alone made them one after another,

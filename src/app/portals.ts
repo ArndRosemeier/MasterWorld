@@ -16,6 +16,7 @@ import { openingOutline, sidesFrom, stepDir, stepPoint, stepYaw, through, toFram
 import type { WalkWorld } from '../game/walker';
 import type { PortalPass, PortalView } from '../render/portal/PortalView';
 import type { Player } from './player';
+import { freeMesh } from '../render/materials';
 
 export interface PortalsHost {
   readonly player: Player;
@@ -82,7 +83,7 @@ export class Portals {
   remove(id: string): void {
     const h = this.held.get(id);
     if (!h) return;
-    for (const m of [h.meshes.a, h.meshes.b]) { m.removeFromParent(); m.geometry.dispose(); }
+    for (const m of [h.meshes.a, h.meshes.b]) freeMesh(m);
     this.held.delete(id);
   }
 

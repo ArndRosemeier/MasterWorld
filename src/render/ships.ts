@@ -12,6 +12,7 @@ import { buildingMeshAt } from './materials/building';
 import { afloatAt, fleetOf, type Afloat as Place, type Vessel } from '../world/fleet';
 import type { Decks, Pose } from '../world/deck';
 import type { Town } from '../world/town';
+import { freeMesh } from './materials';
 
 /** Vessels are drawn within this of the camera (m); their decks are walked within ABOARD. */
 const SEEN = 1500, ABOARD = 250;
@@ -125,7 +126,7 @@ export class ShipsView {
   private drop(fleet: Afloat[]): void {
     for (const a of fleet) {
       this.h.decks.drop(a.id);
-      for (const m of [a.furled, a.set, a.plank]) if (m) { this.group.remove(m); m.geometry.dispose(); }
+      for (const m of [a.furled, a.set, a.plank]) if (m) freeMesh(m);
     }
   }
 }

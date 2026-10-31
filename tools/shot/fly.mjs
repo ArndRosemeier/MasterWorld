@@ -98,14 +98,19 @@ async function census() {
     return r.result.value ?? JSON.stringify(r.exceptionDetails ?? r.result);
   };
   const protoWith = (start, own) => `(() => { let p = Object.getPrototypeOf(${start}); while (p && !Object.prototype.hasOwnProperty.call(p, '${own}')) p = Object.getPrototypeOf(p); return p; })()`;
-  out.push('ArrayBuffers: ' + await query('ArrayBuffer.prototype', `function () {
-    let n = 0, bytes = 0; const by = new Map();
-    for (const b of this) { n++; bytes += b.byteLength; const k = 2 ** Math.ceil(Math.log2(Math.max(1, b.byteLength))); const e = by.get(k) ?? [0, 0]; e[0]++; e[1] += b.byteLength; by.set(k, e); }
+  out.push('Typed arrays: ' + await query('Object.getPrototypeOf(Float32Array.prototype)', `function () {
+    let n = 0, bytes = 0; const seen = new Set(), by = new Map();
+    for (const t of this) {
+      if (!ArrayBuffer.isView(t) || seen.has(t.buffer)) continue;
+      seen.add(t.buffer); n++; bytes += t.buffer.byteLength;
+      const k = t.constructor.name + ' ' + (t.buffer.byteLength >= 2 ** 20 ? '>=1M' : t.buffer.byteLength >= 65536 ? '64K-1M' : '<64K');
+      const e = by.get(k) ?? [0, 0]; e[0]++; e[1] += t.buffer.byteLength; by.set(k, e);
+    }
     const mb = (x) => (x / 2 ** 20).toFixed(1);
-    return n + ' buffers, ' + mb(bytes) + ' MB; by size (up to): ' + [...by].sort((a, b) => b[1][1] - a[1][1]).slice(0, 10).map(([k, [c, b]]) => (k >= 2 ** 20 ? (k / 2 ** 20) + 'M' : (k / 1024) + 'K') + ' ' + c + 'x ' + mb(b) + ' MB').join(', ');
+    return n + ' buffers, ' + mb(bytes) + ' MB; ' + [...by].sort((a, b) => b[1][1] - a[1][1]).slice(0, 10).map(([k, [c, b]]) => k + ' ' + c + 'x ' + mb(b) + ' MB').join(', ');
   }`));
   out.push('Object3Ds: ' + await query(protoWith('window.game.view.camera', 'traverse'), `function () {
-    const by = new Map(); let n = 0;
+    const by = new Map(), counted = new Set(); let n = 0;
     const root = (o) => { while (o.parent) o = o.parent; return o; };
     for (const o of this) {
       n++;
@@ -113,7 +118,7 @@ async function census() {
       const name = (o.name || o.type || '?').split(/[ #:]/)[0] + ' (' + where + ')';
       let bytes = 0;
       const g = o.geometry;
-      if (g && g.attributes) for (const a of Object.values(g.attributes)) bytes += a.array?.byteLength ?? 0;
+      if (g && g.attributes) for (const a of Object.values(g.attributes)) { const buf = a.array?.buffer; if (buf && !counted.has(buf)) { counted.add(buf); bytes += buf.byteLength; } }
       const e = by.get(name) ?? [0, 0]; e[0]++; e[1] += bytes; by.set(name, e);
     }
     return n + ' objects; ' + [...by].sort((a, b) => b[1][1] - a[1][1] || b[1][0] - a[1][0]).slice(0, 25).map(([k, [c, b]]) => k + ' ' + c + 'x ' + (b / 2 ** 20).toFixed(1) + ' MB').join('; ');
@@ -121,6 +126,7 @@ async function census() {
   out.push('BufferGeometries: ' + await query(protoWith('window.game.view.stage.scene.getObjectByProperty("isMesh", true).geometry', 'setAttribute'), `function () {
     let n = 0, bytes = 0; const names = new Map();
     for (const g of this) {
+      if (!g.attributes) continue;
       n++;
       let b = 0;
       for (const a of Object.values(g.attributes)) b += a.array?.byteLength ?? 0;
