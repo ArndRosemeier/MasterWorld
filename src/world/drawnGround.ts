@@ -1,6 +1,6 @@
 /**
  * The ground as it is drawn near the camera, for everything that stands on it (the hero, birds, the wild's creatures,
- * a hold's wardens): the finest terrain chunk's grid (a vertex every 2 m, every metre where a brook runs through the
+ * a hold's wardens, trees and rocks): the finest terrain chunk's grid (a vertex every 2 m, every metre where a brook runs through the
  * chunk: chunkMesh.ts `finerFor`) with its quads cut as the mesh cuts them (`cutsAD`), heights at the vertices exact.
  * The land's own height has relief finer than that grid (a gully's slot, a brook's lip); stood on that, the hero sank
  * into the drawn ground where the mesh stepped over it. Standing on what is drawn, nothing can, whatever the land's
@@ -25,6 +25,15 @@ export const drawnSource = (t: Terrain): DrawnSource => ({
   get version() { return t.version; },
   segs: (x0, z0) => finerFor(t, { x0, z0, size: CHUNK0, segs: SEGS }),
 });
+
+const kept = new WeakMap<Terrain, DrawnGround>();
+
+/** The drawn ground of a terrain, one per terrain (what trees and rocks are set on, in the workers too). */
+export function drawnOf(t: Terrain): DrawnGround {
+  let g = kept.get(t);
+  if (!g) kept.set(t, (g = new DrawnGround(drawnSource(t))));
+  return g;
+}
 
 export class DrawnGround {
   private readonly ix = new Int32Array(SIZE);

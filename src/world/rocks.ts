@@ -14,6 +14,7 @@ import { ROCK_SHAPES, rockModel, type RockShape } from '@futuremagic/rocks';
 import { FORM_CELL, type Landform } from './landforms';
 import type { Terrain } from './terrain';
 import { FetchedCells } from './fetchedCells';
+import { drawnOf } from './drawnGround';
 
 export const ROCK_STRIDE = 6;
 /** Rocks of each shape, each its own seed. */
@@ -142,7 +143,7 @@ export function talusOf(t: Terrain, x0: number, z0: number, size: number): numbe
  * walls in it (ROCK_STRIDE floats each), set on the ground; none in water or on a road.
  */
 export function rockPlacement(t: Terrain, x0: number, z0: number, size: number): Float32Array {
-  const ks = rockKinds();
+  const ks = rockKinds(), ground = drawnOf(t);
   const out: number[] = [];
   const lots = t.landforms.within(x0 + size / 2, z0 + size / 2, size * 0.71)
     .filter((f) => f.x >= x0 && f.x < x0 + size && f.z >= z0 && f.z < z0 + size).map(rocksOf);
@@ -152,8 +153,8 @@ export function rockPlacement(t: Terrain, x0: number, z0: number, size: number):
       const x = rs[k], z = rs[k + 1], scale = rs[k + 2], yaw = rs[k + 3], kind = rs[k + 4], m = ks[kind];
       const r = m.foot * scale;
       if (t.waterDepth(x, z) > 0 || t.roads.fromEdge(x, z) < r + 0.5 || t.townGround(x, z) !== 0) continue;
-      // Set on the lowest ground under its foot, sunk in by a share of its height (it grew out of the ground).
-      const y = seatHeight(t.height.bind(t), x, z, r * 0.8, r * 0.8, yaw, 0.12 * m.height * scale);
+      // Set on the lowest drawn ground under its foot, sunk in by a share of its height (it grew out of the ground).
+      const y = seatHeight((gx, gz) => ground.footing(gx, gz), x, z, r * 0.8, r * 0.8, yaw, 0.12 * m.height * scale);
       out.push(x, y, z, scale, yaw, kind);
     }
   }
