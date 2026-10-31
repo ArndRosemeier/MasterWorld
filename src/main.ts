@@ -2094,6 +2094,7 @@ export async function start(b: Boot): Promise<void> {
       ships.float(view.camera.position, hours(), dt);
       // (A harbour town's passengers aboard too, from its life while it lives.)
       const crewNow = crews.atWork(decks, hours(), (id) => { const t = towns?.get(id); return t?.living ? t.life : null; }, player.walker.pos);
+      ships.ropes(crews.lines);
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);

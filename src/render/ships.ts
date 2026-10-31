@@ -7,7 +7,7 @@
  */
 import { Group, type Mesh, type Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import { gangplankMesh, hullHalf, shipMesh, type ShipPlan } from '@futuremagic/settlement';
+import { gangplankMesh, hullHalf, ropeMesh, shipMesh, type ShipPlan } from '@futuremagic/settlement';
 import { HULLS, HULL_POSES, HULL_STATIONS, WATER } from './materials/waterInputs';
 import { buildingMeshAt } from './materials/building';
 import { afloatAt, fleetOf, type Afloat as Place, type Vessel } from '../world/fleet';
@@ -59,6 +59,8 @@ export interface ShipsHost {
 export class ShipsView {
   private readonly group = new Group();
   private readonly fleets = new Map<string, Afloat[]>();
+  /** The ropes the crew haul on (one mesh each, stretched between its ends; kept for reuse). */
+  private readonly ropeMeshes: Mesh[] = [];
   private added = false;
 
   constructor(private readonly h: ShipsHost) {}
@@ -144,12 +146,31 @@ export class ShipsView {
       a.plank.rotation.order = 'YZX';
       this.group.add(a.plank);
     }
-    const { foot, head } = ends, dx = head.x - foot.x, dy = head.y - foot.y, dz = head.z - foot.z, run = Math.hypot(dx, dz);
-    const m = a.plank;
+    this.span(a.plank, ends.foot, ends.head, PLANK_MADE);
+  }
+
+  /** Each frame, after the crews are placed: a rope along each line from a hand up to its yard. */
+  ropes(lines: readonly { readonly from: { x: number; y: number; z: number }; readonly to: { x: number; y: number; z: number } }[]): void {
+    for (const [i, l] of lines.entries()) {
+      let m = this.ropeMeshes[i];
+      if (!m) {
+        m = buildingMeshAt(ropeMesh(1), 0, 0, 0, 'rope');
+        m.rotation.order = 'YZX';
+        this.group.add(m);
+        this.ropeMeshes.push(m);
+      }
+      this.span(m, l.from, l.to, 1);
+    }
+    for (let i = lines.length; i < this.ropeMeshes.length; i++) this.ropeMeshes[i].visible = false;
+  }
+
+  /** `m` (made `made` long along +x) laid from `a` to `b`. */
+  private span(m: Mesh, a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, made: number): void {
+    const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, run = Math.hypot(dx, dz);
     m.visible = true;
-    m.position.set(foot.x, foot.y, foot.z);
+    m.position.set(a.x, a.y, a.z);
     m.rotation.set(0, -Math.atan2(dz, dx), Math.atan2(dy, run));
-    m.scale.set(Math.hypot(run, dy) / PLANK_MADE, 1, 1);
+    m.scale.set(Math.hypot(run, dy) / made, 1, 1);
     m.updateMatrix();
   }
 

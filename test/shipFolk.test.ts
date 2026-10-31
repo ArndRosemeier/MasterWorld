@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planShip, shipFloors, shipWall } from '@futuremagic/settlement';
+import { hullHalf, planShip, shipFloors, shipWall } from '@futuremagic/settlement';
 import { PASSENGER_POSTS, crewOf, crewPost, passengerPost, type VesselState } from '../src/sim/shipFolk';
 
 // S3: the crew at work stand on the vessel's floors, clear of its walls, masts and each other, whatever it is doing.
@@ -18,6 +18,24 @@ test('ship folk: every crew post stands on a floor, clear of walls and of the ot
         assert.ok(!shipWall(plan, p.a, p.b, 0.3, p.h), `${what}: in a wall`);
         for (const q of posts.slice(k + 1)) assert.ok(Math.hypot(q.a - p.a, q.b - p.b) > 0.7 || Math.abs(q.h - p.h) > 1.5, `${what}: in another`);
       }
+    }
+  }
+});
+
+test('ship folk: a ship\'s hands on the lines haul on a line that goes up before them to a yard', () => {
+  for (const seed of [1, 2, 3, 7]) {
+    const plan = planShip(seed, 'ship'), crew = crewOf(plan, seed, `v${seed}`);
+    for (const state of ['moored', 'sailing'] as VesselState[]) for (const [k, h] of crew.entries()) {
+      const p = crewPost(plan, h, k, state);
+      if (h.job !== 'lines') { assert.equal(p.line, undefined); continue; }
+      assert.ok(p.line, `${seed} ${state}: a line`);
+      const l = p.line!, yards = plan.masts.flatMap((m) => m.yards.map((y) => ({ a: m.a, ...y })));
+      assert.ok(yards.some((y) => Math.abs(y.a - l.a) < 1e-6 && Math.abs(y.y - l.h) < 1e-6 && Math.abs(l.b) <= y.half), 'at a yard');
+      // Before them: the way they face and the way to the line agree (they lean back against it).
+      const first = l.via ?? l;
+      assert.ok(Math.cos(p.dir) * (first.a - p.a) + Math.sin(p.dir) * (first.b - p.b) > 0, `${seed} ${state}: the line before them`);
+      // Belayed at the rail: inside the hull's side at the rail's height.
+      if (l.via) assert.ok(Math.abs(l.via.b) < hullHalf(plan, l.via.a, plan.railY) && Math.abs(l.via.b) > Math.abs(p.b), 'at the rail');
     }
   }
 });
