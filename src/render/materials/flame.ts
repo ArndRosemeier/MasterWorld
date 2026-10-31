@@ -23,15 +23,16 @@ export const FLAME = defineKind('flame', ['position', 'uv', 'color'], () => {
   const lick = float(0.78).add(sin(t.mul(11.0).add(seed).add(q.x.mul(14.0))).mul(0.12)).add(sin(t.mul(23.0).add(seed.mul(1.7))).mul(0.06));
   const h = up.div(lick);
   const width = pow(max(float(1.0).sub(h), 0.0), 0.6).mul(smoothstep(0.0, 0.16, up)).mul(0.95);
-  const body = smoothstep(width, width.mul(0.25), x);
+  // (Above a lick's tip the width is nought, where smoothstep's edges meet: cut there, not filled.)
+  const body = smoothstep(width, width.mul(0.25), x).mul(smoothstep(0.0, 0.03, width));
   // Blue at the root, the yellow-white heart low and inside, orange to deep red out at the edges and tips.
   const heart = smoothstep(width.mul(0.55), 0.0, x).mul(smoothstep(0.7, 0.1, h));
   const edge = smoothstep(0.35, 1.0, h).add(smoothstep(width.mul(0.4), width, x)).min(1.0);
-  const fire = mix(vec3(1.0, 0.42, 0.07), vec3(0.75, 0.12, 0.02), edge);
-  const root = smoothstep(0.12, 0.0, up).mul(0.6);
-  const col = mix(mix(fire, vec3(1.0, 0.85, 0.5), heart), vec3(0.25, 0.35, 1.0), root);
+  const fire = mix(vec3(1.0, 0.38, 0.05), vec3(0.7, 0.1, 0.01), edge);
+  const root = smoothstep(0.1, 0.0, up).mul(0.35);
+  const col = mix(mix(fire, vec3(1.0, 0.72, 0.28), heart), vec3(0.3, 0.3, 0.9), root);
   // Held at the same brightness whatever the eye's exposure (night opens it about 3x and burned the flame white).
-  m.colorNode = col.mul(body).mul(2.4).div(toneMappingExposure);
+  m.colorNode = col.mul(body).mul(1.8).div(toneMappingExposure);
   m.opacityNode = body;
   return m;
 }, { cast: false, receive: false });
