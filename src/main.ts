@@ -939,7 +939,10 @@ export async function start(b: Boot): Promise<void> {
           for (const o of mine) set(o, true);
         }
         const back = view.sky.shade(realm === 'land' ? 'open' : cellars?.visitOf(realm)?.cellar.form.space.carved ? 'cave' : 'below');
-        return () => { for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; unhold(); back(); };
+        // Undone in the reverse order: the sky's light first (it holds the dome as hidden, since it was hidden above),
+        // then what was shown or hidden. The other way round the dome stayed hidden, and the land's sky behind a cave
+        // mouth in view was black.
+        return () => { back(); for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; unhold(); };
       },
       world: (realm) => (realm === 'land' ? landWorld : cellars?.visitOf(realm)?.world ?? null),
     });
