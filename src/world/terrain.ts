@@ -92,7 +92,7 @@ export class Terrain {
   private readonly wet = { river: 0, lake: 0 };
   private roadNet = new RoadNet();
   private readonly clearingMap = new Map<string, Clearing>();
-  /** Counts up whenever the land's heights may change (a road laid, a town founded): caches of them start over (world/groundCache.ts). */
+  /** Counts up whenever the land's heights may change (a road laid, a town founded): caches of them start over (world/drawnGround.ts). */
   version = 0;
 
   /**
