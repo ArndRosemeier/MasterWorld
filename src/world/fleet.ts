@@ -65,14 +65,15 @@ export function afloatAt(v: Vessel, hours: number): Afloat {
   return { x: p.x, z: p.z, ux: home ? -p.dx : p.dx, uz: home ? -p.dz : p.dz, sailing: true };
 }
 
-function wayLength(w: readonly number[]): number {
+/** The length of a way (x, z, ...), m. */
+export function wayLength(w: readonly number[]): number {
   let s = 0;
   for (let i = 2; i < w.length; i += 2) s += Math.hypot(w[i] - w[i - 2], w[i + 1] - w[i - 1]);
   return s;
 }
 
 /** The point `d` metres along a way and its direction there. */
-function alongWay(w: readonly number[], d: number): { x: number; z: number; dx: number; dz: number } {
+export function alongWay(w: readonly number[], d: number): { x: number; z: number; dx: number; dz: number } {
   for (let i = 2; i < w.length; i += 2) {
     const sx = w[i] - w[i - 2], sz = w[i + 1] - w[i - 1], L = Math.hypot(sx, sz);
     if (d <= L || i === w.length - 2) { const f = L > 0 ? Math.min(1, d / L) : 0; return { x: w[i - 2] + sx * f, z: w[i - 1] + sz * f, dx: sx / (L || 1), dz: sz / (L || 1) }; }

@@ -872,6 +872,29 @@ export interface TravelDef {
 }
 
 /**
+ * Passage by sea (S4, plan 5.4, D60): a harbour master sells a berth aboard a ship to another harbour town along the
+ * coast. The ship sails `speed` (m/s, the hero's own time) along its way over deep water, the clock running on as
+ * for anyone aboard (D37); the fare is `perKm` copper a kilometre of the way, at least `least`. When no harbour lies
+ * within `reach` (m, straight; [nearest, farthest]) the VGM opens one at a river's mouth along the coast, before the
+ * ship gets there. `offers`: how many ways the harbour master names.
+ */
+export interface VoyageDef {
+  readonly speed: number;
+  readonly perKm: number;
+  readonly least: number;
+  readonly offers: number;
+  readonly reach: readonly [number, number];
+  readonly words: {
+    /** The harbour master's topic (`{place}`: "the village 4.6 km west", `{price}`), the answer as passage is bought or the purse is too light. */
+    readonly topic: string;
+    readonly given: string;
+    readonly tooDear: string;
+    /** The note on coming in to the far harbour (`{place}`, `{hours}`). */
+    readonly arrived: string;
+  };
+}
+
+/**
  * A kind of shop (plan 11.5): who keeps it, what they keep in stock and buy, and how much coin they hold.
  * Prices follow what the town has: what a shop here makes is cheaper, and the more of a thing the town's
  * merchants already hold, the less they pay for it and ask for it.
@@ -1431,6 +1454,8 @@ export interface SettingModule {
   readonly situations?: readonly SituationDef[];
   /** Carts between towns (plan 5.4, C7); without it no cart goes. */
   readonly travel?: TravelDef;
+  /** Passage by sea between harbour towns (S4); without it no ship takes passengers. */
+  readonly voyage?: VoyageDef;
   /** The town's shops (plan 11.5), by who keeps them. */
   readonly shops: readonly ShopDef[];
   /** The guild houses (D49, D59) that teach abilities, and the bard who knows them; without them nothing is taught. */

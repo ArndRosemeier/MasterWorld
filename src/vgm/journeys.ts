@@ -65,8 +65,13 @@ export function cartTopic(def: TravelDef, w: CartWay): string {
 
 /** The note on arriving. */
 export function cartArrived(def: TravelDef, w: CartWay): string {
+  return arrivedNote(def.words.arrived, w);
+}
+
+/** A note on arriving somewhere (`words`: with `{place}` and `{hours}`), the hours on the way rounded. */
+export function arrivedNote(words: string, w: { readonly name: string; readonly hours: number }): string {
   const h = Math.max(1, Math.round(w.hours));
-  return cap(fill(def.words.arrived, { place: w.name, hours: `${h} hour${h === 1 ? '' : 's'}` }));
+  return cap(fill(words, { place: w.name, hours: `${h} hour${h === 1 ? '' : 's'}` }));
 }
 
 /** The journey a seat on the cart is (to append to the log): it sets out at `at` and arrives `w.hours` later. */

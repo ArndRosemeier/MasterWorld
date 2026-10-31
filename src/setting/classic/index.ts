@@ -21,7 +21,7 @@ import { festivities } from './festivities';
 import { regions } from './regions';
 import { smallLife } from './smallLife';
 import { tower } from './tower';
-import { items, travel, upkeep } from './items';
+import { items, travel, upkeep, voyage } from './items';
 import { sights } from './sights';
 import { situations } from './situations';
 import { landformMix, landforms, landscapeKinds } from './landforms';
@@ -82,6 +82,7 @@ export const classic: SettingModule = {
   items,
   upkeep,
   travel,
+  voyage,
   sights,
   situations,
   shops,
