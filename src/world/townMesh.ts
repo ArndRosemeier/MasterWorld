@@ -16,8 +16,8 @@ export type MeshRange = [id: number, start: number, count: number];
 export interface TownCellMesh {
   x: number;
   z: number;
-  near: BuildingMesh;
-  far: BuildingMesh;
+  near: BuildingMesh | ReadyMesh;
+  far: BuildingMesh | ReadyMesh;
   nearRanges: MeshRange[];
   farRanges: MeshRange[];
 }
@@ -71,7 +71,7 @@ function rangesOf(list: readonly TownBuilding[], parts: readonly BuildingMesh[])
 
 /** The buffers to hand over from a worker. */
 export function townMeshBuffers(cells: readonly TownCellMesh[]): ArrayBuffer[] {
-  return cells.flatMap((c) => [c.near, c.far].flatMap((m) => [m.position.buffer, m.normal.buffer, m.uv.buffer, m.mat.buffer, m.tint.buffer, m.index.buffer] as ArrayBuffer[]));
+  return cells.flatMap((c) => [c.near, c.far].flatMap((m) => [m.position.buffer, m.normal.buffer, m.uv.buffer, m.mat.buffer, m.tint.buffer, m.index.buffer, ...readyBuffers(m)] as ArrayBuffer[]));
 }
 
 /** One mesh of several (same attributes, indices shifted). */
@@ -122,4 +122,56 @@ export function openHouse(b: TownBuilding, opts: { readonly hatch: boolean; read
     plan, mesh: mergeMeshes([buildingMesh(b, at, true, { open: true, sign, hole }), interiorMesh(plan, b, at, { lid: false, doors: false })]),
     lid: hatchLidMesh(plan, b, at), ladderTop: hatchLadderTopMesh(plan, b, at), doors: doorLeaves(plan, b, at),
   };
+}
+
+/**
+ * A building-format mesh made ready for the GPU off the main thread (in the terrain worker): its byte attributes as
+ * floats (WebGPU has no 1- or 3-byte vertex formats) and its bounding sphere, which cost a town's founding some 30 ms
+ * on the main thread (render/materials/building.ts takes them as they are).
+ */
+export interface ReadyMesh extends BuildingMesh {
+  readonly matF: Float32Array;
+  readonly tintF: Float32Array;
+  /** Middle x, y, z and radius (radius −1: empty). */
+  readonly sphere: readonly [number, number, number, number];
+}
+
+/** The buffers a ready mesh adds (none for a plain one). */
+function readyBuffers(m: BuildingMesh): ArrayBuffer[] {
+  const r = m as Partial<ReadyMesh>;
+  return r.matF && r.tintF ? [r.matF.buffer as ArrayBuffer, r.tintF.buffer as ArrayBuffer] : [];
+}
+
+/** `m` made ready for the GPU (see ReadyMesh). */
+export function readyMesh(m: BuildingMesh): ReadyMesh {
+  return { ...m, matF: floatsOf(m.mat, 1), tintF: floatsOf(m.tint, 1 / 255), sphere: sphereOf(m.position) };
+}
+
+/** Bytes as floats times `k`, in a plain loop (`Float32Array.from` with a map boxed every value: garbage by the megabyte per town). */
+export function floatsOf(src: ArrayLike<number>, k: number): Float32Array {
+  const out = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) out[i] = src[i] * k;
+  return out;
+}
+
+/**
+ * The sphere round flat x, y, z positions, as three's `computeBoundingSphere` makes it (the box's middle, out to the
+ * farthest point), in plain loops: three's goes through a vector per vertex, garbage by the megabyte per town.
+ */
+export function sphereOf(p: ArrayLike<number>): [number, number, number, number] {
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i + 2 < p.length; i += 3) {
+    const x = p[i], y = p[i + 1], z = p[i + 2];
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+    if (z < z0) z0 = z; if (z > z1) z1 = z;
+  }
+  if (x0 > x1) return [0, 0, 0, -1];
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+  let r2 = 0;
+  for (let i = 0; i + 2 < p.length; i += 3) {
+    const dx = p[i] - cx, dy = p[i + 1] - cy, dz = p[i + 2] - cz, d = dx * dx + dy * dy + dz * dz;
+    if (d > r2) r2 = d;
+  }
+  return [cx, cy, cz, Math.sqrt(r2)];
 }
