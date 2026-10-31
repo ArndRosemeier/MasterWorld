@@ -251,6 +251,8 @@ export class Den {
       this.heal(c, dt);
       this.sense(c, q, dt, out);
       if (c.hop) { this.hopping(c, dt); continue; }
+      // A swimmer rides the water standing still too (the waves rise and fall under it).
+      if (this.ground.afloat) c.y = this.ground.floorAt(c.x, c.z, c.y + 0.6) ?? c.y;
       const busy = this.unbarring.get(c);
       if (busy !== undefined) {
         if (busy > dt) this.unbarring.set(c, busy - dt); else this.unbarring.delete(c);

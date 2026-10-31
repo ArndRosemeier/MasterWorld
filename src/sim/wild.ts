@@ -71,6 +71,7 @@ export class OpenGround implements DenGround {
   private readonly at: { x: number; z: number }[];
   /** Its home lies out in deep water: it is swum, not walked (S9). */
   readonly sea: boolean;
+  get afloat(): boolean { return this.sea; }
 
   /** `prey`: the height (y) of the hero's feet while the hero swims, else null (a sea ground's bodies come to it). */
   constructor(private readonly land: Land, private readonly homes: readonly { x: number; z: number; r: number }[], private readonly prey: () => number | null = () => null) {
@@ -83,7 +84,8 @@ export class OpenGround implements DenGround {
     const bed = this.land.height(x, z), surface = this.land.surface?.(x, z) ?? bed + this.land.waterDepth(x, z), top = surface - SEA.top;
     const prey = this.prey();
     const want = Math.max(bed + SEA.bed, Math.min(top, prey === null ? surface - SEA.cruise : prey - SEA.under));
-    return y === undefined ? want : Math.max(y - SEA.rise, Math.min(y + SEA.rise, want));
+    // Never out of a trough: the waves' fall is followed at once, only its own rising and sinking are slow.
+    return y === undefined ? want : Math.max(bed + SEA.bed, Math.min(top, y + SEA.rise, Math.max(y - SEA.rise, want)));
   }
 
   /** A point near where the group is gathered (a herd grazes together, a pack keeps close). */

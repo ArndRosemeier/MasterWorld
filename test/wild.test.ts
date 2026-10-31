@@ -161,6 +161,19 @@ test('wild (S9): a shark keeps to deep water under the surface, comes for a hero
     assert.ok(shark.y <= surface - 1.29 && shark.y >= terrain.height(shark.x, shark.z) + 0.59, `under the surface, over the bed (${shark.y.toFixed(2)})`);
   }
   assert.ok(bit > 0, 'it bit the swimmer');
+  // In a heavy swell (PC round 33: it broke out of the troughs) it keeps under the waves, and fights to the end.
+  let time = 0;
+  const swell: Land = { ...land, surface: (x) => surface + 1.5 * Math.sin(time * 1.3 + x * 0.05) };
+  const rough = new Den(new OpenGround(swell, [t], () => swimmer.y), t.members.map((creature) => ({ creature, room: 0 })), classic.creatures, deriveSeed(t.seed, 'den'));
+  const s2 = rough.creatures[0];
+  for (let i = 0; i < 300; i++) {
+    time += 0.1;
+    swimmer = { ...swimmer, x: s2.x + 2, z: s2.z, y: swell.surface!(s2.x + 2, s2.z)! - 1 };
+    rough.step(0.1, swimmer);
+    assert.ok(s2.y <= swell.surface!(s2.x, s2.z)! - 1.29, `under the swell (${s2.y.toFixed(2)})`);
+  }
+  s2.health = 2;
+  for (const e of rough.step(0.1, swimmer)) assert.notEqual(e.kind, 'flee', 'a shark never breaks off');
   // The hero ashore: it keeps to the water.
   const strand = places.find((p) => p.kind === 'crabs')!;
   swimmer = hero(strand.x, strand.z);
