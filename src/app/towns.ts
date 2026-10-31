@@ -37,8 +37,6 @@ export interface TownsHost extends TownshipContext {
   made?(t: Township): void;
   /** A town's buildings stand (their doors light at night). */
   raised?(t: Township): void;
-  /** A town's buildings were let go (far behind the camera): its doors no longer light. */
-  lowered?(t: Township): void;
 }
 
 /** A building of a town, as the game opens it. */
@@ -59,12 +57,6 @@ const OUTPOST = 40;
 const WARM_AHEAD = 300, WARM_MS = 4;
 /** Seconds between two looks for the nearest town. */
 const LOOK = 1;
-/**
- * A town's buildings are drawn while the camera is within DRAW of its edge (m), and let go past DROP: a long
- * journey founds town after town, and every one kept drawn held its meshes for good (MW memory leak, 0.8 GB a minute
- * of fast flight).
- */
-export const TOWN_DRAW = 2400, TOWN_DROP = 3200;
 /** A walled town's gates are drawn while the camera is within this of its edge (m). */
 const GATES_SEEN = 600;
 
@@ -80,7 +72,6 @@ export class Towns {
   /** The window of the masked town's raster in the masks (null: the whole town fits). */
   private maskedAt: [number, number] | null = null;
   private clock = 0;
-  private drawClock = 0;
 
   constructor(private readonly h: TownsHost) {
     // Every town the log has stood on the land since the start: its core now (cheap; its people's words
@@ -112,66 +103,32 @@ export class Towns {
 
   /** Draws every town that stands and is not drawn yet (at the start, and a loaded game's). */
   async standing(cam: Vector3): Promise<void> {
-    // Only those near: the rest are drawn as the camera comes (drawTownsNear).
-    const near = this.h.terrain.towns.filter((t) => Math.hypot(cam.x - t.decision.x, cam.z - t.decision.z) - t.decision.radius < TOWN_DRAW);
-    await Promise.all(near.map((t) => this.raiseTown(t.decision.id, cam, false)));
+    await Promise.all(this.h.terrain.towns.map((t) => this.raise(t.decision.id, cam, false)));
   }
 
   /** A hamlet or village founded while playing (already in the log): planned in a worker, then drawn. */
   async found(d: RegionDecision, cam: Vector3): Promise<void> {
     let view: TownView | null = null;
-    this.raising.add(d.id);
-    try {
-      await this.h.roads.found(d, async () => {
-        if (!this.h.drawn) return null;
-        view = new TownView(this.h.stage, this.h.land);
-        return view.build(d.id, cam, true);
-      });
-    } finally {
-      this.raising.delete(d.id);
-    }
+    await this.h.roads.found(d, async () => {
+      if (!this.h.drawn) return null;
+      view = new TownView(this.h.stage, this.h.land);
+      return view.build(d.id, cam, true);
+    });
     const town = this.h.terrain.town(d.id);
     if (!town) return;
     const t = this.coreOf(town);
     if (view) { this.views.set(d.id, view); this.h.raised?.(t); }
   }
 
-  private async raiseTown(id: string, cam: Vector3, plan: boolean): Promise<void> {
+  private async raise(id: string, cam: Vector3, plan: boolean): Promise<void> {
     const town = this.h.terrain.town(id);
     if (town) this.coreOf(town);
     if (this.views.has(id) || !this.h.drawn) return;
     const view = new TownView(this.h.stage, this.h.land);
     this.views.set(id, view);
-    this.raising.add(id);
-    try {
-      await view.build(id, cam, plan);
-    } finally {
-      this.raising.delete(id);
-    }
-    // Let go again while it was being meshed (the camera flew on).
-    if (this.views.get(id) !== view) { view.unbuild(); return; }
+    await view.build(id, cam, plan);
     const t = this.cores.get(id);
     if (t) this.h.raised?.(t);
-  }
-
-  /** Towns whose buildings are being meshed now. */
-  private readonly raising = new Set<string>();
-
-  /** Each town's buildings drawn as the camera comes within TOWN_DRAW, let go past TOWN_DROP. */
-  private drawTownsNear(cam: Vector3): void {
-    if (!this.h.drawn) return;
-    for (const t of this.h.terrain.towns) {
-      const d = t.decision, id = d.id, edge = Math.hypot(cam.x - d.x, cam.z - d.z) - d.radius;
-      const view = this.views.get(id);
-      if (view && edge > TOWN_DROP && !this.raising.has(id)) {
-        this.views.delete(id);
-        this.gates.get(id)?.clear();
-        this.gates.delete(id);
-        view.unbuild();
-        const core = this.cores.get(id);
-        if (core) this.h.lowered?.(core);
-      } else if (!view && edge < TOWN_DRAW && !this.raising.has(id)) void this.raiseTown(id, cam, false);
-    }
   }
 
   /** A town's buildings as drawn (null: not drawn). */
@@ -217,7 +174,6 @@ export class Towns {
 
   /** Each frame: near or far meshes, the gates swung, and now and then the masks move to the nearest town. */
   tick(dt: number, cam: Vector3): void {
-    if ((this.drawClock += dt) >= LOOK) { this.drawClock = 0; this.drawTownsNear(cam); }
     for (const v of this.views.values()) v.update(cam);
     this.swingGates(dt, cam);
     this.warmPeople(cam);

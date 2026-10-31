@@ -470,15 +470,13 @@ export async function start(b: Boot): Promise<void> {
     // A town's words are tied into the game (how its people take the hero, what they offer) once the game's
     // windows exist (`tieTalk`, set below); the doors light at night once its buildings stand.
     let tieTalk: ((t: Township, words: TownTalk) => void) | null = null;
-    const lit = new Set<Township>();
-    const lightDoors = (): void => { const l = [...lit]; view.warm.atDoors(l.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z), l.flatMap((x) => x.town.plan.wall ?? [])); };
+    const lit: Township[] = [];
     towns = new Towns({
       stage: view.stage, terrain, land: terrainJobs, roads: roadWork, masks: !!start && params.town, drawn: params.town,
       setting, seed, hours, log: () => log, get standing() { return standing; }, towns: () => terrain.towns,
       saved: townSaves(save, start?.decision.id ?? null),
       made: (t) => { t.onTalk = (words) => tieTalk?.(t, words); },
-      raised: (t) => { lit.add(t); lightDoors(); },
-      lowered: (t) => { lit.delete(t); lightDoors(); },
+      raised: (t) => { lit.push(t); view.warm.atDoors(lit.flatMap((x) => x.town.plan.buildings), (x, z) => terrain.height(x, z), lit.flatMap((x) => x.town.plan.wall ?? [])); },
     });
     const startTown = towns.start;
     // Its masks come from the terrain workers, four of them (the world worker alone made them one after another,
@@ -1806,14 +1804,7 @@ export async function start(b: Boot): Promise<void> {
       places: placesFor(seedText, home),
       spots,
       seed: seedText,
-      game: { player, view, decks, hitches: HITCHES,
-        /** What the game holds now, counted (tools/shot/fly.mjs watches it over a long flight for what is never let go). */
-        memory: () => {
-          const info = (view.renderer as unknown as { info?: { memory?: { geometries?: number; textures?: number } } }).info?.memory;
-          let objects = 0;
-          view.stage.scene.traverse(() => { objects++; });
-          return { geometries: info?.geometries, textures: info?.textures, objects, log: log.length, towns: towns?.every.length ?? 0, townsLiving: towns?.every.filter((t) => t.living).length ?? 0, townsDrawn: towns ? towns.every.filter((t) => towns!.viewOf(t.id)).length : 0, sites: regionSites?.status, riverTiles: terrain.hydro.tileCount, brookTiles: terrain.hydro.brookTileCount };
-        }, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get shipClimbs() { return shipClimbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, decks, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get shipClimbs() { return shipClimbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */

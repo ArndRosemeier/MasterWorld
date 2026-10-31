@@ -9,7 +9,6 @@ import type { Stage } from '@futuremagic/stage';
 import type { Terrain } from '../world/terrain';
 import { bridgeMesh, bridgeSideAt, bridgesNear, deckAt, townBridges, type Bridge } from '../world/bridges';
 import { buildingMeshAt } from './materials/building';
-import { freeMesh } from './materials';
 
 /** Bridges within this of the hero are drawn, m; they go again past FORGET. */
 const REACH = 1500, FORGET = 2200;
@@ -83,13 +82,13 @@ export class BridgeView {
     this.known = known; this.lastX = x; this.lastZ = z;
     for (const [id, d] of this.drawn) {
       if (Math.hypot(d.x - x, d.z - z) < FORGET) continue;
-      freeMesh(d.mesh); this.drawn.delete(id);
+      d.mesh.removeFromParent(); d.mesh.geometry.dispose(); this.drawn.delete(id);
     }
     const all = this.around(x, z, REACH), ids = new Set(all.map((b) => b.id));
     // A bridge gone (a road laid on from a town's road out that ended in a brook takes over its bridge).
     for (const [id, d] of this.drawn) {
       if (ids.has(id) || Math.hypot(d.x - x, d.z - z) > REACH * 0.9) continue;
-      freeMesh(d.mesh); this.drawn.delete(id);
+      d.mesh.removeFromParent(); d.mesh.geometry.dispose(); this.drawn.delete(id);
     }
     const fresh = all.filter((b) => !this.drawn.has(b.id));
     if (!fresh.length) return;

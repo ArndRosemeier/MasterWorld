@@ -20,6 +20,7 @@ export const CLIP_SECS: Readonly<Record<string, number>> = {
   'pick up': 26 / 30, 'eat or drink': 41 / 30, crouch: 89 / 30, dance: 31 / 30,
   // Cut from motion capture (render/folk/moves.ts): as long as `npm run packs` prints them.
   'dance folk': 117 / 30, 'dance folk 2': 65 / 30, laugh: 77 / 30, cheer: 47 / 30,
+  'haul line': 40 / 30, 'coil rope': 36 / 30,
 };
 
 const rest = (clip: string, weight = 4, plays: readonly [number, number] = [2, 5]): Turn => ({ clip, weight, plays });
@@ -48,6 +49,8 @@ export const REPERTOIRE: Partial<Readonly<Record<ActivityKind, readonly Turn[]>>
   dance: [rest('dance folk', 3, [2, 4]), now('dance folk 2', 3, [2, 4]), now('cheer', 0.7)],
   // Round the ring: a drink raised, a laugh, a cheer for the dancers, a word with the neighbour.
   revel: [rest('idle', 3, [1, 3]), now('eat or drink', 2.5), now('laugh', 2), now('cheer', 2), now('talk', 2, [1, 2]), now('nod', 1), now('arms folded', 1, [1, 2])],
+  // On a line (a crane's, a ship's): leaning back against its pull, now and then coiling it down or taking a breath.
+  haul: [rest('haul line', 4, [3, 8]), now('coil rope', 2, [2, 4]), now('interact', 1), now('idle', 1, [1, 2])],
   // Children at play: dancing a round, standing a while, crouching down to something.
   play: [rest('idle', 2, [1, 3]), now('dance', 3, [2, 6]), now('crouch', 1, [1, 2])],
 };

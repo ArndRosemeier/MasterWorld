@@ -2,7 +2,6 @@
   "banned": [
     { "id": "Math.random", "pattern": "\\bMath\\.random\\s*\\(", "only": [], "why": "every random number comes from a seed: Rng / deriveSeed (@futuremagic/core)" },
     { "id": "new WebGPURenderer", "pattern": "\\bnew\\s+(WebGPURenderer|WebGLRenderer)\\b", "only": [], "why": "one renderer, made by createRenderer (@futuremagic/stage)" },
-    { "id": "geometry.dispose", "pattern": "\\.geometry\\.dispose\\s*\\(", "only": ["src/render/materials.ts"], "why": "a mesh leaving for good goes through freeMesh (render/materials.ts): its geometry disposed alone, the renderer's render objects kept it through the shared material (MW memory leak)" },
     { "id": "new Worker", "pattern": "\\bnew\\s+Worker\\s*\\(", "only": ["src/workers/pool.ts"], "why": "workers are created by the one worker pool" },
     { "id": "new Material", "pattern": "\\bnew\\s+\\w*Material\\s*\\(", "only": ["src/render/materials.ts", "src/render/materials/"], "why": "every material is a kind in the registry, so warm-up knows every shader (docs/SHADERS.md)" },
     { "id": "onBeforeCompile", "pattern": "\\bonBeforeCompile\\b", "only": [], "why": "shader variants come from the registry's TSL kinds, not from patched source (docs/SHADERS.md)" },

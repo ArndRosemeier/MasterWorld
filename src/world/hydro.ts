@@ -1261,9 +1261,6 @@ export class Hydrology {
     return this.tileOf(this.tiles, this.o, x, z, () => null);
   }
 
-  /** How many river tiles are built here. */
-  get tileCount(): number { return this.tiles.size; }
-
   /** How many brook tiles are built here (grows as they arrive). */
   get brookTileCount(): number { return this.brookTiles.size; }
 

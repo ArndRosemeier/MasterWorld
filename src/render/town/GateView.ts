@@ -9,7 +9,6 @@ import { gateLeaves, type TownWall } from '@futuremagic/settlement';
 import { smoothstep } from '@futuremagic/core';
 import type { Stage } from '@futuremagic/stage';
 import { buildingMeshAt } from '../materials/building';
-import { freeMesh } from '../materials';
 
 /** A gate opens for whoever comes within this of it (m), and shuts once they are this much farther off. */
 const COME = 22, GONE = 8;
@@ -66,6 +65,6 @@ export class GateView {
   }
 
   clear(): void {
-    for (const g of this.gates) for (const l of g.leaves) { this.stage.remove(l.pivot); freeMesh(l.mesh); }
+    for (const g of this.gates) for (const l of g.leaves) { this.stage.remove(l.pivot); l.mesh.geometry.dispose(); }
   }
 }

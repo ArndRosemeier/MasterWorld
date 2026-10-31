@@ -132,7 +132,7 @@ const CLIP: Record<ActivityKind, string> = {
   browse: 'arms folded', sit: 'sit', chat: 'talk', drink: 'eat or drink', pray: 'crouch', mourn: 'arms folded', play: 'idle',
   plough: 'harvest', sow: 'plant seeds', hoe: 'harvest', reap: 'harvest', tendStock: 'interact', muckOut: 'pick up',
   hurt: 'crouch', mark: 'interact',
-  haul: 'interact', carry: 'pick up', mendNets: 'repair (kneeling)',
+  haul: 'haul line', carry: 'pick up', mendNets: 'repair (kneeling)',
 };
 
 /** The clip that shows `act` (`id` varies a few between people; `talking`: held for a talk with the hero). */

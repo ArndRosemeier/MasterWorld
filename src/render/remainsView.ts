@@ -9,7 +9,6 @@ import type { Stage } from '@futuremagic/stage';
 import { remainsMesh, type RemainsLook } from '../world/dungeon/remainsMesh';
 import { loadCellarProps } from './dungeon/props';
 import { buildingMeshAt } from './materials/building';
-import { freeMesh } from './materials';
 
 export interface RemainsSpot extends RemainsLook {
   readonly id: string;
@@ -28,7 +27,7 @@ export class RemainsView {
   /** Draw these and drop the rest. */
   async lay(spots: readonly RemainsSpot[]): Promise<void> {
     const want = new Set(spots.map((s) => s.id));
-    for (const [id, m] of this.drawn) if (!want.has(id)) { freeMesh(m); this.drawn.delete(id); }
+    for (const [id, m] of this.drawn) if (!want.has(id)) { m.removeFromParent(); m.geometry.dispose(); this.drawn.delete(id); }
     const fresh = spots.filter((s) => !this.drawn.has(s.id));
     if (!fresh.length) return;
     if (!this.group.parent && !this.adding) this.adding = this.stage.add(this.group);

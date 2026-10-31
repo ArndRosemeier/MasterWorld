@@ -10,7 +10,6 @@ import type { Stage } from '@futuremagic/stage';
 import type { TerrainJobs } from '../../workers/pool';
 import type { MeshRange } from '../../world/townMesh';
 import { buildingMeshAt } from '../materials/building';
-import { freeMesh } from '../materials';
 
 /** From this far (m, camera to the cell's middle) the far meshes draw. */
 const FAR = 200;
@@ -49,16 +48,6 @@ export class TownView {
     this.update(cam, true);
     await this.stage.add(this.group);
     return planned;
-  }
-
-  /** Out of the scene, its meshes' buffers freed (the town is far behind; drawn anew when it comes near). */
-  unbuild(): void {
-    this.stage.remove(this.group);
-    for (const c of this.cells) { freeMesh(c.near); freeMesh(c.far); }
-    this.cells.length = 0;
-    this.group.clear();
-    this.hidden.clear();
-    this.scorched.clear();
   }
 
   /** Near or far meshes, by distance. */
