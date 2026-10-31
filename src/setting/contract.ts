@@ -863,7 +863,7 @@ export interface SightDef {
 }
 
 /** The situations the engine knows how to stage (C10). */
-export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves', 'raid-smoke', 'stray-beast', 'refugees'] as const;
+export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves', 'raid-smoke', 'stray-beast', 'refugees', 'castaway'] as const;
 export type SituationKind = (typeof SITUATION_KINDS)[number];
 
 /**
@@ -874,7 +874,9 @@ export type SituationKind = (typeof SITUATION_KINDS)[number];
  * `lasts` game hours, seen over the trees from afar. `stray-beast`: in the day `hours`, one of the beasts of
  * a paddock of the town the hero is in gets out and wanders off, and someone of its farm goes after it (once
  * a town every `every` days, for `lasts` hours at most). `refugees` (C11): the folk of a settlement a band
- * holds (a take) camp by the road outside the nearest town until it is freed, one of them hurt. `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
+ * holds (a take) camp by the road outside the nearest town until it is freed, one of them hurt. `castaway` (S9): a
+ * fisher whose boat went over clings to it off the strand near the hero (People's answer by the sea, the share
+ * `chance`), for `lasts` hours; the hero swims out and brings them in. `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
  * only a cry for help), and only once the hero is within `seen` metres of what it is about, so the hero sees
  * it before they are told.
  */
@@ -885,7 +887,7 @@ export interface SituationDef {
   readonly cry?: string;
   /** How near the hero must be (m) to the situation before the cry (they see it first). */
   readonly seen: number;
-  /** hurt-traveller: the share of People's travellers that are hurt (0..1). */
+  /** hurt-traveller: the share of People's travellers that are hurt (0..1); castaway: the share of People's answers by the sea. */
   readonly chance?: number;
   /**
    * hurt-traveller: the talk topic to see to the hurt one, and what they say to it. Chosen, the hero kneels by
@@ -896,7 +898,7 @@ export interface SituationDef {
   readonly encounter?: string;
   readonly hours?: readonly [number, number];
   readonly every?: number;
-  /** raid-smoke: how long the barn smoulders (game hours). */
+  /** raid-smoke: how long the barn smoulders (game hours); castaway: how long they hold on before another boat picks them up. */
   readonly lasts?: number;
 }
 

@@ -10,6 +10,7 @@ import type { SightDecision } from '../world/decisions';
 import type { NeedContext } from './answers';
 import { sightsOf } from './answers';
 import { ringSpot, spiralFind } from '../world/spiral';
+import { harbourTowns } from '../world/town';
 
 /** How far from the hero (m) a wreck may lie, and how deep its bed (m under the sea's level). */
 const RING: readonly [number, number] = [50, 450];
@@ -30,7 +31,7 @@ export function wreckFor(c: NeedContext): SightDecision | null {
   const past = sightsOf(c.log);
   if (past.some((d) => d.sea && Math.hypot(d.x - c.hero.x, d.z - c.hero.z) < APART)) return null;
   const n = past.length + 1, s = deriveSeed(c.seed, 'sight', n), t = c.terrain;
-  const harbours = c.towns.filter((w) => w.decision.harbour);
+  const harbours = harbourTowns(c.towns);
   let best: { x: number; z: number; yaw: number; d: number } | null = null;
   for (let k = 0; k < TRIES; k++) {
     const { x, z, d } = ringSpot(c.hero, RING, s, k), bed = -t.height(x, z);

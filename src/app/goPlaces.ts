@@ -272,7 +272,7 @@ export function goSpots(h: GoHost): GoSpot[] {
       let s = find(), why = '';
       if (!s) {
         // A town's situations happen in the town the hero is in: the start's, if they are out on the land.
-        if (kind !== 'hurt-traveller' && !h.towns().some((x) => Math.hypot(h.heroPos().x - x.town.decision.x, h.heroPos().z - x.town.decision.z) < x.town.decision.radius + 40)) {
+        if (kind !== 'hurt-traveller' && kind !== 'castaway' && !h.towns().some((x) => Math.hypot(h.heroPos().x - x.town.decision.x, h.heroPos().z - x.town.decision.z) < x.town.decision.radius + 40)) {
           const home = nearestTo(h.towns().map((x) => ({ t: x.town, x: x.town.decision.x, z: x.town.decision.z })), h.heroPos())?.t;
           if (home) await h.stand(beside({ x: home.plan.centre[0], z: home.plan.centre[1] }, h.heroPos(), 10));
         }
@@ -289,6 +289,8 @@ export function goSpots(h: GoHost): GoSpot[] {
   situation('hurt-traveller', 'Hurt traveller', () => decisionsOf(h.log(), 'traveller').filter((x) => x.situation && now(x)).at(-1), 10);
   situation('paddock-wolves', 'Wolves at a paddock', () => decisionsOf(h.log(), 'wild').filter((x) => x.situation).at(-1), 30);
   situation('stray-beast', 'A beast got out', () => decisionsOf(h.log(), 'stray').filter(now).at(-1), 12);
+  // By the sea (S9): from the strand, the fisher out on the water in sight.
+  situation('castaway', 'A cry from the water', () => decisionsOf(h.log(), 'castaway').filter(now).at(-1), 40);
   add(W, 'Traveller resting by the way', async () => {
     let d = decisionsOf(h.log(), 'traveller').filter((x) => !x.situation && now(x)).at(-1);
     if (!d) { const m = h.answerFor('people'); d = m?.decision.kind === 'traveller' ? m.decision : undefined; }
