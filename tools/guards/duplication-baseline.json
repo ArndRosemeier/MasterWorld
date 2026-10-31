@@ -1,5 +1,13 @@
 [
   {
+    "key": "same name: masterworld/app/spellFx/learningGlow.ts#lightAt + masterworld/app/spellFx/levelRing.ts#lightAt",
+    "reason": "Both override HeroFx.lightAt (spellFx/heroFx.ts, the shared seam): each draws its own look round the hero (D61 learning glow, G3 level ring)."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/learningGlow.ts#lit + masterworld/app/spellFx/levelRing.ts#lit",
+    "reason": "Both import the one colour helper lit from spellFx/particles.ts; not a copy."
+  },
+  {
     "key": "clone: core/noise.ts#cellular2 + core/noise.ts#cellular3",
     "reason": "2D and 3D variants of the same noise in one file (shared package); merging them would cost the hot path a dimension branch."
   },
@@ -588,7 +596,7 @@
     "reason": "TSL arithmetic (.add/.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the cave pool's sheen (phase P fixes)."
   },
   {
-    "key": "idiom: [.burst] in masterworld/app/spellFx/levelRing.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
+    "key": "idiom: [.burst] in masterworld/app/spellFx/learningGlow.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
     "reason": "Calls into the spells' particle bits (spellFx/particles.ts SpellBits): each effect throws its own sprites; the shared part is SpellBits itself."
   },
   {

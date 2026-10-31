@@ -69,8 +69,10 @@ export class LessonsUi extends BodyWindow {
     if (!g) return;
     const h = this.lessonsHost;
     const rows = teachingsOf(this.setting, g).map((a) => this.abilityRow(g, a));
-    const hint = `${g.name}: each ability is taught once your level is up to it, and takes ${g.hours === 1 ? 'an hour' : `${g.hours} hours`}. Abilities of level ${g.task.from} and above wait for the guild's task. Everything you do brings the next level nearer.`;
-    const foot: Node[] = [el('span', { className: 'purse', textContent: `Your purse: ${coinText(this.hero.coins)}` })];
+    const hint = `${g.name}: each ability is taught once your level is up to it, costs an ability point and takes ${g.hours === 1 ? 'an hour' : `${g.hours} hours`}. Abilities of level ${g.task.from} and above wait for the guild's task. Every level brings a point; a potion of learning gives one more.`;
+    const pts = this.hero.points;
+    const foot: Node[] = [el('span', { className: 'purse', textContent: `Your purse: ${coinText(this.hero.coins)}` }),
+      el('span', { className: `points${pts ? '' : ' none'}`, textContent: `Ability points: ${pts}` })];
     if (!h.book.asked(g.keeper)) {
       const ask = el('button', { textContent: 'Is there work for the guild?' });
       ask.addEventListener('click', () => { h.book.assign(g.keeper, h.hours()); this.said = `“${g.task.ask}”`; this.opened(); });
@@ -86,7 +88,7 @@ export class LessonsUi extends BodyWindow {
   /** An ability the trainer teaches: known, its level not yet reached, the task first, or its price. */
   private abilityRow(g: GuildDef, a: AbilityDef): HTMLElement {
     const h = this.lessonsHost, no = teachRefusal(g, this.hero, a, h.book, h.log()), need = a.level ?? 1;
-    const label = no === 'known' ? 'known' : no === 'level' ? `at level ${need}` : no === 'task' ? 'the task first' : coinText(abilityPrice(g, a));
+    const label = no === 'known' ? 'known' : no === 'level' ? `at level ${need}` : no === 'task' ? 'the task first' : no === 'point' ? 'no point free' : coinText(abilityPrice(g, a));
     const rule = el('div', { className: 'rule' }, el('i', { className: 'line' }), el('i', { className: 'cap' }));
     rule.style.setProperty('--v', String(Math.min(1, this.hero.level / need)));
     rule.style.setProperty('--cap', '1');
@@ -105,6 +107,7 @@ export class LessonsUi extends BodyWindow {
     this.said = no === null ? `“${fill(g.teachesLine, { ability: a.name })}”`
       : no === 'task' ? `“${h.book.asked(g.keeper) ? 'Your task first. You know what I asked.' : g.task.ask}”`
       : no === 'level' ? `“${fill(g.distrust, { ability: a.name.toLowerCase() })}”`
+      : no === 'point' ? `“${this.setting.growth.points.none}”`
       : no === 'coin' ? '“Come back when your purse is heavier.”'
       : no === 'known' ? '“You know that one already.”' : '“That is not mine to teach.”';
     if (no === 'task') h.book.assign(g.keeper, h.hours());

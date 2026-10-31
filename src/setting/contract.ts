@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 14;
+export const CONTRACT_VERSION = 15;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -754,6 +754,8 @@ export interface ItemDef {
   readonly heal?: number;
   /** Potions: an effect the drinker wears (a draught of the deep: water breathing for minutes, S5). */
   readonly effect?: EffectApply;
+  /** Potions: ability points it gives when drunk (D61: the potion of learning). */
+  readonly learning?: number;
   /** Copper pieces. */
   readonly value: number;
   readonly weight: number;
@@ -787,7 +789,22 @@ export interface TreasureDef {
   readonly count: readonly [number, number];
   /** Coins, copper, lo..hi. */
   readonly coins: readonly [number, number];
+  /**
+   * Rare finds rolled on their own, besides the items (D61: the potion of learning): each is there with
+   * `chance` plus `perDanger` for each point of the danger it is found at (at most `TOP_FIND`).
+   */
+  readonly finds?: readonly TreasureFind[];
 }
+
+/** A rare find in a treasure table, likelier the more dangerous the place (D61). */
+export interface TreasureFind {
+  readonly item: string;
+  readonly chance: number;
+  readonly perDanger: number;
+}
+
+/** The most a rare find's chance grows to, however dangerous the place. */
+export const TOP_FIND = 0.3;
 
 /** Items: the catalogue, the legendary ones, treasure tables, and the words for rarer finds. */
 export interface ItemCatalog {
@@ -1465,6 +1482,11 @@ export interface GrowthDef {
    * quality gear adds to a spell's damage and healing.
    */
   readonly scale: AbilityScale & { readonly spell: number };
+  /**
+   * Ability points (D61): how many each level gives (the first level too), and the trainer's words when the
+   * hero has none free. Learning an ability from a trainer or a writing costs one; gifts and worn items none.
+   */
+  readonly points: { readonly perLevel: number; readonly none: string };
 }
 
 /** The share an ability's damage, healing, effect duration and range gain per level above its own (G2). */
@@ -1774,6 +1796,7 @@ function validateFight(m: SettingModule, where: string): string[] {
     for (const k of b.known) if (!k.line.includes('{hero}')) out.push(`${where}: background "${b.id}": the ${k.trade}'s greeting must name {hero}`);
   }
   for (const t of m.items.treasure) for (const [id] of t.items) if (!items.has(id)) out.push(`${where}: treasure "${t.id}" holds unknown item "${id}"`);
+  for (const t of m.items.treasure) for (const f of t.finds ?? []) if (!items.has(f.item)) out.push(`${where}: treasure "${t.id}" finds unknown item "${f.item}"`);
   for (const k of QUALITIES) if (!m.items.affixes[k]) out.push(`${where}: no affix for quality "${k}"`);
   const ids = new Set<string>();
   for (const c of m.creatures) {

@@ -15,6 +15,8 @@ export interface LevelCheer {
 
 /** The gesture's action id and length (s): ACTION_CLIPS plays it. */
 export const CHEER = { id: 'level_up', dur: 1.6 } as const;
+/** The hero drinks a potion out of a fight (a potion of learning, D61): the fight's drink clip. */
+export const DRINK = { id: 'drink', dur: 1.1 } as const;
 
 export class LevelWatch {
   constructor(private level: number) {}

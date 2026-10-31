@@ -3,7 +3,19 @@
  * of armour, potions, food, tools and valuables; a few legendary pieces with their history; what places
  * and creatures of some danger hold. Rarity and the bonuses to its qualities are rolled when an item is found.
  */
-import type { ItemCatalog, TravelDef, UpkeepDef, VoyageDef } from '../contract';
+import type { ItemCatalog, TravelDef, TreasureFind, UpkeepDef, VoyageDef } from '../contract';
+
+/**
+ * Where a potion of learning may lie (D61): in treasure, never on a body or at a trader's. Likeliest in the
+ * hoard of the lair at the bottom of a place, rarer in its chests (rolled at seven tenths of its danger) and
+ * in what was hidden or sunk out on the land (a stash, a wreck). At the danger of a fresh hero's places
+ * (5..12) a lair holds one about one time in ten, a deep and deadly one (25) one in five.
+ */
+const LEARNING: Record<'lair' | 'sight' | 'chest', readonly TreasureFind[]> = {
+  lair: [{ item: 'learning-potion', chance: 0.03, perDanger: 0.006 }],
+  sight: [{ item: 'learning-potion', chance: 0.015, perDanger: 0.004 }],
+  chest: [{ item: 'learning-potion', chance: 0.005, perDanger: 0.002 }],
+};
 
 export const items: ItemCatalog = {
   items: [
@@ -30,6 +42,8 @@ export const items: ItemCatalog = {
     { id: 'amulet', name: 'Pendant on a thong', kind: 'armour', slot: 'amulet', armour: 0, value: 20, weight: 0.05 },
     { id: 'minor-potion', name: 'Small healing draught', kind: 'potion', heal: 25, value: 25, weight: 0.2, lore: 'Bitter and green; the hedge witch swears by it.' },
     { id: 'potion', name: 'Healing draught', kind: 'potion', heal: 55, value: 70, weight: 0.3 },
+    // The potion of learning (D61): found only in treasure, likelier deep and dangerous; never sold.
+    { id: 'learning-potion', name: 'Potion of learning', kind: 'potion', learning: 1, value: 120, weight: 0.2, lore: 'Clear as spring water until it is shaken: then it glows like a lamp. Drunk, it leaves room in the mind for one more thing learned.' },
     { id: 'deep-draught', name: 'Draught of the deep', kind: 'potion', effect: { id: 'gills', magnitude: 1, duration: 180 }, value: 60, weight: 0.3, lore: 'Kelp, salt and something the herbalist will not name: three minutes of breathing water.' },
     { id: 'bread', name: 'Loaf of bread', kind: 'food', heal: 6, value: 2, weight: 0.4 },
     { id: 'cheese', name: 'Wedge of cheese', kind: 'food', heal: 8, value: 4, weight: 0.3 },
@@ -78,13 +92,14 @@ export const items: ItemCatalog = {
     { id: 'web', items: [['silk', 3], ['venom-sac', 2]], count: [1, 2], coins: [0, 0] },
     { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1], ['tome-stone', 0.3]], count: [0, 1], coins: [10, 40] },
     { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1], ['tome-shadows', 0.25]], count: [0, 1], coins: [0, 0] },
-    { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30] },
-    { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25] },
+    { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30], finds: LEARNING.sight },
+    { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25], finds: LEARNING.chest },
     // What the sea leaves (S5, for the wrecks and sea caves of S8): a drowned sailor's chest, a diver's draughts in it.
     { id: 'washed-up', items: [['rope', 1], ['old-coin', 2], ['deep-draught', 1], ['ring', 0.4]], count: [1, 2], coins: [2, 18] },
-    { id: 'wreck', items: [['deep-draught', 2], ['old-coin', 3], ['rope', 1], ['ring', 1], ['amulet', 0.5], ['garnet', 0.5]], count: [1, 2], coins: [5, 40] },
+    { id: 'wreck', items: [['deep-draught', 2], ['old-coin', 3], ['rope', 1], ['ring', 1], ['amulet', 0.5], ['garnet', 0.5]], count: [1, 2], coins: [5, 40], finds: LEARNING.sight },
     {
       id: 'lair', count: [2, 3], coins: [20, 80],
+      finds: LEARNING.lair,
       items: [['minor-potion', 3], ['potion', 1], ['short-sword', 1], ['hatchet', 1], ['spear', 1], ['mace', 1], ['buckler', 1], ['round-shield', 1], ['leather-jerkin', 1], ['mail-shirt', 0.3], ['iron-cap', 0.6], ['boots', 1], ['ring', 1], ['amulet', 1], ['garnet', 1], ['tome-embers', 0.2], ['scroll-sunlance', 0.25]],
     },
   ],
