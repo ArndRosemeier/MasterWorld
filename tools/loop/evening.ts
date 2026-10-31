@@ -16,12 +16,11 @@ const clock = (h: number) => `day ${Math.floor(h / 24)} ${String(Math.floor(h % 
 const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   // The level a run ends at is printed, not held to a band (Arnd 2026-10-30: these runs are artificial; he judges
   // progression in play). `levels` stays for a run by hand.
+  // The start towns stand by the sea (Arnd 2026-10-30): these runs are the harbour town's (S2), its tavern on the quay.
   ...seeds.map((seed) => ({ seed, opts: { evenings }, what: `${evenings} evenings` })),
   { seed: seeds[0], opts: { evenings: 1, reckless: true }, what: 'a reckless evening (a fall)' },
   // A second town (plan B3a): the same game in a village out on the land, through the same code.
   { seed: seeds[0], opts: { evenings: 3, settlement: 'village' }, what: '3 evenings in a village' },
-  // A harbour town (S2): the same game by the sea, its tavern on the quay.
-  { seed: seeds[0], opts: { evenings: 3, settlement: 'village', harbour: true }, what: '3 evenings in a harbour town' },
   { seed: seeds[1] ?? seeds[0], opts: { evenings: 2, settlement: 'hamlet' }, what: '2 evenings in a hamlet' },
   // The capital (C15): an evening in the first city, its 700 houses and 2700 people.
   { seed: seeds[0], opts: { evenings: 1, settlement: 'capital' }, what: 'an evening in the capital' },
