@@ -19,6 +19,7 @@ import { SpellBits, type Vec3 } from './spellFx/particles';
 import { lookOf, type Caster, type FxLook } from './spellFx/looks';
 import { FxView } from './spellFx/fxView';
 import { LevelRing } from './spellFx/levelRing';
+import { LearningGlow } from './spellFx/learningGlow';
 
 /** Where the hand holds a spell when the body's hand is not known: in front of the caster (m) and over the feet (m). */
 const HANDS_AHEAD = 0.45, HANDS_UP = 1.35;
@@ -80,6 +81,9 @@ export class SpellView {
   /** The level celebration round the hero (G3), and whether one waits to begin. */
   private readonly ring = new LevelRing();
   private ringDue = false;
+  /** A potion of learning drunk (D61): its light, and how long until it wells up (the bottle tipped first). */
+  private readonly glow = new LearningGlow();
+  private glowIn = -1;
   /** Where the hero's hand is in the world (main.ts: the body's bone), null while not known. */
   handOf: ((out: Vector3) => Vector3 | null) | null = null;
   /** More drawn with the same bits every frame, spell or none (the portal stone's light: app/portalStoneUse.ts). */
@@ -114,6 +118,12 @@ export class SpellView {
 
   /** The hero gained a level: the ring of light rises round them from the next frame on (G3). */
   levelUp(): void { this.ringDue = true; }
+
+  /** A potion of learning drunk (D61): its light wells up round the hero after `delay` s (while they drink). */
+  learnt(delay = 0): void { this.glowIn = delay; }
+
+  /** The learning light is playing or about to. */
+  get glowing(): boolean { return this.glowIn >= 0 || this.glow.on; }
 
   /** The level ring is playing. */
   get ringing(): boolean { return this.ringDue || this.ring.on; }
@@ -163,6 +173,11 @@ export class SpellView {
       const feet: Vec3 = [f.offset.x + f.me.x, f.offset.y + f.me.y, f.offset.z + f.me.z];
       if (this.ringDue) { this.ring.kindle(b, feet); this.ringDue = false; }
       this.ring.rise(b, feet, dt);
+    }
+    if (f && (this.glowIn >= 0 || this.glow.on)) {
+      const feet: Vec3 = [f.offset.x + f.me.x, f.offset.y + f.me.y, f.offset.z + f.me.z];
+      if (this.glowIn >= 0 && (this.glowIn -= dt) < 0) this.glow.kindle(b, feet);
+      this.glow.rise(b, feet, dt);
     }
     this.also?.(b, dt);
     b.step(dt);

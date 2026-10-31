@@ -29,6 +29,8 @@ export interface PackHost extends WindowHost {
   readOut(why: string | null, ability: string): void;
   /** A portal stone was taken out (the window closes first: the stone floats before the hero). */
   raised(): void;
+  /** A potion of learning was drunk (D61; the window closes first): the hero drinks it and its light sinks in. */
+  learnt(): void;
 }
 
 /** Where a gauge's needle stands for a value (degrees from pointing left; full at 100). */
@@ -53,13 +55,15 @@ export class PackUi extends BodyWindow {
       return cell;
     });
     const carried = h.pack.map((it) => {
-      const d = defOf(this.setting.items, it.def), use = d.slot ? 'Put it on' : d.heal || d.effect ? (d.kind === 'potion' ? 'Drink it' : 'Eat it') : d.teaches ? 'Read it' : d.portal ? 'Hold it up' : '';
+      const d = defOf(this.setting.items, it.def), use = d.slot ? 'Put it on' : d.heal || d.effect || d.learning ? (d.kind === 'potion' ? 'Drink it' : 'Eat it') : d.teaches ? 'Read it' : d.portal ? 'Hold it up' : '';
       const c = itemCard(it, this.setting, enter());
       if (use) {
         c.classList.add('use');
         c.title = use;
         c.addEventListener('click', () => {
           if (d.portal) { this.setOpen(false); this.packHost.raised(); return; }
+          // A potion of learning (D61): the pack closes so the hero is seen drinking it and its light sinking in.
+          if (d.learning) { const had = h.points; h.consume(it); if (h.points > had) { this.setOpen(false); this.packHost.learnt(); } return; }
           if (d.slot) { h.equip(it); this.packHost.changed(); } else if (d.teaches) this.packHost.readOut(h.readWriting(it), d.teaches); else this.packHost.drank(h.consume(it));
           this.opened();
         });

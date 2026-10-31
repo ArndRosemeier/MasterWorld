@@ -52,6 +52,7 @@
     "shot:mouths": "node tools/shot/mouths.mjs",
     "shot:capital": "node tools/shot/capital.mjs",
     "shot:quest": "node tools/shot/quest.mjs",
+    "shot:learning": "node tools/shot/learning.mjs",
     "shot:handover": "node tools/shot/handover.mjs",
     "shot:goto": "node tools/shot/goto.mjs",
     "shot:grounded": "node tools/shot/grounded.mjs",

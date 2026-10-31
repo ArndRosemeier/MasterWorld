@@ -187,24 +187,25 @@ export function abilityPrice(g: GuildDef, a: AbilityDef): number {
   return level <= 1 && g.first !== undefined ? g.first : Math.round(g.price * level ** 1.5);
 }
 
-/** Why an ability was not taught (null: it was): not taught here, known already, not of its level yet, the guild's task first, the purse. */
-export type TeachRefusal = 'not-taught' | 'known' | 'level' | 'task' | 'coin' | null;
+/** Why an ability was not taught (null: it was): not taught here, known already, not of its level yet, the guild's task first, no ability point free (D61), the purse. */
+export type TeachRefusal = 'not-taught' | 'known' | 'level' | 'task' | 'point' | 'coin' | null;
 
 export function teachRefusal(g: GuildDef, hero: Character, a: AbilityDef, book: GuildBook, log: DecisionLog): TeachRefusal {
   if (!g.teaches.includes(a.id)) return 'not-taught';
   if (hero.knows(a.id)) return 'known';
   if (hero.level < (a.level ?? 1)) return 'level';
   if ((a.level ?? 1) >= g.task.from && !book.taskDone(g, log)) return 'task';
+  if (hero.points < 1) return 'point';
   if (hero.coins < abilityPrice(g, a)) return 'coin';
   return null;
 }
 
-/** Learn an ability from this guild: the coin goes, the ability goes onto the action bar. */
+/** Learn an ability from this guild: the coin and an ability point go (D61), the ability goes onto the action bar. */
 export function teach(g: GuildDef, hero: Character, a: AbilityDef, book: GuildBook, log: DecisionLog): TeachRefusal {
   const no = teachRefusal(g, hero, a, book, log);
   if (no) return no;
   hero.coins -= abilityPrice(g, a);
-  hero.learn(a.id);
+  hero.learn(a.id, 1);
   return null;
 }
 

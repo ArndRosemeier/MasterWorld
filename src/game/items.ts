@@ -5,7 +5,7 @@
  * enough. Pure.
  */
 import { Rng } from '@futuremagic/core';
-import { QUALITIES, type EffectDef, type ItemCatalog, type ItemDef, type Quality, type Rarity, type UniqueDef } from '../setting/contract';
+import { QUALITIES, TOP_FIND, type EffectDef, type ItemCatalog, type ItemDef, type Quality, type Rarity, type TreasureFind, type UniqueDef } from '../setting/contract';
 
 export interface Item {
   /** Catalogue id. */
@@ -122,6 +122,11 @@ export function itemAs(cat: ItemCatalog, id: string, rarity: Exclude<Rarity, 'le
   return { def: id, rarity, name, bonuses };
 }
 
+/** How likely a rare find is at `danger` (D61): likelier in more dangerous places, never above `TOP_FIND`. */
+export function findChance(f: TreasureFind, danger: number): number {
+  return Math.max(0, Math.min(TOP_FIND, f.chance + f.perDanger * danger));
+}
+
 /** What a treasure table gives at `danger`. */
 export function rollLoot(cat: ItemCatalog, table: string, danger: number, rng: Rng): Loot {
   const t = cat.treasure.find((x) => x.id === table);
@@ -129,7 +134,10 @@ export function rollLoot(cat: ItemCatalog, table: string, danger: number, rng: R
   const n = rng.int(t.count[0], t.count[1]);
   const items: Item[] = [];
   for (let i = 0; i < n; i++) items.push(rollItem(cat, rng.weighted(t.items, (e) => e[1])[0], danger, rng));
-  return { items, coins: rng.int(t.coins[0], t.coins[1]) };
+  const coins = rng.int(t.coins[0], t.coins[1]);
+  // Rare finds after the rest, so a table's usual roll stays as it was (D61: the potion of learning).
+  for (const f of t.finds ?? []) if (rng.chance(findChance(f, danger))) items.push(plainItem(cat, f.item));
+  return { items, coins };
 }
 
 /** Coins as people say them: 1 silver is 100 copper, 1 gold 100 silver. */

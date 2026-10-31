@@ -432,7 +432,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (shops && !smith) throw new Broke('no smith in town');
       const finds = hero.pack.filter((it) => defOf(setting.items, it.def).slot || defOf(setting.items, it.def).value > 0);
       say(`brought back ${finds.length} finds and ${hero.coins} copper`);
-      // Writings found below are read before anything is sold (C3: a rare extra way to a spell).
+      // A potion of learning found below is drunk at once (D61): one more ability point.
+      for (const it of hero.pack.filter((x) => defOf(setting.items, x.def).learning)) { hero.consume(it); say(`drank ${it.name}: ${hero.points} ability points free`); }
+      // Writings found below are read before anything is sold (C3: a rare extra way to a spell); each takes a point.
       for (const it of hero.pack.filter((x) => defOf(setting.items, x.def).teaches)) {
         const d = defOf(setting.items, it.def);
         if (!hero.readWriting(it)) say(`read ${d.name}: knows ${d.teaches} now`);
@@ -478,7 +480,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
           paid += before - hero.coins;
           hours += g.hours;
           taught.push(a.name);
-          say(`${g.name} teaches ${a.name} (level ${a.level ?? 1}) for ${before - hero.coins} copper`);
+          say(`${g.name} teaches ${a.name} (level ${a.level ?? 1}) for ${before - hero.coins} copper; ${hero.points} ability points left`);
         }
       }
       // The best upgrade the purse allows, at the smith's (and the market's).

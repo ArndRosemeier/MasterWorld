@@ -234,6 +234,11 @@ export class SoundDirector {
     this.notes([['title/bell', 0.55, 1.6, 0], ['title/bell', 0.35, 2.4, 0.12], ['title/ward', 0.5, 1.2, 0.25]]);
   }
 
+  /** A potion of learning drunk (D61): the ward's hum as its light rises, and a soft high bell as it sinks in. */
+  learnt(): void {
+    this.notes([['title/ward', 0.45, 0.8, 0.6], ['title/bell', 0.3, 2, 2.2]]);
+  }
+
   /** Coins changed hands (a trade). */
   coins(): void { this.host.engine.play('fight/coins', { bus: 'ui', gain: 0.8 }); }
 

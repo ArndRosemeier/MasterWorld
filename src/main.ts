@@ -143,7 +143,7 @@ import { release } from './app/release';
 import { CLIMB_COST, Character, fallHurt } from './game/character';
 import { itemWorth } from './game/trade';
 import { bardTells, GuildBook, harbourHall, questGift, teacherOf, whereOf } from './game/guilds';
-import { CHEER, LevelWatch } from './app/levelUp';
+import { CHEER, DRINK, LevelWatch } from './app/levelUp';
 import { carryRenown } from './game/growth';
 import { coinText, findDef, uniqueItem } from './game/items';
 import { washedUpChest } from './world/sites';
@@ -1482,6 +1482,14 @@ export async function start(b: Boot): Promise<void> {
       changed: learnedAbility,
       drank: (n) => { if (n > 0) fightHud.healed(); },
       raised: () => stoneUse.holdUp(),
+      // A potion of learning (D61, rule 11): the hero is seen drinking it, and its light winds up to the brow.
+      learnt: () => {
+        const h = player.hero;
+        if (h && !player.stance.action) player.stance = { ...player.stance, action: { ...DRINK, t0: h.clock } };
+        spellView.learnt(DRINK.dur * 0.6);
+        sounds?.learnt();
+        book.redraw();
+      },
       readOut: (why, id) => {
         const a = abilityOf(setting, id);
         notes.say(why ?? `You read it through, and ${a?.name ?? id} is yours. The page crumbles to dust.`, 7);

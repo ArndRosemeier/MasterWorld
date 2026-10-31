@@ -21,6 +21,9 @@ export type Stuff = typeof STUFFS[number];
 
 export type Vec3 = readonly [number, number, number];
 
+/** A colour made brighter or dimmer (linear). */
+export const lit = (c: Vec3, s: number): Vec3 => [c[0] * s, c[1] * s, c[2] * s];
+
 /** A sprite in flight. Sizes are its height (m); `stretch` > 0 draws it along its velocity, that many seconds of it long. */
 export interface Particle {
   sprite: number;
