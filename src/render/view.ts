@@ -11,6 +11,9 @@ import './materials/flame';
 import { ORIGIN } from './origin';
 import { waterVeil } from './underwater';
 
+/** The hero's lantern's own colour (a lit torch tints it its flame's orange: main.ts). */
+export const LANTERN_COLOR = 0xffc27a;
+
 export interface View {
   readonly renderer: WebGPURenderer;
   readonly backend: 'webgpu' | 'webgl2';
@@ -63,7 +66,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const sun = new DirectionalLight(0xfff0d8, 4.2);
   const hemi = new HemisphereLight(0xbcd6f0, 0x5a5040, 1.4);
   // The lantern is always in the scene (lights are part of every shader's key), dark until needed.
-  const lantern = new PointLight(0xffc27a, 0, 14, 1.6);
+  const lantern = new PointLight(LANTERN_COLOR, 0, 14, 1.6);
   lantern.castShadow = false;
   scene.add(sun, sun.target, hemi, lantern);
   const warm = new WarmLights(scene);

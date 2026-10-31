@@ -12,7 +12,7 @@ import { atDoor, placesFor } from './app/places';
 import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
 import { Portals } from './app/portals';
-import { CAVE_LANTERN, TORCH_DUSK, TORCH_NIGHT } from './app/cellarVisit';
+import { CAVE_LANTERN, TORCH_DUSK, TORCH_LIGHT_OUT, TORCH_LIGHT_UP, TORCH_NIGHT } from './app/cellarVisit';
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
 import { PortalStoneUse } from './app/portalStoneUse';
@@ -39,7 +39,7 @@ import { PoultryView } from './render/livestock/PoultryView';
 import { Steed, groundPace, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import type { Agent, TownOrder } from './sim/townLife';
-import { createView } from './render/view';
+import { LANTERN_COLOR, createView } from './render/view';
 import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
 import { ROOT_LEVEL, chunkSize } from './render/terrain/lod';
@@ -52,7 +52,7 @@ import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
 import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
-import { flameFlicker } from './render/warmLights';
+import { TORCHLIGHT, flameFlicker } from './render/warmLights';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg, harbourMoorings } from '@futuremagic/settlement';
@@ -2458,7 +2458,13 @@ export async function start(b: Boot): Promise<void> {
         const dark = under || (WINDOWS.glow.value > TORCH_DUSK && !rooms?.inside);
         if (h) h.torchLit = h.holdsTorch && dark && !player.hideHero && player.walker.mode !== 'swim';
         const at = h?.flameAt(flamePoint) ?? null;
-        if (at) L.position.copy(at);
+        if (at) {
+          // A little beyond the flame, away from the body (right beside it, it burned the hero's own clothes white).
+          const w = player.walker.pos, dx = at.x - w.x, dz = at.z - w.z, d = Math.hypot(dx, dz) || 1;
+          L.position.set(at.x + (dx / d) * TORCH_LIGHT_OUT, at.y + TORCH_LIGHT_UP, at.z + (dz / d) * TORCH_LIGHT_OUT);
+        }
+        // Firelight's own orange while the torch burns, the lantern's paler gold otherwise.
+        L.color.setHex(at ? TORCHLIGHT.color : LANTERN_COLOR);
         // Out of doors at night the lantern is the torch's alone (below and in a throat their own walks light it).
         const night = !!at && !under;
         if (night) L.intensity = TORCH_NIGHT * flameFlicker(h!.clock);
