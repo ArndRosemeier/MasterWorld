@@ -388,10 +388,6 @@
     "reason": "Building a cellar's meshes into the stage (lids on pivots now) vs adding a piece to a rock mesh."
   },
   {
-    "key": "same name: masterworld/app/birdForm.ts#event + masterworld/app/cellarVisit.ts#event",
-    "reason": "Each handles its own events (a change of shape; a way opening, a key found)."
-  },
-  {
     "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/render/flora/FloraView.ts#add",
     "reason": "Building a cellar's meshes into the stage vs adding trees to the flora: unrelated adds."
   },
@@ -474,10 +470,6 @@
   {
     "key": "idiom: [.some .towns] in masterworld/game/horse.ts + masterworld/vgm/answers.ts + masterworld/vgm/roads.ts",
     "reason": "Asking whether any town holds a point, each a different question (on its streets, in its fields, against its walls); towns.some is the language idiom, not a copied helper."
-  },
-  {
-    "key": "same name: masterworld/game/character.ts#learn + masterworld/main.ts#learn",
-    "reason": "The debug menu's learn toggle (main.ts) calls Character.learnToUse/forget and redraws; only the name matches."
   },
   {
     "key": "same name: masterworld/game/character.ts#level + masterworld/game/knownLand.ts#level",
@@ -730,5 +722,9 @@
   {
     "key": "same name: masterworld/app/shipClimb.ts#yaw + masterworld/game/horse.ts#yaw",
     "reason": "Only the name matches: a ship's ladder climb (app/shipClimb.ts, the Puppet seam) and an unrelated system's member of the same name."
+  },
+  {
+    "key": "same name: masterworld/sim/birdFlight.ts#steer + masterworld/sim/otterSwim.ts#steer",
+    "reason": "Both are app/shapeForm.ts FormSim's steer (one interface for every animal form): a bird's flight and an otter's swimming."
   }
 ]

@@ -49,6 +49,12 @@ export const guilds: readonly GuildDef[] = [
     teachesLine: 'Again, slower. There: {ability} is yours. Do not waste it on show.',
     distrust: 'Not yet, child. {ability} is not for hands that have done so little. Go out and live first.',
     task: { ask: 'Out past the fields something sours the ground. Go and end it, and I will show you deeper things.', done: 'The ground breathes easier. You did that. Sit closer.', out: true, from: 4 },
+    // Otter form is sold nowhere either (S6): the witch gives it for one deed.
+    quest: {
+      reward: 'otter', kinds: ['cave', 'barrow'], level: 5,
+      ask: 'The water has a shape too, older than the boats. Something foul sits in {place}, where the old ones kept it. Clear it, and I will teach you to wear the otter.',
+      done: 'Clean again. Now: hold your breath, longer, longer, and think of cold water sliding by. There. The otter knows you. Try it where the water is deep.',
+    },
   },
   {
     keeper: 'undercroft-keeper', name: 'the Undercroft', title: '{name}, who keeps the Undercroft', topic: 'The cold sent me.',

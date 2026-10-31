@@ -1109,7 +1109,7 @@ export type AbilityOp =
   /** The land reshaped (a wall, a pillar…), where the world allows it (volumes, D9). */
   | { readonly op: 'terrain'; readonly shape: TerrainShape; readonly at?: OpAnchor; readonly radius: number; readonly height?: number; readonly length?: number }
   /** A change of the hero's shape (bird form). */
-  | { readonly op: 'shape'; readonly into: 'bird'; readonly change: number; readonly back: number }
+  | { readonly op: 'shape'; readonly into: 'bird' | 'otter'; readonly change: number; readonly back: number; /** Breath under water lasts this many times longer in the shape (an otter's). */ readonly hold?: number }
   /** Its steps, `t` seconds later. */
   | { readonly op: 'delay'; readonly t: number; readonly ops: readonly AbilityOp[] }
   /** Only for the eye and the ear. */

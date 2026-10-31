@@ -25,6 +25,12 @@ export const abilities: readonly AbilityDef[] = [
     ops: [{ op: 'shape', into: 'bird', change: 15, back: 6 }],
     text: 'Kneel and become a pheasant: fifteen slow breaths, and never while you fight. Space takes off, W flaps on, X dives. Use it again to land and be yourself.',
   },
+  // Otter form (S6, D60): the water's change, taken in the water. Swift at the surface, deep under it, and a breath lasts six times as long.
+  {
+    id: 'otter', icon: '🦦', name: 'Otter form', aim: 'self', cooldown: 30, taught: true,
+    ops: [{ op: 'shape', into: 'otter', change: 8, back: 4, hold: 6 }],
+    text: 'In the water, let the bubbles take you and become an otter: eight breaths, never while you fight. W swims, X dives, Space rises; a breath lasts six times as long. Use it again at the surface to be yourself.',
+  },
   ...arts(),
   ...spells(),
   // Abilities only items give (D31, C5): each legendary piece of the canon carries one, the hero has it while wearing it.
