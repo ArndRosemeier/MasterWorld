@@ -16,6 +16,10 @@
     "reason": "Per-frame update methods of unrelated systems (going in and out of the cellar vs chunk selection); only the name matches."
   },
   {
+    "key": "same name: masterworld/app/journalUi.ts#closed + masterworld/app/mapUi.ts#closed",
+    "reason": "Both override KeyWindow.closed (app/window.ts): each window tidies its own state when it shuts; the name is the seam, not a copy."
+  },
+  {
     "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/mapUi.ts#opened",
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the shared part already lives in the base class."
   },
@@ -374,6 +378,10 @@
   {
     "key": "same name: masterworld/app/player.ts#update + masterworld/render/water/WaterView.ts#update",
     "reason": "The player's frame (walk, ride, puppet) and the water's: per-frame updates of different things."
+  },
+  {
+    "key": "idiom: [.add .mul .sub] in masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (a wave's phase as x * k - t * s + seed): each shader builds its own waves, the flame's licks, the spell glows and the water's ripples; plain math in the node language, not a copied helper."
   },
   {
     "key": "idiom: [.add .mul .y] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
