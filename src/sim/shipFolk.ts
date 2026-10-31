@@ -21,6 +21,8 @@ export interface CrewPost {
   readonly b: number;
   readonly dir: number;
   readonly act: ActivityKind;
+  /** A hand on a line: where the line goes up to from their hands (the vessel's frame), by way of `via` if given. */
+  readonly line?: { readonly a: number; readonly h: number; readonly b: number; readonly via?: { readonly a: number; readonly h: number; readonly b: number } };
 }
 
 /** One of the crew: who, and their job aboard. */
@@ -81,11 +83,15 @@ export function crewPost(plan: ShipPlan, hand: Hand, k: number, state: VesselSta
     default: {
       // The hands on the lines: at the masts' feet, port and starboard, hauling (at the berth: at the hatch, the cargo).
       const n = k - 3, side = n % 2 === 0 ? 1 : -1, m = n < 2 ? main : fore;
+      // (At the hatch the cargo comes up on a whip from the main yard; at sea the hand hauls the yard's brace, up to
+      // its arm over that side.)
       if (state === 'moored' && plan.hatch) {
-        const h = plan.hatch;
-        return { a: h.a0 + (h.a1 - h.a0) * (n < 2 ? 0.3 : 0.7), h: deck, b: side * (h.half + 0.45), dir: side > 0 ? toStar : toPort, act: 'haul' };
+        const h = plan.hatch, yard = main.yards[0];
+        return { a: h.a0 + (h.a1 - h.a0) * (n < 2 ? 0.3 : 0.7), h: deck, b: side * (h.half + 0.45), dir: side > 0 ? toStar : toPort, act: 'haul', line: { a: main.a, h: yard.y, b: 0 } };
       }
-      return { a: m.a + (n < 2 ? -OFF_MAST : OFF_MAST), h: deck, b: side * 0.9, dir: side > 0 ? toPort : toStar, act: 'haul' };
+      // (Belayed at the rail, it goes up outside the sail to the yard's arm.)
+      const yard = m.yards[0], rail = { a: m.a, h: plan.railY + 0.1, b: side * (hullHalf(plan, m.a, plan.railY) - 0.12) };
+      return { a: m.a + (n < 2 ? -OFF_MAST : OFF_MAST), h: deck, b: side * 0.9, dir: side > 0 ? toPort : toStar, act: 'haul', line: { a: m.a, h: yard.y, b: side * yard.half, via: rail } };
     }
   }
 }

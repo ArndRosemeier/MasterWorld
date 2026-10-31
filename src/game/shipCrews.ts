@@ -22,12 +22,25 @@ export interface CrewPlaced {
   readonly act: ActivityKind;
 }
 
+/** A line from a hand's grip to where it goes up to (world metres). */
+export interface CrewLine {
+  /** Who hauls on it (their hands hold its lower end). */
+  readonly agent: Agent;
+  readonly from: { readonly x: number; readonly y: number; readonly z: number };
+  readonly to: { readonly x: number; readonly y: number; readonly z: number };
+  /** Its lower end is in the hauler's hands (else it runs on from the rail). */
+  readonly held: boolean;
+}
+
 /** A crew body's radius (m), as a townsperson's. */
 const BODY = 0.3;
+/** Where a hauling hand grips the line: this far before them and this high over their feet (m). */
+const GRIP = 0.35, GRIP_UP = 0.85;
 
 export class ShipCrews {
   private readonly crews = new Map<string, { hands: Hand[]; agents: Agent[] }>();
   private shown: CrewPlaced[] = [];
+  private hauled: CrewLine[] = [];
   /** The passengers aboard now (to be talked to), and where each was in their town before boarding. */
   private aboard: CrewPlaced[] = [];
   private readonly ashore = new Map<Agent, { x: number; z: number }>();
@@ -40,7 +53,7 @@ export class ShipCrews {
    * talk faces).
    */
   atWork(decks: Decks, hours = 0, lifeOf: (town: string) => TownLife | null = () => null, hero: { x: number; z: number } | null = null): readonly CrewPlaced[] {
-    const out: CrewPlaced[] = [], near = new Set<string>(), aboard: CrewPlaced[] = [], boarded = new Set<string>();
+    const out: CrewPlaced[] = [], lines: CrewLine[] = [], near = new Set<string>(), aboard: CrewPlaced[] = [], boarded = new Set<string>();
     for (const v of decks.each()) {
       near.add(v.id);
       let c = this.crews.get(v.id);
@@ -54,6 +67,13 @@ export class ShipCrews {
         const post = crewPost(v.plan, h, k, v.state), w = toWorld(v.pose, post.a, post.h, post.b), a = c.agents[k];
         a.x = w.x; a.z = w.z; a.dir = post.dir + turn; a.act = a.next = post.act;
         out.push({ agent: a, x: w.x, y: w.y, z: w.z, dir: a.dir, act: post.act });
+        const l = post.line;
+        if (l) {
+          const grip = toWorld(v.pose, post.a + Math.cos(post.dir) * GRIP, post.h + GRIP_UP, post.b + Math.sin(post.dir) * GRIP), up = toWorld(v.pose, l.a, l.h, l.b);
+          const via = l.via ? toWorld(v.pose, l.via.a, l.via.h, l.via.b) : null;
+          lines.push({ agent: a, from: grip, to: via ?? up, held: true });
+          if (via) lines.push({ agent: a, from: via, to: up, held: false });
+        }
       }
       // A town's passengers go aboard the first of its ships near the hero.
       const town = v.id.slice(0, v.id.lastIndexOf('/')), life = v.plan.kind === 'ship' && !boarded.has(town) ? lifeOf(town) : null;
@@ -75,6 +95,7 @@ export class ShipCrews {
     // Off the ship (sailed, or the hero gone from near it): back where they were in their town.
     for (const [a, at] of this.ashore) if (!aboard.some((p) => p.agent === a)) { a.x = at.x; a.z = at.z; this.ashore.delete(a); }
     this.shown = out;
+    this.hauled = lines;
     this.aboard = aboard;
     return out;
   }
@@ -82,6 +103,11 @@ export class ShipCrews {
   /** The passengers aboard the ships near the hero now, where they stand (to be talked to). */
   get passengers(): readonly CrewPlaced[] {
     return this.aboard;
+  }
+
+  /** The lines the crew haul on now, from their hands up (drawn as ropes). */
+  get lines(): readonly CrewLine[] {
+    return this.hauled;
   }
 
   /** Whether a body of radius `r` at (x, z), its feet at `y`, touches one of the crew. */
