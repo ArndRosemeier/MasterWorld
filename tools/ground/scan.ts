@@ -4,9 +4,10 @@
  * brook) and read at points all over it, mesh against world/drawnGround.ts (what the hero, creatures and birds stand
  * on). Fails if any point is off by more than 1 cm: then the hero sinks into or floats over what is drawn.
  *
- * It also reports where the land's own height (what trees, stones and props are set on) is off the drawn ground by
- * more than 0.5 m: relief finer than the mesh shows (a gorge's sheer wall, a sea cliff's gully, a pass's side), the
- * worst as links. That does not fail it. A slow check, on demand: `node --import tsx tools/ground/scan.ts [seed ...]`.
+ * Trees and rocks stand on the drawn ground too: it fails if a tree's foot is off the mesh by more than 1 cm, or a
+ * rock's middle floats over it. It also reports where the land's own height is off the drawn ground by more than
+ * 0.5 m: relief finer than the mesh shows (a gorge's sheer wall, a sea cliff's gully, a pass's side), the worst as
+ * links; only what is still set on the land's own height (grass, a few props) sees it, so that does not fail it. A slow check, on demand: `node --import tsx tools/ground/scan.ts [seed ...]`.
  */
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../../src/setting/classic/index';
@@ -14,6 +15,8 @@ import { startPlace } from '../../src/vgm/builder';
 import { nearestCoast } from '../../src/world/coast';
 import { CHUNK0, SEGS, buildChunk, chunkIndex } from '../../src/world/chunkMesh';
 import { DrawnGround, drawnSource } from '../../src/world/drawnGround';
+import { FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../../src/world/flora';
+import { ROCK_STRIDE, rockPlacement } from '../../src/world/rocks';
 import { Terrain } from '../../src/world/terrain';
 
 /** Off the mesh by more than this (m), the hero is not on what is drawn: the check fails. */
@@ -43,13 +46,26 @@ for (const name of seeds) {
   const cliff = nearestCoast(terrain, 'cliff', s.x, s.z);
   if (cliff) squares.push(['cliff', cliff.x, cliff.z]);
   for (const [what, cx, cz] of squares) {
-    let stood = 0, points = 0, fine = 0, finer = 0;
+    let stood = 0, points = 0, fine = 0, finer = 0, trees = 0, treeOff = 0, rocks = 0, rockOver = 0;
     const worst: { d: number; x: number; z: number }[] = [];
     const ci = Math.floor(cx / CHUNK0), cj = Math.floor(cz / CHUNK0);
     for (let dj = -REACH; dj <= REACH; dj++) for (let di = -REACH; di <= REACH; di++) {
       const x0 = (ci + di) * CHUNK0, z0 = (cj + dj) * CHUNK0, segs = src.segs(x0, z0);
       if (segs > SEGS) finer++;
       const m = buildChunk(terrain, { x0, z0, size: CHUNK0, segs });
+      // Trees and bushes: the foot (sunk 0.15 of its scale) on the mesh.
+      const fl = floraPlacement(terrain, { seed: terrain.seed, setting: classic.id, x0, z0, size: CHUNK0, spacing: NEAR_SPACING });
+      for (let k = 0; k < fl.length; k += FLORA_STRIDE, trees++) {
+        const off = Math.abs(fl[k + 1] + 0.15 * fl[k + 3] - meshAt(m, x0, z0, fl[k], fl[k + 2]));
+        if (!(off <= LIMIT)) { treeOff = Math.max(treeOff, Number.isNaN(off) ? Infinity : off); failed = true; }
+      }
+      // Rocks: seated on the lowest drawn ground under the foot, so the middle never floats over it (a landform's
+      // rocks can lie past the chunk's edge: read off the drawn ground, which is the mesh, as checked above).
+      const rk = rockPlacement(terrain, x0, z0, CHUNK0);
+      for (let k = 0; k < rk.length; k += ROCK_STRIDE, rocks++) {
+        const over = rk[k + 1] - g.footing(rk[k], rk[k + 2]);
+        if (!(over <= LIMIT)) { rockOver = Math.max(rockOver, Number.isNaN(over) ? Infinity : over); failed = true; }
+      }
       // Points over the whole chunk, off the grid: every 2 m cell's middle, and a point in each cell's other triangle.
       for (let z = z0 + 1; z < z0 + CHUNK0; z += 2) for (let x = x0 + 1; x < x0 + CHUNK0; x += 2) {
         for (const [px, pz] of [[x, z], [x + 0.4, z + 0.7]]) {
@@ -65,6 +81,7 @@ for (const name of seeds) {
     const cells = points / 2;
     console.log(`${name} ${what} (${cx.toFixed(0)}, ${cz.toFixed(0)}), ${(2 * REACH + 1) ** 2} chunks (${finer} finer by a brook):`);
     console.log(`  stood on: ${points} points, worst ${stood.toFixed(4)} m off the mesh${stood > LIMIT ? ' FAIL' : ''}`);
+    console.log(`  trees: ${trees}, worst foot ${treeOff.toFixed(4)} m off the mesh${treeOff > LIMIT ? ' FAIL' : ''}; rocks: ${rocks}, worst middle ${rockOver.toFixed(4)} m over it${rockOver > LIMIT ? ' FAIL' : ''}`);
     console.log(`  the land under the mesh: ${fine} of ${cells} cells off by > 0.5 m${worst[0] ? `, worst ${worst[0].d.toFixed(2)} m` : ''}`);
     for (const w of worst.slice(0, 3)) console.log(`    ${w.d > 0 ? '+' : ''}${w.d.toFixed(2)} m  ?seed=${name}&pos=${w.x},${w.z}`);
   }

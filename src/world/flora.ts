@@ -9,6 +9,7 @@ import { Noise, deriveSeed, hash2f, smoothstep } from '@futuremagic/core';
 import { TREES, type FloraDef, type TreeName } from '../setting/contract';
 import type { Terrain } from './terrain';
 import { TownGround } from './town';
+import { drawnOf } from './drawnGround';
 
 export const FLORA_STRIDE = 6;
 
@@ -59,6 +60,8 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
   const seed = deriveSeed(t.seed, 'flora');
   const cover = coverNoise(t.seed);
   const w = { river: 0, lake: 0 };
+  // Each stands on the ground as drawn (its trunk neither floats over a gully nor sinks into a rim).
+  const ground = drawnOf(t);
   const out: number[] = [];
   const thin = (spacing / NEAR_SPACING) ** 2; // candidates far away each stand for this many near ones
   const n = Math.round(size / spacing);
@@ -106,7 +109,7 @@ export function floraPlacement(t: Terrain, job: FloraJob): Float32Array {
     const size0 = 0.8 + 0.45 * hash2f(seed + 6, gi, gj);
     // A far stand-in is bigger, to cover about the canopy its near trees would (up to half again as big).
     const scale = near ? size0 : size0 * Math.min(1.5, Math.max(1, Math.sqrt((pTree * thin * 0.7) / pT)));
-    out.push(x, h - 0.15 * scale, z, scale, hash2f(seed + 7, gi, gj) * Math.PI * 2, kind);
+    out.push(x, ground.footing(x, z) - 0.15 * scale, z, scale, hash2f(seed + 7, gi, gj) * Math.PI * 2, kind);
   }
   return Float32Array.from(out);
 }
