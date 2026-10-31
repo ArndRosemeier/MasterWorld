@@ -110,3 +110,17 @@ test('ship passengers: under way she carries every traveller by sea who was in t
   crews.atWork(decks, off + 31.3, lifeOf);
   assert.ok(on.every((p) => !p.sailing || crews.passengers.some((q) => q.agent.person === p)));
 });
+
+test('harbour master: the hall on the quay has a shield over its door and a name on the map, and its harbour master works there', async () => {
+  const { harbourHall, guildSigns } = await import('../src/game/guilds');
+  const { townsfolk } = await import('../src/sim/people');
+  const { classic } = await import('../src/setting/classic/index');
+  const { frontierLand } = await import('./frontierLand');
+  const { home, terrain } = frontierLand();
+  const plan = terrain.town(home.id)!.plan, hall = harbourHall(plan);
+  assert.ok(hall, 'a harbour master\'s hall in the harbour town');
+  assert.ok(guildSigns([], plan, classic).has(hall.id), 'a shield over its door');
+  assert.ok(classic.voyage?.hall, 'a name for it on the map');
+  const master = townsfolk(plan, home.seed ?? 0).find((p) => p.trade === 'harbourmaster');
+  assert.equal(master?.work, hall.id, 'the harbour master works in the hall');
+});

@@ -19,7 +19,7 @@ import { restingAt } from '../vgm/answers';
 import { strayAt } from '../vgm/situations';
 import { onCircle } from '../world/sites';
 import type { Town } from '../world/town';
-import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
+import { bardOf, guildHouses, harbourHall, staffGuilds, type GuildHouse } from './guilds';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
 import { keptAt } from '../sim/marked';
@@ -306,7 +306,7 @@ export class Township {
   /**
    * The map's marks (the open leads): whoever one is sent here to find (the innkeeper at the start, a cellar's
    * household) keeps to that building while awake (sim/marked.ts), instead of wandering the town; so does every
-   * guild house's keeper (the teachers).
+   * guild house's keeper (the teachers), and the harbour master.
    */
   keepMarked(life: TownLife, marks: readonly { readonly id: string; readonly x: number; readonly z: number }[]): void {
     const t = this.talkOf;
@@ -317,6 +317,9 @@ export class Township {
     const kept = keptAt(this.town.plan, this.residents, marks.map((m) => ({ x: m.x, z: m.z, who: t && t.houseOf(m.id) >= 0 ? t.reportTo(m.id) : undefined })));
     // The teachers keep to their houses too (one comes to the hedge witch's cottage to find her there).
     for (const [id, b] of this.teachersAt) if (!kept.has(id)) kept.set(id, b);
+    // So does the harbour master, in their hall on the quay (one comes there for passage by ship).
+    const hall = harbourHall(this.town.plan), master = hall && this.residents.find((x) => x.work === hall.id && x.trade === 'harbourmaster');
+    if (hall && master && !kept.has(master.id)) kept.set(master.id, hall.id);
     life.keep(kept);
   }
 
