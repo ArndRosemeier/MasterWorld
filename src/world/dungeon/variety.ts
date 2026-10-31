@@ -30,8 +30,8 @@ export function testHouse(i: number): TownBuilding {
   } as unknown as TownBuilding;
 }
 
-export function testDecision(i: number, base = 1, template: DungeonTemplate = 'cellar', also?: readonly string[]): DungeonDecision {
-  const pieces = setPiecesFor(template, also);
+export function testDecision(i: number, base = 1, template: DungeonTemplate = 'cellar', also?: readonly string[], flooded = false): DungeonDecision {
+  const pieces = setPiecesFor(template, also, flooded);
   return { kind: 'dungeon', id: `${template}-${i}`, template, town: 'town-1', building: i, seed: deriveSeed(base, 'variety', template === 'cellar' ? i : `${template}-${i}`), setPiece: pieces[i % pieces.length].id };
 }
 
@@ -54,7 +54,7 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
   const aspects: Record<string, string[]> = { layout: [], mainPattern: [], pattern: [], story: [], goalRoom: [], dressing: [], setPiece: [] };
   for (let i = 0; i < count; i++) {
     let c: Cellar;
-    try { c = outlineCellar(testDecision(i, base, template, lore.form.pieces), testPlace(i, template, lore.form), lore); } catch (e) { problems.push(`${template} ${i}: ${(e as Error).message}`); continue; }
+    try { c = outlineCellar(testDecision(i, base, template, lore.form.pieces, lore.form.space.flood !== undefined), testPlace(i, template, lore.form), lore); } catch (e) { problems.push(`${template} ${i}: ${(e as Error).message}`); continue; }
     const where = `${template} ${i} (${c.signature.split('|')[0]})`;
     if (c.pace.safe < 0) problems.push(`${where}: no safe spot`);
     if (!c.pace.shortcut) problems.push(`${where}: no shortcut out`);

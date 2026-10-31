@@ -6,7 +6,8 @@ import { CONTRACT_VERSION, type SettingModule } from '../contract';
 import { backgrounds } from './backgrounds';
 import { barrow } from './barrow';
 import { cave } from './cave';
-import { seaCave } from './seaCave';
+import { seaCave, sunkenRuin } from './seaCave';
+
 import { hideout } from './hideout';
 import { cellar } from './cellar';
 import { names, talk } from './people';
@@ -74,7 +75,7 @@ export const classic: SettingModule = {
     vista: 220,
     kind: 'mesa',
   },
-  dungeons: { cellar, barrow, cave, tower, hideout, 'sea-cave': seaCave },
+  dungeons: { cellar, barrow, cave, tower, hideout, 'sea-cave': seaCave, 'sunken-ruin': sunkenRuin },
   names,
   peoples,
   standing,
