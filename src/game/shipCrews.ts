@@ -151,8 +151,8 @@ export const REACH = 2.4;
 const BEHIND = 1.1;
 /** How far the fisher is from the boat's middle (m), on its side. */
 const BY_BOAT = 1.1;
-/** How deep the fisher's origin sits under the surface while they swim (m: a swimmer's head and shoulders out). */
-const SWIM_DROP = 0.26;
+/** How deep the fisher's feet (the body's origin) sit under the surface while they swim or tread water (m): as the hero's (game/walker.ts floats the feet 0.56 of the height down, render/hero/HeroView.ts drops a swimmer 0.15 more), for a body of some 1.72 m. */
+const SWIM_DROP = 1.22;
 /** Ashore: how far up the strand they wade (m) past the hero, how fast (m/s), and when they are out of the water (ground over the sea, m). */
 const WADE = 3, WADE_PACE = 1.1, DRY = 0.15;
 /** Steps of 1.5 m they wade on at most looking for dry ground (then they stop where they are). */
@@ -198,8 +198,10 @@ export class Castaways {
       // Picked up by another boat (time ran out), or saved and left behind.
       if ((!a.saved && a.state !== 'towed' && !open.some((d) => d.id === id)) || (a.saved && off > GONE)) { this.adrift.delete(id); continue; }
       this.swimOn(a, dt, hero, water);
-      const wet = a.state !== 'ashore' || water.ground(a.x, a.z) < water.surface(a.x, a.z) - DRY;
-      const y = wet ? water.surface(a.x, a.z) - SWIM_DROP : water.ground(a.x, a.z);
+      // Out of their depth they swim with the head out; in the shallows they wade, feet on the bed.
+      const floating = water.surface(a.x, a.z) - SWIM_DROP, bed = water.ground(a.x, a.z);
+      const wet = a.state !== 'ashore' || bed < floating;
+      const y = wet ? floating : bed;
       a.agent.x = a.x; a.agent.z = a.z; a.agent.dir = a.dir;
       const act = a.state === 'cling' ? 'tread' : a.state === 'towed' ? 'swim' : a.to ? (wet ? 'swim' : 'walk') : 'wait';
       a.agent.act = a.agent.next = act;

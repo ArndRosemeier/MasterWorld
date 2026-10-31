@@ -56,7 +56,7 @@ test('castaway (S9): the fisher treads water by the boat, takes hold of the hero
   let [p] = cast.drift(0.1, [d], hero(-20, false), water);
   assert.equal(p.act, 'tread');
   assert.ok(Math.hypot(p.x - d.x, p.z - d.z) < 2, 'by the boat');
-  assert.ok(p.y < 0 && p.y > -0.5, 'head and shoulders out of the water');
+  assert.ok(p.y < -1 && p.y > -1.5, 'feet well down, the head out of the water as the hero\'s');
   // The hero swims out to them (facing +x: yaw −π/2) and takes them in tow.
   [p] = cast.drift(0.1, [d], hero(p.x - REACH * 0.6), water);
   assert.equal(cast.stateOf(d.id), 'towed');
