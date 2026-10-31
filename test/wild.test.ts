@@ -131,3 +131,17 @@ test('wild: deer keep their distance (Arnd 2026-10-28): they bolt once, then wat
   assert.ok(closest > wary * 0.9, `closest ${closest.toFixed(1)} m`);
   assert.ok(bolts <= d2.den.creatures.length, `${bolts} bolts`);
 });
+
+test('wild (S9): by the sea town, giant crabs and smugglers live on strands just above the sea, the sea beside them', () => {
+  for (const k of ['crabs', 'smugglers']) {
+    const groups = places.filter((t) => t.kind === k);
+    assert.ok(groups.length > 0, `${k} on the coast`);
+    for (const t of groups) {
+      const h = terrain.height(t.x, t.z);
+      assert.ok(h >= 0.3 && h <= 4, `${t.id} on a strand (${h.toFixed(1)} m)`);
+      const sea = [0, 1, 2, 3, 4, 5, 6, 7].some((i) => terrain.waterDepth(t.x + Math.cos(i * Math.PI / 4) * 35, t.z + Math.sin(i * Math.PI / 4) * 35) > 1);
+      assert.ok(sea, `${t.id} by the sea`);
+    }
+  }
+  assert.ok(places.filter((t) => t.kind === 'crabs').every((t) => t.members.every((m) => m === 'giant crab')));
+});

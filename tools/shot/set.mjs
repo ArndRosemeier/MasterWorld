@@ -220,6 +220,8 @@ const SESSIONS = [
   { id: 'land', query: `${still}&hour=10&weather=fair&barrow`, shots: [
     { name: 'barrow' },
     { name: 'wild', act: meet('deer', 25) },
+    // S9: the giant crabs on a strand by the sea.
+    { name: 'sea-crabs', act: meet('crabs', 10) },
     { name: 'fight', act: async (p) => { await meet('wolves', 12)(p); await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
     // Gate C: a fight with magic. The hero learns a spell a fresh hero may cast (the debug menu's way),
     // picks a wolf and casts; the picture is taken once the spell shows.

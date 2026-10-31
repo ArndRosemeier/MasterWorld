@@ -39,6 +39,28 @@ export function territoryOf(d: WildDecision): Territory {
   return { kind: d.group, encounter: d.encounter, x: d.x, z: d.z, r: d.r, members: d.members, seed: d.seed, id: d.id };
 }
 
+/** How high over the sea a strand reaches (m), and how far off (m) the sea is looked for beside it. */
+const STRAND_TOP = 4, SEA_NEAR = 35;
+
+/** Whether the sea (open water 1 m deep or more) is within SEA_NEAR of (x, z), looked for in eight ways. */
+function seaBeside(terrain: Terrain, x: number, z: number): boolean {
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    if (terrain.waterDepth(x + Math.cos(a) * SEA_NEAR, z + Math.sin(a) * SEA_NEAR) > 1) return true;
+  }
+  return false;
+}
+
+/** A strand on the way out from (x, z) in direction `a` within `ring` (its distance; the `pick` share of those found), or -1. */
+function strandOn(terrain: Terrain, x: number, z: number, a: number, ring: readonly [number, number], pick: number): number {
+  const found: number[] = [];
+  for (let d = ring[0]; d <= ring[1]; d += 8) {
+    const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, h = terrain.height(px, pz);
+    if (h >= 0.3 && h <= STRAND_TOP && terrain.waterDepth(px, pz) === 0 && seaBeside(terrain, px, pz)) found.push(d);
+  }
+  return found.length ? found[Math.floor(pick * found.length) % found.length] : -1;
+}
+
 /**
  * The groups around a town: for each kind of the setting's wild, its groups on a ring around the
  * town where the land suits them (woods, open land, by a road out), apart from each other.
@@ -60,20 +82,25 @@ function placeWild(c: WildContext, town: Town): WildDecision[] {
         let a = hash2f(s, k, 2) * Math.PI * 2;
         // By a road: along one of the roads out, a little off it.
         if (def.habitat === 'road' && roads.length) a = roads[Math.floor(hash2f(s, k, 3) * roads.length)] + (hash2f(s, k, 4) - 0.5) * 0.35;
-        const x = tx + Math.cos(a) * d, z = tz + Math.sin(a) * d;
-        if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < 2) continue;
+        const shore = def.habitat === 'shore';
+        // A strand is a narrow band: looked for along the way out, not at one distance.
+        const along = shore ? strandOn(terrain, tx, tz, a, def.ring, hash2f(s, k, 6)) : d;
+        if (along < 0) continue;
+        const x = tx + Math.cos(a) * along, z = tz + Math.sin(a) * along;
+        // Dry and above the floods; on the strand only just above the sea, with the sea beside it.
+        if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < (shore ? 0.3 : 2) || (shore && (terrain.height(x, z) > STRAND_TOP || !seaBeside(terrain, x, z)))) continue;
         // Gentle enough to live on.
         const h = terrain.height(x, z), slope = terrain.steepness(x, z, 8, h);
         if (slope > 0.45) continue;
         const w = woods(x, z);
-        const fit = def.habitat === 'wood' ? w : def.habitat === 'open' ? 1 - w : 0.6 + (1 - w) * 0.2;
+        const fit = def.habitat === 'wood' ? w : def.habitat === 'open' || shore ? 1 - w : 0.6 + (1 - w) * 0.2;
         // Apart from the other groups, and clear of a people's hold.
         const crowd = out.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + def.range + 60) || terrain.holds.some((h) => Math.hypot(h.x - x, h.z - z) < def.range + 110) ? 1 : 0;
         const score = fit - crowd - slope + hash2f(s, k, 5) * 0.1;
         if (!best || score > best.score) best = { x, z, score };
       }
       if (!best || best.score < 0.2) continue;
-      const met = encounterFor({ setting: c.setting, seed: s, of: [def.encounter], where: def.habitat });
+      const met = encounterFor({ setting: c.setting, seed: s, of: [def.encounter], where: def.habitat, count: def.count });
       if (!met) continue;
       const id = town === c.towns[0] ? `${def.id}-${g + 1}` : `${town.decision.id}-${def.id}-${g + 1}`;
       out.push({ kind: 'wild', id, town: town.decision.id, group: def.id, encounter: met.encounter, x: best.x, z: best.z, r: def.range, members: met.members, seed: s, at: c.hours });

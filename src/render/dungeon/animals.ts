@@ -24,8 +24,9 @@ export type { AnimalDoing };
 interface Kind {
   /** Drawn as library animals where the build has their files (else as the Actors pack below). */
   readonly library?: LibraryKind;
-  readonly pack: string;
-  readonly preset: string;
+  /** The Actors pack (none: no Actors animal; without the library files it is grown by @futuremagic/creatures). */
+  readonly pack?: string;
+  readonly preset?: string;
   /** Breeds to pick from by seed (over `preset`): a herd of mixed cattle. */
   readonly presets?: readonly string[];
   /** The pack's clip for each thing it does (null or none: the clip playing goes on). */
@@ -87,6 +88,12 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     pace: { walk: 1.3, run: 4.5 },
     // A full brush of a tail (the presets' is thin at game distance).
     shape: { tailPlume: 1 },
+  },
+  // The strand's giant crabs (S9): the library's crab where the build has it, else grown (render/dungeon/CreatureView.ts).
+  crab: {
+    library: LIBRARY_KINDS.crab,
+    clips: {},
+    pace: { walk: 1.1, run: 3.2 },
   },
   deer: {
     library: LIBRARY_KINDS.deer,
@@ -165,9 +172,10 @@ export async function animalBody(species: string, seed: number, renderer: WebGPU
       return { kind: 'animal', place, actor: null, animal: null, lib, def, doing: '' };
     }
   }
+  if (!def.pack) return null;
   const first = await lead(def.pack);
   const animal = Animal.share(first);
-  animal.setPreset(preset ?? (def.presets ? def.presets[Math.floor(hash2f(seed, 2, 9) * def.presets.length) % def.presets.length] : def.preset));
+  animal.setPreset(preset ?? (def.presets ? def.presets[Math.floor(hash2f(seed, 2, 9) * def.presets.length) % def.presets.length] : def.preset!));
   if (def.shape || def.coat) animal.params = { shape: { ...animal.shape, ...def.shape }, coat: { ...animal.coat, ...def.coat } };
   if (def.shade) animal.params = { shape: animal.shape, coat: shaded(animal.coat as Record<string, unknown>, ...def.shade) };
   const shape = animal.shape as { size?: number };

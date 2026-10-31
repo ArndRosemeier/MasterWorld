@@ -48,6 +48,8 @@ export const items: ItemCatalog = {
     { id: 'venom-sac', name: 'Spider venom sac', kind: 'valuable', value: 30, weight: 0.1, lore: 'Handle it gently. The hedge witch makes a numbing salve of it.' },
     { id: 'boar-tusk', name: 'Boar tusk', kind: 'valuable', value: 14, weight: 0.2 },
     { id: 'venison', name: 'Haunch of venison', kind: 'food', heal: 14, value: 9, weight: 2 },
+    { id: 'crab-meat', name: 'Crab meat', kind: 'food', heal: 10, value: 6, weight: 1 },
+    { id: 'crab-shell', name: 'Giant crab shell', kind: 'valuable', value: 12, weight: 3, lore: 'Red and hard as a buckler. Armourers and cooks both ask after them.' },
     // Writings (C3): rare extra ways to a spell. Read, the spell is yours and the school opens; the page crumbles.
     { id: 'tome-embers', name: 'Charred primer of embers', kind: 'writing', teaches: 'fireball', value: 140, weight: 1.2, lore: 'Half its pages are ash. The rest still smell of smoke, and teach how to throw a fireball.' },
     { id: 'scroll-sunlance', name: 'Scroll of the sunlance', kind: 'writing', teaches: 'sunlance', value: 90, weight: 0.1, lore: 'Gold ink that glows faintly in the dark. Reading it once is enough.' },
@@ -69,6 +71,7 @@ export const items: ItemCatalog = {
     { id: 'wolf', items: [['wolf-pelt', 1]], count: [1, 1], coins: [0, 0] },
     { id: 'boar', items: [['boar-tusk', 2], ['venison', 1]], count: [1, 2], coins: [0, 0] },
     { id: 'deer', items: [['deer-hide', 1], ['venison', 2]], count: [1, 1], coins: [0, 0] },
+    { id: 'crab', items: [['crab-meat', 2], ['crab-shell', 1]], count: [1, 1], coins: [0, 0] },
     { id: 'web', items: [['silk', 3], ['venom-sac', 2]], count: [1, 2], coins: [0, 0] },
     { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1], ['tome-stone', 0.3]], count: [0, 1], coins: [10, 40] },
     { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1], ['tome-shadows', 0.25]], count: [0, 1], coins: [0, 0] },
