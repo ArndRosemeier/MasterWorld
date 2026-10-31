@@ -130,6 +130,8 @@ export const voyage: VoyageDef = {
   least: 24,
   offers: 3,
   reach: [2500, 14000],
+  sign: '#2f5f8f',
+  hall: 'Harbour master (passage by ship)',
   words: {
     topic: 'Passage by ship to {place} ({price})',
     given: '{price}. She lies at the pier: go aboard by the gangplank, she casts off directly.',

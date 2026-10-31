@@ -947,6 +947,9 @@ export interface VoyageDef {
   readonly least: number;
   readonly offers: number;
   readonly reach: readonly [number, number];
+  /** The shield over the harbour master's door ('#rrggbb'), and the map's name for their hall: where passage is bought. */
+  readonly sign?: string;
+  readonly hall?: string;
   readonly words: {
     /** The harbour master's topic (`{place}`: "the village 4.6 km west", `{price}`), the answer as passage is bought or the purse is too light. */
     readonly topic: string;
