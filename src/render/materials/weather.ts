@@ -6,6 +6,7 @@
  */
 import { Color, DoubleSide, MeshBasicNodeMaterial, Vector2, Vector3, type Texture } from 'three/webgpu';
 import { skyToward } from '@futuremagic/sky/node';
+import { SNOW_BAND } from '../../world/weather';
 import {
   Fn, attribute, cameraPosition, clamp, cross, dot, exp, float, fog, fract, length, max, mix, mod, normalize, positionGeometry,
   positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
@@ -17,9 +18,11 @@ export const WEATHER = {
   /** Precipitation 0..1, and the share of it that is snow. */
   rain: uniform(0),
   snow: uniform(0),
-  /** Wet ground 0..1, and snow lying on it 0..1. */
+  /** Wet ground 0..1. */
   wet: uniform(0),
-  lying: uniform(0),
+  /** Fresh snow by height (world/weather.ts WeatherState): up to `snowCover` lies, half of it at `snowLine` (m). */
+  snowCover: uniform(0),
+  snowLine: uniform(9000),
   /** Wind strength 0..1 and the unit direction it blows to (xz). */
   wind: uniform(0),
   windDir: uniform(new Vector2(1, 0)),
@@ -30,6 +33,12 @@ export const WEATHER = {
   /** The floating origin (render/origin.ts) modulo the box of drops (`precipShift`): the drops stay put in the world when it steps. */
   precipShift: uniform(new Vector3()),
 };
+
+/**
+ * Fresh snow lying on ground at height `y` (m), 0..1: the weather's snow cover where the air there is cold
+ * enough. Each spot reads its own height, so the land seen from a snowy peak is as green as it is close up.
+ */
+export const freshSnowAt = (y) => WEATHER.snowCover.mul(smoothstep(WEATHER.snowLine.sub(SNOW_BAND), WEATHER.snowLine.add(SNOW_BAND), y));
 
 /**
  * The scene's fog: exponential-squared haze (as three's FogExp2) plus exponential height mist below
