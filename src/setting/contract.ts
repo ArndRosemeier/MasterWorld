@@ -644,6 +644,23 @@ export interface SmallLifeDef {
   readonly squirrels: readonly string[];
   /** Chance of a squirrel in a 32 m square of closed wood (less where the wood is thinner). */
   readonly squirrelChance: number;
+  /** Shoals under the water (S9); none: no fish. */
+  readonly fish?: readonly FishKindDef[];
+}
+
+/** A kind of small fish, swimming in shoals (S9). */
+export interface FishKindDef {
+  readonly id: string;
+  /** Length, metres (a sprat 0.12, a herring 0.3). */
+  readonly size: number;
+  /** Colours of the back (sRGB 0xRRGGBB), one picked per shoal; the flanks and belly are silvered. */
+  readonly colours: readonly number[];
+  /** sea: off the coast; fresh: in lakes. */
+  readonly water: 'sea' | 'fresh';
+  /** How many in a shoal, at least and at most. */
+  readonly count: readonly [number, number];
+  /** Chance of a shoal in a 32 m square of water deep enough. */
+  readonly chance: number;
 }
 
 /** A kind of bird (plan 9.3). */
@@ -656,9 +673,10 @@ export interface BirdKindDef {
   /**
    * wood: a few forage on the woodland floor and flee up into the crowns; open: the same on meadows and
    * at wood edges, fleeing to the nearest trees or farther over the grass; flock: many wheel over open
-   * land and fields, settle to feed, and rise together.
+   * land and fields, settle to feed, and rise together; shore: a flock over the coast (S9: gulls), wheeling
+   * over the strand and the water off it, settling on the strand.
    */
-  readonly habitat: 'wood' | 'open' | 'flock';
+  readonly habitat: 'wood' | 'open' | 'flock' | 'shore';
   /** How many together, at least and at most. */
   readonly count: readonly [number, number];
   /** Chance of a group in a square where they live (32 m; flocks 128 m). */

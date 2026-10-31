@@ -1,20 +1,22 @@
 /**
  * Small life as drawn (sim/smallLife.ts moves it): every bird in one draw (@futuremagic/creatures
- * BirdBatch), each only as far off as it would still cover a pixel or so; the nearest squirrels on
+ * BirdBatch), every fish near a camera under the water in another (FishBatch), each only as far off as it would still cover a pixel or so; the nearest squirrels on
  * Actors' squirrel in its fur (render/dungeon/animals.ts), at most MAX of them within REACH. A squirrel's
  * body is made the first time one is near (its pack loads then, not at the start) and compiled under the
  * shader cap before it shows; one keeps its body while it stays among the nearest.
  */
 import type { Object3D, Vector3, WebGPURenderer } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import { BirdBatch } from '@futuremagic/creatures/three';
-import { createBirdMaterial } from '../materials/creatures';
+import { BirdBatch, FishBatch } from '@futuremagic/creatures/three';
+import { createBirdMaterial, createFishMaterial } from '../materials/creatures';
 import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from '../dungeon/animals';
 import { preparePeople } from '../hero/play';
 import type { SmallLife, Squirrel, SquirrelDoing } from '../../sim/smallLife';
 
 /** Birds drawn at most; how far off one is drawn per metre of its length. */
 const BIRDS = 384, BIRD_REACH = 600;
+/** Fish drawn at most, and how far off (m: the murk hides them beyond). */
+const FISH = 512, FISH_REACH = 40;
 /** Squirrel bodies at most, and how near (m) one must be to get a body. */
 const MAX = 4, REACH = 45;
 /** Seconds without new squirrel bodies after one could not be made. */
@@ -26,6 +28,7 @@ interface Body { readonly look: string; readonly body: AnimalBody; who: Squirrel
 
 export class SmallLifeView {
   readonly birds = new BirdBatch(createBirdMaterial(), BIRDS);
+  readonly fish = new FishBatch(createFishMaterial(), FISH);
   private readonly bodies: Body[] = [];
   private building = false;
   private sortIn = 0;
@@ -35,13 +38,20 @@ export class SmallLifeView {
 
   constructor(private readonly life: SmallLife, private readonly stage: Stage, private readonly renderer: WebGPURenderer) {}
 
-  /** For the warm-up (the birds' shader). */
-  toWarm(): Object3D[] { return [this.birds.mesh]; }
+  /** For the warm-up (the birds' and the fishes' shaders). */
+  toWarm(): Object3D[] { return [this.birds.mesh, this.fish.mesh]; }
 
-  addBirds(): Promise<void> { return this.stage.add(this.birds.mesh); }
+  async addBirds(): Promise<void> { await Promise.all([this.stage.add(this.birds.mesh), this.stage.add(this.fish.mesh)]); }
 
-  /** Each frame after the life has stepped; `shown`: out of doors (not below, not inside). */
-  show(dt: number, cam: Vector3, shown: boolean): void {
+  /** Each frame after the life has stepped; `shown`: out of doors (not below, not inside); `wet`: the camera under the water. */
+  show(dt: number, cam: Vector3, shown: boolean, wet = false): void {
+    const f = this.fish;
+    f.begin(cam.x, cam.y, cam.z);
+    if (shown && wet) for (const fish of this.life.fish()) {
+      const dx = fish.x - cam.x, dy = fish.y - cam.y, dz = fish.z - cam.z;
+      if (dx * dx + dy * dy + dz * dz < FISH_REACH * FISH_REACH && !f.add(fish)) break;
+    }
+    f.end();
     const b = this.birds;
     b.begin(cam.x, cam.y, cam.z);
     if (shown) for (const bird of this.life.birds()) {
@@ -52,7 +62,7 @@ export class SmallLifeView {
     this.squirrels(dt, cam, shown);
   }
 
-  get hudText(): string { return `${this.life.headcount} (${this.birds.count} drawn, ${this.bodies.filter((x) => x.who).length}/${this.bodies.length} squirrel bodies)`; }
+  get hudText(): string { return `${this.life.headcount} (${this.birds.count} + ${this.fish.count} drawn, ${this.bodies.filter((x) => x.who).length}/${this.bodies.length} squirrel bodies)`; }
 
   private squirrels(dt: number, cam: Vector3, shown: boolean): void {
     const off = (s: Squirrel) => Math.hypot(s.x - cam.x, s.z - cam.z);

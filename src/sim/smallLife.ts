@@ -11,10 +11,14 @@
  * - Flocks (starlings, rooks) wheel over open land, settle to feed now and then and rise together when
  *   someone comes near.
  *
+ * - Shoals (S9) swim under the sea and the lakes, wandering round their square; someone in the water near, and
+ *   they dart away together, spread out, and close up again when it is quiet.
+ *
  * By night they roost; in hard rain the birds shelter. Positions are world metres. Pure.
  */
 import { Rng, angleDiff, deriveSeed, hash2f, smoothstep, srgbToLinear } from '@futuremagic/core';
-import type { BirdKindDef, SmallLifeDef } from '../setting/contract';
+import type { BirdKindDef, FishKindDef, SmallLifeDef } from '../setting/contract';
+import { SEA_LEVEL } from '../world/water';
 
 /** The land as small life sees it. */
 export interface LifeLand {
@@ -40,6 +44,8 @@ export interface LifeHero {
 /** Side of a square of small life (the trunks' cells, world/trunks.ts), metres; flocks keep squares of FLOCK_CELL. */
 export const LIFE_CELL = 32;
 const FLOCK_CELL = 128;
+/** How far round a flock's square the sea and the land are looked for (m): the shore's flocks keep to the coast. */
+const COAST_LOOK = 70;
 /** Floats per tree in LifeLand.trees. */
 const TREE = 4;
 /** A tree's height at scale 1 (world/trunks.ts TREE_TALL). */
@@ -47,6 +53,10 @@ const TALL = 14;
 /** Squares nearer than this (m, their centre) live; farther than DROP they are let go. */
 const LIVE = 110, DROP = 140;
 const FLOCK_LIVE = 260, FLOCK_DROP = 320;
+/** Shoals live in squares nearer than this (m), and are let go farther than SHOAL_DROP; water shallower than SHOAL_DEEP has none. */
+const SHOAL_LIVE = 70, SHOAL_DROP = 95, SHOAL_DEEP = 3;
+/** How near (m) someone in the water comes before a shoal darts; how fast it cruises and darts (m/s); how long it stays scared (s). */
+const SHOAL_SCARE = 7, SHOAL_CRUISE = 0.8, SHOAL_DART = 3.4, SHOAL_CALM = 3;
 
 export type SquirrelDoing = 'idle' | 'alert' | 'eat' | 'hop' | 'run' | 'flick' | 'climb' | 'cling';
 
@@ -151,6 +161,44 @@ interface Flock {
   readonly weave: { p1: number; p2: number; p3: number; r: number; gx: number; gz: number }[];
 }
 
+/** One fish of a shoal, as drawn (@futuremagic/creatures FishPose). */
+export interface Fish {
+  x: number;
+  y: number;
+  z: number;
+  heading: number;
+  pitch: number;
+  roll: number;
+  size: number;
+  phase: number;
+  sweep: number;
+  r: number;
+  g: number;
+  b: number;
+}
+
+interface Shoal {
+  readonly kind: FishKindDef;
+  readonly fish: Fish[];
+  /** Each fish's place in the shoal (across, up, along; m) and its own wobble's phase. */
+  readonly offs: { a: number; u: number; l: number; p: number }[];
+  readonly rng: Rng;
+  /** The square's middle (it wanders round it) and the water's surface there. */
+  readonly hx: number;
+  readonly hz: number;
+  readonly surface: number;
+  cx: number;
+  cy: number;
+  cz: number;
+  heading: number;
+  turn: number;
+  tx: number;
+  ty: number;
+  tz: number;
+  /** Seconds it stays scared. */
+  scared: number;
+}
+
 /** What happened this step (for sound). */
 export interface LifeEvent {
   readonly kind: 'wings';
@@ -177,6 +225,7 @@ export class SmallLife {
   private readonly squares = new Map<number, Square>();
   private readonly flocks = new Map<number, Flock | null>();
   private readonly parties: Party[] = [];
+  private readonly shoals = new Map<number, Shoal | null>();
   private time = 0;
   /** 0 night .. 1 day; how hard it rains. */
   private day = 1;
@@ -191,8 +240,14 @@ export class SmallLife {
     for (const f of this.flocks.values()) if (f && this.rain < 0.35) for (const b of f.birds) if (b.shown) yield b;
   }
 
+  /** Every fish of the shoals about. */
+  *fish(): Generator<Fish> {
+    for (const s of this.shoals.values()) if (s) yield* s.fish;
+  }
+
   /** The first squirrel on the ground, bird pecking on it, or bird of a flock in the air (live, for `small=`: look at them). */
-  firstSeen(kind: 'squirrel' | 'birds' | 'flock'): { x: number; y: number; z: number } | null {
+  firstSeen(kind: 'squirrel' | 'birds' | 'flock' | 'fish'): { x: number; y: number; z: number } | null {
+    if (kind === 'fish') return this.fish().next().value ?? null;
     if (kind === 'squirrel') return this.squirrels.find((s) => !s.trunk) ?? null;
     if (kind === 'flock') {
       for (const f of this.flocks.values()) if (f?.state === 'wheel') return f.birds[0];
@@ -207,7 +262,9 @@ export class SmallLife {
     for (const p of this.parties) birds += p.birds.length;
     for (const f of this.flocks.values()) if (f) birds += f.birds.length;
     for (const _ of this.birds()) shown++;
-    return `small life ${this.squirrels.length} squirrels, ${shown}/${birds} birds`;
+    let fish = 0;
+    for (const _ of this.fish()) fish++;
+    return `small life ${this.squirrels.length} squirrels, ${shown}/${birds} birds, ${fish} fish`;
   }
 
   /**
@@ -230,6 +287,7 @@ export class SmallLife {
       for (const p of this.parties) this.stepParty(p, dt, hero, events);
       for (const f of this.flocks.values()) if (f) this.stepFlock(f, dt, hero, events);
     }
+    for (const s of this.shoals.values()) if (s) this.stepShoal(s, dt, hero);
     return events;
   }
 
@@ -266,6 +324,98 @@ export class SmallLife {
       if (this.flocks.has(k) || Math.hypot((i + 0.5) * F - hero.x, (j + 0.5) * F - hero.z) > FLOCK_LIVE) continue;
       this.flocks.set(k, this.flockOf(i, j));
     }
+    if (!this.def.fish?.length) return;
+    const n2 = Math.ceil(SHOAL_LIVE / C);
+    for (const k of this.shoals.keys()) {
+      const i = Math.floor(k / 65536) - 32768, j = (k % 65536) - 32768;
+      if (Math.hypot((i + 0.5) * C - hero.x, (j + 0.5) * C - hero.z) > SHOAL_DROP) this.shoals.delete(k);
+    }
+    for (let j = cj - n2; j <= cj + n2; j++) for (let i = ci - n2; i <= ci + n2; i++) {
+      const k = key(i, j);
+      if (this.shoals.has(k) || Math.hypot((i + 0.5) * C - hero.x, (j + 0.5) * C - hero.z) > SHOAL_LIVE) continue;
+      this.shoals.set(k, this.shoalOf(i, j));
+    }
+  }
+
+  /** The shoal of square (i, j), if its water is deep enough and one lives there (from its seed). */
+  private shoalOf(i: number, j: number): Shoal | null {
+    const C = LIFE_CELL, s = deriveSeed(this.seed, 'shoal', i, j);
+    const hx = (i + 0.5) * C, hz = (j + 0.5) * C, deep = this.land.waterDepth(hx, hz);
+    if (deep < SHOAL_DEEP) return null;
+    const surface = this.land.height(hx, hz) + deep;
+    const water = Math.abs(surface - SEA_LEVEL) < 0.5 ? 'sea' : 'fresh';
+    const kinds = this.def.fish!.filter((f) => f.water === water);
+    if (!kinds.length) return null;
+    const kind = kinds[Math.floor(hash2f(s, 1, 2) * kinds.length) % kinds.length];
+    if (hash2f(s, 3, 4) >= kind.chance) return null;
+    const rng = new Rng(deriveSeed(s, 'fish'));
+    const n = rng.int(kind.count[0], kind.count[1]), r = kind.size * (1.5 + Math.sqrt(n));
+    const { r: cr, g: cg, b: cb } = linearRgb(rng.pick(kind.colours));
+    const cy = surface - deep / 2;
+    const fish: Fish[] = [], offs: Shoal['offs'] = [];
+    for (let k = 0; k < n; k++) {
+      offs.push({ a: rng.range(-r, r), u: rng.range(-r, r) * 0.35, l: rng.range(-r, r) * 1.4, p: rng.range(0, 6.3) });
+      const size = kind.size * rng.range(0.85, 1.15);
+      fish.push({ x: hx, y: cy, z: hz, heading: 0, pitch: 0, roll: 0, size, phase: rng.range(0, 6.3), sweep: 0.1, r: cr, g: cg, b: cb });
+    }
+    const sh: Shoal = { kind, fish, offs, rng, hx, hz, surface, cx: hx, cy, cz: hz, heading: rng.range(-Math.PI, Math.PI), turn: 0, tx: hx, ty: cy, tz: hz, scared: 0 };
+    this.placeFish(sh, 0, 0);
+    return sh;
+  }
+
+  /** A shoal swims on: round its square, or away from someone in the water near it. */
+  private stepShoal(sh: Shoal, dt: number, hero: LifeHero): void {
+    const dx = sh.cx - hero.x, dy = sh.cy - hero.y, dz = sh.cz - hero.z, near = Math.hypot(dx, dy, dz);
+    if (hero.y < sh.surface && near < SHOAL_SCARE + hero.speed) {
+      // Away from them, a little to one side, and down if there is room.
+      const h = Math.max(Math.hypot(dx, dz), 1e-3), side = sh.rng.range(-0.5, 0.5);
+      sh.tx = sh.cx + (dx / h - (dz / h) * side) * 14;
+      sh.tz = sh.cz + (dz / h + (dx / h) * side) * 14;
+      sh.ty = sh.cy - 1;
+      sh.scared = SHOAL_CALM;
+    } else if (Math.hypot(sh.tx - sh.cx, sh.tz - sh.cz) < 2) {
+      const { x, z } = aboutPoint(sh.rng, sh.hx, sh.hz, 2, LIFE_CELL * 0.45);
+      sh.tx = x;
+      sh.tz = z;
+      sh.ty = sh.surface - this.land.waterDepth(x, z) * sh.rng.range(0.3, 0.7);
+    }
+    sh.scared = Math.max(0, sh.scared - dt);
+    const fright = sh.scared > 0 ? 1 : 0, speed = fright ? SHOAL_DART : SHOAL_CRUISE;
+    const was = sh.heading;
+    sh.heading = turnTo(sh.heading, Math.atan2(sh.tz - sh.cz, sh.tx - sh.cx), dt * (fright ? 5 : 0.9));
+    sh.turn = angleDiff(was, sh.heading) / Math.max(dt, 1e-3);
+    const nx = sh.cx + Math.cos(sh.heading) * speed * dt, nz = sh.cz + Math.sin(sh.heading) * speed * dt;
+    // Never into the shallows: turn back for the square's middle instead.
+    if (this.land.waterDepth(nx, nz) > SHOAL_DEEP * 0.6) {
+      sh.cx = nx;
+      sh.cz = nz;
+    } else {
+      sh.tx = sh.hx;
+      sh.tz = sh.hz;
+    }
+    const floor = sh.surface - this.land.waterDepth(sh.cx, sh.cz) + 1, top = sh.surface - 1;
+    sh.ty = Math.max(floor, Math.min(top, sh.ty));
+    const vy = Math.max(-0.6, Math.min(0.6, sh.ty - sh.cy));
+    sh.cy += vy * dt;
+    this.placeFish(sh, dt, vy / Math.max(speed, 0.5) + fright * 0.4);
+  }
+
+  /** Each fish of a shoal at its place in it (spread when scared), wobbling, its tail beating faster the faster it goes. */
+  private placeFish(sh: Shoal, dt: number, spread: number): void {
+    const c = Math.cos(sh.heading), s = Math.sin(sh.heading), fright = sh.scared > 0;
+    const grow = 1 + (fright ? 0.6 : 0), t = this.time;
+    sh.fish.forEach((f, k) => {
+      const o = sh.offs[k], w = Math.sin(t * 0.7 + o.p);
+      const a = o.a * grow + w * 0.25, l = o.l * grow + Math.sin(t * 0.5 + o.p * 2) * 0.3;
+      f.x = sh.cx + c * l - s * a;
+      f.z = sh.cz + s * l + c * a;
+      f.y = Math.min(sh.surface - 0.3, sh.cy + o.u * grow + Math.sin(t * 0.4 + o.p * 3) * 0.15);
+      f.heading = sh.heading + w * 0.15;
+      f.pitch = Math.max(-0.5, Math.min(0.5, spread * 0.4 + Math.cos(t * 0.4 + o.p * 3) * 0.05));
+      f.roll = Math.max(-0.9, Math.min(0.9, sh.turn * 0.25));
+      f.sweep = fright ? 0.2 : 0.1;
+      f.phase += dt * (fright ? 14 : 5) * (0.9 + 0.2 * Math.sin(o.p));
+    });
   }
 
   /** Who lives in square (i, j), from its seed. */
@@ -291,7 +441,7 @@ export class SmallLife {
     }
     // Ground birds: woodland kinds in woods, open kinds on meadows and at wood edges.
     this.def.birds.forEach((kind, k) => {
-      if (kind.habitat === 'flock') return;
+      if (kind.habitat === 'flock' || kind.habitat === 'shore') return;
       const fit = kind.habitat === 'wood' ? w : (1 - w) * (nTrees > 0 || w > 0.05 ? 1 : 0.6);
       if (hash2f(s, 2, k) >= kind.chance * fit * 2) return;
       const rng = new Rng(deriveSeed(s, 'birds', kind.id));
@@ -306,13 +456,15 @@ export class SmallLife {
   private flockOf(i: number, j: number): Flock | null {
     const F = FLOCK_CELL, s = deriveSeed(this.seed, 'flock', i, j);
     const ox = (i + 0.5) * F, oz = (j + 0.5) * F;
-    const kinds = this.def.birds.filter((b) => b.habitat === 'flock');
-    if (!kinds.length || !this.dry(ox, oz) || this.land.woods(ox, oz) > 0.2) return null;
+    // By the sea (S9): the shore's flocks (gulls), over the strand and the water off it; else the open land's.
+    const coast = this.coast(ox, oz);
+    const kinds = this.def.birds.filter((b) => b.habitat === (coast ? 'shore' : 'flock'));
+    if (!kinds.length || (!coast && (!this.dry(ox, oz) || this.land.woods(ox, oz) > 0.2))) return null;
     const kind = kinds[Math.floor(hash2f(s, 1, 2) * kinds.length) % kinds.length];
     if (hash2f(s, 3, 4) >= kind.chance) return null;
     const rng = new Rng(deriveSeed(s, 'birds'));
     const n = rng.int(kind.count[0], kind.count[1]);
-    const cy = this.land.height(ox, oz) + rng.range(16, 26);
+    const cy = this.groundOrSea(ox, oz) + rng.range(16, 26);
     const birds: Bird[] = [], weave: Flock['weave'] = [];
     for (let k = 0; k < n; k++) {
       weave.push({ p1: rng.range(0, 6.3), p2: rng.range(0, 6.3), p3: rng.range(0, 6.3), r: rng.range(1.5, 3) + kind.size * 8, gx: rng.range(-1, 1), gz: rng.range(-1, 1) });
@@ -326,15 +478,29 @@ export class SmallLife {
   }
 
   private bird(kind: BirdKindDef, rng: Rng, x: number, z: number): Bird {
-    const c = rng.pick(kind.colours);
     return {
       x, y: this.land.height(x, z), z, heading: rng.range(-Math.PI, Math.PI), pitch: 0, bank: 0, size: kind.size * rng.range(0.92, 1.08), wing: 0, fold: 1,
-      r: srgbToLinear(((c >> 16) & 255) / 255), g: srgbToLinear(((c >> 8) & 255) / 255), b: srgbToLinear((c & 255) / 255),
+      ...linearRgb(rng.pick(kind.colours)),
       doing: 'peck', shown: true, beat: kind.beat * rng.range(0.9, 1.1), phase: rng.range(0, 6.3), until: rng.range(0, 2), flight: null, hop: null,
     };
   }
 
   private dry(x: number, z: number): boolean { return this.land.waterDepth(x, z) <= 0; }
+
+  /** What a bird flies over: the land, or the sea's surface over the sea bed. */
+  private groundOrSea(x: number, z: number): number { return Math.max(SEA_LEVEL, this.land.height(x, z)); }
+
+  /** Whether (x, z) lies on the coast: low land or shallow sea, with the sea a little way off and land too. */
+  private coast(x: number, z: number): boolean {
+    const h = this.land.height(x, z);
+    if (h < -12 || h > 8) return false;
+    let sea = false, land = h > SEA_LEVEL;
+    for (let k = 0; k < 8 && !(sea && land); k++) {
+      const a = (k / 8) * Math.PI * 2, y = this.land.height(x + Math.cos(a) * COAST_LOOK, z + Math.sin(a) * COAST_LOOK);
+      if (y < SEA_LEVEL - 1.5) sea = true; else if (y > SEA_LEVEL) land = true;
+    }
+    return sea && land;
+  }
 
   /** Open ground to stand on: dry, no building. */
   private open(x: number, z: number): boolean { return this.dry(x, z) && !this.land.blocked?.(x, z, 0.3); }
@@ -621,7 +787,7 @@ export class SmallLife {
 
   private stepFlock(f: Flock, dt: number, hero: LifeHero, events: LifeEvent[]): void {
     const running = hero.speed > RUNNING;
-    const ground = this.land.height(f.cx, f.cz);
+    const ground = this.groundOrSea(f.cx, f.cz);
     if (f.state === 'wheel') {
       // The centre sweeps about its square in long curves, now higher, now lower.
       if (Math.hypot(f.tx - f.cx, f.tz - f.cz) < 12) {
@@ -702,6 +868,11 @@ export class SmallLife {
       b.fold = f.state === 'land' && f.t > 0.95 ? 1 : 0;
     });
   }
+}
+
+/** An sRGB 0xRRGGBB as linear r, g, b. */
+function linearRgb(c: number): { r: number; g: number; b: number } {
+  return { r: srgbToLinear(((c >> 16) & 255) / 255), g: srgbToLinear(((c >> 8) & 255) / 255), b: srgbToLinear((c & 255) / 255) };
 }
 
 /** A point in the ring r0..r1 round (x, z), in a seeded direction. */

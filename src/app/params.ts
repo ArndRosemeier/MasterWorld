@@ -73,9 +73,9 @@ export const params = {
   /** The wild around the town (`wild=0` leaves it out; `wild=wolves` starts beside the first group of that kind). */
   wild: q.get('wild') !== '0',
   wildAt: ['0', '1', '', null].includes(q.get('wild')) ? null : q.get('wild'),
-  /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about). */
+  /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about; `small=fish` with `fly` swims beside a shoal). */
   small: q.get('small') !== '0',
-  smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
+  smallAt: (['squirrel', 'birds', 'flock', 'fish'] as const).find((k) => k === q.get('small')) ?? null,
   /** Regions open as the hero walks (`regions=0`: only the start's land). */
   regions: q.get('regions') !== '0',
   /** Start beside a place the VGM opens out on the land: `site=waystation`, `hamlet`, `village`, `camp`, `ruin` or `barrows` (the first a walk finds). */

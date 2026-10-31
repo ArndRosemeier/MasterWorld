@@ -148,6 +148,18 @@
     "reason": "step(dt, ...) is a tick: the den's world-simulation step and the spell particles' frame share only the name (the finder paired them anew as creatures.ts grew)."
   },
   {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/smallLife.ts#step",
+    "reason": "step(dt, ...) is a tick: the hero kneeling to search and the small life's world-simulation step share only the name (paired anew as smallLife.ts grew its shoals)."
+  },
+  {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/smallLife.ts#step",
+    "reason": "step(dt, ...) is a tick: a visiting household member's walk and the small life's step share only the name (paired anew as smallLife.ts grew its shoals)."
+  },
+  {
+    "key": "same name: masterworld/render/livestock/PoultryView.ts#toWarm + masterworld/render/wildlife/SmallLifeView.ts#toWarm",
+    "reason": "toWarm() is the warm-up's seam: each view lists its own meshes (hens' bodies; the birds' and fishes' batches)."
+  },
+  {
     "key": "idiom: [.camera .canvas .director .fight .hud .notes .player .setting] in masterworld/app/cellars.ts + masterworld/app/holdGate.ts + masterworld/app/wildLand.ts",
     "reason": "Each builds an Encounter (app/encounter.ts) from its host, whose constructor takes these parts; HoldHost already extends WildHost, so only the call remains."
   },
