@@ -5,11 +5,12 @@ import { Terrain } from '../src/world/terrain';
 import { classic } from '../src/setting/classic/index';
 import { openWorld } from '../src/vgm/builder';
 import { SMALL } from './small';
+import { startWorld } from './frontierLand';
 import { islandFor, islandPlace, isleAt } from '../src/vgm/islands';
 import { seaWays, voyageTopic } from '../src/vgm/voyages';
 import type { Decision } from '../src/world/decisions';
 
-const { terrain } = openWorld(parseSeed('masterworld'), classic);
+const { terrain } = startWorld();
 const def = classic.world.islands!;
 
 test('islands: out at sea within a voyage of the start, each land ringed by deep water, the same on every run', () => {
@@ -39,7 +40,7 @@ test('islands: out at sea within a voyage of the start, each land ringed by deep
 });
 
 test('an island is promised from a harbour, told by its harbour master, sailed to, given a place, and the log replays it', () => {
-  const seed = parseSeed('masterworld'), world = openWorld(seed, classic), t = world.terrain;
+  const seed = parseSeed('masterworld'), world = startWorld({ own: true }), t = world.terrain;
   const home = t.towns[0].decision, def = classic.voyage!, regions = classic.regions!;
   const water = (x: number, z: number) => t.waterDepth(x, z);
   const ctx = { seed, log: world.log, terrain: t, regions, home, hero: home, hours: 9 };
@@ -65,7 +66,7 @@ test('an island is promised from a harbour, told by its harbour master, sailed t
   assert.ok(isleAt(t, classic.world.islands!, place.site!.x, place.site!.z) === isle || Math.hypot(place.site!.x - isle!.x, place.site!.z - isle!.z) < isle!.r, 'on the island');
   assert.ok(t.height(place.site!.x, place.site!.z) > 0, 'on dry land');
   // Replayed from its log, the world has the same island village.
-  const again = openWorld(seed, classic).terrain;
+  const again = openWorld(seed, classic, SMALL).terrain;
   again.settleMore([r]);
   assert.deepEqual(again.town(r.id)?.decision, village.decision);
 });
