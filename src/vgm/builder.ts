@@ -1,12 +1,14 @@
 /**
  * The Builder (plan 4.2), first cut: the decisions a new world starts with. The start (plan 6) is a small
- * town by the river nearest the setting's start place (D50), on gentle dry ground, with the stone arch
+ * harbour town by the river's mouth nearest the setting's start place (Arnd 2026-10-30: the start is a sea town;
+ * D50: the river its fresh water), else a town by the nearest river, on gentle dry ground, with the stone arch
  * of milestone 1 a short walk outside it, and the hold of a people (plan 11.6) in the hills a walk away. Deterministic per seed; the result goes into the decision log.
  */
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import { HOUSE_SCALE } from '@futuremagic/settlement';
 import type { SettingModule } from '../setting/contract';
-import { sitesIn, type Decision, type DecisionLog, type TownDecision } from '../world/decisions';
+import { sitesIn, type Decision, type DecisionLog, type HarbourAt, type TownDecision } from '../world/decisions';
+import { harbourSpots, riverMouths } from '../world/coast';
 import { findStart, startGround, type StartPlace } from '../world/start';
 import { bankSpots, byFreshWater, freshWaterEdge, WATER_REACH } from '../world/freshWater';
 import { Terrain } from '../world/terrain';
@@ -15,11 +17,14 @@ import { holdSite } from '../world/hold';
 import { archNear, type ArchSite } from '../world/volumes';
 import { promiseCellar, retreatSite } from './dungeons';
 
+/** Where the start is; a sea town's shore (its harbour) when it stands by a river's mouth. */
+export type Home = StartPlace & { readonly harbour?: HarbourAt };
+
 /** A world ready to build on: the land, the log it was settled with, and where the start is. */
 export interface OpenWorld {
   terrain: Terrain;
   log: DecisionLog;
-  home: StartPlace;
+  home: Home;
 }
 
 /**
@@ -38,17 +43,53 @@ export function openWorld(seed: number, setting: SettingModule, hydro?: HydroOpt
   return { terrain, log, home };
 }
 
-/** Where a new game starts: the setting's start place, moved to the river nearest it (D50). */
-export function startPlace(t: Terrain): StartPlace {
-  return waterside(t, findStart(t.skeleton, t.setting));
+/** Where a new game starts: the setting's start place, moved to the sea at the river's mouth nearest it, else to the river nearest it (D50). */
+export function startPlace(t: Terrain): Home {
+  const start = findStart(t.skeleton, t.setting);
+  return seaside(t, start) ?? waterside(t, start);
 }
 
+/**
+ * The start moved to the sea (Arnd 2026-10-30: the start town is a sea town): by the river's mouth nearest the
+ * setting's start place, on the bank with the most dry ground (world/coast.ts, as the frontier's harbour towns).
+ */
+export function seaside(t: Terrain, start: StartPlace): Home | null {
+  const want = t.setting.start;
+  for (const within of BANK_SEARCH) {
+    let best: Home | null = null, low = Infinity;
+    for (const m of riverMouths(t, start.x, start.z, within)) for (const h of harbourSpots(t, m, START_R, SEA_ALONG)) {
+      if (!startGround(t.skeleton, want, h.x, h.z, true)) continue;
+      // Its river beside it, not through it.
+      const river = freshWaterEdge(t, h.x, h.z, START_R + WATER_REACH, false);
+      if (river <= START_R || river > START_R + WATER_REACH) continue;
+      // Gentle on its landward side (the sea before it is the harbour's).
+      const c = t.height(h.x, h.z);
+      let steep = 0;
+      for (let a = 0; a < 16; a++) {
+        const ox = Math.cos((a * Math.PI) / 8), oz = Math.sin((a * Math.PI) / 8);
+        if (ox * h.harbour.dx + oz * h.harbour.dz > 0.2) continue;
+        for (const r of [START_R * 0.4, START_R * 0.8]) steep = Math.max(steep, Math.abs(t.height(h.x + ox * r, h.z + oz * r) - c) / r);
+      }
+      if (steep > want.maxSlope * 1.5) continue;
+      const score = Math.hypot(h.x - start.x, h.z - start.z) / within + steep / want.maxSlope;
+      if (score < low) { low = score; best = { x: h.x, z: h.z, elevation: c, biome: t.biomeIdAt(h.x, h.z) ?? start.biome, harbour: h.harbour }; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+/** How far along the coast from a river's mouth a sea start may stand, in town radii (its river beside it, not through it). */
+const SEA_ALONG = [0.9, 1.2, 1.5, 1.9, 2.4];
+
 /** The start's decisions, chosen on the bare land (before anything is settled on it). */
-export function firstDecisions(t: Terrain, home: { x: number; z: number }): Decision[] {
+export function firstDecisions(t: Terrain, home: { x: number; z: number; harbour?: HarbourAt }): Decision[] {
   const out: Decision[] = [];
-  const arch = archNear(t, home);
+  // A sea town stands where its harbour is: the arch keeps out of it.
+  const sea = home.harbour ? seaTown(t, home, home.harbour) : null;
+  const arch = archNear(t, home, sea ? sea.radius + 90 : 0);
   if (arch) out.push({ kind: 'volume', id: 'arch-1', site: arch });
-  const town = startTown(t, home, arch);
+  const town = sea ?? startTown(t, home, arch);
   if (town) out.push(town);
   // A people's own place (plan 11.6): the first hold in the hills near the start town.
   const people = t.setting.peoples.find((p) => p.hold);
@@ -100,14 +141,23 @@ export function waterside(t: Terrain, start: StartPlace): StartPlace {
   return start;
 }
 
+/** The start town of about 80-120 people (D41) as a sea town, at its harbour spot. */
+function seaTown(t: Terrain, home: { x: number; z: number }, harbour: HarbourAt): TownDecision {
+  const seed = deriveSeed(t.seed, 'vgm', 'start-town');
+  return { kind: 'town', id: 'town-1', x: home.x, z: home.z, radius: startRadius(seed), harbour };
+}
+
+/** A small town's outline: 68-76 m, times the houses' scale (AssetGenerator HOUSE_SCALE). */
+const startRadius = (seed: number) => (68 + 8 * hash2f(seed, 1, 1)) * HOUSE_SCALE;
+
 /**
  * The start town: the best spot within SEARCH metres of `home` by flatness, dry ground, fresh water within
  * reach (D50: a river or lake, not a brook; a hard rule when any is near) and nearness; clear of the arch.
  */
 export function startTown(t: Terrain, home: { x: number; z: number }, arch: ArchSite | null): TownDecision | null {
   const seed = deriveSeed(t.seed, 'vgm', 'start-town');
-  // A small town of about 80-120 people (D41): an outline of 68-76 m, times the houses' scale (AssetGenerator HOUSE_SCALE).
-  const R = (68 + 8 * hash2f(seed, 1, 1)) * HOUSE_SCALE;
+  // A small town of about 80-120 people (D41).
+  const R = startRadius(seed);
   const w = { river: 0, lake: 0 };
   // Only where the start has water near (else, on a dry seed, the old rule: the best spot without it).
   const needWater = freshWaterEdge(t, home.x, home.z, SEARCH, false) < SEARCH;

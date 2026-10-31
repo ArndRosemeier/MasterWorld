@@ -11,7 +11,7 @@ import { grassMask } from '../src/world/grass';
 import { bridgesOn, deckAt, townBridges, type Bridge } from '../src/world/bridges';
 import { emptyWater, inChannel } from '../src/world/hydro';
 import { RoadNet } from '../src/world/roads';
-import { EAST, frontierLand } from './frontierLand';
+import { SOUTH, frontierLand } from './frontierLand';
 
 const land = frontierLand({ own: true }), { first, home, seed, terrain } = land;
 // The land as it was opened before harbour towns (S2): the capital's west gate road then ends in a brook (the bridge
@@ -21,7 +21,7 @@ const regions = { ...land.regions, fills: land.regions.fills.filter((f) => !f.ha
 /** The capital (C15, D41): the VGM founds one a few km out as the hero walks, and it replays from the log. */
 test('capital: one, a few km out, a decision in the log; walled, with its ruler, guild halls and shops', () => {
   // Walking east until it is founded (the walk stops there).
-  const log = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, EAST, 9, (d) => settlementOf(d, regions.fills)?.size === 'capital')];
+  const log = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, SOUTH, 9, (d) => settlementOf(d, regions.fills)?.size === 'capital')];
   const caps = regionDecisions(log).filter((d) => settlementOf(d, regions.fills)?.size === 'capital');
   assert.equal(caps.length, 1, 'one capital');
   const d = caps[0], t = settlementOf(d, regions.fills)!;

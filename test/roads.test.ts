@@ -35,9 +35,9 @@ const n = road.pts.length / 3;
 const inner = Array.from({ length: n }, (_, k) => k).filter((k) => k > 6 && k < n - 6 && k % 5 === 0 && terrain.waterDepth(pt(k).x, pt(k).z) <= 0
   && !inChannel(terrain.hydro.brookAt(pt(k).x, pt(k).z), 4) && !inChannel(terrain.hydro.riverAt(pt(k).x, pt(k).z, emptyWater()), 4));
 const bare = inner.map((k) => terrain.height(pt(k).x, pt(k).z));
-// A track out to a spot 1.8 km south of the town, past a brook, for the bridges (the hamlet's track may cross none).
+// A track out to a spot 2.8 km south of the town, past brooks, for the bridges (the hamlet's track may cross none).
 // Its own id: laid with the hamlet track's (both are the log's first road), the net kept only the first.
-const brookRoad = { ...linkRoad(terrain, log.filter((d) => d.kind === 'road'), { id: 'ford', x: town.decision.x, z: town.decision.z + 1800, r: 20 }, 'track')!, id: 'road-ford' };
+const brookRoad = { ...linkRoad(terrain, log.filter((d) => d.kind === 'road'), { id: 'ford', x: town.decision.x, z: town.decision.z + 2800, r: 20 }, 'track')!, id: 'road-ford' };
 const bp = (k: number) => ({ x: brookRoad.pts[k * 3], y: brookRoad.pts[k * 3 + 1], z: brookRoad.pts[k * 3 + 2] });
 const bn = brookRoad.pts.length / 3;
 terrain.addRoad(road);
