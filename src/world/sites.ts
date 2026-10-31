@@ -5,7 +5,7 @@
  * it draws with the town's one building shader, with the shapes the walker cannot go through. Pure.
  */
 import { Rng, deriveSeed, type Ground } from '@futuremagic/core';
-import { distToPoly, ensureCCW, pointInPoly, rect, type BuildingMesh, type Poly } from '@futuremagic/settlement';
+import { distToPoly, ensureCCW, planShip, pointInPoly, rect, type BuildingMesh, type Poly } from '@futuremagic/settlement';
 import type { RegionFillDef, SightShape } from '../setting/contract';
 import { settles, type RegionDecision, type SightDecision } from './decisions';
 import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
@@ -41,7 +41,7 @@ export const SIGHT_CLEARING = 20;
 
 /** A sight by the way (C9), laid out on the land from its decision: a ring of standing stones, a waystone, a cairn, a stash. */
 export function layOutSight(d: SightDecision, shape: SightShape, height: (x: number, z: number) => number): SiteLayout {
-  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : shape === 'stash' ? stash : shape === 'wreck' ? wreckage : cairn);
+  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : shape === 'stash' ? stash : shape === 'wreck' ? wreckage : shape === 'washed-up' ? washedUp : cairn);
 }
 
 /** What to lay out (a region's place or a sight), for a terrain worker: laying out a barrow takes tens of milliseconds. */
@@ -290,6 +290,45 @@ function wreckage(at: At, k: MeshKit): void {
 }
 /** Planks long under the sea: grey-green. */
 const SEA_WOOD: Tint = [112, 118, 104];
+
+/**
+ * A wreck washed up (S9; the boat herself, broken on her side, is drawn by render/ships.ts): sprung planks and a spar in
+ * the wrack along the strand, casks rolled up the sand, and her sea chest by the hull, the find.
+ */
+function washedUp(at: At, k: MeshKit, solids: Solid[]): void {
+  const r = at.rng;
+  for (let i = 0; i < 9; i++) {
+    const [x, z] = onCircle(at, r.range(0, Math.PI * 2), r.range(2.5, 9)), lx = x - at.x, lz = z - at.z;
+    k.onGround(at.ground, () => k.box(lx, 0, lz, r.range(0.18, 0.3), 0.05, r.range(1.2, 2.6), r.range(0, Math.PI), CellarMat.Boards, varyTint(r, DRIFT_WOOD, 0.12)), 0.03);
+  }
+  const [yx, yz] = onCircle(at, r.range(0, Math.PI * 2), r.range(4, 7));
+  k.onGround(at.ground, () => k.box(yx - at.x, 0, yz - at.z, 0.16, 0.16, r.range(4, 6), r.range(0, Math.PI), CellarMat.Boards, varyTint(r, DRIFT_WOOD, 0.08)), 0.06);
+  for (let i = 0; i < 3; i++) {
+    const [x, z] = onCircle(at, r.range(0, Math.PI * 2), r.range(3, 7));
+    k.onGround(at.ground, () => k.cylinder(x - at.x, 0, z - at.z, 0.32, 0.8, 10, CellarMat.Boards, varyTint(r, CASK, 0.1), 0.08), 0.05);
+    solids.push({ x, z, r: 0.35 });
+  }
+  // The sea chest, by the hull (towards the way the hero comes from).
+  const [cx, cz] = washedUpChest(at);
+  k.onGround(at.ground, () => {
+    k.box(cx - at.x, 0, cz - at.z, 0.9, 0.5, 0.55, at.yaw + 0.4, CellarMat.Boards, CHEST);
+    k.box(cx - at.x, 0.5, cz - at.z, 0.92, 0.08, 0.57, at.yaw + 0.4, CellarMat.Boards, varyTint(r, CHEST, 0.06));
+  }, 0.08);
+  solids.push({ x: cx, z: cz, r: 0.5 });
+  // The boat herself (drawn by render/ships.ts, her bow along `yaw`): a row of round solids along her length.
+  const half = planShip(at.seed, 'boat').length / 2;
+  for (let t = -0.8; t <= 0.81; t += 0.4) {
+    const [bx, bz] = onCircle(at, at.yaw, t * half);
+    solids.push({ x: bx, z: bz, r: 0.8 });
+  }
+}
+/** Where a washed-up boat's sea chest stands (the hero kneels at it to search it). */
+export const washedUpChest = (at: { readonly x: number; readonly z: number; readonly yaw: number }): [number, number] => onCircle(at, Math.PI / 2 - at.yaw, 2.2);
+
+/** Wood bleached by the sea and the sun; a cask's staves; an old sea chest. */
+const DRIFT_WOOD: Tint = [168, 156, 136];
+const CASK: Tint = [120, 92, 62];
+const CHEST: Tint = [92, 66, 44];
 
 /** A stash: a flat stone leant against a boulder, a bundle in oilcloth showing under it. */
 function stash(at: At, k: MeshKit, solids: Solid[]): void {

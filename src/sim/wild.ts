@@ -55,13 +55,31 @@ const TURNS = [0.35, -0.35, 0.75, -0.75, 1.15, -1.15, 1.55, -1.55, 1.9, -1.9];
 /** A hop free (Den.unstick): how far it may go (m) and how high up or down it lands. */
 const HOP = { near: 1.2, far: 4.5, up: 1.4, down: 3 } as const;
 
-/** Open land as a den's ground: the territories are its homes; walking is straight, around water and walls. */
+/**
+ * A home in water deeper than this (m) makes the ground the sea's (S9): its bodies swim, keep to water at least
+ * `shallow` deep, and stay `top` under the surface and `bed` over the bottom, at the depth of a hero who swims
+ * (its `prey`; else `cruise` under the surface), rising or sinking at most `rise` (m per step).
+ */
+const SEA = { home: 3, shallow: 1.8, top: 1.3, bed: 0.6, cruise: 2.5, rise: 0.05 } as const;
+
+/** Open land as a den's ground: the territories are its homes; walking is straight, around water and walls. Or the sea, swum. */
 export class OpenGround implements DenGround {
   /** Where each group is gathered now: it drifts about its territory as they move on, together. */
   private readonly at: { x: number; z: number }[];
+  /** Its home lies out in deep water: it is swum, not walked (S9). */
+  readonly sea: boolean;
 
-  constructor(private readonly land: Land, private readonly homes: readonly { x: number; z: number; r: number }[]) {
+  /** `prey`: the height (y) of the hero's feet while the hero swims, else null (a sea ground's bodies come to it). */
+  constructor(private readonly land: Land, private readonly homes: readonly { x: number; z: number; r: number }[], private readonly prey: () => number | null = () => null) {
     this.at = homes.map((h) => ({ x: h.x, z: h.z }));
+    this.sea = homes.length > 0 && land.waterDepth(homes[0].x, homes[0].z) >= SEA.home;
+  }
+
+  /** Where a swimmer at (x, z) keeps (y): the hero's depth, else cruising, between the surface and the bed; near `y` if given. */
+  private swimAt(x: number, z: number, y?: number): number {
+    const bed = this.land.height(x, z), top = bed + this.land.waterDepth(x, z) - SEA.top;
+    const want = Math.max(bed + SEA.bed, Math.min(top, this.prey() ?? top + SEA.top - SEA.cruise));
+    return y === undefined ? want : Math.max(y - SEA.rise, Math.min(y + SEA.rise, want));
   }
 
   /** A point near where the group is gathered (a herd grazes together, a pack keeps close). */
@@ -75,12 +93,13 @@ export class OpenGround implements DenGround {
     for (let i = 0; i < 10; i++) {
       const a = rng.range(0, Math.PI * 2), d = Math.sqrt(rng.range(0, 1)) * GATHER;
       const x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d;
-      if (this.open(x, z, 0.5)) return { x, y: this.land.height(x, z), z };
+      if (this.open(x, z, 0.5)) return { x, y: this.floorAt(x, z), z };
     }
-    return { x: c.x, y: this.land.height(c.x, c.z), z: c.z };
+    return { x: c.x, y: this.floorAt(c.x, c.z), z: c.z };
   }
 
-  floorAt(x: number, z: number): number { return this.land.height(x, z); }
+  /** The ground under (x, z); at sea, where a swimmer keeps (`y`: from about there, as the den asks it 0.6 m over its body). */
+  floorAt(x: number, z: number, y?: number): number { return this.sea ? this.swimAt(x, z, y === undefined ? undefined : y - 0.6) : this.land.height(x, z); }
 
   clearance(x: number, _y: number, z: number): number { return this.open(x, z, 0.4) ? 2 : -1; }
 
@@ -118,6 +137,8 @@ export class OpenGround implements DenGround {
     const nx = x + dx, nz = z + dz, len = Math.hypot(dx, dz);
     if (len < 1e-6) return true;
     const wet = this.land.waterDepth(nx, nz), here = this.land.waterDepth(x, z);
+    // At sea: the water deep enough to swim in, or any way deeper; nothing else in the way.
+    if (this.sea) return wet >= SEA.shallow || wet > here;
     // Out of deep water: any way to shallower goes.
     if (wet >= WADE && !(here >= WADE && wet < here)) return false;
     if (this.land.blocked?.(nx, nz, r) && !this.land.blocked!(x, z, r)) return false;
@@ -133,6 +154,7 @@ export class OpenGround implements DenGround {
    * stand, any such spot. Null: nowhere worth it.
    */
   hop(from: P3, toward: P3 | null, r: number): P3 | null {
+    if (this.sea) return null;
     const bad = !this.open(from.x, from.z, r) || !this.free(from.x, from.y, from.z, r);
     const goal = toward ? Math.hypot(toward.x - from.x, toward.z - from.z) : 0;
     const base = toward ? Math.atan2(toward.z - from.z, toward.x - from.x) : 0;
@@ -168,12 +190,13 @@ export class OpenGround implements DenGround {
     const base = Math.atan2(from.z - q.z, from.x - q.x);
     for (const turn of [0, 0.5, -0.5, 1, -1, 1.6, -1.6]) {
       const a = base + turn, x = from.x + Math.cos(a) * 30, z = from.z + Math.sin(a) * 30;
-      if (this.open(x, z, 0.5) && this.open((from.x + x) / 2, (from.z + z) / 2, 0.5)) return [{ x, y: this.land.height(x, z), z }];
+      if (this.open(x, z, 0.5) && this.open((from.x + x) / 2, (from.z + z) / 2, 0.5)) return [{ x, y: this.floorAt(x, z), z }];
     }
     return [];
   }
 
   private open(x: number, z: number, r: number): boolean {
+    if (this.sea) return this.land.waterDepth(x, z) >= SEA.shallow;
     return this.land.waterDepth(x, z) < 0.25 && !this.land.blocked?.(x, z, r);
   }
 }

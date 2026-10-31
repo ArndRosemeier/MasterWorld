@@ -331,6 +331,11 @@ export function harbourTowns(towns: readonly Town[]): Town[] {
   return towns.filter((t) => t.decision.harbour);
 }
 
+/** Is (x, z) within `within` m of one of these harbour towns (their moorings)? */
+export function byHarbour(harbours: readonly Town[], x: number, z: number, within: number): boolean {
+  return harbours.some((w) => Math.hypot(w.decision.x - x, w.decision.z - z) < within);
+}
+
 export function townPlanOf(d: TownDecision, t: Terrain): TownPlan {
   return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t), farmland: d.size !== 'waystation', ...(d.harbour ? { harbour: d.harbour } : {}) });
 }

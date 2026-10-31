@@ -1,7 +1,7 @@
 /**
  * The land around the town in the classic setting (plan 9.3, 12.1): deer in the meadows, boar under the
  * oaks, a wolf pack deeper in the woods, a few bandits by a road out; giant crabs on the strands and smugglers in a cove
- * by the sea. Near the town, so nothing is too
+ * by the sea, sharks out in deep water. Near the town, so nothing is too
  * strong for a fresh hero (D29): farther lands hold more.
  */
 import type { WildDef } from '../contract';
@@ -15,4 +15,6 @@ export const wild: readonly WildDef[] = [
   // By the sea (S9; a town with no coast near has none): giant crabs on the strands, smugglers in a cove farther off.
   { id: 'crabs', encounter: 'crabs', habitat: 'shore', ring: [320, 1300], range: 28, groups: 2 },
   { id: 'smugglers', encounter: 'smugglers', habitat: 'shore', ring: [600, 1600], range: 24, groups: 1, count: [2, 3] },
+  // Out in deep water past the harbour: a shark, for a hero who swims far out.
+  { id: 'sharks', encounter: 'shark', habitat: 'sea', ring: [500, 1800], range: 45, groups: 2 },
 ];

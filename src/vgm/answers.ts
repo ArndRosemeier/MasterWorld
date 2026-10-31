@@ -63,7 +63,7 @@ export function sightsOf(log: DecisionLog): SightDecision[] {
  * for that need, or no ground fits).
  */
 export function sightFor(c: NeedContext, need: 'discovery' | 'reward' = 'discovery'): SightDecision | null {
-  const defs = (c.setting.sights ?? []).filter((d) => (d.need ?? 'discovery') === need && !d.sea);
+  const defs = (c.setting.sights ?? []).filter((d) => (d.need ?? 'discovery') === need && !d.sea && !d.strand);
   if (!defs.length) return null;
   const past = sightsOf(c.log), n = past.length + 1, s = deriveSeed(c.seed, 'sight', n), r = new Rng(s);
   // Not the one met last, if there is another.

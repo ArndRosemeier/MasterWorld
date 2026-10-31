@@ -95,7 +95,7 @@ export class WildLand {
     const light = this.host.light();
     for (const g of this.groups) {
       const t = g.territory, d = Math.hypot(x - t.x, z - t.z) - t.r;
-      if (!g.built && d < BUILD) g.built = this.build(g);
+      if (!g.built && d < BUILD) g.built = this.raise(g);
       g.awake = awake(g.awake, d);
       if (g.delve) g.delve.fight.light = light;
     }
@@ -139,9 +139,11 @@ export class WildLand {
     return `wild ${on.map((g) => g.territory.id).join(' ') || '-'} (${up.length}/${this.groups.length} built)`;
   }
 
-  private async build(g: Group): Promise<void> {
+  private async raise(g: Group): Promise<void> {
     const h = this.host, t = g.territory, saved = this.saved[t.id];
-    const den = new Den(new OpenGround(this.land, [t]), t.members.map((creature) => ({ creature, room: 0 })), h.setting.creatures, deriveSeed(t.seed, 'den'), saved?.dead ?? []);
+    // Out at sea (S9) its swimmers come to the depth of a hero who swims.
+    const w = h.player.walker, prey = () => (w.mode === 'swim' && !h.player.offFoot ? w.pos.y : null);
+    const den = new Den(new OpenGround(this.land, [t], prey), t.members.map((creature) => ({ creature, room: 0 })), h.setting.creatures, deriveSeed(t.seed, 'den'), saved?.dead ?? []);
     const delve = new Delve(null, den, h.setting, h.character, h.seed, saved);
     const creatures = await CreatureView.build(den, deriveSeed(h.seed, 'wild'), { x: 0, y: 0, z: 0 }, h.renderer);
     creatures.group.visible = false;

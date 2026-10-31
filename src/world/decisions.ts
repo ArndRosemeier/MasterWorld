@@ -302,6 +302,8 @@ export interface SightDecision {
   readonly need?: 'reward';
   /** It lies on the sea bed (a wreck, S8: `vgm/wrecks.ts`), its yaw the way her bow points. */
   readonly sea?: true;
+  /** It lies on a strand (a wreck washed up, S9: `vgm/wrecks.ts`), its yaw the way her bow points. */
+  readonly strand?: true;
   readonly x: number;
   readonly z: number;
   readonly yaw: number;

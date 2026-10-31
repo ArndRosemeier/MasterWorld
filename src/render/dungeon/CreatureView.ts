@@ -69,11 +69,12 @@ interface Shown {
 const yawOf = (dir: number) => Math.atan2(-Math.cos(dir), -Math.sin(dir));
 
 /** How each beast of the land is grown: a hunter's lean build, a grazer's long legs and neck, a rooting brute. */
-const BEAST: Record<'wolf' | 'deer' | 'boar' | 'crab', { role: CritterRole; integument: Integument; plan?: BodyPlan }> = {
+const BEAST: Record<'wolf' | 'deer' | 'boar' | 'crab' | 'shark', { role: CritterRole; integument: Integument; plan?: BodyPlan }> = {
   wolf: { role: 'hunter', integument: 'fur' },
   deer: { role: 'grazer', integument: 'fur' },
   boar: { role: 'brute', integument: 'hide' },
   crab: { role: 'brute', integument: 'chitin', plan: 'crab' },
+  shark: { role: 'hunter', integument: 'hide', plan: 'serpent' },
 };
 
 /** The animal a rat, spider or beast is (one species per creature kind, from the seed). */

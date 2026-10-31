@@ -222,6 +222,8 @@ const SESSIONS = [
     { name: 'wild', act: meet('deer', 25) },
     // S9: the giant crabs on a strand by the sea.
     { name: 'sea-crabs', act: meet('crabs', 10) },
+    // S9: a shark out in deep water, the hero swimming near it.
+    { name: 'sea-shark', act: meet('sharks', 8) },
     { name: 'fight', act: async (p) => { await meet('wolves', 12)(p); await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
     // Gate C: a fight with magic. The hero learns a spell a fresh hero may cast (the debug menu's way),
     // picks a wolf and casts; the picture is taken once the spell shows.
@@ -334,6 +336,10 @@ const SESSIONS = [
   // calling for help (the cry's bubble shows once the hero is near enough to see them).
   { id: 'sea-castaway', query: `${still}&hour=11&weather=fair&castaway&wild=0`, shots: [
     { name: 'sea-castaway', act: async (p) => { await p.waitForTimeout(2500); } },
+  ] },
+  // S9: a boat the sea threw up on a strand, broken on her side, her casks and sea chest in the wrack.
+  { id: 'sea-washed-up', query: `${still}&hour=11&weather=fair&washedup&wild=0`, shots: [
+    { name: 'sea-washed-up', act: async (p) => { await p.waitForTimeout(1500); } },
   ] },
   // S2: a harbour town the VGM founded by a river's mouth. On its quay at late morning looking out over the piers,
   // then from out over the water back at the town, then the quay in the evening, its tavern lit.

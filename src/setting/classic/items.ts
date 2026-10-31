@@ -49,6 +49,8 @@ export const items: ItemCatalog = {
     { id: 'boar-tusk', name: 'Boar tusk', kind: 'valuable', value: 14, weight: 0.2 },
     { id: 'venison', name: 'Haunch of venison', kind: 'food', heal: 14, value: 9, weight: 2 },
     { id: 'crab-meat', name: 'Crab meat', kind: 'food', heal: 10, value: 6, weight: 1 },
+    { id: 'shark-tooth', name: 'Shark tooth', kind: 'valuable', value: 9, weight: 0.1, lore: 'A white wedge, serrated like a saw. Sailors wear them against drowning.' },
+    { id: 'shark-meat', name: 'Shark meat', kind: 'food', heal: 12, value: 5, weight: 2 },
     { id: 'crab-shell', name: 'Giant crab shell', kind: 'valuable', value: 12, weight: 3, lore: 'Red and hard as a buckler. Armourers and cooks both ask after them.' },
     // Writings (C3): rare extra ways to a spell. Read, the spell is yours and the school opens; the page crumbles.
     { id: 'tome-embers', name: 'Charred primer of embers', kind: 'writing', teaches: 'fireball', value: 140, weight: 1.2, lore: 'Half its pages are ash. The rest still smell of smoke, and teach how to throw a fireball.' },
@@ -71,6 +73,7 @@ export const items: ItemCatalog = {
     { id: 'wolf', items: [['wolf-pelt', 1]], count: [1, 1], coins: [0, 0] },
     { id: 'boar', items: [['boar-tusk', 2], ['venison', 1]], count: [1, 2], coins: [0, 0] },
     { id: 'deer', items: [['deer-hide', 1], ['venison', 2]], count: [1, 1], coins: [0, 0] },
+    { id: 'shark', items: [['shark-meat', 2], ['shark-tooth', 2]], count: [1, 2], coins: [0, 0] },
     { id: 'crab', items: [['crab-meat', 2], ['crab-shell', 1]], count: [1, 1], coins: [0, 0] },
     { id: 'web', items: [['silk', 3], ['venom-sac', 2]], count: [1, 2], coins: [0, 0] },
     { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1], ['tome-stone', 0.3]], count: [0, 1], coins: [10, 40] },
@@ -78,6 +81,7 @@ export const items: ItemCatalog = {
     { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30] },
     { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25] },
     // What the sea leaves (S5, for the wrecks and sea caves of S8): a drowned sailor's chest, a diver's draughts in it.
+    { id: 'washed-up', items: [['rope', 1], ['old-coin', 2], ['deep-draught', 1], ['ring', 0.4]], count: [1, 2], coins: [2, 18] },
     { id: 'wreck', items: [['deep-draught', 2], ['old-coin', 3], ['rope', 1], ['ring', 1], ['amulet', 0.5], ['garnet', 0.5]], count: [1, 2], coins: [5, 40] },
     {
       id: 'lair', count: [2, 3], coins: [20, 80],

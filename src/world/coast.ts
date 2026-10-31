@@ -36,6 +36,15 @@ function seaward(t: Terrain, x: number, z: number): [number, number] {
   return [gx / l, gz / l];
 }
 
+/** The way to the sea from (x, z) if open water `deep` m deep or more lies within `within` m (a unit vector), looked for in eight ways; else null. */
+export function seaWithin(t: Pick<Terrain, 'waterDepth'>, x: number, z: number, within: number, deep = 0.5): [number, number] | null {
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2, ux = Math.cos(a), uz = Math.sin(a);
+    if (t.waterDepth(x + ux * within, z + uz * within) > deep) return [ux, uz];
+  }
+  return null;
+}
+
 /**
  * The nearest coast spot of a kind from (x, z), along a spiral out to some 30 km; null if none is met. A beach and
  * a cliff stand on land just in from the waterline, facing the sea; `under` is off the nearest beach, on the bed.
