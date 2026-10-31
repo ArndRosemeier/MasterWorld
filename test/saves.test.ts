@@ -41,3 +41,13 @@ test('saves: other settings, newer games and junk are refused with a reason', ()
 test('saves: the slot line says the day, the time and where', () => {
   assert.equal(saveLabel(save, 'in the town'), 'Day 2, 14:30, in the town');
 });
+
+test('saves: a new save is named as typed, else "Save N" after the highest, and never overwrites a save', async () => {
+  const { saveName } = await import('../src/app/saveGame');
+  assert.equal(saveName('  Before the  crypt ', []), 'Before the crypt');
+  assert.equal(saveName('', ['autosave', 'Save 2', 'slot 1', 'save 7']), 'Save 8');
+  assert.equal(saveName('', []), 'Save 1');
+  assert.equal(saveName('Autosave', []), 'Autosave 2');
+  assert.equal(saveName('crypt', ['Crypt', 'crypt 2']), 'crypt 3');
+  assert.equal(saveName('x'.repeat(60), []).length, 40);
+});
