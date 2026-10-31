@@ -90,6 +90,8 @@ export const TOOLS: readonly Tool[] = [
   { id: 'hurt-traveller', name: 'A hurt traveller', writes: ['traveller'], need: 'people', asked: 'need', answer: hurtTravellerFor },
   { id: 'traveller', name: 'A traveller by the way', writes: ['traveller'], need: 'people', asked: 'need', answer: travellerFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
+  { id: 'voyage', name: 'A voyage', writes: ['journey'], need: null, asked: 'call' },
+  { id: 'far-harbour', name: 'A harbour across the water', writes: ['region'], need: null, asked: 'call' },
   { id: 'quest', name: "A master's deed", writes: ['dungeon'], need: 'purpose', asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },

@@ -3,7 +3,7 @@
  * of armour, potions, food, tools and valuables; a few legendary pieces with their history; what places
  * and creatures of some danger hold. Rarity and the bonuses to its qualities are rolled when an item is found.
  */
-import type { ItemCatalog, TravelDef, UpkeepDef } from '../contract';
+import type { ItemCatalog, TravelDef, UpkeepDef, VoyageDef } from '../contract';
 
 export const items: ItemCatalog = {
   items: [
@@ -107,6 +107,24 @@ export const travel: TravelDef = {
     tooDear: 'The cart is {price}, friend, and your purse says otherwise. Your legs are free.',
     going: 'The road goes by…',
     arrived: 'The cart sets you down at the inn of {place}, {hours} on the road.',
+  },
+};
+
+/**
+ * Passage by sea (S4): a ship makes 7 m/s with the wind (quicker than the cart, the way over the water is short); a
+ * berth costs about twice a seat on the cart a kilometre, a day's wage for a short crossing, food aboard included.
+ */
+export const voyage: VoyageDef = {
+  speed: 7,
+  perKm: 12,
+  least: 24,
+  offers: 3,
+  reach: [2500, 14000],
+  words: {
+    topic: 'Passage by ship to {place} ({price})',
+    given: '{price}. Go aboard by the gangplank; she sails as soon as you are on deck.',
+    tooDear: 'Passage is {price}, and the master takes no promises. Come back with the coin.',
+    arrived: 'The ship comes in to {place}, {hours} at sea.',
   },
 };
 

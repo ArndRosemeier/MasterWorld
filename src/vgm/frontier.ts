@@ -111,28 +111,42 @@ function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; 
   let roll = hash2f(s, Math.floor(p.x / 250), Math.floor(p.z / 250)) * total, pick = country;
   for (const f of pool) { if ((roll -= f.weight) < 0) { pick = f; break; } }
   const base = { kind: 'region' as const, id: `region-${n}`, seed: s, at: c.hours };
-  if (pick.place !== 'none') {
-    // The place needs a square of its own: its size if that is free, else the largest free one round the
-    // point. Open ground first: the point's square, then the free squares beside it; woodland only when
-    // none of them has open ground.
-    for (let level = pick.level; level >= 0; level--) {
-      // A smaller square only while the place (and the fields round it) still fits in it: the capital never squeezes.
-      if (sizeOf(level) < radiusOf(pick) * 5) break;
-      const k = keyAt(level, p.x, p.z);
-      if (!wholeFree(map, k)) continue;
-      let wooded: { k: RegionKey; site: Spot } | null = null;
-      for (const [dx, dz] of AROUND) {
-        const q = { level, x: k.x + dx, z: k.z + dz };
-        if (!wholeFree(map, q)) continue;
-        const site = findSite(c, pick, q, s);
-        if (site?.open) return { ...base, ...q, fill: pick.id, site: site.at };
-        if (site && !wooded) wooded = { k: q, site };
-      }
-      if (wooded) return { ...base, ...wooded.k, fill: pick.id, site: wooded.site.at };
-      break;
+  return (pick.place !== 'none' ? placeFill(c, map, p, pick, base) : null) ?? { ...base, ...keyAt(country.level, p.x, p.z), fill: country.id };
+}
+
+/**
+ * A harbour town opened round `p` (S4, the far harbour of a voyage): the setting's harbour fill, its square and its
+ * place by a river's mouth found as the frontier finds them. Null: the setting has no harbour, or none fits there.
+ */
+export function harbourRegion(c: FrontierContext, p: { x: number; z: number }): RegionDecision | null {
+  const done = regionDecisions(c.log), map = c.map ?? regionMapOf(c.log, c.regions.country);
+  const f = c.regions.fills.find((x) => x.harbour), n = done.length + 1;
+  if (!f || map.at(p.x, p.z)) return null;
+  return placeFill(c, map, p, f, { kind: 'region', id: `region-${n}`, seed: deriveSeed(c.seed, 'vgm', 'region', n), at: c.hours });
+}
+
+/** The place of `pick` in a free square round `p` (its own size, or smaller while it fits), or null. */
+function placeFill(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; z: number }, pick: RegionFillDef, base: Pick<RegionDecision, 'kind' | 'id' | 'seed' | 'at'>): RegionDecision | null {
+  // The place needs a square of its own: its size if that is free, else the largest free one round the
+  // point. Open ground first: the point's square, then the free squares beside it; woodland only when
+  // none of them has open ground.
+  for (let level = pick.level; level >= 0; level--) {
+    // A smaller square only while the place (and the fields round it) still fits in it: the capital never squeezes.
+    if (sizeOf(level) < radiusOf(pick) * 5) break;
+    const k = keyAt(level, p.x, p.z);
+    if (!wholeFree(map, k)) continue;
+    let wooded: { k: RegionKey; site: Spot } | null = null;
+    for (const [dx, dz] of AROUND) {
+      const q = { level, x: k.x + dx, z: k.z + dz };
+      if (!wholeFree(map, q)) continue;
+      const site = findSite(c, pick, q, base.seed);
+      if (site?.open) return { ...base, ...q, fill: pick.id, site: site.at };
+      if (site && !wooded) wooded = { k: q, site };
     }
+    if (wooded) return { ...base, ...wooded.k, fill: pick.id, site: wooded.site.at };
+    break;
   }
-  return { ...base, ...keyAt(country.level, p.x, p.z), fill: country.id };
+  return null;
 }
 
 /** The point's own square first, then the eight beside it. */

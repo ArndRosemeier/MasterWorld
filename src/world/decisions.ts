@@ -282,6 +282,9 @@ export interface JourneyDecision {
   readonly fare: number;
   readonly at: number;
   readonly arrive: number;
+  /** By sea (S4): passage aboard a ship between harbour towns, along its way over the water (x, z, ...). */
+  readonly by?: 'sea';
+  readonly route?: readonly number[];
 }
 
 /**
