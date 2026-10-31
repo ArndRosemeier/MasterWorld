@@ -12,7 +12,7 @@ import type { VoyageDef } from '../setting/contract';
 import { fill } from '../talk/folk';
 import { riverMouths } from '../world/coast';
 import { nearestFirst } from '../world/spiral';
-import { settlementOf, type DecisionLog, type HarbourAt, type JourneyDecision, type RegionDecision, type TownDecision } from '../world/decisions';
+import { settlementOf, type DecisionLog, type DelayDecision, type HarbourAt, type JourneyDecision, type RegionDecision, type TownDecision } from '../world/decisions';
 import { wayLength, type Voyage } from '../world/fleet';
 import { compass } from './dungeons';
 import { heldBy } from './events';
@@ -134,9 +134,47 @@ export function voyageOf(log: DecisionLog, from: string, w: SeaWay, at: number):
   return { ...journeyOf(log, from, w, at), by: 'sea', route: [...w.route] };
 }
 
-/** The voyages in the log (journeys by sea): from which harbour town's ship to which, when and along which way. */
+/**
+ * The voyages in the log (journeys by sea): from which harbour town's ship to which, when and along which way. A
+ * ship held in harbour (S10) sails when the VGM said, and comes in as much later.
+ */
 export function voyagesIn(log: DecisionLog): { readonly id: string; readonly from: string; readonly to: string; readonly v: Voyage }[] {
   const out: { id: string; from: string; to: string; v: Voyage }[] = [];
-  for (const d of log) if (d.kind === 'journey' && d.by === 'sea' && d.route) out.push({ id: d.id, from: d.from, to: d.to, v: { at: d.at, arrive: d.arrive, route: d.route } });
+  const held = new Map<string, number>();
+  for (const d of log) if (d.kind === 'delay') held.set(d.journey, d.until);
+  for (const d of log) {
+    if (d.kind !== 'journey' || d.by !== 'sea' || !d.route) continue;
+    const at = Math.max(d.at, held.get(d.id) ?? d.at);
+    out.push({ id: d.id, from: d.from, to: d.to, v: { at, arrive: d.arrive + at - d.at, route: d.route } });
+  }
   return out;
+}
+
+/** The weather at a place and an hour as the harbour master reads it: wind (0 calm .. 1 gale) and storm (0..1). */
+export type SeaWeather = (x: number, z: number, hours: number) => { readonly wind: number; readonly storm: number };
+
+/** No ship leaves a harbour in a storm or a gale stronger than these (S10, D26). */
+export const ROUGH = { storm: 0.35, wind: 0.8 } as const;
+/** The harbour master looks ahead this often (h), and holds a ship at most this long (h). */
+const HOLD_STEP = 0.5, HOLD_MOST = 36;
+
+/** Is the sea at (x, z) too rough to sail at `hours`? */
+export function roughAt(weather: SeaWeather, x: number, z: number, hours: number): boolean {
+  const w = weather(x, z, hours);
+  return w.storm > ROUGH.storm || w.wind > ROUGH.wind;
+}
+
+/**
+ * The VGM's hold on a ship (tool `hold-ship`, S10): passage `j` bought to sail from its harbour at (x, z) waits
+ * while the sea there is rough, until it has blown over (an hour of fair enough weather), at most HOLD_MOST hours.
+ * Null: she sails when she would.
+ */
+export function holdFor(log: DecisionLog, j: JourneyDecision, x: number, z: number, weather: SeaWeather): DelayDecision | null {
+  if (!roughAt(weather, x, z, j.at)) return null;
+  let until = j.at + HOLD_MOST;
+  for (let h = j.at + HOLD_STEP; h < j.at + HOLD_MOST; h += HOLD_STEP) {
+    if (!roughAt(weather, x, z, h) && !roughAt(weather, x, z, h + HOLD_STEP) && !roughAt(weather, x, z, h + 2 * HOLD_STEP)) { until = h; break; }
+  }
+  const n = log.filter((d) => d.kind === 'delay').length + 1;
+  return { kind: 'delay', id: `delay-${n}`, journey: j.id, until, at: j.at };
 }

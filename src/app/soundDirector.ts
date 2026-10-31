@@ -45,6 +45,8 @@ export interface SoundHost {
   where(): { place: Place; room: string | null };
   /** Flying the free camera: no footsteps. */
   inFlight(): boolean;
+  /** The hero stands on a ship's deck (S10). */
+  aboard(): boolean;
   /** The horses about, and the one the hero rides (null: on foot). */
   horses(): readonly Steed[];
   riding(): Steed | null;
@@ -294,7 +296,7 @@ export class SoundDirector {
     return {
       hour: this.host.hour(), place: where.place, room: where.room, under: this.host.camera.position.y < (this.host.water(camera.position.x, camera.position.z)?.level ?? -1e9) - 0.05 && where.place === 'land',
       rain: wx.rain, snow: wx.snow, wind: wx.wind, storm: wx.storm, height: Math.max(0, ground), sea, water, river: where.place === 'land' ? river : null,
-      fall: where.place === 'land' ? fall : null, town, woods: this.c.cover, conifer: this.c.conifer,
+      fall: where.place === 'land' ? fall : null, town, woods: this.c.cover, conifer: this.c.conifer, aboard: this.host.aboard(),
     };
   }
 

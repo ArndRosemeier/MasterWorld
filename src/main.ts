@@ -259,6 +259,8 @@ export async function start(b: Boot): Promise<void> {
     // Roads decided while the last game was played level the land from the start.
     terrain.settleMore(later);
     const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
+    /** The harbour master's look at the sky (S10), kept for reuse. */
+    const seaSky = weather.state(0, 0, 0);
     const hour = title && !params.hourSet ? title.draw.hour : params.hour;
     if (params.weather) {
       if (!WEATHER_KINDS.includes(params.weather as WeatherKind)) throw new Error(`?weather=${params.weather}: one of ${WEATHER_KINDS.join(', ')}`);
@@ -872,6 +874,8 @@ export async function start(b: Boot): Promise<void> {
     }, start, {
       height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
+      // The sea's waves: a shark keeps under them (S9).
+      surface: (x, z) => sea.surfaceAt(x, z),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
     }, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
@@ -1141,6 +1145,7 @@ export async function start(b: Boot): Promise<void> {
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
       where: () => (visit() ? { place: 'cellar', room: null } : rooms?.door ? { place: 'room', room: rooms.door.b.kind } : { place: 'land', room: null }),
       inFlight: () => player.offFoot,
+      aboard: () => !!decks.ship,
       horses: () => player.steeds,
       riding: () => player.riding,
       threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
@@ -1365,6 +1370,8 @@ export async function start(b: Boot): Promise<void> {
       get towns() { return towns?.every ?? []; },
       log: () => log,
       journey: (d) => { log = [...log, d]; },
+      hold: (d) => { log = [...log, d]; },
+      weather: (x, z, h) => weather.state(x, z, h, seaSky),
       frontier: () => ({ seed, log, terrain, regions: setting.regions!, home: start?.decision ?? home, hero: player.walker.pos, hours: hours() }),
       openRegion: (d) => regionOpened(d),
       water: (x, z) => terrain.waterDepth(x, z),

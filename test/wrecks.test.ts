@@ -1,15 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
+import { frontierLand, startWorld } from './frontierLand';
 import { sightFor, type NeedContext } from '../src/vgm/answers';
 import { offTheCoast, washedUpFor, wreckFor } from '../src/vgm/wrecks';
 import { wildFor } from '../src/vgm/wild';
 import { layOutSight } from '../src/world/sites';
 import { wreckLying } from '../src/world/fleet';
 
-const seed = parseSeed('masterworld'), { terrain, log } = openWorld(seed, classic), home = terrain.towns[0].decision;
+const { seed } = frontierLand(), { terrain, log } = startWorld(), home = terrain.towns[0].decision;
 // A swimmer off the coast, out of the harbour's way.
 const off = offTheCoast(terrain, home)!;
 const c = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: classic, hero: off, toward: null, ...over });

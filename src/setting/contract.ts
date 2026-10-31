@@ -952,6 +952,8 @@ export interface VoyageDef {
     readonly topic: string;
     readonly given: string;
     readonly tooDear: string;
+    /** The answer as passage is bought while a storm keeps the ship in (S10: `{price}`, `{hours}` till she sails). */
+    readonly held: string;
     /** The note on coming in to the far harbour (`{place}`, `{hours}`). */
     readonly arrived: string;
     /** The topic for passage to an island (S7: what sailors say of it, `{place}`: "the island 8.4 km west", `{price}`). */

@@ -10,6 +10,7 @@ import type { Stage } from '@futuremagic/stage';
 import { gangplankMesh, hullHalf, planShip, ropeMesh, shipMesh, type Mooring, type ShipPlan } from '@futuremagic/settlement';
 import { HULLS, HULL_POSES, HULL_STATIONS, WATER } from './materials/waterInputs';
 import { buildingMeshAt } from './materials/building';
+import { WEATHER } from './materials/weather';
 import { LIE_OVER, afloatAt, farBerth, fleetOf, passageShip, voyageAfloat, wreckLying, type Afloat as Place, type Vessel, type Voyage } from '../world/fleet';
 import type { Decks, Pose } from '../world/deck';
 import type { Town } from '../world/town';
@@ -67,12 +68,17 @@ export interface ShipsHost {
   readonly ground?: (x: number, z: number) => number;
 }
 
+/** Wind (0 calm .. 1 gale) in which a ship under way takes her sails in (S10). */
+const REEF_WIND = 0.72;
+/**
+ * How far a ship rolls in a gale over what her waves give her (rad at wind 1; pitch half of it), moored and under
+ * way, and how fast (rad/s): the swell under her is the sea's long waves, too gentle to throw her about alone (S10).
+ */
+const GALE_ROLL = { moored: 0.07, out: 0.12, rate: 0.9 };
 /** How far an upturned boat's keel stands out of the water (m). */
 const KEEL_OUT = 0.3;
 /** How far a boat washed up lies over on her side (rad), and how deep in the sand (share of her draft). */
 const BEACHED_LIST = 1.25, BEACHED_SUNK = 0.35;
-/** What is left of her mast above the deck (m). */
-const BEACHED_STUMP = 0.7;
 
 export class ShipsView {
   private readonly group = new Group();
@@ -82,6 +88,8 @@ export class ShipsView {
   /** The ropes the crew haul on (one mesh each, stretched between its ends; kept for reuse). */
   private readonly ropeMeshes: Mesh[] = [];
   private added = false;
+  /** Seconds drawn, for the roll in a gale. */
+  private clock = 0;
 
   /** The wrecks drawn now (near the camera), by id: her mesh, plan and pose on the bed. */
   private readonly sunk = new Map<string, { mesh: Mesh; plan: ShipPlan; pose: Pose }>();
@@ -96,6 +104,7 @@ export class ShipsView {
    * deck goes with it). One mesh is built per frame at most.
    */
   float(cam: Vector3, hours: number, dt: number): void {
+    this.clock += dt;
     if (!this.added) { this.added = true; void this.h.stage.add(this.group); }
     let built = false;
     const hulls: { far: number; a: Afloat }[] = [];
@@ -118,11 +127,12 @@ export class ShipsView {
         // (The ship the hero stands on counts as here: after a sleep through the crossing she is far from where the camera
         // was, and must carry them on.)
         const at = out ?? afloatAt(a.v, hours), d = this.h.decks.ship === a.id ? 0 : Math.hypot(at.x - cam.x, at.z - cam.z);
-        const want = d < SEEN ? (at.sailing ? 'set' : 'furled') : null;
+        // In a gale her crew have the sails in (reefed, S10): she runs under bare yards.
+        const want = d < SEEN ? (at.sailing && WEATHER.wind.value < REEF_WIND ? 'set' : 'furled') : null;
         if (want && !a[want] && !built) { a[want] = this.build(a.v, want); built = true; }
         for (const k of ['furled', 'set'] as const) { const m = a[k]; if (m) m.visible = want === k; }
         if (!want) { this.h.decks.drop(a.id); if (a.plank) a.plank.visible = false; continue; }
-        this.ride(a, at, dt);
+        this.ride(a, at, dt, !!out);
         hulls.push({ far: d, a });
         const m = a[want];
         if (m) { m.position.set(a.pose.x, a.pose.y, a.pose.z); m.rotation.set(-a.pose.roll, -Math.atan2(a.pose.uz, a.pose.ux), a.pose.pitch); m.updateMatrix(); }
@@ -146,8 +156,8 @@ export class ShipsView {
       if (!near) { if (m) { this.group.remove(m); m.geometry.dispose(); this.ashore.delete(b.id); } continue; }
       if (m || built) continue;
       built = true;
-      // Dismasted: her mast snapped off above the deck (the spar lies on the sand, world/sites.ts).
-      const whole = planShip(b.seed, 'boat'), plan = { ...whole, masts: whole.masts.map((m) => ({ ...m, top: m.foot + BEACHED_STUMP, yards: [] })) };
+      // Dismasted: her mast gone (the spar lies on the sand, world/sites.ts). (A mast without yards breaks the shrouds.)
+      const plan = { ...planShip(b.seed, 'boat'), masts: [] };
       const mesh = buildingMeshAt(shipMesh(plan, 0, 0, 1, 0, 0, [0, 0, 0], 'furled', true), 0, 0, 0, 'boat washed up');
       mesh.rotation.order = 'YZX';
       mesh.position.set(b.x, (this.h.ground?.(b.x, b.z) ?? 0) + plan.draft * (1 - BEACHED_SUNK) * Math.cos(BEACHED_LIST), b.z);
@@ -251,14 +261,16 @@ export class ShipsView {
   }
 
   /** On the waves at its place: up and down with the surface under its middle, its tilt following bow and side. */
-  private ride(a: Afloat, at: Place, dt: number): void {
+  private ride(a: Afloat, at: Place, dt: number, out: boolean): void {
     const p = a.v.mooring.plan, L = p.length * 0.35, B = p.beam * 0.4, o = a.pose;
     const sea = (x: number, z: number) => this.h.surface(x, z) ?? 0;
     const bow = sea(at.x + at.ux * L, at.z + at.uz * L), stern = sea(at.x - at.ux * L, at.z - at.uz * L);
     const port = sea(at.x - at.uz * B, at.z + at.ux * B), star = sea(at.x + at.uz * B, at.z - at.ux * B);
     const k = Math.min(1, dt * FOLLOW);
-    o.pitch += (Math.atan2(bow - stern, 2 * L) - o.pitch) * k;
-    o.roll += (Math.atan2(port - star, 2 * B) * 0.7 - o.roll) * k;
+    // In a storm she rolls and pitches on top of that, each ship to her own beat.
+    const w = WEATHER.wind.value, gale = w * w * (out ? GALE_ROLL.out : GALE_ROLL.moored), beat = this.clock * GALE_ROLL.rate + p.length * 1.7;
+    o.pitch += (Math.atan2(bow - stern, 2 * L) + gale * 0.5 * Math.sin(beat * 0.8 + 1.3) - o.pitch) * k;
+    o.roll += (Math.atan2(port - star, 2 * B) * 0.7 + gale * Math.sin(beat) - o.roll) * k;
     o.x = at.x; o.z = at.z; o.ux = at.ux; o.uz = at.uz;
     o.y = (bow + stern + port + star) / 4;
   }
