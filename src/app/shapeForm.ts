@@ -7,6 +7,7 @@
  * keys move it (`FormKit`: a pheasant flies, an otter swims and dives); in any form no other ability works.
  */
 import { Vector3 } from 'three/webgpu';
+import { damp } from '@futuremagic/core';
 import type { Stage } from '@futuremagic/stage';
 import type { AbilityDef } from '../setting/contract';
 import { changeLook, Shapeshift, type ShiftAround, type ShiftEvent } from '../game/birdForm';
@@ -100,6 +101,9 @@ export class BirdKit extends ViewKit<BirdDoing, BirdFlight> implements FormKit {
   }
 }
 
+/** The otter's body drawn this far lower while it paddles (m), so its back is at the waterline. */
+const PADDLE_LOW = 0.12;
+
 /** Otter form: fast at the surface, diving deep, holding its breath long (sim/otterSwim.ts). */
 export class OtterKit extends ViewKit<OtterDoing, OtterSwim> implements FormKit {
   readonly missing = 'This build has no otter to become (it was made without the animal library).';
@@ -112,9 +116,12 @@ export class OtterKit extends ViewKit<OtterDoing, OtterSwim> implements FormKit 
   constructor(world: WalkWorld) { super(new OtterSwim(world)); }
   begin(x: number, z: number, yaw: number): void { this.sim.slipIn(x, z, yaw); }
   load(stage: Stage): Promise<boolean> { return this.loadView(() => FormView.forHero(stage, OTTER_LOOK, 'float')); }
+  /** How far the paddling body is drawn under its line (m): the mink's fast-swim clip holds the body high, so it would skim. */
+  private low = 0;
   drawForm(at: Spot | null, scale: number, _returning: boolean, dt: number): void {
     const s = this.sim;
-    this.view?.pose(at ? { ...at, bank: 0, pitch: 0, doing: 'float', scale } : { ...s.pos, yaw: s.yaw, bank: 0, pitch: s.pitch, doing: s.doing, scale }, dt);
+    this.low += ((!at && s.doing === 'paddle' ? PADDLE_LOW : 0) - this.low) * damp(4, dt);
+    this.view?.pose(at ? { ...at, bank: 0, pitch: 0, doing: 'float', scale } : { ...s.pos, y: s.pos.y - this.low, yaw: s.yaw, bank: 0, pitch: s.pitch, doing: s.doing, scale }, dt);
   }
 }
 
