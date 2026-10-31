@@ -596,10 +596,11 @@ export async function start(b: Boot): Promise<void> {
         const quay = s.harbour, back = params.siteAt ?? 4;
         if (quay) player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
         else player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
-        // Aboard its first ship once the town stands: on the main deck amidships, looking along it to the bow.
+        // Aboard its first ship once the town stands: on the main deck abaft the mainmast (forward of it the cargo
+        // hatch stands open), looking along it to the bow.
         if (quay && params.aboard) void roading.then(() => {
           const h = terrain.town(found.id)?.plan.harbour, m = h && harbourMoorings(h, terrain.town(found.id)!.decision.seed ?? 0).find((x) => x.plan.kind === 'ship');
-          if (m) player.teleport(m.x + m.ux * 2, m.plan.deckY + 0.6, m.z + m.uz * 2, Math.atan2(-m.ux, -m.uz));
+          if (m) player.teleport(m.x - m.ux * 2, m.plan.deckY + 0.6, m.z - m.uz * 2, Math.atan2(-m.ux, -m.uz));
         });
         break;
       }

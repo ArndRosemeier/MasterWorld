@@ -56,6 +56,7 @@ function cabinShot(end) {
   const g = window.game, id = g.decks.ship, plan = g.decks.planOf(id), c = plan[end], aft = end === 'aft';
   const face = aft ? c.a1 : c.a0, dir = aft ? 1 : -1, w = g.decks.worldOf(id, face - dir * (aft ? 1.6 : 1.2), plan.deckY + 0.05, 0);
   g.player.flying = false;
+  g.player.puppet = null; // off the ladder the shot before climbed (its end would put the hero back on the castle)
   g.player.walker.place(w.x, w.z, w.y);
   const f = g.decks.worldOf(id, face - dir * 3, plan.deckY + 0.05, 0);
   g.player.walker.yaw = Math.atan2(-(f.x - w.x), -(f.z - w.z));
@@ -69,6 +70,7 @@ function holdShot() {
   const g = window.game, id = g.decks.ship, plan = g.decks.planOf(id), h = plan.hold;
   const w = g.decks.worldOf(id, h.a0 + 1.0, h.y + 0.05, 0), f = g.decks.worldOf(id, h.a0 + 6, h.y + 0.05, 0);
   g.player.flying = false;
+  g.player.puppet = null; // off the ladder the shot before climbed (its end would put the hero back on the castle)
   g.player.walker.place(w.x, w.z, w.y);
   g.player.walker.yaw = Math.atan2(-(f.x - w.x), -(f.z - w.z));
   g.player.heroCam.yaw = g.player.walker.yaw;
