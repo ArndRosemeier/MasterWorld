@@ -87,6 +87,8 @@ import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
 import { HatchClimb } from './app/hatchClimb';
 import { BunkSleep } from './app/bunkSleep';
+import { BreathHud } from './app/breathHud';
+import { Breath } from './game/breath';
 import { ShipClimb } from './app/shipClimb';
 import { UsePrompt } from './app/usePrompt';
 import { voyageArrived, voyagesIn } from './vgm/voyages';
@@ -98,6 +100,7 @@ import { Towns } from './app/towns';
 import { ShipsView } from './render/ships';
 import { ShipCrews } from './game/shipCrews';
 import { Decks } from './world/deck';
+import { seaPace, underWay } from './world/fleet';
 import type { Township } from './game/township';
 import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
@@ -139,7 +142,7 @@ import { itemWorth } from './game/trade';
 import { bardTells, GuildBook, questGift, teacherOf, whereOf } from './game/guilds';
 import { CHEER, LevelWatch } from './app/levelUp';
 import { carryRenown } from './game/growth';
-import { coinText, uniqueItem } from './game/items';
+import { coinText, findDef, uniqueItem } from './game/items';
 import { epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
 import { RemainsView } from './render/remainsView';
@@ -1409,7 +1412,7 @@ export async function start(b: Boot): Promise<void> {
     const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
     bodiesBlock = (x, z, r, y, ax, az) => encounters().some((e) => e.pressedBy(x, z, r, y, ax, az));
     const leading = () => encounters().find((e) => e.leading) ?? null;
-    const potions = () => character.pack.filter((i) => setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
+    const potions = () => character.remedies.length;
     // Out of a fight the hero's own spells still work (healing, wards): the recipe runner with nobody else about.
     const alone = new Recipes(character, new Alone(character, () => player.walker.pos), setting.effects ?? [], deriveSeed(seed, 'alone'));
     const aloneCues: RecipeEvent[] = [];
@@ -1842,7 +1845,7 @@ export async function start(b: Boot): Promise<void> {
       nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
       backgrounds: setting.backgrounds,
       abilityName: (id) => abilityOf(setting, id)?.name ?? id,
-      itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
+      itemName: (id) => findDef(setting.items, id)?.name ?? id,
       knownBy: (bg) => (startTown ? friendsOf(bg).map((a) => `${startTown.talk.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
       click: () => sound.play('click'),
       mode: save?.heir ? 'roguelike' : null,
@@ -1905,6 +1908,8 @@ export async function start(b: Boot): Promise<void> {
     });
     // A ship's castle ladders, climbed in sight as the ship rides the swell (E; app/shipClimb.ts).
     const shipClimbs = new ShipClimb({ player, decks });
+    const breath = new Breath(), breathHud = new BreathHud();
+    let drownClock = 0;
     const bunk = new BunkSleep({ player, decks, voyages: voyagesNow, hours, setClock });
     // The free camera is a debug tool: its key (F) works only with `?fly` or once the debug menu has flown, and
     // always lands again while flying (a stray F in a cellar flew the camera through its walls).
@@ -2113,7 +2118,10 @@ export async function start(b: Boot): Promise<void> {
       // Coming in at the far quay aboard her ship (S4): said once, as she comes alongside.
       { const now = hours(), aboard = decks.ship;
         if (aboard && setting.voyage && shipClock >= 0) for (const o of voyagesNow()) if (o.v.arrive > shipClock && o.v.arrive <= now && aboard.startsWith(`${o.from}/`)) notes.say(voyageArrived(setting.voyage, { name: towns?.get(o.to)?.town.decision.size ? `the ${towns.get(o.to)!.town.decision.size}` : 'the harbour', hours: o.v.arrive - o.v.at }), 7);
-        shipClock = now; }
+        shipClock = now;
+        // Out at sea aboard her, the day goes by faster (S4).
+        const o = aboard ? underWay(voyagesNow(), aboard, now) : null, pose = o && decks.poseOf(aboard!);
+        view.sky.pace = o && pose ? seaPace(o.v, now, pose.x, pose.z) : 1; }
       // Through an opening: on out of the other; the camera stands on whichever side it trails on.
       if (!title?.holding && !creator?.showing) {
         const was = through.passed;
@@ -2216,6 +2224,14 @@ export async function start(b: Boot): Promise<void> {
           player.walker.fell = 0;
           if (hurt > 0 && character.alive) { character.health = Math.max(1, character.health - hurt); fightHud.hurt(); }
         }
+        // Breath under water (S5): held while the head is under, unless the hero breathes water; out of it they drown.
+        const under = player.walker.headUnder && !player.offFoot, lost = breath.breathe(dt, under, character.gills, character.maxHealth);
+        player.walker.surfacing = breath.gasping;
+        if (lost > 0 && character.alive) {
+          character.health = Math.max(1, character.health - lost);
+          if ((drownClock -= dt) <= 0) { drownClock = 1; fightHud.hurt(); }
+        }
+        breathHud.showBreath(breath.share, under, character.gills);
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
         const lead = leading();
         // A level gained (G3): the ring of light, the chime and the seal engraved; the hands raised only out of a fight.

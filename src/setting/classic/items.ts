@@ -30,6 +30,7 @@ export const items: ItemCatalog = {
     { id: 'amulet', name: 'Pendant on a thong', kind: 'armour', slot: 'amulet', armour: 0, value: 20, weight: 0.05 },
     { id: 'minor-potion', name: 'Small healing draught', kind: 'potion', heal: 25, value: 25, weight: 0.2, lore: 'Bitter and green; the hedge witch swears by it.' },
     { id: 'potion', name: 'Healing draught', kind: 'potion', heal: 55, value: 70, weight: 0.3 },
+    { id: 'deep-draught', name: 'Draught of the deep', kind: 'potion', effect: { id: 'gills', magnitude: 1, duration: 180 }, value: 60, weight: 0.3, lore: 'Kelp, salt and something the herbalist will not name: three minutes of breathing water.' },
     { id: 'bread', name: 'Loaf of bread', kind: 'food', heal: 6, value: 2, weight: 0.4 },
     { id: 'cheese', name: 'Wedge of cheese', kind: 'food', heal: 8, value: 4, weight: 0.3 },
     { id: 'torch', name: 'Torch', kind: 'tool', value: 2, weight: 0.5 },
@@ -71,11 +72,11 @@ export const items: ItemCatalog = {
     { id: 'web', items: [['silk', 3], ['venom-sac', 2]], count: [1, 2], coins: [0, 0] },
     { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1], ['tome-stone', 0.3]], count: [0, 1], coins: [10, 40] },
     { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1], ['tome-shadows', 0.25]], count: [0, 1], coins: [0, 0] },
-    { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30] },
+    { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2], ['deep-draught', 0.5]], count: [1, 2], coins: [8, 30] },
     { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25] },
     {
       id: 'lair', count: [2, 3], coins: [20, 80],
-      items: [['minor-potion', 3], ['potion', 1], ['short-sword', 1], ['hatchet', 1], ['spear', 1], ['mace', 1], ['buckler', 1], ['round-shield', 1], ['leather-jerkin', 1], ['mail-shirt', 0.3], ['iron-cap', 0.6], ['boots', 1], ['ring', 1], ['amulet', 1], ['garnet', 1], ['tome-embers', 0.2], ['scroll-sunlance', 0.25]],
+      items: [['minor-potion', 3], ['potion', 1], ['short-sword', 1], ['hatchet', 1], ['spear', 1], ['mace', 1], ['buckler', 1], ['round-shield', 1], ['leather-jerkin', 1], ['mail-shirt', 0.3], ['iron-cap', 0.6], ['boots', 1], ['ring', 1], ['amulet', 1], ['garnet', 1], ['tome-embers', 0.2], ['scroll-sunlance', 0.25], ['deep-draught', 0.6]],
     },
   ],
   affixes: {

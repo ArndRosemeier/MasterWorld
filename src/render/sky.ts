@@ -290,13 +290,16 @@ export class SkyView {
   /** The hills' shadows beyond the shadow map: main feeds it the camera and the terrain workers. */
   readonly horizon = new HorizonShadow();
 
+  /** How many times faster than its day length the clock runs now (aboard at sea: world/fleet.ts seaPace). */
+  pace = 1;
+
   /** The setting's colour key over the day (empty: the grade stays as the view set it). */
   look: readonly GradeKey[] = [];
 
   /** Once per frame. `camera` null: only the light (the constructor). */
   update(dt: number, camera: PerspectiveCamera | null): void {
     if (this.dayMinutes > 0) {
-      this.hour += (dt / 60 / this.dayMinutes) * 24;
+      this.hour += (dt / 60 / this.dayMinutes) * 24 * this.pace;
       if (this.hour >= 24) { this.hour -= 24; this.day++; }
     }
     this.time += dt;

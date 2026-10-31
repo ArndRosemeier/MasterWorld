@@ -703,6 +703,8 @@ export interface ItemDef {
   readonly block?: number;
   /** Potions and food: health restored. */
   readonly heal?: number;
+  /** Potions: an effect the drinker wears (a draught of the deep: water breathing for minutes, S5). */
+  readonly effect?: EffectApply;
   /** Copper pieces. */
   readonly value: number;
   readonly weight: number;
@@ -1137,6 +1139,8 @@ export interface EffectDef {
   readonly fear?: boolean;
   /** Harder to see and hear, by magnitude (0..1, a share). */
   readonly veil?: boolean;
+  /** Breathes under water for as long as it lasts (S5, D60). */
+  readonly gills?: boolean;
 }
 
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */
@@ -1687,6 +1691,7 @@ function validateFight(m: SettingModule, where: string): string[] {
     }
   }
   if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);
+  for (const it of m.items.items) { const fx = it.effect?.id; if (fx !== undefined && (it.kind !== 'potion' || !(m.effects ?? []).some((e) => e.id === fx))) out.push(`${where}: item "${it.id}" puts on unknown effect "${fx}" or is no potion`); }
   for (const it of m.items.items) if (it.teaches && !taught(it.teaches)) out.push(`${where}: item "${it.id}" teaches unknown or untaught ability "${it.teaches}"`);
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);

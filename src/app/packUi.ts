@@ -53,7 +53,7 @@ export class PackUi extends BodyWindow {
       return cell;
     });
     const carried = h.pack.map((it) => {
-      const d = defOf(this.setting.items, it.def), use = d.slot ? 'Put it on' : d.heal ? (d.kind === 'potion' ? 'Drink it' : 'Eat it') : d.teaches ? 'Read it' : d.portal ? 'Hold it up' : '';
+      const d = defOf(this.setting.items, it.def), use = d.slot ? 'Put it on' : d.heal || d.effect ? (d.kind === 'potion' ? 'Drink it' : 'Eat it') : d.teaches ? 'Read it' : d.portal ? 'Hold it up' : '';
       const c = itemCard(it, this.setting, enter());
       if (use) {
         c.classList.add('use');

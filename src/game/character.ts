@@ -8,7 +8,7 @@ import { abilityOf, type AbilityDef, type BackgroundDef, type DamageKind, type G
 import type { Blow, Guard } from '../sim/combat';
 import { addToBar, cleanBar, clearSlot, defaultBar, type Bar } from './actionBar';
 import type { Worn } from './recipe';
-import { defOf, plainItem, withQualities, type Item } from './items';
+import { defOf, draughtEffect, plainItem, withQualities, type Item } from './items';
 import { strengthOf, wearState, wornBy, type Lodging, type WearState } from './upkeep';
 import { levelOf, strengthOf as grownBy, type Strength } from './growth';
 
@@ -321,16 +321,26 @@ export class Character {
     this.regrant(had);
   }
 
-  /** Drink or eat something from the pack: the health it gave. */
+  /** Drink or eat something from the pack: the health it gave (a draught's effect, if it has one, put on the hero). */
   consume(item: Item): number {
-    const d = defOf(this.cat, item.def);
-    if (!d.heal) return 0;
+    const d = defOf(this.cat, item.def), effect = draughtEffect(this.setting.effects, d);
+    if (!d.heal && !effect) return 0;
     const i = this.pack.indexOf(item);
     if (i < 0) return 0;
     this.pack.splice(i, 1);
+    if (effect && d.effect) {
+      const was = this.effectsOn.find((w) => w.def === effect);
+      if (was) { was.left = Math.max(was.left, d.effect.duration); was.magnitude = Math.max(was.magnitude, d.effect.magnitude); }
+      else this.effectsOn.push({ def: effect, magnitude: d.effect.magnitude, left: d.effect.duration, tick: 1 });
+    }
     const before = this.health;
-    this.health = Math.min(this.maxHealth, this.health + d.heal);
+    this.health = Math.min(this.maxHealth, this.health + (d.heal ?? 0));
     return this.health - before;
+  }
+
+  /** The hero breathes under water now (an effect with gills on them: a spell, a draught; S5). */
+  get gills(): boolean {
+    return this.effectsOn.some((w) => w.def.gills && w.left > 0);
   }
 
   /** Read a writing from the pack (C3): its ability is learned and the writing crumbles. A line why not, or null. */
@@ -345,9 +355,13 @@ export class Character {
   }
 
   /** The best healing in the pack (a potion first), for the quick slot. */
+  /** The healing draughts in the pack (a draught of the deep heals nothing). */
+  get remedies(): Item[] {
+    return this.pack.filter((i) => defOf(this.cat, i.def).kind === 'potion' && (defOf(this.cat, i.def).heal ?? 0) > 0);
+  }
+
   get remedy(): Item | null {
-    const heals = this.pack.filter((i) => defOf(this.cat, i.def).kind === 'potion');
-    return heals.sort((a, b) => (defOf(this.cat, a.def).heal ?? 0) - (defOf(this.cat, b.def).heal ?? 0))[0] ?? null;
+    return [...this.remedies].sort((a, b) => (defOf(this.cat, a.def).heal ?? 0) - (defOf(this.cat, b.def).heal ?? 0))[0] ?? null;
   }
 
   /**

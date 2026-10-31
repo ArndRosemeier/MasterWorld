@@ -169,7 +169,7 @@ const CROWD = { hero: 0.35, space: 0.2, turns: [-0.3, -0.6, -1.2, -1.65, 0.3, 0.
 const CROWD_CELLS = Math.ceil((2 * CROWD.near) / CROWD.cell) + 4;
 
 /** Trades one goes into on an errand (to buy bread, have shoes mended ...). */
-const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'potter', 'weaver', 'cooper', 'smith', 'miller', 'fletcher', 'bowyer', 'armourer', 'jeweller', 'bookbinder', 'glazier']);
+const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'potter', 'weaver', 'cooper', 'smith', 'miller', 'fletcher', 'bowyer', 'armourer', 'jeweller', 'bookbinder', 'glazier', 'herbalist']);
 
 /** Market spots weigh as if this many metres away per step of 1 (25 for the rest): the market draws from all over the town. */
 const MARKET_REACH = 110;
