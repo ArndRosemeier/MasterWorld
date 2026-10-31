@@ -1575,7 +1575,7 @@ export async function start(b: Boot): Promise<void> {
       roadLines: () => terrain.roads.roads,
       signs: () => (towns?.every ?? []).flatMap((t) => {
         const hall = setting.voyage?.hall ? harbourHall(t.town.plan) : undefined;
-        return [...t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) })), ...(hall ? [{ x: hall.cx, z: hall.cz, label: setting.voyage!.hall! }] : [])];
+        return [...t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) })), ...(hall ? [{ x: hall.door[0], z: hall.door[1], label: setting.voyage!.hall! }] : [])];
       }),
     }) : null;
     // The minimap at the top (plan 17.1, G4): the known land round the hero on the map's own parchment, turning
