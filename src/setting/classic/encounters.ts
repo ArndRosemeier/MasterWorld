@@ -17,7 +17,7 @@ export const encounters: readonly EncounterDef[] = [
   { id: 'highwaymen', creatures: ['highwayman'], count: [2, 3], where: ['below', 'road', 'open'], need: 'challenge' },
   { id: 'boar', creatures: ['boar'], count: [1, 2], where: ['wood'], need: 'challenge' },
   { id: 'deer', creatures: ['deer'], count: [3, 6], where: ['open'], need: 'discovery' },
-  { id: 'crabs', creatures: ['giant crab'], count: [2, 4], where: ['shore'], need: 'challenge' },
+  { id: 'crabs', creatures: ['giant crab'], count: [2, 3], where: ['shore'], need: 'challenge' },
 ];
 
 /** A dweller's who: the encounter's id and its creatures (spread into a DwellerDef). */
