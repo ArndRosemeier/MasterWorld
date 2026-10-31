@@ -24,6 +24,7 @@ const res = await page.evaluate(({ yawDeg }) => {
     folk: (x, z, r) => !!g.towns?.touches(x, z, r, p.x, p.z),
   };
   const rows = [];
+  // `look`'s yaw: 0 north (-z), 90 east (+x); the walker's heading turns the other way (its forward is -sin, -cos).
   const yaw = yawDeg * Math.PI / 180;
   for (const da of [-20, -10, 0, 10, 20]) {
     const a = yaw + da * Math.PI / 180, dx = Math.sin(a), dz = -Math.cos(a);
@@ -35,7 +36,7 @@ const res = await page.evaluate(({ yawDeg }) => {
     }
   }
   const x0 = p.x, z0 = p.z, y0 = p.y, trace = [];
-  for (let i = 0; i < 60; i++) { w.step({ forward: 1, strafe: 0, heading: yaw, walk: false, up: false, down: false }, 0.1); if (i % 5 === 4) trace.push(`${(i / 10 + 0.1).toFixed(1)}s ${Math.hypot(p.x - x0, p.z - z0).toFixed(1)}m (${p.x.toFixed(1)},${p.z.toFixed(1)}) y${p.y.toFixed(2)} ${w.mode}`); }
+  for (let i = 0; i < 60; i++) { w.step({ forward: 1, strafe: 0, heading: -yaw, walk: false, up: false, down: false }, 0.1); if (i % 5 === 4) trace.push(`${(i / 10 + 0.1).toFixed(1)}s ${Math.hypot(p.x - x0, p.z - z0).toFixed(1)}m (${p.x.toFixed(1)},${p.z.toFixed(1)}) y${p.y.toFixed(2)} ${w.mode}`); }
   return { at: [x0, z0, y0], heading: w.heading ?? null, rows, trace };
 }, { yawDeg });
 console.log(JSON.stringify(res, null, 1));
