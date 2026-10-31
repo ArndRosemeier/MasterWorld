@@ -43,12 +43,14 @@ const PLATEAU_VIEW = 2500;
 
 /**
  * Whether (x, z) is ground of the start's kind (D56): well inside a stretch of it, and in mesa country on a
- * valley floor. Anywhere when the setting names no kind.
+ * valley floor (or, at the sea, with a plateau in view). Anywhere when the setting names no kind.
  */
-export function startGround(sk: Skeleton, want: StartSpec, x: number, z: number): boolean {
+export function startGround(sk: Skeleton, want: StartSpec, x: number, z: number, coast = false): boolean {
   if (!want.kind) return true;
   if (sk.kindShare(want.kind, x, z) < KIND_SHARE) return false;
-  return !sk.kinds.find((k) => k.id === want.kind)?.mesa || sk.mesaRise(x, z) <= FLOOR_RISE;
+  if (!sk.kinds.find((k) => k.id === want.kind)?.mesa) return true;
+  // A sea town at a river's mouth (`coast`): the coast has cut the valley floor down to the sea, a plateau in view.
+  return coast ? plateauInView(sk, x, z) : sk.mesaRise(x, z) <= FLOOR_RISE;
 }
 
 /** Whether a plateau stands in view of (x, z) (D56): one PLATEAU_RISE high within PLATEAU_VIEW, on 16 rays. */

@@ -72,3 +72,51 @@ test('ship climb: up a castle ladder from the main deck and down again, on a sai
     assert.ok(Math.abs(n.h - floor) < 0.12, `${way}: standing at ${n.h.toFixed(2)} after`);
   }
 });
+
+test('ship climb: down the companionway to the lower deck and along its passage on a sailing ship; the camera kept below', () => {
+  let decks: Decks | null = null;
+  const sea: WalkWorld = {
+    height: () => -12, rockSurface: () => null, waterLevel: () => 0,
+    floor: (x, z, y) => decks!.underfoot(x, z, y), wall: (x, z, r, y) => decks!.hull(x, z, r, y ?? 0),
+  };
+  const P = new Player(new PerspectiveCamera(), quiet as never, sea, false);
+  decks = new Decks(() => P.walker.pos);
+  const climb = new ShipClimb({ player: P, decks }), dt = 1 / 60, h = plan.hold!;
+  const way = shipLadders(plan).find((l) => l.lean === 0)!;
+  let t = 0;
+  const tick = () => { t += dt; decks!.move('s', plan, swell(t)); P.update(dt); decks!.boarded(); };
+  decks.move('s', plan, swell(t));
+  // Forward of the companionway, on deck.
+  const at = toWorld(swell(0), way.a + 1.2, plan.deckY + 0.1, way.b);
+  P.walker.place(at.x, at.z, at.y);
+  for (let i = 0; i < 30; i++) tick();
+  assert.equal(climb.climbOffered, 'down');
+  assert.ok(climb.use());
+  for (let i = 0; i < 20 * 60 && climb.busy; i++) tick();
+  assert.ok(!climb.busy);
+  let l = toShip(swell(t), P.walker.pos.x, P.walker.pos.y, P.walker.pos.z);
+  assert.ok(Math.abs(l.h - h.y) < 0.12, `feet at ${l.h.toFixed(2)}, the lower deck at ${h.y.toFixed(2)}`);
+  // Over to the passage (to port, +b), then forward along it (+a) for a few seconds: on the lower deck all the way.
+  const s0 = swell(0), toPort = Math.atan2(s0.uz, -s0.ux), forward = Math.atan2(-s0.ux, -s0.uz);
+  for (let i = 0; i < 3 * 60 && l.b < 0; i++) {
+    t += dt; decks.move('s', plan, swell(t));
+    P.walker.step({ forward: 1, strafe: 0, heading: toPort, walk: true, up: false, down: false }, dt);
+    decks.boarded();
+    l = toShip(swell(t), P.walker.pos.x, P.walker.pos.y, P.walker.pos.z);
+  }
+  for (let i = 0; i < 4 * 60; i++) {
+    t += dt; decks.move('s', plan, swell(t));
+    P.walker.step({ forward: 1, strafe: 0, heading: forward, walk: true, up: false, down: false }, dt);
+    decks.boarded();
+    l = toShip(swell(t), P.walker.pos.x, P.walker.pos.y, P.walker.pos.z);
+    assert.ok(Math.abs(l.h - h.y) < 0.15 && P.walker.mode !== 'swim', `off the lower deck at a ${l.a.toFixed(2)} b ${l.b.toFixed(2)} h ${l.h.toFixed(2)}`);
+  }
+  assert.equal(decks.ship, 's');
+  assert.ok(l.a > way.a + 3, `walked on to a ${l.a.toFixed(2)}`);
+  // A camera point up on deck, or out in the sea beside the hull, is hidden from the hero below.
+  const up = toWorld(swell(t), l.a, plan.deckY + 1.5, l.b), out = toWorld(swell(t), l.a, h.y + 1.5, plan.beam / 2 + 1);
+  assert.equal(decks.sight(up.x, up.y, up.z), 0);
+  assert.equal(decks.sight(out.x, out.y, out.z), 0);
+  const near = toWorld(swell(t), l.a - 1.0, h.y + 1.5, l.b);
+  assert.equal(decks.sight(near.x, near.y, near.z), null);
+});

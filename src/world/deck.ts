@@ -4,7 +4,8 @@
  * the quay up to its gangway; and a body standing on a deck goes with it as it rises, pitches, rolls and sails (it
  * neither slides off nor sinks through). Pure: the ship's own shape comes from @futuremagic/settlement.
  */
-import { PLANK, hullHalf, shipFloor, shipLadders, shipWall, type Mooring, type ShipLadder, type ShipPlan } from '@futuremagic/settlement';
+import type { VesselState } from '../sim/shipFolk';
+import { PLANK, hullHalf, shipFloors, shipInside, shipLadders, shipRoom, shipWall, type Mooring, type ShipLadder, type ShipPlan } from '@futuremagic/settlement';
 
 /** A ship's place on the water: its waterline's middle, its heading (unit, bow first), bow up and port side up (rad). */
 export interface Pose {
@@ -47,6 +48,8 @@ interface Afloat {
   readonly plan: ShipPlan;
   readonly pose: Pose;
   plank: { readonly foot: At; readonly side: 1 | -1 } | null;
+  /** At its mooring, under sail, or lying at its ground (its crew works by it: sim/shipFolk.ts). */
+  state: VesselState;
 }
 
 /** How far onto the land a gangplank reaches past its edge (m); a walker's step up (game/walker.ts WALK.step). */
@@ -63,11 +66,13 @@ export class Decks {
 
   /**
    * A ship at its new pose this frame; a body standing on it goes with it. `moored`: lying at its mooring, its
-   * gangplank laid to the pier or the quay (a ship only).
+   * gangplank laid to the pier or the quay (a ship only). `sailing`: under sail (else, away from its mooring, lying
+   * at its ground).
    */
-  move(id: string, plan: ShipPlan, pose: Pose, moored: Mooring | null = null): void {
+  move(id: string, plan: ShipPlan, pose: Pose, moored: Mooring | null = null, sailing = false): void {
     let s = this.ships.get(id);
-    if (!s) { s = { plan, pose: { ...pose }, plank: null }; this.ships.set(id, s); }
+    if (!s) { s = { plan, pose: { ...pose }, plank: null, state: 'moored' }; this.ships.set(id, s); }
+    s.state = moored ? 'moored' : sailing ? 'sailing' : 'lying';
     const r = this.riding(), was = r && this.aboard?.id === id ? this.aboard : null;
     // Put somewhere else since it last stood here (a teleport, a cut scene): not carried back.
     const on = was && r && Math.abs(r.x - was.x) + Math.abs(r.y - was.y) + Math.abs(r.z - was.z) < 1e-6 ? was : null;
@@ -105,7 +110,7 @@ export class Decks {
   private outOfHulls(r: At): void {
     for (const s of this.ships.values()) {
       const l = toShip(s.pose, r.x, r.y, r.z), p = s.plan;
-      if (l.h > p.deckY - 0.5 || !shipWall(p, l.a, l.b, this.radius, l.h)) continue;
+      if (l.h > p.deckY - 0.5 || shipInside(p, l.a, l.b, l.h) || !shipWall(p, l.a, l.b, this.radius, l.h)) continue;
       const half = hullHalf(p, l.a, Math.min(p.deckY - 0.1, l.h + 1.7)), side = l.b < 0 ? -1 : 1;
       const w = toWorld(s.pose, l.a, l.h, side * (half + this.radius + 0.02));
       r.x = w.x; r.z = w.z;
@@ -134,8 +139,9 @@ export class Decks {
       if (d > s.plan.length / 2 + r + 1) continue;
       // Where along and across it at the deck (so neither the feet's height, sinking a step, nor the deck's lean
       // shifts the rail under them), how high from the feet's own.
-      const l = vertical(p, x, z, s.plan.deckY);
-      if (shipWall(s.plan, l.a, l.b, r, toShip(p, x, y, z).h, !!s.plank)) return true;
+      // (The lower deck's level, for feet down on it.)
+      const h = toShip(p, x, y, z).h, hold = s.plan.hold, l = vertical(p, x, z, hold && h < s.plan.deckY - 0.5 && h > hold.y - 0.5 ? hold.y : s.plan.deckY);
+      if (shipWall(s.plan, l.a, l.b, r, h, !!s.plank)) return true;
     }
     return false;
   }
@@ -143,16 +149,55 @@ export class Decks {
   private deckFloor(s: Afloat, x: number, z: number, y?: number): number | null {
     const p = s.pose;
     if (Math.hypot(x - p.x, z - p.z) > s.plan.length / 2 + 1) return null;
-    // Where the vertical through (x, z) meets the main deck, the floor there; on a castle or the grating, its own.
-    const m = vertical(p, x, z, s.plan.deckY), f = shipFloor(s.plan, m.a, m.b);
-    if (f === null) return null;
-    const reach = y === undefined ? Infinity : y + STEP;
-    if (m.y > reach) return null;
-    if (f === s.plan.deckY) return m.y;
-    const c = vertical(p, x, z, f);
-    if (shipFloor(s.plan, c.a, c.b) !== f) return m.y;
-    // A castle's deck over the feet (in its cabin, or against its front): the main deck under it.
-    return c.y > reach ? m.y : c.y;
+    // The floors where the vertical through (x, z) meets the main deck, highest first: the first within a step of the
+    // feet (on a castle's deck, in its cabin under it, on the main deck, on the lower deck under that).
+    const m = vertical(p, x, z, s.plan.deckY), floors = shipFloors(s.plan, m.a, m.b), reach = y === undefined ? Infinity : y + STEP;
+    for (let i = floors.length - 1; i >= 0; i--) {
+      const f = floors[i], c = f === s.plan.deckY ? m : vertical(p, x, z, f);
+      if (c.y <= reach && (c === m || shipFloors(s.plan, c.a, c.b).includes(f))) return c.y;
+    }
+    return null;
+  }
+
+  /**
+   * How far a camera at (x, y, z) is from what hides the hero (a sight surface: under 0.35 too near; null: nothing
+   * near). A hero in a cabin or on the lower deck keeps the camera in that room; one out on deck keeps it out of the
+   * hull below the deck and out of the castles.
+   */
+  sight(x: number, y: number, z: number): number | null {
+    const r = this.riding(), on = r && this.aboard ? this.ships.get(this.aboard.id) : null;
+    const lr = on && r ? toShip(on.pose, r.x, r.y, r.z) : null, room = on && lr ? shipRoom(on.plan, lr.a, lr.b, lr.h + 0.5) : null;
+    for (const s of this.ships.values()) {
+      const p = s.plan, pose = s.pose;
+      if (Math.hypot(x - pose.x, z - pose.z) > p.length / 2 + 2) continue;
+      const l = toShip(pose, x, y, z);
+      if (s === on && room) {
+        if (shipRoom(p, l.a, l.b, l.h) !== room) return 0;
+        const m = 0.3;
+        for (const [da, dh, db] of [[m, 0, 0], [-m, 0, 0], [0, m, 0], [0, -m, 0], [0, 0, m], [0, 0, -m]]) if (shipRoom(p, l.a + da, l.b + db, l.h + dh) !== room) return 0.2;
+        return null;
+      }
+      if (Math.abs(l.b) >= hullHalf(p, l.a, Math.min(l.h, p.railY))) continue;
+      if (l.h < p.deckY - 0.05) return 0;
+      for (const c of [p.aft, p.fore]) if (c && l.a > c.a0 && l.a < c.a1 && l.h < c.y) return 0;
+    }
+    return null;
+  }
+
+  /** A ship's plan (null: not near). */
+  /** Every ship near the hero: its id, plan, pose now and what it is doing. */
+  *each(): Iterable<{ readonly id: string; readonly plan: ShipPlan; readonly pose: Pose; readonly state: VesselState }> {
+    for (const [id, s] of this.ships) yield { id, plan: s.plan, pose: s.pose, state: s.state };
+  }
+
+  planOf(id: string): ShipPlan | null {
+    return this.ships.get(id)?.plan ?? null;
+  }
+
+  /** A point of a ship's frame (a along it, h up, b across to port) in the world now (null: not near). */
+  worldOf(id: string, a: number, h: number, b: number): At | null {
+    const s = this.ships.get(id);
+    return s ? toWorld(s.pose, a, h, b) : null;
   }
 
   /** A ship's pose now (null: not near). */

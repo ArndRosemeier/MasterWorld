@@ -198,7 +198,6 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     // Every minute of the walk the VGM looks again (a long way round a mesa, D56, may need more than one answer).
     let passed = 0;
     const onWay = watch.where === 'land' || out ? (t: number, ahead: [number, number]) => { pass(t - passed); passed = t; byTheWay(ahead[0], ahead[1]); } : undefined;
-    onWay?.(0, [x, z]);
     const s = land.go(x, z, onWay);
     pass(s.seconds - passed);
     if (!s.arrived) throw new Broke(`stuck on the way to ${what} at (${x.toFixed(0)}, ${z.toFixed(0)}): ${s.left.toFixed(0)} m short at (${land.walker.pos.x.toFixed(0)}, ${land.walker.pos.z.toFixed(0)})`);
@@ -595,6 +594,30 @@ export class LandWalk {
     let t = 0, metres = 0, check = { x: p.x, z: p.z, t: 0 }, side = 1;
     let detour: [number, number] | null = null, onFace = false;
     let replans = 0;
+    // The VGM looks along the way (round an estuary or a mesa it is not the goal's way): as the walk sets off, and
+    // every ON_WAY seconds of it.
+    const look = () => {
+      if (!onWay) return;
+      const ox = p.x, oz = p.z;
+      // Where the way leads a few hundred metres on.
+      let ahead = pts[pts.length - 1] ?? [x, z], run = 0;
+      for (let i = 0, [qx, qz] = [p.x, p.z]; i < pts.length; i++) { run += Math.hypot(pts[i][0] - qx, pts[i][1] - qz); [qx, qz] = pts[i]; if (run > AHEAD_ON_WAY) { ahead = pts[i]; break; } }
+      onWay(t, ahead);
+      // Turned aside (to a sight, an ambush): on from the nearest point of the way at the same height (not one
+      // up on a plateau beside it), or a way found afresh.
+      if (Math.hypot(p.x - ox, p.z - oz) > 1) {
+        let k = -1, best = 60;
+        for (let i = 0; i < pts.length; i++) {
+          const d = Math.hypot(pts[i][0] - p.x, pts[i][1] - p.z);
+          if (d < best && Math.abs(this.terrain.height(pts[i][0], pts[i][1]) - p.y) < 3) { best = d; k = i; }
+        }
+        if (k >= 0) pts.splice(0, k);
+        else pts.splice(0, pts.length, ...this.findWay(p.x, p.z, x, z));
+        detour = null;
+        check = { x: p.x, z: p.z, t };
+      }
+    };
+    look();
     while (pts.length && t < WALK_LIMIT) {
       const [tx, tz]: [number, number] = detour ?? pts[0];
       const dx: number = tx - p.x, dz: number = tz - p.z, d = Math.hypot(dx, dz);
@@ -617,26 +640,7 @@ export class LandWalk {
       }
       metres += Math.hypot(p.x - bx, p.z - bz);
       t += dt;
-      if (onWay && Math.floor(t / ON_WAY) > Math.floor((t - dt) / ON_WAY)) {
-        const ox = p.x, oz = p.z;
-        // Where the way leads a few hundred metres on (round a mesa it is not the goal's way).
-        let ahead = pts[pts.length - 1], run = 0;
-        for (let i = 0, [qx, qz] = [p.x, p.z]; i < pts.length; i++) { run += Math.hypot(pts[i][0] - qx, pts[i][1] - qz); [qx, qz] = pts[i]; if (run > AHEAD_ON_WAY) { ahead = pts[i]; break; } }
-        onWay(t, ahead);
-        // Turned aside (to a sight, an ambush): on from the nearest point of the way at the same height (not one
-        // up on a plateau beside it), or a way found afresh.
-        if (Math.hypot(p.x - ox, p.z - oz) > 1) {
-          let k = -1, best = 60;
-          for (let i = 0; i < pts.length; i++) {
-            const d = Math.hypot(pts[i][0] - p.x, pts[i][1] - p.z);
-            if (d < best && Math.abs(this.terrain.height(pts[i][0], pts[i][1]) - p.y) < 3) { best = d; k = i; }
-          }
-          if (k >= 0) pts.splice(0, k);
-          else pts.splice(0, pts.length, ...this.findWay(p.x, p.z, x, z));
-          detour = null;
-          check = { x: p.x, z: p.z, t };
-        }
-      }
+      if (Math.floor(t / ON_WAY) > Math.floor((t - dt) / ON_WAY)) look();
       // No headway for a while (a slope, a rock): step aside and hop, alternating sides, further each time.
       if (t - check.t > 1.5) {
         if (Math.hypot(p.x - check.x, p.z - check.z) < 1 && Math.abs(side) > 6 && replans < REPLANS) {

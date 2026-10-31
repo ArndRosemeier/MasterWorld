@@ -24,7 +24,7 @@ const first = firstDecisions(terrain, startPlace(terrain));
 terrain.settle(first);
 const home = terrain.towns[0].decision;
 const regions = classic.regions!;
-const walked: DecisionLog = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, 0, 5)];
+const walked: DecisionLog = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, Math.PI / 2, 3)];
 const hamlet = regionDecisions(walked).find((d) => settlementOf(d, regions.fills)?.size === 'hamlet')!;
 terrain.settleMore([hamlet]);
 const town = terrain.town(hamlet.id)!;

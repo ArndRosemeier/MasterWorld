@@ -51,6 +51,33 @@ const close = async (page) => { await page.keyboard.press('Escape'); await page.
  * The sessions: one page load each (loads are most of the run's time), then its shots in order. A shot's
  * `act` runs before it settles; `first` runs once the page is loaded, before waiting for it to be ready.
  */
+/** In the page: the hero stood just inside a ship's castle cabin door (`end`: 'aft' or 'fore'), looking in, the hero's camera behind. */
+function cabinShot(end) {
+  const g = window.game, id = g.decks.ship, plan = g.decks.planOf(id), c = plan[end], aft = end === 'aft';
+  const face = aft ? c.a1 : c.a0, dir = aft ? 1 : -1, w = g.decks.worldOf(id, face - dir * (aft ? 1.6 : 1.2), plan.deckY + 0.05, 0);
+  g.player.flying = false;
+  g.player.puppet = null; // off the ladder the shot before climbed (its end would put the hero back on the castle)
+  g.player.walker.place(w.x, w.z, w.y);
+  const f = g.decks.worldOf(id, face - dir * 3, plan.deckY + 0.05, 0);
+  g.player.walker.yaw = Math.atan2(-(f.x - w.x), -(f.z - w.z));
+  g.player.heroCam.yaw = g.player.walker.yaw;
+  g.player.heroCam.pitch = -0.2;
+  g.player.heroCam.zoom = 3;
+}
+
+/** In the page: the hero stood on a ship's lower deck by the companionway's foot, looking forward along its passage. */
+function holdShot() {
+  const g = window.game, id = g.decks.ship, plan = g.decks.planOf(id), h = plan.hold;
+  const w = g.decks.worldOf(id, h.a0 + 1.0, h.y + 0.05, 0), f = g.decks.worldOf(id, h.a0 + 6, h.y + 0.05, 0);
+  g.player.flying = false;
+  g.player.puppet = null; // off the ladder the shot before climbed (its end would put the hero back on the castle)
+  g.player.walker.place(w.x, w.z, w.y);
+  g.player.walker.yaw = Math.atan2(-(f.x - w.x), -(f.z - w.z));
+  g.player.heroCam.yaw = g.player.walker.yaw;
+  g.player.heroCam.pitch = -0.15;
+  g.player.heroCam.zoom = 3;
+}
+
 const SESSIONS = [
   // The title, then New game: the dive lands by the hero and the creator opens (one load for both).
   { id: 'title', query: `title&day=0${gl ? '&gl' : ''}`, first: async (page) => {
@@ -284,7 +311,7 @@ const SESSIONS = [
     { name: 'sea-deck', act: async (p) => {
       await p.waitForFunction(() => window.game?.decks?.ship, null, { timeout: TIMEOUT });
       // The hero's own camera, from behind and above (the free camera lost the hero aboard).
-      await p.evaluate(() => { const pl = window.game.player; pl.flying = false; pl.heroCam.yaw = pl.walker.yaw; pl.heroCam.pitch = -0.4; });
+      await p.evaluate(() => { const pl = window.game.player; pl.flying = false; pl.heroCam.yaw = pl.walker.yaw; pl.heroCam.pitch = -0.4; pl.heroCam.zoom = 4; });
       await p.waitForTimeout(2000);
     } },
     { name: 'sea-deck-plank', act: async (p) => {
@@ -299,6 +326,26 @@ const SESSIONS = [
       });
       await p.waitForTimeout(2000);
     } },
+    // Up the forecastle's ladder, caught halfway (the hero's own camera, from behind on the main deck): stood at its
+    // foot to settle, then the climb started just before the picture.
+    { name: 'sea-climb', act: async (p) => {
+      await p.evaluate(() => {
+        const g = window.game, id = g.decks.ship, plan = g.decks.planOf(id), w = g.decks.worldOf(id, plan.fore.a0 - 1.6, plan.deckY + 0.05, 1.0);
+        g.player.flying = false;
+        g.player.walker.place(w.x, w.z, w.y);
+      });
+      await p.waitForFunction(() => window.game.shipClimbs.climbOffered === 'up', null, { timeout: 10000 });
+    },
+    last: async (p) => {
+      await p.evaluate(() => { const g = window.game, c = g.player.heroCam; g.shipClimbs.use(); c.yaw = g.player.walker.yaw + 0.5; c.pitch = -0.1; c.zoom = 4; });
+      await p.waitForTimeout(2600);
+    } },
+    // Down the companionway onto the lower deck, along the passage between the passengers' cabins.
+    { name: 'sea-hold', act: async (p) => { await p.evaluate(holdShot); await p.waitForTimeout(2500); } },
+    // In the captain's cabin under the sterncastle, from by its door: his table, his bunk, the stern windows.
+    { name: 'sea-cabin', act: async (p) => { await p.evaluate(cabinShot, 'aft'); await p.waitForTimeout(2500); } },
+    // In the forecastle: the galley stove, a berth, the crew's table.
+    { name: 'sea-galley', act: async (p) => { await p.evaluate(cabinShot, 'fore'); await p.waitForTimeout(2500); } },
   ] },
   // Gate C: what phase C gave the world, seen. A hurt traveller by the way (they cry out once seen), then a
   // farm the bandits raided: its barn burnt, smoke over it, its paddock empty.

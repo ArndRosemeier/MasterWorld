@@ -6,16 +6,16 @@ import { findIn, restingAt, sightFor, sightsOf, type NeedContext } from '../src/
 import { Township } from '../src/game/township';
 import { answerNeed } from '../src/vgm/toolbox';
 import { layOutSight } from '../src/world/sites';
-import { EAST, frontierLand } from './frontierLand';
+import { SOUTH, frontierLand } from './frontierLand';
 
 const { home, seed, terrain, walk } = frontierLand({ own: true });
 
 // C9: an overdue need asks the tools that meet it for their cheapest fitting move, on the hero's way.
 
-const log = walk(2, EAST);
-// Out past the mesa wall east of the town, on open land (nearer, a cliff by the way takes a cave for Discovery).
-const out = { x: home.x + home.radius + 500, z: home.z };
-const c = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: classic, hero: out, toward: { x: out.x + 600, z: out.z }, ...over });
+const log = walk(2, SOUTH);
+// Out inland south of the sea town, on open land (the sea lies north and east of it; nearer, a cliff by the way takes a cave for Discovery).
+const out = { x: home.x, z: home.z + home.radius + 700 };
+const c = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: classic, hero: out, toward: { x: out.x, z: out.z + 600 }, ...over });
 
 test('answers: Discovery overdue puts a sight by the hero\'s way, on dry ground off towns and places', () => {
   const m = answerNeed('discovery', c());
@@ -26,9 +26,9 @@ test('answers: Discovery overdue puts a sight by the hero\'s way, on dry ground 
   assert.equal(d.kind, 'sight');
   if (d.kind !== 'sight') return;
   assert.ok(classic.sights!.some((s) => s.id === d.sight));
-  // Ahead on the way (towards +x), a little to its side.
-  assert.ok(d.x > out.x + 40 && d.x < out.x + 300, `ahead: ${(d.x - out.x).toFixed(0)} m`);
-  assert.ok(Math.abs(d.z - out.z) < 60, `by the way: ${(d.z - out.z).toFixed(0)} m aside`);
+  // Ahead on the way (towards +z), a little to its side.
+  assert.ok(d.z > out.z + 40 && d.z < out.z + 300, `ahead: ${(d.z - out.z).toFixed(0)} m`);
+  assert.ok(Math.abs(d.x - out.x) < 60, `by the way: ${(d.x - out.x).toFixed(0)} m aside`);
   const h = terrain.height(d.x, d.z);
   assert.equal(terrain.waterDepth(d.x, d.z, h), 0);
   for (const t of terrain.towns) assert.ok(Math.hypot(t.decision.x - d.x, t.decision.z - d.z) > t.decision.radius + 60);
@@ -37,7 +37,7 @@ test('answers: Discovery overdue puts a sight by the hero\'s way, on dry ground 
   terrain.settleMore([d]);
   assert.ok(terrain.fromClearing(d.x, d.z) < -10, 'in a glade');
   // The next keeps away from it and is another sight.
-  const next = sightFor(c({ log: [...log, d], hero: { x: d.x + 400, z: d.z }, toward: { x: d.x + 1200, z: d.z } }));
+  const next = sightFor(c({ log: [...log, d], hero: { x: d.x, z: d.z + 400 }, toward: { x: d.x, z: d.z + 1200 } }));
   assert.ok(next && Math.hypot(next.x - d.x, next.z - d.z) >= 350, 'apart');
   assert.notEqual(next!.sight, d.sight, 'not the one met last');
   assert.equal(sightsOf([...log, d, next!]).length, 2);
@@ -65,7 +65,7 @@ test('answers: Challenge overdue puts an ambush of the wild ahead on the way', (
   if (d.kind !== 'wild') return;
   assert.equal(classic.encounters.find((e) => e.id === d.encounter)?.need, 'challenge');
   assert.ok(d.members.length >= 1);
-  assert.ok(d.x > out.x + 40 && d.x < out.x + 300, `ahead: ${(d.x - out.x).toFixed(0)} m`);
+  assert.ok(d.z > out.z + 40 && d.z < out.z + 300, `ahead: ${(d.z - out.z).toFixed(0)} m`);
   assert.equal(answerNeed('challenge', c({ log: [...log, d] }))!.decision.id, 'ambush-2', 'counted');
 });
 
@@ -75,7 +75,7 @@ test('answers: People overdue brings a town\'s traveller to rest by the way; the
   const d = m.decision;
   assert.ok(d.kind === 'traveller');
   if (d.kind !== 'traveller') return;
-  assert.ok(d.x > out.x + 40 && d.x < out.x + 300, `ahead: ${(d.x - out.x).toFixed(0)} m`);
+  assert.ok(d.z > out.z + 40 && d.z < out.z + 300, `ahead: ${(d.z - out.z).toFixed(0)} m`);
   assert.ok(d.until > d.at);
   const withIt = [...log, d];
   assert.equal(answerNeed('people', c({ log: withIt })), null, 'the one town with an inn has its traveller out already');

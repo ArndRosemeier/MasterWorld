@@ -86,9 +86,15 @@ export class Landforms {
   private free: readonly FormFree[] = [];
 
   /**
-   * `wet(x, z)`: whether a river runs near (no pond is kept there: the river's banks would spill it).
+   * `wet(x, z)`: whether a river runs near (no pond is kept there: the river's banks would spill it). `base(x, z)`: the
+   * land the landforms are laid on, as the water carved it (a brook's valley cuts tens of metres into the skeleton:
+   * a pond set from the skeleton there stood far above the valley floor); the skeleton where not given.
    */
-  constructor(seed: number, readonly world: WorldShape, readonly skeleton: Skeleton, private readonly wet: (x: number, z: number) => boolean = () => false) {
+  constructor(
+    seed: number, readonly world: WorldShape, readonly skeleton: Skeleton,
+    private readonly wet: (x: number, z: number) => boolean = () => false,
+    private readonly base: (x: number, z: number) => number = (x, z) => skeleton.elevation(x, z),
+  ) {
     this.seed = deriveSeed(seed, 'landforms');
     this.band = new Noise(deriveSeed(seed, 'landforms', 'band'));
     this.defs = world.landforms ?? [];
@@ -116,13 +122,18 @@ export class Landforms {
 
   /** A pond's water level at (x, z) (NaN where there is none). */
   pondAt(x: number, z: number): number {
+    return this.pondOf(x, z)?.pond ?? NaN;
+  }
+
+  /** The dell whose pond's water may lie at (x, z), null where none. */
+  pondOf(x: number, z: number): Landform | null {
     this.gatherNear(x, z);
     for (const f of this.near) {
       if (Number.isNaN(f.pond)) continue;
       const dx = x - f.x, dz = z - f.z;
-      if (dx * dx + dz * dz < f.L * f.L) return f.pond;
+      if (dx * dx + dz * dz < f.L * f.L) return f;
     }
-    return NaN;
+    return null;
   }
 
   /** The landforms whose centre lies within `r` metres of (x, z). */
@@ -192,7 +203,7 @@ export class Landforms {
     const all: Landform[] = [];
     for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) all.push(...this.placedCell(i + di, j + dj).forms);
     const landAt = (x: number, z: number) => {
-      let h = this.skeleton.elevation(x, z) + c.relief * this.bandAt(x, z);
+      let h = this.base(x, z) + c.relief * this.bandAt(x, z);
       for (const g of all) {
         const dx = x - g.x, dz = z - g.z;
         if (dx * dx + dz * dz < g.reach * g.reach) h += shapeAt(g, dx * g.ax + dz * g.az, dz * g.ax - dx * g.az);
@@ -301,7 +312,7 @@ export class Landforms {
    * most half way up from its floor. NaN if that leaves too little water.
    */
   private pondLevel(x: number, z: number, L: number, H: number, relief: number): number {
-    const landAt = (px: number, pz: number) => this.skeleton.elevation(px, pz) + relief * this.bandAt(px, pz);
+    const landAt = (px: number, pz: number) => this.base(px, pz) + relief * this.bandAt(px, pz);
     let rim = Infinity;
     for (let a = 0; a < 12; a++) rim = Math.min(rim, landAt(x + Math.cos((a * Math.PI) / 6) * L * 1.1, z + Math.sin((a * Math.PI) / 6) * L * 1.1));
     const floor = landAt(x, z) - H, level = Math.min(rim - 1.4, floor + H * 0.55);
