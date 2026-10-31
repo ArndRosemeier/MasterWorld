@@ -94,6 +94,7 @@ import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
 import { ShipsView } from './render/ships';
+import { ShipCrews } from './game/shipCrews';
 import { Decks } from './world/deck';
 import type { Township } from './game/township';
 import { cap, type TownTalk } from './talk/townTalk';
@@ -297,6 +298,8 @@ export async function start(b: Boot): Promise<void> {
     const bridgeView = new BridgeView(view.stage, terrain);
     // The decks of the ships near the hero (S3): floors and walls that move with the waves, carrying the hero on them.
     const decks = new Decks(() => player.walker.pos);
+    // Their crews at work (S3): drawn with the townsfolk, carried with their vessels, solid as everyone is.
+    const crews = new ShipCrews(seed);
     // A pier's deck or a bridge's high over the feet (a swimmer under it) is not under them: never lifted onto it.
     const overhead = (f: number | null, y: number | undefined): number | null => (f !== null && y !== undefined && f > y + 1.6 ? null : f);
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
@@ -325,7 +328,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return decks.hull(x, z, r, y ?? player.walker.pos.y) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return decks.hull(x, z, r, y ?? player.walker.pos.y) || crews.inCrew(x, z, r, y ?? player.walker.pos.y) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     // Down in a cellar the walker walks its space, else the land.
@@ -2077,6 +2080,7 @@ export async function start(b: Boot): Promise<void> {
       // The ships on the waves first: a hero on a deck goes with it before taking a step.
       part('ships');
       ships.float(view.camera.position, hours(), dt);
+      const crewNow = crews.atWork(decks);
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
@@ -2337,7 +2341,8 @@ export async function start(b: Boot): Promise<void> {
       const ownerAt = owner?.placed() ?? null;
       if (folk) {
         folk.only = !!visit();
-        folk.indoors = visit() ? (ownerAt ? [ownerAt] : null) : rooms ? rooms.people() : null;
+        // (And out of doors the ships' crews, where their vessels carry them.)
+        folk.indoors = visit() ? (ownerAt ? [ownerAt] : null) : rooms?.inside ? rooms.people() : crewNow.length ? [...(rooms?.people() ?? []), ...crewNow] : rooms ? rooms.people() : null;
         if (!above && ownerAt) folk.follow(dt, view.camera);
       }
       if (above) {

@@ -77,7 +77,7 @@ export class ShipsView {
         if (m) { m.position.set(a.pose.x, a.pose.y, a.pose.z); m.rotation.set(-a.pose.roll, -Math.atan2(a.pose.uz, a.pose.ux), a.pose.pitch); m.updateMatrix(); }
         // Its decks walked near the hero; moored (not out on a trip), its gangplank out to the land.
         const moored = at.x === a.v.mooring.x && at.z === a.v.mooring.z;
-        if (d < ABOARD) this.h.decks.move(a.id, a.v.mooring.plan, a.pose, moored ? a.v.mooring : null);
+        if (d < ABOARD) this.h.decks.move(a.id, a.v.mooring.plan, a.pose, moored ? a.v.mooring : null, at.sailing);
         else this.h.decks.drop(a.id);
         this.lay(a, d < ABOARD && moored);
       }

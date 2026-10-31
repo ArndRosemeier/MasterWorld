@@ -4,6 +4,7 @@
  * the quay up to its gangway; and a body standing on a deck goes with it as it rises, pitches, rolls and sails (it
  * neither slides off nor sinks through). Pure: the ship's own shape comes from @futuremagic/settlement.
  */
+import type { VesselState } from '../sim/shipFolk';
 import { PLANK, hullHalf, shipFloors, shipInside, shipLadders, shipRoom, shipWall, type Mooring, type ShipLadder, type ShipPlan } from '@futuremagic/settlement';
 
 /** A ship's place on the water: its waterline's middle, its heading (unit, bow first), bow up and port side up (rad). */
@@ -47,6 +48,8 @@ interface Afloat {
   readonly plan: ShipPlan;
   readonly pose: Pose;
   plank: { readonly foot: At; readonly side: 1 | -1 } | null;
+  /** At its mooring, under sail, or lying at its ground (its crew works by it: sim/shipFolk.ts). */
+  state: VesselState;
 }
 
 /** How far onto the land a gangplank reaches past its edge (m); a walker's step up (game/walker.ts WALK.step). */
@@ -63,11 +66,13 @@ export class Decks {
 
   /**
    * A ship at its new pose this frame; a body standing on it goes with it. `moored`: lying at its mooring, its
-   * gangplank laid to the pier or the quay (a ship only).
+   * gangplank laid to the pier or the quay (a ship only). `sailing`: under sail (else, away from its mooring, lying
+   * at its ground).
    */
-  move(id: string, plan: ShipPlan, pose: Pose, moored: Mooring | null = null): void {
+  move(id: string, plan: ShipPlan, pose: Pose, moored: Mooring | null = null, sailing = false): void {
     let s = this.ships.get(id);
-    if (!s) { s = { plan, pose: { ...pose }, plank: null }; this.ships.set(id, s); }
+    if (!s) { s = { plan, pose: { ...pose }, plank: null, state: 'moored' }; this.ships.set(id, s); }
+    s.state = moored ? 'moored' : sailing ? 'sailing' : 'lying';
     const r = this.riding(), was = r && this.aboard?.id === id ? this.aboard : null;
     // Put somewhere else since it last stood here (a teleport, a cut scene): not carried back.
     const on = was && r && Math.abs(r.x - was.x) + Math.abs(r.y - was.y) + Math.abs(r.z - was.z) < 1e-6 ? was : null;
@@ -180,6 +185,11 @@ export class Decks {
   }
 
   /** A ship's plan (null: not near). */
+  /** Every ship near the hero: its id, plan, pose now and what it is doing. */
+  *each(): Iterable<{ readonly id: string; readonly plan: ShipPlan; readonly pose: Pose; readonly state: VesselState }> {
+    for (const [id, s] of this.ships) yield { id, plan: s.plan, pose: s.pose, state: s.state };
+  }
+
   planOf(id: string): ShipPlan | null {
     return this.ships.get(id)?.plan ?? null;
   }
