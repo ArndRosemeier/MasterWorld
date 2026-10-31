@@ -12,7 +12,7 @@ import type { VoyageDef } from '../setting/contract';
 import { fill } from '../talk/folk';
 import { riverMouths } from '../world/coast';
 import type { DecisionLog, HarbourAt, JourneyDecision, RegionDecision, TownDecision } from '../world/decisions';
-import { wayLength } from '../world/fleet';
+import { wayLength, type Voyage } from '../world/fleet';
 import { compass } from './dungeons';
 import { heldBy } from './events';
 import { harbourRegion, type FrontierContext } from './frontier';
@@ -118,4 +118,11 @@ export function voyageArrived(def: VoyageDef, w: { name: string; hours: number }
 /** The voyage passage is (to append to the log): it sails at `at`, along its way, and comes in `w.hours` later. */
 export function voyageOf(log: DecisionLog, from: string, w: SeaWay, at: number): JourneyDecision {
   return { ...journeyOf(log, from, w, at), by: 'sea', route: [...w.route] };
+}
+
+/** The voyages in the log (journeys by sea): from which harbour town's ship to which, when and along which way. */
+export function voyagesIn(log: DecisionLog): { readonly id: string; readonly from: string; readonly to: string; readonly v: Voyage }[] {
+  const out: { id: string; from: string; to: string; v: Voyage }[] = [];
+  for (const d of log) if (d.kind === 'journey' && d.by === 'sea' && d.route) out.push({ id: d.id, from: d.from, to: d.to, v: { at: d.at, arrive: d.arrive, route: d.route } });
+  return out;
 }

@@ -7,10 +7,10 @@
  */
 import { Group, type Mesh, type Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import { gangplankMesh, hullHalf, ropeMesh, shipMesh, type ShipPlan } from '@futuremagic/settlement';
+import { gangplankMesh, hullHalf, ropeMesh, shipMesh, type Mooring, type ShipPlan } from '@futuremagic/settlement';
 import { HULLS, HULL_POSES, HULL_STATIONS, WATER } from './materials/waterInputs';
 import { buildingMeshAt } from './materials/building';
-import { afloatAt, fleetOf, type Afloat as Place, type Vessel } from '../world/fleet';
+import { LIE_OVER, afloatAt, farBerth, fleetOf, passageShip, voyageAfloat, type Afloat as Place, type Vessel, type Voyage } from '../world/fleet';
 import type { Decks, Pose } from '../world/deck';
 import type { Town } from '../world/town';
 
@@ -56,11 +56,15 @@ export interface ShipsHost {
   readonly water: (x: number, z: number) => number;
   /** The decks the hero walks: each near ship's pose goes there. */
   readonly decks: Decks;
+  /** The voyages in the log (journeys by sea, S4): from which harbour town's ship, to which. */
+  readonly voyages: () => readonly { readonly id: string; readonly from: string; readonly to: string; readonly v: Voyage }[];
 }
 
 export class ShipsView {
   private readonly group = new Group();
   private readonly fleets = new Map<string, Afloat[]>();
+  /** The berth each voyage's ship comes in to at its far harbour (by voyage id), once that town stands. */
+  private readonly berths = new Map<string, Mooring>();
   /** The ropes the crew haul on (one mesh each, stretched between its ends; kept for reuse). */
   private readonly ropeMeshes: Mesh[] = [];
   private added = false;
@@ -75,18 +79,23 @@ export class ShipsView {
     if (!this.added) { this.added = true; void this.h.stage.add(this.group); }
     let built = false;
     const hulls: { far: number; a: Afloat }[] = [];
-    for (const t of this.h.harbours()) {
+    const towns = this.h.harbours();
+    for (const t of towns) {
       const h = t.plan.harbour;
       if (!h) continue;
-      const dx = t.decision.x - cam.x, dz = t.decision.z - cam.z, near = dx * dx + dz * dz < (SEEN + 2500) ** 2;
+      // Its ship on a voyage now, if one is (she may be far from home: her fleet is kept while she is out).
+      const voyage = this.voyageOf(t.decision.id, hours);
+      const dx = t.decision.x - cam.x, dz = t.decision.z - cam.z, near = !!voyage || dx * dx + dz * dz < (SEEN + 2500) ** 2;
       let fleet = this.fleets.get(t.decision.id);
       if (!near) { if (fleet) this.drop(fleet); this.fleets.delete(t.decision.id); continue; }
       if (!fleet) {
         fleet = fleetOf(h, t.decision.seed ?? 0, this.h.water).map((v, i) => ({ id: `${t.decision.id}/${i}`, v, furled: null, set: null, plank: null, pose: { x: v.mooring.x, y: 0, z: v.mooring.z, ux: v.mooring.ux, uz: v.mooring.uz, pitch: 0, roll: 0 } }));
         this.fleets.set(t.decision.id, fleet);
       }
+      const passage = voyage ? passageShip(fleet.map((a) => a.v)) : null;
       for (const a of fleet) {
-        const at = afloatAt(a.v, hours), d = Math.hypot(at.x - cam.x, at.z - cam.z);
+        const out = passage === a.v && voyage ? this.sail(voyage, a.v, towns, hours) : null;
+        const at = out ?? afloatAt(a.v, hours), d = Math.hypot(at.x - cam.x, at.z - cam.z);
         const want = d < SEEN ? (at.sailing ? 'set' : 'furled') : null;
         if (want && !a[want] && !built) { a[want] = this.build(a.v, want); built = true; }
         for (const k of ['furled', 'set'] as const) { const m = a[k]; if (m) m.visible = want === k; }
@@ -96,13 +105,34 @@ export class ShipsView {
         const m = a[want];
         if (m) { m.position.set(a.pose.x, a.pose.y, a.pose.z); m.rotation.set(-a.pose.roll, -Math.atan2(a.pose.uz, a.pose.ux), a.pose.pitch); m.updateMatrix(); }
         // Its decks walked near the hero; moored (not out on a trip), its gangplank out to the land.
-        const moored = at.x === a.v.mooring.x && at.z === a.v.mooring.z;
-        if (d < ABOARD) this.h.decks.move(a.id, a.v.mooring.plan, a.pose, moored ? a.v.mooring : null, at.sailing);
+        const berth = at.berth ?? (at.x === a.v.mooring.x && at.z === a.v.mooring.z ? a.v.mooring : null), moored = !!berth;
+        if (d < ABOARD) this.h.decks.move(a.id, a.v.mooring.plan, a.pose, berth, at.sailing);
         else this.h.decks.drop(a.id);
         this.lay(a, d < ABOARD && moored);
       }
     }
     this.cut(hulls);
+  }
+
+  /** The voyage the ship of `town` is on at `hours` (sailing, lying at the far quay or sailing home), if any. */
+  private voyageOf(town: string, hours: number): { readonly id: string; readonly to: string; readonly v: Voyage } | null {
+    let best: { readonly id: string; readonly to: string; readonly v: Voyage } | null = null;
+    for (const o of this.h.voyages()) if (o.from === town && o.v.at <= hours && hours < o.v.arrive + LIE_OVER + (o.v.arrive - o.v.at) && (!best || o.v.at > best.v.at)) best = o;
+    return best;
+  }
+
+  /** Where the passage ship is on her voyage (her far berth found once the far town stands; till then off its shore). */
+  private sail(o: { readonly id: string; readonly to: string; readonly v: Voyage }, ship: Vessel, towns: readonly Town[], hours: number): Place | null {
+    let berth = this.berths.get(o.id);
+    if (!berth) {
+      const far = towns.find((t) => t.decision.id === o.to), h = far?.plan.harbour;
+      const at = h ? farBerth(h, far!.decision.seed ?? 0, ship.mooring.plan) : null;
+      if (at) this.berths.set(o.id, (berth = at));
+    }
+    // (No berth yet: she makes for the end of her way over the sea, lying there head out.)
+    const r = o.v.route, n = r.length;
+    const to = berth ?? { ...ship.mooring, x: r[n - 2], z: r[n - 1], ux: Math.sign(r[n - 4] - r[n - 2]) || 1, uz: 0 };
+    return voyageAfloat(o.v, ship.mooring, to, hours);
   }
 
   /** The nearest hulls to the water shader: no water is drawn inside them. */

@@ -88,6 +88,7 @@ import { Cellars } from './app/cellars';
 import { HatchClimb } from './app/hatchClimb';
 import { ShipClimb } from './app/shipClimb';
 import { UsePrompt } from './app/usePrompt';
+import { voyageArrived, voyagesIn } from './vgm/voyages';
 import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { WildLand } from './app/wildLand';
@@ -485,7 +486,11 @@ export async function start(b: Boot): Promise<void> {
     water = sea;
     // The harbours' ships and boats, riding the swell and out fishing by day (S2).
     const handL = new Vector3(), handR = new Vector3();
-    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks });
+    // (The voyages in the log, read again only when the log has changed.)
+    let voyages: { log: readonly Decision[] | null; list: ReturnType<typeof voyagesIn> } = { log: null, list: [] };
+    let shipClock = -1;
+    const voyagesNow = () => (voyages.log === log ? voyages.list : (voyages = { log, list: voyagesIn(log) }).list);
+    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks, voyages: voyagesNow });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
     compileEarly([sea.mesh]);
@@ -1295,6 +1300,9 @@ export async function start(b: Boot): Promise<void> {
       get towns() { return towns?.every ?? []; },
       log: () => log,
       journey: (d) => { log = [...log, d]; },
+      frontier: () => ({ seed, log, terrain, regions: setting.regions!, home: start?.decision ?? home, hero: player.walker.pos, hours: hours() }),
+      openRegion: (d) => regionOpened(d),
+      water: (x, z) => terrain.waterDepth(x, z),
       hours,
       setClock: (h) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; },
       enter: (door) => rooms?.enter(door, true) ?? Promise.resolve(),
@@ -2099,6 +2107,10 @@ export async function start(b: Boot): Promise<void> {
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
       decks.boarded();
+      // Coming in at the far quay aboard her ship (S4): said once, as she comes alongside.
+      { const now = hours(), aboard = decks.ship;
+        if (aboard && setting.voyage && shipClock >= 0) for (const o of voyagesNow()) if (o.v.arrive > shipClock && o.v.arrive <= now && aboard.startsWith(`${o.from}/`)) notes.say(voyageArrived(setting.voyage, { name: towns?.get(o.to)?.town.decision.size ? `the ${towns.get(o.to)!.town.decision.size}` : 'the harbour', hours: o.v.arrive - o.v.at }), 7);
+        shipClock = now; }
       // Through an opening: on out of the other; the camera stands on whichever side it trails on.
       if (!title?.holding && !creator?.showing) {
         const was = through.passed;
