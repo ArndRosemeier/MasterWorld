@@ -5,7 +5,7 @@
  * neither slides off nor sinks through). Pure: the ship's own shape comes from @futuremagic/settlement.
  */
 import type { VesselState } from '../sim/shipFolk';
-import { PLANK, hullHalf, shipFloors, shipInside, shipLadders, shipRoom, shipWall, type Mooring, type ShipLadder, type ShipPlan } from '@futuremagic/settlement';
+import { PLANK, hullHalf, shipFixtures, shipFloors, shipHold, shipInside, shipLadders, shipRoom, shipWall, type Mooring, type ShipLadder, type ShipPlan } from '@futuremagic/settlement';
 
 /** A ship's place on the water: its waterline's middle, its heading (unit, bow first), bow up and port side up (rad). */
 export interface Pose {
@@ -200,6 +200,12 @@ export class Decks {
     return s ? toWorld(s.pose, a, h, b) : null;
   }
 
+  /** Where the rider stands on the ship it is aboard, in that ship's frame now (null: not aboard). */
+  riderOn(): { readonly id: string; readonly a: number; readonly h: number; readonly b: number } | null {
+    const r = this.riding(), id = this.aboard?.id, s = id && this.ships.get(id);
+    return r && id && s ? { id, ...toShip(s.pose, r.x, r.y, r.z) } : null;
+  }
+
   /** A ship's pose now (null: not near). */
   poseOf(id: string): Pose | null {
     return this.ships.get(id)?.pose ?? null;
@@ -263,4 +269,14 @@ function vertical(p: Pose, x: number, z: number, h: number): { a: number; b: num
   const l0 = toShip(p, x, p.y, z), l1 = toShip(p, x, p.y + 1, z), dh = l1.h - l0.h;
   const k = Math.abs(dh) > 1e-6 ? (h - l0.h) / dh : 0;
   return { a: l0.a + (l1.a - l0.a) * k, b: l0.b + (l1.b - l0.b) * k, y: p.y + k };
+}
+
+/** A bunk is lain in from this near its middle (m, in the ship's frame). */
+const BY_BUNK = 1.4;
+
+/** Whether (a, h, b) in the ship's frame stands by a bunk: in a castle's cabin or among the berths below deck. */
+export function byBunk(plan: ShipPlan, a: number, h: number, b: number): boolean {
+  const bunkIn = (beds: readonly { kind: string; a: number; b: number }[], floor: number) =>
+    Math.abs(h - floor) < 0.5 && beds.some((f) => f.kind === 'bed' && Math.hypot(a - f.a, b - f.b) < BY_BUNK);
+  return bunkIn(shipFixtures(plan), plan.deckY) || (!!plan.hold && bunkIn(shipHold(plan).fixtures, plan.hold.y));
 }
