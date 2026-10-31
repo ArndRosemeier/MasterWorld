@@ -16,6 +16,7 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import { RIDE } from '@actors/human';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
+import { ORIGIN } from '../origin';
 import { buildArm, torchFlame, TORCH_TIP } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE, SIT_DOWN, STAND_UP } from './clips';
 import { gripHeld } from './grips';
@@ -264,7 +265,8 @@ export class HeroView {
     const t = this.held.off;
     if (!this.torch.lit || !t) return null;
     t.updateWorldMatrix(true, false);
-    return out.set(0, TORCH_TIP, 0).applyMatrix4(t.matrixWorld);
+    // matrixWorld is relative to the floating origin (render/origin.ts): back into the world.
+    return out.set(0, TORCH_TIP, 0).applyMatrix4(t.matrixWorld).add(ORIGIN.at);
   }
 
   /** The body's clock (actions are timed by it). */

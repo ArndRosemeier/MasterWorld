@@ -68,7 +68,7 @@ export function buildArm(defId: string): Object3D {
     case 'spear': haft(k, 1.9, 0.6); steel(k, 1.3, 0.24, 0.05, 0.012, 0.35); break;
     case 'shield.buckler': k.cylinder(0, -0.02, 0, 0.17, 0.03, 12, M.Slate, DARK); k.cylinder(0, 0.01, 0, 0.05, 0.03, 8, M.Slate, BRASS); break;
     case 'shield.round': k.cylinder(0, -0.02, 0, 0.32, 0.03, 16, M.Oak, OAK); k.cylinder(0, 0.01, 0, 0.07, 0.035, 10, M.Slate, DARK); break;
-    case 'torch': haft(k, 0.45, 0.1); k.box(0, 0.33, 0, 0.06, 0.08, 0.06, 0, M.Thatch, [90, 70, 40]); break;
+    case 'torch': haft(k, 0.38, 0.12); k.box(0, 0.24, 0, 0.06, 0.08, 0.06, 0, M.Thatch, [90, 70, 40]); break;
     default: break;
   }
   const mesh = buildingMeshAt(k.mesh(), 0, 0, 0, `arm ${defId}`);
@@ -90,7 +90,7 @@ export function buildArm(defId: string): Object3D {
 }
 
 /** The flame point over a held torch's head, in grip space (its base sits on the head's top). */
-export const TORCH_TIP = 0.5;
+export const TORCH_TIP = 0.42;
 
 /** A held torch's flame (null: the thing is no torch). */
 export function torchFlame(arm: Object3D | null): Object3D | null {
