@@ -604,10 +604,6 @@
     "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
   },
   {
-    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/townLife.ts#step",
-    "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
-  },
-  {
     "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/townLife.ts#step",
     "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
   },
