@@ -23,7 +23,8 @@ export function dungeonWorld(space: DungeonSpace, origin: { x: number; y: number
     height: () => origin.y - 1000,
     rockSurface: spaceSdf,
     sightSurface: door ? (x, y, z) => Math.min(spaceSdf(x, y, z), doorBox(door, x - origin.x, y - origin.y, z - origin.z)) : undefined,
-    waterLevel: () => null,
+    // A drowned lowest storey (a sea cave): one still surface over all of it (the rock above keeps it to its rooms).
+    waterLevel: space.layout?.flood === undefined ? () => null : () => origin.y + space.layout.flood!,
     // A cave's broken rock is climbed wherever it stands as a wall (a drop's face back up); built walls are not.
     rockHolds: () => space instanceof CaveSpace,
   };

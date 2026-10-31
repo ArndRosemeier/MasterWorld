@@ -51,6 +51,8 @@ export const SHAFT = defineKind('cave shaft', ['position', 'normal', 'uv'], () =
 
 /** Sides round a pool's rim, a shaft's cone. */
 const RIM = 28, SIDES = 18;
+/** A drowned storey's sheet reaches this far past its outermost halls (m): over the ways out of them. */
+const FLOOD_PAD = 30;
 
 /** A cave's pools and stream as one mesh (its frame, placed at x, y, z), or null if it has none. */
 export function caveWaterMesh(f: CaveFeatures, x: number, y: number, z: number): Mesh | null {
@@ -77,6 +79,15 @@ export function caveWaterMesh(f: CaveFeatures, x: number, y: number, z: number):
       uvs.push(run, 1, run, 1);
       if (i > 0) idx.push(o - 2, o, o - 1, o - 1, o, o + 1);
     });
+  }
+  if (f.flood !== null) {
+    // A drowned storey's still surface: one sheet over the whole cave (the rock hides it but where it stands open).
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const h of f.halls.values()) { x0 = Math.min(x0, h.x0); x1 = Math.max(x1, h.x1); z0 = Math.min(z0, h.z0); z1 = Math.max(z1, h.z1); }
+    const o = pos.length / 3, P = FLOOD_PAD;
+    pos.push(x0 - P, f.flood, z0 - P, x1 + P, f.flood, z0 - P, x0 - P, f.flood, z1 + P, x1 + P, f.flood, z1 + P);
+    uvs.push(0, 0, 0, 0, 0, 0, 0, 0);
+    idx.push(o, o + 2, o + 1, o + 1, o + 2, o + 3);
   }
   if (!idx.length) return null;
   return named(kindMesh(geometry(pos, uvs, idx), CAVE_WATER, x, y, z), 'cave water');

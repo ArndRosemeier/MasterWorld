@@ -57,6 +57,8 @@ export interface CaveFeatures {
   readonly keep: readonly (readonly [number, number])[];
   /** The noise of the floor's relief. */
   readonly noise: Noise;
+  /** The water's surface over a drowned lowest storey (m; null: none). Its halls hold no pools or streams. */
+  readonly flood: number | null;
 }
 
 /** A cavern's roof over (x, z): its full height in the middle, falling to this share at its walls. */
@@ -150,7 +152,8 @@ export function caveFeatures(layout: ScaledLayout, seed: number, keep: readonly 
     halls.set(r.id, { id: r.id, x0: r.x * C, x1: (r.x + r.w) * C, z0: r.z * C, z1: (r.z + r.d) * C, floor: r.level * S, high: r.height * S, cavern: r.height >= CAVERN, doors });
   }
   const noise = new Noise(deriveSeed(seed, 'cave', 'floor'));
-  const f = { halls, pools: [] as CavePool[], streams: [] as CaveStream[], shafts: [] as CaveShaft[], blocks: [] as CaveBlock[], mites: [] as CaveMite[], keep, noise };
+  const flood = layout.flood ?? null;
+  const f = { halls, pools: [] as CavePool[], streams: [] as CaveStream[], shafts: [] as CaveShaft[], blocks: [] as CaveBlock[], mites: [] as CaveMite[], keep, noise, flood };
   // The highest cavern always has a shaft to the day; others now and then.
   const caverns = [...halls.values()].filter((h) => h.cavern);
   const top = caverns.reduce<Hall | undefined>((a, h) => (!a || h.high > a.high ? h : a), undefined);
@@ -167,7 +170,8 @@ export function caveFeatures(layout: ScaledLayout, seed: number, keep: readonly 
     const rng = new Rng(deriveSeed(seed, 'cave', 'water', h.id)), W = h.x1 - h.x0, D = h.z1 - h.z0;
     const area = W * D;
     // Pools: one or two in a cavern (one under its shaft when it can), now and then one in a smaller room.
-    const want = h.cavern ? rng.int(1, 2) : area >= 60 && rng.float() < 0.3 ? 1 : 0;
+    const dry = flood === null || h.floor >= flood;
+    const want = !dry ? 0 : h.cavern ? rng.int(1, 2) : area >= 60 && rng.float() < 0.3 ? 1 : 0;
     for (let k = 0, tries = 0; k < want && tries < 40; tries++) {
       const r = h.cavern ? rng.range(1.8, 3.6) : rng.range(1.1, 1.6);
       const shaft = f.shafts.find((s) => s.hall === h.id);

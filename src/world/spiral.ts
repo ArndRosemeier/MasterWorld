@@ -11,3 +11,8 @@ export function spiralFind<T>(x: number, z: number, test: (px: number, pz: numbe
   }
   return null;
 }
+
+/** Things nearest (x, z) first, as a new list. */
+export function nearestFirst<T extends { readonly x: number; readonly z: number }>(items: readonly T[], x: number, z: number): T[] {
+  return [...items].sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
+}
