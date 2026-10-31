@@ -85,6 +85,8 @@ interface SkyShade {
 /** In a natural cave: the faint fill of the day's light through its cracks, and the darkness's density (a cellar's 0.06). */
 const CAVE_FILL = 0.16;
 const CAVE_FOG = 0.022;
+/** Under a place's water (no day in it): its murk and fog, and how thick the fog is per metre. */
+const UNDER_DARK: readonly [number, number, number] = [0.004, 0.018, 0.02], UNDER_DARK_FOG = 0.05;
 
 export class SkyView {
   /** Hours 0..24, and whole days since the start. */
@@ -247,6 +249,13 @@ export class SkyView {
     const fog = FOG.color.value;
     fog.setRGB(0.008, 0.006, 0.005);
     FOG.density.value = cave ? CAVE_FOG : 0.06;
+    if (this.underwater) {
+      // Under a place's water (a sea cave's drowned storey): no day's light in it, only the lantern's. Its murk is
+      // dark, so what the lantern lights is seen a few metres off and the rest goes into the dark water.
+      this.murk.setRGB(...UNDER_DARK);
+      fog.setRGB(...UNDER_DARK);
+      FOG.density.value = UNDER_DARK_FOG;
+    }
     FOG.mist.value = 0;
     FOG.flat.value = 1;
     this.scene.background = fog;

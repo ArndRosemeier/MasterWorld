@@ -41,7 +41,7 @@ export const SIGHT_CLEARING = 20;
 
 /** A sight by the way (C9), laid out on the land from its decision: a ring of standing stones, a waystone, a cairn, a stash. */
 export function layOutSight(d: SightDecision, shape: SightShape, height: (x: number, z: number) => number): SiteLayout {
-  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : shape === 'stash' ? stash : cairn);
+  return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : shape === 'stash' ? stash : shape === 'wreck' ? wreckage : cairn);
 }
 
 /** What to lay out (a region's place or a sight), for a terrain worker: laying out a barrow takes tens of milliseconds. */
@@ -273,6 +273,23 @@ function cairn(at: At, k: MeshKit, solids: Solid[]): void {
   }, 0.1);
   solids.push({ x: at.x, z: at.z, r: 1.3 });
 }
+
+/**
+ * What a wreck spilled on the bed round her (S8; the ship herself is drawn on the bed by render/ships.ts): crates and
+ * casks gone over the side, a broken yard, greyed by the sea. Nothing solid: a column round a crate on the bed would
+ * stop a swimmer far above it.
+ */
+function wreckage(at: At, k: MeshKit): void {
+  const r = at.rng;
+  for (let i = 0; i < 7; i++) {
+    const [x, z] = onCircle(at, r.range(0, Math.PI * 2), r.range(9, 18)), lx = x - at.x, lz = z - at.z, s = r.range(0.45, 0.75);
+    k.onGround(at.ground, () => k.box(lx, 0, lz, s, s * r.range(0.7, 1), s * r.range(0.8, 1.3), r.range(0, Math.PI), CellarMat.Boards, varyTint(r, SEA_WOOD, 0.12)), 0.15);
+  }
+  const [yx, yz] = onCircle(at, r.range(0, Math.PI * 2), r.range(8, 14));
+  k.onGround(at.ground, () => k.box(yx - at.x, 0, yz - at.z, 0.14, 0.14, r.range(4, 7), r.range(0, Math.PI), CellarMat.Boards, varyTint(r, SEA_WOOD, 0.08)), 0.1);
+}
+/** Planks long under the sea: grey-green. */
+const SEA_WOOD: Tint = [112, 118, 104];
 
 /** A stash: a flat stone leant against a boulder, a bundle in oilcloth showing under it. */
 function stash(at: At, k: MeshKit, solids: Solid[]): void {

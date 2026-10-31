@@ -58,3 +58,29 @@ test('sea cave: its mouth by the shore, the sea just below it, out on the ring r
   const far = Math.hypot(x - town.decision.x, z - town.decision.z);
   assert.ok(far >= lore.form.ring![0] && far <= lore.form.ring![1] + 200, `${far.toFixed(0)} m from the town`);
 });
+
+test('sea cave: swimming under a roof that comes lower ahead, the body ducks under it and swims on', () => {
+  // A drowned way: floor at 0, its roof at 3 m, then at 2.3 m past z = 2 (a lintel); the water over both.
+  const roof = (z: number) => (z < 2 ? 3 : 2.3);
+  const sdf = (x: number, y: number, z: number) => Math.min(y, roof(z) - y, 2 - Math.abs(x));
+  const w = new Walker({ height: () => -100, rockSurface: sdf, waterLevel: () => 5 });
+  w.place(0, -2, 0.5);
+  const on = { forward: 1, strafe: 0, heading: Math.PI, walk: false, up: false, down: false };
+  for (let i = 0; i < 360; i++) w.step(on, 1 / 60);
+  assert.equal(w.mode, 'swim');
+  assert.ok(w.pos.z > 4, `on past the lintel: z ${w.pos.z.toFixed(2)}`);
+  assert.ok(sdf(w.pos.x, w.pos.y + w.height - 0.05, w.pos.z) > 0, 'the head under the roof, not in it');
+});
+
+test('sea cave: swimming at the surface of a chamber with air, the body dives into the drowned way leading on under the water', () => {
+  // A chamber (roof at 6 m) with its water at 4 m; past z = 2 a drowned way, its roof at 2.2 m, under the water.
+  const roof = (z: number) => (z < 2 ? 6 : 2.2);
+  const sdf = (x: number, y: number, z: number) => Math.min(y, roof(z) - y, 2 - Math.abs(x));
+  const w = new Walker({ height: () => -100, rockSurface: sdf, waterLevel: () => 4 });
+  w.place(0, -2, 1);
+  const on = { forward: 1, strafe: 0, heading: Math.PI, walk: false, up: false, down: false };
+  for (let i = 0; i < 360; i++) w.step(on, 1 / 60);
+  assert.equal(w.mode, 'swim');
+  assert.ok(w.pos.z > 4, `into the drowned way: z ${w.pos.z.toFixed(2)}`);
+  assert.ok(sdf(w.pos.x, w.pos.y + w.height - 0.05, w.pos.z) > 0, 'the head under its roof, not in it');
+});

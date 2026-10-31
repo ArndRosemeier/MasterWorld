@@ -91,6 +91,8 @@ export const params = {
   tower: q.has('tower'),
   /** Start before a sea cave's mouth (`seacave`; S8), as `barrow`. */
   seacave: q.has('seacave'),
+  /** Start in the sea over a wreck off the start town (`wreck`; S8), one put there now if there is none. */
+  wreck: q.has('wreck'),
   /** A test portal (app/portals.ts): an opening 6 m ahead of the start, joined to one 30 m to the right and turned. */
   portal: q.has('portal'),
   /** Start out in the nearest stretch of a kind of country (`kind=downs`, moor, karst, badlands, mesa, open; L7). */

@@ -42,6 +42,8 @@ interface Site {
 
 /** The hero has come upon a place within this of its edge (m). */
 const CAME_UPON = 12;
+/** A wreck (S8) is come upon within this of her middle (m: she is some 28 m long), and this high over the bed at most. */
+const WRECK_REACH = 10, WRECK_OVER = 7;
 
 export interface RegionSitesHost {
   readonly stage: Stage;
@@ -113,9 +115,11 @@ export class RegionSites {
    * The place the hero at (x, z) has just come upon for the first time (Discovery, C9): a sight with its
    * words and decision, or a region's place (`sight` null); null if none. `id`: the place, for its experience (D58).
    */
-  cameUpon(x: number, z: number): { readonly id: string; readonly sight: SightDef | null; readonly decision?: SightDecision } | null {
+  cameUpon(x: number, z: number, y = Infinity): { readonly id: string; readonly sight: SightDef | null; readonly decision?: SightDecision } | null {
     for (const s of this.sites) {
-      if (s.found || Math.hypot(s.at.x - x, s.at.z - z) > s.at.r + CAME_UPON) continue;
+      if (s.found || Math.hypot(s.at.x - x, s.at.z - z) > s.at.r + (s.decision?.sea ? WRECK_REACH : CAME_UPON)) continue;
+      // A wreck (S8) is come upon down by her, not swimming over her at the surface.
+      if (s.decision?.sea && y > this.host.terrain.height(s.at.x, s.at.z) + WRECK_OVER) continue;
       s.found = true;
       const sight = s.sight;
       s.sight = null;

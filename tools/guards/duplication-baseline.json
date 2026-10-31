@@ -152,7 +152,7 @@
     "reason": "Each builds an Encounter (app/encounter.ts) from its host, whose constructor takes these parts; HoldHost already extends WildHost, so only the call remains."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/dungeons.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
     "reason": "A point along a heading (x + cos a * d, z + sin a * d): plain trigonometry each mover does in its own terms. The hold's site search samples a ring around the town the same way."
   },
   {
