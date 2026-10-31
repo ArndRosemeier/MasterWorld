@@ -5,7 +5,7 @@
  * every view of it agrees. Pure.
  */
 import { deriveSeed, Rng } from '@futuremagic/core';
-import { harbourMoorings, type HarbourPlan, type Mooring } from '@futuremagic/settlement';
+import { berthMooring, freeBerths, harbourMoorings, type HarbourPlan, type Mooring, type ShipPlan } from '@futuremagic/settlement';
 
 /** Where a ship or boat is at an hour: its middle, its heading (unit, bow first) and whether its sails are set. */
 export interface Afloat {
@@ -14,6 +14,8 @@ export interface Afloat {
   readonly ux: number;
   readonly uz: number;
   readonly sailing: boolean;
+  /** Lying at a berth not her own (a voyage's far quay): that berth as she lies there, for her gangplank. */
+  readonly berth?: Mooring;
 }
 
 /** One of the harbour's vessels: its mooring, and for a fishing boat its day out. */
@@ -80,4 +82,58 @@ export function alongWay(w: readonly number[], d: number): { x: number; z: numbe
     d -= L;
   }
   return { x: w[0], z: w[1], dx: 1, dz: 0 };
+}
+
+/** A voyage as the fleet knows it (a journey by sea in the log): when the ship sails, when she comes in, her way over the sea. */
+export interface Voyage {
+  readonly at: number;
+  readonly arrive: number;
+  readonly route: readonly number[];
+}
+
+/** How long a ship lies at the far quay before she sails home (game hours). */
+export const LIE_OVER = 6;
+/** Leaving or coming to a berth, a ship runs this far straight out past it (m) before she turns onto her way. */
+const CLEAR_BERTH = 60;
+
+/** A voyage's whole way: out from her berth `from` bow first, her way over the sea, in to the berth `to` (bow in). */
+export function voyageWay(v: Voyage, from: Mooring, to: Mooring): number[] {
+  return [from.x, from.z, from.x + from.ux * CLEAR_BERTH, from.z + from.uz * CLEAR_BERTH, ...v.route, to.x + to.ux * CLEAR_BERTH, to.z + to.uz * CLEAR_BERTH, to.x, to.z];
+}
+
+/**
+ * Where the ship of voyage `v` is at `hours` (her own berth `from`, the far harbour's free berth `to`): sailing her
+ * way until she comes in, lying at the far quay for LIE_OVER hours, then sailing home the same way. Null: she lies
+ * at home (before she sails, and once back).
+ */
+export function voyageAfloat(v: Voyage, from: Mooring, to: Mooring, hours: number): Afloat | null {
+  if (hours < v.at) return null;
+  const way = voyageWay(v, from, to), length = wayLength(way), span = Math.max(1e-6, v.arrive - v.at);
+  if (hours < v.arrive) {
+    const p = alongWay(way, (length * (hours - v.at)) / span);
+    return { x: p.x, z: p.z, ux: p.dx, uz: p.dz, sailing: true };
+  }
+  // In bow first: she lies the other way round to her berth's own heading, her land side the other side.
+  if (hours < v.arrive + LIE_OVER) return { x: to.x, z: to.z, ux: -to.ux, uz: -to.uz, sailing: false, berth: { ...to, ux: -to.ux, uz: -to.uz, side: to.side === 1 ? -1 : 1 } };
+  const back = hours - v.arrive - LIE_OVER;
+  if (back >= span) return null;
+  const p = alongWay(way, length * (1 - back / span));
+  return { x: p.x, z: p.z, ux: -p.dx, uz: -p.dz, sailing: true };
+}
+
+/** The ship of a harbour's fleet that takes passengers (S4): its first ship (none: the harbour has no ship). */
+export function passageShip(fleet: readonly Vessel[]): Vessel | null {
+  return fleet.find((v) => v.mooring.plan.kind === 'ship' && !v.trip) ?? null;
+}
+
+/** A ship from elsewhere may lie this much longer than a berth (m): her bow or stern a little past its end. */
+const OVERHANG = 2;
+
+/**
+ * Where ship `plan` comes in at harbour `h` (its town's `seed`): the first berth its own ships leave free that takes
+ * her (water enough under her keel, the berth about her length).
+ */
+export function farBerth(h: HarbourPlan, seed: number, plan: ShipPlan): Mooring | null {
+  const i = freeBerths(h, seed).find((k) => h.berths[k].length >= plan.length - OVERHANG && h.berths[k].depth >= plan.draft + 0.25);
+  return i === undefined ? null : berthMooring(h, i, plan);
 }

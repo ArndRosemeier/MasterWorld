@@ -122,7 +122,7 @@ export const voyage: VoyageDef = {
   reach: [2500, 14000],
   words: {
     topic: 'Passage by ship to {place} ({price})',
-    given: '{price}. Go aboard by the gangplank; she sails as soon as you are on deck.',
+    given: '{price}. She lies at the pier: go aboard by the gangplank, she casts off directly.',
     tooDear: 'Passage is {price}, and the master takes no promises. Come back with the coin.',
     arrived: 'The ship comes in to {place}, {hours} at sea.',
   },
