@@ -21,7 +21,7 @@ export interface DrawnSource {
 
 /** A terrain as the source of its drawn ground. */
 export const drawnSource = (t: Terrain): DrawnSource => ({
-  height: (x, z) => t.height(x, z),
+  height: t.height.bind(t),
   get version() { return t.version; },
   segs: (x0, z0) => finerFor(t, { x0, z0, size: CHUNK0, segs: SEGS }),
 });
@@ -42,7 +42,7 @@ export class DrawnGround {
   }
 
   /** The drawn ground's height at (x, z), metres. */
-  at(x: number, z: number): number {
+  footing(x: number, z: number): number {
     const v = this.src.version;
     if (v !== this.seen) { this.seen = v; this.clear(); }
     const step = this.stepAt(x, z);

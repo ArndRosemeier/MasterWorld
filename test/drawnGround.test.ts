@@ -34,7 +34,7 @@ test('drawn ground: the hero stands on exactly what the finest chunk draws, cut 
     cut ||= !!m.index;
     for (let k = 0; k < 400; k++) {
       const x = x0 + ((k * 37.31) % CHUNK0), z = z0 + ((k * 61.7) % CHUNK0);
-      worst = Math.max(worst, Math.abs(g.at(x, z) - meshAt(m, x0, z0, x, z)));
+      worst = Math.max(worst, Math.abs(g.footing(x, z) - meshAt(m, x0, z0, x, z)));
     }
   }
   assert.ok(cut, 'some quads cut along a rim');
@@ -45,14 +45,14 @@ test('drawn ground: asks each corner once, and starts over when the land changes
   let asked = 0, lift = 0;
   const src: DrawnSource & { version: number } = { height: (x, z) => { asked++; return 0.1 * x - 0.05 * z + lift; }, version: 0, segs: () => SEGS };
   const g = new DrawnGround(src);
-  assert.ok(Math.abs(g.at(3.3, 7.1) - (0.33 - 0.355)) < 1e-9, 'a plane drawn as it is');
+  assert.ok(Math.abs(g.footing(3.3, 7.1) - (0.33 - 0.355)) < 1e-9, 'a plane drawn as it is');
   asked = 0;
-  for (let k = 0; k < 100; k++) g.at(3.3, 7.1);
+  for (let k = 0; k < 100; k++) g.footing(3.3, 7.1);
   assert.equal(asked, 0);
   lift = 10;
-  assert.ok(g.at(3.3, 7.1) < 1, 'kept until the land changes');
+  assert.ok(g.footing(3.3, 7.1) < 1, 'kept until the land changes');
   src.version++;
-  assert.ok(g.at(3.3, 7.1) > 9, 'then read anew');
+  assert.ok(g.footing(3.3, 7.1) > 9, 'then read anew');
 });
 
 /**

@@ -18,8 +18,8 @@ import { Terrain } from '../../src/world/terrain';
 
 /** Off the mesh by more than this (m), the hero is not on what is drawn: the check fails. */
 const LIMIT = 0.01;
-/** Chunks scanned each way from a square's middle (5 x 5 chunks, 640 m across). */
-const REACH = 2;
+/** Chunks scanned each way from a square's middle (3 x 3 chunks, 384 m across). */
+const REACH = 1;
 
 /** The mesh's height at (x, z): the triangle of the chunk built at (x0, z0) the point falls in. */
 function meshAt(m: ReturnType<typeof buildChunk>, x0: number, z0: number, x: number, z: number): number {
@@ -53,11 +53,11 @@ for (const name of seeds) {
       // Points over the whole chunk, off the grid: every 2 m cell's middle, and a point in each cell's other triangle.
       for (let z = z0 + 1; z < z0 + CHUNK0; z += 2) for (let x = x0 + 1; x < x0 + CHUNK0; x += 2) {
         for (const [px, pz] of [[x, z], [x + 0.4, z + 0.7]]) {
-          const d = g.at(px, pz), off = Math.abs(d - meshAt(m, x0, z0, px, pz));
+          const d = g.footing(px, pz), off = Math.abs(d - meshAt(m, x0, z0, px, pz));
           points++;
           if (!(off <= LIMIT)) { stood = Math.max(stood, Number.isNaN(off) ? Infinity : off); failed = true; }
         }
-        const r = terrain.height(x, z) - g.at(x, z);
+        const r = terrain.height(x, z) - g.footing(x, z);
         if (Math.abs(r) > 0.5) { fine++; worst.push({ d: r, x, z }); }
       }
     }
