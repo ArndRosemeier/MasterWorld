@@ -53,3 +53,12 @@ test('start valley: the title orbit over the start town keeps above the land and
     }
   }
 });
+
+test('start by the sea: with no river reaching the sea near (seed poev7x, a cliffed coast), the start town still has its harbour on a low shore', () => {
+  const t = new Terrain(parseSeed('poev7x'), classic, SMALL), home = startPlace(t);
+  assert.ok(home.harbour, 'a harbour');
+  const q = home.harbour!;
+  assert.ok(t.waterDepth(q.x + q.dx * 30, q.z + q.dz * 30) > 0, 'the sea before its quay');
+  assert.ok(t.height(q.x - q.dx * 20, q.z - q.dz * 20) <= 8, 'a low shore, not a cliff');
+  assert.ok(t.height(home.x, home.z) > 0, 'the town on dry land');
+});
