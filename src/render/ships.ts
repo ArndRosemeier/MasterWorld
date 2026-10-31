@@ -18,6 +18,8 @@ import type { Town } from '../world/town';
 const SEEN = 1500, ABOARD = 250;
 /** How fast a hull follows the waves' tilt (per second): a long keel answers them slowly. */
 const FOLLOW = 2.5;
+/** A hauled rope is drawn this many times the mesh's thickness, so it reads against the standing rigging. */
+const ROPE_THICK = 1.7;
 /** The gangplank's mesh is made this long, then stretched to the gap it spans (m). */
 const PLANK_MADE = 2.5;
 /** The water is cut this far inside a hull's skin at the waterline (m): it rolls and pitches, and the cut does not. */
@@ -159,18 +161,18 @@ export class ShipsView {
         this.group.add(m);
         this.ropeMeshes.push(m);
       }
-      this.span(m, l.from, l.to, 1);
+      this.span(m, l.from, l.to, 1, ROPE_THICK);
     }
     for (let i = lines.length; i < this.ropeMeshes.length; i++) this.ropeMeshes[i].visible = false;
   }
 
   /** `m` (made `made` long along +x) laid from `a` to `b`. */
-  private span(m: Mesh, a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, made: number): void {
+  private span(m: Mesh, a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, made: number, thick = 1): void {
     const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, run = Math.hypot(dx, dz);
     m.visible = true;
     m.position.set(a.x, a.y, a.z);
     m.rotation.set(0, -Math.atan2(dz, dx), Math.atan2(dy, run));
-    m.scale.set(Math.hypot(run, dy) / made, 1, 1);
+    m.scale.set(Math.hypot(run, dy) / made, thick, thick);
     m.updateMatrix();
   }
 

@@ -484,6 +484,7 @@ export async function start(b: Boot): Promise<void> {
     const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
     // The harbours' ships and boats, riding the swell and out fishing by day (S2).
+    const handL = new Vector3(), handR = new Vector3();
     const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
@@ -2094,7 +2095,6 @@ export async function start(b: Boot): Promise<void> {
       ships.float(view.camera.position, hours(), dt);
       // (A harbour town's passengers aboard too, from its life while it lives.)
       const crewNow = crews.atWork(decks, hours(), (id) => { const t = towns?.get(id); return t?.living ? t.life : null; }, player.walker.pos);
-      ships.ropes(crews.lines);
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
@@ -2363,6 +2363,8 @@ export async function start(b: Boot): Promise<void> {
         // Until the game begins, the people round the hero's place are dressed (the title's fly-over is far up).
         if (folk) folk.focus = title?.holding || !window.__mwReady ? player.walker.pos : null;
         folk?.follow(dt, view.camera);
+        // The crew's ropes, from between their hands as their clips move them (where they are drawn as characters).
+        ships.ropes(crews.lines.map((l) => (l.held && folk?.agentHand(l.agent, 'l', handL) && folk.agentHand(l.agent, 'r', handR) ? { from: { x: (handL.x + handR.x) / 2, y: (handL.y + handR.y) / 2, z: (handL.z + handR.z) / 2 }, to: l.to } : l)));
         part('flora');
         if (boot.trees) flora.update(dt, view.camera);
         part('trunks+grass');

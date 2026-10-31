@@ -24,14 +24,18 @@ export interface CrewPlaced {
 
 /** A line from a hand's grip to where it goes up to (world metres). */
 export interface CrewLine {
+  /** Who hauls on it (their hands hold its lower end). */
+  readonly agent: Agent;
   readonly from: { readonly x: number; readonly y: number; readonly z: number };
   readonly to: { readonly x: number; readonly y: number; readonly z: number };
+  /** Its lower end is in the hauler's hands (else it runs on from the rail). */
+  readonly held: boolean;
 }
 
 /** A crew body's radius (m), as a townsperson's. */
 const BODY = 0.3;
 /** Where a hauling hand grips the line: this far before them and this high over their feet (m). */
-const GRIP = 0.4, GRIP_UP = 1.15;
+const GRIP = 0.35, GRIP_UP = 0.85;
 
 export class ShipCrews {
   private readonly crews = new Map<string, { hands: Hand[]; agents: Agent[] }>();
@@ -67,8 +71,8 @@ export class ShipCrews {
         if (l) {
           const grip = toWorld(v.pose, post.a + Math.cos(post.dir) * GRIP, post.h + GRIP_UP, post.b + Math.sin(post.dir) * GRIP), up = toWorld(v.pose, l.a, l.h, l.b);
           const via = l.via ? toWorld(v.pose, l.via.a, l.via.h, l.via.b) : null;
-          lines.push({ from: grip, to: via ?? up });
-          if (via) lines.push({ from: via, to: up });
+          lines.push({ agent: a, from: grip, to: via ?? up, held: true });
+          if (via) lines.push({ agent: a, from: via, to: up, held: false });
         }
       }
       // A town's passengers go aboard the first of its ships near the hero.
