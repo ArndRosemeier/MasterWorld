@@ -53,7 +53,7 @@ serve<TerrainJob, TerrainResult>((job) => {
   if (job.kind === 'town') {
     const land = terrain, town = land.town(job.id);
     // Made ready for the GPU here (floats, spheres), off the main thread.
-    const cells = (town ? townMeshes(town, guildSigns(guildHouses(town.plan, town.decision.size ?? 'town', land.setting)), (x, z) => land.height(x, z)) : []).map((c) => ({ ...c, near: readyMesh(c.near), far: readyMesh(c.far) }));
+    const cells = (town ? townMeshes(town, guildSigns(guildHouses(town.plan, town.decision.size ?? 'town', land.setting), town.plan, land.setting), (x, z) => land.height(x, z)) : []).map((c) => ({ ...c, near: readyMesh(c.near), far: readyMesh(c.far) }));
     return { result: { cells, plan: job.plan && town ? town.plan : null }, transfer: townMeshBuffers(cells) };
   }
   if (job.kind === 'townMask') {

@@ -7,7 +7,7 @@
  * A new look never builds a shader on the render path: it is put on a second, hidden character, compiled
  * (each garment, hairstyle and shadow) and then swapped in, so the old look shows until the new one is ready.
  */
-import { Group, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Group, Matrix4, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed, smoothstep } from '@futuremagic/core';
 import { Character, outfitGarments, randomConfig, type CharacterCatalog, type CharacterConfig, type CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
@@ -86,10 +86,15 @@ const TORCH_HAND = [0.34, 1.12, 0.26] as const;
 const TORCH_RAISE = 0.4;
 /** A held torch's head leans this far ahead of upright (about the body's +x). */
 const TORCH_LEAN = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), 0.25);
-const torchQ = new Quaternion(), handQ = new Quaternion(), chestAt = new Vector3();
+const torchQ = new Quaternion(), handQ = new Quaternion(), chestAt = new Vector3(), chestQ = new Quaternion(), chestS = new Vector3(), calmInv = new Quaternion(), chestM = new Matrix4();
 /** Holding a torch up, the left arm follows its clip this slowly (s): a run's swing all but goes, a turn comes through. */
-const ARM_CALM = 0.35;
+const ARM_CALM = 0.8;
 const CALM_BONES = ['clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l'] as const;
+/** How much of the chest's bob the torch hand follows up and down (it follows the twist in full). */
+const TORCH_BOB = 0.4;
+const HELD_BONES = ['clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l'] as const;
+/** Which way the torch arm's elbow points (the rig's body frame for this side: out, up, ahead): out, down and back. */
+const TORCH_ELBOW = [0.8, -1, -0.5] as const;
 
 /** The hero's catalog: the setting's themes (filtered by Actors), its peoples, no robots or skeletons. */
 export function heroCatalog(looks: HeroLooks): (c: CharacterCatalog) => CharacterCatalog {
@@ -139,7 +144,9 @@ export class HeroView {
   private readonly torch = { lit: false, up: 0 };
   /** The left arm's bones as calmed while a torch is held up (`holdTorch`), and the chest's calmed place. */
   private readonly armCalm = new Map<Object3D, Quaternion>();
-  private chestCalm: Vector3 | null = null;
+  /** The left arm as it held the torch last frame (upper arm, forearm, hand): where the next frame's reach starts. */
+  private readonly armHeld = new Map<Object3D, Quaternion>();
+  private chestCalm: { at: Vector3; q: Quaternion } | null = null;
   private wanted: CharacterPatch | null = null;
   private dressing: Promise<void> | null = null;
   private readonly seatAt = new Vector3();
@@ -343,14 +350,18 @@ export class HeroView {
     const raise = T.lit && !p.puppet && p.gait !== 'dead' && p.gait !== 'swim' && acting?.id !== 'level_up';
     T.up = Math.max(0, Math.min(1, T.up + (raise ? dt : -dt) / TORCH_RAISE));
     const rig = T.up > 0 ? this.rigOf() : null;
-    if (!rig) { this.armCalm.clear(); this.chestCalm = null; }
+    if (!rig) { this.armCalm.clear(); this.armHeld.clear(); this.chestCalm = null; }
     if (rig) {
       // The clips' own swing of the left arm (a run's is wide) calmed: what they play is followed slowly, so the
       // elbow does not flap round a torch the hand holds still.
       const o = this.object, g = this.goals, k = this.height / 1.75, w = smooth(T.up), follow = 1 - Math.exp(-dt / ARM_CALM);
+      // The shoulder follows its clip slowly; the arm starts from where it held the torch last frame (the IK keeps
+      // the elbow near where it starts, and the clip's elbow would swing it with every stride).
       for (const name of CALM_BONES) {
         const b = this.front.actor.bones.find((x) => x.name === name);
         if (!b) continue;
+        const kept = this.armHeld.get(b);
+        if (kept) { b.quaternion.slerp(kept, w); continue; }
         let q = this.armCalm.get(b);
         if (!q) this.armCalm.set(b, (q = b.quaternion.clone()));
         q.slerp(b.quaternion, follow);
@@ -358,18 +369,34 @@ export class HeroView {
       }
       o.updateMatrixWorld(true);
       // The left hand out to the side and ahead at the chest (Actors' people face +z, +x their left), so the
-      // torch stands beside the head, seen from behind as from the front. It rides the chest's bob, not its own.
-      const chest = this.front.actor.bones.find((x) => x.name === 'spine_03');
-      const at = chest ? o.worldToLocal(chest.getWorldPosition(chestAt)) : null;
-      if (at) this.chestCalm = (this.chestCalm ?? at.clone()).lerp(at, follow);
+      // torch stands beside the head, seen from behind as from the front. It rides the chest as the run bobs and
+      // twists it (the chest's place and turn now against their calmed ones), so the arm keeps its shape to the
+      // body: with the hand held still the twist pushed the elbow out and in with every stride.
       g.L!.p.set(TORCH_HAND[0] * k, TORCH_HAND[1] * k, TORCH_HAND[2] * k);
-      if (at && this.chestCalm) g.L!.p.add(at).sub(this.chestCalm);
+      const chest = this.front.actor.bones.find((x) => x.name === 'spine_03');
+      if (chest) {
+        chestM.copy(o.matrixWorld).invert().multiply(chest.matrixWorld).decompose(chestAt, chestQ, chestS);
+        const C = (this.chestCalm ??= { at: chestAt.clone(), q: chestQ.clone() });
+        C.at.lerp(chestAt, follow);
+        C.q.slerp(chestQ, follow);
+        const y = g.L!.p.y;
+        g.L!.p.sub(C.at).applyQuaternion(calmInv.copy(C.q).invert()).applyQuaternion(chestQ).add(chestAt);
+        // Up and down only part of the chest's bob: a steady hand evens out the stride.
+        g.L!.p.y = y + (g.L!.p.y - y) * TORCH_BOB;
+      }
       o.localToWorld(g.L!.p);
-      g.L!.w = smooth(T.up); g.L!.pole = undefined; g.L!.flat = null;
+      g.L!.w = smooth(T.up); g.L!.pole = TORCH_ELBOW; g.L!.flat = null;
       g.R!.w = 0; g.footL!.w = 0; g.footR!.w = 0;
       g.curl = { L: 1.2 }; g.curlW = smooth(T.up);
       rig.reachFor(g);
       this.rigged = true;
+      // Held fully up, the arm's pose is kept for the next frame's start.
+      for (const name of HELD_BONES) {
+        const b = this.front.actor.bones.find((x) => x.name === name);
+        if (!b) continue;
+        if (T.up >= 1) (this.armHeld.get(b) ?? this.armHeld.set(b, new Quaternion()).get(b)!).copy(b.quaternion);
+        else this.armHeld.delete(b);
+      }
     }
     if (!T.lit || !t?.parent) return;
     // Upright in the world (the body's turn, leaning ahead), whatever the fist's own turn.

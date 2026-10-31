@@ -214,6 +214,12 @@ Gate D: an evening in a harbour town in the loop check, a voyage to a promised i
 
 Later (D60): activities aboard, fights at sea (boarding, a creature attacking a ship), owning or sailing a ship.
 
+### Parked: dialog needs a lot of love (Arnd, 2026-10-31)
+
+Talk with NPCs works but does not read well yet. Arnd: "The dialog is not good yet anyways. Lets park that for now but put it in the plan. Dialog needs a lot of love." It is planned in detail when Arnd opens it, after phase D. Already seen:
+- **Feasts stack in talk.** After two deeds (the bandits and the cellar), the town's people speak of two feasts at once. Talk should know one day's events as one thing (one feast for both deeds, or the second on another evening, `vgm/festivities.ts`), and lines about the same event should not repeat across topics.
+- What talk says should come from what the speaker knows and has seen (9.1, D52), in a voice that fits the person (people, trade, mood), with fewer stock lines and no topic list that reads like a menu. The LLM hook (15) may come in here.
+
 ### Later (milestone 8)
 
 The LLM hook (15), multiplayer (14), crafting (D32). These are not planned until Arnd opens them.

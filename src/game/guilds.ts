@@ -71,11 +71,18 @@ function anchorOf(plan: TownPlan, near: GuildDef['near']): { x: number; z: numbe
 }
 
 /** The shields over the guild houses' doors, by building id (colour 0..255; a hidden house has none). */
-export function guildSigns(houses: readonly GuildHouse[]): Map<number, [number, number, number]> {
+export function guildSigns(houses: readonly GuildHouse[], plan?: TownPlan, setting?: Pick<SettingModule, 'voyage'>): Map<number, [number, number, number]> {
   const out = new Map<number, [number, number, number]>();
-  for (const { guild, b, out: away } of houses) if (guild.sign && !guild.hidden && !away) out.set(b.id, hexToRgb(parseInt(guild.sign.slice(1), 16)).map((c) => Math.round(c * 255)) as [number, number, number]);
+  const rgb = (hex: string) => hexToRgb(parseInt(hex.slice(1), 16)).map((c) => Math.round(c * 255)) as [number, number, number];
+  for (const { guild, b, out: away } of houses) if (guild.sign && !guild.hidden && !away) out.set(b.id, rgb(guild.sign));
+  // The harbour master's hall on the quay has its shield too: where passage by ship is bought (S4).
+  const hall = plan && harbourHall(plan), sign = setting?.voyage?.sign;
+  if (hall && sign) out.set(hall.id, rgb(sign));
   return out;
 }
+
+/** A harbour town's harbour master's hall on the quay, if it has one. */
+export const harbourHall = (plan: TownPlan): TownBuilding | undefined => plan.harbour ? plan.buildings.find((b) => b.trade === 'harbourmaster') : undefined;
 
 /** Each house's first grown-up teaches there (not the temple's keeper; a market trader only if nobody else). */
 export function staffGuilds(people: readonly Person[], houses: readonly GuildHouse[]): void {
