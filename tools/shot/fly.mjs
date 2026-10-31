@@ -5,19 +5,21 @@
  * towns and their people stream in ahead and out behind. Prints the JS heap of the page and of each worker every
  * 15 s, and what the game holds (game.memory). A slow check (docs/CHECKS.md), at most 5 min.
  *
- * FLY_MAX_GROWTH=<MB>: fail when the page's heap grew more than that from the first minute's end to the last
- * sample (both after a forced garbage collection). FLY_SAMPLE=1: V8's sampling heap profiler from the first minute
+ * Fails when the page's heap grew more than FLY_MAX_GROWTH MB (default 400; 0: never fails) from the first minute's
+ * end to the end (both after a forced garbage collection). Before the fix a 4 min flight grew it 2 GB; after, it
+ * stayed level (1.3 GB at both ends on the RTX 5070). FLY_SAMPLE=1: V8's sampling heap profiler from the first minute
  * to the end; what it allocated that still lives at the end, summed by the function that allocated it and by the
  * game's function nearest up its stack (a build with `--minify=false` names them), to find what is kept.
- * FLY_OBJECTS=1: a census after the first minute and at the end (V8's queryObjects): every ArrayBuffer by size, and
- * every Object3D and BufferGeometry in memory, in the scene or not, by name, with the bytes of their arrays.
+ * FLY_OBJECTS=1: a census after the first minute and at the end (V8's queryObjects): every Object3D and BufferGeometry
+ * in memory, in the scene or not, by name, with the bytes of their arrays (each buffer counted once). It found the
+ * leak of MW's fly-check PR: detached terrain chunks, 1392 after a minute and 4948 at the end.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { launch } from './launch.mjs';
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 const minutes = Number(process.argv[2] ?? 4), speed = Number(process.argv[3] ?? 180);
-const maxGrowth = process.env.FLY_MAX_GROWTH ? Number(process.env.FLY_MAX_GROWTH) : null;
+const maxGrowth = Number(process.env.FLY_MAX_GROWTH ?? 400);
 const sampling = process.env.FLY_SAMPLE === '1', objects = process.env.FLY_OBJECTS === '1';
 
 const { server, base, browser } = await launch({ args: ['--enable-precise-memory-info', '--js-flags=--expose-gc'] });
@@ -80,7 +82,7 @@ mkdirSync('shots', { recursive: true });
 writeFileSync('shots/fly-heap.json', JSON.stringify(rows));
 await browser.close();
 await server.close();
-if (maxGrowth !== null && first !== null && last - first > maxGrowth) {
+if (maxGrowth > 0 && first !== null && last - first > maxGrowth) {
   console.log(`FAIL: the page heap grew ${last - first} MB over the flight (allowed ${maxGrowth} MB)`);
   process.exit(1);
 }
@@ -98,17 +100,6 @@ async function census() {
     return r.result.value ?? JSON.stringify(r.exceptionDetails ?? r.result);
   };
   const protoWith = (start, own) => `(() => { let p = Object.getPrototypeOf(${start}); while (p && !Object.prototype.hasOwnProperty.call(p, '${own}')) p = Object.getPrototypeOf(p); return p; })()`;
-  out.push('Typed arrays: ' + await query('Object.getPrototypeOf(Float32Array.prototype)', `function () {
-    let n = 0, bytes = 0; const seen = new Set(), by = new Map();
-    for (const t of this) {
-      if (!ArrayBuffer.isView(t) || seen.has(t.buffer)) continue;
-      seen.add(t.buffer); n++; bytes += t.buffer.byteLength;
-      const k = t.constructor.name + ' ' + (t.buffer.byteLength >= 2 ** 20 ? '>=1M' : t.buffer.byteLength >= 65536 ? '64K-1M' : '<64K');
-      const e = by.get(k) ?? [0, 0]; e[0]++; e[1] += t.buffer.byteLength; by.set(k, e);
-    }
-    const mb = (x) => (x / 2 ** 20).toFixed(1);
-    return n + ' buffers, ' + mb(bytes) + ' MB; ' + [...by].sort((a, b) => b[1][1] - a[1][1]).slice(0, 10).map(([k, [c, b]]) => k + ' ' + c + 'x ' + mb(b) + ' MB').join(', ');
-  }`));
   out.push('Object3Ds: ' + await query(protoWith('window.game.view.camera', 'traverse'), `function () {
     const by = new Map(), counted = new Set(); let n = 0;
     const root = (o) => { while (o.parent) o = o.parent; return o; };
@@ -124,13 +115,12 @@ async function census() {
     return n + ' objects; ' + [...by].sort((a, b) => b[1][1] - a[1][1] || b[1][0] - a[1][0]).slice(0, 25).map(([k, [c, b]]) => k + ' ' + c + 'x ' + (b / 2 ** 20).toFixed(1) + ' MB').join('; ');
   }`));
   out.push('BufferGeometries: ' + await query(protoWith('window.game.view.stage.scene.getObjectByProperty("isMesh", true).geometry', 'setAttribute'), `function () {
-    let n = 0, bytes = 0; const names = new Map();
+    let n = 0, bytes = 0; const names = new Map(), counted = new Set();
     for (const g of this) {
       if (!g.attributes) continue;
       n++;
       let b = 0;
-      for (const a of Object.values(g.attributes)) b += a.array?.byteLength ?? 0;
-      if (g.index) b += g.index.array.byteLength;
+      for (const a of [...Object.values(g.attributes), g.index]) { const buf = a?.array?.buffer; if (buf && !counted.has(buf)) { counted.add(buf); b += buf.byteLength; } }
       bytes += b;
       const k = Object.keys(g.attributes).sort().join(',');
       const e = names.get(k) ?? [0, 0]; e[0]++; e[1] += b; names.set(k, e);
