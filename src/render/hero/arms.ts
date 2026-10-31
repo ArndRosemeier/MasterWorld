@@ -80,6 +80,10 @@ export function buildArm(defId: string): Object3D {
     const f = flameMesh([{ x: 0, y: TORCH_TIP, z: 0 }], 0, 0, 0);
     f.name = 'torch flame';
     f.visible = false;
+    // Fuller than a wall torch's (the cellars' flame), so it reads as fire and not a spike from a few metres off.
+    f.scale.set(1.6, 1.15, 1.6);
+    f.position.set(0, TORCH_TIP * (1 - 1.15), 0);
+    f.updateMatrix();
     mesh.add(f);
   }
   return mesh;

@@ -231,7 +231,7 @@ const DAYLIGHT_BELOW: BelowLight = { color: 0xffe2c0, strength: 45, reach: 48, d
 export const CAVE_LANTERN = 13;
 
 /** The hero's torch out of doors at night: the lantern's strength there (the flame's own flicker on it). */
-export const TORCH_NIGHT = 7;
+export const TORCH_NIGHT = 22;
 
 /** The torch is lit once the town's windows are this far lit (0 day, 1 night: render/sky.ts WINDOWS.glow). */
 export const TORCH_DUSK = 0.5;

@@ -79,8 +79,8 @@ const SEAT_LIFT = 0.02;
 const smooth = (t: number) => t * t * (3 - 2 * t);
 const AT = new Vector3(), KNEE = new Vector3(), ANKLE = new Vector3(), SEAT = new Vector3();
 const TURN = new Quaternion(), BENT = new Quaternion(), UP = new Quaternion(), NONE = new Quaternion();
-/** A lit torch's arm (the rig's pose angles, radians): raised forward, a little out, the forearm bent up. */
-const TORCH_ARM = { fwd: 0.55, out: 0.3, elbow: 1.4 };
+/** Where a lit torch's hand is held, in the body's frame for a body 1.75 m tall (m: left, up, ahead). */
+const TORCH_HAND = [0.34, 1.12, 0.26] as const;
 /** How long raising or lowering the torch takes (s). */
 const TORCH_RAISE = 0.4;
 /** A held torch's head leans this far ahead of upright (about the body's +x). */
@@ -327,7 +327,7 @@ export class HeroView {
   }
 
   /**
-   * A lit torch held up: the left arm raised forward and out, the forearm up (eased in over a moment, so the
+   * A lit torch held up: the left hand out to the side at the chest (eased in over a moment, so the
    * arm is seen lifting it), and the torch upright in the fist whatever the hand does, its head leaning ahead.
    */
   private holdTorch(p: HeroPose, acting: HeroAction | null, dt: number): void {
@@ -336,7 +336,16 @@ export class HeroView {
     T.up = Math.max(0, Math.min(1, T.up + (raise ? dt : -dt) / TORCH_RAISE));
     const rig = T.up > 0 ? this.rigOf() : null;
     if (rig) {
-      rig.pose((q) => q.arm('L', TORCH_ARM.fwd, TORCH_ARM.out, 0, TORCH_ARM.elbow), smooth(T.up));
+      // The left hand out to the side and ahead at the chest (Actors' people face +z, +x their left), so the
+      // torch stands beside the head, seen from behind as from the front.
+      const o = this.object, g = this.goals, k = this.height / 1.75;
+      o.updateMatrixWorld(true);
+      g.L!.p.set(TORCH_HAND[0] * k, TORCH_HAND[1] * k, TORCH_HAND[2] * k);
+      o.localToWorld(g.L!.p);
+      g.L!.w = smooth(T.up); g.L!.pole = undefined; g.L!.flat = null;
+      g.R!.w = 0; g.footL!.w = 0; g.footR!.w = 0;
+      g.curl = { L: 1.2 }; g.curlW = smooth(T.up);
+      rig.reachFor(g);
       this.rigged = true;
     }
     if (!T.lit || !t?.parent) return;
