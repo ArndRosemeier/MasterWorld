@@ -46,18 +46,17 @@ export function openWorld(seed: number, setting: SettingModule, hydro?: HydroOpt
 /** Where a new game starts: the setting's start place, moved to the sea at the river's mouth nearest it, else to the river nearest it (D50). */
 export function startPlace(t: Terrain): Home {
   const start = findStart(t.skeleton, t.setting);
-  // The nearer of a river's mouth and a bare coast, ring by ring.
-  for (const within of BANK_SEARCH) { const h = seaside(t, start, [within]) ?? coastside(t, start, [within]); if (h) return h; }
-  return waterside(t, start);
+  // A river's mouth (D50: the river its fresh water), else a bare coast; inland only with no sea near at all.
+  return seaside(t, start) ?? coastside(t, start) ?? waterside(t, start);
 }
 
 /**
  * The start moved to the sea (Arnd 2026-10-30: the start town is a sea town): by the river's mouth nearest the
  * setting's start place, on the bank with the most dry ground (world/coast.ts, as the frontier's harbour towns).
  */
-export function seaside(t: Terrain, start: StartPlace, rings: readonly number[] = BANK_SEARCH): Home | null {
+export function seaside(t: Terrain, start: StartPlace): Home | null {
   const want = t.setting.start;
-  for (const within of rings) {
+  for (const within of BANK_SEARCH) {
     let best: Home | null = null, low = Infinity;
     for (const m of riverMouths(t, start.x, start.z, within)) for (const h of harbourSpots(t, m, START_R, SEA_ALONG)) {
       if (!startGround(t.skeleton, want, h.x, h.z, true)) continue;
@@ -79,9 +78,9 @@ export function seaside(t: Terrain, start: StartPlace, rings: readonly number[] 
  * harbour (Arnd 2026-10-31): on the coast nearest the start place where the shore comes down low and the land
  * behind is gentle, its water from wells and brooks.
  */
-export function coastside(t: Terrain, start: StartPlace, rings: readonly number[] = BANK_SEARCH): Home | null {
+export function coastside(t: Terrain, start: StartPlace): Home | null {
   const want = t.setting.start;
-  for (const within of rings) {
+  for (const within of BANK_SEARCH) {
     let best: Home | null = null, low = Infinity;
     for (let a = 0; a < COAST_RAYS; a++) {
       const ux = Math.cos((a / COAST_RAYS) * Math.PI * 2), uz = Math.sin((a / COAST_RAYS) * Math.PI * 2);
