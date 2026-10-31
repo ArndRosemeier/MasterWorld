@@ -49,6 +49,8 @@ test('an island is promised from a harbour, told by its harbour master, sailed t
   const isle = isleAt(t, classic.world.islands!, r.site!.x, r.site!.z);
   assert.ok(isle, 'the village stands on an island');
   const log: Decision[] = [...world.log, r];
+  // Asked again before it is built (passage bought while the Builder is still at it): not a second village.
+  assert.equal(islandFor(def, { ...ctx, log }, home, towns(), water), null, 'decided once, even before it stands');
   t.settleMore([r]);
   const village = t.town(r.id);
   assert.ok(village?.decision.isle && village.plan.harbour, 'built, with its quay');
@@ -56,7 +58,7 @@ test('an island is promised from a harbour, told by its harbour master, sailed t
   // The harbour master offers passage, telling what sailors say of it.
   const way = seaWays(def, seed, log, home, towns(), water).find((w) => w.to === r.id);
   assert.ok(way, 'passage to the island');
-  assert.match(voyageTopic(def, way), /island beyond the fog, the island [\d.]+ km/);
+  assert.match(voyageTopic(def, way), /island out at sea, the island [\d.]+ km/);
   // A place out on the island for its people to know of.
   const place = islandPlace({ seed, terrain: t, log, home, dungeons: classic.dungeons, towns: t.towns });
   assert.ok(place && place.town === r.id, 'a place on the island');

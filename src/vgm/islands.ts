@@ -15,7 +15,7 @@ import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { dungeonFor, type DungeonContext } from './dungeons';
 import { radiusOf, siteRegion, type FrontierContext } from './frontier';
-import { seaRoute } from './voyages';
+import { decided, seaRoute } from './voyages';
 
 /** The islands whose middles lie within `reach` (m) of (x, z), nearest first. */
 export function islandsNear(t: Terrain, d: IslandsDef, x: number, z: number, reach: readonly [number, number]): Isle[] {
@@ -91,7 +91,7 @@ function gentle(t: Terrain, x: number, z: number, r: number): boolean {
 export function islandFor(def: VoyageDef, c: FrontierContext, from: TownDecision, towns: readonly TownDecision[], water: (x: number, z: number) => number): RegionDecision | null {
   const isles = c.terrain.skeleton.shape.islands, fill = c.regions.fills.find((f) => f.island);
   if (!from.harbour || !isles || !fill) return null;
-  if (towns.some((t) => t.isle && Math.hypot(t.x - from.x, t.z - from.z) <= def.reach[1])) return null;
+  if (decided(c, towns).some((t) => t.isle && Math.hypot(t.x - from.x, t.z - from.z) <= def.reach[1])) return null;
   for (const isle of islandsNear(c.terrain, isles, from.x, from.z, def.reach)) {
     for (const site of islandSites(c.terrain, isle, from, radiusOf(fill))) {
       const r = siteRegion(c, fill, site);

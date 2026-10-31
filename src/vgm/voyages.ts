@@ -11,7 +11,7 @@ import { coinText } from '../game/items';
 import type { VoyageDef } from '../setting/contract';
 import { fill } from '../talk/folk';
 import { riverMouths } from '../world/coast';
-import type { DecisionLog, HarbourAt, JourneyDecision, RegionDecision, TownDecision } from '../world/decisions';
+import { settlementOf, type DecisionLog, type HarbourAt, type JourneyDecision, type RegionDecision, type TownDecision } from '../world/decisions';
 import { wayLength, type Voyage } from '../world/fleet';
 import { compass } from './dungeons';
 import { heldBy } from './events';
@@ -96,7 +96,7 @@ export function seaWays(def: VoyageDef, seed: number, log: DecisionLog, from: To
  */
 export function farHarbourFor(def: VoyageDef, c: FrontierContext, from: TownDecision, towns: readonly TownDecision[], water: (x: number, z: number) => number): RegionDecision | null {
   if (!from.harbour) return null;
-  if (towns.some((t) => t.id !== from.id && t.harbour && Math.hypot(t.x - from.x, t.z - from.z) <= def.reach[1])) return null;
+  if (decided(c, towns).some((t) => t.id !== from.id && t.harbour && Math.hypot(t.x - from.x, t.z - from.z) <= def.reach[1])) return null;
   const fromHome = (m: { x: number; z: number }) => Math.hypot(m.x - from.x, m.z - from.z);
   const mouths = riverMouths(c.terrain, from.x, from.z, def.reach[1]).filter((m) => fromHome(m) >= def.reach[0]).sort((a, b) => fromHome(a) - fromHome(b));
   for (const m of mouths) {
@@ -105,6 +105,19 @@ export function farHarbourFor(def: VoyageDef, c: FrontierContext, from: TownDeci
     if (r && at && seaRoute(c.seed, water, from.harbour, at)) return r;
   }
   return null;
+}
+
+/**
+ * The towns known so far and those only decided in the log (a region opened but not built yet): a town asked for
+ * again before it stands is not founded twice.
+ */
+export function decided(c: Pick<FrontierContext, 'log' | 'regions'>, towns: readonly TownDecision[]): TownDecision[] {
+  const out = [...towns];
+  for (const d of c.log) {
+    const t = d.kind === 'region' ? settlementOf(d, c.regions.fills) : null;
+    if (t && !out.some((o) => o.id === t.id)) out.push(t);
+  }
+  return out;
 }
 
 /** The harbour master's topic for a way. */
