@@ -279,7 +279,7 @@ export class Character {
   get power(): number {
     // The weapon's blows grow with the level as a level-1 ability's do (G2).
     const w = this.weapon, avg = (w.damage[0] + w.damage[1]) / 2 * (1 + this.setting.growth.scale.damage * (this.level - 1));
-    const knack = (this.aim + this.defence + this.armourKnack * 0.5 + (this.worn.off ? this.shieldKnack * 0.5 : 0)) / 5;
+    const knack = (this.aim + this.defence + this.armourKnack * 0.5 + (this.worn.off && defOf(this.cat, this.worn.off.def).kind === 'shield' ? this.shieldKnack * 0.5 : 0)) / 5;
     return Math.round((knack + avg * (1 + this.aim / 220) / w.time * 2.2 + this.armour * 0.9 + this.blockChance * 8 + (this.maxHealth - 55) * 0.08) * 10) / 10;
   }
 
