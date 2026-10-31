@@ -285,9 +285,9 @@ export class Towns {
     return best;
   }
 
-  /** Does the hero (radius `r` at x, z) run into a town's fixture out of doors (a well, a stall ...)? */
-  fixtureAt(x: number, z: number, r: number): boolean {
-    for (const t of this.near(x, z, r + 1)) if (t.town.fixtureAt(x, z, r)) return true;
+  /** Does the hero (radius `r` at x, z, its feet at `y`) run into a town's fixture out of doors (a well, a stall ...)? */
+  fixtureAt(x: number, z: number, r: number, y?: number): boolean {
+    for (const t of this.near(x, z, r + 1)) if (t.town.fixtureAt(x, z, r, y, this.landHeight)) return true;
     return false;
   }
 

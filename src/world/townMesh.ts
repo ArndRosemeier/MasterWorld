@@ -52,7 +52,7 @@ export function townMeshes(town: Town, signs: ReadonlyMap<number, [number, numbe
     const meshes = (detail: boolean) => {
       const parts = list.map((b) => buildingMesh(b, [x, 0, z], detail, { sign: signs.get(b.id) }));
       const walls = wall ? [wallMesh(wall, [x, 0, z], detail, inCell(i, j))] : [];
-      if (height) walls.push(fixtureMesh(town.plan.fixtures, height, [x, 0, z], detail, inCell(i, j)));
+      if (height) walls.push(fixtureMesh(town.plan.fixtures, (fx, fz) => town.fixtureGround(fx, fz, height), [x, 0, z], detail, inCell(i, j)));
       if (harbour && height && cell === harbourCell) {
         walls.push(harbourMesh(harbour, height, [x, 0, z], detail));
       }

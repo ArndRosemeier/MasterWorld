@@ -32,6 +32,9 @@ export type TownGround = (typeof TownGround)[keyof typeof TownGround];
 export const TOWN_RASTER = 1;
 /** The cell (m) by which `walled` tells what lies within a town wall (its line is a few metres thick anyway). */
 const WALLED_CELL = 4;
+/** A fixture blocks feet from this far below its ground (a step down) to this far above it (its top, a crane's beam aside), metres. */
+const FIXTURE_BELOW = 1;
+const FIXTURE_TALL = 2.4;
 
 export class Town {
   readonly plan: TownPlan;
@@ -125,9 +128,24 @@ export class Town {
   /** The fixtures out of doors by 8 m square (for `fixtureAt`). */
   private fixtureGrid: Map<string, Fixture[]> | null = null;
 
-  /** Does a body of radius `r` at (x, z) run into a fixture out of doors (a well, a stall, a woodpile ...)? The hero's; townsfolk use them. */
-  fixtureAt(x: number, z: number, r: number): boolean {
-    return this.near(x, z, r) && [...this.fixturesNear(x, z)].some((f) => fixtureBlocks(f, x, z, r));
+  /**
+   * Does a body of radius `r` at (x, z) run into a fixture out of doors (a well, a stall, a woodpile ...)? The hero's;
+   * townsfolk use them. With its feet at `y` and the land's `height`, only a fixture standing near that level blocks.
+   */
+  fixtureAt(x: number, z: number, r: number, y?: number, height?: (x: number, z: number) => number): boolean {
+    if (!this.near(x, z, r)) return false;
+    for (const f of this.fixturesNear(x, z)) {
+      if (!fixtureBlocks(f, x, z, r)) continue;
+      if (y === undefined || !height) return true;
+      const g = this.fixtureGround(f.x, f.z, height);
+      if (y > g - FIXTURE_BELOW && y < g + FIXTURE_TALL) return true;
+    }
+    return false;
+  }
+
+  /** The ground a fixture at (x, z) stands on: a harbour's quay or pier where there is one (its cargo, its crane), else the land. */
+  fixtureGround(x: number, z: number, height: (x: number, z: number) => number): number {
+    return this.harbourFloor(x, z) ?? height(x, z);
   }
 
   /**
@@ -138,7 +156,7 @@ export class Town {
     if (!this.near(x, z, 0)) return null;
     let d: number | null = null;
     for (const f of this.fixturesNear(x, z)) {
-      const s = fixtureSight(f, height(f.x, f.z), x, y, z);
+      const s = fixtureSight(f, this.fixtureGround(f.x, f.z, height), x, y, z);
       if (s !== Infinity && (d === null || s < d)) d = s;
     }
     return d;

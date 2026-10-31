@@ -170,7 +170,7 @@ import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
 import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
-import { GroundCache } from './world/groundCache';
+import { DrawnGround, drawnSource } from './world/drawnGround';
 import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
@@ -316,10 +316,12 @@ export async function start(b: Boot): Promise<void> {
     const castaways = new Castaways(seed);
     // A pier's deck or a bridge's high over the feet (a swimmer under it) is not under them: never lifted onto it.
     const overhead = (f: number | null, y: number | undefined): number | null => (f !== null && y !== undefined && f > y + 1.6 ? null : f);
+    // The ground as drawn near the camera: the hero and everything with feet stand on it, never in relief the mesh steps over.
+    const drawn = new DrawnGround(drawnSource(terrain));
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
     const landWorld: WalkWorld = {
       // In a cave mouth's throat its own floor (it runs under the land's ground, which the crag carves).
-      height: (x, z) => cellars?.floor(x, z) ?? terrain.height(x, z),
+      height: (x, z) => cellars?.floor(x, z) ?? drawn.footing(x, z),
       // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
       floor: (x, z, y) => decks.underfoot(x, z, y) ?? overhead(towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null, y),
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
@@ -342,7 +344,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return decks.hull(x, z, r, y ?? player.walker.pos.y) || crews.inCrew(x, z, r, y ?? player.walker.pos.y) || castaways.inBody(x, z, r) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return decks.hull(x, z, r, y ?? player.walker.pos.y) || crews.inCrew(x, z, r, y ?? player.walker.pos.y) || castaways.inBody(x, z, r) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r, y ?? player.walker.pos.y) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     // Down in a cellar the walker walks its space, else the land.
@@ -676,14 +678,12 @@ export async function start(b: Boot): Promise<void> {
     let stock: StockView | null = null;
     if (params.stock > 0) {
       loading.set('Turning out the herds');
-      stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => terrain.height(x, z));
+      stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => drawn.footing(x, z));
     }
-    // The ground under birds' and creatures' feet: off a fine grid of exact heights (the land's own is costly, asked every frame).
-    const feet = new GroundCache((x, z) => terrain.height(x, z), () => terrain.version);
     // Birds and squirrels about the land (plan 9.3): their squares are the trunks' cells.
     const woods = woodsOf(terrain);
     const small = setting.smallLife && params.small ? new SmallLife(seed, {
-      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
       // The town's farmland and fields are open land whatever the woods round them.
       woods: (x, z) => (terrain.townGround(x, z) >= TownGround.Street ? 0 : woods(x, z)),
@@ -692,7 +692,7 @@ export async function start(b: Boot): Promise<void> {
     }, setting.smallLife) : null;
     const smallView = small ? new SmallLifeView(small, view.stage, view.renderer) : null;
     // The yards' hens (the private library's chicken and rooster): bodies for the nearest; none without the library.
-    const hens = params.hens > 0 && setting.world.poultry ? await PoultryView.pool(params.hens, Math.max(1, Math.round(params.hens / 5)), (x, z) => feet.footing(x, z)) : null;
+    const hens = params.hens > 0 && setting.world.poultry ? await PoultryView.pool(params.hens, Math.max(1, Math.round(params.hens / 5)), (x, z) => drawn.footing(x, z)) : null;
     if (hens) compileEarly(hens.toWarm());
     if (stock) compileEarly(stock.toWarm());
     if (smallView) compileEarly(smallView.toWarm());
@@ -876,7 +876,7 @@ export async function start(b: Boot): Promise<void> {
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
     }, start, {
-      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
       // The sea's waves: a shark keeps under them (S9).
       surface: (x, z) => sea.surfaceAt(x, z),
@@ -894,7 +894,7 @@ export async function start(b: Boot): Promise<void> {
         changed: (c) => notes.say(changeLine(c), 6),
         jobs: terrainJobs,
       }, holdSite, holdPeople, {
-        height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
+        height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
         waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
         blocked: (x, z, r) => !!hold?.solid(x, z, r) || bridgeView.side(x, z, r),
       }, save?.hold);

@@ -37,6 +37,7 @@
     "shot:limp": "node tools/shot/limp.mjs",
     "variety": "node --import tsx tools/variety/cellars.ts",
     "zfight": "node --import tsx tools/zfight/scan.ts",
+    "ground:scan": "node --import tsx tools/ground/scan.ts",
     "loop": "node --import tsx tools/loop/evening.ts && node --import tsx tools/loop/voyage.ts",
     "water:fit": "node --import tsx tools/water/fit.ts",
     "walk:landforms": "node --import tsx tools/loop/landformWalk.ts masterworld && node --import tsx tools/loop/landformWalk.ts alpha && node --import tsx tools/loop/landformWalk.ts x4",
