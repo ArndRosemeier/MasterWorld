@@ -38,7 +38,7 @@ export const guilds: readonly GuildDef[] = [
     way: 'knock twice at the back door of the house behind the inn and say you were told to',
     teachesLine: 'Like that, and never in daylight. {ability} is yours. We never met.',
     distrust: 'Green as grass. You would put your foot through the first board. Come back when you have lived a little.',
-    task: { ask: 'A place below a house, cleared, and nobody the wiser. Then we talk again.', done: 'Nobody saw a thing. Good.', from: 4 },
+    task: { ask: 'A place below a house, cleared, and nobody the wiser. Then we talk again.', done: 'Nobody saw a thing. Good.', house: true, from: 4 },
   },
   // The magic teachers (C3): small houses a little out of the way, one teacher for a school or two (D49).
   {
@@ -64,7 +64,7 @@ export const guilds: readonly GuildDef[] = [
     way: 'go down the cellar steps of the house by the inn and say the cold sent you',
     teachesLine: 'Like that. {ability} is yours now. It was old before the Fading. Tell no one.',
     distrust: 'You are too new to this. {ability} would eat you. Come back older in the ways of the world.',
-    task: { ask: 'There is a place below a house where something ugly has made its nest. Empty it, quietly.', done: 'Quietly done. The Undercroft remembers.', from: 4 },
+    task: { ask: 'There is a place below a house where something ugly has made its nest. Empty it, quietly.', done: 'Quietly done. The Undercroft remembers.', house: true, from: 4 },
     // Bird form is sold nowhere (C14): the keeper gives it for one deed, to a student folk here trust.
     quest: {
       reward: 'bird', kinds: ['tower', 'barrow'], level: 4,
