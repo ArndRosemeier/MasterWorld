@@ -21,7 +21,9 @@ export type ActivityKind =
   /** Marking the hero's map, held in both hands (the hand-over, D35). */
   | 'mark'
   /** The harbour (S2): working a crane's winch, carrying cargo, mending nets. */
-  | 'haul' | 'carry' | 'mendNets';
+  | 'haul' | 'carry' | 'mendNets'
+  /** In the sea (S9: a castaway): treading water, swimming. */
+  | 'tread' | 'swim';
 
 /** Who may use a spot: its building's workers, its household, the market's traders, or anyone. */
 export type SpotUse = 'work' | 'home' | 'trade' | 'any';

@@ -7,7 +7,7 @@
  */
 import { Group, type Mesh, type Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import { gangplankMesh, hullHalf, ropeMesh, shipMesh, type Mooring, type ShipPlan } from '@futuremagic/settlement';
+import { gangplankMesh, hullHalf, planShip, ropeMesh, shipMesh, type Mooring, type ShipPlan } from '@futuremagic/settlement';
 import { HULLS, HULL_POSES, HULL_STATIONS, WATER } from './materials/waterInputs';
 import { buildingMeshAt } from './materials/building';
 import { LIE_OVER, afloatAt, farBerth, fleetOf, passageShip, voyageAfloat, wreckLying, type Afloat as Place, type Vessel, type Voyage } from '../world/fleet';
@@ -60,7 +60,12 @@ export interface ShipsHost {
   readonly voyages: () => readonly { readonly id: string; readonly from: string; readonly to: string; readonly v: Voyage }[];
   /** The wrecks in the log (S8, sea sights): where each lies, which way, its seed. */
   readonly wrecks: () => readonly { readonly id: string; readonly x: number; readonly z: number; readonly yaw: number; readonly seed: number }[];
+  /** The boats gone over (S9, castaways): where each floats keel up, which way, its seed. */
+  readonly capsized?: () => readonly { readonly id: string; readonly x: number; readonly z: number; readonly yaw: number; readonly seed: number }[];
 }
+
+/** How far an upturned boat's keel stands out of the water (m). */
+const KEEL_OUT = 0.3;
 
 export class ShipsView {
   private readonly group = new Group();
@@ -73,6 +78,8 @@ export class ShipsView {
 
   /** The wrecks drawn now (near the camera), by id: her mesh, plan and pose on the bed. */
   private readonly sunk = new Map<string, { mesh: Mesh; plan: ShipPlan; pose: Pose }>();
+  /** The boats gone over drawn now, by id. */
+  private readonly upturned = new Map<string, { mesh: Mesh; plan: ShipPlan }>();
 
   constructor(private readonly h: ShipsHost) {}
 
@@ -119,11 +126,35 @@ export class ShipsView {
       }
     }
     this.cut(hulls);
-    this.wrecked(cam, built);
+    built = this.wrecked(cam, built);
+    this.overturned(cam, built);
+  }
+
+  /** The boats gone over near the camera (S9): keel up, riding the waves where they float; one built a frame at most. */
+  private overturned(cam: Vector3, built: boolean): void {
+    const now = this.h.capsized?.() ?? [];
+    for (const [id, u] of this.upturned) if (!now.some((c) => c.id === id)) { this.group.remove(u.mesh); u.mesh.geometry.dispose(); this.upturned.delete(id); }
+    for (const c of now) {
+      let u = this.upturned.get(c.id);
+      if (Math.hypot(c.x - cam.x, c.z - cam.z) > SEEN) continue;
+      if (!u) {
+        if (built) continue;
+        built = true;
+        const plan = planShip(c.seed, 'boat');
+        const mesh = buildingMeshAt(shipMesh(plan, 0, 0, 1, 0, 0, [0, 0, 0], 'furled', true), 0, 0, 0, 'capsized boat');
+        mesh.rotation.order = 'YZX';
+        this.group.add(mesh);
+        this.upturned.set(c.id, (u = { mesh, plan }));
+      }
+      // Rolled right over: the keel (−draft) now stands up out of the water.
+      u.mesh.position.set(c.x, (this.h.surface(c.x, c.z) ?? 0) - u.plan.draft + KEEL_OUT, c.z);
+      u.mesh.rotation.set(-Math.PI, -c.yaw, 0);
+      u.mesh.updateMatrix();
+    }
   }
 
   /** The wrecks near the camera on the bed (S8), their decks walked (swum) near the hero; one built a frame at most. */
-  private wrecked(cam: Vector3, built: boolean): void {
+  private wrecked(cam: Vector3, built: boolean): boolean {
     for (const w of this.h.wrecks()) {
       const d = Math.hypot(w.x - cam.x, w.z - cam.z);
       let s = this.sunk.get(w.id);
@@ -145,6 +176,7 @@ export class ShipsView {
       }
       if (d < ABOARD) this.h.decks.move(w.id, s.plan, s.pose, null, false, true); else this.h.decks.drop(w.id);
     }
+    return built;
   }
 
   /** The voyage the ship of `town` is on at `hours` (sailing, lying at the far quay or sailing home), if any. */

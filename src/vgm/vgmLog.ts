@@ -78,6 +78,7 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'sight': return d.sea ? 'wreck' : d.need === 'reward' ? 'cache' : 'sight';
     case 'traveller': return d.situation ? 'hurt-traveller' : 'traveller';
     case 'stray': return 'stray-beast';
+    case 'castaway': return 'castaway';
     case 'festivity': return 'festivity';
   }
 }
@@ -103,6 +104,7 @@ export function decisionSays(d: Decision): string {
     case 'sight': return `${d.sight} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
     case 'festivity': return `${d.festivity} in ${d.town}, ${Math.round(d.from)} to ${Math.round(d.to)} h`;
     case 'stray': return `a beast out of its paddock in ${d.town}, wandering to ${Math.round(d.x)}, ${Math.round(d.z)}`;
+    case 'castaway': return `a fisher of ${d.town} clinging to their upturned boat ${at(d.x, d.z)}`;
     case 'traveller': return `the traveller of ${d.town} ${d.situation ? 'hurt' : 'resting'} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
   }
 }

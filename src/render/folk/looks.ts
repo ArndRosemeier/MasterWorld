@@ -22,6 +22,7 @@ export const PACK_HAIR = [
 export const PACK_CLIPS = [
   'idle', 'talk', 'arms folded', 'nod', 'shake head', 'dance', 'walk', 'walk carrying', 'sit', 'sit and talk', 'pick up', 'interact', 'eat or drink',
   'repair (kneeling)', 'harvest', 'plant seeds', 'water plants', 'chop wood', 'crouch', 'get up from lying', 'jog',
+  'tread water', 'swim',
 ];
 
 /** Asleep in bed: the first frame of getting up from lying, held still (FolkView lays it along the bed). */
@@ -133,6 +134,7 @@ const CLIP: Record<ActivityKind, string> = {
   plough: 'harvest', sow: 'plant seeds', hoe: 'harvest', reap: 'harvest', tendStock: 'interact', muckOut: 'pick up',
   hurt: 'crouch', mark: 'interact',
   haul: 'haul line', carry: 'pick up', mendNets: 'repair (kneeling)',
+  tread: 'tread water', swim: 'swim',
 };
 
 /** The clip that shows `act` (`id` varies a few between people; `talking`: held for a talk with the hero). */

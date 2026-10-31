@@ -330,6 +330,25 @@ export interface TravellerDecision {
 }
 
 /**
+ * A situation by the sea (S9, D52): a fisher of harbour town `town` whose boat went over, clinging to it upturned at
+ * (x, z) off the strand (its keel along `yaw`), crying for help, from game hour `at` until `until` (then another boat
+ * picks them up). The hero swims out to them and brings them in.
+ */
+export interface CastawayDecision {
+  readonly kind: 'castaway';
+  readonly id: string;
+  readonly town: string;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  readonly seed: number;
+  readonly at: number;
+  readonly until: number;
+  /** The setting's situation. */
+  readonly situation: string;
+}
+
+/**
  * A situation (C10): one of a town's beasts got out of its paddock (`paddock`, its id in the town's plan) and
  * wanders to (x, z); someone of its farm goes after it. From game hour `at` until `until` at most.
  */
@@ -363,7 +382,7 @@ export interface FestivityDecision {
   readonly for?: string;
 }
 
-export type Decision = FestivityDecision | StrayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+export type Decision = FestivityDecision | StrayDecision | CastawayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

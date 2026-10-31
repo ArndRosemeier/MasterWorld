@@ -326,6 +326,11 @@ export function townById(towns: readonly Town[], id: string): Town | undefined {
   return towns.find((t) => t.decision.id === id);
 }
 
+/** The towns with a harbour (S2). */
+export function harbourTowns(towns: readonly Town[]): Town[] {
+  return towns.filter((t) => t.decision.harbour);
+}
+
 export function townPlanOf(d: TownDecision, t: Terrain): TownPlan {
   return planTown({ seed: d.seed ?? t.seed, size: d.size, x: d.x, z: d.z, radius: d.radius, height: t.height.bind(t), water: t.waterDepth.bind(t), farmland: d.size !== 'waystation', ...(d.harbour ? { harbour: d.harbour } : {}) });
 }

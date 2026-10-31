@@ -13,7 +13,7 @@ import { caveFor } from './caves';
 import { wreckFor } from './wrecks';
 import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { festivityFor } from './festivities';
-import { hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
+import { castawayFor, hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 import { islandPlace } from './islands';
 
@@ -92,6 +92,7 @@ export const TOOLS: readonly Tool[] = [
     why: (d) => (d.kind === 'wild' ? `dusk in ${d.town}: ${d.encounter} (${d.members.length}) at a paddock` : d.kind) },
   { id: 'stray-beast', name: 'A beast got out', writes: ['stray'], need: 'people', asked: 'turn', next: strayBeastFor,
     why: (d) => (d.kind === 'stray' ? `a day in ${d.town}: a beast out of its paddock, its farm after it` : d.kind) },
+  { id: 'castaway', name: 'A cry from the water', writes: ['castaway'], need: 'people', asked: 'need', answer: castawayFor },
   { id: 'hurt-traveller', name: 'A hurt traveller', writes: ['traveller'], need: 'people', asked: 'need', answer: hurtTravellerFor },
   { id: 'traveller', name: 'A traveller by the way', writes: ['traveller'], need: 'people', asked: 'need', answer: travellerFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },

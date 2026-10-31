@@ -94,6 +94,8 @@ export const params = {
   /** Start before a sunken ruin on the shore (`sunken`; S8), as `barrow`. */
   sunken: q.has('sunken'),
   /** Start in the sea over a wreck off the start town (`wreck`; S8), one put there now if there is none. */
+  /** On the strand where the giant crabs live, a fisher whose boat went over out on the water before the hero (S9). */
+  castaway: q.has('castaway'),
   wreck: q.has('wreck'),
   /** A test portal (app/portals.ts): an opening 6 m ahead of the start, joined to one 30 m to the right and turned. */
   portal: q.has('portal'),

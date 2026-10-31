@@ -330,6 +330,11 @@ const SESSIONS = [
     { name: 'sea-wreck-under', act: wreckLook('under') },
     { name: 'sea-wreck-over', act: wreckLook('over') },
   ] },
+  // S9: a situation by the sea: from the water's edge, a fisher clinging to their upturned boat out on the water,
+  // calling for help (the cry's bubble shows once the hero is near enough to see them).
+  { id: 'sea-castaway', query: `${still}&hour=11&weather=fair&castaway&wild=0`, shots: [
+    { name: 'sea-castaway', act: async (p) => { await p.waitForTimeout(2500); } },
+  ] },
   // S2: a harbour town the VGM founded by a river's mouth. On its quay at late morning looking out over the piers,
   // then from out over the water back at the town, then the quay in the evening, its tavern lit.
   { id: 'sea-harbour', query: `${still}&hour=11&weather=fair&site=harbour`, shots: [

@@ -83,7 +83,7 @@ import { FAR } from './render/folk/FarFolk';
  * FAR); they go home once the hero is this far off.
  */
 const WAIT_FROM = 395, WAIT_UNSEEN = FAR + 10, WAIT_GONE = 600;
-import { burntBarns, criesDue, situationOf, smokesAt } from './vgm/situations';
+import { burntBarns, castawayFor, castawaysAt, criesDue, situationOf, smokesAt } from './vgm/situations';
 import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
 import { Cellars } from './app/cellars';
@@ -100,7 +100,7 @@ import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
 import { ShipsView } from './render/ships';
-import { ShipCrews } from './game/shipCrews';
+import { Castaways, ShipCrews } from './game/shipCrews';
 import { Decks } from './world/deck';
 import { seaPace, underWay } from './world/fleet';
 import type { Township } from './game/township';
@@ -108,7 +108,7 @@ import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
-import { dungeonOf, type Decision, type DungeonDecision, type EventDecision, type RegionDecision, type RoadDecision, type RoadWay, type SightDecision } from './world/decisions';
+import { dungeonOf, type CastawayDecision, type Decision, type DungeonDecision, type EventDecision, type RegionDecision, type RoadDecision, type RoadWay, type SightDecision } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
 import { HouseView } from './render/town/HouseView';
 import { lookFromDegrees } from './app/look';
@@ -308,6 +308,8 @@ export async function start(b: Boot): Promise<void> {
     const decks = new Decks(() => player.walker.pos);
     // Their crews at work (S3): drawn with the townsfolk, carried with their vessels, solid as everyone is.
     const crews = new ShipCrews(seed);
+    // A fisher whose boat went over (S9, a castaway): drawn with the townsfolk, solid as everyone is.
+    const castaways = new Castaways(seed);
     // A pier's deck or a bridge's high over the feet (a swimmer under it) is not under them: never lifted onto it.
     const overhead = (f: number | null, y: number | undefined): number | null => (f !== null && y !== undefined && f > y + 1.6 ? null : f);
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
@@ -336,7 +338,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return decks.hull(x, z, r, y ?? player.walker.pos.y) || crews.inCrew(x, z, r, y ?? player.walker.pos.y) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return decks.hull(x, z, r, y ?? player.walker.pos.y) || crews.inCrew(x, z, r, y ?? player.walker.pos.y) || castaways.inBody(x, z, r) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     // Down in a cellar the walker walks its space, else the land.
@@ -501,7 +503,7 @@ export async function start(b: Boot): Promise<void> {
     let wrecks: { log: readonly Decision[]; list: SightDecision[] } = { log: [], list: [] };
     const wrecksNow = () => (wrecks.log === log ? wrecks.list : (wrecks = { log, list: log.filter((d): d is SightDecision => d.kind === 'sight' && !!d.sea) }).list);
     const voyagesNow = () => (voyages.log === log ? voyages.list : (voyages = { log, list: voyagesIn(log) }).list);
-    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks, voyages: voyagesNow, wrecks: () => wrecksNow() });
+    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks, voyages: voyagesNow, wrecks: () => wrecksNow(), capsized: () => { const h = hours(); return log.filter((d): d is CastawayDecision => d.kind === 'castaway' && h >= d.at && h < d.until); } });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
     compileEarly([sea.mesh]);
@@ -1010,6 +1012,19 @@ export async function start(b: Boot): Promise<void> {
       }
       if (w) player.teleport(w.x + 14, undefined, w.z, Math.PI / 2);
     }
+    // `castaway`: on a strand by the start (the giant crabs' ground) with a fisher's boat gone over out on the water, facing it.
+    if (params.castaway && start) {
+      const shore = wildFor({ seed, log: [], towns: terrain.towns, terrain, hours: 0, setting }, start).find((t) => t.group === 'crabs');
+      const d = shore && castawayFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: shore, toward: null }, true);
+      if (shore && d) {
+        log = [...log, d];
+        // At the water's edge on the way in from them, looking out at them (yaw 0 faces −z, π/2 faces −x).
+        const k = Math.hypot(shore.x - d.x, shore.z - d.z) || 1, ux = (shore.x - d.x) / k, uz = (shore.z - d.z) / k;
+        let s = 0;
+        while (s < k && terrain.height(d.x + ux * s, d.z + uz * s) < 0.3) s += 1;
+        player.teleport(d.x + ux * (s + 2), undefined, d.z + uz * (s + 2), Math.atan2(ux, uz));
+      }
+    }
     // `wild=<kind>`: beside its first group (for looking at them).
     const by = params.wildAt ? wild?.territories.find((t) => t.kind === params.wildAt) : undefined;
     if (by) player.teleport(by.x + by.r + 20, undefined, by.z, Math.PI / 2);
@@ -1277,6 +1292,15 @@ export async function start(b: Boot): Promise<void> {
       }, { x: a.x + dx * k, z: a.z + dz * k }, { busy: TEND_FOR, ground: (x, z) => terrain.height(x, z), up: () => { if (player.puppet === kneel) player.puppet = null; } });
       player.puppet = kneel;
     });
+    // A castaway brought in (S9, D54): a good deed, as a hurt traveller tended.
+    castaways.saved = (d, a) => {
+      const kept = keepPromise(log, d.id, hours());
+      if (kept) log = [...log, kept];
+      director.met('people');
+      character.earn(`castaway:${d.id}`, 'help');
+      const own = standing.deed(`castaway:${d.id}`, a.person.race, setting.standing.help).find((c) => c.people.id === a.person.race);
+      if (own) notes.say(changeLine(own), 5);
+    };
     services.set('trade', (a) => { const t = talkTown(), m = t?.market.of(a.person.id); if (t && m) { director.model.note('crafter', 0.5); trade.show(t.market, m, t.talk.nameOf(a.person.id)); } });
     // Talk: in the town the hero is in (it follows them from town to town, below).
     const talk: TalkUi | null = startTown ? new TalkUi(startTown, setting.talk, journal, player, {
@@ -2113,6 +2137,12 @@ export async function start(b: Boot): Promise<void> {
     const situationNow = (kind: SituationKind): Made | null => {
       if (kind === 'paddock-wolves' || kind === 'stray-beast') return vgmStep({ tools: [kind], early: true })[0] ?? null;
       const at = player.walker.pos, def = situationOf(setting, kind);
+      if (kind === 'castaway') {
+        const d = castawayFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: { x: at.x, z: at.z }, toward: null }, true);
+        const m = d && madeBy('castaway', d, 'asked for now', hours());
+        if (m) applied(m);
+        return m;
+      }
       const d = def && travellerFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null });
       if (!d || !def) return null;
       const m = madeBy('hurt-traveller', { ...d, situation: def.id }, 'asked for now', hours());
@@ -2144,6 +2174,9 @@ export async function start(b: Boot): Promise<void> {
       ships.float(view.camera.position, hours(), dt);
       // (A harbour town's passengers aboard too, from its life while it lives.)
       const crewNow = crews.atWork(decks, hours(), (id) => { const t = towns?.get(id); return t?.living ? t.life : null; }, player.walker.pos);
+      // A castaway (S9): treading water by their boat, brought in behind the swimming hero, wading ashore.
+      const w0 = player.walker, castNow = castaways.drift(dt, castawaysAt(log, hours()), { x: w0.pos.x, y: w0.pos.y, z: w0.pos.z, yaw: w0.yaw, swimming: w0.mode === 'swim' && !player.offFoot }, { surface: (x, z) => sea.surfaceAt(x, z) ?? 0, ground: (x, z) => terrain.height(x, z) });
+      const outdoorsFolk = castNow.length ? [...crewNow, ...castNow] : crewNow;
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
@@ -2242,9 +2275,12 @@ export async function start(b: Boot): Promise<void> {
             cried.add(c.id);
             const t = towns?.get(c.town), folk = t?.living ? t.life.agents.filter((a) => !a.hidden && !a.held) : [];
             // The traveller themselves; at a paddock or a burning barn whoever of the town stands nearest it (nobody near: no cry).
+            // A castaway calls out themselves, from the water.
             const who = c.kind === 'hurt-traveller' ? folk.find((a) => a.person.role === 'traveller')
+              : c.kind === 'castaway' ? null
               : folk.filter((a) => Math.hypot(a.x - c.x, a.z - c.z) < 90).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
-            if (who) speech.say(c.text, () => (who.hidden ? null : { x: who.x, y: terrain.height(who.x, who.z), z: who.z }));
+            const adrift = c.kind === 'castaway' && castaways.fisherOf(c.id);
+            if (who || adrift) speech.say(c.text, () => (adrift ? castaways.fisherOf(c.id) : who!.hidden ? null : { x: who!.x, y: terrain.height(who!.x, who!.z), z: who!.z }));
             // The smoke over a raided farm and the refugees on the road are a story event seen: the hero knows of it now.
             if (c.kind === 'raid-smoke' || c.kind === 'refugees') learnEvent(c.id.replace(/\/fled$/, ''), 'what you saw');
           }
@@ -2427,7 +2463,7 @@ export async function start(b: Boot): Promise<void> {
       if (folk) {
         folk.only = !!visit();
         // (And out of doors the ships' crews, where their vessels carry them.)
-        folk.indoors = visit() ? (ownerAt ? [ownerAt] : null) : rooms?.inside ? rooms.people() : crewNow.length ? [...(rooms?.people() ?? []), ...crewNow] : rooms ? rooms.people() : null;
+        folk.indoors = visit() ? (ownerAt ? [ownerAt] : null) : rooms?.inside ? rooms.people() : outdoorsFolk.length ? [...(rooms?.people() ?? []), ...outdoorsFolk] : rooms ? rooms.people() : null;
         if (!above && ownerAt) folk.follow(dt, view.camera);
       }
       if (above) {

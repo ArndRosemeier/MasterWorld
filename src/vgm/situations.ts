@@ -5,18 +5,21 @@
  * farm's barn smoulders, its smoke seen over the trees from afar (`smokesAt`, from the raid itself). Each has
  * one urgent line, its cry, called out in a speech bubble once the hero is near enough to see what it is
  * about (`criesDue`): shown first, told after. The folk of a place a band took camp by the road outside the
- * nearest town (C11, vgm/events.ts `refugeOf`) and cry out to the hero too. Pure, seeded.
+ * nearest town (C11, vgm/events.ts `refugeOf`) and cry out to the hero too. By the sea a fisher whose boat went over
+ * clings to it off the strand (S9: People's answer there, `castawayFor`) and cries out. Pure, seeded.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { polyCentroid } from '@futuremagic/settlement';
 import type { SettingModule, SituationDef, SituationKind } from '../setting/contract';
-import type { Decision, DecisionLog, EventDecision, StrayDecision, TravellerDecision, WildDecision } from '../world/decisions';
+import type { CastawayDecision, Decision, DecisionLog, EventDecision, StrayDecision, TravellerDecision, WildDecision } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
-import { townById, type Town } from '../world/town';
+import { harbourTowns, townById, type Town } from '../world/town';
 import { travellerFor, travellersOf, type NeedContext } from './answers';
 import { encounterFor } from './encounters';
 import type { Need } from './director';
 import { openEvents, refugeOf } from './events';
+import { keptOf } from './leads';
+import { ringSpot } from '../world/spiral';
 
 /** The setting's situation of a kind (none: it stages none such). */
 export function situationOf(setting: Pick<SettingModule, 'situations'>, kind: SituationKind): SituationDef | undefined {
@@ -31,6 +34,57 @@ export function hurtTravellerFor(c: NeedContext): TravellerDecision | null {
   if (!def || !new Rng(deriveSeed(c.seed, 'hurt', travellersOf(c.log).length + 1)).chance(chance)) return null;
   const d = travellerFor(c);
   return d && { ...d, situation: def.id };
+}
+
+/** How far from the hero (m) a castaway is, how deep the water under them (m), and how near the strand (m). */
+const ADRIFT: readonly [number, number] = [45, 160];
+const ADRIFT_DEPTH: readonly [number, number] = [2.5, 7];
+const STRAND_NEAR = 70;
+/** The harbour town whose fisher it is lies within this of the hero (m); the castaway keeps this far off its harbour (its moorings). */
+const FISHER_TOWN = 2500, OFF_MOORINGS = 220;
+
+/** The castaways of the log still holding on at game hour `hours` (not brought in, no other boat yet); `all`: every one ever. */
+export function castawaysAt(log: DecisionLog, hours: number, all = false): CastawayDecision[] {
+  const kept = keptOf(log), out: CastawayDecision[] = [];
+  for (const d of log) if (d.kind === 'castaway' && (all || (hours >= d.at && hours < d.until && !kept.has(d.id)))) out.push(d);
+  return out;
+}
+
+/**
+ * People's answer by the sea (S9, D52): a fisher of the nearest harbour town whose boat went over, clinging to it
+ * upturned some way off the strand near the hero (the setting's share `chance` of such answers), until another
+ * boat picks them up (`sure`: whatever the share, the debug menu's). Null: no harbour near, the hero not by the sea,
+ * one adrift already.
+ */
+export function castawayFor(c: NeedContext, sure = false): CastawayDecision | null {
+  const def = situationOf(c.setting, 'castaway');
+  if (!def?.lasts || castawaysAt(c.log, c.hours).length) return null;
+  const harbours = harbourTowns(c.towns), fromHero = (w: Town) => Math.hypot(w.decision.x - c.hero.x, w.decision.z - c.hero.z);
+  const town = harbours.filter((w) => fromHero(w) < FISHER_TOWN).sort((a, b) => fromHero(a) - fromHero(b))[0];
+  if (!town) return null;
+  const n = castawaysAt(c.log, Infinity, true).length + 1, s = deriveSeed(c.seed, 'situation', def.id, n);
+  const chance = Math.min(1, (def.chance ?? 1) * (c.lean?.('people') ?? 1));
+  if (!sure && !new Rng(deriveSeed(s, 'chance')).chance(chance)) return null;
+  const t = c.terrain;
+  for (let k = 0; k < 48; k++) {
+    const { x, z } = ringSpot(c.hero, ADRIFT, s, k), deep = -t.height(x, z);
+    if (deep < ADRIFT_DEPTH[0] || deep > ADRIFT_DEPTH[1] || harbours.some((w) => Math.hypot(w.decision.x - x, w.decision.z - z) < OFF_MOORINGS)) continue;
+    if (!strandNear(t, x, z)) continue;
+    return { kind: 'castaway', id: `castaway-${n}`, town: town.decision.id, x, z, yaw: new Rng(s).range(0, Math.PI * 2), seed: s, at: c.hours, until: c.hours + def.lasts, situation: def.id };
+  }
+  return null;
+}
+
+/** Whether dry strand lies within STRAND_NEAR of (x, z), looked for in eight ways. */
+function strandNear(t: Terrain, x: number, z: number): boolean {
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    for (const d of [STRAND_NEAR / 2, STRAND_NEAR]) {
+      const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, h = t.height(px, pz);
+      if (h > 0.3 && h < 4 && t.waterDepth(px, pz, h) === 0) return true;
+    }
+  }
+  return false;
 }
 
 /** What the paddock's wolves ask: the log, the hours, the town the hero is in and the setting. */
@@ -184,6 +238,10 @@ export function criesDue(c: CryContext): Cry[] {
   for (const e of fled?.cry ? openEvents(log) : []) {
     const at = refugeOf(c.towns, e);
     if (at && !cried.has(`${e.id}/fled`) && Math.hypot(hero.x - at.x, hero.z - at.z) <= fled!.seen) out.push({ id: `${e.id}/fled`, kind: 'refugees', text: fled!.cry!, town: at.town, x: at.x, z: at.z });
+  }
+  const adrift = situationOf(setting, 'castaway');
+  for (const d of adrift?.cry ? castawaysAt(log, hours) : []) {
+    if (!cried.has(d.id) && Math.hypot(hero.x - d.x, hero.z - d.z) <= adrift!.seen) out.push({ id: d.id, kind: 'castaway', text: adrift!.cry!, town: d.town, x: d.x, z: d.z });
   }
   for (const d of log) {
     if ((d.kind !== 'traveller' && d.kind !== 'wild') || !d.situation || cried.has(d.id)) continue;
