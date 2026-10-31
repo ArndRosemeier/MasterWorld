@@ -12,6 +12,7 @@ import { defineKind, kindMesh } from '../materials';
 import { WORLD } from '../origin';
 import { WEATHER } from './weather';
 import type { CaveFeatures } from '../../world/dungeon/caveFeatures';
+import { drownedRooms, type ScaledLayout } from '../../world/dungeon/cellar';
 
 export const CAVE_WATER = defineKind('cave water', ['position', 'normal', 'uv'], () => {
   const m = new MeshPhysicalNodeMaterial({ color: new Color(0x123036), roughness: 0.14, metalness: 0, transparent: true, depthWrite: false, specularIntensity: 1 });
@@ -84,13 +85,24 @@ export function caveWaterMesh(f: CaveFeatures, x: number, y: number, z: number):
     // A drowned storey's still surface: one sheet over the whole cave (the rock hides it but where it stands open).
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const h of f.halls.values()) { x0 = Math.min(x0, h.x0); x1 = Math.max(x1, h.x1); z0 = Math.min(z0, h.z0); z1 = Math.max(z1, h.z1); }
-    const o = pos.length / 3, P = FLOOD_PAD;
-    pos.push(x0 - P, f.flood, z0 - P, x1 + P, f.flood, z0 - P, x0 - P, f.flood, z1 + P, x1 + P, f.flood, z1 + P);
-    uvs.push(0, 0, 0, 0, 0, 0, 0, 0);
-    idx.push(o, o + 2, o + 1, o + 1, o + 2, o + 3);
+    sheet(pos, uvs, idx, x0 - FLOOD_PAD, z0 - FLOOD_PAD, x1 + FLOOD_PAD, z1 + FLOOD_PAD, f.flood);
   }
   if (!idx.length) return null;
   return named(kindMesh(geometry(pos, uvs, idx), CAVE_WATER, x, y, z), 'cave water');
+}
+
+/**
+ * A built place's drowned storey (S8, a sunken ruin: `ScaledLayout.flood`): the still surface in each room that rises
+ * out of the water, over its floor plan (its walls hide the edges); the ways under it are dived and show none.
+ */
+export function floodMesh(layout: ScaledLayout, x: number, y: number, z: number): Mesh | null {
+  if (layout.flood === undefined) return null;
+  const pos: number[] = [], uvs: number[] = [], idx: number[] = [], C = layout.scale.cell, top = layout.flood;
+  for (const id of drownedRooms(layout)) {
+    const r = layout.rooms.find((q) => q.id === id)!;
+    sheet(pos, uvs, idx, r.x * C, r.z * C, (r.x + r.w) * C, (r.z + r.d) * C, top);
+  }
+  return idx.length ? named(kindMesh(geometry(pos, uvs, idx), CAVE_WATER, x, y, z), 'flood water') : null;
 }
 
 /** A cave's shafts of daylight as one mesh: a cone from the shaft's top down to the floor, and the day's disc at its top. */
@@ -126,6 +138,14 @@ function geometry(pos: number[], uvs: number[], idx: number[]): BufferGeometry {
   g.computeVertexNormals();
   g.computeBoundingSphere();
   return g;
+}
+
+/** A still water surface over a rectangle (x0, z0 to x1, z1) at `top`, added to a mesh's lists. */
+function sheet(pos: number[], uvs: number[], idx: number[], x0: number, z0: number, x1: number, z1: number, top: number): void {
+  const o = pos.length / 3;
+  pos.push(x0, top, z0, x1, top, z0, x0, top, z1, x1, top, z1);
+  uvs.push(0, 0, 0, 0, 0, 0, 0, 0);
+  idx.push(o, o + 2, o + 1, o + 1, o + 2, o + 3);
 }
 
 function named(m: Mesh, name: string): Mesh {

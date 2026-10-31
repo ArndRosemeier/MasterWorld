@@ -987,8 +987,8 @@ export async function start(b: Boot): Promise<void> {
       const ax = w.x + fx * 6, az = w.z + fz * 6, bx = w.x - fz * 30, bz = w.z + fx * 30;
       portals.add({ id: 'test', shape: { halfWidth: 1.3, height: 2.8 }, a: { realm: 'land', frame: { x: ax, y: terrain.height(ax, az), z: az, yaw } }, b: { realm: 'land', frame: { x: bx, y: terrain.height(bx, bz), z: bz, yaw: yaw + Math.PI / 2 } } });
     }
-    // `barrow`, `cave`, `tower`, `seacave`: before one, looking at it (one is promised now if there is none).
-    const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : params.seacave ? 'sea-cave' : null;
+    // `barrow`, `cave`, `tower`, `seacave`, `sunken`: before one, looking at it (one is promised now if there is none).
+    const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : params.seacave ? 'sea-cave' : params.sunken ? 'sunken-ruin' : null;
     const lookForm = lookAt ? setting.dungeons[lookAt]?.form : undefined;
     if (lookAt && lookForm && start) {
       let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === lookAt) ?? null;

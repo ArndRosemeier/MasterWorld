@@ -237,6 +237,16 @@ export class Walker {
     const stuck = this.bodyInRock(p.x, p.y, p.z), held = stuck ? this.clearance(p.x, p.y, p.z) : Infinity;
     const walled = stuck ? this.wallDepth(p.x, p.y, p.z) : 0;
     const tryMove = (nx: number, nz: number): boolean => {
+      // Swimming under a roof that comes lower ahead (a drowned way's lintel, a tunnel narrowing up to its roof):
+      // the body ducks under it, also when it already brushes the rock (floated up into the top of a way).
+      if (this.mode === 'swim' && this.bodyInRock(nx, p.y, nz)) {
+        for (let d = 0.1; d <= DUCK_MOST; d += DUCK_STEP) {
+          if (this.bodyInRock(nx, p.y - d, nz) || p.y - d < this.support(nx, nz, p.y - d)) continue;
+          p.y -= d; p.x = nx; p.z = nz;
+          return true;
+        }
+        if (!stuck) return false;
+      }
       // Out, not further in (else it walks into the rock and up its face, or into the wall itself), unless going down
       // a step (the body sinks as it moves on: a tall head under a low edge on the way down a stair).
       if (stuck && this.clearance(nx, p.y, nz) < held - 1e-4 && !(this.mode === 'ground' && this.floorAhead(nx, nz) < p.y - 0.01)) return false;
@@ -245,15 +255,6 @@ export class Walker {
       // Going down a step the body sinks as it moves on, so the head is tested at the lower floor too
       // (else a tall body under a low edge climbs a stair it can never come down again).
       if (!stuck && this.bodyInRock(nx, p.y, nz)) {
-        // Swimming under a roof that comes lower ahead (a drowned way's lintel): the body ducks under it.
-        if (this.mode === 'swim') {
-          for (let d = 0.1; d <= DUCK_MOST; d += DUCK_STEP) {
-            if (this.bodyInRock(nx, p.y - d, nz) || p.y - d < this.support(nx, nz, p.y - d)) continue;
-            p.y -= d; p.x = nx; p.z = nz;
-            return true;
-          }
-          return false;
-        }
         const ahead = this.mode === 'ground' ? this.floorAhead(nx, nz) : p.y;
         if (ahead >= p.y - 1e-3) return false;
         // Sinking up to a step (not into the step ahead's own block, nor deeper than the floor ahead).
@@ -321,8 +322,9 @@ export class Walker {
       const want = intent.up || this.surfacing ? 1.4 : intent.down ? -1.4 : p.y < top - 0.05 ? 0.8 : 0;
       v.y += (want - v.y) * damp(4, dt);
       // Under a roof (a drowned cave's): the head stops at the rock, in the air caught under it if there is any.
+      // (The whole body, not only the head's top: a way narrows up to its roof, and a body floated up into that is held.)
       const roof = v.y > 0 ? this.world.rockSurface(p.x, p.y + v.y * dt + this.height, p.z) : null;
-      if (roof !== null && roof < 0.1) v.y = 0;
+      if ((roof !== null && roof < 0.1) || (v.y > 0 && !this.bodyInRock(p.x, p.y, p.z) && this.bodyInRock(p.x, p.y + v.y * dt, p.z))) v.y = 0;
       p.y = Math.min(top, p.y + v.y * dt);
       if (p.y <= ground) { p.y = ground; v.y = Math.max(0, v.y); }
       // Out of the water once the ground is high enough to wade.

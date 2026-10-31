@@ -60,7 +60,9 @@ test('settlements: in a hamlet the VGM promises a place from it, and its people 
   assert.equal(d.town, town.decision.id);
   // A cellar under one of its houses, or a place out on the land near it.
   const at = d.site ?? { x: town.plan.buildings[d.building].cx, z: town.plan.buildings[d.building].cz };
-  assert.ok(Math.hypot(at.x - town.decision.x, at.z - town.decision.z) < 1500, 'near the hamlet');
+  // Within its kind's ring of the hamlet (a cliff or shore moves the spot a little further).
+  const far = Math.hypot(at.x - town.decision.x, at.z - town.decision.z), ring = classic.dungeons[d.template]?.form.ring?.[1] ?? 1300;
+  assert.ok(far < ring + 200, `near the hamlet: ${d.template} ${far.toFixed(0)} m`);
   log = [...log, d];
   assert.equal(nextPromise({ ...ctx(log, town), hours: 30 }), null, 'one at a time');
   const life = new TownLife(town.plan, town.decision.seed!, 9, classic.routines);

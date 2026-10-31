@@ -46,7 +46,7 @@ export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: 
   const [cx, cz] = town.plan.centre;
   const score = (b: TownBuilding) => hash2f(s, b.id, 7) - Math.min(1, Math.hypot(b.cx - cx, b.cz - cz) / (town.decision.radius * 1.2)) * 0.5;
   const house = houses.reduce((a, b) => (score(b) < score(a) ? b : a));
-  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, kind, form?.pieces);
+  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, kind, form?.pieces, form?.space.flood !== undefined);
   return { kind: 'dungeon', id: `${kind}-${n}`, template: kind, town: town.decision.id, building: house.id, seed: s, setPiece: piece, danger: dangerAt(town, home) };
 }
 
@@ -251,7 +251,7 @@ export function promisePlace(kind: LandKind, form: DungeonForm, seed: number, te
   const houses = town.plan.buildings.filter((b) => CELLARED.includes(b.kind) && b.household > 0);
   if (!houses.length) return null;
   const knower = houses.reduce((a, b) => (Math.hypot(b.cx - best.x, b.cz - best.z) < Math.hypot(a.cx - best.x, a.cz - best.z) ? b : a));
-  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, kind, form.pieces);
+  const piece = nextSetPiece(dungeons.map((d) => d.setPiece), s, kind, form.pieces, form.space.flood !== undefined);
   return { kind: 'dungeon', id: `${kind}-${n}`, template: kind, town: town.decision.id, building: knower.id, site: { x: best.x, z: best.z, yaw }, seed: s, setPiece: piece, danger: dangerAt({ decision: best }, home) };
 }
 
@@ -311,8 +311,8 @@ export function loreOf(setting: Pick<SettingModule, 'dungeons'>, kind: DungeonTe
 }
 
 /** The set piece for the next dungeon of a kind: one used least so far in this world (plan 8.1: none repeats until the library is used through). */
-export function nextSetPiece(used: readonly string[], seed: number, kind: DungeonTemplate = 'cellar', also?: readonly string[]): string {
-  const pieces = setPiecesFor(kind, also);
+export function nextSetPiece(used: readonly string[], seed: number, kind: DungeonTemplate = 'cellar', also?: readonly string[], flooded = false): string {
+  const pieces = setPiecesFor(kind, also, flooded);
   const times = (id: string) => used.filter((u) => u === id).length;
   const fewest = Math.min(...pieces.map((p) => times(p.id)));
   const fresh = pieces.filter((p) => times(p.id) === fewest);

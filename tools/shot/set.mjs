@@ -310,6 +310,18 @@ const SESSIONS = [
     { name: 'sea-cave-under', act: seaCaveLook('under') },
     { name: 'sea-cave-lake', act: seaCaveLook('lake') },
   ] },
+  // S8: a sunken ruin on the shore, the dunes over it; then inside, under the water of its drowned halls and at the
+  // surface of one, the hero swimming there.
+  { id: 'sunken-ruin', query: `${still}&hour=11&weather=fair&sunken`, shots: [
+    { name: 'sunken-ruin-mouth', act: (p) => p.evaluate(() => {
+      const g = window.game, s = g.log.find((x) => x.kind === 'dungeon' && x.template === 'sunken-ruin')?.site;
+      if (!s) return;
+      const a = s.yaw + 0.35, x = s.x + Math.sin(a) * 12, z = s.z + Math.cos(a) * 12;
+      g.player.teleport(x, undefined, z, a); g.player.heroCam.yaw = a + 0.3; g.player.heroCam.pitch = 0.08;
+    }) },
+    { name: 'sunken-ruin-under', act: seaCaveLook('under', 'sunken-ruin') },
+    { name: 'sunken-ruin-hall', act: seaCaveLook('lake', 'sunken-ruin') },
+  ] },
   // S8: a wreck on the sea bed off the start town: the free camera under the water beside her, then from above at
   // the surface, the hero swimming over her.
   { id: 'sea-wreck', query: `${still}&hour=11&weather=fair&wreck`, shots: [
@@ -396,19 +408,19 @@ const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = 
 const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : s.id.startsWith('sea-') ? 'sea' : 'land');
 
 /**
- * Inside the first sea cave (S8), in its first drowned room: `under`, the free camera under the water 1.5 m over the
+ * Inside the first sea cave (S8; or another kind with a drowned storey, a sunken ruin), in its first drowned room: `under`, the free camera under the water 1.5 m over the
  * floor, looking across the room to its far corner; `lake`, the hero swimming in the middle of the room, seen from the
  * hero's camera at the surface of the water over it.
  */
-function seaCaveLook(what) {
+function seaCaveLook(what, kind = 'sea-cave') {
   return async (p) => {
-    const said = await p.evaluate(async (what) => {
-      const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === 'sea-cave');
+    const said = await p.evaluate(async ([what, kind]) => {
+      const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === kind);
       const v = d && await g.cellars.build(d.id);
-      if (!v) throw new Error('no sea cave');
+      if (!v) throw new Error(`no ${kind}`);
       const L = v.cellar.layout, { cell, storey } = L.scale, O = v.view.origin;
       const r = L.rooms.find((q) => q.level * storey < L.flood);
-      if (!r) return 'sea cave: nothing under water';
+      if (!r) return `${kind}: nothing under water`;
       if (!v.inside) await v.enter(true, r.id);
       const x0 = O.x + r.x * cell, z0 = O.z + r.z * cell, W = r.w * cell, D = r.d * cell, floor = O.y + r.level * storey, top = O.y + L.flood;
       const pl = g.player;
@@ -421,8 +433,8 @@ function seaCaveLook(what) {
         pl.teleport(x0 + W / 2, top - 1, z0 + D / 2, Math.atan2(-1, -1));
         pl.heroCam.pitch = 0.1;
       }
-      return `sea cave ${d.id}: room ${r.id} ${W} x ${D} m, floor ${floor.toFixed(1)}, water ${top.toFixed(1)}, ${r.height * storey} m high`;
-    }, what);
+      return `${kind} ${d.id}: room ${r.id} ${W} x ${D} m, floor ${floor.toFixed(1)}, water ${top.toFixed(1)}, ${r.height * storey} m high`;
+    }, [what, kind]);
     console.log(said);
     await p.waitForTimeout(2500);
   };

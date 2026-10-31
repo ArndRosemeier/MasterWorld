@@ -1,6 +1,6 @@
 /**
  * Wrecks (S8, plan 13): Reward's answer at sea. When a find is overdue and the hero is by the sea (on the shore, in
- * the water, aboard), the VGM puts a ship gone down off the coast near them: she lies on the bed some 6 to 16 m down,
+ * the water, aboard), the VGM puts a ship gone down off the coast near them: she lies on the bed some 9 to 16 m down (her masts, laid over, stay under the water),
  * on her side, her hold broken open and a sea chest still in it (the setting's sea sight, its `loot`). It is a sight
  * of the log like any find: the hero comes upon it by diving down to it (breath, a spell, a draught or the otter),
  * and its chest is theirs. Pure, seeded.
@@ -13,7 +13,7 @@ import { ringSpot, spiralFind } from '../world/spiral';
 
 /** How far from the hero (m) a wreck may lie, and how deep its bed (m under the sea's level). */
 const RING: readonly [number, number] = [50, 450];
-const DEPTH: readonly [number, number] = [6, 16];
+const DEPTH: readonly [number, number] = [9, 16];
 /** Wrecks keep this far apart (m), and this far from a harbour town's middle (out of the way of its moorings). */
 const APART = 1500, OFF_HARBOUR = 450;
 /** Her bed is level enough when it rises or falls no more than this (m) over her length either way. */

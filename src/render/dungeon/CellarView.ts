@@ -16,7 +16,7 @@ import { cellarMeshes, type DoorPiece } from '../../world/dungeon/cellarMesh';
 import { buildingMeshAt, caveRockMeshAt } from '../materials/building';
 import { loadCellarProps } from './props';
 import { flameMesh } from '../materials/flame';
-import { caveShaftMesh, caveWaterMesh } from '../materials/caveWater';
+import { caveShaftMesh, caveWaterMesh, floodMesh } from '../materials/caveWater';
 import type { CaveFeatures } from '../../world/dungeon/caveFeatures';
 import { torchSpots } from '../../world/dungeon/torches';
 
@@ -49,7 +49,7 @@ export class CellarView {
     this.group.add(this.piece(m.shell, 'shell'), this.piece(m.props, 'props'));
     if (this.rock) this.group.add(caveRockMeshAt(this.rock, this.origin.x, this.origin.y, this.origin.z));
     const O = this.origin;
-    for (const m of this.cave ? [caveWaterMesh(this.cave, O.x, O.y, O.z), caveShaftMesh(this.cave, O.x, O.y, O.z)] : []) if (m) this.group.add(m);
+    for (const m of this.cave ? [caveWaterMesh(this.cave, O.x, O.y, O.z), caveShaftMesh(this.cave, O.x, O.y, O.z)] : [floodMesh(this.cellar.layout, O.x, O.y, O.z)]) if (m) this.group.add(m);
     const torches = torchSpots(this.cellar);
     if (torches.length) this.group.add(flameMesh(torches, this.origin.x, this.origin.y, this.origin.z));
     m.lids.forEach((l, i) => {
