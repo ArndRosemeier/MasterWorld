@@ -11,7 +11,7 @@ import type { SightDecision } from '../world/decisions';
 import type { NeedContext } from './answers';
 import { sightsOf } from './answers';
 import { ringSpot, spiralFind } from '../world/spiral';
-import { harbourTowns } from '../world/town';
+import { byHarbour, harbourTowns } from '../world/town';
 import { seaWithin } from '../world/coast';
 
 /** How far from the hero (m) a wreck may lie, and how deep its bed (m under the sea's level). */
@@ -38,7 +38,7 @@ export function wreckFor(c: NeedContext): SightDecision | null {
   for (let k = 0; k < TRIES; k++) {
     const { x, z, d } = ringSpot(c.hero, RING, s, k), bed = -t.height(x, z);
     if (bed < DEPTH[0] || bed > DEPTH[1] || (best && d >= best.d)) continue;
-    if (harbours.some((w) => Math.hypot(w.decision.x - x, w.decision.z - z) < OFF_HARBOUR)) continue;
+    if (byHarbour(harbours, x, z, OFF_HARBOUR)) continue;
     // Lying along a level stretch of the bed.
     const yaw = hash2f(s, k, 3) * Math.PI * 2, ux = Math.sin(yaw) * HULL / 2, uz = Math.cos(yaw) * HULL / 2;
     if (Math.abs(t.height(x + ux, z + uz) - t.height(x - ux, z - uz)) > BED_LEVEL || -t.height(x + ux, z + uz) < DEPTH[0] - 1 || -t.height(x - ux, z - uz) < DEPTH[0] - 1) continue;
@@ -74,7 +74,7 @@ export function washedUpFor(c: NeedContext): SightDecision | null {
   for (let k = 0; k < TRIES; k++) {
     const { x, z, d } = ringSpot(c.hero, BEACHED, s, k), h = t.height(x, z);
     if (h < STRAND[0] || h > STRAND[1] || t.waterDepth(x, z, h) > 0 || (best && d >= best.d)) continue;
-    if (harbours.some((w) => Math.hypot(w.decision.x - x, w.decision.z - z) < BEACHED_OFF_HARBOUR) || t.steepness(x, z, 4, h) > 0.25) continue;
+    if (byHarbour(harbours, x, z, BEACHED_OFF_HARBOUR) || t.steepness(x, z, 4, h) > 0.25) continue;
     // Her bow along the strand: square to the way the sea lies.
     const sea = seaWithin(t, x, z, SEA_BY);
     if (!sea) continue;

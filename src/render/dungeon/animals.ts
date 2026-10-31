@@ -95,6 +95,12 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     clips: {},
     pace: { walk: 1.1, run: 3.2 },
   },
+  // The deep water's sharks (S9): the library's shark where the build has it, else grown.
+  shark: {
+    library: LIBRARY_KINDS.shark,
+    clips: {},
+    pace: { walk: 2, run: 5.5 },
+  },
   deer: {
     library: LIBRARY_KINDS.deer,
     pack: 'deer', preset: 'red',

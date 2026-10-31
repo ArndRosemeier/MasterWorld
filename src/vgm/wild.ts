@@ -12,7 +12,7 @@ import type { DecisionLog, WildDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import { seaWithin } from '../world/coast';
 import type { Terrain } from '../world/terrain';
-import type { Town } from '../world/town';
+import { byHarbour, harbourTowns, type Town } from '../world/town';
 import { encounterFor } from './encounters';
 
 export interface WildContext {
@@ -42,6 +42,8 @@ export function territoryOf(d: WildDecision): Territory {
 
 /** How high over the sea a strand reaches (m), and how far off (m) the sea is looked for beside it. */
 const STRAND_TOP = 4, SEA_NEAR = 35;
+/** Water a sea group's ground lies in (m deep at its middle), and how far off a harbour's moorings it keeps (m). */
+const SEA_DEEP = 6, SEA_OFF_HARBOUR = 300;
 
 
 /** A strand on the way out from (x, z) in direction `a` within `ring` (its distance; the `pick` share of those found), or -1. */
@@ -80,6 +82,14 @@ function placeWild(c: WildContext, town: Town): WildDecision[] {
         const along = shore ? strandOn(terrain, tx, tz, a, def.ring, hash2f(s, k, 6)) : d;
         if (along < 0) continue;
         const x = tx + Math.cos(a) * along, z = tz + Math.sin(a) * along;
+        if (def.habitat === 'sea') {
+          // Out in deep water, off the harbour's moorings.
+          if (terrain.waterDepth(x, z) < SEA_DEEP || byHarbour(harbourTowns(c.towns), x, z, SEA_OFF_HARBOUR)) continue;
+          const crowd = out.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + def.range + 60) ? 1 : 0;
+          const score = 1 - crowd + Math.min(1, terrain.waterDepth(x, z) / 30) * 0.2 + hash2f(s, k, 5) * 0.1;
+          if (!best || score > best.score) best = { x, z, score };
+          continue;
+        }
         // Dry and above the floods; on the strand only just above the sea, with the sea beside it.
         if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < (shore ? 0.3 : 2) || (shore && (terrain.height(x, z) > STRAND_TOP || !seaWithin(terrain, x, z, SEA_NEAR, 1)))) continue;
         // Gentle enough to live on.

@@ -55,7 +55,7 @@ import { WINDOWS } from './render/materials/building';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg, harbourMoorings } from '@futuremagic/settlement';
-import { abilityOf, validateSetting, type BackgroundDef, type GrowthSource, type SituationKind } from './setting/contract';
+import { abilityOf, validateSetting, type BackgroundDef, type GrowthSource, type SightDef, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -145,7 +145,8 @@ import { bardTells, GuildBook, questGift, teacherOf, whereOf } from './game/guil
 import { CHEER, LevelWatch } from './app/levelUp';
 import { carryRenown } from './game/growth';
 import { coinText, findDef, uniqueItem } from './game/items';
-import { epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
+import { washedUpChest } from './world/sites';
+import { GATHER_REACH, epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
 import { RemainsView } from './render/remainsView';
 import { SearchKneel } from './app/searchKneel';
@@ -1712,6 +1713,35 @@ export async function start(b: Boot): Promise<void> {
       });
       player.puppet = gathering;
     };
+    // A find by the way (Reward's answer): into the pack and purse, shown as finds below are.
+    const takeFind = (sight: SightDef, d: SightDecision) => {
+      const loot = findIn(setting, sight, d, start?.decision ?? home);
+      if (loot) {
+        character.pack.push(...loot.items);
+        character.coins += loot.coins;
+        fightHud.showFinds(loot);
+        sounds?.coins();
+        director.met('reward');
+      } else director.met('discovery');
+    };
+    // Sea chests come upon and not yet searched (a boat washed up, S9): the hero walks up, kneels, and the find comes.
+    const chests: { x: number; z: number; sight: SightDef; decision: SightDecision }[] = [];
+    let searching: SearchKneel | null = null;
+    const searchChests = () => {
+      if (searching) {
+        if (searching.done || player.puppet !== searching) { if (player.puppet === searching) player.puppet = null; searching = null; }
+        return;
+      }
+      if (!chests.length || !character.alive || player.puppet || visit()) return;
+      const w = player.walker.pos, c = chests.find((c) => Math.hypot(c.x - w.x, c.z - w.z) <= GATHER_REACH);
+      if (!c) return;
+      searching = new SearchKneel(w, player.walker.yaw, c, null, () => {
+        if (!chests.includes(c)) return;
+        chests.splice(chests.indexOf(c), 1);
+        takeFind(c.sight, c.decision);
+      }, undefined, { ground: (x, z) => terrain.height(x, z) });
+      player.puppet = searching;
+    };
     // `?open=tale`: the end of a roguelike tale as it shows (for the standard shots), without ending anything.
     const showTale = () => { paused(true); new TalesEnd().show(heroName || 'Wenna Stonehelm', epitaph(heroName || 'Wenna Stonehelm', view.sky.day, { x: 0, y: 0, z: 0, below: null, mark: { x: 0, z: 0 }, label: 'out on the land' }), () => location.reload()); };
     // Roguelike (plan 11.1): the hero's tale ends where they fell. The world goes on; the next start makes a new hero in it.
@@ -2022,7 +2052,7 @@ export async function start(b: Boot): Promise<void> {
       const m = director.next();
       if (m) notes.say(m, 6);
       HITCHES.part('vgm gather+hails');
-      if (!title?.holding && !creator?.showing) gatherNear();
+      if (!title?.holding && !creator?.showing) { gatherNear(); searchChests(); }
       hails?.sendFor(dt, fighting > 0 || below);
       builderClock += dt;
       if (builderClock < 3 || title?.holding || creator?.showing) return;
@@ -2263,15 +2293,11 @@ export async function start(b: Boot): Promise<void> {
           const came = swims ? regionSites.cameUpon(swims.x, swims.z, swims.y) : null;
           if (came?.sight && came.decision) {
             notes.say(came.sight.seen, 8);
-            // A find by the way (Reward's answer): into the pack and purse, shown as finds below are.
-            const loot = findIn(setting, came.sight, came.decision, start?.decision ?? home);
-            if (loot) {
-              character.pack.push(...loot.items);
-              character.coins += loot.coins;
-              fightHud.showFinds(loot);
-              sounds?.coins();
-              director.met('reward');
-            } else director.met('discovery');
+            // A boat washed up (S9): her sea chest is searched where it lies, the hero kneeling at it (searchChests).
+            if (came.decision.strand) {
+              const [cx, cz] = washedUpChest(came.decision);
+              chests.push({ x: cx, z: cz, sight: came.sight, decision: came.decision });
+            } else takeFind(came.sight, came.decision);
             character.earn(`sight:${came.id}`, 'sight');
           } else if (came) {
             director.met('discovery', 0.5);

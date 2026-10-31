@@ -309,7 +309,7 @@ function washedUp(at: At, k: MeshKit, solids: Solid[]): void {
     solids.push({ x, z, r: 0.35 });
   }
   // The sea chest, by the hull (towards the way the hero comes from).
-  const [cx, cz] = onCircle(at, Math.PI / 2 - at.yaw, 2.2);
+  const [cx, cz] = washedUpChest(at);
   k.onGround(at.ground, () => {
     k.box(cx - at.x, 0, cz - at.z, 0.9, 0.5, 0.55, at.yaw + 0.4, CellarMat.Boards, CHEST);
     k.box(cx - at.x, 0.5, cz - at.z, 0.92, 0.08, 0.57, at.yaw + 0.4, CellarMat.Boards, varyTint(r, CHEST, 0.06));
@@ -322,6 +322,9 @@ function washedUp(at: At, k: MeshKit, solids: Solid[]): void {
     solids.push({ x: bx, z: bz, r: 0.8 });
   }
 }
+/** Where a washed-up boat's sea chest stands (the hero kneels at it to search it). */
+export const washedUpChest = (at: { readonly x: number; readonly z: number; readonly yaw: number }): [number, number] => onCircle(at, Math.PI / 2 - at.yaw, 2.2);
+
 /** Wood bleached by the sea and the sun; a cask's staves; an old sea chest. */
 const DRIFT_WOOD: Tint = [168, 156, 136];
 const CASK: Tint = [120, 92, 62];

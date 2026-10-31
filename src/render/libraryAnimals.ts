@@ -62,6 +62,12 @@ export const LIBRARY_KINDS = {
     ids: ['crab-stylized'],
     clips: { idle: ['Idle'], alert: ['Idle'], feed: ['Idle'], walk: ['Walk'], run: ['Walk'], blow: ['Attack1', 'Attack2'], hurt: ['HitBack'], dead: ['Die'] },
   },
+  shark: {
+    // The deep water's sharks (S9): a stylized shark (6.6 m at scale 1, some 3.6 m here) with its own bites and death roll.
+    ids: ['jaws-stylized'],
+    clips: { idle: ['Swim'], alert: ['Swim'], feed: ['Swim'], walk: ['Swim'], run: ['SwimAt', 'Swim'], blow: ['BiteLeft', 'BiteRight'], hurt: ['SwimLeft', 'SwimRight'], dead: ['Dead'] },
+    scale: 0.55,
+  },
   otter: {
     // The hero's otter form (S6, game/birdForm.ts): WildMesh3D's American mink, which swims at the surface and under
     // it (OTTER_CLIPS), grown to an otter's size (its model is some 2 m long).

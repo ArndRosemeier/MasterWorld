@@ -4,7 +4,7 @@ import { classic } from '../src/setting/classic/index';
 import type { EncounterWhere } from '../src/setting/contract';
 import { encounterFor, encounterOf, membersOf, typicalDanger } from '../src/vgm/encounters';
 
-const WHERE: readonly EncounterWhere[] = ['below', 'wood', 'open', 'road', 'shore'];
+const WHERE: readonly EncounterWhere[] = ['below', 'wood', 'open', 'road', 'shore', 'sea'];
 const DANGERS = [8, 14, 20, 28];
 
 test('encounters: a sweep over every place and danger: no repeats while another fits, no misfits while a fitting one exists', () => {

@@ -13,7 +13,7 @@ import { polyCentroid } from '@futuremagic/settlement';
 import type { SettingModule, SituationDef, SituationKind } from '../setting/contract';
 import type { CastawayDecision, Decision, DecisionLog, EventDecision, StrayDecision, TravellerDecision, WildDecision } from '../world/decisions';
 import type { Terrain } from '../world/terrain';
-import { harbourTowns, townById, type Town } from '../world/town';
+import { byHarbour, harbourTowns, townById, type Town } from '../world/town';
 import { travellerFor, travellersOf, type NeedContext } from './answers';
 import { encounterFor } from './encounters';
 import type { Need } from './director';
@@ -68,7 +68,7 @@ export function castawayFor(c: NeedContext, sure = false): CastawayDecision | nu
   const t = c.terrain;
   for (let k = 0; k < 48; k++) {
     const { x, z } = ringSpot(c.hero, ADRIFT, s, k), deep = -t.height(x, z);
-    if (deep < ADRIFT_DEPTH[0] || deep > ADRIFT_DEPTH[1] || harbours.some((w) => Math.hypot(w.decision.x - x, w.decision.z - z) < OFF_MOORINGS)) continue;
+    if (deep < ADRIFT_DEPTH[0] || deep > ADRIFT_DEPTH[1] || byHarbour(harbours, x, z, OFF_MOORINGS)) continue;
     if (!strandNear(t, x, z)) continue;
     return { kind: 'castaway', id: `castaway-${n}`, town: town.decision.id, x, z, yaw: new Rng(s).range(0, Math.PI * 2), seed: s, at: c.hours, until: c.hours + def.lasts, situation: def.id };
   }

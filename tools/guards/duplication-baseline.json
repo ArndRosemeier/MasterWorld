@@ -80,8 +80,8 @@
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
   },
   {
-    "key": "same name: masterworld/sim/dungeonNav.ts#floorAt + masterworld/sim/wild.ts#floorAt",
-    "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
+    "key": "same name: masterworld/sim/wild.ts#floorAt + masterworld/world/dungeon/caveRock.ts#floorAt",
+    "reason": "DenGround (sim/dungeonNav.ts) is answered by open land and the sea (sim/wild.ts); a cave's rock answers the same question for its own floor."
   },
   {
     "key": "same name: masterworld/sim/dungeonNav.ts#free + masterworld/sim/wild.ts#free",
@@ -186,10 +186,6 @@
   {
     "key": "same name: masterworld/app/cellars.ts#solid + masterworld/app/holdGate.ts#solid",
     "reason": "Each says whether a body stands in its own stones (a barrow's mound, a hold's gate) for the walker's wall test in main.ts; the shapes are their own (inBarrowShape, inHoldShape)."
-  },
-  {
-    "key": "same name: masterworld/app/holdGate.ts#build + masterworld/app/wildLand.ts#build",
-    "reason": "Each builds its own bodies once the hero comes near (a wild band's den, the hold's wardens on their posts)."
   },
   {
     "key": "same name: masterworld/app/holdGate.ts#tend + masterworld/render/grass/GrassView.ts#tend",

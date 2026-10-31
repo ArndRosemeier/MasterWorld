@@ -88,6 +88,13 @@ export const creatures: readonly CreatureDef[] = [
     loot: 'crab', tell: 'Scratching among the wrack on the strand, and shells that are far too big.',
   },
   {
+    // Out in deep water (S9): it circles at its depth and comes up at a hero who swims; it cannot follow into the shallows.
+    id: 'shark', name: 'shark', plural: 'sharks', body: { kind: 'beast', species: 'shark', length: 3.2, color: '#5c6a72' },
+    health: 40, armour: 1, defence: 18, speed: 5.5, senses: { sight: 18, hearing: 30 }, temper: 'hostile', morale: 0.7, pack: false, role: 'melee', danger: 8,
+    attacks: [{ name: 'bite', damage: [4, 9], kind: 'bite', reach: 1.1, time: 1.8, prowess: 28 }],
+    loot: 'shark', tell: 'A fin cutting the swell farther out, and then nothing.',
+  },
+  {
     id: 'deer', name: 'deer', plural: 'deer', body: { kind: 'beast', species: 'deer', length: 1.5, color: '#8a6a48' },
     health: 22, armour: 0, defence: 30, speed: 9, senses: { sight: 34, hearing: 40 }, temper: 'skittish', wary: 22, morale: 0.2, pack: true, role: 'swarm', danger: 2,
     attacks: [{ name: 'kick', damage: [2, 5], kind: 'blunt', reach: 0.7, time: 1.6, prowess: 18 }],

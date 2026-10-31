@@ -491,10 +491,10 @@ export type CreatureBody =
   }
   | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string }
   /** An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures, a giant crab of the strand (S9). `length` nose to rump. */
-  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab'; readonly length: number; readonly color: string };
+  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab' | 'shark'; readonly length: number; readonly color: string };
 
 /** Where an encounter is met: in a place below, under thick trees, on open land, by a road, on the strand (S9). */
-export type EncounterWhere = 'below' | 'wood' | 'open' | 'road' | 'shore';
+export type EncounterWhere = 'below' | 'wood' | 'open' | 'road' | 'shore' | 'sea';
 
 /**
  * An encounter (C6b, docs/design/vgm.md 3): who the hero meets together, how many, and where. The one
@@ -522,8 +522,8 @@ export interface WildDef {
   readonly id: string;
   /** Who they are and how many (an encounter's id; it is met in this habitat). */
   readonly encounter: string;
-  /** wood: under thick trees; open: meadows and heath; road: by a road out of town; shore: on a strand by the sea (S9). */
-  readonly habitat: 'wood' | 'open' | 'road' | 'shore';
+  /** wood: under thick trees; open: meadows and heath; road: by a road out of town; shore: on a strand by the sea; sea: out in deep water, under the surface (S9). */
+  readonly habitat: 'wood' | 'open' | 'road' | 'shore' | 'sea';
   /** Metres from the town's market where their territories lie. */
   readonly ring: readonly [number, number];
   /** Territory radius, metres. */

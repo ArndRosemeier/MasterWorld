@@ -26,7 +26,7 @@ test('wild: deer, boar, a wolf pack and bandits live around the town, apart, on 
   for (const t of places) {
     const d = Math.hypot(t.x - town.decision.x, t.z - town.decision.z);
     assert.ok(d >= ringOf(t.kind)[0] - 1 && d <= ringOf(t.kind)[1] + 1, `${t.id} at ${d.toFixed(0)} m`);
-    assert.equal(terrain.waterDepth(t.x, t.z), 0, `${t.id} on dry land`);
+    if (t.kind !== 'sharks') assert.equal(terrain.waterDepth(t.x, t.z), 0, `${t.id} on dry land`);
     assert.ok(groupDanger(t.members, classic.creatures) <= 18, `${t.id} fits a fresh hero`);
     for (const o of places) if (o !== t) assert.ok(Math.hypot(o.x - t.x, o.z - t.z) > o.r + t.r, `${t.id} and ${o.id} apart`);
   }
@@ -144,4 +144,28 @@ test('wild (S9): by the sea town, giant crabs and smugglers live on strands just
     }
   }
   assert.ok(places.filter((t) => t.kind === 'crabs').every((t) => t.members.every((m) => m === 'giant crab')));
+});
+
+test('wild (S9): a shark keeps to deep water under the surface, comes for a hero who swims, and never follows into the shallows', () => {
+  const sharks = places.filter((t) => t.kind === 'sharks');
+  assert.ok(sharks.length > 0, 'sharks off the sea town');
+  for (const t of sharks) assert.ok(terrain.waterDepth(t.x, t.z) >= 6, `${t.id} in deep water`);
+  const t = sharks[0], surface = 0.3;
+  let swimmer: Quarry = { x: t.x + 12, y: surface - 1, z: t.z, noise: 0.6, light: 0, alive: true, guard };
+  const den = new Den(new OpenGround(land, [t], () => swimmer.y), t.members.map((creature) => ({ creature, room: 0 })), classic.creatures, deriveSeed(t.seed, 'den'));
+  const shark = den.creatures[0];
+  let bit = 0;
+  for (let i = 0; i < 400 && !bit; i++) {
+    for (const e of den.step(0.1, swimmer)) if (e.kind === 'blow') bit++;
+    assert.ok(terrain.waterDepth(shark.x, shark.z) >= 1.8, 'in the water');
+    assert.ok(shark.y <= surface - 1.29 && shark.y >= terrain.height(shark.x, shark.z) + 0.59, `under the surface, over the bed (${shark.y.toFixed(2)})`);
+  }
+  assert.ok(bit > 0, 'it bit the swimmer');
+  // The hero ashore: it keeps to the water.
+  const strand = places.find((p) => p.kind === 'crabs')!;
+  swimmer = hero(strand.x, strand.z);
+  for (let i = 0; i < 300; i++) {
+    den.step(0.1, swimmer);
+    assert.ok(terrain.waterDepth(shark.x, shark.z) >= 1.8, 'never out of the water');
+  }
 });
