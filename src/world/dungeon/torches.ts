@@ -55,7 +55,8 @@ export function torchSpots(c: Cellar): TorchSpot[] {
       }
     }
   }
-  return out;
+  // None under a drowned storey's water (S8): a torch does not burn there.
+  return L.flood === undefined ? out : out.filter((t) => t.y > L.flood! + 0.2);
 }
 
 /** A crack's daylight hangs this far under a cavern's roof (m). */

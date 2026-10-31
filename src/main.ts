@@ -1019,7 +1019,7 @@ export async function start(b: Boot): Promise<void> {
     let lookSmall = params.smallAt;
     let lookHens = params.henShot;
     /** With `fly`: the one the free camera follows, and how far off. */
-    let watchSmall: { it: { x: number; y: number; z: number }; d: number } | null = null;
+    let watchSmall: { it: { x: number; y: number; z: number }; d: number; wet?: boolean } | null = null;
     /** The hero `d` metres from `seen`, on the side they are on, facing it. */
     const standBeside = (seen: { x: number; z: number }, d: number) => {
       const p = player.walker.pos, k = Math.max(1, Math.hypot(p.x - seen.x, p.z - seen.z));
@@ -2400,15 +2400,15 @@ export async function start(b: Boot): Promise<void> {
         const near = lookSmall ? small.firstSeen(lookSmall) : null;
         if (near && lookSmall) {
           // With `fly`: the free camera follows it close by (a free camera alarms no one).
-          if (player.flying) watchSmall = { it: near, d: lookSmall === 'flock' ? 25 : 2.5 };
+          if (player.flying) watchSmall = { it: near, d: lookSmall === 'flock' ? 25 : lookSmall === 'fish' ? 5 : 2.5, wet: lookSmall === 'fish' };
           else standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
           lookSmall = null;
         }
         if (watchSmall && player.flying) {
-          const { it, d } = watchSmall, c = view.camera.position, k = Math.max(0.01, Math.hypot(c.x - it.x, c.z - it.z));
+          const { it, d, wet } = watchSmall, c = view.camera.position, k = Math.max(0.01, Math.hypot(c.x - it.x, c.z - it.z));
           if (k > d * 1.5 || k < d * 0.5) {
             const cx = it.x + (c.x - it.x) / k * d, cz = it.z + (c.z - it.z) / k * d;
-            player.fly.place(cx, cz, d > 5 ? it.y - 4 : terrain.height(cx, cz) + 0.9, true);
+            player.fly.place(cx, cz, wet ? it.y : d > 5 ? it.y - 4 : terrain.height(cx, cz) + 0.9, true);
           }
           const dx = it.x - c.x, dy = it.y + 0.1 - c.y, dz = it.z - c.z;
           player.fly.setLook(Math.atan2(dx, -dz) * 180 / Math.PI, Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI);
@@ -2416,7 +2416,7 @@ export async function start(b: Boot): Promise<void> {
         // A free camera disturbs no one; they live round it.
         const hero = player.flying ? null : { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed };
         if (out) for (const e of small.step(dt, hero, daylight(view.sky.hour), wx.shown.rain, hero ?? view.camera.position)) sounds?.wings(e);
-        smallView.show(dt, view.camera.position, out);
+        smallView.show(dt, view.camera.position, out, view.sky.underwater);
       }
       // The people in the building drawn open (seen through its door and windows too).
       part('folk');

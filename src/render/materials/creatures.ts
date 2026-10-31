@@ -7,7 +7,7 @@
  */
 import { MeshStandardNodeMaterial, NoColorSpace, SRGBColorSpace, Texture, type Material } from 'three/webgpu';
 import { normalMap, texture, vec3, vertexColor } from 'three/tsl';
-import { birdMaterial, critterEye, critterFlesh } from '@futuremagic/creatures/node';
+import { birdMaterial, critterEye, critterFlesh, fishMaterial } from '@futuremagic/creatures/node';
 import type { CritterMaterials } from '@futuremagic/creatures/three';
 import { defineKind } from '../materials';
 
@@ -64,4 +64,9 @@ export function ratMaterial(name: string, loaded: Material): Material | null {
  */
 export function createBirdMaterial(): Material {
   return birdMaterial();
+}
+
+/** The shoals' fish (S9), all in one draw (FishBatch), warmed like the birds. */
+export function createFishMaterial(): Material {
+  return fishMaterial();
 }

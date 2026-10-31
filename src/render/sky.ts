@@ -86,7 +86,7 @@ interface SkyShade {
 const CAVE_FILL = 0.16;
 const CAVE_FOG = 0.022;
 /** Under a place's water (no day in it): its murk and fog, and how thick the fog is per metre. */
-const UNDER_DARK: readonly [number, number, number] = [0.004, 0.018, 0.02], UNDER_DARK_FOG = 0.05;
+const UNDER_DARK: readonly [number, number, number] = [0.008, 0.035, 0.04], UNDER_DARK_FOG = 0.12;
 
 export class SkyView {
   /** Hours 0..24, and whole days since the start. */
