@@ -128,3 +128,26 @@ test('deck: running and jumping at the forecastle front on a rolling deck never 
   }
   assert.equal(decks.ship, 's');
 });
+
+test('deck: into the captain\'s cabin through its door on a rolling deck, standing on the main deck under the castle', () => {
+  let walker: Walker | null = null;
+  const decks = new Decks(() => walker?.pos ?? null), w = (walker = new Walker(sea(decks))), dt = 1 / 60, c = plan.aft!;
+  decks.move('s', plan, swell(0, 2));
+  // Two metres before the cabin's door, on the keel line.
+  w.place(c.a1 + 2, 0);
+  decks.boarded();
+  let inside = 0;
+  for (let i = 0; i < 6 * 60; i++) {
+    const pose = swell(i * dt, 2);
+    decks.move('s', plan, pose);
+    // Aft along the ship (-x: heading π/2).
+    w.step({ forward: 1, strafe: 0, heading: Math.PI / 2, walk: true, up: false, down: false }, dt);
+    decks.boarded();
+    const l = toShip(pose, w.pos.x, w.pos.y, w.pos.z);
+    assert.ok(Math.abs(l.h - plan.deckY) < 0.15, `feet at ${l.h.toFixed(2)} (the main deck ${plan.deckY.toFixed(2)}) at a ${l.a.toFixed(2)}`);
+    inside = Math.max(inside, c.a1 - l.a);
+  }
+  assert.equal(decks.ship, 's');
+  // In, up to the captain's table in the middle of the cabin.
+  assert.ok(inside > 1.2, `only ${inside.toFixed(2)} m in`);
+});
