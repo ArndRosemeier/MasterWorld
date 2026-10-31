@@ -7,7 +7,8 @@
  */
 import { Group, type Mesh, type Vector3 } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import { gangplankMesh, shipMesh } from '@futuremagic/settlement';
+import { gangplankMesh, hullHalf, shipMesh, type ShipPlan } from '@futuremagic/settlement';
+import { HULLS, HULL_POSES, HULL_STATIONS, WATER } from './materials/waterInputs';
 import { buildingMeshAt } from './materials/building';
 import { afloatAt, fleetOf, type Afloat as Place, type Vessel } from '../world/fleet';
 import type { Decks, Pose } from '../world/deck';
@@ -20,6 +21,19 @@ const SEEN = 1500, ABOARD = 250;
 const FOLLOW = 2.5;
 /** The gangplank's mesh is made this long, then stretched to the gap it spans (m). */
 const PLANK_MADE = 2.5;
+/** The water is cut this far inside a hull's skin at the waterline (m): it rolls and pitches, and the cut does not. */
+const HULL_MARGIN = 0.12;
+/** A plan's half widths at the waterline, at the water shader's stations from stern to bow. */
+const WIDTHS = new WeakMap<ShipPlan, number[]>();
+function waterline(p: ShipPlan): number[] {
+  let w = WIDTHS.get(p);
+  if (!w) {
+    w = [];
+    for (let j = 0; j < HULL_STATIONS; j++) w.push(Math.max(0, hullHalf(p, Math.max(-0.995, Math.min(0.995, -1 + (2 * j) / (HULL_STATIONS - 1))) * p.length / 2, 0) - HULL_MARGIN));
+    WIDTHS.set(p, w);
+  }
+  return w;
+}
 
 interface Afloat {
   readonly id: string;
@@ -57,6 +71,7 @@ export class ShipsView {
   float(cam: Vector3, hours: number, dt: number): void {
     if (!this.added) { this.added = true; void this.h.stage.add(this.group); }
     let built = false;
+    const hulls: { far: number; a: Afloat }[] = [];
     for (const t of this.h.harbours()) {
       const h = t.plan.harbour;
       if (!h) continue;
@@ -74,6 +89,7 @@ export class ShipsView {
         for (const k of ['furled', 'set'] as const) { const m = a[k]; if (m) m.visible = want === k; }
         if (!want) { this.h.decks.drop(a.id); if (a.plank) a.plank.visible = false; continue; }
         this.ride(a, at, dt);
+        hulls.push({ far: d, a });
         const m = a[want];
         if (m) { m.position.set(a.pose.x, a.pose.y, a.pose.z); m.rotation.set(-a.pose.roll, -Math.atan2(a.pose.uz, a.pose.ux), a.pose.pitch); m.updateMatrix(); }
         // Its decks walked near the hero; moored (not out on a trip), its gangplank out to the land.
@@ -82,6 +98,21 @@ export class ShipsView {
         else this.h.decks.drop(a.id);
         this.lay(a, d < ABOARD && moored);
       }
+    }
+    this.cut(hulls);
+  }
+
+  /** The nearest hulls to the water shader: no water is drawn inside them. */
+  private cut(hulls: { far: number; a: Afloat }[]): void {
+    hulls.sort((x, y) => x.far - y.far);
+    const len = WATER.hullLength.array as number[], wid = WATER.hullWidth.array as number[];
+    for (let i = 0; i < HULLS; i++) {
+      const a = hulls[i]?.a;
+      len[i] = a ? a.v.mooring.plan.length / 2 : 0;
+      if (!a) continue;
+      HULL_POSES[i].set(a.pose.x, a.pose.z, a.pose.ux, a.pose.uz);
+      const w = waterline(a.v.mooring.plan);
+      for (let j = 0; j < HULL_STATIONS; j++) wid[i * HULL_STATIONS + j] = w[j];
     }
   }
 

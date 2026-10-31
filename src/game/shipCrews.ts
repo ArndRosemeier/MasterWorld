@@ -1,12 +1,14 @@
 /**
  * The crews of the ships and boats near the hero (S3), at work where their vessel's state puts them
- * (sim/shipFolk.ts) and carried with it as it rides the swell: each frame their posts go from the vessel's frame
+ * (sim/shipFolk.ts), and a ship's passengers (its harbour town's travellers by sea, aboard at the end of their
+ * visit: sim/people.ts), carried with it as it rides the swell: each frame their posts go from the vessel's frame
  * into the world. They are drawn with the townsfolk (as people placed by the app, like those in a room) and their
- * bodies block the hero's, as everyone's do.
+ * bodies block the hero's, as everyone's do. The passengers are their town's people, so they can be talked to.
  */
 import { deriveSeed } from '@futuremagic/core';
-import { crewOf, crewPost, type Hand } from '../sim/shipFolk';
-import { standingAgent, type Agent } from '../sim/townLife';
+import { PASSENGER_POSTS, crewOf, crewPost, passengerPost, type Hand } from '../sim/shipFolk';
+import { aboardAt } from '../sim/people';
+import { standingAgent, type Agent, type TownLife } from '../sim/townLife';
 import type { ActivityKind } from '../sim/spots';
 import { toWorld, type Decks } from '../world/deck';
 
@@ -26,12 +28,19 @@ const BODY = 0.3;
 export class ShipCrews {
   private readonly crews = new Map<string, { hands: Hand[]; agents: Agent[] }>();
   private shown: CrewPlaced[] = [];
+  /** The passengers aboard now (to be talked to), and where each was in their town before boarding. */
+  private aboard: CrewPlaced[] = [];
+  private readonly ashore = new Map<Agent, { x: number; z: number }>();
 
   constructor(private readonly seed: number) {}
 
-  /** Once a frame, after the ships have moved: every crew on its vessel now. */
-  atWork(decks: Decks): readonly CrewPlaced[] {
-    const out: CrewPlaced[] = [], near = new Set<string>();
+  /**
+   * Once a frame, after the ships have moved: every crew on its vessel now, and the passengers aboard at game hour
+   * `hours` (`lifeOf`: a harbour town's life, by its id; `hero`: where the hero stands, whom a passenger held in
+   * talk faces).
+   */
+  atWork(decks: Decks, hours = 0, lifeOf: (town: string) => TownLife | null = () => null, hero: { x: number; z: number } | null = null): readonly CrewPlaced[] {
+    const out: CrewPlaced[] = [], near = new Set<string>(), aboard: CrewPlaced[] = [], boarded = new Set<string>();
     for (const v of decks.each()) {
       near.add(v.id);
       let c = this.crews.get(v.id);
@@ -46,10 +55,33 @@ export class ShipCrews {
         a.x = w.x; a.z = w.z; a.dir = post.dir + turn; a.act = a.next = post.act;
         out.push({ agent: a, x: w.x, y: w.y, z: w.z, dir: a.dir, act: post.act });
       }
+      // A town's passengers go aboard the first of its ships near the hero.
+      const town = v.id.slice(0, v.id.lastIndexOf('/')), life = v.plan.kind === 'ship' && !boarded.has(town) ? lifeOf(town) : null;
+      if (!life) continue;
+      boarded.add(town);
+      const going = life.agents.filter((a) => a.person.bySea && aboardAt(a.person, hours)).slice(0, PASSENGER_POSTS);
+      for (const [k, a] of going.entries()) {
+        const post = passengerPost(v.plan, k), w = toWorld(v.pose, post.a, post.h, post.b);
+        if (!this.ashore.has(a)) this.ashore.set(a, { x: a.x, z: a.z });
+        a.x = w.x; a.z = w.z;
+        // Held in talk: turned to the hero, talking.
+        const dir = a.held && hero ? Math.atan2(hero.z - w.z, hero.x - w.x) : post.dir + turn;
+        const p = { agent: a, x: w.x, y: w.y, z: w.z, dir, act: a.held ? 'chat' as const : post.act };
+        out.push(p);
+        aboard.push(p);
+      }
     }
     for (const id of this.crews.keys()) if (!near.has(id)) this.crews.delete(id);
+    // Off the ship (sailed, or the hero gone from near it): back where they were in their town.
+    for (const [a, at] of this.ashore) if (!aboard.some((p) => p.agent === a)) { a.x = at.x; a.z = at.z; this.ashore.delete(a); }
     this.shown = out;
+    this.aboard = aboard;
     return out;
+  }
+
+  /** The passengers aboard the ships near the hero now, where they stand (to be talked to). */
+  get passengers(): readonly CrewPlaced[] {
+    return this.aboard;
   }
 
   /** Whether a body of radius `r` at (x, z), its feet at `y`, touches one of the crew. */

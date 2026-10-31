@@ -68,10 +68,6 @@
     "reason": "Each system's line on the debug HUD; only the name matches."
   },
   {
-    "key": "same name: masterworld/sim/dungeonNav.ts#away + masterworld/sim/people.ts#away",
-    "reason": "Unrelated: a den's way off from a threat vs a townsperson being away from home; only the name matches."
-  },
-  {
     "key": "same name: masterworld/sim/dungeonNav.ts#away + masterworld/sim/wild.ts#away",
     "reason": "DenGround (sim/dungeonNav.ts) implemented twice: a dungeon's rooms and open land (sim/wild.ts); one interface, two grounds."
   },

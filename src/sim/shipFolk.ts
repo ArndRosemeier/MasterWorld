@@ -7,7 +7,7 @@
  * port +b), so they ride with it. Seeded and pure.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import type { ShipPlan } from '@futuremagic/settlement';
+import { hullHalf, type ShipPlan } from '@futuremagic/settlement';
 import type { Person } from './people';
 import type { ActivityKind } from './spots';
 
@@ -88,4 +88,20 @@ export function crewPost(plan: ShipPlan, hand: Hand, k: number, state: VesselSta
       return { a: m.a + (n < 2 ? -OFF_MAST : OFF_MAST), h: deck, b: side * 0.9, dir: side > 0 ? toPort : toStar, act: 'haul' };
     }
   }
+}
+
+/** How many passengers a ship has room for on deck (more wait ashore). */
+export const PASSENGER_POSTS = 3;
+
+/**
+ * Where the k-th passenger aboard a ship stands (k < PASSENGER_POSTS): at the rail looking out, forward of the
+ * hatch and abaft the mainmast, and on the sterncastle looking astern (clear of the crew's posts and the ways).
+ */
+export function passengerPost(plan: ShipPlan, k: number): CrewPost {
+  const deck = plan.deckY + 0.02, rail = (a: number, h: number) => hullHalf(plan, a, h + 0.3) - 0.18 - 0.5;
+  const main = plan.masts[0];
+  if (k === 0) { const a = (plan.hatch?.a1 ?? main.a + 2) + 1.6; return { a, h: deck, b: -rail(a, plan.deckY), dir: -Math.PI / 2, act: 'wait' }; }
+  if (k === 1 && plan.aft) { const a = plan.aft.a0 + 1.4; return { a, h: plan.aft.y + 0.02, b: -0.6, dir: Math.PI, act: 'wait' }; }
+  const a = main.a - 1.8;
+  return { a, h: deck, b: -rail(a, plan.deckY), dir: -Math.PI / 2, act: 'wait' };
 }

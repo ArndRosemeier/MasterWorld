@@ -8,11 +8,11 @@
 import { DoubleSide, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
   Fn, abs, atan, cameraPosition, cos, clamp, cross, dot, exp, float, frontFacing, fwidth, length, max, mix, mx_noise_float, normalize, pmremTexture,
-  positionLocal, positionWorld, pow, fract, reflect, screenUV, select, sin, floor, smoothstep, texture, varying, vec2, vec3, vec4, viewportSharedTexture,
+  positionLocal, positionWorld, pow, fract, reflect, screenUV, select, sin, floor, smoothstep, texture, varying, vec2, vec3, vec4, viewportSharedTexture, int,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
-import { WATER, waterAt } from './waterInputs';
+import { HULLS, HULL_STATIONS, WATER, waterAt } from './waterInputs';
 import { WAVES, waveMotion } from '../../world/swell';
 import { WEATHER, fullSky, rainRings } from './weather';
 import { EYE, WORLD } from '../origin';
@@ -216,7 +216,16 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
   m.alphaTestNode = null;
   const dryBelow = mix(float(-0.2), float(-0.75), smoothstep(0.05, 0.3, length(vFlow)));
   // (A falling sheet stays whole: it hangs over its own lip.)
-  m.opacityNode = select(waterAt(WORLD.xz).y.lessThan(dryBelow).and(vFall.lessThan(0.3)), float(0), float(1));
+  // Nor inside a ship's hull (S3): its lower deck lies below the waterline, and the sea stood in it knee deep.
+  let inHull: Node<'bool'> = float(0).greaterThan(1);
+  for (let i = 0; i < HULLS; i++) {
+    const q = W.hullPose.element(int(i)), L = W.hullLength.element(int(i)), d = WORLD.xz.sub(q.xy);
+    const t = dot(d, q.zw).div(max(L, 0.001)), across = abs(dot(d, vec2(q.w.negate(), q.z)));
+    const s = clamp(t.add(1).mul((HULL_STATIONS - 1) / 2), 0, HULL_STATIONS - 1.001), k = floor(s);
+    const w = mix(W.hullWidth.element(int(k).add(i * HULL_STATIONS)), W.hullWidth.element(int(k).add(i * HULL_STATIONS + 1)), s.sub(k));
+    inHull = inHull.or(L.greaterThan(0).and(abs(t).lessThan(1)).and(across.lessThan(w)));
+  }
+  m.opacityNode = select(waterAt(WORLD.xz).y.lessThan(dryBelow).and(vFall.lessThan(0.3)).or(inHull), float(0), float(1));
   m.alphaTest = 0.5;
   return m;
 }, { cast: false, receive: false });
