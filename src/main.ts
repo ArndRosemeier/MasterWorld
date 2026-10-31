@@ -12,7 +12,7 @@ import { atDoor, placesFor } from './app/places';
 import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
 import { Portals } from './app/portals';
-import { CAVE_LANTERN } from './app/cellarVisit';
+import { CAVE_LANTERN, TORCH_DUSK, TORCH_NIGHT } from './app/cellarVisit';
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
 import { PortalStoneUse } from './app/portalStoneUse';
@@ -52,6 +52,7 @@ import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
 import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
+import { flameFlicker } from './render/warmLights';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg, harbourMoorings } from '@futuremagic/settlement';
@@ -818,6 +819,9 @@ export async function start(b: Boot): Promise<void> {
     let portals: Portals | null = null;
     /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts throatDepth). */
     let throatLamp = false;
+    /** The lantern lit by the hero's torch out of doors at night (else dark, or lit by whoever lights it below). */
+    let torchLamp = false;
+    const flamePoint = new Vector3();
     /** The place below whose lights are lit from out on the land, near its portal. */
     let caveLit: string | null = null;
     /** A cave's own lights are lit once the hero on the land is this near its portal (m). */
@@ -2445,6 +2449,21 @@ export async function start(b: Boot): Promise<void> {
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         part('towns.tick');
         towns.tick(dt, view.camera.position);
+      }
+      // The hero's torch (worn in the off hand): lit in the dark (below ground, in a cave's throat, out of doors at
+      // night), out indoors, in the water and in an animal's form. Its flame carries the lantern's light.
+      part('torch');
+      {
+        const h = player.hero, under = !!visit() || throatLamp, L = view.lantern;
+        const dark = under || (WINDOWS.glow.value > TORCH_DUSK && !rooms?.inside);
+        if (h) h.torchLit = h.holdsTorch && dark && !player.hideHero && player.walker.mode !== 'swim';
+        const at = h?.flameAt(flamePoint) ?? null;
+        if (at) L.position.copy(at);
+        // Out of doors at night the lantern is the torch's alone (below and in a throat their own walks light it).
+        const night = !!at && !under;
+        if (night) L.intensity = TORCH_NIGHT * flameFlicker(h!.clock);
+        else if (torchLamp && !under && !rooms?.inside) L.intensity = 0;
+        torchLamp = night;
       }
       // Doorways at night above, torches below, a soft fill on the hero in a room.
       part('warm lights');

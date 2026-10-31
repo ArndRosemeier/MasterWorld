@@ -33,7 +33,7 @@ export const items: ItemCatalog = {
     { id: 'deep-draught', name: 'Draught of the deep', kind: 'potion', effect: { id: 'gills', magnitude: 1, duration: 180 }, value: 60, weight: 0.3, lore: 'Kelp, salt and something the herbalist will not name: three minutes of breathing water.' },
     { id: 'bread', name: 'Loaf of bread', kind: 'food', heal: 6, value: 2, weight: 0.4 },
     { id: 'cheese', name: 'Wedge of cheese', kind: 'food', heal: 8, value: 4, weight: 0.3 },
-    { id: 'torch', name: 'Torch', kind: 'tool', value: 2, weight: 0.5 },
+    { id: 'torch', name: 'Torch', kind: 'tool', slot: 'off', value: 2, weight: 0.5, lore: 'Pitch-soaked rag on an oak stick. Held in the off hand, it burns whenever the dark comes.' },
     { id: 'rope', name: 'Coil of rope', kind: 'tool', value: 6, weight: 2 },
     { id: 'portal-stone', name: 'Portal stone', kind: 'tool', portal: true, value: 0, weight: 0.3, lore: 'Smooth and cold, it hums when held. One glyph remembers a place; the other opens the way back to it.' },
     { id: 'lockpicks', name: 'Lockpicks', kind: 'tool', value: 40, weight: 0.1 },

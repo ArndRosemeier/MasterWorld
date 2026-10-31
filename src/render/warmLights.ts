@@ -164,11 +164,15 @@ export class WarmLights {
     }
   }
 
-  /** A flame's own unsteady brightness (two slow waves and a quick one, out of step per torch). */
+  /** A torch's own unsteady brightness, out of step per torch. */
   private flicker(s: Spot): number {
-    const t = this.time + s.roll * 50;
-    return 0.86 + 0.07 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 13.1 + 1.7) + 0.03 * Math.sin(t * 29.7);
+    return flameFlicker(this.time + s.roll * 50);
   }
+}
+
+/** A flame's unsteady brightness at time `t` (s): two slow waves and a quick one, about 0.86. */
+export function flameFlicker(t: number): number {
+  return 0.86 + 0.07 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 13.1 + 1.7) + 0.03 * Math.sin(t * 29.7);
 }
 
 function closest(spots: readonly Spot[], cam: Vector3, n: number): { s: Spot; dist: number }[] {
