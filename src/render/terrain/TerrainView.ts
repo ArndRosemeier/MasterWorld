@@ -5,7 +5,7 @@
  */
 import { BufferAttribute, BufferGeometry, type Camera, type Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
-import { CANOPY_RISE, TERRAIN, kindMesh } from '../materials';
+import { CANOPY_RISE, TERRAIN, freeMesh, kindMesh } from '../materials';
 import { chunkIndex, type ChunkMesh } from '../../world/chunkMesh';
 import { until, type TerrainJobs } from '../../workers/pool';
 import { SEGS, chunkId, chunkSize, selectChunks, type ChunkKey } from './lod';
@@ -145,7 +145,7 @@ export class TerrainView {
 /** The index is shared by chunks of a size: detach it first, so disposing frees only this chunk's buffers. */
 function freeChunk(m: Mesh): void {
   if (!m.userData.ownIndex) m.geometry.setIndex(null);
-  m.geometry.dispose();
+  freeMesh(m);
 }
 
 /**

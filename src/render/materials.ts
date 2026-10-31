@@ -64,6 +64,18 @@ export function kindMesh(g: BufferGeometry, kind: MaterialKind, x = 0, y = 0, z 
   return mesh;
 }
 
+/**
+ * Frees a mesh that leaves for good: its geometry's buffers, and the renderer's records of it (its render objects).
+ * Disposing the geometry alone is not enough: each render object listens on the kind's shared material, so it, the
+ * mesh and its arrays stayed reachable from that material for good (MW memory leak: every terrain chunk ever drawn,
+ * 0.6 GB a minute of fast flight). The mesh's own `dispose` event lets the renderer drop them.
+ */
+export function freeMesh(mesh: Mesh): void {
+  mesh.removeFromParent();
+  mesh.geometry.dispose();
+  (mesh as unknown as { dispatchEvent(e: { type: string }): void }).dispatchEvent({ type: 'dispose' });
+}
+
 /** Every kind. */
 export function allKinds(): readonly MaterialKind[] {
   return [...kinds.values()];

@@ -17,6 +17,7 @@ import type { RegionMap } from '../world/regions';
 import { fillOf, keyOf, nextRegion, regionDecisions, regionLine, regionMapOf, wantsRegion, type FrontierAsk, type FrontierContext, type RegionData } from '../vgm/frontier';
 import { buildingMeshAt } from '../render/materials/building';
 import type { Terrain } from '../world/terrain';
+import { freeMesh } from '../render/materials';
 
 /** Places are drawn once the hero is this near (m), and let go again beyond `DROP`. */
 const BUILD = 1600;
@@ -166,10 +167,11 @@ export class RegionSites {
     let built = false;
     for (const s of this.sites) {
       const d = Math.hypot(s.at.x - hero.x, s.at.z - hero.z);
-      if (s.mesh && d > DROP) {
-        this.host.stage.remove(s.mesh);
-        s.mesh.geometry.dispose();
-        s.mesh = null;
+      if (d > DROP && !s.laying && s.layout) {
+        // Let go: its mesh and its layout (laid out again when the hero comes back; kept, a long journey's
+        // places held their meshes' arrays for good).
+        if (s.mesh) { this.host.stage.remove(s.mesh); freeMesh(s.mesh); s.mesh = null; }
+        s.layout = undefined;
       } else if (!s.mesh && !built && !s.laying && d < BUILD) {
         built = true;
         if (s.layout === undefined) {
