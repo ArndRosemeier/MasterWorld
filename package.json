@@ -60,8 +60,8 @@
     "shot:stone": "node tools/shot/stone.mjs"
   },
   "dependencies": {
-    "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.3/actors-animal-0.19.3.tgz",
-    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.19.3/actors-generator-0.19.3.tgz",
+    "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.20.0/actors-animal-0.20.0.tgz",
+    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.20.0/actors-generator-0.20.0.tgz",
     "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/creatures": "file:vendor/assetgenerator/packages/creatures",
