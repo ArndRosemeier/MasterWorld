@@ -11,7 +11,7 @@ import { coinText } from '../game/items';
 import type { VoyageDef } from '../setting/contract';
 import { fill } from '../talk/folk';
 import { riverMouths } from '../world/coast';
-import type { DecisionLog, HarbourAt, JourneyDecision, RegionDecision, TownDecision } from '../world/decisions';
+import { settlementOf, type DecisionLog, type HarbourAt, type JourneyDecision, type RegionDecision, type TownDecision } from '../world/decisions';
 import { wayLength, type Voyage } from '../world/fleet';
 import { compass } from './dungeons';
 import { heldBy } from './events';
@@ -35,6 +35,8 @@ export interface SeaWay {
   /** Where it goes, as the harbour master says it ("the village 4.6 km west"), and as it is called there. */
   readonly place: string;
   readonly name: string;
+  /** To an island (S7): the harbour master tells what sailors say of it. */
+  readonly isle?: true;
 }
 
 /** Off a harbour's shore, out along its way to sea, where a ship has water enough (null: none within OFF_SHORE). */
@@ -58,9 +60,9 @@ export function seaRoute(seed: number, water: (x: number, z: number) => number, 
 
 /** The voyage from `from` to `to` along `route`: its length, time and fare. */
 export function seaWay(def: VoyageDef, from: TownDecision, to: TownDecision, route: readonly number[]): SeaWay {
-  const metres = wayLength(route), km = Math.hypot(to.x - from.x, to.z - from.z) / 1000, name = `the ${to.size ?? 'town'}`;
+  const metres = wayLength(route), km = Math.hypot(to.x - from.x, to.z - from.z) / 1000, name = to.isle ? 'the island' : `the ${to.size ?? 'town'}`;
   return {
-    to: to.id, route, metres,
+    to: to.id, route, metres, ...(to.isle ? { isle: true as const } : {}),
     hours: (metres / def.speed) * CLOCK / 3600,
     fare: Math.max(def.least, Math.round((metres / 1000) * def.perKm)),
     name,
@@ -94,7 +96,7 @@ export function seaWays(def: VoyageDef, seed: number, log: DecisionLog, from: To
  */
 export function farHarbourFor(def: VoyageDef, c: FrontierContext, from: TownDecision, towns: readonly TownDecision[], water: (x: number, z: number) => number): RegionDecision | null {
   if (!from.harbour) return null;
-  if (towns.some((t) => t.id !== from.id && t.harbour && Math.hypot(t.x - from.x, t.z - from.z) <= def.reach[1])) return null;
+  if (decided(c, towns).some((t) => t.id !== from.id && t.harbour && Math.hypot(t.x - from.x, t.z - from.z) <= def.reach[1])) return null;
   const fromHome = (m: { x: number; z: number }) => Math.hypot(m.x - from.x, m.z - from.z);
   const mouths = riverMouths(c.terrain, from.x, from.z, def.reach[1]).filter((m) => fromHome(m) >= def.reach[0]).sort((a, b) => fromHome(a) - fromHome(b));
   for (const m of mouths) {
@@ -105,9 +107,22 @@ export function farHarbourFor(def: VoyageDef, c: FrontierContext, from: TownDeci
   return null;
 }
 
+/**
+ * The towns known so far and those only decided in the log (a region opened but not built yet): a town asked for
+ * again before it stands is not founded twice.
+ */
+export function decided(c: Pick<FrontierContext, 'log' | 'regions'>, towns: readonly TownDecision[]): TownDecision[] {
+  const out = [...towns];
+  for (const d of c.log) {
+    const t = d.kind === 'region' ? settlementOf(d, c.regions.fills) : null;
+    if (t && !out.some((o) => o.id === t.id)) out.push(t);
+  }
+  return out;
+}
+
 /** The harbour master's topic for a way. */
 export function voyageTopic(def: VoyageDef, w: SeaWay): string {
-  return fill(def.words.topic, { place: w.place, price: coinText(w.fare) });
+  return fill(w.isle ? def.words.island : def.words.topic, { place: w.place, price: coinText(w.fare) });
 }
 
 /** The note on coming in. */

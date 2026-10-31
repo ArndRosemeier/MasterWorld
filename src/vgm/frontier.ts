@@ -120,9 +120,19 @@ function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; 
  */
 export function harbourRegion(c: FrontierContext, p: { x: number; z: number }): RegionDecision | null {
   const done = regionDecisions(c.log), map = c.map ?? regionMapOf(c.log, c.regions.country);
-  const f = c.regions.fills.find((x) => x.harbour), n = done.length + 1;
+  const f = c.regions.fills.find((x) => x.harbour && !x.island), n = done.length + 1;
   if (!f || map.at(p.x, p.z)) return null;
   return placeFill(c, map, p, f, { kind: 'region', id: `region-${n}`, seed: deriveSeed(c.seed, 'vgm', 'region', n), at: c.hours });
+}
+
+/**
+ * A region of fill `f` with its place at `site`, found by the caller (S7: an island's fishing village on its shore):
+ * the square of the fill's size round it, if that is free. Null: taken, or the setting has no such fill.
+ */
+export function siteRegion(c: FrontierContext, f: RegionFillDef, site: NonNullable<RegionDecision['site']>): RegionDecision | null {
+  const map = c.map ?? regionMapOf(c.log, c.regions.country), n = regionDecisions(c.log).length + 1, k = keyAt(f.level, site.x, site.z);
+  if (!wholeFree(map, k)) return null;
+  return { kind: 'region', id: `region-${n}`, seed: deriveSeed(c.seed, 'vgm', 'region', n), at: c.hours, ...k, fill: f.id, site };
 }
 
 /** The place of `pick` in a free square round `p` (its own size, or smaller while it fits), or null. */
@@ -183,7 +193,7 @@ const WALL_DRY = 0.6;
 const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, waystation: true, hamlet: true, village: true, capital: true, camp: false, ruin: false, barrows: false };
 
 /** A fill's footprint radius (m): a settlement's grows with its houses (AssetGenerator HOUSE_SCALE), a camp's or a ruin's does not. */
-function radiusOf(f: RegionFillDef): number {
+export function radiusOf(f: RegionFillDef): number {
   return (f.radius ?? 20) * (SETTLES[f.place] ? HOUSE_SCALE : 1);
 }
 
@@ -274,10 +284,10 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
 }
 
 /** The settlements in the log (the towns, and the hamlets and villages of regions): for roads and for whatever links places. */
-export function settlementsOf(log: DecisionLog, regions?: RegionsDef): { id: string; x: number; z: number; r: number }[] {
+export function settlementsOf(log: DecisionLog, regions?: RegionsDef): { id: string; x: number; z: number; r: number; isle?: true }[] {
   return log.flatMap((d) => {
     const t = d.kind === 'town' ? d : d.kind === 'region' && regions ? settlementOf(d, regions.fills) : null;
-    return t ? [{ id: t.id, x: t.x, z: t.z, r: t.radius }] : [];
+    return t ? [{ id: t.id, x: t.x, z: t.z, r: t.radius, ...(t.isle ? { isle: t.isle } : {}) }] : [];
   });
 }
 

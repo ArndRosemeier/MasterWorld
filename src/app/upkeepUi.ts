@@ -12,9 +12,10 @@ import { coinText, type Item } from '../game/items';
 import { takeRoom, wakePlace } from '../game/upkeep';
 import { buildingOf, type Person } from '../sim/people';
 import { cartArrived, cartTopic, cartWays, journeyOf, type CartWay } from '../vgm/journeys';
-import { settlementOf, type DecisionLog, type JourneyDecision, type RegionDecision } from '../world/decisions';
+import { settlementOf, type DecisionLog, type JourneyDecision, type RegionDecision, type TownDecision } from '../world/decisions';
 import type { FrontierContext } from '../vgm/frontier';
 import { farHarbourFor, seaWays, voyageOf, voyageTopic, type SeaWay } from '../vgm/voyages';
+import { islandFor } from '../vgm/islands';
 import { cap, fill } from '../talk/folk';
 import type { Service } from '../talk/townTalk';
 import { RepairUi } from './repairUi';
@@ -87,7 +88,8 @@ export class UpkeepUi {
 
   /**
    * The harbour master's passages by ship to the nearest harbour towns along the coast (S4). With none in reach the
-   * VGM opens one across the water first (vgm/voyages.ts farHarbourFor). Found once per town while the log stands.
+   * VGM opens one across the water first (vgm/voyages.ts farHarbourFor), and promises an island in reach (S7,
+   * vgm/islands.ts islandFor: sailors talk of it). Found once per town while the log stands.
    */
   private passages(): { id: string; label: string; line: string }[] {
     const def = this.setting.voyage, town = this.host.town, log = this.host.log();
@@ -95,10 +97,15 @@ export class UpkeepUi {
     if (this.voyagesFor?.town !== town.id || this.voyagesFor.log !== log) {
       const from = town.town.decision, known = this.host.towns.map((t) => t.town.decision);
       const fills = this.setting.regions?.fills ?? [];
-      const far = farHarbourFor(def, this.host.frontier(), from, known, (x, z) => this.host.water(x, z));
-      const opened = far ? settlementOf(far, fills) : null;
-      if (far) this.host.openRegion(far);
-      this.voyages = seaWays(def, this.host.frontier().seed, this.host.log(), from, opened ? [...known, opened] : known, (x, z) => this.host.water(x, z)).slice(0, SEA_IDS.length);
+      const depth = (x: number, z: number) => this.host.water(x, z), opened: TownDecision[] = [];
+      // Each opened region is in the log before the next is looked for (they never take the same square).
+      for (const ask of [farHarbourFor, islandFor]) {
+        const r = ask(def, this.host.frontier(), from, [...known, ...opened], depth), town = r && settlementOf(r, fills);
+        if (!r) continue;
+        this.host.openRegion(r);
+        if (town) opened.push(town);
+      }
+      this.voyages = seaWays(def, this.host.frontier().seed, this.host.log(), from, [...known, ...opened], depth).slice(0, SEA_IDS.length);
       this.voyagesFor = { town: town.id, log: this.host.log() };
     }
     return this.voyages.map((w, i) => {

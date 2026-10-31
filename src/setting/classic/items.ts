@@ -128,6 +128,7 @@ export const voyage: VoyageDef = {
     given: '{price}. She lies at the pier: go aboard by the gangplank, she casts off directly.',
     tooDear: 'Passage is {price}, and the master takes no promises. Come back with the coin.',
     arrived: 'The ship comes in to {place}, {hours} at sea.',
+    island: 'Sailors talk of an island out at sea, {place}: passage there ({price})',
   },
 };
 

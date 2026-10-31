@@ -612,6 +612,11 @@ export interface RegionFillDef {
   readonly apart?: number;
   /** A harbour town (phase D, S2): the settlement stands where a river meets the sea, with a quay and piers. */
   readonly harbour?: boolean;
+  /**
+   * An island's fishing village (S7): opened only when the VGM promises the island (vgm/islands.ts), on its shore
+   * with a quay (a spring its fresh water, no river); never by the frontier (give it weight 0).
+   */
+  readonly island?: boolean;
 }
 
 /** The regions the VGM opens as the hero walks (plan 5.5): the fills, which is plain country, and the start's. */
@@ -910,6 +915,8 @@ export interface VoyageDef {
     readonly tooDear: string;
     /** The note on coming in to the far harbour (`{place}`, `{hours}`). */
     readonly arrived: string;
+    /** The topic for passage to an island (S7: what sailors say of it, `{place}`: "the island 8.4 km west", `{price}`). */
+    readonly island: string;
   };
 }
 

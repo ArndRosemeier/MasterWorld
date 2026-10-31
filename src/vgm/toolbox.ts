@@ -14,6 +14,7 @@ import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { festivityFor } from './festivities';
 import { hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
+import { islandPlace } from './islands';
 
 /** Who asks a tool: the start of a game, the hero walking, the Builder's turn, an overdue need (C9), or another tool or the game. */
 export type Asked = 'start' | 'walk' | 'turn' | 'need' | 'call';
@@ -62,6 +63,8 @@ export const TOOLS: readonly Tool[] = [
   { id: 'region', name: 'Open a region', writes: ['region'], need: 'discovery', asked: 'walk' },
   { id: 'road', name: 'Lay a road', writes: ['road'], need: 'discovery', asked: 'call' },
   { id: 'wild', name: 'Place the wild', writes: ['wild'], need: 'challenge', asked: 'call' },
+  { id: 'island-place', name: 'A place on an island', writes: ['dungeon'], need: 'discovery', asked: 'turn', next: (c) => islandPlace({ ...c, dungeons: c.setting.dungeons }),
+    why: (d) => (d.kind === 'dungeon' ? `a ${d.template} out on the island of ${d.town}, for its people to know of` : d.kind) },
   { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons }),
     why: (d, c) => {
       const open = openPromises(c.log).length;
@@ -92,6 +95,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
   { id: 'voyage', name: 'A voyage', writes: ['journey'], need: null, asked: 'call' },
   { id: 'far-harbour', name: 'A harbour across the water', writes: ['region'], need: null, asked: 'call' },
+  { id: 'island', name: 'An island out at sea', writes: ['region'], need: 'discovery', asked: 'call' },
   { id: 'quest', name: "A master's deed", writes: ['dungeon'], need: 'purpose', asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },

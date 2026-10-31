@@ -1,5 +1,6 @@
 /**
- * The loop check's voyage (S4, plan 5.4): in each world a hero buys passage from the start's harbour master, goes
+ * The loop check's voyages (S4, plan 5.4; S7): in each world a hero buys passage from the start's harbour master, along
+ * the coast and to the island promised in reach, goes
  * aboard the passage ship and stays on her deck the whole crossing, awake for the first part and then asleep in a
  * cabin bunk until she is about to come in, until her gangplank is down at the far harbour (walking a gangplank is
  * test/deck.test.ts's). Headless: the far town is
@@ -10,9 +11,12 @@
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../../src/setting/classic/index';
 import { openWorld } from '../../src/vgm/builder';
-import { farHarbourFor, seaWays, voyageOf, voyagesIn } from '../../src/vgm/voyages';
+import { farHarbourFor, seaWays, voyageOf, voyagesIn, type SeaWay } from '../../src/vgm/voyages';
+import { islandFor } from '../../src/vgm/islands';
+import type { VoyageDef } from '../../src/setting/contract';
+import type { Terrain } from '../../src/world/terrain';
 import { CLOCK } from '../../src/vgm/journeys';
-import { settlementOf, type Decision } from '../../src/world/decisions';
+import { settlementOf, type Decision, type RegionDecision, type TownDecision } from '../../src/world/decisions';
 import { Decks, byBunk } from '../../src/world/deck';
 import { farBerth, fleetOf, passageShip, voyageAfloat } from '../../src/world/fleet';
 import { SEA_LEVEL } from '../../src/world/water';
@@ -26,28 +30,45 @@ const FRAME = 1 / 30, HOUR_PER_FRAME = (FRAME * CLOCK) / 3600, AWAKE = 0.5, WAKE
 const ENDS = 0.8;
 
 function voyage(name: string): string | null {
-  const seed = parseSeed(name), t0 = performance.now();
+  const seed = parseSeed(name);
   const { terrain, log: first } = openWorld(seed, classic);
   const home = terrain.towns[0]?.decision, regions = classic.regions;
   if (!home?.harbour || !regions) return 'the start town has no harbour';
   const water = (x: number, z: number) => terrain.waterDepth(x, z);
   const def = classic.voyage!;
-  // The harbour master's offer: the VGM opens a far harbour when none is in reach, and the Builder builds it.
+  // The harbour master's offer: the VGM opens a far harbour when none is in reach, and promises an island in reach
+  // (S7); the Builder builds them.
   let log: Decision[] = [...first];
   const towns = () => terrain.towns.map((t) => t.decision);
-  const r = farHarbourFor(def, { seed, log, terrain, regions, home, hero: home, hours: 9 }, home, towns(), water);
-  if (r) { log = [...log, r]; terrain.settleMore([r]); }
-  const [w] = seaWays(def, seed, log, home, towns(), water);
+  const opened: RegionDecision[] = [];
+  for (const ask of [farHarbourFor, islandFor]) {
+    const r = ask(def, { seed, log, terrain, regions, home, hero: home, hours: 9 }, home, towns(), water);
+    if (r) { log = [...log, r]; terrain.settleMore([r]); opened.push(r); }
+  }
+  const ways = seaWays(def, seed, log, home, towns(), water);
   // (Some coasts have no other river's mouth in reach, so no harbour to sail to: then no ship takes passengers there.)
-  if (!w && !r) { console.log(`${name}: no harbour in reach along this coast; no passage offered`); return null; }
-  if (!w) return `the far harbour ${r!.id} was opened, but no way by sea to it`;
-  const farTown = terrain.town(w.to), far = farTown?.decision ?? (r && settlementOf(r, regions.fills));
+  const isle = ways.find((w) => w.isle), along = ways.find((w) => !w.isle);
+  if (!along) console.log(`${name}: no harbour in reach along this coast; no passage offered`);
+  if (opened.some((r) => !ways.some((w) => w.to === r.id))) return `a harbour opened across the water, ${opened.map((r) => r.id).join(', ')}, but no way by sea to it`;
+  if (classic.world.islands && !isle) return 'no island promised in reach';
+  for (const w of [along, isle]) {
+    const e = w ? crossing(name, seed, terrain, log, home, w, def) : null;
+    if (e) return e;
+  }
+  return null;
+}
+
+/** One crossing aboard the passage ship from `home` along way `w`, from casting off till her gangplank is down at the far quay. */
+function crossing(name: string, seed: number, terrain: Terrain, log: readonly Decision[], home: TownDecision, w: SeaWay, def: VoyageDef): string | null {
+  const t0 = performance.now(), regions = classic.regions!;
+  const water = (x: number, z: number) => terrain.waterDepth(x, z);
+  const farTown = terrain.town(w.to), far = farTown?.decision ?? (() => { const r = log.find((d) => d.id === w.to); return r?.kind === 'region' ? settlementOf(r, regions.fills) : null; })();
   if (!farTown?.plan.harbour || !far) return `the far town ${w.to} is not built`;
   const j = voyagesIn([voyageOf(log, home.id, w, 9)])[0].v;
   const ship = passageShip(fleetOf(terrain.town(home.id)!.plan.harbour!, home.seed ?? seed, water));
   if (!ship) return 'no passage ship';
   const plan = ship.mooring.plan, berth = farBerth(farTown.plan.harbour, far.seed ?? seed, plan);
-  if (!berth) return 'no berth at the far harbour takes her';
+  if (!berth) return `no berth at ${w.name}'s harbour takes her`;
   console.log(`${name}: passage to ${w.place}, ${(w.metres / 1000).toFixed(1)} km, ${w.hours.toFixed(1)} h, ${w.fare} copper`);
 
   // Aboard at her berth, by a cabin bunk, as she casts off.
@@ -100,7 +121,7 @@ function voyage(name: string): string | null {
   if (!s.at.berth || !plank) return 'not at the far quay with her gangplank out';
   const footLand = Math.abs(plank.foot.y - berth.landY);
   if (footLand > 0.5) return `the gangplank's foot ${footLand.toFixed(2)} m off the quay`;
-  console.log(`${name}: in at the far quay with the hero aboard, awake, her gangplank down on the quay (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
+  console.log(`${name}: in at ${w.name}'s quay with the hero aboard, awake, her gangplank down on the quay (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
   return null;
 }
 

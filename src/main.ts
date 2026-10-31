@@ -591,6 +591,8 @@ export async function start(b: Boot): Promise<void> {
       if (!place) return;
       roading = roading.then(async () => {
         await towns?.found(d, view.camera.position);
+        // (An island's village has no road to the mainland: the ships are its way.)
+        if (place.isle) return;
         const road = await jobs.linkRoad(log.filter((x): x is RoadDecision => x.kind === 'road'), place, 'track', d.at);
         if (road && !log.some((x) => x.id === road.id)) { log = [...log, road]; await roadWork.lay(road); }
       }).catch((e: unknown) => console.warn('founding a settlement:', e));
