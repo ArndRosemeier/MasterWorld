@@ -10,16 +10,16 @@ import { criesDue, paddockWolvesFor, smokesAt, strayBeastFor, type PaddockContex
 import { pointInPoly } from '@futuremagic/settlement';
 import { answerNeed } from '../src/vgm/toolbox';
 import type { Decision } from '../src/world/decisions';
-import { EAST, frontierLand } from './frontierLand';
+import { SOUTH, frontierLand } from './frontierLand';
 
 const { home, seed, terrain, walk } = frontierLand();
 
-const log = walk(2, EAST);
+const log = walk(2, SOUTH);
 const town = terrain.towns[0];
-// Out past the mesa wall east of the town, on open land.
-const out = { x: home.x + home.radius + 350, z: home.z };
+// Out inland south of the sea town, on open land.
+const out = { x: home.x, z: home.z + home.radius + 700 };
 const sure = { ...classic, situations: classic.situations!.map((t) => (t.kind === 'hurt-traveller' ? { ...t, chance: 1 } : t)) };
-const need = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: sure, hero: out, toward: { x: out.x + 600, z: out.z }, ...over });
+const need = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: sure, hero: out, toward: { x: out.x, z: out.z + 600 }, ...over });
 const dusk = (over: Partial<PaddockContext> = {}): PaddockContext => ({ seed, log, hours: 24 * 2 + 19, near: town, setting: classic, ...over });
 
 test('situations: the setting\'s situations are sound; each cries only a short line, and only from where it is seen', () => {

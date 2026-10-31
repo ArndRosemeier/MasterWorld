@@ -1,26 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { regionDecisions, walkFrontier } from '../src/vgm/frontier';
-import { settlementOf } from '../src/world/decisions';
 import { townsfolk } from '../src/sim/people';
 import { townSpots } from '../src/sim/spots';
 import { nearestCoast } from '../src/world/coast';
 import { afloatAt, fleetOf } from '../src/world/fleet';
 import { frontierLand } from './frontierLand';
 
-const { first, home, regions, seed, terrain } = frontierLand({ own: true });
+const { home, seed, terrain } = frontierLand();
 
-/** S2: where a river meets the sea, the VGM opens a harbour town; it replays from the log. */
-test('harbour town: opened by a river mouth, with its quay, piers, berths and harbour folk', () => {
-  // Walking north towards the coast (the river by the start reaches the sea some 2 km north) until one is founded.
-  const NORTH = -Math.PI / 2;
-  const log = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, NORTH, 5, (d) => !!settlementOf(d, regions.fills)?.harbour)];
-  const d = regionDecisions(log).find((x) => settlementOf(x, regions.fills)?.harbour);
-  assert.ok(d, 'a harbour town was opened');
+/** S2 and the start (Arnd 2026-10-30): the start town is a sea town by a river's mouth; it replays from the log. */
+test('harbour town: the start town stands by a river mouth, with its quay, piers, berths and harbour folk', () => {
+  const d = home;
+  assert.ok(d.harbour, 'the start town has a harbour');
   assert.deepEqual(JSON.parse(JSON.stringify(d)), d, 'it is plain data in the log');
-  const t = settlementOf(d, regions.fills)!;
+  const t = d;
   assert.ok(terrain.height(t.x, t.z) >= 1.5, 'its middle on dry ground');
-  terrain.settleMore([d]);
   const plan = terrain.town(d.id)!.plan, h = plan.harbour;
   assert.ok(h, 'the town has its harbour');
   assert.ok(h.piers.length >= 1 && h.berths.length >= 1, `${h.piers.length} piers, ${h.berths.length} berths`);

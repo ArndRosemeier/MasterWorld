@@ -117,12 +117,12 @@ export interface HarbourSpot {
  * harbour), on either bank: the quay on the coast beside the mouth, the town's middle inland of it, on dry ground at
  * least 1.5 m up. Those with more dry ground round the middle first.
  */
-export function harbourSpots(t: Terrain, m: RiverMouth, r: number): HarbourSpot[] {
+export function harbourSpots(t: Terrain, m: RiverMouth, r: number, along: readonly number[] = HARBOUR_ALONG): HarbourSpot[] {
   const [sx, sz] = seaward(t, m.x, m.z), out: (HarbourSpot & { dry: number })[] = [];
-  for (const side of [1, -1]) for (const along of HARBOUR_ALONG) {
+  for (const side of [1, -1]) for (const k of along) {
     // Along the coast, one way or the other from the mouth (the river's end lies a little out at sea), past its bank
     // (nearer or farther: a place must fit in its square); then inland to the shore.
-    const tx = -sz * side, tz = sx * side, off = m.half + 15 + r * along;
+    const tx = -sz * side, tz = sx * side, off = m.half + 15 + r * k;
     let hx = NaN, hz = NaN;
     for (let s = -60; s < 400; s += 4) {
       const x = m.x + tx * off - sx * s, z = m.z + tz * off - sz * s;
