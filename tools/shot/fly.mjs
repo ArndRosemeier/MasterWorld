@@ -9,6 +9,8 @@
  * sample (both after a forced garbage collection). FLY_SAMPLE=1: V8's sampling heap profiler from the first minute
  * to the end; what it allocated that still lives at the end, summed by the function that allocated it and by the
  * game's function nearest up its stack (a build with `--minify=false` names them), to find what is kept.
+ * FLY_OBJECTS=1: a census after the first minute and at the end (V8's queryObjects): every ArrayBuffer by size, and
+ * every Object3D and BufferGeometry in memory, in the scene or not, by name, with the bytes of their arrays.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { launch } from './launch.mjs';
@@ -16,7 +18,7 @@ import { launch } from './launch.mjs';
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 120000);
 const minutes = Number(process.argv[2] ?? 4), speed = Number(process.argv[3] ?? 180);
 const maxGrowth = process.env.FLY_MAX_GROWTH ? Number(process.env.FLY_MAX_GROWTH) : null;
-const sampling = process.env.FLY_SAMPLE === '1';
+const sampling = process.env.FLY_SAMPLE === '1', objects = process.env.FLY_OBJECTS === '1';
 
 const { server, base, browser } = await launch({ args: ['--enable-precise-memory-info', '--js-flags=--expose-gc'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -65,12 +67,14 @@ for (let tick = 1; Date.now() < end; tick++) {
   console.log(`${s} s, ${flown} km: page heap ${heap} MB${minute ? ' (after gc)' : ''}; holds ${await held()}`);
   if (minute) {
     first = heap;
+    if (objects) console.log(`census after the first minute:\n${await census()}`);
     if (sampling) { await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.startSampling', { samplingInterval: 256 * 1024 }); }
   }
 }
 await gc();
 const last = mb(await page.evaluate(() => performance.memory?.usedJSHeapSize ?? 0));
 console.log(`after gc at the end: page heap ${last} MB (after the first minute ${first} MB)`);
+if (objects) console.log(`census at the end:\n${await census()}`);
 if (sampling && first !== null) kept((await cdp.send('HeapProfiler.getSamplingProfile')).profile);
 mkdirSync('shots', { recursive: true });
 writeFileSync('shots/fly-heap.json', JSON.stringify(rows));
@@ -79,6 +83,55 @@ await server.close();
 if (maxGrowth !== null && first !== null && last - first > maxGrowth) {
   console.log(`FAIL: the page heap grew ${last - first} MB over the flight (allowed ${maxGrowth} MB)`);
   process.exit(1);
+}
+
+/** Every ArrayBuffer, Object3D and BufferGeometry alive in the page, summed (see FLY_OBJECTS). */
+async function census() {
+  await gc();
+  const out = [];
+  const query = async (protoExpr, fn) => {
+    const proto = await cdp.send('Runtime.evaluate', { expression: protoExpr, objectGroup: 'census' });
+    if (!proto.result.objectId) return `no prototype for ${protoExpr}`;
+    const { objects: arr } = await cdp.send('Runtime.queryObjects', { prototypeObjectId: proto.result.objectId, objectGroup: 'census' });
+    const r = await cdp.send('Runtime.callFunctionOn', { objectId: arr.objectId, functionDeclaration: fn, returnByValue: true });
+    await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'census' }).catch(() => {});
+    return r.result.value ?? JSON.stringify(r.exceptionDetails ?? r.result);
+  };
+  const protoWith = (start, own) => `(() => { let p = Object.getPrototypeOf(${start}); while (p && !Object.prototype.hasOwnProperty.call(p, '${own}')) p = Object.getPrototypeOf(p); return p; })()`;
+  out.push('ArrayBuffers: ' + await query('ArrayBuffer.prototype', `function () {
+    let n = 0, bytes = 0; const by = new Map();
+    for (const b of this) { n++; bytes += b.byteLength; const k = 2 ** Math.ceil(Math.log2(Math.max(1, b.byteLength))); const e = by.get(k) ?? [0, 0]; e[0]++; e[1] += b.byteLength; by.set(k, e); }
+    const mb = (x) => (x / 2 ** 20).toFixed(1);
+    return n + ' buffers, ' + mb(bytes) + ' MB; by size (up to): ' + [...by].sort((a, b) => b[1][1] - a[1][1]).slice(0, 10).map(([k, [c, b]]) => (k >= 2 ** 20 ? (k / 2 ** 20) + 'M' : (k / 1024) + 'K') + ' ' + c + 'x ' + mb(b) + ' MB').join(', ');
+  }`));
+  out.push('Object3Ds: ' + await query(protoWith('window.game.view.camera', 'traverse'), `function () {
+    const by = new Map(); let n = 0;
+    const root = (o) => { while (o.parent) o = o.parent; return o; };
+    for (const o of this) {
+      n++;
+      const r = root(o), where = r.isScene ? 'in scene' : 'detached';
+      const name = (o.name || o.type || '?').split(/[ #:]/)[0] + ' (' + where + ')';
+      let bytes = 0;
+      const g = o.geometry;
+      if (g && g.attributes) for (const a of Object.values(g.attributes)) bytes += a.array?.byteLength ?? 0;
+      const e = by.get(name) ?? [0, 0]; e[0]++; e[1] += bytes; by.set(name, e);
+    }
+    return n + ' objects; ' + [...by].sort((a, b) => b[1][1] - a[1][1] || b[1][0] - a[1][0]).slice(0, 25).map(([k, [c, b]]) => k + ' ' + c + 'x ' + (b / 2 ** 20).toFixed(1) + ' MB').join('; ');
+  }`));
+  out.push('BufferGeometries: ' + await query(protoWith('window.game.view.stage.scene.getObjectByProperty("isMesh", true).geometry', 'setAttribute'), `function () {
+    let n = 0, bytes = 0; const names = new Map();
+    for (const g of this) {
+      n++;
+      let b = 0;
+      for (const a of Object.values(g.attributes)) b += a.array?.byteLength ?? 0;
+      if (g.index) b += g.index.array.byteLength;
+      bytes += b;
+      const k = Object.keys(g.attributes).sort().join(',');
+      const e = names.get(k) ?? [0, 0]; e[0]++; e[1] += b; names.set(k, e);
+    }
+    return n + ' geometries, ' + (bytes / 2 ** 20).toFixed(1) + ' MB; by attributes: ' + [...names].sort((a, b) => b[1][1] - a[1][1]).slice(0, 10).map(([k, [c, b]]) => '[' + k + '] ' + c + 'x ' + (b / 2 ** 20).toFixed(1) + ' MB').join('; ');
+  }`));
+  return out.map((l) => `  ${l}`).join('\n');
 }
 
 /** What the sampling heap profile holds (allocated since sampling began and alive now), by allocating function and by game function. */
