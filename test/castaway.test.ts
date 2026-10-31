@@ -67,7 +67,7 @@ test('castaway (S9): the fisher treads water by the boat, takes hold of the hero
   // On their feet in the shallows: the fisher wades on past them up onto the dry strand.
   for (let k = 0; k < 120; k++) [p] = cast.drift(0.1, [d], hero(1.5, false, Math.PI / 2), water);
   assert.equal(cast.stateOf(d.id), 'ashore');
-  assert.ok(water.ground(p.x) > 0.15, 'out of the water');
+  assert.ok(water.ground(p.x) > -0.15, 'up at the water\'s edge');
   assert.equal(p.act, 'wait');
   assert.equal(saved, 1, 'saved, once');
   for (let k = 0; k < 20; k++) cast.drift(0.1, [], hero(1.5, false), water);

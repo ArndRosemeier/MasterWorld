@@ -153,7 +153,7 @@ const BEHIND = 1.1;
 const BY_BOAT = 1.1;
 /** How deep the fisher's feet (the body's origin) sit under the surface while they swim or tread water (m): as the hero's (game/walker.ts floats the feet 0.56 of the height down, render/hero/HeroView.ts drops a swimmer 0.15 more), for a body of some 1.72 m. */
 const SWIM_DROP = 1.22;
-/** Ashore: how far up the strand they wade (m) past the hero, how fast (m/s), and when they are out of the water (ground over the sea, m). */
+/** Ashore: how far up the strand they wade (m) past the hero, how fast (m/s), and when they are out of the water (the ground at most this under the sea's surface, waves and all, m). */
 const WADE = 3, WADE_PACE = 1.1, DRY = 0.15;
 /** Steps of 1.5 m they wade on at most looking for dry ground (then they stop where they are). */
 const WADE_ON = 12;
@@ -200,8 +200,9 @@ export class Castaways {
       this.swimOn(a, dt, hero, water);
       // Out of their depth they swim with the head out; in the shallows they wade, feet on the bed.
       const floating = water.surface(a.x, a.z) - SWIM_DROP, bed = water.ground(a.x, a.z);
+      // (Never into the bed: in the shallows behind the hero their feet are on it.)
       const wet = a.state !== 'ashore' || bed < floating;
-      const y = wet ? floating : bed;
+      const y = Math.max(floating, bed);
       a.agent.x = a.x; a.agent.z = a.z; a.agent.dir = a.dir;
       const act = a.state === 'cling' ? 'tread' : a.state === 'towed' ? 'swim' : a.to ? (wet ? 'swim' : 'walk') : 'wait';
       a.agent.act = a.agent.next = act;
@@ -280,8 +281,8 @@ export class Castaways {
     }
     a.x = a.to.x;
     a.z = a.to.z;
-    // Still in the water there: on the way they go until they are out of it.
-    if (water.ground(a.x, a.z) < water.surface(a.x, a.z) + DRY && a.wade++ < WADE_ON) {
+    // Still in the water there: on the way they go until they are out of it (past the waves' reach).
+    if (water.ground(a.x, a.z) < water.surface(a.x, a.z) - DRY && a.wade++ < WADE_ON) {
       a.to = { x: a.x + a.ux * 1.5, z: a.z + a.uz * 1.5 };
       return;
     }
