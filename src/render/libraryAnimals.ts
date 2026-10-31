@@ -5,6 +5,7 @@
  */
 
 import type { BirdDoing } from '../sim/birdFlight';
+import type { OtterDoing } from '../sim/otterSwim';
 
 /** What a wild animal does this frame (from its den state). */
 export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 'hurt' | 'dead' | 'flick' | 'rest' | 'call';
@@ -56,12 +57,24 @@ export const LIBRARY_KINDS = {
     ids: ['pheasant'],
     clips: { idle: ['Idle', 'Idle_Breathing'], feed: ['StandGrazingA'], walk: ['WalkMedium_NoRootMotion'], run: ['RunFast_NoRootMotion'] },
   },
+  otter: {
+    // The hero's otter form (S6, game/birdForm.ts): WildMesh3D's American mink, which swims at the surface and under
+    // it (OTTER_CLIPS), grown to an otter's size (its model is some 2 m long).
+    ids: ['american-mink'],
+    clips: { idle: ['swim_surface_idle_01'], walk: ['swim_fwd_surface_fast_01'], run: ['swim_fwd_underwater_01'] },
+    scale: 0.6,
+  },
 } satisfies Record<string, LibraryKind>;
 
 /** The pheasant's clip for each thing the hero's bird does (game/birdForm.ts BirdDoing). */
 export const BIRD_CLIPS: Readonly<Record<BirdDoing, string>> = {
   idle: 'Idle', walk: 'WalkMedium_NoRootMotion', run: 'RunFast_NoRootMotion',
   takeoff: 'TakeOf_BounceOff', flap: 'FlyFlapping_NoRootMotion', glide: 'FlyGliding_NoRootMotion', dive: 'FlyGliding_NoRootMotion', land: 'Landing_Touch',
+};
+
+/** The mink's clip for each thing the hero's otter does (sim/otterSwim.ts OtterDoing). */
+export const OTTER_CLIPS: Readonly<Record<OtterDoing, string>> = {
+  float: 'swim_surface_idle_01', paddle: 'swim_fwd_surface_fast_01', dive: 'swim_surface_dive_fwd', swim: 'swim_fwd_underwater_01',
 };
 
 /** What a doing asks of `clipFor` when the kind names no clip for it. */

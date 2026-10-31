@@ -24,15 +24,19 @@ export class Breath {
     return this.left / BREATH;
   }
 
-  /** One step: `under` (the head is under water), `gills` (breathing water), `most` (the hero's most health). The health lost. */
-  breathe(dt: number, under: boolean, gills: boolean, most: number): number {
+  /**
+   * One step: `under` (the head is under water), `gills` (breathing water), `most` (the hero's most health), `hold`
+   * (a breath lasts this many times longer: an otter's). The health lost.
+   */
+  breathe(dt: number, under: boolean, gills: boolean, most: number, hold = 1): number {
     if (!under || gills) {
       this.left = Math.min(BREATH, this.left + CATCH * dt);
       return 0;
     }
     const was = this.left;
-    this.left = Math.max(0, this.left - dt);
+    const used = dt / hold;
+    this.left = Math.max(0, this.left - used);
     // Only the time spent with none left drowns.
-    return Math.max(0, dt - was) * DROWN * most;
+    return (Math.max(0, used - was) * hold) * DROWN * most;
   }
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { libraryAnimal } from '@actors/animal/library';
-import { BIRD_CLIPS, LIBRARY_KINDS, libraryClip, type AnimalDoing, type LibraryKind } from '../src/render/libraryAnimals';
+import { BIRD_CLIPS, LIBRARY_KINDS, OTTER_CLIPS, libraryClip, type AnimalDoing, type LibraryKind } from '../src/render/libraryAnimals';
 // @ts-expect-error a plain .mjs tool without types
 import { libraryIds } from '../tools/packs/library.mjs';
 
@@ -22,7 +22,9 @@ test('npm run packs copies exactly the library animals the kinds name', () => {
   assert.deepEqual(libraryIds(), named);
 });
 
-test('the hero\'s bird (the pheasant) has every clip its flight plays', () => {
-  const names = libraryAnimal(LIBRARY_KINDS.pheasant.ids[0]).clips.map((c) => c.name);
-  for (const [doing, clip] of Object.entries(BIRD_CLIPS)) assert.ok(names.includes(clip), `${doing}: ${clip}`);
+test('the hero\'s bird (the pheasant) and otter (the mink) have every clip their forms play', () => {
+  for (const [kind, clips] of [['pheasant', BIRD_CLIPS], ['otter', OTTER_CLIPS]] as const) {
+    const names = libraryAnimal(LIBRARY_KINDS[kind].ids[0]).clips.map((c) => c.name);
+    for (const [doing, clip] of Object.entries(clips)) assert.ok(names.includes(clip), `${kind} ${doing}: ${clip}`);
+  }
 });

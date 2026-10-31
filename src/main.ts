@@ -155,8 +155,9 @@ import { ActionBarUi } from './app/actionBarUi';
 import { AbilityBook } from './app/abilityBook';
 import { POTION, REST } from './game/actionBar';
 import { Rest, type RestWatch } from './game/rest';
-import { BirdForm } from './app/birdForm';
+import { BirdKit, OtterKit, ShapeForm, shapesFrame } from './app/shapeForm';
 import { Alone, blowOf, Recipes, shapeOf, type RecipeEvent } from './game/recipe';
+import { shapeBars } from './game/birdForm';
 import { SpellView } from './app/spellView';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
@@ -1318,7 +1319,7 @@ export async function start(b: Boot): Promise<void> {
     for (const id of UPKEEP_SERVICES) services.set(id, (a) => { const t = talkTown(); if (t) upkeep.answer(id, a.person, t.talk.nameOf(a.person.id)); });
     /** An ability was learned (a teacher, a writing): the hero redressed, and bird form's body made ready once it is known. */
     // What the hero can do changed (a spell learned, an item that gives an ability put on or off): the bar and book show it.
-    const learnedAbility = () => { armHero(); actionBar.draw(); book.redraw(); if (birdAbility && character.knows(birdAbility.id)) void birdForm?.warm(); };
+    const learnedAbility = () => { armHero(); actionBar.draw(); book.redraw(); warmForms(); };
     /** One of the canon's legendary items (C5) into the pack and on, to try the ability it gives (debug menu, shots). */
     const wearLegend = (id: string): string => {
       const u = setting.items.uniques.find((x) => x.id === id);
@@ -1423,28 +1424,40 @@ export async function start(b: Boot): Promise<void> {
       hands: castHands,
       sound: (what, motif, at) => sounds?.spell(what, motif, at),
     };
-    // Bird form (plan 10): the hero becomes a pheasant and flies; the change takes its time and never in a fight.
-    const birdAbility = setting.abilities.find((a) => shapeOf(a)?.into === 'bird') ?? null;
-    const birdForm = birdAbility ? new BirdForm(birdAbility, player, world, {
+    // Animal forms (plan 10, S6): the hero becomes a pheasant and flies, or an otter in the water and swims; the change
+    // takes its time and never in a fight, and in any form no other ability works.
+    const formHost = {
       stage: view.stage, notes,
       around: () => ({ fighting: encounters().some((e) => e.pressure.fighting > 0), riding: !!player.riding, swimming: player.walker.mode === 'swim', roofed: !!visit() || !!rooms?.inside }),
       changed: () => autosave(),
-    }) : null;
-    if (birdForm && birdAbility && character.knows(birdAbility.id)) void birdForm.warm();
+    };
+    const shapeAbility = (into: 'bird' | 'otter') => setting.abilities.find((a) => shapeOf(a)?.into === into);
+    const birdAbility = shapeAbility('bird'), otterAbility = shapeAbility('otter');
+    const birdForm = birdAbility ? new ShapeForm(birdAbility, new BirdKit(world), player, formHost) : null;
+    const otterForm = otterAbility ? new ShapeForm(otterAbility, new OtterKit(world), player, formHost) : null;
+    const forms: ShapeForm[] = [];
+    for (const f of [birdForm, otterForm]) if (f) forms.push(f);
+    player.shape = shapesFrame(forms);
+    const formOf = (id: string) => forms.find((f) => f.shift.ability.id === id);
+    /** The forms the hero knows, loaded and compiled ahead (the change then shows the animal at once). */
+    const warmForms = () => { for (const f of forms) if (character.knows(f.shift.ability.id)) void f.warm(); };
+    warmForms();
+    const shifts = forms.map((f) => f.shift);
     // Sitting down to rest (the rest key or the bar): faster healing, ended by moving, a fight or a wound.
     const rest = new Rest(character);
     const restWatch = (): RestWatch => ({
       moving: player.walker.gait !== 'idle',
       fighting: encounters().some((e) => e.pressure.fighting > 0),
-      afoot: !player.riding && !player.offFoot && !player.hideHero && !birdForm?.flying && player.walker.mode === 'ground',
+      afoot: !player.riding && !player.offFoot && !player.hideHero && player.walker.mode === 'ground',
     });
     /** An ability from the action bar (or a shot): resting, bird form, the fight's, the hero's own out of a fight, the potion. A line why not, or null. */
     const useAbility = (id: string): string | null => {
+      const barred = shapeBars(shifts, id), form = formOf(id);
+      if (barred) return barred;
+      if (form) return form.invoke();
       if (id === REST) return rest.toggle(restWatch());
       if (id !== POTION) rest.stand();
       const e = leading();
-      if (birdForm && id === birdAbility?.id) return birdForm.invoke();
-      if (birdForm?.flying) return 'A pheasant cannot do that.';
       const a = abilityOf(setting, id), spell = !!a && !blowOf(a);
       // A spell cast is a mage's evidence (C12: the player model).
       if (e) { const no = e.use(id); if (!no && spell) director.model.count('casts'); return no; }
@@ -1459,10 +1472,11 @@ export async function start(b: Boot): Promise<void> {
       get blocked() { return open > 0; },
       trigger: (id) => { const said = useAbility(id); if (said) notes.say(said, 2.5); },
       state: (id) => {
-        const f = leading()?.fighting ?? null;
+        const f = leading()?.fighting ?? null, form = formOf(id);
+        if (form) { const b = form.state; return { left: b.left, total: form.shift.ability.cooldown, dim: false, on: b.on }; }
+        if (shapeBars(shifts, id)) return { left: 0, total: 0, dim: true, on: false };
         if (id === POTION) { const n = potions(); return { left: 0, total: 0, dim: n === 0, on: false, count: n }; }
         if (id === REST) return { left: 0, total: 0, dim: false, on: rest.sitting };
-        if (birdForm && id === birdAbility?.id) { const b = birdForm.state; return { left: b.left, total: birdAbility.cooldown, dim: false, on: b.on }; }
         const a = abilityOf(setting, id);
         if (!a) return { left: 0, total: 0, dim: true, on: false };
         if (!f) return { left: alone.cooling(id), total: a.cooldown, dim: !!blowOf(a) || character.mana < (a.cost?.mana ?? 0), on: alone.casting?.def === a };
@@ -1812,13 +1826,13 @@ export async function start(b: Boot): Promise<void> {
         const did = on ? character.learnToUse(id) : character.forget(id);
         actionBar.draw();
         book.redraw();
-        if (on && id === birdAbility?.id) void birdForm?.warm();
+        if (on) void formOf(id)?.warm();
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(seedText, home),
       spots,
       seed: seedText,
-      game: { player, view, decks, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get shipClimbs() { return shipClimbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, decks, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get shipClimbs() { return shipClimbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, otterForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
@@ -2225,8 +2239,12 @@ export async function start(b: Boot): Promise<void> {
           if (hurt > 0 && character.alive) { character.health = Math.max(1, character.health - hurt); fightHud.hurt(); }
         }
         // Breath under water (S5): held while the head is under, unless the hero breathes water; out of it they drown.
-        const under = player.walker.headUnder && !player.offFoot, lost = breath.breathe(dt, under, character.gills, character.maxHealth);
+        // An otter holds it far longer (its shape's `hold`).
+        const otter = otterForm?.animal ? otterForm : null;
+        const under = otter ? otter.kit.sim.under : player.walker.headUnder && !player.offFoot;
+        const lost = breath.breathe(dt, under, character.gills, character.maxHealth, otter?.shift.shape.hold ?? 1);
         player.walker.surfacing = breath.gasping;
+        if (otter) otter.kit.sim.surfacing = breath.gasping;
         if (lost > 0 && character.alive) {
           character.health = Math.max(1, character.health - lost);
           if ((drownClock -= dt) <= 0) { drownClock = 1; fightHud.hurt(); }

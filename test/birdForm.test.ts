@@ -38,7 +38,7 @@ test('bird form: the change takes its 15 s, a fight breaks it, using it again ca
   assert.equal(s.phase, 'changing');
   assert.ok(s.progress > 0.9 && s.progress < 1);
   assert.deepEqual(s.tickChange(0.6, calm), ['became']);
-  assert.equal(s.phase, 'bird');
+  assert.equal(s.phase, 'animal');
   // Another change, broken by a fight halfway.
   const b = new Shapeshift(bird);
   b.callOn(calm);
