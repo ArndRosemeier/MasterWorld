@@ -24,6 +24,8 @@ export interface Person {
   trade: string;
   /** Dressed for their calling rather than by role: a guild's master at arms, an old caravan hand. */
   dress?: 'fighter' | 'traveller';
+  /** A traveller who comes and goes by sea (a harbour town's): the end of each visit is spent aboard, waiting to sail. */
+  bySea?: boolean;
   /** 0..1 each. */
   social: number;
   diligent: number;
@@ -101,6 +103,12 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     const elf = houseOne(inn.id, -1, 'traveller', '');
     elf.race = 'elf';
     elf.age = Math.round(new Rng(deriveSeed(elf.seed, 'age')).range(90, 400));
+    // A harbour's inn lodges travellers by sea too (S3), passengers aboard its ships before they sail.
+    if (plan.harbour) for (let k = 0; k < SEA_TRAVELLERS; k++) {
+      const p = houseOne(inn.id, -1, 'traveller', ''), pr = new Rng(deriveSeed(p.seed, 'sea'));
+      p.bySea = true;
+      p.race = pr.chance(0.15) ? 'dwarf' : pr.chance(0.1) ? 'halfling' : 'human';
+    }
   }
   return people;
 }
@@ -116,6 +124,8 @@ const dist = (plan: TownPlan, home: number, x: number, z: number) => Math.hypot(
 
 /** A traveller's visits come round every this many game hours. */
 const VISIT = 72;
+/** A harbour inn's travellers by sea, and the hours before each visit's end they are aboard their ship. */
+const SEA_TRAVELLERS = 3, ABOARD = 4;
 
 /**
  * Whether a traveller is out of town at `hours` game hours since the start (day × 24 + hour): each visit
@@ -123,8 +133,19 @@ const VISIT = 72;
  */
 export function away(p: Person, hours: number): boolean {
   if (p.role !== 'traveller') return false;
-  const k = Math.floor(hours / VISIT), t = hours - k * VISIT;
-  const r = new Rng(deriveSeed(p.seed, 'visit', k));
-  const from = r.range(9, 15), to = 24 + r.range(10, 15);
-  return t < from || t >= to;
+  const { t, from, to } = visitOf(p, hours);
+  return t < from || t >= to || aboardAt(p, hours);
+}
+
+/** Whether a traveller by sea is aboard their ship at `hours`: the last ABOARD hours of each visit (S3). */
+export function aboardAt(p: Person, hours: number): boolean {
+  if (!p.bySea) return false;
+  const { t, from, to } = visitOf(p, hours);
+  return t >= Math.max(from, to - ABOARD) && t < to;
+}
+
+/** Where `hours` falls in a traveller's round of visits: hours into it, and the visit's start and end then. */
+function visitOf(p: Person, hours: number): { t: number; from: number; to: number } {
+  const k = Math.floor(hours / VISIT), r = new Rng(deriveSeed(p.seed, 'visit', k));
+  return { t: hours - k * VISIT, from: r.range(9, 15), to: 24 + r.range(10, 15) };
 }

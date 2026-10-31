@@ -1265,7 +1265,14 @@ export async function start(b: Boot): Promise<void> {
         return t.talk.toldSafe(a.person.id, id, paidFor(id, t));
       },
       // Sleepers lie in their beds, not to be talked to (but those the hero comes to find get up for the hero).
-      get roomPeople() { return rooms?.inside ? rooms.talkers() : null; },
+      // Aboard a ship near the hero: its passengers too, where they stand on it (S3).
+      get roomPeople() {
+        if (rooms?.inside) return rooms.talkers();
+        const aboard = crews.passengers;
+        if (!aboard.length) return null;
+        const on = new Set(aboard.map((p) => p.agent)), out = talk?.place.life.agents.filter((a) => !a.hidden && !on.has(a)).map((a) => ({ agent: a, x: a.x, z: a.z })) ?? [];
+        return [...out, ...aboard];
+      },
     }) : null;
     // A room at the inn and the smith's mending (plan 11.5): two more services, in whichever town.
     const upkeep = new UpkeepUi(character, setting, {
@@ -2085,7 +2092,8 @@ export async function start(b: Boot): Promise<void> {
       // The ships on the waves first: a hero on a deck goes with it before taking a step.
       part('ships');
       ships.float(view.camera.position, hours(), dt);
-      const crewNow = crews.atWork(decks);
+      // (A harbour town's passengers aboard too, from its life while it lives.)
+      const crewNow = crews.atWork(decks, hours(), (id) => { const t = towns?.get(id); return t?.living ? t.life : null; }, player.walker.pos);
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
