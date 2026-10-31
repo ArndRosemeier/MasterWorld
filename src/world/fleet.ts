@@ -93,10 +93,29 @@ export interface Voyage {
 
 /** How long a ship lies at the far quay before she sails home (game hours). */
 export const LIE_OVER = 6;
+/**
+ * Out at sea, away from both harbours, the clock runs this many times faster aboard (plan S4: the crossing goes by
+ * quicker, as a day at sea does); from OPEN_SEA off either end of the way, rising to it over RAMP (m).
+ */
+export const SEA_PACE = 3;
+const OPEN_SEA = 400, RAMP = 500;
 /** Leaving or coming to a berth, a ship runs this far straight out past it (m) before she turns onto her way. */
 const CLEAR_BERTH = 60;
 
 /** A voyage's whole way: out from her berth `from` bow first, her way over the sea, in to the berth `to` (bow in). */
+/** The voyage of `voyages` that ship `ship` (`town/i`) is under way on at `hours`, cast off and not yet in (null: none). */
+export function underWay<T extends { readonly from: string; readonly v: Voyage }>(voyages: readonly T[], ship: string, hours: number): T | null {
+  return voyages.find((o) => ship.startsWith(`${o.from}/`) && o.v.at <= hours && hours < o.v.arrive) ?? null;
+}
+
+/** How fast the clock runs (times the land's) for someone aboard a ship at (x, z) on voyage `v` at `hours`. */
+export function seaPace(v: Voyage, hours: number, x: number, z: number): number {
+  const r = v.route, n = r.length;
+  if (hours < v.at || hours >= v.arrive || n < 2) return 1;
+  const off = Math.min(Math.hypot(x - r[0], z - r[1]), Math.hypot(x - r[n - 2], z - r[n - 1]));
+  return 1 + (SEA_PACE - 1) * Math.min(1, Math.max(0, (off - OPEN_SEA) / RAMP));
+}
+
 export function voyageWay(v: Voyage, from: Mooring, to: Mooring): number[] {
   return [from.x, from.z, from.x + from.ux * CLEAR_BERTH, from.z + from.uz * CLEAR_BERTH, ...v.route, to.x + to.ux * CLEAR_BERTH, to.z + to.uz * CLEAR_BERTH, to.x, to.z];
 }

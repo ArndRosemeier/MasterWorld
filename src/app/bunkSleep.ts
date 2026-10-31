@@ -5,7 +5,7 @@
  * see her come in. Awake, the crossing is played aboard in full (no fade past it: rule 11).
  */
 import { byBunk, type Decks } from '../world/deck';
-import type { Voyage } from '../world/fleet';
+import { underWay, type Voyage } from '../world/fleet';
 import type { Player } from './player';
 import { Sleep } from './sleep';
 
@@ -31,8 +31,8 @@ export class BunkSleep {
     const P = this.host.player, on = this.host.decks.riderOn();
     if (!on || this.sleep.busy || P.puppet || P.offFoot || P.walker.mode !== 'ground') return null;
     const now = this.host.hours(), plan = this.host.decks.planOf(on.id);
-    const o = this.host.voyages().find((x) => on.id.startsWith(`${x.from}/`) && x.v.at <= now && now < x.v.arrive - WAKE - 0.05);
-    return o && plan && byBunk(plan, on.a, on.h, on.b) ? o.v : null;
+    const o = underWay(this.host.voyages(), on.id, now);
+    return o && now < o.v.arrive - WAKE - 0.05 && plan && byBunk(plan, on.a, on.h, on.b) ? o.v : null;
   }
 
   /** The use key (E): to sleep until she is about to come in. Whether it was used. */

@@ -298,7 +298,7 @@ export class Walker {
     } else {
       const top = level === null ? -Infinity : this.floatAt(level);
       // Up and down by choice; otherwise the body floats up to the surface.
-      const want = intent.up ? 1.4 : intent.down ? -1.4 : p.y < top - 0.05 ? 0.8 : 0;
+      const want = intent.up || this.surfacing ? 1.4 : intent.down ? -1.4 : p.y < top - 0.05 ? 0.8 : 0;
       v.y += (want - v.y) * damp(4, dt);
       p.y = Math.min(top, p.y + v.y * dt);
       if (p.y <= ground) { p.y = ground; v.y = Math.max(0, v.y); }
@@ -446,6 +446,15 @@ export class Walker {
   /** The gait for the animator. */
   /** Speed over the ground, m/s. */
   get groundSpeed(): number { return Math.hypot(this.vel.x, this.vel.z); }
+
+  /** Out of breath (game/breath.ts): swimming, the body comes up whatever is pressed. */
+  surfacing = false;
+
+  /** The head is under the water (diving): the hero holds their breath (game/breath.ts). */
+  get headUnder(): boolean {
+    const w = this.mode === 'swim' ? this.world.waterLevel(this.pos.x, this.pos.z) : null;
+    return w !== null && this.pos.y + this.height * 0.9 < w;
+  }
 
   get gait(): 'idle' | 'walk' | 'run' | 'swim' | 'jump' | 'fall' {
     if (this.mode === 'swim') return 'swim';

@@ -5,7 +5,7 @@
  * enough. Pure.
  */
 import { Rng } from '@futuremagic/core';
-import { QUALITIES, type ItemCatalog, type ItemDef, type Quality, type Rarity, type UniqueDef } from '../setting/contract';
+import { QUALITIES, type EffectDef, type ItemCatalog, type ItemDef, type Quality, type Rarity, type UniqueDef } from '../setting/contract';
 
 export interface Item {
   /** Catalogue id. */
@@ -40,8 +40,19 @@ export function plainItem(cat: ItemCatalog, id: string): Item {
   return { def: id, rarity: 'common', name: d.name, bonuses: {}, ...(d.lore ? { lore: d.lore } : {}) };
 }
 
+/** The effect a draught puts on its drinker, of the setting's `effects` (undefined: none). */
+export function draughtEffect(effects: readonly EffectDef[] | undefined, d: ItemDef): EffectDef | undefined {
+  const id = d.effect?.id;
+  return id === undefined ? undefined : effects?.find((e) => e.id === id);
+}
+
+/** The item of this id in the catalogue (undefined: none). */
+export function findDef(cat: ItemCatalog, id: string): ItemDef | undefined {
+  return cat.items.find((i) => i.id === id);
+}
+
 export function defOf(cat: ItemCatalog, id: string): ItemDef {
-  const d = cat.items.find((i) => i.id === id);
+  const d = findDef(cat, id);
   if (!d) throw new Error(`no item "${id}"`);
   return d;
 }

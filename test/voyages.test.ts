@@ -67,3 +67,14 @@ test('voyages: the passage ship sails out from her berth along the way, lies at 
   assert.ok(voyageAfloat(j, m, berth, j.arrive + LIE_OVER + 0.5)!.sailing, 'home again');
   assert.equal(voyageAfloat(j, m, berth, j.arrive + LIE_OVER + (j.arrive - j.at) + 0.1), null, 'back at her berth');
 });
+
+test('voyages: out at sea, away from both harbours, the clock runs faster aboard; near either and ashore it does not', async () => {
+  const { seaPace, SEA_PACE } = await import('../src/world/fleet');
+  const v = { at: 10, arrive: 14, route: [0, 0, 2000, 0, 4000, 0] };
+  assert.equal(seaPace(v, 11, 50, 0), 1, 'off the harbour she left');
+  assert.equal(seaPace(v, 13.9, 3950, 0), 1, 'off the one she makes');
+  assert.equal(seaPace(v, 12, 2000, 0), SEA_PACE, 'out at sea');
+  const half = seaPace(v, 11, 650, 0);
+  assert.ok(half > 1 && half < SEA_PACE, 'rising to it');
+  assert.equal(seaPace(v, 15, 2000, 0), 1, 'lying at the far quay');
+});
