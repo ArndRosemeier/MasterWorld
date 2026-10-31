@@ -20,7 +20,7 @@ import type { Terrain } from '../world/terrain';
 import { TOWN_RASTER, TownGround, type Town } from '../world/town';
 import { canopySampler, type Canopy } from '../world/canopy';
 import { emptyWater } from '../world/hydro';
-import { freshSnow, type WeatherState } from '../world/weather';
+import type { WeatherState } from '../world/weather';
 import type { FightCue } from './encounter';
 import type { SpellSound } from './spellView';
 import type { SpellMotif } from '../setting/contract';
@@ -366,7 +366,7 @@ export class SoundDirector {
     const wx = this.host.weather();
     return {
       place: where.place, room: where.room, wading: level !== null && level > p.y + 0.05, town,
-      surface: bi >= 0 ? terrain.biomes[bi].surface : null, rock, snow: Math.max(freshSnow(wx, h), smoothstep(1800, 2000, h)),
+      surface: bi >= 0 ? terrain.biomes[bi].surface : null, rock, snow: Math.max(wx.lying, smoothstep(1800, 2000, h)),
       beach: h < 4 && (this.hearing?.sea ?? Infinity) < 120,
     };
   }

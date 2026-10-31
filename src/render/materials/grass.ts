@@ -13,7 +13,7 @@ import {
 } from 'three/tsl';
 import { FloatMask, inside, sampleMask } from './masks';
 import { WATER } from './waterInputs';
-import { WEATHER, freshSnowAt } from './weather';
+import { WEATHER } from './weather';
 import { ORIGIN } from '../origin';
 
 /** Side of a patch, metres, and blades in it (the near density: 48 a square metre). */
@@ -62,7 +62,7 @@ export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   // A blade grows if its rank is within what this distance keeps, and its roll within the density here.
   const live = step(blade.z, keep).mul(step(r2, g.y.sqrt())).mul(step(0.0, inside(GRASS.mask, xz)));
   // Lying snow buries most of the grass (the tallest blades still poke through).
-  const height = g.z.mul(mix(0.55, 1.35, r3)).mul(freshSnowAt(g.x).mul(mix(0.95, 0.5, r3)).oneMinus()).mul(smoothstep(0.0, 0.3, g.y).mul(0.5).add(0.5)).mul(fade).mul(live);
+  const height = g.z.mul(mix(0.55, 1.35, r3)).mul(WEATHER.lying.mul(mix(0.95, 0.5, r3)).oneMinus()).mul(smoothstep(0.0, 0.3, g.y).mul(0.5).add(0.5)).mul(fade).mul(live);
   const width = mix(0.011, 0.022, r4).mul(pow(keep, -0.5)).mul(d.div(40).add(1)).mul(live);
 
   // The blade's frame: it faces `f` and leans that way, its width runs along `tg`.

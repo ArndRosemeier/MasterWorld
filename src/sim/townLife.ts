@@ -32,6 +32,11 @@ export type TownOrder =
   /** Everyone stays indoors (a curfew, a storm). */
   | { kind: 'stayIn'; from: number; to: number };
 
+/** Someone standing at (x, z) facing `dir`, doing `act`, with no day planned yet (a town's life plans it; a crew's post sets it). */
+export function standingAgent(person: Person, x: number, z: number, dir: number, act: ActivityKind, seed: number): Agent {
+  return { person, x, z, dir, act, next: act, spot: -1, seat: 0, hidden: false, until: 0, path: [], pi: 0, task: 'sleep', plan: { day: NaN, rest: false, at: [0], task: ['sleep'] }, rng: new Rng(seed) };
+}
+
 export interface Agent {
   person: Person;
   x: number;
@@ -278,7 +283,7 @@ export class TownLife {
     const t0 = performance.now();
     while (this.agents.length < this.waiting.length) {
       const p = this.waiting[this.agents.length], d = this.plan.buildings[p.home].door;
-      const a: Agent = { person: p, x: d[0], z: d[1], dir: d[2], act: 'wait', next: 'wait', spot: -1, seat: 0, hidden: false, until: 0, path: [], pi: 0, task: 'sleep', plan: { day: NaN, rest: false, at: [0], task: ['sleep'] }, rng: new Rng(deriveSeed(this.seed, 'life', p.id)) };
+      const a = standingAgent(p, d[0], d[1], d[2], 'wait', deriveSeed(this.seed, 'life', p.id));
       this.choose(a, true);
       a.until = this.time + a.rng.range(0, 1) * (a.until - this.time);
       this.agents.push(a);
