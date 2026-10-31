@@ -16,6 +16,10 @@
     "reason": "Per-frame update methods of unrelated systems (going in and out of the cellar vs chunk selection); only the name matches."
   },
   {
+    "key": "same name: masterworld/app/journalUi.ts#closed + masterworld/app/mapUi.ts#closed",
+    "reason": "Both override KeyWindow.closed (app/window.ts): each window tidies its own state when it shuts; the name is the seam, not a copy."
+  },
+  {
     "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/mapUi.ts#opened",
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the shared part already lives in the base class."
   },

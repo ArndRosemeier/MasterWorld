@@ -95,24 +95,23 @@ export class MapUi extends KeyWindow {
     });
   }
 
-  protected closed(): void { cancelAnimationFrame(this.frame); }
+  /** Shut before the new marks were fully drawn in: they count as drawn all the same. */
+  protected closed(): void { cancelAnimationFrame(this.frame); this.inkOpenLeads(); }
+
+  private inkOpenLeads(): void { for (const l of this.journal.open) this.inked.add(l.id); }
 
   protected opened(): void {
-    // The map opens on the hero. A new mark is drawn in; if it lies off the sheet, the map opens on it instead.
+    // The map always opens on the hero (Arnd). New marks are drawn in where they lie.
     const hero = this.map.heroAt();
     [this.cx, this.cz] = [hero.x, hero.z];
-    const fresh = this.journal.open.find((l) => !this.inked.has(l.id));
-    if (fresh) {
-      const half = SPAN / this.zoom / 2 * 0.85;
-      if (Math.abs(fresh.mark.x - hero.x) > half || Math.abs(fresh.mark.z - hero.z) > half) { this.cx = fresh.mark.x; this.cz = fresh.mark.z; }
-      this.stroke = 0;
-    }
+    const fresh = this.journal.open.some((l) => !this.inked.has(l.id));
+    this.stroke = fresh ? 0 : 1;
     const t0 = performance.now();
     const step = () => {
       this.stroke = fresh ? Math.min(1, (performance.now() - t0) / 1100) : 1;
       this.draw();
       if (this.stroke < 1) this.frame = requestAnimationFrame(step);
-      else for (const l of this.journal.open) this.inked.add(l.id);
+      else this.inkOpenLeads();
     };
     step();
   }
