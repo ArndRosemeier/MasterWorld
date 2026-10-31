@@ -23,6 +23,9 @@ export const MOVE_CUTS: readonly MoveCut[] = [
   // A good laugh, and a happy bounce (played through once).
   { clip: 'laugh', take: 'cmu 13_15', secs: [1.5, 4], seam: 0.2, travel: 1, upright: { hips: 0.1, tilt: 0.4 } },
   { clip: 'cheer', take: 'cmu 80_43', secs: [1.5, 4], seam: 0.08, travel: 1, upright: { hips: 0.1, tilt: 0.4 } },
+  // A sailor on a line: leaning back against its pull, and coiling a rope down (S3, the crew at work).
+  { clip: 'haul line', take: 'cmu 19_03', secs: [1.2, 3], seam: 0.2, travel: 1, upright: { hips: 0.5, tilt: 1 } },
+  { clip: 'coil rope', take: 'cmu 62_21', secs: [1.2, 3], seam: 0.2, travel: 1, upright: { hips: 0.25, tilt: 0.6 } },
 ];
 
 /** The cut clips' names (shipped beside PACK_CLIPS). */
