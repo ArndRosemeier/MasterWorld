@@ -1,16 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import type { NeedContext } from '../src/vgm/answers';
 import { castawayFor, castawaysAt, criesDue } from '../src/vgm/situations';
 import { keepPromise } from '../src/vgm/leads';
 import { wildFor } from '../src/vgm/wild';
 import { Castaways, REACH, type CastawayHero } from '../src/game/shipCrews';
 import type { CastawayDecision } from '../src/world/decisions';
+import { frontierLand, startWorld } from './frontierLand';
 
-const seed = parseSeed('masterworld'), { terrain, log } = openWorld(seed, classic), home = terrain.towns[0].decision;
+const { seed } = frontierLand(), { terrain, log } = startWorld(), home = terrain.towns[0].decision;
 
 /** A dry strand near the start, the sea beside it: where the giant crabs live (vgm/wild.ts habitat shore). */
 function strand(): { x: number; z: number } {

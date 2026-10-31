@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { drownedRooms, outlineCellar } from '../src/world/dungeon/cellar';
 import { CaveSpace, caveField } from '../src/world/dungeon/caveRock';
@@ -8,11 +7,11 @@ import { caveFeatures, keepSpots } from '../src/world/dungeon/caveFeatures';
 import { testDecision } from '../src/world/dungeon/variety';
 import { dungeonWorld } from '../src/game/dungeonWorld';
 import { Walker } from '../src/game/walker';
-import { openWorld } from '../src/vgm/builder';
+import { frontierLand, startWorld } from './frontierLand';
 import { dungeonFor } from '../src/vgm/dungeons';
 
 const lore = classic.dungeons['sea-cave']!;
-const seed = parseSeed('masterworld'), world = openWorld(seed, classic);
+const { seed } = frontierLand(), world = startWorld();
 const seaCave = (n: number) => outlineCellar(testDecision(n, 1, 'sea-cave', lore.form.pieces), { kind: 'sea-cave', hu: 3, hv: 3, name: 'the sea cave' }, lore);
 
 test('sea cave (S8): its lowest storey under water, a room on the way there two storeys high; the lair and its dwellers dry', () => {

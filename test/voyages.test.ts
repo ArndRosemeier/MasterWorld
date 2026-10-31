@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { settlementOf } from '../src/world/decisions';
-import { farHarbourFor, offShore, seaWays, voyageArrived, voyageOf, voyagesIn, voyageTopic, SEA_DEPTH } from '../src/vgm/voyages';
+import { farHarbourFor, holdFor, offShore, seaWays, voyageArrived, voyageOf, voyagesIn, voyageTopic, SEA_DEPTH, type SeaWeather } from '../src/vgm/voyages';
+import type { JourneyDecision } from '../src/world/decisions';
+import { Weather } from '../src/world/weather';
 import { frontierLand } from './frontierLand';
 
 const { home, seed, terrain, first, regions } = frontierLand();
@@ -77,4 +79,24 @@ test('voyages: out at sea, away from both harbours, the clock runs faster aboard
   const half = seaPace(v, 11, 650, 0);
   assert.ok(half > 1 && half < SEA_PACE, 'rising to it');
   assert.equal(seaPace(v, 15, 2000, 0), 1, 'lying at the far quay');
+});
+
+test('voyages (S10): a storm at the harbour holds the ship till it blows over; she sails and comes in as much later', () => {
+  const j: JourneyDecision = { kind: 'journey', id: 'journey-1', from: 'a', to: 'b', fare: 30, at: 10, arrive: 14, by: 'sea', route: [0, 0, 100, 0] };
+  // A storm the VGM ordered from 8 to 15 h over the harbour, as the game's weather has it.
+  const w = new Weather(1, classic.world.weather, () => ({ temperature: 12, moisture: 0.5 }));
+  w.order({ kind: 'storm', from: 8, to: 15, ramp: 0.5 });
+  const weather: SeaWeather = (x, z, h) => w.state(x, z, h);
+  const held = holdFor([j], j, 0, 0, weather)!;
+  assert.ok(held, 'held in harbour');
+  assert.equal(held.journey, j.id);
+  assert.ok(held.until >= 15 && held.until <= 17, `sails once the storm has passed (${held.until} h)`);
+  const [v] = voyagesIn([j, held]);
+  assert.equal(v.v.at, held.until);
+  assert.equal(v.v.arrive - v.v.at, j.arrive - j.at, 'the crossing takes as long');
+  // In fair weather she sails when she would.
+  const fair = new Weather(1, classic.world.weather, () => ({ temperature: 12, moisture: 0.5 }));
+  fair.order({ kind: 'clear', from: 0, to: 40 });
+  assert.equal(holdFor([j], j, 0, 0, (x, z, h) => fair.state(x, z, h)), null);
+  assert.equal(voyagesIn([j])[0].v.at, j.at);
 });

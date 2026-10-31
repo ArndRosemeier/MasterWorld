@@ -290,6 +290,18 @@ export interface JourneyDecision {
 }
 
 /**
+ * A ship held in harbour (S10): the VGM's word that the voyage `journey` waits out a storm at its harbour and
+ * sails at `until` instead (it comes in as much later). Logged as passage is bought.
+ */
+export interface DelayDecision {
+  readonly kind: 'delay';
+  readonly id: string;
+  readonly journey: string;
+  readonly until: number;
+  readonly at: number;
+}
+
+/**
  * A sight by the hero's way (plan 4.1, C9): the VGM's answer to an overdue Discovery. It stands at (x, z),
  * facing `yaw`, from game hour `at` on.
  */
@@ -384,7 +396,7 @@ export interface FestivityDecision {
   readonly for?: string;
 }
 
-export type Decision = FestivityDecision | StrayDecision | CastawayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+export type Decision = DelayDecision | FestivityDecision | StrayDecision | CastawayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 
