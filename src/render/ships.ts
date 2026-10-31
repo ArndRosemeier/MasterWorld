@@ -71,8 +71,6 @@ export interface ShipsHost {
 const KEEL_OUT = 0.3;
 /** How far a boat washed up lies over on her side (rad), and how deep in the sand (share of her draft). */
 const BEACHED_LIST = 1.25, BEACHED_SUNK = 0.35;
-/** What is left of her mast above the deck (m). */
-const BEACHED_STUMP = 0.7;
 
 export class ShipsView {
   private readonly group = new Group();
@@ -146,8 +144,8 @@ export class ShipsView {
       if (!near) { if (m) { this.group.remove(m); m.geometry.dispose(); this.ashore.delete(b.id); } continue; }
       if (m || built) continue;
       built = true;
-      // Dismasted: her mast snapped off above the deck (the spar lies on the sand, world/sites.ts).
-      const whole = planShip(b.seed, 'boat'), plan = { ...whole, masts: whole.masts.map((m) => ({ ...m, top: m.foot + BEACHED_STUMP, yards: [] })) };
+      // Dismasted: her mast gone (the spar lies on the sand, world/sites.ts). (A mast without yards breaks the shrouds.)
+      const plan = { ...planShip(b.seed, 'boat'), masts: [] };
       const mesh = buildingMeshAt(shipMesh(plan, 0, 0, 1, 0, 0, [0, 0, 0], 'furled', true), 0, 0, 0, 'boat washed up');
       mesh.rotation.order = 'YZX';
       mesh.position.set(b.x, (this.h.ground?.(b.x, b.z) ?? 0) + plan.draft * (1 - BEACHED_SUNK) * Math.cos(BEACHED_LIST), b.z);

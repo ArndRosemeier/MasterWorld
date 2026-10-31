@@ -19,6 +19,8 @@ export interface Land {
   waterDepth(x: number, z: number): number;
   /** A building's walls, a tree trunk (r: the body's radius). */
   blocked?(x: number, z: number, r: number): boolean;
+  /** The water's surface with its waves (null or none: still water over the bed by `waterDepth`). */
+  surface?(x: number, z: number): number | null;
 }
 
 /** A group's home ground. */
@@ -57,10 +59,11 @@ const HOP = { near: 1.2, far: 4.5, up: 1.4, down: 3 } as const;
 
 /**
  * A home in water deeper than this (m) makes the ground the sea's (S9): its bodies swim, keep to water at least
- * `shallow` deep, and stay `top` under the surface and `bed` over the bottom, at the depth of a hero who swims
- * (its `prey`; else `cruise` under the surface), rising or sinking at most `rise` (m per step).
+ * `shallow` deep, and stay `top` under the waves and `bed` over the bottom, `under` below the feet of a hero who
+ * swims (its `prey`; else `cruise` under the surface), rising or sinking at most `rise` (m per step). Kept level
+ * with the swimmer, the two never pass through each other (bodies farther apart in height do, sim/creatures.ts).
  */
-const SEA = { home: 3, shallow: 1.8, top: 1.3, bed: 0.6, cruise: 2.5, rise: 0.05 } as const;
+const SEA = { home: 3, shallow: 1.8, top: 1.3, bed: 0.6, cruise: 2.5, under: 0.2, rise: 0.08 } as const;
 
 /** Open land as a den's ground: the territories are its homes; walking is straight, around water and walls. Or the sea, swum. */
 export class OpenGround implements DenGround {
@@ -77,8 +80,9 @@ export class OpenGround implements DenGround {
 
   /** Where a swimmer at (x, z) keeps (y): the hero's depth, else cruising, between the surface and the bed; near `y` if given. */
   private swimAt(x: number, z: number, y?: number): number {
-    const bed = this.land.height(x, z), top = bed + this.land.waterDepth(x, z) - SEA.top;
-    const want = Math.max(bed + SEA.bed, Math.min(top, this.prey() ?? top + SEA.top - SEA.cruise));
+    const bed = this.land.height(x, z), surface = this.land.surface?.(x, z) ?? bed + this.land.waterDepth(x, z), top = surface - SEA.top;
+    const prey = this.prey();
+    const want = Math.max(bed + SEA.bed, Math.min(top, prey === null ? surface - SEA.cruise : prey - SEA.under));
     return y === undefined ? want : Math.max(y - SEA.rise, Math.min(y + SEA.rise, want));
   }
 

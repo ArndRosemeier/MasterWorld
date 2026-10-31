@@ -872,6 +872,8 @@ export async function start(b: Boot): Promise<void> {
     }, start, {
       height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
+      // The sea's waves: a shark keeps under them (S9).
+      surface: (x, z) => sea.surfaceAt(x, z),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
     }, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
