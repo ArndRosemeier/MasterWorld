@@ -77,8 +77,11 @@ const PULL_RISE = 0.5;
 const OFF_FACE = 0.35;
 /** Pushing into a climbable face this long starts a climb (s): no climb by brushing past. */
 const GRIP_ON = 0.25;
-/** How far a swimming body ducks to get under a lower roof ahead (m), tried in turn. */
-const DUCKS = [0.1, 0.25, 0.45, 0.7];
+/**
+ * How far a swimming body ducks to get under a lower roof ahead (m), at most, tried a hand apart from the least: a
+ * lintel, or a drowned way's mouth under the water of a chamber with air (swum at the surface, its roof well under it).
+ */
+const DUCK_MOST = 3.5, DUCK_STEP = 0.15;
 
 /** The hero's. */
 export const WALK: WalkSpec = {
@@ -244,10 +247,12 @@ export class Walker {
       if (!stuck && this.bodyInRock(nx, p.y, nz)) {
         // Swimming under a roof that comes lower ahead (a drowned way's lintel): the body ducks under it.
         if (this.mode === 'swim') {
-          const duck = DUCKS.find((d) => !this.bodyInRock(nx, p.y - d, nz) && p.y - d >= this.support(nx, nz, p.y - d));
-          if (duck === undefined) return false;
-          p.y -= duck; p.x = nx; p.z = nz;
-          return true;
+          for (let d = 0.1; d <= DUCK_MOST; d += DUCK_STEP) {
+            if (this.bodyInRock(nx, p.y - d, nz) || p.y - d < this.support(nx, nz, p.y - d)) continue;
+            p.y -= d; p.x = nx; p.z = nz;
+            return true;
+          }
+          return false;
         }
         const ahead = this.mode === 'ground' ? this.floorAhead(nx, nz) : p.y;
         if (ahead >= p.y - 1e-3) return false;

@@ -15,6 +15,7 @@ import type { DungeonPlace } from '../world/dungeon/cellar';
 import { setPiecesFor } from '../world/dungeon/setPieces';
 import type { Terrain } from '../world/terrain';
 import { townById, type Town } from '../world/town';
+import { ringSpot } from '../world/spiral';
 
 /** Houses that dig cellars: lived in, not the temple, the hall or the stable. */
 const CELLARED: readonly TownBuilding['kind'][] = ['house', 'cottage', 'inn', 'bakery', 'workshop', 'smithy'];
@@ -263,7 +264,7 @@ const MESA_LEVEL = 15;
  */
 
 function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[]): { x: number; z: number; score: number; yaw?: number } | null {
-  const [r0, r1] = ring, fit = GROUND[stands](terrain, s);
+  const r0 = ring[0], fit = GROUND[stands](terrain, s);
   // On the level of where it is asked from (D56): not up on a mesa's plateau or bench over a valley, whose way up
   // may be kilometres round to a pass.
   const sk = terrain.skeleton, level = sk.mesaRise(at.x, at.z);
@@ -271,8 +272,7 @@ function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number]
   const low = stands === 'shore' ? SHORE_DRY : 3;
   const dry = (x: number, z: number) => terrain.waterDepth(x, z) <= 0 && terrain.height(x, z) >= low && Math.abs(sk.mesaRise(x, z) - level) <= MESA_LEVEL && !avoid.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40);
   for (let k = 0; k < TRIES; k++) {
-    const d = r0 + (r1 - r0) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
-    const x = at.x + Math.cos(a) * d, z = at.z + Math.sin(a) * d;
+    const { x, z } = ringSpot(at, ring, s, k);
     if (!dry(x, z)) continue;
     const f = fit(x, z, k);
     // Ground that moved the spot: the spot it moved to must suit too (dry, on the level asked, clear of others).

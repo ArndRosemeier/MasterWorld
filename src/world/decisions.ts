@@ -300,6 +300,8 @@ export interface SightDecision {
   readonly sight: string;
   /** The need it answers, if not Discovery (a find by the way answers Reward). */
   readonly need?: 'reward';
+  /** It lies on the sea bed (a wreck, S8: `vgm/wrecks.ts`), its yaw the way her bow points. */
+  readonly sea?: true;
   readonly x: number;
   readonly z: number;
   readonly yaw: number;

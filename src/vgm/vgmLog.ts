@@ -75,7 +75,7 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'retake': return 'retake';
     case 'order': return 'order';
     case 'journey': return 'journey';
-    case 'sight': return d.need === 'reward' ? 'cache' : 'sight';
+    case 'sight': return d.sea ? 'wreck' : d.need === 'reward' ? 'cache' : 'sight';
     case 'traveller': return d.situation ? 'hurt-traveller' : 'traveller';
     case 'stray': return 'stray-beast';
     case 'festivity': return 'festivity';

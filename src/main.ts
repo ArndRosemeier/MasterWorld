@@ -70,6 +70,7 @@ import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/event
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
 import { cleanWhys, PACING, vgmLines, whyOf, WHY_KEPT, type VgmWhy } from './vgm/vgmLog';
 import { findIn, travellerFor } from './vgm/answers';
+import { offTheCoast, wreckFor } from './vgm/wrecks';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
@@ -107,7 +108,7 @@ import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
-import { dungeonOf, type Decision, type DungeonDecision, type EventDecision, type RegionDecision, type RoadDecision, type RoadWay } from './world/decisions';
+import { dungeonOf, type Decision, type DungeonDecision, type EventDecision, type RegionDecision, type RoadDecision, type RoadWay, type SightDecision } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
 import { HouseView } from './render/town/HouseView';
 import { lookFromDegrees } from './app/look';
@@ -496,8 +497,11 @@ export async function start(b: Boot): Promise<void> {
     // (The voyages in the log, read again only when the log has changed.)
     let voyages: { log: readonly Decision[] | null; list: ReturnType<typeof voyagesIn> } = { log: null, list: [] };
     let shipClock = -1;
+    // The wrecks on the sea bed (S8): the log's sea sights.
+    let wrecks: { log: readonly Decision[]; list: SightDecision[] } = { log: [], list: [] };
+    const wrecksNow = () => (wrecks.log === log ? wrecks.list : (wrecks = { log, list: log.filter((d): d is SightDecision => d.kind === 'sight' && !!d.sea) }).list);
     const voyagesNow = () => (voyages.log === log ? voyages.list : (voyages = { log, list: voyagesIn(log) }).list);
-    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks, voyages: voyagesNow });
+    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks, voyages: voyagesNow, wrecks: () => wrecksNow() });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
     compileEarly([sea.mesh]);
@@ -992,6 +996,16 @@ export async function start(b: Boot): Promise<void> {
       // Far enough off to see it whole.
       const off = { hatch: 9, mound: 9, mouth: 16, keep: 32 }[lookForm.shell];
       if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * off, undefined, b.site.z + Math.cos(b.site.yaw) * off, b.site.yaw);
+    }
+    // `wreck`: in the sea 14 m off a wreck near the start town, facing her (one is put there now if there is none).
+    if (params.wreck && start) {
+      const off = offTheCoast(terrain, start.decision);
+      let w = off && log.find((d): d is SightDecision => d.kind === 'sight' && !!d.sea && Math.hypot(d.x - off.x, d.z - off.z) < 1500) || null;
+      if (off && !w) {
+        w = wreckFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, home: start.decision, hero: off, toward: null });
+        if (w) log = [...log, w];
+      }
+      if (w) player.teleport(w.x + 14, undefined, w.z, Math.PI / 2);
     }
     // `wild=<kind>`: beside its first group (for looking at them).
     const by = params.wildAt ? wild?.territories.find((t) => t.kind === params.wildAt) : undefined;
@@ -2194,7 +2208,9 @@ export async function start(b: Boot): Promise<void> {
           const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
           if (opened) regionOpened(opened);
           // A place come upon for the first time meets Discovery (C9): a sight in full, with its words; a region's place half.
-          const came = player.offFoot ? null : regionSites.cameUpon(player.walker.pos.x, player.walker.pos.z);
+          // (As an otter, where it swims: a wreck is come upon in that shape too.)
+          const swims = otterForm?.animal ? otterForm.kit.sim.pos : player.offFoot ? null : player.walker.pos;
+          const came = swims ? regionSites.cameUpon(swims.x, swims.z, swims.y) : null;
           if (came?.sight && came.decision) {
             notes.say(came.sight.seen, 8);
             // A find by the way (Reward's answer): into the pack and purse, shown as finds below are.

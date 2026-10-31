@@ -310,6 +310,12 @@ const SESSIONS = [
     { name: 'sea-cave-under', act: seaCaveLook('under') },
     { name: 'sea-cave-lake', act: seaCaveLook('lake') },
   ] },
+  // S8: a wreck on the sea bed off the start town: the free camera under the water beside her, then from above at
+  // the surface, the hero swimming over her.
+  { id: 'sea-wreck', query: `${still}&hour=11&weather=fair&wreck`, shots: [
+    { name: 'sea-wreck-under', act: wreckLook('under') },
+    { name: 'sea-wreck-over', act: wreckLook('over') },
+  ] },
   // S2: a harbour town the VGM founded by a river's mouth. On its quay at late morning looking out over the piers,
   // then from out over the water back at the town, then the quay in the evening, its tavern lit.
   { id: 'sea-harbour', query: `${still}&hour=11&weather=fair&site=harbour`, shots: [
@@ -416,6 +422,29 @@ function seaCaveLook(what) {
         pl.heroCam.pitch = 0.1;
       }
       return `sea cave ${d.id}: room ${r.id} ${W} x ${D} m, floor ${floor.toFixed(1)}, water ${top.toFixed(1)}, ${r.height * storey} m high`;
+    }, what);
+    console.log(said);
+    await p.waitForTimeout(2500);
+  };
+}
+
+/** By the wreck the `wreck` start put off the start town (vgm/wrecks.ts): under the water beside her, or at the surface. */
+function wreckLook(what) {
+  return async (p) => {
+    const said = await p.evaluate((what) => {
+      const g = window.game, d = g.log.find((x) => x.kind === 'sight' && x.sea);
+      if (!d) return 'no wreck';
+      const pl = g.player, bed = g.terrain.height(d.x, d.z);
+      if (what === 'under') {
+        const cx = d.x + 13, cz = d.z + 7, cy = bed + 3;
+        pl.flying = true;
+        pl.goTo([cx, cy, cz], [(Math.atan2(d.x - cx, -(d.z - cz)) * 180) / Math.PI, -8]);
+      } else {
+        pl.flying = false;
+        pl.teleport(d.x + 14, undefined, d.z, Math.PI / 2);
+        pl.heroCam.pitch = -0.5;
+      }
+      return `wreck ${d.id} at ${d.x.toFixed(0)}, ${d.z.toFixed(0)}: bed ${bed.toFixed(1)}`;
     }, what);
     console.log(said);
     await p.waitForTimeout(2500);

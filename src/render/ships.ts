@@ -10,7 +10,7 @@ import type { Stage } from '@futuremagic/stage';
 import { gangplankMesh, hullHalf, ropeMesh, shipMesh, type Mooring, type ShipPlan } from '@futuremagic/settlement';
 import { HULLS, HULL_POSES, HULL_STATIONS, WATER } from './materials/waterInputs';
 import { buildingMeshAt } from './materials/building';
-import { LIE_OVER, afloatAt, farBerth, fleetOf, passageShip, voyageAfloat, type Afloat as Place, type Vessel, type Voyage } from '../world/fleet';
+import { LIE_OVER, afloatAt, farBerth, fleetOf, passageShip, voyageAfloat, wreckLying, type Afloat as Place, type Vessel, type Voyage } from '../world/fleet';
 import type { Decks, Pose } from '../world/deck';
 import type { Town } from '../world/town';
 
@@ -58,6 +58,8 @@ export interface ShipsHost {
   readonly decks: Decks;
   /** The voyages in the log (journeys by sea, S4): from which harbour town's ship, to which. */
   readonly voyages: () => readonly { readonly id: string; readonly from: string; readonly to: string; readonly v: Voyage }[];
+  /** The wrecks in the log (S8, sea sights): where each lies, which way, its seed. */
+  readonly wrecks: () => readonly { readonly id: string; readonly x: number; readonly z: number; readonly yaw: number; readonly seed: number }[];
 }
 
 export class ShipsView {
@@ -68,6 +70,9 @@ export class ShipsView {
   /** The ropes the crew haul on (one mesh each, stretched between its ends; kept for reuse). */
   private readonly ropeMeshes: Mesh[] = [];
   private added = false;
+
+  /** The wrecks drawn now (near the camera), by id: her mesh, plan and pose on the bed. */
+  private readonly sunk = new Map<string, { mesh: Mesh; plan: ShipPlan; pose: Pose }>();
 
   constructor(private readonly h: ShipsHost) {}
 
@@ -114,6 +119,32 @@ export class ShipsView {
       }
     }
     this.cut(hulls);
+    this.wrecked(cam, built);
+  }
+
+  /** The wrecks near the camera on the bed (S8), their decks walked (swum) near the hero; one built a frame at most. */
+  private wrecked(cam: Vector3, built: boolean): void {
+    for (const w of this.h.wrecks()) {
+      const d = Math.hypot(w.x - cam.x, w.z - cam.z);
+      let s = this.sunk.get(w.id);
+      if (d > SEEN) {
+        if (s) { this.group.remove(s.mesh); s.mesh.geometry.dispose(); this.sunk.delete(w.id); this.h.decks.drop(w.id); }
+        continue;
+      }
+      if (!s) {
+        if (built) continue;
+        built = true;
+        const { plan, pose } = wreckLying(w, -this.h.water(w.x, w.z));
+        const mesh = buildingMeshAt(shipMesh(plan, 0, 0, 1, 0, 0, [0, 0, 0], 'furled', true), 0, 0, 0, 'wreck');
+        mesh.rotation.order = 'YZX';
+        mesh.position.set(pose.x, pose.y, pose.z);
+        mesh.rotation.set(-pose.roll, -Math.atan2(pose.uz, pose.ux), pose.pitch);
+        mesh.updateMatrix();
+        this.group.add(mesh);
+        this.sunk.set(w.id, (s = { mesh, plan, pose }));
+      }
+      if (d < ABOARD) this.h.decks.move(w.id, s.plan, s.pose, null, false, true); else this.h.decks.drop(w.id);
+    }
   }
 
   /** The voyage the ship of `town` is on at `hours` (sailing, lying at the far quay or sailing home), if any. */

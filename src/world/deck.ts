@@ -50,6 +50,8 @@ interface Afloat {
   plank: { readonly foot: At; readonly side: 1 | -1 } | null;
   /** At its mooring, under sail, or lying at its ground (its crew works by it: sim/shipFolk.ts). */
   state: VesselState;
+  /** A wreck on the sea bed (S8): swum in and round, no crew. */
+  sunk: boolean;
 }
 
 /** How far onto the land a gangplank reaches past its edge (m); a walker's step up (game/walker.ts WALK.step). */
@@ -69,9 +71,9 @@ export class Decks {
    * gangplank laid to the pier or the quay (a ship only). `sailing`: under sail (else, away from its mooring, lying
    * at its ground).
    */
-  move(id: string, plan: ShipPlan, pose: Pose, moored: Mooring | null = null, sailing = false): void {
+  move(id: string, plan: ShipPlan, pose: Pose, moored: Mooring | null = null, sailing = false, sunk = false): void {
     let s = this.ships.get(id);
-    if (!s) { s = { plan, pose: { ...pose }, plank: null, state: 'moored' }; this.ships.set(id, s); }
+    if (!s) { s = { plan, pose: { ...pose }, plank: null, state: 'moored', sunk }; this.ships.set(id, s); }
     s.state = moored ? 'moored' : sailing ? 'sailing' : 'lying';
     const r = this.riding(), was = r && this.aboard?.id === id ? this.aboard : null;
     // Put somewhere else since it last stood here (a teleport, a cut scene): not carried back.
@@ -185,9 +187,9 @@ export class Decks {
   }
 
   /** A ship's plan (null: not near). */
-  /** Every ship near the hero: its id, plan, pose now and what it is doing. */
+  /** Every ship afloat near the hero (not a wreck): its id, plan, pose now and what it is doing. */
   *each(): Iterable<{ readonly id: string; readonly plan: ShipPlan; readonly pose: Pose; readonly state: VesselState }> {
-    for (const [id, s] of this.ships) yield { id, plan: s.plan, pose: s.pose, state: s.state };
+    for (const [id, s] of this.ships) if (!s.sunk) yield { id, plan: s.plan, pose: s.pose, state: s.state };
   }
 
   planOf(id: string): ShipPlan | null {

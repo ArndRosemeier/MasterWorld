@@ -101,6 +101,7 @@ test('answers: every sight shape stands on the land, with something the walker c
   for (const [i, shape] of SIGHT_SHAPES.entries()) {
     const l = layOutSight({ kind: 'sight', id: `sight-${i}`, sight: shape, x: out.x, z: out.z, yaw: 0.4, seed: 9 + i, at: 0 }, shape, (x, z) => terrain.height(x, z));
     assert.ok(l.mesh.index.length >= 36, `${shape}: drawn`);
-    assert.ok(l.solids.length >= 1, `${shape}: solid`);
+    // A wreck's spill lies on the sea bed: a column round it would stop a swimmer far above (she herself is a deck).
+    if (shape !== 'wreck') assert.ok(l.solids.length >= 1, `${shape}: solid`);
   }
 });

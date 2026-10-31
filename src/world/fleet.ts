@@ -5,7 +5,7 @@
  * every view of it agrees. Pure.
  */
 import { deriveSeed, Rng } from '@futuremagic/core';
-import { berthMooring, freeBerths, harbourMoorings, type HarbourPlan, type Mooring, type ShipPlan } from '@futuremagic/settlement';
+import { berthMooring, freeBerths, harbourMoorings, planShip, type HarbourPlan, type Mooring, type ShipPlan } from '@futuremagic/settlement';
 
 /** Where a ship or boat is at an hour: its middle, its heading (unit, bow first) and whether its sails are set. */
 export interface Afloat {
@@ -158,3 +158,15 @@ export function farBerth(h: HarbourPlan, seed: number, plan: ShipPlan): Mooring 
   const i = freeBerths(h, seed).find((k) => h.berths[k].length >= plan.length - OVERHANG && h.berths[k].depth >= plan.draft + KEEL);
   return i === undefined ? null : berthMooring(h, i, plan);
 }
+
+/**
+ * A wreck on the sea bed (S8, `vgm/wrecks.ts`): her plan and how she lies, from the decision alone. On her side (a
+ * seeded list either way), bow a little up or down, sunk into the bed `bed` (its height there) to half her draft.
+ */
+export function wreckLying(d: { readonly x: number; readonly z: number; readonly yaw: number; readonly seed: number }, bed: number): { plan: ShipPlan; pose: { x: number; y: number; z: number; ux: number; uz: number; pitch: number; roll: number } } {
+  const r = new Rng(deriveSeed(d.seed, 'wreck')), plan = planShip(d.seed, 'ship');
+  const roll = r.range(WRECK_LIST[0], WRECK_LIST[1]) * (r.chance(0.5) ? 1 : -1), pitch = r.range(-0.06, 0.06);
+  return { plan, pose: { x: d.x, y: bed + plan.draft * 0.5, z: d.z, ux: Math.sin(d.yaw), uz: Math.cos(d.yaw), pitch, roll } };
+}
+/** How far a wreck lies over on her side (rad), least and most. */
+const WRECK_LIST: readonly [number, number] = [0.3, 0.6];

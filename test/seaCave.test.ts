@@ -71,3 +71,16 @@ test('sea cave: swimming under a roof that comes lower ahead, the body ducks und
   assert.ok(w.pos.z > 4, `on past the lintel: z ${w.pos.z.toFixed(2)}`);
   assert.ok(sdf(w.pos.x, w.pos.y + w.height - 0.05, w.pos.z) > 0, 'the head under the roof, not in it');
 });
+
+test('sea cave: swimming at the surface of a chamber with air, the body dives into the drowned way leading on under the water', () => {
+  // A chamber (roof at 6 m) with its water at 4 m; past z = 2 a drowned way, its roof at 2.2 m, under the water.
+  const roof = (z: number) => (z < 2 ? 6 : 2.2);
+  const sdf = (x: number, y: number, z: number) => Math.min(y, roof(z) - y, 2 - Math.abs(x));
+  const w = new Walker({ height: () => -100, rockSurface: sdf, waterLevel: () => 4 });
+  w.place(0, -2, 1);
+  const on = { forward: 1, strafe: 0, heading: Math.PI, walk: false, up: false, down: false };
+  for (let i = 0; i < 360; i++) w.step(on, 1 / 60);
+  assert.equal(w.mode, 'swim');
+  assert.ok(w.pos.z > 4, `into the drowned way: z ${w.pos.z.toFixed(2)}`);
+  assert.ok(sdf(w.pos.x, w.pos.y + w.height - 0.05, w.pos.z) > 0, 'the head under its roof, not in it');
+});
