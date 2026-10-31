@@ -87,14 +87,10 @@
 .panel .news li { display: flex; flex-direction: column; padding: 7px 0; border-bottom: 1px solid #4a351044; }
 .panel .news .when { color: var(--ward); font: 12px 'Marcellus SC', Georgia, serif; letter-spacing: .08em; }
 
-/* Saved games: a row per save, as many as the player keeps (the list scrolls). */
-.saves.body { max-height: min(60vh, 520px); overflow-y: auto; }
-.saves .newsave { display: flex; gap: 6px; flex: 1 1 100%; }
-.saves .newsave input { flex: 1; min-width: 0; padding: 4px 8px; font: inherit; color: var(--ink); background: #1a120c; border: 1px solid #4a3510; border-radius: 4px; }
-.panel.saves .foot { flex-wrap: wrap; }
+/* Saved games: a row per slot. */
 .saves .saverow { grid-template-columns: 1fr auto; padding: 8px 0; border-bottom: 1px solid #4a351044; }
 .saves .saverow b { font: 400 16px 'Marcellus SC', Georgia, serif; letter-spacing: .06em; color: var(--brass); }
-.saves .buttons { display: flex; gap: 6px; }
+.saves .saverow .buttons { display: flex; gap: 6px; }
 
 /* The journal: leads written in, the newest with a ward-lit bookmark. */
 .panel.journal { width: min(580px, 100%); background: linear-gradient(170deg, #34261a, #241910 50%, #1a120c); }

@@ -69,12 +69,23 @@ export const standClear = (page, at, d, { zoom = 2.2, pitch = -0.08, side = 0, a
 
 /** A hurt traveller (C10) made by the hero's way out west of the start town: its decision, or null. */
 export const hurtTraveller = async (page) => {
-  await page.evaluate(() => {
-    const g = window.game, d = g.towns.every[0].town.decision;
-    g.player.teleport(d.x - d.radius - 260, undefined, d.z - 600, Math.PI / 2);
+  // Out on dry land past the start town's fields (it stands by the sea: the first ways round it may be water).
+  const spots = await page.evaluate(() => {
+    const g = window.game, d = g.towns.every[0].town.decision, r = d.radius + 650, out = [];
+    for (let k = 0; k < 16; k++) {
+      const a = (k * Math.PI) / 8, x = d.x + Math.cos(a) * r, z = d.z + Math.sin(a) * r;
+      // Dry here and on the way on out.
+      if ([0, 150, 300].every((m) => g.terrain.height(x + Math.cos(a) * m, z + Math.sin(a) * m) > 2)) out.push({ x, z, yaw: Math.atan2(Math.cos(a), Math.sin(a)) });
+    }
+    return out;
   });
-  await page.waitForTimeout(2500);
-  return page.evaluate(() => { const m = window.game.situationNow('hurt-traveller'); return m ? { id: m.decision.id, ...m.decision } : null; });
+  for (const at of spots.slice(0, 4)) {
+    await page.evaluate((at) => window.game.player.teleport(at.x, undefined, at.z, at.yaw), at);
+    await page.waitForTimeout(2500);
+    const h = await page.evaluate(() => { const m = window.game.situationNow('hurt-traveller'); return m ? { id: m.decision.id, ...m.decision } : null; });
+    if (h) return h;
+  }
+  return null;
 };
 
 /** A farm raided now (C6, C10): what the debug menu says, and its barn (where the smoke rises; what could hide it), or null. */

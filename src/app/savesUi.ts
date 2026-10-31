@@ -1,17 +1,17 @@
 /**
- * The saves window (plan 17): the autosave and any number of the player's own saves, each to save over, load,
- * export as a file or delete;
- * the game saved straight to a file, and a file to load (the browser's file dialogs where it has them). Loading starts the game again from the save (the world is rebuilt from its seed),
+ * The saves window (plan 17): the autosave and three slots, each to save into, load or export as a file,
+ * and a file to import. Loading starts the game again from the save (the world is rebuilt from its seed),
  * so it goes through a reload. Opened from the corner's Saves button.
  */
 import { PENDING_LOAD as PENDING, loadLocal, saveLocal } from '../persist/local';
-import { deleteSlot, listSlots, readSlot, writeSlot, type SlotInfo } from '../persist/saves';
+import { listSlots, readSlot, writeSlot, type SlotInfo } from '../persist/saves';
 import { button, el } from './dom';
-import { AUTOSAVE, KEPT, ROGUE_SLOT, checkSave, saveLabel, saveName, type SaveData } from './saveGame';
+import { ROGUE_SLOT, checkSave, saveLabel, type SaveData } from './saveGame';
 import type { GameMode } from '../game/death';
 import { KeyWindow, type WindowHost } from './window';
 
-export { AUTOSAVE };
+export const AUTOSAVE = 'autosave';
+const SLOTS = [AUTOSAVE, 'slot 1', 'slot 2', 'slot 3'];
 
 export interface SavesHost extends WindowHost {
   /** The game as it is now, and where the hero is ("in the town"). */
@@ -65,31 +65,6 @@ export async function saveNow(host: SavesHost, slot: string): Promise<boolean> {
   }
 }
 
-const JSON_TYPE = { description: 'MasterWorld save', accept: { 'application/json': ['.json'] } };
-type OpenPicker = (o: object) => Promise<{ getFile(): Promise<File> }[]>;
-type SavePicker = (o: object) => Promise<{ createWritable(): Promise<{ write(b: Blob): Promise<void>; close(): Promise<void> }> }>;
-
-/**
- * Writes a save as a JSON file: through the browser's save dialog where it has one (the player picks the
- * place and name), else as a download. False if the player closed the dialog.
- */
-async function writeFile(data: unknown, name: string): Promise<boolean> {
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  const picker = (window as unknown as { showSaveFilePicker?: SavePicker }).showSaveFilePicker;
-  if (picker) {
-    let handle;
-    try { handle = await picker({ suggestedName: name, types: [JSON_TYPE] }); } catch { return false; }
-    const out = await handle.createWritable();
-    await out.write(blob);
-    await out.close();
-    return true;
-  }
-  const a = el('a', { href: URL.createObjectURL(blob), download: name });
-  a.click();
-  URL.revokeObjectURL(a.href);
-  return true;
-}
-
 export class SavesUi extends KeyWindow {
   private readonly list: HTMLDivElement;
   private readonly foot: HTMLDivElement;
@@ -115,100 +90,59 @@ export class SavesUi extends KeyWindow {
   protected opened(): void { void this.render(); }
 
   private async render(): Promise<void> {
-    const all = await listSlots();
-    const slots = new Map<string, SlotInfo>(all.map((s) => [s.slot, s]));
-    const when = (s: SlotInfo) => `${s.label} · saved ${new Date(s.at).toLocaleString()}`;
-    const row = (title: string, hint: string, ...buttons: HTMLElement[]) => el('div', { className: 'row saverow' },
-      el('span', {}, el('b', { textContent: title }), el('br'), el('span', { className: 'hint', textContent: hint })),
-      el('span', { className: 'buttons' }, ...buttons));
-    if (this.saves.mode === 'roguelike') {
-      this.foot.replaceChildren(el('span', { className: 'hint', textContent: 'A roguelike tale: the game keeps its one save, every minute and at every door. There is no going back.' }));
+    const slots = new Map<string, SlotInfo>((await listSlots()).map((s) => [s.slot, s]));
+    const rogue = this.saves.mode === 'roguelike';
+    this.foot.replaceChildren(...(rogue
+      ? [el('span', { className: 'hint', textContent: 'A roguelike tale: the game keeps its one save, every minute and at every door. There is no going back.' })]
+      : [button('Import a file…', () => this.importer.click()), el('span', { className: 'hint', textContent: 'Autosave: every 5 minutes and at every door down or up.' })]));
+    if (rogue) {
       const s = slots.get(ROGUE_SLOT);
-      this.list.replaceChildren(row('This tale', s ? when(s) : 'not saved yet'));
+      this.list.replaceChildren(el('div', { className: 'row saverow' }, el('span', {}, el('b', { textContent: 'This tale' }), el('br'),
+        el('span', { className: 'hint', textContent: s ? `${s.label} · saved ${new Date(s.at).toLocaleString()}` : 'not saved yet' }))));
       return;
     }
-    // A new save: a name to type (or none: "Save N"), then into the list.
-    const name = el('input', { type: 'text', maxLength: 40, spellcheck: false, placeholder: 'Name (optional)', ariaLabel: 'Name of the new save' });
-    const make = () => void this.save(saveName(name.value, all.map((s) => s.slot)));
-    name.addEventListener('keydown', (e) => { if (e.code === 'Enter' || e.code === 'NumpadEnter') make(); });
-    this.foot.replaceChildren(
-      el('div', { className: 'newsave' }, name, button('New save', make)),
-      el('div', { className: 'buttons' }, button('Save to file…', () => void this.saveToFile()), button('Load from file…', () => void this.loadFromFile())),
-      el('span', { className: 'hint', textContent: 'Autosave: every 5 minutes and at every door down or up.' }));
-    const auto = slots.get(AUTOSAVE);
+    // A roguelike tale kept beside the classic slots: it can be taken up again, never saved into or exported.
     const tale = slots.get(ROGUE_SLOT);
-    // The player's own saves, newest first.
-    const own = all.filter((s) => !KEPT.has(s.slot)).sort((a, b) => b.at - a.at);
-    this.list.replaceChildren(
-      row('Autosave', auto ? when(auto) : 'empty', ...(auto ? [button('Load', () => this.load(AUTOSAVE)), button('Export', () => void this.exportSlot(AUTOSAVE))] : [])),
-      // A roguelike tale kept beside them: it can be taken up again, never saved into or exported.
-      ...(tale ? [row('Roguelike tale', when(tale), button('Take it up', () => this.load(ROGUE_SLOT)))] : []),
-      ...own.map((s) => row(s.slot.replace(/^./, (c) => c.toUpperCase()), when(s),
-        button('Save', () => void this.save(s.slot), { title: 'Save the game as it is now over this one' }),
-        button('Load', () => this.load(s.slot)),
-        button('Export', () => void this.exportSlot(s.slot)),
-        this.deleteButton(s.slot))),
-      ...(own.length ? [] : [el('p', { className: 'hint', textContent: 'No saves of your own yet: name one below, or just press New save.' })]));
-  }
-
-  /** Delete asks once more on the button itself before the save goes. */
-  private deleteButton(slot: string): HTMLButtonElement {
-    const b = button('Delete', () => {
-      if (b.dataset.sure) { void deleteSlot(slot).then(() => this.render(), () => this.saves.say('The browser would not delete it.')); return; }
-      b.dataset.sure = '1';
-      b.textContent = 'Sure?';
-      setTimeout(() => { delete b.dataset.sure; b.textContent = 'Delete'; }, 3000);
-    });
-    return b;
+    const shown = tale ? [...SLOTS, ROGUE_SLOT] : SLOTS;
+    this.list.replaceChildren(...shown.map((slot) => {
+      const s = slots.get(slot);
+      if (slot === ROGUE_SLOT && s) {
+        return el('div', { className: 'row saverow' },
+          el('span', {}, el('b', { textContent: 'Roguelike tale' }), el('br'), el('span', { className: 'hint', textContent: `${s.label} · saved ${new Date(s.at).toLocaleString()}` })),
+          el('span', { className: 'buttons' }, button('Take it up', () => this.load(slot))));
+      }
+      return el('div', { className: 'row saverow' },
+        el('span', {}, el('b', { textContent: slot === AUTOSAVE ? 'Autosave' : slot.replace(/^s/, 'S') }), el('br'),
+          el('span', { className: 'hint', textContent: s ? `${s.label} · saved ${new Date(s.at).toLocaleString()}` : 'empty' })),
+        el('span', { className: 'buttons' },
+          ...(slot === AUTOSAVE ? [] : [button('Save', () => void this.save(slot))]),
+          ...(s ? [button('Load', () => this.load(slot)), button('Export', () => void this.exportSlot(slot))] : [])));
+    }));
   }
 
   private async save(slot: string): Promise<void> {
-    this.saves.say(await saveNow(this.saves, slot) ? `Saved as ${slot}.` : 'The browser would not keep the save. Save it to a file instead.');
+    this.saves.say(await saveNow(this.saves, slot) ? `Saved to ${slot}.` : 'The browser would not keep the save. Export it to a file instead.');
     await this.render();
   }
 
   private load(slot: string): void { loadAtRestart(slot); }
 
   private async exportSlot(slot: string): Promise<void> {
-    await writeFile(await readSlot(slot), `masterworld-${slot.replace(' ', '-')}.json`);
-  }
-
-  /** The game as it is now, straight into a file the player picks (the browser's save dialog where it has one). */
-  private async saveToFile(): Promise<void> {
-    const { data, where } = this.saves.capture();
-    const name = `masterworld-${saveLabel(data, where).replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'save'}.json`;
-    try {
-      if (await writeFile(data, name)) this.saves.say('Saved to a file.');
-    } catch {
-      this.saves.say('The file could not be written.');
-    }
-  }
-
-  /** A save file the player picks (the browser's open dialog where it has one, else the file input). */
-  private async loadFromFile(): Promise<void> {
-    const picker = (window as unknown as { showOpenFilePicker?: OpenPicker }).showOpenFilePicker;
-    if (!picker) { this.importer.click(); return; }
-    let file: File;
-    try {
-      const [handle] = await picker({ types: [JSON_TYPE], multiple: false });
-      file = await handle.getFile();
-    } catch { return; /* closed without a file */ }
-    await this.loadFile(file);
+    const data = await readSlot(slot);
+    const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' })), download: `masterworld-${slot.replace(' ', '-')}.json` });
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   private async importFile(input: HTMLInputElement): Promise<void> {
     const f = input.files?.[0];
     input.value = '';
-    if (f) await this.loadFile(f);
-  }
-
-  private async loadFile(f: File): Promise<void> {
+    if (!f) return;
     let raw: unknown;
     try { raw = JSON.parse(await f.text()); } catch { this.saves.say('That file is not a save.'); return; }
     const s = checkSave(raw, this.saves.setting);
     if (typeof s === 'string') { this.saves.say(`Cannot load it: ${s}.`); return; }
-    const slot = saveName(f.name.replace(/\.json$/i, ''), (await listSlots()).map((x) => x.slot));
-    await writeSlot(slot, saveLabel(s, 'from a file'), s);
-    this.load(slot);
+    await writeSlot('imported', saveLabel(s, 'from a file'), s);
+    this.load('imported');
   }
 }
