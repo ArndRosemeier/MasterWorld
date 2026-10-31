@@ -52,11 +52,16 @@ export interface WalkIntent {
   up: boolean;
   /** Dive while swimming. */
   down: boolean;
+  /** Where the camera looks, up or down (rad, up positive): swimming forward, a look well down dives and well up rises. */
+  look?: number;
   /** How much of its speed the ground lets it make (0..1; a horse off the road). Default 1. */
   pace?: number;
 }
 
 /** `climb`: on a rock face; `pull`: pulling up over its top. */
+/** How far down (and up) the camera must look for a swimmer going forward to dive (rise), rad: past a third-person look down at the hero. */
+const DIVE_LOOK = 0.55, RISE_LOOK = 0.3;
+
 export type WalkMode = 'ground' | 'air' | 'swim' | 'climb' | 'pull';
 
 /** Speeds (m/s) and the body of something that walks (the hero's, a horse's in game/horse.ts). */
@@ -319,7 +324,9 @@ export class Walker {
     } else {
       const top = level === null ? -Infinity : this.floatAt(level);
       // Up and down by choice; otherwise the body floats up to the surface.
-      const want = intent.up || this.surfacing ? 1.4 : intent.down ? -1.4 : p.y < top - 0.05 ? 0.8 : 0;
+      // (Swimming forward, the camera's look steers too: well down dives, well up rises, level holds the depth.)
+      const looked = intent.look !== undefined && intent.forward > 0 ? (intent.look < -DIVE_LOOK ? -1 : intent.look > RISE_LOOK ? 1 : 0) : null;
+      const want = intent.up || this.surfacing ? 1.4 : intent.down || looked === -1 ? -1.4 : looked === 1 ? 1.4 : p.y < top - 0.05 && looked !== 0 ? 0.8 : 0;
       v.y += (want - v.y) * damp(4, dt);
       // Under a roof (a drowned cave's): the head stops at the rock, in the air caught under it if there is any.
       // (The whole body, not only the head's top: a way narrows up to its roof, and a body floated up into that is held.)

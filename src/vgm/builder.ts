@@ -46,7 +46,8 @@ export function openWorld(seed: number, setting: SettingModule, hydro?: HydroOpt
 /** Where a new game starts: the setting's start place, moved to the sea at the river's mouth nearest it, else to the river nearest it (D50). */
 export function startPlace(t: Terrain): Home {
   const start = findStart(t.skeleton, t.setting);
-  return seaside(t, start) ?? waterside(t, start);
+  // A river's mouth (D50: the river its fresh water), else a bare coast; inland only with no sea near at all.
+  return seaside(t, start) ?? coastside(t, start) ?? waterside(t, start);
 }
 
 /**
@@ -62,22 +63,65 @@ export function seaside(t: Terrain, start: StartPlace): Home | null {
       // Its river beside it, not through it.
       const river = freshWaterEdge(t, h.x, h.z, START_R + WATER_REACH, false);
       if (river <= START_R || river > START_R + WATER_REACH) continue;
-      // Gentle on its landward side (the sea before it is the harbour's).
-      const c = t.height(h.x, h.z);
-      let steep = 0;
-      for (let a = 0; a < 16; a++) {
-        const ox = Math.cos((a * Math.PI) / 8), oz = Math.sin((a * Math.PI) / 8);
-        if (ox * h.harbour.dx + oz * h.harbour.dz > 0.2) continue;
-        for (const r of [START_R * 0.4, START_R * 0.8]) steep = Math.max(steep, Math.abs(t.height(h.x + ox * r, h.z + oz * r) - c) / r);
-      }
+      const steep = landward(t, h);
       if (steep > want.maxSlope * 1.5) continue;
       const score = Math.hypot(h.x - start.x, h.z - start.z) / within + steep / want.maxSlope;
-      if (score < low) { low = score; best = { x: h.x, z: h.z, elevation: c, biome: t.biomeIdAt(h.x, h.z) ?? start.biome, harbour: h.harbour }; }
+      if (score < low) { low = score; best = homeAt(t, h, start); }
     }
     if (best) return best;
   }
   return null;
 }
+
+/**
+ * With no river reaching the sea near (a dry or cliffed coast), the start town still stands by the sea with its
+ * harbour (Arnd 2026-10-31): on the coast nearest the start place where the shore comes down low and the land
+ * behind is gentle, its water from wells and brooks.
+ */
+export function coastside(t: Terrain, start: StartPlace): Home | null {
+  const want = t.setting.start;
+  for (const within of BANK_SEARCH) {
+    let best: Home | null = null, low = Infinity;
+    for (let a = 0; a < COAST_RAYS; a++) {
+      const ux = Math.cos((a / COAST_RAYS) * Math.PI * 2), uz = Math.sin((a / COAST_RAYS) * Math.PI * 2);
+      // The shore along this way: the last dry ground before the sea.
+      let shore: { x: number; z: number } | null = null;
+      for (let d = COAST_STEP; d <= within; d += COAST_STEP) {
+        const x = start.x + ux * d, z = start.z + uz * d;
+        if (t.waterDepth(x, z) > 0 && t.height(x, z) < -0.5) { shore = { x: x - ux * COAST_STEP, z: z - uz * COAST_STEP }; break; }
+      }
+      if (!shore) continue;
+      for (const h of harbourSpots(t, { ...shore, fx: ux, fz: uz, half: 0 }, START_R, COAST_ALONG)) {
+        const steep = landward(t, h);
+        if (steep > want.maxSlope * 1.5) continue;
+        // A low shore for its quay, not a cliff.
+        const top = t.height(h.harbour.x - h.harbour.dx * 20, h.harbour.z - h.harbour.dz * 20);
+        if (top > COAST_TOP) continue;
+        const score = Math.hypot(h.x - start.x, h.z - start.z) / within + steep / want.maxSlope + top / COAST_TOP;
+        if (score < low) { low = score; best = homeAt(t, h, start); }
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+/** The ways a coast start is looked along, the step, how far along the shore and how high its quay's ground may stand (m). */
+const COAST_RAYS = 48, COAST_STEP = 40, COAST_ALONG = [0, 0.6, 1.2], COAST_TOP = 8;
+
+/** How steep a harbour town's ground rises on its landward side (the sea before it is the harbour's). */
+function landward(t: Terrain, h: { x: number; z: number; harbour: HarbourAt }): number {
+  const c = t.height(h.x, h.z);
+  let steep = 0;
+  for (let a = 0; a < 16; a++) {
+    const ox = Math.cos((a * Math.PI) / 8), oz = Math.sin((a * Math.PI) / 8);
+    if (ox * h.harbour.dx + oz * h.harbour.dz > 0.2) continue;
+    for (const r of [START_R * 0.4, START_R * 0.8]) steep = Math.max(steep, Math.abs(t.height(h.x + ox * r, h.z + oz * r) - c) / r);
+  }
+  return steep;
+}
+
+const homeAt = (t: Terrain, h: { x: number; z: number; harbour: HarbourAt }, start: StartPlace): Home => ({ x: h.x, z: h.z, elevation: t.height(h.x, h.z), biome: t.biomeIdAt(h.x, h.z) ?? start.biome, harbour: h.harbour });
 
 /** How far along the coast from a river's mouth a sea start may stand, in town radii (its river beside it, not through it). */
 const SEA_ALONG = [0.9, 1.2, 1.5, 1.9, 2.4];
