@@ -35,6 +35,8 @@ export interface SeaWay {
   /** Where it goes, as the harbour master says it ("the village 4.6 km west"), and as it is called there. */
   readonly place: string;
   readonly name: string;
+  /** To an island (S7): the harbour master tells what sailors say of it. */
+  readonly isle?: true;
 }
 
 /** Off a harbour's shore, out along its way to sea, where a ship has water enough (null: none within OFF_SHORE). */
@@ -58,9 +60,9 @@ export function seaRoute(seed: number, water: (x: number, z: number) => number, 
 
 /** The voyage from `from` to `to` along `route`: its length, time and fare. */
 export function seaWay(def: VoyageDef, from: TownDecision, to: TownDecision, route: readonly number[]): SeaWay {
-  const metres = wayLength(route), km = Math.hypot(to.x - from.x, to.z - from.z) / 1000, name = `the ${to.size ?? 'town'}`;
+  const metres = wayLength(route), km = Math.hypot(to.x - from.x, to.z - from.z) / 1000, name = to.isle ? 'the island' : `the ${to.size ?? 'town'}`;
   return {
-    to: to.id, route, metres,
+    to: to.id, route, metres, ...(to.isle ? { isle: true as const } : {}),
     hours: (metres / def.speed) * CLOCK / 3600,
     fare: Math.max(def.least, Math.round((metres / 1000) * def.perKm)),
     name,
@@ -107,7 +109,7 @@ export function farHarbourFor(def: VoyageDef, c: FrontierContext, from: TownDeci
 
 /** The harbour master's topic for a way. */
 export function voyageTopic(def: VoyageDef, w: SeaWay): string {
-  return fill(def.words.topic, { place: w.place, price: coinText(w.fare) });
+  return fill(w.isle ? def.words.island : def.words.topic, { place: w.place, price: coinText(w.fare) });
 }
 
 /** The note on coming in. */
