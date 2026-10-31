@@ -38,6 +38,8 @@ export const classic: SettingModule = {
     continentSpacing: 900_000,
     landFraction: 0.45,
     seaDepth: 3500,
+    // Islands beyond the fog (S7): one in every few 5 km squares of open sea, 0.3-1 km of land each.
+    islands: { cell: 5000, chance: 0.4, radius: [600, 1400], off: 2500 },
     mountainHeight: 3600,
     rangeSpacing: 70_000,
     drama: 0.75,

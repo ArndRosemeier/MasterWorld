@@ -153,6 +153,23 @@ export interface WorldShape {
   readonly landforms?: readonly LandformDef[];
   /** The kinds of country (D55, plan 5.9), each stretch of 5-20 km one of them; all open country if absent. */
   readonly kinds?: readonly LandscapeKindDef[];
+  /** Islands out at sea (S7); none if absent. */
+  readonly islands?: IslandsDef;
+}
+
+/**
+ * Islands out at sea (S7, plan 13): the sea is cut into square cells, and a share of them holds an island well off
+ * any coast, a rise of the sea floor whose top stands above the water, with its own beaches and cliffs.
+ */
+export interface IslandsDef {
+  /** The cells' side (m); an island stays inside its cell. */
+  readonly cell: number;
+  /** Share of the cells with an island (where the sea is open enough). */
+  readonly chance: number;
+  /** Its rise's radius (m), least and most; the land above water is some 0.4-0.7 of it. */
+  readonly radius: readonly [number, number];
+  /** How far from the mainland's shore its middle lies at least (m): open water between. */
+  readonly off: number;
 }
 
 /**

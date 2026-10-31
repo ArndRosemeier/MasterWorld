@@ -7,7 +7,7 @@
  */
 import { Noise, deriveSeed, clamp, smoothstep, lerp, smax, hash2i, hashToFloat } from '@futuremagic/core';
 import { spiralFind } from './spiral';
-import type { BiomeDef, LandscapeKindDef, MesaDef, WorldShape } from '../setting/contract';
+import type { BiomeDef, IslandsDef, LandscapeKindDef, MesaDef, WorldShape } from '../setting/contract';
 
 /** Everything the skeleton knows about one point. */
 export interface SkeletonSample {
@@ -41,6 +41,17 @@ export const SHORE = {
   /** Continent value inside which the shore is shaped (beyond it the land is as it was). */
   band: 0.12,
 };
+
+/**
+ * An island's rise in the continent field: its top (a little inland of the coast, so it has a beach and some land),
+ * and how far below the coast it falls at its rim, so its shore lies at some 0.6 of its radius whatever the depth.
+ */
+const ISLE_TOP = 0.04, ISLE_FOOT = 0.07;
+/** An island's rim wanders in and out this share of its radius. */
+const ISLE_RAGGED = 0.22;
+
+/** An island out at sea (S7): the middle of its rise and its radius (m). */
+export interface Isle { readonly x: number; readonly z: number; readonly r: number }
 
 /** Kinds of country (D55): stretches round seed points this far apart (metres), so 5-20 km across. */
 const KIND_CELL = 11_000;
@@ -85,6 +96,9 @@ export class Skeleton {
   private bi = NaN;
   private bj = NaN;
   private oneKind = -1;
+  /** Each sea cell's island, or null (worked out once). */
+  private readonly isles = new Map<number, Isle | null>();
+  private readonly isleSeed: number;
   private readonly seedX9 = new Float64Array(9);
   private readonly seedZ9 = new Float64Array(9);
   private readonly kinds9 = new Int32Array(9);
@@ -102,6 +116,7 @@ export class Skeleton {
     this.kindNoise = new Noise(deriveSeed(seed, 'skeleton', 'kind'));
     this.mesaNoise = new Noise(deriveSeed(seed, 'skeleton', 'mesa'));
     this.kindSeed = deriveSeed(seed, 'skeleton', 'kinds');
+    this.isleSeed = deriveSeed(seed, 'skeleton', 'isles');
     this.kinds = shape.kinds?.length ? shape.kinds : OPEN;
     this.mesa = this.kinds.find((k) => k.mesa)?.mesa ?? null;
     this.swells = this.kinds.some((k) => k.swell);
@@ -285,8 +300,50 @@ export class Skeleton {
     return lerp(wall, ramp, p);
   }
 
-  /** Continent field: -1 deep ocean … 0 coast … 1 deep inland. */
+  /** Continent field: -1 deep ocean … 0 coast … 1 deep inland; the islands out at sea (S7) rise in it. */
   continent(x: number, z: number): number {
+    const c = this.mainland(x, z), d = this.shape.islands;
+    return d ? this.withIsle(x, z, c, d) : c;
+  }
+
+  /**
+   * The island in the sea cell (i, j) of `d` (S7), or null: by the seed a share of the cells has one, its middle and
+   * radius inside the cell, where the mainland's shore is at least `d.off` beyond its rim.
+   */
+  isleOf(i: number, j: number, d: IslandsDef): Isle | null {
+    const key = (i + 0x80000) * 0x100000 + (j + 0x80000);
+    const had = this.isles.get(key);
+    if (had !== undefined) return had;
+    let isle: Isle | null = null;
+    const h = hash2i(this.isleSeed, i, j);
+    if (hashToFloat(h) < d.chance) {
+      const m = d.radius[1] * (1 + ISLE_RAGGED), span = d.cell - 2 * m;
+      const x = i * d.cell + m + hashToFloat(hash2i(h, 1, 7)) * span, z = j * d.cell + m + hashToFloat(hash2i(h, 2, 11)) * span;
+      const r = lerp(d.radius[0], d.radius[1], hashToFloat(hash2i(h, 3, 13)));
+      const c0 = this.mainland(x, z), D = 50;
+      // How far the mainland's shore is: its field over its slope (none in the open ocean, where the field is flat).
+      const g = Math.hypot(this.mainland(x + D, z) - c0, this.mainland(x, z + D) - c0) / D;
+      if (c0 < -0.005 && -c0 > g * (d.off + r)) isle = { x, z, r };
+    }
+    this.isles.set(key, isle);
+    return isle;
+  }
+
+  /** The continent field `c` at (x, z), lifted by its cell's island. */
+  private withIsle(x: number, z: number, c: number, d: IslandsDef): number {
+    const isle = this.isleOf(Math.floor(x / d.cell), Math.floor(z / d.cell), d);
+    if (!isle) return c;
+    const dx = x - isle.x, dz = z - isle.z, d2 = dx * dx + dz * dz, most = isle.r * (1 + ISLE_RAGGED);
+    if (d2 >= most * most) return c;
+    // A ragged rim: bays and points, so it is no round blob.
+    const t = Math.sqrt(d2) / (isle.r * (1 + ISLE_RAGGED * this.shoreNoise.fbm2(x / 300 + 11.7, z / 300 - 4.2, 2)));
+    if (t >= 1) return c;
+    // Its field falls from the top at its middle to under the coast at its rim, and blends into the sea's beyond.
+    return smax(c, ISLE_TOP - (ISLE_TOP + ISLE_FOOT) * t * t, 0.04);
+  }
+
+  /** The mainland's continent field, before the islands. */
+  private mainland(x: number, z: number): number {
     const s = 1 / this.shape.continentSpacing;
     // Domain warp: coasts with bays and peninsulas instead of round blobs.
     const wx = this.warpNoise.fbm2(x * s * 2, z * s * 2, 3) * 0.35;
