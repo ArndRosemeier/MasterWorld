@@ -26,6 +26,27 @@ export const SAVE_VERSION = 4;
 
 /** The one slot a roguelike game writes (plan 11.1): it is never saved into or loaded by hand. */
 export const ROGUE_SLOT = 'roguelike';
+/** The classic game's own save, every 5 minutes and at every door. */
+export const AUTOSAVE = 'autosave';
+/** Kept by the game itself: never a name for a save made by hand. */
+export const KEPT = new Set([AUTOSAVE, ROGUE_SLOT]);
+
+/**
+ * The name a new save gets: the one typed (trimmed, at most 40 letters), else "Save N" after the highest
+ * N there is. A new save never overwrites one: a name already taken, or one the game keeps for itself
+ * ("autosave"), gets a number (" 2", " 3"); saving over a save is that save's own Save button.
+ */
+export function saveName(typed: string, taken: readonly string[]): string {
+  const name = typed.trim().replace(/\s+/g, ' ').slice(0, 40);
+  if (name) {
+    const used = new Set([...KEPT, ...taken.map((t) => t.toLowerCase())]);
+    let n = 1;
+    while (used.has((n === 1 ? name : `${name} ${n}`).toLowerCase())) n++;
+    return n === 1 ? name : `${name} ${n}`;
+  }
+  const n = Math.max(0, ...taken.map((t) => Number(/^save (\d+)$/i.exec(t)?.[1] ?? 0)));
+  return `Save ${n + 1}`;
+}
 
 export interface CellarDiff {
   readonly open: readonly number[];
