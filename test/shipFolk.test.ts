@@ -83,3 +83,30 @@ test('ship passengers: a harbour inn\'s travellers by sea wait aboard at the end
   assert.equal(crews.passengers.length, 0, 'sailed');
   assert.deepEqual([on[0].agent.x, on[0].agent.z], [plan.centre[0], plan.centre[1]], 'back where they were in town');
 });
+
+test('ship passengers: under way she carries every traveller by sea who was in town when she cast off, out of town till she comes in', async () => {
+  const { Decks } = await import('../src/world/deck');
+  const { ShipCrews } = await import('../src/game/shipCrews');
+  const { townsfolk, away, sailsAt } = await import('../src/sim/people');
+  const { standingAgent } = await import('../src/sim/townLife');
+  const { frontierLand } = await import('./frontierLand');
+  const { home, terrain } = frontierLand();
+  const plan = terrain.town(home.id)!.plan, folk = townsfolk(plan, home.seed ?? 0), sea = folk.filter((p) => p.bySea);
+  // An hour when one of them is in town, though not yet waiting aboard (a voyage the hero bought on a day of their visit).
+  const off = Array.from({ length: 72 * 4 }, (_, i) => i / 4).find((h) => sailsAt(sea[0], h))!;
+  const agents = folk.map((p) => standingAgent(p, plan.centre[0], plan.centre[1], 0, 'wait', p.seed));
+  const life = { agents } as unknown as import('../src/sim/townLife').TownLife, lifeOf = (id: string) => (id === home.id ? life : null);
+  const ship = planShip(4, 'ship'), decks = new Decks(), crews = new ShipCrews(1), pose = { x: home.x, y: 0, z: home.z - 300, ux: 1, uz: 0, pitch: 0, roll: 0 };
+  decks.move(`${home.id}/0`, ship, pose, null, true);
+  crews.atWork(decks, off, lifeOf);
+  const on = crews.passengers.map((p) => p.agent.person);
+  assert.ok(on.includes(sea[0]), 'aboard as she sails');
+  // Hours on, past the end of their visit, still aboard and out of town.
+  crews.atWork(decks, off + 30, lifeOf);
+  assert.deepEqual(crews.passengers.map((p) => p.agent.person), on, 'the same passengers all the way');
+  assert.ok(on.every((p) => away(p, off + 1) && p.sailing));
+  // In at the pier: off the ship, and back in their town's round.
+  decks.move(`${home.id}/0`, ship, pose, null, false);
+  crews.atWork(decks, off + 31.3, lifeOf);
+  assert.ok(on.every((p) => !p.sailing || crews.passengers.some((q) => q.agent.person === p)));
+});

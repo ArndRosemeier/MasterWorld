@@ -14,7 +14,7 @@
 import { deriveSeed } from '@futuremagic/core';
 import { planShip } from '@futuremagic/settlement';
 import { PASSENGER_POSTS, crewOf, crewPost, passengerPost, type Hand } from '../sim/shipFolk';
-import { aboardAt } from '../sim/people';
+import { aboardAt, sailsAt } from '../sim/people';
 import { standingAgent, type Agent, type TownLife } from '../sim/townLife';
 import type { ActivityKind } from '../sim/spots';
 import { toWorld, type Decks } from '../world/deck';
@@ -53,6 +53,8 @@ export class ShipCrews {
   /** The passengers aboard now (to be talked to), and where each was in their town before boarding. */
   private aboard: CrewPlaced[] = [];
   private readonly ashore = new Map<Agent, { x: number; z: number }>();
+  /** The game hour each ship near the hero cast off at, while she is under way (her passengers are who sailed then). */
+  private readonly castOff = new Map<string, number>();
 
   constructor(private readonly seed: number) {}
 
@@ -88,7 +90,12 @@ export class ShipCrews {
       const town = v.id.slice(0, v.id.lastIndexOf('/')), life = v.plan.kind === 'ship' && !boarded.has(town) ? lifeOf(town) : null;
       if (!life) continue;
       boarded.add(town);
-      const going = life.agents.filter((a) => a.person.bySea && aboardAt(a.person, hours)).slice(0, PASSENGER_POSTS);
+      // Waiting aboard at the pier (the end of their visit); under way, everyone of them in town when she cast off.
+      if (v.state !== 'sailing') this.castOff.delete(v.id);
+      else if (!this.castOff.has(v.id)) this.castOff.set(v.id, hours);
+      const off = this.castOff.get(v.id);
+      const going = life.agents.filter((a) => (off === undefined ? aboardAt(a.person, hours) : sailsAt(a.person, off))).slice(0, PASSENGER_POSTS);
+      for (const a of going) a.person.sailing = off !== undefined;
       for (const [k, a] of going.entries()) {
         const post = passengerPost(v.plan, k), w = toWorld(v.pose, post.a, post.h, post.b);
         if (!this.ashore.has(a)) this.ashore.set(a, { x: a.x, z: a.z });
@@ -102,7 +109,8 @@ export class ShipCrews {
     }
     for (const id of this.crews.keys()) if (!near.has(id)) this.crews.delete(id);
     // Off the ship (sailed, or the hero gone from near it): back where they were in their town.
-    for (const [a, at] of this.ashore) if (!aboard.some((p) => p.agent === a)) { a.x = at.x; a.z = at.z; this.ashore.delete(a); }
+    for (const [a, at] of this.ashore) if (!aboard.some((p) => p.agent === a)) { a.x = at.x; a.z = at.z; a.person.sailing = false; this.ashore.delete(a); }
+    for (const id of this.castOff.keys()) if (!near.has(id)) this.castOff.delete(id);
     this.shown = out;
     this.hauled = lines;
     this.aboard = aboard;
