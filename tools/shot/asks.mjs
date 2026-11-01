@@ -45,10 +45,11 @@ async function seal() {
     if (!b) return null;
     for (const c of f.delve.den.creatures) { c.health = 0; c.state = 'dead'; c.act = 'dead'; }
     v.restore({ open: v.cellar.layout.links.map((pl) => pl.link.id), keys: [], read: [] });
-    const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw), x = O.x + b.x + fx * 1.5, z = O.z + b.z + fz * 1.5;
-    p.teleport(x, O.y + b.y, z, Math.atan2(fx, fz));
+    // Forward is into the room (-sin, -cos; the wall is behind a prop): stand in the room, facing the wall.
+    const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw), x = O.x + b.x + fx * 1.5, z = O.z + b.z + fz * 1.5, yaw = b.yaw + Math.PI;
+    p.teleport(x, O.y + b.y, z, yaw);
     // From the side and a little behind, so the hero and the hole are both in the picture.
-    p.heroCam.yaw = Math.atan2(fx, fz) + 0.9;
+    p.heroCam.yaw = yaw + 0.9;
     p.heroCam.pitch = -0.12;
     p.heroCam.zoom = 3.2;
     return { sealed: f.delve.sealed, ask: f.delve.ask?.verb };
@@ -80,8 +81,13 @@ async function parley() {
     if (!k || f.delve.ask?.verb !== 'parley') return { ask: f.delve.ask?.verb ?? null };
     window.game.character.coins = Math.max(window.game.character.coins, 100);
     v.restore({ open: v.cellar.layout.links.map((pl) => pl.link.id), keys: [], read: [] });
-    p.teleport(O.x + k.x + 2, O.y + k.y, O.z + k.z, Math.atan2(2, 0));
-    p.heroCam.yaw = Math.atan2(2, 0) + 0.8;
+    // Stand about 1.6 m from the leader on a free side (the room's other things may stand nearer: the prompt
+    // would then be theirs), facing them.
+    const at = [0, 1, 2, 3, 4, 5, 6, 7].map((n) => { const a = (n * Math.PI) / 4; return { x: k.x + Math.cos(a) * 1.6, z: k.z + Math.sin(a) * 1.6 }; })
+      .find((c) => f.delve.den.nav.free(c.x, k.y, c.z, 0.35)) ?? { x: k.x + 1.6, z: k.z };
+    const yaw = Math.atan2(k.x - at.x, k.z - at.z) + Math.PI;
+    p.teleport(O.x + at.x, O.y + k.y, O.z + at.z, yaw);
+    p.heroCam.yaw = yaw + 0.5;
     p.heroCam.pitch = -0.1;
     p.heroCam.zoom = 3.5;
     return { ask: 'parley', who: k.def.name };

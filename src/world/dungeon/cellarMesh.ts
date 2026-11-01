@@ -72,7 +72,8 @@ const HOLE: Tint = [22, 19, 17];
  */
 function breach(k: MeshKit, p: Prop): BuildingMesh[] {
   const { x, y, z, yaw } = p, rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), 'breach'));
-  const fwd = [Math.sin(yaw), Math.cos(yaw)];
+  // Forward is into the room (-sin, -cos; the wall is behind, as the ladder's); +w is out into the room, -w into the wall.
+  const fwd = [-Math.sin(yaw), -Math.cos(yaw)];
   const spot = (u: number, w: number) => [x + Math.cos(yaw) * u + fwd[0] * w, z - Math.sin(yaw) * u + fwd[1] * w] as const;
   // The hole, set into the wall's face; its rim of broken stones; what fell out of it.
   const [hx, hz] = spot(0, -0.36);
