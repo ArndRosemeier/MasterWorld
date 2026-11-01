@@ -8,6 +8,7 @@
  * north (−z) and yaw π/2 faces west (−x).
  */
 import { clamp, damp } from '@futuremagic/core';
+import { caveHolds } from '../world/rockHolds';
 
 /** What the walker needs to know of the world around it. */
 export interface WalkWorld {
@@ -378,12 +379,7 @@ export class Walker {
    */
   private holds(x: number, z: number, y: number): { nx: number; nz: number } | null {
     if (!this.inRock()) return this.world.climbable?.(x, z) ?? null;
-    const f = (px: number, py: number, pz: number) => this.world.rockSurface(px, py, pz) ?? -1, e = 0.15, h = y + 1;
-    if (f(x, h, z) > 0.6) return null;
-    const gx = f(x + e, h, z) - f(x - e, h, z), gy = f(x, h + e, z) - f(x, h - e, z), gz = f(x, h, z + e) - f(x, h, z - e);
-    const across = Math.hypot(gx, gz);
-    if (across < 1e-6 || across < 0.7 * Math.hypot(gx, gy, gz)) return null;
-    return { nx: -gx / across, nz: -gz / across };
+    return caveHolds((px, py, pz) => this.world.rockSurface(px, py, pz) ?? -1, x, z, y);
   }
 
   /** Onto the climbable face ahead (dx, dz: the way the body pushes), if it is one; whether it got on. */

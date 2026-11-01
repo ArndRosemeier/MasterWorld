@@ -22,7 +22,7 @@ async function take(name, query, width, height, page = 'formed') {
   p.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.error(name, m.type(), m.text().slice(0, 600)); });
   await p.goto(`http://localhost:5298/tools/preview/${page}.html?${query}`);
   const info = JSON.parse(await p.waitForFunction(() => window.done, null, { timeout: 280000 }).then((h) => h.jsonValue()));
-  if (page === 'inside') {
+  if (page !== 'formed') {
     // The page's one canvas holds the picture; a page screenshot of a WebGPURenderer page can stall in SwiftShader.
     const url = await p.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));
     writeFileSync(`${out}/${name}.png`, Buffer.from(url.split(',')[1], 'base64'));
@@ -36,6 +36,8 @@ for (const rock of rocks) {
   console.log(rock, size, 'wall', info.wall, 'ms for', n, 'caves; worst form+carve', info.worstFormCarve, 'ms');
   for (const seed of floors) console.log(' floor', seed, JSON.stringify(await take(`floor-${rock}-${size}-${seed}`, `rock=${rock}&size=${size}&seed=${seed}${extra}`, 1650, 680, 'inside')));
 }
+// WALKS=0,3,7: the walking page (walk.html), one picture standing at each of those places of the first floor seed's cave (the real walker, the game's shaders).
+for (const rock of rocks) for (const at of (process.env.WALKS ?? '').split(',').filter(Boolean)) console.log(' walk', rock, at, JSON.stringify(await take(`walk-${rock}-${size}-${(process.env.WALKSEED ?? floors[0] ?? 1)}-${at}`, `rock=${rock}&size=${size}&seed=${(process.env.WALKSEED ?? floors[0] ?? 1)}&auto=1&gl=1&at=${at}`, 1100, 680, 'walk')));
 writeFileSync(`${out}/summary-${size}.json`, JSON.stringify(summary, null, 1));
 await browser.close();
 await server.close();

@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
 import { dressFormed, formCave, readFormed } from '../src/world/cave/form';
+import { Walker } from '../src/game/walker';
+import { formedWorld } from '../src/game/formedWorld';
 import { PART_MIN } from '../src/world/cave/reader';
 
 const caves = classic.caves!;
@@ -33,4 +35,24 @@ test('caves: the places of a cave are found, seeded, and every one lies on groun
   assert.deepEqual(a.opened, b.opened);
   // Depth grows along the way: no place is nearer the way in than the way in itself.
   assert.ok(a.reading.places.every((p) => p.depth >= 0));
+});
+
+test('caves: the real walker crosses the walk links of the reading (the reader and the body agree, no squeezing)', () => {
+  const r = read(6, 'massive'), world = formedWorld(r.c.field as never), g = r.reading;
+  let tried = 0, crossed = 0;
+  for (let a = 0, n = 0; a < g.count && tried < 60; a++) {
+    if (g.depth[a] === Infinity) continue;
+    for (let e = g.edgeStart[a]; e < g.edgeStart[a + 1]; e++) {
+      if (g.edgeKind[e] !== 0 || ++n % 25 !== 0) continue;
+      const b = g.edgeTo[e], w = new Walker(world);
+      w.place(g.x[a], g.z[a], g.y[a] + 0.02);
+      tried++;
+      for (let t = 0; t < 60 * 6; t++) {
+        w.step({ forward: 1, strafe: 0, heading: Math.atan2(-(g.x[b] - w.pos.x), -(g.z[b] - w.pos.z)), walk: false, up: false, down: false }, 1 / 60);
+        if (Math.hypot(g.x[b] - w.pos.x, g.z[b] - w.pos.z) < 0.35 && Math.abs(g.y[b] - w.pos.y) < 0.8) { crossed++; break; }
+      }
+    }
+  }
+  assert.ok(tried >= 30, `${tried} walk links tried`);
+  assert.ok(crossed >= tried * 0.97, `${crossed} of ${tried} walk links walked by the real walker`);
 });
