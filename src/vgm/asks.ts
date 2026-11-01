@@ -44,8 +44,8 @@ export interface AskPlace {
   /** Who lives there (the lore's dweller id), if known, and their encounter (a band of them). */
   readonly dweller?: string;
   readonly encounter?: string;
-  /** What someone of the household wants (Q5): the ask it calls for weighs far more, and carries the want. */
-  readonly want?: PromiseWant | null;
+  /** What the people of the household want (Q5): the asks they call for weigh far more, and the one chosen carries its want. */
+  readonly wants?: readonly PromiseWant[];
 }
 
 /** The setting's asks a place fits. */
@@ -67,15 +67,15 @@ export function askFor(setting: Pick<SettingModule, 'asks' | 'twists'>, seed: nu
     return i < 0 ? given.length + 1 : given.length - 1 - i;
   };
   const rng = new Rng(deriveSeed(seed, 'vgm', 'ask', p.decision.id));
-  const wanted = p.want ? WANT_VERB[p.want.kind] : null;
-  const odds = pool.map((x) => x.weight * waited(since(x.id)) * (x.verb === wanted ? WANT_PULL : 1));
+  const wanted = new Set((p.wants ?? []).map((w) => WANT_VERB[w.kind]));
+  const odds = pool.map((x) => x.weight * waited(since(x.id)) * (wanted.has(x.verb) ? WANT_PULL : 1));
   const a = rng.weighted(pool, (_, i) => odds[i]!);
-  const twist = twistFor(setting, seed, log, p, a);
+  const twist = twistFor(setting, seed, log, p, a), want = p.wants?.find((w) => WANT_VERB[w.kind] === a.verb);
   return {
     id: a.id,
     verb: a.verb,
     ...(twist ? { twist } : {}),
-    ...(p.want && a.verb === wanted ? { want: p.want } : {}),
+    ...(want ? { want } : {}),
     ...(a.things?.length ? { thing: rng.int(0, a.things.length - 1) } : {}),
     line: rng.int(0, a.words.told.length - 1),
     ...(a.verb === 'lost' && a.lost ? { who: rng.int(0, 9999), alive: rng.chance(a.lost.alive) } : {}),

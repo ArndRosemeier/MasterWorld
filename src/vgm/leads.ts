@@ -13,7 +13,7 @@ import type { Terrain } from '../world/terrain';
 import { townById, type Town } from '../world/town';
 import { landKinds, loreOf, placeOf, promiseCellar, promisePlace } from './dungeons';
 import { townsfolk } from '../sim/people';
-import { wantOf } from './wants';
+import { wantsOf } from './wants';
 import { askFor, asksGiven, CLEAR } from './asks';
 
 export const LEADS = {
@@ -150,10 +150,10 @@ function asked(c: LeadsContext, d: DungeonDecision): DungeonDecision {
   const dweller = sketchCellar(d, place, loreOf({ dungeons: c.dungeons }, d.template)).dweller;
   // What the household wants, as the world simulation has them (Q5).
   const town = townById(c.towns, d.town);
-  const wanted = town ? wantOf(townsfolk(town.plan, town.decision.seed ?? c.seed), d) : null;
+  const spent = new Set(c.log.flatMap((x) => (x.kind === 'dungeon' && x.town === d.town && x.ask?.want ? [x.ask.want.person] : [])));
   // A want drives one task: someone who has asked from it once does not ask from it again.
-  const want = wanted && !c.log.some((x) => x.kind === 'dungeon' && x.town === d.town && x.ask?.want?.person === wanted.person) ? wanted : null;
-  const ask = askFor({ asks: c.asks, twists: c.twists }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id, encounter: dweller.encounter, want });
+  const wants = town ? wantsOf(townsfolk(town.plan, town.decision.seed ?? c.seed), d).filter((w) => !spent.has(w.person)) : [];
+  const ask = askFor({ asks: c.asks, twists: c.twists }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id, encounter: dweller.encounter, wants });
   return ask ? { ...d, ask } : d;
 }
 

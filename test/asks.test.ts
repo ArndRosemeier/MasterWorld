@@ -7,7 +7,7 @@ import { askFor, askMet, asksGiven, askWords, holdsKeepsake, keepsakeOf, askedOn
 import { endingOf, keepPromise, moveInto, nextPromise, openPromises, thiefBack } from '../src/vgm/leads';
 import { NightWatch, nightWatchFor } from '../src/vgm/watch';
 import { firstDungeon } from '../src/vgm/dungeons';
-import { wantOf } from '../src/vgm/wants';
+import { WANT_VERB, wantsOf } from '../src/vgm/wants';
 import { townsfolk } from '../src/sim/people';
 import { talkCellar, townTalk } from '../src/talk/townTalk';
 import { Character } from '../src/game/character';
@@ -406,15 +406,15 @@ test('asks: tasks come from what people want, and the log traces each back to wh
   // A trader with a rival of the same trade in town suspects them; the eldest of a house, old now, wants back what is left.
   const byHouse = (h: number) => ({ ...testDecision(8), town: town.decision.id, building: h }) as DungeonDecision;
   const houses = [...new Set(people.map((p) => p.home))];
-  const rivalHouse = houses.find((h) => wantOf(people, byHouse(h))?.kind === 'rival');
+  const rivalHouse = houses.find((h) => wantsOf(people, byHouse(h)).some((x) => x.kind === 'rival'));
   assert.ok(rivalHouse !== undefined, 'a trader with a rival');
-  const w = wantOf(people, byHouse(rivalHouse!))!;
+  const w = wantsOf(people, byHouse(rivalHouse!)).find((x) => x.kind === 'rival')!;
   const me = people.find((p) => p.id === w.person)!, them = people.find((p) => p.id === w.rival)!;
   assert.ok(me.home === rivalHouse && me.trade === them.trade && them.home !== rivalHouse, `${me.trade} / ${them.trade}`);
   // The want pulls its ask: a rival's household mostly asks to find the thief, and the thief is the rival.
   let thieves = 0;
   for (let i = 0; i < 40; i++) {
-    const a: PromiseAsk = askFor(classic, i, [], { decision: { ...byHouse(rivalHouse!), id: `w${i}` }, lived: false, want: w })!;
+    const a: PromiseAsk = askFor(classic, i, [], { decision: { ...byHouse(rivalHouse!), id: `w${i}` }, lived: false, wants: [w] })!;
     if (a.verb !== 'thief') { assert.equal(a.want, undefined, 'a want only rides the ask it called for'); continue; }
     thieves++;
     assert.deepEqual(a.want, w);
@@ -422,6 +422,15 @@ test('asks: tasks come from what people want, and the log traces each back to wh
     assert.equal(askedOne(people, [...first, d], d)?.id, them.id, 'the rival did it');
   }
   assert.ok(thieves > 20, `${thieves} of 40 ask for the thief`);
+  // Five kinds of want among the town's households, each calling for its own kind of task.
+  const kinds = new Set(houses.flatMap((h) => wantsOf(people, byHouse(h)).map((x) => x.kind)));
+  assert.deepEqual([...kinds].sort(), ['elder', 'parent', 'peaceable', 'pious', 'rival']);
+  for (const k of kinds) {
+    const h = houses.find((x) => wantsOf(people, byHouse(x)).some((y) => y.kind === k))!, mine = wantsOf(people, byHouse(h)).find((y) => y.kind === k)!;
+    const verbs = Array.from({ length: 60 }, (_, i) => askFor(classic, i, [], { decision: { ...byHouse(h), id: `k${k}${i}` }, lived: true, dweller: 'smugglers', wants: [mine] })!);
+    const called = verbs.filter((a) => a.want).length;
+    assert.ok(called > 10 && verbs.every((a) => !a.want || WANT_VERB[a.want.kind] === a.verb), `${k}: ${called} of 60 follow the want`);
+  }
   // Over two days of play, asks carry wants; each traced back to someone of that household.
   let traced = 0;
   for (const name of ['masterworld', 'alpha', 'x4']) {
