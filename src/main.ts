@@ -66,7 +66,7 @@ import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
 import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
-import { askDefOf, askNamed, askOf, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
+import { askDefOf, askNamed, askOf, asEnded, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
@@ -1225,7 +1225,7 @@ export async function start(b: Boot): Promise<void> {
     };
     // A parley broken (D62): the hero struck first and beat them; the household asked for none of it and pays nothing.
     failedPlace = (id) => {
-      const k = keepPromise(log, id, hours(), true);
+      const k = keepPromise(log, id, hours(), true, 'broken');
       if (k) log = [...log, k];
       const t = townOfPromise(id), broken = askDefOf(setting, askOf(log, id) ?? undefined)?.parley?.broken;
       if (broken) journal.lapse(id, { text: fill(broken, { place: t?.talk.cellarCalled(id) ?? 'that place' }), from: 'you' });
@@ -1238,7 +1238,7 @@ export async function start(b: Boot): Promise<void> {
      */
     const keptNow = (id: string, t: Township): void => {
       // How it ended goes into the log (a thief caught or let go, D62): what comes next may follow from it.
-      const k = keepPromise(log, id, hours(), false, t.talk.endingOf(id) ?? undefined);
+      const k = keepPromise(log, id, hours(), false, t.talk.endingOf(id) ?? asEnded(askOf(log, id)));
       if (k) log = [...log, k];
       journal.fulfil(id);
       director.met('purpose');

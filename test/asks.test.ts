@@ -4,8 +4,10 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { validateSetting } from '../src/setting/contract';
 import { askFor, askMet, asksGiven, askWords, holdsKeepsake, keepsakeOf, askedOne, verbOf } from '../src/vgm/asks';
-import { keepPromise, nextPromise, openPromises } from '../src/vgm/leads';
+import { endingOf, keepPromise, moveInto, nextPromise, openPromises, thiefBack } from '../src/vgm/leads';
 import { NightWatch, nightWatchFor } from '../src/vgm/watch';
+import { firstDungeon } from '../src/vgm/dungeons';
+import { wantOf } from '../src/vgm/wants';
 import { townsfolk } from '../src/sim/people';
 import { talkCellar, townTalk } from '../src/talk/townTalk';
 import { Character } from '../src/game/character';
@@ -15,7 +17,7 @@ import { outlineCellar, sketchCellar } from '../src/world/dungeon/cellar';
 import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { testDecision, testHouse } from '../src/world/dungeon/variety';
-import type { Decision, DecisionLog, DungeonDecision } from '../src/world/decisions';
+import type { Decision, DecisionLog, DungeonDecision, PromiseAsk } from '../src/world/decisions';
 import { startWorld } from './frontierLand';
 
 const seed = parseSeed('masterworld');
@@ -370,4 +372,62 @@ test('asks: twists come now and then, never the same twist twice running, each s
   talk.holding = (id) => id === lied.id;
   assert.ok(talk.topics(owner.id).some((t) => t.id === `give:${lied.id}`));
   assert.deepEqual(talk.ask(owner.id, `give:${lied.id}`).named, { id: lied.id, ending: 'given' });
+});
+
+test('asks: endings feed what comes next, replayed from the log: a thief let go comes back, a pact or a sealed breach stays as it ended (Q4)', () => {
+  const house = town.plan.buildings.findIndex((_, i) => i > 2 && people.some((p) => p.home === i));
+  const robbed = { ...testDecision(6), id: 'cellar-robbed', town: town.decision.id, building: house, ask: { id: 'thief', verb: 'thief', line: 0, thing: 0, who: 7 } } as DungeonDecision;
+  const ended = (ending: string): DecisionLog => [...first, robbed, keepPromise([...first, robbed], robbed.id, 5, false, ending)!];
+  // Caught: not again. Let go: after a day, the town's next place under a house is robbed again, by the same one.
+  const next = (log: DecisionLog) => { for (let h = 30; h < 80; h += 0.25) { const d = nextPromise(ctx(log, h)); if (d?.kind === 'dungeon' && d.town === town.decision.id && !d.site) return d; if (d) log = [...log, d]; } return null; };
+  assert.equal(endingOf(ended('let-go'), robbed.id), 'let-go');
+  assert.equal(thiefBack(ended('caught'), robbed, 40), null);
+  assert.equal(thiefBack(ended('let-go'), robbed, 20), null, 'they keep their word a while');
+  const back = next(ended('let-go'))!;
+  assert.ok(back && back.ask?.verb === 'thief' && back.ask.again === robbed.id, JSON.stringify(back?.ask));
+  const log = [...ended('let-go'), back];
+  assert.equal(askedOne(people, log, back)?.id, askedOne(people, log, robbed)?.id, 'the same thief');
+  const { talk } = townTalk(seed, classic, town, people, log);
+  assert.ok(talk.askOf(back.id)!.told.includes(talk.namesFor(back).who), talk.askOf(back.id)!.told);
+  assert.equal(thiefBack(log, robbed, 80), null, 'back once');
+  // A pact's dwellers, or a breach walled up: nobody new moves in there.
+  const d = firstDungeon(first)!;
+  const keptAs = (ending?: string): DecisionLog => [...first, keepPromise(first, d.id, 1, false, ending)!];
+  const moved = (log: DecisionLog) => [0, 1, 2, 3, 4, 5].some((s) => moveInto({ ...ctx(log, 400) }, s)?.dungeon === d.id);
+  assert.ok(moved(keptAs()), 'cleared, someone moves in later');
+  assert.ok(!moved(keptAs('pact')), 'a pact holds');
+  assert.ok(!moved(keptAs('sealed')), 'walled up stays shut');
+});
+
+test('asks: tasks come from what people want, and the log traces each back to who wanted it and why (Q5)', () => {
+  // A trader with a rival of the same trade in town suspects them; the eldest of a house, old now, wants back what is left.
+  const byHouse = (h: number) => ({ ...testDecision(8), town: town.decision.id, building: h }) as DungeonDecision;
+  const houses = [...new Set(people.map((p) => p.home))];
+  const rivalHouse = houses.find((h) => wantOf(people, byHouse(h))?.kind === 'rival');
+  assert.ok(rivalHouse !== undefined, 'a trader with a rival');
+  const w = wantOf(people, byHouse(rivalHouse!))!;
+  const me = people.find((p) => p.id === w.person)!, them = people.find((p) => p.id === w.rival)!;
+  assert.ok(me.home === rivalHouse && me.trade === them.trade && them.home !== rivalHouse, `${me.trade} / ${them.trade}`);
+  // The want pulls its ask: a rival's household mostly asks to find the thief, and the thief is the rival.
+  let thieves = 0;
+  for (let i = 0; i < 40; i++) {
+    const a: PromiseAsk = askFor(classic, i, [], { decision: { ...byHouse(rivalHouse!), id: `w${i}` }, lived: false, want: w })!;
+    if (a.verb !== 'thief') { assert.equal(a.want, undefined, 'a want only rides the ask it called for'); continue; }
+    thieves++;
+    assert.deepEqual(a.want, w);
+    const d: DungeonDecision = { ...byHouse(rivalHouse!), id: `w${i}`, ask: a };
+    assert.equal(askedOne(people, [...first, d], d)?.id, them.id, 'the rival did it');
+  }
+  assert.ok(thieves > 20, `${thieves} of 40 ask for the thief`);
+  // Over two days of play, asks carry wants; each traced back to someone of that household.
+  let traced = 0;
+  for (const name of ['masterworld', 'alpha', 'x4']) {
+    for (const d of play(48, parseSeed(name))) {
+      if (d.kind !== 'dungeon' || !d.ask?.want || d.town !== town.decision.id) continue;
+      const who = people.find((p) => p.id === d.ask!.want!.person);
+      assert.equal(who?.home, d.building, 'the one who wants it lives there');
+      traced++;
+    }
+  }
+  assert.ok(traced > 0, 'some tasks come from a want');
 });

@@ -220,9 +220,10 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
     }
     // A mage stands still while a spell gathers, and casts what fits before closing in.
     if (fight.recipes.casting || castNow(hero, setting, fight)) { speed = 0; continue; }
-    // Close enough that the blade lands (else step in: a foe can stand just outside it and still strike).
+    // Close enough that the blade lands (else step in: a foe can stand just outside it and still strike), and
+    // not with a wall between (a rat just behind a wall's corner is near, yet out of every blow).
     const d = Math.hypot(foe.x - x, foe.z - z);
-    if (d < Math.min(1.6, fight.reach(foe) - 0.05) && Math.abs(foe.y - y) < 1.2) {
+    if (d < Math.min(1.6, fight.reach(foe) - 0.05) && Math.abs(foe.y - y) < 1.2 && den.ground.sees(x, y, z, foe.x, foe.y, foe.z, 0.9)) {
       speed = 0;
       yaw = Math.atan2(-(foe.x - x), -(foe.z - z));
       if (!fight.attacking) fight.use('strike');

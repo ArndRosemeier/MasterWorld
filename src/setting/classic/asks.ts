@@ -41,6 +41,7 @@ export const asks: readonly AskDef[] = [
       note: 'I have {thing}. {name} of {house} will want it back, and pay for it.',
       thanks: '{thing}! I never thought to hold it again. Here, {coins}, and you are welcome at our table.',
       missing: 'Then where is it? Come back when you have {thing} in your hands.',
+      wants: { elder: 'I am old now, and {thing} is all that is left of the ones before me. I want it back in this house before I go.' },
     },
   },
   {
@@ -157,6 +158,7 @@ export const asks: readonly AskDef[] = [
       spare: 'Go. And do not do it again.',
       caught: 'Then I will go with you and answer for it. I knew it would come out.',
       spared: 'You would let me go? I will not forget it. I swear it will not happen again.',
+      again: 'And I will tell you what I think: it is {who} again. Somebody let them off last time.',
     },
     words: {
       told: [
@@ -168,6 +170,7 @@ export const asks: readonly AskDef[] = [
       note: 'I know who the thief is, and I have {thing}. {name} of {house} will want to hear it.',
       thanks: '{thing}, and the thief found out! I would never have guessed. Here, {coins}, and my thanks.',
       missing: 'You know who it is? Then you will have found {thing}. Bring it back.',
+      wants: { rival: 'I will say it plainly: ever since our things began to go, {who} has done very well in the same trade as ours.' },
     },
   },
 ];

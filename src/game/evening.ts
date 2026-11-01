@@ -16,7 +16,7 @@ import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
-import { askDefOf, holdsKeepsake, keepsakeOf, twistOf, verbOf } from '../vgm/asks';
+import { asEnded, askDefOf, holdsKeepsake, keepsakeOf, twistOf, verbOf } from '../vgm/asks';
 import { NightWatch, nightWatchFor, watchDoor } from '../vgm/watch';
 import { hailer } from '../vgm/guide';
 import { Director, NEEDS, type Need } from '../vgm/director';
@@ -57,6 +57,10 @@ export interface EveningResult {
   readonly verbs: readonly string[];
   /** The twists met (Q3), in order. */
   readonly twists: readonly string[];
+  /** What earlier endings brought about (Q4), in order. */
+  readonly consequences: readonly string[];
+  /** The wants tasks came from (Q5), in order. */
+  readonly wants: readonly string[];
   readonly falls: number;
   /** Copper the finds fetched, and what was bought. */
   readonly earned: number;
@@ -155,7 +159,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const power0 = hero.power;
   // Standing in a town for the first time is a discovery (D58), as in the game.
   hero.earn(`town:${town.decision.id}`, 'town');
-  const verbs: string[] = [], twists: string[] = [];
+  const verbs: string[] = [], twists: string[] = [], consequences: string[] = [], wants: string[] = [];
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
   const book = new GuildBook();
   // A human hero (the creator's first people): a guild's task done is a good deed with its trainer's people (D54).
@@ -385,6 +389,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const names = talk.namesFor(dungeon), keepsake = own ? keepsakeOf(setting, dungeon, names) : null;
       verbs.push(verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb);
       const twist = own ? twistOf(setting, dungeon.ask) : null;
+      // What an earlier ending brought about (Q4), as the log has it.
+      if (ask?.want) { wants.push(ask.want.kind); say(`asked because ${talk.nameOf(ask.want.person)} ${ask.want.kind === 'rival' ? `suspects ${talk.nameOf(ask.want.rival!)}, a rival in trade` : 'is old and wants it back before the end'}`); }
+      if (ask?.again) { consequences.push(`thief again (${ask.again})`); say(`the thief let go on ${ask.again} is at it again`); }
       if (twist) { twists.push(twist.kind); say(`twist: ${twist.kind}${twist.kind === 'changed' ? ` (told ${sketchCellar(dungeon, place, lore, undefined, true).dweller.id}, finds ${cellar.dweller.id})` : ''}`); }
       if (verb !== 'clear') say(`the household asks: ${verb}${names.who && verb === 'lost' ? ` ${names.who}` : ''}${keepsake ? ` (${keepsake.name})` : ''}`);
       // Out to the door above, or the barrow's mouth.
@@ -471,7 +478,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         if (!broke) say(`struck terms with those in ${name} (${ask.terms === 'price' ? `paid ${ask.price} copper` : 'gave the hero\'s word'}); nobody killed`);
         else if (saved?.parley !== 'broken') throw new Broke(`came out of ${name} with no terms struck`);
         else {
-          const k = keepPromise(log, lead.id, hours, true);
+          const k = keepPromise(log, lead.id, hours, true, 'broken');
           if (k) log = [...log, k];
           say(`broke the parley in ${name}: the household pays nothing`);
         }
@@ -513,8 +520,13 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (!talk.topics(to.id).some((t) => t.id === `report:${lead.id}`)) throw new Broke(`${talk.nameOf(to.id)} cannot be told that ${name} is safe`);
       const reward = rewardFor(cellar, setting.creatures);
       hero.coins += reward;
-      const kept = keepPromise(log, lead.id, hours, false, ending);
+      const kept = keepPromise(log, lead.id, hours, false, ending ?? asEnded(ask));
       if (kept) log = [...log, kept];
+      // An ending the VGM reads later (Q4): a pact's place and a sealed one stay as they are; a thief let go comes back (moveInto and leads test it).
+      if (kept?.ending === 'pact' || kept?.ending === 'sealed' || kept?.ending === 'let-go') {
+        consequences.push(`${kept.ending} (${lead.id})`);
+        say(`the log keeps how ${name} ended: ${kept.ending}`);
+      }
       // The household's people think better of the hero for it, once (D54).
       if (kept) { standing.keptFor(to.race, lead.id); hero.earn(`kept:${lead.id}`, 'kept'); }
       cleared.push(lead.id);
@@ -631,9 +643,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, verbs, twists, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+    return { ok: false, failed: e.message, steps, cleared, verbs, twists, consequences, wants, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
   }
-  return { ok: true, failed: null, steps, cleared, verbs, twists, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+  return { ok: true, failed: null, steps, cleared, verbs, twists, consequences, wants, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
 }
 
 /** A point just outside a building's door. */

@@ -15,7 +15,7 @@ import { cellarHint, type CellarHint } from '../vgm/hints';
 import { eventTold, fadedOf } from '../vgm/events';
 import { festivityTold } from '../vgm/festivities';
 import { dwellersOf, keptOf } from '../vgm/leads';
-import { askWords, askedOne, twistOf } from '../vgm/asks';
+import { askDefOf, askWords, askedOne, thingOf, twistOf } from '../vgm/asks';
 import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type FestivityDecision } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
@@ -631,7 +631,12 @@ export function talkCellar(d: Decision, setting: SettingModule, town: Town, peop
   const twist = d.kind === 'dungeon' ? twistOf(setting, d.ask) : null;
   const homes = [...new Set(people.map((p) => p.home))].filter((h) => h !== dungeon.building && h >= 0);
   const rightful = twist?.kind === 'lied' && homes.length ? homes[dungeon.seed % homes.length] : undefined;
-  const twisted = twist ? { ...(twist.words.told ? { told: `${words?.told ?? ""} ${cap(twist.words.told)}` } : {}), ...(twist.words.thanks ? { thanks: cap(twist.words.thanks) } : {}) } : {};
+  // A thief let go, at it again (Q4): the household has its own idea who it is.
+  const again = d.kind === 'dungeon' && d.ask?.again && faced?.again ? ` ${cap(faced.again)}` : '';
+  // What they want (Q5), in their own words.
+  const wantLine = d.kind === 'dungeon' && d.ask?.want ? askDefOf(setting, d.ask)?.words.wants?.[d.ask.want.kind] : undefined;
+  const wanted = wantLine ? ` ${cap(fill(wantLine, { thing: thingOf(setting, d.kind === 'dungeon' ? d.ask : undefined, { family: '{family}', who: '{who}' })?.name ?? '' }))}` : '';
+  const twisted = twist || again || wanted ? { told: `${words?.told ?? ''}${wanted}${twist?.words.told ? ` ${cap(twist.words.told)}` : ''}${again}`, ...(twist?.words.thanks ? { thanks: cap(twist.words.thanks) } : {}) } : {};
   const gives = rightful !== undefined && twist?.words.give && twist.words.rightful ? { rightful, give: cap(twist.words.give), owned: cap(twist.words.rightful) } : {};
   const ask = words && d.kind === 'dungeon' && d.ask ? { verb: d.ask.verb, ...(said as Omit<typeof words, 'thief'>), ...twisted, ...gives, ...(lost ? { lost: lost.id } : {}), ...(thief ? { thief: thief.id } : {}), ...(faced ? { faced } : {}) } : null;
   return { sketch, hint: cellarHint(sketch, people, town.plan), ...(ask ? { ask } : {}) };
