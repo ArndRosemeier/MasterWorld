@@ -66,6 +66,7 @@ else {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   // The ability book shows the points too.
+  await page.evaluate(() => { window.game.character.points = 2; });
   await page.keyboard.press('KeyK');
   await page.waitForTimeout(1200);
   console.log(`book foot: ${await footText()}`);
@@ -77,7 +78,7 @@ else {
 await page.evaluate(() => {
   const g = window.game, c = g.character, d = g.setting.items.items.find((x) => x.id === 'learning-potion');
   c.pack.push({ def: d.id, rarity: 'common', name: d.name, bonuses: {}, lore: d.lore });
-  const s = g.towns.every[0].decision;
+  const s = g.towns.every[0].town.decision;
   g.player.teleport(s.x + 4, undefined, s.z + 4, Math.PI * 0.25);
 });
 await page.waitForTimeout(3000);
