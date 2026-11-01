@@ -193,7 +193,11 @@ export class Fight implements RecipeWorld {
     for (const e of this.den.step(dt, this.quarry(p))) this.denEvent(e, out);
     for (const e of this.recipes.elapse(dt, p, p.speed, breathe)) this.recipeEvent(e, out);
     const t = this.target;
-    if (t && t.state === 'dead') { this.target = null; this.attacking = false; }
+    // The target fell: the nearest of those still fighting the hero is the target now (the swinging goes on), else none.
+    if (t && t.state === 'dead') {
+      this.target = this.den.fighting.reduce<Creature | null>((best, c) => (!best || Math.hypot(c.x - p.x, c.z - p.z) < Math.hypot(best.x - p.x, best.z - p.z) ? c : best), null);
+      if (!this.target) this.attacking = false;
+    }
     if (hero.alive && this.attacking && this.target && this.swing === 0 && !this.recipes.isHeld(SELF) && !this.recipes.casting) this.blow(this.target, p, out);
     this.still = p.speed < 0.3 ? this.still + dt : 0;
     if (breathe) hero.recover(dt, this.den.fighting.length > 0 || this.quiet < 6, this.still);

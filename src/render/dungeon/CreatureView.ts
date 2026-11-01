@@ -9,7 +9,7 @@
  * cellar's origin.
  */
 import { Box3, Group, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
-import { Rng, deriveSeed, hexToRgb } from '@futuremagic/core';
+import { Rng, damp, deriveSeed, hexToRgb } from '@futuremagic/core';
 import { Character } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
@@ -28,6 +28,8 @@ import { Jolt, joltRoot, joltSpine } from '../jolt';
 import { limp, limpOf } from '../limp';
 import { PACE } from '../hero/clips';
 import { Held, Steady } from '../steady';
+import { AURAS } from '../aura/AuraView';
+import { FAINT, STRONG, auraReach, auraSize, healthLook } from '../../sim/aura';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -64,6 +66,9 @@ interface Shown {
   /** Blows taken so far (the den's count), and the last one's jolt. */
   blows: number;
   readonly jolt: Jolt;
+  /** How lit its aura is: the faint one (near the hero, in a fight) and the strong one (the hero's target), each eased 0..1. */
+  faint: number;
+  strong: number;
 }
 
 const yawOf = (dir: number) => Math.atan2(-Math.cos(dir), -Math.sin(dir));
@@ -159,7 +164,7 @@ export class CreatureView {
         v.group.add(fig.root);
         body = { kind: 'critter', fig, scale };
       }
-      v.shown.push({ c, body, st: new Steady().ease(0, c.x, c.y, c.z, yawOf(c.dir)), look: new Held(''), blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0, blows: c.blows, jolt: new Jolt() });
+      v.shown.push({ c, body, st: new Steady().ease(0, c.x, c.y, c.z, yawOf(c.dir)), look: new Held(''), blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0, blows: c.blows, jolt: new Jolt(), faint: 0, strong: 0 });
     }
     v.pose(0);
     return v;
@@ -266,6 +271,23 @@ export class CreatureView {
           if (f) joltSpine(p.ch.actor.bones, f.names, s.jolt, 0.45);
         }
       }
+    }
+  }
+
+  /**
+   * The auras of this frame (sim/aura.ts): while a fight is on (`on`) every living creature within reach of the
+   * hero (`hero`, in the den's frame) is faintly lit in its health's colour, `target` strongly. They ease in and out.
+   */
+  auras(dt: number, hero: { readonly x: number; readonly z: number }, target: Creature | null, on: boolean): void {
+    const O = this.group.position;
+    for (const s of this.shown) {
+      const c = s.c, live = c.state !== 'dead';
+      s.faint += ((on && live ? auraReach(Math.hypot(c.x - hero.x, c.z - hero.z)) : 0) - s.faint) * damp(5, dt);
+      s.strong += ((live && c === target ? 1 : 0) - s.strong) * damp(8, dt);
+      const k = Math.max(s.faint * FAINT, s.strong * STRONG);
+      if (k <= 0.003) continue;
+      const size = auraSize(c.def), look = healthLook(c.health / Math.max(1, c.def.health));
+      AURAS.mark(s.st.x + O.x, s.st.y + O.y + size.lift, s.st.z + O.z, k, size.halfW, size.halfH, (c.id * 0.6180339) % 1, look.r, look.g, look.b, look.dim);
     }
   }
 
