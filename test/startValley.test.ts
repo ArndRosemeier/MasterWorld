@@ -9,10 +9,14 @@ import { byFreshWater } from '../src/world/freshWater';
 import { orbitPose, steadyHeight, type Orbit } from '../src/app/title/route';
 import { SMALL } from './small';
 
+/** A world's terrain, made once for the tests of this file (its hydrology is the slow part). */
+const worlds = new Map<string, Terrain>();
+const worldOf = (name: string): Terrain => { if (!worlds.has(name)) worlds.set(name, new Terrain(parseSeed(name), classic, SMALL)); return worlds.get(name)!; };
+
 // L5 (D56): the classic setting asks for its start in a mesa valley; every seed's start town stands there.
 for (const name of ['masterworld', 'alpha']) {
   test(`start valley (${name}): the start town stands in mesa country by fresh water, plateaus in view, on a valley floor or at the sea`, () => {
-    const terrain = new Terrain(parseSeed(name), classic, SMALL);
+    const terrain = worldOf(name);
     const town = firstDecisions(terrain, startPlace(terrain)).find((d) => d.kind === 'town')!;
     const sk = terrain.skeleton;
     assert.ok(town, 'a start town');
@@ -35,7 +39,7 @@ for (const name of ['masterworld', 'alpha']) {
 }
 
 test('start valley: the title orbit over the start town keeps above the land and climbs no wall in a jump', () => {
-  const terrain = new Terrain(parseSeed('masterworld'), classic, SMALL);
+  const terrain = worldOf('masterworld');
   const town = firstDecisions(terrain, startPlace(terrain)).find((d) => d.kind === 'town')!;
   const ground = (x: number, z: number) => terrain.height(x, z);
   for (const near of [0]) {
