@@ -324,8 +324,8 @@ export interface CaveDressDef {
   readonly floor: { readonly silt: readonly [number, number]; readonly relief: number };
   /** Fallen rock: stones along the walls' feet (per 100 m of way), under a collapse (per hall) and their size (half-size, least and most). */
   readonly rocks: { readonly along: number; readonly perHall: readonly [number, number]; readonly size: readonly [number, number] };
-  /** The stream of the live level: its width (least, most) and how deep the bed is cut; pools along it (per 100 m) and their depth. */
-  readonly water: { readonly width: readonly [number, number]; readonly bed: number; readonly pools: number; readonly poolDepth: number };
+  /** The stream of the live level: its width (least, most) and how deep the bed is cut, and the most it is cut into a floor that stands higher over the water (where the floor stands higher there is no stream); pools along it (per 100 m) and their depth. */
+  readonly water: { readonly width: readonly [number, number]; readonly bed: number; readonly pools: number; readonly poolDepth: number; readonly cutMost: number };
   /** Drips fall along the cracks that cross a way's roof: chance at each spacing metres along the crack, the drips still running (the rest are dead), the crack's spacing; and drips from the roof away from any crack, per 100 m of way. */
   readonly drips: { readonly chance: number; readonly live: number; readonly spacing: number; readonly scatter: number };
   /** Loose stones, per 100 m of way: their half-size (least, most; most are small: a power law), how many gather in heaps, and the most in a cave. */
@@ -2055,7 +2055,7 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
   if (!(d.stones.per100 >= 0 && d.stones.most >= 0 && d.stones.heaps >= 0 && d.stones.heaps <= 1 && d.crystals.per100 >= 0 && d.crystals.oreTries >= 0)) out.push(`${where}: cave stones and crystals need counts, and heaps a share`);
   if (!(d.floor.relief >= 0 && d.floor.relief <= 1)) out.push(`${where}: cave floor relief must be 0 to 1 m`);
   if (!(d.drips.chance >= 0 && d.drips.chance <= 1 && d.drips.live >= 0 && d.drips.live <= 1 && d.drips.spacing > 0.3 && d.drips.scatter >= 0)) out.push(`${where}: cave drips need chances 0 to 1 and a crack spacing over 0.3 m`);
-  if (!(d.formations.most > 0 && d.formations.column > 0 && d.water.bed >= 0 && d.water.poolDepth >= 0)) out.push(`${where}: cave formations and water need positive sizes`);
+  if (!(d.formations.most > 0 && d.formations.column > 0 && d.water.bed >= 0 && d.water.poolDepth >= 0 && d.water.cutMost > 0)) out.push(`${where}: cave formations and water need positive sizes`);
   range(c.ore.bodies, 'ore bodies');
   return out;
 }

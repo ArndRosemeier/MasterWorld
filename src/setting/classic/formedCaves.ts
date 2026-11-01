@@ -66,7 +66,8 @@ export const caves: CavesDef = {
   dress: {
     floor: { silt: [0.08, 0.32], relief: 0.14 },
     rocks: { along: 16, perHall: [8, 16], size: [0.35, 1.5] },
-    water: { width: [0.5, 1.5], bed: 0.28, pools: 4, poolDepth: 0.4 },
+    // (`cutMost`: the stream's bed is never cut deeper than a step into the floor; where the floor stands higher over the water, there is no stream.)
+    water: { width: [0.5, 1.5], bed: 0.28, pools: 4, poolDepth: 0.4, cutMost: 0.4 },
     drips: { chance: 0.55, live: 0.55, spacing: 1.7, scatter: 18 },
     stones: { per100: 520, size: [0.06, 0.7], heaps: 0.3, most: 4500 },
     crystals: { per100: 9, count: [3, 9], len: [0.1, 0.5], oreTries: 5000 },
