@@ -61,6 +61,14 @@ export const caves: CavesDef = {
   // No squeezing (D63): a way is 2 m wide and 2.8 m high at the least, for a hero up to 2.1 m tall.
   way: { minWidth: 2, minHeight: 2.8, maxRadius: 5.5, maxCut: 14 },
   walls: { rough: 0.7 },
+  // The dresser (K3): silt and fallen rock, a stream with pools, drips along the roof's cracks with their formations.
+  dress: {
+    floor: { silt: [0.08, 0.32], relief: 0.14 },
+    rocks: { along: 16, perHall: [8, 16], size: [0.35, 1.5] },
+    water: { width: [0.5, 1.5], bed: 0.28, pools: 4, poolDepth: 0.4 },
+    drips: { chance: 0.55, live: 0.55, spacing: 1.7, scatter: 18 },
+    formations: { length: [0.2, 2.6], age: 0.5, column: 7, straws: 0.12, most: 3000 },
+  },
   // Ore is for show (no mining, ever): veins on faults and joints, seams along a bed, pockets.
   ore: {
     bodies: [1, 4],

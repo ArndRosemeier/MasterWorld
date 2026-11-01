@@ -50,9 +50,12 @@ export function brickField(ox: number, oy: number, oz: number, step: number, nx:
   return { ox, oy, oz, step, nx, ny, nz, bx, by, bz, bricks: new Array<Float32Array | null>(bx * by * bz).fill(null) };
 }
 
+/** The index in `bricks` of the brick holding sample (i, j, k). */
+export const brickIndex = (f: BrickField, i: number, j: number, k: number): number => ((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0));
+
 /** Set a sample of a field in bricks (its brick is made when first needed). */
 export function setSample(f: BrickField, i: number, j: number, k: number, v: number): void {
-  const b = ((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0));
+  const b = brickIndex(f, i, j, k);
   let brick = f.bricks[b];
   if (!brick) {
     if (v === -1) return;
@@ -64,7 +67,7 @@ export function setSample(f: BrickField, i: number, j: number, k: number, v: num
 /** A sample of a field (inside its grid). */
 export function sampleOf(f: AnyField, i: number, j: number, k: number): number {
   if ('d' in f) return f.d[i + f.nx * (j + f.ny * k)];
-  const brick = f.bricks[((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0))];
+  const brick = f.bricks[brickIndex(f, i, j, k)];
   return brick ? brick[(i % BRICK) + BRICK * ((j % BRICK) + BRICK * (k % BRICK))] : -1;
 }
 

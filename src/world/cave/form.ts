@@ -3,8 +3,10 @@
  * and the carver, with what each took (the mesh is made apart: it is the slow part, and the game makes it per brick).
  */
 import type { CaveSizeDef, CavesDef } from '../../setting/contract';
+import type { BrickField } from '../dungeon/rockMesh';
 import { rockBlock, type CaveLand, type RockBlock } from './block';
 import { carveSkeleton, type FormedField } from './carve';
+import { dressCave, type Dressing } from './dress';
 import { rockById, sizeFor } from './choose';
 import { previewLand } from './land';
 import type { Skeleton } from './skeleton';
@@ -25,3 +27,6 @@ export function formCave(caves: CavesDef, seed: number, rockId: string, sizeId?:
   const t1 = since(), skeleton = formSolution(block, caves, size.scale, size.step, since), t2 = since(), field = carveSkeleton(skeleton, block, caves, size.field), t3 = since();
   return { block, skeleton, field, ms: { block: t1 - t0, form: t2 - t1, carve: t3 - t2, total: t3 - t0 } };
 }
+
+/** Dress a formed cave (silt, stream, rocks, drips and formations): edits its field, so mesh it after. */
+export const dressFormed = (c: FormedCave, caves: CavesDef): Dressing => dressCave(c.skeleton, c.block, c.field as BrickField, caves);
