@@ -822,5 +822,49 @@
   {
     "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/cave/reader.ts + masterworld/world/hydro.ts + masterworld/world/lakes.ts",
     "reason": "Stack-and-heap loops (pop until empty, size of a search frontier) written out in each search; the cave reader's Dijkstra and flood fills, not a copy."
+  },
+  {
+    "key": "clone: masterworld/sim/formedGround.ts#slide + masterworld/sim/wild.ts#slide",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/particles.ts#spot + masterworld/sim/formedGround.ts#spot",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#clearance + masterworld/sim/formedGround.ts#clearance",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#slide + masterworld/sim/formedGround.ts#slide",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#spot + masterworld/sim/formedGround.ts#spot",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#way + masterworld/sim/formedGround.ts#way",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#clearance + masterworld/sim/wild.ts#clearance",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#floorAt + masterworld/world/dungeon/space.ts#floorAt",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#hop + masterworld/sim/wild.ts#hop",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#sees + masterworld/sim/wild.ts#sees",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#slide + masterworld/sim/wild.ts#slide",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
   }
 ]
