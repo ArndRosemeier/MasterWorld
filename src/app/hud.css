@@ -44,8 +44,6 @@
 /* The foe's level on a small seal at the plate's left (D58). */
 #fight .target .lvl { position: absolute; left: 10px; top: 8px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 13px 'Marcellus SC', Georgia, serif; color: #2a1c0c; background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 60%, var(--brass-dark)); box-shadow: 0 0 6px var(--threat, var(--ward)); }
 #fight .target .state { font-size: 12px; text-align: center; color: var(--ink-dim); font-style: italic; height: 15px; }
-#fight .target .bar { height: 9px; margin-top: 4px; border-radius: 5px; background: #0b0807; border: 1px solid var(--brass-lo); overflow: hidden; }
-#fight .target .bar div { height: 100%; background: linear-gradient(#ff8a7a, #9d1f17); transition: width .3s; }
 #fight .target .ward { position: absolute; inset: 3px; border-radius: 6px; border: 1px solid var(--threat, var(--ward)); box-shadow: 0 0 8px var(--threat, var(--ward)); animation: hud-pulse 2.4s ease-in-out infinite; pointer-events: none; }
 #fight .target .hit { position: absolute; right: 10px; top: -6px; font: 18px 'Marcellus SC', serif; color: #ffd27a; text-shadow: 0 1px 3px #000; animation: hud-rise .9s ease-out forwards; }
 #fight .target .hit.miss { color: var(--ink-dim); font-size: 14px; }

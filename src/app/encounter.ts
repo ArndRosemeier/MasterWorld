@@ -321,6 +321,8 @@ export class Encounter {
     if (this.wasFighting > 0 && fighting === 0) this.director.met('challenge');
     if ((this.wasFighting > 0) !== (fighting > 0)) this.onCue({ kind: 'battle', on: fighting > 0 });
     this.wasFighting = fighting;
+    // Aura round every creature near in a fight, strong round the hero's target (sim/aura.ts).
+    this.creatures.auras(dt, pose, lead ? this.fight.target : null, fighting > 0 || !!this.fight.target);
     if (!this.quietSaid && this.delve.beaten) {
       this.quietSaid = true;
       this.onCue({ kind: 'quiet' });

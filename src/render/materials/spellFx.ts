@@ -37,8 +37,9 @@ export const SPRITE_DATA = {
   look: dyn(),
 };
 
-function dyn(): InstancedBufferAttribute {
-  const a = new InstancedBufferAttribute(new Float32Array(SPRITE_CAP * 4), 4);
+/** A per-instance attribute of four floats for `cap` instances, rewritten every frame (the aura shader uses it too). */
+export function dyn(cap = SPRITE_CAP): InstancedBufferAttribute {
+  const a = new InstancedBufferAttribute(new Float32Array(cap * 4), 4);
   a.setUsage(DynamicDrawUsage);
   return a;
 }

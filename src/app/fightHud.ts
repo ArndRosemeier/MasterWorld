@@ -32,7 +32,6 @@ export class FightHud {
   private readonly target = el('div', { className: 'target plate' });
   private readonly tName = el('div', { className: 'name' });
   private readonly tState = el('div', { className: 'state' });
-  private readonly tBar = el('div');
   /** The foe's level (D58): the level whose even fight it is. */
   private readonly tLevel = el('div', { className: 'lvl' });
   /** The hero's level engraved on a brass seal by the vials (D58; the way to the next is the action bar's experience rule). */
@@ -52,7 +51,7 @@ export class FightHud {
       return { box, liquid, text, was: -1 };
     };
     this.vials = { health: vial('health'), stamina: vial('stamina'), mana: vial('mana') };
-    this.target.append(el('div', { className: 'ward' }), this.tLevel, this.tName, this.tState, el('div', { className: 'bar' }, this.tBar));
+    this.target.append(el('div', { className: 'ward' }), this.tLevel, this.tName, this.tState);
     const level = el('div', { className: 'level' }, this.seal);
     this.root.append(this.hurtEdge, el('div', { className: 'gauges plate' }, level, this.vials.health.box, this.vials.stamina.box, this.vials.mana.box), this.target, this.prompt, this.finds, this.dark);
     document.body.append(this.root);
@@ -94,9 +93,8 @@ export class FightHud {
       if (this.target.style.getPropertyValue('--threat') !== THREAT[threat]) this.target.style.setProperty('--threat', THREAT[threat]);
       // Several at once: the ward and the words are for all of them ("the pack" when it hunts as one).
       const who = together ? (t.def.pack ? 'the pack: ' : 'together: ') : '';
-      const state = [STATE[t.state], who + THREAT_WORD[threat]].filter(Boolean).join(' · '), bar = `${Math.max(0, (t.health / t.def.health) * 100).toFixed(1)}%`;
+      const state = [STATE[t.state], who + THREAT_WORD[threat]].filter(Boolean).join(' · ');
       if (this.tState.textContent !== state) this.tState.textContent = state;
-      if (this.tBar.style.width !== bar) this.tBar.style.width = bar;
     }
     this.prompt.classList.toggle('shown', !!search);
     if (search && search !== this.searchShown) this.prompt.replaceChildren(el('b', {}, keyLabel(this.bindings().search[0])), ` ${search}`);
