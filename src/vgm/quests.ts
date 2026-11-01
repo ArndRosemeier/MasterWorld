@@ -32,6 +32,27 @@ export function questFor(a: QuestAsk, c: DungeonContext): DungeonDecision | null
   return d && { ...d, building: a.building, quest: a.guild.keeper, at: a.hours };
 }
 
+/** The place a guild's task names (null: none named, as in a save from before tasks named one). */
+export function taskOf(log: DecisionLog, keeper: string): DungeonDecision | null {
+  for (const d of log) if (d.kind === 'dungeon' && d.task === keeper) return d;
+  return null;
+}
+
+/**
+ * The place for a guild's task (D49), named when the trainer gives it: of the kind the task asks (below a
+ * house, out on the land, or any), for the trainer's town. Out on the land its household is the trainer's own,
+ * so the hero comes back to tell them; a cellar keeps its own household. Null: named already, or none fits.
+ */
+export function taskFor(a: QuestAsk, c: DungeonContext): DungeonDecision | null {
+  const t = a.guild.task;
+  if (taskOf(c.log, a.guild.keeper)) return null;
+  const all = Object.keys(c.dungeons).filter((k) => !t.house && !t.out || (c.dungeons[k]!.form.stands === 'house') === !!t.house);
+  // Not always the first kind: which one comes first turns with the log.
+  const kinds = all.map((_, i) => all[(i + c.log.length) % all.length]);
+  const d = dungeonFor({ purpose: 'lead', town: a.town, kinds }, c);
+  return d && { ...d, ...(d.site ? { building: a.building } : {}), task: a.guild.keeper, at: a.hours };
+}
+
 /** The guild whose master's deed promise `id` is (null: it is no such deed). */
 export function questGuild(setting: Pick<SettingModule, 'guilds'>, log: DecisionLog, id: string): GuildDef | null {
   const d = log.find((x) => x.id === id);

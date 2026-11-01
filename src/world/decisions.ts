@@ -70,6 +70,8 @@ export interface DungeonDecision {
   readonly event?: string;
   /** The guild whose master asked for it, as their one deed (C14: a keeper's id); its household is the master's. */
   readonly quest?: string;
+  /** The guild whose task it is (D49: a keeper's id): the one place that does the task. */
+  readonly task?: string;
 }
 
 /**

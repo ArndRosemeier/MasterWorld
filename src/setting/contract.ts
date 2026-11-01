@@ -1021,9 +1021,11 @@ export interface ShopDef {
  * abilities (of level `from` and up) are taught only once it is done.
  */
 export interface GuildTaskDef {
-  /** What the trainer asks, and says when it is done. */
+  /** What the trainer asks ({place}: the one place that does it, named when the task is given), and says when it is done. */
   readonly ask: string;
   readonly done: string;
+  /** Said for {place} when no place fits (any place of the task's kind does it then). */
+  readonly anywhere: string;
   /** Only a place out on the land counts (a barrow, a cave, a tower), not a cellar. */
   readonly out?: boolean;
   /** Only a place below a house counts (a cellar), not one out on the land. */

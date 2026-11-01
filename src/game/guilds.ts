@@ -9,7 +9,8 @@ import { hexToRgb } from '@futuremagic/core';
 import { fill } from '../talk/folk';
 import { cap } from '../talk/townTalk';
 import { compass } from '../vgm/dungeons';
-import { questOf, questReward } from '../vgm/quests';
+import { questOf, questReward, taskOf } from '../vgm/quests';
+import { keptOf } from '../vgm/leads';
 import { houseShape, polyCentroid, signPlace, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import { abilityOf, guildOf, type AbilityDef, type GuildDef, type SettingModule } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
@@ -148,10 +149,14 @@ export class GuildBook {
   /** Whether the task was given. */
   asked(guild: string): boolean { return this.given.has(guild); }
 
-  /** Whether the guild's task is done: a promise kept since it was given (out on the land, or below a house, if it asks so). */
+  /** Whether the guild's task is done: the place the trainer named is kept (an older task: any place of its kind kept since it was given). */
   taskDone(g: GuildDef, log: DecisionLog): boolean {
     const from = this.given.get(g.keeper);
     if (from === undefined) return false;
+    // The place the trainer named: only that one does it.
+    const named = taskOf(log, g.keeper);
+    if (named) return keptOf(log).has(named.id);
+    // A task from before tasks named a place (or none fitted): any place of its kind kept since.
     for (const d of log) {
       if (d.kind !== 'kept' || d.at < from) continue;
       const p = log.find((x) => x.id === d.promise);
