@@ -18,6 +18,8 @@ const HOMES = new Set<Place['kind']>(['void', 'deadEnd', 'alcove', 'junction', '
 const APART = 12;
 /** Props set down on a floor keep this far from one another (m). */
 const CLEAR = 0.9;
+/** Nothing is set down this close to the way in (m): the portal's window and the walk out stay clear. */
+const MOUTH = 4;
 /** A home has at least this many cells to live on round it (about 10 m2 of floor). */
 const ROOMY = 30;
 /** Under a skylight the daylight hangs this high over the floor (m), as a natural cave's shaft does (world/dungeon/torches.ts). */
@@ -96,7 +98,10 @@ export function inhabit(cellar: Cellar, field: BrickField, reading: Reading, thr
   // Daylight under each skylight: the cavern's shaft lights its floor in a pool.
   const glows = reading.places.filter((p) => p.kind === 'skylight').map((p) => ({ x: p.x, y: p.y + SHAFT_UP, z: p.z }));
   const placed: Prop[] = [];
-  const roomAt = (a: { x: number; z: number }): number => placed.reduce((m, q) => Math.min(m, Math.hypot(q.x - a.x, q.z - a.z)), Infinity);
+  // The way out stands at the throat (the entry cell, facing in).
+  const e = reading.entries[0] ?? cells[cellar.graph.entrance];
+  // How clear a spot is of the other props, and of the way in (scaled so that MOUTH metres from it count as CLEAR).
+  const roomAt = (a: { x: number; z: number }): number => Math.min(placed.reduce((m, q) => Math.min(m, Math.hypot(q.x - a.x, q.z - a.z)), Infinity), (Math.hypot(reading.x[e] - a.x, reading.z[e] - a.z) * CLEAR) / MOUTH);
   const setDown = (p: Prop): Prop => {
     // A spot of its room's home clear of the other props (the roomiest of a few tries if the home is crowded).
     let at = ground.spot(p.room, rng), room = roomAt(at);
@@ -105,8 +110,6 @@ export function inhabit(cellar: Cellar, field: BrickField, reading: Reading, thr
     placed.push(out);
     return out;
   };
-  // The way out stands at the throat (the entry cell, facing in).
-  const e = reading.entries[0] ?? cells[cellar.graph.entrance];
   const hatch: Prop = { ...cellar.hatch, x: reading.x[e], y: reading.y[e], z: reading.z[e], ...(throat ? { yaw: throat.yaw } : {}) };
   const props = cellar.props.map((p) => (p === cellar.hatch ? hatch : setDown(p)));
   return { cellar: { ...cellar, props, hatch, formed: { homes, glows } }, ground, cells };

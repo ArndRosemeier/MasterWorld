@@ -34,6 +34,8 @@ test('inhabit: a cave outline gets its rooms as places of the formed cave: the w
     }
     const spots = h.cellar.props.filter((p) => p !== h.cellar.hatch);
     for (let i = 0; i < spots.length; i++) for (let j = i + 1; j < spots.length; j++) assert.ok(Math.hypot(spots[i].x - spots[j].x, spots[i].z - spots[j].z) > 0.3, 'props apart');
+    // The way out stays clear: nothing stands in the portal's window (the hatch itself is not drawn at a throat).
+    for (const p of spots) assert.ok(Math.hypot(p.x - h.cellar.hatch.x, p.z - h.cellar.hatch.z) > 2.5, `${p.kind} stands ${Math.hypot(p.x - h.cellar.hatch.x, p.z - h.cellar.hatch.z).toFixed(1)} m from the way out`);
     // The lair's hoard lies at its home.
     const lair = hoardsOf(h.cellar, classic.creatures).find((x) => !x.prop)!;
     const home = h.cellar.formed!.homes[g.goal];
