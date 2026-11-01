@@ -83,6 +83,8 @@ const PULL_RISE = 0.5;
 const OFF_FACE = 0.35;
 /** Pushing into a climbable face this long starts a climb (s): no climb by brushing past. */
 const GRIP_ON = 0.25;
+/** The highest ledge in a cave the body hops up on (m): a jump rises about a metre, and the feet go over an edge within a step of its top. */
+const HOP = 1.3;
 /**
  * How far a swimming body ducks to get under a lower roof ahead (m), at most, tried a hand apart from the least: a
  * lintel, or a drowned way's mouth under the water of a chamber with air (swum at the surface, its roof well under it).
@@ -294,7 +296,7 @@ export class Walker {
     // Pushing on into a face with holds: onto it.
     if (asked && intent.forward > 0.5 && this.stuckFor > 0 && this.spec.climb && (this.world.climbable || this.inRock())) {
       this.pushing += dt;
-      if (this.pushing >= GRIP_ON && this.gripFace(-sh, -ch)) return;
+      if (this.pushing >= GRIP_ON && (this.gripFace(-sh, -ch) || this.hopLedge(-sh, -ch))) return;
     } else this.pushing = 0;
 
     // Up and down.
@@ -397,6 +399,22 @@ export class Walker {
     p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.yaw = Math.atan2(-c.nx, -c.nz);
+    this.pushing = 0;
+    return true;
+  }
+
+  /**
+   * In a cave, pushing on into rock that is too high to step and too low to climb (a ledge, a rough steep ramp of the
+   * floor): the body hops up on it, seen as a jump. Whether it did.
+   */
+  private hopLedge(dx: number, dz: number): boolean {
+    if (!this.inRock() || this.mode !== 'ground') return false;
+    const p = this.pos, r = this.spec.radius + 0.25, fx = p.x + dx * r, fz = p.z + dz * r;
+    const top = this.support(fx, fz, p.y + HOP - this.spec.step);
+    if (top <= p.y + this.spec.step || top > p.y + HOP || this.bodyInRock(fx, top, fz)) return false;
+    this.mode = 'air';
+    this.vel.y = this.spec.jump;
+    this.airTop = p.y;
     this.pushing = 0;
     return true;
   }
