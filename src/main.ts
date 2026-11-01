@@ -66,7 +66,7 @@ import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
 import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
-import { askOf, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
+import { askNamed, askOf, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
@@ -583,6 +583,9 @@ export async function start(b: Boot): Promise<void> {
     let playing = !title && !((params.create && !save) || save?.heir);
     // The VGM's decisions so far (the towns' orders among them: each town's people follow theirs, game/township.ts).
     let log: readonly Decision[] = [...opened.log, ...later];
+    // `ask=`: what the households of the first places ask (D62), for looking at it.
+    const looked = params.ask && !save ? askNamed(setting, params.ask) : null;
+    if (looked) log = log.map((d) => (d.kind === 'dungeon' && !d.quest && !d.task ? { ...d, ask: looked } : d));
     // `moved`: the first cellar was cleared long ago, and new dwellers have moved in since.
     const cleared = params.moved && start ? firstDungeon(log) : null;
     if (cleared && start && !keptOf(log).has(cleared.id)) {

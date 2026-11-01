@@ -31,6 +31,9 @@ export class CellarView {
   /** The keys lying where they are picked up, by room; and the rooms whose key is taken. */
   private readonly keys = new Map<number, Mesh>();
   private readonly taken = new Set<number>();
+  /** A seal's breach walled up (D62), course by course; and how far it is set (0..1). */
+  private seal: Mesh[] = [];
+  private sealed = 0;
   /** A cave's carved rock (world/dungeon/caveRock.ts), drawn with the rest; set before `add`. */
   rock: BuildingMesh | null = null;
   /** A cave's water and shafts of daylight (world/dungeon/caveFeatures.ts); set before `add`. */
@@ -56,6 +59,9 @@ export class CellarView {
       this.lids.push({ pivot: this.onPivot(l.mesh, `chest lid ${i}`, l.hinge), axis: new Vector3(l.axis[0], 0, l.axis[1]) });
       this.lidUp(i, this.lift.get(i) ?? 0);
     });
+    this.seal = m.seal.map((c, i) => this.piece(c, `seal course ${i}`));
+    for (const c of this.seal) this.group.add(c);
+    this.sealUp(this.sealed);
     for (const k of m.keys) {
       const mesh = this.piece(k.mesh, `key ${k.room}`);
       mesh.visible = !this.taken.has(k.room);
@@ -153,6 +159,13 @@ export class CellarView {
     this.lift.set(i, k);
     const l = this.lids[i];
     if (l) l.pivot.quaternion.setFromAxisAngle(l.axis, LID_OPEN * k);
+  }
+
+  /** The breach walled up as far as `k` (0 open .. 1 closed): a course more shows for each part set. */
+  sealUp(k: number): void {
+    this.sealed = k;
+    const n = Math.ceil(k * this.seal.length - 1e-6);
+    this.seal.forEach((c, i) => (c.visible = i < n));
   }
 
   private piece(m: BuildingMesh, name: string): Mesh {

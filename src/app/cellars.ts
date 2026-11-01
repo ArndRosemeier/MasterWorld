@@ -506,6 +506,9 @@ export class Cellars {
     // The chests stand open that were opened (before these dwellers too), shut the rest; searched, a lid lifts.
     for (const x of hoardsOf(cellar, h.setting.creatures)) if (x.prop) b.view.lidUp(x.id, b.delve.hasOpened(x) ? 1 : 0);
     b.fight.onLid = (id, k) => b.view.lidUp(id, k);
+    // A seal's breach (D62): walled up before, or seen walled up as the hero sets the stones.
+    b.view.sealUp(b.delve.sealed ? 1 : 0);
+    b.fight.onSeal = (k) => b.view.sealUp(k);
   }
 
   /** The newest dwellers' warm-up (loading waits for the first cellar's; later ones warm while the hero walks to the hatch). */

@@ -53,7 +53,7 @@ const FOOT: Readonly<Record<DungeonProp, readonly [number, number]>> = {
   table: [0.58, 0.45], stool: [0.26, 0.26], cot: [0.96, 0.5], straw: [0.62, 0.5], rubble: [0.75, 0.75], bones: [0.35, 0.35],
   candle: [0.12, 0.12], lantern: [0.13, 0.13], ledger: [0.27, 0.22], chest: [0.47, 0.28], web: [0.85, 0.3], nest: [0.75, 0.75],
   vat: [0.7, 0.7], bricks: [0.42, 0.32], beam: [1.25, 0.5], puddle: [0.7, 0.5], bin: [0.55, 0.35], jar: [0.2, 0.2],
-  ladder: [0.35, 0.3], door: [0.7, 0.3],
+  ladder: [0.35, 0.3], door: [0.7, 0.3], breach: [0.75, 0.3],
 };
 const LOOSE: ReadonlySet<DungeonProp> = new Set(['bones', 'straw', 'rubble', 'nest']);
 /** The floor kept clear before a doorway: half its width, and how far into the room (m). */
@@ -479,6 +479,8 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: ScaledLayout
   // The way out first (the ladder up to the hatch, a tower's door), so nothing stands in front of it.
   put(graph.entrance, shape.way);
   const hatch = props[0];
+  // A seal (D62): the breach they come through, in a wall of the last room, before anything stands there.
+  if (sketch.decision.ask?.verb === 'seal') put(graph.goal, 'breach');
   // The set piece next (its clues must find a place): its own dressing and its clues.
   piece.dress({ link, graph, rooms, trouble, dweller: now, rng, put, clue: (text, room, l) => { clues.push({ text, room, ...(l !== undefined ? { link: l } : {}) }); return clues.length - 1; } });
   // Traces of history: each layer's in the rooms of its time, the dwellers' also near the entrance (foreshadowing).

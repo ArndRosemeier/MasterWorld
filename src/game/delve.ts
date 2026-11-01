@@ -23,12 +23,16 @@ export interface DelveSave {
   /** Bodies searched, by den index; hoards opened, by hoard id. */
   readonly searched: readonly number[];
   readonly opened: readonly number[];
+  /** A seal's breach walled up (D62; none in older saves: not). */
+  readonly sealed?: boolean;
 }
 
 /** Something within reach to search. */
 export type Lootable =
   | { readonly kind: 'body'; readonly who: Creature; readonly x: number; readonly y: number; readonly z: number; readonly name: string }
-  | { readonly kind: 'hoard'; readonly hoard: Hoard; readonly x: number; readonly y: number; readonly z: number; readonly name: string };
+  | { readonly kind: 'hoard'; readonly hoard: Hoard; readonly x: number; readonly y: number; readonly z: number; readonly name: string }
+  /** A seal's breach (D62), to wall up: the hero kneels and sets the stones. */
+  | { readonly kind: 'breach'; readonly x: number; readonly y: number; readonly z: number; readonly name: string };
 
 /** How close the hero must be to search something, metres. */
 const REACH = 1.9;
@@ -51,6 +55,7 @@ export class Delve {
     this.hoards = cellar ? hoardsOf(cellar, setting.creatures) : [];
     for (const h of saved?.opened ?? []) this.opened.add(h);
     for (const b of saved?.searched ?? []) this.searched.add(b);
+    this.sealed = !!saved?.sealed;
     // The fallen not yet searched still carry what they had (rolled from their own seed).
     for (const c of this.den.creatures) if (c.state === 'dead' && !this.searched.has(c.id)) this.fight.restoreBody(c);
   }
@@ -72,11 +77,21 @@ export class Delve {
   ask: PromiseAsk | null = null;
   keepsake: Item | null = null;
   found = false;
+  /** A seal's breach is walled up (D62). */
+  sealed = false;
+
+  /** A seal's breach (D62): the prop in the wall of the last room; null if the place has none. */
+  get breach(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null {
+    return this.cellar?.props.find((p) => p.kind === 'breach') ?? null;
+  }
+
+  /** Wall up the breach (the hero's kneel has set the last stone). */
+  seal(): void { if (this.breach) this.sealed = true; }
 
   /** What the promise asks is done (D62): only the thing it names counts (beaten, the keepsake in hand, the lost one found). */
   get met(): boolean {
     const k = this.keepsake;
-    return askMet(this.ask, { beaten: this.beaten, holds: !!k?.keepsake && holdsKeepsake(this.hero.pack, k.keepsake), found: this.found });
+    return askMet(this.ask, { beaten: this.beaten, holds: !!k?.keepsake && holdsKeepsake(this.hero.pack, k.keepsake), found: this.found, sealed: this.sealed });
   }
 
   step(dt: number, pose: HeroPose, breathe = true): FightEvent[] {
@@ -92,6 +107,12 @@ export class Delve {
       const d = near(c.x, c.y, c.z);
       if (d < bd) { bd = d; best = { kind: 'body', who: c, x: c.x, y: c.y, z: c.z, name: `the ${c.def.name}` }; }
     }
+    // A seal's breach still open: walled up from before it (it stands in the wall: reach it from further off).
+    const b = this.breach;
+    if (b && !this.sealed && this.ask?.verb === 'seal') {
+      const d = near(b.x, b.y, b.z) - 0.6;
+      if (d < bd) { bd = d; best = { kind: 'breach', x: b.x, y: b.y, z: b.z, name: 'the breach' }; }
+    }
     // A chest stands by the wall: reach it from a little further off.
     for (const h of this.hoards) {
       if (this.opened.has(h.id)) continue;
@@ -104,6 +125,7 @@ export class Delve {
   /** Search it: what it held goes into the pack (null if it was already empty or taken). */
   plunder(l: Lootable): Loot | null {
     let loot: Loot | null;
+    if (l.kind === 'breach') return null;
     if (l.kind === 'body') {
       loot = this.fight.search(l.who);
       if (loot) this.searched.add(l.who.id);
@@ -130,6 +152,7 @@ export class Delve {
       spared: this.den.creatures.filter((c) => c.state === 'meek').map((c) => c.id),
       searched: [...this.searched],
       opened: [...this.opened],
+      ...(this.sealed ? { sealed: true } : {}),
     };
   }
 }

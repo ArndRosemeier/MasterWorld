@@ -417,6 +417,10 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       // Quiet, and the hero gone: back to its household to tell them (plan 4.2). They pay, the promise is
       // kept, and with the next lead already about they pass on its rumour.
       if (keepsake && !holdsKeepsake(hero.pack, lead.id)) throw new Broke(`came out of ${name} without ${keepsake.name}`);
+      if (ask?.verb === 'seal') {
+        if (!saved?.sealed) throw new Broke(`came out of ${name} with its breach still open`);
+        say(`walled up the breach in ${name}`);
+      }
       if (ask?.verb === 'lost' && ask.alive) {
         if (!found) throw new Broke(`came out of ${name} without finding ${names.who}`);
         say(`found ${names.who} alive; they walk home`);

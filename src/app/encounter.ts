@@ -88,11 +88,16 @@ export type FightCue =
   | { readonly kind: 'woke' }
   | { readonly kind: 'paid'; readonly coins: number };
 
+/** Walling up a breach (D62): seconds the stones take, and where the hero kneels before it (m out from it). */
+const SEAL_BUSY = 7, SEAL_FRONT = 0.75;
+
 export class Encounter {
   /** Hears every cue (the game's sound sets it); nothing listens by default. */
   onCue: (cue: FightCue) => void = () => {};
   /** A chest's lid lifted by k (0 shut, 1 open): its view sets it (a cellar's); nothing by default. */
   onLid: (hoard: number, k: number) => void = () => {};
+  /** A seal's breach walled up so far (D62; 0..1), as the hero sets the stones. */
+  onSeal: (k: number) => void = () => {};
   /** The hero kneeling to search (null: not searching). */
   private kneel: SearchKneel | null = null;
   private wasInside = false;
@@ -196,6 +201,13 @@ export class Encounter {
     const l = this.near, p = this.player;
     if (!l || this.kneel || p.puppet) return null;
     const O = this.creatures.group.position, w = p.walker;
+    // A seal's breach (D62): kneeling before it, the stones go in course by course until it is walled up.
+    if (l.kind === 'breach') {
+      const b = this.delve.breach!, f = [Math.sin(b.yaw), Math.cos(b.yaw)];
+      this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, null, () => { this.delve.seal(); this.onSeal(1); }, { x: O.x + l.x + f[0] * SEAL_FRONT, z: O.z + l.z + f[1] * SEAL_FRONT }, { busy: SEAL_BUSY, work: (k) => this.onSeal(k) });
+      p.puppet = this.kneel;
+      return null;
+    }
     const lid = l.kind === 'hoard' && l.hoard.prop ? (k: number) => this.onLid(l.hoard.id, k) : null;
     // A chest is opened from its front.
     const f = l.kind === 'hoard' ? l.hoard.front : undefined;
@@ -309,7 +321,7 @@ export class Encounter {
     const stance = this.player.stance;
     const swinging = stance.action && this.player.hero ? this.player.hero.clock - stance.action.t0 < stance.action.dur : false;
     this.player.stance = { combat: fighting > 0 || this.fight.attacking, action: swinging ? stance.action : undefined };
-    this.hud.follow(this.fight, this.hero, this.near ? `Search ${this.near.name}` : null);
+    this.hud.follow(this.fight, this.hero, this.near ? `${this.near.kind === 'breach' ? 'Wall up' : 'Search'} ${this.near.name}` : null);
   }
 
   /** What the Director watches (plan 4.3): who fights the hero, and how much danger knows of them. */

@@ -157,6 +157,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       // Search whatever is in reach; then walk to the nearest thing left to search, a spot, or the ladder.
       const l = delve.within(pose);
       if (l) {
+        // A seal's breach (D62): walled up.
+        if (l.kind === 'breach') { delve.seal(); continue; }
         if (delve.plunder(l)) looted++;
         // Someone lost alive sits by the lair's hoard (D62): the hero has come up to them.
         if (l.kind === 'hoard' && !l.hoard.prop && delve.ask?.alive) delve.found = true;
@@ -167,6 +169,7 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       const left = [
         ...den.dead.map((id) => den.creatures[id]).filter((c) => fight.bodies.has(c.id)),
         ...delve.hoards.filter((hd) => !delve.hasOpened(hd)),
+        ...(delve.ask?.verb === 'seal' && !delve.sealed && delve.breach ? [delve.breach] : []),
         ...spots,
       ].sort((a, b) => Math.hypot(a.x - x, a.z - z, a.y - y) - Math.hypot(b.x - x, b.z - z, b.y - y));
       // Keep to the thing chosen until it is searched (two about as near, one up a stair, would make it dither).
