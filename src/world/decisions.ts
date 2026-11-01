@@ -76,17 +76,17 @@ export interface DungeonDecision {
   readonly ask?: PromiseAsk;
 }
 
-/** What a household asks about its place (D62, vgm/asks.ts): only the thing it names counts as done. */
 /**
- * What someone wanted that a task came from (Q5): `lone`, someone living alone in their later years wants back what
- * is left of their life together; `rival`, a trader suspects the rival of their trade (`rival`, a person id).
+ * What someone wanted that a task came from (Q5): `elder`, the eldest of a household, old now, wants back what is left
+ * of the ones before them; `rival`, a trader suspects the rival of their trade (`rival`, a person id).
  */
 export interface PromiseWant {
   readonly person: number;
-  readonly kind: 'lone' | 'rival';
+  readonly kind: 'elder' | 'rival';
   readonly rival?: number;
 }
 
+/** What a household asks about its place (D62, vgm/asks.ts): only the thing it names counts as done. */
 export interface PromiseAsk {
   /** The setting's ask (its kind). */
   readonly id: string;

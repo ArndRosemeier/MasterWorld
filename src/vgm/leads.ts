@@ -150,7 +150,9 @@ function asked(c: LeadsContext, d: DungeonDecision): DungeonDecision {
   const dweller = sketchCellar(d, place, loreOf({ dungeons: c.dungeons }, d.template)).dweller;
   // What the household wants, as the world simulation has them (Q5).
   const town = townById(c.towns, d.town);
-  const want = town && !d.site ? wantOf(townsfolk(town.plan, town.decision.seed ?? c.seed), d) : null;
+  const wanted = town ? wantOf(townsfolk(town.plan, town.decision.seed ?? c.seed), d) : null;
+  // A want drives one task: someone who has asked from it once does not ask from it again.
+  const want = wanted && !c.log.some((x) => x.kind === 'dungeon' && x.town === d.town && x.ask?.want?.person === wanted.person) ? wanted : null;
   const ask = askFor({ asks: c.asks, twists: c.twists }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id, encounter: dweller.encounter, want });
   return ask ? { ...d, ask } : d;
 }

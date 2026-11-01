@@ -390,7 +390,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       verbs.push(verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb);
       const twist = own ? twistOf(setting, dungeon.ask) : null;
       // What an earlier ending brought about (Q4), as the log has it.
-      if (ask?.want) { wants.push(ask.want.kind); say(`asked because ${talk.nameOf(ask.want.person)} ${ask.want.kind === 'rival' ? `suspects ${talk.nameOf(ask.want.rival!)}, a rival in trade` : 'lives alone now and wants back what is left'}`); }
+      if (ask?.want) { wants.push(ask.want.kind); say(`asked because ${talk.nameOf(ask.want.person)} ${ask.want.kind === 'rival' ? `suspects ${talk.nameOf(ask.want.rival!)}, a rival in trade` : 'is old and wants it back before the end'}`); }
       if (ask?.again) { consequences.push(`thief again (${ask.again})`); say(`the thief let go on ${ask.again} is at it again`); }
       if (twist) { twists.push(twist.kind); say(`twist: ${twist.kind}${twist.kind === 'changed' ? ` (told ${sketchCellar(dungeon, place, lore, undefined, true).dweller.id}, finds ${cellar.dweller.id})` : ''}`); }
       if (verb !== 'clear') say(`the household asks: ${verb}${names.who && verb === 'lost' ? ` ${names.who}` : ''}${keepsake ? ` (${keepsake.name})` : ''}`);

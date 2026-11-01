@@ -41,7 +41,7 @@ export const asks: readonly AskDef[] = [
       note: 'I have {thing}. {name} of {house} will want it back, and pay for it.',
       thanks: '{thing}! I never thought to hold it again. Here, {coins}, and you are welcome at our table.',
       missing: 'Then where is it? Come back when you have {thing} in your hands.',
-      wants: { lone: 'Since I was left on my own, {thing} is all I have of the life we had. I want it back before I go too.' },
+      wants: { elder: 'I am old now, and {thing} is all that is left of the ones before me. I want it back in this house before I go.' },
     },
   },
   {

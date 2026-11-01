@@ -400,7 +400,7 @@ test('asks: endings feed what comes next, replayed from the log: a thief let go 
 });
 
 test('asks: tasks come from what people want, and the log traces each back to who wanted it and why (Q5)', () => {
-  // A trader with a rival of the same trade in town suspects them; someone left alone in later years wants back what is left.
+  // A trader with a rival of the same trade in town suspects them; the eldest of a house, old now, wants back what is left.
   const byHouse = (h: number) => ({ ...testDecision(8), town: town.decision.id, building: h }) as DungeonDecision;
   const houses = [...new Set(people.map((p) => p.home))];
   const rivalHouse = houses.find((h) => wantOf(people, byHouse(h))?.kind === 'rival');
