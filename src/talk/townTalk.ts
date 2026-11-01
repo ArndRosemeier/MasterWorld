@@ -15,8 +15,8 @@ import { cellarHint, type CellarHint } from '../vgm/hints';
 import { eventTold, fadedOf } from '../vgm/events';
 import { festivityTold } from '../vgm/festivities';
 import { dwellersOf, keptOf } from '../vgm/leads';
-import { askWords } from '../vgm/asks';
-import { dungeonOf, type Decision, type DecisionLog, type FestivityDecision } from '../world/decisions';
+import { askWords, lostOne } from '../vgm/asks';
+import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type FestivityDecision } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
 import { cap, fill, nameFolk, type Folk } from './folk';
@@ -37,6 +37,10 @@ export interface TalkAsk {
   readonly note: string;
   readonly thanks: string;
   readonly missing: string;
+  /** What someone lost says when the hero finds them alive. */
+  readonly found: string;
+  /** Who of the town is lost (a person id). */
+  readonly lost?: number;
 }
 
 /**
@@ -220,7 +224,7 @@ export class TownTalk {
       const fact = (n: string, atom: Fact['atom']): Fact => ({ id: `${id}/${n}`, atom, validFrom: 0, validTo: null, knownBy, sourceKey: 'source.house', origin: { kind: 'vgm', promise: id } });
       facts.push(fact('troubled', { predicate: 'troubled', args: { subject: id } }));
       // What they ask of whoever goes (D62), in their own words: the first thing they say more of.
-      if (ask) facts.push(fact('asked', { predicate: 'noticed', args: { subject: id, sign: clause(fill(ask.told, { family: teller?.family ?? '' })) } }));
+      if (ask) facts.push(fact('asked', { predicate: 'noticed', args: { subject: id, sign: clause(fill(ask.told, this.namesFor(sketch.decision))) } }));
       sketch.hints.forEach((h, i) => facts.push(fact(`sign-${i}`, { predicate: 'noticed', args: { subject: id, sign: clause(h) } })));
       sketch.history.filter((h) => h.layer === 'built' || h.layer === 'older').forEach((h, i) => facts.push(fact(`story-${i}`, { predicate: 'story', args: { subject: id, line: clause(h.text) } })));
     }
@@ -275,8 +279,14 @@ export class TownTalk {
   askOf(id: string): TalkAsk | null {
     const c = this.cellars.find((x) => x.hint.cellar === id);
     if (!c?.ask || c.ask.verb === 'clear') return null;
-    const family = this.familyAt(c.hint.building), f = (t: string) => fill(t, { family });
-    return { verb: c.ask.verb, told: f(c.ask.told), topic: f(c.ask.topic), note: f(c.ask.note), thanks: f(c.ask.thanks), missing: f(c.ask.missing) };
+    const names = this.namesFor(c.sketch.decision), named = (t: string) => fill(t, names);
+    return { ...c.ask, told: named(c.ask.told), topic: named(c.ask.topic), note: named(c.ask.note), thanks: named(c.ask.thanks), missing: named(c.ask.missing), found: named(c.ask.found) };
+  }
+
+  /** The names a promise's ask fills (D62): its household's family, and who is lost, by the name the household uses. */
+  namesFor(d: DungeonDecision): { family: string; who: string } {
+    const lost = this.cellars.find((c) => c.sketch.decision.id === d.id)?.ask?.lost, f = lost === undefined ? undefined : this.byId.get(lost);
+    return { family: this.familyAt(d.building), who: !f ? '' : f.person.home === d.building ? f.given : f.name };
   }
 
   /** The family a house is called after (its first named household's): who a keepsake belongs to (D62). */
@@ -556,7 +566,8 @@ export function talkCellar(d: Decision, setting: SettingModule, town: Town, peop
   if (!house) return null;
   const sketch = sketchCellar(dungeon, house, loreOf(setting, dungeon.template), dwellersOf(log, d));
   // The place's own promise carries its household's ask (D62); new dwellers in it are only to be cleared.
-  const words = d.kind === 'dungeon' ? askWords(setting, d.ask, '{family}') : null;
-  const ask = words && d.kind === 'dungeon' && d.ask ? { verb: d.ask.verb, ...words } : null;
+  const words = d.kind === 'dungeon' ? askWords(setting, d.ask, { family: '{family}', who: '{who}' }) : null;
+  const lost = d.kind === 'dungeon' ? lostOne(people, log, d) : null;
+  const ask = words && d.kind === 'dungeon' && d.ask ? { verb: d.ask.verb, ...words, ...(lost ? { lost: lost.id } : {}) } : null;
   return { sketch, hint: cellarHint(sketch, people, town.plan), ...(ask ? { ask } : {}) };
 }

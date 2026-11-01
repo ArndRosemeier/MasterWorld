@@ -814,8 +814,8 @@ export const TOP_FIND = 0.3;
  * topic to tell them), `note` the journal's line once it is done (`{name}` who to tell, `{house}`), `thanks`
  * what they say (`{coins}`, `{thing}`).
  */
-export type AskVerb = 'clear' | 'fetch';
-export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch'];
+export type AskVerb = 'clear' | 'fetch' | 'lost';
+export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost'];
 
 export interface AskDef {
   /** The kind (the VGM remembers kinds given, D62): a slug. */
@@ -829,6 +829,13 @@ export interface AskDef {
   readonly lived?: boolean;
   /** `fetch`: the things it may name, each a catalogue item and what it is called (`{family}`: the household's name). */
   readonly things?: readonly { readonly item: string; readonly name: string; readonly lore: string }[];
+  /**
+   * `lost`: someone of the town went in and did not come back (`{who}` their name in every line). `alive` the share
+   * found alive (they sit hurt at the end of the place; come up to, they get up, say `found` and walk home). The
+   * rest are dead: what is left of them (one of `things`, `{who}`'s) lies in the lair's hoard, and `dead` gives the
+   * topic, note and thanks for bringing it home.
+   */
+  readonly lost?: { readonly alive: number; readonly found: string; readonly dead: { readonly topic: string; readonly note: string; readonly thanks: string } };
   /** `missing`: what they say when told it is done but the thing is not in the hero's hands (a fetch). */
   readonly words: { readonly told: readonly string[]; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing?: string };
 }
@@ -1765,6 +1772,7 @@ function validateAsks(m: SettingModule, where: string): string[] {
     if (!(a.weight > 0)) out.push(`${where}: ask "${a.id}" needs a weight above 0`);
     for (const k of a.kinds ?? []) if (!m.dungeons[k]) out.push(`${where}: ask "${a.id}" names dungeon kind "${k}" the setting has not`);
     if (!a.words.told.length || !a.words.topic || !a.words.note || !a.words.thanks) out.push(`${where}: ask "${a.id}" lacks its words`);
+    if (a.verb === 'lost' && (!a.lost || !a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" is lost: it needs lost (alive, found, dead), things left of the dead and missing`);
     if (a.verb === 'fetch' && (!a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" fetches nothing (things), or has no words for the thing not brought (missing)`);
     for (const t of a.things ?? []) if (!m.items.items.some((d) => d.id === t.item)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is no catalogue item (${t.item})`);
   }

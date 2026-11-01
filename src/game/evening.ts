@@ -346,9 +346,10 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const cellar: Cellar = moved ? moveIn(firstCellar, moved, place, lore) : firstCellar;
       const name = `${cellar.house} (${dungeon.template}, ${cellar.dweller.id})`;
       // What the household asks (D62): a fetch's keepsake lies in the lair's hoard, and only it does the task.
-      const verb = verbOf(log, lead.id), keepsake = lead.id === dungeon.id ? keepsakeOf(setting, dungeon, talk.familyAt(dungeon.building)) : null;
-      verbs.push(verb);
-      if (verb !== 'clear') say(`the household asks: ${verb}${keepsake ? ` ${keepsake.name}` : ''}`);
+      const own = lead.id === dungeon.id, verb = verbOf(log, lead.id), ask = own ? dungeon.ask ?? null : null;
+      const names = talk.namesFor(dungeon), keepsake = own ? keepsakeOf(setting, dungeon, names) : null;
+      verbs.push(verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb);
+      if (verb !== 'clear') say(`the household asks: ${verb}${names.who && verb === 'lost' ? ` ${names.who}` : ''}${keepsake ? ` (${keepsake.name})` : ''}`);
       // Out to the door above, or the barrow's mouth.
       const goDown = () => {
         if (dungeon.site) walkTo(name, dungeon.site.x - Math.sin(dungeon.site.yaw) * 2, dungeon.site.z - Math.cos(dungeon.site.yaw) * 2);
@@ -365,11 +366,11 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         hero.health = Math.max(1, Math.round(hero.maxHealth * 0.1));
         say(`goes down reckless: ${hero.health} health, no potions`);
       }
-      let saved: DelveSave | undefined;
+      let saved: DelveSave | undefined, found = false;
       let left: Remains | null = null;
       for (;;) {
         const spots = left ? [{ ...left.at, reached: () => { gather(hero, left!); say(`took up the pack left at the fall (${left!.items.length} ${left!.items.length === 1 ? 'thing' : 'things'})`); left = null; } }] : [];
-        const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0, keepsake });
+        const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0, ask, keepsake });
         // Below: the fights and the searching spread over the visit, each meeting its need as it ends.
         watch.where = 'below';
         const parts = r.kills + r.looted + 1, cast = r.spells.length;
@@ -384,6 +385,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         }
         if (!r.kills) casts(cast);
         saved = r.delve.tally();
+        found ||= r.delve.found;
         spells += cast;
         if (r.won && r.out) {
           hero.earn(`cleared:${lead.id}`, 'cleared');
@@ -414,7 +416,11 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (school) say(`${spells} spells cast so far`);
       // Quiet, and the hero gone: back to its household to tell them (plan 4.2). They pay, the promise is
       // kept, and with the next lead already about they pass on its rumour.
-      if (verb === 'fetch' && !holdsKeepsake(hero.pack, lead.id)) throw new Broke(`came out of ${name} without ${keepsake?.name ?? 'the keepsake'}`);
+      if (keepsake && !holdsKeepsake(hero.pack, lead.id)) throw new Broke(`came out of ${name} without ${keepsake.name}`);
+      if (ask?.verb === 'lost' && ask.alive) {
+        if (!found) throw new Broke(`came out of ${name} without finding ${names.who}`);
+        say(`found ${names.who} alive; they walk home`);
+      }
       if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
       const to = talk.reportTo(lead.id).map((id) => people.find((p) => p.id === id)).find((p) => !!p);
       if (!to) throw new Broke(`nobody to tell that ${name} is safe`);

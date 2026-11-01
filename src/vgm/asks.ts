@@ -66,6 +66,7 @@ export function askFor(setting: Pick<SettingModule, 'asks'>, seed: number, log: 
     verb: a.verb,
     ...(a.things?.length ? { thing: rng.int(0, a.things.length - 1) } : {}),
     line: rng.int(0, a.words.told.length - 1),
+    ...(a.verb === 'lost' && a.lost ? { who: rng.int(0, 9999), alive: rng.chance(a.lost.alive) } : {}),
   };
 }
 
@@ -85,22 +86,58 @@ export function verbOf(log: DecisionLog, id: string): string {
   return askOf(log, id)?.verb ?? CLEAR;
 }
 
-/** The named thing of a fetch, as the household calls it (`family`: their name). Null: it fetches nothing. */
-export function thingOf(setting: Pick<SettingModule, 'asks'>, ask: PromiseAsk | undefined, family: string): { readonly item: string; readonly name: string; readonly lore: string } | null {
-  const t = ask?.thing === undefined ? undefined : askDefOf(setting, ask)?.things?.[ask.thing];
-  return t ? { item: t.item, name: fill(t.name, { family }), lore: fill(t.lore, { family }) } : null;
+/** Names an ask's lines fill: the household's family, and who is lost (a lost person). */
+export interface AskNames {
+  readonly family: string;
+  readonly who?: string;
 }
 
-/** The keepsake a fetch asks for, as an item in the pack (null: the promise fetches nothing). */
-export function keepsakeOf(setting: Pick<SettingModule, 'asks' | 'items'>, d: DungeonDecision, family: string): Item | null {
-  const t = thingOf(setting, d.ask, family);
+/** The named thing of a fetch, or what is left of someone lost dead, as the household calls it. Null: none. */
+export function thingOf(setting: Pick<SettingModule, 'asks'>, ask: PromiseAsk | undefined, n: AskNames): { readonly item: string; readonly name: string; readonly lore: string } | null {
+  if (!ask || ask.alive) return null;
+  const t = ask.thing === undefined ? undefined : askDefOf(setting, ask)?.things?.[ask.thing];
+  const v = { family: n.family, who: n.who ?? '' };
+  return t ? { item: t.item, name: fill(t.name, v), lore: fill(t.lore, v) } : null;
+}
+
+/** The keepsake a promise asks to be brought (a fetch's thing, a dead lost one's), as an item in the pack (null: none). */
+export function keepsakeOf(setting: Pick<SettingModule, 'asks' | 'items'>, d: DungeonDecision, n: AskNames): Item | null {
+  const t = thingOf(setting, d.ask, n);
   if (!t || !setting.items.items.some((x) => x.id === t.item)) return null;
   return { def: t.item, rarity: 'common', name: cap(t.name), bonuses: {}, lore: t.lore, keepsake: d.id };
+}
+
+/** Whether an ask is done by bringing something (a fetch's thing, what is left of someone lost dead). */
+export function bringsBack(ask: PromiseAsk | null | undefined): boolean {
+  return ask?.verb === 'fetch' || (ask?.verb === 'lost' && !ask.alive);
 }
 
 /** Whether the hero holds the keepsake of promise `id`. */
 export function holdsKeepsake(pack: readonly Item[], id: string): boolean {
   return pack.some((it) => it.keepsake === id);
+}
+
+/**
+ * Who of the town is lost in place `d` (D62): a child of the household (those who tell of the trouble are its
+ * grown-ups), else one of the town's hands, homemakers or children from another house; a seeded pick, never one
+ * lost in a place before (found or not). Never someone a map marks (a shop's keeper, a teacher): they stay at their
+ * place. Null: it asks for nobody lost, or nobody fits.
+ */
+export function lostOne<P extends { readonly id: number; readonly home: number; readonly role: string }>(people: readonly P[], log: DecisionLog, d: DungeonDecision): P | null {
+  if (d.ask?.verb !== 'lost') return null;
+  const before = new Set<number>();
+  for (const x of log) {
+    if (x.id === d.id) break;
+    if (x.kind === 'dungeon' && x.town === d.town && x.ask?.verb === 'lost') {
+      const p = lostOne(people, log, x);
+      if (p) before.add(p.id);
+    }
+  }
+  const free = (p: P) => !before.has(p.id);
+  const own = people.filter((p) => p.home === d.building && p.role === 'child' && free(p));
+  const others = people.filter((p) => p.home !== d.building && (p.role === 'hand' || p.role === 'homemaker' || p.role === 'child') && free(p));
+  const pool = own.length ? own : others;
+  return pool.length ? pool[(d.ask.who ?? 0) % pool.length]! : null;
 }
 
 /** What the place shows of how its ask stands, as the game reads it. */
@@ -109,23 +146,36 @@ export interface AskState {
   readonly beaten: boolean;
   /** The hero holds the keepsake asked for. */
   readonly holds: boolean;
+  /** The hero came up to the one who was lost, alive. */
+  readonly found?: boolean;
 }
 
 /**
  * Is the ask done (D62)? Only the thing it names counts: clear, the place beaten; fetch, the named thing in
- * the hero's hands (beating the place does not do it, and nor does any other thing).
+ * the hero's hands (beating the place does not do it, and nor does any other thing); lost, the lost one found
+ * alive, or what is left of them in the hero's hands.
  */
-export function askMet(verb: string, s: AskState): boolean {
-  if (verb === 'fetch') return s.holds;
+export function askMet(ask: PromiseAsk | null | undefined, s: AskState): boolean {
+  if (ask?.verb === 'fetch') return s.holds;
+  if (ask?.verb === 'lost') return ask.alive ? !!s.found : s.holds;
   return s.beaten;
 }
 
-/** The ask's words for its household (`family`), its things named: the told line, the topic, the journal's note and the thanks. */
-export function askWords(setting: Pick<SettingModule, 'asks'>, ask: PromiseAsk | undefined, family: string): { readonly told: string; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing: string } | null {
+/** The ask's words for its household, its names filled: the told line, the topic, the journal's note, the thanks, what they say to a report without the thing, and the lost one's words when found. */
+export function askWords(setting: Pick<SettingModule, 'asks'>, ask: PromiseAsk | undefined, n: AskNames): { readonly told: string; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing: string; readonly found: string } | null {
   const a = askDefOf(setting, ask);
   if (!a || !ask) return null;
-  const thing = thingOf(setting, ask, family)?.name ?? '';
-  const f = (s: string) => cap(fill(s, { thing }));
-  // The thanks keep `{coins}` (and `{place}`) for the game to fill.
-  return { told: f(a.words.told[ask.line % a.words.told.length]!), topic: a.words.topic.replace('{thing}', thing), note: a.words.note.replace('{thing}', thing), thanks: f(a.words.thanks), missing: f(a.words.missing ?? '') };
+  const thing = thingOf(setting, ask, n)?.name ?? '';
+  const v = { thing, who: n.who ?? '' };
+  // `{coins}`, `{name}`, `{house}` and `{place}` are left for the game to fill.
+  const f = (t: string) => cap(fill(t, v)), g = (t: string) => fill(t, v);
+  const dead = a.verb === 'lost' && !ask.alive ? a.lost?.dead : undefined;
+  return {
+    told: f(a.words.told[ask.line % a.words.told.length]!),
+    topic: g(dead?.topic ?? a.words.topic),
+    note: g(dead?.note ?? a.words.note),
+    thanks: f(dead?.thanks ?? a.words.thanks),
+    missing: f(a.words.missing ?? ''),
+    found: f(a.lost?.found ?? ''),
+  };
 }

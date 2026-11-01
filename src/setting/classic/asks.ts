@@ -43,4 +43,35 @@ export const asks: readonly AskDef[] = [
       missing: 'Then where is it? Come back when you have {thing} in your hands.',
     },
   },
+  {
+    id: 'lost',
+    verb: 'lost',
+    weight: 1.2,
+    lived: true,
+    lost: {
+      alive: 0.6,
+      found: 'You came for me? I heard them all round me in the dark, and I did not dare move. I can walk. I know the way out from here.',
+      dead: {
+        topic: 'I found what was left of {who}.',
+        note: 'I have {thing}. {name} of {house} must hear what became of {who}.',
+        thanks: 'So that is the end of it. At least we know, and we can bury what is left. Take this, {coins}. You went where none of us would.',
+      },
+    },
+    things: [
+      { item: 'satchel', name: "{who}'s satchel", lore: 'Torn at the strap and dark with damp. {who} carried it everywhere.' },
+      { item: 'woollen-cap', name: "{who}'s cap", lore: 'A knitted cap, trodden into the dirt. Someone at home made it for {who}.' },
+      { item: 'whittled-knife', name: "{who}'s knife", lore: 'A small knife with a whittled handle and initials cut into it.' },
+    ],
+    words: {
+      told: [
+        '{who} went down after the noises and has not come back. Please, find {who}.',
+        '{who} said they would see for themselves what it was. That was the day before yesterday.',
+        'It is {who} I am afraid for, not the house. {who} went in there, and nobody has seen them since.',
+      ],
+      topic: '{who} is home again.',
+      note: '{who} is on the way home. {name} of {house} will want to see you.',
+      thanks: '{who} walked in at the door as if nothing had happened! I cannot thank you enough. Here, {coins}, and more if we had it.',
+      missing: 'You say you know what became of {who}? Then show me something of theirs, or I will not believe it.',
+    },
+  },
 ];

@@ -12,6 +12,7 @@ import { DungeonSpace } from '../world/dungeon/space';
 import { Character } from './character';
 import { Delve, type DelveSave } from './delve';
 import type { Item } from './items';
+import type { PromiseAsk } from '../world/decisions';
 import type { Fight, HeroPose } from './fight';
 import { aimsAtFoe } from './recipe';
 import type { Creature } from '../sim/creatures';
@@ -42,7 +43,8 @@ export interface BotOptions {
   readonly spots?: readonly BotSpot[];
   /** Fights on without resting, potions or second wind (the loop check's reckless hero). */
   readonly rash?: boolean;
-  /** A household's keepsake to find in the lair's hoard (D62: a fetch). */
+  /** What the household asks (D62), and the keepsake to find in the lair's hoard (a fetch, a lost one dead). */
+  readonly ask?: PromiseAsk | null;
   readonly keepsake?: Item | null;
 }
 
@@ -86,6 +88,7 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   // The way down took longer than any cooldown: the hero comes in fresh.
   hero.cooldowns.clear();
   const delve = new Delve(cellar, space, setting, hero, seed, opts.saved);
+  delve.ask = opts.ask ?? null;
   delve.keepsake = opts.keepsake ?? null;
   const { den, fight } = delve;
   const h = cellar.hatch;
@@ -153,7 +156,12 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       if (!opts.loot) return run(true, t);
       // Search whatever is in reach; then walk to the nearest thing left to search, a spot, or the ladder.
       const l = delve.within(pose);
-      if (l) { if (delve.plunder(l)) looted++; continue; }
+      if (l) {
+        if (delve.plunder(l)) looted++;
+        // Someone lost alive sits by the lair's hoard (D62): the hero has come up to them.
+        if (l.kind === 'hoard' && !l.hoard.prop && delve.ask?.alive) delve.found = true;
+        continue;
+      }
       const spot = [...spots].find((s) => standsBy(s, NEAR));
       if (spot) { spots.delete(spot); spot.reached(); continue; }
       const left = [

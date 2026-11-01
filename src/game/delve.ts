@@ -14,6 +14,7 @@ import type { Character } from './character';
 import { Fight, type FightEvent, type HeroPose } from './fight';
 import { rollLoot, type Item, type Loot } from './items';
 import { askMet, holdsKeepsake } from '../vgm/asks';
+import type { PromiseAsk } from '../world/decisions';
 
 export interface DelveSave {
   /** Creatures dead and spared, by den index. */
@@ -64,18 +65,18 @@ export class Delve {
   }
 
   /**
-   * A household's keepsake (D62: a fetch): it lies in the lair's hoard at the end of the place, and searching
-   * that hoard puts it in the pack. Set by whoever opens the place (the game names it for the family).
+   * What the place's household asks (D62), set by whoever opens the place: a keepsake to bring (a fetch's thing,
+   * what is left of someone lost dead) lies in the lair's hoard at the end, and searching that hoard puts it in the
+   * pack; someone lost alive is `found` once the hero comes up to them.
    */
+  ask: PromiseAsk | null = null;
   keepsake: Item | null = null;
+  found = false;
 
-  /**
-   * What the promise asks is done (D62): only the thing it names counts. A fetch is done with the keepsake in
-   * the hero's hands, whether the place is beaten or not; anything else asks the place beaten.
-   */
+  /** What the promise asks is done (D62): only the thing it names counts (beaten, the keepsake in hand, the lost one found). */
   get met(): boolean {
     const k = this.keepsake;
-    return askMet(k ? 'fetch' : 'clear', { beaten: this.beaten, holds: !!k?.keepsake && holdsKeepsake(this.hero.pack, k.keepsake) });
+    return askMet(this.ask, { beaten: this.beaten, holds: !!k?.keepsake && holdsKeepsake(this.hero.pack, k.keepsake), found: this.found });
   }
 
   step(dt: number, pose: HeroPose, breathe = true): FightEvent[] {

@@ -297,11 +297,11 @@ export class Encounter {
       this.quietSaid = true;
       this.onCue({ kind: 'quiet' });
     }
-    // What was asked is done (D62: a fetch once the keepsake is in hand): the household may come to the hero.
+    // What was asked is done (D62: a fetch once the keepsake is in hand, someone lost once found): the household may come to the hero.
     if (!this.metSaid && this.delve.met) {
       this.metSaid = true;
       const comes = !this.paid && !!this.arena.promise && this.arena.inside && this.host.stilled(this.arena.promise);
-      if (this.arena.quietLine && !comes && !this.delve.keepsake) this.director.queue(this.arena.quietLine, 2);
+      if (this.arena.quietLine && !comes && (this.delve.ask?.verb ?? 'clear') === 'clear') this.director.queue(this.arena.quietLine, 2);
     }
     if (!lead) return;
     if (this.kneel?.done) this.getUp();

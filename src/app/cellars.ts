@@ -87,7 +87,7 @@ export interface CellarsHost {
   };
   /** A place out on the land opens: the trees round it go (the land's views are built again there). */
   cleared?(d: DungeonDecision): void;
-  /** The keepsake a place's household asked for (D62: a fetch), named for them; null: it asks nothing to be fetched. */
+  /** The keepsake a place's household asked to be brought (D62: a fetch, a lost one dead), named for them; null: none.  */
   keepsake?(d: DungeonDecision): Item | null;
   /** Down (true) or up again: the land above leaves the frame meanwhile, all but `keep` (the cellar and its dwellers). */
   depth(below: boolean, keep: readonly Object3D[]): void;
@@ -485,8 +485,8 @@ export class Cellars {
     const before = own === s.decision.id ? undefined : priorChests(cellar, was ? was.delve.tally() : this.saved[s.decision.id]?.delve, h.setting);
     const saved: DelveSave | undefined = mine?.delve ?? (before ? { dead: [], spared: [], searched: [], opened: before } : undefined);
     b.delve = new Delve(cellar, b.visit.space, h.setting, h.character, h.seed, saved);
-    // A fetch (D62): the keepsake lies in the lair's hoard (the place's own promise; new dwellers are only to be cleared).
-    if (own === s.decision.id) b.delve.keepsake = h.keepsake?.(s.decision) ?? null;
+    // What its household asks (D62; the place's own promise: new dwellers are only to be cleared): a keepsake lies in the lair's hoard.
+    if (own === s.decision.id) { b.delve.ask = s.decision.ask ?? null; b.delve.keepsake = h.keepsake?.(s.decision) ?? null; }
     b.creatures = await CreatureView.build(b.delve.den, h.seed, b.view.origin, h.renderer);
     // Its people's shaders build in the Stage's frame slots; they show once warm.
     const drawn = b.creatures;
