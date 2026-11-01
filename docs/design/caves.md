@@ -199,3 +199,11 @@ Mines can also have built locks: a grate, a door, a raised ladder.
 3. **Size**: up to about 300 m across and 60 m deep, as constants that are easy to change.
 4. **Order**: K1 and K2 start now, next to phases D and Q.
 5. **Mix**: three shares (built, water, lava). Pure caves are the norm, and a mixed cave usually has two shares filled and one at zero.
+
+## 8. What K1 and K2 built (2026-11-01)
+
+Arnd's answers (section 7) are in the setting's cave data: `sizes`, `way` (2 m wide, 2.8 m high at least), `shares`.
+
+K1 and K2 are in `src/world/cave/` (pure, seeded) with the data in `src/setting/classic/formedCaves.ts`. The former differs from 3.2 in two ways worth knowing: the water flows over an 18-neighbour lattice (3 m for a medium block, 5 m for the big one, so the forming stays quick) and each stage's springs sit on the valley face of the block, taken from the land's lowest side. Braids and mazes come from several water paths per round over rock whose ease is jittered; branchwork from one path per round and strong feedback. Open for Arnd: sea caves as water caves whose lowest level lies under the sea (recommended) or a fourth, wave-cut former.
+
+After Arnd's first look at the gallery ("too tidy", the round collapse blobs look strange, two disjoint systems sometimes form, and his idea: carving resistance should differ a lot): each rock has a `resistance` field (hard and soft patches, `size` and `contrast` in the setting) that sets both the water's route and the width of a way, the springs lie close together and only the biggest system stays, and a collapse hall is a long room under a flattish ceiling.
