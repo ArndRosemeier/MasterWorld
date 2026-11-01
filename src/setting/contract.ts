@@ -901,8 +901,8 @@ export interface AskDef {
   /** `missing`: what they say when told it is done but the thing is not in the hero's hands (a fetch). */
   readonly words: {
     readonly told: readonly string[]; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing?: string;
-    /** Q5: added to what the household says when the ask came from their want (`elder`, `rival`; `{who}` the rival). */
-    readonly wants?: { readonly elder?: string; readonly rival?: string };
+    /** Q5: added to what the household says when the ask came from their want (`rival`, `elder`, `parent`, `pious`, `peaceable`; `{who}` the rival). */
+    readonly wants?: { readonly [kind: string]: string | undefined };
   };
 }
 

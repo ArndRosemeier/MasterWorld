@@ -69,6 +69,7 @@ export const asks: readonly AskDef[] = [
         '{who} said they would see for themselves what it was. That was the day before yesterday.',
         'It is {who} I am afraid for, not the house. {who} went in there, and nobody has seen them since.',
       ],
+      wants: { parent: 'There are little ones in this house, and I lie awake thinking what a place like that does to the ones who go near it.' },
       topic: '{who} is home again.',
       note: '{who} is on the way home. {name} of {house} will want to see you.',
       thanks: '{who} walked in at the door as if nothing had happened! I cannot thank you enough. Here, {coins}, and more if we had it.',
@@ -86,6 +87,7 @@ export const asks: readonly AskDef[] = [
         'Something broke through from behind the old wall. Close it, and whatever is behind can stay there.',
         'Kill them if you must, but it is the hole they came through that matters. Stop it up, or more will come.',
       ],
+      wants: { pious: 'I pray for whatever is behind it, and for us. Shut it, and let them rest.' },
       topic: 'The breach in {place} is walled up.',
       note: 'I walled up the breach. {name} of {house} will want to hear that nothing more comes through.',
       thanks: 'Walled up, stone on stone? Then nothing more comes through. Here, {coins}, and well earned.',
@@ -117,6 +119,7 @@ export const asks: readonly AskDef[] = [
         'They are not beasts down there; they can be talked to. Get them to leave us be, and no killing.',
         'Go and speak with them. If it comes to fighting they will only come back angrier, or their friends will.',
       ],
+      wants: { peaceable: 'I have never liked a killing. If it can be talked out, I would sooner it were.' },
       topic: 'I have spoken with those in {place}. They will trouble you no more.',
       note: 'Terms struck in {place}, and no blood spilled. {name} of {house} will want to hear it.',
       thanks: 'Talked them round, and nobody hurt? That is worth more than any killing. Here, {coins}.',
@@ -128,7 +131,7 @@ export const asks: readonly AskDef[] = [
     weight: 1.1,
     lived: true,
     kinds: ['cave', 'tower', 'barrow', 'hideout'],
-    dwellers: ['wolves', 'goblins', 'highwaymen', 'grave-robbers'],
+    dwellers: ['wolves', 'goblins', 'highwaymen', 'grave-robbers', 'smugglers', 'restless-dead'],
     watch: { comes: 0.7, hours: [22, 26], near: 18 },
     words: {
       told: [

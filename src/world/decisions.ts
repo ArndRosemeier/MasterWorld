@@ -78,11 +78,12 @@ export interface DungeonDecision {
 
 /**
  * What someone wanted that a task came from (Q5): `elder`, the eldest of a household, old now, wants back what is left
- * of the ones before them; `rival`, a trader suspects the rival of their trade (`rival`, a person id).
+ * of the ones before them; `rival`, a trader suspects the rival of their trade (`rival`, a person id); `parent`, a grown-up with a child in
+ * the house fears for them; `pious`, a devout one wants the restless laid to rest; `peaceable`, a sociable one would rather it were talked out.
  */
 export interface PromiseWant {
   readonly person: number;
-  readonly kind: 'elder' | 'rival';
+  readonly kind: 'rival' | 'elder' | 'parent' | 'pious' | 'peaceable';
   readonly rival?: number;
 }
 
