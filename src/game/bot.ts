@@ -103,6 +103,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   /** The foe being walked to (kept until it falls or a fight starts). */
   let chase: Creature | null = null;
   const spells: string[] = [];
+  /** Short of a parley's price: it comes to blows. */
+  let short = false;
   const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z }, spells });
   /** Nothing in the way of walking straight to `to` (no wall's corner between, which sliding would never get round). */
   const clear = (to: { x: number; z: number }): boolean => {
@@ -146,11 +148,26 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   const standsBy = (p: { x: number; y: number; z: number }, r: number) => Math.hypot(p.x - x, p.z - z) < r && Math.abs(p.y - y) < 1.5;
   for (let t = 0; t < limit; t += dt) {
     const pose: HeroPose = { x, y, z, yaw, speed };
-    for (const e of fight.advance(dt, pose)) {
+    for (const e of delve.step(dt, pose)) {
       if (e.kind === 'killed') kills++;
       if (e.kind === 'spared') spared++;
       if (e.kind === 'fallen') return run(false, t);
       if (e.kind === 'recipe' && e.event.kind === 'went' && e.event.ability.cost?.mana) spells.push(e.event.ability.id);
+    }
+    // A parley (D62): up to the leader, hear their terms and agree (short of their price, it comes to blows).
+    if (delve.talking && !short) {
+      const l = delve.within(pose);
+      if (l?.kind === 'chief') { short = delve.speak()?.kind === 'short'; continue; }
+      const k = delve.chief!;
+      towards(k, k);
+      continue;
+    }
+    // Terms struck: nothing more to do down here but walk out (their goods are theirs).
+    if (delve.parley === 'struck') {
+      if (!opts.loot) return run(true, t);
+      if (standsBy(ladder, NEAR)) return run(true, t, true);
+      towards(ladder, ladder);
+      continue;
     }
     if (den.beaten) {
       if (!opts.loot) return run(true, t);

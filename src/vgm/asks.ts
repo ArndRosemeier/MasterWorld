@@ -38,11 +38,13 @@ export interface AskPlace {
   readonly decision: DungeonDecision;
   /** Somebody lives there (not an empty place). */
   readonly lived: boolean;
+  /** Who lives there (the lore's dweller id), if known. */
+  readonly dweller?: string;
 }
 
 /** The setting's asks a place fits. */
 export function asksFitting(setting: Pick<SettingModule, 'asks'>, p: AskPlace): AskDef[] {
-  return (setting.asks ?? []).filter((a) => (!a.kinds || a.kinds.includes(p.decision.template)) && (a.lived === undefined || a.lived === p.lived));
+  return (setting.asks ?? []).filter((a) => (!a.kinds || a.kinds.includes(p.decision.template)) && (a.lived === undefined || a.lived === p.lived) && (!a.dwellers || (!!p.dweller && a.dwellers.includes(p.dweller))));
 }
 
 /**
@@ -67,13 +69,14 @@ export function askFor(setting: Pick<SettingModule, 'asks'>, seed: number, log: 
     ...(a.things?.length ? { thing: rng.int(0, a.things.length - 1) } : {}),
     line: rng.int(0, a.words.told.length - 1),
     ...(a.verb === 'lost' && a.lost ? { who: rng.int(0, 9999), alive: rng.chance(a.lost.alive) } : {}),
+    ...(a.verb === 'parley' && a.parley ? (rng.chance(a.parley.pact) ? { terms: 'pact' as const } : { terms: 'price' as const, price: rng.int(a.parley.cost[0], a.parley.cost[1]) }) : {}),
   };
 }
 
 /** The setting's ask `id` as a place would carry it, its first thing and line (someone lost: found alive), for looking at it (`?ask=`). Null: no such ask. */
 export function askNamed(setting: Pick<SettingModule, 'asks'>, id: string): PromiseAsk | null {
   const a = setting.asks?.find((x) => x.id === id);
-  return a ? { id: a.id, verb: a.verb, line: 0, ...(a.things?.length ? { thing: 0 } : {}), ...(a.verb === 'lost' ? { who: 0, alive: true } : {}) } : null;
+  return a ? { id: a.id, verb: a.verb, line: 0, ...(a.things?.length ? { thing: 0 } : {}), ...(a.verb === 'lost' ? { who: 0, alive: true } : {}), ...(a.parley ? { terms: 'price' as const, price: a.parley.cost[0] } : {}) } : null;
 }
 
 /** The setting's ask a promise carries (null: none, as in an older save or a guild's place: clear it). */
@@ -156,17 +159,20 @@ export interface AskState {
   readonly found?: boolean;
   /** The breach is walled up (a seal). */
   readonly sealed?: boolean;
+  /** Terms were agreed with the dwellers' leader (a parley). */
+  readonly parleyed?: boolean;
 }
 
 /**
  * Is the ask done (D62)? Only the thing it names counts: clear, the place beaten; fetch, the named thing in
  * the hero's hands (beating the place does not do it, and nor does any other thing); lost, the lost one found
- * alive, or what is left of them in the hero's hands; seal, the breach walled up (beating what came through it is not).
+ * alive, or what is left of them in the hero's hands; seal, the breach walled up (beating what came through it is not); parley, terms agreed (killing them never is).
  */
 export function askMet(ask: PromiseAsk | null | undefined, s: AskState): boolean {
   if (ask?.verb === 'fetch') return s.holds;
   if (ask?.verb === 'lost') return ask.alive ? !!s.found : s.holds;
   if (ask?.verb === 'seal') return !!s.sealed;
+  if (ask?.verb === 'parley') return !!s.parleyed;
   return s.beaten;
 }
 

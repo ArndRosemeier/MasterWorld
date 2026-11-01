@@ -190,3 +190,59 @@ test('asks: a seal\'s breach stands in a wall of the last room, is walled up cou
   }
   assert.equal(n, 8);
 });
+
+test('asks: a parley\'s dwellers watch and wait; their leader names terms, and only terms struck do it; a blow breaks it for good (D62)', () => {
+  // Only where those who live there can be talked with.
+  const d = testDecision(3) as DungeonDecision;
+  const fits = (dweller: string) => askFor({ asks: classic.asks!.filter((a) => a.id === 'parley') }, 1, [], { decision: d, lived: true, dweller });
+  assert.equal(fits('rats'), null);
+  assert.equal(fits('smugglers')?.verb, 'parley');
+  for (const terms of ['price', 'pact'] as const) {
+    const dec = { ...testDecision(4), dwellers: 'smugglers', ask: { id: 'parley', verb: 'parley', line: 0, terms, ...(terms === 'price' ? { price: 20 } : {}) } } as DungeonDecision;
+    const c = outlineCellar(dec, testHouse(4), classic.dungeons.cellar);
+    assert.equal(c.dweller.id, 'smugglers');
+    const hero = new Character(classic);
+    hero.coins = 50;
+    const delve = new Delve(c, new DungeonSpace(c.layout), classic, hero, 4);
+    delve.ask = dec.ask!;
+    assert.ok(delve.den.peace && delve.talking, 'at peace, someone to talk to');
+    // Up to their leader: spoken with from a step or two off.
+    const k = delve.chief!;
+    assert.equal(delve.within({ x: k.x + 2.2, y: k.y, z: k.z })?.kind, 'chief');
+    const first = delve.speak()!;
+    assert.equal(first.kind, 'terms');
+    assert.ok(!delve.met, 'hearing terms is not striking them');
+    if (terms === 'price') assert.ok(first.text.includes('20 copper'), first.text);
+    assert.equal(delve.speak()!.kind, 'struck');
+    assert.ok(delve.met && !delve.failed);
+    assert.equal(hero.coins, terms === 'price' ? 30 : 50);
+    // Paid off, they go meekly; a pact, they stay at peace.
+    if (terms === 'price') assert.ok(delve.den.creatures.every((x) => x.state === 'meek' || x.state === 'dead'));
+    else assert.ok(delve.den.peace && !delve.beaten);
+    assert.equal(delve.tally().parley, 'struck');
+  }
+  // Short of the price, they say so and nothing is struck.
+  const dec = { ...testDecision(4), dwellers: 'smugglers', ask: { id: 'parley', verb: 'parley', line: 0, terms: 'price', price: 20 } } as DungeonDecision;
+  const c = outlineCellar(dec, testHouse(4), classic.dungeons.cellar);
+  const poor = new Character(classic);
+  poor.coins = 3;
+  const delve = new Delve(c, new DungeonSpace(c.layout), classic, poor, 4);
+  delve.ask = dec.ask!;
+  delve.speak();
+  assert.equal(delve.speak()!.kind, 'short');
+  assert.equal(poor.coins, 3);
+  // A blow before terms: broken, they fight; killing them all is not the parley, and it ends failed.
+  const k = delve.chief!;
+  k.health -= 1;
+  delve.step(0.1, { x: 0, y: 0, z: 0, yaw: 0, speed: 0 });
+  assert.equal(delve.parley, 'broken');
+  assert.ok(!delve.den.peace && !delve.talking && delve.speak() === null);
+  for (const x of delve.den.creatures) x.state = 'dead';
+  assert.ok(delve.beaten && !delve.met && delve.failed);
+  // Kept in the save: broken stays broken, never at peace again.
+  const again = new Delve(c, new DungeonSpace(c.layout), classic, new Character(classic), 4, delve.tally());
+  again.ask = dec.ask!;
+  assert.ok(!again.den.peace && again.failed);
+  // The promise ends failed in the log.
+  assert.equal(keepPromise([], dec.id, 3, true)?.failed, true);
+});

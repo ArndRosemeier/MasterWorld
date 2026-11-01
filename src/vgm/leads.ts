@@ -42,10 +42,10 @@ export function openPromises(log: DecisionLog): (DungeonDecision | MoveInDecisio
 }
 
 /** The promise kept, for the log; null if it already was. */
-export function keepPromise(log: DecisionLog, promise: string, at: number): KeptDecision | null {
+export function keepPromise(log: DecisionLog, promise: string, at: number, failed = false): KeptDecision | null {
   if (keptOf(log).has(promise)) return null;
   const n = log.filter((d) => d.kind === 'kept').length + 1;
-  return { kind: 'kept', id: `kept-${n}`, promise, at };
+  return { kind: 'kept', id: `kept-${n}`, promise, at, ...(failed ? { failed } : {}) };
 }
 
 /** Who lives in a place now as its story goes: the latest move-in or retake into it (a move-in promise's: itself or a later retake). */
@@ -109,8 +109,8 @@ function asked(c: LeadsContext, d: DungeonDecision): DungeonDecision {
   if (!c.asks?.length) return d;
   const place = placeOf(d, c.towns, c.dungeons);
   if (!place) return d;
-  const lived = sketchCellar(d, place, loreOf({ dungeons: c.dungeons }, d.template)).dweller.creatures.length > 0;
-  const ask = askFor({ asks: c.asks }, c.seed, c.log, { decision: d, lived });
+  const dweller = sketchCellar(d, place, loreOf({ dungeons: c.dungeons }, d.template)).dweller;
+  const ask = askFor({ asks: c.asks }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id });
   return ask ? { ...d, ask } : d;
 }
 

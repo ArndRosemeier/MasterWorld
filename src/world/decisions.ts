@@ -88,6 +88,9 @@ export interface PromiseAsk {
   /** `lost`: who of the town is lost (a seeded pick, `vgm/asks.ts` `lostOne`), and whether they are found alive. */
   readonly who?: number;
   readonly alive?: boolean;
+  /** `parley`: the leader's terms, a price (copper) or a pact. */
+  readonly terms?: 'price' | 'pact';
+  readonly price?: number;
 }
 
 /**
@@ -100,6 +103,8 @@ export interface KeptDecision {
   readonly promise: string;
   /** Game hours since the world began. */
   readonly at: number;
+  /** It ended without what was asked (D62: a parley the hero broke by striking first); nobody pays for it. */
+  readonly failed?: boolean;
   /** It ended without the hero (C11: a story event left alone ran its course; the VGM's 'fade' tool). */
   readonly faded?: true;
 }

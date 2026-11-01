@@ -54,6 +54,10 @@ export interface FightHost {
    * (a cellar's household down its ladder, app/ownerComes.ts). True if someone comes (then no line says it is quiet).
    */
   stilled(id: string): boolean;
+  /** The place of a promise ended without what it asked (D62: a parley the hero broke): nobody pays. True once taken in. */
+  failed(id: string): boolean;
+  /** Someone down there speaks (a parley's leader): a bubble over them while `at` gives where (null: gone). */
+  say(text: string, at: () => { x: number; y: number; z: number } | null): void;
 }
 
 /** Where an encounter is: a cellar, a band's ground. */
@@ -90,6 +94,8 @@ export type FightCue =
 
 /** Walling up a breach (D62): seconds the stones take, and where the hero kneels before it (m out from it). */
 const SEAL_BUSY = 7, SEAL_FRONT = 0.75;
+/** What G does to what is near, as the HUD offers it. */
+const PROMPT: Record<Lootable['kind'], string> = { body: 'Search', hoard: 'Search', breach: 'Wall up', chief: 'Speak with' };
 
 export class Encounter {
   /** Hears every cue (the game's sound sets it); nothing listens by default. */
@@ -208,6 +214,15 @@ export class Encounter {
       p.puppet = this.kneel;
       return null;
     }
+    // A parley's leader (D62): spoken with where the hero stands, the words over the leader's head.
+    if (l.kind === 'chief') {
+      const said = this.delve.speak();
+      if (said) {
+        const who = l.who, head = who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1;
+        this.host.say(said.text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
+      }
+      return null;
+    }
     const lid = l.kind === 'hoard' && l.hoard.prop ? (k: number) => this.onLid(l.hoard.id, k) : null;
     // A chest is opened from its front.
     const f = l.kind === 'hoard' ? l.hoard.front : undefined;
@@ -257,6 +272,7 @@ export class Encounter {
     this.cueInside();
     this.creatures.group.visible = this.arena.shown;
     if (!this.arena.inside && !this.paid && !this.reported && this.arena.promise && this.delve.met) this.reported = this.host.quiet(this.arena.promise);
+    if (!this.paid && !this.reported && this.arena.promise && this.delve.failed) this.reported = this.paid = this.host.failed(this.arena.promise);
   }
 
   private cueInside(): void {
@@ -321,7 +337,7 @@ export class Encounter {
     const stance = this.player.stance;
     const swinging = stance.action && this.player.hero ? this.player.hero.clock - stance.action.t0 < stance.action.dur : false;
     this.player.stance = { combat: fighting > 0 || this.fight.attacking, action: swinging ? stance.action : undefined };
-    this.hud.follow(this.fight, this.hero, this.near ? `${this.near.kind === 'breach' ? 'Wall up' : 'Search'} ${this.near.name}` : null);
+    this.hud.follow(this.fight, this.hero, this.near ? `${PROMPT[this.near.kind]} ${this.near.name}` : null);
   }
 
   /** What the Director watches (plan 4.3): who fights the hero, and how much danger knows of them. */
