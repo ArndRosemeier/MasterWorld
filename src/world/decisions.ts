@@ -91,6 +91,8 @@ export interface PromiseAsk {
   /** `parley`: the leader's terms, a price (copper) or a pact. */
   readonly terms?: 'price' | 'pact';
   readonly price?: number;
+  /** What turns out other than told (Q3: the setting's twist id); none: as told. */
+  readonly twist?: string;
   /** `watch`: whether a band comes out of the dark, and who they are (the dwellers' encounter). */
   readonly comes?: boolean;
   readonly band?: string;

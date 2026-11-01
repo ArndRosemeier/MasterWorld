@@ -38,8 +38,8 @@ export interface TalkHost {
   heard(lead: { id: string; title: string; note: string }): void;
   /** The hero asked about story event `id` and was told of it (by `from`): the journal and map take it up. */
   heardOf(event: string, from: string): void;
-  /** A thief was named and dealt with (D62): promise `id`, caught or let go. */
-  named(id: string, ending: 'caught' | 'let-go'): void;
+  /** A thief was named and dealt with (D62): promise `id`, caught or let go; or a lied-about thing given to its rightful household (Q3). */
+  named(id: string, ending: 'caught' | 'let-go' | 'given'): void;
   /** A service was asked for (trade, a repair, a room): the talk has ended, open its window. */
   serve(service: string, agent: Agent): void;
   /** The hero tells `agent` the place of promise `id` is safe again: the game pays and keeps it; their answer. */

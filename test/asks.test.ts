@@ -11,7 +11,7 @@ import { talkCellar, townTalk } from '../src/talk/townTalk';
 import { Character } from '../src/game/character';
 import { Delve } from '../src/game/delve';
 import { Market } from '../src/game/trade';
-import { outlineCellar } from '../src/world/dungeon/cellar';
+import { outlineCellar, sketchCellar } from '../src/world/dungeon/cellar';
 import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { testDecision, testHouse } from '../src/world/dungeon/variety';
@@ -22,7 +22,7 @@ const seed = parseSeed('masterworld');
 const { terrain, log: first, home } = startWorld();
 const town = terrain.towns[0];
 const people = townsfolk(town.plan, seed);
-const ctx = (log: DecisionLog, hours: number) => ({ seed, log, towns: terrain.towns, home, hours, purposeOverdue: false, inside: () => false, dungeons: classic.dungeons, terrain, asks: classic.asks });
+const ctx = (log: DecisionLog, hours: number) => ({ seed, log, towns: terrain.towns, home, hours, purposeOverdue: false, inside: () => false, dungeons: classic.dungeons, terrain, asks: classic.asks, twists: classic.twists });
 
 /** The Builder for `hours`, keeping the oldest open promise every two game hours. */
 function play(hours: number, s = seed): Decision[] {
@@ -322,4 +322,52 @@ test('asks: a thief is one of the town; what they stole gives them away, and onl
   // Judged only by the facing: the stash found is not it.
   assert.equal(askMet(d.ask, { beaten: true, holds: true }), false);
   assert.equal(askMet(d.ask, { beaten: false, holds: true, named: true }), true);
+});
+
+test('asks: twists come now and then, never the same twist twice running, each seen in the place or heard in talk (Q3)', () => {
+  assert.deepEqual(validateSetting(classic).filter((e) => e.includes('twist')), []);
+  // Over two days of play: some asks turn out other than told, and the twist given last is not given again.
+  let n = 0, total = 0;
+  for (const name of ['masterworld', 'alpha', 'x4']) {
+    const twisted = play(48, parseSeed(name)).filter((x): x is DungeonDecision => x.kind === 'dungeon' && !!x.ask);
+    total += twisted.length;
+    const seen = twisted.map((x) => x.ask!.twist).filter(Boolean);
+    n += seen.length;
+    for (let i = 1; i < seen.length; i++) assert.notEqual(seen[i], seen[i - 1], `${name}: ${seen.join(', ')}`);
+  }
+  assert.ok(n > total * 0.1 && n < total * 0.5, `${n} twists of ${total} asks`);
+  // Someone got there first: the bodies lie searched, the strongest is left, hurt.
+  const beat = { ...testDecision(4), dwellers: 'smugglers', ask: { id: 'clear', verb: 'clear', line: 0, twist: 'got-there-first' } } as DungeonDecision;
+  const c = outlineCellar(beat, testHouse(4), classic.dungeons.cellar);
+  const delve = new Delve(c, new DungeonSpace(c.layout), classic, new Character(classic), 4);
+  const full = delve.chief!.health;
+  delve.ask = beat.ask!;
+  const alive = delve.den.creatures.filter((x) => x.state !== 'dead');
+  assert.ok(delve.den.creatures.length > 1 && alive.length === 1 && alive[0]!.health < full, `${alive.length} of ${delve.den.creatures.length} alive`);
+  for (const x of delve.den.creatures.filter((k) => k.state === 'dead')) assert.equal(delve.within(x)?.kind === 'body', false, 'already searched');
+  assert.ok(!delve.beaten, 'not done for the hero');
+  const again = new Delve(c, new DungeonSpace(c.layout), classic, new Character(classic), 4, delve.tally());
+  again.ask = beat.ask!;
+  assert.equal(again.den.creatures.filter((x) => x.state !== 'dead').length, 1, 'the save keeps it, nothing more falls');
+  // The place changed since it was told: other dwellers there than the town speaks of.
+  let changed = 0;
+  for (let i = 0; i < 6; i++) {
+    const d = { ...testDecision(i), ask: { id: 'clear', verb: 'clear', line: 0, twist: 'changed' } } as DungeonDecision;
+    const lore = classic.dungeons.cellar, told = sketchCellar(d, testHouse(i), lore, undefined, true), found = sketchCellar(d, testHouse(i), lore);
+    if (found.dweller.id !== told.dweller.id) changed++;
+    assert.equal(outlineCellar(d, testHouse(i), lore).dweller.id, found.dweller.id, 'the place holds what is there now');
+  }
+  assert.ok(changed >= 5, `${changed} of 6 changed`);
+  // The household lied: the thing bears another family's mark, and their household can be given it.
+  const house = town.plan.buildings.findIndex((_, i) => i > 2 && people.some((p) => p.home === i));
+  const lied = { ...testDecision(7), town: town.decision.id, building: house, ask: { id: 'heirloom', verb: 'fetch', line: 0, thing: 1, twist: 'not-theirs' } } as DungeonDecision;
+  const log: DecisionLog = [...first, lied];
+  const { talk } = townTalk(seed, classic, town, people, log);
+  const names = talk.namesFor(lied), thing = keepsakeOf(classic, lied, names)!;
+  assert.ok(names.other && names.other !== names.family && thing.lore!.includes(names.other), thing.lore);
+  const owner = people.find((p) => p.home === talk.askOf(lied.id)!.rightful && p.role !== 'child')!;
+  assert.ok(!talk.topics(owner.id).some((t) => t.id.startsWith('give:')), 'not without the thing');
+  talk.holding = (id) => id === lied.id;
+  assert.ok(talk.topics(owner.id).some((t) => t.id === `give:${lied.id}`));
+  assert.deepEqual(talk.ask(owner.id, `give:${lied.id}`).named, { id: lied.id, ending: 'given' });
 });

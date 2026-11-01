@@ -6,7 +6,7 @@
  * an ask names counts as done (`askMet`). Pure.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import type { AskDef, SettingModule } from '../setting/contract';
+import type { AskDef, SettingModule, TwistDef } from '../setting/contract';
 import type { DecisionLog, DungeonDecision, PromiseAsk } from '../world/decisions';
 import type { Item } from '../game/items';
 import { cap, fill } from '../talk/folk';
@@ -52,7 +52,7 @@ export function asksFitting(setting: Pick<SettingModule, 'asks'>, p: AskPlace): 
  * What the household asks about a newly promised place: a kind that fits it, not the kind given last (while
  * another fits), weighed by how long each has waited. Null: the setting has no asks that fit (clear it).
  */
-export function askFor(setting: Pick<SettingModule, 'asks'>, seed: number, log: DecisionLog, p: AskPlace): PromiseAsk | null {
+export function askFor(setting: Pick<SettingModule, 'asks' | 'twists'>, seed: number, log: DecisionLog, p: AskPlace): PromiseAsk | null {
   const fit = asksFitting(setting, p);
   if (!fit.length) return null;
   const given = asksGiven(log), last = given.at(-1);
@@ -64,9 +64,11 @@ export function askFor(setting: Pick<SettingModule, 'asks'>, seed: number, log: 
   const rng = new Rng(deriveSeed(seed, 'vgm', 'ask', p.decision.id));
   const odds = pool.map((x) => x.weight * waited(since(x.id)));
   const a = rng.weighted(pool, (_, i) => odds[i]!);
+  const twist = twistFor(setting, seed, log, p, a);
   return {
     id: a.id,
     verb: a.verb,
+    ...(twist ? { twist } : {}),
     ...(a.things?.length ? { thing: rng.int(0, a.things.length - 1) } : {}),
     line: rng.int(0, a.words.told.length - 1),
     ...(a.verb === 'lost' && a.lost ? { who: rng.int(0, 9999), alive: rng.chance(a.lost.alive) } : {}),
@@ -74,6 +76,27 @@ export function askFor(setting: Pick<SettingModule, 'asks'>, seed: number, log: 
     ...(a.verb === 'watch' && a.watch ? { comes: rng.chance(a.watch.comes), ...(p.encounter ? { band: p.encounter } : {}) } : {}),
     ...(a.verb === 'parley' && a.parley ? (rng.chance(a.parley.pact) ? { terms: 'pact' as const } : { terms: 'price' as const, price: rng.int(a.parley.cost[0], a.parley.cost[1]) }) : {}),
   };
+}
+
+/** How often an ask turns out other than told (Q3): a twist is a surprise, not the rule. */
+const TWIST_SHARE = 0.3;
+
+/**
+ * Whether ask `a` on place `p` turns out other than told (Q3), and how: one of the setting's twists that fit its
+ * verb (and its kind: a lie needs a thing to lie about, someone got there first and the place changed need
+ * dwellers), never the twist given last; a seeded share of asks only. Null: as told.
+ */
+function twistFor(setting: Pick<SettingModule, 'twists'>, seed: number, log: DecisionLog, p: AskPlace, a: AskDef): string | null {
+  const rng = new Rng(deriveSeed(seed, 'vgm', 'twist', p.decision.id));
+  if (!rng.chance(TWIST_SHARE)) return null;
+  const last = [...log].reverse().find((x): x is DungeonDecision => x.kind === 'dungeon' && !!x.ask?.twist)?.ask?.twist;
+  const fit = (setting.twists ?? []).filter((t) => t.verbs.includes(a.verb) && t.id !== last && (t.kind === 'lied' ? !!a.things?.length : p.lived));
+  return fit.length ? rng.weighted(fit, (t) => t.weight).id : null;
+}
+
+/** The setting's twist an ask carries (null: as told). */
+export function twistOf(setting: Partial<Pick<SettingModule, 'twists'>>, ask: PromiseAsk | null | undefined): TwistDef | null {
+  return (ask?.twist && setting.twists?.find((t) => t.id === ask.twist)) || null;
 }
 
 /** The setting's ask `id` as a place would carry it, its first thing and line (someone lost: found alive), for looking at it (`?ask=`). Null: no such ask. */
@@ -102,18 +125,22 @@ export function verbOf(log: DecisionLog, id: string): string {
 export interface AskNames {
   readonly family: string;
   readonly who?: string;
+  /** The family a lied-about thing really belongs to (a twist). */
+  readonly other?: string;
 }
 
 /** The named thing of a fetch, or what is left of someone lost dead, as the household calls it. Null: none. */
-export function thingOf(setting: Pick<SettingModule, 'asks'>, ask: PromiseAsk | undefined, n: AskNames): { readonly item: string; readonly name: string; readonly lore: string } | null {
+export function thingOf(setting: Pick<SettingModule, 'asks'> & Partial<Pick<SettingModule, 'twists'>>, ask: PromiseAsk | undefined, n: AskNames): { readonly item: string; readonly name: string; readonly lore: string } | null {
   if (!ask || ask.alive) return null;
   const t = ask.thing === undefined ? undefined : askDefOf(setting, ask)?.things?.[ask.thing];
-  const v = { family: n.family, who: n.who ?? '' };
-  return t ? { item: t.item, name: fill(t.name, v), lore: fill(t.lore, v) } : null;
+  const v = { family: n.family, who: n.who ?? '', other: n.other ?? '' };
+  // A lie (Q3): the thing shows whose it really is.
+  const lied = twistOf(setting, ask), more = lied?.kind === 'lied' && lied.words.lore && n.other ? ` ${fill(lied.words.lore, v)}` : '';
+  return t ? { item: t.item, name: fill(t.name, v), lore: fill(t.lore, v) + more } : null;
 }
 
 /** The keepsake a promise asks to be brought (a fetch's thing, a dead lost one's), as an item in the pack (null: none). */
-export function keepsakeOf(setting: Pick<SettingModule, 'asks' | 'items'>, d: DungeonDecision, n: AskNames): Item | null {
+export function keepsakeOf(setting: Pick<SettingModule, 'asks' | 'items'> & Partial<Pick<SettingModule, 'twists'>>, d: DungeonDecision, n: AskNames): Item | null {
   const t = thingOf(setting, d.ask, n);
   if (!t || !setting.items.items.some((x) => x.id === t.item)) return null;
   return { def: t.item, rarity: 'common', name: cap(t.name), bonuses: {}, lore: t.lore, keepsake: d.id };
