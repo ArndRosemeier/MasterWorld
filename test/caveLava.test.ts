@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formedCave, caves } from './support/formedCave';
+import { formedCave, caves, small } from './support/formedCave';
 import { formCave } from '../src/world/cave/form';
 import { rockFor, sharesFor } from '../src/world/cave/choose';
 import { Walker } from '../src/game/walker';
@@ -11,7 +11,7 @@ test('lava tubes (K7): volcanic country holds basalt and lava, the flow forms th
   assert.equal(rockFor(caves, 'volcanic', 5)!.id, 'basalt');
   assert.ok(Array.from({ length: 40 }, (_, i) => sharesFor(caves, 'volcanic', i).lava).some((l) => l > 0), 'lava is among the shares there');
   assert.equal(Array.from({ length: 40 }, (_, i) => sharesFor(caves, 'karst', i).lava).filter((l) => l > 0).length, 0, 'and nowhere else');
-  const a = formCave(caves, 3, 'basalt', 'small'), b = formCave(caves, 3, 'basalt', 'small'), c = formCave(caves, 4, 'basalt', 'small');
+  const own = (seed: number) => formCave(caves, seed, 'basalt', small.id, undefined, undefined, small), a = own(3), b = own(3), c = own(4);
   assert.equal(JSON.stringify(a.skeleton.conduits), JSON.stringify(b.skeleton.conduits), 'seeded');
   assert.notEqual(JSON.stringify(a.skeleton.conduits), JSON.stringify(c.skeleton.conduits));
   const tube = a.skeleton.conduits[0].points;
