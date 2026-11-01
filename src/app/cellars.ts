@@ -107,6 +107,8 @@ interface Mound extends LandSite {
   mesh: Mesh | null;
   /** Is a body of radius `r` at (x, z) of its own frame in its way? */
   inShape: (x: number, z: number, r: number) => boolean;
+  /** The height (world y) of its highest point, once its mesh is made: over it a body or the camera is not in its way. */
+  top: number;
   /** Where in its doorway the way goes in (its frame; a cave's once its mouth is made). */
   way: { readonly x: number; readonly z: number };
   /** Where the hero comes back out (its frame), facing away from it. */
@@ -311,10 +313,19 @@ export class Cellars {
   }
 
   /** Is a body of radius `r` at (x, z) on the land inside a place's piece (a barrow's mound, a crag, a tower's walls)? */
-  solid(x: number, z: number, r: number): boolean {
+  solid(x: number, z: number, r: number): boolean { return this.inPieces(x, -Infinity, z, r); }
+
+  /**
+   * Is (x, y, z) in a place's piece on the land, with `r` to spare? The camera keeps out of it: `solid` knows no height,
+   * and the camera swings round over the land with the mouse.
+   */
+  inPiece(x: number, y: number, z: number, r: number): boolean { return this.inPieces(x, y, z, r); }
+
+  /** The pieces' footprints, for what is not over their top (`y`). */
+  private inPieces(x: number, y: number, z: number, r: number): boolean {
     for (const s of this.sites.values()) {
       const m = s.mound;
-      if (!m || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
+      if (!m || y > m.top || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
       const [fx, fz] = inFrame(m, x, z);
       if (m.inShape(fx, fz, r)) return true;
     }
@@ -409,13 +420,15 @@ export class Cellars {
       void h.stage.add(m);
       return m;
     };
+    const topOf = (mesh: Mesh): number => { mesh.geometry.computeBoundingBox(); return y + mesh.geometry.boundingBox!.max.y; };
     // What stands over it is its kind's shell (C6c: the form says which builder, not the kind's name).
     const shell = loreOf(h.setting, d.template).form.shell;
     if (shell === 'mouth') {
       const seed = deriveSeed(d.seed, 'cave');
-      const mound: Mound = { ...site, mesh: null, inShape: () => false, way: MOUTH_WAY_DOWN, out: 3, cool: 0 };
+      const mound: Mound = { ...site, mesh: null, inShape: () => false, top: -Infinity, way: MOUTH_WAY_DOWN, out: 3, cool: 0 };
       void (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
         mound.mesh = put(mouth.mesh, 0);
+        mound.top = topOf(mound.mesh);
         mound.inShape = (x, z) => inWalkRaster(mouth.walk, x, z);
         // A cliff's way in is bigger: it goes down further in, and the hero comes out further before it.
         mound.way = mouth.way;
@@ -427,9 +440,11 @@ export class Cellars {
     }
     if (shell === 'keep') {
       const size = towerOf(layout);
-      return { ...site, mesh: put(towerMesh(size, deriveSeed(d.seed, 'tower'), land), 0.02), inShape: (x, z, r) => inTowerShape(size, x, z, r), way: TOWER_WAY_IN, out: 2.4, cool: 0 };
+      const mesh = put(towerMesh(size, deriveSeed(d.seed, 'tower'), land), 0.02);
+      return { ...site, mesh, top: topOf(mesh), inShape: (x, z, r) => inTowerShape(size, x, z, r), way: TOWER_WAY_IN, out: 2.4, cool: 0 };
     }
-    return { ...site, mesh: put(barrowMesh(deriveSeed(d.seed, 'barrow'), land), 0.05), inShape: inBarrowShape, way: WAY_DOWN, out: 2.2, cool: 0 };
+    const mesh = put(barrowMesh(deriveSeed(d.seed, 'barrow'), land), 0.05);
+    return { ...site, mesh, top: topOf(mesh), inShape: inBarrowShape, way: WAY_DOWN, out: 2.2, cool: 0 };
   }
 
   /** New dwellers (a move-in after a clear, or a retake while it stands): only the latest of them lives there. */

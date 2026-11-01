@@ -72,13 +72,14 @@ export function throatFrame(f: BrickField, sk: Skeleton): ThroatFrame | null {
     if (c.kind !== 'mouth') continue;
     const a = c.points[0], b = c.points[c.points.length - 1];
     const len = Math.hypot(b.x - a.x, b.z - a.z) || 1, dx = (b.x - a.x) / len, dz = (b.z - a.z) / len;
-    SPOTS.forEach((s, rank) => {
-      if (s > len + 2) return;
+    for (let rank = 0; rank < SPOTS.length; rank++) {
+      const s = SPOTS[rank];
+      if (s > len + 2) continue;
       const x = a.x + dx * s, z = a.z + dz * s, y = floorNear(f, x, a.y + 0.5 * a.B, z, a.B + a.D + 2);
-      if (y === null) return;
+      if (y === null) continue;
       const ground = levelGround(f, x - dx * IN, y, z - dz * IN) - rank * 2;
       if (!best || ground > best.ground) best = { frame: { x, y, z, yaw: Math.atan2(dx, dz) }, ground };
-    });
+    }
   }
   return best ? best.frame : null;
 }
