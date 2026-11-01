@@ -565,6 +565,8 @@ export interface DungeonSpace {
   readonly entrance: 'footprint' | readonly [number, number];
   /** Its rock is carved (a signed distance field meshed with surface nets), not built of walls and floors. */
   readonly carved: boolean;
+  /** Its rock is a formed cave (D63, phase K: the setting's `caves`), the cellar's rooms told as places of it, not carved round a room layout. */
+  readonly formed?: boolean;
   /** Wall torches by its doors (a natural cave has none: the lantern is all the light there is). */
   readonly torches: boolean;
   /** The hero comes in standing in the middle of the entrance room (a tower's door, a cave's rock step), else by the way out. */

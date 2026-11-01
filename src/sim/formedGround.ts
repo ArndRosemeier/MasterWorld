@@ -27,8 +27,8 @@ const SEARCH = 6000;
 export class FormedGround implements DenGround {
   /** Cells by their column (grid position). */
   private readonly columns = new Map<number, number[]>();
-  /** For each home, the cells within `SPREAD` metres of it by walk links (filled when first asked). */
-  private readonly around = new Map<number, number[]>();
+  /** For each cell asked, the cells round it (`around`). */
+  private readonly near = new Map<number, number[]>();
 
   constructor(private readonly field: BrickField, private readonly r: Reading, private readonly homes: readonly number[]) {
     for (let c = 0; c < r.count; c++) {
@@ -64,11 +64,11 @@ export class FormedGround implements DenGround {
 
   private point(c: number): P3 { return { x: this.r.x[c], y: this.r.y[c], z: this.r.z[c] }; }
 
-  /** The reached cells within `SPREAD` metres of a home along walk links. */
-  private cellsAround(home: number): number[] {
-    let out = this.around.get(home);
+  /** The reached cells within `SPREAD` metres of a cell that a creature goes to from it (walks, scrambles, drops), the cell first. */
+  surround(start: number): number[] {
+    let out = this.near.get(start);
     if (out) return out;
-    const start = this.homes[home], r = this.r, seen = new Set<number>([start]);
+    const r = this.r, seen = new Set<number>([start]);
     out = [start];
     for (let n = 0; n < out.length; n++) {
       const a = out[n];
@@ -78,12 +78,12 @@ export class FormedGround implements DenGround {
         seen.add(b); out.push(b);
       }
     }
-    this.around.set(home, out);
+    this.near.set(start, out);
     return out;
   }
 
   spot(home: number, rng: { range(a: number, b: number): number }): P3 {
-    const cells = this.cellsAround(home), c = cells[Math.min(cells.length - 1, Math.floor(rng.range(0, cells.length)))];
+    const cells = this.surround(this.homes[home]), c = cells[Math.min(cells.length - 1, Math.floor(rng.range(0, cells.length)))];
     const j = this.field.step * 0.15;
     const x = this.r.x[c] + rng.range(-j, j), z = this.r.z[c] + rng.range(-j, j);
     // The cell's own floor (a column can hold shelves over one another).
@@ -106,6 +106,17 @@ export class FormedGround implements DenGround {
       prev = w;
     }
     return null;
+  }
+
+  /** The floor points of reached cells within `reach` metres across and 3.5 m up or down of a body at (x, y, z) that it has a clear line to (what a lantern shows). */
+  *lit(x: number, y: number, z: number, reach: number): Iterable<P3> {
+    const f = this.field, ci = Math.round((x - f.ox) / f.step), ck = Math.round((z - f.oz) / f.step), n = Math.ceil(reach / f.step);
+    for (let dk = -n; dk <= n; dk++) for (let di = -n; di <= n; di++) {
+      for (const c of this.columns.get(this.columnKey(ci + di, ck + dk)) ?? []) {
+        if (Math.hypot(this.r.x[c] - x, this.r.z[c] - z) > reach || Math.abs(this.r.y[c] - y) > 3.5) continue;
+        if (this.sees(x, y, z, this.r.x[c], this.r.y[c], this.r.z[c], 1.2)) yield this.point(c);
+      }
+    }
   }
 
   clearance(x: number, y: number, z: number): number { return fieldAt(this.field, x, y + 0.5, z, -1); }

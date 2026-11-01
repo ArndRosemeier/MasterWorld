@@ -6,6 +6,7 @@ import type { Prop } from '../world/dungeon/cellar';
 import { inFrame } from '../world/dungeon/site';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { CaveSpace } from '../world/dungeon/caveRock';
+import { FormedSpace } from '../sim/formedSpace';
 import type { WalkWorld } from './walker';
 
 /** A tower's way out (a door prop against the wall): the part of it the camera keeps out of, in its frame (m: across; along its facing, the wall at about +0.55 and the pane at -0.5; up). */
@@ -26,7 +27,7 @@ export function dungeonWorld(space: DungeonSpace, origin: { x: number; y: number
     // A drowned lowest storey (a sea cave): one still surface over all of it (the rock above keeps it to its rooms).
     waterLevel: space.layout?.flood === undefined ? () => null : () => origin.y + space.layout.flood!,
     // A cave's broken rock is climbed wherever it stands as a wall (a drop's face back up); built walls are not.
-    rockHolds: () => space instanceof CaveSpace,
+    rockHolds: () => space instanceof CaveSpace || space instanceof FormedSpace,
   };
 }
 

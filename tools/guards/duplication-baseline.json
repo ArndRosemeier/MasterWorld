@@ -866,5 +866,25 @@
   {
     "key": "same name: masterworld/sim/formedGround.ts#slide + masterworld/sim/wild.ts#slide",
     "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "clone: masterworld/render/cave/formedMeshes.ts#waterGeometry + masterworld/render/rocks/RockView.ts#geometryOf",
+    "reason": "Both turn typed arrays into a BufferGeometry, but with different attribute sets (water: uv + flow in tint; rock: colour) and RockView's is private to the rocks."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#floorAt + masterworld/sim/formedSpace.ts#floorAt",
+    "reason": "Both implement the DungeonSpace seam (game/dungeonWorld.ts reads a built dungeon or a formed cave through it); each reads its own ground."
+  },
+  {
+    "key": "same name: masterworld/sim/formedSpace.ts#sdf + masterworld/world/dungeon/caveRock.ts#sdf",
+    "reason": "Both implement the rock-distance seam of DungeonSpace; the formed cave reads its carved brick field, the old cave its noise."
+  },
+  {
+    "key": "same name: masterworld/sim/formedSpace.ts#sdf + masterworld/world/dungeon/space.ts#sdf",
+    "reason": "Both implement the rock-distance seam of DungeonSpace; the formed cave reads its carved brick field, the built dungeon its walls."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#spot + masterworld/sim/wild.ts#spot",
+    "reason": "FormedGround.spot implements the DenGround seam (sim/dungeonNav.ts) as the wild ground's does; each picks a spot on its own ground."
   }
 ]

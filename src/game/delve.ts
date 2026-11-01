@@ -7,6 +7,7 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { SettingModule } from '../setting/contract';
 import { Den, type Creature } from '../sim/creatures';
+import type { DenGround } from '../sim/dungeonNav';
 import { isEmpty, type Cellar } from '../world/dungeon/cellar';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { hoardsOf, type Hoard } from '../world/dungeon/treasure';
@@ -58,8 +59,8 @@ export class Delve {
   private readonly opened = new Set<number>();
   private readonly searched = new Set<number>();
 
-  /** A cellar and its space, or (no cellar) a den already standing on its ground. */
-  constructor(readonly cellar: Cellar | null, ground: DungeonSpace | Den, private readonly setting: SettingModule, readonly hero: Character, seed: number, saved?: DelveSave) {
+  /** A cellar and its space (or the ground its dwellers live on: a formed cave's), or (no cellar) a den already standing on its ground. */
+  constructor(readonly cellar: Cellar | null, ground: DungeonSpace | DenGround | Den, private readonly setting: SettingModule, readonly hero: Character, seed: number, saved?: DelveSave) {
     this.den = ground instanceof Den ? ground : new Den(ground, cellar?.spawns ?? [], setting.creatures, deriveSeed(seed, 'den'), saved?.dead ?? []);
     for (const id of saved?.spared ?? []) {
       const c = this.den.creatures[id];

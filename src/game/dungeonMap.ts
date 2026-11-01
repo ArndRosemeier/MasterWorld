@@ -11,15 +11,53 @@ export const LANTERN_CELLS = 3;
 
 const cellKey = (i: number, j: number, l: number) => `${i},${j},${l}`;
 
-export class DungeonSeen {
-  /** Seen cells by key, with their grid place. */
-  private readonly cells = new Map<string, readonly [number, number, number]>();
-  private readonly rooms = new Set<number>();
-  private at = '';
+/** The squares of floor the hero has seen, by "i,j,storey" (kept in the save; the minimap paints them). */
+export class SeenCells {
+  protected readonly cells = new Map<string, readonly [number, number, number]>();
   /** Grows by one each time a cell is added (the minimap paints again then). */
   version = 0;
 
-  constructor(private readonly space: DungeonSpace) {}
+  /** Has the hero seen cell (i, j) on storey l? */
+  has(i: number, j: number, l: number): boolean {
+    return this.cells.has(cellKey(i, j, l));
+  }
+
+  /** Every seen cell (i, j, storey). */
+  seenCells(): IterableIterator<readonly [number, number, number]> {
+    return this.cells.values();
+  }
+
+  /** For the save. */
+  save(): string[] {
+    return [...this.cells.keys()];
+  }
+
+  /** A saved record laid over a fresh one. */
+  restore(keys: readonly string[]): void {
+    for (const k of keys) {
+      const [i, j, l] = k.split(',').map(Number);
+      if (Number.isFinite(i) && Number.isFinite(j) && Number.isFinite(l)) this.note(i, j, l);
+    }
+  }
+
+  /** Mark a cell seen (a built dungeon only marks cells it owns). */
+  protected note(i: number, j: number, l: number): void {
+    const k = cellKey(i, j, l);
+    if (this.cells.has(k)) return;
+    this.cells.set(k, [i, j, l]);
+    this.version++;
+  }
+}
+
+/** What the minimap and the save ask of what the hero has seen (a built dungeon's cells, or a formed cave's squares: game/formedMap.ts). */
+export type Seen = Pick<SeenCells, 'has' | 'seenCells' | 'save' | 'restore' | 'version'> & { see(x: number, y: number, z: number): void };
+
+export class DungeonSeen extends SeenCells {
+  private readonly rooms = new Set<number>();
+  private at = '';
+  constructor(private readonly space: DungeonSpace) {
+    super();
+  }
 
   /** The hero stands at (x, y, z), in the dungeon's frame (feet). */
   see(x: number, y: number, z: number): void {
@@ -53,33 +91,8 @@ export class DungeonSeen {
     }
   }
 
-  /** Has the hero seen cell (i, j) on storey l? */
-  has(i: number, j: number, l: number): boolean {
-    return this.cells.has(cellKey(i, j, l));
-  }
-
-  /** Every seen cell (i, j, storey). */
-  seenCells(): IterableIterator<readonly [number, number, number]> {
-    return this.cells.values();
-  }
-
-  /** For the save. */
-  save(): string[] {
-    return [...this.cells.keys()];
-  }
-
-  /** A saved record laid over a fresh one. */
-  restore(keys: readonly string[]): void {
-    for (const k of keys) {
-      const [i, j, l] = k.split(',').map(Number);
-      if (Number.isFinite(i) && Number.isFinite(j) && Number.isFinite(l)) this.note(i, j, l);
-    }
-  }
-
-  private note(i: number, j: number, l: number): void {
-    const k = cellKey(i, j, l);
-    if (this.cells.has(k) || this.space.own(i, j, l) === undefined) return;
-    this.cells.set(k, [i, j, l]);
-    this.version++;
+  protected override note(i: number, j: number, l: number): void {
+    if (this.space.own(i, j, l) === undefined) return;
+    super.note(i, j, l);
   }
 }

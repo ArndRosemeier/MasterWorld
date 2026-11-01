@@ -5,6 +5,8 @@ import { dressFormed, formCave, readFormed } from '../src/world/cave/form';
 import { Walker } from '../src/game/walker';
 import { formedWorld } from '../src/game/formedWorld';
 import { PART_MIN } from '../src/world/cave/reader';
+import { fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
+import { THROAT_BEYOND } from '../src/world/dungeon/caveThroat';
 
 const caves = classic.caves!;
 // A block a little smaller than the smallest cave, to keep within the time of `npm test`.
@@ -55,4 +57,20 @@ test('caves: the real walker crosses the walk links of the reading (the reader a
   }
   assert.ok(tried >= 30, `${tried} walk links tried`);
   assert.ok(crossed >= tried * 0.97, `${crossed} of ${tried} walk links walked by the real walker`);
+});
+
+test('caves: the first mouth is cut as a portal throat: an arch through a closed wall, the way in standing on its floor', () => {
+  for (const [seed, rock] of [[5, 'jointed'], [6, 'massive'], [7, 'thin-bedded']] as const) {
+    const r = read(seed, rock), t = r.c.skeleton.throat, f = r.c.field as BrickField;
+    assert.ok(t, `${rock} ${seed}: a throat`);
+    const s = Math.sin(t.yaw), c = Math.cos(t.yaw);
+    // The point at (u across, v up, w along: w > 0 behind the plane, towards the day) of the portal's frame.
+    const at = (u: number, v: number, w: number) => fieldAt(f, t.x + u * c + w * s, t.y + v, t.z - u * s + w * c, -1);
+    assert.ok(at(0, 1.2, -1) > 0.3, 'the arch is open on the cave side');
+    assert.ok(at(0, 1.2, 0.4) > 0.3, 'and through the plane');
+    assert.ok(at(2.6, 1.2, 0.5) < 0 && at(-2.6, 1.2, 0.5) < 0, 'with rock closed round it behind the plane');
+    assert.ok(at(0, 1.2, THROAT_BEYOND + 0.8) < 0, 'and a plug past it');
+    const e = r.reading.entries[0];
+    assert.ok(e !== undefined && Math.hypot(r.reading.x[e] - t.x, r.reading.z[e] - t.z) < 3 && Math.abs(r.reading.y[e] - t.y) < 0.8, 'the way in stands at the throat');
+  }
 });

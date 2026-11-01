@@ -68,7 +68,7 @@ export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, s
 }
 
 /** Write v into a sample: the larger of it and the stored value (air is added), or with `rock` the smaller (rock is added); a brick is made where there was none and v is inside its skin. */
-function putSample(f: BrickField, i: number, j: number, k: number, v: number, rock = false): void {
+export function putSample(f: BrickField, i: number, j: number, k: number, v: number, rock = false): void {
   if (rock ? v >= 1 : v <= -1) return;
   const b = brickIndex(f, i, j, k);
   let brick = f.bricks[b];
@@ -78,7 +78,7 @@ function putSample(f: BrickField, i: number, j: number, k: number, v: number, ro
 }
 
 /** The samples of one axis a range of metres covers. */
-function sampleRange(f: BrickField, lo: number, hi: number, axis: 'x' | 'y' | 'z'): [number, number] {
+export function sampleRange(f: BrickField, lo: number, hi: number, axis: 'x' | 'y' | 'z'): [number, number] {
   const o = axis === 'x' ? f.ox : axis === 'y' ? f.oy : f.oz, n = axis === 'x' ? f.nx : axis === 'y' ? f.ny : f.nz;
   return [Math.max(0, Math.floor((lo - o) / f.step)), Math.min(n - 1, Math.ceil((hi - o) / f.step))];
 }

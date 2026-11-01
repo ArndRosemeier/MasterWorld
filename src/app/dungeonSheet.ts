@@ -5,7 +5,8 @@
  * out marked; what was seen on the storeys above and below shows faintly. North up, `across` metres across.
  */
 import { DIRS } from '@futuremagic/dungeon';
-import type { DungeonSeen } from '../game/dungeonMap';
+import type { DungeonSeen, Seen } from '../game/dungeonMap';
+import { SQUARE } from '../game/formedMap';
 import { DOOR_W, isFeature, type DungeonSpace } from '../world/dungeon/space';
 
 export interface BelowSheet {
@@ -119,4 +120,33 @@ export function wallOf(b: Pick<BelowSheet, 'space'>, i: number, j: number, l: nu
   // A hidden way is wall until it is found; rubble that blocks it too.
   if ((kind === 'secret' && !open) || kind === 'blocked') return 'wall';
   return SHUTS.has(kind) && !open ? 'shut' : 'open';
+}
+
+/**
+ * The plan of a formed cave (D63, K5): the squares of floor the lantern has shown on the hero's storey, on parchment, those of the
+ * storeys above and below faint; the rock dark and the way out marked once its square is seen. North up, `across` metres across.
+ */
+export function paintFormed(canvas: HTMLCanvasElement, seen: Seen, exit: { readonly x: number; readonly y: number; readonly z: number }, x: number, z: number, level: number, across: number): boolean {
+  const g = canvas.getContext('2d')!, size = canvas.width, s = size / across, C = SQUARE;
+  const sx = (u: number) => size / 2 + (u - x) * s, sz = (w: number) => size / 2 + (w - z) * s;
+  g.fillStyle = ROCK;
+  g.fillRect(0, 0, size, size);
+  const half = across / 2 + C, here: (readonly [number, number])[] = [];
+  g.fillStyle = GHOST;
+  for (const [i, j, l] of seen.seenCells()) {
+    if (Math.abs((i + 0.5) * C - x) > half || Math.abs((j + 0.5) * C - z) > half) continue;
+    if (l === level) here.push([i, j]);
+    else if (Math.abs(l - level) === 1 && !seen.has(i, j, level)) g.fillRect(sx(i * C), sz(j * C), C * s + 0.5, C * s + 0.5);
+  }
+  g.fillStyle = FLOOR;
+  for (const [i, j] of here) g.fillRect(sx(i * C) - 0.25, sz(j * C) - 0.25, C * s + 0.5, C * s + 0.5);
+  if (seen.has(Math.floor(exit.x / C), Math.floor(exit.z / C), level)) {
+    const r = Math.max(3, s * 0.45), mark = new Path2D();
+    g.fillStyle = EXIT;
+    g.strokeStyle = '#e8f3d0';
+    g.lineWidth = 1;
+    mark.moveTo(sx(exit.x), sz(exit.z) - r); mark.lineTo(sx(exit.x) + r * 0.9, sz(exit.z) + r * 0.7); mark.lineTo(sx(exit.x) - r * 0.9, sz(exit.z) + r * 0.7); mark.closePath();
+    g.fill(mark); g.stroke(mark);
+  }
+  return true;
 }

@@ -19,6 +19,8 @@ import { flameMesh } from '../materials/flame';
 import { caveShaftMesh, caveWaterMesh, floodMesh } from '../materials/caveWater';
 import type { CaveFeatures } from '../../world/dungeon/caveFeatures';
 import { torchSpots } from '../../world/dungeon/torches';
+import { formedMeshes } from '../cave/formedMeshes';
+import type { CaveResult } from '../../world/cave/job';
 
 export class CellarView {
   readonly group = new Group();
@@ -36,6 +38,8 @@ export class CellarView {
   private sealed = 0;
   /** A cave's carved rock (world/dungeon/caveRock.ts), drawn with the rest; set before `add`. */
   rock: BuildingMesh | null = null;
+  /** A formed cave's walls, formations, stones and water (D63, K5), instead of `rock`; set before `add`. */
+  formed: Pick<CaveResult, 'mesh' | 'parts'> | null = null;
   /** A cave's water and shafts of daylight (world/dungeon/caveFeatures.ts); set before `add`. */
   cave: CaveFeatures | null = null;
   /** Walked into through a throat from its mouth (a portal): no ladder up stands at its way out; set before `add`. */
@@ -50,7 +54,8 @@ export class CellarView {
   async add(stage: Stage): Promise<void> {
     const m = cellarMeshes(this.cellar, await loadCellarProps(), this.throat);
     this.group.add(this.piece(m.shell, 'shell'), this.piece(m.props, 'props'));
-    if (this.rock) this.group.add(caveRockMeshAt(this.rock, this.origin.x, this.origin.y, this.origin.z));
+    if (this.formed) this.group.add(formedMeshes(this.formed, this.origin).group);
+    else if (this.rock) this.group.add(caveRockMeshAt(this.rock, this.origin.x, this.origin.y, this.origin.z));
     const O = this.origin;
     for (const m of this.cave ? [caveWaterMesh(this.cave, O.x, O.y, O.z), caveShaftMesh(this.cave, O.x, O.y, O.z)] : [floodMesh(this.cellar.layout, O.x, O.y, O.z)]) if (m) this.group.add(m);
     const torches = torchSpots(this.cellar);
