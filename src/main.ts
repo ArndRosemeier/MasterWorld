@@ -74,6 +74,7 @@ import { cleanWhys, PACING, vgmLines, whyOf, WHY_KEPT, type VgmWhy } from './vgm
 import { findIn, travellerFor } from './vgm/answers';
 import { offTheCoast, washedUpFor, wreckFor } from './vgm/wrecks';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
+import { NightWatch } from './vgm/watch';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
@@ -1208,6 +1209,8 @@ export async function start(b: Boot): Promise<void> {
         const k = keepPromise(log, id, hours());
         if (k) log = [...log, k];
         deedFor(`wolves:${id}`, towns?.get(ev.town), setting.standing.help, 'help');
+        // A night watch's band beaten (D62): the watch is kept; its household will want to hear.
+        if (ev.watch) return quietPlace?.(ev.watch) ?? true;
         return true;
       }
       // A place cleared is experience (D58), once; telling its household is more.
@@ -1234,7 +1237,8 @@ export async function start(b: Boot): Promise<void> {
      * household's people (and the hero's name), a master's gift if it was their deed (C14), and the VGM's next lead.
      */
     const keptNow = (id: string, t: Township): void => {
-      const k = keepPromise(log, id, hours());
+      // How it ended goes into the log (a thief caught or let go, D62): what comes next may follow from it.
+      const k = keepPromise(log, id, hours(), false, t.talk.endingOf(id) ?? undefined);
       if (k) log = [...log, k];
       journal.fulfil(id);
       director.met('purpose');
@@ -1381,6 +1385,8 @@ export async function start(b: Boot): Promise<void> {
         journal.fulfil(ARRIVAL);
       },
       heardOf: (id, from) => learnEvent(id, from),
+      // A thief named and dealt with (D62): the ask is done; the household will want to hear.
+      named: (id) => { quietPlace?.(id); },
       serve: (id, a) => services.get(id)?.(a),
       report: (id, a) => {
         const t = talk!.place;
@@ -1502,6 +1508,8 @@ export async function start(b: Boot): Promise<void> {
     const tend = situationOf(setting, 'hurt-traveller')?.tend;
     tieTalk = (t, words) => {
       words.manner = (p) => standing.manner(p.race, p.seed);
+      // A thief can be faced once the hero holds what they stole (D62).
+      words.holding = (id) => holdsKeepsake(character.pack, id);
       words.services = (id) => {
         const p = t.residents.find((x) => x.id === id);
         if (!p) return [];
@@ -2119,6 +2127,7 @@ export async function start(b: Boot): Promise<void> {
       say: (text) => notes.say(text, 6),
     });
     /** Each VGM tool's time into the hitch log (a slow frame names the tool). */
+    const nightWatch = new NightWatch();
     const vgmTimed = { timeNow: () => performance.now(), spent: (tool: string, ms: number) => { if (ms >= 2) HITCHES.note(`vgm ${tool}`, ms); } };
     const direct = (dt: number): void => {
       const below = !!visit();
@@ -2136,6 +2145,8 @@ export async function start(b: Boot): Promise<void> {
       builderClock = 0;
       HITCHES.part('vgm turn');
       vgmStep();
+      // A night watched through at a household's door, nothing having come (D62).
+      for (const id of nightWatch.step({ seed, log, towns: terrain.towns, hours: hours(), hero: { x: player.walker.pos.x, z: player.walker.pos.z }, setting })) quietPlace?.(id);
       HITCHES.part('vgm answer');
       answerOverdue(below);
     };

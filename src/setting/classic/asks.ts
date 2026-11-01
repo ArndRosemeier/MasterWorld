@@ -121,4 +121,53 @@ export const asks: readonly AskDef[] = [
       thanks: 'Talked them round, and nobody hurt? That is worth more than any killing. Here, {coins}.',
     },
   },
+  {
+    id: 'watch',
+    verb: 'watch',
+    weight: 1.1,
+    lived: true,
+    kinds: ['cave', 'tower', 'barrow', 'hideout'],
+    dwellers: ['wolves', 'goblins', 'highwaymen', 'grave-robbers'],
+    watch: { comes: 0.7, hours: [22, 26], near: 18 },
+    words: {
+      told: [
+        'They come down from {place} after dark. Stand by our door tonight, that is all I ask, and see them off if they come.',
+        'Every night we lie awake listening for them. Keep watch at our door one night, until the small hours, and we can sleep.',
+        'It is not the place I care about, it is our door. Watch it tonight. If they come, let them find someone waiting.',
+      ],
+      topic: 'I kept watch at your door through the night.',
+      note: 'I kept the watch. {name} of {house} will want to hear the night passed safely.',
+      thanks: 'You stood out there all night for us? We slept for the first time in weeks. Here, {coins}.',
+    },
+  },
+  {
+    id: 'thief',
+    verb: 'thief',
+    weight: 1.1,
+    kinds: ['cellar'],
+    things: [
+      { item: 'candlestick', name: 'the {family} candlesticks', lore: 'Silver, worn smooth at the base. They were wrapped in a shawl that is not the {family} family\'s: {who} wears one like it.' },
+      { item: 'old-coin', name: 'the {family} savings', lore: 'Old coins in a knotted stocking. The knot is a weaver\'s knot, and {who} is the only one in town who ties it so.' },
+      { item: 'locket', name: 'the {family} locket', lore: 'Silver, with a lark on the lid. It lay on a scrap of sacking with a name burnt into it: {who}.' },
+    ],
+    thief: {
+      accuse: 'You took {thing}.',
+      confess: 'Keep your voice down! Yes, it was me. Times are hard, and they have so much. What will you do?',
+      catch: 'You will answer for it.',
+      spare: 'Go. And do not do it again.',
+      caught: 'Then I will go with you and answer for it. I knew it would come out.',
+      spared: 'You would let me go? I will not forget it. I swear it will not happen again.',
+    },
+    words: {
+      told: [
+        'Things go missing from our house, a little at a time, and someone has been down in the old cellar. Find out who it is.',
+        'Somebody in this town is a thief. It is not the losing I mind, it is not knowing which of my neighbours it is.',
+        'We are being robbed, and whoever it is knows our house well enough to hide it all under it. Find them for me.',
+      ],
+      topic: 'I know who has been stealing from you.',
+      note: 'I know who the thief is, and I have {thing}. {name} of {house} will want to hear it.',
+      thanks: '{thing}, and the thief found out! I would never have guessed. Here, {coins}, and my thanks.',
+      missing: 'You know who it is? Then you will have found {thing}. Bring it back.',
+    },
+  },
 ];

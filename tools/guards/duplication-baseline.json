@@ -44,10 +44,6 @@
     "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
   },
   {
-    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/items.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",
-    "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
-  },
-  {
     "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/livestock.ts#step",
     "reason": "Each world-simulation behaviour advances by step(dt): dungeon creatures (sight, packs, fights) and grazing farm animals (wander in a paddock) share only the name."
   },
@@ -170,10 +166,6 @@
   {
     "key": "idiom: [.camera .canvas .director .fight .hud .notes .player .setting] in masterworld/app/cellars.ts + masterworld/app/holdGate.ts + masterworld/app/wildLand.ts",
     "reason": "Each builds an Encounter (app/encounter.ts) from its host, whose constructor takes these parts; HoldHost already extends WildHost, so only the call remains."
-  },
-  {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
-    "reason": "A point along a heading (x + cos a * d, z + sin a * d): plain trigonometry each mover does in its own terms. The hold's site search samples a ring around the town the same way."
   },
   {
     "key": "idiom: [.host Promise] in masterworld/app/cellars.ts + masterworld/app/holdGate.ts + masterworld/app/wildLand.ts",
@@ -738,5 +730,109 @@
   {
     "key": "same name: masterworld/game/delve.ts#met + masterworld/vgm/director.ts#met",
     "reason": "Delve.met is whether the household's ask is done (D62); Director.met records a need met. Same word, different things."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/building.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/weather.ts",
+    "reason": "The node-material idiom a.add(b).mul(c) every TSL shader writes; its weight drifts with the corpus (IDF), not a copy."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/watch.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "idiom: [.encounter .id] in masterworld/vgm/situations.ts + masterworld/vgm/watch.ts + masterworld/vgm/wild.ts",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "idiom: [.filter .kind .log] in masterworld/vgm/answers.ts + masterworld/vgm/leads.ts + masterworld/vgm/watch.ts",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/lab/spellLab.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/townLife.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/items.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts + masterworld/talk/townTalk.ts",
+    "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
+  },
+  {
+    "key": "same name: masterworld/game/character.ts#save + masterworld/talk/townTalk.ts#save",
+    "reason": "Each class writes its own save (the hero, the town talk); same word, different things."
   }
 ]

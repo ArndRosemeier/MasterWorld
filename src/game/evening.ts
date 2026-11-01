@@ -8,7 +8,7 @@
  * the result, so a failure says where the evening broke. Pure: the land, the town, the VGM's leads, the
  * talk and the market are the game's own; only the renderer and the townsfolk walking about are left out.
  */
-import { MinHeap, deriveSeed } from '@futuremagic/core';
+import { MinHeap, Rng, deriveSeed } from '@futuremagic/core';
 import { polyCentroid, type SettlementSize, type TownBuilding } from '@futuremagic/settlement';
 import { type GuildDef, type SettingModule } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
@@ -16,7 +16,8 @@ import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
-import { holdsKeepsake, keepsakeOf, verbOf } from '../vgm/asks';
+import { askDefOf, holdsKeepsake, keepsakeOf, verbOf } from '../vgm/asks';
+import { NightWatch, nightWatchFor, watchDoor } from '../vgm/watch';
 import { hailer } from '../vgm/guide';
 import { Director, NEEDS, type Need } from '../vgm/director';
 import { answerNeed } from '../vgm/toolbox';
@@ -178,6 +179,38 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     }
   };
   const pass = (s: number) => { seconds += s; hours += s * HOURS_PER_SECOND; observe(s); };
+  /**
+   * A night watch (D62): to the household's door, the day passed until the watch's first hour, and the night kept
+   * there. A band that comes is staged by the VGM's tool and seen at the door; its fight is not played here (as an
+   * ambush's: the fight bot plays the places below), it is counted beaten. Nothing coming, the night watched through
+   * does it.
+   */
+  const keepWatch = (d: DungeonDecision, name: string, before: readonly [number, number]) => {
+    const w = askDefOf(setting, d.ask)?.watch, door = watchDoor(terrain.towns, d);
+    if (!w || !door) throw new Broke(`${name} asks a watch but has no door to keep it at`);
+    walkTo(`the door of ${name}'s household`, before[0], before[1]);
+    const h = ((hours % 24) + 24) % 24, wait = (w.hours[0] + 0.1 - h + 24) % 24;
+    pass(wait / HOURS_PER_SECOND);
+    say(`keeps watch at the household's door from ${Math.floor(hours % 24)}:00`);
+    const night = new NightWatch();
+    const at = { x: before[0], z: before[1] };
+    for (let k = 0; k < 40; k++) {
+      const c = { seed, log, towns: terrain.towns, hours, hero: at, setting };
+      const band = nightWatchFor(c);
+      if (band) {
+        log = [...log, band];
+        const kept = keepPromise(log, band.id, hours + 0.3);
+        if (kept) log = [...log, kept];
+        director.met('challenge');
+        say(`${band.members.length} ${band.encounter} came out of the dark towards the door, ${Math.hypot(band.x - door.x, band.z - door.z).toFixed(0)} m off; beaten off (not played here)`);
+        pass(0.5 / HOURS_PER_SECOND);
+        return;
+      }
+      if (night.step(c).includes(d.id)) { say(`watched the night through at ${Math.floor(hours % 24)}:00; nothing came`); return; }
+      pass(0.25 / HOURS_PER_SECOND);
+    }
+    throw new Broke(`kept watch for ${name} and it never ended`);
+  };
   /** The places the hero has stood before (a new one meets Discovery). */
   const seen = new Set<string>();
 
@@ -358,6 +391,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         if (!seen.has(lead.id)) { director.met('discovery', seen.has(dungeon.id) ? 0.5 : 1); seen.add(lead.id); seen.add(dungeon.id); }
         hero.earn(`place:${lead.id}`, 'place');
       };
+      let saved: DelveSave | undefined, found = false;
+      if (verb === 'watch') keepWatch(dungeon, name, front(house));
+      else {
       goDown();
       if (opts.reckless && e === 0) {
         const kept = hero.pack.filter((it) => defOf(setting.items, it.def).kind !== 'potion');
@@ -366,7 +402,6 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         hero.health = Math.max(1, Math.round(hero.maxHealth * 0.1));
         say(`goes down reckless: ${hero.health} health, no potions`);
       }
-      let saved: DelveSave | undefined, found = false;
       let left: Remains | null = null;
       for (;;) {
         const spots = left ? [{ ...left.at, reached: () => { gather(hero, left!); say(`took up the pack left at the fall (${left!.items.length} ${left!.items.length === 1 ? 'thing' : 'things'})`); left = null; } }] : [];
@@ -414,6 +449,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (left) throw new Broke(`cleared ${name} but never found the pack left at the fall`);
       if (school && e === 0 && !spells) throw new Broke(`the mage cast no spell in ${name}`);
       if (school) say(`${spells} spells cast so far`);
+      }
       // Quiet, and the hero gone: back to its household to tell them (plan 4.2). They pay, the promise is
       // kept, and with the next lead already about they pass on its rumour.
       if (keepsake && !holdsKeepsake(hero.pack, lead.id)) throw new Broke(`came out of ${name} without ${keepsake.name}`);
@@ -436,6 +472,21 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
           say(`broke the parley in ${name}: the household pays nothing`);
         }
       }
+      // A thief (D62): the stash gave them away; faced with it, they own up, and the hero turns them in or lets them go.
+      let ending: 'caught' | 'let-go' | undefined;
+      if (ask?.verb === 'thief') {
+        talk.holding = (id) => holdsKeepsake(hero.pack, id);
+        const who = talk.askOf(lead.id)?.thief, thief = people.find((p) => p.id === who);
+        if (!thief) throw new Broke(`${name} asks to find a thief, and nobody in town is one`);
+        walkTo(`${talk.nameOf(thief.id)}'s door`, ...front(town.plan.buildings[thief.home]));
+        if (!talk.topics(thief.id).some((t) => t.id === `accuse:${lead.id}`)) throw new Broke(`cannot face ${talk.nameOf(thief.id)} with ${keepsake?.name}`);
+        say(`faced ${talk.nameOf(thief.id)} with ${keepsake?.name}: "${talk.ask(thief.id, `accuse:${lead.id}`).text}"`);
+        const act = new Rng(deriveSeed(seed, 'thief', lead.id)).chance(0.5) ? 'catch' : 'spare';
+        const r = talk.ask(thief.id, `${act}:${lead.id}`);
+        ending = r.named?.ending;
+        if (!ending) throw new Broke(`${talk.nameOf(thief.id)} owned up but nothing came of it`);
+        say(`${ending === 'caught' ? 'turned in' : 'let go'} ${talk.nameOf(thief.id)}: "${r.text}"`);
+      }
       if (!broke) {
       if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
       const to = talk.reportTo(lead.id).map((id) => people.find((p) => p.id === id)).find((p) => !!p);
@@ -444,7 +495,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (!talk.topics(to.id).some((t) => t.id === `report:${lead.id}`)) throw new Broke(`${talk.nameOf(to.id)} cannot be told that ${name} is safe`);
       const reward = rewardFor(cellar, setting.creatures);
       hero.coins += reward;
-      const kept = keepPromise(log, lead.id, hours);
+      const kept = keepPromise(log, lead.id, hours, false, ending);
       if (kept) log = [...log, kept];
       // The household's people think better of the hero for it, once (D54).
       if (kept) { standing.keptFor(to.race, lead.id); hero.earn(`kept:${lead.id}`, 'kept'); }

@@ -14,7 +14,7 @@ import { talkCellar, talkEvent, townTalk, type TownTalk, type TownTalkSave } fro
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
 import { heldBy, refugeOf, takenFrom } from '../vgm/events';
-import { lostOne } from '../vgm/asks';
+import { askedOne } from '../vgm/asks';
 import type { Decision, DecisionLog, RetreatDecision, TravellerDecision } from '../world/decisions';
 import { restingAt } from '../vgm/answers';
 import { strayAt } from '../vgm/situations';
@@ -347,7 +347,7 @@ export class Township {
     const log = this.c.log(), kept = keptOf(log);
     for (const d of log) {
       if (d.kind !== 'dungeon' || d.town !== this.id || d.ask?.verb !== 'lost') continue;
-      const p = lostOne(this.residents, log, d);
+      const p = askedOne(this.residents, log, d);
       if (!p) continue;
       const home = d.ask.alive && (kept.has(d.id) || this.homeAgain.has(d.id) || (this.talkOf?.isQuiet(d.id) ?? false));
       if (!home) life.missing.add(p.id);
@@ -364,7 +364,7 @@ export class Township {
   lostIn(id: string): Person | null {
     const d = this.c.log().find((x) => x.id === id);
     if (d?.kind !== 'dungeon' || !d.ask?.alive || this.homeAgain.has(id) || keptOf(this.c.log()).has(id) || this.talkOf?.isQuiet(id)) return null;
-    return lostOne(this.residents, this.c.log(), d);
+    return askedOne(this.residents, this.c.log(), d);
   }
 
   /** Whether its people live yet (a town far off never needed them). */

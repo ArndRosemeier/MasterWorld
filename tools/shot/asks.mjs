@@ -1,7 +1,9 @@
 /**
  * What households ask, seen being done (D62, phase Q; rule 11): `node tools/shot/asks.mjs [out dir]` after
- * `npm run build` and `npm run packs`, SHOT_GPU=1 on the reference machine; ASKS=seal,parley (default; more as phase Q
- * adds them). parley: the cellar of smugglers whose household asks to talk (`?ask=parley`); the hero walks up to their
+ * `npm run build` and `npm run packs`, SHOT_GPU=1 on the reference machine; ASKS=seal,parley,watch (default; more as phase
+ * Q adds them). watch: night in the start town (`?ask=watch&hour=22`), the hero at the door of the household that asks
+ * for a watch; a band of the place's dwellers comes out of the dark (the VGM's night-watch tool) and the camera looks
+ * out after them: a picture every 0.7 s. Checks: the band came, for that watch, and is shown. parley: the cellar of smugglers whose household asks to talk (`?ask=parley`); the hero walks up to their
  * leader, speaks (G) and hears the terms in a bubble over the leader's head, speaks again and strikes them. Checks: the
  * prompt says "Speak with", the dwellers never fight, a bubble shows each time, the terms are struck. seal: the town's cellar with a breach in the wall of its last room (`?ask=breach`), its dwellers fallen; the
  * hero stands before the breach and walls it up (G): a picture every 0.7 s while the courses of stones go in. Checks:
@@ -103,9 +105,45 @@ async function parley() {
   if (end.fighting) fail('parley: the dwellers fight');
 }
 
-for (const kind of (process.env.ASKS ?? 'seal,parley').split(',')) {
+/** A night watch: at the household's door at night, the band comes out of the dark. */
+async function watch() {
+  await page.goto(`${base}?title=0&day=0&hour=22.2&weather=fair&ask=watch${gl ? '&gl' : ''}`);
+  await page.waitForFunction(() => window.__mwReady === true, null, { timeout: TIMEOUT });
+  await page.addStyleTag({ content: '#loading{display:none!important}' });
+  const at = await page.evaluate(() => {
+    const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.ask?.verb === 'watch');
+    const t = d && g.terrain.towns.find((w) => w.decision.id === d.town), b = t?.plan.buildings[d.building];
+    if (!b) return null;
+    g.player.teleport(b.door[0], undefined, b.door[1], 0);
+    return { id: d.id, door: b.door };
+  });
+  if (!at) return fail('watch: no household asks for a watch');
+  let band = null;
+  for (let i = 0; i < 40 && !band; i++) {
+    await page.waitForTimeout(500);
+    band = await page.evaluate((id) => window.game.log.find((x) => x.kind === 'wild' && x.watch === id) ?? null, at.id);
+  }
+  if (!band) return fail('watch: no band came out of the dark');
+  console.log(`watch: ${band.members.length} ${band.encounter} came, ${Math.hypot(band.x - at.door[0], band.z - at.door[1]).toFixed(0)} m from the door`);
+  for (let i = 0; i < 16; i++) {
+    // The camera looks out from the door after them.
+    await page.evaluate(() => {
+      const g = window.game, p = g.player, w = p.walker.pos, c = g.wild?.sight(g.wild.territories.at(-1)?.kind ?? 'watch');
+      if (c) p.heroCam.yaw = Math.atan2(-(c.x - w.x), -(c.z - w.z));
+      p.heroCam.pitch = -0.08;
+      p.heroCam.zoom = 4;
+    });
+    await page.waitForTimeout(700);
+    await shoot(`watch-${String(i).padStart(2, '0')}`);
+  }
+  const shown = await page.evaluate(() => !!window.game.wild?.sight('watch'));
+  if (!shown) fail('watch: the band is not shown');
+}
+
+for (const kind of (process.env.ASKS ?? 'seal,parley,watch').split(',')) {
   if (kind === 'seal') await seal();
   else if (kind === 'parley') await parley();
+  else if (kind === 'watch') await watch();
   else fail(`no shot for ${kind}`);
 }
 const report = await page.evaluate(() => window.game.view.stage.hudLine?.() ?? '');

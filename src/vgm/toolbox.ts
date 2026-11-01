@@ -14,6 +14,7 @@ import { washedUpFor, wreckFor } from './wrecks';
 import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { festivityFor } from './festivities';
 import { castawayFor, hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
+import { nightWatchFor } from './watch';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 import { islandPlace } from './islands';
 
@@ -91,6 +92,8 @@ export const TOOLS: readonly Tool[] = [
   { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },
   { id: 'paddock-wolves', name: 'Wolves at the paddock', writes: ['wild'], need: 'challenge', asked: 'turn', next: paddockWolvesFor,
     why: (d) => (d.kind === 'wild' ? `dusk in ${d.town}: ${d.encounter} (${d.members.length}) at a paddock` : d.kind) },
+  { id: 'night-watch', name: 'The threat comes in the night', writes: ['wild'], need: 'challenge', asked: 'turn', next: nightWatchFor,
+    why: (d) => (d.kind === 'wild' ? `the hero keeps watch for ${d.watch}: ${d.encounter} (${d.members.length}) come out of the dark` : d.kind) },
   { id: 'stray-beast', name: 'A beast got out', writes: ['stray'], need: 'people', asked: 'turn', next: strayBeastFor,
     why: (d) => (d.kind === 'stray' ? `a day in ${d.town}: a beast out of its paddock, its farm after it` : d.kind) },
   { id: 'castaway', name: 'A cry from the water', writes: ['castaway'], need: 'people', asked: 'need', answer: castawayFor },
