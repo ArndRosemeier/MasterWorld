@@ -66,7 +66,7 @@ import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
 import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
-import { holdsKeepsake, keepsakeOf, verbOf } from './vgm/asks';
+import { askOf, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
@@ -77,7 +77,7 @@ import { territoryOf, wildFor, wildOf } from './vgm/wild';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
-import { OwnerComes } from './app/ownerComes';
+import { OwnerComes, type OwnerHost } from './app/ownerComes';
 import { FAR } from './render/folk/FarFolk';
 /**
  * One of a place's household goes out to wait before its way in once the hero is this near (m: within the 400 m round
@@ -847,7 +847,7 @@ export async function start(b: Boot): Promise<void> {
       jobs: terrainJobs,
       portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
       cleared: (d) => void roadWork.clear(d),
-      keepsake: (d) => keepsakeOf(setting, d, towns?.get(d.town)?.talk.familyAt(d.building) ?? ''),
+      keepsake: (d) => { const t = towns?.get(d.town); return t ? keepsakeOf(setting, d, t.talk.namesFor(d)) : null; },
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       // The hero, what they leave lying and their spells go down with them.
@@ -1249,6 +1249,8 @@ export async function start(b: Boot): Promise<void> {
     };
     // A cellar gone quiet with the hero down in it (show, don't tell): the one of its household the hero would report to
     // climbs down the ladder, comes to the hero and thanks and pays them there.
+    /** What one of a household says down in a place, over their head (their thanks; someone lost, found). */
+    const overHead: OwnerHost['say'] = (text, at) => speech.say(text, at);
     comeDown = (id) => {
       const v = visit(), t = townOfPromise(id);
       if (!v || owner || !t?.living || t.talk.isSettled(id)) return false;
@@ -1257,13 +1259,28 @@ export async function start(b: Boot): Promise<void> {
       if (!a) return false;
       owner = new OwnerComes(v, a, {
         body: () => folk?.bodyOf(a) ?? null,
-        say: (text, at) => speech.say(text, at),
+        say: overHead,
         told: () => {
           t.talk.thanked(a.person.id, id);
           return paidFor(id, t, true);
         },
       });
       return true;
+    };
+    /**
+     * Someone lost in the place the hero is down in (D62), still to be found alive: they sit hurt by the lair's hoard
+     * at its end; come up to, they get up, say so, and walk out and home (app/ownerComes.ts `LostHere`).
+     */
+    const lostBelow = (): void => {
+      const v = visit(), f = cellars.fightBelow;
+      if (!v || owner || !f) return;
+      const id = v.cellar.decision.id, t = towns?.get(v.cellar.decision.town), p = t?.living ? t.lostIn(id) : null;
+      const a = p && t?.life.agentOf(p.id), lair = f.delve.hoards.find((h) => !h.prop);
+      if (!t || !a || !lair) return;
+      owner = new OwnerComes(v, a, { body: () => folk?.bodyOf(a) ?? null, say: overHead, told: () => '' }, {
+        at: lair,
+        cameUp: () => { f.delve.found = true; t.foundLost(id); return t.talk.askOf(id)?.found ?? ''; },
+      });
     };
     /**
      * Out on the land, one of a place's household waits outside its way in while it is to be cleared (they come in to the
@@ -1350,8 +1367,8 @@ export async function start(b: Boot): Promise<void> {
       serve: (id, a) => services.get(id)?.(a),
       report: (id, a) => {
         const t = talk!.place;
-        // A fetch (D62) is done only with the thing itself: told without it in hand, they ask where it is.
-        if (verbOf(log, id) === 'fetch' && !holdsKeepsake(character.pack, id)) return { text: t.talk.askOf(id)?.missing ?? '', heard: [], done: false };
+        // A fetch (D62), or news of someone lost dead, is done only with the thing itself: told without it in hand, they ask where it is.
+        if (bringsBack(askOf(log, id)) && !holdsKeepsake(character.pack, id)) return { text: t.talk.askOf(id)?.missing ?? '', heard: [], done: false };
         return t.talk.toldSafe(a.person.id, id, paidFor(id, t));
       },
       // Sleepers lie in their beds, not to be talked to (but those the hero comes to find get up for the hero).
@@ -2561,6 +2578,7 @@ export async function start(b: Boot): Promise<void> {
       part('folk');
       // Below, only whoever of the household came down to the hero (nobody else is in the frame).
       if (owner && (owner.done || visit() !== owner.visit)) owner = null;
+      lostBelow();
       if (owner) owner.step(dt, player.walker.pos);
       const ownerAt = owner?.placed() ?? null;
       if (folk) {

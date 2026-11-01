@@ -14,6 +14,7 @@ import { talkCellar, talkEvent, townTalk, type TownTalk, type TownTalkSave } fro
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
 import { heldBy, refugeOf, takenFrom } from '../vgm/events';
+import { lostOne } from '../vgm/asks';
 import type { Decision, DecisionLog, RetreatDecision, TravellerDecision } from '../world/decisions';
 import { restingAt } from '../vgm/answers';
 import { strayAt } from '../vgm/situations';
@@ -165,7 +166,7 @@ export class Township {
   get life(): TownLife {
     if (this.lifeOf) {
       const log = this.c.log();
-      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); this.shelter(this.lifeOf); }
+      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); this.shelter(this.lifeOf); this.lose(this.lifeOf); }
       this.rest(this.lifeOf);
       this.chase(this.lifeOf);
       return this.lifeOf;
@@ -202,6 +203,7 @@ export class Township {
     life.gone = !!heldBy(this.c.log(), this.id);
     this.heldLog = this.c.log().length;
     this.shelter(life);
+    this.lose(life);
     // A master with a place out on the land keeps watch at its door, facing the town.
     for (const { guild, out } of this.guilds) {
       const a = out && life.agents.find((x) => x.person.trade === guild.keeper);
@@ -331,6 +333,38 @@ export class Township {
       if (p) out.set(p.id, b.id);
     }
     return out;
+  }
+
+  /** Promises whose lost one was found alive this session (D62): they are on their way home. */
+  private readonly homeAgain = new Set<string>();
+
+  /**
+   * Who of its people is lost in a place (D62, vgm/asks.ts): away from their days while lost; found alive, they come
+   * home (found now, told of, or kept); the dead never do.
+   */
+  private lose(life: TownLife): void {
+    life.missing.clear();
+    const log = this.c.log(), kept = keptOf(log);
+    for (const d of log) {
+      if (d.kind !== 'dungeon' || d.town !== this.id || d.ask?.verb !== 'lost') continue;
+      const p = lostOne(this.residents, log, d);
+      if (!p) continue;
+      const home = d.ask.alive && (kept.has(d.id) || this.homeAgain.has(d.id) || (this.talkOf?.isQuiet(d.id) ?? false));
+      if (!home) life.missing.add(p.id);
+    }
+  }
+
+  /** The one lost in promise `id`'s place was found alive and walks home (D62). */
+  foundLost(id: string): void {
+    this.homeAgain.add(id);
+    if (this.lifeOf) this.lose(this.lifeOf);
+  }
+
+  /** Who is lost in promise `id`'s place and still to be found alive there (null: nobody, or found). */
+  lostIn(id: string): Person | null {
+    const d = this.c.log().find((x) => x.id === id);
+    if (d?.kind !== 'dungeon' || !d.ask?.alive || this.homeAgain.has(id) || keptOf(this.c.log()).has(id) || this.talkOf?.isQuiet(id)) return null;
+    return lostOne(this.residents, this.c.log(), d);
   }
 
   /** Whether its people live yet (a town far off never needed them). */

@@ -85,6 +85,9 @@ export interface PromiseAsk {
   readonly thing?: number;
   /** Which of the ask's told lines the household says (index). */
   readonly line: number;
+  /** `lost`: who of the town is lost (a seeded pick, `vgm/asks.ts` `lostOne`), and whether they are found alive. */
+  readonly who?: number;
+  readonly alive?: boolean;
 }
 
 /**

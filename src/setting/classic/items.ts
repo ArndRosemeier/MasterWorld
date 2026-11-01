@@ -59,6 +59,10 @@ export const items: ItemCatalog = {
     { id: 'signet', name: 'Signet ring', kind: 'valuable', value: 55, weight: 0.03 },
     { id: 'old-blade', name: 'Old family sword', kind: 'valuable', value: 30, weight: 1.6 },
     { id: 'deed-box', name: 'Iron deed box', kind: 'valuable', value: 10, weight: 2.2 },
+    // What is left of someone lost (D62, a lost person found dead): named for them; no table rolls them.
+    { id: 'satchel', name: 'Torn satchel', kind: 'valuable', value: 1, weight: 0.4 },
+    { id: 'woollen-cap', name: 'Woollen cap', kind: 'valuable', value: 1, weight: 0.1 },
+    { id: 'whittled-knife', name: 'Whittled knife', kind: 'valuable', value: 2, weight: 0.2 },
     { id: 'trinket', name: 'Shiny trinket', kind: 'valuable', value: 3, weight: 0.05, lore: 'A button, a bent spoon and a bead on a string. Treasured by someone.' },
     { id: 'silk', name: 'Bundle of spider silk', kind: 'valuable', value: 45, weight: 0.3, lore: 'Weavers in the city pay well for it, and ask no questions.' },
     { id: 'wolf-pelt', name: 'Wolf pelt', kind: 'valuable', value: 35, weight: 2.5, lore: 'Thick grey fur. The furrier in town pays well for it before winter.' },

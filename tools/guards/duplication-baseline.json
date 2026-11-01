@@ -216,10 +216,6 @@
     "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
   },
   {
-    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/creatures.ts#step",
-    "reason": "Each simulation steps its own agents (a den's creatures, a cellar's owner coming down) by dt; the finder paired them anew as files changed."
-  },
-  {
     "key": "idiom: [.fbm3 .sin Math] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
     "reason": "Rock beds as a sine warped by fbm noise: one line of shaping in each rock field, with its own scales and amplitudes."
   },
@@ -516,18 +512,6 @@
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
   {
-    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/game/visitor.ts#step",
-    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/lab/spellLab.ts#step",
-    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/livestock.ts#step",
-    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
-  },
-  {
     "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/game/visitor.ts#step",
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
@@ -748,67 +732,7 @@
     "reason": "Both are app/shapeForm.ts FormSim's steer (one interface for every animal form): a bird's flight and an otter's swimming."
   },
   {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/building.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/weather.ts",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "same name: masterworld/game/delve.ts#met + masterworld/vgm/director.ts#met",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
-  },
-  {
-    "key": "same name: masterworld/talk/townTalk.ts#f + masterworld/vgm/asks.ts#f",
-    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/game/walker.ts#step",
+    "reason": "Each its own frame step: OwnerComes moves one of a household (or someone lost) through a place, the walker the hero; same name only."
   }
 ]

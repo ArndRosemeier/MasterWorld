@@ -221,6 +221,8 @@ export class TownLife {
   private readonly orders: TownOrder[] = [];
   /** Everyone has fled (a band holds the place, vgm/events.ts take): all are away until it is false again. */
   gone = false;
+  /** People lost in a place (D62: a lost person, vgm/asks.ts): away from their days until they come home (the dead never do). */
+  readonly missing = new Set<number>();
   private readonly market: [number, number];
   /** Every building's footprint (walks go round them). */
   private readonly footprints: Footprints;
@@ -458,7 +460,7 @@ export class TownLife {
 
   /** What they should be about now (today's plan is made on the day's first ask). */
   taskOf(a: Agent): Task {
-    if (this.gone || away(a.person, this.hours)) return 'away';
+    if (this.gone || this.missing.has(a.person.id) || away(a.person, this.hours)) return 'away';
     const day = Math.floor(this.hours / 24);
     if (a.plan.day !== day) a.plan = dayPlan(this.routines, a.person, day);
     const t = taskAt(a.plan, this.hour);
