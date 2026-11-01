@@ -857,6 +857,7 @@ export async function start(b: Boot): Promise<void> {
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
+      land: (x, z) => terrain.skeleton.kinds[terrain.skeleton.kindAt(x, z)].id,
       jobs: { caveRock: (l, c, k, t) => terrainJobs.caveRock(l, c, k, t), caveMouth: (s, c) => terrainJobs.caveMouth(s, c), formed: (j) => (cavePool ??= createCavePool(1)).run(j) },
       portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
       cleared: (d) => void roadWork.clear(d),

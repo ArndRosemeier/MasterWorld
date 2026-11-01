@@ -38,7 +38,7 @@ import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dunge
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
 import type { ScaledLayout } from '../world/dungeon/cellar';
 import { runCaveJob, type CaveJob, type CaveResult } from '../world/cave/job';
-import { rockFor } from '../world/cave/choose';
+import { caveSpecFor, type CaveSpec } from '../vgm/caves';
 import { inhabit } from '../vgm/inhabit';
 import { FormedSpace } from '../sim/formedSpace';
 import type { BuildingMesh } from '@futuremagic/settlement';
@@ -82,6 +82,8 @@ export interface CellarsHost {
   readonly dweller: string | null;
   /** The land's height (a barrow, a cave's crag, a tower stand on it). */
   ground(x: number, z: number): number;
+  /** The kind of country at a point (the rock a cave there is in: setting `caves.geology`); none: unknown. */
+  land?(x: number, z: number): string;
   /** The terrain workers, for a cave's rock and mouth (none: built here, a moment's stall). */
   /** A portal opened (a cave's mouth joined to its throat below: app/portals.ts). */
   readonly portal?: (p: Portal) => void;
@@ -139,6 +141,8 @@ interface Site {
   first: Cellar;
   /** A cave's throat in its own frame, where the portal from its mouth comes out (null: walked in with a fade). */
   throat: ThroatFrame | null;
+  /** What the VGM asked of the formed cave below (vgm/caves.ts `caveSpecFor`); none: the old natural cave, or not a cave. */
+  readonly spec: CaveSpec | null;
   /** Who lives there now. */
   cellar: Cellar;
   built: Promise<Built> | null;
@@ -384,8 +388,9 @@ export class Cellars {
     if (d.site) this.host.cleared?.(d);
     // A cave's throat: from its layout's entrance room, or (a formed cave) once the cave is made, its mouth's plane (a placeholder till then).
     const mouthed = mound && first.form.space.carved && loreOf(this.host.setting, d.template).form.shell === 'mouth';
-    const throat = mouthed ? (first.form.space.formed && this.host.setting.caves ? { x: 0, y: 0, z: 0, yaw: 0 } : caveThroat(first)) : null;
-    const s: Site = { decision: d, house, place, mound, first, throat, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
+    const caves = this.host.setting.caves, at = d.site, spec = first.form.space.formed && caves && at ? caveSpecFor(caves, this.host.land?.(at.x, at.z) ?? '*', d, first.graph.rooms.length) : null;
+    const throat = mouthed ? (spec ? { x: 0, y: 0, z: 0, yaw: 0 } : caveThroat(first)) : null;
+    const s: Site = { decision: d, house, place, mound, first, throat, spec, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;
     this.down.set(houseKey(d.town, house.id), async () => (await this.ensure(s)).visit);
@@ -446,7 +451,7 @@ export class Cellars {
   private async assemble(s: Site): Promise<Built> {
     const h = this.host;
     // A formed cave (phase K) is made first: the rooms of its story are told as places of it, and its throat is the way in.
-    const formed = s.first.form.space.formed ? await this.formedCave(s) : null;
+    const formed = s.spec ? await this.formedCave(s) : null;
     // Its own space, deep under the house.
     const m = s.mound, at = m ?? { x: s.house.cx, z: s.house.cz };
     const view = new CellarView(s.first, { x: at.x, y: -400, z: at.z });
@@ -494,10 +499,10 @@ export class Cellars {
    */
   private async formedCave(s: Site): Promise<{ readonly res: CaveResult; readonly space: FormedSpace } | null> {
     const caves = this.host.setting.caves, h = this.host;
-    const rock = caves ? rockFor(caves, '*', s.decision.seed) : null;
-    if (!caves || !rock) return null;
-    // A story of many rooms wants a bigger cave.
-    const job: CaveJob = { kind: 'form', setting: h.setting.id, seed: s.decision.seed, rock: rock.id, size: s.first.graph.rooms.length >= 9 ? 'medium' : 'small', dress: true, read: true, field: true };
+    // The VGM's cave tool (vgm/caves.ts) asked for the rock, size and shares when the place was opened.
+    const spec = s.spec;
+    if (!caves || !spec) return null;
+    const job: CaveJob = { kind: 'form', setting: h.setting.id, seed: s.decision.seed, rock: spec.rock, size: spec.size, dress: true, read: true, field: true };
     const res = await (h.jobs?.formed ? h.jobs.formed(job) : Promise.resolve(runCaveJob(job).result));
     if (!res.field || !res.read || !res.mesh) throw new Error(`formed cave of ${s.decision.id}: ${!res.field ? 'no field' : !res.read ? 'no reading' : 'no mesh'}`);
     const was = s.first, throat = res.skeleton.throat, first = inhabit(was, res.field, res.read.reading, throat);
