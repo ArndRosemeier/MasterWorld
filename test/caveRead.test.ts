@@ -1,13 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { caves, formedCave, makeCave } from './support/formedCave';
+import { caves, formedCave as seen } from './support/formedCave';
 import { Walker } from '../src/game/walker';
 import { formedWorld } from '../src/game/formedWorld';
 import { PART_MIN } from '../src/world/cave/reader';
 import { fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
 import { THROAT_BEYOND } from '../src/world/dungeon/caveThroat';
 
-const read = makeCave, seen = formedCave;
 
 test('caves: every cut-off part of a cave is opened by a hero-sized way, no cell is a squeeze, and a way in exists', () => {
   for (const [seed, rock] of [[5, 'jointed'], [6, 'massive'], [7, 'thin-bedded']] as const) {
@@ -21,13 +20,12 @@ test('caves: every cut-off part of a cave is opened by a hero-sized way, no cell
   }
 });
 
-test('caves: the places of a cave are found, seeded, and every one lies on ground that can be reached', () => {
-  const a = seen(5, 'jointed'), b = read(5, 'jointed');
+test('caves: the places of a cave are found, and every one lies on ground that can be reached', () => {
+  // (That the cave forms, dresses and reads the same twice is checked on the former and the dresser: caveFormer, caveDress.)
+  const a = seen(5, 'jointed');
   const kinds = new Set(a.reading.places.map((p) => p.kind));
   for (const k of ['entry', 'deadEnd', 'junction', 'ledge'] as const) assert.ok(kinds.has(k) || (k === 'deadEnd' && kinds.has('alcove')), `a ${k} is found`);
   for (const p of a.reading.places) assert.ok(a.reading.depth[p.cell] < Infinity, `${p.kind} lies on reached ground`);
-  assert.deepEqual(a.reading.places, b.reading.places, 'seeded');
-  assert.deepEqual(a.opened, b.opened);
   // Depth grows along the way: no place is nearer the way in than the way in itself.
   assert.ok(a.reading.places.every((p) => p.depth >= 0));
 });

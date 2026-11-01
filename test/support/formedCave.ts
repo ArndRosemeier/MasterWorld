@@ -9,7 +9,7 @@ export const caves = classic.caves!;
 export const small = { ...caves.sizes.find((s) => s.id === 'small')!, across: 70, deep: 30, field: 0.6 };
 
 /** A cave made fresh (a test of its being seeded makes two). */
-export function makeCave(seed: number, rock: string) {
+function makeCave(seed: number, rock: string) {
   const c = formCave(caves, seed, rock, small.id, undefined, undefined, small), d = dressFormed(c, caves);
   return { c, ...readFormed(c, caves, d) };
 }

@@ -7,6 +7,7 @@ import { crystalsMesh, stonesMesh } from '../src/world/cave/loose';
 import { waterMesh } from '../src/world/cave/waterMesh';
 import { dressFormed, formCave } from '../src/world/cave/form';
 import type { BrickField } from '../src/world/dungeon/rockMesh';
+import { formedCave } from './support/formedCave';
 
 const caves = classic.caves!;
 // A block a little smaller than the smallest cave, to keep within the time of `npm test`.
@@ -62,7 +63,7 @@ test('caves: dressing is seeded: the same cave is dressed the same twice', () =>
 });
 
 test('caves: the dressing becomes sound part meshes (layered formations, rocks of all sizes, crystals, water), seeded', () => {
-  const c = form(5, 'jointed'), d = dressFormed(c, caves);
+  const d = formedCave(5, 'jointed').dressing;
   const sound = (m: { position: Float32Array; normal: Float32Array; index: Uint32Array }, what: string) => {
     assert.ok(m.index.length > 0 && m.index.length % 3 === 0, `${what} has triangles`);
     const n = m.position.length / 3;
