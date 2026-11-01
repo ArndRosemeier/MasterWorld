@@ -175,6 +175,8 @@ export interface CavesDef {
   readonly way: CaveWayDef;
   /** The carved walls. */
   readonly walls: CaveWallsDef;
+  /** What lies in the cave: silt, fallen rock, water, drips and formations (K3). */
+  readonly dress: CaveDressDef;
   /** The ore in the rock (it only shows in the walls: no mining, D63). */
   readonly ore: CaveOreDef;
 }
@@ -308,6 +310,20 @@ export interface CaveWayDef {
 export interface CaveWallsDef {
   /** How the rock's walls are roughened, metres of the biggest scallop. */
   readonly rough: number;
+}
+
+/** What the dresser puts in a solution cave (D63, K3; docs/design/caves.md 3.4). Metres, at a scale of 1. */
+export interface CaveDressDef {
+  /** Silt on the floor: depth least and most, and the floor's own unevenness (the highest bump). The floor is never level. */
+  readonly floor: { readonly silt: readonly [number, number]; readonly relief: number };
+  /** Fallen rock: stones along the walls' feet (per 100 m of way), under a collapse (per hall) and their size (half-size, least and most). */
+  readonly rocks: { readonly along: number; readonly perHall: readonly [number, number]; readonly size: readonly [number, number] };
+  /** The stream of the live level: its width (least, most) and how deep the bed is cut; pools along it (per 100 m) and their depth. */
+  readonly water: { readonly width: readonly [number, number]; readonly bed: number; readonly pools: number; readonly poolDepth: number };
+  /** Drips fall along the cracks that cross a way's roof: chance at each spacing metres along the crack, the drips still running (the rest are dead), the crack's spacing; and drips from the roof away from any crack, per 100 m of way. */
+  readonly drips: { readonly chance: number; readonly live: number; readonly spacing: number; readonly scatter: number };
+  /** Formations: stalactite length (least, most), how much longer old levels grow, a column forms where roof and floor are closer than `column`, the share of drips with a straw, at most this many in a cave. */
+  readonly formations: { readonly length: readonly [number, number]; readonly age: number; readonly column: number; readonly straws: number; readonly most: number };
 }
 
 /** The ore in the rock (K8's mines follow it; in K1 to K7 it only shows). */
@@ -2021,6 +2037,11 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
   const wy = c.way;
   if (!(wy.minWidth >= 1.6 && wy.minHeight >= 2.4 && wy.maxRadius > wy.minWidth && wy.maxCut > 0)) out.push(`${where}: cave ways must fit the standing hero (width >= 1.6 m, height >= 2.4 m)`);
   if (!(c.walls.rough >= 0 && c.walls.rough <= 1.2)) out.push(`${where}: cave wall roughness must be 0 to 1.2 m (more could close a way)`);
+  const d = c.dress, span = (r: readonly [number, number], what: string) => { if (!(r[0] >= 0 && r[1] >= r[0])) out.push(`${where}: cave ${what} must be a range, least first`); };
+  span(d.floor.silt, 'silt depth'); span(d.rocks.perHall, 'rocks per hall'); span(d.rocks.size, 'rock size'); span(d.water.width, 'stream width'); span(d.formations.length, 'stalactite length');
+  if (!(d.floor.relief >= 0 && d.floor.relief <= 1)) out.push(`${where}: cave floor relief must be 0 to 1 m`);
+  if (!(d.drips.chance >= 0 && d.drips.chance <= 1 && d.drips.live >= 0 && d.drips.live <= 1 && d.drips.spacing > 0.3 && d.drips.scatter >= 0)) out.push(`${where}: cave drips need chances 0 to 1 and a crack spacing over 0.3 m`);
+  if (!(d.formations.most > 0 && d.formations.column > 0 && d.water.bed >= 0 && d.water.poolDepth >= 0)) out.push(`${where}: cave formations and water need positive sizes`);
   range(c.ore.bodies, 'ore bodies');
   return out;
 }

@@ -9,7 +9,7 @@ import { Noise, deriveSeed, smax } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import type { CavesDef } from '../../setting/contract';
 import { WildMat } from '../dungeon/meshKit';
-import { BRICK, brickField, meshField, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
+import { BRICK, brickField, brickIndex, meshField, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
 import { bedAt, oreAt, type RockBlock } from './block';
 import type { CondPoint, Skeleton, Void } from './skeleton';
 
@@ -36,7 +36,7 @@ export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, s
   /** Write the larger of the stored value and v at a sample; a brick is made only for what is in the rock's skin. */
   const putAir = (i: number, j: number, k: number, v: number): void => {
     if (v <= -1) return;
-    const b = ((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0));
+    const b = brickIndex(f, i, j, k);
     let brick = f.bricks[b];
     if (!brick) brick = f.bricks[b] = new Float32Array(BRICK * BRICK * BRICK).fill(-1);
     const at = (i % BRICK) + BRICK * ((j % BRICK) + BRICK * (k % BRICK));

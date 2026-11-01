@@ -207,3 +207,16 @@ Arnd's answers (section 7) are in the setting's cave data: `sizes`, `way` (2 m w
 K1 and K2 are in `src/world/cave/` (pure, seeded) with the data in `src/setting/classic/formedCaves.ts`. The former differs from 3.2 in two ways worth knowing: the water flows over an 18-neighbour lattice (3 m for a medium block, 5 m for the big one, so the forming stays quick) and each stage's springs sit on the valley face of the block, taken from the land's lowest side. Braids and mazes come from several water paths per round over rock whose ease is jittered; branchwork from one path per round and strong feedback. Open for Arnd: sea caves as water caves whose lowest level lies under the sea (recommended) or a fourth, wave-cut former.
 
 After Arnd's first look at the gallery ("too tidy", the round collapse blobs look strange, two disjoint systems sometimes form, and his idea: carving resistance should differ a lot): each rock has a `resistance` field (hard and soft patches, `size` and `contrast` in the setting) that sets both the water's route and the width of a way, the springs lie close together and only the biggest system stays, and a collapse hall is a long room under a flattish ceiling.
+
+## 9. What K3 built (2026-11-01)
+
+Arnd, after the outer shape: "now we just need to get the inner shape right ... stalagmites and stalactites, rocks all around, water flowing and dripping." That is the dresser (3.4). It is `src/world/cave/dress.ts` (pure, seeded, in the cave worker) with its numbers in the setting's `dress` data (silt depth and relief, rocks, the stream's width and pools, drips, formation lengths and the most formations).
+
+- **Silt** lies on every floor, deeper where the way is roomy and never taking the head room (it stops at `minHeight`, D63: no squeezing), with its own bumps: under a tenth of the standable ground is level (a test holds it).
+- **The stream** runs along the live conduits at the lowest floor, its bed cut into the field, with pools cut where the floor is flat; water only where the cut bed holds it.
+- **Rocks** are stamped into the field: along the feet of the walls where the way is wide enough to leave the middle free, and over a collapse's heap.
+- **Drips** fall along the joints that cross a way's roof (so formations stand in rows along a crack, as they do in real caves) and from seeps away from cracks. Each drip hangs a stalactite (its tip always above the hero's head), grows a stalagmite under it (not in the stream, not where it would narrow the way), or a column where roof and floor are close; straws are rare; old dry levels have longer, grey, dead formations and no drips.
+- Formations, drips, the stream and pools are lists (the game instances them, the walker reads their colliders, K4/K5); only silt, bed, pools and rocks are in the field.
+- The floor views of the gallery (`npm run preview:caves`, `view=floor`) put the hero's figure in the stream's bed with a lantern, eye 1.7 m over the floor.
+
+Not yet: flowstone on the walls, rimstone dams round the pools, waterfalls where the stream drops, the walls following the beds and joints (ledges, flat joint faces), and water's sound (K5).
