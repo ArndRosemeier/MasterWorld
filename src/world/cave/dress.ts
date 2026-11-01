@@ -149,11 +149,19 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   function finish(raw: { x: number; z: number; fl: number; w: number; hh: number }[]): void {
     if (raw.length < 6) return;
     // The surface keeps to the lowest floor near it, so the water never floats over a dip.
-    const pts = raw.map((r, i) => {
-      let lo = Infinity;
-      for (let o = -1; o <= 1; o++) lo = Math.min(lo, raw[Math.max(0, Math.min(raw.length - 1, i + o))].fl);
-      return [r.x, lo - 0.05, r.z, Math.max(0.5, r.w)] as [number, number, number, number];
+    const at = (i: number): number => Math.max(0, Math.min(raw.length - 1, i));
+    const low = raw.map((_, i) => Math.min(raw[at(i - 1)].fl, raw[i].fl, raw[at(i + 1)].fl) - 0.05);
+    // And the surface is smooth: the floor's lows averaged over some metres, kept within a little of the floor under each
+    // point (no water over a dip, no deep slot cut for it), then never rising downstream. A level that followed every lump
+    // of the floor stood in terraces.
+    const SPAN = 4, level = low.map((_, i) => {
+      let sum = 0;
+      for (let o = -SPAN; o <= SPAN; o++) sum += low[at(i + o)];
+      return Math.max(low[i] - 0.3, Math.min(low[i] + 0.2, sum / (2 * SPAN + 1)));
     });
+    if (level[0] >= level[level.length - 1]) for (let i = 1; i < level.length; i++) level[i] = Math.min(level[i], level[i - 1]);
+    else for (let i = level.length - 2; i >= 0; i--) level[i] = Math.min(level[i], level[i + 1]);
+    const pts = raw.map((r, i) => [r.x, level[i], r.z, Math.max(0.5, r.w)] as [number, number, number, number]);
     // Where the floor rises more than a step over that surface there is no stream: cutting its bed down to the water would
     // dig a slot a metre deep, whose walls the water hides and the hero cannot climb out of or walk along.
     const dry = raw.map((r, i) => r.fl - pts[i][1] > d.water.cutMost);
