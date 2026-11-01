@@ -26,7 +26,7 @@ export const FORMED_WATER = defineKind('formed water', ['position', 'normal', 'u
   m.normalNode = normalize(cameraViewMatrix.mul(vec4(normalize(vec3(slope.x, 1, slope.y)), 0)).xyz);
   // Clear in the shallows, dark and tinted in the deep: the outside water's absorption and its shallow and deep colours.
   const facing = clamp(abs(dot(normalize(positionView.negate()), normalView)), 0.2, 1);
-  const path = depth.div(facing);
+  const path = max(depth, 0).div(facing);
   const trans = exp(W.absorb.mul(path).mul(2.2).negate());
   // Underground there is no sky to light the body, so the outside colours are lifted: the lantern lights a clear teal
   // and the rest is the glint of its ripples. The surface reads over the silt in the shallows too (it is never invisible).
@@ -36,7 +36,8 @@ export const FORMED_WATER = defineKind('formed water', ['position', 'normal', 'u
   const foam = clamp(streakFoam(p, { t, speed, fdir, camDist }).mul(running).mul(smoothstep(0.02, 0.12, depth)).add(rim), 0, 1);
   m.colorNode = mix(body, vec3(0.78, 0.84, 0.86), foam.mul(0.85));
   const murk = float(1).sub(trans.x.add(trans.y).add(trans.z).div(3));
-  m.opacityNode = max(clamp(murk.mul(0.5).add(0.5), 0, 0.92), foam.mul(0.85)).mul(smoothstep(0.0, 0.02, depth.add(0.02)));
+  // The shore: from the floor's own depth (negative beyond it), so the water ends along the floor and not in a straight edge.
+  m.opacityNode = max(clamp(murk.mul(0.5).add(0.5), 0, 0.92), foam.mul(0.85)).mul(smoothstep(0.0, 0.08, depth));
   m.emissiveNode = body.mul(0.12).add(foam.mul(vec3(0.12, 0.14, 0.15)));
   return m;
 }, { cast: false, receive: true }, true);

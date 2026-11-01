@@ -4,7 +4,7 @@ import { classic } from '../src/setting/classic/index';
 import { columnSpans } from '../src/world/cave/dress';
 import { formationMesh } from '../src/world/cave/formations';
 import { crystalsMesh, stonesMesh } from '../src/world/cave/loose';
-import { waterMesh } from '../src/world/cave/waterMesh';
+import { floorUnder, waterMesh } from '../src/world/cave/waterMesh';
 import { dressFormed, formCave } from '../src/world/cave/form';
 import type { BrickField } from '../src/world/dungeon/rockMesh';
 import { formedCave } from './support/formedCave';
@@ -92,4 +92,22 @@ test('caves: the dressing becomes sound part meshes (layered formations, rocks o
   assert.ok(r.length > 100 && r[r.length - 1] / r[0] > 4, `stones from ${r[0]?.toFixed(2)} to ${r[r.length - 1]?.toFixed(2)} m`);
   const again = stonesMesh(d.stones, 5, () => [120, 110, 100]);
   assert.deepEqual(Array.from(again.position.slice(0, 300)), Array.from(s.position.slice(0, 300)), 'seeded');
+});
+
+test('caves: the water lies over the floor as carved: never buried in rock, never hanging far over a drop, its shore where the floor rises to it', () => {
+  const { c, dressing } = formedCave(5, 'jointed'), f = c.field as BrickField, floor = floorUnder(f), { bed, poolDepth } = caves.dress.water;
+  const w = waterMesh(dressing, bed, poolDepth, floor), cap = 1.5 * (Math.max(bed, poolDepth) + 0.35);
+  assert.ok(w.position.length > 0 && w.index.length > 0, 'the cave has water');
+  let wet = 0;
+  for (let i = 0; i < w.position.length / 3; i++) {
+    const depth = w.uv[i * 2], y = w.position[i * 3 + 1];
+    if (depth <= 0.02) continue;
+    wet++;
+    const over = y - floor(w.position[i * 3], y, w.position[i * 3 + 2]);
+    assert.ok(over > -0.05 && over < cap, `water ${over.toFixed(2)} m over the floor`);
+    assert.ok(depth <= over + 0.05, 'its depth is no more than its height over the floor');
+  }
+  assert.ok(wet > 20, `${wet} wet vertices`);
+  // The shore: vertices of no depth, where the surface meets the floor (they carry the water's height and no direction of their own beyond its stream's).
+  assert.ok(Array.from({ length: w.position.length / 3 }, (_, i) => w.uv[i * 2]).some((d) => d === 0), 'a shore');
 });
