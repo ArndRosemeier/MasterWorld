@@ -164,9 +164,19 @@ export function farBerth(h: HarbourPlan, seed: number, plan: ShipPlan): Mooring 
  * seeded list either way, her masts laid over towards the bed), bow a little up or down, sunk into the bed `bed` (its height there) to half her draft.
  */
 export function wreckLying(d: { readonly x: number; readonly z: number; readonly yaw: number; readonly seed: number }, bed: number): { plan: ShipPlan; pose: { x: number; y: number; z: number; ux: number; uz: number; pitch: number; roll: number } } {
-  const r = new Rng(deriveSeed(d.seed, 'wreck')), plan = planShip(d.seed, 'ship');
-  const roll = r.range(WRECK_LIST[0], WRECK_LIST[1]) * (r.chance(0.5) ? 1 : -1), pitch = r.range(-0.06, 0.06);
-  return { plan, pose: { x: d.x, y: bed + plan.draft * 0.5, z: d.z, ux: Math.sin(d.yaw), uz: Math.cos(d.yaw), pitch, roll } };
+  const r = new Rng(deriveSeed(d.seed, 'wreck')), whole = planShip(d.seed, 'ship');
+  const roll = r.range(WRECK_LIST[0], WRECK_LIST[1]) * (r.chance(0.5) ? 1 : -1), pitch = r.range(-0.06, 0.06), y = bed + whole.draft * 0.5;
+  // Her masts broke off where they would stand out of the sea (on her side they reach up `top · cos(roll)`); a stump
+  // keeps its lowest yard, the spar left hanging (the shrouds need one).
+  const most = Math.max(0, (-WRECK_UNDER - y) / Math.cos(roll));
+  const masts = whole.masts.map((m) => {
+    if (m.top <= most) return m;
+    const top = Math.max(m.foot + 1.5, most), kept = m.yards.filter((k) => k.y < top - 0.3);
+    return { ...m, top, yards: kept.length ? kept : [{ y: top - 0.4, half: m.yards[0].half * 0.5 }] };
+  });
+  return { plan: { ...whole, masts }, pose: { x: d.x, y, z: d.z, ux: Math.sin(d.yaw), uz: Math.cos(d.yaw), pitch, roll } };
 }
 /** How far a wreck lies over on her side (rad), least and most. */
 const WRECK_LIST: readonly [number, number] = [1.0, 1.35];
+/** How far under the surface the highest of a wreck stays (m). */
+const WRECK_UNDER = 1.5;

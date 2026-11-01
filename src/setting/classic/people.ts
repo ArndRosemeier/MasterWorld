@@ -38,6 +38,8 @@ export const talk: TalkDef = {
     homemaker: "I'm {name}. I keep house in {house}.",
     child: "I'm {name}! I live in {house}.",
     traveller: "I am {name}, only passing through. I lodge at {house} until the road calls again.",
+    // (Asked in town or aboard: S3's passengers are these.)
+    'traveller:sea': "I am {name}, a traveller by sea. Between ships I lodge at {house}; then I'm off to the next harbour.",
   },
   topics: {
     greet: 'Greet',

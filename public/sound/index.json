@@ -189,6 +189,24 @@
     17.85
    ]
   },
+  "bed/sea-storm": {
+   "kind": "bed",
+   "files": [
+    "bed/sea-storm.mp3"
+   ],
+   "seconds": [
+    19.84
+   ]
+  },
+  "bed/ship-creak": {
+   "kind": "bed",
+   "files": [
+    "bed/ship-creak.mp3"
+   ],
+   "seconds": [
+    19.825
+   ]
+  },
   "bed/snow": {
    "kind": "bed",
    "files": [

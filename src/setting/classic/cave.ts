@@ -17,7 +17,7 @@ export const cave: CellarLore = {
     space: {
       ...CELLAR_SPACE, scale: { cell: 3, storey: 4, stairRun: 3, passage: 3.4 }, radius: 40, maxRooms: 13, depth: [-2, -2], inset: 1.25, entrance: [3, 3],
       rooms: { nook: [2, 3], small: [3, 4], medium: [4, 5], large: [5, 7] }, ways: { gap: [3, 6], turn: 0.3, longest: 20, least: 220, rise: 1 }, cavern: { height: 6, size: [7, 10] },
-      carved: true, torches: false, arriveMid: true,
+      carved: true, formed: true, torches: false, arriveMid: true,
     },
   },
   words: {

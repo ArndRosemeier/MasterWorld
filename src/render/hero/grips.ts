@@ -47,10 +47,13 @@ export interface Holder {
   setGrip(side: 'l' | 'r', amount: number): void;
 }
 
-/** Main and off hand things: drawn (in closed hands) or carried (hip, back, hands open). */
-export function gripHeld(main: Object3D | null, off: Object3D | null, drawn: boolean, who: Holder, owner: Object3D): void {
+/**
+ * Main and off hand things: drawn (in closed hands) or carried (hip, back, hands open). `offInHand`: the off
+ * hand holds its thing even when nothing is drawn (a lit torch).
+ */
+export function gripHeld(main: Object3D | null, off: Object3D | null, drawn: boolean, who: Holder, owner: Object3D, offInHand = drawn): void {
   if (main) grip(main, who.bones, drawn ? 'hand_r' : 'pelvis', owner);
-  if (off) grip(off, who.bones, drawn ? 'hand_l' : 'spine_03', owner);
+  if (off) grip(off, who.bones, offInHand ? 'hand_l' : 'spine_03', owner);
   who.setGrip('r', main && drawn ? 1 : 0);
-  who.setGrip('l', off && drawn ? 1 : 0);
+  who.setGrip('l', off && offInHand ? 1 : 0);
 }

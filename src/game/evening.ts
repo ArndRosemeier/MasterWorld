@@ -8,20 +8,23 @@
  * the result, so a failure says where the evening broke. Pure: the land, the town, the VGM's leads, the
  * talk and the market are the game's own; only the renderer and the townsfolk walking about are left out.
  */
-import { MinHeap, deriveSeed } from '@futuremagic/core';
+import { MinHeap, Rng, deriveSeed } from '@futuremagic/core';
 import { polyCentroid, type SettlementSize, type TownBuilding } from '@futuremagic/settlement';
 import { type GuildDef, type SettingModule } from '../setting/contract';
-import { buildingOf, type Person } from '../sim/people';
+import { buildingOf, townsfolk, type Person } from '../sim/people';
 import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
-import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
+import { endingOf, keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
+import { wantsOf } from '../vgm/wants';
+import { asEnded, askDefOf, holdsKeepsake, keepsakeOf, twistOf, verbOf } from '../vgm/asks';
+import { NightWatch, nightWatchFor, watchDoor } from '../vgm/watch';
 import { hailer } from '../vgm/guide';
 import { Director, NEEDS, type Need } from '../vgm/director';
 import { answerNeed } from '../vgm/toolbox';
-import { dungeonOf, settlementOf, type Decision, type DungeonDecision, type RegionDecision } from '../world/decisions';
-import { moveIn, outlineCellar, type Cellar } from '../world/dungeon/cellar';
-import { marketStart, type Town } from '../world/town';
+import { dungeonOf, settlementOf, type Decision, type DungeonDecision, type PromiseWant, type RegionDecision } from '../world/decisions';
+import { moveIn, outlineCellar, sketchCellar, type Cellar } from '../world/dungeon/cellar';
+import { marketStart, townById, type Town } from '../world/town';
 import { Character } from './character';
 import { fallClassic, gather, remainsId, type Remains } from './death';
 import type { DelveSave } from './delve';
@@ -33,7 +36,7 @@ import { itemWorth, type Merchant } from './trade';
 import { Township } from './township';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
 import { abilityPrice, bardTells, GuildBook, teach, teachingsOf, teachRefusal } from './guilds';
-import { Standing } from './standing';
+import { Standing, grownUpOf } from './standing';
 import { WALK, Walker, type WalkWorld } from './walker';
 import type { Terrain } from '../world/terrain';
 
@@ -51,6 +54,14 @@ export interface EveningResult {
   readonly steps: readonly EveningStep[];
   /** Promises cleared, by id. */
   readonly cleared: readonly string[];
+  /** What each lead asked, in order (D62: clear, fetch, ...). */
+  readonly verbs: readonly string[];
+  /** The twists met (Q3), in order. */
+  readonly twists: readonly string[];
+  /** What earlier endings brought about (Q4), in order. */
+  readonly consequences: readonly string[];
+  /** The wants tasks came from (Q5), in order. */
+  readonly wants: readonly string[];
   readonly falls: number;
   /** Copper the finds fetched, and what was bought. */
   readonly earned: number;
@@ -101,6 +112,8 @@ export interface EveningOptions {
   readonly mage?: boolean;
   /** The levels the hero must end within (D58, G1: an evening of play brings a fresh hero to level 3–5); none: any. */
   readonly levels?: readonly [number, number];
+  /** The loop check's coverage runs: the household asks only these kinds of task (ask ids), so each is played end to end. */
+  readonly only?: readonly string[];
 }
 
 /** One game day takes 60 real minutes (D37): game hours per second played. */
@@ -117,6 +130,8 @@ const AHEAD_ON_WAY = 300;
 const CLIMB_COST = 8;
 /** How long one visit below may take, seconds. */
 const DELVE_LIMIT = 1200;
+/** Why each want asks (the loop's log line). */
+const WANT_WHY: Readonly<Record<PromiseWant['kind'], string>> = { rival: 'suspects a rival in trade,', elder: 'is old and wants it back before the end', parent: 'fears for a child of the house', pious: 'wants the restless laid to rest', peaceable: 'would rather it were talked out' };
 
 /** Copper kept back from abilities (with the room): a mending or two. */
 const LESSON_RESERVE = 40;
@@ -129,7 +144,8 @@ const OVERDUE_MOST = 300;
 /** A failure of the evening: thrown inside, returned as `failed`. */
 class Broke extends Error {}
 
-export function playEvening(seed: number, setting: SettingModule, opts: EveningOptions = {}): EveningResult {
+export function playEvening(seed: number, setting0: SettingModule, opts: EveningOptions = {}): EveningResult {
+  const setting = opts.only ? { ...setting0, asks: setting0.asks?.filter((a) => opts.only!.includes(a.id)) } : setting0;
   const steps: EveningStep[] = [];
   const { terrain, log: first } = openWorld(seed, setting);
   const start = terrain.towns[0];
@@ -149,6 +165,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const power0 = hero.power;
   // Standing in a town for the first time is a discovery (D58), as in the game.
   hero.earn(`town:${town.decision.id}`, 'town');
+  const verbs: string[] = [], twists: string[] = [], consequences: string[] = [], wants: string[] = [];
+  const endings: [string, string][] = [];
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
   const book = new GuildBook();
   // A human hero (the creator's first people): a guild's task done is a good deed with its trainer's people (D54).
@@ -174,6 +192,39 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     }
   };
   const pass = (s: number) => { seconds += s; hours += s * HOURS_PER_SECOND; observe(s); };
+  /**
+   * A night watch (D62): to the household's door, the day passed until the watch's first hour, and the night kept
+   * there. A band that comes is staged by the VGM's tool and seen at the door; its fight is not played here (as an
+   * ambush's: the fight bot plays the places below), it is counted beaten. Nothing coming, the night watched through
+   * does it.
+   */
+  const keepWatch = (d: DungeonDecision, name: string, before: readonly [number, number]) => {
+    const w = askDefOf(setting, d.ask)?.watch, door = watchDoor(terrain.towns, d);
+    if (!w || !door) throw new Broke(`${name} asks a watch but has no door to keep it at`);
+    walkTo(`the door of ${name}'s household`, before[0], before[1]);
+    const h = ((hours % 24) + 24) % 24, wait = (w.hours[0] + 0.1 - h + 24) % 24;
+    // The day until then is spent resting (as a night at the inn is), not played: the Director sees no play in it.
+    hours += wait;
+    say(`keeps watch at the household's door from ${Math.floor(hours % 24)}:00`);
+    const night = new NightWatch();
+    const at = { x: before[0], z: before[1] };
+    for (let k = 0; k < 40; k++) {
+      const c = { seed, log, towns: terrain.towns, hours, hero: at, setting };
+      const band = nightWatchFor(c);
+      if (band) {
+        log = [...log, band];
+        const kept = keepPromise(log, band.id, hours + 0.3);
+        if (kept) log = [...log, kept];
+        director.met('challenge');
+        say(`${band.members.length} ${band.encounter} came out of the dark towards the door, ${Math.hypot(band.x - door.x, band.z - door.z).toFixed(0)} m off; beaten off (not played here)`);
+        pass(0.5 / HOURS_PER_SECOND);
+        return;
+      }
+      if (night.step(c).includes(d.id)) { say(`watched the night through at ${Math.floor(hours % 24)}:00; nothing came`); return; }
+      pass(0.25 / HOURS_PER_SECOND);
+    }
+    throw new Broke(`kept watch for ${name} and it never ended`);
+  };
   /** The places the hero has stood before (a new one meets Discovery). */
   const seen = new Set<string>();
 
@@ -188,7 +239,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   // In a settlement the VGM promises from there (vgm/leads.ts `near`), as the game does while the hero is in one.
   // Its danger counts from there too, as for a hero whose game began there: a fresh hero is the check's, and
   // danger by distance from the start (D29) would make any settlement a few km out a check of luck in a fight.
-  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain, near: town === start ? null : town });
+  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, asks: setting.asks, twists: setting.twists, terrain, near: town === start ? null : town });
 
   const walkTo = (what: string, x: number, z: number) => {
     const inTown = (px: number, pz: number) => Math.hypot(px - town.decision.x, pz - town.decision.z) < town.decision.radius + 60;
@@ -341,6 +392,19 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const moved = occupationOf(log, dungeon.id);
       const cellar: Cellar = moved ? moveIn(firstCellar, moved, place, lore) : firstCellar;
       const name = `${cellar.house} (${dungeon.template}, ${cellar.dweller.id})`;
+      // What the household asks (D62): a fetch's keepsake lies in the lair's hoard, and only it does the task.
+      const own = lead.id === dungeon.id, verb = verbOf(log, lead.id), ask = own ? dungeon.ask ?? null : null;
+      const names = talk.namesFor(dungeon), keepsake = own ? keepsakeOf(setting, dungeon, names) : null;
+      // What the household asked (Q2). Places other tools make are not the Builder's to vary, so they are tagged: new
+      // dwellers, a guild's task, a master's deed, and any place made without an ask (the first lead, a story event's).
+      const given = !own ? ' (dwellers)' : dungeon.task ? ' (task)' : dungeon.quest ? ' (deed)' : !dungeon.ask ? ' (other)' : '';
+      verbs.push(`${verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb}${given}`);
+      const twist = own ? twistOf(setting, dungeon.ask) : null;
+      // What an earlier ending brought about (Q4), as the log has it.
+      if (ask?.want) { wants.push(ask.want.kind); say(`asked because ${talk.nameOf(ask.want.person)} ${WANT_WHY[ask.want.kind]}${ask.want.rival !== undefined ? ` ${talk.nameOf(ask.want.rival)}` : ''}`); }
+      if (ask?.again) { consequences.push(`thief again (${ask.again})`); say(`the thief let go on ${ask.again} is at it again`); }
+      if (twist) { twists.push(twist.kind); say(`twist: ${twist.kind}${twist.kind === 'changed' ? ` (told ${sketchCellar(dungeon, place, lore, undefined, true).dweller.id}, finds ${cellar.dweller.id})` : ''}`); }
+      if (verb !== 'clear') say(`the household asks: ${verb}${names.who && verb === 'lost' ? ` ${names.who}` : ''}${keepsake ? ` (${keepsake.name})` : ''}`);
       // Out to the door above, or the barrow's mouth.
       const goDown = () => {
         if (dungeon.site) walkTo(name, dungeon.site.x - Math.sin(dungeon.site.yaw) * 2, dungeon.site.z - Math.cos(dungeon.site.yaw) * 2);
@@ -349,6 +413,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         if (!seen.has(lead.id)) { director.met('discovery', seen.has(dungeon.id) ? 0.5 : 1); seen.add(lead.id); seen.add(dungeon.id); }
         hero.earn(`place:${lead.id}`, 'place');
       };
+      let saved: DelveSave | undefined, found = false;
+      if (verb === 'watch') keepWatch(dungeon, name, front(house));
+      else {
       goDown();
       if (opts.reckless && e === 0) {
         const kept = hero.pack.filter((it) => defOf(setting.items, it.def).kind !== 'potion');
@@ -357,11 +424,10 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         hero.health = Math.max(1, Math.round(hero.maxHealth * 0.1));
         say(`goes down reckless: ${hero.health} health, no potions`);
       }
-      let saved: DelveSave | undefined;
       let left: Remains | null = null;
       for (;;) {
         const spots = left ? [{ ...left.at, reached: () => { gather(hero, left!); say(`took up the pack left at the fall (${left!.items.length} ${left!.items.length === 1 ? 'thing' : 'things'})`); left = null; } }] : [];
-        const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0 });
+        const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0, ask, keepsake });
         // Below: the fights and the searching spread over the visit, each meeting its need as it ends.
         watch.where = 'below';
         const parts = r.kills + r.looted + 1, cast = r.spells.length;
@@ -376,6 +442,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         }
         if (!r.kills) casts(cast);
         saved = r.delve.tally();
+        found ||= r.delve.found;
         spells += cast;
         if (r.won && r.out) {
           hero.earn(`cleared:${lead.id}`, 'cleared');
@@ -404,8 +471,59 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (left) throw new Broke(`cleared ${name} but never found the pack left at the fall`);
       if (school && e === 0 && !spells) throw new Broke(`the mage cast no spell in ${name}`);
       if (school) say(`${spells} spells cast so far`);
+      }
       // Quiet, and the hero gone: back to its household to tell them (plan 4.2). They pay, the promise is
       // kept, and with the next lead already about they pass on its rumour.
+      if (keepsake && !holdsKeepsake(hero.pack, lead.id)) throw new Broke(`came out of ${name} without ${keepsake.name}`);
+      if (ask?.verb === 'seal') {
+        if (!saved?.sealed) throw new Broke(`came out of ${name} with its breach still open`);
+        say(`walled up the breach in ${name}`);
+      }
+      if (ask?.verb === 'lost' && ask.alive) {
+        if (!found) throw new Broke(`came out of ${name} without finding ${names.who}`);
+        say(`found ${names.who} alive; they walk home`);
+      }
+      // A parley (D62): terms struck; or broken by a blow, and then the household pays nothing.
+      const broke = ask?.verb === 'parley' && saved?.parley !== 'struck';
+      if (ask?.verb === 'parley') {
+        if (!broke) say(`struck terms with those in ${name} (${ask.terms === 'price' ? `paid ${ask.price} copper` : 'gave the hero\'s word'}); nobody killed`);
+        else if (saved?.parley !== 'broken') throw new Broke(`came out of ${name} with no terms struck`);
+        else {
+          const k = keepPromise(log, lead.id, hours, true, 'broken');
+          if (k) log = [...log, k];
+          say(`broke the parley in ${name}: the household pays nothing`);
+        }
+      }
+      // A thief (D62): the stash gave them away; faced with it, they own up, and the hero turns them in or lets them go.
+      let ending: 'caught' | 'let-go' | 'given' | undefined;
+      if (ask?.verb === 'thief') {
+        talk.holding = (id) => holdsKeepsake(hero.pack, id);
+        const who = talk.askOf(lead.id)?.thief, thief = people.find((p) => p.id === who);
+        if (!thief) throw new Broke(`${name} asks to find a thief, and nobody in town is one`);
+        walkTo(`${talk.nameOf(thief.id)}'s door`, ...front(town.plan.buildings[thief.home]));
+        if (!talk.topics(thief.id).some((t) => t.id === `accuse:${lead.id}`)) throw new Broke(`cannot face ${talk.nameOf(thief.id)} with ${keepsake?.name}`);
+        say(`faced ${talk.nameOf(thief.id)} with ${keepsake?.name}: "${talk.ask(thief.id, `accuse:${lead.id}`).text}"`);
+        const act = new Rng(deriveSeed(seed, 'thief', lead.id)).chance(0.5) ? 'catch' : 'spare';
+        const r = talk.ask(thief.id, `${act}:${lead.id}`);
+        ending = r.named?.ending;
+        if (!ending) throw new Broke(`${talk.nameOf(thief.id)} owned up but nothing came of it`);
+        say(`${ending === 'caught' ? 'turned in' : 'let go'} ${talk.nameOf(thief.id)}: "${r.text}"`);
+      }
+      // A lie (Q3): the thing bears another family's mark; half the time the hero gives it to them instead, and the one who lied pays nothing.
+      let gave = false;
+      if (twist?.kind === 'lied' && new Rng(deriveSeed(seed, 'lied', lead.id)).chance(0.5)) {
+        talk.holding = (id) => holdsKeepsake(hero.pack, id);
+        const rightful = grownUpOf(people, talk.askOf(lead.id)?.rightful);
+        if (!rightful) throw new Broke(`${keepsake?.name} is another family's, and nobody of theirs lives in town`);
+        walkTo(`${talk.nameOf(rightful.id)}'s door`, ...front(town.plan.buildings[rightful.home]));
+        if (!talk.topics(rightful.id).some((t) => t.id === `give:${lead.id}`)) throw new Broke(`cannot give ${keepsake?.name} to ${talk.nameOf(rightful.id)}`);
+        say(`gave ${keepsake?.name} to ${talk.nameOf(rightful.id)}, whose it was: "${talk.ask(rightful.id, `give:${lead.id}`).text}"`);
+        hero.pack.splice(hero.pack.findIndex((it) => it.keepsake === lead.id), 1);
+        const k = keepPromise(log, lead.id, hours, true, 'given');
+        if (k) log = [...log, k];
+        gave = true;
+      }
+      if (!broke && !gave) {
       if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
       const to = talk.reportTo(lead.id).map((id) => people.find((p) => p.id === id)).find((p) => !!p);
       if (!to) throw new Broke(`nobody to tell that ${name} is safe`);
@@ -413,18 +531,28 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (!talk.topics(to.id).some((t) => t.id === `report:${lead.id}`)) throw new Broke(`${talk.nameOf(to.id)} cannot be told that ${name} is safe`);
       const reward = rewardFor(cellar, setting.creatures);
       hero.coins += reward;
-      const kept = keepPromise(log, lead.id, hours);
+      const kept = keepPromise(log, lead.id, hours, false, ending ?? asEnded(ask));
       if (kept) log = [...log, kept];
+      // An ending the VGM reads later (Q4): a pact's place and a sealed one stay as they are; a thief let go comes back (moveInto and leads test it).
+      if (kept?.ending === 'pact' || kept?.ending === 'sealed' || kept?.ending === 'let-go') {
+        consequences.push(`${kept.ending} (${lead.id})`);
+        endings.push([lead.id, kept.ending]);
+        say(`the log keeps how ${name} ended: ${kept.ending}`);
+      }
       // The household's people think better of the hero for it, once (D54).
       if (kept) { standing.keptFor(to.race, lead.id); hero.earn(`kept:${lead.id}`, 'kept'); }
       cleared.push(lead.id);
       watch.leads = 0;
       director.met('reward');
       promiseDue();
+      // A keepsake goes back to its household.
+      const back = hero.pack.findIndex((it) => it.keepsake === lead.id);
+      if (back >= 0) say(`handed back ${hero.pack.splice(back, 1)[0]!.name}`);
       const told = talk.toldSafe(to.id, lead.id, `paid ${reward}`);
       rumour = openPromises(log).find((o) => told.heard.includes(o.id) && !heard.has(o.id)) ?? null;
       say(`told ${talk.nameOf(to.id)} that ${name} is safe: paid ${reward} copper${rumour ? `, and heard a rumour of ${rumour.id}` : ''}`);
       if (talk.ask(to.id, 'news').heard.includes(lead.id)) throw new Broke(`${talk.nameOf(to.id)} still tells of ${name} after hearing it is safe`);
+      }
 
       // Back in town: sell, mend, upgrade. A town without shops (a hamlet) has nobody to trade with; one
       // with any has a smith.
@@ -432,7 +560,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (shops && !smith) throw new Broke('no smith in town');
       const finds = hero.pack.filter((it) => defOf(setting.items, it.def).slot || defOf(setting.items, it.def).value > 0);
       say(`brought back ${finds.length} finds and ${hero.coins} copper`);
-      // Writings found below are read before anything is sold (C3: a rare extra way to a spell).
+      // A potion of learning found below is drunk at once (D61): one more ability point.
+      for (const it of hero.pack.filter((x) => defOf(setting.items, x.def).learning)) { hero.consume(it); say(`drank ${it.name}: ${hero.points} ability points free`); }
+      // Writings found below are read before anything is sold (C3: a rare extra way to a spell); each takes a point.
       for (const it of hero.pack.filter((x) => defOf(setting.items, x.def).teaches)) {
         const d = defOf(setting.items, it.def);
         if (!hero.readWriting(it)) say(`read ${d.name}: knows ${d.teaches} now`);
@@ -478,7 +608,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
           paid += before - hero.coins;
           hours += g.hours;
           taught.push(a.name);
-          say(`${g.name} teaches ${a.name} (level ${a.level ?? 1}) for ${before - hero.coins} copper`);
+          say(`${g.name} teaches ${a.name} (level ${a.level ?? 1}) for ${before - hero.coins} copper; ${hero.points} ability points left`);
         }
       }
       // The best upgrade the purse allows, at the smith's (and the market's).
@@ -519,15 +649,25 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     if (shops && hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
     // Gate C (C9): the VGM answers every need; none stands overdue longer than OVERDUE_MOST.
     for (const n of NEEDS) if (overdue[n] > OVERDUE_MOST) throw new Broke(`${n} stood overdue ${(overdue[n] / 60).toFixed(1)} min (at most ${OVERDUE_MOST / 60})`);
+    // Gate Q (Q2): in natural play no kind of task the VGM gives is given twice in a row (the runs that ask one kind only may).
+    const natural = verbs.filter((v) => !/\((dwellers|task|deed|other)\)$/.test(v)).map((v) => v.split(' ')[0]!);
+    if (!opts.only) for (let i = 1; i < natural.length; i++) if (natural[i] === natural[i - 1]) throw new Broke(`the same kind of task twice in a row: ${verbs.join(', ')}`);
+    // Gate Q: the endings and the wants met read back from the log alone (the log is the save).
+    for (const [id, ending] of endings) if (endingOf(log, id) !== ending) throw new Broke(`the log does not keep how ${id} ended (${ending})`);
+    for (const d of log) {
+      if (d.kind !== 'dungeon' || !d.ask?.want) continue;
+      const t = townById(terrain.towns, d.town), w = d.ask.want;
+      if (!(t && wantsOf(townsfolk(t.plan, t.decision.seed ?? seed), d).some((x) => x.person === w.person && x.kind === w.kind))) throw new Broke(`the want behind ${d.id} does not replay from the log`);
+    }
     // The next lead: someone has news of a place not yet visited.
     const next = hearLead(heard);
     say(`the next lead is ${next.id}`);
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+    return { ok: false, failed: e.message, steps, cleared, verbs, twists, consequences, wants, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+  return { ok: true, failed: null, steps, cleared, verbs, twists, consequences, wants, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
 }
 
 /** A point just outside a building's door. */

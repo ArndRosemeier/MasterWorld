@@ -1,5 +1,5 @@
 /**
- * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves|kinds|capital]` after `npm run build`,
+ * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves|kinds|sea|ships|capital]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night, in rain and wet toward the afternoon sun, a cellar, a barrow, the wild, a fight, a fight with magic, a hurt traveller, a raided farm, the pack,
  * the map, the trade window, talk, a people's hold) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
@@ -11,9 +11,9 @@
  * the town at noon (F2). Four slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
  * `--part=caves` is mesa country (a valley, a plateau top, a tor, a climb; gate L) and a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
- * `--part=sea` is the nearest beach, sea cliff and the bed off the beach, the camera in the waterline and the hero swimming (S1), a harbour town (S2) and aboard a ship at its berth (S3);
+ * `--part=sea` is the nearest beach, sea cliff and the bed off the beach, the camera in the waterline and the hero swimming (S1), sea caves, sunken ruins, a wreck and the sea's situations (S8, S9); `--part=ships` a harbour town (S2), a storm from the deck (S10) and aboard a ship at its berth (S3);
  * `--part=capital` runs tools/shot/capital.mjs (its gate by day and night, its market; gate P) into `<out root>/capital`;
- * without `--part` all six run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
+ * without `--part` all seven run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
  * Exits 1 when a page failed or a shot breaks F2 or F3 (what was still waiting to be drawn is noted).
  */
@@ -348,6 +348,14 @@ const SESSIONS = [
     { name: 'sea-harbour-aloft', act: seaLook({ out: 70, up: 16, side: 20, back: true, pitch: -8 }) },
     { name: 'sea-harbour-evening', act: async (p) => { await turn(17.8, 'fair')(p); await seaLook({ out: 40, up: 6, back: true, pitch: -3 })(p); } },
   ] },
+  // S10: a storm at sea from the deck of a ship held at her berth (the sea's swell high, the sky dark, rain).
+  { id: 'sea-storm', query: `${still}&hour=15&weather=storm&site=harbour&aboard`, shots: [
+    { name: 'sea-storm-deck', act: async (p) => {
+      await p.waitForFunction(() => window.game?.decks?.ship, null, { timeout: TIMEOUT });
+      await p.evaluate(() => { const pl = window.game.player; pl.flying = false; pl.heroCam.yaw = pl.walker.yaw + Math.PI / 2; pl.heroCam.pitch = -0.15; pl.heroCam.zoom = 4; });
+      await p.waitForTimeout(4000);
+    } },
+  ] },
   // S3: aboard a ship at its berth (the hero on its main deck, looking to the bow), then from beside it at the pier:
   // the gangplank up to its gangway, the hull on the swell.
   { id: 'sea-deck', query: `${still}&hour=11&weather=fair&site=harbour&aboard`, shots: [
@@ -418,7 +426,9 @@ const SESSIONS = [
 ];
 /** The sessions of each part (each part one run, under 5 min). */
 const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave', 'mesa']);
-const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : s.id.startsWith('sea-') ? 'sea' : 'land');
+// (The harbour and its ships are their own part: with the sea's they ran over 5 min.)
+const SHIP_PART = new Set(['sea-harbour', 'sea-storm', 'sea-deck']);
+const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : SHIP_PART.has(s.id) ? 'ships' : s.id.startsWith('sea-') ? 'sea' : 'land');
 
 /**
  * Inside the first sea cave (S8; or another kind with a drowned storey, a sunken ruin), in its first drowned room: `under`, the free camera under the water 1.5 m over the
@@ -572,7 +582,7 @@ if (part === 'capital') {
 }
 if (!part) {
   let bad = false;
-  for (const p of ['town', 'land', 'caves', 'kinds', 'sea', 'capital']) {
+  for (const p of ['town', 'land', 'caves', 'kinds', 'sea', 'ships', 'capital']) {
     try { execFileSync(process.execPath, [fileURLToPath(import.meta.url), root, `--part=${p}`], { stdio: 'inherit' }); } catch { bad = true; }
   }
   process.exit(bad ? 1 : 0);

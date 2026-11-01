@@ -153,7 +153,8 @@ export class Market {
 
   /** What the merchant pays for one of the hero's things (0: they do not buy that kind). */
   pays(m: Merchant, item: Item, speech: number): number {
-    if (!m.shop.buys.includes(defOf(this.cat, item.def).kind)) return 0;
+    // A household's keepsake (D62) is theirs: nobody buys it.
+    if (item.keepsake || !m.shop.buys.includes(defOf(this.cat, item.def).kind)) return 0;
     return Math.max(1, Math.round(this.worthHere(item) * m.shop.pays * (1 + haggle(speech)) * (this.standing?.prices(m.race).pays ?? 1)));
   }
 

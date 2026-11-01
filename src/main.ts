@@ -12,11 +12,11 @@ import { atDoor, placesFor } from './app/places';
 import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
 import { Portals } from './app/portals';
-import { CAVE_LANTERN } from './app/cellarVisit';
+import { CAVE_LANTERN, TORCH_DUSK, TORCH_LIGHT_OUT, TORCH_LIGHT_UP, TORCH_NIGHT } from './app/cellarVisit';
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
 import { PortalStoneUse } from './app/portalStoneUse';
-import { cleanStoneSave } from './game/portalStone';
+import { cleanStoneSave, imprintSpawn } from './game/portalStone';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
@@ -39,12 +39,12 @@ import { PoultryView } from './render/livestock/PoultryView';
 import { Steed, groundPace, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import type { Agent, TownOrder } from './sim/townLife';
-import { createView } from './render/view';
+import { LANTERN_COLOR, createView } from './render/view';
 import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
 import { ROOT_LEVEL, chunkSize } from './render/terrain/lod';
 import { VolumeView } from './render/terrain/VolumeView';
-import { TerrainJobs, WorldJobs, createTerrainPool, createTexturePool, createWorldPool } from './workers/pool';
+import { TerrainJobs, WorldJobs, createCavePool, createTerrainPool, createTexturePool, createWorldPool, type CavePool } from './workers/pool';
 import { WaterView } from './render/water/WaterView';
 import { FloraView } from './render/flora/FloraView';
 import { GrassView } from './render/grass/GrassView';
@@ -52,10 +52,11 @@ import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
 import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
+import { TORCHLIGHT, flameFlicker } from './render/warmLights';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg, harbourMoorings } from '@futuremagic/settlement';
-import { abilityOf, validateSetting, type BackgroundDef, type GrowthSource, type SightDef, type SituationKind } from './setting/contract';
+import { abilityOf, validateSetting, type BackgroundDef, type GuildDef, type GrowthSource, type SightDef, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -63,8 +64,9 @@ import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
-import { firstDungeon, houseOf, placeOf, promisePlace, type LandKind } from './vgm/dungeons';
-import { questFor, questGuild } from './vgm/quests';
+import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
+import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
+import { askDefOf, askNamed, askOf, asEnded, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
@@ -72,10 +74,11 @@ import { cleanWhys, PACING, vgmLines, whyOf, WHY_KEPT, type VgmWhy } from './vgm
 import { findIn, travellerFor } from './vgm/answers';
 import { offTheCoast, washedUpFor, wreckFor } from './vgm/wrecks';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
+import { NightWatch } from './vgm/watch';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
-import { OwnerComes } from './app/ownerComes';
+import { OwnerComes, type OwnerHost } from './app/ownerComes';
 import { FAR } from './render/folk/FarFolk';
 /**
  * One of a place's household goes out to wait before its way in once the hero is this near (m: within the 400 m round
@@ -133,7 +136,9 @@ import { HandOverScene } from './app/handOverScene';
 import { MapSheet } from './render/hero/MapSheet';
 import { HOME_SIGHT, KnownLand } from './game/knownLand';
 import { Minimap, type SkyGlyph } from './app/minimap';
-import { belowRange, paintBelow } from './app/dungeonSheet';
+import { belowRange, paintBelow, paintFormed } from './app/dungeonSheet';
+import type { DungeonSeen } from './game/dungeonMap';
+import { STOREY } from './game/formedMap';
 import { fill } from './talk/folk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
@@ -141,8 +146,8 @@ import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved
 import { release } from './app/release';
 import { CLIMB_COST, Character, fallHurt } from './game/character';
 import { itemWorth } from './game/trade';
-import { bardTells, GuildBook, questGift, teacherOf, whereOf } from './game/guilds';
-import { CHEER, LevelWatch } from './app/levelUp';
+import { bardTells, GuildBook, harbourHall, questGift, teacherOf, whereOf } from './game/guilds';
+import { CHEER, DRINK, LevelWatch } from './app/levelUp';
 import { carryRenown } from './game/growth';
 import { coinText, findDef, uniqueItem } from './game/items';
 import { washedUpChest } from './world/sites';
@@ -169,7 +174,7 @@ import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
 import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
-import { GroundCache } from './world/groundCache';
+import { DrawnGround, drawnSource } from './world/drawnGround';
 import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
@@ -259,6 +264,8 @@ export async function start(b: Boot): Promise<void> {
     // Roads decided while the last game was played level the land from the start.
     terrain.settleMore(later);
     const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
+    /** The harbour master's look at the sky (S10), kept for reuse. */
+    const seaSky = weather.state(0, 0, 0);
     const hour = title && !params.hourSet ? title.draw.hour : params.hour;
     if (params.weather) {
       if (!WEATHER_KINDS.includes(params.weather as WeatherKind)) throw new Error(`?weather=${params.weather}: one of ${WEATHER_KINDS.join(', ')}`);
@@ -313,10 +320,12 @@ export async function start(b: Boot): Promise<void> {
     const castaways = new Castaways(seed);
     // A pier's deck or a bridge's high over the feet (a swimmer under it) is not under them: never lifted onto it.
     const overhead = (f: number | null, y: number | undefined): number | null => (f !== null && y !== undefined && f > y + 1.6 ? null : f);
+    // The ground as drawn near the camera: the hero and everything with feet stand on it, never in relief the mesh steps over.
+    const drawn = new DrawnGround(drawnSource(terrain));
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
     const landWorld: WalkWorld = {
       // In a cave mouth's throat its own floor (it runs under the land's ground, which the crag carves).
-      height: (x, z) => cellars?.floor(x, z) ?? terrain.height(x, z),
+      height: (x, z) => cellars?.floor(x, z) ?? drawn.footing(x, z),
       // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
       floor: (x, z, y) => decks.underfoot(x, z, y) ?? overhead(towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null, y),
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
@@ -325,6 +334,8 @@ export async function start(b: Boot): Promise<void> {
       // Out of doors also a stall's awning, a well's roof (the talk view stood on an awning).
       sightSurface: (x, y, z) => {
         if (cellars?.throatAir(x, y, z)) return null;
+        // A cave's crag, a barrow's mound, a tower's walls: the camera swung round with the mouse stays out of them.
+        if (cellars?.inPiece(x, y, z, 0.2)) return -1;
         const s = surfaceAt(x, y, z, !!rooms?.inside), f = rooms?.inside ? null : towns?.fixtureSight(x, y, z) ?? null;
         // A ship's cabins and lower deck keep the camera in them; out on deck, out of its hull and castles.
         const d = decks.sight(x, y, z);
@@ -339,7 +350,7 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return decks.hull(x, z, r, y ?? player.walker.pos.y) || crews.inCrew(x, z, r, y ?? player.walker.pos.y) || castaways.inBody(x, z, r) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return decks.hull(x, z, r, y ?? player.walker.pos.y) || crews.inCrew(x, z, r, y ?? player.walker.pos.y) || castaways.inBody(x, z, r) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r, y ?? player.walker.pos.y) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     // Down in a cellar the walker walks its space, else the land.
@@ -359,6 +370,8 @@ export async function start(b: Boot): Promise<void> {
     let bodiesBlock: NonNullable<WalkWorld['bodies']> = () => false;
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? (resume ? [resume.x, resume.z] : [home.x, home.z]), params.look);
+    // Which way the hero faced at the start (the portal stone's first home faces so).
+    const spawn = { x: home.x, y: player.walker.support(home.x, home.z, 1e5), z: home.z, yaw: player.walker.yaw };
     // The floating origin starts where the camera does (everything drawn is relative to it: render/origin.ts).
     if (params.origin) ORIGIN.moveTo(view.camera.position.x, view.camera.position.z);
     // Off (`origin=0`, or from the debug console: game.followOrigin) the origin stays where it is.
@@ -577,6 +590,11 @@ export async function start(b: Boot): Promise<void> {
     let playing = !title && !((params.create && !save) || save?.heir);
     // The VGM's decisions so far (the towns' orders among them: each town's people follow theirs, game/township.ts).
     let log: readonly Decision[] = [...opened.log, ...later];
+    // `ask=`: what the households of the first places ask (D62), for looking at it.
+    const looked = params.ask && !save ? askNamed(setting, params.ask) : null;
+    // A parley needs dwellers who talk: the first of its kinds moves in (their encounter is named as they are).
+    const talkers = askDefOf(setting, looked ?? undefined)?.dwellers?.[0];
+    if (looked) log = log.map((d) => (d.kind === 'dungeon' && !d.quest && !d.task ? { ...d, ask: looked, ...(talkers ? { dwellers: talkers } : {}) } : d));
     // `moved`: the first cellar was cleared long ago, and new dwellers have moved in since.
     const cleared = params.moved && start ? firstDungeon(log) : null;
     if (cleared && start && !keptOf(log).has(cleared.id)) {
@@ -673,14 +691,12 @@ export async function start(b: Boot): Promise<void> {
     let stock: StockView | null = null;
     if (params.stock > 0) {
       loading.set('Turning out the herds');
-      stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => terrain.height(x, z));
+      stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => drawn.footing(x, z));
     }
-    // The ground under birds' and creatures' feet: off a fine grid of exact heights (the land's own is costly, asked every frame).
-    const feet = new GroundCache((x, z) => terrain.height(x, z), () => terrain.version);
     // Birds and squirrels about the land (plan 9.3): their squares are the trunks' cells.
     const woods = woodsOf(terrain);
     const small = setting.smallLife && params.small ? new SmallLife(seed, {
-      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
       // The town's farmland and fields are open land whatever the woods round them.
       woods: (x, z) => (terrain.townGround(x, z) >= TownGround.Street ? 0 : woods(x, z)),
@@ -689,7 +705,7 @@ export async function start(b: Boot): Promise<void> {
     }, setting.smallLife) : null;
     const smallView = small ? new SmallLifeView(small, view.stage, view.renderer) : null;
     // The yards' hens (the private library's chicken and rooster): bodies for the nearest; none without the library.
-    const hens = params.hens > 0 && setting.world.poultry ? await PoultryView.pool(params.hens, Math.max(1, Math.round(params.hens / 5)), (x, z) => feet.footing(x, z)) : null;
+    const hens = params.hens > 0 && setting.world.poultry ? await PoultryView.pool(params.hens, Math.max(1, Math.round(params.hens / 5)), (x, z) => drawn.footing(x, z)) : null;
     if (hens) compileEarly(hens.toWarm());
     if (stock) compileEarly(stock.toWarm());
     if (smallView) compileEarly(smallView.toWarm());
@@ -767,6 +783,8 @@ export async function start(b: Boot): Promise<void> {
     director.strict = save?.mode === 'roguelike';
     const fightHud = new FightHud(setting, () => settings.current.bindings);
     const journal = new Journal(save?.journal);
+    // A guild's task names its place now (D49): an unnamed task's page from a save of before closes.
+    for (const l of journal.open) if (l.id.startsWith('task:')) journal.fulfil(l.id);
     // The land the hero knows (plan 11.7): a new hero knows the town where the game begins; the rest is seen on the way or told of.
     const known = new KnownLand(save?.map);
     if (!save?.map) known.see(home.x, home.z, HOME_SIGHT);
@@ -778,6 +796,7 @@ export async function start(b: Boot): Promise<void> {
     let quietPlace: ((id: string) => boolean) | null = null;
     /** A cellar gone quiet with the hero down in it: its household comes down to them (set once the town talks). */
     let comeDown: ((id: string) => boolean) | null = null;
+    let failedPlace: ((id: string) => boolean) | null = null;
     /** Who of a cellar's household came down to the hero (app/ownerComes.ts), while they are there. */
     let owner: OwnerComes | null = null;
     // What the fights (down in a cellar, out on the land) ask of the game.
@@ -809,6 +828,8 @@ export async function start(b: Boot): Promise<void> {
       armed: armHero,
       quiet: (id) => quietPlace?.(id) ?? false,
       stilled: (id) => comeDown?.(id) ?? false,
+      failed: (id) => failedPlace?.(id) ?? true,
+      say: (text, at) => overHead(text, at),
     };
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
@@ -816,6 +837,9 @@ export async function start(b: Boot): Promise<void> {
     let portals: Portals | null = null;
     /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts throatDepth). */
     let throatLamp = false;
+    /** The lantern lit by the hero's torch out of doors at night (else dark, or lit by whoever lights it below). */
+    let torchLamp = false;
+    const flamePoint = new Vector3();
     /** The place below whose lights are lit from out on the land, near its portal. */
     let caveLit: string | null = null;
     /** A cave's own lights are lit once the hero on the land is this near its portal (m). */
@@ -828,6 +852,8 @@ export async function start(b: Boot): Promise<void> {
     const portalsDue: Portal[] = [];
     /** The portal stone as held up (set once the portals are): it goes below ground with the hero. */
     let stoneMesh: Object3D | null = null;
+    // Formed caves (phase K) are made in a worker of their own, started with the first one.
+    let cavePool: CavePool | null = null;
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
       fight: fightHost,
@@ -835,9 +861,11 @@ export async function start(b: Boot): Promise<void> {
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
-      jobs: terrainJobs,
+      land: (x, z) => terrain.skeleton.kinds[terrain.skeleton.kindAt(x, z)].id,
+      jobs: { caveRock: (l, c, k, t) => terrainJobs.caveRock(l, c, k, t), caveMouth: (s, c) => terrainJobs.caveMouth(s, c), formed: (j) => (cavePool ??= createCavePool(1)).run(j) },
       portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
       cleared: (d) => void roadWork.clear(d),
+      keepsake: (d) => { const t = towns?.get(d.town); return t ? keepsakeOf(setting, d, t.talk.namesFor(d)) : null; },
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       // The hero, what they leave lying and their spells go down with them.
@@ -870,8 +898,10 @@ export async function start(b: Boot): Promise<void> {
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
     }, start, {
-      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
+      // The sea's waves: a shark keeps under them (S9).
+      surface: (x, z) => sea.surfaceAt(x, z),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
       blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
     }, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
@@ -886,7 +916,7 @@ export async function start(b: Boot): Promise<void> {
         changed: (c) => notes.say(changeLine(c), 6),
         jobs: terrainJobs,
       }, holdSite, holdPeople, {
-        height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
+        height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
         waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
         blocked: (x, z, r) => !!hold?.solid(x, z, r) || bridgeView.side(x, z, r),
       }, save?.hold);
@@ -984,7 +1014,8 @@ export async function start(b: Boot): Promise<void> {
       },
       gesture: (what) => castHands(what === 'raise' ? 'charge' : 'release', what === 'raise' ? 0.9 : 0.8),
       changed: () => autosave(),
-    }, cleanStoneSave(save?.portalStone));
+    // A stone that marked no home yet (every new hero's) is imprinted with where the hero started: a way out when stuck.
+    }, imprintSpawn(cleanStoneSave(save?.portalStone), spawn));
     await stoneUse.addToStage();
     stoneMesh = stoneUse.mesh;
     spellView.also = (b, dt) => stoneUse.stoneLight(b, dt);
@@ -1141,6 +1172,7 @@ export async function start(b: Boot): Promise<void> {
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
       where: () => (visit() ? { place: 'cellar', room: null } : rooms?.door ? { place: 'room', room: rooms.door.b.kind } : { place: 'land', room: null }),
       inFlight: () => player.offFoot,
+      aboard: () => !!decks.ship,
       horses: () => player.steeds,
       riding: () => player.riding,
       threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
@@ -1187,6 +1219,8 @@ export async function start(b: Boot): Promise<void> {
         const k = keepPromise(log, id, hours());
         if (k) log = [...log, k];
         deedFor(`wolves:${id}`, towns?.get(ev.town), setting.standing.help, 'help');
+        // A night watch's band beaten (D62): the watch is kept; its household will want to hear.
+        if (ev.watch) return quietPlace?.(ev.watch) ?? true;
         return true;
       }
       // A place cleared is experience (D58), once; telling its household is more.
@@ -1196,7 +1230,16 @@ export async function start(b: Boot): Promise<void> {
       const words = t.talk, to = words.reportTo(id)[0], p = t.residents.find((x) => x.id === to);
       if (p === undefined) return true;
       const name = words.nameOf(p.id), house = words.homeCalled(p.id), door = t.town.plan.buildings[p.home].door;
-      journal.quiet(id, { text: fill(setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
+      journal.quiet(id, { text: fill(words.askOf(id)?.note ?? setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
+      return true;
+    };
+    // A parley broken (D62): the hero struck first and beat them; the household asked for none of it and pays nothing.
+    failedPlace = (id) => {
+      const k = keepPromise(log, id, hours(), true, 'broken');
+      if (k) log = [...log, k];
+      const t = townOfPromise(id), broken = askDefOf(setting, askOf(log, id) ?? undefined)?.parley?.broken;
+      if (broken) journal.lapse(id, { text: fill(broken, { place: t?.talk.cellarCalled(id) ?? 'that place' }), from: 'you' });
+      else journal.fulfil(id);
       return true;
     };
     /**
@@ -1204,7 +1247,8 @@ export async function start(b: Boot): Promise<void> {
      * household's people (and the hero's name), a master's gift if it was their deed (C14), and the VGM's next lead.
      */
     const keptNow = (id: string, t: Township): void => {
-      const k = keepPromise(log, id, hours());
+      // How it ended goes into the log (a thief caught or let go, D62): what comes next may follow from it.
+      const k = keepPromise(log, id, hours(), false, t.talk.endingOf(id) ?? asEnded(askOf(log, id)));
       if (k) log = [...log, k];
       journal.fulfil(id);
       director.met('purpose');
@@ -1227,11 +1271,17 @@ export async function start(b: Boot): Promise<void> {
       character.coins += coins;
       if (coins) sounds?.cue({ kind: 'paid', coins });
       character.earn(`cleared:${id}`, 'cleared');
+      // A fetch (D62): the keepsake goes back to its household.
+      const asked = t.talk.askOf(id), i = character.pack.findIndex((it) => it.keepsake === id);
+      if (i >= 0) character.pack.splice(i, 1);
       keptNow(id, t);
+      if (asked && due) return cap(fill(asked.thanks, { coins: coinText(coins), place: t.talk.cellarCalled(id) }));
       return deed?.quest ? deed.quest.done : due ? due.thanks(coinText(coins)) : '';
     };
     // A cellar gone quiet with the hero down in it (show, don't tell): the one of its household the hero would report to
     // climbs down the ladder, comes to the hero and thanks and pays them there.
+    /** What one of a household says down in a place, over their head (their thanks; someone lost, found). */
+    const overHead: OwnerHost['say'] = (text, at) => speech.say(text, at);
     comeDown = (id) => {
       const v = visit(), t = townOfPromise(id);
       if (!v || owner || !t?.living || t.talk.isSettled(id)) return false;
@@ -1240,13 +1290,28 @@ export async function start(b: Boot): Promise<void> {
       if (!a) return false;
       owner = new OwnerComes(v, a, {
         body: () => folk?.bodyOf(a) ?? null,
-        say: (text, at) => speech.say(text, at),
+        say: overHead,
         told: () => {
           t.talk.thanked(a.person.id, id);
           return paidFor(id, t, true);
         },
       });
       return true;
+    };
+    /**
+     * Someone lost in the place the hero is down in (D62), still to be found alive: they sit hurt by the lair's hoard
+     * at its end; come up to, they get up, say so, and walk out and home (app/ownerComes.ts `LostHere`).
+     */
+    const lostBelow = (): void => {
+      const v = visit(), f = cellars.fightBelow;
+      if (!v || owner || !f) return;
+      const id = v.cellar.decision.id, t = towns?.get(v.cellar.decision.town), p = t?.living ? t.lostIn(id) : null;
+      const a = p && t?.life.agentOf(p.id), lair = f.delve.hoards.find((h) => !h.prop);
+      if (!t || !a || !lair) return;
+      owner = new OwnerComes(v, a, { body: () => folk?.bodyOf(a) ?? null, say: overHead, told: () => '' }, {
+        at: lair,
+        cameUp: () => { f.delve.found = true; t.foundLost(id); return t.talk.askOf(id)?.found ?? ''; },
+      });
     };
     /**
      * Out on the land, one of a place's household waits outside its way in while it is to be cleared (they come in to the
@@ -1330,9 +1395,21 @@ export async function start(b: Boot): Promise<void> {
         journal.fulfil(ARRIVAL);
       },
       heardOf: (id, from) => learnEvent(id, from),
+      // A thief named and dealt with (D62): the ask is done; the household will want to hear.
+      named: (id, ending) => {
+        if (ending !== 'given') { quietPlace?.(id); return; }
+        // A lie found out (Q3): the thing went to its rightful household; the one who lied gets nothing, and pays nothing.
+        const i = character.pack.findIndex((it) => it.keepsake === id);
+        if (i >= 0) character.pack.splice(i, 1);
+        const k = keepPromise(log, id, hours(), true, 'given');
+        if (k) log = [...log, k];
+        journal.fulfil(id);
+      },
       serve: (id, a) => services.get(id)?.(a),
       report: (id, a) => {
         const t = talk!.place;
+        // A fetch (D62), or news of someone lost dead, is done only with the thing itself: told without it in hand, they ask where it is.
+        if (bringsBack(askOf(log, id)) && !holdsKeepsake(character.pack, id)) return { text: t.talk.askOf(id)?.missing ?? '', heard: [], done: false };
         return t.talk.toldSafe(a.person.id, id, paidFor(id, t));
       },
       // Sleepers lie in their beds, not to be talked to (but those the hero comes to find get up for the hero).
@@ -1365,6 +1442,8 @@ export async function start(b: Boot): Promise<void> {
       get towns() { return towns?.every ?? []; },
       log: () => log,
       journey: (d) => { log = [...log, d]; },
+      hold: (d) => { log = [...log, d]; },
+      weather: (x, z, h) => weather.state(x, z, h, seaSky),
       frontier: () => ({ seed, log, terrain, regions: setting.regions!, home: start?.decision ?? home, hero: player.walker.pos, hours: hours() }),
       openRegion: (d) => regionOpened(d),
       water: (x, z) => terrain.waterDepth(x, z),
@@ -1390,6 +1469,25 @@ export async function start(b: Boot): Promise<void> {
       return `${u.name} worn${it.grants ? `: ${abilityOf(setting, it.grants)?.name ?? it.grants} on the action bar` : ''}`;
     };
     // Lessons (plan 11.4, D49, D59): the guild houses' trainers teach abilities for coin at a level; one more service.
+    /**
+     * A place a guild's master names (their deed, or the guild's task), made by the VGM for the town the hero
+     * talks in: into the log, the journal and on the map. What it is called, or null if none fits.
+     */
+    const guildPlace = (g: GuildDef, tool: 'quest' | 'task', make: (a: QuestAsk, c: DungeonContext) => DungeonDecision | null, said: (place: string) => string, why: string, who?: string): string | null => {
+      const t = talkTown(), house = t?.guilds.find((h) => h.guild.keeper === g.keeper);
+      if (!t || !house || !start) return null;
+      const d = make({ guild: g, town: t.town, building: house.b.id, hours: hours() }, { seed, terrain, log, home: start.decision, dungeons: setting.dungeons, avoid: wild?.territories ?? [] });
+      if (!d) { console.warn(`[vgm] no place for ${g.keeper}'s ${tool} near ${t.town.decision.id}`); return null; }
+      applied(madeBy(tool, d, why, hours()));
+      // Out on the land its name says where; a cellar is called by its house, as the town knows it.
+      const door = t.town.plan.buildings.find((b) => b.id === d.building)?.door;
+      const place = d.site ? placeOf(d, terrain.towns, setting.dungeons)?.name : t.talk.cellarCalled(d.id);
+      const at = d.site ?? (door && { x: door[0], z: door[1] });
+      if (!place || !at) return null;
+      const from = who || t.talk.nameOf(t.residents.find((p) => p.trade === g.keeper)?.id ?? -1) || g.name;
+      journal.hear(d.id, fill(setting.talk.lead, { cellar: place }), { text: said(place), from }, { x: at.x, z: at.z, label: place });
+      return place;
+    };
     const lessons = new LessonsUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -1400,17 +1498,9 @@ export async function start(b: Boot): Promise<void> {
       hours,
       standing,
       // A master's one deed (C14): the VGM makes its place, the master's household will be told; it goes in the journal and on the map.
-      quest: (g) => {
-        const t = talkTown(), house = t?.guilds.find((h) => h.guild.keeper === g.keeper);
-        if (!t || !house || !start || !g.quest) return null;
-        const d = questFor({ guild: g, town: t.town, building: house.b.id, hours: hours() }, { seed, terrain, log, home: start.decision, dungeons: setting.dungeons, avoid: wild?.territories ?? [] });
-        const place = d && placeOf(d, terrain.towns, setting.dungeons)?.name;
-        if (!d?.site || !place) return null;
-        applied(madeBy('quest', d, `${g.keeper}'s deed, for ${g.quest.reward}: the hero is a student and known well enough`, hours()));
-        const from = t.talk.nameOf(t.residents.find((p) => p.trade === g.keeper)?.id ?? -1) || g.name;
-        journal.hear(d.id, fill(setting.talk.lead, { cellar: place }), { text: fill(g.quest.ask, { place }), from }, { x: d.site.x, z: d.site.z, label: place });
-        return place;
-      },
+      quest: (g) => g.quest ? guildPlace(g, 'quest', (a, c) => questFor(a, c), (place) => fill(g.quest!.ask, { place }), `${g.keeper}'s deed, for ${g.quest.reward}: the hero is a student and known well enough`) : null,
+      // A guild's task (D49): the VGM names the one place that does it; the journal and map take it up.
+      task: (g, who) => guildPlace(g, 'task', (a, c) => taskFor(a, c), (place) => fill(g.task.ask, { place }), `${g.keeper}'s task: the hero asked for work`, who),
     });
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id), a.person.race); });
     // The bard at the inn (D49): "where can I learn something?" names every guild house of the town and puts
@@ -1436,6 +1526,8 @@ export async function start(b: Boot): Promise<void> {
     const tend = situationOf(setting, 'hurt-traveller')?.tend;
     tieTalk = (t, words) => {
       words.manner = (p) => standing.manner(p.race, p.seed);
+      // A thief can be faced once the hero holds what they stole (D62).
+      words.holding = (id) => holdsKeepsake(character.pack, id);
       words.services = (id) => {
         const p = t.residents.find((x) => x.id === id);
         if (!p) return [];
@@ -1462,6 +1554,14 @@ export async function start(b: Boot): Promise<void> {
       changed: learnedAbility,
       drank: (n) => { if (n > 0) fightHud.healed(); },
       raised: () => stoneUse.holdUp(),
+      // A potion of learning (D61, rule 11): the hero is seen drinking it, and its light winds up to the brow.
+      learnt: () => {
+        const h = player.hero;
+        if (h && !player.stance.action) player.stance = { ...player.stance, action: { ...DRINK, t0: h.clock } };
+        spellView.learnt(DRINK.dur * 0.6);
+        sounds?.learnt();
+        book.redraw();
+      },
       readOut: (why, id) => {
         const a = abilityOf(setting, id);
         notes.say(why ?? `You read it through, and ${a?.name ?? id} is yours. The page crumbles to dust.`, 7);
@@ -1562,7 +1662,10 @@ export async function start(b: Boot): Promise<void> {
       heroAt: () => heroAt(player.walker.yaw),
       known,
       roadLines: () => terrain.roads.roads,
-      signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) }))),
+      signs: () => (towns?.every ?? []).flatMap((t) => {
+        const hall = setting.voyage?.hall ? harbourHall(t.town.plan) : undefined;
+        return [...t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) })), ...(hall ? [{ x: hall.door[0], z: hall.door[1], label: setting.voyage!.hall! }] : [])];
+      }),
     }) : null;
     // The minimap at the top (plan 17.1, G4): the known land round the hero on the map's own parchment, turning
     // with the camera and always true; the townsfolk near as dots. Below ground: the dungeon's own plan, as far
@@ -1571,7 +1674,8 @@ export async function start(b: Boot): Promise<void> {
       const v = visit();
       if (v) {
         const O = v.origin;
-        return paintBelow(canvas, { space: v.space, seen: v.seen, carved: !!v.cellar.form.space.carved, exit: v.cellar.hatch }, x - O.x, z - O.z, v.space.levelAt(player.walker.pos.y - O.y), across);
+        if (v.formed) return paintFormed(canvas, v.seen, v.cellar.hatch, x - O.x, z - O.z, Math.round((player.walker.pos.y - O.y) / STOREY), across);
+        return paintBelow(canvas, { space: v.space, seen: v.seen as DungeonSeen, carved: !!v.cellar.form.space.carved, exit: v.cellar.hatch }, x - O.x, z - O.z, v.space.levelAt(player.walker.pos.y - O.y), across);
       }
       const t = here(), r = across / 2;
       const dots = (t?.life.agents ?? []).filter((a) => !a.hidden && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);
@@ -2042,6 +2146,7 @@ export async function start(b: Boot): Promise<void> {
       say: (text) => notes.say(text, 6),
     });
     /** Each VGM tool's time into the hitch log (a slow frame names the tool). */
+    const nightWatch = new NightWatch();
     const vgmTimed = { timeNow: () => performance.now(), spent: (tool: string, ms: number) => { if (ms >= 2) HITCHES.note(`vgm ${tool}`, ms); } };
     const direct = (dt: number): void => {
       const below = !!visit();
@@ -2059,6 +2164,8 @@ export async function start(b: Boot): Promise<void> {
       builderClock = 0;
       HITCHES.part('vgm turn');
       vgmStep();
+      // A night watched through at a household's door, nothing having come (D62).
+      for (const id of nightWatch.step({ seed, log, towns: terrain.towns, hours: hours(), hero: { x: player.walker.pos.x, z: player.walker.pos.z }, setting })) quietPlace?.(id);
       HITCHES.part('vgm answer');
       answerOverdue(below);
     };
@@ -2358,6 +2465,7 @@ export async function start(b: Boot): Promise<void> {
           if (cheer.gesture && h) player.stance = { ...player.stance, action: { ...CHEER, t0: h.clock } };
         }
         stoneUse.stoneFrame(dt);
+        spellView.bodyHeight = player.walker.height;
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }
@@ -2379,7 +2487,7 @@ export async function start(b: Boot): Promise<void> {
         const marks = journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })), sky = skyGlyph();
         if (v) {
           // Below ground the round is the dungeon round the hero; the land's marks ride the rim from its door.
-          const lv = v.space.levelAt(w.pos.y - v.origin.y), range = belowRange(v.space, !!v.cellar.form.space.carved);
+          const lv = v.formed ? Math.round((w.pos.y - v.origin.y) / STOREY) : v.space.levelAt(w.pos.y - v.origin.y), range = belowRange(v.space, !!v.cellar.form.space.carved);
           minimap.read({ x: w.pos.x, z: w.pos.z, look, yaw: w.yaw, hour: view.sky.hour, sky, marks, below: { sheet: `${v.origin.x},${v.origin.z}:${lv}:${v.seen.version}`, range, from: me } });
           minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark, 0);
         } else {
@@ -2438,6 +2546,26 @@ export async function start(b: Boot): Promise<void> {
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         part('towns.tick');
         towns.tick(dt, view.camera.position);
+      }
+      // The hero's torch (worn in the off hand): lit in the dark (below ground, in a cave's throat, out of doors at
+      // night), out indoors, in the water and in an animal's form. Its flame carries the lantern's light.
+      part('torch');
+      {
+        const h = player.hero, under = !!visit() || throatLamp, L = view.lantern;
+        const dark = under || (WINDOWS.glow.value > TORCH_DUSK && !rooms?.inside);
+        if (h) h.torchLit = h.holdsTorch && dark && !player.hideHero && player.walker.mode !== 'swim';
+        const at = h?.flameAt(flamePoint) ?? null;
+        // Out of doors at night the lantern is the torch's alone: a little beyond the flame, away from the body (right
+        // beside it, it burned the hero's own clothes white), in firelight's orange. Below and in a throat their own
+        // walks light it as before, head-high just ahead (about where the flame burns), as the places were tuned.
+        const night = !!at && !under;
+        if (night) {
+          const w = player.walker.pos, dx = at.x - w.x, dz = at.z - w.z, d = Math.hypot(dx, dz) || 1;
+          L.position.set(at.x + (dx / d) * TORCH_LIGHT_OUT, at.y + TORCH_LIGHT_UP, at.z + (dz / d) * TORCH_LIGHT_OUT);
+          L.intensity = TORCH_NIGHT * flameFlicker(h!.clock);
+        } else if (torchLamp && !under && !rooms?.inside) L.intensity = 0;
+        L.color.setHex(night ? TORCHLIGHT.color : LANTERN_COLOR);
+        torchLamp = night;
       }
       // Doorways at night above, torches below, a soft fill on the hero in a room.
       part('warm lights');
@@ -2498,6 +2626,7 @@ export async function start(b: Boot): Promise<void> {
       part('folk');
       // Below, only whoever of the household came down to the hero (nobody else is in the frame).
       if (owner && (owner.done || visit() !== owner.visit)) owner = null;
+      lostBelow();
       if (owner) owner.step(dt, player.walker.pos);
       const ownerAt = owner?.placed() ?? null;
       if (folk) {

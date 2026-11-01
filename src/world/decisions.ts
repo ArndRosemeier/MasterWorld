@@ -70,6 +70,47 @@ export interface DungeonDecision {
   readonly event?: string;
   /** The guild whose master asked for it, as their one deed (C14: a keeper's id); its household is the master's. */
   readonly quest?: string;
+  /** The guild whose task it is (D49: a keeper's id): the one place that does the task. */
+  readonly task?: string;
+  /** What its household asks (D62): a kind of the setting's asks and its verb; none (an older save, a guild's place): clear it. */
+  readonly ask?: PromiseAsk;
+}
+
+/**
+ * What someone wanted that a task came from (Q5): `elder`, the eldest of a household, old now, wants back what is left
+ * of the ones before them; `rival`, a trader suspects the rival of their trade (`rival`, a person id); `parent`, a grown-up with a child in
+ * the house fears for them; `pious`, a devout one wants the restless laid to rest; `peaceable`, a sociable one would rather it were talked out.
+ */
+export interface PromiseWant {
+  readonly person: number;
+  readonly kind: 'rival' | 'elder' | 'parent' | 'pious' | 'peaceable';
+  readonly rival?: number;
+}
+
+/** What a household asks about its place (D62, vgm/asks.ts): only the thing it names counts as done. */
+export interface PromiseAsk {
+  /** The setting's ask (its kind). */
+  readonly id: string;
+  readonly verb: string;
+  /** `fetch`: which of the ask's things (index). */
+  readonly thing?: number;
+  /** Which of the ask's told lines the household says (index). */
+  readonly line: number;
+  /** `lost`: who of the town is lost (a seeded pick, `vgm/asks.ts` `askedOne`), and whether they are found alive. */
+  readonly who?: number;
+  readonly alive?: boolean;
+  /** `parley`: the leader's terms, a price (copper) or a pact. */
+  readonly terms?: 'price' | 'pact';
+  readonly price?: number;
+  /** Whose want it came from (Q5): who in the household wants it, and why. */
+  readonly want?: PromiseWant;
+  /** `thief` (Q4): the earlier promise whose thief, let go, is at it again. */
+  readonly again?: string;
+  /** What turns out other than told (Q3: the setting's twist id); none: as told. */
+  readonly twist?: string;
+  /** `watch`: whether a band comes out of the dark, and who they are (the dwellers' encounter). */
+  readonly comes?: boolean;
+  readonly band?: string;
 }
 
 /**
@@ -82,6 +123,10 @@ export interface KeptDecision {
   readonly promise: string;
   /** Game hours since the world began. */
   readonly at: number;
+  /** It ended without what was asked (D62: a parley the hero broke by striking first); nobody pays for it. */
+  readonly failed?: boolean;
+  /** How it ended, where there was a choice (D62, Q4: a thief `caught` or `let-go`); what comes next may follow from it. */
+  readonly ending?: string;
   /** It ended without the hero (C11: a story event left alone ran its course; the VGM's 'fade' tool). */
   readonly faded?: true;
 }
@@ -269,6 +314,8 @@ export interface WildDecision {
   readonly at: number;
   /** A situation it is (C10: the setting's, wolves at a paddock at dusk); none: a group of the wild. */
   readonly situation?: string;
+  /** The promise whose night watch it came on (D62): beaten, the watch is done. */
+  readonly watch?: string;
 }
 
 /**
@@ -287,6 +334,18 @@ export interface JourneyDecision {
   /** By sea (S4): passage aboard a ship between harbour towns, along its way over the water (x, z, ...). */
   readonly by?: 'sea';
   readonly route?: readonly number[];
+}
+
+/**
+ * A ship held in harbour (S10): the VGM's word that the voyage `journey` waits out a storm at its harbour and
+ * sails at `until` instead (it comes in as much later). Logged as passage is bought.
+ */
+export interface DelayDecision {
+  readonly kind: 'delay';
+  readonly id: string;
+  readonly journey: string;
+  readonly until: number;
+  readonly at: number;
 }
 
 /**
@@ -384,7 +443,7 @@ export interface FestivityDecision {
   readonly for?: string;
 }
 
-export type Decision = FestivityDecision | StrayDecision | CastawayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+export type Decision = DelayDecision | FestivityDecision | StrayDecision | CastawayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

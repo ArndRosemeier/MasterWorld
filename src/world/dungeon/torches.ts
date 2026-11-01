@@ -73,6 +73,7 @@ export const caveSeed = (c: Cellar): number => deriveSeed(c.decision.seed, 'cave
  * over its middle. A cave without caverns has none (the lantern alone).
  */
 export function caveGlows(c: Cellar): { x: number; y: number; z: number }[] {
+  if (c.formed) return [...c.formed.glows];
   if (c.form.space.torches || !c.form.space.carved) return [];
   const { cell, storey } = c.layout.scale;
   const shafts = caveFeatures(c.layout, caveSeed(c)).shafts;

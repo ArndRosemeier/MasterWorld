@@ -8,6 +8,7 @@
  * north (−z) and yaw π/2 faces west (−x).
  */
 import { clamp, damp } from '@futuremagic/core';
+import { caveHolds } from '../world/rockHolds';
 
 /** What the walker needs to know of the world around it. */
 export interface WalkWorld {
@@ -52,11 +53,16 @@ export interface WalkIntent {
   up: boolean;
   /** Dive while swimming. */
   down: boolean;
+  /** Where the camera looks, up or down (rad, up positive): swimming forward, a look well down dives and well up rises. */
+  look?: number;
   /** How much of its speed the ground lets it make (0..1; a horse off the road). Default 1. */
   pace?: number;
 }
 
 /** `climb`: on a rock face; `pull`: pulling up over its top. */
+/** How far down (and up) the camera must look for a swimmer going forward to dive (rise), rad: past a third-person look down at the hero. */
+const DIVE_LOOK = 0.55, RISE_LOOK = 0.3;
+
 export type WalkMode = 'ground' | 'air' | 'swim' | 'climb' | 'pull';
 
 /** Speeds (m/s) and the body of something that walks (the hero's, a horse's in game/horse.ts). */
@@ -77,6 +83,8 @@ const PULL_RISE = 0.5;
 const OFF_FACE = 0.35;
 /** Pushing into a climbable face this long starts a climb (s): no climb by brushing past. */
 const GRIP_ON = 0.25;
+/** The highest ledge in a cave the body hops up on (m): a jump rises about a metre, and the feet go over an edge within a step of its top. */
+const HOP = 1.3;
 /**
  * How far a swimming body ducks to get under a lower roof ahead (m), at most, tried a hand apart from the least: a
  * lintel, or a drowned way's mouth under the water of a chamber with air (swum at the surface, its roof well under it).
@@ -288,7 +296,7 @@ export class Walker {
     // Pushing on into a face with holds: onto it.
     if (asked && intent.forward > 0.5 && this.stuckFor > 0 && this.spec.climb && (this.world.climbable || this.inRock())) {
       this.pushing += dt;
-      if (this.pushing >= GRIP_ON && this.gripFace(-sh, -ch)) return;
+      if (this.pushing >= GRIP_ON && (this.gripFace(-sh, -ch) || this.hopLedge(-sh, -ch))) return;
     } else this.pushing = 0;
 
     // Up and down.
@@ -319,7 +327,9 @@ export class Walker {
     } else {
       const top = level === null ? -Infinity : this.floatAt(level);
       // Up and down by choice; otherwise the body floats up to the surface.
-      const want = intent.up || this.surfacing ? 1.4 : intent.down ? -1.4 : p.y < top - 0.05 ? 0.8 : 0;
+      // (Swimming forward, the camera's look steers too: well down dives, well up rises, level holds the depth.)
+      const looked = intent.look !== undefined && intent.forward > 0 ? (intent.look < -DIVE_LOOK ? -1 : intent.look > RISE_LOOK ? 1 : 0) : null;
+      const want = intent.up || this.surfacing ? 1.4 : intent.down || looked === -1 ? -1.4 : looked === 1 ? 1.4 : p.y < top - 0.05 && looked !== 0 ? 0.8 : 0;
       v.y += (want - v.y) * damp(4, dt);
       // Under a roof (a drowned cave's): the head stops at the rock, in the air caught under it if there is any.
       // (The whole body, not only the head's top: a way narrows up to its roof, and a body floated up into that is held.)
@@ -371,12 +381,7 @@ export class Walker {
    */
   private holds(x: number, z: number, y: number): { nx: number; nz: number } | null {
     if (!this.inRock()) return this.world.climbable?.(x, z) ?? null;
-    const f = (px: number, py: number, pz: number) => this.world.rockSurface(px, py, pz) ?? -1, e = 0.15, h = y + 1;
-    if (f(x, h, z) > 0.6) return null;
-    const gx = f(x + e, h, z) - f(x - e, h, z), gy = f(x, h + e, z) - f(x, h - e, z), gz = f(x, h, z + e) - f(x, h, z - e);
-    const across = Math.hypot(gx, gz);
-    if (across < 1e-6 || across < 0.7 * Math.hypot(gx, gy, gz)) return null;
-    return { nx: -gx / across, nz: -gz / across };
+    return caveHolds((px, py, pz) => this.world.rockSurface(px, py, pz) ?? -1, x, z, y);
   }
 
   /** Onto the climbable face ahead (dx, dz: the way the body pushes), if it is one; whether it got on. */
@@ -394,6 +399,22 @@ export class Walker {
     p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.yaw = Math.atan2(-c.nx, -c.nz);
+    this.pushing = 0;
+    return true;
+  }
+
+  /**
+   * In a cave, pushing on into rock that is too high to step and too low to climb (a ledge, a rough steep ramp of the
+   * floor): the body hops up on it, seen as a jump. Whether it did.
+   */
+  private hopLedge(dx: number, dz: number): boolean {
+    if (!this.inRock() || this.mode !== 'ground') return false;
+    const p = this.pos, r = this.spec.radius + 0.25, fx = p.x + dx * r, fz = p.z + dz * r;
+    const top = this.support(fx, fz, p.y + HOP - this.spec.step);
+    if (top <= p.y + this.spec.step || top > p.y + HOP || this.bodyInRock(fx, top, fz)) return false;
+    this.mode = 'air';
+    this.vel.y = this.spec.jump;
+    this.airTop = p.y;
     this.pushing = 0;
     return true;
   }

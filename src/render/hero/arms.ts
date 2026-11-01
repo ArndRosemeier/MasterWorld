@@ -8,6 +8,7 @@ import { BuildingMat as M } from '@futuremagic/settlement';
 import type { Object3D } from 'three/webgpu';
 import { MeshKit, type Tint } from '../../world/dungeon/meshKit';
 import { buildingMeshAt } from '../materials/building';
+import { flameMesh } from '../materials/flame';
 
 const STEEL: Tint = [236, 240, 246], DARK: Tint = [90, 92, 98], OAK: Tint = [130, 96, 64], LEATHER: Tint = [88, 60, 40], BRASS: Tint = [214, 170, 90];
 
@@ -67,12 +68,31 @@ export function buildArm(defId: string): Object3D {
     case 'spear': haft(k, 1.9, 0.6); steel(k, 1.3, 0.24, 0.05, 0.012, 0.35); break;
     case 'shield.buckler': k.cylinder(0, -0.02, 0, 0.17, 0.03, 12, M.Slate, DARK); k.cylinder(0, 0.01, 0, 0.05, 0.03, 8, M.Slate, BRASS); break;
     case 'shield.round': k.cylinder(0, -0.02, 0, 0.32, 0.03, 16, M.Oak, OAK); k.cylinder(0, 0.01, 0, 0.07, 0.035, 10, M.Slate, DARK); break;
-    case 'torch': haft(k, 0.45, 0.1); k.box(0, 0.33, 0, 0.06, 0.08, 0.06, 0, M.Thatch, [90, 70, 40]); break;
+    case 'torch': haft(k, 0.38, 0.12); k.box(0, 0.24, 0, 0.06, 0.08, 0.06, 0, M.Thatch, [90, 70, 40]); break;
     default: break;
   }
   const mesh = buildingMeshAt(k.mesh(), 0, 0, 0, `arm ${defId}`);
   // Shields lie in their plate, face to −z (out of the back of the fist in a hand's grip): the cylinders above
   // stand up along +y. Turned in the geometry, as grip() sets the mesh's own turn.
   if (ARM_SHAPES[defId]?.startsWith('shield')) mesh.geometry.rotateX(-Math.PI / 2);
+  // A torch's flame over its head (the cellars' flame kind), dark until it is lit (`torchFlame`).
+  if (ARM_SHAPES[defId] === 'torch') {
+    const f = flameMesh([{ x: 0, y: TORCH_TIP, z: 0 }], 0, 0, 0);
+    f.name = 'torch flame';
+    f.visible = false;
+    // Fuller than a wall torch's (the cellars' flame), so it reads as fire and not a spike from a few metres off.
+    f.scale.set(1.6, 1.15, 1.6);
+    f.position.set(0, TORCH_TIP * (1 - 1.15), 0);
+    f.updateMatrix();
+    mesh.add(f);
+  }
   return mesh;
+}
+
+/** The flame point over a held torch's head, in grip space (its base sits on the head's top). */
+export const TORCH_TIP = 0.42;
+
+/** A held torch's flame (null: the thing is no torch). */
+export function torchFlame(arm: Object3D | null): Object3D | null {
+  return arm?.getObjectByName('torch flame') ?? null;
 }

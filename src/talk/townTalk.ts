@@ -8,14 +8,15 @@
 import { AgentCore, characterFromProfile, createSettingSession, hearResponse, type Act, type Atom, type Domain, type Fact, type Plan, type Profile, type SettingSession, type SettingSnapshot } from 'solarpolis-dialogue';
 import { createEnglishResources, englishModule, type EnglishResources } from 'solarpolis-dialogue/english';
 import { hash2f } from '@futuremagic/core';
-import type { SettingModule, TalkDef } from '../setting/contract';
+import type { AskDef, SettingModule, TalkDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import { loreOf, placeOf } from '../vgm/dungeons';
 import { cellarHint, type CellarHint } from '../vgm/hints';
 import { eventTold, fadedOf } from '../vgm/events';
 import { festivityTold } from '../vgm/festivities';
 import { dwellersOf, keptOf } from '../vgm/leads';
-import { dungeonOf, type Decision, type DecisionLog, type FestivityDecision } from '../world/decisions';
+import { askDefOf, askWords, askedOne, thingOf, twistOf } from '../vgm/asks';
+import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type FestivityDecision } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
 import { cap, fill, nameFolk, type Folk } from './folk';
@@ -24,6 +25,30 @@ import { cap, fill, nameFolk, type Folk } from './folk';
 export interface TalkCellar {
   readonly sketch: CellarSketch;
   readonly hint: CellarHint;
+  /** What the household asks (D62): its verb and words (`{family}` still to fill with their name). None: clear it, in the talk's own words. */
+  readonly ask?: TalkAsk;
+}
+
+/** A household's ask in talk (D62): the line they say, and for any verb but clear the topic, the journal's note and their thanks. */
+export interface TalkAsk {
+  readonly verb: string;
+  readonly told: string;
+  readonly topic: string;
+  readonly note: string;
+  readonly thanks: string;
+  readonly missing: string;
+  /** What someone lost says when the hero finds them alive. */
+  readonly found: string;
+  /** Who of the town is lost (a person id). */
+  readonly lost?: number;
+  /** Who of the town is the thief (a person id), and the words when they are faced. */
+  readonly thief?: number;
+  /** A thief's words when the hero faces them: the topics to pick and what they answer. */
+  readonly faced?: NonNullable<AskDef['thief']>;
+  /** A lie (Q3): the house whose the thing really is, the hero's line giving it to them, and their thanks. */
+  readonly rightful?: number;
+  readonly give?: string;
+  readonly owned?: string;
 }
 
 /**
@@ -67,6 +92,8 @@ export interface Reply {
   readonly heard: readonly string[];
   /** The promise the hero just told this household was kept (its place is safe again). */
   readonly reported?: string;
+  /** A thief just named and dealt with (D62): their promise, and how it ended. */
+  readonly named?: { readonly id: string; readonly ending: 'caught' | 'let-go' | 'given' };
   /** The conversation is over (farewell). */
   readonly done: boolean;
 }
@@ -110,6 +137,11 @@ export class TownTalk {
   private readonly quiet = new Set<string>();
   /** Promises kept: the household was told, and nobody speaks of the trouble any more. */
   private readonly settled = new Set<string>();
+  /** Does the hero hold the keepsake of promise `id` (D62: a thief's stash found; set by the game)? */
+  holding: (id: string) => boolean = () => false;
+  /** Thieves who owned up (promise ids), and how each ended (D62): caught, or let go. */
+  private readonly confessed = new Set<string>();
+  private readonly endings = new Map<string, 'caught' | 'let-go' | 'given'>();
   /** How each person's people stand with the hero (set by the game; none: as with any stranger). */
   manner: (person: Person) => Manner | null = () => null;
   /** The story events the town knows of (C11), oldest first; and those that ended while talked of. */
@@ -132,6 +164,8 @@ export class TownTalk {
       this.leads.push(...saved.leads.filter((l) => this.cellarName.has(l)));
       for (const id of saved.settled ?? []) this.settled.add(id);
       for (const id of saved.quiet ?? []) if (!this.settled.has(id)) this.quiet.add(id);
+      for (const id of saved.confessed ?? []) this.confessed.add(id);
+      for (const [id, e] of Object.entries(saved.endings ?? {})) this.endings.set(id, e);
     } else this.spread(this.cellars);
   }
 
@@ -187,14 +221,14 @@ export class TownTalk {
       names[pid(p.id)] = f.name;
       voices[pid(p.id)] = {};
       social[pid(p.id)] = {
-        identity: fill(talk.identity[`${p.role}:${p.trade}`] ?? talk.identity[p.role] ?? talk.identity.homemaker, { name: f.name, trade: p.trade, house: f.house }),
+        identity: fill((p.bySea ? talk.identity['traveller:sea'] : undefined) ?? talk.identity[`${p.role}:${p.trade}`] ?? talk.identity[p.role] ?? talk.identity.homemaker, { name: f.name, trade: p.trade, house: f.house }),
         sourceReply: 'I know it from {source}: {claim}.',
       };
       // The household's own source reads as their own house.
       return { ...characterFromProfile(profile), voice: pid(p.id), personality: { detail: 1, testimony: 'provisional' as const, affiliation: 0.9 } };
     });
     const facts: Fact[] = [];
-    for (const { sketch, hint } of cellars) {
+    for (const { sketch, hint, ask } of cellars) {
       const id = hint.cellar;
       const teller = folk.find((f) => f.person.home === hint.building);
       const house = teller?.house ?? sketch.house;
@@ -206,6 +240,8 @@ export class TownTalk {
       const knownBy = hint.knowers.map(pid);
       const fact = (n: string, atom: Fact['atom']): Fact => ({ id: `${id}/${n}`, atom, validFrom: 0, validTo: null, knownBy, sourceKey: 'source.house', origin: { kind: 'vgm', promise: id } });
       facts.push(fact('troubled', { predicate: 'troubled', args: { subject: id } }));
+      // What they ask of whoever goes (D62), in their own words: the first thing they say more of.
+      if (ask) facts.push(fact('asked', { predicate: 'noticed', args: { subject: id, sign: clause(fill(ask.told, this.namesFor(sketch.decision))) } }));
       sketch.hints.forEach((h, i) => facts.push(fact(`sign-${i}`, { predicate: 'noticed', args: { subject: id, sign: clause(h) } })));
       sketch.history.filter((h) => h.layer === 'built' || h.layer === 'older').forEach((h, i) => facts.push(fact(`story-${i}`, { predicate: 'story', args: { subject: id, line: clause(h.text) } })));
     }
@@ -253,8 +289,33 @@ export class TownTalk {
     this.session = createSettingSession({ contractVersion: 1, id: 'masterworld-town', domain, languages: { en: resources } }, { languageModule: englishModule, saved: state });
   }
 
+  /** How a thief's promise ended (D62): caught or let go; null while not faced. */
+  endingOf(id: string): 'caught' | 'let-go' | 'given' | null { return this.endings.get(id) ?? null; }
+
   /** The person's name. */
   nameOf(person: number): string { return this.byId.get(person)?.name ?? '?'; }
+
+  /** What promise `id`'s household asks (D62), named for them; null: clear it, in the talk's own words. */
+  askOf(id: string): TalkAsk | null {
+    const c = this.cellars.find((x) => x.hint.cellar === id);
+    if (!c?.ask || c.ask.verb === 'clear') return null;
+    const names = this.namesFor(c.sketch.decision), named = (t: string) => fill(t, names);
+    const f = c.ask.faced;
+    return {
+      ...c.ask, told: named(c.ask.told), topic: named(c.ask.topic), note: named(c.ask.note), thanks: named(c.ask.thanks), missing: named(c.ask.missing), found: named(c.ask.found),
+      ...(c.ask.give ? { give: named(c.ask.give), owned: named(c.ask.owned ?? '') } : {}),
+      ...(f ? { faced: { accuse: named(f.accuse), confess: named(f.confess), catch: named(f.catch), spare: named(f.spare), caught: named(f.caught), spared: named(f.spared) } } : {}),
+    };
+  }
+
+  /** The names a promise's ask fills (D62): its household's family, and who is lost (or the thief), by the name the household uses. */
+  namesFor(d: DungeonDecision): { family: string; who: string; other: string } {
+    const a = this.cellars.find((c) => c.sketch.decision.id === d.id)?.ask, who = a?.lost ?? a?.thief, f = who === undefined ? undefined : this.byId.get(who);
+    return { family: this.familyAt(d.building), who: !f ? '' : f.person.home === d.building ? f.given : f.name, other: a?.rightful === undefined ? '' : this.familyAt(a.rightful) };
+  }
+
+  /** The family a house is called after (its first named household's): who a keepsake belongs to (D62). */
+  familyAt(building: number): string { return this.folk.find((f) => f.person.home === building)?.family ?? ''; }
 
   /** Where the person lives, as people call it ("the inn of the Hollin family"). */
   homeCalled(person: number): string { return this.byId.get(person)?.house ?? '?'; }
@@ -368,7 +429,8 @@ export class TownTalk {
       if (!this.reportTo(id).includes(person)) continue;
       const h = this.cellarHouse.get(id);
       const own = h && !h.site && this.byId.get(person)?.person.home === h.building;
-      out.push({ id: `report:${id}`, label: cap(fill(this.talk.cleared.topic, { place: own ? this.talk.cleared.yours : this.cellarCalled(id) })), lead: true });
+      const asked = this.askOf(id);
+      out.push({ id: `report:${id}`, label: cap(fill(asked?.topic ?? this.talk.cleared.topic, { place: own ? this.talk.cleared.yours : this.cellarCalled(id) })), lead: true });
     }
     // A cellar moved into again: only its newest story is a topic; a quiet or kept one is none.
     this.leads.forEach((l, i) => {
@@ -377,6 +439,20 @@ export class TownTalk {
       if (this.leads.slice(i + 1).some((m) => place(m) === place(l))) return;
       out.push({ id: `lead:${l}`, label: cap(this.cellarCalled(l)), lead: true });
     });
+    // A thief (D62): faced with what they stole, they own up; then the hero turns them in or lets them go.
+    for (const c of this.cellars) {
+      const id = c.hint.cellar, a = this.askOf(id)?.faced;
+      if (c.ask?.thief !== person || !a || this.endings.has(id) || this.settled.has(id)) continue;
+      if (!this.confessed.has(id)) { if (this.holding(id)) out.push({ id: `accuse:${id}`, label: a.accuse, lead: true }); }
+      else out.push({ id: `catch:${id}`, label: a.catch, lead: true }, { id: `spare:${id}`, label: a.spare, lead: true });
+    }
+    // A lie (Q3): the thing's rightful household can be given it, by the hero who holds it.
+    const home = this.byId.get(person)?.person;
+    for (const c of this.cellars) {
+      const id = c.hint.cellar, a = this.askOf(id);
+      if (!a?.give || c.ask?.rightful !== home?.home || home?.role === 'child' || this.endings.has(id) || this.settled.has(id) || !this.holding(id)) continue;
+      out.push({ id: `give:${id}`, label: a.give, lead: true });
+    }
     // What has happened here lately (C11): the latest few story events, each a topic.
     for (const e of this.events.slice(-TownTalk.EVENT_TOPICS).reverse()) out.push({ id: `event:${e.id}`, label: cap(e.name) });
     if (this.session.core.context(pid(person)).pendingOffer) out.push({ id: 'more', label: t.more });
@@ -425,6 +501,21 @@ export class TownTalk {
     if (topic === 'bye') return { ...this.respond(person, { function: 'farewell' }), done: true };
     const service = this.services(person).find((s) => s.id === topic);
     if (service) return { text: service.line, heard: [], done: true, opens: service.id };
+    // A thief faced (D62): only the one who did it is offered these (`topics`).
+    if (topic.startsWith('give:')) {
+      const id = topic.slice(5);
+      this.endings.set(id, 'given');
+      return { text: this.askOf(id)?.owned ?? '', heard: [], done: false, named: { id, ending: 'given' } };
+    }
+    const thief = /^(accuse|catch|spare):(.+)$/.exec(topic);
+    if (thief) {
+      const [, act, id] = thief, a = this.askOf(id!)?.faced;
+      if (!a) throw new Error(`no thief for ${id}`);
+      if (act === 'accuse') { this.confessed.add(id!); return { text: a.confess, heard: [], done: false }; }
+      const ending = act === 'catch' ? 'caught' : 'let-go';
+      this.endings.set(id!, ending);
+      return { text: act === 'catch' ? a.caught : a.spared, heard: [], done: false, named: { id: id!, ending } };
+    }
     if (topic.startsWith('report:')) throw new Error(`a report is told with toldSafe(), not asked: ${topic}`);
     if (topic.startsWith('lead:')) return this.respond(person, { function: 'ask', query: { args: { subject: topic.slice(5) } } });
     if (topic.startsWith('event:')) return this.respond(person, { function: 'ask', query: { args: { subject: topic.slice(6) }, polarity: true } });
@@ -462,7 +553,7 @@ export class TownTalk {
 
   /** For the save (plan 17: the talk's evidence and the leads). */
   save(): TownTalkSave {
-    return { session: this.session.snapshot(), leads: [...this.leads], quiet: [...this.quiet], settled: [...this.settled] };
+    return { session: this.session.snapshot(), leads: [...this.leads], quiet: [...this.quiet], settled: [...this.settled], confessed: [...this.confessed], endings: Object.fromEntries(this.endings) };
   }
 }
 
@@ -473,6 +564,9 @@ export interface TownTalkSave {
   readonly quiet?: readonly string[];
   /** Promises kept and told (none in older saves: the game settles what its log has kept). */
   readonly settled?: readonly string[];
+  /** Thieves who owned up, and how each ended (D62; none in older saves). */
+  readonly confessed?: readonly string[];
+  readonly endings?: Readonly<Record<string, 'caught' | 'let-go' | 'given'>>;
 }
 
 /** The subjects a plan's answers are about. */
@@ -527,6 +621,23 @@ export function talkCellar(d: Decision, setting: SettingModule, town: Town, peop
   if (!dungeon || dungeon.town !== town.decision.id) return null;
   const house = placeOf(dungeon, [town], setting.dungeons);
   if (!house) return null;
-  const sketch = sketchCellar(dungeon, house, loreOf(setting, dungeon.template), dwellersOf(log, d));
-  return { sketch, hint: cellarHint(sketch, people, town.plan) };
+  // As the town tells it (a place changed since, Q3, is told as it was).
+  const sketch = sketchCellar(dungeon, house, loreOf(setting, dungeon.template), dwellersOf(log, d), true);
+  // The place's own promise carries its household's ask (D62); new dwellers in it are only to be cleared.
+  const words = d.kind === 'dungeon' ? askWords(setting, d.ask, { family: '{family}', who: '{who}' }) : null;
+  const one = d.kind === 'dungeon' ? askedOne(people, log, d) : null, lost = d.kind === 'dungeon' && d.ask?.verb === 'lost' ? one : null, thief = d.kind === 'dungeon' && d.ask?.verb === 'thief' ? one : null;
+  const { thief: faced, ...said } = words ?? { thief: undefined };
+  // A twist (Q3): what the household adds of it, their thanks owning to it, and whose a lied-about thing really is.
+  const twist = d.kind === 'dungeon' ? twistOf(setting, d.ask) : null;
+  const homes = [...new Set(people.map((p) => p.home))].filter((h) => h !== dungeon.building && h >= 0);
+  const rightful = twist?.kind === 'lied' && homes.length ? homes[dungeon.seed % homes.length] : undefined;
+  // A thief let go, at it again (Q4): the household has its own idea who it is.
+  const again = d.kind === 'dungeon' && d.ask?.again && faced?.again ? ` ${cap(faced.again)}` : '';
+  // What they want (Q5), in their own words.
+  const wantLine = d.kind === 'dungeon' && d.ask?.want ? askDefOf(setting, d.ask)?.words.wants?.[d.ask.want.kind] : undefined;
+  const wanted = wantLine ? ` ${cap(fill(wantLine, { thing: thingOf(setting, d.kind === 'dungeon' ? d.ask : undefined, { family: '{family}', who: '{who}' })?.name ?? '' }))}` : '';
+  const twisted = twist || again || wanted ? { told: `${words?.told ?? ''}${wanted}${twist?.words.told ? ` ${cap(twist.words.told)}` : ''}${again}`, ...(twist?.words.thanks ? { thanks: cap(twist.words.thanks) } : {}) } : {};
+  const gives = rightful !== undefined && twist?.words.give && twist.words.rightful ? { rightful, give: cap(twist.words.give), owned: cap(twist.words.rightful) } : {};
+  const ask = words && d.kind === 'dungeon' && d.ask ? { verb: d.ask.verb, ...(said as Omit<typeof words, 'thief'>), ...twisted, ...gives, ...(lost ? { lost: lost.id } : {}), ...(thief ? { thief: thief.id } : {}), ...(faced ? { faced } : {}) } : null;
+  return { sketch, hint: cellarHint(sketch, people, town.plan), ...(ask ? { ask } : {}) };
 }

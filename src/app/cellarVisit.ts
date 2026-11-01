@@ -7,7 +7,9 @@
  * and picked up, and the things worth reading speak through short notes.
  */
 import type { PointLight } from 'three/webgpu';
-import { DungeonSeen } from '../game/dungeonMap';
+import { DungeonSeen, type Seen } from '../game/dungeonMap';
+import { FormedSeen } from '../game/formedMap';
+import { FormedSpace } from '../sim/formedSpace';
 import { dungeonWorld } from '../game/dungeonWorld';
 import type { WalkWorld } from '../game/walker';
 import type { CellarView } from '../render/dungeon/CellarView';
@@ -31,7 +33,7 @@ export class CellarVisit {
   readonly space: DungeonSpace;
   readonly world: WalkWorld;
   /** What the hero has seen of it, for the minimap. */
-  readonly seen: DungeonSeen;
+  readonly seen: Seen;
   private readonly fade = new Fade();
   private cooldown = 0;
   private readonly read = new Set<number>();
@@ -59,7 +61,7 @@ export class CellarVisit {
   ) {
     this.space = space ?? new DungeonSpace(cellar.layout);
     this.world = dungeonWorld(this.space, view.origin, cellar.hatch);
-    this.seen = new DungeonSeen(this.space);
+    this.seen = this.space instanceof FormedSpace ? new FormedSeen(this.space.ground) : new DungeonSeen(this.space);
   }
 
   /** Go down (now: at once, no fade); `room` to stand in the middle of that room instead of at the ladder. */
@@ -69,9 +71,12 @@ export class CellarVisit {
       this.goIn();
       const O = this.view.origin, h = this.cellar.hatch;
       const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
+      // A formed cave has homes, not a room layout: in the middle of the entrance room is at its home.
+      const home = this.cellar.formed?.homes[room ?? this.cellar.graph.entrance];
       // Some kinds bring the hero in the middle of the entrance room (world/dungeon/kinds.ts).
       if (room === undefined && this.cellar.form.space.arriveMid) room = this.cellar.graph.entrance;
-      if (room !== undefined && this.cellar.layout.rooms[room]) {
+      if (home) this.player.teleport(O.x + home.x, O.y + home.y, O.z + home.z, h.yaw);
+      else if (room !== undefined && this.cellar.layout.rooms[room]) {
         const r = this.cellar.layout.rooms[room], { cell, storey } = this.cellar.layout.scale;
         this.player.teleport(O.x + (r.x + r.w / 2) * cell, O.y + r.level * storey, O.z + (r.z + r.d / 2) * cell, h.yaw);
       } else this.player.teleport(O.x + h.x - fx * 1.0, O.y + h.y, O.z + h.z - fz * 1.0, h.yaw);
@@ -88,6 +93,9 @@ export class CellarVisit {
   depart(): void {
     this.goOut();
   }
+
+  /** The formed cave this is a visit to (D63, K5), if it is one. */
+  get formed(): FormedSpace | null { return this.space instanceof FormedSpace ? this.space : null; }
 
   /** The ladder up to the hatch, in the world (rungs 0.32 m apart: world/dungeon/cellarMesh.ts). */
   get ladder(): Ladder {
@@ -229,6 +237,15 @@ const DAYLIGHT_BELOW: BelowLight = { color: 0xffe2c0, strength: 45, reach: 48, d
 
 /** The lantern's strength in a cave (its rock is dark, its halls wide). */
 export const CAVE_LANTERN = 13;
+
+/** The hero's torch out of doors at night: the lantern's strength there (the flame's own flicker on it). */
+export const TORCH_NIGHT = 8;
+
+/** The torch's light stands this far out beyond its flame, away from the body, and this far over it (m). */
+export const TORCH_LIGHT_OUT = 0.35, TORCH_LIGHT_UP = 0.2;
+
+/** The torch is lit once the town's windows are this far lit (0 day, 1 night: render/sky.ts WINDOWS.glow). */
+export const TORCH_DUSK = 0.5;
 
 /** How fast the lantern brightens in a throat (per second). */
 const LANTERN_UP = 1.5;

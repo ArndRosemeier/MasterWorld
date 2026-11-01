@@ -71,7 +71,7 @@ export class Portals {
       this.held.set(portal.id, { portal, meshes: was.meshes });
       return;
     }
-    const v = this.host.view, outline = openingOutline(portal.shape);
+    const v = this.host.view, outline = openingOutline(portal.shape, 40);
     const meshes = portal.rift
       ? { a: v.riftOpening(portal.shape, portal.a.frame, 0), b: v.riftOpening(portal.shape, portal.b.frame, 1) }
       : { a: v.opening(outline, portal.a.frame), b: v.opening(outline, portal.b.frame) };

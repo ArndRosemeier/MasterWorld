@@ -36,6 +36,8 @@ export interface CharacterSave {
   readonly xp?: number;
   /** The deeds and discoveries already counted for experience, by key (each once). */
   readonly earned?: readonly string[];
+  /** Ability points free (D61; absent in saves from before them: reckoned from the level, `oldPoints`). */
+  readonly points?: number;
 }
 
 export interface WeaponStats {
@@ -77,6 +79,8 @@ export class Character {
   xp = 0;
   /** Deeds and discoveries counted for experience already (each once, D58). */
   readonly earned = new Set<string>();
+  /** Ability points free (D61): one comes with every level, a potion of learning gives one; learning costs one. */
+  points = 0;
   private readonly cat: ItemCatalog;
 
   constructor(private readonly setting: SettingModule, saved?: CharacterSave) {
@@ -92,6 +96,7 @@ export class Character {
       for (const id of saved.learned ?? []) if (setting.abilities.some((a) => a.id === id && a.taught)) this.learned.add(id);
       this.xp = saved.xp ?? 0;
       for (const k of saved.earned ?? []) this.earned.add(k);
+      this.points = saved.points ?? oldPoints(setting, this.level, this.background, this.learned);
     } else this.beginAs(setting.backgrounds[0]);
     this.bar = saved ? cleanBar(saved.bar, this.known) : defaultBar(this.known);
     this.health = Math.min(saved?.health ?? Infinity, this.maxHealth);
@@ -107,6 +112,8 @@ export class Character {
     this.earned.clear();
     this.learned.clear();
     for (const id of bg.abilities) this.learned.add(id);
+    // The first level's points (D61); the background's abilities cost none.
+    this.points = this.setting.growth.points.perLevel;
     for (const k of Object.keys(this.worn) as (Slot | 'ring2')[]) delete this.worn[k];
     this.pack.length = 0;
     const p = (id: string) => plainItem(this.cat, id);
@@ -153,6 +160,7 @@ export class Character {
     const was = this.level;
     this.xp = Math.round((this.xp + xp) * 10) / 10;
     const up = this.level - was;
+    this.points += up * this.setting.growth.points.perLevel;
     // A new level comes with its health, stamina and mana, filled by what it adds.
     if (up) {
       const p = this.setting.growth.perLevel;
@@ -170,11 +178,16 @@ export class Character {
     return this.gain(this.setting.growth.deeds[source]);
   }
 
-  /** A taught ability learned (from a teacher, or the debug menu): onto the bar's first free slot. False if there is no such ability or it is known already. */
-  learn(id: string): boolean {
+  /**
+   * A taught ability learned: onto the bar's first free slot. `cost`: the ability points it takes (D61: one from
+   * a teacher or a writing, none for a deed's gift or the debug menu). False if there is no such ability, it is
+   * known already, or the points are not free.
+   */
+  learn(id: string, cost = 0): boolean {
     const a = abilityOf(this.setting, id);
-    if (this.knows(id) || !a || a.item) return false;
+    if (this.knows(id) || !a || a.item || this.points < cost) return false;
     const magic = this.hasMagic;
+    this.points -= cost;
     this.learned.add(id);
     this.earn(`learn:${id}`, 'learn');
     // The first spell wakes the hero's mana (D59), full.
@@ -279,7 +292,7 @@ export class Character {
   get power(): number {
     // The weapon's blows grow with the level as a level-1 ability's do (G2).
     const w = this.weapon, avg = (w.damage[0] + w.damage[1]) / 2 * (1 + this.setting.growth.scale.damage * (this.level - 1));
-    const knack = (this.aim + this.defence + this.armourKnack * 0.5 + (this.worn.off ? this.shieldKnack * 0.5 : 0)) / 5;
+    const knack = (this.aim + this.defence + this.armourKnack * 0.5 + (this.worn.off && defOf(this.cat, this.worn.off.def).kind === 'shield' ? this.shieldKnack * 0.5 : 0)) / 5;
     return Math.round((knack + avg * (1 + this.aim / 220) / w.time * 2.2 + this.armour * 0.9 + this.blockChance * 8 + (this.maxHealth - 55) * 0.08) * 10) / 10;
   }
 
@@ -321,13 +334,17 @@ export class Character {
     this.regrant(had);
   }
 
-  /** Drink or eat something from the pack: the health it gave (a draught's effect, if it has one, put on the hero). */
+  /**
+   * Drink or eat something from the pack: the health it gave (a draught's effect, if it has one, put on the
+   * hero; a potion of learning's points added, D61).
+   */
   consume(item: Item): number {
     const d = defOf(this.cat, item.def), effect = draughtEffect(this.setting.effects, d);
-    if (!d.heal && !effect) return 0;
+    if (!d.heal && !effect && !d.learning) return 0;
     const i = this.pack.indexOf(item);
     if (i < 0) return 0;
     this.pack.splice(i, 1);
+    this.points += d.learning ?? 0;
     if (effect && d.effect) {
       const was = this.effectsOn.find((w) => w.def === effect);
       if (was) { was.left = Math.max(was.left, d.effect.duration); was.magnitude = Math.max(was.magnitude, d.effect.magnitude); }
@@ -348,9 +365,11 @@ export class Character {
     const d = defOf(this.cat, item.def), i = this.pack.indexOf(item);
     if (!d.teaches || i < 0) return 'There is nothing in it to learn.';
     if (this.knows(d.teaches)) return 'You know what it teaches already.';
+    // It takes an ability point (D61); without one free it waits in the pack.
+    if (this.points < 1) return 'You cannot take it in yet: you have no ability point free. Keep it until you have grown.';
     this.pack.splice(i, 1);
     this.earn(`read:${d.teaches}`, 'read');
-    this.learn(d.teaches);
+    this.learn(d.teaches, 1);
     return null;
   }
 
@@ -383,8 +402,18 @@ export class Character {
   }
 
   save(): CharacterSave {
-    return { health: this.health, stamina: this.stamina, mana: this.mana, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), learned: [...this.learned], bar: [...this.bar], xp: this.xp, ...(this.earned.size ? { earned: [...this.earned] } : {}) };
+    return { health: this.health, stamina: this.stamina, mana: this.mana, worn: { ...this.worn }, pack: [...this.pack], coins: this.coins, background: this.background, ...(this.lodging ? { lodging: this.lodging } : {}), learned: [...this.learned], bar: [...this.bar], xp: this.xp, ...(this.earned.size ? { earned: [...this.earned] } : {}), points: this.points };
   }
+}
+
+/**
+ * Ability points for a save from before them (D61): one for every level reached, the first too (as a new hero
+ * has), less the abilities learned (not the background's, not a deed's gift), never fewer than none.
+ */
+export function oldPoints(setting: Pick<SettingModule, 'growth' | 'backgrounds' | 'guilds'>, level: number, background: string, learned: Iterable<string>): number {
+  const free = new Set([...(setting.backgrounds.find((b) => b.id === background)?.abilities ?? []), ...(setting.guilds ?? []).flatMap((g) => (g.quest ? [g.quest.reward] : []))]);
+  const paid = [...learned].filter((id) => !free.has(id)).length;
+  return Math.max(0, level * setting.growth.points.perLevel - paid);
 }
 
 /** Strength a climb spends (stamina per second): hanging still, and more while moving on the face. */

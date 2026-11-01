@@ -7,7 +7,7 @@
  * A new look never builds a shader on the render path: it is put on a second, hidden character, compiled
  * (each garment, hairstyle and shadow) and then swapped in, so the old look shows until the new one is ready.
  */
-import { Group, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Group, Matrix4, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed, smoothstep } from '@futuremagic/core';
 import { Character, outfitGarments, randomConfig, type CharacterCatalog, type CharacterConfig, type CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
@@ -16,7 +16,8 @@ import { nodeMaterials } from '@actors/three/webgpu';
 import { RIDE } from '@actors/human';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
-import { buildArm } from './arms';
+import { ORIGIN } from '../origin';
+import { buildArm, torchFlame, TORCH_TIP } from './arms';
 import { ACTION_CLIPS, HERO_CLIPS, PACE, SIT_DOWN, STAND_UP } from './clips';
 import { gripHeld } from './grips';
 import { FADE, castShadows, handOf, playClip, preparePeople, seatOf } from './play';
@@ -79,6 +80,21 @@ const SEAT_LIFT = 0.02;
 const smooth = (t: number) => t * t * (3 - 2 * t);
 const AT = new Vector3(), KNEE = new Vector3(), ANKLE = new Vector3(), SEAT = new Vector3();
 const TURN = new Quaternion(), BENT = new Quaternion(), UP = new Quaternion(), NONE = new Quaternion();
+/** Where a lit torch's hand is held, in the body's frame for a body 1.75 m tall (m: left, up, ahead). */
+const TORCH_HAND = [0.34, 1.12, 0.26] as const;
+/** How long raising or lowering the torch takes (s). */
+const TORCH_RAISE = 0.4;
+/** A held torch's head leans this far ahead of upright (about the body's +x). */
+const TORCH_LEAN = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), 0.25);
+const torchQ = new Quaternion(), handQ = new Quaternion(), chestAt = new Vector3(), chestQ = new Quaternion(), chestS = new Vector3(), calmInv = new Quaternion(), chestM = new Matrix4();
+/** Holding a torch up, the left arm follows its clip this slowly (s): a run's swing all but goes, a turn comes through. */
+const ARM_CALM = 0.8;
+const CALM_BONES = ['clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l'] as const;
+/** How much of the chest's bob the torch hand follows up and down (it follows the twist in full). */
+const TORCH_BOB = 0.4;
+const HELD_BONES = ['clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l'] as const;
+/** Which way the torch arm's elbow points (the rig's body frame for this side: out, up, ahead): out, down and back. */
+const TORCH_ELBOW = [0.8, -1, -0.5] as const;
 
 /** The hero's catalog: the setting's themes (filtered by Actors), its peoples, no robots or skeletons. */
 export function heroCatalog(looks: HeroLooks): (c: CharacterCatalog) => CharacterCatalog {
@@ -124,6 +140,13 @@ export class HeroView {
   private cut = false;
   private actionShown: HeroAction | null = null;
   private held: { main: Object3D | null; off: Object3D | null; drawn: boolean | null } = { main: null, off: null, drawn: null };
+  /** The off hand's torch burns (`torchLit`), and how far the arm has raised it (0 down, 1 held up and out). */
+  private readonly torch = { lit: false, up: 0 };
+  /** The left arm's bones as calmed while a torch is held up (`holdTorch`), and the chest's calmed place. */
+  private readonly armCalm = new Map<Object3D, Quaternion>();
+  /** The left arm as it held the torch last frame (upper arm, forearm, hand): where the next frame's reach starts. */
+  private readonly armHeld = new Map<Object3D, Quaternion>();
+  private chestCalm: { at: Vector3; q: Quaternion } | null = null;
   private wanted: CharacterPatch | null = null;
   private dressing: Promise<void> | null = null;
   private readonly seatAt = new Vector3();
@@ -228,7 +251,35 @@ export class HeroView {
   arm(main: string | null, off: string | null = null): void {
     for (const o of [this.held.main, this.held.off]) o?.removeFromParent();
     this.held = { main: main ? buildArm(main) : null, off: off ? buildArm(off) : null, drawn: null };
+    // A torch put back in hand burns on; anything else in the off hand puts the light out.
+    const f = torchFlame(this.held.off);
+    if (f) f.visible = this.torch.lit; else this.torch.lit = false;
     this.moveHeld();
+  }
+
+  /** Holds a torch in the off hand (lit or not). */
+  get holdsTorch(): boolean { return !!torchFlame(this.held.off); }
+
+  /**
+   * Lights the off hand's torch, or puts it out (the game says when: in the dark, not indoors or swimming). Lit,
+   * it is held up and out ahead in the left hand, upright, its flame burning; out, it goes back on the back.
+   */
+  set torchLit(lit: boolean) {
+    const f = torchFlame(this.held.off), on = lit && !!f;
+    if (on === this.torch.lit) return;
+    this.torch.lit = on;
+    if (f) f.visible = on;
+    this.moveHeld();
+  }
+  get torchLit(): boolean { return this.torch.lit; }
+
+  /** Where the torch's flame burns in the world (`out`), null when it is not lit. */
+  flameAt(out: Vector3): Vector3 | null {
+    const t = this.held.off;
+    if (!this.torch.lit || !t) return null;
+    t.updateWorldMatrix(true, false);
+    // matrixWorld is relative to the floating origin (render/origin.ts): back into the world.
+    return out.set(0, TORCH_TIP, 0).applyMatrix4(t.matrixWorld).add(ORIGIN.at);
   }
 
   /** The body's clock (actions are timed by it). */
@@ -287,6 +338,71 @@ export class HeroView {
     // A spell is cast with empty hands: the weapon goes away while it gathers and is thrown.
     const drawn = !!p.combat && !acting?.id.startsWith('spell_');
     if (this.held.drawn !== drawn) { this.held.drawn = drawn; this.moveHeld(); }
+    this.holdTorch(p, acting, dt);
+  }
+
+  /**
+   * A lit torch held up: the left hand out to the side at the chest (eased in over a moment, so the
+   * arm is seen lifting it), and the torch upright in the fist whatever the hand does, its head leaning ahead.
+   */
+  private holdTorch(p: HeroPose, acting: HeroAction | null, dt: number): void {
+    const T = this.torch, t = this.held.off;
+    const raise = T.lit && !p.puppet && p.gait !== 'dead' && p.gait !== 'swim' && acting?.id !== 'level_up';
+    T.up = Math.max(0, Math.min(1, T.up + (raise ? dt : -dt) / TORCH_RAISE));
+    const rig = T.up > 0 ? this.rigOf() : null;
+    if (!rig) { this.armCalm.clear(); this.armHeld.clear(); this.chestCalm = null; }
+    if (rig) {
+      // The clips' own swing of the left arm (a run's is wide) calmed: what they play is followed slowly, so the
+      // elbow does not flap round a torch the hand holds still.
+      const o = this.object, g = this.goals, k = this.height / 1.75, w = smooth(T.up), follow = 1 - Math.exp(-dt / ARM_CALM);
+      // The shoulder follows its clip slowly; the arm starts from where it held the torch last frame (the IK keeps
+      // the elbow near where it starts, and the clip's elbow would swing it with every stride).
+      for (const name of CALM_BONES) {
+        const b = this.front.actor.bones.find((x) => x.name === name);
+        if (!b) continue;
+        const kept = this.armHeld.get(b);
+        if (kept) { b.quaternion.slerp(kept, w); continue; }
+        let q = this.armCalm.get(b);
+        if (!q) this.armCalm.set(b, (q = b.quaternion.clone()));
+        q.slerp(b.quaternion, follow);
+        b.quaternion.slerp(q, w);
+      }
+      o.updateMatrixWorld(true);
+      // The left hand out to the side and ahead at the chest (Actors' people face +z, +x their left), so the
+      // torch stands beside the head, seen from behind as from the front. It rides the chest as the run bobs and
+      // twists it (the chest's place and turn now against their calmed ones), so the arm keeps its shape to the
+      // body: with the hand held still the twist pushed the elbow out and in with every stride.
+      g.L!.p.set(TORCH_HAND[0] * k, TORCH_HAND[1] * k, TORCH_HAND[2] * k);
+      const chest = this.front.actor.bones.find((x) => x.name === 'spine_03');
+      if (chest) {
+        chestM.copy(o.matrixWorld).invert().multiply(chest.matrixWorld).decompose(chestAt, chestQ, chestS);
+        const C = (this.chestCalm ??= { at: chestAt.clone(), q: chestQ.clone() });
+        C.at.lerp(chestAt, follow);
+        C.q.slerp(chestQ, follow);
+        const y = g.L!.p.y;
+        g.L!.p.sub(C.at).applyQuaternion(calmInv.copy(C.q).invert()).applyQuaternion(chestQ).add(chestAt);
+        // Up and down only part of the chest's bob: a steady hand evens out the stride.
+        g.L!.p.y = y + (g.L!.p.y - y) * TORCH_BOB;
+      }
+      o.localToWorld(g.L!.p);
+      g.L!.w = smooth(T.up); g.L!.pole = TORCH_ELBOW; g.L!.flat = null;
+      g.R!.w = 0; g.footL!.w = 0; g.footR!.w = 0;
+      g.curl = { L: 1.2 }; g.curlW = smooth(T.up);
+      rig.reachFor(g);
+      this.rigged = true;
+      // Held fully up, the arm's pose is kept for the next frame's start.
+      for (const name of HELD_BONES) {
+        const b = this.front.actor.bones.find((x) => x.name === name);
+        if (!b) continue;
+        if (T.up >= 1) (this.armHeld.get(b) ?? this.armHeld.set(b, new Quaternion()).get(b)!).copy(b.quaternion);
+        else this.armHeld.delete(b);
+      }
+    }
+    if (!T.lit || !t?.parent) return;
+    // Upright in the world (the body's turn, leaning ahead), whatever the fist's own turn.
+    this.object.getWorldQuaternion(torchQ).multiply(TORCH_LEAN);
+    t.quaternion.copy(t.parent.getWorldQuaternion(handQ).invert().multiply(torchQ));
+    t.updateMatrix();
   }
 
   /**
@@ -396,6 +512,6 @@ export class HeroView {
 
   /** The held things onto the hands (in a fight) or the hip and back. */
   private moveHeld(): void {
-    gripHeld(this.held.main, this.held.off, !!this.held.drawn, this.front.actor, this.object);
+    gripHeld(this.held.main, this.held.off, !!this.held.drawn, this.front.actor, this.object, !!this.held.drawn || this.torch.lit);
   }
 }

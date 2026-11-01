@@ -53,7 +53,7 @@ const FOOT: Readonly<Record<DungeonProp, readonly [number, number]>> = {
   table: [0.58, 0.45], stool: [0.26, 0.26], cot: [0.96, 0.5], straw: [0.62, 0.5], rubble: [0.75, 0.75], bones: [0.35, 0.35],
   candle: [0.12, 0.12], lantern: [0.13, 0.13], ledger: [0.27, 0.22], chest: [0.47, 0.28], web: [0.85, 0.3], nest: [0.75, 0.75],
   vat: [0.7, 0.7], bricks: [0.42, 0.32], beam: [1.25, 0.5], puddle: [0.7, 0.5], bin: [0.55, 0.35], jar: [0.2, 0.2],
-  ladder: [0.35, 0.3], door: [0.7, 0.3],
+  ladder: [0.35, 0.3], door: [0.7, 0.3], breach: [0.75, 0.3],
 };
 const LOOSE: ReadonlySet<DungeonProp> = new Set(['bones', 'straw', 'rubble', 'nest']);
 /** The floor kept clear before a doorway: half its width, and how far into the room (m). */
@@ -182,6 +182,8 @@ export interface Cellar extends CellarSketch {
   readonly hatch: Prop;
   /** For variety checks: what makes this cellar's shape. */
   readonly signature: string;
+  /** A formed cave's (D63, K5): where each room's home lies in the cave (the rooms of the layout are only a story then). */
+  readonly formed?: { readonly homes: readonly { readonly x: number; readonly y: number; readonly z: number }[]; readonly glows: readonly { readonly x: number; readonly y: number; readonly z: number }[] };
 }
 
 /**
@@ -201,9 +203,10 @@ const pickDef = <T extends HistoryDef>(rng: Rng, list: readonly T[], ok: (d: T) 
 
 /**
  * The sketch: history, hints and facts (no layout). With `moved`, the dwellers who moved in after it was
- * cleared (plan 8.1); its history and hints are theirs, its id the move-in's.
+ * cleared (plan 8.1); its history and hints are theirs, its id the move-in's. `told`: as the town tells it (a
+ * place changed since, Q3, holds other dwellers than told).
  */
-export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: CellarLore, moved?: MoveInDecision | RetakeDecision): CellarSketch {
+export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: CellarLore, moved?: MoveInDecision | RetakeDecision, told = false): CellarSketch {
   const rng = new Rng(deriveSeed(d.seed, 'cellar', 'history'));
   const piece = setPieceById(d.setPiece);
   const name = houseName(house);
@@ -218,7 +221,10 @@ export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: Cell
   const first = asked.length ? pickDef(rng, asked) : pickDef(rng, lore.dwellers, (w) => (!w.with || w.with.some((x) => ids.includes(x))) && w.danger <= (d.danger ?? Infinity));
   // Not every one is lived in (D57): an empty one is a sight, unless dwellers were asked for (its own stream: the rest stays).
   const empty = lore.empty && !asked.length && !moved && new Rng(deriveSeed(d.seed, 'cellar', 'empty')).chance(lore.empty.share) ? emptyDweller(lore.empty.def) : null;
-  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || empty || first;
+  // The place changed since it was told (Q3, a twist): others live there now than the town speaks of (`told`: as told).
+  const others = !told && !moved && !empty && d.ask?.twist === 'changed' ? lore.dwellers.filter((w) => w.id !== first.id && w.danger <= (d.danger ?? Infinity)) : [];
+  const since = others.length ? pickDef(new Rng(deriveSeed(d.seed, 'cellar', 'changed')), others) : null;
+  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || empty || since || first;
   const line = (def: HistoryDef) => def.text.replaceAll('{house}', name).replaceAll('{place}', name);
   const history: HistoryEntry[] = [];
   if (older) history.push({ layer: 'older', def: older, text: line(older) });
@@ -479,6 +485,8 @@ function furnish(sketch: CellarSketch, graph: DungeonGraph, layout: ScaledLayout
   // The way out first (the ladder up to the hatch, a tower's door), so nothing stands in front of it.
   put(graph.entrance, shape.way);
   const hatch = props[0];
+  // A seal (D62): the breach they come through, in a wall of the last room, before anything stands there.
+  if (sketch.decision.ask?.verb === 'seal') put(graph.goal, 'breach');
   // The set piece next (its clues must find a place): its own dressing and its clues.
   piece.dress({ link, graph, rooms, trouble, dweller: now, rng, put, clue: (text, room, l) => { clues.push({ text, room, ...(l !== undefined ? { link: l } : {}) }); return clues.length - 1; } });
   // Traces of history: each layer's in the rooms of its time, the dwellers' also near the entrance (foreshadowing).

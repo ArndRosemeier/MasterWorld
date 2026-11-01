@@ -5,6 +5,8 @@
  * lore picks its dwellers), a share stand empty as sights (`CellarLore.empty`). The nearest town's people know
  * of it, as of any promised place. Pure.
  */
+import type { CavesDef } from '../setting/contract';
+import { rockFor, sharesFor, sizeFor, type CaveShares } from '../world/cave/choose';
 import type { DungeonDecision } from '../world/decisions';
 import { siteInCliff } from '../world/dungeon/caveMouth';
 import type { NeedContext } from './answers';
@@ -30,4 +32,33 @@ export function caveFor(c: NeedContext): DungeonDecision | null {
   if (!d?.site || !siteInCliff((x, z) => c.terrain.height(x, z), d.site)) return null;
   if (c.towns.some((w) => farFrom(w, d.site!) < w.decision.radius + OFF_TOWN)) return null;
   return { ...d, at: c.hours };
+}
+
+/** A story of this many rooms or more wants at least the size of the same index (small, medium, big): a tale of many rooms needs the halls. */
+const ROOMS_FOR_SIZE: readonly number[] = [0, 9, 18];
+
+/** What the VGM asks of the formed cave (D63, phase K6) for a cave place: which rock, how big, which shares, how dangerous. */
+export interface CaveSpec {
+  /** The rock setting's id (`CavesDef.rocks`). */
+  readonly rock: string;
+  /** The size's id (`CavesDef.sizes`). */
+  readonly size: string;
+  /** Built, water and lava shares of the cave; they add up to 1 and a pure cave is the norm. */
+  readonly shares: CaveShares;
+  /** The most danger the place may hold (the decision's, fixed by how far it lies from the start); none: anything. */
+  readonly danger: number | undefined;
+}
+
+/**
+ * The tool that asks for a formed cave (D51, D63): the rock the country holds, a size from the seed but at least big enough for
+ * the story's rooms, and the three shares the land allows. `kind` is the land's kind of country at the mouth. Null when the
+ * country holds no solution cave (moor, badlands): the old natural cave stands there until its own former comes (lava tubes K7, mines K8).
+ */
+export function caveSpecFor(caves: CavesDef, kind: string, d: Pick<DungeonDecision, 'seed' | 'danger'>, rooms: number): CaveSpec | null {
+  const rock = rockFor(caves, kind, d.seed);
+  if (!rock) return null;
+  const seeded = Math.max(0, caves.sizes.indexOf(sizeFor(caves, d.seed)));
+  let need = 0;
+  for (let i = 0; i < caves.sizes.length; i++) if (rooms >= (ROOMS_FOR_SIZE[i] ?? Infinity)) need = i;
+  return { rock: rock.id, size: caves.sizes[Math.max(seeded, need)].id, shares: sharesFor(caves, kind, d.seed), danger: d.danger };
 }

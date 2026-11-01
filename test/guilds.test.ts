@@ -53,6 +53,12 @@ test('guilds: abilities from the task\'s level on wait for the guild\'s task: a 
   // The Lodge asks for a place out on the land: a cellar does not count.
   book.assign('lodge-master', 10);
   assert.equal(book.taskDone(lodge, log), false);
+  // The Undercroft asks for a place below a house: a cave out on the land does not count, a cellar does.
+  const under = classic.guilds!.find((g) => g.keeper === 'undercroft-keeper')!, cave: Decision = { ...place, id: 'cave-1', template: 'cave', site: { x: 0, z: 0, yaw: 0 } };
+  const book2 = new GuildBook();
+  book2.assign(under.keeper, 10);
+  assert.equal(book2.taskDone(under, [cave, { kind: 'kept', id: 'kept-3', promise: 'cave-1', at: 12 }]), false);
+  assert.equal(book2.taskDone(under, log), true);
   // Thanks for the task come once (a deed counts once, D54), and a save keeps that.
   assert.equal(book.thank(arms, log), true);
   assert.equal(book.thank(arms, log), false);

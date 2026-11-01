@@ -9,7 +9,8 @@ import './hud.css';
 
 /** How long a cry stays (s), and how far over the ground it floats (m). */
 const SHOWN = 5;
-const OVER_HEAD = 2.2;
+/** `hover` floats this far over the point it is given (the speaker's feet). */
+export const OVER_HEAD = 2.2;
 
 export class Speech {
   private readonly el = overlay('speech', 'position:fixed;left:0;top:0;pointer-events:none;display:none;z-index:6');

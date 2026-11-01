@@ -34,6 +34,20 @@ export interface OwnerHost {
 
 export type Phase = 'wait' | 'down' | 'walk' | 'up' | 'gone';
 
+/**
+ * Someone lost in the place (D62), found alive: they sit hurt by the lair's hoard at its end (`at`, the place's
+ * frame) until the hero comes up to them; then they get up, say `found()`'s words and walk out the way in, up the
+ * ladder under a house, home (the town has them back). Shown, not told (rule 11).
+ */
+export interface LostHere {
+  readonly at: P3;
+  /** The hero came up to them: what they say. */
+  cameUp(): string;
+}
+
+/** How near the hero comes to someone lost before they get up (m), and the seconds they speak before they walk out. */
+const FOUND_NEAR = 2.2, FOUND_SPEAK = 2.5;
+
 export class OwnerComes {
   /** Where they are in it: waiting up the shaft, on the ladder down, walking (to the hero and back), on it up, gone. */
   phase: Phase = 'wait';
@@ -45,9 +59,17 @@ export class OwnerComes {
   private thanking = -1;
   private body: Climber = { height: 1.75, hipHeight: 0.9 };
 
-  constructor(readonly visit: CellarVisit, readonly agent: Agent, private readonly host: OwnerHost) {
+  /** Someone lost, sitting where they were found (the place's frame): set while they wait to be found. */
+  private readonly sat: P3 | null = null;
+
+  constructor(readonly visit: CellarVisit, readonly agent: Agent, private readonly host: OwnerHost, private readonly lost?: LostHere) {
     this.ground = new DungeonGround(visit.space);
+    // A little off the heap, where the floor goes on.
+    if (lost) { const p = this.ground.slide(lost.at.x, lost.at.y, lost.at.z, 0.9, 0.5, 0.3); this.sat = p ? { ...p, y: lost.at.y } : lost.at; }
   }
+
+  /** The one lost has been found (they got up). */
+  get found(): boolean { return !!this.lost && this.phase !== 'wait'; }
 
   /** Back up and gone (the hero may climb up after them). */
   get done(): boolean { return this.phase === 'gone'; }
@@ -59,6 +81,19 @@ export class OwnerComes {
   step(dt: number, hero: P3): void {
     this.t += dt;
     const L = this.visit.ladder;
+    if (this.phase === 'wait' && this.sat) {
+      const O = this.visit.origin, at = this.sat;
+      if (!this.host.body() || Math.hypot(hero.x - O.x - at.x, hero.z - O.z - at.z) > FOUND_NEAR || Math.abs(hero.y - O.y - at.y) > 1.2) return;
+      // Found: up, a word, then out the way in (the visitor's way back leads to it).
+      const h = this.visit.cellar.hatch, f = this.out, d = this.visit.above ? 1 : IN_FROM;
+      this.walker = new Visitor(this.ground, { x: h.x - f[0] * d, y: h.y, z: h.z - f[1] * d }, Math.atan2(hero.z - O.z - at.z, hero.x - O.x - at.x));
+      Object.assign(this.walker, { x: at.x, y: at.y, z: at.z });
+      this.thanking = 0;
+      const text = this.lost!.cameUp(), v = this.walker;
+      if (text) this.host.say(text, () => (this.phase === 'walk' ? { x: v.x + O.x, y: v.y + O.y, z: v.z + O.z } : null));
+      this.phase = 'walk';
+      return;
+    }
     if (this.phase === 'wait') {
       const body = this.host.body();
       if (!body || this.t < COME_AFTER) return;
@@ -89,6 +124,9 @@ export class OwnerComes {
     if (this.phase !== 'walk' || !this.walker) return;
     const O = this.visit.origin, v = this.walker;
     if (this.thanking >= 0) this.thanking += dt;
+    // Someone found speaks a moment, facing the hero, then walks out.
+    if (this.sat && this.thanking >= 0 && this.thanking < FOUND_SPEAK) return;
+    if (this.sat) v.goBack();
     const e = v.step(dt, { x: hero.x - O.x, y: hero.y - O.y, z: hero.z - O.z });
     if (e === 'thanks') {
       this.thanking = 0;
@@ -110,6 +148,10 @@ export class OwnerComes {
   placed(): Placed | null {
     const L = this.visit.ladder, a = this.agent;
     if (this.phase === 'gone') return null;
+    if (this.phase === 'wait' && this.sat) {
+      const O = this.visit.origin, at = this.sat;
+      return { agent: a, x: O.x + at.x, y: O.y + at.y, z: O.z + at.z, dir: Math.atan2(-this.out[1], -this.out[0]), act: 'hurt' };
+    }
     if (this.phase === 'wait' && !this.visit.above) {
       // Out of sight behind the way in, being dressed.
       const O = this.visit.origin, h = this.visit.cellar.hatch, f = this.out;
@@ -121,7 +163,8 @@ export class OwnerComes {
       return { agent: a, x: p.x, y: p.y, z: p.z, dir: -Math.PI / 2 - this.climb.yaw, act: 'walk', puppet: this.climb };
     }
     const O = this.visit.origin, v = this.walker!;
-    const act = v.walking ? 'walk' : this.thanking >= 0 && this.thanking < HAND_OVER ? 'mark' : v.phase === 'thank' ? 'chat' : 'wait';
+    const speaking = this.thanking >= 0 && this.thanking < (this.sat ? FOUND_SPEAK : HAND_OVER);
+    const act = v.walking ? 'walk' : speaking ? (this.sat ? 'chat' : 'mark') : v.phase === 'thank' ? 'chat' : 'wait';
     return { agent: a, x: v.x + O.x, y: v.y + O.y, z: v.z + O.z, dir: v.dir, act };
   }
 

@@ -89,8 +89,9 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     // Out in deep water (S9): it circles at its depth and comes up at a hero who swims; it cannot follow into the shallows.
+    // Once it bites it fights to the end (a hero cannot swim after a shark that breaks off, PC round 33).
     id: 'shark', name: 'shark', plural: 'sharks', body: { kind: 'beast', species: 'shark', length: 3.2, color: '#5c6a72' },
-    health: 40, armour: 1, defence: 18, speed: 5.5, senses: { sight: 18, hearing: 30 }, temper: 'hostile', morale: 0.7, pack: false, role: 'melee', danger: 8,
+    health: 40, armour: 1, defence: 18, speed: 5.5, senses: { sight: 18, hearing: 30 }, temper: 'hostile', morale: 1, pack: false, role: 'melee', danger: 8,
     attacks: [{ name: 'bite', damage: [4, 9], kind: 'bite', reach: 1.1, time: 1.8, prowess: 28 }],
     loot: 'shark', tell: 'A fin cutting the swell farther out, and then nothing.',
   },

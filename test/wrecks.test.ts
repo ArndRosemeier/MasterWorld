@@ -1,15 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
+import { frontierLand, startWorld } from './frontierLand';
 import { sightFor, type NeedContext } from '../src/vgm/answers';
 import { offTheCoast, washedUpFor, wreckFor } from '../src/vgm/wrecks';
 import { wildFor } from '../src/vgm/wild';
 import { layOutSight } from '../src/world/sites';
 import { wreckLying } from '../src/world/fleet';
 
-const seed = parseSeed('masterworld'), { terrain, log } = openWorld(seed, classic), home = terrain.towns[0].decision;
+const { seed } = frontierLand(), { terrain, log } = startWorld(), home = terrain.towns[0].decision;
 // A swimmer off the coast, out of the harbour's way.
 const off = offTheCoast(terrain, home)!;
 const c = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: classic, hero: off, toward: null, ...over });
@@ -28,6 +27,14 @@ test('wrecks (S8): a reward by the sea is a ship gone down near the hero, on a l
   const { plan, pose } = wreckLying(d, terrain.height(d.x, d.z));
   assert.ok(pose.y > terrain.height(d.x, d.z) && pose.y < terrain.height(d.x, d.z) + plan.draft, 'in the bed to half her draft');
   assert.ok(Math.abs(pose.roll) >= 1 && Math.abs(pose.roll) <= 1.35, 'on her side, masts laid over');
+  // Nothing of her stands out of the sea, even in shallow water: her masts broke off.
+  for (const b of [-16, -9, -4]) {
+    const w = wreckLying(d, b);
+    for (const m of w.plan.masts) {
+      assert.ok(w.pose.y + m.top * Math.cos(w.pose.roll) <= -1.4 || m.top <= m.foot + 1.5, `bed ${b}: mast top ${(w.pose.y + m.top * Math.cos(w.pose.roll)).toFixed(1)}`);
+      assert.ok(m.yards.length >= 1 && m.yards.every((k) => k.y < m.top), 'a yard on each stump, under its top');
+    }
+  }
   // One near is enough; none in the harbour; a find by the way on land is never a wreck.
   assert.equal(wreckFor(c({ log: [...log, d] })), null, 'no second wreck near the first');
   assert.equal(wreckFor(c({ hero: { x: home.x, z: home.z } })), null, 'none among the moorings');

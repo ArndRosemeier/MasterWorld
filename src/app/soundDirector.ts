@@ -45,6 +45,8 @@ export interface SoundHost {
   where(): { place: Place; room: string | null };
   /** Flying the free camera: no footsteps. */
   inFlight(): boolean;
+  /** The hero stands on a ship's deck (S10). */
+  aboard(): boolean;
   /** The horses about, and the one the hero rides (null: on foot). */
   horses(): readonly Steed[];
   riding(): Steed | null;
@@ -232,6 +234,11 @@ export class SoundDirector {
     this.notes([['title/bell', 0.55, 1.6, 0], ['title/bell', 0.35, 2.4, 0.12], ['title/ward', 0.5, 1.2, 0.25]]);
   }
 
+  /** A potion of learning drunk (D61): the ward's hum as its light rises, and a soft high bell as it sinks in. */
+  learnt(): void {
+    this.notes([['title/ward', 0.45, 0.8, 0.6], ['title/bell', 0.3, 2, 2.2]]);
+  }
+
   /** Coins changed hands (a trade). */
   coins(): void { this.host.engine.play('fight/coins', { bus: 'ui', gain: 0.8 }); }
 
@@ -294,7 +301,7 @@ export class SoundDirector {
     return {
       hour: this.host.hour(), place: where.place, room: where.room, under: this.host.camera.position.y < (this.host.water(camera.position.x, camera.position.z)?.level ?? -1e9) - 0.05 && where.place === 'land',
       rain: wx.rain, snow: wx.snow, wind: wx.wind, storm: wx.storm, height: Math.max(0, ground), sea, water, river: where.place === 'land' ? river : null,
-      fall: where.place === 'land' ? fall : null, town, woods: this.c.cover, conifer: this.c.conifer,
+      fall: where.place === 'land' ? fall : null, town, woods: this.c.cover, conifer: this.c.conifer, aboard: this.host.aboard(),
     };
   }
 

@@ -1,5 +1,13 @@
 [
   {
+    "key": "same name: masterworld/app/spellFx/learningGlow.ts#lightAt + masterworld/app/spellFx/levelRing.ts#lightAt",
+    "reason": "Both override HeroFx.lightAt (spellFx/heroFx.ts, the shared seam): each draws its own look round the hero (D61 learning glow, G3 level ring)."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/learningGlow.ts#lit + masterworld/app/spellFx/levelRing.ts#lit",
+    "reason": "Both import the one colour helper lit from spellFx/particles.ts; not a copy."
+  },
+  {
     "key": "clone: core/noise.ts#cellular2 + core/noise.ts#cellular3",
     "reason": "2D and 3D variants of the same noise in one file (shared package); merging them would cost the hot path a dimension branch."
   },
@@ -16,6 +24,10 @@
     "reason": "Per-frame update methods of unrelated systems (going in and out of the cellar vs chunk selection); only the name matches."
   },
   {
+    "key": "same name: masterworld/app/journalUi.ts#closed + masterworld/app/mapUi.ts#closed",
+    "reason": "Both override KeyWindow.closed (app/window.ts): each window tidies its own state when it shuts; the name is the seam, not a copy."
+  },
+  {
     "key": "same name: masterworld/app/journalUi.ts#opened + masterworld/app/mapUi.ts#opened",
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the shared part already lives in the base class."
   },
@@ -30,10 +42,6 @@
   {
     "key": "same name: masterworld/app/loading.ts#fail + masterworld/app/title/TitleScreen.ts#fail",
     "reason": "The same seam on purpose: the title is the loading screen when it shows (set, done, fail), main.ts uses either."
-  },
-  {
-    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/items.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts",
-    "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
   },
   {
     "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/livestock.ts#step",
@@ -62,10 +70,6 @@
   {
     "key": "same name: masterworld/app/cellars.ts#shown + masterworld/app/wildLand.ts#shown",
     "reason": "Each place builds its encounter's Arena (app/encounter.ts) as an object literal: a cellar's and a band's; one interface, two arenas."
-  },
-  {
-    "key": "same name: masterworld/app/cellars.ts#step + masterworld/game/delve.ts#step",
-    "reason": "Per-frame step of unrelated things (the cellars' visits vs one fight); only the name matches."
   },
   {
     "key": "same name: masterworld/app/wildLand.ts#hudText + masterworld/render/folk/FolkView.ts#hudText",
@@ -120,10 +124,6 @@
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the card entrances are shared in KeyWindow.entrances."
   },
   {
-    "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/hydro.ts + masterworld/world/lakes.ts",
-    "reason": "The MinHeap's pop loop (@futuremagic/core) in four different searches: A* over the town's street graph, the priority flood of a tile's water, a lake's inside-out flood (W3), and A* over 1 m walk cells in the loop check. The heap is shared; the searches are not the same."
-  },
-  {
     "key": "same name: masterworld/game/evening.ts#floor + masterworld/world/dungeon/space.ts#floor",
     "reason": "WalkWorld.floor (game/walker.ts) for the loop check's land walk vs the dungeon space's own floor lookup: an interface member, only the name matches."
   },
@@ -164,10 +164,6 @@
     "reason": "Each builds an Encounter (app/encounter.ts) from its host, whose constructor takes these parts; HoldHost already extends WildHost, so only the call remains."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
-    "reason": "A point along a heading (x + cos a * d, z + sin a * d): plain trigonometry each mover does in its own terms. The hold's site search samples a ring around the town the same way."
-  },
-  {
     "key": "idiom: [.host Promise] in masterworld/app/cellars.ts + masterworld/app/holdGate.ts + masterworld/app/wildLand.ts",
     "reason": "Things built once the hero comes near keep their build's promise (built ??= build()); each builds different bodies and places."
   },
@@ -184,10 +180,6 @@
     "reason": "Both implement Arena.inside (app/encounter.ts) for their place: the interface's member, not a copy."
   },
   {
-    "key": "same name: masterworld/app/cellars.ts#solid + masterworld/app/holdGate.ts#solid",
-    "reason": "Each says whether a body stands in its own stones (a barrow's mound, a hold's gate) for the walker's wall test in main.ts; the shapes are their own (inBarrowShape, inHoldShape)."
-  },
-  {
     "key": "same name: masterworld/app/holdGate.ts#tend + masterworld/render/grass/GrassView.ts#tend",
     "reason": "Per-frame methods of unrelated systems (the hold's wardens vs grass patches); only the name matches."
   },
@@ -202,10 +194,6 @@
   {
     "key": "same name: masterworld/game/standing.ts#save + masterworld/talk/townTalk.ts#save",
     "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
-  },
-  {
-    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/creatures.ts#step",
-    "reason": "Each simulation steps its own agents (a den's creatures, a cellar's owner coming down) by dt; the finder paired them anew as files changed."
   },
   {
     "key": "idiom: [.fbm3 .sin Math] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
@@ -376,6 +364,10 @@
     "reason": "The player's frame (walk, ride, puppet) and the water's: per-frame updates of different things."
   },
   {
+    "key": "idiom: [.add .mul .sub] in masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (a wave's phase as x * k - t * s + seed): each shader builds its own waves, the flame's licks, the spell glows and the water's ripples; plain math in the node language, not a copied helper."
+  },
+  {
     "key": "idiom: [.add .mul .y] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
@@ -398,10 +390,6 @@
   {
     "key": "same name: masterworld/render/dungeon/CellarView.ts#add + masterworld/world/dungeon/rockMesh.ts#add",
     "reason": "Building a cellar's meshes into the stage (lids on pivots now) vs adding a piece to a rock mesh."
-  },
-  {
-    "key": "same name: masterworld/app/hatchClimb.ts#step + masterworld/app/searchKneel.ts#step",
-    "reason": "Per-frame steps of different things (a scene playing the hero: climbing a ladder, walking somewhere, kneeling; or the small life and townsfolk); the walking itself is shared (app/walkTo.ts walkOn)."
   },
   {
     "key": "same name: masterworld/app/hatchClimb.ts#step + masterworld/app/walkTo.ts#step",
@@ -500,18 +488,6 @@
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
   {
-    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/game/visitor.ts#step",
-    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/lab/spellLab.ts#step",
-    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/livestock.ts#step",
-    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
-  },
-  {
     "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/game/visitor.ts#step",
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
@@ -544,10 +520,6 @@
     "reason": "Each glowing kind sets additive blending on its own material (a material property, one line); nothing to share."
   },
   {
-    "key": "idiom: [.cos .sin .yaw Math] in masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/propModels.ts + masterworld/world/dungeon/site.ts",
-    "reason": "Turning a point by a yaw: a fallen block's box (caveFeatures.blockAt), a prop, a site's frame; two lines of trigonometry each, in different frames."
-  },
-  {
     "key": "idiom: [.doors .links] in masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/dungeon/torches.ts",
     "reason": "Walking a layout's doorways: a hall's doorways for its level floor (caveFeatures), the doorways near each column for the rock's bulge (caveRock), a torch beside each doorway (torches); each keeps different ones."
   },
@@ -572,15 +544,11 @@
     "reason": "WalkWorld's rockSurface as main's land and below-ground walk worlds give it (they ask the terrain's own and the open building's); the terrain's is the rock itself."
   },
   {
-    "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/building.ts + masterworld/render/materials/spellFx.ts",
-    "reason": "TSL arithmetic (.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the city's paving (P4)."
-  },
-  {
     "key": "idiom: [.mul .sub] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/smoke.ts",
     "reason": "TSL arithmetic (.add/.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the cave pool's sheen (phase P fixes)."
   },
   {
-    "key": "idiom: [.burst] in masterworld/app/spellFx/levelRing.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
+    "key": "idiom: [.burst] in masterworld/app/spellFx/learningGlow.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
     "reason": "Calls into the spells' particle bits (spellFx/particles.ts SpellBits): each effect throws its own sprites; the shared part is SpellBits itself."
   },
   {
@@ -601,10 +569,6 @@
   },
   {
     "key": "same name: masterworld/lab/spellLab.ts#step + masterworld/sim/townLife.ts#step",
-    "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
-  },
-  {
-    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/sim/townLife.ts#step",
     "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
   },
   {
@@ -734,5 +698,189 @@
   {
     "key": "same name: masterworld/sim/birdFlight.ts#steer + masterworld/sim/otterSwim.ts#steer",
     "reason": "Both are app/shapeForm.ts FormSim's steer (one interface for every animal form): a bird's flight and an otter's swimming."
+  },
+  {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/game/walker.ts#step",
+    "reason": "Each its own frame step: OwnerComes moves one of a household (or someone lost) through a place, the walker the hero; same name only."
+  },
+  {
+    "key": "same name: masterworld/app/hatchClimb.ts#step + masterworld/game/delve.ts#step",
+    "reason": "Different things that share a common name: each class steps or reports its own state (Delve.step drives its fight and a parley's peace)."
+  },
+  {
+    "key": "same name: masterworld/game/delve.ts#step + masterworld/sim/smallLife.ts#step",
+    "reason": "Different things that share a common name: each class steps or reports its own state (Delve.step drives its fight and a parley's peace)."
+  },
+  {
+    "key": "same name: masterworld/game/delve.ts#met + masterworld/vgm/director.ts#met",
+    "reason": "Delve.met is whether the household's ask is done (D62); Director.met records a need met. Same word, different things."
+  },
+  {
+    "key": "idiom: [.encounter .id] in masterworld/vgm/situations.ts + masterworld/vgm/watch.ts + masterworld/vgm/wild.ts",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "idiom: [.filter .kind .log] in masterworld/vgm/answers.ts + masterworld/vgm/leads.ts + masterworld/vgm/watch.ts",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/lab/spellLab.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/livestock.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/smallLife.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "same name: masterworld/sim/townLife.ts#step + masterworld/vgm/watch.ts#step",
+    "reason": "Shared idiom, not a copy."
+  },
+  {
+    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/items.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts + masterworld/talk/townTalk.ts",
+    "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
+  },
+  {
+    "key": "same name: masterworld/game/character.ts#save + masterworld/talk/townTalk.ts#save",
+    "reason": "Each class writes its own save (the hero, the town talk); same word, different things."
+  },
+  {
+    "key": "idiom: [.biomeAt] in masterworld/world/canopy.ts + masterworld/world/flora.ts + masterworld/world/grass.ts",
+    "reason": "Not a copied helper: a call every user of the land's or the noise's own method makes. It crossed the finder's info floor when the formed caves (phase K) added their code to the corpus, with no change in these files."
+  },
+  {
+    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/dungeon/caveThroat.ts + masterworld/world/holdRock.ts",
+    "reason": "Not a copied helper: a call every user of the land's or the noise's own method makes. It crossed the finder's info floor when the formed caves (phase K) added their code to the corpus, with no change in these files."
+  },
+  {
+    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/holdRock.ts + masterworld/world/volumes.ts",
+    "reason": "Not a copied helper: a call every user of the land's or the noise's own method makes. It crossed the finder's info floor when the formed caves (phase K) added their code to the corpus, with no change in these files."
+  },
+  {
+    "key": "idiom: [.steepness] in masterworld/vgm/answers.ts + masterworld/vgm/events.ts + masterworld/vgm/wrecks.ts",
+    "reason": "Not a copied helper: a call every user of the land's or the noise's own method makes. It crossed the finder's info floor when the formed caves (phase K) added their code to the corpus, with no change in these files."
+  },
+  {
+    "key": "clone: masterworld/world/cave/parts.ts#build + masterworld/world/dungeon/meshKit.ts#mesh",
+    "reason": "Both turn builder arrays into typed arrays, but in different formats (the cave parts carry per-vertex tint and material bytes, the building mesh its own layout); a shared helper would only hide that."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/watch.ts + masterworld/world/cave/formations.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
+    "reason": "Placing a point on a ring round (x, z): a trigonometric pair each, in different frames (a formation's saucer layers here)."
+  },
+  {
+    "key": "idiom: [.cos .sin .yaw Math] in masterworld/world/cave/carve.ts + masterworld/world/cave/dress.ts + masterworld/world/cave/loose.ts + masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/propModels.ts + masterworld/world/dungeon/site.ts",
+    "reason": "Turning a point by a yaw: a fallen block's box, a prop, a site's frame, a rock's own turn; two lines of trigonometry each, in different frames."
+  },
+  {
+    "key": "idiom: [.mul .normalNode .xyz] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/grass.ts",
+    "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
+  },
+  {
+    "key": "idiom: [.mul .normalNode] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedWater.ts",
+    "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
+  },
+  {
+    "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/building.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/formedWater.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
+  },
+  {
+    "key": "idiom: [.mul .sub] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/waterSurface.ts",
+    "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
+  },
+  {
+    "key": "idiom: [.mul .x .y] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
+  },
+  {
+    "key": "idiom: [.length .pop] in masterworld/world/cave/reader.ts + masterworld/world/cave/solution.ts + masterworld/world/hydro.ts",
+    "reason": "Stack-and-heap loops (pop until empty, size of a search frontier) written out in each search; the cave reader's Dijkstra and flood fills, not a copy."
+  },
+  {
+    "key": "idiom: [.now Date] in masterworld/world/cave/concede.ts + masterworld/world/cave/dress.ts + masterworld/world/cave/reader.ts + masterworld/world/cave/solution.ts",
+    "reason": "A start time taken for the stage's millisecond count (`Date.now` as the default clock), as the other cave stages do."
+  },
+  {
+    "key": "idiom: [.pop .size] in masterworld/game/evening.ts + masterworld/sim/nav.ts + masterworld/world/cave/reader.ts + masterworld/world/hydro.ts + masterworld/world/lakes.ts",
+    "reason": "Stack-and-heap loops (pop until empty, size of a search frontier) written out in each search; the cave reader's Dijkstra and flood fills, not a copy."
+  },
+  {
+    "key": "clone: masterworld/sim/formedGround.ts#slide + masterworld/sim/wild.ts#slide",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/app/spellFx/particles.ts#spot + masterworld/sim/formedGround.ts#spot",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#clearance + masterworld/sim/formedGround.ts#clearance",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#slide + masterworld/sim/formedGround.ts#slide",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#spot + masterworld/sim/formedGround.ts#spot",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#way + masterworld/sim/formedGround.ts#way",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#clearance + masterworld/sim/wild.ts#clearance",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#floorAt + masterworld/world/dungeon/space.ts#floorAt",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#hop + masterworld/sim/wild.ts#hop",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#sees + masterworld/sim/wild.ts#sees",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#slide + masterworld/sim/wild.ts#slide",
+    "reason": "FormedGround implements the DenGround interface (sim/dungeonNav.ts) beside DungeonGround and OpenGround: the method names are the interface's, the bodies differ (the cave's field, not rooms or open land)."
+  },
+  {
+    "key": "clone: masterworld/render/cave/formedMeshes.ts#waterGeometry + masterworld/render/rocks/RockView.ts#geometryOf",
+    "reason": "Both turn typed arrays into a BufferGeometry, but with different attribute sets (water: uv + flow in tint; rock: colour) and RockView's is private to the rocks."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#floorAt + masterworld/sim/formedSpace.ts#floorAt",
+    "reason": "Both implement the DungeonSpace seam (game/dungeonWorld.ts reads a built dungeon or a formed cave through it); each reads its own ground."
+  },
+  {
+    "key": "same name: masterworld/sim/formedSpace.ts#sdf + masterworld/world/dungeon/caveRock.ts#sdf",
+    "reason": "Both implement the rock-distance seam of DungeonSpace; the formed cave reads its carved brick field, the old cave its noise."
+  },
+  {
+    "key": "same name: masterworld/sim/formedSpace.ts#sdf + masterworld/world/dungeon/space.ts#sdf",
+    "reason": "Both implement the rock-distance seam of DungeonSpace; the formed cave reads its carved brick field, the built dungeon its walls."
+  },
+  {
+    "key": "same name: masterworld/sim/formedGround.ts#spot + masterworld/sim/wild.ts#spot",
+    "reason": "FormedGround.spot implements the DenGround seam (sim/dungeonNav.ts) as the wild ground's does; each picks a spot on its own ground."
   }
 ]

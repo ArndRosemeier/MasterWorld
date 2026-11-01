@@ -128,6 +128,8 @@ export const params = {
   cellarRoom: q.get('cellar') ? Number(q.get('cellar')) : undefined,
   /** Slow motion for watching a blow land (tools/shot/hits.mjs): `slow=8` runs everything eight times slower. */
   slow: Math.max(1, Number(q.get('slow') ?? 1) || 1),
+  /** What every first place's household asks (D62, for looking at it): one of the setting's asks, `ask=breach`. */
+  ask: q.get('ask'),
   /** Who lives in the town's cellar (for looking at them): a cellar dweller's id, `dweller=goblins`. */
   dweller: q.get('dweller'),
   /** The first cellar was cleared long ago and others have moved in (`moved`, with `cellar` to look at them). */

@@ -11,6 +11,8 @@ import type { Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace } from '../world/dungeon/space';
 import { Character } from './character';
 import { Delve, type DelveSave } from './delve';
+import type { Item } from './items';
+import type { PromiseAsk } from '../world/decisions';
 import type { Fight, HeroPose } from './fight';
 import { aimsAtFoe } from './recipe';
 import type { Creature } from '../sim/creatures';
@@ -41,6 +43,9 @@ export interface BotOptions {
   readonly spots?: readonly BotSpot[];
   /** Fights on without resting, potions or second wind (the loop check's reckless hero). */
   readonly rash?: boolean;
+  /** What the household asks (D62), and the keepsake to find in the lair's hoard (a fetch, a lost one dead). */
+  readonly ask?: PromiseAsk | null;
+  readonly keepsake?: Item | null;
 }
 
 /** A whole visit: the fight's result, what was searched, and whether the hero got back to the ladder. */
@@ -83,6 +88,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   // The way down took longer than any cooldown: the hero comes in fresh.
   hero.cooldowns.clear();
   const delve = new Delve(cellar, space, setting, hero, seed, opts.saved);
+  delve.ask = opts.ask ?? null;
+  delve.keepsake = opts.keepsake ?? null;
   const { den, fight } = delve;
   const h = cellar.hatch;
   const ladder = { x: h.x - Math.sin(h.yaw), y: h.y, z: h.z - Math.cos(h.yaw) };
@@ -96,6 +103,8 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   /** The foe being walked to (kept until it falls or a fight starts). */
   let chase: Creature | null = null;
   const spells: string[] = [];
+  /** Short of a parley's price: it comes to blows. */
+  let short = false;
   const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z }, spells });
   /** Nothing in the way of walking straight to `to` (no wall's corner between, which sliding would never get round). */
   const clear = (to: { x: number; z: number }): boolean => {
@@ -139,22 +148,45 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   const standsBy = (p: { x: number; y: number; z: number }, r: number) => Math.hypot(p.x - x, p.z - z) < r && Math.abs(p.y - y) < 1.5;
   for (let t = 0; t < limit; t += dt) {
     const pose: HeroPose = { x, y, z, yaw, speed };
-    for (const e of fight.advance(dt, pose)) {
+    for (const e of delve.step(dt, pose)) {
       if (e.kind === 'killed') kills++;
       if (e.kind === 'spared') spared++;
       if (e.kind === 'fallen') return run(false, t);
       if (e.kind === 'recipe' && e.event.kind === 'went' && e.event.ability.cost?.mana) spells.push(e.event.ability.id);
     }
+    // A parley (D62): up to the leader, hear their terms and agree (short of their price, it comes to blows).
+    if (delve.talking && !short) {
+      const l = delve.within(pose);
+      if (l?.kind === 'chief') { short = delve.speak()?.kind === 'short'; continue; }
+      const k = delve.chief!;
+      towards(k, k);
+      continue;
+    }
+    // Terms struck: nothing more to do down here but walk out (their goods are theirs).
+    if (delve.parley === 'struck') {
+      if (!opts.loot) return run(true, t);
+      if (standsBy(ladder, NEAR)) return run(true, t, true);
+      towards(ladder, ladder);
+      continue;
+    }
     if (den.beaten) {
       if (!opts.loot) return run(true, t);
       // Search whatever is in reach; then walk to the nearest thing left to search, a spot, or the ladder.
       const l = delve.within(pose);
-      if (l) { if (delve.plunder(l)) looted++; continue; }
+      if (l) {
+        // A seal's breach (D62): walled up.
+        if (l.kind === 'breach') { delve.seal(); continue; }
+        if (delve.plunder(l)) looted++;
+        // Someone lost alive sits by the lair's hoard (D62): the hero has come up to them.
+        if (l.kind === 'hoard' && !l.hoard.prop && delve.ask?.alive) delve.found = true;
+        continue;
+      }
       const spot = [...spots].find((s) => standsBy(s, NEAR));
       if (spot) { spots.delete(spot); spot.reached(); continue; }
       const left = [
         ...den.dead.map((id) => den.creatures[id]).filter((c) => fight.bodies.has(c.id)),
         ...delve.hoards.filter((hd) => !delve.hasOpened(hd)),
+        ...(delve.ask?.verb === 'seal' && !delve.sealed && delve.breach ? [delve.breach] : []),
         ...spots,
       ].sort((a, b) => Math.hypot(a.x - x, a.z - z, a.y - y) - Math.hypot(b.x - x, b.z - z, b.y - y));
       // Keep to the thing chosen until it is searched (two about as near, one up a stair, would make it dither).
@@ -188,9 +220,10 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
     }
     // A mage stands still while a spell gathers, and casts what fits before closing in.
     if (fight.recipes.casting || castNow(hero, setting, fight)) { speed = 0; continue; }
-    // Close enough that the blade lands (else step in: a foe can stand just outside it and still strike).
+    // Close enough that the blade lands (else step in: a foe can stand just outside it and still strike), and
+    // not with a wall between (a rat just behind a wall's corner is near, yet out of every blow).
     const d = Math.hypot(foe.x - x, foe.z - z);
-    if (d < Math.min(1.6, fight.reach(foe) - 0.05) && Math.abs(foe.y - y) < 1.2) {
+    if (d < Math.min(1.6, fight.reach(foe) - 0.05) && Math.abs(foe.y - y) < 1.2 && den.ground.sees(x, y, z, foe.x, foe.y, foe.z, 0.9)) {
       speed = 0;
       yaw = Math.atan2(-(foe.x - x), -(foe.z - z));
       if (!fight.attacking) fight.use('strike');

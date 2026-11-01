@@ -58,3 +58,16 @@ test('coast: a beach, a sea cliff and the bed off the beach near the start, each
   assert.ok(under.y <= -5 && t.waterDepth(under.x, under.z) >= 5);
   assert.ok(Math.hypot(under.x - beach.x, under.z - beach.z) < 600);
 });
+
+/** Arnd 2026-10-31 (seed y29auv by 13454, 12637): crates on the quay were drawn and stood at the land's height under its paving, unseen yet in the way. */
+test('harbour town: its cargo and crane stand on the quay, and block feet there, not under it', () => {
+  const town = terrain.town(home.id)!, height = terrain.height.bind(terrain);
+  const onQuay = town.plan.fixtures.filter((f) => (f.kind === 'cargo' || f.kind === 'crane') && town.harbourFloor(f.x, f.z) !== null);
+  assert.ok(onQuay.length >= 1, 'cargo or a crane on the quay');
+  for (const f of onQuay) {
+    const g = town.fixtureGround(f.x, f.z, height);
+    assert.equal(g, town.harbourFloor(f.x, f.z), 'stands on the quay floor');
+    assert.ok(town.fixtureAt(f.x, f.z, 0.4, g, height), 'in the way of one on the quay');
+    assert.ok(!town.fixtureAt(f.x, f.z, 0.4, g + 3, height), 'not of one above it');
+  }
+});

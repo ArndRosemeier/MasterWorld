@@ -26,6 +26,8 @@ export interface Person {
   dress?: 'fighter' | 'traveller';
   /** A traveller who comes and goes by sea (a harbour town's): the end of each visit is spent aboard, waiting to sail. */
   bySea?: boolean;
+  /** Such a traveller sailing now with their town's ship (set by its crew, game/shipCrews.ts): out of town till she comes in. */
+  sailing?: boolean;
   /** 0..1 each. */
   social: number;
   diligent: number;
@@ -134,7 +136,7 @@ const SEA_TRAVELLERS = 3, ABOARD = 4;
 export function away(p: Person, hours: number): boolean {
   if (p.role !== 'traveller') return false;
   const { t, from, to } = visitOf(p, hours);
-  return t < from || t >= to || aboardAt(p, hours);
+  return t < from || t >= to || aboardAt(p, hours) || !!p.sailing;
 }
 
 /** Whether a traveller by sea is aboard their ship at `hours`: the last ABOARD hours of each visit (S3). */
@@ -142,6 +144,16 @@ export function aboardAt(p: Person, hours: number): boolean {
   if (!p.bySea) return false;
   const { t, from, to } = visitOf(p, hours);
   return t >= Math.max(from, to - ABOARD) && t < to;
+}
+
+/**
+ * Whether a traveller by sea goes with their town's ship casting off at `hours` (S3, S4): they are in town or aboard,
+ * their visit not over. (They sail with her, the hero's passage or not; aboard till she comes in.)
+ */
+export function sailsAt(p: Person, hours: number): boolean {
+  if (!p.bySea) return false;
+  const { t, from, to } = visitOf(p, hours);
+  return t >= from && t < to;
 }
 
 /** Where `hours` falls in a traveller's round of visits: hours into it, and the visit's start and end then. */

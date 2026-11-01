@@ -355,6 +355,7 @@ export function nearMatch(aName, bName) {
 export function levenshtein(a, b, max = Infinity) {
   if (a === b) return 0;
   if (Math.abs(a.length - b.length) > max) return max + 1;
+  if (max <= 16) return bandedLevenshtein(a, b, max);
   let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i += 1) {
     const cur = [i];
@@ -370,6 +371,35 @@ export function levenshtein(a, b, max = Infinity) {
   }
   return prev[b.length];
 }
+
+/**
+ * The same bounded distance, only the band of cells within `max` of the diagonal worked out (anything further off is over
+ * the bound anyway): O(length * max) with no allocation per row. The hot path of the near-name tier.
+ */
+function bandedLevenshtein(a, b, max) {
+  const n = a.length, m = b.length, over = max + 1;
+  if (BAND.length < m + 2) { BAND = new Int32Array(m + 2); BAND2 = new Int32Array(m + 2); }
+  let prev = BAND, cur = BAND2;
+  for (let j = 0; j <= m; j += 1) prev[j] = j <= max ? j : over;
+  for (let i = 1; i <= n; i += 1) {
+    const lo = Math.max(1, i - max), hi = Math.min(m, i + max), ca = a.charCodeAt(i - 1);
+    cur[lo - 1] = lo === 1 ? (i <= max ? i : over) : over;
+    let rowMin = lo === 1 ? cur[0] : over;
+    for (let j = lo; j <= hi; j += 1) {
+      const left = cur[j - 1] + 1, up = (j <= i - 1 + max ? prev[j] : over) + 1, diag = prev[j - 1] + (ca === b.charCodeAt(j - 1) ? 0 : 1);
+      let val = left < up ? left : up;
+      if (diag < val) val = diag;
+      if (val > over) val = over;
+      cur[j] = val;
+      if (val < rowMin) rowMin = val;
+    }
+    if (rowMin > max) return over;
+    if (hi < m) cur[hi + 1] = over;
+    const t = prev; prev = cur; cur = t;
+  }
+  return prev[m] > max ? over : prev[m];
+}
+let BAND = new Int32Array(64), BAND2 = new Int32Array(64);
 
 /** Token sequence with every identifier replaced by `ID` and numbers by `NUM`. */
 export function shape(tokens) {
@@ -1263,10 +1293,11 @@ export function groupCandidates(functions, opts = {}) {
     });
   }
   const nearPairs = [];
+  const preps = names.map((name) => prep.get(name));
   for (let i = 0; i < names.length; i += 1) {
-    const pa = prep.get(names[i]);
+    const pa = preps[i];
     for (let j = i + 1; j < names.length; j += 1) {
-      const pb = prep.get(names[j]);
+      const pb = preps[j];
       let match = pa.setKey === pb.setKey;
       if (!match && Math.abs(pa.joined.length - pb.joined.length) <= 2) {
         match = levenshtein(pa.joined, pb.joined, 2) <= 2;

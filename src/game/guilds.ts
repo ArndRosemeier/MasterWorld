@@ -9,7 +9,8 @@ import { hexToRgb } from '@futuremagic/core';
 import { fill } from '../talk/folk';
 import { cap } from '../talk/townTalk';
 import { compass } from '../vgm/dungeons';
-import { questOf, questReward } from '../vgm/quests';
+import { questOf, questReward, taskOf } from '../vgm/quests';
+import { keptOf } from '../vgm/leads';
 import { houseShape, polyCentroid, signPlace, type TownBuilding, type TownPlan } from '@futuremagic/settlement';
 import { abilityOf, guildOf, type AbilityDef, type GuildDef, type SettingModule } from '../setting/contract';
 import { buildingOf, type Person } from '../sim/people';
@@ -71,11 +72,18 @@ function anchorOf(plan: TownPlan, near: GuildDef['near']): { x: number; z: numbe
 }
 
 /** The shields over the guild houses' doors, by building id (colour 0..255; a hidden house has none). */
-export function guildSigns(houses: readonly GuildHouse[]): Map<number, [number, number, number]> {
+export function guildSigns(houses: readonly GuildHouse[], plan?: TownPlan, setting?: Pick<SettingModule, 'voyage'>): Map<number, [number, number, number]> {
   const out = new Map<number, [number, number, number]>();
-  for (const { guild, b, out: away } of houses) if (guild.sign && !guild.hidden && !away) out.set(b.id, hexToRgb(parseInt(guild.sign.slice(1), 16)).map((c) => Math.round(c * 255)) as [number, number, number]);
+  const rgb = (hex: string) => hexToRgb(parseInt(hex.slice(1), 16)).map((c) => Math.round(c * 255)) as [number, number, number];
+  for (const { guild, b, out: away } of houses) if (guild.sign && !guild.hidden && !away) out.set(b.id, rgb(guild.sign));
+  // The harbour master's hall on the quay has its shield too: where passage by ship is bought (S4).
+  const hall = plan && harbourHall(plan), sign = setting?.voyage?.sign;
+  if (hall && sign) out.set(hall.id, rgb(sign));
   return out;
 }
+
+/** A harbour town's harbour master's hall on the quay, if it has one. */
+export const harbourHall = (plan: TownPlan): TownBuilding | undefined => plan.harbour ? plan.buildings.find((b) => b.trade === 'harbourmaster') : undefined;
 
 /** Each house's first grown-up teaches there (not the temple's keeper; a market trader only if nobody else). */
 export function staffGuilds(people: readonly Person[], houses: readonly GuildHouse[]): void {
@@ -141,15 +149,19 @@ export class GuildBook {
   /** Whether the task was given. */
   asked(guild: string): boolean { return this.given.has(guild); }
 
-  /** Whether the guild's task is done: a promise kept since it was given (out on the land, if it asks so). */
+  /** Whether the guild's task is done: the place the trainer named is kept (an older task: any place of its kind kept since it was given). */
   taskDone(g: GuildDef, log: DecisionLog): boolean {
     const from = this.given.get(g.keeper);
     if (from === undefined) return false;
+    // The place the trainer named: only that one does it.
+    const named = taskOf(log, g.keeper);
+    if (named) return keptOf(log).has(named.id);
+    // A task from before tasks named a place (or none fitted): any place of its kind kept since.
     for (const d of log) {
       if (d.kind !== 'kept' || d.at < from) continue;
       const p = log.find((x) => x.id === d.promise);
       const dungeon = p && (p.kind === 'dungeon' || p.kind === 'move-in') ? dungeonOf(log, p) : null;
-      if (dungeon && (!g.task.out || dungeon.site)) return true;
+      if (dungeon && (!g.task.out || dungeon.site) && (!g.task.house || !dungeon.site)) return true;
     }
     return false;
   }
@@ -180,24 +192,25 @@ export function abilityPrice(g: GuildDef, a: AbilityDef): number {
   return level <= 1 && g.first !== undefined ? g.first : Math.round(g.price * level ** 1.5);
 }
 
-/** Why an ability was not taught (null: it was): not taught here, known already, not of its level yet, the guild's task first, the purse. */
-export type TeachRefusal = 'not-taught' | 'known' | 'level' | 'task' | 'coin' | null;
+/** Why an ability was not taught (null: it was): not taught here, known already, not of its level yet, the guild's task first, no ability point free (D61), the purse. */
+export type TeachRefusal = 'not-taught' | 'known' | 'level' | 'task' | 'point' | 'coin' | null;
 
 export function teachRefusal(g: GuildDef, hero: Character, a: AbilityDef, book: GuildBook, log: DecisionLog): TeachRefusal {
   if (!g.teaches.includes(a.id)) return 'not-taught';
   if (hero.knows(a.id)) return 'known';
   if (hero.level < (a.level ?? 1)) return 'level';
   if ((a.level ?? 1) >= g.task.from && !book.taskDone(g, log)) return 'task';
+  if (hero.points < 1) return 'point';
   if (hero.coins < abilityPrice(g, a)) return 'coin';
   return null;
 }
 
-/** Learn an ability from this guild: the coin goes, the ability goes onto the action bar. */
+/** Learn an ability from this guild: the coin and an ability point go (D61), the ability goes onto the action bar. */
 export function teach(g: GuildDef, hero: Character, a: AbilityDef, book: GuildBook, log: DecisionLog): TeachRefusal {
   const no = teachRefusal(g, hero, a, book, log);
   if (no) return no;
   hero.coins -= abilityPrice(g, a);
-  hero.learn(a.id);
+  hero.learn(a.id, 1);
   return null;
 }
 

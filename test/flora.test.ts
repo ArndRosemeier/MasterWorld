@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { Terrain } from '../src/world/terrain';
+import { drawnOf } from '../src/world/drawnGround';
 import { classic } from '../src/setting/classic/index';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
 import type { Decision } from '../src/world/decisions';
@@ -18,7 +19,7 @@ test('flora: plants stand on dry, gentle land, with known kinds, deterministical
     const [x, y, z, scale, , kind] = d.subarray(r, r + FLORA_STRIDE);
     assert.ok(Number.isInteger(kind) && kind >= 0 && kind < FLORA_KINDS.length);
     assert.ok(scale > 0.5 && scale < 2);
-    assert.ok(Math.abs(y + 0.15 * scale - terrain.height(x, z)) < 1e-3, 'on the ground');
+    assert.ok(Math.abs(y + 0.15 * scale - drawnOf(terrain).footing(x, z)) < 1e-3, 'on the ground as drawn');
     assert.ok(y > 1, 'not on the beach');
   }
   assert.deepEqual(floraPlacement(terrain, job(-32080, 34720, 128)), d);

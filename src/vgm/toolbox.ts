@@ -14,6 +14,7 @@ import { washedUpFor, wreckFor } from './wrecks';
 import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { festivityFor } from './festivities';
 import { castawayFor, hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
+import { nightWatchFor } from './watch';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
 import { islandPlace } from './islands';
 
@@ -22,7 +23,7 @@ export type Asked = 'start' | 'walk' | 'turn' | 'need' | 'call';
 
 /** What the Builder's turn knows: the log, the land and towns, the hours, the hero and the setting. */
 export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & Omit<EventsContext, 'setting'> & {
-  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world'>;
+  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world' | 'asks' | 'twists'>;
   /** Ask only these turn tools (by id); none: all of them. */
   readonly tools?: readonly string[];
   /** How much this player enjoys a need (C12: the player model); none: no lean. */
@@ -66,7 +67,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'wild', name: 'Place the wild', writes: ['wild'], need: 'challenge', asked: 'call' },
   { id: 'island-place', name: 'A place on an island', writes: ['dungeon'], need: 'discovery', asked: 'turn', next: (c) => islandPlace({ ...c, dungeons: c.setting.dungeons }),
     why: (d) => (d.kind === 'dungeon' ? `a ${d.template} out on the island of ${d.town}, for its people to know of` : d.kind) },
-  { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons }),
+  { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons, asks: c.setting.asks, twists: c.setting.twists }),
     why: (d, c) => {
       const open = openPromises(c.log).length;
       const what = d.kind === 'move-in' ? `new dwellers into ${d.dungeon}` : d.kind === 'dungeon' ? `a ${d.template} for ${d.town}` : d.kind;
@@ -91,6 +92,8 @@ export const TOOLS: readonly Tool[] = [
   { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },
   { id: 'paddock-wolves', name: 'Wolves at the paddock', writes: ['wild'], need: 'challenge', asked: 'turn', next: paddockWolvesFor,
     why: (d) => (d.kind === 'wild' ? `dusk in ${d.town}: ${d.encounter} (${d.members.length}) at a paddock` : d.kind) },
+  { id: 'night-watch', name: 'The threat comes in the night', writes: ['wild'], need: 'challenge', asked: 'turn', next: nightWatchFor,
+    why: (d) => (d.kind === 'wild' ? `the hero keeps watch for ${d.watch}: ${d.encounter} (${d.members.length}) come out of the dark` : d.kind) },
   { id: 'stray-beast', name: 'A beast got out', writes: ['stray'], need: 'people', asked: 'turn', next: strayBeastFor,
     why: (d) => (d.kind === 'stray' ? `a day in ${d.town}: a beast out of its paddock, its farm after it` : d.kind) },
   { id: 'castaway', name: 'A cry from the water', writes: ['castaway'], need: 'people', asked: 'need', answer: castawayFor },
@@ -98,9 +101,11 @@ export const TOOLS: readonly Tool[] = [
   { id: 'traveller', name: 'A traveller by the way', writes: ['traveller'], need: 'people', asked: 'need', answer: travellerFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
   { id: 'voyage', name: 'A voyage', writes: ['journey'], need: null, asked: 'call' },
+  { id: 'hold-ship', name: 'Hold a ship in harbour', writes: ['delay'], need: null, asked: 'call' },
   { id: 'far-harbour', name: 'A harbour across the water', writes: ['region'], need: null, asked: 'call' },
   { id: 'island', name: 'An island out at sea', writes: ['region'], need: 'discovery', asked: 'call' },
   { id: 'quest', name: "A master's deed", writes: ['dungeon'], need: 'purpose', asked: 'call' },
+  { id: 'task', name: "A guild's task", writes: ['dungeon'], need: 'purpose', asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },
 ];
