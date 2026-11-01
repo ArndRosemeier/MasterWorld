@@ -87,9 +87,10 @@ async function parley() {
       .find((c) => f.delve.den.nav.free(c.x, k.y, c.z, 0.35)) ?? { x: k.x + 1.6, z: k.z };
     const yaw = Math.atan2(k.x - at.x, k.z - at.z) + Math.PI;
     p.teleport(O.x + at.x, O.y + k.y, O.z + at.z, yaw);
-    p.heroCam.yaw = yaw + 0.5;
-    p.heroCam.pitch = -0.1;
-    p.heroCam.zoom = 3.5;
+    // From the side, so the hero and the leader (and the bubble over them) are both in the picture.
+    p.heroCam.yaw = yaw - Math.PI / 2;
+    p.heroCam.pitch = -0.25;
+    p.heroCam.zoom = 6;
     return { ask: 'parley', who: k.def.name };
   })()`);
   if (at.ask !== 'parley') return fail(`parley: the place asks ${at.ask} (its dwellers cannot be talked with?)`);

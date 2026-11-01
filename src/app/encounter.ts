@@ -27,6 +27,7 @@ import { warning, type Director } from '../vgm/director';
 import { cap } from '../talk/townTalk';
 import { fill } from '../talk/folk';
 import type { FightHud } from './fightHud';
+import { OVER_HEAD } from './speech';
 import type { Notes } from './notes';
 import type { Player } from './player';
 import { SearchKneel } from './searchKneel';
@@ -218,7 +219,8 @@ export class Encounter {
     if (l.kind === 'chief') {
       const said = this.delve.speak();
       if (said) {
-        const who = l.who, head = who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1;
+        // The bubble floats OVER_HEAD over the point it is given (their feet), so give the feet less that much below the head.
+        const who = l.who, head = (who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1) - OVER_HEAD;
         this.host.say(said.text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
       }
       return null;
