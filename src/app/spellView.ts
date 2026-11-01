@@ -19,7 +19,7 @@ import { SpellBits, type Vec3 } from './spellFx/particles';
 import { lookOf, type Caster, type FxLook } from './spellFx/looks';
 import { FxView } from './spellFx/fxView';
 import { LevelRing } from './spellFx/levelRing';
-import { LearningGlow } from './spellFx/learningGlow';
+import { LearningGlow, PERSON } from './spellFx/learningGlow';
 
 /** Where the hand holds a spell when the body's hand is not known: in front of the caster (m) and over the feet (m). */
 const HANDS_AHEAD = 0.45, HANDS_UP = 1.35;
@@ -84,6 +84,8 @@ export class SpellView {
   /** A potion of learning drunk (D61): its light, and how long until it wells up (the bottle tipped first). */
   private readonly glow = new LearningGlow();
   private glowIn = -1;
+  /** How tall the hero is (m; main.ts: the walker's height): the learning light is made for a person of 1.7 m. */
+  bodyHeight = 1.7;
   /** Where the hero's hand is in the world (main.ts: the body's bone), null while not known. */
   handOf: ((out: Vector3) => Vector3 | null) | null = null;
   /** More drawn with the same bits every frame, spell or none (the portal stone's light: app/portalStoneUse.ts). */
@@ -176,8 +178,9 @@ export class SpellView {
     }
     if (f && (this.glowIn >= 0 || this.glow.on)) {
       const feet: Vec3 = [f.offset.x + f.me.x, f.offset.y + f.me.y, f.offset.z + f.me.z];
-      if (this.glowIn >= 0 && (this.glowIn -= dt) < 0) this.glow.kindle(b, feet);
-      this.glow.rise(b, feet, dt);
+      const size = this.bodyHeight / PERSON;
+      if (this.glowIn >= 0 && (this.glowIn -= dt) < 0) this.glow.kindle(b, feet, size);
+      this.glow.rise(b, feet, dt, size);
     }
     this.also?.(b, dt);
     b.step(dt);

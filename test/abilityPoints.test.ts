@@ -117,20 +117,22 @@ test('ability points: the potion lies only in treasure (hoards, chests, stashes,
 test('potion of learning: the light winds up the hero\'s body in one spiral and ends at the brow, never above it', async () => {
   const { moteAt } = await import('../src/app/spellFx/learningGlow');
   const feet = [10, 5, -3] as const;
+  // The game's hero is 0.93 m tall: the light is made smaller for them and ends at their brow (0.86 m), not above it.
+  const size = 0.93 / 1.7;
   let seen = 0, last = -1;
   for (let t = 0; t < 3.6; t += 0.05) {
     for (let i = 0; i < 24; i++) {
-      const at = moteAt(i, t, feet);
+      const at = moteAt(i, t, feet, size);
       if (!at) continue;
       seen++;
-      assert.ok(at[1] >= feet[1] && at[1] <= feet[1] + 1.62 + 1e-9, `height ${at[1] - feet[1]}`);
-      assert.ok(Math.hypot(at[0] - feet[0], at[2] - feet[2]) <= 0.83, 'within the body\'s width');
+      assert.ok(at[1] >= feet[1] && at[1] <= feet[1] + 1.62 * size + 1e-9, `height ${at[1] - feet[1]}`);
+      assert.ok(Math.hypot(at[0] - feet[0], at[2] - feet[2]) <= 0.83 * size, 'within the body\'s width');
     }
   }
   assert.ok(seen > 100);
   // One after another: a later mote is never ahead of an earlier one of the same strand.
   for (let i = 0; i < 22; i++) {
-    const a = moteAt(i, 1.5, feet), b = moteAt(i + 2, 1.5, feet);
+    const a = moteAt(i, 1.5, feet, size), b = moteAt(i + 2, 1.5, feet, size);
     if (a && b) { assert.ok(b[1] <= a[1] + 1e-9); last = a[1]; }
   }
   assert.ok(last >= 0);
