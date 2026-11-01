@@ -227,7 +227,7 @@ Goal: what the hero is asked to do stops being "clear place X, tell the one who 
 | Q4 ✓ | **Consequences**: how a task ended feeds the next situation (a parley kept makes a later visit friendly, a thief let go comes back, a sealed tomb stays shut) | Test: an ending changes what the VGM makes next, and the log replays it | 4, D52 |
 | Q5 ✓ | **Causes from NPC wants**: tasks arise from what people in the world simulation want or lack (a farmer's lost herd, a widow's ring, a rival trader) rather than from a table | Test: a task traced back to an NPC's want in the log | 4, 9.1 |
 
-Gate Q (**not passed yet**, review 2026-11-01 at `/mnt/project-files/masterworld/shots/gateQ/gate-q-review.md`: parley, night watch and thief never come up in the loop; wants are only "elder"; the gate line is printed, not enforced; shots not yet copied for Arnd) (Arnd: "lets tackle all of that now", so all five steps): the loop check plays an evening with three different verbs and no kind twice in a row, meets a twist, and replays a consequence and a task caused by an NPC's want from the log; GPU shots of a parley, a seal and a night watch; F1 to F4; Arnd's eye; the review.
+Gate Q (**retake 2026-11-01 after #472: passes on the logic and the numbers except one hole, a natural run asked "clear" twice in a row (Q2); then Arnd's eye on the three shots**; review `/mnt/project-files/masterworld/shots/gateQ/gate-q-review.md`) (Arnd: "lets tackle all of that now", so all five steps): the loop check plays an evening with three different verbs and no kind twice in a row, meets a twist, and replays a consequence and a task caused by an NPC's want from the log; GPU shots of a parley, a seal and a night watch; F1 to F4; Arnd's eye; the review.
 
 Built (2026-11-01, MW #457 to #464): all five steps. `npm run loop` prints `gate Q: met` for a run that has three kinds of task, none twice in a row, a twist, a consequence and a want, and each evening checks that the endings and wants read back from the log (two of the eight runs meet it). The plan thread's review (2026-11-01) found three of the six verbs and all but one kind of want missing in the runs; fixed: five kinds of want (`rival`, `elder`, `parent`, `pious`, `peaceable`), coverage runs that ask one kind only (`only`), the night watch widened to the dead and smugglers, and the loop now fails when a verb, three kinds of want, the three twists (first, changed, lied) or a run meeting gate Q is missing. GPU shots of a parley, a seal and a night watch were taken on Arnd's PC (`tools/shot/asks.mjs`, which now prints F2 and F3 per scene). Still open for the gate: F2 to F4 numbers, Arnd's eye.
 
@@ -284,7 +284,9 @@ Things seen and deliberately not in a phase yet. Each has a reason.
 | Other factions (Temple, the watch, a thieves' ring) | After peoples (B4) work; guilds are B3b |
 | ~~freeryder / free LLMs (O15)~~ | Dropped by D62: no LLM support |
 | Parley side camera frames the hero poorly | Left from gate Q; small, after the gate |
-| `npm run loop` takes 153 s in CI (warns at 60 s, fails at 300 s) | Seen at gate Q; needs a look before more runs are added |
+| Parley and thief (and the "lied" twist) come up only in forced coverage runs, never by chance | Seen at gate Q; their conditions and weights need a look so players meet them |
+| WebGPU playable in 17.6 s (limit 20 s) | Seen at gate Q; close to the limit, check before more load-time work lands |
+| `npm run loop` takes 143–226 s in CI for 12 runs (warns at 60 s, fails at 300 s) | Seen at gate Q; close to the limit, needs a look before more runs are added |
 | Companions (animals, elementals, summons) | After magic (C), since summons need it |
 | A hedge witch who teaches | Her cottage is C3 (D49) |
 | Interiors rework (ceiling joists cross the wall tops, dim rooms) | Seen at gate A; looks, not function. Before gate B's shots |
