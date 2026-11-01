@@ -56,7 +56,7 @@ import { TORCHLIGHT, flameFlicker } from './render/warmLights';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
 import { distSqPointSeg, harbourMoorings } from '@futuremagic/settlement';
-import { abilityOf, validateSetting, type BackgroundDef, type GrowthSource, type SightDef, type SituationKind } from './setting/contract';
+import { abilityOf, validateSetting, type BackgroundDef, type GuildDef, type GrowthSource, type SightDef, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -64,8 +64,8 @@ import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
-import { firstDungeon, houseOf, placeOf, promisePlace, type LandKind } from './vgm/dungeons';
-import { questFor, questGuild } from './vgm/quests';
+import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
+import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
@@ -770,6 +770,8 @@ export async function start(b: Boot): Promise<void> {
     director.strict = save?.mode === 'roguelike';
     const fightHud = new FightHud(setting, () => settings.current.bindings);
     const journal = new Journal(save?.journal);
+    // A guild's task names its place now (D49): an unnamed task's page from a save of before closes.
+    for (const l of journal.open) if (l.id.startsWith('task:')) journal.fulfil(l.id);
     // The land the hero knows (plan 11.7): a new hero knows the town where the game begins; the rest is seen on the way or told of.
     const known = new KnownLand(save?.map);
     if (!save?.map) known.see(home.x, home.z, HOME_SIGHT);
@@ -1401,6 +1403,25 @@ export async function start(b: Boot): Promise<void> {
       return `${u.name} worn${it.grants ? `: ${abilityOf(setting, it.grants)?.name ?? it.grants} on the action bar` : ''}`;
     };
     // Lessons (plan 11.4, D49, D59): the guild houses' trainers teach abilities for coin at a level; one more service.
+    /**
+     * A place a guild's master names (their deed, or the guild's task), made by the VGM for the town the hero
+     * talks in: into the log, the journal and on the map. What it is called, or null if none fits.
+     */
+    const guildPlace = (g: GuildDef, tool: 'quest' | 'task', make: (a: QuestAsk, c: DungeonContext) => DungeonDecision | null, said: (place: string) => string, why: string, who?: string): string | null => {
+      const t = talkTown(), house = t?.guilds.find((h) => h.guild.keeper === g.keeper);
+      if (!t || !house || !start) return null;
+      const d = make({ guild: g, town: t.town, building: house.b.id, hours: hours() }, { seed, terrain, log, home: start.decision, dungeons: setting.dungeons, avoid: wild?.territories ?? [] });
+      if (!d) { console.warn(`[vgm] no place for ${g.keeper}'s ${tool} near ${t.town.decision.id}`); return null; }
+      applied(madeBy(tool, d, why, hours()));
+      // Out on the land its name says where; a cellar is called by its house, as the town knows it.
+      const door = t.town.plan.buildings.find((b) => b.id === d.building)?.door;
+      const place = d.site ? placeOf(d, terrain.towns, setting.dungeons)?.name : t.talk.cellarCalled(d.id);
+      const at = d.site ?? (door && { x: door[0], z: door[1] });
+      if (!place || !at) return null;
+      const from = who || t.talk.nameOf(t.residents.find((p) => p.trade === g.keeper)?.id ?? -1) || g.name;
+      journal.hear(d.id, fill(setting.talk.lead, { cellar: place }), { text: said(place), from }, { x: at.x, z: at.z, label: place });
+      return place;
+    };
     const lessons = new LessonsUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -1411,26 +1432,9 @@ export async function start(b: Boot): Promise<void> {
       hours,
       standing,
       // A master's one deed (C14): the VGM makes its place, the master's household will be told; it goes in the journal and on the map.
-      quest: (g) => {
-        const t = talkTown(), house = t?.guilds.find((h) => h.guild.keeper === g.keeper);
-        if (!t || !house || !start || !g.quest) return null;
-        const d = questFor({ guild: g, town: t.town, building: house.b.id, hours: hours() }, { seed, terrain, log, home: start.decision, dungeons: setting.dungeons, avoid: wild?.territories ?? [] });
-        const place = d && placeOf(d, terrain.towns, setting.dungeons)?.name;
-        if (!d?.site || !place) { console.warn(`[vgm] no place for ${g.keeper}'s deed (${g.quest.kinds.join(', ')}) near ${t.town.decision.id}`); return null; }
-        applied(madeBy('quest', d, `${g.keeper}'s deed, for ${g.quest.reward}: the hero is a student and known well enough`, hours()));
-        const from = t.talk.nameOf(t.residents.find((p) => p.trade === g.keeper)?.id ?? -1) || g.name;
-        journal.hear(d.id, fill(setting.talk.lead, { cellar: place }), { text: fill(g.quest.ask, { place }), from }, { x: d.site.x, z: d.site.z, label: place });
-        return place;
-      },
-      // The guild's task (D49): in the journal while open, its mark at the guild's house.
-      taskNoted: (g, who, done) => {
-        const id = `task:${g.keeper}`;
-        if (done) { journal.fulfil(id); return; }
-        const house = talkTown()?.guilds.find((h) => h.guild.keeper === g.keeper);
-        if (!house || journal.knows(id)) return;
-        const at = whereOf(house);
-        journal.hear(id, `${cap(g.name)}: the guild's task`, { text: g.task.ask, from: who || g.name }, { x: at.x, z: at.z, label: g.name });
-      },
+      quest: (g) => g.quest ? guildPlace(g, 'quest', (a, c) => questFor(a, c), (place) => fill(g.quest!.ask, { place }), `${g.keeper}'s deed, for ${g.quest.reward}: the hero is a student and known well enough`) : null,
+      // A guild's task (D49): the VGM names the one place that does it; the journal and map take it up.
+      task: (g, who) => guildPlace(g, 'task', (a, c) => taskFor(a, c), (place) => fill(g.task.ask, { place }), `${g.keeper}'s task: the hero asked for work`, who),
     });
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id), a.person.race); });
     // The bard at the inn (D49): "where can I learn something?" names every guild house of the town and puts

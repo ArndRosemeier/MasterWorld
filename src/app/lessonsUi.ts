@@ -8,6 +8,7 @@
  * is their student and of the level it asks.
  */
 import type { AbilityDef, GuildDef, SettingModule } from '../setting/contract';
+import { taskOf } from '../vgm/quests';
 import { abilityPrice, questDue, teach, teachRefusal, teachingsOf, type GuildBook, type TeachRefusal } from '../game/guilds';
 import type { Standing } from '../game/standing';
 import type { DecisionLog } from '../world/decisions';
@@ -30,8 +31,8 @@ export interface LessonsHost extends WindowHost {
   readonly standing: Standing;
   /** A master speaks of their one deed (C14): the VGM makes its place; what it is called, or null if none fits. */
   quest(g: GuildDef): string | null;
-  /** The guild's task in the journal: given (its words, who asked) and open, or done (closed). */
-  taskNoted(g: GuildDef, who: string, done: boolean): void;
+  /** The guild's task given (D49): the VGM names its place, the journal and map take it up; what it is called, or null if none fits. */
+  task(g: GuildDef, who: string): string | null;
 }
 
 export class LessonsUi extends BodyWindow {
@@ -59,8 +60,8 @@ export class LessonsUi extends BodyWindow {
       this.hero.earn(`task:${g.keeper}`, 'task');
       said.push(`“${g.task.done}”`);
     }
-    // A task given (also in a save from before tasks went in the journal) stays in the journal until it is done.
-    if (h.book.asked(g.keeper)) h.taskNoted(g, who, h.book.taskDone(g, h.log()));
+    // A task given in a save from before tasks named a place, and not done: it names one now.
+    if (h.book.asked(g.keeper) && !h.book.taskDone(g, h.log()) && !taskOf(h.log(), g.keeper)) h.task(g, who);
     if (g.quest && questDue(g, this.hero, h.log())) {
       // A student of the level it asks: the master speaks of the deed for what no trainer sells (C14), on the
       // same visit as the thanks if both come at once.
@@ -85,7 +86,7 @@ export class LessonsUi extends BodyWindow {
       el('span', { className: `points${pts ? '' : ' none'}`, textContent: `Ability points: ${pts}` })];
     if (!h.book.asked(g.keeper)) {
       const ask = el('button', { textContent: 'Is there work for the guild?' });
-      ask.addEventListener('click', () => { h.book.assign(g.keeper, h.hours()); h.taskNoted(g, this.who, false); this.said = `“${g.task.ask}”`; this.opened(); });
+      ask.addEventListener('click', () => { this.said = this.give(g); this.opened(); });
       foot.push(ask);
     }
     foot.push(el('span', { className: 'standing', textContent: `Your level: ${this.hero.level}${h.book.asked(g.keeper) ? (h.book.taskDone(g, h.log()) ? ' · task done' : ' · task open') : ''}` }));
@@ -111,16 +112,22 @@ export class LessonsUi extends BodyWindow {
     return r;
   }
 
+  /** The guild's task given: its place named (the journal takes it up); what the trainer says. */
+  private give(g: GuildDef): string {
+    const h = this.lessonsHost;
+    h.book.assign(g.keeper, h.hours());
+    return `“${fill(g.task.ask, { place: h.task(g, this.who) ?? g.task.anywhere })}”`;
+  }
+
   /** Learn an ability here (by click, or from the console). */
   learn(g: GuildDef, a: AbilityDef): TeachRefusal {
     const h = this.lessonsHost, no = teach(g, this.hero, a, h.book, h.log());
     this.said = no === null ? `“${fill(g.teachesLine, { ability: a.name })}”`
-      : no === 'task' ? `“${h.book.asked(g.keeper) ? 'Your task first. You know what I asked.' : g.task.ask}”`
+      : no === 'task' ? (h.book.asked(g.keeper) ? '“Your task first. You know what I asked.”' : this.give(g))
       : no === 'level' ? `“${fill(g.distrust, { ability: a.name.toLowerCase() })}”`
       : no === 'point' ? `“${this.setting.growth.points.none}”`
       : no === 'coin' ? '“Come back when your purse is heavier.”'
       : no === 'known' ? '“You know that one already.”' : '“That is not mine to teach.”';
-    if (no === 'task') { h.book.assign(g.keeper, h.hours()); h.taskNoted(g, this.who, false); }
     this.rose = no === null ? a.id : null;
     if (no === null) { h.taught(g.hours); h.changed(); }
     this.opened();
