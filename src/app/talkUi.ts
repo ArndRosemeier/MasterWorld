@@ -38,6 +38,8 @@ export interface TalkHost {
   heard(lead: { id: string; title: string; note: string }): void;
   /** The hero asked about story event `id` and was told of it (by `from`): the journal and map take it up. */
   heardOf(event: string, from: string): void;
+  /** A thief was named and dealt with (D62): promise `id`, caught or let go. */
+  named(id: string, ending: 'caught' | 'let-go'): void;
   /** A service was asked for (trade, a repair, a room): the talk has ended, open its window. */
   serve(service: string, agent: Agent): void;
   /** The hero tells `agent` the place of promise `id` is safe again: the game pays and keeps it; their answer. */
@@ -189,6 +191,7 @@ export class TalkUi {
     this.speak(r.text);
     const from = this.talk.nameOf(a.person.id);
     if (t.id.startsWith('event:')) this.host.heardOf(t.id.slice(6), from);
+    if (r.named) this.host.named(r.named.id, r.named.ending);
     for (const id of r.heard) {
       const b = this.plan.buildings[this.talk.houseOf(id)];
       const title = fill(this.words.lead, { cellar: this.talk.cellarCalled(id) });

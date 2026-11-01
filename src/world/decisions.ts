@@ -85,12 +85,15 @@ export interface PromiseAsk {
   readonly thing?: number;
   /** Which of the ask's told lines the household says (index). */
   readonly line: number;
-  /** `lost`: who of the town is lost (a seeded pick, `vgm/asks.ts` `lostOne`), and whether they are found alive. */
+  /** `lost`: who of the town is lost (a seeded pick, `vgm/asks.ts` `askedOne`), and whether they are found alive. */
   readonly who?: number;
   readonly alive?: boolean;
   /** `parley`: the leader's terms, a price (copper) or a pact. */
   readonly terms?: 'price' | 'pact';
   readonly price?: number;
+  /** `watch`: whether a band comes out of the dark, and who they are (the dwellers' encounter). */
+  readonly comes?: boolean;
+  readonly band?: string;
 }
 
 /**
@@ -105,6 +108,8 @@ export interface KeptDecision {
   readonly at: number;
   /** It ended without what was asked (D62: a parley the hero broke by striking first); nobody pays for it. */
   readonly failed?: boolean;
+  /** How it ended, where there was a choice (D62, Q4: a thief `caught` or `let-go`); what comes next may follow from it. */
+  readonly ending?: string;
   /** It ended without the hero (C11: a story event left alone ran its course; the VGM's 'fade' tool). */
   readonly faded?: true;
 }
@@ -292,6 +297,8 @@ export interface WildDecision {
   readonly at: number;
   /** A situation it is (C10: the setting's, wolves at a paddock at dusk); none: a group of the wild. */
   readonly situation?: string;
+  /** The promise whose night watch it came on (D62): beaten, the watch is done. */
+  readonly watch?: string;
 }
 
 /**

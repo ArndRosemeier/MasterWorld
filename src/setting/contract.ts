@@ -817,8 +817,8 @@ export const TOP_FIND = 0.3;
  * topic to tell them), `note` the journal's line once it is done (`{name}` who to tell, `{house}`), `thanks`
  * what they say (`{coins}`, `{thing}`).
  */
-export type AskVerb = 'clear' | 'fetch' | 'lost' | 'seal' | 'parley';
-export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost', 'seal', 'parley'];
+export type AskVerb = 'clear' | 'fetch' | 'lost' | 'seal' | 'parley' | 'watch' | 'thief';
+export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost', 'seal', 'parley', 'watch', 'thief'];
 
 export interface AskDef {
   /** The kind (the VGM remembers kinds given, D62): a slug. */
@@ -846,6 +846,19 @@ export interface AskDef {
    * leave the household be). The leader's words: `terms` (`{coins}`), `struck` once agreed, `short` when the hero
    * cannot pay; `broken` the journal's line when the hero struck first and the parley can never be (`{place}`).
    */
+  /**
+   * `watch`: the dwellers come out by night; the hero stands watch by the household's door (within `near` m) through
+   * the night's `hours` (from, to; past midnight as 24 and more). With the share `comes` a band of them comes out of the
+   * dark and must be beaten; otherwise nothing comes and the night watched through does it.
+   */
+  /**
+   * `thief`: someone of the town steals from the household and hides it in their place. The stolen thing (`things`)
+   * lies in the stash at its end, and its lore gives the thief away (`{who}`). With it in hand the hero can face the
+   * thief in town: `accuse` (the topic), `confess` (their answer), then `catch` or `spare` (topics) and their words
+   * `caught` or `spared`. Named, caught or let go, is done; the thing goes back to the household.
+   */
+  readonly thief?: { readonly accuse: string; readonly confess: string; readonly catch: string; readonly spare: string; readonly caught: string; readonly spared: string };
+  readonly watch?: { readonly comes: number; readonly hours: readonly [number, number]; readonly near: number };
   readonly parley?: {
     readonly pact: number;
     readonly cost: readonly [number, number];
@@ -1792,6 +1805,8 @@ function validateAsks(m: SettingModule, where: string): string[] {
     for (const k of a.kinds ?? []) if (!m.dungeons[k]) out.push(`${where}: ask "${a.id}" names dungeon kind "${k}" the setting has not`);
     if (!a.words.told.length || !a.words.topic || !a.words.note || !a.words.thanks) out.push(`${where}: ask "${a.id}" lacks its words`);
     if (a.verb === 'lost' && (!a.lost || !a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" is lost: it needs lost (alive, found, dead), things left of the dead and missing`);
+    if (a.verb === 'thief' && (!a.thief || !a.things?.length)) out.push(`${where}: ask "${a.id}" is a thief: it needs thief (accuse, confess, catch, spare, caught, spared) and the things stolen`);
+    if (a.verb === 'watch' && (!a.watch || !a.dwellers?.length || a.watch.hours[1] <= a.watch.hours[0])) out.push(`${where}: ask "${a.id}" is a watch: it needs watch (comes, hours from before to) and the dwellers who come by night`);
     if (a.verb === 'parley' && (!a.parley || !a.dwellers?.length)) out.push(`${where}: ask "${a.id}" is a parley: it needs parley (terms, struck, short, broken) and the dwellers who talk`);
     if (a.verb === 'fetch' && (!a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" fetches nothing (things), or has no words for the thing not brought (missing)`);
     for (const t of a.things ?? []) if (!m.items.items.some((d) => d.id === t.item)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is no catalogue item (${t.item})`);

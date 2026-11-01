@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { validateSetting } from '../src/setting/contract';
-import { askFor, askMet, asksGiven, askWords, holdsKeepsake, keepsakeOf, lostOne, verbOf } from '../src/vgm/asks';
+import { askFor, askMet, asksGiven, askWords, holdsKeepsake, keepsakeOf, askedOne, verbOf } from '../src/vgm/asks';
 import { keepPromise, nextPromise, openPromises } from '../src/vgm/leads';
+import { NightWatch, nightWatchFor } from '../src/vgm/watch';
 import { townsfolk } from '../src/sim/people';
 import { talkCellar, townTalk } from '../src/talk/townTalk';
 import { Character } from '../src/game/character';
@@ -131,7 +132,7 @@ test('asks: someone lost is one of the town who does not tell of it, never lost 
   for (const name of ['masterworld', 'alpha', 'x4']) {
     const log = play(48, parseSeed(name));
     const lost = log.filter((x): x is DungeonDecision => x.kind === 'dungeon' && x.ask?.verb === 'lost' && x.town === town.decision.id);
-    const who = lost.map((d) => lostOne(people, log, d));
+    const who = lost.map((d) => askedOne(people, log, d));
     assert.equal(new Set(who.map((p) => p?.id)).size, who.length, `${name}: nobody is lost twice`);
     for (const [i, d] of lost.entries()) {
       const p = who[i]!;
@@ -245,4 +246,80 @@ test('asks: a parley\'s dwellers watch and wait; their leader names terms, and o
   assert.ok(!again.den.peace && again.failed);
   // The promise ends failed in the log.
   assert.equal(keepPromise([], dec.id, 3, true)?.failed, true);
+});
+
+test('asks: a night watch is kept at the household\'s door: the band comes out of the dark, or the night is watched through; clearing their place is not it (D62)', () => {
+  const house = town.plan.buildings.findIndex((b, i) => i > 0 && b.door);
+  const door = { x: town.plan.buildings[house]!.door[0], z: town.plan.buildings[house]!.door[1] };
+  const watchOf = (comes: boolean): DungeonDecision => ({ ...testDecision(5, 1, 'cave'), id: `cave-watch-${comes}`, town: town.decision.id, building: house, site: { x: door.x + 300, z: door.z, yaw: 0 }, ask: { id: 'watch', verb: 'watch', line: 0, comes, band: 'wolves' } });
+  // Only out on the land, and only dwellers who come by night.
+  const only = { asks: classic.asks!.filter((a) => a.id === 'watch') };
+  assert.equal(askFor(only, 1, [], { decision: testDecision(1), lived: true, dweller: 'goblins', encounter: 'goblins' }), null, 'not a cellar');
+  assert.equal(askFor(only, 1, [], { decision: testDecision(1, 1, 'cave'), lived: true, dweller: 'spiders', encounter: 'spiders' }), null, 'not spiders');
+  const asked = askFor(only, 1, [], { decision: testDecision(1, 1, 'cave'), lived: true, dweller: 'wolves', encounter: 'wolves' })!;
+  assert.equal(asked.verb, 'watch');
+  assert.equal(asked.band, 'wolves');
+  // The threat comes: nothing by day or away from the door; at the door in the night, a band of them out of the dark.
+  const d = watchOf(true);
+  let log: DecisionLog = [...first, d];
+  const at = (hours: number, hero = door) => ({ seed, log, towns: terrain.towns, hours, hero, setting: classic });
+  assert.equal(nightWatchFor(at(12)), null, 'not by day');
+  assert.equal(nightWatchFor(at(22.5, { x: door.x + 80, z: door.z })), null, 'not away from the door');
+  const band = nightWatchFor(at(22.5))!;
+  assert.ok(band && band.watch === d.id && band.members.length > 0, 'a band comes');
+  const from = Math.hypot(band.x - door.x, band.z - door.z);
+  assert.ok(from > 10 && from < band.r, `out of the dark (${from.toFixed(0)} m), roaming to the door (${band.r} m)`);
+  assert.ok(band.x > door.x, 'from the side of their place');
+  log = [...log, band];
+  assert.equal(nightWatchFor(at(23)), null, 'once a watch');
+  // Nothing comes: only the night watched through from its first hour does it; walking off ends the watch.
+  const q = watchOf(false);
+  log = [...first, q];
+  assert.equal(nightWatchFor(at(22.5)), null, 'nothing comes');
+  const night = new NightWatch();
+  assert.deepEqual(night.step(at(22.2)), []);
+  assert.deepEqual(night.step(at(24.5, { x: door.x + 10, z: door.z })), [], 'a step round the house is still watching');
+  assert.deepEqual(night.step(at(26.3)), [q.id]);
+  const left = new NightWatch();
+  left.step(at(22.2));
+  left.step(at(23, { x: door.x + 100, z: door.z }));
+  assert.deepEqual(left.step(at(26.3)), [], 'walked off');
+  const late = new NightWatch();
+  late.step(at(25));
+  assert.deepEqual(late.step(at(26.3)), [], 'coming at one in the morning is not watching the night');
+  // Judged only by the watch.
+  assert.equal(askMet(q.ask, { beaten: true, holds: false }), false, 'clearing their place is not the watch');
+  assert.equal(askMet(q.ask, { beaten: false, holds: false, watched: true }), true);
+});
+
+test('asks: a thief is one of the town; what they stole gives them away, and only facing them does it; caught or let go goes into the log (D62)', () => {
+  const house = town.plan.buildings.findIndex((_, i) => i > 2 && people.some((p) => p.home === i));
+  const d = { ...testDecision(6), town: town.decision.id, building: house, ask: { id: 'thief', verb: 'thief', line: 0, thing: 0, who: 7 } } as DungeonDecision;
+  const log: DecisionLog = [...first, d];
+  const thief = askedOne(people, log, d)!;
+  assert.ok(thief && thief.home !== house && (thief.role === 'hand' || thief.role === 'homemaker'), `${thief?.role} of house ${thief?.home}`);
+  const { talk } = townTalk(seed, classic, town, people, log);
+  assert.equal(talk.askOf(d.id)!.thief, thief.id);
+  // What they stole lies in the stash, and it gives them away.
+  const names = talk.namesFor(d), thing = keepsakeOf(classic, d, names)!;
+  assert.ok(names.who === talk.nameOf(thief.id) && thing.lore!.includes(names.who), thing.lore);
+  // Faced only with it in hand, and only the thief.
+  assert.ok(!talk.topics(thief.id).some((t) => t.id.startsWith('accuse:')), 'not without the thing');
+  talk.holding = (id) => id === d.id;
+  assert.ok(talk.topics(thief.id).some((t) => t.id === `accuse:${d.id}`));
+  const other = people.find((p) => p.id !== thief.id && p.role !== 'child')!;
+  assert.ok(!talk.topics(other.id).some((t) => t.id.startsWith('accuse:')), 'nobody else is offered it');
+  assert.ok(talk.ask(thief.id, `accuse:${d.id}`).text.length > 10);
+  const offered = talk.topics(thief.id).map((t) => t.id);
+  assert.ok(offered.includes(`catch:${d.id}`) && offered.includes(`spare:${d.id}`), offered.join(', '));
+  const r = talk.ask(thief.id, `spare:${d.id}`);
+  assert.deepEqual(r.named, { id: d.id, ending: 'let-go' });
+  assert.equal(talk.endingOf(d.id), 'let-go');
+  assert.ok(!talk.topics(thief.id).some((t) => t.id.includes(d.id)), 'dealt with');
+  // Kept in the save, and the ending goes into the log with the promise kept.
+  assert.equal(townTalk(seed, classic, town, people, log, talk.save()).talk.endingOf(d.id), 'let-go');
+  assert.equal(keepPromise(log, d.id, 5, false, 'let-go')?.ending, 'let-go');
+  // Judged only by the facing: the stash found is not it.
+  assert.equal(askMet(d.ask, { beaten: true, holds: true }), false);
+  assert.equal(askMet(d.ask, { beaten: false, holds: true, named: true }), true);
 });
