@@ -83,8 +83,10 @@ export const FORMED_ROCK = defineKind('formed rock', ['position', 'normal', 'tin
   const bedTint = mix(mix(mix(tintLin, cool, smoothstep(0.5, 0.8, hue).mul(0.8)), warm, smoothstep(0.2, 0.03, hue).mul(0.4)), rusty, smoothstep(0.44, 0.5, hue).mul(smoothstep(0.56, 0.5, hue)).mul(0.3));
   const stone = bedTint.mul(0.8).mul(mottle).mul(tone).mul(parting).mul(cavity).mul(float(0.85).add(harder.mul(0.3)));
   let col = mix(stone, vec3(0.44, 0.22, 0.09).mul(tone), rustW);
-  col = mix(col, vec3(0.74, 0.7, 0.62).mul(float(0.75).add(n3(p.mul(5.0)).mul(0.25))), crust.mul(0.8));
-  col = mix(col, vec3(0.86, 0.83, 0.76), vein.mul(0.92));
+  // (Pale deposits take the light the rock has: in a dark throat they go dark with it, not stand out as cream cracks.)
+  const pale = clamp(lum.div(0.25), 0.25, 1);
+  col = mix(col, vec3(0.74, 0.7, 0.62).mul(float(0.75).add(n3(p.mul(5.0)).mul(0.25))).mul(pale), crust.mul(0.8));
+  col = mix(col, vec3(0.86, 0.83, 0.76).mul(pale), vein.mul(0.92));
   const oreCol = tintRaw.mul(2.2).mul(float(0.55).add(speck.mul(0.9))).add(vec3(1.0, 0.92, 0.7).mul(glint).mul(0.6));
   col = mix(col, oreCol, oreBody);
   m.colorNode = col;
