@@ -16,7 +16,7 @@ import { CAVE_LANTERN, TORCH_DUSK, TORCH_LIGHT_OUT, TORCH_LIGHT_UP, TORCH_NIGHT 
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
 import { PortalStoneUse } from './app/portalStoneUse';
-import { cleanStoneSave } from './game/portalStone';
+import { cleanStoneSave, imprintSpawn } from './game/portalStone';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
@@ -370,6 +370,8 @@ export async function start(b: Boot): Promise<void> {
     let bodiesBlock: NonNullable<WalkWorld['bodies']> = () => false;
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? (resume ? [resume.x, resume.z] : [home.x, home.z]), params.look);
+    // Which way the hero faced at the start (the portal stone's first home faces so).
+    const spawn = { x: home.x, y: player.walker.support(home.x, home.z, 1e5), z: home.z, yaw: player.walker.yaw };
     // The floating origin starts where the camera does (everything drawn is relative to it: render/origin.ts).
     if (params.origin) ORIGIN.moveTo(view.camera.position.x, view.camera.position.z);
     // Off (`origin=0`, or from the debug console: game.followOrigin) the origin stays where it is.
@@ -1012,7 +1014,8 @@ export async function start(b: Boot): Promise<void> {
       },
       gesture: (what) => castHands(what === 'raise' ? 'charge' : 'release', what === 'raise' ? 0.9 : 0.8),
       changed: () => autosave(),
-    }, cleanStoneSave(save?.portalStone));
+    // A stone that marked no home yet (every new hero's) is imprinted with where the hero started: a way out when stuck.
+    }, imprintSpawn(cleanStoneSave(save?.portalStone), spawn));
     await stoneUse.addToStage();
     stoneMesh = stoneUse.mesh;
     spellView.also = (b, dt) => stoneUse.stoneLight(b, dt);
