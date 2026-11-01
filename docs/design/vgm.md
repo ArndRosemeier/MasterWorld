@@ -84,7 +84,7 @@ An **encounter** is who the hero meets, where and why: a group of creatures or p
 
 * **One definition.** An encounter is data in the setting (an `EncounterDef`: who, how many, habitat or room, temper, danger range, the words used to tell of it). Dwellers, wild groups and event bands are all encounters.
 * **One generator.** `encounterFor(need, where, danger, seed)` picks and fills an encounter from the setting. It fits the danger the place already has (D29), keeps away from what the hero has just met (against formula, plan 8.1), and returns plain data that goes into the log.
-* **Every use goes through it:** a dungeon's dwellers, a wild group, an event's band, a road ambush, a guild task's quarry, and later the LLM hook's `propose` (plan 15). The hook proposes; the generator checks and fills.
+* **Every use goes through it:** a dungeon's dwellers, a wild group, an event's band, a road ambush, a guild task's quarry. The generator checks and fills.
 * **A design tool.** A headless check (`npm run variety` style) samples encounters per need, place and danger band, and fails on repeats or misfits. So someone designing new encounters writes data and sees what the VGM would make from it.
 
 ## 4. Dungeons

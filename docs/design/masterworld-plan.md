@@ -23,7 +23,7 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 
 | # | Decision | Notes |
 |---|---|---|
-| D1 | **The VGM is procedural.** No language model is needed to play. | An LLM hook comes later (Norgo's Oracle already had one). Out of the box the game must cost nothing to run. |
+| D1 | **The VGM is procedural.** No language model is needed to play. | ~~An LLM hook comes later (Norgo's Oracle already had one).~~ Since D62 there is no LLM hook at all. Out of the box the game must cost nothing to run. |
 | D2 | **Single player.** Multiplayer is a later milestone. | Keep the door open: see section 14. |
 | D3 | **TypeScript, three.js, 3D**, like the other projects. | |
 | D4 | **The VGM's job is to make the game feel good for the player.** Difficulty and similar options are settings the VGM honours, not separate systems. | |
@@ -84,6 +84,7 @@ MasterWorld is free and open source under the MIT licence, like all of Arnd's pr
 | D59 | **No skills: the level is the skill.** Skills are retired altogether: weapon skills, magic schools as skills, stealth, speech, dodge and orientation. Every ability the hero has works at the hero's level (with gear); nothing rises by use and nothing is trained by repetition. Trainers teach **abilities** (a blade technique, a spell, a way of moving) for coin, each needing a level, higher for dangerous ones; a magic teacher opens a school by teaching its first spell, and mana comes with the first spell and grows with level. Backgrounds give kit, a first ability or two and acquaintances, not skill points. **The map shows where the hero is, exactly** (no orientation skill), and the HUD has a **minimap**: a round warded-brass window in a corner with the known land round the hero, roads, places and the marks NPCs made, the hero's arrow at its centre, the compass letters on its rim (it takes the compass's place). The big map stays as it is (known land, marks, hand-over). | Arnd, 2026-10-29 ("skill ups by use is a flawed concept … rewards repetitive behaviour. So, no more skills. The level is the skill for any ability you have"; "get also rid of the orientation skill and have a more normal minimap"). Replaces the skills of D30, D49's ranks and D54's skill ranks, and D35's orientation skill. Sections 10, 11.4, 11.7, 17.1. |
 | D60 | **Ships, not boats; an aquatic form; breathing under water.** The hero does not row: no boat the hero steers (a new system that makes things needlessly complicated). Ships carry the hero between harbours, for the way and for the feel of it: **the whole harbour** (quays, piers, ships at their moorings, cargo loaded and unloaded, a fish market, sailors and fisherfolk, a harbour master who sells passage) and **a ship that is good to walk around in** (deck, rigging, hold, cabins, galley), with its crew at work and other passengers usually aboard; the voyage is played, not skipped (rule 11), and activities aboard can come later. Under water: **an aquatic form**, a second change of shape beside bird form, and **spells and potions of water breathing** for the hero's own form. **No other ability works in any animal form** (bird or aquatic): other forms would need animations for everything, and it keeps the breathing spells and potions worth having, since only in the hero's own form can they fight or cast under water. Fights at sea (boarding, a creature attacking a ship), owning or sailing a ship and activities aboard are later. Islands are mostly places to explore, with at most a small fishing village (the reviewer's pick, open for Arnd to change). | Arnd, 2026-10-30 ("skip rowing … riding ships … not only for the functionality but for the ambiente"; "using animal forms should forbid usage of all other abilities"; "the whole harbour experience and a ship that is nice to walk around in, with other passengers usually on board and maybe even activities, later"). Replaces the rowing boat of the phase D draft. Sections 13, 9.3. |
 | D61 | **Ability points: one per level, one per ability.** The hero earns **one ability point per level** (Arnd said "skill point"; it is called an ability point in the game, since D59 there are no skills). **Learning an ability costs one point** as well as the trainer's coin and level; a writing read from the pack teaches its ability only if a point is free (otherwise it waits in the pack). Gifts for deeds (bird form from the Undercroft's keeper), abilities worn on items and the background's first abilities cost no point. An uncommon find, **the potion of learning**, gives one more point when drunk: found in treasure (more likely in deeper and more dangerous places), never sold by an ordinary trader. Points not spent are kept; the lessons window and the ability book show how many are free. Older saves get a point for every level reached above the first, less the abilities learned since then, never fewer than none. | Arnd, 2026-10-31 ("Lets earn 1 skill point per level. Buying an ability also costs a skill point. There should be a special kind of uncommon loot (a potion of learning maybe) that grants another skill point."). Adds to D58 and D59. Sections 10, 11.4. |
+| D62 | **Tasks count only what they name; quests vary procedurally, never by a model.** (1) Any task that gives the hero something specific to do counts only that thing as done (a guild's task names one place, and clearing another place does not fulfil it). (2) Today nearly every lead is "clear place X, tell the one who asked, get coin". Leads get **new verbs on the existing places**, which combine with the place and with who asks: find a lost person, fetch an heirloom, parley with dwellers who are not hostile, seal something, guard at night, find out who is stealing. (3) **The VGM remembers what it gave** and does not give the same kind twice in a row. Later layers: **twists** (the client lies, someone got there first, the place has changed), **consequences** that feed the next situation, and **causes that come from what NPCs want** in the world simulation. (4) **No LLM support, now or later**: a free game cannot ask its players to pay for a model, so everything stays procedural; the LLM hook (15) is dropped. D52 still holds: few quests, situations that come from the world, never a quest hub. | Arnd, 2026-11-01 ("ANY task where i get something SPECIFIC to do needs to count only THAT THING as fulfillment"; "How can we make those less repetitive?"; "Do not rely on LLM support. That would mean people willing to pay for a free game, so we need to try to keep this procedural"). Guild tasks name one place since MW #455. Replaces section 15 and O15. Sections 4, 9.1, 15, D52. |
 
 ---
 
@@ -621,7 +622,9 @@ Rules for the contract:
 
 ---
 
-## 15. The LLM hook
+## 15. ~~The LLM hook~~ (dropped by D62)
+
+**Dropped (Arnd, 2026-11-01, D62):** no LLM support, now or later. A free game cannot ask its players to pay for a model, so everything stays procedural. The text below is kept only as a record.
 
 Out of the box nothing calls a model. The hook is a narrow interface the procedural parts already use:
 
@@ -721,7 +724,7 @@ StarLord's title is the bar: the game's own world, alive, playful, new every sta
 | O7 | ~~Lore of the default module~~ | **Decided as a first sketch** (D43, 12.1): the Fading, the five Wardens. Details grow with play. |
 | O8 | ~~Which Norgo code is ported?~~ | **Decided** (D15): the GM is inspiration only. Skills, abilities and the worker split are candidates to port. |
 | O9 | ~~Footprint rules~~ | **Decided** (section 7): hard land wins, then the older decision; settlements and roads beat vegetation. |
-| O15 | Free LLMs through `freeryder` | **Parked** (Arnd, 2026-10-25): not sure it belongs in MasterWorld at all. |
+| O15 | Free LLMs through `freeryder` | **Dropped** (Arnd, 2026-11-01, D62): no LLM support; everything stays procedural. |
 | O16 | ~~Dungeons that don't feel formulaic~~ | **Decided** (D39, 8.1): eight layers, detective puzzles only, repopulation, rare surprises. |
 | O17 | ~~The interface's design language~~ | **Decided** (D45, 17.1): warded brass. Each window's signature still to be mocked up. |
 | O18 | ~~The title animation~~ | **Decided** (D46, 17.2). First version in `src/app/title/`. |
@@ -739,7 +742,8 @@ StarLord's title is the bar: the game's own world, alive, playful, new every sta
 6c. **Levels**: experience from everything, levels 1–20, abilities scaling with level, the celebration (D58; phase G).
 6b. **The land at every scale**: landforms, rock, landscape kinds with mesa country first, the start in a mesa valley, climbing, real caves (D55–D57; phase L).
 7. **Seas.**
-8. Later: the LLM hook, multiplayer, crafting.
+8. Quest variety (D62; phase Q), then dialog (parked).
+9. Later: multiplayer, crafting.
 
 The order of the work, its steps and their done-checks are in [implementation-plan.md](implementation-plan.md). Milestones 3–4 are finished there as phase A (trading, upkeep, death and roguelike mode, the loop check), 5 is phase B, 6 is phase C, 6b is phase L and 7 is phase D.
 
