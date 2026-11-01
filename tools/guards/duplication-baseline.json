@@ -180,10 +180,6 @@
     "reason": "Both implement Arena.inside (app/encounter.ts) for their place: the interface's member, not a copy."
   },
   {
-    "key": "same name: masterworld/app/cellars.ts#solid + masterworld/app/holdGate.ts#solid",
-    "reason": "Each says whether a body stands in its own stones (a barrow's mound, a hold's gate) for the walker's wall test in main.ts; the shapes are their own (inBarrowShape, inHoldShape)."
-  },
-  {
     "key": "same name: masterworld/app/holdGate.ts#tend + masterworld/render/grass/GrassView.ts#tend",
     "reason": "Per-frame methods of unrelated systems (the hold's wardens vs grass patches); only the name matches."
   },

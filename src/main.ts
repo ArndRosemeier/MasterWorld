@@ -334,6 +334,8 @@ export async function start(b: Boot): Promise<void> {
       // Out of doors also a stall's awning, a well's roof (the talk view stood on an awning).
       sightSurface: (x, y, z) => {
         if (cellars?.throatAir(x, y, z)) return null;
+        // A cave's crag, a barrow's mound, a tower's walls: the camera swung round with the mouse stays out of them.
+        if (cellars?.inPiece(x, y, z, 0.2)) return -1;
         const s = surfaceAt(x, y, z, !!rooms?.inside), f = rooms?.inside ? null : towns?.fixtureSight(x, y, z) ?? null;
         // A ship's cabins and lower deck keep the camera in them; out on deck, out of its hull and castles.
         const d = decks.sight(x, y, z);
