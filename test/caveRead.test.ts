@@ -15,10 +15,13 @@ const read = (seed: number, rock: string) => {
   const c = formCave(caves, seed, rock, small.id, undefined, undefined, small), d = dressFormed(c, caves);
   return { c, ...readFormed(c, caves, d) };
 };
+// The same cave for the tests that only look at it (the seeded test forms its own twice).
+const made = new Map<string, ReturnType<typeof read>>();
+const seen = (seed: number, rock: string) => { const k = `${rock} ${seed}`; if (!made.has(k)) made.set(k, read(seed, rock)); return made.get(k)!; };
 
 test('caves: every cut-off part of a cave is opened by a hero-sized way, no cell is a squeeze, and a way in exists', () => {
   for (const [seed, rock] of [[5, 'jointed'], [6, 'massive'], [7, 'thin-bedded']] as const) {
-    const t0 = Date.now(), r = read(seed, rock), s = r.reading.stats;
+    const t0 = Date.now(), r = seen(seed, rock), s = r.reading.stats;
     assert.ok(r.reading.entries.length >= 1, `${rock} ${seed}: a way in`);
     assert.equal(s.cutOff, 0, `${rock} ${seed}: no part of ${PART_MIN} cells or more is out of reach`);
     assert.ok(s.reached > 0.9 * s.cells, `${rock} ${seed}: ${s.reached} of ${s.cells} cells reached`);
@@ -40,7 +43,7 @@ test('caves: the places of a cave are found, seeded, and every one lies on groun
 });
 
 test('caves: the real walker crosses the walk links of the reading (the reader and the body agree, no squeezing)', () => {
-  const r = read(6, 'massive'), world = formedWorld(r.c.field as never), g = r.reading;
+  const r = seen(6, 'massive'), world = formedWorld(r.c.field as never), g = r.reading;
   let tried = 0, crossed = 0;
   for (let a = 0, n = 0; a < g.count && tried < 60; a++) {
     if (g.depth[a] === Infinity) continue;
@@ -61,7 +64,7 @@ test('caves: the real walker crosses the walk links of the reading (the reader a
 
 test('caves: the first mouth is cut as a portal throat: an arch through a closed wall, the way in standing on its floor', () => {
   for (const [seed, rock] of [[5, 'jointed'], [6, 'massive'], [7, 'thin-bedded']] as const) {
-    const r = read(seed, rock), t = r.c.skeleton.throat, f = r.c.field as BrickField;
+    const r = seen(seed, rock), t = r.c.skeleton.throat, f = r.c.field as BrickField;
     assert.ok(t, `${rock} ${seed}: a throat`);
     const s = Math.sin(t.yaw), c = Math.cos(t.yaw);
     // The point at (u across, v up, w along: w > 0 behind the plane, towards the day) of the portal's frame.
