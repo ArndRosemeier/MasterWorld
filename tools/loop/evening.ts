@@ -40,7 +40,7 @@ function play(i: number): boolean {
   const r = playEvening(parseSeed(seed), classic, { ...opts, log: (s) => console.log(`${clock(s.hour)}  ${s.what}`) });
   console.log(`${r.ok ? "passed" : "FAILED"}: ${r.cleared.length} places cleared (asked: ${r.verbs.join(", ")}${r.twists.length ? `; twists: ${r.twists.join(", ")}` : ""}${r.consequences.length ? `; consequences: ${r.consequences.join(", ")}` : ""}${r.wants.length ? `; wants: ${r.wants.join(", ")}` : ""}), ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, learned ${r.lessons.join(', ') || 'nothing'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}, level ${r.level} (${r.xp} xp)${r.spells ? `, ${r.spells} spells cast` : ''}; plays like a ${r.style ?? 'newcomer'} (challenge x${r.challengeLean.toFixed(2)}); longest overdue ${Object.entries(r.overdue).map(([n, s]) => `${n} ${(s / 60).toFixed(1)}`).join(', ')} min; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   const met = (): boolean => {
-    const kinds = r.verbs.map((v) => v.split(' ')[0]);
+    const kinds = r.verbs.filter((v) => !/\((dwellers|task|deed|other)\)$/.test(v)).map((v) => v.split(' ')[0]);
     return r.ok && new Set(kinds).size >= 3 && kinds.every((v, k) => k === 0 || v !== kinds[k - 1]) && r.twists.length > 0 && r.consequences.length > 0 && r.wants.length > 0;
   };
   console.log(`GATEQ ${JSON.stringify({ met: met(), ok: r.ok, verbs: r.verbs.map((v) => v.split(' ')[0]), wants: r.wants, twists: r.twists, consequences: r.consequences })}`);
