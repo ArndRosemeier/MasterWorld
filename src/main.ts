@@ -2454,6 +2454,7 @@ export async function start(b: Boot): Promise<void> {
           if (cheer.gesture && h) player.stance = { ...player.stance, action: { ...CHEER, t0: h.clock } };
         }
         stoneUse.stoneFrame(dt);
+        spellView.bodyHeight = player.walker.height;
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
       }

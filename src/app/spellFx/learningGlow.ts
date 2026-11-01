@@ -5,7 +5,7 @@
  * hero; play never stops. Pure; the spell view draws it.
  */
 import { smoothstep } from '@futuremagic/core';
-import { lit, type SpellBits, type Vec3 } from './particles';
+import { lit, type PuffSpec, type SpellBits, type Vec3 } from './particles';
 import { HeroFx } from './heroFx';
 
 /** How long it plays (s). */
@@ -26,12 +26,15 @@ const STAGGER = 1.1;
 /** Turns of the spiral on the way up. */
 const TURNS = 1.5;
 
+/** The height of a person the lengths below are made for (m); a hero of another height scales them (`size`: their height over this). */
+export const PERSON = 1.7;
+
 /** Where mote `i` is `t` s in, over `feet`: all follow one spiral path (two strands), one after another; null before it sets off and after it is in. */
-export function moteAt(i: number, t: number, feet: Vec3): Vec3 | null {
+export function moteAt(i: number, t: number, feet: Vec3, size = 1): Vec3 | null {
   const p = (t - (i / MOTES) * STAGGER) / CLIMB;
   if (p <= 0 || p >= 1) return null;
-  const e = smoothstep(0, 1, p), a = e * TURNS * Math.PI * 2 + (i % 2) * Math.PI, r = WIDE * (1 - e) ** 1.2 + 0.08;
-  return [feet[0] + Math.cos(a) * r, feet[1] + 0.1 + (BROW - 0.1) * e, feet[2] + Math.sin(a) * r];
+  const e = smoothstep(0, 1, p), a = e * TURNS * Math.PI * 2 + (i % 2) * Math.PI, r = (WIDE * (1 - e) ** 1.2 + 0.08) * size;
+  return [feet[0] + Math.cos(a) * r, feet[1] + (0.1 + (BROW - 0.1) * e) * size, feet[2] + Math.sin(a) * r];
 }
 
 /** Light welling up off the ground round the hero. */
@@ -42,28 +45,30 @@ const FLARE_AT = STAGGER + CLIMB + 0.1;
 export class LearningGlow extends HeroFx {
   constructor() { super(GLOW_TIME, { spec: WELL, count: 30 }); }
 
-  protected lightAt(b: SpellBits, feet: Vec3, t: number, dt: number): void {
+  protected sized(spec: PuffSpec, size: number): PuffSpec { return { ...spec, spread: WIDE * size }; }
+
+  protected lightAt(b: SpellBits, feet: Vec3, t: number, dt: number, size: number): void {
     const fade = t > GLOW_TIME * 0.75 ? Math.max(0, 1 - (t - GLOW_TIME * 0.75) / (GLOW_TIME * 0.25)) : 1;
-    const brow: Vec3 = [feet[0], feet[1] + BROW, feet[2]];
+    const brow: Vec3 = [feet[0], feet[1] + BROW * size, feet[2]];
     // A faint pool of light on the ground while the motes leave it.
     const pool = Math.max(0, 1 - t / 1.2);
-    if (pool > 0) b.hold('glow', [feet[0], feet[1] + 0.04, feet[2]], WIDE * 2.6, lit(DEEP, 0.25 * pool), { flat: UP });
+    if (pool > 0) b.hold('glow', [feet[0], feet[1] + 0.04, feet[2]], WIDE * 2.6 * size, lit(DEEP, 0.25 * pool), { flat: UP });
     // The motes wind up the body, each a little after the one before, narrowing to the brow.
     for (let i = 0; i < MOTES; i++) {
-      const at = moteAt(i, t, feet);
+      const at = moteAt(i, t, feet, size);
       if (!at) continue;
-      const up = (at[1] - feet[1]) / BROW;
-      b.hold('spark', at, 0.08 + 0.05 * (1 - up), lit(WARD, 1.6), { seed: i / MOTES });
-      b.hold('glow', at, 0.26, lit(DEEP, 0.4), {});
+      const up = (at[1] - feet[1]) / (BROW * size);
+      b.hold('spark', at, (0.08 + 0.05 * (1 - up)) * size, lit(WARD, 1.6), { seed: i / MOTES });
+      b.hold('glow', at, 0.26 * size, lit(DEEP, 0.4), {});
     }
     // At the brow the light gathers, flares once when the motes are in, and sinks in.
     const gather = smoothstep(0.5, STAGGER + CLIMB, t) * fade;
     if (gather > 0) {
-      b.hold('glow', brow, 0.35 + 0.35 * gather, lit(WARD, 0.55 * gather), {});
-      b.hold('ring', brow, 0.5 * (1 - 0.4 * gather), lit(WARD, 0.6 * gather), { flat: UP, rot: t * 2.2, seed: 0.41 });
+      b.hold('glow', brow, (0.35 + 0.35 * gather) * size, lit(WARD, 0.55 * gather), {});
+      b.hold('ring', brow, 0.5 * (1 - 0.4 * gather) * size, lit(WARD, 0.6 * gather), { flat: UP, rot: t * 2.2, seed: 0.41 });
     }
     if (t >= FLARE_AT && t - dt < FLARE_AT) {
-      b.burst({ sprite: 'spark', life: [0.4, 0.8], size: [0.08, 0.02], spread: 0.08, speed: [0.4, 1.1], cone: Math.PI, up: [0.1, 0.5], drag: 2, color: lit(WARD, 1.8), to: DEEP, stretch: 0.05 }, 40, brow);
+      b.burst({ sprite: 'spark', life: [0.4, 0.8], size: [0.08 * size, 0.02 * size], spread: 0.08 * size, speed: [0.4 * size, 1.1 * size], cone: Math.PI, up: [0.1, 0.5], drag: 2, color: lit(WARD, 1.8), to: DEEP, stretch: 0.05 }, 40, brow);
     }
   }
 }
