@@ -746,5 +746,69 @@
   {
     "key": "same name: masterworld/sim/birdFlight.ts#steer + masterworld/sim/otterSwim.ts#steer",
     "reason": "Both are app/shapeForm.ts FormSim's steer (one interface for every animal form): a bird's flight and an otter's swimming."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/building.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "same name: masterworld/game/delve.ts#met + masterworld/vgm/director.ts#met",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
+  },
+  {
+    "key": "same name: masterworld/talk/townTalk.ts#f + masterworld/vgm/asks.ts#f",
+    "reason": "TSL node arithmetic (.add/.mul chains) in the material kinds: each its own shader maths, not a copy. Rose over the info floor as the corpus grew (IDF drift), phase Q files."
   }
 ]

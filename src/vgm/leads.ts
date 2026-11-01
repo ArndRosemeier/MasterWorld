@@ -12,6 +12,7 @@ import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
 import type { Town } from '../world/town';
 import { landKinds, loreOf, placeOf, promiseCellar, promisePlace } from './dungeons';
+import { askFor, asksGiven, CLEAR } from './asks';
 
 export const LEADS = {
   /** Open promises the world always has. */
@@ -90,13 +91,30 @@ export interface LeadsContext {
    * people do), even when the world has its few open leads already (one more than `max` at most).
    */
   readonly near?: Town | null;
+  /** What households may ask about a new place (D62); none: every place is to be cleared. */
+  readonly asks?: SettingModule['asks'];
 }
 
 /** Share of new places that lie out on the land (a barrow, a cave, a tower), when the setting has a kind none of which is open. */
 const LAND_SHARE = 0.55;
 
-/** The Builder's next promise, if one is due now. */
+/** The Builder's next promise, if one is due now: a new place carries what its household asks (D62). */
 export function nextPromise(c: LeadsContext): Decision | null {
+  const d = promiseDue(c);
+  return d?.kind === 'dungeon' ? asked(c, d) : d;
+}
+
+/** A new place with what its household asks of it (D62): of the kinds that fit it, not the last kind given. */
+function asked(c: LeadsContext, d: DungeonDecision): DungeonDecision {
+  if (!c.asks?.length) return d;
+  const place = placeOf(d, c.towns, c.dungeons);
+  if (!place) return d;
+  const lived = sketchCellar(d, place, loreOf({ dungeons: c.dungeons }, d.template)).dweller.creatures.length > 0;
+  const ask = askFor({ asks: c.asks }, c.seed, c.log, { decision: d, lived });
+  return ask ? { ...d, ask } : d;
+}
+
+function promiseDue(c: LeadsContext): Decision | null {
   const promised = openPromises(c.log), open = promised.length;
   const local = c.near && c.near !== c.towns[0] && c.terrain && !promised.some((p) => dungeonOf(c.log, p)?.town === c.near!.decision.id) ? c.near : null;
   if (open >= LEADS.max + (local ? 1 : 0) || (open >= LEADS.min && !c.purposeOverdue && !local)) return null;
@@ -114,7 +132,9 @@ export function nextPromise(c: LeadsContext): Decision | null {
   // then the new place lies out on the land: a barrow, a cave or a tower (one of each kind open at a time).
   const town = c.towns[0];
   const fresh = (town && landPlace(c, s, town)) ?? (town ? promiseCellar(c.seed, town, c.log, c.home) : null);
-  if (moved && (!fresh || hash2f(s, 5, 1) < 0.4)) return moved;
+  // New dwellers are only to be cleared: not right after a place that was (D62), while a new place can be had.
+  const cleared = asksGiven(c.log).at(-1) === CLEAR && !!c.asks?.length;
+  if (moved && (!fresh || (!cleared && hash2f(s, 5, 1) < 0.4))) return moved;
   return fresh ? { ...fresh, at: c.hours } : null;
 }
 

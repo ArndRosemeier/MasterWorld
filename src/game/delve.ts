@@ -12,7 +12,8 @@ import type { DungeonSpace } from '../world/dungeon/space';
 import { hoardsOf, type Hoard } from '../world/dungeon/treasure';
 import type { Character } from './character';
 import { Fight, type FightEvent, type HeroPose } from './fight';
-import { rollLoot, type Loot } from './items';
+import { rollLoot, type Item, type Loot } from './items';
+import { askMet, holdsKeepsake } from '../vgm/asks';
 
 export interface DelveSave {
   /** Creatures dead and spared, by den index. */
@@ -62,6 +63,21 @@ export class Delve {
     return this.den.beaten;
   }
 
+  /**
+   * A household's keepsake (D62: a fetch): it lies in the lair's hoard at the end of the place, and searching
+   * that hoard puts it in the pack. Set by whoever opens the place (the game names it for the family).
+   */
+  keepsake: Item | null = null;
+
+  /**
+   * What the promise asks is done (D62): only the thing it names counts. A fetch is done with the keepsake in
+   * the hero's hands, whether the place is beaten or not; anything else asks the place beaten.
+   */
+  get met(): boolean {
+    const k = this.keepsake;
+    return askMet(k ? 'fetch' : 'clear', { beaten: this.beaten, holds: !!k?.keepsake && holdsKeepsake(this.hero.pack, k.keepsake) });
+  }
+
   step(dt: number, pose: HeroPose, breathe = true): FightEvent[] {
     return this.fight.advance(dt, pose, breathe);
   }
@@ -94,6 +110,9 @@ export class Delve {
       if (this.opened.has(l.hoard.id)) return null;
       this.opened.add(l.hoard.id);
       loot = rollLoot(this.setting.items, l.hoard.table, l.hoard.danger, new Rng(l.hoard.seed));
+      // The keepsake asked for lies in the lair's hoard (it is in the pack already if a save had it opened).
+      const k = this.keepsake;
+      if (k && !l.hoard.prop && !holdsKeepsake(this.hero.pack, k.keepsake!)) loot = { items: [...loot.items, k], coins: loot.coins };
     }
     if (!loot) return null;
     this.hero.pack.push(...loot.items);

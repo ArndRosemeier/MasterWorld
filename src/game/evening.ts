@@ -16,6 +16,7 @@ import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
+import { holdsKeepsake, keepsakeOf, verbOf } from '../vgm/asks';
 import { hailer } from '../vgm/guide';
 import { Director, NEEDS, type Need } from '../vgm/director';
 import { answerNeed } from '../vgm/toolbox';
@@ -51,6 +52,8 @@ export interface EveningResult {
   readonly steps: readonly EveningStep[];
   /** Promises cleared, by id. */
   readonly cleared: readonly string[];
+  /** What each lead asked, in order (D62: clear, fetch, ...). */
+  readonly verbs: readonly string[];
   readonly falls: number;
   /** Copper the finds fetched, and what was bought. */
   readonly earned: number;
@@ -149,6 +152,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const power0 = hero.power;
   // Standing in a town for the first time is a discovery (D58), as in the game.
   hero.earn(`town:${town.decision.id}`, 'town');
+  const verbs: string[] = [];
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
   const book = new GuildBook();
   // A human hero (the creator's first people): a guild's task done is a good deed with its trainer's people (D54).
@@ -188,7 +192,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   // In a settlement the VGM promises from there (vgm/leads.ts `near`), as the game does while the hero is in one.
   // Its danger counts from there too, as for a hero whose game began there: a fresh hero is the check's, and
   // danger by distance from the start (D29) would make any settlement a few km out a check of luck in a fight.
-  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, terrain, near: town === start ? null : town });
+  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, asks: setting.asks, terrain, near: town === start ? null : town });
 
   const walkTo = (what: string, x: number, z: number) => {
     const inTown = (px: number, pz: number) => Math.hypot(px - town.decision.x, pz - town.decision.z) < town.decision.radius + 60;
@@ -341,6 +345,10 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const moved = occupationOf(log, dungeon.id);
       const cellar: Cellar = moved ? moveIn(firstCellar, moved, place, lore) : firstCellar;
       const name = `${cellar.house} (${dungeon.template}, ${cellar.dweller.id})`;
+      // What the household asks (D62): a fetch's keepsake lies in the lair's hoard, and only it does the task.
+      const verb = verbOf(log, lead.id), keepsake = lead.id === dungeon.id ? keepsakeOf(setting, dungeon, talk.familyAt(dungeon.building)) : null;
+      verbs.push(verb);
+      if (verb !== 'clear') say(`the household asks: ${verb}${keepsake ? ` ${keepsake.name}` : ''}`);
       // Out to the door above, or the barrow's mouth.
       const goDown = () => {
         if (dungeon.site) walkTo(name, dungeon.site.x - Math.sin(dungeon.site.yaw) * 2, dungeon.site.z - Math.cos(dungeon.site.yaw) * 2);
@@ -361,7 +369,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       let left: Remains | null = null;
       for (;;) {
         const spots = left ? [{ ...left.at, reached: () => { gather(hero, left!); say(`took up the pack left at the fall (${left!.items.length} ${left!.items.length === 1 ? 'thing' : 'things'})`); left = null; } }] : [];
-        const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0 });
+        const r = fightBot(cellar, setting, deriveSeed(dungeon.seed, 'visit', falls), hero, DELVE_LIMIT, { saved, loot: true, spots, rash: opts.reckless && falls === 0 && e === 0, keepsake });
         // Below: the fights and the searching spread over the visit, each meeting its need as it ends.
         watch.where = 'below';
         const parts = r.kills + r.looted + 1, cast = r.spells.length;
@@ -406,6 +414,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       if (school) say(`${spells} spells cast so far`);
       // Quiet, and the hero gone: back to its household to tell them (plan 4.2). They pay, the promise is
       // kept, and with the next lead already about they pass on its rumour.
+      if (verb === 'fetch' && !holdsKeepsake(hero.pack, lead.id)) throw new Broke(`came out of ${name} without ${keepsake?.name ?? 'the keepsake'}`);
       if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
       const to = talk.reportTo(lead.id).map((id) => people.find((p) => p.id === id)).find((p) => !!p);
       if (!to) throw new Broke(`nobody to tell that ${name} is safe`);
@@ -421,6 +430,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       watch.leads = 0;
       director.met('reward');
       promiseDue();
+      // A keepsake goes back to its household.
+      const back = hero.pack.findIndex((it) => it.keepsake === lead.id);
+      if (back >= 0) say(`handed back ${hero.pack.splice(back, 1)[0]!.name}`);
       const told = talk.toldSafe(to.id, lead.id, `paid ${reward}`);
       rumour = openPromises(log).find((o) => told.heard.includes(o.id) && !heard.has(o.id)) ?? null;
       say(`told ${talk.nameOf(to.id)} that ${name} is safe: paid ${reward} copper${rumour ? `, and heard a rumour of ${rumour.id}` : ''}`);
@@ -527,9 +539,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+    return { ok: false, failed: e.message, steps, cleared, verbs, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
   }
-  return { ok: true, failed: null, steps, cleared, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+  return { ok: true, failed: null, steps, cleared, verbs, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
 }
 
 /** A point just outside a building's door. */

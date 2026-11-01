@@ -72,6 +72,19 @@ export interface DungeonDecision {
   readonly quest?: string;
   /** The guild whose task it is (D49: a keeper's id): the one place that does the task. */
   readonly task?: string;
+  /** What its household asks (D62): a kind of the setting's asks and its verb; none (an older save, a guild's place): clear it. */
+  readonly ask?: PromiseAsk;
+}
+
+/** What a household asks about its place (D62, vgm/asks.ts): only the thing it names counts as done. */
+export interface PromiseAsk {
+  /** The setting's ask (its kind). */
+  readonly id: string;
+  readonly verb: string;
+  /** `fetch`: which of the ask's things (index). */
+  readonly thing?: number;
+  /** Which of the ask's told lines the household says (index). */
+  readonly line: number;
 }
 
 /**
