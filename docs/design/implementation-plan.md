@@ -231,6 +231,23 @@ Gate Q (Arnd: "lets tackle all of that now", so all five steps): the loop check 
 
 Built (2026-11-01, MW #457 to #464): all five steps. `npm run loop` prints `gate Q: met` for a run that has three kinds of task, none twice in a row, a twist, a consequence and a want, and each evening checks that the endings and wants read back from the log (two of the eight runs meet it). Still open for the gate: GPU shots of a parley, a seal and a night watch on Arnd's PC (`tools/shot/asks.mjs`), F1 to F4, Arnd's eye, the review.
 
+### Phase K: Caves that form (Arnd, 2026-11-01, D63)
+
+Goal: natural caves stop being rooms and passages. They form from rock and a process (water, lava, people after ore), and the game reads where one can go from the rock itself. The design is in [caves.md](caves.md). K1 and K2 are preview only, with Arnd's eye on many seeds before anything goes into play (hands-on design, Arnd's wish).
+
+| Step | Delivers | Done when | Design |
+|---|---|---|---|
+| K1 | **The rock block and the preview**: geology from the land's kind (layers, joints, faults, ore bodies, groundwater from the real heights above); a preview tool that forms and renders a cave alone (slices and the mesh, in the cloud) and a gallery page of seeds | Tests: the block is seeded and pure; a gallery of 12 seeds' rock blocks | caves.md 3.1 |
+| K2 | **The solution former**: flow from sinks to springs on a coarse lattice, widening by flow, collapse voids, tube, canyon and keyhole sections, levels as the water table drops; the carver turns it into the field (sparse bricks, surface nets) | A gallery of 24 seeds and three rock settings (branchwork, maze, braids); **Arnd's eye on the gallery** before K3; forms and carves in under 3 s in a worker | caves.md 3.2, 3.3 |
+| K3 | **The dresser**: silt floors, breakdown and rocks, streams along the flow lines, pools and rimstone, drips from ceiling joints with stalactites over stalagmites, flowstone; dead formations on dry levels | Gallery shots from the floor in the preview; the floor is level on under a tenth of standable ground | caves.md 3.4 |
+| K4 | **The reader and the concession**: standable ground from the field, links (walk, step, climb, squeeze, drop, swim), the network, places (voids, alcoves, junctions, ledges, depth), and the concession that opens cut-off parts | Tests: every seed of the gallery has its main part reachable from the way in; places found per seed; under 1 s per cave | caves.md 3.5, 3.6 |
+| K5 | **Formed caves in play**: walker, creatures, minimap, save and bot on the network; sinkholes and spring mouths as ways in (portals); daylight shafts; drip and stream sounds; the old natural caves replaced (sea caves too); squeeze if Arnd wants it now | The loop check delves formed caves; GPU shots from the floor, of a stream and drips, and of a daylight shaft; F2, F3 and F4 hold below ground and at load | caves.md 5 |
+| K6 | **Content in places**: lairs, treasure and set pieces placed in places, danger by depth; natural locks (sump, climb, squeeze, chasm, choke dug through on screen); the VGM `cave` tool asks for kind, size, danger and built share (row in vgm.md) | The variety sweep covers formed caves; tests for each lock; the loop check meets a sump and a climb | caves.md 3.7, rule 10 |
+| K7 | **Lava tubes**: volcanic country as a kind of land (cinder cones, lava fields, basalt) where the skeleton allows; the lava former traced down the land surface; arches, ledges, set lava floors, lava drips, braids and stacked tubes; skylights as ways in and light | Gallery, then GPU shots of a skylight from inside and of a tube from the floor; the loop check delves one | caves.md 3.2, 4 |
+| K8 | **Mines**: ore bodies in the rock block; the mine former (adit or shaft, drifts, crosscuts, stopes, winzes) with the built rooms near the entrance; tool marks, timbering, rails, carts; ore veins showing in the walls; break-throughs into natural caves by the built share | Gallery, then GPU shots of an ore vein, a stope and a break-through into a natural cave; the loop check delves one | caves.md 3.2, 3.3 |
+
+Gate K: Arnd's eye on the K2 gallery (passed before K3); in play a solution cave, a lava tube and a mine (with a break-through) in GPU shots from the floor, with water and drips, a skylight and an ore vein; the loop check delves each kind; F1 to F4 hold; the review.
+
 ### Parked: dialog needs a lot of love (Arnd, 2026-10-31)
 
 Talk with NPCs works but does not read well yet. Arnd: "The dialog is not good yet anyways. Lets park that for now but put it in the plan. Dialog needs a lot of love." It is planned in detail when Arnd opens it, after phase Q. Already seen:
