@@ -1,7 +1,7 @@
 /**
- * The aura round creatures in a fight (game/aura.ts, render/materials/aura.ts): `node tools/shot/auras.mjs [out dir]` after
+ * The outline round creatures in a fight (sim/aura.ts, render/materials/outline.ts): `node tools/shot/auras.mjs [out dir]` after
  * `npm run packs` and `npm run build`. A cellar with a pack (goblins, rats), the hero a few metres from the nearest, facing it:
- * a picture with no target (faint auras), one with the nearest picked (strong), one with the target hurt to half and one
+ * a picture with no target (thin outlines), one with the nearest picked (thick), one with the target hurt to half and one
  * to a sliver (colours), then the target killed and the next fighter taken as target. JPEGs into `<out dir>`
  * (default `shots/auras/<date>-<commit>/`). A slow check (docs/CHECKS.md), well under 5 min.
  */

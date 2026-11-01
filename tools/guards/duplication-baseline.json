@@ -364,6 +364,10 @@
     "reason": "The player's frame (walk, ride, puppet) and the water's: per-frame updates of different things."
   },
   {
+    "key": "idiom: [.add .mul .sub] in masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL node arithmetic (a wave's phase as x * k - t * s + seed): each shader builds its own waves, the flame's licks, the spell glows and the water's ripples; plain math in the node language, not a copied helper."
+  },
+  {
     "key": "idiom: [.add .mul .y] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
     "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted with app/hatchClimb.ts, which has no such chain."
   },
@@ -592,6 +596,10 @@
     "reason": "A step along the facing in each animal or person sim (z += sin(dir) v dt); one line each, the paces and checks differ."
   },
   {
+    "key": "idiom: [.map .place Promise] in masterworld/render/horse/HorseView.ts + masterworld/render/livestock/PoultryView.ts + masterworld/render/livestock/StockView.ts",
+    "reason": "Each animal view hands its body groups to warm-up and the stage (toWarm/enter); the bodies differ (horses, Actors herds, library hens)."
+  },
+  {
     "key": "idiom: [.range .rng .time .until] in masterworld/sim/livestock.ts + masterworld/sim/poultry.ts + masterworld/sim/smallLife.ts + masterworld/sim/townLife.ts",
     "reason": "Each sim agent holds its act until a seeded time; the acts and their lengths are each sim's own."
   },
@@ -792,6 +800,10 @@
     "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
   },
   {
+    "key": "idiom: [.mul .sub] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/waterSurface.ts",
+    "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
+  },
+  {
     "key": "idiom: [.mul .x .y] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts",
     "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
   },
@@ -870,21 +882,5 @@
   {
     "key": "same name: masterworld/sim/formedGround.ts#spot + masterworld/sim/wild.ts#spot",
     "reason": "FormedGround.spot implements the DenGround seam (sim/dungeonNav.ts) as the wild ground's does; each picks a spot on its own ground."
-  },
-  {
-    "key": "idiom: [.add .mul .sub] in masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "Node math of shader files (the aura's beside spellFx, flame, water ...): the shared seam is three's node API; the aura's own shape is its own expression."
-  },
-  {
-    "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/aura.ts + masterworld/render/materials/water.ts",
-    "reason": "Node math of shader files (the aura's beside spellFx, flame, water ...): the shared seam is three's node API; the aura's own shape is its own expression."
-  },
-  {
-    "key": "idiom: [.mul .sub] in masterworld/render/materials/aura.ts + masterworld/render/materials/building.ts + masterworld/render/materials/formedCave.ts",
-    "reason": "Node math of shader files (the aura's beside spellFx, flame, water ...): the shared seam is three's node API; the aura's own shape is its own expression."
-  },
-  {
-    "key": "idiom: [.mul .sub] in masterworld/render/materials/aura.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
-    "reason": "Node math of shader files (the aura's beside spellFx, flame, water ...): the shared seam is three's node API; the aura's own shape is its own expression."
   }
 ]
