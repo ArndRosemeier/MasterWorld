@@ -528,7 +528,7 @@
     "reason": "Each glowing kind sets additive blending on its own material (a material property, one line); nothing to share."
   },
   {
-    "key": "idiom: [.cos .sin .yaw Math] in masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/propModels.ts + masterworld/world/dungeon/site.ts",
+    "key": "idiom: [.cos .sin .yaw Math] in masterworld/world/cave/carve.ts + masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/propModels.ts + masterworld/world/dungeon/site.ts",
     "reason": "Turning a point by a yaw: a fallen block's box (caveFeatures.blockAt), a prop, a site's frame; two lines of trigonometry each, in different frames."
   },
   {
