@@ -67,6 +67,8 @@ export const caves: CavesDef = {
     rocks: { along: 16, perHall: [8, 16], size: [0.35, 1.5] },
     water: { width: [0.5, 1.5], bed: 0.28, pools: 4, poolDepth: 0.4 },
     drips: { chance: 0.55, live: 0.55, spacing: 1.7, scatter: 18 },
+    stones: { per100: 520, size: [0.06, 0.7], heaps: 0.3, most: 4500 },
+    crystals: { per100: 9, count: [3, 9], len: [0.1, 0.5], oreTries: 5000 },
     formations: { length: [0.2, 2.6], age: 0.5, column: 7, straws: 0.12, most: 3000 },
   },
   // Ore is for show (no mining, ever): veins on faults and joints, seams along a bed, pockets.

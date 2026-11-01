@@ -322,6 +322,10 @@ export interface CaveDressDef {
   readonly water: { readonly width: readonly [number, number]; readonly bed: number; readonly pools: number; readonly poolDepth: number };
   /** Drips fall along the cracks that cross a way's roof: chance at each spacing metres along the crack, the drips still running (the rest are dead), the crack's spacing; and drips from the roof away from any crack, per 100 m of way. */
   readonly drips: { readonly chance: number; readonly live: number; readonly spacing: number; readonly scatter: number };
+  /** Loose stones, per 100 m of way: their half-size (least, most; most are small: a power law), how many gather in heaps, and the most in a cave. */
+  readonly stones: { readonly per100: number; readonly size: readonly [number, number]; readonly heaps: number; readonly most: number };
+  /** Crystals on the walls: clusters per 100 m of way, how many prisms (least, most), how long (least, most), and tries to find ore in the walls (lumps and gems show where a body reaches the wall). */
+  readonly crystals: { readonly per100: number; readonly count: readonly [number, number]; readonly len: readonly [number, number]; readonly oreTries: number };
   /** Formations: stalactite length (least, most), how much longer old levels grow, a column forms where roof and floor are closer than `column`, the share of drips with a straw, at most this many in a cave. */
   readonly formations: { readonly length: readonly [number, number]; readonly age: number; readonly column: number; readonly straws: number; readonly most: number };
 }
@@ -2038,7 +2042,8 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
   if (!(wy.minWidth >= 1.6 && wy.minHeight >= 2.4 && wy.maxRadius > wy.minWidth && wy.maxCut > 0)) out.push(`${where}: cave ways must fit the standing hero (width >= 1.6 m, height >= 2.4 m)`);
   if (!(c.walls.rough >= 0 && c.walls.rough <= 1.2)) out.push(`${where}: cave wall roughness must be 0 to 1.2 m (more could close a way)`);
   const d = c.dress, span = (r: readonly [number, number], what: string) => { if (!(r[0] >= 0 && r[1] >= r[0])) out.push(`${where}: cave ${what} must be a range, least first`); };
-  span(d.floor.silt, 'silt depth'); span(d.rocks.perHall, 'rocks per hall'); span(d.rocks.size, 'rock size'); span(d.water.width, 'stream width'); span(d.formations.length, 'stalactite length');
+  span(d.floor.silt, 'silt depth'); span(d.rocks.perHall, 'rocks per hall'); span(d.rocks.size, 'rock size'); span(d.water.width, 'stream width'); span(d.formations.length, 'stalactite length'); span(d.stones.size, 'stone size'); span(d.crystals.count, 'crystal count'); span(d.crystals.len, 'crystal length');
+  if (!(d.stones.per100 >= 0 && d.stones.most >= 0 && d.stones.heaps >= 0 && d.stones.heaps <= 1 && d.crystals.per100 >= 0 && d.crystals.oreTries >= 0)) out.push(`${where}: cave stones and crystals need counts, and heaps a share`);
   if (!(d.floor.relief >= 0 && d.floor.relief <= 1)) out.push(`${where}: cave floor relief must be 0 to 1 m`);
   if (!(d.drips.chance >= 0 && d.drips.chance <= 1 && d.drips.live >= 0 && d.drips.live <= 1 && d.drips.spacing > 0.3 && d.drips.scatter >= 0)) out.push(`${where}: cave drips need chances 0 to 1 and a crack spacing over 0.3 m`);
   if (!(d.formations.most > 0 && d.formations.column > 0 && d.water.bed >= 0 && d.water.poolDepth >= 0)) out.push(`${where}: cave formations and water need positive sizes`);

@@ -5,7 +5,12 @@
  */
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { settingById } from '../setting/index';
+import { bedAt } from '../world/cave/block';
 import { coarsen, formedMesh } from '../world/cave/carve';
+import { formationMesh } from '../world/cave/formations';
+import { crystalsMesh, stonesMesh } from '../world/cave/loose';
+import { waterMesh, type WaterMesh } from '../world/cave/waterMesh';
+import type { PartMesh } from '../world/cave/parts';
 import type { Dressing } from '../world/cave/dress';
 import { dressFormed, formCave, type FormedCave } from '../world/cave/form';
 import type { Skeleton } from '../world/cave/skeleton';
@@ -26,6 +31,8 @@ export interface CaveJob {
 export interface CaveResult {
   readonly skeleton: Skeleton;
   readonly dressing: Dressing | null;
+  /** The dressing's loose parts as meshes (when it was dressed and meshed). */
+  readonly parts: { readonly formations: PartMesh; readonly stones: PartMesh; readonly crystals: PartMesh; readonly water: WaterMesh } | null;
   readonly mesh: BuildingMesh | null;
   readonly ms: FormedCave['ms'] & { readonly mesh: number; readonly dress: number };
   readonly rock: string;
@@ -39,7 +46,7 @@ export interface CaveResult {
   readonly dip: number;
 }
 
-const buffers = (m: BuildingMesh): ArrayBuffer[] => Object.values(m).flatMap((v) => (ArrayBuffer.isView(v) ? [v.buffer as ArrayBuffer] : []));
+const buffers = (m: object): ArrayBuffer[] => Object.values(m).flatMap((v) => (ArrayBuffer.isView(v) ? [v.buffer as ArrayBuffer] : []));
 
 serve<CaveJob, CaveResult>((job) => {
   const caves = settingById(job.setting).caves;
@@ -50,12 +57,14 @@ serve<CaveJob, CaveResult>((job) => {
   const t = Date.now();
   if (job.coarse !== 0) mesh = formedMesh(job.coarse && job.coarse > 1 ? coarsen(c.field, job.coarse) : c.field, c.block);
   const meshMs = Date.now() - t;
+  const bedTint = (x: number, y: number, z: number): [number, number, number] => { const i = bedAt(c.block.beds, x, y, z) * 3, bc = c.block.beds.color; return [bc[i], bc[i + 1], bc[i + 2]]; };
+  const parts = dressing && job.coarse !== 0 ? { formations: formationMesh(dressing.speleos, job.seed), stones: stonesMesh(dressing.stones, job.seed, bedTint), crystals: crystalsMesh(dressing.crystals), water: waterMesh(dressing, caves.dress.water.bed, caves.dress.water.poolDepth) } : null;
   const size = caves.sizes.find((s) => s.across === c.block.across && s.deep === c.block.deep)!;
   return {
     result: {
-      skeleton: c.skeleton, dressing, mesh, ms: { ...c.ms, mesh: meshMs, dress: dressMs }, rock: job.rock, size: { id: size.id, across: size.across, deep: size.deep },
+      skeleton: c.skeleton, dressing, parts, mesh, ms: { ...c.ms, mesh: meshMs, dress: dressMs }, rock: job.rock, size: { id: size.id, across: size.across, deep: size.deep },
       bricks: c.field.bricks.filter(Boolean).length, tris: mesh ? mesh.index.length / 3 : 0, face: c.block.water.face, dip: Math.atan(c.block.beds.slope) * 180 / Math.PI,
     },
-    transfer: mesh ? buffers(mesh) : [],
+    transfer: [...(mesh ? buffers(mesh) : []), ...(parts ? Object.values(parts).flatMap(buffers) : [])],
   };
 });
