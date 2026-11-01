@@ -98,6 +98,29 @@ test('walker: in a cave it climbs the ledge\'s face and pulls up over its top', 
   assert.ok(Math.abs(w.pos.y - 2.6) < 0.05 && w.pos.x > 3, `at ${w.pos.x.toFixed(2)}, ${w.pos.y.toFixed(2)}`);
 });
 
+/** A cave's floor at 0 and a low ledge `h` m up from x 2 on: too high to step, too low to climb. */
+const low = (h: number, rockHolds: boolean): WalkWorld => ({
+  height: () => -1000,
+  rockSurface: (x, y) => Math.min(y, Math.max(2 - x, y - h)),
+  waterLevel: () => null,
+  rockHolds: () => rockHolds,
+});
+
+test('walker: in a cave it hops up on a low ledge it can neither step nor climb, and not on one over its reach', () => {
+  for (const [h, up] of [[0.7, true], [1.2, true], [1.8, false]] as const) {
+    const w = new Walker(low(h, true)), seen = new Set<string>();
+    w.place(0, 0);
+    for (let t = 0; t < 8; t += 1 / 60) { w.step(east(), 1 / 60); seen.add(w.mode); }
+    if (up) assert.ok(seen.has('air') && Math.abs(w.pos.y - h) < 0.05 && w.pos.x > 3, `${h} m: at ${w.pos.x.toFixed(2)}, ${w.pos.y.toFixed(2)} (${[...seen].join(' ')})`);
+    else assert.ok(!seen.has('air') || w.pos.y < 1.3, `${h} m: hopped to ${w.pos.y.toFixed(2)}`);
+  }
+  // Out of doors there is no hop (a wall is a wall).
+  const w = new Walker(low(0.7, false));
+  w.place(0, 0);
+  for (let t = 0; t < 4; t += 1 / 60) w.step(east(), 1 / 60);
+  assert.ok(w.pos.x < 2 && w.pos.y < 0.1, `at ${w.pos.x.toFixed(2)}, ${w.pos.y.toFixed(2)}`);
+});
+
 /** A cave's floor at 0 and a wall 8 m high from x 2 on, with an opening in it: a passage 2.2 m high whose floor is 2.6 m up. */
 const opening: WalkWorld = {
   height: () => -1000,
