@@ -151,28 +151,31 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     // The surface keeps to the lowest floor near it, so the water never floats over a dip.
     const pts = raw.map((r, i) => {
       let lo = Infinity;
-      for (let o = -3; o <= 3; o++) lo = Math.min(lo, raw[Math.max(0, Math.min(raw.length - 1, i + o))].fl);
+      for (let o = -1; o <= 1; o++) lo = Math.min(lo, raw[Math.max(0, Math.min(raw.length - 1, i + o))].fl);
       return [r.x, lo - 0.05, r.z, Math.max(0.5, r.w)] as [number, number, number, number];
     });
+    // Where the floor rises more than a step over that surface there is no stream: cutting its bed down to the water would
+    // dig a slot a metre deep, whose walls the water hides and the hero cannot climb out of or walk along.
+    const dry = raw.map((r, i) => r.fl - pts[i][1] > d.water.cutMost);
     const length = pts.length * 1.1, want = Math.round(length / 100 * d.water.pools + rng.float() * 0.8);
     const flat = pts.map((_, i) => ({ i, slope: i < 4 || i > pts.length - 5 ? 9 : Math.abs(pts[i + 4][1] - pts[i - 4][1]) })).sort((a, b) => a.slope - b.slope);
     const taken: number[] = [], mine: Pool[] = [];
     for (const { i, slope } of flat) {
       if (taken.length >= want || slope > 0.3) break;
-      if (taken.some((t) => Math.abs(t - i) < 9)) continue;
+      if (dry[i] || taken.some((t) => Math.abs(t - i) < 9)) continue;
       const r = Math.min(2.4, raw[i].hh * 0.55, pts[i][3] * 1.8);
       if (r < 1.1) continue;
       taken.push(i); mine.push({ x: pts[i][0], y: pts[i][1], z: pts[i][2], r });
     }
-    for (const p of pts) basin(p[0], p[1], p[2], p[3], d.water.bed);
+    pts.forEach((p, i) => { if (!dry[i]) basin(p[0], p[1], p[2], p[3], d.water.bed); });
     for (const p of mine) basin(p.x, p.y, p.z, p.r, d.water.poolDepth);
     // Water stays where the cut bed holds it: a stretch over a drop or a gap is no stream.
     let run: [number, number, number, number][] = [];
     const keep = (): void => { if (run.length >= 6) streams.push({ pts: run }); run = []; };
-    for (const p of pts) {
-      const sp = spanAt(p[0], p[1] + 0.3, p[2]);
+    pts.forEach((p, i) => {
+      const sp = dry[i] ? null : spanAt(p[0], p[1] + 0.3, p[2]);
       if (sp && sp[0] <= p[1] - d.water.bed * 0.4 && sp[0] >= p[1] - d.water.bed - 0.5) run.push(p); else keep();
-    }
+    });
     keep();
     for (const p of mine) if (streams.some((s) => s.pts.some((q) => q[0] === p.x && q[2] === p.z))) pools.push(p);
   }

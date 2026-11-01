@@ -6,7 +6,9 @@ import { formationMesh } from '../src/world/cave/formations';
 import { crystalsMesh, stonesMesh } from '../src/world/cave/loose';
 import { floorUnder, waterMesh } from '../src/world/cave/waterMesh';
 import { dressFormed, formCave } from '../src/world/cave/form';
-import type { BrickField } from '../src/world/dungeon/rockMesh';
+import { fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
+import { Walker } from '../src/game/walker';
+import { formedWorld } from '../src/game/formedWorld';
 import { formedCave } from './support/formedCave';
 
 const caves = classic.caves!;
@@ -110,4 +112,22 @@ test('caves: the water lies over the floor as carved: never buried in rock, neve
   assert.ok(wet > 20, `${wet} wet vertices`);
   // The shore: vertices of no depth, where the surface meets the floor (they carry the water's height and no direction of their own beyond its stream's).
   assert.ok(Array.from({ length: w.position.length / 3 }, (_, i) => w.uv[i * 2]).some((d) => d === 0), 'a shore');
+});
+
+test('caves: the stream can be walked along: its bed is a shallow cut, not a slot the hero cannot enter (the real walker)', () => {
+  let tried = 0, blocked = 0;
+  for (const [seed, rock] of [[5, 'jointed'], [6, 'massive']] as const) {
+    const { c, dressing } = formedCave(seed, rock), f = c.field as BrickField, world = formedWorld(f);
+    for (const sm of dressing.streams) for (let i = 0; i + 3 < sm.pts.length; i += 2) {
+      const a = sm.pts[i], b = sm.pts[i + 3], w = new Walker(world);
+      let fy = a[1];
+      for (let y = a[1] + 1.5; y > a[1] - 1.5; y -= 0.05) if (fieldAt(f, a[0], y, a[2], -1) <= 0) { fy = y + 0.05; break; }
+      w.place(a[0], a[2], fy + 0.02);
+      for (let t = 0; t < 90; t++) w.step({ forward: 1, strafe: 0, heading: Math.atan2(-(b[0] - a[0]), -(b[2] - a[2])), walk: false, up: false, down: false }, 1 / 60);
+      tried++;
+      if (Math.hypot(w.pos.x - a[0], w.pos.z - a[2]) < 0.8 * Math.hypot(b[0] - a[0], b[2] - a[2])) blocked++;
+    }
+  }
+  assert.ok(tried >= 20, `${tried} stretches of stream tried`);
+  assert.ok(blocked <= tried * 0.15, `${blocked} of ${tried} stretches of the stream cannot be walked along`);
 });
