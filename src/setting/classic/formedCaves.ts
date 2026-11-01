@@ -7,7 +7,8 @@
 import type { CavesDef } from '../contract';
 
 /** Limestone's wall colours: buff, grey-brown, cream and a rust-stained brown. */
-const LIME = [0xb8a98a, 0x9c9078, 0xcbbf9f, 0x8d8670, 0xa6998a, 0x9a7f62] as const;
+// Limestone beds: mostly greys (pale, mid, dark, blue-grey, a greenish one), some buff and a brown, so no cave is one colour.
+const LIME = [0x9a9da0, 0x777b80, 0xb4b6b2, 0x5e6368, 0x868a8e, 0xa5a79c, 0x6a7078, 0xa89c88, 0x8a7a66, 0x4f5459] as const;
 
 export const caves: CavesDef = {
   // The land's kind holds the rock: karst and downs are limestone and chalk, open country sometimes, the mesas' foot hills now and then.

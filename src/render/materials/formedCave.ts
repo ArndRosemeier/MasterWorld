@@ -25,7 +25,7 @@ export const FORMED_ROCK = defineKind('formed rock', ['position', 'normal', 'tin
   const m = new MeshStandardNodeMaterial({ roughness: 0.9, metalness: 0 });
   const p = WORLD, n = normalWorld;
   const tintRaw = pow(attribute('tint', 'vec3'), vec3(2.2));
-  const tintLin = mix(tintRaw, vec3(dot(tintRaw, vec3(0.2126, 0.7152, 0.0722))), 0.3);
+  const tintLin = mix(tintRaw, vec3(dot(tintRaw, vec3(0.2126, 0.7152, 0.0722))), 0.15);
   const isOre = step(ORE_MAT - 0.5, attribute('mat', 'float'));
 
   // Smooth against rough: ~7 m patches. Rough is scalloped and ridged, smooth is polished and gently swollen.
@@ -68,7 +68,7 @@ export const FORMED_ROCK = defineKind('formed rock', ['position', 'normal', 'tin
 
   // Rust streaks run down the walls.
   const streak = smoothstep(0.3, 0.7, n3(vec3(p.x.mul(1.3), p.y.mul(0.13), p.z.mul(1.3))).add(n3(p.mul(0.2)).mul(0.5)));
-  const rustW = streak.mul(smoothstep(0.7, 0.1, n.y)).mul(0.45);
+  const rustW = streak.mul(smoothstep(0.7, 0.1, n.y)).mul(0.3);
 
   // Ore: its colour (the tint), speckled and glinting, over the stone.
   const speck = smoothstep(0.55, 0.85, n3(p.mul(7.0)));
@@ -79,8 +79,8 @@ export const FORMED_ROCK = defineKind('formed rock', ['position', 'normal', 'tin
   const mottle = float(0.78).add(n3(p.mul(0.9).add(vec3(2.2, 8.1, 4.4))).mul(0.28)).add(n3(p.mul(3.3)).mul(0.18)).add(n3(p.mul(34.0)).mul(0.14));
   // Each bed leans its own way: some grey, some ochre, some rust, so a wall is not one tan.
   const lum = dot(tintLin, vec3(0.2126, 0.7152, 0.0722)), hue = hash1(bed.add(3.0));
-  const cool = vec3(0.82, 0.88, 1.0).mul(lum), warm = vec3(1.18, 0.95, 0.7).mul(lum), rusty = vec3(1.25, 0.8, 0.6).mul(lum);
-  const bedTint = mix(mix(mix(tintLin, cool, smoothstep(0.55, 0.9, hue).mul(0.7)), warm, smoothstep(0.35, 0.05, hue).mul(0.55)), rusty, smoothstep(0.42, 0.5, hue).mul(smoothstep(0.58, 0.5, hue)).mul(0.5));
+  const cool = vec3(0.8, 0.88, 1.05).mul(lum), warm = vec3(1.18, 0.95, 0.7).mul(lum), rusty = vec3(1.25, 0.8, 0.6).mul(lum);
+  const bedTint = mix(mix(mix(tintLin, cool, smoothstep(0.5, 0.8, hue).mul(0.8)), warm, smoothstep(0.2, 0.03, hue).mul(0.4)), rusty, smoothstep(0.44, 0.5, hue).mul(smoothstep(0.56, 0.5, hue)).mul(0.3));
   const stone = bedTint.mul(0.8).mul(mottle).mul(tone).mul(parting).mul(cavity).mul(float(0.85).add(harder.mul(0.3)));
   let col = mix(stone, vec3(0.44, 0.22, 0.09).mul(tone), rustW);
   col = mix(col, vec3(0.74, 0.7, 0.62).mul(float(0.75).add(n3(p.mul(5.0)).mul(0.25))), crust.mul(0.8));

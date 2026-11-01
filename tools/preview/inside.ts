@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     const sheet = q.get('waterdebug') ? new T.Mesh(g, new T.MeshBasicMaterial({ color: 0xff00ff })) : kindMesh(g, FORMED_WATER); sheet.renderOrder = 2;
     scene.add(sheet);
   }
-  scene.add(new T.AmbientLight(0x6a7488, 0.4));
+  scene.add(new T.AmbientLight(0x8494b0, 0.55));
   scene.background = new T.Color(0x07080a);
   scene.fog = new T.FogExp2(0x07080a, 0.03);
   const ray = new T.Raycaster(), down = new T.Vector3(0, -1, 0);
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
   const out = document.createElement('canvas'); out.width = W * cols; out.height = H * Math.ceil(chosen.length / cols);
   document.body.appendChild(out);
   const ctx = out.getContext('2d')!;
-  const lantern = new T.PointLight(0xffc27a, 9, 40, 1.6); scene.add(lantern);
+  const lantern = new T.PointLight(0xffe2bd, 9, 40, 1.6); scene.add(lantern);
   const hero = new T.Group();
   hero.add(new T.Mesh(new T.CapsuleGeometry(0.28, 1.2, 4, 10), new T.MeshStandardMaterial({ color: 0x3d5a80, roughness: 0.8 })).translateY(0.95));
   hero.add(new T.Mesh(new T.SphereGeometry(0.16, 10, 8), new T.MeshStandardMaterial({ color: 0xd9b38c })).translateY(1.78));
