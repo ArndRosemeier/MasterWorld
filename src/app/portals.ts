@@ -184,6 +184,7 @@ export class Portals {
           here: f, there: there.frame, mesh,
           // Another realm's view draws its own shadow maps due this frame (the host's `showRealm` says whose).
           shadows: there.realm !== realm,
+          clipBack: h.portal.clipBack,
           beyond: () => {
             const back = this.host.showRealm(there.realm);
             const hero = this.heroIn(there.realm, heroRealm);
