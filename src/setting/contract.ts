@@ -1026,6 +1026,8 @@ export interface GuildTaskDef {
   readonly done: string;
   /** Only a place out on the land counts (a barrow, a cave, a tower), not a cellar. */
   readonly out?: boolean;
+  /** Only a place below a house counts (a cellar), not one out on the land. */
+  readonly house?: boolean;
   /** Abilities of this level and higher wait for it. */
   readonly from: number;
 }

@@ -148,7 +148,7 @@ export class GuildBook {
   /** Whether the task was given. */
   asked(guild: string): boolean { return this.given.has(guild); }
 
-  /** Whether the guild's task is done: a promise kept since it was given (out on the land, if it asks so). */
+  /** Whether the guild's task is done: a promise kept since it was given (out on the land, or below a house, if it asks so). */
   taskDone(g: GuildDef, log: DecisionLog): boolean {
     const from = this.given.get(g.keeper);
     if (from === undefined) return false;
@@ -156,7 +156,7 @@ export class GuildBook {
       if (d.kind !== 'kept' || d.at < from) continue;
       const p = log.find((x) => x.id === d.promise);
       const dungeon = p && (p.kind === 'dungeon' || p.kind === 'move-in') ? dungeonOf(log, p) : null;
-      if (dungeon && (!g.task.out || dungeon.site)) return true;
+      if (dungeon && (!g.task.out || dungeon.site) && (!g.task.house || !dungeon.site)) return true;
     }
     return false;
   }
