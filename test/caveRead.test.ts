@@ -1,23 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classic } from '../src/setting/classic/index';
-import { dressFormed, formCave, readFormed } from '../src/world/cave/form';
+import { caves, formedCave, makeCave } from './support/formedCave';
 import { Walker } from '../src/game/walker';
 import { formedWorld } from '../src/game/formedWorld';
 import { PART_MIN } from '../src/world/cave/reader';
 import { fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
 import { THROAT_BEYOND } from '../src/world/dungeon/caveThroat';
 
-const caves = classic.caves!;
-// A block a little smaller than the smallest cave, to keep within the time of `npm test`.
-const small = { ...caves.sizes.find((s) => s.id === 'small')!, across: 70, deep: 30, field: 0.6 };
-const read = (seed: number, rock: string) => {
-  const c = formCave(caves, seed, rock, small.id, undefined, undefined, small), d = dressFormed(c, caves);
-  return { c, ...readFormed(c, caves, d) };
-};
-// The same cave for the tests that only look at it (the seeded test forms its own twice).
-const made = new Map<string, ReturnType<typeof read>>();
-const seen = (seed: number, rock: string) => { const k = `${rock} ${seed}`; if (!made.has(k)) made.set(k, read(seed, rock)); return made.get(k)!; };
+const read = makeCave, seen = formedCave;
 
 test('caves: every cut-off part of a cave is opened by a hero-sized way, no cell is a squeeze, and a way in exists', () => {
   for (const [seed, rock] of [[5, 'jointed'], [6, 'massive'], [7, 'thin-bedded']] as const) {
@@ -32,7 +22,7 @@ test('caves: every cut-off part of a cave is opened by a hero-sized way, no cell
 });
 
 test('caves: the places of a cave are found, seeded, and every one lies on ground that can be reached', () => {
-  const a = read(5, 'jointed'), b = read(5, 'jointed');
+  const a = seen(5, 'jointed'), b = read(5, 'jointed');
   const kinds = new Set(a.reading.places.map((p) => p.kind));
   for (const k of ['entry', 'deadEnd', 'junction', 'ledge'] as const) assert.ok(kinds.has(k) || (k === 'deadEnd' && kinds.has('alcove')), `a ${k} is found`);
   for (const p of a.reading.places) assert.ok(a.reading.depth[p.cell] < Infinity, `${p.kind} lies on reached ground`);

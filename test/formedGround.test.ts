@@ -1,15 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
-import { dressFormed, formCave, readFormed } from '../src/world/cave/form';
+import { formedCave } from './support/formedCave';
 import { Den, type Quarry } from '../src/sim/creatures';
 import { FormedGround } from '../src/sim/formedGround';
 import type { BrickField } from '../src/world/dungeon/rockMesh';
 
-const caves = classic.caves!;
-const small = { ...caves.sizes.find((s) => s.id === 'small')!, across: 70, deep: 30, field: 0.6 };
-const c = formCave(caves, 6, 'massive', small.id, undefined, undefined, small);
-const { reading: g } = readFormed(c, caves, dressFormed(c, caves));
+const { c, reading: g } = formedCave(6, 'massive');
 const field = c.field as BrickField;
 const guard = { defence: 20, armour: 1, open: false };
 
