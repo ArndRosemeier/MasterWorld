@@ -809,6 +809,32 @@ export interface TreasureFind {
 export const TOP_FIND = 0.3;
 
 /**
+ * A twist (D62, Q3): what turns out other than the household told, seen in the world and heard in talk, never a
+ * note. `first`: someone got there first (its dwellers lie dead and searched, all but the strongest, hurt; the
+ * household says so: `told`). `changed`: the place changed since it was told (other dwellers there than the town
+ * speaks of; the thanks own to it). `lied`: the household lied (the thing they want back is another family's: its
+ * `lore` names them, `{other}`; the hero can give it to them instead, `give`, who thank them, `rightful`).
+ */
+export type TwistKind = 'first' | 'changed' | 'lied';
+export const TWIST_KINDS: readonly TwistKind[] = ['first', 'changed', 'lied'];
+export interface TwistDef {
+  readonly id: string;
+  readonly kind: TwistKind;
+  /** The asks' verbs it can come with. */
+  readonly verbs: readonly AskVerb[];
+  readonly weight: number;
+  readonly words: {
+    /** Added to what the household says of the trouble. */
+    readonly told?: string;
+    /** The household's thanks instead of the ask's (`{coins}`). */
+    readonly thanks?: string;
+    readonly lore?: string;
+    readonly give?: string;
+    readonly rightful?: string;
+  };
+}
+
+/**
  * What a household asks of the hero about its place (D62, phase Q): one verb on one place, and only the
  * thing it names counts as done. `clear`: the dwellers gone (as every lead was before). `fetch`: one named
  * thing out of the place (an heirloom). `seal`: the breach in the wall of its last room walled up (the hero kneels
@@ -1644,6 +1670,8 @@ export interface SettingModule {
   readonly festivities?: readonly FestivityDef[];
   /** What a household may ask of the hero besides clearing a place (D62, phase Q): each a verb on a place. None: every lead is "clear it". */
   readonly asks?: readonly AskDef[];
+  /** What may turn out other than told about an ask (D62, Q3); none: every ask is as told. */
+  readonly twists?: readonly TwistDef[];
   /** Birds and squirrels about the land; without it the land has none. */
   readonly smallLife?: SmallLifeDef;
   /** What fills the regions the VGM opens as the hero walks; without it no regions open beyond the start. */
@@ -1796,6 +1824,11 @@ export function validateSetting(m: SettingModule): string[] {
 /** What households ask (D62): known verbs, the things a fetch names exist, every ask says its words. */
 function validateAsks(m: SettingModule, where: string): string[] {
   const out: string[] = [];
+  for (const t of m.twists ?? []) {
+    if (!TWIST_KINDS.includes(t.kind)) out.push(`${where}: twist "${t.id}" kind "${t.kind}" is unknown`);
+    if (!t.verbs.length || t.verbs.some((v) => !ASK_VERBS.includes(v))) out.push(`${where}: twist "${t.id}" names no verbs, or one unknown`);
+    if (t.kind === 'lied' && (!t.words.lore || !t.words.give || !t.words.rightful)) out.push(`${where}: twist "${t.id}" is a lie: it needs lore, give and rightful`);
+  }
   const ids = new Set<string>();
   for (const a of m.asks ?? []) {
     if (ids.has(a.id)) out.push(`${where}: ask "${a.id}" defined twice`);

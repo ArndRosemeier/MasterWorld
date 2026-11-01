@@ -93,6 +93,8 @@ export interface LeadsContext {
   readonly near?: Town | null;
   /** What households may ask about a new place (D62); none: every place is to be cleared. */
   readonly asks?: SettingModule['asks'];
+  /** What may turn out other than told (Q3). */
+  readonly twists?: SettingModule['twists'];
 }
 
 /** Share of new places that lie out on the land (a barrow, a cave, a tower), when the setting has a kind none of which is open. */
@@ -110,7 +112,7 @@ function asked(c: LeadsContext, d: DungeonDecision): DungeonDecision {
   const place = placeOf(d, c.towns, c.dungeons);
   if (!place) return d;
   const dweller = sketchCellar(d, place, loreOf({ dungeons: c.dungeons }, d.template)).dweller;
-  const ask = askFor({ asks: c.asks }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id, encounter: dweller.encounter });
+  const ask = askFor({ asks: c.asks, twists: c.twists }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id, encounter: dweller.encounter });
   return ask ? { ...d, ask } : d;
 }
 

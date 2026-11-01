@@ -201,9 +201,10 @@ const pickDef = <T extends HistoryDef>(rng: Rng, list: readonly T[], ok: (d: T) 
 
 /**
  * The sketch: history, hints and facts (no layout). With `moved`, the dwellers who moved in after it was
- * cleared (plan 8.1); its history and hints are theirs, its id the move-in's.
+ * cleared (plan 8.1); its history and hints are theirs, its id the move-in's. `told`: as the town tells it (a
+ * place changed since, Q3, holds other dwellers than told).
  */
-export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: CellarLore, moved?: MoveInDecision | RetakeDecision): CellarSketch {
+export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: CellarLore, moved?: MoveInDecision | RetakeDecision, told = false): CellarSketch {
   const rng = new Rng(deriveSeed(d.seed, 'cellar', 'history'));
   const piece = setPieceById(d.setPiece);
   const name = houseName(house);
@@ -218,7 +219,10 @@ export function sketchCellar(d: DungeonDecision, house: DungeonPlace, lore: Cell
   const first = asked.length ? pickDef(rng, asked) : pickDef(rng, lore.dwellers, (w) => (!w.with || w.with.some((x) => ids.includes(x))) && w.danger <= (d.danger ?? Infinity));
   // Not every one is lived in (D57): an empty one is a sight, unless dwellers were asked for (its own stream: the rest stays).
   const empty = lore.empty && !asked.length && !moved && new Rng(deriveSeed(d.seed, 'cellar', 'empty')).chance(lore.empty.share) ? emptyDweller(lore.empty.def) : null;
-  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || empty || first;
+  // The place changed since it was told (Q3, a twist): others live there now than the town speaks of (`told`: as told).
+  const others = !told && !moved && !empty && d.ask?.twist === 'changed' ? lore.dwellers.filter((w) => w.id !== first.id && w.danger <= (d.danger ?? Infinity)) : [];
+  const since = others.length ? pickDef(new Rng(deriveSeed(d.seed, 'cellar', 'changed')), others) : null;
+  const dweller = (moved && lore.dwellers.find((w) => w.id === moved.dweller)) || empty || since || first;
   const line = (def: HistoryDef) => def.text.replaceAll('{house}', name).replaceAll('{place}', name);
   const history: HistoryEntry[] = [];
   if (older) history.push({ layer: 'older', def: older, text: line(older) });

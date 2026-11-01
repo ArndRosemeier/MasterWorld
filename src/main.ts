@@ -1386,7 +1386,15 @@ export async function start(b: Boot): Promise<void> {
       },
       heardOf: (id, from) => learnEvent(id, from),
       // A thief named and dealt with (D62): the ask is done; the household will want to hear.
-      named: (id) => { quietPlace?.(id); },
+      named: (id, ending) => {
+        if (ending !== 'given') { quietPlace?.(id); return; }
+        // A lie found out (Q3): the thing went to its rightful household; the one who lied gets nothing, and pays nothing.
+        const i = character.pack.findIndex((it) => it.keepsake === id);
+        if (i >= 0) character.pack.splice(i, 1);
+        const k = keepPromise(log, id, hours(), true, 'given');
+        if (k) log = [...log, k];
+        journal.fulfil(id);
+      },
       serve: (id, a) => services.get(id)?.(a),
       report: (id, a) => {
         const t = talk!.place;

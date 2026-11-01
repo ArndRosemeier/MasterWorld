@@ -20,7 +20,7 @@ import { wild } from './wild';
 import { encounters } from './encounters';
 import { events } from './events';
 import { festivities } from './festivities';
-import { asks } from './asks';
+import { asks, twists } from './asks';
 import { regions } from './regions';
 import { smallLife } from './smallLife';
 import { tower } from './tower';
@@ -114,6 +114,7 @@ export const classic: SettingModule = {
   events,
   festivities,
   asks,
+  twists,
   smallLife,
   regions,
 };

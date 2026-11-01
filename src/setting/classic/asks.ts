@@ -3,7 +3,7 @@
  * kind names one thing, and only that thing counts as done. The VGM picks the kind (vgm/asks.ts) and keeps
  * from giving the same kind twice in a row.
  */
-import type { AskDef } from '../contract';
+import type { AskDef, TwistDef } from '../contract';
 
 export const asks: readonly AskDef[] = [
   {
@@ -168,6 +168,35 @@ export const asks: readonly AskDef[] = [
       note: 'I know who the thief is, and I have {thing}. {name} of {house} will want to hear it.',
       thanks: '{thing}, and the thief found out! I would never have guessed. Here, {coins}, and my thanks.',
       missing: 'You know who it is? Then you will have found {thing}. Bring it back.',
+    },
+  },
+];
+
+/** What may turn out other than told (Q3): seen in the place and heard in talk, never a note. */
+export const twists: readonly TwistDef[] = [
+  {
+    id: 'got-there-first',
+    kind: 'first',
+    verbs: ['clear', 'fetch', 'seal', 'lost'],
+    weight: 1,
+    words: { told: 'And a sellsword from the road went down there before you, for the reward. He came up bleeding and left town. Whatever is still down there is angry now.' },
+  },
+  {
+    id: 'changed',
+    kind: 'changed',
+    verbs: ['clear', 'fetch', 'seal', 'lost'],
+    weight: 1,
+    words: { thanks: 'Those? That is not what we saw down there. Then something worse moved in since, and you dealt with it anyway. Here, {coins}, and more for the fright.' },
+  },
+  {
+    id: 'not-theirs',
+    kind: 'lied',
+    verbs: ['fetch'],
+    weight: 1,
+    words: {
+      lore: 'Turned to the light, it bears another mark than theirs: the {other} family\'s.',
+      give: 'This has your family\'s mark on it: {thing}.',
+      rightful: 'That is ours! It went missing years ago, and we never knew where. So that is where it went. Thank you, truly.',
     },
   },
 ];

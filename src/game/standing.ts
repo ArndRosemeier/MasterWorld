@@ -194,5 +194,10 @@ export function peopleOf(residents: readonly Person[]): string | null {
 export function householdOf(log: DecisionLog, promise: string, people: readonly Person[]): Person | null {
   const dungeon = dungeonOf(log, log.find((x) => x.id === promise));
   if (!dungeon) return null;
-  return people.find((p) => p.home === dungeon.building && p.role !== 'child' && p.role !== 'traveller') ?? null;
+  return grownUpOf(people, dungeon.building);
+}
+
+/** A grown-up who lives in house `building` (not a child, not a traveller staying there), or null. */
+export function grownUpOf<P extends Pick<Person, 'home' | 'role'>>(people: readonly P[], building: number | undefined): P | null {
+  return people.find((p) => p.home === building && p.role !== 'child' && p.role !== 'traveller') ?? null;
 }

@@ -13,7 +13,7 @@ import { hoardsOf, type Hoard } from '../world/dungeon/treasure';
 import type { Character } from './character';
 import { Fight, type FightEvent, type HeroPose } from './fight';
 import { rollLoot, type Item, type Loot } from './items';
-import { askDefOf, askMet, holdsKeepsake } from '../vgm/asks';
+import { askDefOf, askMet, holdsKeepsake, twistOf } from '../vgm/asks';
 import type { PromiseAsk } from '../world/decisions';
 
 export interface DelveSave {
@@ -48,6 +48,8 @@ export interface ParleyWord {
 const REACH = 1.9;
 /** A parley's leader is spoken with from this far (m): not up close to someone wary. */
 const SPEAK = 2.6;
+/** What health the strongest has left after someone got there first (Q3). */
+const FIRST_LEFT = 0.55;
 
 export class Delve {
   readonly den: Den;
@@ -69,6 +71,7 @@ export class Delve {
     for (const b of saved?.searched ?? []) this.searched.add(b);
     this.sealed = !!saved?.sealed;
     this.parley = saved?.parley ?? null;
+    this.fresh = !saved;
     // The fallen not yet searched still carry what they had (rolled from their own seed).
     for (const c of this.den.creatures) if (c.state === 'dead' && !this.searched.has(c.id)) this.fight.restoreBody(c);
   }
@@ -92,6 +95,20 @@ export class Delve {
     this.asked = a;
     // A parley's dwellers watch the hero and do not fight unless struck (as a hold's wardens), until it is broken.
     if (a?.verb === 'parley' && this.parley !== 'broken') this.makePeace();
+    // Someone got there first (Q3): its dwellers lie dead and searched, all but the strongest, hurt (a fresh visit only: the save keeps the rest).
+    if (this.fresh && twistOf(this.setting, a)?.kind === 'first') this.beatenBefore();
+  }
+  /** Nothing of it was saved yet (the first visit). */
+  private readonly fresh: boolean;
+
+  /** Someone else fought here before the hero: all but the strongest dead, their bodies searched; the strongest hurt. */
+  private beatenBefore(): void {
+    const left = this.chief;
+    for (const c of this.den.creatures) {
+      if (c === left) { c.health = Math.max(1, Math.round(c.health * FIRST_LEFT)); continue; }
+      c.health = 0; c.state = 'dead'; c.act = 'dead';
+      this.searched.add(c.id);
+    }
   }
   private asked: PromiseAsk | null = null;
   keepsake: Item | null = null;

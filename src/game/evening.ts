@@ -16,13 +16,13 @@ import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
-import { askDefOf, holdsKeepsake, keepsakeOf, verbOf } from '../vgm/asks';
+import { askDefOf, holdsKeepsake, keepsakeOf, twistOf, verbOf } from '../vgm/asks';
 import { NightWatch, nightWatchFor, watchDoor } from '../vgm/watch';
 import { hailer } from '../vgm/guide';
 import { Director, NEEDS, type Need } from '../vgm/director';
 import { answerNeed } from '../vgm/toolbox';
 import { dungeonOf, settlementOf, type Decision, type DungeonDecision, type RegionDecision } from '../world/decisions';
-import { moveIn, outlineCellar, type Cellar } from '../world/dungeon/cellar';
+import { moveIn, outlineCellar, sketchCellar, type Cellar } from '../world/dungeon/cellar';
 import { marketStart, type Town } from '../world/town';
 import { Character } from './character';
 import { fallClassic, gather, remainsId, type Remains } from './death';
@@ -35,7 +35,7 @@ import { itemWorth, type Merchant } from './trade';
 import { Township } from './township';
 import { mendAll, takeRoom, wakePlace } from './upkeep';
 import { abilityPrice, bardTells, GuildBook, teach, teachingsOf, teachRefusal } from './guilds';
-import { Standing } from './standing';
+import { Standing, grownUpOf } from './standing';
 import { WALK, Walker, type WalkWorld } from './walker';
 import type { Terrain } from '../world/terrain';
 
@@ -55,6 +55,8 @@ export interface EveningResult {
   readonly cleared: readonly string[];
   /** What each lead asked, in order (D62: clear, fetch, ...). */
   readonly verbs: readonly string[];
+  /** The twists met (Q3), in order. */
+  readonly twists: readonly string[];
   readonly falls: number;
   /** Copper the finds fetched, and what was bought. */
   readonly earned: number;
@@ -153,7 +155,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   const power0 = hero.power;
   // Standing in a town for the first time is a discovery (D58), as in the game.
   hero.earn(`town:${town.decision.id}`, 'town');
-  const verbs: string[] = [];
+  const verbs: string[] = [], twists: string[] = [];
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
   const book = new GuildBook();
   // A human hero (the creator's first people): a guild's task done is a good deed with its trainer's people (D54).
@@ -225,7 +227,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   // In a settlement the VGM promises from there (vgm/leads.ts `near`), as the game does while the hero is in one.
   // Its danger counts from there too, as for a hero whose game began there: a fresh hero is the check's, and
   // danger by distance from the start (D29) would make any settlement a few km out a check of luck in a fight.
-  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, asks: setting.asks, terrain, near: town === start ? null : town });
+  const vgmNext = () => nextPromise({ seed, log, towns: terrain.towns, home: town.decision, hours, purposeOverdue: false, inside: () => false, dungeons: setting.dungeons, asks: setting.asks, twists: setting.twists, terrain, near: town === start ? null : town });
 
   const walkTo = (what: string, x: number, z: number) => {
     const inTown = (px: number, pz: number) => Math.hypot(px - town.decision.x, pz - town.decision.z) < town.decision.radius + 60;
@@ -382,6 +384,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       const own = lead.id === dungeon.id, verb = verbOf(log, lead.id), ask = own ? dungeon.ask ?? null : null;
       const names = talk.namesFor(dungeon), keepsake = own ? keepsakeOf(setting, dungeon, names) : null;
       verbs.push(verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb);
+      const twist = own ? twistOf(setting, dungeon.ask) : null;
+      if (twist) { twists.push(twist.kind); say(`twist: ${twist.kind}${twist.kind === 'changed' ? ` (told ${sketchCellar(dungeon, place, lore, undefined, true).dweller.id}, finds ${cellar.dweller.id})` : ''}`); }
       if (verb !== 'clear') say(`the household asks: ${verb}${names.who && verb === 'lost' ? ` ${names.who}` : ''}${keepsake ? ` (${keepsake.name})` : ''}`);
       // Out to the door above, or the barrow's mouth.
       const goDown = () => {
@@ -473,7 +477,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         }
       }
       // A thief (D62): the stash gave them away; faced with it, they own up, and the hero turns them in or lets them go.
-      let ending: 'caught' | 'let-go' | undefined;
+      let ending: 'caught' | 'let-go' | 'given' | undefined;
       if (ask?.verb === 'thief') {
         talk.holding = (id) => holdsKeepsake(hero.pack, id);
         const who = talk.askOf(lead.id)?.thief, thief = people.find((p) => p.id === who);
@@ -487,7 +491,21 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         if (!ending) throw new Broke(`${talk.nameOf(thief.id)} owned up but nothing came of it`);
         say(`${ending === 'caught' ? 'turned in' : 'let go'} ${talk.nameOf(thief.id)}: "${r.text}"`);
       }
-      if (!broke) {
+      // A lie (Q3): the thing bears another family's mark; half the time the hero gives it to them instead, and the one who lied pays nothing.
+      let gave = false;
+      if (twist?.kind === 'lied' && new Rng(deriveSeed(seed, 'lied', lead.id)).chance(0.5)) {
+        talk.holding = (id) => holdsKeepsake(hero.pack, id);
+        const rightful = grownUpOf(people, talk.askOf(lead.id)?.rightful);
+        if (!rightful) throw new Broke(`${keepsake?.name} is another family's, and nobody of theirs lives in town`);
+        walkTo(`${talk.nameOf(rightful.id)}'s door`, ...front(town.plan.buildings[rightful.home]));
+        if (!talk.topics(rightful.id).some((t) => t.id === `give:${lead.id}`)) throw new Broke(`cannot give ${keepsake?.name} to ${talk.nameOf(rightful.id)}`);
+        say(`gave ${keepsake?.name} to ${talk.nameOf(rightful.id)}, whose it was: "${talk.ask(rightful.id, `give:${lead.id}`).text}"`);
+        hero.pack.splice(hero.pack.findIndex((it) => it.keepsake === lead.id), 1);
+        const k = keepPromise(log, lead.id, hours, true, 'given');
+        if (k) log = [...log, k];
+        gave = true;
+      }
+      if (!broke && !gave) {
       if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
       const to = talk.reportTo(lead.id).map((id) => people.find((p) => p.id === id)).find((p) => !!p);
       if (!to) throw new Broke(`nobody to tell that ${name} is safe`);
@@ -613,9 +631,9 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   } catch (e) {
     if (!(e instanceof Broke)) throw e;
     say(`BROKE: ${e.message}`);
-    return { ok: false, failed: e.message, steps, cleared, verbs, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+    return { ok: false, failed: e.message, steps, cleared, verbs, twists, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
   }
-  return { ok: true, failed: null, steps, cleared, verbs, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
+  return { ok: true, failed: null, steps, cleared, verbs, twists, falls, earned, bought, lessons: taught, spent, purse: hero.coins, power: [power0, hero.power], level: hero.level, xp: hero.xp, seconds, spells, overdue, style: director.model.style, challengeLean: director.model.lean('challenge') };
 }
 
 /** A point just outside a building's door. */

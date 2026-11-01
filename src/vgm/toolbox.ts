@@ -23,7 +23,7 @@ export type Asked = 'start' | 'walk' | 'turn' | 'need' | 'call';
 
 /** What the Builder's turn knows: the log, the land and towns, the hours, the hero and the setting. */
 export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & Omit<EventsContext, 'setting'> & {
-  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world' | 'asks'>;
+  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world' | 'asks' | 'twists'>;
   /** Ask only these turn tools (by id); none: all of them. */
   readonly tools?: readonly string[];
   /** How much this player enjoys a need (C12: the player model); none: no lean. */
@@ -67,7 +67,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'wild', name: 'Place the wild', writes: ['wild'], need: 'challenge', asked: 'call' },
   { id: 'island-place', name: 'A place on an island', writes: ['dungeon'], need: 'discovery', asked: 'turn', next: (c) => islandPlace({ ...c, dungeons: c.setting.dungeons }),
     why: (d) => (d.kind === 'dungeon' ? `a ${d.template} out on the island of ${d.town}, for its people to know of` : d.kind) },
-  { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons, asks: c.setting.asks }),
+  { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons, asks: c.setting.asks, twists: c.setting.twists }),
     why: (d, c) => {
       const open = openPromises(c.log).length;
       const what = d.kind === 'move-in' ? `new dwellers into ${d.dungeon}` : d.kind === 'dungeon' ? `a ${d.template} for ${d.town}` : d.kind;
