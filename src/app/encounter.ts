@@ -31,6 +31,7 @@ import { OVER_HEAD } from './speech';
 import type { Notes } from './notes';
 import type { Player } from './player';
 import { SearchKneel } from './searchKneel';
+import type { Fallen } from './fallen';
 
 export interface FightHost {
   readonly bindings: Bindings;
@@ -117,8 +118,6 @@ export class Encounter {
   private reported = false;
   /** Its dwellers were replaced by new ones (a move-in): it no longer plays. */
   retired = false;
-  private down = 0;
-  private fallenFor = -1;
   private wasFighting = 0;
   private near: Lootable | null = null;
   private readonly ray = new Vector3();
@@ -299,11 +298,10 @@ export class Encounter {
         if (w) this.director.queue(w, 3);
       }
     }
-    // Fallen: the wards go dark, then the hero wakes at the inn.
+    // Fallen: the wards go dark, then the hero wakes at the inn (app/fallen.ts sees to that, whoever struck the blow).
     if (!this.hero.alive) {
       this.getUp();
-      this.down += dt;
-      if (lead && this.down > 3.2 && this.fallenFor >= 0) this.wakeUp();
+      this.fight.pick(null);
       this.creatures.pose(dt);
       return;
     }
@@ -389,26 +387,8 @@ export class Encounter {
       case 'refused': this.notes.say(e.text, 2.5); break;
       case 'recipe': if (this.active) this.spellCues.push(e.event); break;
       case 'worn': if (e.state !== 'new') this.director.queue(fill(this.setting.upkeep.words[e.state], { item: e.item.name.toLowerCase() }), 1); break;
-      case 'fallen':
-        this.fallenFor = 0;
-        this.down = 0;
-        this.hud.fallen(true, 'You fall.');
-        this.host.still(true);
-        break;
       default: break;
     }
-  }
-
-  /** The wards gone dark: the hero wakes somewhere safe (classic), or stays down for good (roguelike). */
-  private wakeUp(): void {
-    this.fallenFor = -1;
-    this.fight.pick(null);
-    const woke = this.host.wake();
-    if (woke === null) return;
-    this.hud.fallen(false);
-    this.host.still(false);
-    this.onCue({ kind: 'woke' });
-    this.notes.say(woke, 8);
   }
 }
 
@@ -416,7 +396,9 @@ export class Encounter {
  * One frame of every encounter: those the hero is in play (the most stirred leads), the others rest;
  * with none, the hero catches breath and the HUD shows only while they are hurt.
  */
-export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[] }): void {
+export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[]; readonly fallen?: Fallen }): void {
+  // A fall is seen through whichever fight (if any) dealt it.
+  calm.fallen?.seeTo(dt, calm.hero);
   let best: Encounter | null = null;
   // A bird in the hero's place (bird form) is nothing the dwellers fight: every encounter rests meanwhile.
   const flown = !!calm.player.shape?.aloft;

@@ -99,6 +99,7 @@ import { UsePrompt } from './app/usePrompt';
 import { voyageArrived, voyagesIn } from './vgm/voyages';
 import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
+import { Fallen } from './app/fallen';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
@@ -831,6 +832,8 @@ export async function start(b: Boot): Promise<void> {
       failed: (id) => failedPlace?.(id) ?? true,
       say: (text, at) => overHead(text, at),
     };
+    // The hero's fall, seen through to its end whichever fight dealt it.
+    const fallen = new Fallen(fightHost, fightHud, notes, (c) => sounds?.cue(c));
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
     // The portals (app/portals.ts: a cave's mouth joined to its throat below), and those opened before they were set up.
@@ -2454,7 +2457,7 @@ export async function start(b: Boot): Promise<void> {
           if ((drownClock -= dt) <= 0) { drownClock = 1; fightHud.hurt(); }
         }
         breathHud.showBreath(breath.share, under, character.gills);
-        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
+        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
         const lead = leading();
         // A level gained (G3): the ring of light, the chime and the seal engraved; the hands raised only out of a fight.
         const h = player.hero, act = player.stance.action, acting = !!act && !!h && h.clock - act.t0 < act.dur;
