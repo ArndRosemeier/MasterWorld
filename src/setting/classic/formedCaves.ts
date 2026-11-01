@@ -10,14 +10,18 @@ import type { CavesDef } from '../contract';
 // Limestone beds: mostly greys (pale, mid, dark, blue-grey, a greenish one), some buff and a brown, so no cave is one colour.
 const LIME = [0x9a9da0, 0x777b80, 0xb4b6b2, 0x5e6368, 0x868a8e, 0xa5a79c, 0x6a7078, 0xa89c88, 0x8a7a66, 0x4f5459] as const;
 
+/** Basalt's flow beds: blacks and dark greys, a rust-stained bed and a reddish one where the lava was oxidised. */
+const BASALT = [0x2c2b2b, 0x383635, 0x45403e, 0x242424, 0x3d3f42, 0x5a463e, 0x4f4a46, 0x6a4f42] as const;
+
 export const caves: CavesDef = {
   // The land's kind holds the rock: karst and downs are limestone and chalk, open country sometimes, the mesas' foot hills now and then.
-  // (Volcanic country, with lava tubes, comes with K7; moor and badlands hold no solution cave.)
+  // (Moor and badlands hold no solution cave; volcanic country holds lava tubes, K7.)
   geology: [
     { kind: 'karst', rocks: { massive: 3, jointed: 2, 'thin-bedded': 2 } },
     { kind: 'downs', rocks: { 'thin-bedded': 3, massive: 1 } },
     { kind: 'open', rocks: { massive: 2, jointed: 1, 'thin-bedded': 1 } },
     { kind: 'mesa', rocks: { massive: 1, jointed: 2 } },
+    { kind: 'volcanic', rocks: { basalt: 1 } },
   ],
   rocks: [
     {
@@ -49,6 +53,22 @@ export const caves: CavesDef = {
       water: { sinks: [3, 6], springs: [2, 3], stages: [2, 3], drop: [4, 8], loop: 6 },
       former: { rounds: 3, samples: 2, feedback: 1.3, growth: 0.35, reuse: 0.15, noise: 0.6, keep: 0.02 },
       collapse: { junction: 0.2, span: 5, most: 3 },
+    },
+    {
+      // Lava tubes (K7): flows of basalt, one over another, cracked into columns. The water numbers only give the block its
+      // groundwater (a tube has no stream); the tube's making is `lava`.
+      id: 'basalt', name: 'Basalt lava flows',
+      bedding: { thickness: [1.5, 5], dip: [0, 3], soluble: 0.5, parting: 0.5, colors: BASALT },
+      resistance: { size: 30, contrast: 1 },
+      joints: { sets: 2, spacing: [3, 6], between: [55, 75], strength: 0.3 },
+      faults: { count: [0, 1], strength: 1 },
+      water: { sinks: [1, 2], springs: [1, 1], stages: [1, 1], drop: [4, 6], loop: 4 },
+      former: { rounds: 1, samples: 1, feedback: 1, growth: 0.3, reuse: 0.2, noise: 0.2, keep: 0.05 },
+      collapse: { junction: 0, span: 6, most: 3 },
+      lava: {
+        halfWidth: [2.6, 6.2], halfHeight: [2, 3.6], gradient: [0.02, 0.07], length: [1, 1.8], roof: 4,
+        branches: [0, 2], branchLength: [28, 70], wander: 0.7, skylights: { most: 3, apart: 38, thin: 7 },
+      },
     },
   ],
   // The big cave is about 300 m across and 60 m deep (Arnd, D63).

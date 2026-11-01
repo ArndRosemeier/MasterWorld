@@ -99,6 +99,7 @@ import { UsePrompt } from './app/usePrompt';
 import { voyageArrived, voyagesIn } from './vgm/voyages';
 import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
+import { Fallen } from './app/fallen';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
@@ -835,6 +836,8 @@ export async function start(b: Boot): Promise<void> {
       failed: (id) => failedPlace?.(id) ?? true,
       say: (text, at) => overHead(text, at),
     };
+    // The hero's fall, seen through to its end whichever fight dealt it.
+    const fallen = new Fallen(fightHost, fightHud, notes, (c) => sounds?.cue(c));
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
     // The portals (app/portals.ts: a cave's mouth joined to its throat below), and those opened before they were set up.
@@ -1040,7 +1043,12 @@ export async function start(b: Boot): Promise<void> {
       }
       // Far enough off to see it whole.
       const off = { hatch: 9, mound: 9, mouth: 16, keep: 32 }[lookForm.shell];
-      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * off, undefined, b.site.z + Math.cos(b.site.yaw) * off, b.site.yaw);
+      if (b?.site) {
+        const tx = b.site.x + Math.sin(b.site.yaw) * off, tz = b.site.z + Math.cos(b.site.yaw) * off;
+        // (Its mouth and rooms made first: a cave's portal is open when one arrives, not a moment after.)
+        await cellars.buildNear(tx, tz);
+        player.teleport(tx, undefined, tz, b.site.yaw);
+      }
     }
     // `wreck`: in the sea 14 m off a wreck near the start town, facing her (one is put there now if there is none).
     if (params.wreck && start) {
@@ -2458,7 +2466,7 @@ export async function start(b: Boot): Promise<void> {
           if ((drownClock -= dt) <= 0) { drownClock = 1; fightHud.hurt(); }
         }
         breathHud.showBreath(breath.share, under, character.gills);
-        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
+        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
         const lead = leading();
         // A level gained (G3): the ring of light, the chime and the seal engraved; the hands raised only out of a fight.
         const h = player.hero, act = player.stance.action, acting = !!act && !!h && h.clock - act.t0 < act.dur;

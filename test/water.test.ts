@@ -102,7 +102,8 @@ test('water mask: a river\'s current dies away where it meets a lake, the lake l
   for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
     const x = x0 + (i + 0.5) * step, z = z0 + (j + 0.5) * step, p = (j * res + i) * 4, l = tl.lakeNear(x, z);
     const flow = Math.hypot(m[p + 2], m[p + 3]);
-    if (l && l.shore(x, z) <= 50 && m[p + 1] > 0) { still++; assert.equal(flow, 0, `current on the lake at ${x.toFixed(0)},${z.toFixed(0)}`); }
+    // (The mouth itself, as wide as the river is, still runs a little; the lake beyond it lies still.)
+    if (l && l.shore(x, z) <= 50 && m[p + 1] > 0 && Math.hypot(x - mouth[0], z - mouth[1]) > widest) { still++; assert.equal(flow, 0, `current on the lake at ${x.toFixed(0)},${z.toFixed(0)}`); }
     else if (flow > 0.3) running++;
   }
   assert.ok(still > 20 && running > 5, `still ${still}, running ${running}`);

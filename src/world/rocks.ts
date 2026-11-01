@@ -93,10 +93,11 @@ export function rocksOf(f: Landform): number[] {
       }
       break;
     }
-    case 'sinkhole': {
+    case 'sinkhole': case 'cone': {
+      // A sinkhole's rim of blocks, a cinder cone's lava blocks round its crater.
       const n = 3 + Math.round(rock * 6);
       for (let k = 0; k < n; k++) {
-        const a = rng.float() * Math.PI * 2, r = L * rng.range(0.55, 0.95);
+        const a = rng.float() * Math.PI * 2, r = L * (f.shape === 'cone' ? rng.range(0.2, 0.5) : rng.range(0.55, 0.95));
         lay(f.x + Math.cos(a) * r, f.z + Math.sin(a) * r, rng.range(0.4, 1.1), 'block');
       }
       break;

@@ -11,6 +11,7 @@ import type { Terrain } from './terrain';
 import type { CropKind } from '@futuremagic/settlement';
 import { TownGround } from './town';
 import { WAYS, emptyRoad } from './roads';
+import { drawnOf } from './drawnGround';
 
 const TRACK = WAYS.indexOf('track');
 
@@ -33,7 +34,9 @@ const SNOW = 1650;
 
 /**
  * Float RGBA per sample, row-major from (x0, z0), at pixel centres: R = ground height, G = grass density
- * 0..1, B = blade height (m), A = dryness 0..1.
+ * 0..1, B = blade height (m), A = dryness 0..1. The ground is the ground as drawn (world/drawnGround.ts), like the
+ * hero's, the trees' and the rocks': blades rooted on the land's own height sank into the mesh, or stood over it,
+ * where the mesh steps over relief finer than its grid (up to 0.8 m at a gully's lip).
  */
 export function grassMask(t: Terrain, job: MaskJob): Float32Array {
   const { x0, z0, size, res } = job;
@@ -84,9 +87,9 @@ export function grassMask(t: Terrain, job: MaskJob): Float32Array {
     return lerp(lerp(q(0, 0), q(1, 0), u), lerp(q(0, 1), q(1, 1), u), v);
   };
 
-  // Heights with one extra ring, so slopes on the edge match the neighbouring mask's.
-  const m = res + 2, ground = new Float32Array(m * m);
-  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) ground[j * m + i] = t.height(x0 + (i - 0.5) * step, z0 + (j - 0.5) * step);
+  // Heights of the drawn ground with one extra ring, so slopes on the edge match the neighbouring mask's.
+  const drawn = drawnOf(t), m = res + 2, ground = new Float32Array(m * m);
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) ground[j * m + i] = drawn.footing(x0 + (i - 0.5) * step, z0 + (j - 0.5) * step);
   const gh = (i: number, j: number) => ground[(j + 1) * m + i + 1];
 
   for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {

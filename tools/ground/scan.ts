@@ -4,10 +4,10 @@
  * brook) and read at points all over it, mesh against world/drawnGround.ts (what the hero, creatures and birds stand
  * on). Fails if any point is off by more than 1 cm: then the hero sinks into or floats over what is drawn.
  *
- * Trees and rocks stand on the drawn ground too: it fails if a tree's foot is off the mesh by more than 1 cm, or a
- * rock's middle floats over it. It also reports where the land's own height is off the drawn ground by more than
+ * Trees, rocks and grass stand on the drawn ground too: it fails if a tree's foot is off the mesh by more than 1 cm, or a
+ * rock's middle floats over it, or a grass mask's ground is off it. It also reports where the land's own height is off the drawn ground by more than
  * 0.5 m: relief finer than the mesh shows (a gorge's sheer wall, a sea cliff's gully, a pass's side), the worst as
- * links; only what is still set on the land's own height (grass, a few props) sees it, so that does not fail it. A slow check, on demand: `node --import tsx tools/ground/scan.ts [seed ...]`.
+ * links; only what is still set on the land's own height (a few props) sees it, so that does not fail it. A slow check, on demand: `node --import tsx tools/ground/scan.ts [seed ...]`.
  */
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../../src/setting/classic/index';
@@ -16,6 +16,7 @@ import { nearestCoast } from '../../src/world/coast';
 import { CHUNK0, SEGS, buildChunk, chunkIndex } from '../../src/world/chunkMesh';
 import { DrawnGround, drawnSource } from '../../src/world/drawnGround';
 import { FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../../src/world/flora';
+import { grassMask } from '../../src/world/grass';
 import { ROCK_STRIDE, rockPlacement } from '../../src/world/rocks';
 import { Terrain } from '../../src/world/terrain';
 
@@ -46,7 +47,7 @@ for (const name of seeds) {
   const cliff = nearestCoast(terrain, 'cliff', s.x, s.z);
   if (cliff) squares.push(['cliff', cliff.x, cliff.z]);
   for (const [what, cx, cz] of squares) {
-    let stood = 0, points = 0, fine = 0, finer = 0, trees = 0, treeOff = 0, rocks = 0, rockOver = 0;
+    let stood = 0, points = 0, fine = 0, finer = 0, trees = 0, treeOff = 0, rocks = 0, rockOver = 0, blades = 0, bladeOff = 0;
     const worst: { d: number; x: number; z: number }[] = [];
     const ci = Math.floor(cx / CHUNK0), cj = Math.floor(cz / CHUNK0);
     for (let dj = -REACH; dj <= REACH; dj++) for (let di = -REACH; di <= REACH; di++) {
@@ -66,6 +67,12 @@ for (const name of seeds) {
         const over = rk[k + 1] - g.footing(rk[k], rk[k + 2]);
         if (!(over <= LIMIT)) { rockOver = Math.max(rockOver, Number.isNaN(over) ? Infinity : over); failed = true; }
       }
+      // Grass: the mask's ground (what the blades are rooted on) on the mesh, a pixel a metre.
+      const gm = grassMask(terrain, { seed: terrain.seed, setting: classic.id, x0, z0, size: CHUNK0, res: CHUNK0 });
+      for (let k = 0; k < CHUNK0 * CHUNK0; k++, blades++) {
+        const off = Math.abs(gm[k * 4] - meshAt(m, x0, z0, x0 + (k % CHUNK0) + 0.5, z0 + Math.floor(k / CHUNK0) + 0.5));
+        if (!(off <= LIMIT)) { bladeOff = Math.max(bladeOff, Number.isNaN(off) ? Infinity : off); failed = true; }
+      }
       // Points over the whole chunk, off the grid: every 2 m cell's middle, and a point in each cell's other triangle.
       for (let z = z0 + 1; z < z0 + CHUNK0; z += 2) for (let x = x0 + 1; x < x0 + CHUNK0; x += 2) {
         for (const [px, pz] of [[x, z], [x + 0.4, z + 0.7]]) {
@@ -82,6 +89,7 @@ for (const name of seeds) {
     console.log(`${name} ${what} (${cx.toFixed(0)}, ${cz.toFixed(0)}), ${(2 * REACH + 1) ** 2} chunks (${finer} finer by a brook):`);
     console.log(`  stood on: ${points} points, worst ${stood.toFixed(4)} m off the mesh${stood > LIMIT ? ' FAIL' : ''}`);
     console.log(`  trees: ${trees}, worst foot ${treeOff.toFixed(4)} m off the mesh${treeOff > LIMIT ? ' FAIL' : ''}; rocks: ${rocks}, worst middle ${rockOver.toFixed(4)} m over it${rockOver > LIMIT ? ' FAIL' : ''}`);
+    console.log(`  grass: ${blades} mask pixels, worst root ${bladeOff.toFixed(4)} m off the mesh${bladeOff > LIMIT ? ' FAIL' : ''}`);
     console.log(`  the land under the mesh: ${fine} of ${cells} cells off by > 0.5 m${worst[0] ? `, worst ${worst[0].d.toFixed(2)} m` : ''}`);
     for (const w of worst.slice(0, 3)) console.log(`    ${w.d > 0 ? '+' : ''}${w.d.toFixed(2)} m  ?seed=${name}&pos=${w.x},${w.z}`);
   }

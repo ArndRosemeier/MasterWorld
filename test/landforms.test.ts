@@ -95,3 +95,19 @@ test('landforms: a pond in a brook valley sits on the valley floor, never in the
   }
   assert.ok(kept >= 2, `${kept} ponds kept`);
 });
+
+test('landforms (K7): a cinder cone rises steeply to a rim round a crater, and the volcanic country holds cones, lava rock and collapsed pits', async () => {
+  const { shapeAt } = await import('../src/world/landforms');
+  const cone = { shape: 'cone', L: 100, W: 100, H: 50, seed: 7 } as Parameters<typeof shapeAt>[0];
+  const rim = Math.max(...[0.2, 0.3, 0.4, 0.5].map((r) => shapeAt(cone, 100 * r, 0)));
+  assert.ok(rim > 0.6 * 50 && rim < 50, `a rim of ${rim.toFixed(1)} m`);
+  assert.ok(shapeAt(cone, 0, 0) < rim - 8, 'the crater floor lies well under the rim');
+  assert.ok(shapeAt(cone, 100, 0) < 1, 'it ends where its footprint does');
+  const volcanic = world.kinds!.find((k) => k.id === 'volcanic')!;
+  const shapes = Object.keys(volcanic.landforms!.mix).map((id) => world.landforms!.find((l) => l.id === id)?.shape);
+  assert.ok(shapes.includes('cone') && shapes.includes('tor') && shapes.includes('sinkhole'), shapes.join(' '));
+  // Cut from mesa country's share and put last: the shares before it keep their cumulative bounds.
+  const sum = (ids: string[]) => world.kinds!.filter((k) => ids.includes(k.id)).reduce((a, k) => a + k.share, 0);
+  assert.ok(Math.abs(sum(['open', 'downs', 'moor', 'karst', 'badlands', 'mesa', 'volcanic']) - 1) < 1e-9, 'the shares still sum to 1');
+  assert.equal(world.kinds![world.kinds!.length - 1].id, 'volcanic');
+});
