@@ -60,7 +60,9 @@ export function fallClassic(hero: Character, at: FallPlace, id: string, day: num
   const lost = Math.floor(hero.coins / 2);
   hero.coins -= lost;
   const items = hero.pack.splice(0);
-  hero.health = Math.round(hero.maxHealth * 0.5);
+  // (Never none: a hero who woke with no health would not recover any.)
+  const half = Math.round(hero.maxHealth * 0.5);
+  hero.health = half >= 1 ? half : 1;
   hero.stamina = hero.maxStamina;
   return { remains: items.length ? { id, grave: null, at, items, coins: 0, day } : null, lost };
 }

@@ -272,3 +272,26 @@ test('fight: struck with no target, the hero targets whoever struck; a target al
   const kept = run(true);
   if (kept?.other && kept.by !== kept.other) assert.equal(kept.target, kept.other);
 });
+
+test('fight: when the target falls, the nearest still fighting the hero is the target (the swinging goes on); with none, no target', () => {
+  const c = cellars.find((x) => x.dweller.id === 'rats') ?? cellars[0];
+  const hero = new Character(classic);
+  hero.health = hero.maxHealth * 50;
+  const d = new Delve(c, openSpace(c), classic, hero, 4);
+  const [first, second, third] = d.den.creatures;
+  assert.ok(second && third, 'a pack');
+  const pose = { x: first.x, y: first.y, z: first.z, yaw: 0, speed: 0 };
+  for (const o of d.den.creatures) o.state = 'fight';
+  d.fight.pick(first);
+  d.fight.attacking = true;
+  first.state = 'dead'; first.health = 0;
+  d.step(0.02, pose);
+  const next = d.fight.target;
+  assert.ok(next && next !== first && d.den.fighting.includes(next), 'the next fighter is the target');
+  assert.equal(d.fight.attacking, true);
+  // All fighters gone: no target, no swinging.
+  for (const o of d.den.creatures) { o.state = 'dead'; o.health = 0; }
+  d.step(0.02, pose);
+  assert.equal(d.fight.target, null);
+  assert.equal(d.fight.attacking, false);
+});

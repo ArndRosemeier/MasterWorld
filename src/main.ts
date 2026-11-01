@@ -16,7 +16,7 @@ import { CAVE_LANTERN, TORCH_DUSK, TORCH_LIGHT_OUT, TORCH_LIGHT_UP, TORCH_NIGHT 
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
 import { PortalStoneUse } from './app/portalStoneUse';
-import { cleanStoneSave } from './game/portalStone';
+import { cleanStoneSave, imprintSpawn } from './game/portalStone';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
@@ -99,6 +99,7 @@ import { UsePrompt } from './app/usePrompt';
 import { voyageArrived, voyagesIn } from './vgm/voyages';
 import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
+import { Fallen } from './app/fallen';
 import { WildLand } from './app/wildLand';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
@@ -167,6 +168,7 @@ import { BirdKit, OtterKit, ShapeForm, shapesFrame } from './app/shapeForm';
 import { Alone, blowOf, Recipes, shapeOf, type RecipeEvent } from './game/recipe';
 import { shapeBars } from './game/birdForm';
 import { SpellView } from './app/spellView';
+import { AuraView } from './render/aura/AuraView';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { Retreats } from './app/retreats';
@@ -370,6 +372,8 @@ export async function start(b: Boot): Promise<void> {
     let bodiesBlock: NonNullable<WalkWorld['bodies']> = () => false;
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? (resume ? [resume.x, resume.z] : [home.x, home.z]), params.look);
+    // Which way the hero faced at the start (the portal stone's first home faces so).
+    const spawn = { x: home.x, y: player.walker.support(home.x, home.z, 1e5), z: home.z, yaw: player.walker.yaw };
     // The floating origin starts where the camera does (everything drawn is relative to it: render/origin.ts).
     if (params.origin) ORIGIN.moveTo(view.camera.position.x, view.camera.position.z);
     // Off (`origin=0`, or from the debug console: game.followOrigin) the origin stays where it is.
@@ -766,11 +770,14 @@ export async function start(b: Boot): Promise<void> {
     // shader budget (F3), so they do not lengthen the load (F4, gate C). Neither is needed in the first seconds:
     // until then a spell is reckoned but not drawn, and no smoke rises.
     const spellView = new SpellView(setting);
+    // The auras round the creatures of a fight (sim/aura.ts): one shader, built with the spells.
+    const auraView = new AuraView();
     let smokeIn = false;
     const warmLater = async (): Promise<void> => {
       await view.stage.add(smoke.mesh);
       smokeIn = true;
       await spellView.enter(view.stage);
+      await auraView.settleIn(view.stage);
     };
 
     const notes = new Notes();
@@ -829,6 +836,8 @@ export async function start(b: Boot): Promise<void> {
       failed: (id) => failedPlace?.(id) ?? true,
       say: (text, at) => overHead(text, at),
     };
+    // The hero's fall, seen through to its end whichever fight dealt it.
+    const fallen = new Fallen(fightHost, fightHud, notes, (c) => sounds?.cue(c));
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
     // The portals (app/portals.ts: a cave's mouth joined to its throat below), and those opened before they were set up.
@@ -869,7 +878,7 @@ export async function start(b: Boot): Promise<void> {
       // The hero, what they leave lying and their spells go down with them.
       depth: (down, keep) => {
         if (!down) { for (const o of hidden) o.visible = true; hidden.length = 0; return; }
-        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group, spellView.group, ...(stoneMesh ? [stoneMesh] : [])]);
+        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group, spellView.group, auraView.mesh, ...(stoneMesh ? [stoneMesh] : [])]);
         for (const o of view.scene.children) if (o.visible && !kept.has(o) && !(o as Light).isLight) { o.visible = false; hidden.push(o); }
       },
     }, terrain.towns, save?.cellars ?? {});
@@ -969,7 +978,7 @@ export async function start(b: Boot): Promise<void> {
           for (const o of cellars?.drawnBelow() ?? []) set(o, false);
         } else {
           const mine = cellars?.drawnOf(realm) ?? [];
-          const kept = new Set<Object3D>([...mine, hero.object, view.camera, remainsView.group, spellView.group, portalView.group, ...(stoneMesh ? [stoneMesh] : [])]);
+          const kept = new Set<Object3D>([...mine, hero.object, view.camera, remainsView.group, spellView.group, auraView.mesh, portalView.group, ...(stoneMesh ? [stoneMesh] : [])]);
           for (const o of view.scene.children) if (!kept.has(o) && !(o as Light).isLight) set(o, false);
           for (const o of mine) set(o, true);
         }
@@ -1012,7 +1021,8 @@ export async function start(b: Boot): Promise<void> {
       },
       gesture: (what) => castHands(what === 'raise' ? 'charge' : 'release', what === 'raise' ? 0.9 : 0.8),
       changed: () => autosave(),
-    }, cleanStoneSave(save?.portalStone));
+    // A stone that marked no home yet (every new hero's) is imprinted with where the hero started: a way out when stuck.
+    }, imprintSpawn(cleanStoneSave(save?.portalStone), spawn));
     await stoneUse.addToStage();
     stoneMesh = stoneUse.mesh;
     spellView.also = (b, dt) => stoneUse.stoneLight(b, dt);
@@ -2456,7 +2466,7 @@ export async function start(b: Boot): Promise<void> {
           if ((drownClock -= dt) <= 0) { drownClock = 1; fightHud.hurt(); }
         }
         breathHud.showBreath(breath.share, under, character.gills);
-        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
+        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
         const lead = leading();
         // A level gained (G3): the ring of light, the chime and the seal engraved; the hands raised only out of a fight.
         const h = player.hero, act = player.stance.action, acting = !!act && !!h && h.clock - act.t0 < act.dur;
@@ -2470,6 +2480,7 @@ export async function start(b: Boot): Promise<void> {
         spellView.bodyHeight = player.walker.height;
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
+        auraView.lightUp();
       }
       part('rooms+talk');
       if (!visit()) rooms?.update(dt);
