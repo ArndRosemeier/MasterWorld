@@ -13,7 +13,12 @@ Natural caves are not designed. **They form.** A real cave is what a process did
 
 The generator copies the process rather than placing rooms. The game then reads what formed, decides where things go, and makes one small concession so every part can be reached.
 
-There is one generator with three formers and a mix. A cave has a **built share**, which is how much of its volume people dug. A mine that broke into an old solution cave is both kinds at once, and the place where they meet tells its own story.
+There is one generator with three formers and a **mix of three shares**: built, water and lava (Arnd, 2026-11-01). **Pure caves are the norm.** A mixed cave usually has two shares filled and the third at zero:
+- a mine that broke into an old solution cave (built and water);
+- a lava tube that a stream later found and partly filled (lava and water);
+- miners who dug for ore along an old lava tube (built and lava).
+
+Where two kinds meet, the place tells its own story.
 
 ## 2. What a natural cave must be (Arnd's list)
 
@@ -38,7 +43,7 @@ A block of rock around the cave's site, in the cave's own frame (the portal keep
   - any hard rock can hold a mine.
 - **Layers** (bedding planes): their thickness, a slight tilt, and how easily each dissolves, how hard it is and its colour. The colour bands show on the walls.
 - **Joints**: two sets of near-vertical cracks at an angle to each other, with their spacing. Faults are rare, bigger breaks.
-- **Ore bodies**, for mines: veins along faults or joints (thin, steep and long), seams along a layer, and pockets. Each body has an ore (iron, copper, silver, gold, gems), from the setting's data.
+- **Ore bodies**, for mines: veins along faults or joints (thin, steep and long), seams along a layer, and pockets. Each body has an ore (iron, copper, silver, gold, gems), from the setting's data. **Ore is only for show** (Arnd: "No mining yet. Probably never."). It gives the mine its purpose and its look, not loot or a skill.
 - **Groundwater**: where the water table stood over time (it drops in stages), where water gets in high up (sinks), and where it comes out low (springs at a cliff foot or valley side). These come from the land's real heights above the cave's site.
 
 ### 3.2 The former (the process)
@@ -115,7 +120,7 @@ The floor is almost never level.
 
 Nothing assumes rooms. The reader finds where one can stand and move, from the carved field itself:
 - **standable ground**: columns of about 0.5 m where the floor is not too steep and there is head room;
-- **links** between them: walk, step up, **climb** (D56: cave rock is climbable), **squeeze** (low head room, crouched), **drop** (one way down), **swim** (water, with breath or a water breathing spell or potion, D60);
+- **links** between them: walk, step up, **climb** (D56: cave rock is climbable), **drop** (one way down), **swim** (water, with breath or a water breathing spell or potion, D60). **No squeezing** (Arnd): every way the hero takes is at least the hero's own size, standing (constants, section 6).
 - the **network**: patches of standable ground and the links between them.
 
 The network then reads the cave's **places**:
@@ -128,7 +133,7 @@ The network then reads the cave's **places**:
 
 From the way in, the network is walked:
 - **Parts reachable with every kind of link** keep them. A climb or a swim is a fair way.
-- **Parts cut off** get the smallest change that opens them: a rubble ramp under a lip that's too high, a squeeze widened a little, a climbable flowstone, a fallen slab across a gap.
+- **Parts cut off** get the smallest change that opens them: a rubble ramp under a lip that's too high, a gap too low or narrow for a standing hero widened to that size, a climbable flowstone, a fallen slab across a gap.
 - **A part that is still out of reach** stays as it is, seen but not reached: a sump that goes on, a crack with a breeze. That's mystery, not a bug.
 
 ### 3.7 The game reads the places
@@ -142,7 +147,6 @@ Content goes into places, not rooms (C6c, `dungeonFor`):
 The pacing the room graph gave (loops, a safe spot, a shortcut back) comes from the network's own loops, where solution caves have plenty. **Natural locks** take the place of doors:
 - a **sump** (dive through: water breathing);
 - a **climb**;
-- a **squeeze**;
 - a **chasm** (a ledge round it, or a fallen slab);
 - a **choke** (rubble to dig through, shown, rule 11).
 
@@ -164,7 +168,7 @@ Mines can also have built locks: a grate, a door, a raised ladder.
 
 ## 5. What changes in the game
 
-- **Walking**: the hero's floor and walls come from the field (the walker already reads `CaveSpace.sdf`). Climbing works as now. **Squeeze** is new: a crouched crawl with its own movement and animation (rule 11).
+- **Walking**: the hero's floor and walls come from the field (the walker already reads `CaveSpace.sdf`). Climbing works as now. There is no new movement: no squeezing or crawling (Arnd).
 - **Creatures** path on the network, not on grid cells.
 - **The minimap** paints the network's standable ground seen so far (today's `DungeonSeen` is per grid cell).
 - **The save** keeps what was seen and what was changed (a dug choke, a taken treasure) by network patch.
@@ -172,7 +176,7 @@ Mines can also have built locks: a grate, a door, a raised ladder.
 - **Ways in** are portals as now (`caveThroat.ts`). Lava tube skylights and solution cave sinkholes are new mouths, some of them open to the sky.
 - **Light**: daylight shafts at sinkholes and skylights, the hero's torch everywhere else (as now).
 - **Water** uses today's water materials and drip particles. Sounds: drips, the stream, a breeze at a crack.
-- **The VGM's `cave` tool** asks for a kind, a size, a danger and a built share, with its row in vgm.md (rule 10).
+- **The VGM's `cave` tool** asks for a size, a danger and the three shares (built, water, lava; usually pure, at most two filled), with its row in vgm.md (rule 10).
 - **Volcanic country**: there is no volcanic landscape kind today. Lava tubes need one (old cinder cones, lava fields, black basalt), added as a kind of country (D55) where the skeleton allows it.
 
 ## 6. What is hard, and the limits
@@ -181,11 +185,17 @@ Mines can also have built locks: a grate, a door, a raised ladder.
 - **Taste.** A process can form a dull cave: long tubes with nothing in them. That's why phase K starts with a preview tool and Arnd's eye on many seeds before anything is in play.
 - **The reader is the big job.** Everything that read the grid moves to the network: walking, creatures, the minimap, the save and the bot. It's the price of "no rooms".
 - **Frame time below ground** (F2): one cave mesh per carved brick, as now, and drips as one instanced particle set.
-- **Squeeze** needs a new movement and animation for the hero and for creatures that can follow.
+- **Constants** (Arnd: "make those constants that can be easily changed"): every size lives in one place, the setting's cave data, never scattered in code:
+  - the biggest cave, about 300 m across and 60 m deep;
+  - the least passage the hero takes, standing height and width;
+  - the lattice step and the field step;
+  - the share of mixed caves and how often each pair mixes;
+  - drip and formation density.
 
-## 7. Open questions for Arnd
+## 7. Arnd's answers (2026-11-01)
 
-1. **Ore**: should the hero be able to mine ore (a pick, ore to sell or craft with), or is ore only seen in the walls and sometimes found as loot? Crafting (D32) is still later.
-2. **Squeeze**: should it be in phase K, or should narrow places be climbs and swims only at first?
-3. **Size**: how big should a large cave be? The suggestion is up to about 300 m across and 60 m deep, with a cave of every kind possible near the start (a lava tube only on volcanic ground).
-4. **Order**: phase K could start now with the design work in K1 and K2 (preview only, no risk to play), next to phases D and Q.
+1. **Ore**: no mining, now and probably never. Ore is only for show.
+2. **Squeezing**: none. That's the unrealistic part. Everything stays reachable at normal size.
+3. **Size**: up to about 300 m across and 60 m deep, as constants that are easy to change.
+4. **Order**: K1 and K2 start now, next to phases D and Q.
+5. **Mix**: three shares (built, water, lava). Pure caves are the norm, and a mixed cave usually has two shares filled and one at zero.
