@@ -215,7 +215,7 @@ Gate D: an evening in a harbour town in the loop check, a voyage to a promised i
 
 Later (D60): activities aboard, fights at sea (boarding, a creature attacking a ship), owning or sailing a ship.
 
-### Phase Q: Quests that vary (Arnd, 2026-11-01, D62; after phase D)
+### Phase Q: Quests that vary (Arnd, 2026-11-01, D62; now, in parallel with phase D)
 
 Goal: what the hero is asked to do stops being "clear place X, tell the one who asked, get coin". Fully procedural (D62: no LLM). D52 holds: few quests, situations from the world, no quest hub. Each new verb is a VGM tool in `src/vgm` with its row in vgm.md (rule 10), and every task counts only the thing it names (D62).
 
@@ -223,11 +223,11 @@ Goal: what the hero is asked to do stops being "clear place X, tell the one who 
 |---|---|---|---|
 | Q1 | **New verbs on the existing places**: find a lost person (alive or not, brought home or their fate told), fetch an heirloom (one named thing in one place), parley with dwellers who are not hostile (talk instead of a fight, a price or a promise), seal something (a breach, a tomb, a shrine, shown being sealed, rule 11), guard at night (a watch at a farm or a gate, the threat comes or doesn't), find out who is stealing (clues in the town, the thief named and caught or let go). They combine with the place kinds (C6c) and with who asks (people, trade, standing) | Tests: each verb made, told, done and judged only by its named thing; the loop check meets at least three verbs in one run | 4, 9.1, D52, D62 |
 | Q2 | **The VGM remembers what it gave**: the kind of the last tasks is kept in the save and weighed against, so the same kind does not come twice in a row and a kind comes back only after others | Test over many seeds: no kind twice in a row; the spread of kinds over an evening of play | 4, D53, D62 |
-| Q3 (later) | **Twists**: the client lies, someone got there first, the place changed since it was told; seen in the world and in talk, not as a note | Tests per twist; a shot of one | 4, D52 |
-| Q4 (later) | **Consequences**: how a task ended feeds the next situation (a parley kept makes a later visit friendly, a thief let go comes back, a sealed tomb stays shut) | Test: an ending changes what the VGM makes next, and the log replays it | 4, D52 |
-| Q5 (later) | **Causes from NPC wants**: tasks arise from what people in the world simulation want or lack (a farmer's lost herd, a widow's ring, a rival trader) rather than from a table | Test: a task traced back to an NPC's want in the log | 4, 9.1 |
+| Q3 | **Twists**: the client lies, someone got there first, the place changed since it was told; seen in the world and in talk, not as a note | Tests per twist; a shot of one | 4, D52 |
+| Q4 | **Consequences**: how a task ended feeds the next situation (a parley kept makes a later visit friendly, a thief let go comes back, a sealed tomb stays shut) | Test: an ending changes what the VGM makes next, and the log replays it | 4, D52 |
+| Q5 | **Causes from NPC wants**: tasks arise from what people in the world simulation want or lack (a farmer's lost herd, a widow's ring, a rival trader) rather than from a table | Test: a task traced back to an NPC's want in the log | 4, 9.1 |
 
-Gate Q (for Q1 and Q2): the loop check plays an evening with three different verbs and no kind twice in a row; GPU shots of a parley, a seal and a night watch; F1 to F4; Arnd's eye; the review.
+Gate Q (Arnd: "lets tackle all of that now", so all five steps): the loop check plays an evening with three different verbs and no kind twice in a row, meets a twist, and replays a consequence and a task caused by an NPC's want from the log; GPU shots of a parley, a seal and a night watch; F1 to F4; Arnd's eye; the review.
 
 ### Parked: dialog needs a lot of love (Arnd, 2026-10-31)
 
