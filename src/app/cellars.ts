@@ -120,6 +120,8 @@ interface Mound extends LandSite {
    * portal stands, once the mouth is made; and the floor of the way in there (frame heights), else null.
    */
   throat?: { readonly z: number; readonly floor: number; readonly y: number; walk(x: number, z: number): number | null };
+  /** A cave's mouth being made by a worker: settled once it stands. */
+  made?: Promise<void>;
 }
 
 /** A place on the land is built (rooms, dwellers) once the hero is this near, metres. */
@@ -214,6 +216,17 @@ export class Cellars {
   /** The hero is in this building's room: its cellar, if it has one, gets ready below. */
   nearHouse(town: string, building: number): void {
     for (const s of this.sites.values()) if (!s.mound && s.decision.town === town && s.house.id === building && !s.built) void this.ensure(s);
+  }
+
+  /**
+   * Before the hero is set down at (x, z) by a jump (a teleport, a start before a place): the places near there are
+   * built now and awaited, mouth and rooms, so a cave's portal is open on arrival, not a moment after. (Walking up,
+   * `approach` has built them long before.)
+   */
+  async buildNear(x: number, z: number): Promise<void> {
+    const near = [...this.sites.values()].filter((s) => s.mound && Math.hypot(x - s.mound.x, z - s.mound.z) <= BARROW_NEAR);
+    // (A place that fails to build is left to `approach`, as before: the jump goes on.)
+    await Promise.all(near.map((s) => Promise.all([s.mound?.made, this.ensure(s)]).catch(() => undefined)));
   }
 
   /**
@@ -426,7 +439,7 @@ export class Cellars {
     if (shell === 'mouth') {
       const seed = deriveSeed(d.seed, 'cave');
       const mound: Mound = { ...site, mesh: null, inShape: () => false, top: -Infinity, way: MOUTH_WAY_DOWN, out: 3, cool: 0 };
-      void (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
+      mound.made = (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
         mound.mesh = put(mouth.mesh, 0);
         mound.top = topOf(mound.mesh);
         mound.inShape = (x, z) => inWalkRaster(mouth.walk, x, z);

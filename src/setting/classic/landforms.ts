@@ -20,6 +20,10 @@ export const landforms: readonly LandformDef[] = [
   { id: 'sunkenLane', shape: 'sunkenLane', size: [100, 300], width: [3, 5], height: [1.5, 3] },
   { id: 'boulders', shape: 'boulders', size: [30, 90], height: [0, 0], rock: 1 },
   { id: 'erratic', shape: 'erratic', size: [6, 14], height: [0, 0], rock: 1 },
+  // Volcanic country: cinder cones with a crater, black lava rock standing out, collapsed pits (a lava tube's roof fallen in).
+  { id: 'cinderCone', shape: 'cone', size: [90, 240], height: [28, 70], rock: 0.5 },
+  { id: 'lavaRock', shape: 'tor', size: [40, 120], height: [4, 12], rock: 1 },
+  { id: 'collapse', shape: 'sinkhole', size: [14, 36], height: [4, 9], rock: 0.5 },
 ];
 
 /** Each biome's mix (by biome id). */
@@ -67,10 +71,17 @@ export const landscapeKinds: readonly LandscapeKindDef[] = [
     landforms: { perKm2: 62, relief: 10, mix: { gully: 6, ravine: 4, ridge: 3, scarp: 3, knoll: 1 } },
   },
   {
-    id: 'mesa', share: 0.38,
+    id: 'mesa', share: 0.34,
     // Its valleys' floors: the biome's own ground, with gravel washed down from the walls in drifts.
     wears: { layer: 'gravel', share: 0.3 },
     mesa: { height: [40, 200], cover: 0.42, size: 2400, steep: [4.5, 6.5], passes: 0.2, climbable: 0.3, tiers: 2 },
     landforms: { perKm2: 40, relief: 4, mix: { boulders: 4, erratic: 3, gully: 3, dryValley: 2, scarp: 2, knoll: 2, sinkhole: 1, ravine: 1 } },
+  },
+  // Volcanic country (K7, D63): old cinder cones and lava fields of black rock, thin on plants, pits where a lava tube's
+  // roof fell in. Last, and cut from mesa country's share, so every other kind's cells stay where they were.
+  {
+    id: 'volcanic', share: 0.04, swell: { height: 30, size: 700 }, bare: 0.93,
+    wears: { color: 0x4a443e, surface: 'scree', grass: { cover: 0.15, height: 0.1, dry: 0.8 }, layer: 'basalt', share: 0.9 },
+    landforms: { perKm2: 58, relief: 7, mix: { cinderCone: 4, lavaRock: 5, boulders: 4, collapse: 3, erratic: 2, knoll: 1 } },
   },
 ];

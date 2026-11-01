@@ -1039,7 +1039,12 @@ export async function start(b: Boot): Promise<void> {
       }
       // Far enough off to see it whole.
       const off = { hatch: 9, mound: 9, mouth: 16, keep: 32 }[lookForm.shell];
-      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * off, undefined, b.site.z + Math.cos(b.site.yaw) * off, b.site.yaw);
+      if (b?.site) {
+        const tx = b.site.x + Math.sin(b.site.yaw) * off, tz = b.site.z + Math.cos(b.site.yaw) * off;
+        // (Its mouth and rooms made first: a cave's portal is open when one arrives, not a moment after.)
+        await cellars.buildNear(tx, tz);
+        player.teleport(tx, undefined, tz, b.site.yaw);
+      }
     }
     // `wreck`: in the sea 14 m off a wreck near the start town, facing her (one is put there now if there is none).
     if (params.wreck && start) {

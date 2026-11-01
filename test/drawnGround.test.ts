@@ -74,7 +74,8 @@ test('drawn ground: a sea cliff\'s gullies are wide enough for the mesh to show'
   const at = (w: { dev: number; x: number; z: number }) => `${w.dev.toFixed(1)} m at ${w.x}, ${w.z}`;
   // Arnd's spot, on the crest of a sea cliff.
   const poev = worstCell(new Skeleton(parseSeed('poev7x'), classic.world), 37691, -1576, 20);
-  assert.ok(Math.abs(poev.dev) < 1.5, at(poev));
+  // (Volcanic country since K7: this coast is cinder rock now, its gullies a little rougher than the old mesa's.)
+  assert.ok(Math.abs(poev.dev) < 2, at(poev));
   // A stretch of cliff coast with gullies (up to 8.5 m off before they were widened).
   const coast = worstCell(new Skeleton(parseSeed('brazok'), classic.world), -200, 420, 80);
   assert.ok(Math.abs(coast.dev) < 1.5, at(coast));
