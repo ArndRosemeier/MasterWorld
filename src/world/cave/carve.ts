@@ -104,7 +104,8 @@ export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, 
       v = smax(v, vs, BLEND);
     }
     if (v < -1.4) continue;
-    if (v < rough + 0.3 && v > -rough - 0.3) v += wall(x, y, z);
+    // (A lava tube's floor is level: its flat bottom takes hardly any scallops, or the hero would stand in dents.)
+    if (v < rough + 0.3 && v > -rough - 0.3) v += wall(x, y, z) * (a.D === 0 && C > 0 && dy < -0.4 * B ? 0.15 : 1);
     putSample(f, i, j, k, v);
   }
 }

@@ -328,7 +328,7 @@ export class Landforms {
 /** How far from its centre a landform shapes the land. */
 function reachOf(shape: LandformShape, L: number, W: number): number {
   switch (shape) {
-    case 'knoll': case 'tor': case 'dell': case 'sinkhole': return Math.hypot(L, W) * 1.15;
+    case 'knoll': case 'tor': case 'dell': case 'sinkhole': case 'cone': return Math.hypot(L, W) * 1.15;
     case 'scarp': return Math.hypot(L, W * 3 + L * 0.1);
     case 'bank': case 'sunkenLane': return Math.hypot(L, W * 2.2 + L * 0.08);
     case 'boulders': case 'erratic': return 0;
@@ -341,7 +341,7 @@ export function shapeAt(f: Landform, u: number, v: number): number {
   const { L, W, H } = f;
   const ph = (f.seed % 1000) / 159.2; // a phase from the seed, 0..2π
   switch (f.shape) {
-    case 'knoll': case 'tor': case 'dell': case 'sinkhole': {
+    case 'knoll': case 'tor': case 'dell': case 'sinkhole': case 'cone': {
       // Round, with a lobed outline so no two look turned out of one mould.
       // (Three lobes and two, from the direction's sine and cosine; each form lies turned its own way.)
       const d = Math.sqrt(u * u + v * v) || 1, c = u / d, sn = v / d;
@@ -350,6 +350,8 @@ export function shapeAt(f: Landform, u: number, v: number): number {
       // A tor's crown stands up steeply where the rock breaks through.
       if (f.shape === 'tor') return H * (0.55 * bump(r) + 0.45 * smoothstep(0.5, 0.22, r));
       // A dell is a dish; a sinkhole drops steeply to a narrow floor.
+      // A cinder cone: steep sides straight up to a rim, a crater bowl inside it (a quarter of the height deep).
+      if (f.shape === 'cone') return H * (clamp(1 - r, 0, 1) ** 0.8 - 0.5 * smoothstep(0.36, 0.02, r));
       if (f.shape === 'dell') return -H * bump(r);
       return -H * smoothstep(1, 0.35, r);
     }
