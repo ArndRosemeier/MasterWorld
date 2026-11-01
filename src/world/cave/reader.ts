@@ -45,6 +45,8 @@ export interface Reading {
   /** Per cell: metres of way from the nearest way in (Infinity: not reached), whether it can walk back to a way in, and its part (cells joined by links, any kind, either way). */
   readonly depth: Float32Array;
   readonly back: Uint8Array;
+  /** Per cell: the cell it was reached from on the way in (-1 at a way in or where not reached). */
+  readonly from: Int32Array;
   readonly part: Int32Array;
   /** Links as arrays: the edges of cell c are edgeStart[c] .. edgeStart[c + 1]. */
   readonly edgeStart: Int32Array;
@@ -79,6 +81,9 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
   // Which columns of the field hold any brick (the rest is solid).
   const inBricks = brickColumns(f);
 
+  // The body's width where the walker tests it: the knee, the waist and the head (its radius clear of rock at each).
+  const bodyFits = (x: number, fl: number, z: number): boolean => [0.75, 1.3, way.stand - way.radius].every((h) => fieldAt(f, x, fl + h, z) >= way.radius);
+
   // Cells: each column's spans with room to stand and body width at the waist.
   const first = new Int32Array(nx * nz + 1);
   const cx: number[] = [], cy: number[] = [], cz: number[] = [], cr: number[] = [], cc: number[] = [];
@@ -90,7 +95,7 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
     const x = f.ox + i * step, z = f.oz + k * step;
     for (let n = 0; n < sp.length; n += 2) {
       const fl = sp[n], ce = sp[n + 1];
-      if (ce - fl < stand || fieldAt(f, x, fl + 1.05, z) < way.radius) continue;
+      if (ce - fl < stand || !bodyFits(x, fl, z)) continue;
       cx.push(x); cy.push(fl); cz.push(z); cr.push(ce - fl); cc.push(ce);
     }
   }
@@ -260,7 +265,15 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
   }
 
   return {
-    count, x, y, z, room, depth, back, part: partOf, edgeStart, edgeTo, edgeKind, entries, places,
+    count, x, y, z, room, depth, back, from: tree, part: partOf, edgeStart, edgeTo, edgeKind, entries, places,
     stats: { cells: count, links: { walk: counts.walk, climb: counts.climb, drop: counts.drop }, parts: partId.size, reached, trapped, cutOff, ms: ticker() - t0 },
   };
+}
+
+/** The cells from a way in to `cell`, along the network (empty where `cell` is not reached). */
+export function pathTo(r: Reading, cell: number): number[] {
+  if (r.depth[cell] === Infinity) return [];
+  const out: number[] = [];
+  for (let c = cell; c >= 0; c = r.from[c]) out.push(c);
+  return out.reverse();
 }

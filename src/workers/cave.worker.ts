@@ -12,6 +12,7 @@ import { crystalsMesh, stonesMesh } from '../world/cave/loose';
 import { waterMesh, type WaterMesh } from '../world/cave/waterMesh';
 import type { PartMesh } from '../world/cave/parts';
 import type { Dressing } from '../world/cave/dress';
+import type { BrickField } from '../world/dungeon/rockMesh';
 import type { Opened } from '../world/cave/concede';
 import { dressFormed, formCave, readFormed, type FormedCave } from '../world/cave/form';
 import type { Reading } from '../world/cave/reader';
@@ -30,6 +31,8 @@ export interface CaveJob {
   readonly dress?: boolean;
   /** Read its network and open what is cut off (K4; needs `dress`), before meshing. */
   readonly read?: boolean;
+  /** Send the carved field back (to walk in the cave in the page: tools/preview/walk.ts). */
+  readonly field?: boolean;
 }
 
 export interface CaveResult {
@@ -39,6 +42,8 @@ export interface CaveResult {
   readonly parts: { readonly formations: PartMesh; readonly stones: PartMesh; readonly crystals: PartMesh; readonly water: WaterMesh } | null;
   /** The network of standable ground, its places and the ways the concession cut (when read). */
   readonly read: { readonly reading: Reading; readonly opened: readonly Opened[]; readonly ms: number } | null;
+  /** The carved field, when asked for (`job.field`). */
+  readonly field: BrickField | null;
   readonly mesh: BuildingMesh | null;
   readonly ms: FormedCave['ms'] & { readonly mesh: number; readonly dress: number };
   readonly rock: string;
@@ -70,9 +75,9 @@ serve<CaveJob, CaveResult>((job) => {
   const size = caves.sizes.find((s) => s.across === c.block.across && s.deep === c.block.deep)!;
   return {
     result: {
-      skeleton: c.skeleton, dressing, parts, read: rd ? { reading: rd.reading, opened: rd.opened, ms: rd.ms } : null, mesh, ms: { ...c.ms, mesh: meshMs, dress: dressMs }, rock: job.rock, size: { id: size.id, across: size.across, deep: size.deep },
+      skeleton: c.skeleton, dressing, parts, read: rd ? { reading: rd.reading, opened: rd.opened, ms: rd.ms } : null, field: job.field ? (c.field as BrickField) : null, mesh, ms: { ...c.ms, mesh: meshMs, dress: dressMs }, rock: job.rock, size: { id: size.id, across: size.across, deep: size.deep },
       bricks: c.field.bricks.filter(Boolean).length, tris: mesh ? mesh.index.length / 3 : 0, face: c.block.water.face, dip: Math.atan(c.block.beds.slope) * 180 / Math.PI,
     },
-    transfer: [...(mesh ? buffers(mesh) : []), ...(parts ? Object.values(parts).flatMap(buffers) : []), ...(rd ? buffers(rd.reading) : [])],
+    transfer: [...(mesh ? buffers(mesh) : []), ...(parts ? Object.values(parts).flatMap(buffers) : []), ...(rd ? buffers(rd.reading) : []), ...(job.field ? (c.field as BrickField).bricks.flatMap((b) => (b ? [b.buffer as ArrayBuffer] : [])) : [])],
   };
 });

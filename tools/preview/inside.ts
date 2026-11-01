@@ -6,9 +6,7 @@
  * the hero ahead for the size. `node tools/preview/formed.mjs out-dir n size rocks floorSeeds` takes the pictures.
  */
 import * as T from 'three/webgpu';
-import { FORMED_CALCITE, FORMED_ROCK } from '../../src/render/materials/formedCave';
-import { FORMED_WATER } from '../../src/render/materials/formedWater';
-import { kindMesh } from '../../src/render/materials';
+import { caveScene } from './caveScene';
 import { createCavePool } from '../../src/workers/pool';
 import type { CaveResult } from '../../src/workers/cave.worker';
 
@@ -16,45 +14,13 @@ const q = new URLSearchParams(location.search);
 const rock = q.get('rock') ?? 'massive', size = q.get('size') ?? 'medium', seed = Number(q.get('seed') ?? 1), tiles = Number(q.get('tiles') ?? 6);
 const done = (o: unknown) => { (window as unknown as { done: string }).done = JSON.stringify(o); };
 
-/** A geometry from a mesh of arrays: position, normal, tint (sRGB bytes to 0..1) and the material per vertex. */
-function geometryOf(m: { position: Float32Array; normal: Float32Array; tint: Uint8Array; mat: Uint8Array; index: Uint32Array }): T.BufferGeometry {
-  const g = new T.BufferGeometry();
-  g.setAttribute('position', new T.BufferAttribute(m.position, 3));
-  g.setAttribute('normal', new T.BufferAttribute(m.normal, 3));
-  g.setAttribute('tint', new T.BufferAttribute(Float32Array.from(m.tint, (v) => v / 255), 3));
-  g.setAttribute('mat', new T.BufferAttribute(Float32Array.from(m.mat), 1));
-  g.setIndex(new T.BufferAttribute(m.index, 1));
-  return g;
-}
-
 async function main(): Promise<void> {
   const W = 550, H = 340, cols = 3;
   const res: CaveResult = await createCavePool().run({ kind: 'form', setting: 'classic', seed, rock, size, coarse: 1, dress: true, read: true });
   const r = new T.WebGPURenderer({ antialias: true, forceWebGL: true });
   r.setSize(W, H); r.toneMapping = T.AgXToneMapping; r.toneMappingExposure = 1.3;
   await r.init();
-  const scene = new T.Scene();
-  const walls = kindMesh(geometryOf(res.mesh as never), FORMED_ROCK);
-  scene.add(walls);
-  // Formations and crystals (waxy calcite), stones (the wall's own stone).
-  if (res.parts) {
-    scene.add(kindMesh(geometryOf(res.parts.formations), FORMED_CALCITE));
-    scene.add(kindMesh(geometryOf(res.parts.crystals), FORMED_CALCITE));
-    scene.add(kindMesh(geometryOf(res.parts.stones), FORMED_ROCK));
-  }
-  if (res.parts) {
-    const w = res.parts.water, g = new T.BufferGeometry();
-    g.setAttribute('position', new T.BufferAttribute(w.position, 3));
-    g.setAttribute('normal', new T.BufferAttribute(w.normal, 3));
-    g.setAttribute('uv', new T.BufferAttribute(w.uv, 2));
-    g.setAttribute('tint', new T.BufferAttribute(w.flow, 3));
-    g.setIndex(new T.BufferAttribute(w.index, 1));
-    const sheet = q.get('waterdebug') ? new T.Mesh(g, new T.MeshBasicMaterial({ color: 0xff00ff })) : kindMesh(g, FORMED_WATER); sheet.renderOrder = 2;
-    scene.add(sheet);
-  }
-  scene.add(new T.AmbientLight(0x8494b0, 0.55));
-  scene.background = new T.Color(0x07080a);
-  scene.fog = new T.FogExp2(0x07080a, 0.03);
+  const { scene, walls } = caveScene(res);
   const ray = new T.Raycaster(), down = new T.Vector3(0, -1, 0);
   const floorOf = (x: number, z: number, y: number): number => { ray.set(new T.Vector3(x, y + 1.5, z), down); ray.far = 8; const h = ray.intersectObject(walls)[0]; return h ? h.point.y : y; };
   type Spot = { x: number; y: number; z: number; tx: number; tz: number };
