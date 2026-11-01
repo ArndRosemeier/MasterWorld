@@ -19,6 +19,8 @@ export interface Item {
   readonly grants?: string;
   /** How worn it is (game/upkeep.ts): 0 new .. 1 broken; absent: new. */
   readonly wear?: number;
+  /** A household's keepsake (D62): the promise whose household asked for it back. Not for sale; handed back when told. */
+  readonly keepsake?: string;
 }
 
 export interface Loot {

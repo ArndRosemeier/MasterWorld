@@ -15,6 +15,7 @@ import { cellarHint, type CellarHint } from '../vgm/hints';
 import { eventTold, fadedOf } from '../vgm/events';
 import { festivityTold } from '../vgm/festivities';
 import { dwellersOf, keptOf } from '../vgm/leads';
+import { askWords } from '../vgm/asks';
 import { dungeonOf, type Decision, type DecisionLog, type FestivityDecision } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
@@ -24,6 +25,18 @@ import { cap, fill, nameFolk, type Folk } from './folk';
 export interface TalkCellar {
   readonly sketch: CellarSketch;
   readonly hint: CellarHint;
+  /** What the household asks (D62): its verb and words (`{family}` still to fill with their name). None: clear it, in the talk's own words. */
+  readonly ask?: TalkAsk;
+}
+
+/** A household's ask in talk (D62): the line they say, and for any verb but clear the topic, the journal's note and their thanks. */
+export interface TalkAsk {
+  readonly verb: string;
+  readonly told: string;
+  readonly topic: string;
+  readonly note: string;
+  readonly thanks: string;
+  readonly missing: string;
 }
 
 /**
@@ -194,7 +207,7 @@ export class TownTalk {
       return { ...characterFromProfile(profile), voice: pid(p.id), personality: { detail: 1, testimony: 'provisional' as const, affiliation: 0.9 } };
     });
     const facts: Fact[] = [];
-    for (const { sketch, hint } of cellars) {
+    for (const { sketch, hint, ask } of cellars) {
       const id = hint.cellar;
       const teller = folk.find((f) => f.person.home === hint.building);
       const house = teller?.house ?? sketch.house;
@@ -206,6 +219,8 @@ export class TownTalk {
       const knownBy = hint.knowers.map(pid);
       const fact = (n: string, atom: Fact['atom']): Fact => ({ id: `${id}/${n}`, atom, validFrom: 0, validTo: null, knownBy, sourceKey: 'source.house', origin: { kind: 'vgm', promise: id } });
       facts.push(fact('troubled', { predicate: 'troubled', args: { subject: id } }));
+      // What they ask of whoever goes (D62), in their own words: the first thing they say more of.
+      if (ask) facts.push(fact('asked', { predicate: 'noticed', args: { subject: id, sign: clause(fill(ask.told, { family: teller?.family ?? '' })) } }));
       sketch.hints.forEach((h, i) => facts.push(fact(`sign-${i}`, { predicate: 'noticed', args: { subject: id, sign: clause(h) } })));
       sketch.history.filter((h) => h.layer === 'built' || h.layer === 'older').forEach((h, i) => facts.push(fact(`story-${i}`, { predicate: 'story', args: { subject: id, line: clause(h.text) } })));
     }
@@ -255,6 +270,17 @@ export class TownTalk {
 
   /** The person's name. */
   nameOf(person: number): string { return this.byId.get(person)?.name ?? '?'; }
+
+  /** What promise `id`'s household asks (D62), named for them; null: clear it, in the talk's own words. */
+  askOf(id: string): TalkAsk | null {
+    const c = this.cellars.find((x) => x.hint.cellar === id);
+    if (!c?.ask || c.ask.verb === 'clear') return null;
+    const family = this.familyAt(c.hint.building), f = (t: string) => fill(t, { family });
+    return { verb: c.ask.verb, told: f(c.ask.told), topic: f(c.ask.topic), note: f(c.ask.note), thanks: f(c.ask.thanks), missing: f(c.ask.missing) };
+  }
+
+  /** The family a house is called after (its first named household's): who a keepsake belongs to (D62). */
+  familyAt(building: number): string { return this.folk.find((f) => f.person.home === building)?.family ?? ''; }
 
   /** Where the person lives, as people call it ("the inn of the Hollin family"). */
   homeCalled(person: number): string { return this.byId.get(person)?.house ?? '?'; }
@@ -368,7 +394,8 @@ export class TownTalk {
       if (!this.reportTo(id).includes(person)) continue;
       const h = this.cellarHouse.get(id);
       const own = h && !h.site && this.byId.get(person)?.person.home === h.building;
-      out.push({ id: `report:${id}`, label: cap(fill(this.talk.cleared.topic, { place: own ? this.talk.cleared.yours : this.cellarCalled(id) })), lead: true });
+      const asked = this.askOf(id);
+      out.push({ id: `report:${id}`, label: cap(fill(asked?.topic ?? this.talk.cleared.topic, { place: own ? this.talk.cleared.yours : this.cellarCalled(id) })), lead: true });
     }
     // A cellar moved into again: only its newest story is a topic; a quiet or kept one is none.
     this.leads.forEach((l, i) => {
@@ -528,5 +555,8 @@ export function talkCellar(d: Decision, setting: SettingModule, town: Town, peop
   const house = placeOf(dungeon, [town], setting.dungeons);
   if (!house) return null;
   const sketch = sketchCellar(dungeon, house, loreOf(setting, dungeon.template), dwellersOf(log, d));
-  return { sketch, hint: cellarHint(sketch, people, town.plan) };
+  // The place's own promise carries its household's ask (D62); new dwellers in it are only to be cleared.
+  const words = d.kind === 'dungeon' ? askWords(setting, d.ask, '{family}') : null;
+  const ask = words && d.kind === 'dungeon' && d.ask ? { verb: d.ask.verb, ...words } : null;
+  return { sketch, hint: cellarHint(sketch, people, town.plan), ...(ask ? { ask } : {}) };
 }

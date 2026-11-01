@@ -98,6 +98,7 @@ export class Encounter {
   private wasInside = false;
   private warned = false;
   private quietSaid = false;
+  private metSaid = false;
   /** The promise was kept and paid (its household was told). */
   paid: boolean;
   /** The game took in that it is quiet. */
@@ -243,7 +244,7 @@ export class Encounter {
     if (this.retired) return;
     this.cueInside();
     this.creatures.group.visible = this.arena.shown;
-    if (!this.arena.inside && !this.paid && !this.reported && this.arena.promise && this.delve.beaten) this.reported = this.host.quiet(this.arena.promise);
+    if (!this.arena.inside && !this.paid && !this.reported && this.arena.promise && this.delve.met) this.reported = this.host.quiet(this.arena.promise);
   }
 
   private cueInside(): void {
@@ -295,8 +296,12 @@ export class Encounter {
     if (!this.quietSaid && this.delve.beaten) {
       this.quietSaid = true;
       this.onCue({ kind: 'quiet' });
+    }
+    // What was asked is done (D62: a fetch once the keepsake is in hand): the household may come to the hero.
+    if (!this.metSaid && this.delve.met) {
+      this.metSaid = true;
       const comes = !this.paid && !!this.arena.promise && this.arena.inside && this.host.stilled(this.arena.promise);
-      if (this.arena.quietLine && !comes) this.director.queue(this.arena.quietLine, 2);
+      if (this.arena.quietLine && !comes && !this.delve.keepsake) this.director.queue(this.arena.quietLine, 2);
     }
     if (!lead) return;
     if (this.kneel?.done) this.getUp();

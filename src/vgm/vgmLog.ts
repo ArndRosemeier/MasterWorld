@@ -94,7 +94,7 @@ export function decisionSays(d: Decision): string {
     case 'hold': return `the ${d.people} hold ${at(d.x, d.z)}`;
     case 'retreat': return `the ${d.keeper}'s retreat of ${d.town} ${at(d.x, d.z)}`;
     case 'road': return `a ${d.way} from ${d.from} to ${d.to}`;
-    case 'dungeon': return `a ${d.template} for ${d.town}${d.dwellers ? ` (${d.dwellers})` : ''}`;
+    case 'dungeon': return `a ${d.template} for ${d.town}${d.dwellers ? ` (${d.dwellers})` : ''}${d.ask ? `; its household asks: ${d.ask.id}` : ''}`;
     case 'move-in': return `${d.dweller} into ${d.dungeon}`;
     case 'retake': return `${d.dweller} take ${d.dungeon}`;
     case 'kept': return `${d.promise} ${d.faded ? 'ran its course' : 'kept'}`;

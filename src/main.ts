@@ -66,6 +66,7 @@ import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
 import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
+import { holdsKeepsake, keepsakeOf, verbOf } from './vgm/asks';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
@@ -846,6 +847,7 @@ export async function start(b: Boot): Promise<void> {
       jobs: terrainJobs,
       portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
       cleared: (d) => void roadWork.clear(d),
+      keepsake: (d) => keepsakeOf(setting, d, towns?.get(d.town)?.talk.familyAt(d.building) ?? ''),
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       // The hero, what they leave lying and their spells go down with them.
@@ -1207,7 +1209,7 @@ export async function start(b: Boot): Promise<void> {
       const words = t.talk, to = words.reportTo(id)[0], p = t.residents.find((x) => x.id === to);
       if (p === undefined) return true;
       const name = words.nameOf(p.id), house = words.homeCalled(p.id), door = t.town.plan.buildings[p.home].door;
-      journal.quiet(id, { text: fill(setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
+      journal.quiet(id, { text: fill(words.askOf(id)?.note ?? setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
       return true;
     };
     /**
@@ -1238,7 +1240,11 @@ export async function start(b: Boot): Promise<void> {
       character.coins += coins;
       if (coins) sounds?.cue({ kind: 'paid', coins });
       character.earn(`cleared:${id}`, 'cleared');
+      // A fetch (D62): the keepsake goes back to its household.
+      const asked = t.talk.askOf(id), i = character.pack.findIndex((it) => it.keepsake === id);
+      if (i >= 0) character.pack.splice(i, 1);
       keptNow(id, t);
+      if (asked && due) return cap(fill(asked.thanks, { coins: coinText(coins), place: t.talk.cellarCalled(id) }));
       return deed?.quest ? deed.quest.done : due ? due.thanks(coinText(coins)) : '';
     };
     // A cellar gone quiet with the hero down in it (show, don't tell): the one of its household the hero would report to
@@ -1344,6 +1350,8 @@ export async function start(b: Boot): Promise<void> {
       serve: (id, a) => services.get(id)?.(a),
       report: (id, a) => {
         const t = talk!.place;
+        // A fetch (D62) is done only with the thing itself: told without it in hand, they ask where it is.
+        if (verbOf(log, id) === 'fetch' && !holdsKeepsake(character.pack, id)) return { text: t.talk.askOf(id)?.missing ?? '', heard: [], done: false };
         return t.talk.toldSafe(a.person.id, id, paidFor(id, t));
       },
       // Sleepers lie in their beds, not to be talked to (but those the hero comes to find get up for the hero).

@@ -11,6 +11,7 @@ import type { Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace } from '../world/dungeon/space';
 import { Character } from './character';
 import { Delve, type DelveSave } from './delve';
+import type { Item } from './items';
 import type { Fight, HeroPose } from './fight';
 import { aimsAtFoe } from './recipe';
 import type { Creature } from '../sim/creatures';
@@ -41,6 +42,8 @@ export interface BotOptions {
   readonly spots?: readonly BotSpot[];
   /** Fights on without resting, potions or second wind (the loop check's reckless hero). */
   readonly rash?: boolean;
+  /** A household's keepsake to find in the lair's hoard (D62: a fetch). */
+  readonly keepsake?: Item | null;
 }
 
 /** A whole visit: the fight's result, what was searched, and whether the hero got back to the ladder. */
@@ -83,6 +86,7 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   // The way down took longer than any cooldown: the hero comes in fresh.
   hero.cooldowns.clear();
   const delve = new Delve(cellar, space, setting, hero, seed, opts.saved);
+  delve.keepsake = opts.keepsake ?? null;
   const { den, fight } = delve;
   const h = cellar.hatch;
   const ladder = { x: h.x - Math.sin(h.yaw), y: h.y, z: h.z - Math.cos(h.yaw) };

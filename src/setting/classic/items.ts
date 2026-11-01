@@ -54,6 +54,11 @@ export const items: ItemCatalog = {
     { id: 'old-coin', name: 'Coin of the old realm', kind: 'valuable', value: 30, weight: 0.01, lore: 'A crowned hammer on one side, a tower on the other. Nobody mints these any more.' },
     { id: 'candlestick', name: 'Silver candlestick', kind: 'valuable', value: 90, weight: 0.8 },
     { id: 'garnet', name: 'Rough garnet', kind: 'valuable', value: 60, weight: 0.02 },
+    // Keepsakes a household asks back (D62, vgm/asks.ts): named for the family when one is asked for; no table rolls them.
+    { id: 'locket', name: 'Silver locket', kind: 'valuable', value: 40, weight: 0.05 },
+    { id: 'signet', name: 'Signet ring', kind: 'valuable', value: 55, weight: 0.03 },
+    { id: 'old-blade', name: 'Old family sword', kind: 'valuable', value: 30, weight: 1.6 },
+    { id: 'deed-box', name: 'Iron deed box', kind: 'valuable', value: 10, weight: 2.2 },
     { id: 'trinket', name: 'Shiny trinket', kind: 'valuable', value: 3, weight: 0.05, lore: 'A button, a bent spoon and a bead on a string. Treasured by someone.' },
     { id: 'silk', name: 'Bundle of spider silk', kind: 'valuable', value: 45, weight: 0.3, lore: 'Weavers in the city pay well for it, and ask no questions.' },
     { id: 'wolf-pelt', name: 'Wolf pelt', kind: 'valuable', value: 35, weight: 2.5, lore: 'Thick grey fur. The furrier in town pays well for it before winter.' },

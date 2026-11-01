@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 15;
+export const CONTRACT_VERSION = 16;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -806,6 +806,33 @@ export interface TreasureFind {
 /** The most a rare find's chance grows to, however dangerous the place. */
 export const TOP_FIND = 0.3;
 
+/**
+ * What a household asks of the hero about its place (D62, phase Q): one verb on one place, and only the
+ * thing it names counts as done. `clear`: the dwellers gone (as every lead was before). `fetch`: one named
+ * thing out of the place (an heirloom). The words: `told` the lines the household says themselves (in talk,
+ * as what they know; `{thing}` the thing's name, `{place}`), `topic` the hero's line when it is done (the
+ * topic to tell them), `note` the journal's line once it is done (`{name}` who to tell, `{house}`), `thanks`
+ * what they say (`{coins}`, `{thing}`).
+ */
+export type AskVerb = 'clear' | 'fetch';
+export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch'];
+
+export interface AskDef {
+  /** The kind (the VGM remembers kinds given, D62): a slug. */
+  readonly id: string;
+  readonly verb: AskVerb;
+  /** How often against the others (before the VGM's memory weighs it). */
+  readonly weight: number;
+  /** The dungeon kinds it fits (none: any). */
+  readonly kinds?: readonly string[];
+  /** Only places with dwellers (`true`), only empty ones (`false`), or either (none). */
+  readonly lived?: boolean;
+  /** `fetch`: the things it may name, each a catalogue item and what it is called (`{family}`: the household's name). */
+  readonly things?: readonly { readonly item: string; readonly name: string; readonly lore: string }[];
+  /** `missing`: what they say when told it is done but the thing is not in the hero's hands (a fetch). */
+  readonly words: { readonly told: readonly string[]; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing?: string };
+}
+
 /** Items: the catalogue, the legendary ones, treasure tables, and the words for rarer finds. */
 export interface ItemCatalog {
   readonly items: readonly ItemDef[];
@@ -1576,6 +1603,8 @@ export interface SettingModule {
   readonly events?: readonly StoryEventDef[];
   /** Good days in the towns (C11): feasts for the hero's deeds, market days. None: no such days. */
   readonly festivities?: readonly FestivityDef[];
+  /** What a household may ask of the hero besides clearing a place (D62, phase Q): each a verb on a place. None: every lead is "clear it". */
+  readonly asks?: readonly AskDef[];
   /** Birds and squirrels about the land; without it the land has none. */
   readonly smallLife?: SmallLifeDef;
   /** What fills the regions the VGM opens as the hero walks; without it no regions open beyond the start. */
@@ -1721,6 +1750,24 @@ export function validateSetting(m: SettingModule): string[] {
   out.push(...validateFight(m, where));
   out.push(...validatePeoples(m, where));
   out.push(...validateRoutines(m.routines, where));
+  out.push(...validateAsks(m, where));
+  return out;
+}
+
+/** What households ask (D62): known verbs, the things a fetch names exist, every ask says its words. */
+function validateAsks(m: SettingModule, where: string): string[] {
+  const out: string[] = [];
+  const ids = new Set<string>();
+  for (const a of m.asks ?? []) {
+    if (ids.has(a.id)) out.push(`${where}: ask "${a.id}" defined twice`);
+    ids.add(a.id);
+    if (!ASK_VERBS.includes(a.verb)) out.push(`${where}: ask "${a.id}" verb "${a.verb}" is unknown`);
+    if (!(a.weight > 0)) out.push(`${where}: ask "${a.id}" needs a weight above 0`);
+    for (const k of a.kinds ?? []) if (!m.dungeons[k]) out.push(`${where}: ask "${a.id}" names dungeon kind "${k}" the setting has not`);
+    if (!a.words.told.length || !a.words.topic || !a.words.note || !a.words.thanks) out.push(`${where}: ask "${a.id}" lacks its words`);
+    if (a.verb === 'fetch' && (!a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" fetches nothing (things), or has no words for the thing not brought (missing)`);
+    for (const t of a.things ?? []) if (!m.items.items.some((d) => d.id === t.item)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is no catalogue item (${t.item})`);
+  }
   return out;
 }
 
