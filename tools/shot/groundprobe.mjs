@@ -43,15 +43,27 @@ const res = await page.evaluate(() => {
     }
     return best;
   };
+  // The grass mask as the blades read it: ground height (R) read bilinear at world (x, z), null outside it.
+  const gm = g.grass?.mask?.mask;
+  const grassGround = (x, z) => {
+    if (!gm) return null;
+    const o = gm.origin.value, fx = (x - o.x) / gm.side * gm.res - 0.5, fz = (z - o.y) / gm.side * gm.res - 0.5, i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+    if (i < 0 || j < 0 || i + 1 >= gm.res || j + 1 >= gm.res) return null;
+    const q = (a, b) => gm.data[((j + b) * gm.res + i + a) * 4];
+    return q(0, 0) * (1 - u) * (1 - v) + q(1, 0) * u * (1 - v) + q(0, 1) * (1 - u) * v + q(1, 1) * u * v;
+  };
   const rows = [];
   const at = (x, z, tag) => {
-    const m = mesh(x, z), walk = w.world.height(x, z), land = g.terrain.height(x, z);
-    rows.push({ tag, x: +x.toFixed(1), z: +z.toFixed(1), mesh: m ? +m.y.toFixed(3) : null, level: m?.level ?? null, walk: +walk.toFixed(3), land: +land.toFixed(3), floor: w.world.floor?.(x, z, walk) ?? null });
+    const m = mesh(x, z), walk = w.world.height(x, z), land = g.terrain.height(x, z), gg = grassGround(x, z);
+    rows.push({ tag, x: +x.toFixed(1), z: +z.toFixed(1), mesh: m ? +m.y.toFixed(3) : null, level: m?.level ?? null, walk: +walk.toFixed(3), land: +land.toFixed(3), grass: gg === null ? null : +gg.toFixed(3), floor: w.world.floor?.(x, z, walk) ?? null });
   };
   at(p.x, p.z, 'hero');
   for (const r of [2, 5, 10, 20]) for (let a = 0; a < 16; a++) at(p.x + Math.cos(a * Math.PI / 8) * r, p.z + Math.sin(a * Math.PI / 8) * r, `r${r}`);
-  const gaps = rows.filter((r) => r.mesh !== null).map((r) => ({ ...r, gap: +(r.walk - r.mesh).toFixed(3) })).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
-  return { hero: { x: p.x, y: p.y, z: p.z, mode: w.mode }, chunks: chunks.map((c) => `${c.level}@${c.ox},${c.oz}`).join(' '), shown: rows.length, noMesh: rows.filter((r) => r.mesh === null).length, worst: gaps.slice(0, 8), heroRow: rows[0] };
+  // And a grid, 1 m apart, 24 m each way.
+  for (let dz = -24; dz <= 24; dz++) for (let dx = -24; dx <= 24; dx++) at(Math.floor(p.x) + dx + 0.5, Math.floor(p.z) + dz + 0.5, 'grid');
+  const seen = rows.filter((r) => r.mesh !== null);
+  const worst = (key) => seen.filter((r) => r[key] !== null).map((r) => ({ ...r, gap: +(r[key] - r.mesh).toFixed(3) })).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap)).slice(0, 6);
+  return { hero: { x: p.x, y: p.y, z: p.z, mode: w.mode }, seed: g.terrain.seed, chunks: chunks.map((c) => `${c.level}@${c.ox},${c.oz}`).join(' '), points: rows.length, noMesh: rows.length - seen.length, noGrass: rows.filter((r) => r.grass === null).length, heroRow: rows[0], worstWalk: worst('walk'), worstGrass: worst('grass'), worstLand: worst('land') };
 });
 console.log(JSON.stringify(res, null, 1));
 await page.screenshot({ path: out });
