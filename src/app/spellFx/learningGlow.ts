@@ -9,21 +9,35 @@ import { lit, type SpellBits, type Vec3 } from './particles';
 import { HeroFx } from './heroFx';
 
 /** How long it plays (s). */
-export const GLOW_TIME = 2.8;
+export const GLOW_TIME = 3.6;
 /** Ward light, glowing (linear, over 1): the colour of the warded-brass lines' blue. */
 const WARD: Vec3 = [0.9, 2.3, 3.2];
 const DEEP: Vec3 = [0.3, 0.9, 2.4];
 const UP: Vec3 = [0, 1, 0];
-/** The motes winding up, how wide they start (m), where the brow is over the feet (m), and when they reach it (s). */
-const MOTES = 16;
+/**
+ * The motes winding up in two strands: how many, how wide the spiral starts (m), where the brow is over the feet
+ * (m), how long each takes to climb and how long the last waits to set off (s).
+ */
+const MOTES = 24;
 const WIDE = 0.75;
 const BROW = 1.62;
-const CLIMB = 1.7;
+const CLIMB = 1.4;
+const STAGGER = 1.1;
+/** Turns of the spiral on the way up. */
+const TURNS = 1.5;
+
+/** Where mote `i` is `t` s in, over `feet`: all follow one spiral path (two strands), one after another; null before it sets off and after it is in. */
+export function moteAt(i: number, t: number, feet: Vec3): Vec3 | null {
+  const p = (t - (i / MOTES) * STAGGER) / CLIMB;
+  if (p <= 0 || p >= 1) return null;
+  const e = smoothstep(0, 1, p), a = e * TURNS * Math.PI * 2 + (i % 2) * Math.PI, r = WIDE * (1 - e) ** 1.2 + 0.08;
+  return [feet[0] + Math.cos(a) * r, feet[1] + 0.1 + (BROW - 0.1) * e, feet[2] + Math.sin(a) * r];
+}
 
 /** Light welling up off the ground round the hero. */
 const WELL = { sprite: 'wisp', life: [0.7, 1.2], size: [0.16, 0.05], spread: WIDE, ring: true, speed: [0, 0.2], up: [0.4, 0.9], drag: 1.5, color: lit(WARD, 0.8), to: DEEP, swirl: 2 } as const;
 /** When the motes are in and the light flares at the brow (s). */
-const FLARE_AT = CLIMB + 0.2;
+const FLARE_AT = STAGGER + CLIMB + 0.1;
 
 export class LearningGlow extends HeroFx {
   constructor() { super(GLOW_TIME, { spec: WELL, count: 30 }); }
@@ -36,15 +50,14 @@ export class LearningGlow extends HeroFx {
     if (pool > 0) b.hold('glow', [feet[0], feet[1] + 0.04, feet[2]], WIDE * 2.6, lit(DEEP, 0.25 * pool), { flat: UP });
     // The motes wind up the body, each a little after the one before, narrowing to the brow.
     for (let i = 0; i < MOTES; i++) {
-      const p = smoothstep(0, 1, (t - (i / MOTES) * 0.5) / CLIMB);
-      if (p <= 0 || p >= 1) continue;
-      const a = (i / MOTES) * Math.PI * 2 + p * Math.PI * 3, r = WIDE * (1 - p) ** 1.3 + 0.06;
-      const at: Vec3 = [feet[0] + Math.cos(a) * r, feet[1] + 0.1 + (BROW - 0.1) * p, feet[2] + Math.sin(a) * r];
-      b.hold('spark', at, 0.07 + 0.05 * (1 - p), lit(WARD, 1.4), { seed: i / MOTES });
-      b.hold('glow', at, 0.22, lit(DEEP, 0.35), {});
+      const at = moteAt(i, t, feet);
+      if (!at) continue;
+      const up = (at[1] - feet[1]) / BROW;
+      b.hold('spark', at, 0.08 + 0.05 * (1 - up), lit(WARD, 1.6), { seed: i / MOTES });
+      b.hold('glow', at, 0.26, lit(DEEP, 0.4), {});
     }
     // At the brow the light gathers, flares once when the motes are in, and sinks in.
-    const gather = smoothstep(0.4, CLIMB + 0.3, t) * fade;
+    const gather = smoothstep(0.5, STAGGER + CLIMB, t) * fade;
     if (gather > 0) {
       b.hold('glow', brow, 0.35 + 0.35 * gather, lit(WARD, 0.55 * gather), {});
       b.hold('ring', brow, 0.5 * (1 - 0.4 * gather), lit(WARD, 0.6 * gather), { flat: UP, rot: t * 2.2, seed: 0.41 });

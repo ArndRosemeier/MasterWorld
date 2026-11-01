@@ -113,3 +113,25 @@ test('ability points: the potion lies only in treasure (hoards, chests, stashes,
   for (let i = 0; i < N; i++) if (rollLoot(classic.items, 'lair', 10, new Rng(1000 + i)).items.some((it) => it.def === POTION)) found++;
   assert.ok(Math.abs(found / N - findChance(lair, 10)) < 0.03, `${found} of ${N}`);
 });
+
+test('potion of learning: the light winds up the hero\'s body in one spiral and ends at the brow, never above it', async () => {
+  const { moteAt } = await import('../src/app/spellFx/learningGlow');
+  const feet = [10, 5, -3] as const;
+  let seen = 0, last = -1;
+  for (let t = 0; t < 3.6; t += 0.05) {
+    for (let i = 0; i < 24; i++) {
+      const at = moteAt(i, t, feet);
+      if (!at) continue;
+      seen++;
+      assert.ok(at[1] >= feet[1] && at[1] <= feet[1] + 1.62 + 1e-9, `height ${at[1] - feet[1]}`);
+      assert.ok(Math.hypot(at[0] - feet[0], at[2] - feet[2]) <= 0.83, 'within the body\'s width');
+    }
+  }
+  assert.ok(seen > 100);
+  // One after another: a later mote is never ahead of an earlier one of the same strand.
+  for (let i = 0; i < 22; i++) {
+    const a = moteAt(i, 1.5, feet), b = moteAt(i + 2, 1.5, feet);
+    if (a && b) { assert.ok(b[1] <= a[1] + 1e-9); last = a[1]; }
+  }
+  assert.ok(last >= 0);
+});
