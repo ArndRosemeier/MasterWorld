@@ -395,7 +395,10 @@ export function playEvening(seed: number, setting0: SettingModule, opts: Evening
       // What the household asks (D62): a fetch's keepsake lies in the lair's hoard, and only it does the task.
       const own = lead.id === dungeon.id, verb = verbOf(log, lead.id), ask = own ? dungeon.ask ?? null : null;
       const names = talk.namesFor(dungeon), keepsake = own ? keepsakeOf(setting, dungeon, names) : null;
-      verbs.push(verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb);
+      // What the household asked (Q2). Places other tools make are not the Builder's to vary, so they are tagged: new
+      // dwellers, a guild's task, a master's deed, and any place made without an ask (the first lead, a story event's).
+      const given = !own ? ' (dwellers)' : dungeon.task ? ' (task)' : dungeon.quest ? ' (deed)' : !dungeon.ask ? ' (other)' : '';
+      verbs.push(`${verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb}${given}`);
       const twist = own ? twistOf(setting, dungeon.ask) : null;
       // What an earlier ending brought about (Q4), as the log has it.
       if (ask?.want) { wants.push(ask.want.kind); say(`asked because ${talk.nameOf(ask.want.person)} ${WANT_WHY[ask.want.kind]}${ask.want.rival !== undefined ? ` ${talk.nameOf(ask.want.rival)}` : ''}`); }
@@ -646,6 +649,9 @@ export function playEvening(seed: number, setting0: SettingModule, opts: Evening
     if (shops && hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
     // Gate C (C9): the VGM answers every need; none stands overdue longer than OVERDUE_MOST.
     for (const n of NEEDS) if (overdue[n] > OVERDUE_MOST) throw new Broke(`${n} stood overdue ${(overdue[n] / 60).toFixed(1)} min (at most ${OVERDUE_MOST / 60})`);
+    // Gate Q (Q2): in natural play no kind of task the VGM gives is given twice in a row (the runs that ask one kind only may).
+    const natural = verbs.filter((v) => !/\((dwellers|task|deed|other)\)$/.test(v)).map((v) => v.split(' ')[0]!);
+    if (!opts.only) for (let i = 1; i < natural.length; i++) if (natural[i] === natural[i - 1]) throw new Broke(`the same kind of task twice in a row: ${verbs.join(', ')}`);
     // Gate Q: the endings and the wants met read back from the log alone (the log is the save).
     for (const [id, ending] of endings) if (endingOf(log, id) !== ending) throw new Broke(`the log does not keep how ${id} ended (${ending})`);
     for (const d of log) {
