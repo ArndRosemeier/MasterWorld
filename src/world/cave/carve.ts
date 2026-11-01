@@ -78,15 +78,18 @@ export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, s
   }
 
   function stampVoid(v: Void): void {
-    const rn = new Noise(v.seed), reff = 0.8 * Math.min(v.rx, v.rz, v.height);
-    const [i0, i1] = sampleRange(v.x - v.rx - 3, v.x + v.rx + 3, f.ox, f.nx), [j0, j1] = sampleRange(v.floor - 1, v.floor + v.height + 3, f.oy, f.ny), [k0, k1] = sampleRange(v.z - v.rz - 3, v.z + v.rz + 3, f.oz, f.nz);
+    const rn = new Noise(v.seed), reach = Math.max(v.rx, v.rz), cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
+    const [i0, i1] = sampleRange(v.x - reach - 3, v.x + reach + 3, f.ox, f.nx), [j0, j1] = sampleRange(v.floor - 1, v.floor + v.height + 3, f.oy, f.ny), [k0, k1] = sampleRange(v.z - reach - 3, v.z + reach + 3, f.oz, f.nz);
     for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const x = f.ox + i * step, y = f.oy + j * step, z = f.oz + k * step, dy = y - v.floor, dx = x - v.x, dz = z - v.z;
-      const e = Math.sqrt((dx / v.rx) ** 2 + (dz / v.rz) ** 2 + (dy / v.height) ** 2);
-      let a = Math.min((1 - e) * reff, dy + 0.4);
+      // In the room's own frame: long along yaw, short across it. The ceiling is a flattened dome.
+      const u = (dx * cy + dz * sy) / v.rx, w = (-dx * sy + dz * cy) / v.rz, e2 = u * u + w * w;
+      if (e2 > 1.6) continue;
+      const top = v.height * Math.sqrt(Math.max(0, 1 - e2)) ** 0.55;
+      let a = Math.min(top - dy, (1 - Math.sqrt(e2)) * 0.9 * v.rz, dy + 0.4);
       if (a < -3) continue;
-      // A fallen ceiling is uneven: big bulges and ledges.
-      a += 2.6 * rn.n3(x / 7, y / 7, z / 7) + 0.8 * rn.n3(x / 2.6 + 5, y / 2.6, z / 2.6);
+      // A fallen ceiling is uneven: broad bulges and ledges, not cauliflower.
+      a += 1.3 * rn.n3(x / 9, y / 8, z / 9) + 0.3 * rn.n3(x / 3 + 5, y / 3, z / 3);
       if (a > -1) {
         const d = Math.hypot(dx, dz);
         if (a > 0 && d < v.heapR + 1) {

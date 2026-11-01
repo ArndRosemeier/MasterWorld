@@ -22,6 +22,7 @@ export const caves: CavesDef = {
     {
       id: 'massive', name: 'Massive limestone',
       bedding: { thickness: [3, 9], dip: [0, 6], soluble: 0.5, parting: 0.8, colors: LIME },
+      resistance: { size: 30, contrast: 3 },
       joints: { sets: 2, spacing: [20, 40], between: [55, 90], strength: 1 },
       faults: { count: [0, 1], strength: 1.5 },
       water: { sinks: [5, 9], springs: [1, 2], stages: [2, 4], drop: [6, 12], loop: 14 },
@@ -31,6 +32,7 @@ export const caves: CavesDef = {
     {
       id: 'jointed', name: 'Jointed limestone',
       bedding: { thickness: [1.5, 4], dip: [0, 4], soluble: 0.7, parting: 0.5, colors: LIME },
+      resistance: { size: 20, contrast: 2.4 },
       joints: { sets: 2, spacing: [7, 14], between: [70, 90], strength: 3 },
       faults: { count: [1, 2], strength: 2 },
       water: { sinks: [10, 18], springs: [2, 3], stages: [1, 2], drop: [5, 9], loop: 8 },
@@ -40,17 +42,18 @@ export const caves: CavesDef = {
     {
       id: 'thin-bedded', name: 'Thin-bedded limestone',
       bedding: { thickness: [0.6, 2.2], dip: [2, 8], soluble: 0.35, parting: 3.5, colors: LIME },
+      resistance: { size: 24, contrast: 3 },
       joints: { sets: 2, spacing: [18, 30], between: [60, 90], strength: 0.6 },
       faults: { count: [0, 1], strength: 1 },
       water: { sinks: [3, 6], springs: [2, 3], stages: [2, 3], drop: [4, 8], loop: 6 },
-      former: { rounds: 4, samples: 3, feedback: 1.3, growth: 0.35, reuse: 0.15, noise: 0.6, keep: 0.02 },
+      former: { rounds: 3, samples: 2, feedback: 1.3, growth: 0.35, reuse: 0.15, noise: 0.6, keep: 0.02 },
       collapse: { junction: 0.2, span: 5, most: 3 },
     },
   ],
   // The big cave is about 300 m across and 60 m deep (Arnd, D63).
   sizes: [
     { id: 'small', across: 80, deep: 32, weight: 4, scale: 0.7, step: 2.5, field: 0.5 },
-    { id: 'medium', across: 160, deep: 48, weight: 3, scale: 1, step: 3, field: 0.6 },
+    { id: 'medium', across: 160, deep: 48, weight: 3, scale: 1, step: 3, field: 0.65 },
     { id: 'big', across: 300, deep: 60, weight: 1, scale: 1.4, step: 5, field: 0.8 },
   ],
   // Pure caves are the norm; a mixed one usually has two shares and the third at zero (Arnd, 2026-11-01).

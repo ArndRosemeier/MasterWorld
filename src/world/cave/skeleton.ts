@@ -39,9 +39,10 @@ export interface Void {
   readonly x: number;
   readonly z: number;
   readonly floor: number;
-  /** The dome's horizontal radii (rx along x, rz along z) and its height above the floor. */
+  /** The dome's horizontal radii (rx along the direction `yaw`, rz across it) and its height above the floor. */
   readonly rx: number;
   readonly rz: number;
+  readonly yaw: number;
   readonly height: number;
   /** The rubble heap's radius and height. */
   readonly heapR: number;

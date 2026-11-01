@@ -272,8 +272,9 @@ function makeWater(rng: Rng, rock: CaveRockDef, land: CaveLand, across: number, 
   const newest = Math.min(Math.max(low, 0.12 * deep), 0.4 * deep);
   const nStages = rng.int(w.stages[0], w.stages[1]), tables: number[] = [];
   for (let s = 0, t = newest; s < nStages; s++) { tables.unshift(t); t += rng.range(w.drop[0], w.drop[1]); }
-  const topTable = tables[0], nSprings = rng.int(w.springs[0], w.springs[1]), along: number[] = [];
-  for (let i = 0; i < nSprings; i++) along.push((i + rng.range(0.2, 0.8)) / nSprings);
+  // The springs lie close along the valley side, so the systems that feed them meet: one cave, not two apart.
+  const topTable = tables[0], nSprings = rng.int(w.springs[0], w.springs[1]), along: number[] = [], span = 0.12 * nSprings, start = rng.range(0.15, 0.85 - span);
+  for (let i = 0; i < nSprings; i++) along.push(start + (i + rng.range(0.2, 0.8)) / nSprings * span);
   const stages: Stage[] = tables.map((table) => ({
     table,
     springs: along.map((t) => { const [x, z] = onFace(face, t, across); return { x, y: table, z }; }),

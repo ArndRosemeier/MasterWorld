@@ -70,7 +70,8 @@ export function formSolution(block: RockBlock, caves: CavesDef, scale: number, h
     const bi = bedIndex(block.beds, bedCoord(block.beds, x, y, z)), d = bedEdgeDistance(block.beds, x, y, z);
     sol[n] = block.beds.sol[bi];
     // The rock is not even over a few metres either: soft and hard patches the water winds round.
-    ease[n] = Math.exp(rock.former.noise * 1.5 * (0.7 * easeNoise.n3(x / 17, y / 11, z / 17) + 0.3 * easeNoise.n3(x / 6 + 31, y / 5, z / 6)));
+    const rs = rock.resistance.size;
+    ease[n] = Math.exp(rock.resistance.contrast * (0.6 * easeNoise.n3(x / rs, y / (0.6 * rs), z / rs) + 0.28 * easeNoise.n3(x / (rs / 2.7) + 31, y / (rs / 4), z / (rs / 2.7)) + 0.12 * easeNoise.n3(x / (rs / 6) + 71, y / (rs / 8), z / (rs / 6))));
     bprox[n] = Math.exp(-((d / tauB) ** 2)) * sol[n];
     block.joints.forEach((set, s) => { jprox[s][n] = Math.exp(-((jointDistance(set, x, z) / tauJ) ** 2)); });
     let f = 0;
@@ -214,10 +215,22 @@ export function formSolution(block: RockBlock, caves: CavesDef, scale: number, h
     for (let i = 0; i < nb.length; i += 2) if (!reach.has(nb[i])) { reach.add(nb[i]); todo.push(nb[i]); }
   }
   for (const n of [...adj.keys()]) if (!reach.has(n)) adj.delete(n);
+  // One cave, not several apart: of the systems that reached their springs, the biggest stays.
+  const part = new Map<number, number>(), sizes: number[] = [];
+  for (const n0 of adj.keys()) {
+    if (part.has(n0)) continue;
+    const id = sizes.length, todo = [n0];
+    let count = 0;
+    part.set(n0, id);
+    while (todo.length) { const q = todo.pop()!, nb = adj.get(q)!; count += nb.length / 2; for (let i = 0; i < nb.length; i += 2) if (!part.has(nb[i])) { part.set(nb[i], id); todo.push(nb[i]); } }
+    sizes.push(count);
+  }
+  const main = sizes.indexOf(Math.max(...sizes));
+  for (const [n, id] of part) if (id !== main) adj.delete(n);
   // (Whatever a reached node touches is reached too, so what is left is consistent.)
   let degrees = 0;
   for (const nb of adj.values()) degrees += nb.length / 2;
-  const net: Net = { adj, rec, nx, ny, h, bprox, jprox, springNodes, sinkNodes: sinkNodes.map((s) => s.n), totalFlow, edgeCount: degrees / 2 };
+  const net: Net = { adj, rec, nx, ny, h, bprox, ease, jprox, springNodes, sinkNodes: sinkNodes.map((s) => s.n), totalFlow, edgeCount: degrees / 2 };
   const tChains0 = time();
   const out = shape(block, caves, scale, net, rng);
   const tEnd = time();
@@ -233,6 +246,8 @@ interface Net {
   readonly ny: number;
   readonly h: number;
   readonly bprox: Float32Array;
+  /** How readily the rock opens at a node (the resistance field's inverse). */
+  readonly ease: Float32Array;
   readonly jprox: readonly Float32Array[];
   readonly springNodes: ReadonlySet<number>;
   readonly sinkNodes: readonly number[];
@@ -246,7 +261,7 @@ interface Chain {
 }
 
 /** The section of a point from what the water did there. */
-interface Wet { ph: number; va: number; pb: number; jb: number; stage: number; act: boolean }
+interface Wet { ph: number; va: number; pb: number; jb: number; soft: number; stage: number; act: boolean }
 
 /** The shortest stretch of a way cut as one straight piece, metres (a wider way is cut in longer pieces). */
 const SEG = 1.6;
@@ -258,7 +273,7 @@ function shape(block: RockBlock, caves: CavesDef, scale: number, net: Net, rng: 
   const xyz = (n: number): [number, number, number] => [(n % nx) * h, (((n / nx) | 0) % ny) * h, ((n / (nx * ny)) | 0) * h];
   const stageN = block.water.stages.length;
   const wetOf = (n: number): Wet => {
-    const w: Wet = { ph: 0, va: 0, pb: net.bprox[n] * Math.min(1, rock.bedding.parting / 2), jb: 0, stage: 0, act: false };
+    const w: Wet = { ph: 0, va: 0, pb: net.bprox[n] * Math.min(1, rock.bedding.parting / 2), jb: 0, soft: net.ease[n], stage: 0, act: false };
     let best = -1;
     const nb = adj.get(n) ?? [];
     for (let i = 1; i < nb.length; i += 2) {
@@ -304,7 +319,9 @@ function shape(block: RockBlock, caves: CavesDef, scale: number, net: Net, rng: 
       D = way.maxCut * scale * v ** 0.6;
       if (w.ph <= 0) A = C;
     }
-    A = Math.max(Amin, A * (1 + 0.45 * m)); B = Math.max(Bmin, B * (1 + 0.35 * n));
+    // Soft rock opens wide, hard rock stays tight: the way swells and pinches with the rock.
+    const soft = Math.min(2.2, Math.max(0.55, w.soft ** 0.4));
+    A = Math.max(Amin, A * soft * (1 + 0.45 * m)); B = Math.max(Bmin, B * Math.min(1.6, Math.max(0.7, w.soft ** 0.2)) * (1 + 0.35 * n));
     return { A, B, C: C > 0 ? Math.max(Amin, C * (1 + 0.2 * n)) : 0, D };
   };
 
@@ -326,17 +343,17 @@ function shape(block: RockBlock, caves: CavesDef, scale: number, net: Net, rng: 
     for (let i = 0; i + 1 < P.length; i++) {
       const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
       const e0 = i === 0 ? [2 * p1[0] - p2[0], 2 * p1[1] - p2[1], 2 * p1[2] - p2[2]] : p0, e3 = i + 2 >= P.length ? [2 * p2[0] - p1[0], 2 * p2[1] - p1[1], 2 * p2[2] - p1[2]] : p3;
-      const segLen = Math.hypot(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]), steps = Math.max(1, Math.ceil(segLen / Math.min(5, Math.max(SEG, 1.1 * Math.max(Amin, section(W[i], 0, 0).A))))), last = i + 2 >= P.length;
+      const segLen = Math.hypot(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]), steps = Math.max(1, Math.ceil(segLen / Math.min(6, Math.max(SEG, 1.6 * Math.max(Amin, section(W[i], 0, 0).A))))), last = i + 2 >= P.length;
       for (let s = 0; s < steps + (last ? 1 : 0); s++) {
         const t = s / steps;
         let x = cr(e0[0], p1[0], p2[0], e3[0], t), y = cr(e0[1], p1[1], p2[1], e3[1], t), z = cr(e0[2], p1[2], p2[2], e3[2], t);
         const w: Wet = {
-          ph: lerp(W[i].ph, W[i + 1].ph, t), va: lerp(W[i].va, W[i + 1].va, t), pb: lerp(W[i].pb, W[i + 1].pb, t), jb: lerp(W[i].jb, W[i + 1].jb, t), stage: W[i].stage, act: W[i].act,
+          ph: lerp(W[i].ph, W[i + 1].ph, t), va: lerp(W[i].va, W[i + 1].va, t), pb: lerp(W[i].pb, W[i + 1].pb, t), jb: lerp(W[i].jb, W[i + 1].jb, t), soft: lerp(W[i].soft, W[i + 1].soft, t), stage: W[i].stage, act: W[i].act,
         };
         const m = noise.n3(x / 10 + 40, y / 10, z / 10), n = noise.n3(x / 8, y / 8 + 60, z / 8), sec = section(w, m, n);
         // The way wanders a little off the lattice's smoothed line; a point on the chain's ends stays (junctions meet).
         if (!(i === 0 && s === 0) && !(last && s === steps)) {
-          const amp = Math.min(1.3, 0.3 * sec.A);
+          const amp = Math.min(2.2, 0.45 * sec.A);
           x += noise.n3(x / 13 + 7, y / 13, z / 13) * amp; y += noise.n3(x / 13, y / 13 + 9, z / 13) * amp * 0.6; z += noise.n3(x / 13, y / 13, z / 13 + 11) * amp;
         }
         pts.push({ x, y, z, A: sec.A, B: sec.B, C: sec.C, D: sec.D, flow: Math.max(w.ph, w.va) });
@@ -364,13 +381,14 @@ function shape(block: RockBlock, caves: CavesDef, scale: number, net: Net, rng: 
     if (voids.length >= c.most) break;
     if (!vrng.chance(k.weight) || voids.some((v) => Math.hypot(v.x - k.x, v.z - k.z) < apart)) continue;
     const floor = k.y - k.B, ground = block.land.surface(k.x, k.z);
-    let height = vrng.range(7, 22) * Math.sqrt(scale);
+    // A breakdown room: wide and lowish under a flattish ceiling, longer one way than the other.
+    let height = vrng.range(6, 14) * Math.sqrt(scale);
     const room = block.deep - floor - 3;
     if (room < 6) continue;
     const skylight = ground < floor + height + 3 && ground <= block.deep + 2;
     if (skylight) height = Math.max(6, ground - floor + 2); else height = Math.min(height, room);
-    const rx = k.A * vrng.range(1.5, 2.5) + 2, rz = k.A * vrng.range(1.5, 2.5) + 2;
-    voids.push({ x: k.x, z: k.z, floor, rx, rz, height, heapR: 0.6 * Math.min(rx, rz), heapH: Math.min(0.4 * height, 7), skylight, seed: deriveSeed(block.seed, 'void', voids.length) });
+    const rx = Math.min(k.A * vrng.range(2, 3.2) + 4, 15 * Math.sqrt(scale)), rz = rx * vrng.range(0.45, 0.8);
+    voids.push({ x: k.x, z: k.z, floor, rx, rz, yaw: vrng.range(0, Math.PI), height, heapR: 0.6 * Math.min(rx, rz), heapH: Math.min(0.35 * height, 4.5), skylight, seed: deriveSeed(block.seed, 'void', voids.length) });
   }
 
   // Shafts at the sinks (water comes in through the land) and mouths at the springs (it goes out through the valley side).
@@ -406,7 +424,7 @@ function shape(block: RockBlock, caves: CavesDef, scale: number, net: Net, rng: 
   }
   return {
     conduits, voids,
-    sinks: net.sinkNodes.map((n) => xyz(n)), springs: [...net.springNodes].map((n) => xyz(n)),
+    sinks: net.sinkNodes.map((n) => xyz(n)), springs: [...net.springNodes].filter((n) => adj.has(n)).map((n) => xyz(n)),
     tables: block.water.stages.map((s) => s.table),
     stats: { length, junctions, loops: net.edgeCount - adj.size + parts },
   };

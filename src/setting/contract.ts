@@ -203,6 +203,13 @@ export interface CaveRockDef {
     /** Wall colours of the beds (0xRRGGBB); each bed takes one, varied in lightness. */
     readonly colors: readonly number[];
   };
+  /**
+   * How much the rock resists the water, patch by patch (D63, Arnd: the rock differs in what it is made of, so the water
+   * does not open it evenly): hard and soft patches, `size` metres across, whose ease differs by about `contrast` (the
+   * natural log of the spread: 1 is a factor of about 3 either way). The water winds round the hard and opens the soft
+   * wide.
+   */
+  readonly resistance: { readonly size: number; readonly contrast: number };
   /** Joints: near-vertical cracks in sets at an angle to each other. */
   readonly joints: {
     readonly sets: number;
@@ -2000,6 +2007,7 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
     range(r.joints.between, `${w} joint angle`); range(r.faults.count, `${w} faults`); range(r.water.sinks, `${w} sinks`, 1); range(r.water.springs, `${w} springs`, 1);
     range(r.water.stages, `${w} stages`, 1); range(r.water.drop, `${w} drop`, 1);
     if (!(r.bedding.soluble > 0 && r.bedding.soluble <= 1) || !r.bedding.colors.length) out.push(`${where}: ${w} needs a soluble share in 0..1 and bed colours`);
+      if (!(r.resistance.size >= 4 && r.resistance.contrast >= 0 && r.resistance.contrast <= 6)) out.push(`${where}: ${w} resistance needs a patch size of 4 m or more and a contrast of 0 to 6`);
     if (!(r.former.rounds >= 1 && r.former.samples >= 1 && r.former.feedback > 0 && r.former.growth > 0 && r.former.reuse >= 0 && r.former.reuse <= 1 && r.former.keep > 0 && r.former.keep < 1)) out.push(`${where}: ${w} former needs rounds, samples, feedback, growth > 0 and keep in 0..1`);
     if (!(r.collapse.junction >= 0 && r.collapse.junction <= 1 && r.collapse.span > 0 && r.collapse.most >= 0)) out.push(`${where}: ${w} collapse is malformed`);
   }
