@@ -35,7 +35,7 @@ async function sheet(): Promise<void> {
   const ctx = sheetCanvas.getContext('2d')!;
   ctx.fillStyle = '#16191c'; ctx.fillRect(0, 0, sheetCanvas.width, sheetCanvas.height);
   const t0 = performance.now();
-  const jobs = Array.from({ length: n }, (_, i) => pool.run({ kind: 'form', setting: 'classic', seed: seed0 + i, rock, size, coarse: 2, dress: q.get('dress') === '1' }));
+  const jobs = Array.from({ length: n }, (_, i) => pool.run({ kind: 'form', setting: 'classic', seed: seed0 + i, rock, size, coarse: 2, dress: q.get('dress') === '1', read: q.get('dress') === '1' }));
   const results = await Promise.all(jobs);
   const wall = performance.now() - t0;
   const r = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -66,15 +66,22 @@ async function sheet(): Promise<void> {
       ctx.beginPath(); c.points.forEach((p, k) => (k ? ctx.lineTo(p.x * s, p.z * s) : ctx.moveTo(p.x * s, p.z * s))); ctx.stroke();
     }
     ctx.fillStyle = '#0ff'; for (const p of res.skeleton.springs) ctx.fillRect(p[0] * s - 2, p[2] * s - 2, 4, 4);
+    // What the reader found: ways in (green), voids (blue), dead ends (red), junctions (yellow), ledges (white), the ways the concession cut (magenta).
+    if (res.read) {
+      ctx.strokeStyle = '#f4f'; ctx.lineWidth = 1.5;
+      for (const o of res.read.opened) { ctx.beginPath(); ctx.moveTo(o.a[0] * s, o.a[2] * s); ctx.lineTo(o.b[0] * s, o.b[2] * s); ctx.stroke(); }
+      const colour: Record<string, string> = { entry: '#4f4', skylight: '#8f8', void: '#48f', deadEnd: '#f44', alcove: '#f94', junction: '#ff4', ledge: '#fff', bank: '#4ff' };
+      for (const p of res.read.reading.places) { ctx.fillStyle = colour[p.kind] ?? '#fff'; ctx.fillRect(p.x * s - 1.5, p.z * s - 1.5, 3, 3); }
+    }
     ctx.restore();
     const k = res.skeleton.stats;
     ctx.fillStyle = '#dde'; ctx.font = '12px sans-serif';
     ctx.fillText(`${rock} #${seed0 + i} ${res.size.id}  ${Math.round(k.length)} m, ${k.junctions} junctions, ${k.loops} loops, ${res.skeleton.voids.length} collapses, ${res.skeleton.tables.length} levels`, x + 6, y + 15);
-    ctx.fillText(`form ${Math.round(res.ms.form)} + carve ${Math.round(res.ms.carve)}${res.dressing ? ` + dress ${Math.round(res.ms.dress)}` : ''} ms   dip ${res.dip.toFixed(0)}°`, x + 6, y + 30);
-    stats.push({ seed: seed0 + i, length: Math.round(k.length), junctions: k.junctions, loops: k.loops, voids: res.skeleton.voids.length, levels: res.skeleton.tables.length, form: Math.round(res.ms.form), carve: Math.round(res.ms.carve), dress: Math.round(res.ms.dress), speleos: res.dressing?.speleos.length, rocks: res.dressing?.rocks.length, level: res.dressing?.stats.level, mesh: Math.round(res.ms.mesh), tris: res.tris });
+    ctx.fillText(`form ${Math.round(res.ms.form)} + carve ${Math.round(res.ms.carve)}${res.dressing ? ` + dress ${Math.round(res.ms.dress)}` : ''}${res.read ? ` + read ${Math.round(res.read.ms)}` : ''} ms   dip ${res.dip.toFixed(0)}°`, x + 6, y + 30);
+    stats.push({ seed: seed0 + i, length: Math.round(k.length), junctions: k.junctions, loops: k.loops, voids: res.skeleton.voids.length, levels: res.skeleton.tables.length, form: Math.round(res.ms.form), carve: Math.round(res.ms.carve), dress: Math.round(res.ms.dress), speleos: res.dressing?.speleos.length, read: res.read ? { ...res.read.reading.stats, opened: res.read.opened.length, places: res.read.reading.places.length } : undefined, rocks: res.dressing?.rocks.length, level: res.dressing?.stats.level, mesh: Math.round(res.ms.mesh), tris: res.tris });
   });
   const ms = (f: (r: CaveResult) => number) => Math.max(...results.map(f));
-  done({ rock, size, n, wall: Math.round(wall), worstFormCarve: Math.round(ms((x) => x.ms.form + x.ms.carve + x.ms.dress)), stats });
+  done({ rock, size, n, wall: Math.round(wall), worstFormCarve: Math.round(ms((x) => x.ms.form + x.ms.carve + x.ms.dress + (x.read?.ms ?? 0))), stats });
 }
 
 sheet().catch((e) => { document.title = 'error'; console.error(e); done({ error: String(e) }); });

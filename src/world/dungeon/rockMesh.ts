@@ -143,6 +143,13 @@ export function meshField(f: AnyField, look: RockLook): BuildingMesh {
   }
 }
 
+/** Which columns of a field hold any brick (the others are solid throughout): a test for a sample column. */
+export function brickColumns(f: BrickField): (i: number, k: number) => boolean {
+  const has = new Uint8Array(f.bx * f.bz);
+  for (let b = 0; b < f.bricks.length; b++) if (f.bricks[b]) has[(b % f.bx) + f.bx * Math.floor(b / (f.bx * f.by))] = 1;
+  return (i, k) => has[((i / BRICK) | 0) + f.bx * ((k / BRICK) | 0)] === 1;
+}
+
 /** The field at a point (trilinear); `outside` beyond it. */
 export function fieldAt(f: AnyField, x: number, y: number, z: number, outside = -1): number {
   const u = (x - f.ox) / f.step, v = (y - f.oy) / f.step, w = (z - f.oz) / f.step;

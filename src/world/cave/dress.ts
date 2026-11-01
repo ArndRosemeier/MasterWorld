@@ -14,7 +14,7 @@ import { Noise, Rng, deriveSeed, lerp } from '@futuremagic/core';
 import type { CavesDef } from '../../setting/contract';
 import { jointDistance, oreAt, type RockBlock } from './block';
 import type { Crystal, Stone } from './loose';
-import { BRICK, brickIndex, fieldAt, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
+import { BRICK, brickColumns, brickIndex, fieldAt, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
 import type { CondPoint, Conduit, Skeleton } from './skeleton';
 
 /** A formation: a body of revolution about a vertical axis from `y0` up to `y1`, `rb` wide at the bottom, `rt` at the top, `waist` the share of the mean radius in the middle. */
@@ -95,9 +95,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   const wayHalf = (p: CondPoint) => (p.C > 0 ? p.C : p.A);
 
   // Which columns of the field hold any brick.
-  const has = new Uint8Array(f.bx * f.bz);
-  for (let b = 0; b < f.bricks.length; b++) if (f.bricks[b]) has[(b % f.bx) + f.bx * Math.floor(b / (f.bx * f.by))] = 1;
-  const inBricks = (i: number, k: number) => has[((i / BRICK) | 0) + f.bx * ((k / BRICK) | 0)] === 1;
+  const inBricks = brickColumns(f);
 
   const spansOf = (i: number, k: number, out: number[] = []): number[] => (inBricks(i, k) ? columnSpans(f, i, k, out) : (out.length = 0, out));
   const tmp: number[] = [];

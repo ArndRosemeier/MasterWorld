@@ -34,53 +34,16 @@ export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, s
   if (!isFinite(x0)) { x0 = y0 = z0 = 0; x1 = y1 = z1 = step; }
   const f = brickField(x0, y0, z0, step, Math.ceil((x1 - x0) / step) + 1, Math.ceil((y1 - y0) / step) + 1, Math.ceil((z1 - z0) / step) + 1);
 
-  /** Write the larger of the stored value and v at a sample; a brick is made only for what is in the rock's skin. */
-  const putAir = (i: number, j: number, k: number, v: number): void => {
-    if (v <= -1) return;
-    const b = brickIndex(f, i, j, k);
-    let brick = f.bricks[b];
-    if (!brick) brick = f.bricks[b] = new Float32Array(BRICK * BRICK * BRICK).fill(-1);
-    const at = (i % BRICK) + BRICK * ((j % BRICK) + BRICK * (k % BRICK));
-    if (v > brick[at]) brick[at] = Math.min(v, 3);
-  };
   /** Scallops: how much the wall bulges out (little goes in). */
   const wall = (x: number, y: number, z: number) => rough * Math.max(-0.2, noise.n3(x / 2.6, y / 2.6, z / 2.6));
 
-  for (const c of sk.conduits) for (let s = 0; s + 1 < c.points.length; s++) stamp(c.points[s], c.points[s + 1]);
+  for (const c of sk.conduits) for (let s = 0; s + 1 < c.points.length; s++) stampTube(f, c.points[s], c.points[s + 1], rough, wall);
   for (const v of sk.voids) stampVoid(v);
   return f;
 
-  function sampleRange(lo: number, hi: number, o: number, n: number): [number, number] {
-    return [Math.max(0, Math.floor((lo - o) / step)), Math.min(n - 1, Math.ceil((hi - o) / step))];
-  }
-
-    function stamp(a: CondPoint, b: CondPoint): void {
-    const rh = Math.max(a.A, b.A, a.C, b.C) + 1.5, down = Math.max(a.B + a.D, b.B + b.D) + 1.5, up = Math.max(a.B, b.B) + 1.5;
-    const [i0, i1] = sampleRange(Math.min(a.x, b.x) - rh, Math.max(a.x, b.x) + rh, f.ox, f.nx), [j0, j1] = sampleRange(Math.min(a.y, b.y) - down, Math.max(a.y, b.y) + up, f.oy, f.ny), [k0, k1] = sampleRange(Math.min(a.z, b.z) - rh, Math.max(a.z, b.z) + rh, f.oz, f.nz);
-    const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z, len2 = abx * abx + aby * aby + abz * abz || 1;
-    for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const x = f.ox + i * step, y = f.oy + j * step, z = f.oz + k * step;
-      const t = Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby + (z - a.z) * abz) / len2));
-      const qx = a.x + abx * t, qy = a.y + aby * t, qz = a.z + abz * t, dx = x - qx, dy = y - qy, dz = z - qz;
-      const A = a.A + (b.A - a.A) * t, B = a.B + (b.B - a.B) * t, hh = Math.sqrt(dx * dx + dz * dz);
-      // The tube: an ellipse, its distance estimated to first order.
-      const e = Math.sqrt((hh / A) ** 2 + (dy / B) ** 2);
-      let v = e < 1e-4 ? Math.min(A, B) : (1 - e) * e / Math.sqrt((hh / (A * A)) ** 2 + (dy / (B * B)) ** 2);
-      v = Math.min(v, Math.min(A, B));
-      const C = a.C + (b.C - a.C) * t;
-      if (C > 0) {
-        const D = a.D + (b.D - a.D) * t, vs = Math.min(C - hh, y - (qy - B - D), qy - 0.3 * B - y);
-        v = smax(v, vs, BLEND);
-      }
-      if (v < -1.4) continue;
-      if (v < rough + 0.3 && v > -rough - 0.3) v += wall(x, y, z);
-      putAir(i, j, k, v);
-    }
-  }
-
   function stampVoid(v: Void): void {
     const rn = new Noise(v.seed), reach = Math.max(v.rx, v.rz), cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
-    const [i0, i1] = sampleRange(v.x - reach - 3, v.x + reach + 3, f.ox, f.nx), [j0, j1] = sampleRange(v.floor - 1, v.floor + v.height + 3, f.oy, f.ny), [k0, k1] = sampleRange(v.z - reach - 3, v.z + reach + 3, f.oz, f.nz);
+    const [i0, i1] = sampleRange(f, v.x - reach - 3, v.x + reach + 3, 'x'), [j0, j1] = sampleRange(f, v.floor - 1, v.floor + v.height + 3, 'y'), [k0, k1] = sampleRange(f, v.z - reach - 3, v.z + reach + 3, 'z');
     for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const x = f.ox + i * step, y = f.oy + j * step, z = f.oz + k * step, dy = y - v.floor, dx = x - v.x, dz = z - v.z;
       // In the room's own frame: long along yaw, short across it. The ceiling is a flattened dome.
@@ -98,8 +61,71 @@ export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, s
           const hh = v.heapH * Math.max(0, 1 - d / v.heapR) ** 1.3 + (d < v.heapR ? 0.5 * rn.n3(x / 1.8 + 3, 0, z / 1.8) : 0);
           a = Math.min(a, (dy - hh) * 0.7);
         }
-        putAir(i, j, k, a);
+        putSample(f, i, j, k, a);
       }
+    }
+  }
+}
+
+/** Write v into a sample: the larger of it and the stored value (air is added), or with `rock` the smaller (rock is added); a brick is made where there was none and v is inside its skin. */
+function putSample(f: BrickField, i: number, j: number, k: number, v: number, rock = false): void {
+  if (rock ? v >= 1 : v <= -1) return;
+  const b = brickIndex(f, i, j, k);
+  let brick = f.bricks[b];
+  if (!brick) brick = f.bricks[b] = new Float32Array(BRICK * BRICK * BRICK).fill(-1);
+  const at = (i % BRICK) + BRICK * ((j % BRICK) + BRICK * (k % BRICK));
+  if (rock) { if (v < brick[at]) brick[at] = Math.max(v, -1); } else if (v > brick[at]) brick[at] = Math.min(v, 3);
+}
+
+/** The samples of one axis a range of metres covers. */
+function sampleRange(f: BrickField, lo: number, hi: number, axis: 'x' | 'y' | 'z'): [number, number] {
+  const o = axis === 'x' ? f.ox : axis === 'y' ? f.oy : f.oz, n = axis === 'x' ? f.nx : axis === 'y' ? f.ny : f.nz;
+  return [Math.max(0, Math.floor((lo - o) / f.step)), Math.min(n - 1, Math.ceil((hi - o) / f.step))];
+}
+
+/** Stamp one stretch of conduit (from a to b) into the field as a tube joined with its canyon; `wall` adds the scallops near the surface. */
+export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, wall: (x: number, y: number, z: number) => number = () => 0): void {
+  const { step } = f;
+  const rh = Math.max(a.A, b.A, a.C, b.C) + 1.5, down = Math.max(a.B + a.D, b.B + b.D) + 1.5, up = Math.max(a.B, b.B) + 1.5;
+  const [i0, i1] = sampleRange(f, Math.min(a.x, b.x) - rh, Math.max(a.x, b.x) + rh, 'x'), [j0, j1] = sampleRange(f, Math.min(a.y, b.y) - down, Math.max(a.y, b.y) + up, 'y'), [k0, k1] = sampleRange(f, Math.min(a.z, b.z) - rh, Math.max(a.z, b.z) + rh, 'z');
+  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z, len2 = abx * abx + aby * aby + abz * abz || 1;
+  for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const x = f.ox + i * step, y = f.oy + j * step, z = f.oz + k * step;
+    const t = Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby + (z - a.z) * abz) / len2));
+    const qx = a.x + abx * t, qy = a.y + aby * t, qz = a.z + abz * t, dx = x - qx, dy = y - qy, dz = z - qz;
+    const A = a.A + (b.A - a.A) * t, B = a.B + (b.B - a.B) * t, hh = Math.sqrt(dx * dx + dz * dz);
+    // The tube: an ellipse, its distance estimated to first order.
+    const e = Math.sqrt((hh / A) ** 2 + (dy / B) ** 2);
+    let v = e < 1e-4 ? Math.min(A, B) : (1 - e) * e / Math.sqrt((hh / (A * A)) ** 2 + (dy / (B * B)) ** 2);
+    v = Math.min(v, Math.min(A, B));
+    const C = a.C + (b.C - a.C) * t;
+    if (C > 0) {
+      const D = a.D + (b.D - a.D) * t, vs = Math.min(C - hh, y - (qy - B - D), qy - 0.3 * B - y);
+      v = smax(v, vs, BLEND);
+    }
+    if (v < -1.4) continue;
+    if (v < rough + 0.3 && v > -rough - 0.3) v += wall(x, y, z);
+    putSample(f, i, j, k, v);
+  }
+}
+
+/**
+ * Cut a hero-sized way between two floor points (the concession, K4): air `height` high over a floor that runs straight from
+ * one point to the other, `half` wide either side of the line seen from above; the walls are smooth, the floor level across.
+ * Where the line crosses open air the floor is a slab of rock 2.5 m thick (a ramp of fallen rock, a fallen slab across a gap).
+ */
+export function stampSlab(f: BrickField, a: readonly [number, number, number], b: readonly [number, number, number], half: number, height: number): void {
+  const { step } = f, hx = b[0] - a[0], hz = b[2] - a[2], len2 = hx * hx + hz * hz || 1;
+  const [i0, i1] = sampleRange(f, Math.min(a[0], b[0]) - half - 1, Math.max(a[0], b[0]) + half + 1, 'x'), [j0, j1] = sampleRange(f, Math.min(a[1], b[1]) - 2.6, Math.max(a[1], b[1]) + height + 1, 'y'), [k0, k1] = sampleRange(f, Math.min(a[2], b[2]) - half - 1, Math.max(a[2], b[2]) + half + 1, 'z');
+  for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+    const x = f.ox + i * step, z = f.oz + k * step, t = Math.max(0, Math.min(1, ((x - a[0]) * hx + (z - a[2]) * hz) / len2));
+    const hh = Math.hypot(x - (a[0] + hx * t), z - (a[2] + hz * t));
+    if (hh > half + 1) continue;
+    const yf = a[1] + (b[1] - a[1]) * t;
+    for (let j = j0; j <= j1; j++) {
+      const y = f.oy + j * step;
+      if (y < yf) { if (y > yf - 2.5) putSample(f, i, j, k, -Math.min(half + 0.4 - hh, yf - y, 1), true); continue; }
+      putSample(f, i, j, k, Math.min(half - hh, y - yf, yf + height - y, 1.5));
     }
   }
 }
