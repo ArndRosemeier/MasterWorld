@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { caveFor } from '../src/vgm/caves';
+import { caveFor, caveSpecFor } from '../src/vgm/caves';
 import { dungeonFor, loreOf, placeOf } from '../src/vgm/dungeons';
 import { answerNeed } from '../src/vgm/toolbox';
 import { siteInCliff } from '../src/world/dungeon/caveMouth';
@@ -56,4 +56,28 @@ test('caves: a share stand empty, sights with nobody in them; asked-for dwellers
   assert.equal(c.dweller.id, lore.empty!.def.id);
   const asked = lore.dwellers[0].encounter;
   assert.ok(empty.every((d) => !isEmpty(sketchCellar({ ...d, dwellers: asked }, place, lore))), 'dwellers asked for move in');
+});
+
+test('cave tool (K6): the formed cave is asked for by the country at its mouth: its rock, a size the story needs, shares the land allows', () => {
+  const caves = classic.caves!;
+  // Country without a solution cave holds none (the old cave stands there); karst holds one of its three rocks.
+  assert.equal(caveSpecFor(caves, 'moor', { seed: 5 }, 6), null);
+  assert.equal(caveSpecFor(caves, 'badlands', { seed: 5 }, 6), null);
+  const rocks = new Set<string>(), sizes = new Set<string>();
+  for (let seed = 1; seed < 80; seed++) {
+    const a = caveSpecFor(caves, 'karst', { seed, danger: 3 }, 6)!, again = caveSpecFor(caves, 'karst', { seed, danger: 3 }, 6)!;
+    assert.deepEqual(a, again, 'seeded');
+    assert.equal(a.danger, 3);
+    assert.ok(Math.abs(a.shares.built + a.shares.water + a.shares.lava - 1) < 1e-9);
+    assert.equal(a.shares.lava, 0, 'no lava in karst');
+    rocks.add(a.rock); sizes.add(a.size);
+    // A story of many rooms is never told in a cave that is too small for it.
+    const many = caveSpecFor(caves, 'karst', { seed }, 20)!;
+    assert.equal(many.size, 'big');
+    assert.notEqual(caveSpecFor(caves, 'karst', { seed }, 10)!.size, 'small');
+  }
+  assert.deepEqual([...rocks].sort(), ['jointed', 'massive', 'thin-bedded']);
+  assert.ok(sizes.has('small') && sizes.has('medium'));
+  // Downs hold only the thin-bedded and the massive.
+  for (let seed = 1; seed < 30; seed++) assert.ok(['thin-bedded', 'massive'].includes(caveSpecFor(caves, 'downs', { seed }, 4)!.rock));
 });
