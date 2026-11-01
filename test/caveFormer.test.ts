@@ -83,7 +83,7 @@ for (const rock of ['massive', 'jointed', 'thin-bedded']) {
   test(`caves: a ${rock} cave forms the same twice, reaches its springs, and no way squeezes`, () => {
     const carved = rock === 'thin-bedded', a = carved ? formCave(caves, 11, rock, small.id, undefined, undefined, small) : { skeleton: formSolution(blockOf(11, rock), caves, small.scale, small.step), block: blockOf(11, rock), field: null }, again = formSolution(blockOf(11, rock), caves, small.scale, small.step), sk = a.skeleton, way = caves.way;
     loopsOf.set(rock, sk.stats.loops);
-    const bare = (k: typeof sk) => JSON.stringify({ ...k, stats: { ...k.stats, ms: 0 } });
+    const bare = (k: typeof sk) => JSON.stringify({ ...k, throat: undefined, stats: { ...k.stats, ms: 0 } });
     assert.equal(bare(sk), bare(again), 'seeded');
     assert.ok(sk.stats.length > 60, `the water opened some way (${sk.stats.length} m)`);
     assert.ok(sk.springs.length >= 1 && sk.sinks.length >= 1);

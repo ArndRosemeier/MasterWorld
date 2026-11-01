@@ -44,7 +44,7 @@ import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
 import { ROOT_LEVEL, chunkSize } from './render/terrain/lod';
 import { VolumeView } from './render/terrain/VolumeView';
-import { TerrainJobs, WorldJobs, createTerrainPool, createTexturePool, createWorldPool } from './workers/pool';
+import { TerrainJobs, WorldJobs, createCavePool, createTerrainPool, createTexturePool, createWorldPool, type CavePool } from './workers/pool';
 import { WaterView } from './render/water/WaterView';
 import { FloraView } from './render/flora/FloraView';
 import { GrassView } from './render/grass/GrassView';
@@ -136,7 +136,9 @@ import { HandOverScene } from './app/handOverScene';
 import { MapSheet } from './render/hero/MapSheet';
 import { HOME_SIGHT, KnownLand } from './game/knownLand';
 import { Minimap, type SkyGlyph } from './app/minimap';
-import { belowRange, paintBelow } from './app/dungeonSheet';
+import { belowRange, paintBelow, paintFormed } from './app/dungeonSheet';
+import type { DungeonSeen } from './game/dungeonMap';
+import { STOREY } from './game/formedMap';
 import { fill } from './talk/folk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
@@ -846,6 +848,8 @@ export async function start(b: Boot): Promise<void> {
     const portalsDue: Portal[] = [];
     /** The portal stone as held up (set once the portals are): it goes below ground with the hero. */
     let stoneMesh: Object3D | null = null;
+    // Formed caves (phase K) are made in a worker of their own, started with the first one.
+    let cavePool: CavePool | null = null;
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
       fight: fightHost,
@@ -853,7 +857,7 @@ export async function start(b: Boot): Promise<void> {
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
-      jobs: terrainJobs,
+      jobs: { caveRock: (l, c, k, t) => terrainJobs.caveRock(l, c, k, t), caveMouth: (s, c) => terrainJobs.caveMouth(s, c), formed: (j) => (cavePool ??= createCavePool(1)).run(j) },
       portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
       cleared: (d) => void roadWork.clear(d),
       keepsake: (d) => { const t = towns?.get(d.town); return t ? keepsakeOf(setting, d, t.talk.namesFor(d)) : null; },
@@ -1664,7 +1668,8 @@ export async function start(b: Boot): Promise<void> {
       const v = visit();
       if (v) {
         const O = v.origin;
-        return paintBelow(canvas, { space: v.space, seen: v.seen, carved: !!v.cellar.form.space.carved, exit: v.cellar.hatch }, x - O.x, z - O.z, v.space.levelAt(player.walker.pos.y - O.y), across);
+        if (v.formed) return paintFormed(canvas, v.seen, v.cellar.hatch, x - O.x, z - O.z, Math.round((player.walker.pos.y - O.y) / STOREY), across);
+        return paintBelow(canvas, { space: v.space, seen: v.seen as DungeonSeen, carved: !!v.cellar.form.space.carved, exit: v.cellar.hatch }, x - O.x, z - O.z, v.space.levelAt(player.walker.pos.y - O.y), across);
       }
       const t = here(), r = across / 2;
       const dots = (t?.life.agents ?? []).filter((a) => !a.hidden && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);
@@ -2476,7 +2481,7 @@ export async function start(b: Boot): Promise<void> {
         const marks = journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })), sky = skyGlyph();
         if (v) {
           // Below ground the round is the dungeon round the hero; the land's marks ride the rim from its door.
-          const lv = v.space.levelAt(w.pos.y - v.origin.y), range = belowRange(v.space, !!v.cellar.form.space.carved);
+          const lv = v.formed ? Math.round((w.pos.y - v.origin.y) / STOREY) : v.space.levelAt(w.pos.y - v.origin.y), range = belowRange(v.space, !!v.cellar.form.space.carved);
           minimap.read({ x: w.pos.x, z: w.pos.z, look, yaw: w.yaw, hour: view.sky.hour, sky, marks, below: { sheet: `${v.origin.x},${v.origin.z}:${lv}:${v.seen.version}`, range, from: me } });
           minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark, 0);
         } else {

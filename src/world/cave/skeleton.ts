@@ -8,6 +8,8 @@
  * a small tube above its slot, and a keyhole has both.
  */
 
+import type { ThroatFrame } from '../dungeon/caveThroat';
+
 export interface CondPoint {
   readonly x: number;
   readonly y: number;
@@ -54,6 +56,8 @@ export interface Void {
 
 /** What the later stages read off the former. */
 export interface Skeleton {
+  /** Where the first mouth's portal plane stands, once the carver has cut its throat (form.ts): the cave's way in from the land. */
+  readonly throat?: ThroatFrame;
   readonly conduits: readonly Conduit[];
   readonly voids: readonly Void[];
   /** Where the water came in (the lattice nodes' positions) and went out. */

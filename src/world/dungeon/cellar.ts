@@ -182,6 +182,8 @@ export interface Cellar extends CellarSketch {
   readonly hatch: Prop;
   /** For variety checks: what makes this cellar's shape. */
   readonly signature: string;
+  /** A formed cave's (D63, K5): where each room's home lies in the cave (the rooms of the layout are only a story then). */
+  readonly formed?: { readonly homes: readonly { readonly x: number; readonly y: number; readonly z: number }[]; readonly glows: readonly { readonly x: number; readonly y: number; readonly z: number }[] };
 }
 
 /**

@@ -13,6 +13,7 @@ import { rockById, sizeFor } from './choose';
 import { previewLand } from './land';
 import type { Skeleton } from './skeleton';
 import { formSolution } from './solution';
+import { stampThroat, throatFrame } from './throat';
 
 export interface FormedCave {
   readonly block: RockBlock;
@@ -26,7 +27,11 @@ export interface FormedCave {
 export function formCave(caves: CavesDef, seed: number, rockId: string, sizeId?: string, land?: (across: number, deep: number) => CaveLand, since: () => number = Date.now, own?: CaveSizeDef): FormedCave {
   const t0 = since(), size = own ?? (sizeId ? caves.sizes.find((s) => s.id === sizeId) ?? sizeFor(caves, seed) : sizeFor(caves, seed));
   const block = rockBlock(seed, rockById(caves, rockId), size, land ? land(size.across, size.deep) : previewLand(seed, size.across, size.deep), caves.ore, size.step);
-  const t1 = since(), skeleton = formSolution(block, caves, size.scale, size.step, since), t2 = since(), field = carveSkeleton(skeleton, block, caves, size.field), t3 = since();
+  const t1 = since(), formed = formSolution(block, caves, size.scale, size.step, since), t2 = since(), field = carveSkeleton(formed, block, caves, size.field);
+  // The first mouth is the way in from the land: its throat is cut as a portal's arch (K5) and the plane noted in the skeleton.
+  const throat = throatFrame(field as BrickField, formed);
+  if (throat) stampThroat(field as BrickField, throat, seed);
+  const skeleton = throat ? { ...formed, throat } : formed, t3 = since();
   return { block, skeleton, field, ms: { block: t1 - t0, form: t2 - t1, carve: t3 - t2, total: t3 - t0 } };
 }
 

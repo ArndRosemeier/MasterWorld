@@ -164,7 +164,10 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
   };
   const entries: number[] = [], places: Place[] = [];
   const addEntry = (kind: PlaceKind, c: number): void => { if (c >= 0 && !entries.includes(c)) { entries.push(c); places.push({ kind, cell: c, x: x[c], y: y[c], z: z[c], depth: 0, radius: 0 }); } };
-  for (const c of sk.conduits) if (c.kind === 'mouth') { const p = c.points[c.points.length - 1]; addEntry('entry', cellNear(p.x, p.y - p.B - p.D, p.z)); }
+  // The way in from the land: the throat's floor a metre inside its portal plane (cut by form.ts); else the end of the first mouth.
+  const th = sk.throat;
+  if (th) addEntry('entry', cellNear(th.x - Math.sin(th.yaw), th.y, th.z - Math.cos(th.yaw)));
+  else for (const c of sk.conduits) if (c.kind === 'mouth') { const p = c.points[c.points.length - 1]; addEntry('entry', cellNear(p.x, p.y - p.B - p.D, p.z)); }
   for (const v of sk.voids) if (v.skylight) addEntry('skylight', cellNear(v.x, v.floor + v.heapH, v.z));
 
   // Dijkstra from the ways in; then the same over the reversed links for what can walk back out.

@@ -1,0 +1,82 @@
+/**
+ * A formed cave made whole as one job (D63, phase K): formed, carved, dressed, read, meshed. Pure: the worker runs it off the
+ * main thread (workers/cave.worker.ts) and a headless check or a game without workers runs it in place.
+ */
+import type { BuildingMesh } from '@futuremagic/settlement';
+import { settingById } from '../../setting/index';
+import { bedAt } from './block';
+import { coarsen, formedMesh } from './carve';
+import { formationMesh } from './formations';
+import { crystalsMesh, stonesMesh } from './loose';
+import { waterMesh, type WaterMesh } from './waterMesh';
+import type { PartMesh } from './parts';
+import type { Dressing } from './dress';
+import type { BrickField } from '../dungeon/rockMesh';
+import type { Opened } from './concede';
+import { dressFormed, formCave, readFormed, type FormedCave } from './form';
+import type { Reading } from './reader';
+import type { Skeleton } from './skeleton';
+
+/** A cave to form: `coarse` meshes only every n-th sample (a quick look), 0 skips the mesh. */
+export interface CaveJob {
+  readonly kind: 'form';
+  readonly setting: string;
+  readonly seed: number;
+  readonly rock: string;
+  readonly size?: string;
+  readonly coarse?: number;
+  /** Dress it (silt, stream, rocks, drips, formations) before meshing. */
+  readonly dress?: boolean;
+  /** Read its network and open what is cut off (K4; needs `dress`), before meshing. */
+  readonly read?: boolean;
+  /** Send the carved field back (to walk in the cave in the page: tools/preview/walk.ts). */
+  readonly field?: boolean;
+}
+
+export interface CaveResult {
+  readonly skeleton: Skeleton;
+  readonly dressing: Dressing | null;
+  /** The dressing's loose parts as meshes (when it was dressed and meshed). */
+  readonly parts: { readonly formations: PartMesh; readonly stones: PartMesh; readonly crystals: PartMesh; readonly water: WaterMesh } | null;
+  /** The network of standable ground, its places and the ways the concession cut (when read). */
+  readonly read: { readonly reading: Reading; readonly opened: readonly Opened[]; readonly ms: number } | null;
+  /** The carved field, when asked for (`job.field`). */
+  readonly field: BrickField | null;
+  readonly mesh: BuildingMesh | null;
+  readonly ms: FormedCave['ms'] & { readonly mesh: number; readonly dress: number };
+  readonly rock: string;
+  readonly size: { readonly id: string; readonly across: number; readonly deep: number };
+  /** Bricks of the field that hold anything, and triangles meshed. */
+  readonly bricks: number;
+  readonly tris: number;
+  /** The valley side. */
+  readonly face: string;
+  /** Beds' dip, degrees. */
+  readonly dip: number;
+}
+
+export const buffers = (m: object): ArrayBuffer[] => Object.values(m).flatMap((v) => (ArrayBuffer.isView(v) ? [v.buffer as ArrayBuffer] : []));
+
+/** Make the cave of a job, with the buffers a worker transfers. */
+export function runCaveJob(job: CaveJob): { result: CaveResult; transfer: ArrayBuffer[] } {
+  const caves = settingById(job.setting).caves;
+  if (!caves) throw new Error(`setting "${job.setting}" has no formed caves`);
+  const c = formCave(caves, job.seed, job.rock, job.size);
+  let mesh: BuildingMesh | null = null;
+  const td = Date.now(), dressed = job.dress ? dressFormed(c, caves) : null, dressMs = Date.now() - td;
+  // Read and open what is cut off before meshing: the concession edits the field and takes what it cuts through from the dressing.
+  const rd = dressed && job.read ? readFormed(c, caves, dressed) : null, dressing = rd ? rd.dressing : dressed;
+  const t = Date.now();
+  if (job.coarse !== 0) mesh = formedMesh(job.coarse && job.coarse > 1 ? coarsen(c.field, job.coarse) : c.field, c.block);
+  const meshMs = Date.now() - t;
+  const bedTint = (x: number, y: number, z: number): [number, number, number] => { const i = bedAt(c.block.beds, x, y, z) * 3, bc = c.block.beds.color; return [bc[i], bc[i + 1], bc[i + 2]]; };
+  const parts = dressing && job.coarse !== 0 ? { formations: formationMesh(dressing.speleos, job.seed), stones: stonesMesh(dressing.stones, job.seed, bedTint), crystals: crystalsMesh(dressing.crystals), water: waterMesh(dressing, caves.dress.water.bed, caves.dress.water.poolDepth) } : null;
+  const size = caves.sizes.find((s) => s.across === c.block.across && s.deep === c.block.deep)!;
+  return {
+    result: {
+      skeleton: c.skeleton, dressing, parts, read: rd ? { reading: rd.reading, opened: rd.opened, ms: rd.ms } : null, field: job.field ? (c.field as BrickField) : null, mesh, ms: { ...c.ms, mesh: meshMs, dress: dressMs }, rock: job.rock, size: { id: size.id, across: size.across, deep: size.deep },
+      bricks: c.field.bricks.filter(Boolean).length, tris: mesh ? mesh.index.length / 3 : 0, face: c.block.water.face, dip: Math.atan(c.block.beds.slope) * 180 / Math.PI,
+    },
+    transfer: [...(mesh ? buffers(mesh) : []), ...(parts ? Object.values(parts).flatMap(buffers) : []), ...(rd ? buffers(rd.reading) : []), ...(job.field ? (c.field as BrickField).bricks.flatMap((b) => (b ? [b.buffer as ArrayBuffer] : [])) : [])],
+  };
+}

@@ -37,6 +37,10 @@ import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
 import type { ScaledLayout } from '../world/dungeon/cellar';
+import { runCaveJob, type CaveJob, type CaveResult } from '../world/cave/job';
+import { rockFor } from '../world/cave/choose';
+import { inhabit } from '../vgm/inhabit';
+import { FormedSpace } from '../sim/formedSpace';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { moveIn, occupantId, outlineCellar, type Cellar, type DungeonPlace } from '../world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
@@ -84,6 +88,8 @@ export interface CellarsHost {
   readonly jobs?: {
     caveRock(layout: ScaledLayout, cave: number, keep: readonly (readonly [number, number])[], throat?: CaveThroat | null): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
     caveMouth(site: LandSite, cave: number): Promise<CaveMouth>;
+    /** A formed cave (phase K, world/cave/job.ts) made in a worker; none: made here, a moment's stall. */
+    formed?(job: CaveJob): Promise<CaveResult>;
   };
   /** A place out on the land opens: the trees round it go (the land's views are built again there). */
   cleared?(d: DungeonDecision): void;
@@ -130,9 +136,9 @@ interface Site {
   /** A place's piece on the land (none: a cellar, reached through its house). */
   readonly mound: Mound | null;
   /** As outlined for its first dwellers (the rooms never change). */
-  readonly first: Cellar;
+  first: Cellar;
   /** A cave's throat in its own frame, where the portal from its mouth comes out (null: walked in with a fade). */
-  readonly throat: ThroatFrame | null;
+  throat: ThroatFrame | null;
   /** Who lives there now. */
   cellar: Cellar;
   built: Promise<Built> | null;
@@ -376,7 +382,9 @@ export class Cellars {
     const m = occupationOf(this.log, d.id);
     const mound = d.site ? this.heap(d, d.site, first.layout) : null;
     if (d.site) this.host.cleared?.(d);
-    const throat = mound && first.form.space.carved && loreOf(this.host.setting, d.template).form.shell === 'mouth' ? caveThroat(first) : null;
+    // A cave's throat: from its layout's entrance room, or (a formed cave) once the cave is made, its mouth's plane (a placeholder till then).
+    const mouthed = mound && first.form.space.carved && loreOf(this.host.setting, d.template).form.shell === 'mouth';
+    const throat = mouthed ? (first.form.space.formed && this.host.setting.caves ? { x: 0, y: 0, z: 0, yaw: 0 } : caveThroat(first)) : null;
     const s: Site = { decision: d, house, place, mound, first, throat, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;
@@ -437,12 +445,17 @@ export class Cellars {
 
   private async assemble(s: Site): Promise<Built> {
     const h = this.host;
+    // A formed cave (phase K) is made first: the rooms of its story are told as places of it, and its throat is the way in.
+    const formed = s.first.form.space.formed ? await this.formedCave(s) : null;
     // Its own space, deep under the house.
     const m = s.mound, at = m ?? { x: s.house.cx, z: s.house.cz };
     const view = new CellarView(s.first, { x: at.x, y: -400, z: at.z });
     // A cave: its rock carved round its rooms (a worker's few hundred milliseconds), walked as it is seen.
     let carved: CaveSpace | undefined;
-    if (s.first.form.space.carved) {
+    if (formed) {
+      view.formed = formed.res;
+      view.throat = !!s.throat;
+    } else if (s.first.form.space.carved) {
       const layout = s.first.layout, seed = caveSeed(s.first);
       // Its natural features (caveFeatures.ts): the floor kept level where its things lie, its water and shafts drawn.
       const keep = keepSpots(s.first), feat = caveFeatures(layout, seed, keep);
@@ -458,7 +471,7 @@ export class Cellars {
     // A place on the land: back out in front of its doorway, facing away from it.
     // (Read when the hero comes out: a cave's mouth may be made after this, a cliff's further out.)
     const out = m ? { get door() { return [...onLand(m, 0, m.out), m.yaw + Math.PI] as const; } } : s.house;
-    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, carved);
+    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, formed?.space ?? carved);
     if (!m) visit.above = { town: s.decision.town, house: s.house };
     visit.throat = s.throat;
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
@@ -475,6 +488,26 @@ export class Cellars {
     return b;
   }
 
+  /**
+   * A formed cave for a cave place (phase K5): made in a worker from the place's seed, the cellar's rooms told as places of it
+   * (vgm/inhabit.ts), its mouth's plane as the throat the portal comes out of. Null: the setting has no rock for it.
+   */
+  private async formedCave(s: Site): Promise<{ readonly res: CaveResult; readonly space: FormedSpace } | null> {
+    const caves = this.host.setting.caves, h = this.host;
+    const rock = caves ? rockFor(caves, '*', s.decision.seed) : null;
+    if (!caves || !rock) return null;
+    // A story of many rooms wants a bigger cave.
+    const job: CaveJob = { kind: 'form', setting: h.setting.id, seed: s.decision.seed, rock: rock.id, size: s.first.graph.rooms.length >= 9 ? 'medium' : 'small', dress: true, read: true, field: true };
+    const res = await (h.jobs?.formed ? h.jobs.formed(job) : Promise.resolve(runCaveJob(job).result));
+    if (!res.field || !res.read || !res.mesh) throw new Error(`formed cave of ${s.decision.id}: ${!res.field ? 'no field' : !res.read ? 'no reading' : 'no mesh'}`);
+    const was = s.first, throat = res.skeleton.throat, first = inhabit(was, res.field, res.read.reading, throat);
+    // The newest dwellers' rooms are told in the same places.
+    s.first = first.cellar;
+    s.cellar = s.cellar === was ? first.cellar : inhabit(s.cellar, res.field, res.read.reading, throat).cellar;
+    s.throat = throat ?? null;
+    return { res, space: new FormedSpace(first.cellar.layout, res.field, first.ground, first.cellar.formed!.homes) };
+  }
+
   /** Its dwellers now: the den, their bodies and the fight (again after a move-in). */
   private async populate(s: Site, b: Built): Promise<void> {
     const h = this.host, cellar = s.cellar, own = occupantId(cellar);
@@ -484,7 +517,8 @@ export class Cellars {
     // Chests opened before new dwellers came stay open; the lair's hoard is theirs.
     const before = own === s.decision.id ? undefined : priorChests(cellar, was ? was.delve.tally() : this.saved[s.decision.id]?.delve, h.setting);
     const saved: DelveSave | undefined = mine?.delve ?? (before ? { dead: [], spared: [], searched: [], opened: before } : undefined);
-    b.delve = new Delve(cellar, b.visit.space, h.setting, h.character, h.seed, saved);
+    const space = b.visit.space;
+    b.delve = new Delve(cellar, space instanceof FormedSpace ? space.ground : space, h.setting, h.character, h.seed, saved);
     // What its household asks (D62; the place's own promise: new dwellers are only to be cleared): a keepsake lies in the lair's hoard.
     if (own === s.decision.id) { b.delve.ask = s.decision.ask ?? null; b.delve.keepsake = h.keepsake?.(s.decision) ?? null; }
     b.creatures = await CreatureView.build(b.delve.den, h.seed, b.view.origin, h.renderer);
