@@ -270,6 +270,8 @@ export interface StartSpec {
 export const DUNGEON_PROPS = [
   'barrel', 'cask', 'rack', 'crate', 'sack', 'shelf', 'table', 'stool', 'cot', 'straw', 'rubble', 'bones',
   'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar', 'ladder', 'door',
+  // A hole broken through a wall where something comes through (D62: a seal's breach, walled up by the hero).
+  'breach',
 ] as const;
 export type DungeonProp = (typeof DUNGEON_PROPS)[number];
 
@@ -809,13 +811,14 @@ export const TOP_FIND = 0.3;
 /**
  * What a household asks of the hero about its place (D62, phase Q): one verb on one place, and only the
  * thing it names counts as done. `clear`: the dwellers gone (as every lead was before). `fetch`: one named
- * thing out of the place (an heirloom). The words: `told` the lines the household says themselves (in talk,
+ * thing out of the place (an heirloom). `seal`: the breach in the wall of its last room walled up (the hero kneels
+ * and sets the stones, course by course). The words: `told` the lines the household says themselves (in talk,
  * as what they know; `{thing}` the thing's name, `{place}`), `topic` the hero's line when it is done (the
  * topic to tell them), `note` the journal's line once it is done (`{name}` who to tell, `{house}`), `thanks`
  * what they say (`{coins}`, `{thing}`).
  */
-export type AskVerb = 'clear' | 'fetch' | 'lost';
-export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost'];
+export type AskVerb = 'clear' | 'fetch' | 'lost' | 'seal';
+export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost', 'seal'];
 
 export interface AskDef {
   /** The kind (the VGM remembers kinds given, D62): a slug. */

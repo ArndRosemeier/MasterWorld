@@ -58,6 +58,46 @@ export interface CellarMeshes {
   readonly lids: ChestLid[];
   /** The keys lying where they are picked up (keySpot), by the room that holds each. */
   readonly keys: { readonly room: number; readonly mesh: BuildingMesh }[];
+  /** A seal's breach walled up (D62), course by course from the floor: shown one more as the hero sets them. */
+  readonly seal: BuildingMesh[];
+}
+
+/** A breach in the wall (m): its width and height, and the stones' courses that wall it up. */
+const BREACH_W = 1.1, BREACH_H = 1.3, COURSES = 5, PER_COURSE = 3;
+const HOLE: Tint = [22, 19, 17];
+
+/**
+ * A hole broken through the wall behind prop `p` (it faces into the room): dark, its rim broken, rubble at its
+ * foot (into `k`); and the stones that wall it up again, one mesh per course from the floor up, to show as they are set.
+ */
+function breach(k: MeshKit, p: Prop): BuildingMesh[] {
+  const { x, y, z, yaw } = p, rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), 'breach'));
+  const fwd = [Math.sin(yaw), Math.cos(yaw)];
+  const spot = (u: number, w: number) => [x + Math.cos(yaw) * u + fwd[0] * w, z - Math.sin(yaw) * u + fwd[1] * w] as const;
+  // The hole, set into the wall's face; its rim of broken stones; what fell out of it.
+  const [hx, hz] = spot(0, -0.36);
+  k.box(hx, y, hz, BREACH_W, BREACH_H, 0.06, yaw, M.Slate, HOLE);
+  for (let n = 0; n < 9; n++) {
+    const a = (n / 8) * Math.PI, [rx, rz] = spot(Math.cos(a) * BREACH_W * 0.55, -0.3);
+    k.box(rx, y + Math.sin(a) * BREACH_H * 0.95, rz, rng.range(0.18, 0.3), rng.range(0.14, 0.24), 0.16, yaw + rng.range(-0.3, 0.3), M.Rubble, varyTint(rng, STONE, 0.15));
+  }
+  for (let n = 0; n < 6; n++) {
+    const [rx, rz] = spot(rng.range(-0.6, 0.6), rng.range(-0.15, 0.45));
+    k.box(rx, y, rz, rng.range(0.15, 0.35), rng.range(0.1, 0.22), rng.range(0.15, 0.35), rng.range(0, 3), M.Rubble, varyTint(rng, STONE, 0.2));
+  }
+  // The stones that close it: courses across the hole, each a little offset from the one below.
+  const out: BuildingMesh[] = [], ch = BREACH_H / COURSES, sw = BREACH_W / PER_COURSE;
+  for (let c = 0; c < COURSES; c++) {
+    const course = new MeshKit(), shift = c % 2 ? sw / 2 : 0;
+    for (let i = 0; i < PER_COURSE + (c % 2); i++) {
+      const u = -BREACH_W / 2 + sw / 2 + i * sw - shift, w2 = Math.min(sw, BREACH_W / 2 - Math.abs(u) + sw / 2) - 0.02;
+      if (w2 < 0.1) continue;
+      const [sx, sz] = spot(Math.max(-BREACH_W / 2 + w2 / 2, Math.min(BREACH_W / 2 - w2 / 2, u)), -0.3);
+      course.box(sx, y + c * ch + 0.005, sz, w2, ch - 0.015, 0.24, yaw + rng.range(-0.04, 0.04), M.Rubble, varyTint(rng, STONE, 0.12));
+    }
+    out.push(course.mesh());
+  }
+  return out;
 }
 
 const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], EARTH: Tint = [120, 96, 72];
@@ -335,17 +375,18 @@ export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): Ce
     }
   });
 
-  const lids: ChestLid[] = [];
+  const lids: ChestLid[] = [], seal: BuildingMesh[] = [];
   for (const p of c.props) {
     // A cave walked into through its throat (caveThroat.ts) has no ladder up: its way out is the throat itself.
     if (throat && p === c.hatch) continue;
     if (p.kind === 'chest') lids.push(chest(propKit, p, models));
+    else if (p.kind === 'breach') seal.push(...breach(propKit, p));
     else if (!models || !modelProp(propKit, p, models)) prop(propKit, p);
   }
   if (models) dress(propKit, c, models);
   for (const t of torchSpots(c)) sconce(shell, t.x, t.y, t.z, t.nx, t.nz);
   const keys = L.links.filter((pl) => pl.link.kind === 'locked' && pl.link.key !== undefined).map((pl) => ({ room: pl.link.key!, mesh: keyMesh(keySpot(L, pl.link.key!), deriveSeed(c.decision.seed, 'key', pl.link.id)) }));
-  return { shell: shell.mesh(), props: propKit.mesh(), doors, lids, keys };
+  return { shell: shell.mesh(), props: propKit.mesh(), doors, lids, keys, seal };
 }
 
 /** An old iron key with a brass bow, lying on the floor at `at`, turned by its seed (a hand long: seen from a few steps). */

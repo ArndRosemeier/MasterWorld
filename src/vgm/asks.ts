@@ -70,6 +70,12 @@ export function askFor(setting: Pick<SettingModule, 'asks'>, seed: number, log: 
   };
 }
 
+/** The setting's ask `id` as a place would carry it, its first thing and line (someone lost: found alive), for looking at it (`?ask=`). Null: no such ask. */
+export function askNamed(setting: Pick<SettingModule, 'asks'>, id: string): PromiseAsk | null {
+  const a = setting.asks?.find((x) => x.id === id);
+  return a ? { id: a.id, verb: a.verb, line: 0, ...(a.things?.length ? { thing: 0 } : {}), ...(a.verb === 'lost' ? { who: 0, alive: true } : {}) } : null;
+}
+
 /** The setting's ask a promise carries (null: none, as in an older save or a guild's place: clear it). */
 export function askDefOf(setting: Pick<SettingModule, 'asks'>, ask: PromiseAsk | undefined): AskDef | null {
   return (ask && setting.asks?.find((a) => a.id === ask.id)) || null;
@@ -148,16 +154,19 @@ export interface AskState {
   readonly holds: boolean;
   /** The hero came up to the one who was lost, alive. */
   readonly found?: boolean;
+  /** The breach is walled up (a seal). */
+  readonly sealed?: boolean;
 }
 
 /**
  * Is the ask done (D62)? Only the thing it names counts: clear, the place beaten; fetch, the named thing in
  * the hero's hands (beating the place does not do it, and nor does any other thing); lost, the lost one found
- * alive, or what is left of them in the hero's hands.
+ * alive, or what is left of them in the hero's hands; seal, the breach walled up (beating what came through it is not).
  */
 export function askMet(ask: PromiseAsk | null | undefined, s: AskState): boolean {
   if (ask?.verb === 'fetch') return s.holds;
   if (ask?.verb === 'lost') return ask.alive ? !!s.found : s.holds;
+  if (ask?.verb === 'seal') return !!s.sealed;
   return s.beaten;
 }
 

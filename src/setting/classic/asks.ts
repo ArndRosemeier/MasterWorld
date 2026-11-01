@@ -74,4 +74,20 @@ export const asks: readonly AskDef[] = [
       missing: 'You say you know what became of {who}? Then show me something of theirs, or I will not believe it.',
     },
   },
+  {
+    id: 'breach',
+    verb: 'seal',
+    weight: 1.2,
+    lived: true,
+    words: {
+      told: [
+        'They come up through a hole in the wall down there. Wall it up again, that is all we ask.',
+        'Something broke through from behind the old wall. Close it, and whatever is behind can stay there.',
+        'Kill them if you must, but it is the hole they came through that matters. Stop it up, or more will come.',
+      ],
+      topic: 'The breach in {place} is walled up.',
+      note: 'I walled up the breach. {name} of {house} will want to hear that nothing more comes through.',
+      thanks: 'Walled up, stone on stone? Then nothing more comes through. Here, {coins}, and well earned.',
+    },
+  },
 ];

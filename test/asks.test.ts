@@ -11,6 +11,7 @@ import { Character } from '../src/game/character';
 import { Delve } from '../src/game/delve';
 import { Market } from '../src/game/trade';
 import { outlineCellar } from '../src/world/dungeon/cellar';
+import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import type { Decision, DecisionLog, DungeonDecision } from '../src/world/decisions';
@@ -158,4 +159,34 @@ test('asks: someone lost is one of the town who does not tell of it, never lost 
     }
   }
   assert.ok(alive > 0 && dead >= 0 && alive + dead >= 3, `${alive} alive, ${dead} dead`);
+});
+
+test('asks: a seal\'s breach stands in a wall of the last room, is walled up course by course, and only that does it (D62)', () => {
+  let n = 0;
+  for (let i = 0; i < 8; i++) {
+    const dec = { ...testDecision(i), ask: { id: 'breach', verb: 'seal', line: 0 } } as DungeonDecision;
+    const c = outlineCellar(dec, testHouse(i), classic.dungeons.cellar);
+    const b = c.props.filter((p) => p.kind === 'breach');
+    assert.equal(b.length, 1, `cellar ${i}: one breach`);
+    assert.equal(b[0]!.room, c.graph.goal, 'in the last room');
+    // A place that asks no seal has none.
+    assert.ok(!outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar).props.some((p) => p.kind === 'breach'));
+    // Drawn: the hole in the props, the stones apart in courses.
+    assert.ok(cellarMeshes(c).seal.length >= 4, 'courses of stones to set');
+    const hero = new Character(classic), delve = new Delve(c, new DungeonSpace(c.layout), classic, hero, 4);
+    delve.ask = dec.ask!;
+    for (const k of delve.den.creatures) k.state = 'dead';
+    assert.ok(delve.beaten && !delve.met, 'beating what came through is not sealing it');
+    // Before it, the hero is offered to wall it up.
+    const f = [Math.sin(b[0]!.yaw), Math.cos(b[0]!.yaw)];
+    const near = delve.within({ x: b[0]!.x + f[0]! * 1.2, y: b[0]!.y, z: b[0]!.z + f[1]! * 1.2 });
+    assert.equal(near?.kind, 'breach');
+    delve.seal();
+    assert.ok(delve.met && delve.sealed);
+    // Kept in the save.
+    const again = new Delve(c, new DungeonSpace(c.layout), classic, new Character(classic), 4, delve.tally());
+    assert.ok(again.sealed);
+    n++;
+  }
+  assert.equal(n, 8);
 });
