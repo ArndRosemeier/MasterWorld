@@ -304,6 +304,12 @@ export interface CaveWayDef {
   readonly maxRadius: number;
   /** Deepest a canyon is cut into its floor, metres, at a scale of 1. */
   readonly maxCut: number;
+  /** The reader's hero (K4): standing height and body radius, metres; a step up or down that is just walked; the highest face climbed (cave rock is climbable, D56); the furthest jumped or let down (one way). */
+  readonly stand: number;
+  readonly radius: number;
+  readonly step: number;
+  readonly climb: number;
+  readonly drop: number;
 }
 
 /** The look of the carved walls. */
@@ -2040,6 +2046,7 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
   if (Math.abs(sh.pure + sh.two + sh.three - 1) > 1e-6) out.push(`${where}: cave shares pure, two and three must add up to 1`);
   const wy = c.way;
   if (!(wy.minWidth >= 1.6 && wy.minHeight >= 2.4 && wy.maxRadius > wy.minWidth && wy.maxCut > 0)) out.push(`${where}: cave ways must fit the standing hero (width >= 1.6 m, height >= 2.4 m)`);
+  if (!(wy.stand >= 1.6 && wy.stand < wy.minHeight && wy.radius > 0.2 && wy.radius * 2 < wy.minWidth && wy.step > 0.2 && wy.climb > wy.step && wy.drop >= wy.climb)) out.push(`${where}: the reader's hero must fit the ways (stand < minHeight, 2 x radius < minWidth, step < climb <= drop)`);
   if (!(c.walls.rough >= 0 && c.walls.rough <= 1.2)) out.push(`${where}: cave wall roughness must be 0 to 1.2 m (more could close a way)`);
   const d = c.dress, span = (r: readonly [number, number], what: string) => { if (!(r[0] >= 0 && r[1] >= r[0])) out.push(`${where}: cave ${what} must be a range, least first`); };
   span(d.floor.silt, 'silt depth'); span(d.rocks.perHall, 'rocks per hall'); span(d.rocks.size, 'rock size'); span(d.water.width, 'stream width'); span(d.formations.length, 'stalactite length'); span(d.stones.size, 'stone size'); span(d.crystals.count, 'crystal count'); span(d.crystals.len, 'crystal length');

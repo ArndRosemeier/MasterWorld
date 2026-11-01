@@ -6,7 +6,9 @@ import type { CaveSizeDef, CavesDef } from '../../setting/contract';
 import type { BrickField } from '../dungeon/rockMesh';
 import { rockBlock, type CaveLand, type RockBlock } from './block';
 import { carveSkeleton, type FormedField } from './carve';
+import { clearOpened, concede, type Opened } from './concede';
 import { dressCave, type Dressing } from './dress';
+import type { Reading } from './reader';
 import { rockById, sizeFor } from './choose';
 import { previewLand } from './land';
 import type { Skeleton } from './skeleton';
@@ -30,3 +32,18 @@ export function formCave(caves: CavesDef, seed: number, rockId: string, sizeId?:
 
 /** Dress a formed cave (silt, stream, rocks, drips and formations): edits its field, so mesh it after. */
 export const dressFormed = (c: FormedCave, caves: CavesDef): Dressing => dressCave(c.skeleton, c.block, c.field as BrickField, caves);
+
+/** A cave read: its network, the ways the concession cut, and its dressing without what those cut through. */
+export interface FormedRead {
+  readonly reading: Reading;
+  readonly opened: readonly Opened[];
+  readonly dressing: Dressing;
+  /** Milliseconds the reading and concession took. */
+  readonly ms: number;
+}
+
+/** Read a dressed cave and open what is cut off (K4): edits its field, so mesh it after. */
+export function readFormed(c: FormedCave, caves: CavesDef, dressing: Dressing): FormedRead {
+  const done = concede(c.field as BrickField, c.skeleton, caves, dressing);
+  return { reading: done.reading, opened: done.opened, dressing: clearOpened(dressing, done.opened), ms: done.ms };
+}

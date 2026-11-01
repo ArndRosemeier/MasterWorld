@@ -29,7 +29,7 @@ function geometryOf(m: { position: Float32Array; normal: Float32Array; tint: Uin
 
 async function main(): Promise<void> {
   const W = 550, H = 340, cols = 3;
-  const res: CaveResult = await createCavePool().run({ kind: 'form', setting: 'classic', seed, rock, size, coarse: 1, dress: true });
+  const res: CaveResult = await createCavePool().run({ kind: 'form', setting: 'classic', seed, rock, size, coarse: 1, dress: true, read: true });
   const r = new T.WebGPURenderer({ antialias: true, forceWebGL: true });
   r.setSize(W, H); r.toneMapping = T.AgXToneMapping; r.toneMappingExposure = 1.3;
   await r.init();

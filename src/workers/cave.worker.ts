@@ -12,7 +12,9 @@ import { crystalsMesh, stonesMesh } from '../world/cave/loose';
 import { waterMesh, type WaterMesh } from '../world/cave/waterMesh';
 import type { PartMesh } from '../world/cave/parts';
 import type { Dressing } from '../world/cave/dress';
-import { dressFormed, formCave, type FormedCave } from '../world/cave/form';
+import type { Opened } from '../world/cave/concede';
+import { dressFormed, formCave, readFormed, type FormedCave } from '../world/cave/form';
+import type { Reading } from '../world/cave/reader';
 import type { Skeleton } from '../world/cave/skeleton';
 import { serve } from './serve';
 
@@ -26,6 +28,8 @@ export interface CaveJob {
   readonly coarse?: number;
   /** Dress it (silt, stream, rocks, drips, formations) before meshing. */
   readonly dress?: boolean;
+  /** Read its network and open what is cut off (K4; needs `dress`), before meshing. */
+  readonly read?: boolean;
 }
 
 export interface CaveResult {
@@ -33,6 +37,8 @@ export interface CaveResult {
   readonly dressing: Dressing | null;
   /** The dressing's loose parts as meshes (when it was dressed and meshed). */
   readonly parts: { readonly formations: PartMesh; readonly stones: PartMesh; readonly crystals: PartMesh; readonly water: WaterMesh } | null;
+  /** The network of standable ground, its places and the ways the concession cut (when read). */
+  readonly read: { readonly reading: Reading; readonly opened: readonly Opened[]; readonly ms: number } | null;
   readonly mesh: BuildingMesh | null;
   readonly ms: FormedCave['ms'] & { readonly mesh: number; readonly dress: number };
   readonly rock: string;
@@ -53,7 +59,9 @@ serve<CaveJob, CaveResult>((job) => {
   if (!caves) throw new Error(`setting "${job.setting}" has no formed caves`);
   const c = formCave(caves, job.seed, job.rock, job.size);
   let mesh: BuildingMesh | null = null;
-  const td = Date.now(), dressing = job.dress ? dressFormed(c, caves) : null, dressMs = Date.now() - td;
+  const td = Date.now(), dressed = job.dress ? dressFormed(c, caves) : null, dressMs = Date.now() - td;
+  // Read and open what is cut off before meshing: the concession edits the field and takes what it cuts through from the dressing.
+  const rd = dressed && job.read ? readFormed(c, caves, dressed) : null, dressing = rd ? rd.dressing : dressed;
   const t = Date.now();
   if (job.coarse !== 0) mesh = formedMesh(job.coarse && job.coarse > 1 ? coarsen(c.field, job.coarse) : c.field, c.block);
   const meshMs = Date.now() - t;
@@ -62,9 +70,9 @@ serve<CaveJob, CaveResult>((job) => {
   const size = caves.sizes.find((s) => s.across === c.block.across && s.deep === c.block.deep)!;
   return {
     result: {
-      skeleton: c.skeleton, dressing, parts, mesh, ms: { ...c.ms, mesh: meshMs, dress: dressMs }, rock: job.rock, size: { id: size.id, across: size.across, deep: size.deep },
+      skeleton: c.skeleton, dressing, parts, read: rd ? { reading: rd.reading, opened: rd.opened, ms: rd.ms } : null, mesh, ms: { ...c.ms, mesh: meshMs, dress: dressMs }, rock: job.rock, size: { id: size.id, across: size.across, deep: size.deep },
       bricks: c.field.bricks.filter(Boolean).length, tris: mesh ? mesh.index.length / 3 : 0, face: c.block.water.face, dip: Math.atan(c.block.beds.slope) * 180 / Math.PI,
     },
-    transfer: [...(mesh ? buffers(mesh) : []), ...(parts ? Object.values(parts).flatMap(buffers) : [])],
+    transfer: [...(mesh ? buffers(mesh) : []), ...(parts ? Object.values(parts).flatMap(buffers) : []), ...(rd ? buffers(rd.reading) : [])],
   };
 });

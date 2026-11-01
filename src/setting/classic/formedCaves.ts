@@ -60,7 +60,7 @@ export const caves: CavesDef = {
   // Pure caves are the norm; a mixed one usually has two shares and the third at zero (Arnd, 2026-11-01).
   shares: { pure: 0.6, two: 0.32, three: 0.08, weight: { built: 1, water: 2.2, lava: 1 }, lavaOn: ['volcanic'] },
   // No squeezing (D63): a way is 2 m wide and 2.8 m high at the least, for a hero up to 2.1 m tall.
-  way: { minWidth: 2, minHeight: 2.8, maxRadius: 5.5, maxCut: 14 },
+  way: { minWidth: 2, minHeight: 2.8, maxRadius: 5.5, maxCut: 14, stand: 2.1, radius: 0.4, step: 0.55, climb: 6, drop: 14 },
   walls: { rough: 0.7 },
   // The dresser (K3): silt and fallen rock, a stream with pools, drips along the roof's cracks with their formations.
   dress: {
