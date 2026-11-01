@@ -168,7 +168,6 @@ import { BirdKit, OtterKit, ShapeForm, shapesFrame } from './app/shapeForm';
 import { Alone, blowOf, Recipes, shapeOf, type RecipeEvent } from './game/recipe';
 import { shapeBars } from './game/birdForm';
 import { SpellView } from './app/spellView';
-import { AuraView } from './render/aura/AuraView';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { Retreats } from './app/retreats';
@@ -770,14 +769,11 @@ export async function start(b: Boot): Promise<void> {
     // shader budget (F3), so they do not lengthen the load (F4, gate C). Neither is needed in the first seconds:
     // until then a spell is reckoned but not drawn, and no smoke rises.
     const spellView = new SpellView(setting);
-    // The auras round the creatures of a fight (sim/aura.ts): one shader, built with the spells.
-    const auraView = new AuraView();
     let smokeIn = false;
     const warmLater = async (): Promise<void> => {
       await view.stage.add(smoke.mesh);
       smokeIn = true;
       await spellView.enter(view.stage);
-      await auraView.settleIn(view.stage);
     };
 
     const notes = new Notes();
@@ -878,7 +874,7 @@ export async function start(b: Boot): Promise<void> {
       // The hero, what they leave lying and their spells go down with them.
       depth: (down, keep) => {
         if (!down) { for (const o of hidden) o.visible = true; hidden.length = 0; return; }
-        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group, spellView.group, auraView.mesh, ...(stoneMesh ? [stoneMesh] : [])]);
+        const kept = new Set<Object3D>([...keep, hero.object, view.camera, remainsView.group, spellView.group, ...(stoneMesh ? [stoneMesh] : [])]);
         for (const o of view.scene.children) if (o.visible && !kept.has(o) && !(o as Light).isLight) { o.visible = false; hidden.push(o); }
       },
     }, terrain.towns, save?.cellars ?? {});
@@ -978,7 +974,7 @@ export async function start(b: Boot): Promise<void> {
           for (const o of cellars?.drawnBelow() ?? []) set(o, false);
         } else {
           const mine = cellars?.drawnOf(realm) ?? [];
-          const kept = new Set<Object3D>([...mine, hero.object, view.camera, remainsView.group, spellView.group, auraView.mesh, portalView.group, ...(stoneMesh ? [stoneMesh] : [])]);
+          const kept = new Set<Object3D>([...mine, hero.object, view.camera, remainsView.group, spellView.group, portalView.group, ...(stoneMesh ? [stoneMesh] : [])]);
           for (const o of view.scene.children) if (!kept.has(o) && !(o as Light).isLight) set(o, false);
           for (const o of mine) set(o, true);
         }
@@ -2480,7 +2476,6 @@ export async function start(b: Boot): Promise<void> {
         spellView.bodyHeight = player.walker.height;
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
-        auraView.lightUp();
       }
       part('rooms+talk');
       if (!visit()) rooms?.update(dt);

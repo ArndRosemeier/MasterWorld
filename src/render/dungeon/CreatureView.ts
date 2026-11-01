@@ -28,7 +28,7 @@ import { Jolt, joltRoot, joltSpine } from '../jolt';
 import { limp, limpOf } from '../limp';
 import { PACE } from '../hero/clips';
 import { Held, Steady } from '../steady';
-import { AURAS } from '../aura/AuraView';
+import { AURAS } from '../aura/marks';
 import { FAINT, STRONG, auraReach, auraSize, healthLook } from '../../sim/aura';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
