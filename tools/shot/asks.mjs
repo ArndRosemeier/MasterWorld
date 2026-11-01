@@ -34,6 +34,19 @@ const shoot = async (name) => {
 };
 const FIGHT = `window.game.cellars?.fightBelow`;
 
+/** F2 and F3 for the scene on screen: the frame interval over 3 s (p50, p95) and the shader policy line. */
+async function numbers(scene) {
+  const dts = await page.evaluate(() => new Promise((done) => {
+    const out = []; let last = performance.now(); const t0 = last;
+    const step = (now) => { out.push(now - last); last = now; if (now - t0 < 3000) requestAnimationFrame(step); else done(out.slice(2)); };
+    requestAnimationFrame(step);
+  }));
+  const at = (q) => dts.slice().sort((a, b) => a - b)[Math.min(dts.length - 1, Math.floor(dts.length * q))] ?? 0;
+  const hud = await page.evaluate(() => window.game.view.stage.hudLine?.() ?? '');
+  console.log(`F2 ${scene}: frame p50 ${at(0.5).toFixed(1)} ms, p95 ${at(0.95).toFixed(1)} ms (${dts.length} frames)`);
+  console.log(`F3 ${scene}: ${hud}`);
+}
+
 /** A seal: wall up the breach in the cellar's last room. */
 async function seal() {
   await page.goto(`${base}?title=0&day=0&hour=12&weather=fair&ask=breach&cellar${gl ? '&gl' : ''}`);
@@ -68,6 +81,7 @@ async function seal() {
   const end = await page.evaluate(`(() => { const f = ${FIGHT}; return { sealed: f.delve.sealed, met: f.delve.met }; })()`);
   console.log(`seal: ${JSON.stringify(end)}`);
   if (!end.sealed || !end.met) fail('seal: the breach is not walled up');
+  await numbers('seal');
 }
 
 /** A parley: up to the dwellers' leader, hear the terms and strike them. */
@@ -110,6 +124,7 @@ async function parley() {
   console.log(`parley: ${JSON.stringify(end)}`);
   if (end.parley !== 'struck' || !end.met) fail('parley: no terms struck');
   if (end.fighting) fail('parley: the dwellers fight');
+  await numbers('parley');
 }
 
 /** A night watch: at the household's door at night, the band comes out of the dark. */
@@ -145,6 +160,7 @@ async function watch() {
   }
   const shown = await page.evaluate(() => !!window.game.wild?.sight('watch'));
   if (!shown) fail('watch: the band is not shown');
+  await numbers('watch');
 }
 
 for (const kind of (process.env.ASKS ?? 'seal,parley,watch').split(',')) {

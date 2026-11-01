@@ -16,13 +16,13 @@ import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { endingOf, keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
-import { wantOf } from '../vgm/wants';
+import { wantsOf } from '../vgm/wants';
 import { asEnded, askDefOf, holdsKeepsake, keepsakeOf, twistOf, verbOf } from '../vgm/asks';
 import { NightWatch, nightWatchFor, watchDoor } from '../vgm/watch';
 import { hailer } from '../vgm/guide';
 import { Director, NEEDS, type Need } from '../vgm/director';
 import { answerNeed } from '../vgm/toolbox';
-import { dungeonOf, settlementOf, type Decision, type DungeonDecision, type RegionDecision } from '../world/decisions';
+import { dungeonOf, settlementOf, type Decision, type DungeonDecision, type PromiseWant, type RegionDecision } from '../world/decisions';
 import { moveIn, outlineCellar, sketchCellar, type Cellar } from '../world/dungeon/cellar';
 import { marketStart, townById, type Town } from '../world/town';
 import { Character } from './character';
@@ -112,6 +112,8 @@ export interface EveningOptions {
   readonly mage?: boolean;
   /** The levels the hero must end within (D58, G1: an evening of play brings a fresh hero to level 3–5); none: any. */
   readonly levels?: readonly [number, number];
+  /** The loop check's coverage runs: the household asks only these kinds of task (ask ids), so each is played end to end. */
+  readonly only?: readonly string[];
 }
 
 /** One game day takes 60 real minutes (D37): game hours per second played. */
@@ -128,6 +130,8 @@ const AHEAD_ON_WAY = 300;
 const CLIMB_COST = 8;
 /** How long one visit below may take, seconds. */
 const DELVE_LIMIT = 1200;
+/** Why each want asks (the loop's log line). */
+const WANT_WHY: Readonly<Record<PromiseWant['kind'], string>> = { rival: 'suspects a rival in trade,', elder: 'is old and wants it back before the end', parent: 'fears for a child of the house', pious: 'wants the restless laid to rest', peaceable: 'would rather it were talked out' };
 
 /** Copper kept back from abilities (with the room): a mending or two. */
 const LESSON_RESERVE = 40;
@@ -140,7 +144,8 @@ const OVERDUE_MOST = 300;
 /** A failure of the evening: thrown inside, returned as `failed`. */
 class Broke extends Error {}
 
-export function playEvening(seed: number, setting: SettingModule, opts: EveningOptions = {}): EveningResult {
+export function playEvening(seed: number, setting0: SettingModule, opts: EveningOptions = {}): EveningResult {
+  const setting = opts.only ? { ...setting0, asks: setting0.asks?.filter((a) => opts.only!.includes(a.id)) } : setting0;
   const steps: EveningStep[] = [];
   const { terrain, log: first } = openWorld(seed, setting);
   const start = terrain.towns[0];
@@ -198,7 +203,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     if (!w || !door) throw new Broke(`${name} asks a watch but has no door to keep it at`);
     walkTo(`the door of ${name}'s household`, before[0], before[1]);
     const h = ((hours % 24) + 24) % 24, wait = (w.hours[0] + 0.1 - h + 24) % 24;
-    pass(wait / HOURS_PER_SECOND);
+    // The day until then is spent resting (as a night at the inn is), not played: the Director sees no play in it.
+    hours += wait;
     say(`keeps watch at the household's door from ${Math.floor(hours % 24)}:00`);
     const night = new NightWatch();
     const at = { x: before[0], z: before[1] };
@@ -392,7 +398,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       verbs.push(verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb);
       const twist = own ? twistOf(setting, dungeon.ask) : null;
       // What an earlier ending brought about (Q4), as the log has it.
-      if (ask?.want) { wants.push(ask.want.kind); say(`asked because ${talk.nameOf(ask.want.person)} ${ask.want.kind === 'rival' ? `suspects ${talk.nameOf(ask.want.rival!)}, a rival in trade` : 'is old and wants it back before the end'}`); }
+      if (ask?.want) { wants.push(ask.want.kind); say(`asked because ${talk.nameOf(ask.want.person)} ${WANT_WHY[ask.want.kind]}${ask.want.rival !== undefined ? ` ${talk.nameOf(ask.want.rival)}` : ''}`); }
       if (ask?.again) { consequences.push(`thief again (${ask.again})`); say(`the thief let go on ${ask.again} is at it again`); }
       if (twist) { twists.push(twist.kind); say(`twist: ${twist.kind}${twist.kind === 'changed' ? ` (told ${sketchCellar(dungeon, place, lore, undefined, true).dweller.id}, finds ${cellar.dweller.id})` : ''}`); }
       if (verb !== 'clear') say(`the household asks: ${verb}${names.who && verb === 'lost' ? ` ${names.who}` : ''}${keepsake ? ` (${keepsake.name})` : ''}`);
@@ -644,8 +650,8 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     for (const [id, ending] of endings) if (endingOf(log, id) !== ending) throw new Broke(`the log does not keep how ${id} ended (${ending})`);
     for (const d of log) {
       if (d.kind !== 'dungeon' || !d.ask?.want) continue;
-      const t = townById(terrain.towns, d.town), again = t ? wantOf(townsfolk(t.plan, t.decision.seed ?? seed), d) : null;
-      if (again?.person !== d.ask.want.person || again.kind !== d.ask.want.kind) throw new Broke(`the want behind ${d.id} does not replay from the log`);
+      const t = townById(terrain.towns, d.town), w = d.ask.want;
+      if (!(t && wantsOf(townsfolk(t.plan, t.decision.seed ?? seed), d).some((x) => x.person === w.person && x.kind === w.kind))) throw new Broke(`the want behind ${d.id} does not replay from the log`);
     }
     // The next lead: someone has news of a place not yet visited.
     const next = hearLead(heard);
