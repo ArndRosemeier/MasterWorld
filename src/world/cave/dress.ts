@@ -154,13 +154,14 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     // And the surface is smooth: the floor's lows averaged over some metres, kept within a little of the floor under each
     // point (no water over a dip, no deep slot cut for it), then never rising downstream. A level that followed every lump
     // of the floor stood in terraces.
-    const SPAN = 4, level = low.map((_, i) => {
+    const SPAN = 4, mean = low.map((_, i) => {
       let sum = 0;
       for (let o = -SPAN; o <= SPAN; o++) sum += low[clampI(i + o)];
-      return Math.max(low[i] - 0.3, Math.min(low[i] + 0.2, sum / (2 * SPAN + 1)));
+      return sum / (2 * SPAN + 1);
     });
-    if (level[0] >= level[level.length - 1]) for (let i = 1; i < level.length; i++) level[i] = Math.min(level[i], level[i - 1]);
-    else for (let i = level.length - 2; i >= 0; i--) level[i] = Math.min(level[i], level[i + 1]);
+    if (mean[0] >= mean[mean.length - 1]) for (let i = 1; i < mean.length; i++) mean[i] = Math.min(mean[i], mean[i - 1]);
+    else for (let i = mean.length - 2; i >= 0; i--) mean[i] = Math.min(mean[i], mean[i + 1]);
+    const level = mean.map((m, i) => Math.max(low[i] - 0.05, Math.min(low[i] + 0.2, m)));
     const pts = raw.map((r, i) => [r.x, level[i], r.z, Math.max(0.5, r.w)] as [number, number, number, number]);
     // Where the floor rises more than a step over that surface there is no stream: cutting its bed down to the water would
     // dig a slot a metre deep, whose walls the water hides and the hero cannot climb out of or walk along.
