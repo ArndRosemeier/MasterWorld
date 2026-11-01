@@ -181,9 +181,12 @@ test('asks: a seal\'s breach stands in a wall of the last room, is walled up cou
     for (const k of delve.den.creatures) k.state = 'dead';
     assert.ok(delve.beaten && !delve.met, 'beating what came through is not sealing it');
     // Before it, the hero is offered to wall it up.
-    const f = [Math.sin(b[0]!.yaw), Math.cos(b[0]!.yaw)];
+    // Forward is into the room (-sin, -cos; the wall is behind): the hero stands and kneels on that side, on the floor.
+    const f = [-Math.sin(b[0]!.yaw), -Math.cos(b[0]!.yaw)], space = new DungeonSpace(c.layout);
     const near = delve.within({ x: b[0]!.x + f[0]! * 1.2, y: b[0]!.y, z: b[0]!.z + f[1]! * 1.2 });
     assert.equal(near?.kind, 'breach');
+    for (const m of [0.75, 1.5]) assert.notEqual(space.floorAt(b[0]!.x + f[0]! * m, b[0]!.z + f[1]! * m, b[0]!.y + 0.6), null, `cellar ${i}: ${m} m in front of the breach is floor`);
+    assert.equal(space.floorAt(b[0]!.x - f[0]! * 1.5, b[0]!.z - f[1]! * 1.5, b[0]!.y + 0.6), null, `cellar ${i}: behind the breach is rock`);
     delve.seal();
     assert.ok(delve.met && delve.sealed);
     // Kept in the save.

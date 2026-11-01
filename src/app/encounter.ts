@@ -209,7 +209,7 @@ export class Encounter {
     const O = this.creatures.group.position, w = p.walker;
     // A seal's breach (D62): kneeling before it, the stones go in course by course until it is walled up.
     if (l.kind === 'breach') {
-      const b = this.delve.breach!, f = [Math.sin(b.yaw), Math.cos(b.yaw)];
+      const b = this.delve.breach!, f = [-Math.sin(b.yaw), -Math.cos(b.yaw)];
       this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, null, () => { this.delve.seal(); this.onSeal(1); }, { x: O.x + l.x + f[0] * SEAL_FRONT, z: O.z + l.z + f[1] * SEAL_FRONT }, { busy: SEAL_BUSY, work: (k) => this.onSeal(k) });
       p.puppet = this.kneel;
       return null;
