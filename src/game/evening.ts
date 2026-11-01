@@ -425,6 +425,18 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
         if (!found) throw new Broke(`came out of ${name} without finding ${names.who}`);
         say(`found ${names.who} alive; they walk home`);
       }
+      // A parley (D62): terms struck; or broken by a blow, and then the household pays nothing.
+      const broke = ask?.verb === 'parley' && saved?.parley !== 'struck';
+      if (ask?.verb === 'parley') {
+        if (!broke) say(`struck terms with those in ${name} (${ask.terms === 'price' ? `paid ${ask.price} copper` : 'gave the hero\'s word'}); nobody killed`);
+        else if (saved?.parley !== 'broken') throw new Broke(`came out of ${name} with no terms struck`);
+        else {
+          const k = keepPromise(log, lead.id, hours, true);
+          if (k) log = [...log, k];
+          say(`broke the parley in ${name}: the household pays nothing`);
+        }
+      }
+      if (!broke) {
       if (!talk.clear(lead.id)) throw new Broke(`${name} did not wait to be reported`);
       const to = talk.reportTo(lead.id).map((id) => people.find((p) => p.id === id)).find((p) => !!p);
       if (!to) throw new Broke(`nobody to tell that ${name} is safe`);
@@ -447,6 +459,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       rumour = openPromises(log).find((o) => told.heard.includes(o.id) && !heard.has(o.id)) ?? null;
       say(`told ${talk.nameOf(to.id)} that ${name} is safe: paid ${reward} copper${rumour ? `, and heard a rumour of ${rumour.id}` : ''}`);
       if (talk.ask(to.id, 'news').heard.includes(lead.id)) throw new Broke(`${talk.nameOf(to.id)} still tells of ${name} after hearing it is safe`);
+      }
 
       // Back in town: sell, mend, upgrade. A town without shops (a hamlet) has nobody to trade with; one
       // with any has a smith.

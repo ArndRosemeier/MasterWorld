@@ -90,4 +90,35 @@ export const asks: readonly AskDef[] = [
       thanks: 'Walled up, stone on stone? Then nothing more comes through. Here, {coins}, and well earned.',
     },
   },
+  {
+    id: 'parley',
+    verb: 'parley',
+    weight: 1.2,
+    lived: true,
+    dwellers: ['smugglers', 'goblins', 'grave-robbers', 'highwaymen', 'wreckers'],
+    parley: {
+      pact: 0.45,
+      cost: [12, 30],
+      terms: {
+        price: 'You want us gone? Fair enough. {coins}, and we pack up and leave tonight.',
+        pact: 'We go where we please. But give us your word nobody comes down here after us, and we leave that household be.',
+      },
+      struck: {
+        price: 'Done. We are gone by morning. Nobody needs to bleed for it.',
+        pact: 'Your word, then. We keep to ours: that household has nothing more to fear from us.',
+      },
+      short: 'You have not got it. Come back when you have {coins}, and do not come with your hand on that blade.',
+      broken: 'I struck first in {place}. There is no talking to them now.',
+    },
+    words: {
+      told: [
+        'I do not want blood spilled under my own roof. Talk to them. Whatever they want, let it be over.',
+        'They are not beasts down there; they can be talked to. Get them to leave us be, and no killing.',
+        'Go and speak with them. If it comes to fighting they will only come back angrier, or their friends will.',
+      ],
+      topic: 'I have spoken with those in {place}. They will trouble you no more.',
+      note: 'Terms struck in {place}, and no blood spilled. {name} of {house} will want to hear it.',
+      thanks: 'Talked them round, and nobody hurt? That is worth more than any killing. Here, {coins}.',
+    },
+  },
 ];

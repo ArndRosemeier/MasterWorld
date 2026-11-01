@@ -66,7 +66,7 @@ import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
 import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
-import { askNamed, askOf, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
+import { askDefOf, askNamed, askOf, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
@@ -585,7 +585,9 @@ export async function start(b: Boot): Promise<void> {
     let log: readonly Decision[] = [...opened.log, ...later];
     // `ask=`: what the households of the first places ask (D62), for looking at it.
     const looked = params.ask && !save ? askNamed(setting, params.ask) : null;
-    if (looked) log = log.map((d) => (d.kind === 'dungeon' && !d.quest && !d.task ? { ...d, ask: looked } : d));
+    // A parley needs dwellers who talk: the first of its kinds moves in (their encounter is named as they are).
+    const talkers = askDefOf(setting, looked ?? undefined)?.dwellers?.[0];
+    if (looked) log = log.map((d) => (d.kind === 'dungeon' && !d.quest && !d.task ? { ...d, ask: looked, ...(talkers ? { dwellers: talkers } : {}) } : d));
     // `moved`: the first cellar was cleared long ago, and new dwellers have moved in since.
     const cleared = params.moved && start ? firstDungeon(log) : null;
     if (cleared && start && !keptOf(log).has(cleared.id)) {
@@ -787,6 +789,7 @@ export async function start(b: Boot): Promise<void> {
     let quietPlace: ((id: string) => boolean) | null = null;
     /** A cellar gone quiet with the hero down in it: its household comes down to them (set once the town talks). */
     let comeDown: ((id: string) => boolean) | null = null;
+    let failedPlace: ((id: string) => boolean) | null = null;
     /** Who of a cellar's household came down to the hero (app/ownerComes.ts), while they are there. */
     let owner: OwnerComes | null = null;
     // What the fights (down in a cellar, out on the land) ask of the game.
@@ -818,6 +821,8 @@ export async function start(b: Boot): Promise<void> {
       armed: armHero,
       quiet: (id) => quietPlace?.(id) ?? false,
       stilled: (id) => comeDown?.(id) ?? false,
+      failed: (id) => failedPlace?.(id) ?? true,
+      say: (text, at) => overHead(text, at),
     };
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
@@ -1213,6 +1218,15 @@ export async function start(b: Boot): Promise<void> {
       if (p === undefined) return true;
       const name = words.nameOf(p.id), house = words.homeCalled(p.id), door = t.town.plan.buildings[p.home].door;
       journal.quiet(id, { text: fill(words.askOf(id)?.note ?? setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
+      return true;
+    };
+    // A parley broken (D62): the hero struck first and beat them; the household asked for none of it and pays nothing.
+    failedPlace = (id) => {
+      const k = keepPromise(log, id, hours(), true);
+      if (k) log = [...log, k];
+      const t = townOfPromise(id), broken = askDefOf(setting, askOf(log, id) ?? undefined)?.parley?.broken;
+      if (broken) journal.lapse(id, { text: fill(broken, { place: t?.talk.cellarCalled(id) ?? 'that place' }), from: 'you' });
+      else journal.fulfil(id);
       return true;
     };
     /**

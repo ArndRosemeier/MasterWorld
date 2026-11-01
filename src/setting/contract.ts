@@ -817,8 +817,8 @@ export const TOP_FIND = 0.3;
  * topic to tell them), `note` the journal's line once it is done (`{name}` who to tell, `{house}`), `thanks`
  * what they say (`{coins}`, `{thing}`).
  */
-export type AskVerb = 'clear' | 'fetch' | 'lost' | 'seal';
-export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost', 'seal'];
+export type AskVerb = 'clear' | 'fetch' | 'lost' | 'seal' | 'parley';
+export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost', 'seal', 'parley'];
 
 export interface AskDef {
   /** The kind (the VGM remembers kinds given, D62): a slug. */
@@ -838,6 +838,22 @@ export interface AskDef {
    * rest are dead: what is left of them (one of `things`, `{who}`'s) lies in the lair's hoard, and `dead` gives the
    * topic, note and thanks for bringing it home.
    */
+  /** Only places whose dwellers are one of these (the lore's dweller ids; none: any). */
+  readonly dwellers?: readonly string[];
+  /**
+   * `parley`: the dwellers are not hostile (they watch the hero, and fight only once struck); their leader names
+   * terms when spoken to: a `price` (copper, `cost`; paid, they pack up and go meekly) or a `pact` (they stay and
+   * leave the household be). The leader's words: `terms` (`{coins}`), `struck` once agreed, `short` when the hero
+   * cannot pay; `broken` the journal's line when the hero struck first and the parley can never be (`{place}`).
+   */
+  readonly parley?: {
+    readonly pact: number;
+    readonly cost: readonly [number, number];
+    readonly terms: { readonly price: string; readonly pact: string };
+    readonly struck: { readonly price: string; readonly pact: string };
+    readonly short: string;
+    readonly broken: string;
+  };
   readonly lost?: { readonly alive: number; readonly found: string; readonly dead: { readonly topic: string; readonly note: string; readonly thanks: string } };
   /** `missing`: what they say when told it is done but the thing is not in the hero's hands (a fetch). */
   readonly words: { readonly told: readonly string[]; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing?: string };
@@ -1776,6 +1792,7 @@ function validateAsks(m: SettingModule, where: string): string[] {
     for (const k of a.kinds ?? []) if (!m.dungeons[k]) out.push(`${where}: ask "${a.id}" names dungeon kind "${k}" the setting has not`);
     if (!a.words.told.length || !a.words.topic || !a.words.note || !a.words.thanks) out.push(`${where}: ask "${a.id}" lacks its words`);
     if (a.verb === 'lost' && (!a.lost || !a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" is lost: it needs lost (alive, found, dead), things left of the dead and missing`);
+    if (a.verb === 'parley' && (!a.parley || !a.dwellers?.length)) out.push(`${where}: ask "${a.id}" is a parley: it needs parley (terms, struck, short, broken) and the dwellers who talk`);
     if (a.verb === 'fetch' && (!a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" fetches nothing (things), or has no words for the thing not brought (missing)`);
     for (const t of a.things ?? []) if (!m.items.items.some((d) => d.id === t.item)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is no catalogue item (${t.item})`);
   }

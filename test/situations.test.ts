@@ -122,7 +122,7 @@ test('situations: by day a beast gets out of its paddock, someone of its farm go
 test('situations: speech bubbles carry only the cries, a story event shouted in town and a household come to thank the hero (D52: rare lines)', () => {
   const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
   const says = [...main.matchAll(/speech\.say\(([^,]+),/g)].map((m) => m[1].trim());
-  // (`text`: a cellar's household come down once it is quiet, app/ownerComes.ts: their thanks show the task is done.)
+  // (`text`: a cellar's household come down once it is quiet, app/ownerComes.ts: their thanks show the task is done; a parley's leader naming terms, D62.)
   assert.deepEqual(says.sort(), ['c.text', 'text', 'told.cry'], 'the game says nothing else in a bubble');
 });
 
