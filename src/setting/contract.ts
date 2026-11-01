@@ -67,11 +67,12 @@ export interface BiomeDef {
 
 /**
  * The shapes a landform can take (D55, plan 5.9): each is a rule in world/landforms.ts that bends the height
- * field over 30-500 m. Round ones: knoll, tor (a knoll with rock breaking through its crown), dell, sinkhole.
+ * field over 30-500 m. Round ones: knoll, tor (a knoll with rock breaking through its crown), dell, sinkhole, cone (a
+ * cinder cone: steep sides to a rim round a crater).
  * Long ones run along an axis: gully and ravine (cut downhill), ridge, scarp (a step in the land), dry valley,
  * bank and sunken lane (old work of hands). Boulders and erratics leave the ground as it is; their rock is all.
  */
-export const LANDFORM_SHAPES = ['knoll', 'tor', 'dell', 'sinkhole', 'gully', 'ravine', 'ridge', 'scarp', 'dryValley', 'bank', 'sunkenLane', 'boulders', 'erratic'] as const;
+export const LANDFORM_SHAPES = ['knoll', 'tor', 'dell', 'sinkhole', 'gully', 'ravine', 'ridge', 'scarp', 'dryValley', 'bank', 'sunkenLane', 'boulders', 'erratic', 'cone'] as const;
 export type LandformShape = (typeof LANDFORM_SHAPES)[number];
 
 /** One kind of landform: its shape and how big it comes. */
@@ -188,6 +189,26 @@ export interface CaveGeologyDef {
   readonly rocks: Readonly<Record<string, number>>;
 }
 
+/** A lava tube's making (K7, docs/design/caves.md 3.2): a flow runs from a vent down the old land, a few metres under its crust, and drains. Metres, as the block's frame. */
+export interface CaveLavaDef {
+  /** A tube's half-width and half-height, metres, least and most (a tube 5 to 15 m wide). */
+  readonly halfWidth: readonly [number, number];
+  readonly halfHeight: readonly [number, number];
+  /** How much the floor falls per metre along a tube, least and most (a tube is gently sloped). */
+  readonly gradient: readonly [number, number];
+  /** How far the main tube runs under the crust before it may come out, as a share of the block's width (least and most). */
+  readonly length: readonly [number, number];
+  /** Rock over a tube's roof, metres; a tube reaches the land (a mouth) where the land comes down to it. */
+  readonly roof: number;
+  /** Side tubes (distributaries) off the main one, least and most, and how long they run, metres. */
+  readonly branches: readonly [number, number];
+  readonly branchLength: readonly [number, number];
+  /** How much the course wanders (radians of turn per step, 0..1). */
+  readonly wander: number;
+  /** Skylights (the roof fell in) most, how far apart, and the roof thickness under which one may stand, metres. */
+  readonly skylights: { readonly most: number; readonly apart: number; readonly thin: number };
+}
+
 /** One rock setting of a solution cave: the three patterns the water leaves (branchwork, network maze, braids) come from these numbers. */
 export interface CaveRockDef {
   readonly id: string;
@@ -254,6 +275,8 @@ export interface CaveRockDef {
     /** Least share of the water a path carries to stay a passage. */
     readonly keep: number;
   };
+  /** Lava tubes (K7): a rock with this is opened by a lava flow draining from under its crust (world/cave/lava.ts), not by water. */
+  readonly lava?: CaveLavaDef;
   /** Collapse: where passages cross or span too wide, the ceiling falls (a big uneven void and a rubble heap under it). */
   readonly collapse: {
     /** Chance at a junction of big passages. */
@@ -2037,6 +2060,11 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
     if (!(r.bedding.soluble > 0 && r.bedding.soluble <= 1) || !r.bedding.colors.length) out.push(`${where}: ${w} needs a soluble share in 0..1 and bed colours`);
       if (!(r.resistance.size >= 4 && r.resistance.contrast >= 0 && r.resistance.contrast <= 6)) out.push(`${where}: ${w} resistance needs a patch size of 4 m or more and a contrast of 0 to 6`);
     if (!(r.former.rounds >= 1 && r.former.samples >= 1 && r.former.feedback > 0 && r.former.growth > 0 && r.former.reuse >= 0 && r.former.reuse <= 1 && r.former.keep > 0 && r.former.keep < 1)) out.push(`${where}: ${w} former needs rounds, samples, feedback, growth > 0 and keep in 0..1`);
+    if (r.lava) {
+      const l = r.lava;
+      range(l.halfWidth, `${w} lava tube half width`, 1.2); range(l.halfHeight, `${w} lava tube half height`, 1.5); range(l.gradient, `${w} lava gradient`); range(l.length, `${w} lava length`, 0.1); range(l.branches, `${w} lava branches`); range(l.branchLength, `${w} lava branch length`, 8);
+      if (!(l.roof >= 2 && l.wander >= 0 && l.wander <= 1 && l.skylights.most >= 0 && l.skylights.apart > 0 && l.skylights.thin > 0)) out.push(`${where}: ${w} lava needs a roof of 2 m or more, a wander in 0..1 and skylights`);
+    }
     if (!(r.collapse.junction >= 0 && r.collapse.junction <= 1 && r.collapse.span > 0 && r.collapse.most >= 0)) out.push(`${where}: ${w} collapse is malformed`);
   }
   for (const g of c.geology) {

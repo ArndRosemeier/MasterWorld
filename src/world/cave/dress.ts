@@ -250,10 +250,12 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   }
 
   // --- drips and formations along the cracks over the ways ---
+  // (A lava tube has no dripstone: its own drips and ledges are K7's dresser; no limestone crystals either.)
+  const lava = !!block.rock.lava, most = lava ? 0 : d.formations.most;
   const speleos: Speleo[] = [], drips: Drip[] = [], lastLevel = Math.max(0, sk.tables.length - 1);
   for (const c of passages) {
     const age = 1 + d.formations.age * (1 - (lastLevel ? c.level / lastLevel : 0));
-    for (let s = 0; s + 1 < c.points.length && speleos.length < d.formations.most; s++) {
+    for (let s = 0; s + 1 < c.points.length && speleos.length < most; s++) {
       const a = c.points[s], b = c.points[s + 1];
       if (a.B < 1.4) continue;
       for (const set of block.joints) {
@@ -263,7 +265,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
           const t = (plane - u0) / (u1 - u0), qx = lerp(a.x, b.x, t), qy = lerp(a.y, b.y, t), qz = lerp(a.z, b.z, t), A = lerp(a.A, b.A, t);
           // Along the crack across the roof, a drip every so often.
           for (let o = -A * 0.85 + rng.range(0, d.drips.spacing); o < A * 0.85; o += d.drips.spacing * rng.range(0.7, 1.4)) {
-            if (!rng.chance(d.drips.chance) || speleos.length >= d.formations.most) continue;
+            if (!rng.chance(d.drips.chance) || speleos.length >= most) continue;
             const x = qx - set.nz * o, z = qz + set.nx * o, span = spanAt(x, qy, z);
             if (!span || span[1] - span[0] < head + 0.3 || Math.abs(jointDistance(set, x, z)) > 1) continue;
             dripAt(x, z, span[0], span[1], c, age, wayHalf(a));
@@ -274,7 +276,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   }
   // Seeps away from the cracks too.
   const nSeep = passagePts.length ? Math.round(sk.stats.length / 100 * d.drips.scatter) : 0;
-  for (let n = 0; n < nSeep && speleos.length < d.formations.most; n++) {
+  for (let n = 0; n < nSeep && speleos.length < most; n++) {
     const { p, q } = passagePts[rng.int(0, passagePts.length - 1)], t = rng.float(), c = passages.find((k) => k.points.includes(p))!;
     const x = lerp(p.x, q.x, t) + rng.range(-0.75, 0.75) * p.A, z = lerp(p.z, q.z, t) + rng.range(-0.75, 0.75) * p.A, span = spanAt(x, lerp(p.y, q.y, t), z);
     if (span && span[1] - span[0] >= head + 0.3 && p.B >= 1.4) dripAt(x, z, span[0], span[1], c, 1 + d.formations.age * (1 - (lastLevel ? c.level / lastLevel : 0)), wayHalf(p));
@@ -359,11 +361,11 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
         found++;
         const col = ores[o - 1].color;
         for (let m = srng.int(1, 4); m > 0; m--) addStone(h[0] + srng.range(-0.5, 0.5) - h[3] * 0.06, h[1] + srng.range(-0.4, 0.4) - h[4] * 0.06, h[2] + srng.range(-0.5, 0.5) - h[5] * 0.06, srng.range(0.07, 0.3), col);
-        if (o - 1 === GEM || srng.chance(0.25)) crystals.push({ x: h[0], y: h[1], z: h[2], nx: h[3], ny: h[4], nz: h[5], count: srng.int(d.crystals.count[0], d.crystals.count[1]), len: srng.range(d.crystals.len[0], d.crystals.len[1] * 1.2), color: o - 1 === GEM ? 0x9a6ad8 : col, seed: srng.int(0, 99999) });
+        if (!lava && (o - 1 === GEM || srng.chance(0.25))) crystals.push({ x: h[0], y: h[1], z: h[2], nx: h[3], ny: h[4], nz: h[5], count: srng.int(d.crystals.count[0], d.crystals.count[1]), len: srng.range(d.crystals.len[0], d.crystals.len[1] * 1.2), color: o - 1 === GEM ? 0x9a6ad8 : col, seed: srng.int(0, 99999) });
       }
     }
     // A crystal here and there, anywhere: quartz, calcite, now and then amber or amethyst.
-    const nCr = passagePts.length ? Math.round(sk.stats.length / 100 * d.crystals.per100) : 0;
+    const nCr = passagePts.length && !lava ? Math.round(sk.stats.length / 100 * d.crystals.per100) : 0;
     for (let k = 0, tries = 0; k < nCr && tries < nCr * 30; tries++) {
       const { p } = passagePts[srng.int(0, passagePts.length - 1)], [ux, uy, uz] = dir(), h = wallHit(p.x, p.y, p.z, ux, uy, uz);
       if (!h || h[4] > 0.8) continue;

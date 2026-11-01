@@ -177,7 +177,7 @@ Mines can also have built locks: a grate, a door, a raised ladder.
 - **Light**: daylight shafts at sinkholes and skylights, the hero's torch everywhere else (as now).
 - **Water** uses today's water materials and drip particles. Sounds: drips, the stream, a breeze at a crack.
 - **The VGM's `cave` tool** asks for a size, a danger and the three shares (built, water, lava; usually pure, at most two filled), with its row in vgm.md (rule 10).
-- **Volcanic country**: there is no volcanic landscape kind today. Lava tubes need one (old cinder cones, lava fields, black basalt), added as a kind of country (D55) where the skeleton allows it.
+- **Volcanic country** (K7a, built 2026-11-01): the kind `volcanic` (6 % of the land, cut from mesa country's share and put last, so every other kind's cells stay where they were): old cinder cones with a crater (landform shape `cone`), black lava rock (`tor`, `boulders`), pits where a tube's roof fell in (`sinkhole`), little grass, and its own ground, the texgen layer `basalt`. Data in `src/setting/classic/landforms.ts`; the lava former (K7b) reads this country's skeleton.
 
 ## 6. What is hard, and the limits
 
