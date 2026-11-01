@@ -11,6 +11,7 @@ import type { CavesDef } from '../../setting/contract';
 import { WildMat } from '../dungeon/meshKit';
 import { BRICK, brickField, brickIndex, meshField, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
 import { bedAt, oreAt, type RockBlock } from './block';
+import { ORE_MAT } from './parts';
 import type { CondPoint, Skeleton, Void } from './skeleton';
 
 /** Metres of rock kept round the skeleton in the field. */
@@ -106,7 +107,7 @@ export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, s
 /** The rock's look: stone in the colour of its bed, ore where a body of it reaches the wall. */
 export function formedLook(block: RockBlock): Parameters<typeof meshField>[1] {
   const ores = block.oreDef.ores;
-  const stone = () => WildMat.Rock;
+  const stone = (x: number, y: number, z: number) => (block.ore.length && oreAt(block, x, y, z) ? ORE_MAT : WildMat.Rock);
   const tinted = (x: number, y: number, z: number, _mat: number, up: number): [number, number, number] => {
       const o = block.ore.length ? oreAt(block, x, y, z) : 0;
       if (o) { const c = ores[o - 1].color; return [(c >> 16) & 255, (c >> 8) & 255, c & 255]; }

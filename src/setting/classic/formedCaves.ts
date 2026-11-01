@@ -7,7 +7,8 @@
 import type { CavesDef } from '../contract';
 
 /** Limestone's wall colours: buff, grey-brown, cream and a rust-stained brown. */
-const LIME = [0xb8a98a, 0x9c9078, 0xcbbf9f, 0x8d8670, 0xa6998a, 0x9a7f62] as const;
+// Limestone beds: mostly greys (pale, mid, dark, blue-grey, a greenish one), some buff and a brown, so no cave is one colour.
+const LIME = [0x9a9da0, 0x777b80, 0xb4b6b2, 0x5e6368, 0x868a8e, 0xa5a79c, 0x6a7078, 0xa89c88, 0x8a7a66, 0x4f5459] as const;
 
 export const caves: CavesDef = {
   // The land's kind holds the rock: karst and downs are limestone and chalk, open country sometimes, the mesas' foot hills now and then.
@@ -67,6 +68,8 @@ export const caves: CavesDef = {
     rocks: { along: 16, perHall: [8, 16], size: [0.35, 1.5] },
     water: { width: [0.5, 1.5], bed: 0.28, pools: 4, poolDepth: 0.4 },
     drips: { chance: 0.55, live: 0.55, spacing: 1.7, scatter: 18 },
+    stones: { per100: 520, size: [0.06, 0.7], heaps: 0.3, most: 4500 },
+    crystals: { per100: 9, count: [3, 9], len: [0.1, 0.5], oreTries: 5000 },
     formations: { length: [0.2, 2.6], age: 0.5, column: 7, straws: 0.12, most: 3000 },
   },
   // Ore is for show (no mining, ever): veins on faults and joints, seams along a bed, pockets.

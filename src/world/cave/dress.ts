@@ -12,8 +12,9 @@
  */
 import { Noise, Rng, deriveSeed, lerp } from '@futuremagic/core';
 import type { CavesDef } from '../../setting/contract';
-import { jointDistance, type RockBlock } from './block';
-import { BRICK, brickIndex, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
+import { jointDistance, oreAt, type RockBlock } from './block';
+import type { Crystal, Stone } from './loose';
+import { BRICK, brickIndex, fieldAt, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
 import type { CondPoint, Conduit, Skeleton } from './skeleton';
 
 /** A formation: a body of revolution about a vertical axis from `y0` up to `y1`, `rb` wide at the bottom, `rt` at the top, `waist` the share of the mean radius in the middle. */
@@ -48,6 +49,10 @@ export interface Dressing {
   readonly streams: readonly Stream[];
   readonly pools: readonly Pool[];
   readonly rocks: readonly Rock[];
+  /** Loose stones of every size, and ore lumps in the walls (`ore` set). */
+  readonly stones: readonly Stone[];
+  /** Clusters of crystals on the walls. */
+  readonly crystals: readonly Crystal[];
   readonly stats: {
     /** Columns with head room to stand, and the share of them whose floor is level (under about 2.5 degrees). */
     readonly standable: number;
@@ -295,6 +300,79 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     if (live) drips.push({ x, y: ceil - lenT, z, floor: floor + (mayStand && lenM > 0.1 ? lenM : 0) });
   }
 
+  /** Loose stones over the floors and crystals and ore lumps in the walls. */
+  function scatter(): { stones: Stone[]; crystals: Crystal[] } {
+    const srng = new Rng(deriveSeed(block.seed, 'cave', 'scatter'));
+    const stones: Stone[] = [], crystals: Crystal[] = [], st = d.stones, sz = st.size;
+    const addStone = (x: number, y: number, z: number, r: number, ore = -1): void => {
+      stones.push({ x, y, z, r, flat: ore >= 0 ? srng.range(0.45, 0.7) : srng.range(0.55, 0.95), yaw: srng.range(0, Math.PI * 2), tone: srng.float(), ore, seed: srng.int(0, 9999) });
+    };
+    // Stones on the floors: many small, few big, against the walls more than in the middle; heaps of them.
+    const want = passagePts.length ? Math.min(st.most, Math.round(sk.stats.length / 100 * st.per100)) : 0;
+    for (let n = 0, tries = 0; stones.length < want && tries < want * 4; tries++) {
+      const { p, q } = passagePts[srng.int(0, passagePts.length - 1)], t = srng.float(), hh = wayHalf(p);
+      let r = lerp(sz[0], sz[1], srng.float() ** 4);
+      // A big stone only where the free way stays at its least.
+      if (r > 0.3 && hh - r * 1.2 < half + 0.25) r = 0.3;
+      const dx = q.x - p.x, dz = q.z - p.z, l = Math.hypot(dx, dz) || 1, side = srng.sign(), off = hh * 0.92 * side * (srng.chance(0.3) ? srng.float() * 0.6 : 0.55 + 0.45 * srng.float() ** 0.6);
+      const x = lerp(p.x, q.x, t) - dz / l * off, z = lerp(p.z, q.z, t) + dx / l * off, c = chan[col(x) + nx * row(z)];
+      if (c < 0.25 && r > 0.15) continue;
+      const sp = spanAt(x, lerp(p.y, q.y, t) - lerp(p.B + p.D, q.B + q.D, t) + 1, z);
+      if (!sp || sp[1] - sp[0] < head + r) continue;
+      addStone(x, sp[0] + r * 0.3, z, r); n++;
+      if (srng.chance(st.heaps)) for (let k = srng.int(2, 6); k > 0; k--) {
+        const a = srng.range(0, Math.PI * 2), rr = r * srng.range(1.1, 3), hx = x + Math.cos(a) * rr, hz = z + Math.sin(a) * rr, hs = spanAt(hx, sp[0] + 1, hz), r2 = r * srng.range(0.25, 0.85);
+        if (hs && hs[1] - hs[0] >= head + r2 && chan[col(hx) + nx * row(hz)] > 0.25) addStone(hx, hs[0] + r2 * 0.3, hz, Math.max(sz[0], r2));
+      }
+    }
+    for (const v of sk.voids) for (let k = srng.int(15, 40); k > 0; k--) {
+      const a = srng.range(0, Math.PI * 2), rr = Math.sqrt(srng.float()) * 0.9, u = Math.cos(a) * rr * v.rx, w = Math.sin(a) * rr * v.rz, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
+      const x = v.x + u * cy - w * sy, z = v.z + u * sy + w * cy, r = lerp(sz[0], sz[1] * 1.8, srng.float() ** 3), hs = spanAt(x, v.floor + 1, z);
+      if (hs && hs[1] - hs[0] > head + r * 2 && stones.length < st.most + 400) addStone(x, hs[0] + r * 0.3, z, r);
+    }
+    // Walls: from a point in a way, look in a direction until the rock; the hit and the wall's normal.
+    const gx = (x: number, y: number, z: number) => fieldAt(f, x, y, z, -1);
+    const wallHit = (x: number, y: number, z: number, ux: number, uy: number, uz: number): [number, number, number, number, number, number] | null => {
+      let s = 0;
+      for (; s < 14; s += 0.3) if (gx(x + ux * s, y + uy * s, z + uz * s) <= 0) break;
+      if (s >= 14 || s === 0) return null;
+      let lo = Math.max(0, s - 0.3), hi = s;
+      for (let k = 0; k < 4; k++) { const m = (lo + hi) / 2; if (gx(x + ux * m, y + uy * m, z + uz * m) <= 0) hi = m; else lo = m; }
+      const hx = x + ux * hi, hy = y + uy * hi, hz = z + uz * hi, e = 0.4;
+      let nx0 = gx(hx + e, hy, hz) - gx(hx - e, hy, hz), ny0 = gx(hx, hy + e, hz) - gx(hx, hy - e, hz), nz0 = gx(hx, hy, hz + e) - gx(hx, hy, hz - e);
+      const l = Math.hypot(nx0, ny0, nz0);
+      if (l < 1e-4) return null;
+      nx0 /= l; ny0 /= l; nz0 /= l;
+      return [hx, hy, hz, nx0, ny0, nz0];
+    };
+    const dir = (): [number, number, number] => { const a = srng.range(0, Math.PI * 2), y = srng.range(-0.5, 0.8), c = Math.sqrt(1 - y * y); return [Math.cos(a) * c, y, Math.sin(a) * c]; };
+    const GEM = 4, QUARTZ = [0xdbe6ee, 0xe9d9b0, 0xd9a24a, 0xe4ecf3], ores = block.oreDef.ores;
+    // Ore showing in the wall: lumps pressed into it, and where it is gems, crystals.
+    if (block.ore.length && passagePts.length) {
+      let found = 0;
+      for (let k = 0; k < d.crystals.oreTries && found < 160; k++) {
+        const { p } = passagePts[srng.int(0, passagePts.length - 1)], [ux, uy, uz] = dir(), h = wallHit(p.x, p.y, p.z, ux, uy, uz);
+        if (!h || Math.abs(h[4]) > 0.92) continue;
+        const o = oreAt(block, h[0] - h[3] * 0.25, h[1] - h[4] * 0.25, h[2] - h[5] * 0.25);
+        if (!o) continue;
+        found++;
+        const col = ores[o - 1].color;
+        for (let m = srng.int(1, 4); m > 0; m--) addStone(h[0] + srng.range(-0.5, 0.5) - h[3] * 0.06, h[1] + srng.range(-0.4, 0.4) - h[4] * 0.06, h[2] + srng.range(-0.5, 0.5) - h[5] * 0.06, srng.range(0.07, 0.3), col);
+        if (o - 1 === GEM || srng.chance(0.25)) crystals.push({ x: h[0], y: h[1], z: h[2], nx: h[3], ny: h[4], nz: h[5], count: srng.int(d.crystals.count[0], d.crystals.count[1]), len: srng.range(d.crystals.len[0], d.crystals.len[1] * 1.2), color: o - 1 === GEM ? 0x9a6ad8 : col, seed: srng.int(0, 99999) });
+      }
+    }
+    // A crystal here and there, anywhere: quartz, calcite, now and then amber or amethyst.
+    const nCr = passagePts.length ? Math.round(sk.stats.length / 100 * d.crystals.per100) : 0;
+    for (let k = 0, tries = 0; k < nCr && tries < nCr * 30; tries++) {
+      const { p } = passagePts[srng.int(0, passagePts.length - 1)], [ux, uy, uz] = dir(), h = wallHit(p.x, p.y, p.z, ux, uy, uz);
+      if (!h || h[4] > 0.8) continue;
+      const big = srng.chance(0.08);
+      crystals.push({ x: h[0], y: h[1], z: h[2], nx: h[3], ny: h[4], nz: h[5], count: srng.int(d.crystals.count[0], d.crystals.count[1]), len: srng.range(d.crystals.len[0], d.crystals.len[1]) * (big ? 2.2 : 1), color: srng.chance(0.07) ? 0x9a6ad8 : QUARTZ[srng.int(0, QUARTZ.length - 1)], seed: srng.int(0, 99999) });
+      k++;
+    }
+    return { stones, crystals };
+  }
+
   // --- how level is the standable ground? ---
   const floors = new Float32Array(nx * nz).fill(NaN);
   let standable = 0;
@@ -308,5 +386,6 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     const h = floors[i + nx * k], hx = floors[i + 1 + nx * k], hz = floors[i + nx * (k + 1)];
     if (h === h && hx === hx && hz === hz && Math.max(Math.abs(hx - h), Math.abs(hz - h)) < 0.045 * step) level++;
   }
-  return { speleos, drips, streams, pools, rocks, stats: { standable, level: standable ? level / standable : 0, ms: timer() - t0 } };
+  const { stones, crystals } = scatter();
+  return { speleos, drips, streams, pools, rocks, stones, crystals, stats: { standable, level: standable ? level / standable : 0, ms: timer() - t0 } };
 }

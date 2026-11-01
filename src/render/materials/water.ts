@@ -7,25 +7,22 @@
  */
 import { DoubleSide, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
-  Fn, abs, atan, cameraPosition, cos, clamp, cross, dot, exp, float, frontFacing, fwidth, length, max, mix, mx_noise_float, normalize, pmremTexture,
-  positionLocal, positionWorld, pow, fract, reflect, screenUV, select, sin, floor, smoothstep, texture, varying, vec2, vec3, vec4, viewportSharedTexture, int,
+  Fn, abs, cameraPosition, clamp, cross, dot, exp, float, frontFacing, fwidth, length, max, mix, mx_noise_float, normalize, pmremTexture,
+  positionLocal, positionWorld, pow, reflect, screenUV, select, sin, floor, smoothstep, texture, varying, vec2, vec3, vec4, viewportSharedTexture, int,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
 import { HULLS, HULL_STATIONS, WATER, waterAt } from './waterInputs';
 import { WAVES, waveMotion } from '../../world/swell';
 import { WEATHER, fullSky, rainRings } from './weather';
+import { rippleSlope, streakFoam } from './waterSurface';
 import { EYE, WORLD } from '../origin';
 
 let envTex: Texture | null = null;
-/** Seconds a running water's pattern is carried before it fades back (flow map cycle). */
-const FLOW_CYCLE = 1.6;
 /** Above this height (m) still water is a lake, not the sea, and has no surf. */
 const SEA_SURF_TOP = 3;
 /** How white the wet rim at a still water's edge is (0..1). */
 const WET_RIM = 0.2;
-/** Running water's foam streaks lie along one of this many fixed directions (the two nearest the current, blended). */
-const STREAK_DIRS = 12;
 /** The sky's environment map (SkyView), before the warm-up builds the water. */
 export function useWaterEnvironment(t: Texture): void { envTex = t; }
 
@@ -80,41 +77,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     const running = smoothstep(0.05, 0.3, speed);
     const fdir = vFlow.div(max(speed, 0.001));
     const across = vec2(fdir.y.negate(), fdir.x);
-    // The current carries its pattern downstream in two layers half a cycle apart, each pulled back when it fades
-    // out (a flow map): drift that grew without end would tear the pattern apart where the speed changes.
-    const phaseA = fract(t.div(FLOW_CYCLE)), phaseB = fract(t.div(FLOW_CYCLE).add(0.5));
-    const layerB = abs(phaseA.mul(2).sub(1));
-    const carried = (ph: Node<'float'>) => speed.mul(ph.sub(0.5)).mul(FLOW_CYCLE);
-    const e = 0.04;
-    // Ripples: the slope of small waves (metres of height), finer ones faster. Still water: three octaves drifting
-    // with the wind. Running water: two, drawn out along the current (it streams in lines) and carried by it.
-    const oct: [number, number, number][] = [[0.6, 0.035, 0.35], [1.9, 0.012, 0.7], [5.2, 0.004, 1.3]];
-    const hStill = (q: Node<'vec2'>) => {
-      let sum: Node<'float'> = float(0);
-      oct.forEach(([sc, amp, sp], i) => {
-        sum = sum.add(mx_noise_float(vec3(q.add(W.wind.mul(t.mul(sp * 0.6))).mul(sc).add(i * 13.7), t.mul(sp * 0.5))).mul(amp));
-      });
-      return sum;
-    };
-    // (Carried, not turned to the current: world coordinates turned by a direction that bends across a brook
-    // swing by hundreds of metres, which tore the pattern into blocks.)
-    const hRun = (q: Node<'vec2'>, ph: Node<'float'>, seed: number) => {
-      const f = q.sub(fdir.mul(carried(ph)));
-      let sum: Node<'float'> = float(0);
-      oct.slice(0, 2).forEach(([sc, amp, sp], i) => {
-        sum = sum.add(mx_noise_float(vec3(f.mul(sc * 0.9).add(i * 13.7 + seed), t.mul(sp * 0.8))).mul(amp));
-      });
-      return sum;
-    };
-    const slopeOf = (h: (q: Node<'vec2'>) => Node<'float'>) => {
-      const h0 = h(p.xz);
-      return vec2(h0.sub(h(p.xz.add(vec2(e, 0)))), h0.sub(h(p.xz.add(vec2(0, e))))).div(e);
-    };
-    // Faster water is rougher. (Blended, not branched: an If here turned rivers opaque on WebGPU, the refraction
-    // read below lost its view of the bed.)
-    const choppy = mix(float(1.4), float(2.2), smoothstep(1.0, 3.0, speed));
-    const runSlope = mix(slopeOf((q) => hRun(q, phaseA, 0)), slopeOf((q) => hRun(q, phaseB, 5.3)), layerB).mul(choppy);
-    const rippled = mix(slopeOf(hStill), runSlope, running);
+    const rippled = rippleSlope(p.xz, { t, wind: W.wind, speed, running, fdir });
     // Raindrops ring the surface near the camera.
     const rings = rainRings(p.xz).mul(smoothstep(12.0, 50.0, camDist).oneMinus());
     const faded = rippled.mul(fade).add(rings);
@@ -166,27 +129,9 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     // Surf rolls in from the sea only: a lake has no breakers, and over its long flat shelves the bands stood still as
     // one solid white strip along the shore (gate W). The sea's surface is at 0 m, a lake's well above it.
     const surf = shore.mul(smoothstep(SEA_SURF_TOP, 0.5, p.y));
-    // Streaks: noise stretched along the flow and carried with it (in the same two layers as the ripples). Stretched
-    // along one of STREAK_DIRS fixed directions, the two either side of the current blended: turning the world
-    // coordinates by the current itself (which bends across a narrow brook) tore them into blocks.
-    const turns = atan(fdir.y, fdir.x).div(Math.PI * 2 / STREAK_DIRS), turn0 = floor(turns), turnW = fract(turns);
-    const dirAt = (k: Node<'float'>) => vec2(cos(k.mul(Math.PI * 2 / STREAK_DIRS)), sin(k.mul(Math.PI * 2 / STREAK_DIRS)));
     const sideways = dot(p.xz, across);
-    // Each layer is made foam first and then blended: blending the noise would lower its contrast mid-cycle, and the
-    // foam would pulse with the cycle instead of drifting. Streaks lie along the current; where it rushes (a steep
-    // brook, below a fall) finer churned water breaks white, carried the same way.
-    const rush = smoothstep(1.3, 3.2, speed);
-    const runFoamAlong = (d: Node<'vec2'>, ph: Node<'float'>, seed: number) => {
-      const down = dot(p.xz, d).sub(carried(ph)), sideways = dot(p.xz, vec2(d.y.negate(), d.x));
-      const streak = mx_noise_float(vec3(down.mul(0.12).add(seed), sideways.mul(1.1), t.mul(0.2))).mul(0.5).add(0.5);
-      const churn = mx_noise_float(vec3(down.mul(0.45).add(seed), sideways.mul(1.3), t.mul(0.5))).mul(0.5).add(0.5);
-      // Seen from the bank the reflected sky drowns the ripples: the streaks carry the current there.
-      return smoothstep(0.69, 0.92, streak).mul(mix(float(0.6), float(0.38), smoothstep(8.0, 60.0, camDist))).add(rush.mul(smoothstep(0.55, 0.85, churn.mul(0.7).add(streak.mul(0.4)))).mul(0.7));
-    };
-    // (One seed for both: a direction's streaks must be the same whichever side of the blend it is on, or they
-    // jump where the current turns past one of the fixed directions.)
-    const runFoam = (ph: Node<'float'>, seed: number) => mix(runFoamAlong(dirAt(turn0), ph, seed), runFoamAlong(dirAt(turn0.add(1)), ph, seed), turnW);
-    const runningFoam = mix(runFoam(phaseA, 0), runFoam(phaseB, 7.1), layerB).mul(running);
+    // Streaks and churn of fast water (waterSurface.ts, shared with the water in caves).
+    const runningFoam = streakFoam(p.xz, { t, speed, fdir, camDist }).mul(running);
     // The falling sheet: streaks stretched down the fall, rushing.
     const sheet = mx_noise_float(vec3(sideways.mul(1.4), p.y.mul(0.18).add(t.mul(3.0)), t.mul(0.4))).mul(0.35)
       .add(mx_noise_float(vec3(sideways.mul(4.0), p.y.mul(0.5).add(t.mul(6.0)), 3.1)).mul(0.15)).add(0.5);
