@@ -35,6 +35,10 @@ function play(i: number): boolean {
   const t0 = performance.now();
   const r = playEvening(parseSeed(seed), classic, { ...opts, log: (s) => console.log(`${clock(s.hour)}  ${s.what}`) });
   console.log(`${r.ok ? "passed" : "FAILED"}: ${r.cleared.length} places cleared (asked: ${r.verbs.join(", ")}${r.twists.length ? `; twists: ${r.twists.join(", ")}` : ""}${r.consequences.length ? `; consequences: ${r.consequences.join(", ")}` : ""}${r.wants.length ? `; wants: ${r.wants.join(", ")}` : ""}), ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, learned ${r.lessons.join(', ') || 'nothing'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}, level ${r.level} (${r.xp} xp)${r.spells ? `, ${r.spells} spells cast` : ''}; plays like a ${r.style ?? 'newcomer'} (challenge x${r.challengeLean.toFixed(2)}); longest overdue ${Object.entries(r.overdue).map(([n, s]) => `${n} ${(s / 60).toFixed(1)}`).join(', ')} min; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+  // Gate Q: three kinds of task, none twice in a row, a twist, a consequence and a want, all read back from the log.
+  const kinds = r.verbs.map((v) => v.split(' ')[0]);
+  const gateQ = new Set(kinds).size >= 3 && kinds.every((v, k) => k === 0 || v !== kinds[k - 1]) && r.twists.length > 0 && r.consequences.length > 0 && r.wants.length > 0;
+  if (r.ok && gateQ) console.log('gate Q: met (3+ kinds of task, none twice in a row, a twist, a consequence, a want, replayed from the log)');
   return r.ok;
 }
 

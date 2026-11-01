@@ -11,11 +11,12 @@
 import { MinHeap, Rng, deriveSeed } from '@futuremagic/core';
 import { polyCentroid, type SettlementSize, type TownBuilding } from '@futuremagic/settlement';
 import { type GuildDef, type SettingModule } from '../setting/contract';
-import { buildingOf, type Person } from '../sim/people';
+import { buildingOf, townsfolk, type Person } from '../sim/people';
 import { openWorld } from '../vgm/builder';
 import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
-import { keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
+import { endingOf, keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
+import { wantOf } from '../vgm/wants';
 import { asEnded, askDefOf, holdsKeepsake, keepsakeOf, twistOf, verbOf } from '../vgm/asks';
 import { NightWatch, nightWatchFor, watchDoor } from '../vgm/watch';
 import { hailer } from '../vgm/guide';
@@ -23,7 +24,7 @@ import { Director, NEEDS, type Need } from '../vgm/director';
 import { answerNeed } from '../vgm/toolbox';
 import { dungeonOf, settlementOf, type Decision, type DungeonDecision, type RegionDecision } from '../world/decisions';
 import { moveIn, outlineCellar, sketchCellar, type Cellar } from '../world/dungeon/cellar';
-import { marketStart, type Town } from '../world/town';
+import { marketStart, townById, type Town } from '../world/town';
 import { Character } from './character';
 import { fallClassic, gather, remainsId, type Remains } from './death';
 import type { DelveSave } from './delve';
@@ -160,6 +161,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
   // Standing in a town for the first time is a discovery (D58), as in the game.
   hero.earn(`town:${town.decision.id}`, 'town');
   const verbs: string[] = [], twists: string[] = [], consequences: string[] = [], wants: string[] = [];
+  const endings: [string, string][] = [];
   const cleared: string[] = [], bought: string[] = [], taught: string[] = [], spent: number[] = [];
   const book = new GuildBook();
   // A human hero (the creator's first people): a guild's task done is a good deed with its trainer's people (D54).
@@ -525,6 +527,7 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
       // An ending the VGM reads later (Q4): a pact's place and a sealed one stay as they are; a thief let go comes back (moveInto and leads test it).
       if (kept?.ending === 'pact' || kept?.ending === 'sealed' || kept?.ending === 'let-go') {
         consequences.push(`${kept.ending} (${lead.id})`);
+        endings.push([lead.id, kept.ending]);
         say(`the log keeps how ${name} ended: ${kept.ending}`);
       }
       // The household's people think better of the hero for it, once (D54).
@@ -637,6 +640,13 @@ export function playEvening(seed: number, setting: SettingModule, opts: EveningO
     if (shops && hero.coins > SENSIBLE_PURSE) throw new Broke(`${hero.coins} copper piled up with nothing to spend it on (at most ${SENSIBLE_PURSE})`);
     // Gate C (C9): the VGM answers every need; none stands overdue longer than OVERDUE_MOST.
     for (const n of NEEDS) if (overdue[n] > OVERDUE_MOST) throw new Broke(`${n} stood overdue ${(overdue[n] / 60).toFixed(1)} min (at most ${OVERDUE_MOST / 60})`);
+    // Gate Q: the endings and the wants met read back from the log alone (the log is the save).
+    for (const [id, ending] of endings) if (endingOf(log, id) !== ending) throw new Broke(`the log does not keep how ${id} ended (${ending})`);
+    for (const d of log) {
+      if (d.kind !== 'dungeon' || !d.ask?.want) continue;
+      const t = townById(terrain.towns, d.town), again = t ? wantOf(townsfolk(t.plan, t.decision.seed ?? seed), d) : null;
+      if (again?.person !== d.ask.want.person || again.kind !== d.ask.want.kind) throw new Broke(`the want behind ${d.id} does not replay from the log`);
+    }
     // The next lead: someone has news of a place not yet visited.
     const next = hearLead(heard);
     say(`the next lead is ${next.id}`);
