@@ -28,7 +28,7 @@ import { occupationOf } from '../vgm/leads';
 import type { DecisionLog, DungeonDecision, MoveInDecision, RetakeDecision } from '../world/decisions';
 import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh';
 import { CaveSpace, caveField, caveShell, type CaveThroat } from '../world/dungeon/caveRock';
-import { THROAT_OPENING, caveThroat, type ThroatFrame } from '../world/dungeon/caveThroat';
+import { THROAT_BEYOND, THROAT_OPENING, caveThroat, type ThroatFrame } from '../world/dungeon/caveThroat';
 import type { Portal } from '../game/portal';
 import { caveFeatures, keepSpots } from '../world/dungeon/caveFeatures';
 import { caveSeed } from '../world/dungeon/torches';
@@ -261,7 +261,7 @@ export class Cellars {
     if (!s || !m || !t || !f || !visit) return;
     const [ax, az] = onLand(m, 0, t.z), O = visit.origin;
     this.host.portal?.({
-      id: `cave:${id}`, shape: THROAT_OPENING,
+      id: `cave:${id}`, shape: THROAT_OPENING, clipBack: THROAT_BEYOND,
       a: { realm: 'land', frame: { x: ax, y: t.y + t.floor, z: az, yaw: m.yaw } },
       b: { realm: id, frame: { x: O.x + f.x, y: O.y + f.y, z: O.z + f.z, yaw: f.yaw } },
     });
