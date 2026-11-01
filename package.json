@@ -24,6 +24,7 @@
     "shot:set": "node tools/shot/set.mjs",
     "shot:set:town": "node tools/shot/set.mjs shots/set --part=town",
     "shot:set:land": "node tools/shot/set.mjs shots/set --part=land",
+    "preview:caves": "node tools/preview/formed.mjs",
     "shot:set:caves": "node tools/shot/set.mjs shots/set --part=caves",
     "shot:set:kinds": "node tools/shot/set.mjs shots/set --part=kinds",
     "shot:set:sea": "node tools/shot/set.mjs shots/set --part=sea",

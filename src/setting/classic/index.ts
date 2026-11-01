@@ -28,6 +28,7 @@ import { items, travel, upkeep, voyage } from './items';
 import { sights } from './sights';
 import { situations } from './situations';
 import { landformMix, landforms, landscapeKinds } from './landforms';
+import { caves } from './formedCaves';
 import { shops } from './shops';
 import { bard, guilds } from './guilds';
 import { abilities, director, effects, schools } from './abilities';
@@ -99,6 +100,7 @@ export const classic: SettingModule = {
   hero,
   backgrounds,
   routines,
+  caves,
   // Golden late light, a cooler blue dusk, a blue night; neutral by day (the sun's own colour does the rest).
   look: {
     grade: [

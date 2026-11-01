@@ -158,6 +158,161 @@ export interface WorldShape {
 }
 
 /**
+ * Caves that form (D63, phase K, docs/design/caves.md): every size, share and rock setting of a formed cave is a
+ * number here, so it is changed in one place. A cave is a block of rock (geology from the land's kind), a former
+ * that lets the water, the lava or the miners open it, and a carver that turns what formed into the rock field.
+ */
+export interface CavesDef {
+  /** Which rocks the land's kinds hold (by landscape kind id); a kind not listed holds no formed cave. */
+  readonly geology: readonly CaveGeologyDef[];
+  /** The rock settings: how the rock is bedded and jointed, where the water comes in and how it opens the rock. */
+  readonly rocks: readonly CaveRockDef[];
+  /** How big a cave is; the big one is about 300 m across and 60 m deep. */
+  readonly sizes: readonly CaveSizeDef[];
+  /** How the built, water and lava shares of a cave mix (Arnd: pure caves are the norm, a mixed one has two shares). */
+  readonly shares: CaveSharesDef;
+  /** What a way must allow: no squeezing, every way is at least the hero's standing size. */
+  readonly way: CaveWayDef;
+  /** The carved walls. */
+  readonly walls: CaveWallsDef;
+  /** The ore in the rock (it only shows in the walls: no mining, D63). */
+  readonly ore: CaveOreDef;
+}
+
+/** The rocks a kind of country holds (`kind` '*': any other kind), by weight. */
+export interface CaveGeologyDef {
+  readonly kind: string;
+  /** Rock setting id to weight. */
+  readonly rocks: Readonly<Record<string, number>>;
+}
+
+/** One rock setting of a solution cave: the three patterns the water leaves (branchwork, network maze, braids) come from these numbers. */
+export interface CaveRockDef {
+  readonly id: string;
+  readonly name: string;
+  /** Beds (layers): thickness and dip, how readily they dissolve, how much the water prefers the planes between them. */
+  readonly bedding: {
+    /** Thickness of one bed, metres, least and most. */
+    readonly thickness: readonly [number, number];
+    /** Dip of the beds, degrees, least and most. */
+    readonly dip: readonly [number, number];
+    /** Share of the beds that dissolve readily (the rest are hard and tight). */
+    readonly soluble: number;
+    /** How much easier the water goes along the plane between two beds, 0 (no preference) and up. */
+    readonly parting: number;
+    /** Wall colours of the beds (0xRRGGBB); each bed takes one, varied in lightness. */
+    readonly colors: readonly number[];
+  };
+  /** Joints: near-vertical cracks in sets at an angle to each other. */
+  readonly joints: {
+    readonly sets: number;
+    /** Spacing between cracks of a set, metres. */
+    readonly spacing: readonly [number, number];
+    /** The angle between the first set and each next, degrees. */
+    readonly between: readonly [number, number];
+    /** How much easier the water goes along a crack, 0 and up. */
+    readonly strength: number;
+  };
+  /** Faults: rare, long breaks. */
+  readonly faults: { readonly count: readonly [number, number]; readonly strength: number };
+  /** Where the water comes in and goes out, and how the water table dropped over time. */
+  readonly water: {
+    /** Sinks (water gets in high up), least and most. */
+    readonly sinks: readonly [number, number];
+    /** Springs (water comes out low, on the valley side), least and most. */
+    readonly springs: readonly [number, number];
+    /** Levels: stages the water table stood at, least and most (the older ones dry above the new). */
+    readonly stages: readonly [number, number];
+    /** How far the table dropped between two stages, metres. */
+    readonly drop: readonly [number, number];
+    /** How far below the table the water may loop in a tube, metres. */
+    readonly loop: number;
+  };
+  /** How the water opens the rock (the feedback of flow and width). */
+  readonly former: {
+    /** Rounds of flow and widening per stage. */
+    readonly rounds: number;
+    /** Paths found per round, each over rock whose ease is jittered: 1 gives a tree, more give braids. */
+    readonly samples: number;
+    /** How strongly width draws flow (the conductance goes with width to this power): high gives one winner, low a net. */
+    readonly feedback: number;
+    /** How much a round of full flow widens a path (a factor per round). */
+    readonly growth: number;
+    /** How much of its ease an old, now dry passage keeps when the water table has dropped (0..1): low lets the new water find its own way down. */
+    readonly reuse: number;
+    /** How uneven the rock's ease is, 0..1 (cracks, pockets); braids need it. */
+    readonly noise: number;
+    /** Least share of the water a path carries to stay a passage. */
+    readonly keep: number;
+  };
+  /** Collapse: where passages cross or span too wide, the ceiling falls (a big uneven void and a rubble heap under it). */
+  readonly collapse: {
+    /** Chance at a junction of big passages. */
+    readonly junction: number;
+    /** Half-width of a passage, metres, past which its ceiling may fall. */
+    readonly span: number;
+    /** Most voids in one cave. */
+    readonly most: number;
+  };
+}
+
+/** A size of cave: the block of rock around it. */
+export interface CaveSizeDef {
+  readonly id: string;
+  /** Side of the block, metres. */
+  readonly across: number;
+  /** Depth of the block, metres. */
+  readonly deep: number;
+  /** Relative chance. */
+  readonly weight: number;
+  /** How much its passages are scaled (a big cave has broad trunks). */
+  readonly scale: number;
+  /** Distance between nodes of the lattice the water flows on, metres (a coarser lattice for a bigger block keeps the forming quick). */
+  readonly step: number;
+  /** Distance between samples of the carved field, metres (coarser for a bigger cave: the carving and the mesh cost goes with the cube of it). */
+  readonly field: number;
+}
+
+/** Shares of a cave: built (people dug), water (a solution cave), lava (a lava tube). They add up to 1; one is usually 0. */
+export interface CaveSharesDef {
+  /** Chance of a cave with one share only (the norm), with two, with all three. They add up to 1. */
+  readonly pure: number;
+  readonly two: number;
+  readonly three: number;
+  /** How likely each share is to be among the ones present. */
+  readonly weight: { readonly built: number; readonly water: number; readonly lava: number };
+  /** The kinds of country lava caves need (none today: there is no volcanic country yet). */
+  readonly lavaOn: readonly string[];
+}
+
+/** The least size of a way (D63: no squeezing): the standing hero fits everywhere. */
+export interface CaveWayDef {
+  /** Least width of a passage at the floor, metres. */
+  readonly minWidth: number;
+  /** Least height of a passage, metres. */
+  readonly minHeight: number;
+  /** Greatest half-width of a tube, metres, at a scale of 1. */
+  readonly maxRadius: number;
+  /** Deepest a canyon is cut into its floor, metres, at a scale of 1. */
+  readonly maxCut: number;
+}
+
+/** The look of the carved walls. */
+export interface CaveWallsDef {
+  /** How the rock's walls are roughened, metres of the biggest scallop. */
+  readonly rough: number;
+}
+
+/** The ore in the rock (K8's mines follow it; in K1 to K7 it only shows). */
+export interface CaveOreDef {
+  /** Ore bodies in a block, least and most. */
+  readonly bodies: readonly [number, number];
+  /** Relative chance of a vein (steep, along a fault or joint), a seam (along a bed) and a pocket. */
+  readonly kinds: { readonly vein: number; readonly seam: number; readonly pocket: number };
+  readonly ores: readonly { readonly id: string; readonly name: string; readonly color: number; readonly weight: number }[];
+}
+
+/**
  * Islands out at sea (S7, plan 13): the sea is cut into square cells, and a share of them holds an island well off
  * any coast, a rise of the sea floor whose top stands above the water, with its own beaches and cliffs.
  */
@@ -1686,6 +1841,8 @@ export interface SettingModule {
   readonly regions?: RegionsDef;
   /** The setting's colour key over the day; without it the engine's neutral grade. */
   readonly look?: LookDef;
+  /** Caves that form (D63, phase K): rock, sizes, shares. None: only the old grid caves. */
+  readonly caves?: CavesDef;
 }
 
 /** The picture's colour key: grade keys at sun heights, sorted by `at` (warm dusk, blue night, ...). */
@@ -1826,6 +1983,37 @@ export function validateSetting(m: SettingModule): string[] {
   out.push(...validatePeoples(m, where));
   out.push(...validateRoutines(m.routines, where));
   out.push(...validateAsks(m, where));
+  if (m.caves) out.push(...validateCaves(m.caves, m.world.kinds?.map((k) => k.id) ?? [], where));
+  return out;
+}
+
+/** Formed caves (D63): the rocks their kinds name exist, the ranges run the right way, the chances add up, no way squeezes. */
+export function validateCaves(c: CavesDef, kinds: readonly string[], where: string): string[] {
+  const out: string[] = [];
+  const ids = new Set<string>();
+  const range = (r: readonly [number, number], what: string, lo = 0) => { if (!(r[0] >= lo && r[0] <= r[1])) out.push(`${where}: caves ${what} must run from least to most, from ${lo} up`); };
+  for (const r of c.rocks) {
+    if (ids.has(r.id)) out.push(`${where}: cave rock "${r.id}" defined twice`);
+    ids.add(r.id);
+    const w = `cave rock "${r.id}"`;
+    range(r.bedding.thickness, `${w} bed thickness`, 0.2); range(r.bedding.dip, `${w} dip`); range(r.joints.spacing, `${w} joint spacing`, 2);
+    range(r.joints.between, `${w} joint angle`); range(r.faults.count, `${w} faults`); range(r.water.sinks, `${w} sinks`, 1); range(r.water.springs, `${w} springs`, 1);
+    range(r.water.stages, `${w} stages`, 1); range(r.water.drop, `${w} drop`, 1);
+    if (!(r.bedding.soluble > 0 && r.bedding.soluble <= 1) || !r.bedding.colors.length) out.push(`${where}: ${w} needs a soluble share in 0..1 and bed colours`);
+    if (!(r.former.rounds >= 1 && r.former.samples >= 1 && r.former.feedback > 0 && r.former.growth > 0 && r.former.reuse >= 0 && r.former.reuse <= 1 && r.former.keep > 0 && r.former.keep < 1)) out.push(`${where}: ${w} former needs rounds, samples, feedback, growth > 0 and keep in 0..1`);
+    if (!(r.collapse.junction >= 0 && r.collapse.junction <= 1 && r.collapse.span > 0 && r.collapse.most >= 0)) out.push(`${where}: ${w} collapse is malformed`);
+  }
+  for (const g of c.geology) {
+    if (g.kind !== '*' && !kinds.includes(g.kind)) out.push(`${where}: cave geology names land kind "${g.kind}" the world has not`);
+    for (const id of Object.keys(g.rocks)) if (!ids.has(id)) out.push(`${where}: cave geology of "${g.kind}" names rock "${id}" the setting has not`);
+  }
+  if (!c.sizes.length || c.sizes.some((s) => !(s.across >= 40 && s.deep >= 20 && s.weight > 0 && s.scale > 0 && s.step >= 1.5 && s.step <= s.across / 8 && s.field >= 0.25 && s.field <= 1.5))) out.push(`${where}: cave sizes need across >= 40, deep >= 20, weight and scale > 0 and a lattice step of 1.5 m up to an eighth of the block and a field step of 0.25 to 1.5 m`);
+  const sh = c.shares;
+  if (Math.abs(sh.pure + sh.two + sh.three - 1) > 1e-6) out.push(`${where}: cave shares pure, two and three must add up to 1`);
+  const wy = c.way;
+  if (!(wy.minWidth >= 1.6 && wy.minHeight >= 2.4 && wy.maxRadius > wy.minWidth && wy.maxCut > 0)) out.push(`${where}: cave ways must fit the standing hero (width >= 1.6 m, height >= 2.4 m)`);
+  if (!(c.walls.rough >= 0 && c.walls.rough <= 1.2)) out.push(`${where}: cave wall roughness must be 0 to 1.2 m (more could close a way)`);
+  range(c.ore.bodies, 'ore bodies');
   return out;
 }
 

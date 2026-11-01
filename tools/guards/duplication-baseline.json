@@ -834,5 +834,21 @@
   {
     "key": "same name: masterworld/game/character.ts#save + masterworld/talk/townTalk.ts#save",
     "reason": "Each class writes its own save (the hero, the town talk); same word, different things."
+  },
+  {
+    "key": "idiom: [.biomeAt] in masterworld/world/canopy.ts + masterworld/world/flora.ts + masterworld/world/grass.ts",
+    "reason": "Not a copied helper: a call every user of the land's or the noise's own method makes. It crossed the finder's info floor when the formed caves (phase K) added their code to the corpus, with no change in these files."
+  },
+  {
+    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/dungeon/caveThroat.ts + masterworld/world/holdRock.ts",
+    "reason": "Not a copied helper: a call every user of the land's or the noise's own method makes. It crossed the finder's info floor when the formed caves (phase K) added their code to the corpus, with no change in these files."
+  },
+  {
+    "key": "idiom: [.fbm3] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/holdRock.ts + masterworld/world/volumes.ts",
+    "reason": "Not a copied helper: a call every user of the land's or the noise's own method makes. It crossed the finder's info floor when the formed caves (phase K) added their code to the corpus, with no change in these files."
+  },
+  {
+    "key": "idiom: [.steepness] in masterworld/vgm/answers.ts + masterworld/vgm/events.ts + masterworld/vgm/wrecks.ts",
+    "reason": "Not a copied helper: a call every user of the land's or the noise's own method makes. It crossed the finder's info floor when the formed caves (phase K) added their code to the corpus, with no change in these files."
   }
 ]

@@ -189,3 +189,9 @@ Mines can also have built locks: a grate, a door, a raised ladder.
 2. **Squeeze**: should it be in phase K, or should narrow places be climbs and swims only at first?
 3. **Size**: how big should a large cave be? The suggestion is up to about 300 m across and 60 m deep, with a cave of every kind possible near the start (a lava tube only on volcanic ground).
 4. **Order**: phase K could start now with the design work in K1 and K2 (preview only, no risk to play), next to phases D and Q.
+
+## 8. Answers and what K1 and K2 built (2026-11-01)
+
+Arnd's answers to section 7: **ore** is for show, no mining, probably never; **squeeze**: none, every way is at least the hero's standing size (2 m wide, 2.8 m high, `way` in the setting's cave data), narrow places are not part of the design; **size**: yes, the big cave about 300 m across and 60 m deep, as constants (`sizes`); **order**: K1 and K2 start now. He also gave the cave three shares (built, water, lava): usually pure, a mixed cave with two shares and one at zero (`shares`).
+
+K1 and K2 are in `src/world/cave/` (pure, seeded) with the data in `src/setting/classic/formedCaves.ts`. The former differs from 3.2 in two ways worth knowing: the water flows over an 18-neighbour lattice (3 m for a medium block, 5 m for the big one, so the forming stays quick) and each stage's springs sit on the valley face of the block, taken from the land's lowest side. Braids and mazes come from several water paths per round over rock whose ease is jittered; branchwork from one path per round and strong feedback. Open for Arnd: sea caves as water caves whose lowest level lies under the sea (recommended) or a fourth, wave-cut former.

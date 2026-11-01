@@ -110,9 +110,9 @@ export function meshField(f: AnyField, look: RockLook): BuildingMesh {
 
   /** One cube's triangles. */
   function add(P: Float32Array, N: Float32Array, I: Uint32Array): void {
-    const made = new Map<string, number>();
+    const made = new Map<number, number>();
     const vertex = (v: number, axis: number, m: number): number => {
-      const key = `${v},${axis},${m}`;
+      const key = (v * 3 + axis) * 256 + m;
       let out = made.get(key);
       if (out !== undefined) return out;
       out = pos.length / 3;
