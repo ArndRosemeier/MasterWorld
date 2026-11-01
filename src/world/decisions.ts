@@ -77,6 +77,16 @@ export interface DungeonDecision {
 }
 
 /** What a household asks about its place (D62, vgm/asks.ts): only the thing it names counts as done. */
+/**
+ * What someone wanted that a task came from (Q5): `lone`, someone living alone in their later years wants back what
+ * is left of their life together; `rival`, a trader suspects the rival of their trade (`rival`, a person id).
+ */
+export interface PromiseWant {
+  readonly person: number;
+  readonly kind: 'lone' | 'rival';
+  readonly rival?: number;
+}
+
 export interface PromiseAsk {
   /** The setting's ask (its kind). */
   readonly id: string;
@@ -91,6 +101,10 @@ export interface PromiseAsk {
   /** `parley`: the leader's terms, a price (copper) or a pact. */
   readonly terms?: 'price' | 'pact';
   readonly price?: number;
+  /** Whose want it came from (Q5): who in the household wants it, and why. */
+  readonly want?: PromiseWant;
+  /** `thief` (Q4): the earlier promise whose thief, let go, is at it again. */
+  readonly again?: string;
   /** What turns out other than told (Q3: the setting's twist id); none: as told. */
   readonly twist?: string;
   /** `watch`: whether a band comes out of the dark, and who they are (the dwellers' encounter). */

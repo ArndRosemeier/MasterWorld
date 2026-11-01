@@ -7,7 +7,8 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { AskDef, SettingModule, TwistDef } from '../setting/contract';
-import type { DecisionLog, DungeonDecision, PromiseAsk } from '../world/decisions';
+import type { DecisionLog, DungeonDecision, PromiseAsk, PromiseWant } from '../world/decisions';
+import { WANT_VERB } from './wants';
 import type { Item } from '../game/items';
 import { cap, fill } from '../talk/folk';
 
@@ -32,6 +33,8 @@ export function asksGiven(log: DecisionLog): string[] {
  * left out altogether while another fits (`askFor`).
  */
 const waited = (since: number): number => 1 + Math.min(since, 6) * 0.5;
+/** How much more the ask someone wants weighs (Q5): what people lack drives what they ask. */
+const WANT_PULL = 4;
 
 /** What fits a place: a place with dwellers or an empty one (a sight), of its kind. */
 export interface AskPlace {
@@ -41,6 +44,8 @@ export interface AskPlace {
   /** Who lives there (the lore's dweller id), if known, and their encounter (a band of them). */
   readonly dweller?: string;
   readonly encounter?: string;
+  /** What someone of the household wants (Q5): the ask it calls for weighs far more, and carries the want. */
+  readonly want?: PromiseWant | null;
 }
 
 /** The setting's asks a place fits. */
@@ -62,13 +67,15 @@ export function askFor(setting: Pick<SettingModule, 'asks' | 'twists'>, seed: nu
     return i < 0 ? given.length + 1 : given.length - 1 - i;
   };
   const rng = new Rng(deriveSeed(seed, 'vgm', 'ask', p.decision.id));
-  const odds = pool.map((x) => x.weight * waited(since(x.id)));
+  const wanted = p.want ? WANT_VERB[p.want.kind] : null;
+  const odds = pool.map((x) => x.weight * waited(since(x.id)) * (x.verb === wanted ? WANT_PULL : 1));
   const a = rng.weighted(pool, (_, i) => odds[i]!);
   const twist = twistFor(setting, seed, log, p, a);
   return {
     id: a.id,
     verb: a.verb,
     ...(twist ? { twist } : {}),
+    ...(p.want && a.verb === wanted ? { want: p.want } : {}),
     ...(a.things?.length ? { thing: rng.int(0, a.things.length - 1) } : {}),
     line: rng.int(0, a.words.told.length - 1),
     ...(a.verb === 'lost' && a.lost ? { who: rng.int(0, 9999), alive: rng.chance(a.lost.alive) } : {}),
@@ -92,6 +99,12 @@ function twistFor(setting: Pick<SettingModule, 'twists'>, seed: number, log: Dec
   const last = [...log].reverse().find((x): x is DungeonDecision => x.kind === 'dungeon' && !!x.ask?.twist)?.ask?.twist;
   const fit = (setting.twists ?? []).filter((t) => t.verbs.includes(a.verb) && t.id !== last && (t.kind === 'lied' ? !!a.things?.length : p.lived));
   return fit.length ? rng.weighted(fit, (t) => t.weight).id : null;
+}
+
+/** How a promise with ask `a` ended when its household was told (Q4): a parley's `pact` or `paid`, a breach `sealed`; none: one way only. */
+export function asEnded(a: PromiseAsk | null | undefined): string | undefined {
+  if (a?.verb === 'parley') return a.terms === 'pact' ? 'pact' : 'paid';
+  return a?.verb === 'seal' ? 'sealed' : undefined;
 }
 
 /** The setting's twist an ask carries (null: as told). */
@@ -164,6 +177,12 @@ export function holdsKeepsake(pack: readonly Item[], id: string): boolean {
  * they stay at their place. Null: the ask is about nobody of the town, or nobody fits.
  */
 export function askedOne<P extends Townsperson>(people: readonly P[], log: DecisionLog, d: DungeonDecision): P | null {
+  // A thief let go, at it again (Q4): the same one as before.
+  const before = d.ask?.again ? log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === d.ask!.again) : undefined;
+  if (before) return askedOne(people, log, before);
+  // A trader's rival (Q5): the one they suspect is the one who did it.
+  const rival = d.ask?.verb === 'thief' ? d.ask.want?.rival : undefined;
+  if (rival !== undefined) return people.find((p) => p.id === rival) ?? null;
   const w = d.ask && WHO[d.ask.verb];
   return w ? oneOf(people, log, d, w[0], w[1]) : null;
 }
@@ -183,7 +202,7 @@ function oneOf<P extends Townsperson>(people: readonly P[], log: DecisionLog, d:
   for (const x of log) {
     if (x.id === d.id) break;
     if (x.kind === 'dungeon' && x.town === d.town && x.ask?.verb === d.ask?.verb) {
-      const p = oneOf(people, log, x, own, other);
+      const p = askedOne(people, log, x);
       if (p) before.add(p.id);
     }
   }
@@ -242,6 +261,6 @@ export function askWords(setting: Pick<SettingModule, 'asks'>, ask: PromiseAsk |
     thanks: f(dead?.thanks ?? a.words.thanks),
     missing: f(a.words.missing ?? ''),
     found: f(a.lost?.found ?? ''),
-    ...(a.thief ? { thief: { accuse: f(a.thief.accuse), confess: f(a.thief.confess), catch: f(a.thief.catch), spare: f(a.thief.spare), caught: f(a.thief.caught), spared: f(a.thief.spared) } } : {}),
+    ...(a.thief ? { thief: { accuse: f(a.thief.accuse), confess: f(a.thief.confess), catch: f(a.thief.catch), spare: f(a.thief.spare), caught: f(a.thief.caught), spared: f(a.thief.spared), ...(a.thief.again ? { again: f(a.thief.again) } : {}) } } : {}),
   };
 }

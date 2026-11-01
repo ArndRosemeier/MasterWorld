@@ -883,7 +883,11 @@ export interface AskDef {
    * thief in town: `accuse` (the topic), `confess` (their answer), then `catch` or `spare` (topics) and their words
    * `caught` or `spared`. Named, caught or let go, is done; the thing goes back to the household.
    */
-  readonly thief?: { readonly accuse: string; readonly confess: string; readonly catch: string; readonly spare: string; readonly caught: string; readonly spared: string };
+  readonly thief?: {
+    readonly accuse: string; readonly confess: string; readonly catch: string; readonly spare: string; readonly caught: string; readonly spared: string;
+    /** Q4: added to the household's words when a thief let go before is at it again (`{who}`). */
+    readonly again?: string;
+  };
   readonly watch?: { readonly comes: number; readonly hours: readonly [number, number]; readonly near: number };
   readonly parley?: {
     readonly pact: number;
@@ -895,7 +899,11 @@ export interface AskDef {
   };
   readonly lost?: { readonly alive: number; readonly found: string; readonly dead: { readonly topic: string; readonly note: string; readonly thanks: string } };
   /** `missing`: what they say when told it is done but the thing is not in the hero's hands (a fetch). */
-  readonly words: { readonly told: readonly string[]; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing?: string };
+  readonly words: {
+    readonly told: readonly string[]; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing?: string;
+    /** Q5: added to what the household says when the ask came from their want (`lone`, `rival`; `{who}` the rival). */
+    readonly wants?: { readonly lone?: string; readonly rival?: string };
+  };
 }
 
 /** Items: the catalogue, the legendary ones, treasure tables, and the words for rarer finds. */

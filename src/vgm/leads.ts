@@ -10,8 +10,10 @@ import type { SettingModule } from '../setting/contract';
 import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type KeptDecision, type MoveInDecision, type RetakeDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
-import type { Town } from '../world/town';
+import { townById, type Town } from '../world/town';
 import { landKinds, loreOf, placeOf, promiseCellar, promisePlace } from './dungeons';
+import { townsfolk } from '../sim/people';
+import { wantOf } from './wants';
 import { askFor, asksGiven, CLEAR } from './asks';
 
 export const LEADS = {
@@ -97,6 +99,37 @@ export interface LeadsContext {
   readonly twists?: SettingModule['twists'];
 }
 
+/** How long (game hours) a thief let go keeps their word before they are at it again (Q4). */
+const THIEF_BACK = 24;
+
+/**
+ * How a promise ended, where it could end more than one way (Q4: the log replays it): a thief `caught`, `let-go`
+ * or the thing `given` to its rightful owners, a parley's `pact`, `paid` or `broken`, a breach `sealed`; null:
+ * not kept, or no such ending.
+ */
+export function endingOf(log: DecisionLog, promise: string): string | null {
+  return log.find((x): x is KeptDecision => x.kind === 'kept' && x.promise === promise)?.ending ?? null;
+}
+
+/**
+ * A thief let go in `d`'s town long enough ago, not yet back (Q4): the promise they were let go on. Null: none,
+ * or `d` is no place under a house.
+ */
+export function thiefBack(log: DecisionLog, d: DungeonDecision, hours: number): DungeonDecision | null {
+  if (d.site) return null;
+  const letGo = new Map<string, number>();
+  for (const x of log) if (x.kind === 'kept' && x.ending === 'let-go') letGo.set(x.promise, x.at);
+  for (const x of log) {
+    if (x.kind !== 'dungeon' || x.town !== d.town || x.ask?.verb !== 'thief') continue;
+    if (x.ask.again) letGo.delete(x.ask.again);
+  }
+  for (const [id, at] of letGo) {
+    const p = log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === id);
+    if (p && p.town === d.town && hours - at >= THIEF_BACK) return p;
+  }
+  return null;
+}
+
 /** Share of new places that lie out on the land (a barrow, a cave, a tower), when the setting has a kind none of which is open. */
 const LAND_SHARE = 0.55;
 
@@ -111,8 +144,14 @@ function asked(c: LeadsContext, d: DungeonDecision): DungeonDecision {
   if (!c.asks?.length) return d;
   const place = placeOf(d, c.towns, c.dungeons);
   if (!place) return d;
+  // A thief let go comes back (Q4): their town's next place under a house is robbed again, by them.
+  const back = thiefBack(c.log, d, c.hours), thief = back && c.asks.find((a) => a.verb === 'thief' && (!a.kinds || a.kinds.includes(d.template)));
+  if (back && thief) return { ...d, ask: { id: thief.id, verb: 'thief', line: 0, thing: (back.ask?.thing ?? 0) % Math.max(1, thief.things?.length ?? 1), who: back.ask?.who ?? 0, again: back.id } };
   const dweller = sketchCellar(d, place, loreOf({ dungeons: c.dungeons }, d.template)).dweller;
-  const ask = askFor({ asks: c.asks, twists: c.twists }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id, encounter: dweller.encounter });
+  // What the household wants, as the world simulation has them (Q5).
+  const town = townById(c.towns, d.town);
+  const want = town && !d.site ? wantOf(townsfolk(town.plan, town.decision.seed ?? c.seed), d) : null;
+  const ask = askFor({ asks: c.asks, twists: c.twists }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id, encounter: dweller.encounter, want });
   return ask ? { ...d, ask } : d;
 }
 
@@ -164,6 +203,8 @@ export function moveInto(c: LeadsContext, s: number): MoveInDecision | null {
     const now = occupationOf(c.log, d.id);
     const k = kept.find((x) => x.promise === (now?.id ?? d.id));
     if (!k || c.hours - k.at < LEADS.settle) continue;
+    // How it ended holds (Q4): a pact's dwellers still live there in peace; a breach walled up stays shut.
+    if (k.ending === 'pact' || k.ending === 'sealed') continue;
     const house = placeOf(d, c.towns, c.dungeons);
     if (!house) continue;
     const sketch = sketchCellar(d, house, loreOf(c, d.template), now ?? undefined);
