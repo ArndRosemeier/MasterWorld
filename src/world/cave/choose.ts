@@ -48,6 +48,8 @@ export function sizeFor(c: CavesDef, seed: number): CaveSizeDef {
  */
 export function sharesFor(c: CavesDef, kind: string, seed: number): CaveShares {
   const rng = new Rng(deriveSeed(seed, 'cave', 'shares')), s: CaveSharesDef = c.shares;
+  // A mine is all built (a mine that broke into a natural cave comes with the mixed caves of K8's break-throughs).
+  if (rockFor(c, kind, seed)?.mine) return { built: 1, water: 0, lava: 0 };
   const allowed: (keyof CaveShares)[] = ['built'];
   if (Object.keys(rocksOfKind(c, kind)).length) allowed.push('water');
   if (s.lavaOn.includes(kind)) allowed.push('lava');

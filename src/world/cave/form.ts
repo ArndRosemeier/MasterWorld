@@ -1,6 +1,6 @@
 /**
  * A cave formed whole (D63, phase K2; pure, runs in a worker): the rock block over a land, the former (water's solution, or
- * a lava flow's tube when the rock has `lava`, K7) and the carver, with what each took (the mesh is made apart: it is the slow part, and the game makes it per brick).
+ * a lava flow's tube when the rock has `lava` (K7), or people following ore when it has a `mine` (K8)) and the carver, with what each took (the mesh is made apart: it is the slow part, and the game makes it per brick).
  */
 import type { CaveSizeDef, CavesDef } from '../../setting/contract';
 import type { BrickField } from '../dungeon/rockMesh';
@@ -13,6 +13,7 @@ import { rockById, sizeFor } from './choose';
 import { previewLand } from './land';
 import type { Skeleton } from './skeleton';
 import { formLava } from './lava';
+import { formMine } from './mine';
 import { formSolution } from './solution';
 import { stampThroat, throatFrame } from './throat';
 
@@ -28,7 +29,7 @@ export interface FormedCave {
 export function formCave(caves: CavesDef, seed: number, rockId: string, sizeId?: string, land?: (across: number, deep: number) => CaveLand, since: () => number = Date.now, own?: CaveSizeDef): FormedCave {
   const t0 = since(), size = own ?? (sizeId ? caves.sizes.find((s) => s.id === sizeId) ?? sizeFor(caves, seed) : sizeFor(caves, seed));
   const block = rockBlock(seed, rockById(caves, rockId), size, land ? land(size.across, size.deep) : previewLand(seed, size.across, size.deep, !!rockById(caves, rockId).lava), caves.ore, size.step);
-  const t1 = since(), formed = block.rock.lava ? formLava(block, caves, size.scale, since) : formSolution(block, caves, size.scale, size.step, since), t2 = since(), field = carveSkeleton(formed, block, caves, size.field);
+  const t1 = since(), formed = block.rock.mine ? formMine(block, caves, size.scale, since) : block.rock.lava ? formLava(block, caves, size.scale, since) : formSolution(block, caves, size.scale, size.step, since), t2 = since(), field = carveSkeleton(formed, block, caves, size.field);
   // The first mouth is the way in from the land: its throat is cut as a portal's arch (K5) and the plane noted in the skeleton.
   const throat = throatFrame(field as BrickField, formed);
   if (throat) stampThroat(field as BrickField, throat, seed);
