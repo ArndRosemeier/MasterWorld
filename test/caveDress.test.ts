@@ -131,3 +131,17 @@ test('caves: the stream can be walked along: its bed is a shallow cut, not a slo
   assert.ok(tried >= 20, `${tried} stretches of stream tried`);
   assert.ok(blocked <= tried * 0.15, `${blocked} of ${tried} stretches of the stream cannot be walked along`);
 });
+
+test('caves: where a stream drops, the water is two surfaces and no sheet stands on its edge between them (seen on the GPU in a big cave: a 3 m pane across the way)', () => {
+  const stream = (y: number, x0: number) => ({ pts: [[x0, y, 0, 1.2], [x0 + 1.5, y, 0, 1.2], [x0 + 3, y, 0, 1.2]] });
+  const d = { streams: [stream(3.2, 0), stream(0, 3.4)], pools: [] } as unknown as Parameters<typeof waterMesh>[0];
+  const w = waterMesh(d, caves.dress.water.bed, caves.dress.water.poolDepth);
+  assert.ok(w.index.length > 30, 'both surfaces are there');
+  const ys = new Set<number>();
+  for (let i = 0; i < w.index.length; i += 3) {
+    const t = [0, 1, 2].map((n) => w.position[w.index[i + n] * 3 + 1]);
+    assert.ok(Math.max(...t) - Math.min(...t) < 0.4, 'a triangle of water is level');
+    ys.add(Math.round(t[0] * 10) / 10);
+  }
+  assert.ok(ys.has(3.2) && ys.has(0), `the upper and the lower surface (${[...ys].join(', ')})`);
+});
