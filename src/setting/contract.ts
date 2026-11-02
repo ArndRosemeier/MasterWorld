@@ -924,6 +924,13 @@ export const WARNING_STANCES: readonly StanceKind[] = ['guard', 'rob', 'jeer'];
 export const WARN_TURNS = ['warn', 'last', 'demand', 'jeer', 'settle', 'greet', 'yield'] as const;
 export type WarnTurn = (typeof WARN_TURNS)[number];
 
+/**
+ * What the speaker of a band says when the hero talks to it during its warning (R7): `terms` what it wants, `deal` its word once the
+ * hero agrees, `short` when the hero cannot pay. A robber's terms are a price (`{coins}` copper), a guard's a pact (the hero keeps away).
+ */
+export const TALK_TURNS = ['terms', 'deal', 'short'] as const;
+export type TalkTurn = (typeof TALK_TURNS)[number];
+
 /** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero, or the VGM knows a reason (the hero was hired against them, or killed their kin: `vgm/stance.ts`). */
 export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated', 'hired', 'kin'] as const;
 export type BreakCause = (typeof BREAK_CAUSES)[number];
@@ -939,6 +946,8 @@ export const STANCE_SPEECH: Readonly<Record<'guard' | 'rob' | 'jeer', { readonly
 export interface StanceWords {
   readonly turns: Readonly<Partial<Record<WarnTurn, readonly string[]>>>;
   readonly breaks: Readonly<Partial<Record<BreakCause, readonly string[]>>>;
+  /** What it says when the hero talks to it (only the stances that can be talked to: `StanceDef.talk`). */
+  readonly talk?: Readonly<Partial<Record<TalkTurn, readonly string[]>>>;
 }
 
 export interface StanceDef {
@@ -953,6 +962,13 @@ export interface StanceDef {
   readonly patience?: number;
   /** `jeer`: with at least this many of its band, it fights when its patience is spent (a lone one only jeers). */
   readonly many?: number;
+  /**
+   * Talking to the band during its warning (R7): `price` it names a share of the hero's purse and lets them pass once it is paid; `pact`
+   * it lets them pass on their word to keep away; none: it does not talk. The band then keeps its word until the hero strikes.
+   */
+  readonly talk?: 'price' | 'pact';
+  /** `talk: price`: the share of the hero's purse it asks, between these two (seeded by who asks and the purse). */
+  readonly toll?: readonly [number, number];
 }
 
 /**
@@ -1917,8 +1933,8 @@ export interface FactionsDef {
   readonly others: readonly FactionDef[];
   /** Each pair that is not neutral, both ways round (a faction is its own ally). */
   readonly matrix: readonly (readonly [string, string, Hostility])[];
-  /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. */
-  readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number };
+  /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. Striking a band first (R7, once per band) moves it by `first`. */
+  readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number; readonly first: number };
   /** What the one who speaks for a band says to the hero (D64), by stance: a short speech bubble, never anywhere else (rule 11). */
   readonly words: Readonly<Partial<Record<'guard' | 'rob' | 'jeer', StanceWords>>>;
 }
@@ -2148,6 +2164,8 @@ export function validateStance(c: CreatureDef, where: string): string[] {
   if (!(st.warn! > 0) || !(st.line! > 0) || st.line! >= st.warn!) out.push(`${at} stance ${st.kind} needs warn > line > 0`);
   if (st.kind === 'rob' && (!(st.close! > st.line!) || st.close! >= st.warn! || !(st.patience! > 0))) out.push(`${at} stance rob needs warn > close > line and a patience`);
   if (st.kind === 'jeer' && (!(st.many! >= 2) || !(st.patience! > 0))) out.push(`${at} stance jeer needs many (2 or more) and a patience`);
+  if (st.talk === 'price' && (!st.toll || !(st.toll[0] > 0 && st.toll[0] <= st.toll[1] && st.toll[1] <= 1))) out.push(`${at} stance talk price needs a toll of two shares, 0 < low <= high <= 1`);
+  if (st.talk !== 'price' && st.toll) out.push(`${at} has a toll without asking a price`);
   return out;
 }
 
@@ -2242,7 +2260,7 @@ export function validateFactions(m: SettingModule, where: string): string[] {
     if (!w) { out.push(`${where}: stance ${kind} has no words`); continue; }
     for (const t of need.turns) if (!w.turns[t]?.length) out.push(`${where}: stance ${kind} has no line for ${t}`);
     for (const b of need.breaks) if (!w.breaks[b]?.length) out.push(`${where}: stance ${kind} has no line for breaking on ${b}`);
-    for (const l of [...Object.values(w.turns), ...Object.values(w.breaks)].flat()) if (l.length > 60) out.push(`${where}: stance ${kind} line "${l.slice(0, 20)}…" is over 60 characters (a bubble is short)`);
+    for (const l of [...Object.values(w.turns), ...Object.values(w.breaks), ...Object.values(w.talk ?? {})].flat()) if (l.length > 60) out.push(`${where}: stance ${kind} line "${l.slice(0, 20)}…" is over 60 characters (a bubble is short)`);
   }
   return out;
 }
@@ -2333,6 +2351,8 @@ function validateFight(m: SettingModule, where: string): string[] {
     for (const a of c.attacks) if (!DAMAGE_KINDS.includes(a.kind) || !(a.time > 0)) out.push(`${where}: creature "${c.id}" attack "${a.name}" needs a known kind and time > 0`);
     if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
     out.push(...validateStance(c, where));
+    const talk = c.stance?.talk ? m.factions.words[c.stance.kind as 'guard']?.talk : undefined;
+    if (c.stance?.talk) for (const t of TALK_TURNS) if (!talk?.[t]?.length) out.push(`${where}: creature "${c.id}" can be talked to and its stance ${c.stance.kind} has no line for ${t}`);
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
   const encounter = (id: string) => m.encounters.find((e) => e.id === id);

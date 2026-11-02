@@ -147,6 +147,15 @@ export class Standing {
     return out;
   }
 
+  /** The hero struck a band of faction `id` first, in the middle of its warning or after its word (R7): counted once for each band (`key`), kept with the deeds. */
+  struckFirst(key: string, id: string): StandingChange[] {
+    const k = `first:${key}`;
+    if (this.deeds.has(k) || !this.others.find((o) => o.id === id)?.aware) return [];
+    this.deeds.add(k);
+    const c = this.change(id, this.setting.factions.kill.first);
+    return c ? [c] : [];
+  }
+
   /** Whether a deed was counted already. */
   did(key: string): boolean { return this.deeds.has(key); }
 

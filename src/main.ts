@@ -839,6 +839,7 @@ export async function start(b: Boot): Promise<void> {
       stilled: (id) => comeDown?.(id) ?? false,
       failed: (id) => failedPlace?.(id) ?? true,
       slain: (faction) => { for (const c of standing.slain(faction)) if (c.tier) notes.say(changeLine(c), 5); },
+      struckFirst: (faction, key) => { for (const c of standing.struckFirst(key, faction)) if (c.tier) notes.say(changeLine(c), 5); },
       say: (text, at) => overHead(text, at),
     };
     // The hero's fall, seen through to its end whichever fight dealt it.

@@ -61,6 +61,8 @@ export interface FightHost {
   failed(id: string): boolean;
   /** The hero killed one of this faction (D65): standing with it and with its foes moves. */
   slain(faction: string): void;
+  /** The hero struck a band of this faction first, while it was talking or after its word (R7): a deed, once per band (`key`), kept in the log. */
+  struckFirst(faction: string, key: string): void;
   /** Someone down there speaks (a parley's leader): a bubble over them while `at` gives where (null: gone). */
   say(text: string, at: () => { x: number; y: number; z: number } | null): void;
 }
@@ -75,6 +77,8 @@ export interface Arena {
   readonly enclosed: boolean;
   /** As the Director's warning names it ('this cellar'). */
   readonly place: string;
+  /** Who it is, for what the hero does to it once (the wild group's territory id, the dungeon's id); none: its place stands for it. */
+  readonly id?: string;
   /** Its danger (D29: from who lives there). */
   readonly danger: number;
   /** The promise whose household waits to hear once it is quiet and the hero has left (null: none). */
@@ -398,7 +402,10 @@ export class Encounter {
         break;
       case 'heal': this.hud.healed(); this.act('drink', 1.1); break;
       // Noticed, fleeing, slinking off spared: all seen on the creature, so nothing is said.
-      case 'warn': case 'break': this.foeSays(e.who, e); break;
+      case 'warn': case 'break':
+        this.foeSays(e.who, e);
+        if (e.kind === 'break' && e.cause === 'struck') this.host.struckFirst(e.who.def.faction, this.arena.id ?? this.arena.place);
+        break;
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
       case 'spared': this.director.met('people', 0.5); break;
       case 'killed':

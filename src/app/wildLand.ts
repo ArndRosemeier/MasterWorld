@@ -169,6 +169,7 @@ export class WildLand {
       get inside() { return g.awake && h.out(); },
       get shown() { return g.awake; },
       enclosed: false,
+      id: t.id,
       place: `the ${def?.plural ?? 'creatures'} about here`,
       danger: groupDanger(t.members, h.setting.creatures),
       // An event's band is a lead: once it is beaten and the hero moves on, the game takes it in. A foray the town fights off itself is none.

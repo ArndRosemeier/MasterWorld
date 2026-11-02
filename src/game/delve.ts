@@ -14,6 +14,7 @@ import { hoardsOf, type Hoard } from '../world/dungeon/treasure';
 import type { Character } from './character';
 import { Fight, type FightEvent, type HeroPose } from './fight';
 import { rollLoot, type Item, type Loot } from './items';
+import { foeLine } from './foeSpeech';
 import { askDefOf, askMet, holdsKeepsake, twistOf } from '../vgm/asks';
 import type { PromiseAsk } from '../world/decisions';
 
@@ -28,6 +29,8 @@ export interface DelveSave {
   readonly sealed?: boolean;
   /** A parley's end (D62): terms struck, or broken by the hero's blow (none: still to talk). */
   readonly parley?: 'struck' | 'broken';
+  /** What the hero settled with its warning band (R7): the toll paid, or their word given. */
+  readonly word?: 'paid' | 'pact';
 }
 
 /** Something within reach to search. */
@@ -72,6 +75,7 @@ export class Delve {
     for (const b of saved?.searched ?? []) this.searched.add(b);
     this.sealed = !!saved?.sealed;
     this.parley = saved?.parley ?? null;
+    this.den.word = saved?.word ?? null;
     this.fresh = !saved;
     // The fallen not yet searched still carry what they had (rolled from their own seed).
     for (const c of this.den.creatures) if (c.state === 'dead' && !this.searched.has(c.id)) this.fight.restoreBody(c);
@@ -158,7 +162,8 @@ export class Delve {
    */
   speak(): ParleyWord | null {
     const p = askDefOf(this.setting, this.asked ?? undefined)?.parley, a = this.asked;
-    if (!p || !a?.terms || !this.talking) return null;
+    if (!this.talking) return this.bandSpeak();
+    if (!p || !a?.terms) return null;
     const price = a.price ?? 0;
     const fill = (t: string) => t.replaceAll('{coins}', `${price} copper`);
     if (!this.heard) { this.heard = true; return { kind: 'terms', text: fill(p.terms[a.terms]) }; }
@@ -170,6 +175,16 @@ export class Delve {
     this.makePeace();
     return { kind: 'struck', text: fill(p.struck[a.terms]) };
   }
+
+  /** The hero talks to the band that warns them (R7): its terms, then the deal (the price leaves the purse), or the short answer. */
+  private bandSpeak(): ParleyWord | null {
+    const t = this.den.parley(this.hero.coins);
+    if (!t) return null;
+    if (t.turn === 'deal') this.hero.coins -= t.coins;
+    const line = foeLine(this.setting, t.who.def, t.turn, t.who.id, this.said++);
+    return line ? { kind: t.turn === 'deal' ? 'struck' : t.turn, text: line.replaceAll('{coins}', `${t.coins} copper`) } : null;
+  }
+  private said = 0;
 
   /** What the promise asks is done (D62): only the thing it names counts (beaten, the keepsake in hand, the lost one found). */
   get met(): boolean {
@@ -202,6 +217,9 @@ export class Delve {
       const d = near(k.x, k.y, k.z) - (SPEAK - REACH);
       if (d < bd) { bd = d; best = { kind: 'chief', who: k, x: k.x, y: k.y, z: k.z, name: `the ${k.def.name}` }; }
     }
+    // Else a band that warns the hero and can be talked to (R7), from where it stands.
+    const h = best ? null : this.den.hail();
+    if (h) best = { kind: 'chief', who: h, x: h.x, y: h.y, z: h.z, name: `the ${h.def.name}` };
     // A seal's breach still open: walled up from before it (it stands in the wall: reach it from further off).
     const b = this.breach;
     if (b && !this.sealed && this.ask?.verb === 'seal') {
@@ -249,6 +267,7 @@ export class Delve {
       opened: [...this.opened],
       ...(this.sealed ? { sealed: true } : {}),
       ...(this.parley ? { parley: this.parley } : {}),
+      ...(this.den.word ? { word: this.den.word } : {}),
     };
   }
 }
