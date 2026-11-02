@@ -339,7 +339,7 @@ export class Encounter {
     const stance = this.player.stance;
     const swinging = stance.action && this.player.hero ? this.player.hero.clock - stance.action.t0 < stance.action.dur : false;
     this.player.stance = { combat: fighting > 0 || this.fight.attacking, action: swinging ? stance.action : undefined };
-    this.hud.follow(this.fight, this.hero, this.near ? `${PROMPT[this.near.kind]} ${this.near.name}` : null);
+    this.hud.follow(this.fight, this.hero, this.near ? `${PROMPT[this.near.kind]} ${this.near.name}` : null, pose);
   }
 
   /** What the Director watches (plan 4.3): who fights the hero, and how much danger knows of them. */
