@@ -90,7 +90,7 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     id: 'wolf', name: 'wolf', plural: 'wolves', body: { kind: 'beast', species: 'wolf', length: 1.15, color: '#6e665a' },
-    health: 26, armour: 0, defence: 26, speed: 7.5, senses: { sight: 26, hearing: 34 }, faction: 'predators', temper: 'hostile', stalks: { from: 10, secs: 4.5, burst: 1.7, seen: 0.12 }, morale: 0.5, pack: true, role: 'melee', danger: 6,
+    health: 26, armour: 0, defence: 26, speed: 7.5, senses: { sight: 26, hearing: 34 }, faction: 'predators', temper: 'hostile', stalks: { from: 10, secs: 3.5, burst: 1.7, seen: 0.2 }, morale: 0.5, pack: true, role: 'melee', danger: 6,
     attacks: [{ name: 'bite', damage: [3, 7], kind: 'bite', reach: 0.7, time: 1.3, prowess: 30 }],
     loot: 'wolf', tell: 'A howl, far off, and then another, nearer.',
   },
