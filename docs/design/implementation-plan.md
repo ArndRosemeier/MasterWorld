@@ -274,6 +274,21 @@ Built (2026-11-02, MW #515 to #522, gate fixes #526 and #528): R1 to R8; the loo
 
 Gate R: in the loop check's natural runs, every fight with a humanoid that is not mindless or murderous starts after a warning, from standing, or with a known reason in the log. The loop check also sees creatures fight creatures and a town fight off creatures. GPU shots of a smugglers' warning, a holdup on the road, a band that knows the hero, a band backing off, wolves hunting deer, and the watch with townsfolk in a street fight. F2 holds, Arnd looks at the shots, and the review is written.
 
+### Phase M: The leak from the first world (Arnd, 2026-11-02, D67; design talk ongoing)
+
+Goal: the first world's leak is seen in the land. Bright growth spreads from cracks, and creatures that eat it change. Giant versions of the established creatures roam far out. The design is in [plague.md](plague.md); the steps below are a proposal until Arnd closes its open questions. Deform is built in Actors (the source for creatures). PR lines read `PLAN: M1 deform`.
+
+| Step | Delivers | Done when | Design |
+|---|---|---|---|
+| M1 | **Deform in Actors, the giant recipe**: a seeded recipe with a strength, applied to bones (square-cube proportions), skin (detail kept sharp, scars, age) and movement (slower clips, heavier steps), for generated people and library animals; built off the render path; one shared skin material | An Actors release with tests (the same seed gives the same body; strength 0 changes nothing); a GPU sheet of a giant wolf, boar and deer beside the normal ones | plague.md 3 |
+| M2 | **Giants in the world**: giant kinds of the established creatures in the setting (their own danger and loot), placed far out and deep by danger (D29), kept to open land and big caves | Tests: giants appear only past their danger and never in cellars; the loop check meets one; a GPU shot | plague.md 4.7, D29 |
+| M3 | **Deform, the plague recipe**: uneven bones, growths, first-world colours spreading with strength, and the twist layer over the normal clips (crooked joints, a limp, twitches) | An Actors release with tests; a GPU sheet of a deer and a wolf at three strengths, and a walking clip twisted | plague.md 3 |
+| M4 | **Cracks and the bright growth**: cracks seeded with the land (few, the first far enough out), the shimmer, the origin area, colourful first-world plants that spread over days of world time (seeded, saved), and strays as small creatures | Tests: the growth spreads only over world time and is the same for the same seed; the minimap marks a crack once seen (D66); GPU shots of a crack and a bright patch | plague.md 4.1 to 4.3 |
+| M5 | **Mutation and spread**: taint from eating (grazers from plants, hunters from strays and tainted prey), Deform strength from taint, the blighted faction hostile to all (D65), blighted creatures wandering out and carrying seeds to new patches | Tests: a herd near a crack grows tainted over days; a blighted wolf leaves its territory; a new patch starts where it went; the loop check meets a blighted creature far from a crack | plague.md 4.4, 4.5 |
+| M6 | **People tell it**: herders, hunters and the innkeeper speak of what they have seen, more and surer near the plague; a scholar in the capital knows what the cracks are. Built with the dialog work | Tests: talk near a bright area speaks of it, far away only rumours; the scholar's knowledge is there | plague.md 5, 7 |
+
+Gate M: GPU shots of a giant beside its normal kind, a crack with its bright growth, a twisted deer and wolf moving, and a blighted creature far from any crack; F2 and F3 hold with many deformed creatures in view; Arnd's eye; the review.
+
 ### Parked: dialog needs a lot of love (Arnd, 2026-10-31)
 
 Talk with NPCs works but does not read well yet. Arnd: "The dialog is not good yet anyways. Lets park that for now but put it in the plan. Dialog needs a lot of love." It is planned in detail when Arnd opens it, after phase Q. Already seen:
