@@ -74,12 +74,14 @@ interface Shown {
 const yawOf = (dir: number) => Math.atan2(-Math.cos(dir), -Math.sin(dir));
 
 /** How each beast of the land is grown: a hunter's lean build, a grazer's long legs and neck, a rooting brute. */
-const BEAST: Record<'wolf' | 'deer' | 'boar' | 'crab' | 'shark', { role: CritterRole; integument: Integument; plan?: BodyPlan }> = {
+const BEAST: Record<'wolf' | 'deer' | 'boar' | 'crab' | 'shark' | 'elk' | 'turtle', { role: CritterRole; integument: Integument; plan?: BodyPlan }> = {
   wolf: { role: 'hunter', integument: 'fur' },
   deer: { role: 'grazer', integument: 'fur' },
   boar: { role: 'brute', integument: 'hide' },
   crab: { role: 'brute', integument: 'chitin', plan: 'crab' },
   shark: { role: 'hunter', integument: 'hide', plan: 'serpent' },
+  elk: { role: 'grazer', integument: 'fur' },
+  turtle: { role: 'brute', integument: 'chitin' },
 };
 
 /** The animal a rat, spider or beast is (one species per creature kind, from the seed). */
@@ -125,7 +127,7 @@ export class CreatureView {
       const b = c.def.body;
       let body: Body;
       // The wild's beasts are Actors' animals (render/dungeon/animals.ts).
-      const animal = b.kind === 'beast' ? await animalBody(b.species, deriveSeed(seed, 'animal', c.id), renderer) : null;
+      const animal = b.kind === 'beast' ? await animalBody(b.species, deriveSeed(seed, 'animal', c.id), renderer, undefined, b.giant) : null;
       if (b.kind === 'humanoid') {
         const ch = await person();
         await ch.set(foeLook(c.def, seed, c.id));
@@ -220,8 +222,10 @@ export class CreatureView {
           : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
         const doing = s.look.pick(dt, want, dead || blowT < 1 || hurtT < 1) as AnimalDoing;
         poseAnimal(s.body, X, Y, Z, yaw, doing, speed, dt, fresh);
-        if (!dead) joltRoot(s.body.place, s.jolt, 0.14, 0.14);
-        if (!dead) limp(s.body.place, lame, s.walked, 1.3, 1, moving);
+        // A giant's blow-back and limp are a giant's: its stride and size, not a wolf's (the tilt stays small, a heavy body tips less).
+        const big = c.def.body.kind === 'beast' && c.def.body.giant ? Math.max(1, c.def.body.length / 1.5) : 1;
+        if (!dead) joltRoot(s.body.place, s.jolt, 0.14 * big, 0.14 / Math.sqrt(big));
+        if (!dead) limp(s.body.place, lame, s.walked, 1.3 * big, big, moving);
       } else if (s.body.kind === 'critter') {
         const i = this.input;
         // Its body pushed back from the blow, the feet planted where they stand.
@@ -302,7 +306,7 @@ export class CreatureView {
     const O = this.group.position;
     for (const s of this.shown) {
       const c = s.c;
-      const h = c.def.body.kind === 'humanoid' ? c.def.body.height * 0.6 : s.body.kind === 'animal' ? 0.55 : 0.2;
+      const h = c.def.body.kind === 'humanoid' ? c.def.body.height * 0.6 : s.body.kind === 'animal' ? Math.max(0.55, (c.def.body.kind === 'beast' ? c.def.body.length : 0) * 0.28) : 0.2;
       const px = c.x + O.x - from.x, py = c.y + h + O.y - from.y, pz = c.z + O.z - from.z;
       const along = px * dir.x + py * dir.y + pz * dir.z;
       if (along < 0) continue;
