@@ -49,18 +49,21 @@ export function encounterFor(a: EncounterAsk): Met | null {
   return { encounter: best.id, members: membersOf(best, a.seed, a.count) };
 }
 
-/** Who is in an encounter: its count (within `count` if given), the leader first, the others at random. */
+/** Who is in an encounter: its count (within `count` if given), the leader first, the others at random (a `lone` leader is not drawn again). */
 export function membersOf(e: EncounterDef, seed: number, count?: readonly [number, number]): string[] {
   const rng = new Rng(deriveSeed(seed, 'members'));
   const lo = Math.max(e.count[0], count?.[0] ?? 0), hi = Math.max(lo, Math.min(e.count[1], count?.[1] ?? Infinity));
   const n = rng.int(lo, hi), c = e.creatures;
-  return Array.from({ length: n }, (_, i) => (i === 0 ? c[0] : c[Math.min(c.length - 1, rng.int(0, c.length - 1))]));
+  const rest = e.lone && c.length > 1 ? c.slice(1) : c;
+  return Array.from({ length: n }, (_, i) => (i === 0 ? c[0] : rest[Math.min(rest.length - 1, rng.int(0, rest.length - 1))]));
 }
 
 /** An encounter's danger at its middling size, its leader and one of each other kind. */
 export function typicalDanger(setting: Pick<SettingModule, 'creatures'>, e: EncounterDef): number {
   const n = Math.round((e.count[0] + e.count[1]) / 2);
-  return groupDanger(Array.from({ length: n }, (_, i) => e.creatures[i % e.creatures.length]), setting.creatures);
+  const rest = e.creatures.slice(1);
+  const who = (i: number) => (e.lone && rest.length ? (i === 0 ? e.creatures[0] : rest[(i - 1) % rest.length]) : e.creatures[i % e.creatures.length]);
+  return groupDanger(Array.from({ length: n }, (_, i) => who(i)), setting.creatures);
 }
 
 /** The setting's encounter of this id. */

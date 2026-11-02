@@ -64,7 +64,8 @@
     "shot:hitches": "node tools/shot/hitches.mjs",
     "shot:holdfight": "node tools/shot/holdfight.mjs",
     "shot:vgm": "node tools/shot/vgm.mjs",
-    "shot:stone": "node tools/shot/stone.mjs"
+    "shot:stone": "node tools/shot/stone.mjs",
+    "shot:giants": "node tools/shot/giants.mjs"
   },
   "dependencies": {
     "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.20.0/actors-animal-0.20.0.tgz",

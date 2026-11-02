@@ -15,8 +15,9 @@ import { Group, LoopOnce, type WebGPURenderer } from 'three/webgpu';
 import { Animal } from '@actors/animal';
 import AnimalWorker from '../../workers/animal.worker?worker';
 import { loadLibraryAnimal, type LibraryAnimal, type ThreeActor } from '@actors/three';
-import { LIBRARY_KINDS, libraryClip, type AnimalDoing, type LibraryKind } from '../libraryAnimals';
+import { LIBRARY_KINDS, giantPlan, libraryClip, type AnimalDoing, type LibraryKind } from '../libraryAnimals';
 import { hash2f } from '@futuremagic/core';
+import { deformCoat, deformRanges, deformShape } from '@actors/animal';
 import { furActor, gaitPace } from '../furAnimal';
 
 export type { AnimalDoing };
@@ -101,6 +102,20 @@ export const ANIMAL_KINDS: Partial<Record<string, Kind>> = {
     clips: {},
     pace: { walk: 2, run: 5.5 },
   },
+  // The giant elk (M2): the library's elk, else a big red deer (the deer pack) with a heavy neck.
+  elk: {
+    library: LIBRARY_KINDS.elk,
+    pack: 'deer', preset: 'red',
+    clips: { idle: 'idle', alert: 'idle2', feed: 'eat', walk: 'walk', run: 'gallop', blow: 'kick', hurt: 'hit', dead: 'death' },
+    pace: { walk: 1.7, run: 9 },
+    shape: { size: 1.45, legs: 1.1, neckThick: 0.7 },
+  },
+  // The giant turtle (M2): the library's tortoise where the build has it, else grown.
+  turtle: {
+    library: LIBRARY_KINDS.turtle,
+    clips: {},
+    pace: { walk: 0.8, run: 1.6 },
+  },
   deer: {
     library: LIBRARY_KINDS.deer,
     pack: 'deer', preset: 'red',
@@ -161,11 +176,15 @@ export async function shelvedAnimal(id: string): Promise<LibraryAnimal | null> {
   return (await libraryShelf()).has(id) ? loadLibraryAnimal(id, { baseUrl: LIBRARY }) : null;
 }
 
-/** One animal of a species (`wolf`, `deer`); a little bigger or smaller by `seed`; `preset` over the kind's own. */
-export async function animalBody(species: string, seed: number, renderer: WebGPURenderer, preset?: string): Promise<AnimalBody | null> {
+/**
+ * One animal of a species (`wolf`, `deer`); a little bigger or smaller by `seed`; `preset` over the kind's own. `giant`: the strength of
+ * the giant recipe (Actors' Deform): a body grown, not scaled, drawn `plan.scale` times the kind's size, its gait slow.
+ */
+export async function animalBody(species: string, seed: number, renderer: WebGPURenderer, preset?: string, giant?: number): Promise<AnimalBody | null> {
   const def = ANIMAL_KINDS[species];
   if (!def) return null;
   const size = 0.92 + hash2f(seed, 1, 7) * 0.16;
+  const plan = giantPlan(giant, seed);
   if (def.library && !preset) {
     const ids = def.library.ids;
     const id = ids[Math.floor(hash2f(seed, 2, 9) * ids.length) % ids.length];
@@ -174,7 +193,8 @@ export async function animalBody(species: string, seed: number, renderer: WebGPU
       const place = new Group();
       place.name = species;
       place.add(lib.object);
-      lib.object.scale.setScalar((def.library.scale ?? 1) * size);
+      lib.object.scale.setScalar((def.library.scale ?? 1) * size * (plan?.scale ?? 1));
+      lib.setDeform(plan);
       return { kind: 'animal', place, actor: null, animal: null, lib, def, doing: '' };
     }
   }
@@ -186,7 +206,10 @@ export async function animalBody(species: string, seed: number, renderer: WebGPU
   if (def.shade) animal.params = { shape: animal.shape, coat: shaded(animal.coat as Record<string, unknown>, ...def.shade) };
   const shape = animal.shape as { size?: number };
   if (typeof shape.size === 'number') shape.size *= size;
+  // A giant: the proportions and the old coat on the generated animal; the body is grown by the plan's scale below.
+  if (plan) animal.params = { shape: deformShape(animal.shape, plan, deformRanges(animal.kind)), coat: deformCoat(animal.coat, plan) };
   const { actor, place } = await furActor(animal, renderer, species);
+  if (plan) place.scale.setScalar(plan.scale);
   return { kind: 'animal', place, actor, animal, lib: null, def, doing: '' };
 }
 
@@ -243,7 +266,7 @@ export function poseLibrary(b: { doing: AnimalDoing | '' }, lib: LibraryAnimal, 
   const a = lib.currentAction;
   if (a) {
     const own = (doing === 'walk' || doing === 'run') && b.doing === doing ? lib.speedOf(a.getClip().name) * lib.object.scale.x : 0;
-    a.timeScale = own > 0 ? Math.min(1.6, Math.max(0.5, speed / own)) : 1;
+    a.timeScale = own > 0 ? Math.min(1.6, Math.max(0.5, speed / own)) : lib.gaitRate;
   }
   lib.update(dt);
 }
