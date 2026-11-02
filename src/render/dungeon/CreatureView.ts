@@ -239,12 +239,12 @@ export class CreatureView {
         s.body.fig.animate(i, dt, hurtT < 1 ? 1 - hurtT : 0);
       } else {
         const p = s.body;
-        const fighting = c.state === 'fight' || c.state === 'alert';
+        const fighting = c.state === 'fight' || c.state === 'alert' || c.armed;
         const doing: FoeDoing = {
           dead, speed: Math.hypot(vx, vz), fighting,
           low: c.act === 'beg' ? 'beg' : c.act === 'rummage' || c.act === 'gnaw' ? 'rummage' : null,
           action: dead ? null : blowT < 1 ? (c.def.body.kind === 'humanoid' && c.def.body.held === 'knife' ? 'stab' : c.def.body.kind === 'humanoid' && c.def.body.held ? 'swing_1h' : 'slam') : hurtT < 1 ? 'flinch' : null,
-          variant: s.variant,
+          variant: s.variant, signal: c.signal,
         };
         const clip = s.look.pick(dt, foeClip(c.def, doing), dead || !!doing.action);
         // A blow or flinch starts again when a new one comes, even of the same clip.

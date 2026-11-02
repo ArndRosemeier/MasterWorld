@@ -913,6 +913,30 @@ export type StanceKind = (typeof STANCE_KINDS)[number];
 /** The kinds that warn before they fight (a bar's warning belongs to the hold). */
 export const WARNING_STANCES: readonly StanceKind[] = ['guard', 'rob', 'jeer'];
 
+/**
+ * What a warning band says (D64): `warn` its first word (a guard's challenge, a robber's halt), `last` the final one, `demand` a robber's
+ * price, `jeer` a goblin's jibe, `settle` giving way once the hero has gone back, `greet` its word to a friend.
+ */
+export const WARN_TURNS = ['warn', 'last', 'demand', 'jeer', 'settle', 'greet'] as const;
+export type WarnTurn = (typeof WARN_TURNS)[number];
+
+/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero. */
+export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated'] as const;
+export type BreakCause = (typeof BREAK_CAUSES)[number];
+
+/** What each warning stance says, and the ways its warning ends (the lines the setting must give). */
+export const STANCE_SPEECH: Readonly<Record<'guard' | 'rob' | 'jeer', { readonly turns: readonly WarnTurn[]; readonly breaks: readonly BreakCause[] }>> = {
+  guard: { turns: ['warn', 'last', 'settle', 'greet'], breaks: ['line', 'struck', 'hated'] },
+  rob: { turns: ['warn', 'demand', 'settle', 'greet'], breaks: ['line', 'struck', 'hated', 'patience'] },
+  jeer: { turns: ['jeer', 'settle', 'greet'], breaks: ['line', 'struck', 'hated', 'many', 'frail'] },
+};
+
+/** The lines of one stance: a pool for each turn it speaks (one picked, seeded) and for each way its warning ends. */
+export interface StanceWords {
+  readonly turns: Readonly<Partial<Record<WarnTurn, readonly string[]>>>;
+  readonly breaks: Readonly<Partial<Record<BreakCause, readonly string[]>>>;
+}
+
 export interface StanceDef {
   readonly kind: StanceKind;
   /** Warning kinds: it speaks to a hero this near (m) once it has noticed them. */
@@ -1891,6 +1915,8 @@ export interface FactionsDef {
   readonly matrix: readonly (readonly [string, string, Hostility])[];
   /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. */
   readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number };
+  /** What the one who speaks for a band says to the hero (D64), by stance: a short speech bubble, never anywhere else (rule 11). */
+  readonly words: Readonly<Partial<Record<'guard' | 'rob' | 'jeer', StanceWords>>>;
 }
 
 export interface SettingModule {
@@ -2207,6 +2233,13 @@ export function validateFactions(m: SettingModule, where: string): string[] {
     seen.add(key);
   }
   if (!(f.kill.own < 0 && f.kill.foes > 0 && f.kill.upTo > 0)) out.push(`${where}: factions.kill needs own below 0, foes and upTo above 0`);
+  for (const kind of ['guard', 'rob', 'jeer'] as const) {
+    const need = STANCE_SPEECH[kind], w = f.words[kind];
+    if (!w) { out.push(`${where}: stance ${kind} has no words`); continue; }
+    for (const t of need.turns) if (!w.turns[t]?.length) out.push(`${where}: stance ${kind} has no line for ${t}`);
+    for (const b of need.breaks) if (!w.breaks[b]?.length) out.push(`${where}: stance ${kind} has no line for breaking on ${b}`);
+    for (const l of [...Object.values(w.turns), ...Object.values(w.breaks)].flat()) if (l.length > 60) out.push(`${where}: stance ${kind} line "${l.slice(0, 20)}…" is over 60 characters (a bubble is short)`);
+  }
   return out;
 }
 

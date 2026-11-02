@@ -740,10 +740,6 @@
     "reason": "Shared idiom, not a copy."
   },
   {
-    "key": "same name: masterworld/sim/creatures.ts#step + masterworld/vgm/watch.ts#step",
-    "reason": "Shared idiom, not a copy."
-  },
-  {
     "key": "same name: masterworld/sim/livestock.ts#step + masterworld/vgm/watch.ts#step",
     "reason": "Shared idiom, not a copy."
   },

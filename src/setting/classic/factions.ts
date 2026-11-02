@@ -36,4 +36,47 @@ export const factions: FactionsDef = {
     ...['smugglers', 'bandits', 'goblins', 'cutthroats', 'predators', 'prey', 'vermin', 'beasts'].map((f) => ['undead', f, 'hostile'] as const),
   ],
   kill: { own: -8, foes: 3, upTo: 14 },
+  words: {
+    guard: {
+      turns: {
+        warn: ['Hold there, stranger. This is no road for you.', 'You are a long way from anywhere you belong.', 'Turn back. There is nothing here for you.', 'Easy now. Keep your distance.'],
+        last: ['One more step and we cut you down.', 'Last warning. Go back.', 'I said stay out. I will not say it again.'],
+        settle: ['That is right. Keep walking.', 'Wise. Go on your way.', 'Good. Forget you saw us.'],
+        greet: ['Ah, it is you. Pass, friend.', 'Go on through. We never saw you.'],
+      },
+      breaks: {
+        line: ['That is far enough!', 'You were told!', 'Get him!'],
+        struck: ['He struck first! Get him!', 'Blood! Cut him down!'],
+        hated: ['It is you! You have spilled our blood!', 'That face! Kill him!'],
+      },
+    },
+    rob: {
+      turns: {
+        warn: ['Halt, traveller!', 'Stop right there!', 'Not so fast, friend!'],
+        demand: ['Your purse, or your life.', 'Hand over your coin and walk on.', 'Pay up, and nobody bleeds.'],
+        settle: ['Off with you, then.', 'Run along. Not worth the trouble.', 'Go on, we have no quarrel.'],
+        greet: ['Well met, friend. The road is yours.', 'Ha! You. Go on, no toll for you.'],
+      },
+      breaks: {
+        line: ['Too close! Take him!', 'He means trouble! Cut him!'],
+        struck: ['He drew on us! Kill him!', 'You will pay for that in blood!'],
+        hated: ['You! You killed our own! Get him!', 'That is the one who cut down our friends!'],
+        patience: ['Then we take it from your corpse!', 'Wrong answer! Get him, lads!'],
+      },
+    },
+    jeer: {
+      turns: {
+        jeer: ['Big one come! Snik cut him!', 'Pretty boots! Give-give!', 'Ha! Tall fool! Tall fool!', 'Go back! This our hole!', 'Smell him! He smell of soap!'],
+        settle: ['Run-run! Hee! He run!', 'Scared! Big one scared!'],
+        greet: ['Friend! Friend come! No hurt!', 'Hee, friend! Pass-pass!'],
+      },
+      breaks: {
+        line: ['Too near! Cut him!', 'Get him! Get him!'],
+        struck: ['He hit! He hit Snik! Get him!', 'Kill-kill! He hit us!'],
+        hated: ['It him! It him that kill us! Get him!', 'The killer! Kill the killer!'],
+        many: ['Many! We many! Get him!', 'Enough talk! Cut him!'],
+        frail: ['He hurt! He weak! Get him!', 'Bleeding! Kill him now!'],
+      },
+    },
+  },
 };
