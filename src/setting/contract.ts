@@ -1041,6 +1041,8 @@ export interface CreatureDef {
   readonly defence: number;
   /** Running speed, m/s. */
   readonly speed: number;
+  /** Walks the bottom of water this deep (m), not swimming: a crab sidles into the sea along the bed. Unset: it wades only a knee deep. */
+  readonly bed?: number;
   readonly attacks: readonly AttackDef[];
   /** Sees this far in the dark (m) and much farther by the hero's light; hears a running hero this far. */
   readonly senses: { readonly sight: number; readonly hearing: number };

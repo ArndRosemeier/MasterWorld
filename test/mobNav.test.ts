@@ -112,3 +112,28 @@ test('anti-jitter: what is drawn follows a body that steps back and forth smooth
   assert.equal(h.pick(0.15, 'walk'), 'walk');
   assert.equal(h.pick(0.01, 'swing', true), 'swing');
 });
+
+test('mob nav: crabs do not swim, they walk the sea bed down to a swimmer\'s reach and no deeper', () => {
+  const crabs = (land: Land, x: number) => {
+    const bed = classic.creatures.find((d) => d.id === 'giant crab')!.bed!;
+    return new Den(new OpenGround(land, [{ x, z: 0, r: 0.01 }], () => null, bed), [{ creature: 'giant crab', room: 0 }], classic.creatures, 5);
+  };
+  // A sea bed sloping from the strand (x 0) down to 4 m at x 20; the surface lies at 0.
+  const slope: Land = { height: (x) => -Math.min(4, Math.max(0, x / 5)), waterDepth: (x) => Math.min(4, Math.max(0, x / 5)) };
+  const den = crabs(slope, 0), c = den.creatures[0];
+  const q = hero(30, 0);
+  rouse(den, q);
+  let deepest = 0;
+  for (let i = 0; i < 600; i++) {
+    den.step(0.1, q);
+    deepest = Math.max(deepest, slope.waterDepth(c.x, c.z));
+    assert.ok(Math.abs(c.y - slope.height(c.x, c.z)) < 0.05, `it keeps to the bed at x ${c.x.toFixed(1)} (y ${c.y.toFixed(2)})`);
+  }
+  assert.ok(deepest > 1.5, `it went down into the sea (deepest ${deepest.toFixed(2)} m)`);
+  assert.ok(deepest <= 2.2 + 1e-6, `and no deeper than its bed (${deepest.toFixed(2)} m)`);
+  // A wolf on the same ground stays on the shore.
+  const wolf = new Den(new OpenGround(slope, [{ x: 0, z: 0, r: 0.01 }]), [{ creature: 'wolf', room: 0 }], classic.creatures, 5), w = wolf.creatures[0];
+  rouse(wolf, q);
+  for (let i = 0; i < 300; i++) wolf.step(0.1, q);
+  assert.ok(slope.waterDepth(w.x, w.z) <= 0.5 + 1e-6, 'a wolf only wades');
+});

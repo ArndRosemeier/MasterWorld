@@ -67,6 +67,12 @@ const HOP = { near: 1.2, far: 4.5, up: 1.4, down: 3 } as const;
  */
 const SEA = { home: 3, shallow: 1.8, top: 0.6, bed: 0.6, cruise: 2.5, over: 0.4, rise: 0.08, float: 0.25, drift: 0.02, riding: 0.6 } as const;
 
+/** How deep a group walks the bottom of the water (m): the least of its members' `bed`, 0 if any wades only (a crab pack: the sea bed). */
+export function bedOf(members: readonly string[], defs: readonly CreatureDef[]): number {
+  const beds = members.map((m) => defs.find((d) => d.id === m)?.bed ?? 0);
+  return beds.length ? Math.min(...beds) : 0;
+}
+
 /** Open land as a den's ground: the territories are its homes; walking is straight, around water and walls. Or the sea, swum. */
 export class OpenGround implements DenGround {
   /** Where each group is gathered now: it drifts about its territory as they move on, together. */
@@ -84,9 +90,9 @@ export class OpenGround implements DenGround {
   }
 
   /** `prey`: the height (y) of the hero's feet while the hero swims, else null (a sea ground's bodies come to it). */
-  constructor(private readonly land: Land, private readonly homes: readonly { x: number; z: number; r: number }[], private readonly prey: () => number | null = () => null) {
+  constructor(private readonly land: Land, private readonly homes: readonly { x: number; z: number; r: number }[], private readonly prey: () => number | null = () => null, private readonly bed = 0) {
     this.at = homes.map((h) => ({ x: h.x, z: h.z }));
-    this.sea = homes.length > 0 && land.waterDepth(homes[0].x, homes[0].z) >= SEA.home;
+    this.sea = !bed && homes.length > 0 && land.waterDepth(homes[0].x, homes[0].z) >= SEA.home;
   }
 
   /** Where a swimmer at (x, z) keeps (y): the hero's depth, else cruising, between the surface and the bed; near `y` if given. */
@@ -155,8 +161,9 @@ export class OpenGround implements DenGround {
     const wet = this.land.waterDepth(nx, nz), here = this.land.waterDepth(x, z);
     // At sea: the water deep enough to swim in, or any way deeper; nothing else in the way.
     if (this.sea) return wet >= SEA.shallow || wet > here;
-    // Out of deep water: any way to shallower goes.
-    if (wet >= WADE && !(here >= WADE && wet < here)) return false;
+    // Out of deep water: any way to shallower goes. A bed walker goes down along the bottom, as deep as its `bed`.
+    const deep = this.bed || WADE;
+    if (wet >= deep && !(here >= deep && wet < here)) return false;
     if (this.land.blocked?.(nx, nz, r) && !this.land.blocked!(x, z, r)) return false;
     // The rise over a stride ahead (a frame's step is too short to judge a slope by).
     const ux = dx / len, uz = dz / len, s = Math.max(len, STRIDE);
@@ -170,7 +177,8 @@ export class OpenGround implements DenGround {
    * stand, any such spot. Null: nowhere worth it.
    */
   hop(from: P3, toward: P3 | null, r: number): P3 | null {
-    if (this.sea) return null;
+    // No leaping about on the bottom: a bed walker stopped at its depth gives up and goes home.
+    if (this.sea || (this.bed && this.land.waterDepth(from.x, from.z) > WADE)) return null;
     const bad = !this.open(from.x, from.z, r) || !this.free(from.x, from.y, from.z, r);
     const goal = toward ? Math.hypot(toward.x - from.x, toward.z - from.z) : 0;
     const base = toward ? Math.atan2(toward.z - from.z, toward.x - from.x) : 0;
@@ -213,7 +221,7 @@ export class OpenGround implements DenGround {
 
   private open(x: number, z: number, r: number): boolean {
     if (this.sea) return this.land.waterDepth(x, z) >= SEA.shallow;
-    return this.land.waterDepth(x, z) < 0.25 && !this.land.blocked?.(x, z, r);
+    return this.land.waterDepth(x, z) < (this.bed ? this.bed - 0.2 : 0.25) && !this.land.blocked?.(x, z, r);
   }
 }
 
@@ -246,7 +254,7 @@ export class Wilds {
 
   constructor(readonly territories: readonly Territory[], land: Land, defs: readonly CreatureDef[], dead: Readonly<Record<string, readonly number[]>> = {}) {
     this.bands = territories.map((t) => {
-      const ground = new OpenGround(land, [t]);
+      const ground = new OpenGround(land, [t], () => null, bedOf(t.members, defs));
       const den = new Den(ground, t.members.map((creature) => ({ creature, room: 0 })), defs, deriveSeed(t.seed, 'den'), dead[t.id] ?? []);
       return { territory: t, den, awake: false };
     });
