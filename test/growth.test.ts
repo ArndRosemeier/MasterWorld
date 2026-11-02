@@ -6,9 +6,8 @@ import { Character } from '../src/game/character';
 import { carryRenown, dauntsFrom, evenDanger, fightXp, levelOf, levelOfDanger, topLevel, xpToNext } from '../src/game/growth';
 import { fightBot } from '../src/game/bot';
 import { plainItem } from '../src/game/items';
-import { outlineCellar } from '../src/world/dungeon/cellar';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { cellarFight } from './fightKit';
+import { testCellars } from './testCellars';
 
 const g = classic.growth;
 const danger = (id: string) => classic.creatures.find((c) => c.id === id)!.danger;
@@ -77,7 +76,7 @@ test('growth: a foe gives experience by its danger against the level; outgrown f
 
 test('growth: a fight won gives experience; an old save\'s reputation becomes experience', () => {
   const hero = new Character(classic);
-  const c = Array.from({ length: 24 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar)).find((x) => x.dweller.id === 'goblins')!;
+  const c = testCellars(24).find((x) => x.dweller.id === 'goblins')!;
   const r = fightBot(c, classic, 3, hero, 400);
   assert.ok(r.kills > 0);
   assert.ok(hero.xp > 0, 'the goblins gave experience');

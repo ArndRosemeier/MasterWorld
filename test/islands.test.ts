@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { Terrain } from '../src/world/terrain';
 import { classic } from '../src/setting/classic/index';
-import { openWorld } from '../src/vgm/builder';
 import { SMALL } from './small';
 import { startWorld } from './frontierLand';
 import { islandFor, islandPlace, isleAt } from '../src/vgm/islands';
@@ -66,7 +65,7 @@ test('an island is promised from a harbour, told by its harbour master, sailed t
   assert.ok(isleAt(t, classic.world.islands!, place.site!.x, place.site!.z) === isle || Math.hypot(place.site!.x - isle!.x, place.site!.z - isle!.z) < isle!.r, 'on the island');
   assert.ok(t.height(place.site!.x, place.site!.z) > 0, 'on dry land');
   // Replayed from its log, the world has the same island village.
-  const again = openWorld(seed, classic, SMALL).terrain;
+  const again = startWorld({ own: true }).terrain;
   again.settleMore([r]);
   assert.deepEqual(again.town(r.id)?.decision, village.decision);
 });

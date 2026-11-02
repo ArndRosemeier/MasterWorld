@@ -12,13 +12,14 @@ import { FormedSpace } from '../src/sim/formedSpace';
 import { FormedSeen } from '../src/game/formedMap';
 import { Delve } from '../src/game/delve';
 import { Character } from '../src/game/character';
+import { testCellar } from './testCellars';
 
 const { c, ...read } = formedCave(6, 'massive');
 const field = c.field as BrickField;
 
 test('inhabit: a cave outline gets its rooms as places of the formed cave: the way in at the throat, the lair deepest, props on its floor', () => {
   for (let n = 1; n <= 6; n++) {
-    const cellar = outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
+    const cellar = testCellar(n, 'cave');
     const h = inhabit(cellar, field, read.reading, c.skeleton.throat);
     const rd = read.reading, g = cellar.graph;
     assert.equal(h.cells.length, g.rooms.length);

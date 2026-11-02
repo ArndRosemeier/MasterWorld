@@ -24,8 +24,8 @@ Because files share a process, a test file never changes what another one sees, 
 holds only caches. The start's land (seed masterworld, small drainage tiles) is built once per process and shared:
 `frontierLand()` and `startWorld()` (as `openWorld`) in test/frontierLand.ts. Its log is frozen and its terrain
 refuses `settle`, `settleMore`, `addTown` and `addRoad`; a file that settles more on it, or pushes to its log, asks
-for its own with `{ own: true }` (built from the shared first decisions, about 0.5 s instead of 2 s). Building that
-land again in each file took a quarter of all test time. `--test-timeout` holds for each test; setup at a file's top
+for its own with `{ own: true }` (built from the shared first decisions and the shared start town's plan, `Terrain.settle(log, plans)`, about 0.3 s instead of 2 s). Building that
+land again in each file took a quarter of all test time. The test cellars (`outlineCellar` under a test house) are built once per process too and frozen: `testCellar(i, template)` and `testCellars(n)` in test/testCellars.ts. `--test-timeout` holds for each test; setup at a file's top
 is not timed, so keep it small. The land's big rivers' grid costs about 2 s to build: a test that makes its own
 `Terrain` passes `SMALL` (test/small.ts) unless it needs the game's own rivers.
 
@@ -44,7 +44,7 @@ before it fails. When a warning shows up, find the cause then, not when it fails
 
 | Step | Time (Oct 2026) | Warn | Fail |
 |---|---|---|---|
-| `npm test` | ~30 s | 55 s | 70 s |
+| `npm test` | ~42 s here, ~1.4 times that on CI's runner | 55 s | 70 s |
 | `npm run variety` | ~12 s | 30 s | 5 min |
 | `npm run loop` (its runs side by side, one process each) | ~30 s | 60 s | 5 min |
 | `npm run walk:landforms` (three worlds) | ~20 s | 30 s | 5 min |

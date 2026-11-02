@@ -79,7 +79,14 @@ test('repo: layer boundaries hold', () => {
   assert.deepEqual(checkLayers(REPO, files), []);
 });
 
-test('repo: duplication matches the baseline exactly (ratchet)', () => {
-  const problems = checkDuplication(duplicationFindings(), readBaseline());
+// The ratchet in two tests (each half of the finder takes a few seconds; a test may take 5): copies and idioms, then same names.
+const isName = (key) => key.startsWith('same name:');
+test('repo: copied bodies and idioms match the baseline exactly (ratchet)', () => {
+  const problems = checkDuplication(duplicationFindings(REPO, undefined, ['copies']), readBaseline().filter((b) => !isName(b.key)));
+  assert.equal(problems.length, 0, '\n' + problems.join('\n'));
+});
+
+test('repo: same-name functions match the baseline exactly (ratchet)', () => {
+  const problems = checkDuplication(duplicationFindings(REPO, undefined, ['names']), readBaseline().filter((b) => isName(b.key)));
   assert.equal(problems.length, 0, '\n' + problems.join('\n'));
 });
