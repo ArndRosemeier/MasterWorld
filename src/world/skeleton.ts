@@ -233,14 +233,17 @@ export class Skeleton {
   }
 
   /**
-   * The nearest land well inside the biome `id` from (x, z) (the biome holds all round it, 120 m out), along a spiral walked out from
-   * there (turns 2 km apart, a step every 500 m, out to some 160 km); null if none is met. For the debug menu and checks.
+   * The nearest land well inside the biome `id` from (x, z) (the biome holding all round it, 120 m out), along a spiral walked out from
+   * there: first close (turns 2 km apart, a step every 500 m, out to some 160 km), then wide (8 km apart, a step every 4 km, out to
+   * some 1000 km: the warm biomes lie hundreds of kilometres to the south of the start, `northCooling`). Null if none is met.
+   * For the debug menu and checks.
    */
   nearestBiome(id: string, x: number, z: number): { x: number; z: number } | null {
     const k = this.shape.biomes.findIndex((b) => b.id === id);
     if (k < 0) return null;
     const out = emptySample(), is = (px: number, pz: number): boolean => this.sample(px, pz, out).biome === k;
-    return spiralFind(x, z, (px, pz) => (is(px, pz) && is(px + 120, pz) && is(px - 120, pz) && is(px, pz + 120) && is(px, pz - 120) ? { x: px, z: pz } : null), 1000, 2000, 500, 80000);
+    const inside = (px: number, pz: number) => (is(px, pz) && is(px + 120, pz) && is(px - 120, pz) && is(px, pz + 120) && is(px, pz - 120) ? { x: px, z: pz } : null);
+    return spiralFind(x, z, inside, 1000, 2000, 500, 80000) ?? spiralFind(x, z, inside, 160000, 8000, 4000, 100000);
   }
 
   /** How much of mesa country is at (x, z), 0..1. */

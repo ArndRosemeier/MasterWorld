@@ -39,7 +39,10 @@ test('go to terrain: a kind of country and a biome put the hero well inside it',
   assert.ok(terrain.skeleton.kindShare('volcanic', volcanic.at.x, volcanic.at.z) > 0.99);
   const taiga = await go('Biome: Pine forest');
   assert.equal(terrain.skeleton.sample(taiga.at.x, taiga.at.z).biome, terrain.skeleton.shape.biomes.findIndex((b) => b.id === 'taiga'));
-  assert.match((await go('Biome: Desert')).said, /^no /, 'a biome this world lacks says so');
+  // The warm biomes lie hundreds of kilometres to the south of the start (northCooling): found by the wide walk.
+  const jungle = await go('Biome: Jungle');
+  assert.equal(terrain.skeleton.sample(jungle.at.x, jungle.at.z).biome, terrain.skeleton.shape.biomes.findIndex((b) => b.id === 'jungle'));
+  assert.ok(Math.hypot(jungle.at.x - START.x, jungle.at.z - START.z) > 160_000, 'beyond the close walk');
 });
 
 test('go to terrain: a volcano of a state is stood before on the side its lava spills, facing the crater', async () => {
