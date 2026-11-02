@@ -38,6 +38,8 @@ export interface Hearing {
   conifer: number;
   /** On a ship's deck (S10). */
   aboard?: boolean;
+  /** Down in a formed cave (K5): the distance to the nearest point of a stream in it, metres (none: no stream near). */
+  stream?: number;
 }
 
 /** What to play for a hearing. */
@@ -80,6 +82,8 @@ export function soundscape(h: Hearing): Scape {
   }
   if (h.place === 'cellar') {
     add('bed/cellar', 0.8);
+    // A stream running through a cave is heard before it is seen.
+    add('bed/river-riffle', close(h.stream ?? Infinity, 1.5, 24) * 0.75);
     return { beds, muffle: null, echo: { t60: 1.1, wet: 0.3 }, day };
   }
   const wet = h.rain * (1 - h.snow);

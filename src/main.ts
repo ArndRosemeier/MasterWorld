@@ -797,6 +797,8 @@ export async function start(b: Boot): Promise<void> {
     for (const l of journal.open) if (l.id.startsWith('task:')) journal.fulfil(l.id);
     // The land the hero knows (plan 11.7): a new hero knows the town where the game begins; the rest is seen on the way or told of.
     const known = new KnownLand(save?.map);
+    // A formed cave's drips and streams in world metres, for its sounds (made once for each visit).
+    let caveHeard: { of: object; drips: [number, number, number][]; streams: [number, number, number][] } | null = null;
     // The places the hero noticed on the land (D66, K9): the log's fixed places, kept while the log has not grown.
     const noticed = new Noticed(save?.noticed);
     let noticeFor = -1, noticeSpots: NoticeSpot[] = [], noticeClock = 0;
@@ -1214,6 +1216,7 @@ export async function start(b: Boot): Promise<void> {
       weather: () => wx.shown,
       hour: () => view.sky.hour,
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
+      cave: () => { const v = visit(), f = v?.formed; if (!v || !f) return null; if (caveHeard?.of !== f) { const o = v.origin, pastOrigin = (q: readonly [number, number, number]): [number, number, number] => [q[0] + o.x, q[1] + o.y, q[2] + o.z]; caveHeard = { of: f, drips: f.sounds.drips.map(pastOrigin), streams: f.sounds.streams.map(pastOrigin) }; } return caveHeard; },
       where: () => (visit() ? { place: 'cellar', room: null } : rooms?.door ? { place: 'room', room: rooms.door.b.kind } : { place: 'land', room: null }),
       inFlight: () => player.offFoot,
       aboard: () => !!decks.ship,

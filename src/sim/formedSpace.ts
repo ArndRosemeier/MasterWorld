@@ -11,8 +11,14 @@ import type { FormedGround } from './formedGround';
 /** A room's home counts as the hero's place within this far of it (m). */
 const NEAR_HOME = 14;
 
+/** Where a formed cave drips and runs (cave metres), for its sounds (K5): the drips that fall, and points along its streams. */
+export interface CaveSounds {
+  readonly drips: readonly (readonly [number, number, number])[];
+  readonly streams: readonly (readonly [number, number, number])[];
+}
+
 export class FormedSpace extends DungeonSpace {
-  constructor(layout: ScaledLayout, readonly field: BrickField, readonly ground: FormedGround, private readonly homes: readonly { readonly x: number; readonly y: number; readonly z: number }[]) {
+  constructor(layout: ScaledLayout, readonly field: BrickField, readonly ground: FormedGround, private readonly homes: readonly { readonly x: number; readonly y: number; readonly z: number }[], readonly sounds: CaveSounds = { drips: [], streams: [] }) {
     super(layout);
   }
 

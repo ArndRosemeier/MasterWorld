@@ -544,7 +544,8 @@ export class Cellars {
     s.first = first.cellar;
     s.cellar = s.cellar === was ? first.cellar : inhabit(s.cellar, res.field, res.read.reading, throat).cellar;
     s.throat = throat ?? null;
-    return { res, space: new FormedSpace(first.cellar.layout, res.field, first.ground, first.cellar.formed!.homes) };
+    const d = res.dressing, sounds = { drips: d?.drips.map((p): [number, number, number] => [p.x, p.floor, p.z]) ?? [], streams: d?.streams.flatMap((st) => st.pts.filter((_, i) => i % 2 === 0).map((q): [number, number, number] => [q[0], q[1], q[2]])) ?? [] };
+    return { res, space: new FormedSpace(first.cellar.layout, res.field, first.ground, first.cellar.formed!.homes, sounds) };
   }
 
   /** Its dwellers now: the den, their bodies and the fight (again after a move-in). */

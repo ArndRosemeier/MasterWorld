@@ -40,6 +40,10 @@ test('soundscape: rooms, the cellar and under water', () => {
   assert.equal(inn.beds['bed/birds-meadow'], undefined);
   assert.ok(soundscape({ ...land, place: 'room', room: 'temple' }).echo.t60 > 2);
   assert.ok(soundscape({ ...land, place: 'cellar' }).beds['bed/cellar'] > 0.5);
+  // K5: a stream in a formed cave is heard from near, not from far, and a dry cave has none.
+  assert.ok(soundscape({ ...land, place: 'cellar', stream: 2 }).beds['bed/river-riffle'] > 0.6);
+  assert.equal(soundscape({ ...land, place: 'cellar', stream: 40 }).beds['bed/river-riffle'], undefined);
+  assert.equal(soundscape({ ...land, place: 'cellar' }).beds['bed/river-riffle'], undefined);
   const under = soundscape({ ...land, under: true });
   assert.deepEqual(Object.keys(under.beds), ['bed/underwater']);
   assert.ok(under.muffle !== null && under.muffle < 1000);
