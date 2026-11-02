@@ -4,6 +4,8 @@
  * so tests check it against Actors' catalogue (@actors/animal/library) and tools/packs/library.mjs reads the ids.
  */
 
+import { deriveSeed } from '@futuremagic/core';
+import { deform, type DeformPlan } from '@actors/core';
 import type { BirdDoing } from '../sim/birdFlight';
 import type { OtterDoing } from '../sim/otterSwim';
 
@@ -41,6 +43,17 @@ export const LIBRARY_KINDS = {
     // Red deer: a stag to every two hinds (one rig, so the same clips).
     ids: ['red-deer-male', 'female-deer', 'female-deer'],
     clips: { idle: ['Idle'], alert: ['Idle_2', 'Idle_Idle_02', 'Idle_Breathing_01'], feed: ['Idle_Eating', 'Idle_Eating_01'], walk: ['Walk'], run: ['Sprint', 'Run'], hurt: ['Hit_Stand_L01'], dead: ['Death_Stand_R01'] },
+  },
+  elk: {
+    // The giant elk's body (M2, Deform "giant"): WildMesh3D's elk, on the red deer's rig B (so the deer's clips, here under their elk names).
+    ids: ['elk'],
+    clips: { idle: ['Idle'], alert: ['Idle_Breathing_01', 'Idle'], feed: ['Food_Eating_01_Wolf'], walk: ['Walk'], run: ['Run', 'Sprint'], hurt: ['Hit_Idle_L01'], dead: ['Death_Idle_R01'] },
+  },
+  turtle: {
+    // The giant turtle's body (M2, Deform "giant"): a stylized tortoise (0.85 m at scale 1) that draws its head in when struck and dies on its back.
+    ids: ['tortoise-stylized'],
+    clips: { idle: ['Idle', 'Idle_2'], alert: ['Idle'], feed: ['Idle_2'], walk: ['Walk'], run: ['Run'], blow: ['Attack'], hurt: ['Hide'], dead: ['Onback'] },
+    scale: 1.3,
   },
   hen: {
     // The yards' hens (sim/poultry.ts): both idles peck at the ground; at night they sit (IdleLay).
@@ -102,4 +115,9 @@ export function libraryClip(lib: { readonly clipNames: readonly string[]; clipFo
   if (want) return want.find((n) => lib.clipNames.includes(n));
   const motion = MOTION[doing];
   return motion ? lib.clipFor(motion) : undefined;
+}
+
+/** The Deform plan of a giant animal: strength 0..1 of Actors' "giant" recipe, seeded by the animal's own seed (null: not a giant). */
+export function giantPlan(giant: number | undefined, seed: number): DeformPlan | null {
+  return giant && giant > 0 ? deform({ recipe: 'giant', seed: deriveSeed(seed, 'giant'), strength: giant }) : null;
 }

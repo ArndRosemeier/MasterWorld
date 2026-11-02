@@ -19,6 +19,11 @@ export const encounters: readonly EncounterDef[] = [
   { id: 'boar', creatures: ['boar'], count: [1, 2], where: ['wood'], need: 'challenge' },
   { id: 'deer', creatures: ['deer'], count: [3, 6], where: ['open'], need: 'discovery' },
   { id: 'crabs', creatures: ['giant crab'], count: [2, 3], where: ['shore'], need: 'challenge' },
+  // The giants (D67, phase M): two peaceful, as a promise, and two that hunt, which the land holds only far out (their danger, D29).
+  { id: 'giant-elk', creatures: ['giant elk'], count: [1, 1], where: ['open'], need: 'discovery' },
+  { id: 'giant-turtle', creatures: ['giant turtle'], count: [1, 1], where: ['water'], need: 'discovery' },
+  { id: 'giant-boar', creatures: ['giant boar'], count: [1, 1], where: ['wood'], need: 'challenge' },
+  { id: 'giant-wolves', creatures: ['giant wolf', 'wolf'], count: [3, 4], where: ['wood'], need: 'challenge', lone: true },
   { id: 'shark', creatures: ['shark'], count: [1, 1], where: ['sea'], need: 'challenge' },
 ];
 

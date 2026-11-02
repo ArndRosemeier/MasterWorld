@@ -743,11 +743,15 @@ export type CreatureBody =
     readonly bones?: boolean;
   }
   | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string }
-  /** An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures, a giant crab of the strand (S9). `length` nose to rump. */
-  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab' | 'shark'; readonly length: number; readonly color: string };
+  /**
+   * An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures, a giant crab of the strand (S9), the elk and
+   * the turtle (M2). `length` nose to rump, as drawn. `giant`: the strength 0..1 of Actors' Deform "giant" recipe (D67, phase M): the
+   * body is grown by it (thicker legs and neck, an old coat, a slow gait), not just scaled; `length` is the size it ends up.
+   */
+  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab' | 'shark' | 'elk' | 'turtle'; readonly length: number; readonly color: string; readonly giant?: number };
 
 /** Where an encounter is met: in a place below, under thick trees, on open land, by a road, on the strand (S9). */
-export type EncounterWhere = 'below' | 'wood' | 'open' | 'road' | 'shore' | 'sea';
+export type EncounterWhere = 'below' | 'wood' | 'open' | 'road' | 'shore' | 'water' | 'sea';
 
 /**
  * An encounter (C6b, docs/design/vgm.md 3): who the hero meets together, how many, and where. The one
@@ -764,6 +768,8 @@ export interface EncounterDef {
   readonly where: readonly EncounterWhere[];
   /** What meeting them gives the hero (the Director's need it meets): a fight, or a sight. */
   readonly need: 'challenge' | 'discovery';
+  /** The leader is one only: the others are drawn from the creatures after it (a giant wolf leading plain wolves), never the leader's kind. */
+  readonly lone?: boolean;
 }
 
 /**
@@ -776,7 +782,7 @@ export interface WildDef {
   /** Who they are and how many (an encounter's id; it is met in this habitat). */
   readonly encounter: string;
   /** wood: under thick trees; open: meadows and heath; road: by a road out of town; shore: on a strand by the sea; sea: out in deep water, under the surface (S9). */
-  readonly habitat: 'wood' | 'open' | 'road' | 'shore' | 'sea';
+  readonly habitat: 'wood' | 'open' | 'road' | 'shore' | 'water' | 'sea';
   /** Metres from the town's market where their territories lie. */
   readonly ring: readonly [number, number];
   /** Territory radius, metres. */

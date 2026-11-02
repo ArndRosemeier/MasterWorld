@@ -18,6 +18,8 @@ export const factions: FactionsDef = {
     { id: 'prey', name: 'grazing beast', plural: 'grazing beasts', regard: 0, aware: false },
     { id: 'vermin', name: 'vermin', plural: 'vermin', regard: 0, aware: false },
     { id: 'beasts', name: 'beast', plural: 'beasts', regard: 0, aware: false },
+    // The great beasts (D67): the giants of peace. At feud with nobody and nobody with them, so no wolf hunts a giant elk.
+    { id: 'great', name: 'great beast', plural: 'great beasts', regard: 0, aware: false },
   ],
   matrix: [
     // The watch stands with the town's peoples and against whatever comes at them.
