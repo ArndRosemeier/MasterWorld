@@ -903,6 +903,31 @@ export interface BirdKindDef {
 }
 
 /**
+ * What a humanoid foe wants of the hero (D64). `guard`: warns and holds a line; `rob`: walks up and demands a share of the purse;
+ * `jeer`: taunts, and attacks once many or the hero looks weak; `bar`: a hold's warden (the hold's own watch, game/hold.ts, speaks for it);
+ * `mindless`: the walking dead attack at once; `murderous`: attacks at once with a war cry that says why (cutthroats).
+ */
+export const STANCE_KINDS = ['guard', 'rob', 'jeer', 'bar', 'mindless', 'murderous'] as const;
+export type StanceKind = (typeof STANCE_KINDS)[number];
+
+/** The kinds that warn before they fight (a bar's warning belongs to the hold). */
+export const WARNING_STANCES: readonly StanceKind[] = ['guard', 'rob', 'jeer'];
+
+export interface StanceDef {
+  readonly kind: StanceKind;
+  /** Warning kinds: it speaks to a hero this near (m) once it has noticed them. */
+  readonly warn?: number;
+  /** Warning kinds: a hero nearer than this (m) starts the fight. */
+  readonly line?: number;
+  /** `rob`: it walks up to the hero until it stands this far off (m), and demands. */
+  readonly close?: number;
+  /** `rob`, `jeer`: seconds after its demand or first jibe before it loses patience and fights. */
+  readonly patience?: number;
+  /** `jeer`: with at least this many of its band, it fights when its patience is spent (a lone one only jeers). */
+  readonly many?: number;
+}
+
+/**
  * A creature (plan 9.3, 12, D29): its body, senses, temper and power. Its danger is fixed by what it is,
  * never scaled to the player; weak ones fight anyway, as they do not know the player is a champion.
  */
@@ -922,10 +947,12 @@ export interface CreatureDef {
   readonly attacks: readonly AttackDef[];
   /** Sees this far in the dark (m) and much farther by the hero's light; hears a running hero this far. */
   readonly senses: { readonly sight: number; readonly hearing: number };
-  /** skittish: keeps away unless cornered or many; hostile: attacks on sight. */
+  /** skittish: keeps away unless cornered or many; hostile: attacks on sight (D64: a humanoid's `stance` says what it wants first). */
   readonly temper: 'skittish' | 'hostile';
   /** Who it belongs to (D65): a people's id or one of `factions.others`. It never changes. */
   readonly faction: string;
+  /** What a humanoid wants of the hero before any blow (D64, phase R); every humanoid has one, beasts none (they only fight or flee). */
+  readonly stance?: StanceDef;
   /**
    * A shy beast's flight distance, metres (deer): farther off it only lifts its head and watches the hero,
    * nearer it bolts, and it runs until twice this far before it grazes again, never back towards the hero.
@@ -2081,6 +2108,19 @@ export function validateSetting(m: SettingModule): string[] {
 }
 
 /** Formed caves (D63): the rocks their kinds name exist, the ranges run the right way, the chances add up, no way squeezes. */
+/** A humanoid has a stance (D64), a beast none; a warning stance has its distances, the line inside the warning. */
+export function validateStance(c: CreatureDef, where: string): string[] {
+  const out: string[] = [], st = c.stance, at = `${where}: creature "${c.id}"`;
+  if (c.body.kind !== 'humanoid') { if (st) out.push(`${at} is no humanoid and has a stance`); return out; }
+  if (!st) return [`${at} is a humanoid and needs a stance (D64)`];
+  if (!STANCE_KINDS.includes(st.kind)) return [`${at} has an unknown stance "${st.kind}"`];
+  if (!WARNING_STANCES.includes(st.kind)) return out;
+  if (!(st.warn! > 0) || !(st.line! > 0) || st.line! >= st.warn!) out.push(`${at} stance ${st.kind} needs warn > line > 0`);
+  if (st.kind === 'rob' && (!(st.close! > st.line!) || st.close! >= st.warn! || !(st.patience! > 0))) out.push(`${at} stance rob needs warn > close > line and a patience`);
+  if (st.kind === 'jeer' && (!(st.many! >= 2) || !(st.patience! > 0))) out.push(`${at} stance jeer needs many (2 or more) and a patience`);
+  return out;
+}
+
 export function validateCaves(c: CavesDef, kinds: readonly string[], where: string): string[] {
   const out: string[] = [];
   const ids = new Set<string>();
@@ -2255,6 +2295,7 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (!(c.morale >= 0 && c.morale <= 1)) out.push(`${where}: creature "${c.id}" morale must be 0..1`);
     for (const a of c.attacks) if (!DAMAGE_KINDS.includes(a.kind) || !(a.time > 0)) out.push(`${where}: creature "${c.id}" attack "${a.name}" needs a known kind and time > 0`);
     if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
+    out.push(...validateStance(c, where));
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
   const encounter = (id: string) => m.encounters.find((e) => e.id === id);
