@@ -18,7 +18,7 @@ import type { BelowLight, WarmLights } from '../render/warmLights';
 import { caveGlows, torchSpots } from '../world/dungeon/torches';
 import type { Cellar } from '../world/dungeon/cellar';
 import type { ThroatFrame } from '../world/dungeon/caveThroat';
-import { DungeonSpace, keySpot, type SpaceEvent } from '../world/dungeon/space';
+import { DungeonSpace, type SpaceEvent } from '../world/dungeon/space';
 import { SearchKneel } from './searchKneel';
 import { WalkTo } from './walkTo';
 import { Fade } from './fade';
@@ -191,7 +191,7 @@ export class CellarVisit {
   /** Lay a saved state over the fresh cellar. */
   restore(d: CellarDiff): void {
     for (const k of d.keys) { this.space.keys.add(k); this.view.keyTaken(k); }
-    for (const l of d.open) { this.space.open.add(l); this.view.opened(l); }
+    for (const l of d.open) { this.space.openLink(l); this.view.opened(l); }
     for (const r of d.read) this.read.add(r);
     if (d.seen) this.seen.restore(d.seen);
   }
@@ -218,7 +218,7 @@ export class CellarVisit {
     // A key lying there: the hero kneels to it and picks it up (unless something else plays the hero now).
     const room = this.cellar.layout.links.find((pl) => pl.link.id === e.link)?.link.key;
     if (room === undefined) return;
-    const [kx, , kz] = keySpot(this.cellar.layout, room), p = this.player;
+    const [kx, , kz] = this.space.keyAt(room), p = this.player;
     if (p.puppet) { this.view.keyTaken(room); return; }
     const kneel = new SearchKneel(w, p.walker.yaw, { x: O.x + kx, z: O.z + kz }, null, () => this.view.keyTaken(room));
     p.puppet = kneel;
