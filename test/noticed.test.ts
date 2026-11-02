@@ -44,7 +44,7 @@ test('noticing (D66, K9): the cave tool puts a cave ahead of a walking hero, in 
   const seed = parseSeed('masterworld'), { terrain, log, home } = startWorld(), t = terrain.towns[0].decision, height = (x: number, z: number) => terrain.height(x, z);
   const open = log.filter((d) => !(d.kind === 'dungeon' && d.template === 'cave'));
   // Three places on the land where the tool finds a cave ahead (found by scanning the headings out of the town).
-  for (const [k, d] of [[3, 450], [7, 450], [8, 1050]]) {
+  for (const [k, d] of [[3, 430], [7, 390], [8, 1050]]) {
     const a = (k * Math.PI) / 8, hero = { x: t.x + Math.cos(a) * d, z: t.z + Math.sin(a) * d }, toward = { x: hero.x + Math.cos(a) * 400, z: hero.z + Math.sin(a) * 400 };
     const cave = caveFor({ seed, log: open, terrain, towns: terrain.towns, hours: 30, setting: classic, home, hero, toward });
     assert.ok(cave?.site, `heading ${k}: a cave is opened`);
