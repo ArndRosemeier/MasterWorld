@@ -13,7 +13,7 @@
  * Patterns read WORLD (the floating origin).
  */
 import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, MeshStandardNodeMaterial, Vector4 } from 'three/webgpu';
-import { abs, attribute, cameraPosition, cross, float, fract, int, length, max, mix, modelWorldMatrix, mx_noise_float, mx_worley_noise_vec2, normalize, positionGeometry, positionLocal, pow, sin, smoothstep, toneMappingExposure, uniform, uniformArray, vec2, vec3, vec4 } from 'three/tsl';
+import { abs, attribute, cameraPosition, cross, float, fract, int, length, max, mix, modelWorldMatrix, mx_noise_float, mx_worley_noise_vec2, normalize, positionGeometry, positionLocal, positionWorld, pow, sin, smoothstep, toneMappingExposure, uniform, uniformArray, vec2, vec3, vec4 } from 'three/tsl';
 import { defineKind } from '../materials';
 import { WORLD } from '../origin';
 import { puffMaterial } from './smoke';
@@ -27,7 +27,7 @@ export const LAVA = { time: uniform(0) };
  * meshes lie on the near ground as it is drawn (2 m between its vertices), but the ground chunks further out are coarser and
  * their vertices stand higher over a channel cut a metre and a half deep, so unlifted the lava sank into them and vanished by 300 m.
  */
-const lift = () => {
+const liftByDistance = () => {
   const far = length(modelWorldMatrix.mul(vec4(positionLocal, 1)).xyz.sub(cameraPosition));
   return smoothstep(45, 300, far).mul(1.3).add(smoothstep(300, 1500, far).mul(3.0));
 };
@@ -44,7 +44,7 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
   const uv = attribute('uv', 'vec2'), fx = attribute('fx', 'vec4');
   const flow = fx.x, heat = fx.y, half = fx.z, ph = fx.w, t = LAVA.time;
   // (A flow is lifted by its distance; the lake's disc lies flat at its level.)
-  m.positionNode = positionLocal.add(vec3(0, lift().mul(flow), 0));
+  m.positionNode = positionLocal.add(vec3(0, liftByDistance().mul(flow), 0));
   const across = abs(uv.y).mul(flow);
   // The plates' space: on a flow, metres along and across, carried downstream; on the lake, the world point, stirred slowly.
   const qFlow = vec2(uv.x.sub(t.mul(0.6)), uv.y.mul(half));
@@ -58,7 +58,14 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
   const crack1 = float(1).sub(smoothstep(0.0, 0.085, d1)), crack2 = float(1).sub(smoothstep(0.0, 0.1, d2));
   const soft = float(1).sub(smoothstep(0.0, 0.42, d1));
   const wide = mx_noise_float(vec3(q.mul(0.06), 2.0)).mul(0.5).add(0.5);
-  const crack = max(crack1.mul(wide.mul(0.7).add(0.5)), crack2.mul(0.65).mul(wide));
+  // Close up (within some twenty metres) a third, fine layer of cracks and a grain in the crust come in: the plates are metres across, and from
+  // a few metres off the broad soft cracks alone read as a blur.
+  const close = float(1).sub(smoothstep(3.0, 24.0, length(positionWorld.sub(cameraPosition))));
+  const qw = q.add(vec2(mx_noise_float(vec3(q.mul(0.42), 8.0)), mx_noise_float(vec3(q.mul(0.42).add(5.5), 8.0))).mul(1.6));
+  const c3 = mx_worley_noise_vec2(qw.mul(0.9).add(vec2(11.7, t.mul(0.03))));
+  const crackF = float(1).sub(smoothstep(0.0, 0.05, c3.y.sub(c3.x))).mul(close).mul(wide.mul(0.8).add(0.3));
+  const grain = mx_noise_float(vec3(q.mul(5.5), 1.0)).mul(0.5).add(0.5), clots = mx_noise_float(vec3(q.mul(1.7), 4.0)).mul(0.5).add(0.5);
+  const crack = max(max(crack1.mul(wide.mul(0.7).add(0.5)), crack2.mul(0.65).mul(wide)), crackF.mul(0.85));
   // Thin spots in the crust where it glows through, coming and going.
   const thin = smoothstep(0.52, 0.86, mx_noise_float(vec3(q.mul(0.085), t.mul(0.05).add(ph))));
   // Pulses of heat running down a flow; the lake breathes.
@@ -67,7 +74,7 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
   // A flow's open channel near its head: molten, streaked along it, brightest in the middle.
   const streak = mx_noise_float(vec3(uv.x.mul(0.35).sub(t.mul(1.1)), uv.y.mul(3.0), t.mul(0.2)));
   const core = float(1).sub(smoothstep(0.0, 0.62, across)).mul(pow(heat, 2.2)).mul(streak.mul(0.35).add(0.65)).mul(flow);
-  let col = CRUST.add(DEEP.mul(pow(soft, 2.0).mul(0.55).add(0.08)).mul(h)).add(ORANGE.mul(crack.mul(h.mul(0.75).add(0.25)).add(thin.mul(0.22).mul(h)))).add(YELLOW.mul(pow(crack1, 3.0)).mul(h).mul(h));
+  let col = CRUST.mul(float(0.45).add(grain.mul(0.7)).add(clots.mul(0.5).mul(close))).add(DEEP.mul(pow(soft, 2.0).mul(0.55).add(0.08)).mul(float(1).sub(close.mul(0.6))).mul(h)).add(ORANGE.mul(crack.mul(h.mul(0.75).add(0.25)).add(thin.mul(0.22).mul(h)))).add(YELLOW.mul(pow(max(crack1, crackF), 3.0)).mul(h).mul(h));
   col = mix(col, ORANGE.mul(1.3).add(YELLOW.mul(streak.mul(0.3).add(0.3))), core.mul(0.85));
   // The chilled edge: a flow's levees are dark crust.
   const edge = smoothstep(0.62, 0.95, across);
@@ -87,7 +94,7 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
 export const VOLCANO_CRUST = defineKind('volcano crust', ['position', 'normal', 'uv', 'fx'], () => {
   const m = new MeshStandardNodeMaterial({ roughness: 0.62, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const uv = attribute('uv', 'vec2'), fx = attribute('fx', 'vec4');
-  m.positionNode = positionLocal.add(vec3(0, lift(), 0));
+  m.positionNode = positionLocal.add(vec3(0, liftByDistance(), 0));
   const p = WORLD, r = length(uv);
   const grain = mx_noise_float(p.mul(vec3(2.6, 2.6, 2.6)).add(fx.x)), clot = mx_noise_float(p.mul(0.55).add(fx.x.mul(3.0)));
   const rimFray = r.add(clot.mul(0.28)).add(grain.mul(0.1));
