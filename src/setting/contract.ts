@@ -2062,12 +2062,6 @@ export interface NoticingDef {
   /** A place ahead of the hero is sited between these metres from them (the roadside sights' own 70 to 260), within this many radians either side of their way. */
   readonly ahead: readonly [number, number];
   readonly spread: number;
-  /**
-   * Caves along a cliff the hero runs by (Arnd 2026-11-02: "a user running along a cliff has a very good chance to see one"): for every
-   * `cell` metres they cover with a cliff ahead of them, `chance` of a cave opening in it, never within `near` metres of another open
-   * one and never more than `most` open within 2.5 km of them.
-   */
-  readonly caves?: { readonly chance: number; readonly cell: number; readonly near: number; readonly most: number };
 }
 
 /** The picture's colour key: grade keys at sun heights, sorted by `at` (warm dusk, blue night, ...). */
@@ -2213,7 +2207,6 @@ export function validateSetting(m: SettingModule): string[] {
   if (m.noticing) {
     const n = m.noticing;
     if (!(n.range >= 30 && n.night > 0 && n.night <= 1 && n.eye > 0 && n.face >= 0 && n.ahead[0] > 0 && n.ahead[1] > n.ahead[0] && n.ahead[1] <= n.range * 2 && n.spread > 0 && n.spread < Math.PI / 2)) out.push(`${where}: noticing needs a range of 30 m or more, a night share above 0 and up to 1, positive heights, an ahead range that rises and a spread under a quarter turn`);
-    if (n.caves && !(n.caves.chance > 0 && n.caves.chance <= 1 && n.caves.cell > 0 && n.caves.near > 0 && n.caves.most >= 1)) out.push(`${where}: noticing.caves needs a chance above 0 and up to 1, a cell and a spacing above 0 and at least one cave`);
   }
   return out;
 }
