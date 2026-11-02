@@ -113,6 +113,28 @@ export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, 
 }
 
 /**
+ * A slope of fallen rock (the rubble ramp, K5): from `top` it runs `run` metres along the unit heading `dir` (x, z), falling `slope` per metre, `half`
+ * wide either side; the air under the line is filled with rock (to the sides' edge columns, so no sliver of rock stands at its rim), the air over it is left as it is.
+ */
+export function stampRamp(f: BrickField, top: readonly [number, number, number], dir: readonly [number, number], run: number, slope: number, half: number): void {
+  const { step } = f, ex = top[0] + dir[0] * run, ez = top[2] + dir[1] * run;
+  const [i0, i1] = sampleRange(f, Math.min(top[0], ex) - half - 1, Math.max(top[0], ex) + half + 1, 'x'), [k0, k1] = sampleRange(f, Math.min(top[2], ez) - half - 1, Math.max(top[2], ez) + half + 1, 'z'), [j0, j1] = sampleRange(f, top[1] - slope * run - 8, top[1] + 0.5, 'y');
+  for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+    const x = f.ox + i * step, z = f.oz + k * step, t = (x - top[0]) * dir[0] + (z - top[2]) * dir[1], hh = Math.abs(-(x - top[0]) * dir[1] + (z - top[2]) * dir[0]);
+    if (t < -0.4 || t > run + 0.4 || hh > half) continue;
+    const yf = top[1] - slope * Math.max(0, Math.min(run, t));
+    // Fill the air straight under the line down to the old floor (and no other air under it: a passage on a lower level stays).
+    let air = true;
+    for (let j = j1; j >= j0; j--) {
+      const y = f.oy + j * step;
+      if (y >= yf) continue;
+      if (air && sampleOf(f, i, j, k) <= 0) air = false;
+      if (air) putSample(f, i, j, k, -Math.min(half + 0.35 - hh, yf - y, 1), true);
+    }
+  }
+}
+
+/**
  * Cut a hero-sized way between two floor points (the concession, K4): air `height` high over a floor that runs straight from
  * one point to the other, `half` wide either side of the line seen from above; the walls are smooth, the floor level across.
  * Where the line crosses open air the floor is a slab of rock 2.5 m thick (a ramp of fallen rock, a fallen slab across a gap).
