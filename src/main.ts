@@ -146,6 +146,7 @@ import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, typ
 import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved, townSaves, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { CLIMB_COST, Character, fallHurt } from './game/character';
+import { inLava, lavaBurn } from './game/heat';
 import { itemWorth } from './game/trade';
 import { bardTells, GuildBook, harbourHall, questGift, teacherOf, whereOf } from './game/guilds';
 import { CHEER, DRINK, LevelWatch } from './app/levelUp';
@@ -2124,6 +2125,7 @@ export async function start(b: Boot): Promise<void> {
     const shipClimbs = new ShipClimb({ player, decks });
     const breath = new Breath(), breathHud = new BreathHud();
     let drownClock = 0;
+    let burnClock = 0;
     const bunk = new BunkSleep({ player, decks, voyages: voyagesNow, hours, setClock });
     // The free camera is a debug tool: its key (F) works only with `?fly` or once the debug menu has flown, and
     // always lands again while flying (a stray F in a cellar flew the camera through its walls).
@@ -2460,6 +2462,14 @@ export async function start(b: Boot): Promise<void> {
         if (lost > 0 && character.alive) {
           character.health = Math.max(1, character.health - lost);
           if ((drownClock -= dt) <= 0) { drownClock = 1; fightHud.hurt(); }
+        }
+        // Lava (K7d): standing in a volcano's lake or in a flow's channel burns, to the last point of health and no lower.
+        if (!visit() && !player.offFoot && character.alive) {
+          const p = player.walker.pos, burns = inLava(p.y, terrain.lavaAt(p.x, p.z));
+          if (burns) {
+            character.health = Math.max(1, character.health - lavaBurn(dt, true, character.maxHealth));
+            if ((burnClock -= dt) <= 0) { burnClock = 0.5; fightHud.hurt(); }
+          }
         }
         breathHud.showBreath(breath.share, under, character.gills);
         stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
