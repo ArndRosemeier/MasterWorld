@@ -464,10 +464,6 @@
     "reason": "Unrelated: the ground rule for a place standing at a cliff's foot (a DungeonForm.stands key), and the skeleton's sea cliff height."
   },
   {
-    "key": "idiom: [.seed .terrain] in masterworld/app/regionSites.ts + masterworld/vgm/caves.ts + masterworld/vgm/events.ts",
-    "reason": "Reading the world's seed and terrain off a context object is how every VGM tool starts, not a copied helper; the cave tool (L6) was the third."
-  },
-  {
     "key": "idiom: [.some .towns] in masterworld/game/horse.ts + masterworld/vgm/answers.ts + masterworld/vgm/roads.ts",
     "reason": "Asking whether any town holds a point, each a different question (on its streets, in its fields, against its walls); towns.some is the language idiom, not a copied helper."
   },
@@ -918,5 +914,9 @@
   {
     "key": "idiom: [.cos .sin .yaw Math] in masterworld/app/cellarVisit.ts + masterworld/world/cave/fittings.ts + masterworld/world/cave/throat.ts",
     "reason": "A point offset to the side of a heading (x - sin(yaw) d, z + cos(yaw) d) in each file's own geometry (a visit's door, a mine's timber, a throat's arch); two lines of trigonometry."
+  },
+  {
+    "key": "idiom: [.map .person] in masterworld/app/hails.ts + masterworld/main.ts + masterworld/sim/townFight.ts",
+    "reason": "Reading a list of people into their ids or spots (.map over .person) in three unrelated places; it comes and goes with edits to main.ts and is not a copied helper."
   }
 ]

@@ -62,6 +62,8 @@ export interface SaveData {
   readonly journal: readonly Lead[];
   /** The land the hero knows, as the map shows it (none in older saves: the land round the start town). */
   readonly map?: KnownLandSave;
+  /** The ids of the places the hero noticed on the land (D66, K9; none in older saves). */
+  readonly noticed?: readonly string[];
   /** The hero's level, abilities, health, gear and purse (version 2; none: a fresh hero). */
   readonly character: CharacterSave | null;
   /** The Director's needs and tension (version 2). */
@@ -138,7 +140,7 @@ export function remainsEntry(r: Remains): Lead {
 export function heirSave(s: SaveData, grave: Remains, start: SaveData['hero']): SaveData {
   // The next hero knows the land only as a new hero does (the map key is left out).
   // Nor does it find the last one's portals open.
-  const { map: _known, portalStone: _stone, ...world } = s;
+  const { map: _known, noticed: _noticed, portalStone: _stone, ...world } = s;
   return {
     ...world, mode: 'roguelike', heir: true, hero: start, character: null, looks: null,
     remains: [...s.remains, grave], journal: [remainsEntry(grave)],

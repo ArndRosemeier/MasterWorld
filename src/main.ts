@@ -27,6 +27,7 @@ import { Rocks } from './world/rocks';
 import { RockView } from './render/rocks/RockView';
 import { woodsOf } from './world/flora';
 import { daylight } from './game/soundscape';
+import { Noticed, noticeable, type NoticeSpot } from './game/noticed';
 import { HeroView } from './render/hero/HeroView';
 import { preparePeople } from './render/hero/play';
 import { GiantView } from './render/giant/GiantView';
@@ -796,6 +797,10 @@ export async function start(b: Boot): Promise<void> {
     for (const l of journal.open) if (l.id.startsWith('task:')) journal.fulfil(l.id);
     // The land the hero knows (plan 11.7): a new hero knows the town where the game begins; the rest is seen on the way or told of.
     const known = new KnownLand(save?.map);
+    // The places the hero noticed on the land (D66, K9): the log's fixed places, kept while the log has not grown.
+    const noticed = new Noticed(save?.noticed);
+    let noticeFor = -1, noticeSpots: NoticeSpot[] = [], noticeClock = 0;
+    const noticeList = (): NoticeSpot[] => { if (log.length !== noticeFor) { noticeFor = log.length; noticeSpots = noticeable(log); } return noticeSpots; };
     if (!save?.map) known.see(home.x, home.z, HOME_SIGHT);
     let seenAt: [number, number] | null = null;
     // Every cellar the VGM promised under the town's houses: the first is built now, the others when the hero steps into the house above.
@@ -1700,6 +1705,7 @@ export async function start(b: Boot): Promise<void> {
       woods,
       heroAt: () => heroAt(player.walker.yaw),
       known,
+      noticed: () => noticed.of(noticeList()),
       roadLines: () => terrain.roads.roads,
       signs: () => (towns?.every ?? []).flatMap((t) => {
         const hall = setting.voyage?.hall ? harbourHall(t.town.plan) : undefined;
@@ -1799,6 +1805,7 @@ export async function start(b: Boot): Promise<void> {
           towns: towns?.toSave() ?? {},
           journal: journal.entries(),
           map: known.landSave(),
+          noticed: noticed.keep(),
           character: character.save(),
           standing: standing.save(),
           guilds: guildBook.bookSave(),
@@ -2533,6 +2540,8 @@ export async function start(b: Boot): Promise<void> {
       const at = player.walker.pos;
       // The map fills in: the land round the hero as they go (not below ground), and a sketch of the way to each new mark.
       if (!visit() && (!seenAt || Math.hypot(at.x - seenAt[0], at.z - seenAt[1]) > 16)) { seenAt = [at.x, at.z]; known.see(at.x, at.z); }
+      // Noticing (D66): twice a second the hero's eyes take in the places in view, and the minimap and map mark them.
+      if (!visit() && setting.noticing && (noticeClock -= dt) <= 0) { noticeClock = 0.5; noticed.glance(at, noticeList(), (x, z) => terrain.height(x, z), daylight(view.sky.hour), setting.noticing); }
       for (const l of journal.open) if (!known.told(l.id)) known.tell(l.id, rooms?.outside ? [rooms.outside.x, rooms.outside.z] : [at.x, at.z], [l.mark.x, l.mark.z]);
       if (minimap.showWhile(!title?.holding && !creator?.showing && !!window.__mwReady)) {
         const look = player.flying ? player.fly.yaw : player.heroCam.yaw, me = heroAt(player.walker.yaw), v = visit(), w = player.walker;
@@ -2542,9 +2551,11 @@ export async function start(b: Boot): Promise<void> {
           const lv = v.formed ? Math.round((w.pos.y - v.origin.y) / STOREY) : v.space.levelAt(w.pos.y - v.origin.y), range = belowRange(v.space, !!v.cellar.form.space.carved);
           minimap.read({ x: w.pos.x, z: w.pos.z, look, yaw: w.yaw, hour: view.sky.hour, sky, marks, below: { sheet: `${v.origin.x},${v.origin.z}:${lv}:${v.seen.version}`, range, from: me } });
           minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark, 0);
+          minimap.noticedMarks(noticed.of(noticeList()), me.x, me.z, 0);
         } else {
           minimap.read({ x: me.x, z: me.z, look, yaw: me.yaw, hour: view.sky.hour, sky, marks });
           minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark);
+          minimap.noticedMarks(noticed.of(noticeList()), me.x, me.z);
         }
       }
       part('vgm direct');

@@ -69,3 +69,9 @@ test('foe speech: every turn has a gesture clip of the people\'s own, only for a
     assert.notEqual(foeClip(def('skeleton'), { ...doing, signal: t }), SIGNAL_CLIPS[t], 'the dead have nothing to gesture');
   }
 });
+
+test('foe speech: no line calls the hero he or him (the hero may be a woman)', () => {
+  const lines = Object.values(classic.factions.words).flatMap((w) => [...Object.values(w!.turns), ...Object.values(w!.breaks), ...Object.values(w!.talk ?? {})].flat());
+  assert.ok(lines.length > 40);
+  for (const l of lines) assert.doesNotMatch(l!, /\b(he|him|his|himself)\b/i, l);
+});
