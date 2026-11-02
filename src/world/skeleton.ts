@@ -236,14 +236,21 @@ export class Skeleton {
    * The nearest land well inside the biome `id` from (x, z) (the biome holding all round it, 120 m out), along a spiral walked out from
    * there: first close (turns 2 km apart, a step every 500 m, out to some 160 km), then wide (8 km apart, a step every 4 km, out to
    * some 1000 km: the warm biomes lie hundreds of kilometres to the south of the start, `northCooling`). Null if none is met.
+   * It looks for the biome as it is meant to be seen, in plain country (a kind with no swell, bareness or mesa: a meadow on a moor's
+   * bare hills or a badland's ridges is not a meadow to look at), and takes any country only where there is no such place.
    * For the debug menu and checks.
    */
   nearestBiome(id: string, x: number, z: number): { x: number; z: number } | null {
     const k = this.shape.biomes.findIndex((b) => b.id === id);
     if (k < 0) return null;
+    const plain = this.kinds.find((d) => !d.swell && !d.bare && !d.mesa)?.id;
     const out = emptySample(), is = (px: number, pz: number): boolean => this.sample(px, pz, out).biome === k;
-    const inside = (px: number, pz: number) => (is(px, pz) && is(px + 120, pz) && is(px - 120, pz) && is(px, pz + 120) && is(px, pz - 120) ? { x: px, z: pz } : null);
-    return spiralFind(x, z, inside, 1000, 2000, 500, 80000) ?? spiralFind(x, z, inside, 160000, 8000, 4000, 100000);
+    const find = (inPlain: boolean): { x: number; z: number } | null => {
+      const inside = (px: number, pz: number) => (is(px, pz) && is(px + 120, pz) && is(px - 120, pz) && is(px, pz + 120) && is(px, pz - 120)
+        && (!inPlain || (plain !== undefined && this.kindShare(plain, px, pz) > 0.99)) ? { x: px, z: pz } : null);
+      return spiralFind(x, z, inside, 1000, 2000, 500, 80000) ?? spiralFind(x, z, inside, 160000, 8000, 4000, 100000);
+    };
+    return (plain !== undefined ? find(true) : null) ?? find(false);
   }
 
   /** How much of mesa country is at (x, z), 0..1. */

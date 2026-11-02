@@ -39,6 +39,9 @@ test('go to terrain: a kind of country and a biome put the hero well inside it',
   assert.ok(terrain.skeleton.kindShare('volcanic', volcanic.at.x, volcanic.at.z) > 0.99);
   const taiga = await go('Biome: Pine forest');
   assert.equal(terrain.skeleton.sample(taiga.at.x, taiga.at.z).biome, terrain.skeleton.shape.biomes.findIndex((b) => b.id === 'taiga'));
+  // A biome is shown in plain country, not on a moor's bare hills or a mesa's cliffs (Arnd: the meadow was rocky, bare and rough).
+  const meadow = await go('Biome: Meadows');
+  assert.ok(terrain.skeleton.kindShare('open', meadow.at.x, meadow.at.z) > 0.99);
   // The warm biomes lie hundreds of kilometres to the south of the start (northCooling): found by the wide walk.
   const jungle = await go('Biome: Jungle');
   assert.equal(terrain.skeleton.sample(jungle.at.x, jungle.at.z).biome, terrain.skeleton.shape.biomes.findIndex((b) => b.id === 'jungle'));
