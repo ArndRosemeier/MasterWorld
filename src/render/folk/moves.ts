@@ -26,6 +26,12 @@ export const MOVE_CUTS: readonly MoveCut[] = [
   // A sailor on a line: leaning back against its pull, and coiling a rope down (S3, the crew at work).
   { clip: 'haul line', take: 'cmu 19_03', secs: [1.2, 3], seam: 0.2, travel: 1, upright: { hips: 0.5, tilt: 1 } },
   { clip: 'coil rope', take: 'cmu 62_21', secs: [1.2, 3], seam: 0.2, travel: 1, upright: { hips: 0.25, tilt: 0.6 } },
+  // What the cellar's talkers do with their hands (R3, D64): a raised hand to stop, angry hands, an argument, a shrug, a hello.
+  { clip: 'raised hand', take: 'cmu 111_37', secs: [1.5, 2.6], seam: 0.25, travel: 1, upright: { hips: 0.15, tilt: 0.5 } },
+  { clip: 'angry hands', take: 'cmu 18_10', secs: [2, 4], seam: 0.3, travel: 1, upright: { hips: 0.15, tilt: 0.5 } },
+  { clip: 'argue', take: 'cmu 80_48', secs: [2, 4], seam: 0.3, travel: 1, upright: { hips: 0.15, tilt: 0.5 } },
+  { clip: 'shrug', take: 'cmu 111_25', secs: [1.5, 2.3], seam: 0.25, travel: 1, upright: { hips: 0.15, tilt: 0.5 } },
+  { clip: 'wave hello', take: 'cmu 141_16', secs: [1.5, 2.3], seam: 0.25, travel: 1, upright: { hips: 0.15, tilt: 0.5 } },
 ];
 
 /** The cut clips' names (shipped beside PACK_CLIPS). */
