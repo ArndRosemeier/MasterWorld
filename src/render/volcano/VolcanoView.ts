@@ -101,7 +101,7 @@ export class VolcanoView {
     const out: typeof this.halos = [];
     for (const v of vs) {
       const lake = this.terrain.lakeLevel(v);
-      if (lake !== null && v.state !== 'steaming') out.push({ x: v.x, y: lake + 26, z: v.z, r: v.rimR * (v.state === 'erupting' ? 2.4 : 1.6) });
+      if (lake !== null && v.state !== 'steaming') out.push({ x: v.x, y: lake + 26, z: v.z, r: v.rimR * (v.state === 'erupting' ? 1.6 : 1.1) });
     }
     return out.slice(0, GLOW_MAX);
   }
@@ -225,6 +225,9 @@ export class VolcanoView {
       }
       for (let i = 0; i < RR; i++) for (let k = 0; k < RA; k++) {
         const a = base + i * RA + k, b = base + i * RA + ((k + 1) % RA), c = base + (i + 1) * RA + ((k + 1) % RA), d = base + (i + 1) * RA + k;
+        // Not over an edge: where the ground falls away more steeply than 43 degrees between the rings, a sheet would hang out in the air.
+        const ys = [a, b, c, d].map((q) => pos[q * 3 + 1]);
+        if (Math.max(...ys) - Math.min(...ys) > 0.95 * (R / RR)) continue;
         idx.push(a, b, c, a, c, d);
       }
     }
@@ -290,10 +293,10 @@ export class VolcanoView {
     for (const v of [...vs].sort((a, b) => Math.hypot(a.x - cam.x, a.z - cam.z) - Math.hypot(b.x - cam.x, b.z - cam.z))) {
       const lake = this.terrain.lakeLevel(v);
       // The crater: an ash plume over a spilling lake, a thinner one over a lake, a broad steam over a steaming crater.
-      if (v.state === 'erupting' && lake !== null) for (let k = 0; k < 4; k++) out.push({ x: v.x + (k - 1.5) * 7, y: lake, z: v.z + ((k * 5) % 3 - 1) * 8, ash: 1, high: 300 - k * 25, thick: 1, size: 22 - k * 2, glow: 1 });
-      else if (v.state === 'lake' && lake !== null) out.push({ x: v.x, y: lake, z: v.z, ash: 0.6, high: 120, thick: 0.75, size: 11, glow: 0.7 });
-      else out.push({ x: v.x, y: this.terrain.height(v.x, v.z) + 1, z: v.z, ash: 0, high: 85, thick: 0.8, size: 9, glow: 0 });
-      for (const vent of v.vents) out.push({ x: vent.x, y: this.terrain.height(vent.x, vent.z) + 0.4, z: vent.z, ash: 0, high: 28 + vent.r * 2.6, thick: 0.62, size: 1.7 + vent.r * 0.26, glow: 0 });
+      if (v.state === 'erupting' && lake !== null) for (let k = 0; k < 4; k++) out.push({ x: v.x + (k - 1.5) * 0.07 * v.rimR, y: lake, z: v.z + ((k * 5) % 3 - 1) * 0.08 * v.rimR, ash: 1, high: v.H * (1.5 - k * 0.12), thick: 1, size: v.rimR * (0.3 - k * 0.025), glow: 1 });
+      else if (v.state === 'lake' && lake !== null) out.push({ x: v.x, y: lake, z: v.z, ash: 0.6, high: v.H * 0.7, thick: 0.75, size: v.rimR * 0.16, glow: 0.7 });
+      else out.push({ x: v.x, y: this.terrain.height(v.x, v.z) + 1, z: v.z, ash: 0, high: v.H * 0.5, thick: 0.8, size: v.rimR * 0.13, glow: 0 });
+      for (const vent of v.vents) out.push({ x: vent.x, y: this.terrain.height(vent.x, vent.z) + 0.4, z: vent.z, ash: 0, high: (28 + vent.r * 2.6) * Math.sqrt(v.H / 170), thick: 0.62, size: (1.7 + vent.r * 0.26) * Math.sqrt(v.H / 170), glow: 0 });
     }
     return out.slice(0, STEAM_COLUMNS);
   }
