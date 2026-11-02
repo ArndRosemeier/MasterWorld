@@ -89,6 +89,12 @@ export const params = {
   /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
   cave: q.has('cave'),
   tower: q.has('tower'),
+  /**
+   * Start before an active volcano, on the side its lava spills, facing the crater (K7d): `volcano` the nearest, `volcano=erupting|lake|steaming`
+   * the nearest in that state, `volcano=<id>` a given one; `volcano.at=rim|foot|far` how near (default: the foot, 420 m out).
+   */
+  volcano: q.has('volcano') ? (q.get('volcano') || 'any') : null,
+  volcanoAt: q.get('volcano.at') ?? 'foot',
   /** Start before a sea cave's mouth (`seacave`; S8), as `barrow`. */
   seacave: q.has('seacave'),
   /** Start before a sunken ruin on the shore (`sunken`; S8), as `barrow`. */

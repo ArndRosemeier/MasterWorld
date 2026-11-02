@@ -271,6 +271,12 @@ export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'su
   const rockB = hblend(rockT, rockN.b.sub(h), 2);
   const rockTone = float(1).add(broad.mul(0.25));
   col = mix(col, rockA.rgb.mul(rockTone).mul(macro), rockB); rough = mix(rough, rockA.a, rockB); ao = mix(ao, rockN.a, rockB);
+  // In volcanic country (its ground layer is basalt) the rock is black lava rock, not the biome's tan strata.
+  {
+    const kv = attribute('ground', 'vec4');
+    const basalt = float(1).sub(step(0.5, abs(kv.x.sub(LAYER('basalt'))))).mul(kv.y);
+    col = mix(col, col.mul(vec3(0.2, 0.19, 0.19)), rockB.mul(basalt));
+  }
   pert = mix(pert, rockP, rockB); h = mix(h, rockN.b, rockB);
 
   // The woods from afar: crowns and the shaded floor between them (@futuremagic/vegetation woodsFromAfar).
