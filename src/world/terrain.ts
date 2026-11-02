@@ -312,6 +312,9 @@ export class Terrain {
   rockAt(x: number, z: number, h: number): boolean {
     for (const f of this.volumes) if (f.inBounds(x, h + 0.3, z) && f.at(x, h + 0.3, z) < 0.8) return true;
     for (const d of this.holdList) if (holdBare(d, x, z)) return true;
+    // Lava, and the sulphur crusts round a volcano's vents: nothing grows there.
+    const v = this.volcanoes.holding(x, z);
+    if (v && (this.lavaAt(x, z) !== null || v.vents.some((e) => Math.hypot(x - e.x, z - e.z) < e.r * 1.8))) return true;
     return false;
   }
 
