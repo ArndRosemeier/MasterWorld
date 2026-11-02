@@ -9,9 +9,12 @@
 import type { SettingModule, SituationKind } from '../setting/contract';
 import type { DecisionLog, DungeonDecision, EventDecision, RegionDecision } from '../world/decisions';
 import { onLand } from '../world/dungeon/site';
+import type { Terrain } from '../world/terrain';
+import { nearestCoast } from '../world/coast';
 import { COURT } from '../world/hold';
 import type { Bridge } from '../world/bridges';
 import type { Town } from '../world/town';
+import type { Volcano } from '../world/volcano';
 import { polyCentroid, type TownBuilding } from '@futuremagic/settlement';
 import type { Need } from '../vgm/director';
 import type { Made } from '../vgm/toolbox';
@@ -26,6 +29,8 @@ import { atDoor, before, beside, clearStand, decisionsOf, nearestTo, outsideGate
 /** What the go-to list reaches in the running game. */
 export interface GoHost {
   readonly setting: SettingModule;
+  /** The land itself: the kinds of country, the biomes, the volcanoes and the coast are looked for in it. */
+  readonly terrain: Terrain;
   log(): DecisionLog;
   hours(): number;
   heroPos(): { readonly x: number; readonly z: number };
@@ -209,6 +214,36 @@ export function goSpots(h: GoHost): GoSpot[] {
       return at(d && beside(d, h.heroPos(), 30), `${w.id}'s ground`);
     });
   }
+
+  // The kinds of country, the biomes, the coast and the volcanoes (Arnd 2026-11-02): the nearest of each in this seed's land,
+  // found in the height field itself (the land opens round the hero as they arrive).
+  const R = 'Go to: terrain';
+  const sk = h.terrain.skeleton;
+  for (const k of sk.kinds) {
+    add(R, `Country: ${cap(k.id)}`, async () => { const f = sk.nearestKind(k.id, h.heroPos().x, h.heroPos().z); return at(f && { ...f, yaw: 0 }, `${k.id} country`); });
+  }
+  for (const b of h.setting.world.biomes) {
+    add(R, `Biome: ${b.name}`, async () => { const f = sk.nearestBiome(b.id, h.heroPos().x, h.heroPos().z); return at(f && { ...f, yaw: 0 }, `${b.id} (${b.name.toLowerCase()})`); });
+  }
+  for (const [kind, name] of [['beach', 'Beach'], ['cliff', 'Sea cliff (on its top)'], ['under', 'Under the sea']] as const) {
+    add(R, name, async () => {
+      const c = nearestCoast(h.terrain, kind, h.heroPos().x, h.heroPos().z);
+      return at(c && { x: c.x, z: c.z, yaw: Math.atan2(-c.seaX, -c.seaZ) }, name.toLowerCase());
+    });
+  }
+  /** Before a volcano on the side its lava spills, `d` m out, looking at its crater (a little up from afar). */
+  const volcano = (label: string, want: string, d: (v: Volcano) => number): void => {
+    add(R, label, async () => {
+      const p = h.heroPos(), v = h.terrain.volcanoes.nearestVolcano(p.x, p.z, want);
+      if (!v) return `no ${want === 'any' ? '' : `${want} `}volcano within 90 km`;
+      const out = d(v), x = v.x + Math.cos(v.phi0) * out, z = v.z + Math.sin(v.phi0) * out;
+      return at({ x, z, yaw: Math.atan2(x - v.x, z - v.z), at: v, arc: Math.PI / 3, pitch: out > 300 ? 0.1 : undefined }, `${v.state} volcano ${v.id}`);
+    });
+  };
+  volcano('Volcano', 'any', (v) => v.R * 0.65);
+  for (const state of ['erupting', 'lake', 'steaming'] as const) volcano(`Volcano: ${state}`, state, (v) => v.R * 0.65);
+  volcano('Volcano: crater rim', 'any', (v) => v.rimR * 1.35);
+  volcano('Volcano: from afar', 'any', () => 1100);
 
   // Dungeons of every kind (D51: the setting's dungeon kinds): before the way in, and down in it.
   const D = 'Go to: dungeons';
