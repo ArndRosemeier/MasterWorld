@@ -32,6 +32,7 @@
     "shot:origin": "node tools/shot/origin.mjs",
     "shot:spells": "node tools/shot/spells.mjs",
     "shot:rest": "node tools/shot/rest.mjs",
+    "shot:fall": "node tools/shot/fall.mjs",
     "shot:events": "node tools/shot/events.mjs",
     "shot:sights": "node tools/shot/sights.mjs",
     "shot:hits": "node tools/shot/hits.mjs",
