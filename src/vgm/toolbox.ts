@@ -9,7 +9,7 @@ import type { SettingModule } from '../setting/contract';
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
-import { caveFor } from './caves';
+import { caveFor, cliffCaveFor } from './caves';
 import { washedUpFor, wreckFor } from './wrecks';
 import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { festivityFor } from './festivities';
@@ -23,7 +23,9 @@ export type Asked = 'start' | 'walk' | 'turn' | 'need' | 'call';
 
 /** What the Builder's turn knows: the log, the land and towns, the hours, the hero and the setting. */
 export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & Omit<EventsContext, 'setting'> & {
-  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world' | 'asks' | 'twists'>;
+  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world' | 'asks' | 'twists' | 'sights' | 'noticing'>;
+  /** Where the hero is going, if the game knows and they are out on the land on foot (the cliff caves ahead of them; none: no way known). */
+  readonly toward?: { readonly x: number; readonly z: number } | null;
   /** Ask only these turn tools (by id); none: all of them. */
   readonly tools?: readonly string[];
   /** How much this player enjoys a need (C12: the player model); none: no lean. */
@@ -85,6 +87,8 @@ export const TOOLS: readonly Tool[] = [
     why: (d) => (d.kind === 'festivity' ? `${d.festivity} in ${d.town}${d.for ? `: the hero kept ${d.for}` : ''}` : d.kind) },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
   { id: 'cave', name: 'A cave in the cliffs', writes: ['dungeon'], need: 'discovery', asked: 'need', answer: caveFor },
+  { id: 'cliff-cave', name: 'Caves along a cliff', writes: ['dungeon'], need: 'discovery', asked: 'turn', next: (c) => cliffCaveFor({ ...c, hero: c.hero ?? { x: Infinity, z: Infinity }, toward: c.toward ?? null }),
+    why: (d) => (d.kind === 'dungeon' ? `a ${d.template} in a cliff ahead of the hero, as they run along it` : d.kind) },
   { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
   { id: 'washed-up', name: 'A wreck washed up', writes: ['sight'], need: 'reward', asked: 'need', answer: washedUpFor },
   { id: 'wreck', name: 'A wreck off the coast', writes: ['sight'], need: 'reward', asked: 'need', answer: wreckFor },

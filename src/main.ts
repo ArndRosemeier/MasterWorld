@@ -2255,6 +2255,8 @@ export async function start(b: Boot): Promise<void> {
       const made = vgmTurn({
         seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id),
         setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), beaten: (id) => wild?.bandBeaten(id) ?? false, hero: { x: player.walker.pos.x, z: player.walker.pos.z }, lean: (n) => director.model.lean(n),
+        // Out on the land on foot, where the world may press the hero: the way they are going (the caves along a cliff open ahead of it).
+        toward: visit() || here() || player.offFoot || !director.fair ? null : regionSites?.ahead(400) ?? null,
         // A story event's band needs the wild to roam in.
         tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which, ...vgmTimed,
       });
