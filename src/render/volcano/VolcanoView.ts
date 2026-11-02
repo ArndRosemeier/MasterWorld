@@ -16,6 +16,7 @@ import { kindMesh } from '../materials';
 import { GLOW, GLOW_FEET, GLOW_MAX, LAVA, STEAM, STEAM_COLUMNS, STEAM_FEET, STEAM_PUFFS, STEAM_SHAPE, VOLCANO_CRUST, VOLCANO_LAVA, VOLCANO_SULPHUR, createGlowMaterial, createSteamMaterial } from '../materials/volcano';
 import { ORIGIN } from '../origin';
 import type { Terrain } from '../../world/terrain';
+import { drawnOf } from '../../world/drawnGround';
 import { acrossFlow, flowHalf, type Flow, type Volcano } from '../../world/volcano';
 
 /** A volcano is drawn from this far off (m, from its middle) and let go beyond the second. */
@@ -24,8 +25,8 @@ const NEAR = 3200, FAR = 4400;
 const WRAP = 32768;
 /** How the lake's disc is cut: rays, rings, and the least it reaches beyond where the ground meets its level (m). */
 const RAYS = 160, RINGS = 18, LAP = 0.7;
-/** The lava lies this far over the ground it is laid on (m; `Terrain.lavaAt` says 0.3, the mesh's far levels of detail lie lower). */
-const ON = 0.62;
+/** The lava lies this far over the ground it is laid on (m): the ground as it is drawn (world/drawnGround.ts: the channel is a few metres wide, the mesh's quads 2 m, so the exact height lies far under or over the mesh), a hand's width up so the mesh's own curvature does not cut through. */
+const ON = 0.2;
 /** A flow's ribbon: metres between its cross-sections, and points across it. */
 const STEP = 4, ACROSS = 9;
 
@@ -184,7 +185,7 @@ export class VolcanoView {
       const half = flowHalf(f, r) * 1.0 + 0.4;
       for (let a = 0; a < ACROSS; a++) {
         const k = (a / (ACROSS - 1)) * 2 - 1, wx = c[0] - tz * half * k * 1.12, wz = c[1] + tx * half * k * 1.12;
-        pos.push(wx - v.x, this.terrain.height(wx, wz) + ON, wz - v.z);
+        pos.push(wx - v.x, drawnOf(this.terrain).footing(wx, wz) + ON, wz - v.z);
         uv.push(s, k);
         fx.push(1, hot(s) * (0.55 + 0.45 * Math.min(1, flowHalf(f, r) / 4)), half, ((v.seed + n * 977) % 1000) / 1000);
       }
@@ -217,7 +218,7 @@ export class VolcanoView {
         const u = i / RR, a = (k / RA) * Math.PI * 2, x = vent.x + Math.cos(a) * R * u, z = vent.z + Math.sin(a) * R * u;
         // Dome up to a ring a third of the way out, hollow in the middle.
         const dome = 0.34 * Math.sin(Math.min(1, u * 2.2) * Math.PI * 0.5) * (1 - u) - 0.16 * Math.max(0, 1 - u * 5);
-        pos.push(x - v.x, Math.max(this.terrain.height(x, z), h0 - 1.5) + 0.3 + dome, z - v.z);
+        pos.push(x - v.x, Math.max(drawnOf(this.terrain).footing(x, z), h0 - 1.5) + 0.1 + dome, z - v.z);
         nor.push(0, 1, 0);
         uv.push(Math.cos(a) * u, Math.sin(a) * u);
         fx.push(ph, 0, 0, 0);
@@ -268,7 +269,7 @@ export class VolcanoView {
       for (let i = 0; i < n; i++) {
         const a = rng.float() * Math.PI * 2, d = vent.r * rng.range(0.15, 1.15), x = vent.x + Math.cos(a) * d, z = vent.z + Math.sin(a) * d;
         const big = rng.float() < 0.2, h = big ? rng.range(0.7, 1.5) : rng.range(0.18, 0.7), w = h * rng.range(0.16, 0.3);
-        spike(x, this.terrain.height(x, z) + 0.05, z, h, w, Math.cos(a) * rng.range(0.1, 0.5) + rng.range(-0.2, 0.2), Math.sin(a) * rng.range(0.1, 0.5) + rng.range(-0.2, 0.2), rng.float() < 0.15 ? 0.7 : 0, rng.float() * 6);
+        spike(x, drawnOf(this.terrain).footing(x, z) - 0.05, z, h, w, Math.cos(a) * rng.range(0.1, 0.5) + rng.range(-0.2, 0.2), Math.sin(a) * rng.range(0.1, 0.5) + rng.range(-0.2, 0.2), rng.float() < 0.15 ? 0.7 : 0, rng.float() * 6);
       }
     }
     const g = new BufferGeometry();
