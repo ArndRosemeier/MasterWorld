@@ -364,7 +364,7 @@
     "reason": "The player's frame (walk, ride, puppet) and the water's: per-frame updates of different things."
   },
   {
-    "key": "idiom: [.add .mul .sub] in masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts",
+    "key": "idiom: [.add .mul .sub] in masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
     "reason": "TSL node arithmetic (a wave's phase as x * k - t * s + seed): each shader builds its own waves, the flame's licks, the spell glows and the water's ripples; plain math in the node language, not a copied helper."
   },
   {
@@ -420,7 +420,7 @@
     "reason": "Unrelated: the camera holds a scene's shot; a townsperson is held for a talk (and comes round their work first). Only the name matches."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/weather/WeatherView.ts + masterworld/sim/spots.ts + masterworld/sim/townLife.ts + masterworld/world/rocks.ts + masterworld/world/sites.ts + masterworld/world/volcano.ts",
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/volcano/VolcanoView.ts + masterworld/render/weather/WeatherView.ts + masterworld/sim/spots.ts + masterworld/sim/townLife.ts + masterworld/world/rocks.ts + masterworld/world/sites.ts + masterworld/world/volcano.ts",
     "reason": "A point at an angle and a distance from a middle (x + cos a * r, z + sin a * r): plain trigonometry, each placing its own things; rocks.ts added a fifth use (rocks round a tor's crown), volcano.ts a sixth (the crater rim's crests)."
   },
   {
@@ -544,7 +544,7 @@
     "reason": "WalkWorld's rockSurface as main's land and below-ground walk worlds give it (they ask the terrain's own and the open building's); the terrain's is the rock itself."
   },
   {
-    "key": "idiom: [.mul .sub] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/smoke.ts",
+    "key": "idiom: [.mul .sub] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/smoke.ts + masterworld/render/materials/volcano.ts",
     "reason": "TSL arithmetic (.add/.mul/.sub node chains) in shader code: how the shading language is written, not a copied routine. Surfaced with the cave pool's sheen (phase P fixes)."
   },
   {
@@ -564,7 +564,7 @@
     "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper (rocks.ts: the rock models, variants of each shape)."
   },
   {
-    "key": "idiom: [.setAttribute .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/materials/portal.ts + masterworld/render/portal/PortalView.ts + masterworld/render/water/WaterView.ts + stage/stage.ts",
+    "key": "idiom: [.setAttribute .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/materials/portal.ts + masterworld/render/portal/PortalView.ts + masterworld/render/volcano/VolcanoView.ts + masterworld/render/water/WaterView.ts + stage/stage.ts",
     "reason": "Three's BufferGeometry built by hand (attributes, then the index); each mesh builds its own shape."
   },
   {
@@ -780,7 +780,7 @@
     "reason": "Both turn builder arrays into typed arrays, but in different formats (the cave parts carry per-vertex tint and material bytes, the building mesh its own layout); a shared helper would only hide that."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/watch.ts + masterworld/world/cave/formations.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/render/volcano/VolcanoView.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/watch.ts + masterworld/world/cave/formations.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
     "reason": "Placing a point on a ring round (x, z): a trigonometric pair each, in different frames (a formation's saucer layers here)."
   },
   {
@@ -882,5 +882,33 @@
   {
     "key": "same name: masterworld/sim/formedGround.ts#spot + masterworld/sim/wild.ts#spot",
     "reason": "FormedGround.spot implements the DenGround seam (sim/dungeonNav.ts) as the wild ground's does; each picks a spot on its own ground."
+  },
+  {
+    "key": "idiom: [.PI .float Math] in masterworld/render/volcano/VolcanoView.ts + masterworld/world/landforms.ts + masterworld/world/rocks.ts",
+    "reason": "A random angle round a point (Math.PI * 2 * rng.float()): one expression, no shared work."
+  },
+  {
+    "key": "idiom: [.add .mul .x .y] in masterworld/render/materials/smoke.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "Shader node math of the materials (TSL): the same few operators strung in a different order for each look; not a copy."
+  },
+  {
+    "key": "idiom: [.add .mul .x] in masterworld/render/materials/flame.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/volcano.ts",
+    "reason": "Shader node math of the materials (TSL): the same few operators strung in a different order for each look; not a copy."
+  },
+  {
+    "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "Shader node math of the materials (TSL): the same few operators strung in a different order for each look; not a copy."
+  },
+  {
+    "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
+    "reason": "Shader node math of the materials (TSL): the same few operators strung in a different order for each look; not a copy."
+  },
+  {
+    "key": "idiom: [.mul .sub] in masterworld/render/materials/formedWater.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
+    "reason": "Shader node math of the materials (TSL): the same few operators strung in a different order for each look; not a copy."
+  },
+  {
+    "key": "idiom: [.from Array] in masterworld/render/materials/portal.ts + masterworld/render/materials/smoke.ts + masterworld/render/materials/volcano.ts",
+    "reason": "The uniform arrays the views fill each frame (Array.from({ length }, () => new Vector4())): one line each, owned by their own materials."
   }
 ]

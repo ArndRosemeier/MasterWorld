@@ -126,13 +126,13 @@ export class VolcanoView {
 
   /** The lake: a disc at its level over the crater, each ray cut back to where the ground rises to that level. */
   private lake(v: Volcano, level: number): Object3D {
-    const ground = (x: number, z: number) => this.terrain.height(x, z), reach = v.rimR * 1.25;
+    const heightHere = (x: number, z: number) => this.terrain.height(x, z), reach = v.rimR * 1.25;
     const rad = new Float32Array(RAYS);
     for (let k = 0; k < RAYS; k++) {
       const a = (k / RAYS) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
       let r = 2;
       // Out along the ray to the first ground at the lake's level (walls rise to it); the saddle's sill is a little over it.
-      while (r < reach && ground(v.x + c * r, v.z + s * r) < level + 0.05) r += 1.5;
+      while (r < reach && heightHere(v.x + c * r, v.z + s * r) < level + 0.05) r += 1.5;
       rad[k] = Math.min(r + LAP, reach);
     }
     const pos: number[] = [0, 0, 0], uv: number[] = [0, 0], fx: number[] = [0, 1, 0, 0.3], idx: number[] = [];
