@@ -5,6 +5,7 @@ import { Terrain } from '../src/world/terrain';
 import { settingById } from '../src/setting/index';
 import { goSpots, type GoHost } from '../src/app/goPlaces';
 import type { Stand } from '../src/app/places';
+import { woodsOf } from '../src/world/flora';
 import { SMALL } from './small';
 
 // The debug menu's terrain go-tos (Arnd 2026-11-02) on seed ajn1uw (volcanic country, a lake volcano and a steaming one near the start).
@@ -39,7 +40,17 @@ test('go to terrain: a kind of country and a biome put the hero well inside it',
   assert.ok(terrain.skeleton.kindShare('volcanic', volcanic.at.x, volcanic.at.z) > 0.99);
   const taiga = await go('Biome: Pine forest');
   assert.equal(terrain.skeleton.sample(taiga.at.x, taiga.at.z).biome, terrain.skeleton.shape.biomes.findIndex((b) => b.id === 'taiga'));
-  assert.match((await go('Biome: Desert')).said, /^no /, 'a biome this world lacks says so');
+  assert.ok(woodsOf(terrain)(taiga.at.x, taiga.at.z) > 0.9, 'a pine forest stands in thick woods, not in a clearing');
+});
+
+test('go to terrain: a biome is shown in plain country, and the warm ones are found hundreds of km south', async () => {
+  // A biome is shown in plain country, not on a moor's bare hills or a mesa's cliffs (Arnd: the meadow was rocky, bare and rough).
+  const meadow = await go('Biome: Meadows');
+  assert.ok(terrain.skeleton.kindShare('open', meadow.at.x, meadow.at.z) > 0.99);
+  // The warm biomes lie hundreds of kilometres to the south of the start (northCooling): found by the wide walk.
+  const jungle = await go('Biome: Jungle');
+  assert.equal(terrain.skeleton.sample(jungle.at.x, jungle.at.z).biome, terrain.skeleton.shape.biomes.findIndex((b) => b.id === 'jungle'));
+  assert.ok(Math.hypot(jungle.at.x - START.x, jungle.at.z - START.z) > 160_000, 'beyond the close walk');
 });
 
 test('go to terrain: a volcano of a state is stood before on the side its lava spills, facing the crater', async () => {

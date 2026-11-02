@@ -11,6 +11,7 @@ import type { DecisionLog, DungeonDecision, EventDecision, RegionDecision } from
 import { onLand } from '../world/dungeon/site';
 import type { Terrain } from '../world/terrain';
 import { nearestCoast } from '../world/coast';
+import { woodsOf } from '../world/flora';
 import { COURT } from '../world/hold';
 import type { Bridge } from '../world/bridges';
 import type { Town } from '../world/town';
@@ -222,8 +223,12 @@ export function goSpots(h: GoHost): GoSpot[] {
   for (const k of sk.kinds) {
     add(R, `Country: ${cap(k.id)}`, async () => { const f = sk.nearestKind(k.id, h.heroPos().x, h.heroPos().z); return at(f && { ...f, yaw: 0 }, `${k.id} country`); });
   }
+  // A woodland biome (its flora cover over 0) is shown in a thick wood: the woods are patchy (a few hundred metres), a taiga's clearing has no tree in sight.
+  const woods = woodsOf(h.terrain);
+  const thick = (x: number, z: number): boolean => [[0, 0], [60, 0], [-60, 0], [0, 60], [0, -60]].every(([dx, dz]) => woods(x + dx, z + dz) > 0.9);
   for (const b of h.setting.world.biomes) {
-    add(R, `Biome: ${b.name}`, async () => { const f = sk.nearestBiome(b.id, h.heroPos().x, h.heroPos().z); return at(f && { ...f, yaw: 0 }, `${b.id} (${b.name.toLowerCase()})`); });
+    const wooded = (b.flora?.cover ?? -1) > 0;
+    add(R, `Biome: ${b.name}`, async () => { const f = sk.nearestBiome(b.id, h.heroPos().x, h.heroPos().z, wooded ? thick : undefined); return at(f && { ...f, yaw: 0 }, `${b.id} (${b.name.toLowerCase()})`); });
   }
   for (const [kind, name] of [['beach', 'Beach'], ['cliff', 'Sea cliff (on its top)'], ['under', 'Under the sea']] as const) {
     add(R, name, async () => {
