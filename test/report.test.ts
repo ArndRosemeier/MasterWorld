@@ -45,13 +45,13 @@ test('report: a quiet place is a topic for its household only, and telling them 
 });
 
 test('report: once kept, nobody tells of the trouble any more, and the hailer has nobody to send', () => {
-  const { talk } = townTalk(seed, classic, town, people, first);
+  const { talk, folk } = townTalk(seed, classic, town, people, first);
   talk.clear(cellar.id);
   talk.toldSafe(owner.id, cellar.id, 'Thank you.');
   for (const p of [owner, inn]) {
     const news = talk.ask(p.id, 'news');
     assert.deepEqual(news.heard, [], `${talk.nameOf(p.id)} no longer tells of it: ${news.text}`);
-    assert.ok(classic.talk.nothing.includes(news.text), news.text);
+    assert.ok(classic.talk.persona.temperaments[folk.find((f) => f.person.id === p.id)!.persona.temperament].nothing.includes(news.text), news.text);
   }
   assert.equal(talk.knowersOf(new Set([cellar.id])).size, 0);
 });
