@@ -22,7 +22,7 @@ const NEAR = 700;
 /** How far round the hero (m) the open caves are counted against `noticing.caves.most`. */
 const OPEN_ROUND = 2500;
 /** Seeded looks for a cave ahead of the hero in view, at the most. */
-const LOOKS = 16;
+const LOOKS = 3;
 /** A cave keeps this far from a town's edge (m). */
 const OFF_TOWN = 120;
 
@@ -39,15 +39,14 @@ export function caveFor(c: NeedContext, apart = NEAR): DungeonDecision | null {
   if (!town) return null;
   const n = c.setting.noticing, way = c.toward ? Math.atan2(c.toward.z - c.hero.z, c.toward.x - c.hero.x) : null;
   if (n && way === null) return null;
-  // (Ahead of the hero a cliff that is also in view and faces them is rarer than any cliff: a few seeded looks are made, the first that fits is taken.)
+  const low = (x: number, z: number) => c.terrain.height(x, z), ahead = n && way !== null ? { yaw: way, spread: n.spread } : undefined;
+  // (Ahead of the hero a cliff that is also in view and faces them is rarer than any cliff: the ring is searched for the best spot that fits, so a few seeded looks are enough.)
   for (let look = 0; look < (n ? LOOKS : 1); look++) {
     const seed = look === 0 ? c.seed : deriveSeed(c.seed, 'cave-look', look);
-    const d = dungeonFor({ purpose: 'lead', town, kinds, near: { x: c.hero.x, z: c.hero.z, ring: n ? n.ahead : RING, ahead: n && way !== null ? { yaw: way, spread: n.spread } : undefined } }, { seed, terrain: c.terrain, log: c.log, home: c.home ?? town.decision, dungeons });
-    // Only a mouth in a cliff: a hillside cave is the Builder's promise to make, not this tool's.
-    if (!d?.site || !siteInCliff((x, z) => c.terrain.height(x, z), d.site)) continue;
-    if (c.towns.some((w) => farFrom(w, d.site!) < w.decision.radius + OFF_TOWN)) continue;
-    if (n && !facesAndShows(c, d.site, n)) continue;
-    return { ...d, at: c.hours };
+    // Only a mouth in a cliff (a hillside cave is the Builder's promise to make, not this tool's), off the towns, and in view and facing the hero.
+    const mouthFits = (x: number, z: number, yaw: number | undefined): boolean => yaw !== undefined && siteInCliff(low, { x, z, yaw }) && !c.towns.some((w) => farFrom(w, { x, z }) < w.decision.radius + OFF_TOWN) && (!n || facesAndShows(c, { x, z, yaw }, n));
+    const d = dungeonFor({ purpose: 'lead', town, kinds, near: { x: c.hero.x, z: c.hero.z, ring: n ? n.ahead : RING, ahead, accept: mouthFits } }, { seed, terrain: c.terrain, log: c.log, home: c.home ?? town.decision, dungeons });
+    if (d?.site) return { ...d, at: c.hours };
   }
   return null;
 }
