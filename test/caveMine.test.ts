@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { formedCave, caves, small } from './support/formedCave';
 import { formCave } from '../src/world/cave/form';
 import { oreAt } from '../src/world/cave/block';
+import { boxesMesh } from '../src/world/cave/fittings';
 import { rockFor, sharesFor } from '../src/world/cave/choose';
 
 test('mines (K8): moor and badlands hold hard rock with a long vein, the mine forms the same twice, and its adit is a way in from the land', () => {
@@ -33,4 +34,16 @@ test('mines (K8): the drifts run along the vein, so its ore shows in the wall; t
     const best = Math.max(...c.skeleton.conduits.filter((x) => x.kind === 'passage' && x.points.length > 5).map((x) => share(x.points)));
     assert.ok(best >= 0.6, `seed ${seed}: ore at the wall along ${(best * 100).toFixed(0)} % of the best drift`);
   }
+});
+
+test('mines (K8): timber sets, rails and a cart are fitted (inside the air, on the floor), and no cave but a mine has any', () => {
+  for (const seed of [1, 2, 4]) {
+    const { dressing } = formedCave(seed, 'hard-rock');
+    assert.ok(dressing.fittings.length >= 10, `seed ${seed}: ${dressing.fittings.length} fittings`);
+    assert.ok(dressing.fittings.some((k) => k.pitch > 1.5), 'timber posts stand');
+    assert.ok(dressing.fittings.every((k) => Number.isFinite(k.x + k.y + k.z + k.l + k.h + k.w) && k.l > 0 && k.h > 0 && k.w > 0));
+    const mesh = boxesMesh(dressing.fittings);
+    assert.equal(mesh.position.length / 3, dressing.fittings.length * 24, 'four corners on each of six faces');
+  }
+  assert.equal(formedCave(1, 'basalt').dressing.fittings.length, 0);
 });

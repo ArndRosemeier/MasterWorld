@@ -38,7 +38,7 @@ export function formedMeshes(res: Pick<CaveResult, 'mesh' | 'parts'>, origin: { 
   walls.name = 'cave walls';
   group.add(walls);
   if (res.parts) {
-    group.add(placed(caveGeometry(res.parts.formations), FORMED_CALCITE), placed(caveGeometry(res.parts.crystals), FORMED_CALCITE), placed(caveGeometry(res.parts.stones), FORMED_ROCK));
+    group.add(placed(caveGeometry(res.parts.formations), FORMED_CALCITE), placed(caveGeometry(res.parts.crystals), FORMED_CALCITE), placed(caveGeometry(res.parts.stones), FORMED_ROCK), placed(caveGeometry(res.parts.fittings), FORMED_CALCITE));
     const sheet = placed(waterGeometry(res.parts.water), FORMED_WATER);
     sheet.renderOrder = 2;
     group.add(sheet);

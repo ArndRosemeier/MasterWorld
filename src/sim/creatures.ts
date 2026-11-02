@@ -431,6 +431,8 @@ export class Den {
   private notice(c: Creature, q: Quarry, out: DenEvent[]): void {
     // One that warns first (D64) speaks before it fights; the hero beyond its warning distance is only watched.
     if (warns(c) && !c.surprise) { this.meet(c, q, out); return; }
+    // A murderous one (R8) falls on the hero at once, and its war cry says why.
+    if (c.def.stance?.kind === 'murderous') out.push({ kind: 'break', who: c, cause: 'murder' });
     out.push({ kind: 'notice', who: c });
     if (c.surprise && c.pleas === 0) { c.state = 'beg'; c.act = 'beg'; c.until = 0; return; }
     if (c.def.temper === 'skittish' && !this.brave(c, q)) { this.toFlee(c, out); return; }

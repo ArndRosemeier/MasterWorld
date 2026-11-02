@@ -230,6 +230,8 @@ export interface CaveMineDef {
   readonly stopeLength: readonly [number, number];
   /** How steeply an incline between two levels climbs (rise per metre). */
   readonly incline: number;
+  /** What people fitted in (world/cave/fittings.ts): timber sets every `posts` m (a post's half thickness, the beam's, the share of sets that stand), rails (gauge, rail thickness, sleeper spacing) and carts (most). */
+  readonly fittings: { readonly posts: number; readonly post: number; readonly beam: number; readonly timbered: number; readonly gauge: number; readonly rail: number; readonly sleeper: number; readonly carts: number };
 }
 
 /** One rock setting of a solution cave: the three patterns the water leaves (branchwork, network maze, braids) come from these numbers. */
@@ -940,6 +942,8 @@ export type StanceKind = (typeof STANCE_KINDS)[number];
 
 /** The kinds that warn before they fight (a bar's warning belongs to the hold). */
 export const WARNING_STANCES: readonly StanceKind[] = ['guard', 'rob', 'jeer'];
+/** The kinds whose speaker has lines: the warning ones, and the murderous with their war cry (R8). */
+export const SPEAKING_STANCES: readonly StanceKind[] = [...WARNING_STANCES, 'murderous'];
 
 /**
  * What a warning band says (D64): `warn` its first word (a guard's challenge, a robber's halt), `last` the final one, `demand` a robber's
@@ -956,15 +960,16 @@ export type WarnTurn = (typeof WARN_TURNS)[number];
 export const TALK_TURNS = ['terms', 'deal', 'short'] as const;
 export type TalkTurn = (typeof TALK_TURNS)[number];
 
-/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero, or the VGM knows a reason (the hero was hired against them, or killed their kin: `vgm/stance.ts`). */
-export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated', 'hired', 'kin'] as const;
+/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero, a cutthroat wants them dead (`murder`: R8, no warning at all), or the VGM knows a reason (the hero was hired against them, or killed their kin: `vgm/stance.ts`). */
+export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated', 'hired', 'kin', 'murder'] as const;
 export type BreakCause = (typeof BREAK_CAUSES)[number];
 
 /** What each warning stance says, and the ways its warning ends (the lines the setting must give). */
-export const STANCE_SPEECH: Readonly<Record<'guard' | 'rob' | 'jeer', { readonly turns: readonly WarnTurn[]; readonly breaks: readonly BreakCause[] }>> = {
+export const STANCE_SPEECH: Readonly<Record<'guard' | 'rob' | 'jeer' | 'murderous', { readonly turns: readonly WarnTurn[]; readonly breaks: readonly BreakCause[] }>> = {
   guard: { turns: ['warn', 'last', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin'] },
   rob: { turns: ['warn', 'demand', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'patience'] },
   jeer: { turns: ['jeer', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'many', 'frail'] },
+  murderous: { turns: [], breaks: ['murder', 'struck'] },
 };
 
 /** The lines of one stance: a pool for each turn it speaks (one picked, seeded) and for each way its warning ends. */
@@ -1961,7 +1966,7 @@ export interface FactionsDef {
   /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. Striking a band first (R7, once per band) moves it by `first`. */
   readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number; readonly first: number };
   /** What the one who speaks for a band says to the hero (D64), by stance: a short speech bubble, never anywhere else (rule 11). */
-  readonly words: Readonly<Partial<Record<'guard' | 'rob' | 'jeer', StanceWords>>>;
+  readonly words: Readonly<Partial<Record<'guard' | 'rob' | 'jeer' | 'murderous', StanceWords>>>;
 }
 
 export interface SettingModule {
@@ -2218,6 +2223,10 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
       range(m.halfWidth, `${w} mine drift half width`, 1.1); range(m.halfHeight, `${w} mine drift half height`, 1.45); range(m.levels, `${w} mine levels`, 1); range(m.crosscuts, `${w} mine crosscuts`); range(m.crosscutLength, `${w} mine crosscut length`, 6); range(m.stopeLength, `${w} mine stope length`, 3);
       if (!(m.square >= 0 && m.square <= 1 && m.gap >= 6 && m.adit >= 10 && m.roof >= 2 && m.stopes >= 0 && m.incline > 0 && m.incline <= 0.5)) out.push(`${where}: ${w} mine needs a square in 0..1, a level gap of 6 m or more, an adit of 10 m or more, a roof of 2 m or more and an incline in 0..0.5`);
     }
+    if (r.mine) {
+      const fi = r.mine.fittings;
+      if (!(fi.posts >= 2 && fi.post > 0.05 && fi.post < 0.5 && fi.beam > 0.05 && fi.beam < 0.5 && fi.timbered >= 0 && fi.timbered <= 1 && fi.gauge >= 0.5 && fi.gauge < 1.6 && fi.rail > 0.02 && fi.sleeper >= 0.6 && fi.carts >= 0)) out.push(`${where}: ${w} mine fittings are malformed (posts every 2 m or more, a gauge of 0.5 to 1.6 m)`);
+    }
     if (!(r.collapse.junction >= 0 && r.collapse.junction <= 1 && r.collapse.span > 0 && r.collapse.most >= 0)) out.push(`${where}: ${w} collapse is malformed`);
   }
   for (const g of c.geology) {
@@ -2285,7 +2294,7 @@ export function validateFactions(m: SettingModule, where: string): string[] {
     seen.add(key);
   }
   if (!(f.kill.own < 0 && f.kill.foes > 0 && f.kill.upTo > 0)) out.push(`${where}: factions.kill needs own below 0, foes and upTo above 0`);
-  for (const kind of ['guard', 'rob', 'jeer'] as const) {
+  for (const kind of ['guard', 'rob', 'jeer', 'murderous'] as const) {
     const need = STANCE_SPEECH[kind], w = f.words[kind];
     if (!w) { out.push(`${where}: stance ${kind} has no words`); continue; }
     for (const t of need.turns) if (!w.turns[t]?.length) out.push(`${where}: stance ${kind} has no line for ${t}`);

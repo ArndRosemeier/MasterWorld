@@ -80,6 +80,14 @@ export const factions: FactionsDef = {
         patience: ['Then we take it from your corpse!', 'Wrong answer! Get him, lads!'],
       },
     },
+    // Cutthroats say nothing before: they fall on the hero, and the cry is the reason.
+    murderous: {
+      turns: {},
+      breaks: {
+        murder: ['Your throat is my wage!', 'Die here, and quiet!', 'No witnesses!', 'Blood buys my supper!', 'Cut him down!'],
+        struck: ['He bites! Kill him!', 'Open him up!'],
+      },
+    },
     jeer: {
       turns: {
         jeer: ['Big one come! Snik cut him!', 'Pretty boots! Give-give!', 'Ha! Tall fool! Tall fool!', 'Go back! This our hole!', 'Smell him! He smell of soap!'],

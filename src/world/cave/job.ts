@@ -7,6 +7,7 @@ import { settingById } from '../../setting/index';
 import { bedAt } from './block';
 import { coarsen, formedMesh } from './carve';
 import { formationMesh } from './formations';
+import { boxesMesh } from './fittings';
 import { crystalsMesh, stonesMesh } from './loose';
 import { floorUnder, waterMesh, type WaterMesh } from './waterMesh';
 import type { PartMesh } from './parts';
@@ -37,7 +38,7 @@ export interface CaveResult {
   readonly skeleton: Skeleton;
   readonly dressing: Dressing | null;
   /** The dressing's loose parts as meshes (when it was dressed and meshed). */
-  readonly parts: { readonly formations: PartMesh; readonly stones: PartMesh; readonly crystals: PartMesh; readonly water: WaterMesh } | null;
+  readonly parts: { readonly formations: PartMesh; readonly stones: PartMesh; readonly crystals: PartMesh; readonly fittings: PartMesh; readonly water: WaterMesh } | null;
   /** The network of standable ground, its places and the ways the concession cut (when read). */
   readonly read: { readonly reading: Reading; readonly opened: readonly Opened[]; readonly ms: number } | null;
   /** The carved field, when asked for (`job.field`). */
@@ -70,7 +71,7 @@ export function runCaveJob(job: CaveJob): { result: CaveResult; transfer: ArrayB
   if (job.coarse !== 0) mesh = formedMesh(job.coarse && job.coarse > 1 ? coarsen(c.field, job.coarse) : c.field, c.block);
   const meshMs = Date.now() - t;
   const bedTint = (x: number, y: number, z: number): [number, number, number] => { const i = bedAt(c.block.beds, x, y, z) * 3, bc = c.block.beds.color; return [bc[i], bc[i + 1], bc[i + 2]]; };
-  const parts = dressing && job.coarse !== 0 ? { formations: formationMesh(dressing.speleos, job.seed), stones: stonesMesh(dressing.stones, job.seed, bedTint), crystals: crystalsMesh(dressing.crystals), water: waterMesh(dressing, caves.dress.water.bed, caves.dress.water.poolDepth, floorUnder(c.field as BrickField)) } : null;
+  const parts = dressing && job.coarse !== 0 ? { formations: formationMesh(dressing.speleos, job.seed), stones: stonesMesh(dressing.stones, job.seed, bedTint), crystals: crystalsMesh(dressing.crystals), fittings: boxesMesh(dressing.fittings), water: waterMesh(dressing, caves.dress.water.bed, caves.dress.water.poolDepth, floorUnder(c.field as BrickField)) } : null;
   const size = caves.sizes.find((s) => s.across === c.block.across && s.deep === c.block.deep)!;
   return {
     result: {

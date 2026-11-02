@@ -83,6 +83,12 @@ export const creatures: readonly CreatureDef[] = [
     loot: 'bandit', tell: 'Woodsmoke where no farm is, and a whistle that is not a bird.',
   },
   {
+    id: 'cutthroat', name: 'cutthroat', plural: 'cutthroats', body: { kind: 'humanoid', race: 'human', height: 1.84, outfit: 'bandit', held: 'bearded-axe' },
+    health: 48, armour: 3, defence: 28, speed: 5.4, senses: { sight: 24, hearing: 18 }, faction: 'cutthroats', temper: 'hostile', stance: { kind: 'murderous' }, morale: 0.8, pack: true, role: 'melee', danger: 18,
+    attacks: [{ name: 'axe', damage: [5, 11], kind: 'cut', reach: 1.0, time: 2.2, prowess: 34 }],
+    loot: 'bandit', tell: 'Crows lifting from a ditch, and a silence where birds should be.',
+  },
+  {
     id: 'wolf', name: 'wolf', plural: 'wolves', body: { kind: 'beast', species: 'wolf', length: 1.15, color: '#6e665a' },
     health: 26, armour: 0, defence: 26, speed: 7.5, senses: { sight: 26, hearing: 34 }, faction: 'predators', temper: 'hostile', morale: 0.5, pack: true, role: 'melee', danger: 6,
     attacks: [{ name: 'bite', damage: [3, 7], kind: 'bite', reach: 0.7, time: 1.3, prowess: 30 }],
