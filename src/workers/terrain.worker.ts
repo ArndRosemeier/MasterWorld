@@ -17,6 +17,7 @@ import type { BuildingMesh, TownBuilding, TownPlan } from '@futuremagic/settleme
 import { caveField, caveShell, type CaveField, type CaveThroat } from '../world/dungeon/caveRock';
 import { caveFeatures } from '../world/dungeon/caveFeatures';
 import { mouthOnLand, type CaveMouth } from '../world/dungeon/caveMouth';
+import { drawnOf } from '../world/drawnGround';
 import type { Site } from '../world/dungeon/site';
 import type { ScaledLayout } from '../world/dungeon/cellar';
 import { holdRockOnLand, type HoldRock } from '../world/holdRock';
@@ -65,7 +66,8 @@ serve<TerrainJob, TerrainResult>((job) => {
     return { result: { field, shell }, transfer: [...field.bricks.flatMap((b) => (b ? [b.buffer as ArrayBuffer] : [])), ...meshBuffers(shell)] };
   }
   if (job.kind === 'caveMouth') {
-    const t = terrain, mouth = mouthOnLand((x, z) => t.height(x, z), job.site, job.cave);
+    // Built on the ground as drawn (the hero's, the game's `ground`): a crag on the land's own height hung over or sank into the mesh where that steps over a sheer face.
+    const drawn = drawnOf(terrain), mouth = mouthOnLand((x, z) => drawn.footing(x, z), job.site, job.cave);
     return { result: mouth, transfer: [mouth.walk.blocked.buffer, ...meshBuffers(mouth.mesh)] };
   }
   if (job.kind === 'holdRock') {

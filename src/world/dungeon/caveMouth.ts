@@ -12,7 +12,7 @@ import { Noise, Rng, deriveSeed, smin, smoothstep } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { WildMat, scaleTint, type Tint } from './meshKit';
 import { cragMat, meshField, walkRaster, type Field, type WalkRaster } from './rockMesh';
-import { groundIn, type Site } from './site';
+import { groundIn, onLand, type Site } from './site';
 import { THROAT_BEYOND, THROAT_DARK, THROAT_GROW, throatAir, throatNoise } from './caveThroat';
 
 /** Where in the mouth the hero goes down (its frame): a hillside's, a cliff's (its way in is bigger). */
@@ -260,4 +260,25 @@ const PLAIN: Extent = EXTENT;
 /** Whether a cave's mouth at this site on the land goes into a cliff (a rise of more than `CLIFF_RISE` behind it). */
 export function siteInCliff(height: (x: number, z: number) => number, site: Site): boolean {
   return inCliff(groundIn(site, height, height(site.x, site.z)));
+}
+
+/**
+ * Where a mouth's rock is off the ground as drawn (for checks): the area (m²) of its skin that is `hover`ing, standing on the ground it
+ * was built on (`built`) more than half a metre over the drawn one (a lip hung in the air over a mesh that steps down a sheer face), and
+ * `buried` under the drawn one by more than that (hidden inside a mesh that steps up it). Both are 0 when it was built on the drawn ground.
+ * `base` is the height the frame's heights are from (the ground at the site, as built on).
+ */
+export function mouthOffGround(m: CaveMouth, site: Site, base: number, built: (x: number, z: number) => number, drawn: (x: number, z: number) => number): { hover: number; buried: number } {
+  const P = m.mesh.position, I = m.mesh.index;
+  let hover = 0, buried = 0;
+  for (let k = 0; k < I.length; k += 3) {
+    const a = I[k] * 3, b = I[k + 1] * 3, c = I[k + 2] * 3;
+    const e = [P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2], P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]];
+    const area = 0.5 * Math.hypot(e[1] * e[5] - e[2] * e[4], e[2] * e[3] - e[0] * e[5], e[0] * e[4] - e[1] * e[3]);
+    const x = (P[a] + P[b] + P[c]) / 3, y = base + (P[a + 1] + P[b + 1] + P[c + 1]) / 3, z = (P[a + 2] + P[b + 2] + P[c + 2]) / 3;
+    const [wx, wz] = onLand(site, x, z), gap = y - drawn(wx, wz);
+    if (gap < -0.5) buried += area;
+    else if (gap > 0.5 && Math.abs(y - built(wx, wz)) < 0.4) hover += area;
+  }
+  return { hover, buried };
 }

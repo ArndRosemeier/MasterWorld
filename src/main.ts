@@ -881,7 +881,8 @@ export async function start(b: Boot): Promise<void> {
       swapped: () => autosave(),
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
-      ground: (x, z) => terrain.height(x, z),
+      // What the pieces on the land (a cave's crag, a tower, a barrow) are set on: the ground as drawn, as the hero stands on it.
+      ground: (x, z) => drawn.footing(x, z),
       land: (x, z) => terrain.skeleton.kinds[terrain.skeleton.kindAt(x, z)].id,
       jobs: { caveRock: (l, c, k, t) => terrainJobs.caveRock(l, c, k, t), caveMouth: (s, c) => terrainJobs.caveMouth(s, c), formed: (j) => (cavePool ??= createCavePool(1)).run(j) },
       portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
