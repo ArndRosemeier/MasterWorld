@@ -172,6 +172,22 @@ export class Volcanoes {
     return out;
   }
 
+  /**
+   * The volcano nearest (x, z) that is `want` (`any`, one of the states, or an id), looked for in widening rings out to 90 km (null: none).
+   * For starts and the debug menu.
+   */
+  nearestVolcano(x: number, z: number, want = 'any'): Volcano | null {
+    for (const reach of [3000, 8000, 20000, 45000, 90000]) {
+      let best: Volcano | null = null, low = Infinity;
+      for (const v of this.nearTo(x, z, reach)) {
+        const d = Math.hypot(v.x - x, v.z - z);
+        if (d < low && (want === 'any' || v.state === want || v.id === want)) { low = d; best = v; }
+      }
+      if (best) return best;
+    }
+    return null;
+  }
+
   /** The volcano square (i, j) holds, from the seed: only where the land is wholly volcanic country, inland, level, dry and clear of towns. */
   private found(i: number, j: number): Volcano | null {
     const rng = new Rng(hash2i(this.seed, i, j)), sk = this.skeleton;
@@ -275,4 +291,20 @@ export function lowestCrest(v: Volcano, height: (x: number, z: number) => number
     low = Math.min(low, crest);
   }
   return low;
+}
+
+/** Is (x, z) on the crust round one of the volcano's vents (where nothing grows)? */
+export function nearVent(v: Volcano, x: number, z: number): boolean {
+  for (const e of v.vents) if (Math.hypot(x - e.x, z - e.z) < e.r * 1.8) return true;
+  return false;
+}
+
+/** Is (x, z) on the crater (its walls and the rim's crest) or beside a flow's lava, where nothing grows? */
+export function scorched(v: Volcano, x: number, z: number): boolean {
+  const dx = x - v.x, dz = z - v.z, r = Math.hypot(dx, dz);
+  if (r < v.rimR * 1.3) return true;
+  if (v.state !== 'erupting') return false;
+  const th = Math.atan2(dz, dx);
+  for (const f of v.flows) if (r > f.r0 - 15 && r < f.r1 + 12 && Math.abs(acrossFlow(f, r, th)) < flowHalf(f, r) * 2.8 + 3) return true;
+  return false;
 }

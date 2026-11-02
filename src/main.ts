@@ -89,6 +89,7 @@ const WAIT_FROM = 395, WAIT_UNSEEN = FAR + 10, WAIT_GONE = 600;
 import { burntBarns, castawayFor, castawaysAt, criesDue, situationOf, smokesAt } from './vgm/situations';
 import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
+import { VolcanoView } from './render/volcano/VolcanoView';
 import { Cellars } from './app/cellars';
 import { HatchClimb } from './app/hatchClimb';
 import { BunkSleep } from './app/bunkSleep';
@@ -469,6 +470,8 @@ export async function start(b: Boot): Promise<void> {
     };
     // Smoke over a raided farm (C10): one shader, built once the game is playable (warmLater).
     const smoke = new SmokeView(deriveSeed(seed, 'smoke'));
+    // The active volcanoes (K7d): lava, sulphur and steam, built when one comes in sight, its late shaders once the game is playable.
+    const volcanoes = new VolcanoView(terrain, view.stage, deriveSeed(seed, 'volcanoes'));
     compileEarly([wx.precip]);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
@@ -774,6 +777,7 @@ export async function start(b: Boot): Promise<void> {
     const warmLater = async (): Promise<void> => {
       await view.stage.add(smoke.mesh);
       smokeIn = true;
+      await volcanoes.switchOn();
       await spellView.enter(view.stage);
     };
 
@@ -1045,6 +1049,16 @@ export async function start(b: Boot): Promise<void> {
         // (Its mouth and rooms made first: a cave's portal is open when one arrives, not a moment after.)
         await cellars.buildNear(tx, tz);
         player.teleport(tx, undefined, tz, b.site.yaw);
+      }
+    }
+    // `volcano`: before an active volcano (the nearest, or of a state or id), on the side its lava spills, facing the crater (K7d).
+    if (params.volcano) {
+      const p0 = player.walker.pos, v = terrain.volcanoes.nearestVolcano(p0.x, p0.z, params.volcano);
+      if (v) {
+        const out = ({ rim: v.rimR * 1.35, foot: 420, far: 1100 } as Record<string, number>)[params.volcanoAt] ?? 420;
+        const tx = v.x + Math.cos(v.phi0) * out, tz = v.z + Math.sin(v.phi0) * out;
+        console.info(`[volcano] ${v.id} (${v.state}) at ${Math.round(v.x)}, ${Math.round(v.z)}, lake ${terrain.lakeLevel(v)?.toFixed(1) ?? 'none'}, floor ${terrain.height(v.x, v.z).toFixed(1)}, rim ${v.rimR.toFixed(0)} m, saddle ${v.phi0.toFixed(2)} rad, foot ${v.R.toFixed(0)} m, height ${v.H.toFixed(0)} m, vents ${v.vents.slice(0, 3).map((e) => `${Math.round(e.x)},${Math.round(e.z)} r${e.r.toFixed(0)}`).join(' | ')}`);
+        player.teleport(tx, undefined, tz, Math.atan2(v.x - tx, v.z - tz) + Math.PI);
       }
     }
     // `wreck`: in the sea 14 m off a wreck near the start town, facing her (one is put there now if there is none).
@@ -1908,6 +1922,7 @@ export async function start(b: Boot): Promise<void> {
     const brookHere = emptyWater();
     const spots = goSpots({
       setting,
+      terrain,
       log: () => log,
       hours,
       heroPos: () => player.walker.pos,
@@ -2550,6 +2565,7 @@ export async function start(b: Boot): Promise<void> {
         scorched = burnt;
       }
       if (smokeIn) smoke.billow(dt);
+      volcanoes.keepUp(dt, view.camera.position);
       part('sky');
       view.sky.update(dt, view.camera);
       // Down in the cellar the land above is out of the frame (visit.onDepth): its updates wait.
