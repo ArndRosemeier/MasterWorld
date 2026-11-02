@@ -305,13 +305,27 @@ export class TownLife {
     const was = this.kept;
     if (was.size === kept.size && [...kept].every(([id, b]) => was.get(id) === b)) return;
     this.kept = new Map(kept);
+    // Before the first step nobody has seen the town: those kept are at their posts from the start, not walking there.
+    this.skipping = this.time === 0;
     for (const a of this.agents) {
       const id = a.person.id;
       if (was.get(id) === kept.get(id) || a.held || a.post) continue;
       if (a.seek) a.seek = undefined;
       this.choose(a, false);
     }
+    this.skipping = false;
   }
+
+  /** The stall (a seller's spot) of market seller `id`, one each in turn (-1: the town has no stall). */
+  private stallOf(id: number): number {
+    if (!this.stalls) {
+      const stalls = this.spots.filter((s) => s.use === 'trade').map((s) => s.id);
+      this.stalls = new Map();
+      this.waiting.filter((p) => p.role === 'trader').sort((a, b) => a.id - b.id).forEach((p, k) => { if (stalls.length) this.stalls!.set(p.id, stalls[k % stalls.length]); });
+    }
+    return this.stalls.get(id) ?? -1;
+  }
+  private stalls: Map<number, number> | null = null;
 
   /** Whether a map mark keeps this person where they are. */
   isKept(id: number): boolean { return this.kept.has(id); }
@@ -716,11 +730,17 @@ export class TownLife {
     const inside = (spot: number) => at(spot, 'indoors', [120, 400]);
     const stroll = () => { const n = r.int(0, this.nav.xs.length - 1); return free(this.nav.xs[n], this.nav.zs[n], 'stroll', [20, 60]); };
     let task = a.task;
-    if (task === 'sleep') return at(home, 'sleep', [600, 1200]);
+    // The temple's keeper lies in the temple's cot, not in the house they were counted to (a fallen hero is brought to them).
+    if (task === 'sleep') return at(p.role === 'keeper' && this.temple >= 0 ? this.temple : home, 'sleep', [600, 1200]);
     // Marked on the hero's map (a teacher, one a mark sends the hero to): in that building while awake, where the
     // hero was sent to find them; a gathering, a feast or a market day does not take them from it.
     const kept = this.kept.get(p.id);
     if (kept !== undefined && this.doorOf(kept) >= 0) return inside(this.doorOf(kept));
+    // A market seller keeps their own stall through the working day, at meals and on a market day (the hero buys there).
+    if (p.role === 'trader' && (task === 'work' || task === 'meal' || task === 'order')) {
+      const stall = this.stallOf(p.id);
+      if (stall >= 0) return at(stall, 'sell');
+    }
     if (task === 'away') {
       // On the road: gone where it leaves the town (or still there).
       const [x, z] = this.roadEnds.length ? r.pick(this.roadEnds) : [this.spots[home].x, this.spots[home].z];

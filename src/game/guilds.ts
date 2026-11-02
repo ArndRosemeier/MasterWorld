@@ -99,11 +99,11 @@ export function staffGuilds(people: readonly Person[], houses: readonly GuildHou
   }
 }
 
-/** The bard at the inn (D49): one who works there besides the innkeeper, else the innkeeper. */
+/** The bard at the inn (D49): one who lives and works there besides the innkeeper (so they lie in its beds at night), else the innkeeper. */
 export function bardOf(people: readonly Person[], plan: TownPlan): Person | null {
   const inn = buildingOf(plan, 'inn');
   if (!inn) return null;
-  return people.find((p) => p.work === inn.id && p.role === 'hand') ?? people.find((p) => p.work === inn.id && p.role === 'trade') ?? null;
+  return people.find((p) => p.work === inn.id && p.home === inn.id && p.role === 'hand') ?? people.find((p) => p.work === inn.id && p.role === 'trade') ?? null;
 }
 
 /** The guild a townsperson teaches for (D49), if any: by their trade. */

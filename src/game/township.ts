@@ -20,7 +20,8 @@ import { restingAt } from '../vgm/answers';
 import { strayAt } from '../vgm/situations';
 import { onCircle } from '../world/sites';
 import type { Town } from '../world/town';
-import { bardOf, guildHouses, harbourHall, staffGuilds, type GuildHouse } from './guilds';
+import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
+import { postsOf, postTrades } from './posts';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
 import { keptAt } from '../sim/marked';
@@ -308,7 +309,7 @@ export class Township {
   /**
    * The map's marks (the open leads): whoever one is sent here to find (the innkeeper at the start, a cellar's
    * household) keeps to that building while awake (sim/marked.ts), instead of wandering the town; so does every
-   * guild house's keeper (the teachers), and the harbour master.
+   * guild house's keeper (the teachers), the harbour master and every shop and service master (game/posts.ts).
    */
   keepMarked(life: TownLife, marks: readonly { readonly id: string; readonly x: number; readonly z: number }[]): void {
     const t = this.talkOf;
@@ -317,23 +318,16 @@ export class Township {
     this.keptKey = key;
     this.keptLife = life;
     const kept = keptAt(this.town.plan, this.residents, marks.map((m) => ({ x: m.x, z: m.z, who: t && t.houseOf(m.id) >= 0 ? t.reportTo(m.id) : undefined })));
-    // The teachers keep to their houses too (one comes to the hedge witch's cottage to find her there).
-    for (const [id, b] of this.teachersAt) if (!kept.has(id)) kept.set(id, b);
-    // So does the harbour master, in their hall on the quay (one comes there for passage by ship).
-    const hall = harbourHall(this.town.plan), master = hall && this.residents.find((x) => x.work === hall.id && x.trade === 'harbourmaster');
-    if (hall && master && !kept.has(master.id)) kept.set(master.id, hall.id);
+    // Whoever the game's services rest on holds their post, day and night, whatever a mark says (game/posts.ts).
+    for (const [id, b] of this.postHolders) kept.set(id, b);
     life.keep(kept);
   }
 
-  /** Each guild house's keeper (by person id) and their house: where the hero comes to learn, always found there while awake. */
-  private get teachersAt(): Map<number, number> {
-    const out = new Map<number, number>();
-    for (const { guild, b } of this.guilds) {
-      const p = this.residents.find((x) => x.work === b.id && x.trade === guild.keeper);
-      if (p) out.set(p.id, b.id);
-    }
-    return out;
+  /** Who holds a post (game/posts.ts: every service's master, the teachers, the harbour master, the bard) and the building of it. */
+  private get postHolders(): Map<number, number> {
+    return this.postHoldersOf ??= postsOf(this.town.plan, this.residents, postTrades(this.c.setting));
   }
+  private postHoldersOf: Map<number, number> | null = null;
 
   /** Promises whose lost one was found alive this session (D62): they are on their way home. */
   private readonly homeAgain = new Set<string>();

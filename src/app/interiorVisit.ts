@@ -135,6 +135,8 @@ export class InteriorVisit {
    */
   async enter(door: TownDoor, _now = true, byHatch = false): Promise<void> {
     const o = await this.openUp(door), b = door.b;
+    // (A walk the hero was playing, a barrow's way out, would drag them back to where it was going.)
+    this.player.puppet = null;
     const hatch = byHatch ? hatchOf(o.plan) : undefined;
     if (hatch) {
       const l = this.wayDown(o, hatch).ladder;
