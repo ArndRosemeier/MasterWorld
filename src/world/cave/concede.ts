@@ -114,5 +114,6 @@ export function clearOpened(d: Dressing, opened: readonly Opened[]): Dressing {
     crystals: d.crystals.filter((c) => !cutsThrough(c.x, c.y, c.z)),
     rocks: d.rocks.filter((k) => !cutsThrough(k.x, k.y, k.z)),
     drips: d.drips.filter((p) => !cutsThrough(p.x, p.y, p.z)),
+    fittings: d.fittings.filter((k) => !cutsThrough(k.x, k.y, k.z)),
   };
 }
