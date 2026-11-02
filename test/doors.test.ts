@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DIRS, type PlacedLink } from '@futuremagic/dungeon';
 import { classic } from '../src/setting/classic/index';
-import { CELL, STOREY, outlineCellar, type Cellar } from '../src/world/dungeon/cellar';
+import { CELL, STOREY, type Cellar } from '../src/world/dungeon/cellar';
 import { DungeonSpace } from '../src/world/dungeon/space';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { Den, radiusOf, type DenEvent, type Quarry } from '../src/sim/creatures';
 import { DungeonNav } from '../src/sim/dungeonNav';
+import { testCellars } from './testCellars';
 
-const cellars: Cellar[] = Array.from({ length: 24 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar));
+const cellars: Cellar[] = testCellars(24);
 const guard = { defence: 20, armour: 1, open: false };
 
 /**

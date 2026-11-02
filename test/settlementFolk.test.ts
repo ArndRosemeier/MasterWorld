@@ -1,30 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { firstDecisions, startPlace } from '../src/vgm/builder';
-import { regionDecisions, walkFrontier } from '../src/vgm/frontier';
+import { regionDecisions } from '../src/vgm/frontier';
 import { nextPromise, openPromises } from '../src/vgm/leads';
 import { TownLife } from '../src/sim/townLife';
 import { townTalk, type TownTalkSave } from '../src/talk/townTalk';
 import { Township } from '../src/game/township';
 import { townSaves, type SaveData } from '../src/app/saveGame';
 import { houseKey } from '../src/world/town';
-import { Terrain } from '../src/world/terrain';
 import { settlementOf, type Decision, type DecisionLog } from '../src/world/decisions';
-import { SMALL } from './small';
 import { planInterior } from '@futuremagic/settlement';
 import { roomCast } from '../src/sim/roomCast';
+import { SOUTH, frontierLand } from './frontierLand';
 
-const seed = parseSeed('masterworld');
-// The start's land with small drainage tiles (as the frontier test): the same town, faster.
-const terrain = new Terrain(seed, classic, SMALL);
-const first = firstDecisions(terrain, startPlace(terrain));
-terrain.settle(first);
-const home = terrain.towns[0].decision;
-const regions = classic.regions!;
-const walked: DecisionLog = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, Math.PI / 2, 3)];
+// The start's land (test/frontierLand.ts; ours, as a hamlet is settled on it).
+const { seed, terrain, home, regions, walk } = frontierLand({ own: true });
+const walked: DecisionLog = walk(3, SOUTH);
 const hamlet = regionDecisions(walked).find((d) => settlementOf(d, regions.fills)?.size === 'hamlet')!;
 terrain.settleMore([hamlet]);
 const town = terrain.town(hamlet.id)!;

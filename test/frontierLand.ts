@@ -3,6 +3,7 @@ import { classic } from '../src/setting/classic/index';
 import { firstDecisions, startPlace, type OpenWorld } from '../src/vgm/builder';
 import type { StartPlace } from '../src/world/start';
 import type { RegionsDef } from '../src/setting/contract';
+import type { TownPlan } from '@futuremagic/settlement';
 import { promiseCellar } from '../src/vgm/dungeons';
 import { Terrain } from '../src/world/terrain';
 import { walkFrontier } from '../src/vgm/frontier';
@@ -19,6 +20,8 @@ export interface Land {
   readonly home: TownDecision;
   readonly start: StartPlace;
   readonly regions: RegionsDef;
+  /** The start town's plan (by town id): `terrain.settle(log, plans)` takes it instead of planning the town again. */
+  readonly plans: ReadonlyMap<string, TownPlan>;
   walk(km: number, dir: number, from?: DecisionLog): Decision[];
   along(dir: number): Decision[];
 }
@@ -56,13 +59,15 @@ function buildLand(base: Land | null): Land {
   const terrain = new Terrain(seed, classic, SMALL);
   const start = base ? { ...base.start } : startPlace(terrain);
   const built = base ? structuredClone(base.first) as Decision[] : firstDecisions(terrain, start);
-  terrain.settle(built);
+  // (An own land takes the shared land's plans for its start town: the same land plans the same town.)
+  terrain.settle(built, base?.plans);
   const first: Decision[] = guard ? (Object.freeze(built) as Decision[]) : built;
   if (guard) {
     for (const m of ['settle', 'settleMore', 'addTown', 'addRoad'] as const) {
       terrain[m] = () => { throw new Error(`the shared start land: use frontierLand({ own: true }) or startWorld({ own: true }) to ${m}`); };
     }
   }
+  const plans = new Map(terrain.towns.map((t) => [t.decision.id, t.plan]));
   const home = terrain.towns[0].decision;
   const regions = classic.regions!;
   /** Walks `km` from the start along `dir` (radians, atan2(z, x)). */
@@ -70,5 +75,5 @@ function buildLand(base: Land | null): Land {
   // The walks, made when a test first needs them (each test has its own time budget).
   const walks = new Map<number, Decision[]>();
   const along = (dir: number) => walks.get(dir) ?? walks.set(dir, guard ? (Object.freeze(walk(5, dir)) as Decision[]) : walk(5, dir)).get(dir)!;
-  return { seed, terrain, first, home, start, regions, walk, along };
+  return { seed, terrain, first, home, start, regions, plans, walk, along };
 }

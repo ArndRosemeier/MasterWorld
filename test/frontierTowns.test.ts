@@ -8,7 +8,7 @@ import { townPlanOf } from '../src/world/town';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement, woodsOf } from '../src/world/flora';
 import { EAST, SOUTH, WEST, frontierLand } from './frontierLand';
 
-const { along, first, home, regions, seed, terrain } = frontierLand({ own: true });
+const { along, first, home, regions, seed, terrain, plans } = frontierLand({ own: true });
 
 test('frontier: waystations, hamlets and villages are towns of their size from the one planner, settled from the log', () => {
   // Each walk numbers its regions from the start's: their places are named apart here (one region-16 a waystation
@@ -37,7 +37,7 @@ test('frontier: waystations, hamlets and villages are towns of their size from t
     const t = settlementOf(d, regions.fills)!;
     assert.ok(byFreshWater(terrain, t.x, t.z, t.radius), `${d.id} (${t.size}) has water`);
   }
-  terrain.settle(first);
+  terrain.settle(first, plans);
   assert.equal(terrain.towns.length, 1);
 });
 
@@ -75,6 +75,6 @@ test('frontier: trees keep out of a place and what its people cleared round it, 
   for (let i = 0; i < plants.length; i += FLORA_STRIDE) {
     if (FLORA_KINDS[plants[i + 5]].trunk > 0) assert.ok(Math.hypot(plants[i] - c.x, plants[i + 2] - c.z) >= c.r, 'no trunk in the clearing');
   }
-  terrain.settle(first);
+  terrain.settle(first, plans);
   assert.equal(terrain.clearings.has(place.id), false);
 });

@@ -1,13 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classic } from '../src/setting/classic/index';
-import { outlineCellar, type Cellar } from '../src/world/dungeon/cellar';
+import { type Cellar } from '../src/world/dungeon/cellar';
 import { DungeonSpace } from '../src/world/dungeon/space';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { DungeonSeen, LANTERN_CELLS } from '../src/game/dungeonMap';
 import { wallOf } from '../src/app/dungeonSheet';
+import { testCellars } from './testCellars';
 
-const cellars: Cellar[] = Array.from({ length: 6 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar));
+const cellars: Cellar[] = testCellars(6);
 
 test('dungeon map: a room stood in is known whole, the rest stays dark until walked near', () => {
   for (const c of cellars) {

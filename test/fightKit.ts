@@ -3,12 +3,12 @@ import { classic } from '../src/setting/classic/index';
 import { Character } from '../src/game/character';
 import type { Item } from '../src/game/items';
 import { Delve } from '../src/game/delve';
-import { outlineCellar, type Cellar } from '../src/world/dungeon/cellar';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
+import { type Cellar } from '../src/world/dungeon/cellar';
 import { DungeonSpace } from '../src/world/dungeon/space';
+import { testCellars } from './testCellars';
 
 export function cellarFight(seed: number, near = 2.5, gear: readonly Item[] = []) {
-  const c: Cellar = Array.from({ length: 24 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar)).find((x) => x.dweller.id === 'goblins')!;
+  const c: Cellar = testCellars(24).find((x) => x.dweller.id === 'goblins')!;
   const space = new DungeonSpace(c.layout);
   for (const pl of c.layout.links) space.open.add(pl.link.id);
   const hero = new Character(classic);
