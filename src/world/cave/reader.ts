@@ -74,6 +74,24 @@ export const PART_MIN = 60;
 
 const DIRS: readonly (readonly [number, number])[] = [[1, 0], [0, 1], [1, 1], [1, -1]];
 
+/**
+ * The cells reached from `start` over the links using no climb of more than `above` metres (the real climb up a tall face fails more
+ * often than not, so the concession ramps the ones the only way on climbs), and the cell each was reached from (-1 at a start or where not reached).
+ */
+export function reachFree(r: Reading, above: number, start: readonly number[]): { readonly reached: Uint8Array; readonly from: Int32Array } {
+  const reached = new Uint8Array(r.count), from = new Int32Array(r.count).fill(-1), queue: number[] = [];
+  for (const c of start) { reached[c] = 1; queue.push(c); }
+  for (let n = 0; n < queue.length; n++) {
+    const a = queue[n];
+    for (let e = r.edgeStart[a]; e < r.edgeStart[a + 1]; e++) {
+      const b = r.edgeTo[e];
+      if (reached[b] || (r.edgeKind[e] === 1 && Math.abs(r.y[b] - r.y[a]) > above)) continue;
+      reached[b] = 1; from[b] = a; queue.push(b);
+    }
+  }
+  return { reached, from };
+}
+
 /** Read a carved (and dressed) cave: its standable ground, links, network and places. `dressing` adds the stream's bank. */
 export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing?: Dressing, ticker: () => number = Date.now): Reading {
   const t0 = ticker(), way = caves.way, stand = way.stand + 0.05, { nx, nz, step } = f;
