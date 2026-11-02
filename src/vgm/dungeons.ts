@@ -65,7 +65,9 @@ export interface DungeonAsk {
   /** The town whose people may know of it (the household nearest it), and whose danger it has (D29). */
   readonly town: Town;
   /** Near this point (world metres), on `ring` round it; none: on the kind's own ring round the town. */
-  readonly near?: { readonly x: number; readonly z: number; readonly ring: readonly [number, number]; readonly ahead?: { readonly yaw: number; readonly spread: number } };
+  readonly near?: { readonly x: number; readonly z: number; readonly ring: readonly [number, number]; readonly ahead?: { readonly yaw: number; readonly spread: number };
+    /** Only a spot (as the ground moved it to, and its yaw) that this accepts: the best of those wins, not the best of all. */
+    readonly accept?: (x: number, z: number, yaw: number | undefined) => boolean };
   /** Who lives there (an encounter's id): only kinds whose lore has such dwellers. */
   readonly dwellers?: string;
   /** Only these kinds, tried in this order (none: those that fit, from a seeded start). */
@@ -243,7 +245,7 @@ export function promisePlace(kind: LandKind, form: DungeonForm, seed: number, te
   const n = dungeons.filter((d) => d.template === kind).length + 1;
   const s = deriveSeed(seed, 'vgm', kind, n);
   const { x: tx, z: tz } = town.decision;
-  const best = spotOnRing(form.stands, near?.ring ?? form.ring, s, terrain, near ?? town.decision, [...avoid, ...sitesIn(log, 150)], near?.ahead);
+  const best = spotOnRing(form.stands, near?.ring ?? form.ring, s, terrain, near ?? town.decision, [...avoid, ...sitesIn(log, 150)], near?.ahead, near?.accept);
   if (!best) return null;
   const dx = best.x - tx, dz = best.z - tz;
   // Facing into it is facing away from the town (yaw as the walker's: it faces (−sin, −cos)), unless its ground says otherwise.
@@ -263,7 +265,7 @@ const MESA_LEVEL = 15;
  * ground that fits the kind, away from `avoid`; null if none of the tries fits.
  */
 
-function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[], ahead?: { readonly yaw: number; readonly spread: number }): { x: number; z: number; score: number; yaw?: number } | null {
+function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[], ahead?: { readonly yaw: number; readonly spread: number }, accept?: (x: number, z: number, yaw: number | undefined) => boolean): { x: number; z: number; score: number; yaw?: number } | null {
   const r0 = ring[0], fit = GROUND[stands](terrain, s);
   // On the level of where it is asked from (D56): not up on a mesa's plateau or bench over a valley, whose way up
   // may be kilometres round to a pass.
@@ -279,7 +281,8 @@ function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number]
     if (!f || (f.x !== undefined && !dry(f.x, f.z!))) continue;
     // A sea cave found down at the shore keeps as far out as its ring asks.
     if (stands === 'shore' && Math.hypot(f.x! - at.x, f.z! - at.z) < r0) continue;
-    if (!best || f.score > best.score) best = { x, z, ...f };
+    // (The accepting test is dearer than the score: it is made only for a spot that would win.)
+    if ((!best || f.score > best.score) && (!accept || accept(f.x ?? x, f.z ?? z, f.yaw))) best = { x, z, ...f };
   }
   return best;
 }

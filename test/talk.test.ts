@@ -20,6 +20,8 @@ const inn = people.find((p) => town.plan.buildings[p.home].kind === 'inn' && p.r
 const household = people.filter((p) => p.home === cellar.building && p.role !== 'child');
 // A homemaker of a house far across town from the cellar's.
 const fromCellar = (p: (typeof people)[number]) => Math.hypot(town.plan.buildings[p.home].cx - town.plan.buildings[cellar.building].cx, town.plan.buildings[p.home].cz - town.plan.buildings[cellar.building].cz);
+/** How a person tells what they only heard: the start of their temperament's hearsay line (D68), so told in their own words. */
+const hearsayLead = (folk: ReturnType<typeof townTalk>['folk'], id: number) => classic.talk.persona.temperaments[folk.find((f) => f.person.id === id)!.persona.temperament].heard.split('{claim}')[0];
 const stranger = people.filter((p) => p.home !== inn.home && p.home !== cellar.building && p.role === 'homemaker').sort((a, b) => fromCellar(b) - fromCellar(a))[0];
 
 test('talk: every townsperson has a name, and households share their family name', () => {
@@ -37,19 +39,21 @@ test('talk: every townsperson has a name, and households share their family name
 });
 
 test('talk: the household knows first-hand, the inn heard it from them, a stranger knows nothing', () => {
-  const { talk } = townTalk(seed, classic, town, people, log);
+  const { talk, folk } = townTalk(seed, classic, town, people, log);
   const own = talk.ask(household[0].id, 'news');
   assert.deepEqual(own.heard, [cellar.id]);
   assert.match(own.text, /something is wrong in our cellar/i);
+  assert.ok(!own.text.startsWith(hearsayLead(folk, household[0].id)), 'first-hand is not hearsay');
   const innNews = talk.ask(inn.id, 'news');
   assert.deepEqual(innNews.heard, [cellar.id]);
-  assert.match(innNews.text, /heard/i, 'hearsay is told as hearsay');
+  assert.ok(innNews.text.startsWith(hearsayLead(folk, inn.id)), `hearsay is told as hearsay, in the innkeeper's voice: ${innNews.text}`);
   assert.ok(talk.topics(inn.id).some((t) => t.id === 'source'));
   const source = talk.ask(inn.id, 'source');
   assert.ok(household.some((p) => source.text.includes(talk.nameOf(p.id))), `the inn names who told them: ${source.text}`);
   const none = talk.ask(stranger.id, 'news');
   assert.deepEqual(none.heard, []);
-  assert.ok(classic.talk.nothing.includes(none.text), 'plain talk for knowing nothing');
+  const voice = classic.talk.persona.temperaments[folk.find((f) => f.person.id === stranger.id)!.persona.temperament];
+  assert.ok(voice.nothing.includes(none.text), 'plain talk for knowing nothing, in their own voice');
 });
 
 test('talk: once heard, the lead is a topic; the household tells the signs one by one', () => {
@@ -79,7 +83,7 @@ test('talk: saved and restored, the townsfolk still know what they learned and t
   const again = townTalk(seed, classic, town, people, log, saved).talk;
   assert.ok(again.topics(inn.id).some((t) => t.lead));
   assert.ok(again instanceof TownTalk && folk.length === people.length);
-  assert.match(again.ask(inn.id, 'news').text, /heard/i);
+  assert.ok(again.ask(inn.id, 'news').text.startsWith(hearsayLead(folk, inn.id)));
 });
 
 test('talk: the journal keeps one lead per promise, with every new thing told', () => {

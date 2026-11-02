@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 16;
+export const CONTRACT_VERSION = 17;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -779,6 +779,18 @@ export interface WildDef {
   readonly groups: number;
   /** How many in a group, within the encounter's own count (none: the encounter's count). */
   readonly count?: readonly [number, number];
+  /** What the people who know the land say of them (D68, N2): none: nobody speaks of them. */
+  readonly lore?: WildLore;
+}
+
+/**
+ * What is told of a group of the wild (D68, N2): `told` the clause as they tell it (`{dir}` where it lies from the town: "north-east"),
+ * `by` who knows it first-hand from their own rounds, and everyone else hears it from them: a person who takes up one of the pursuits, works one of the
+ * trades (the building's trade), or is of the town's watch.
+ */
+export interface WildLore {
+  readonly told: string;
+  readonly by: { readonly pursuits?: readonly string[]; readonly trades?: readonly string[]; readonly watch?: boolean };
 }
 
 /**
@@ -1670,6 +1682,73 @@ export interface NamesDef {
   readonly family: readonly string[];
 }
 
+/** The temperaments a person can have (Conversations' profile: how they speak). */
+export const TEMPERAMENTS = ['warm', 'reserved', 'curious', 'dry', 'lively'] as const;
+export type Temperament = (typeof TEMPERAMENTS)[number];
+/** Roughly where a person is in life (Conversations' profile `ageGroup`). */
+export const AGE_GROUPS = ['young', 'adult', 'elder'] as const;
+export type AgeGroup = (typeof AGE_GROUPS)[number];
+
+/**
+ * Something a person does with their free hours (D68, N1): keeping bees, whittling, singing. A person has one or
+ * two; they are what they tell of themselves, what they talk of with each other (N6) and what a task of theirs is
+ * made from (N3). `id` is Conversations' pursuit id.
+ */
+export interface PursuitDef {
+  readonly id: string;
+  /** What it is called after "I keep coming back to" ("keeping bees"). */
+  readonly name: string;
+  /** Why they like it, one is picked (a reason in the first person). */
+  readonly reasons: readonly string[];
+  /** What they say of it when asked who they are: whole sentences, one is picked per person. */
+  readonly self: readonly string[];
+  /** How common it is among those it fits. */
+  readonly weight: number;
+  /** Who takes it up; none of these: anyone. Trades are the building's trade ('smith'); '' is a household without one. */
+  readonly trades?: readonly string[];
+  readonly roles?: readonly string[];
+  readonly ages?: readonly AgeGroup[];
+  readonly races?: readonly string[];
+}
+
+/** How a temperament speaks and how likely it is to be someone's (D68, N1). Lines are first person; `{claim}` is what they know. */
+export interface TemperamentDef {
+  /** The odds of the temperament for someone: `base` plus each of their traits (0..1) times its weight; `young` and `old` are 1 for those age groups. */
+  readonly lean: { readonly base: number; readonly social: number; readonly diligent: number; readonly pious: number; readonly early: number; readonly young: number; readonly old: number };
+  /** How they give their name, the start of "Who are you?" (`{name}`); one is picked per person. */
+  readonly intro: readonly string[];
+  /** The greeting as a talk opens, and the parting words; one each is picked per person. */
+  readonly greeting: readonly string[];
+  readonly farewell: readonly string[];
+  /** What they say of themselves when asked how they are, and when asked back. */
+  readonly wellbeing: readonly string[];
+  /** What they say when they know nothing of what was asked. */
+  readonly nothing: readonly string[];
+  /** What they know first-hand, and what they only heard (hearsay): each with `{claim}`. */
+  readonly sure: string;
+  readonly heard: string;
+  /** When asked how they know: first-hand (`{source}`, `{claim}`), and from another. */
+  readonly source: string;
+  readonly testimony: string;
+  /** What they add when there is more to tell. */
+  readonly more: string;
+  /** Their thanks, and what they say when they cannot follow. */
+  readonly thanks: string;
+  readonly repair: string;
+}
+
+/** Who people are, beyond their trade (D68, N1; docs/design/masterworld-plan.md 9.1). */
+export interface PersonaDef {
+  readonly temperaments: Readonly<Record<Temperament, TemperamentDef>>;
+  readonly pursuits: readonly PursuitDef[];
+  /** A sentence about their years, per age group; `{age}` their age. */
+  readonly ages: Readonly<Record<AgeGroup, readonly string[]>>;
+  /** From what age (human years) a person is young no more and old; `long` multiplies these for the long-lived peoples. */
+  readonly young: number;
+  readonly elder: number;
+  readonly long: Readonly<Record<string, number>>;
+}
+
 /**
  * How townsfolk talk (plan 9.1: topic-based dialogue through Conversations), in English for now. `{name}`,
  * `{family}`, `{house}`, `{trade}` and `{sign}` are filled in by the engine.
@@ -1679,8 +1758,6 @@ export interface TalkDef {
   readonly identity: Readonly<Record<string, string>>;
   /** The topics the player can pick, by id (greet, self, news, more, source, bye, and `lead` for a lead's topic). */
   readonly topics: Readonly<Record<string, string>>;
-  /** What is said when someone knows nothing of a topic. */
-  readonly nothing: readonly string[];
   /** How a house is called: `{house}` the building ("the cottage"), `{family}` the household's name. */
   readonly house: string;
   /** How a promised cellar is called (`{house}` from above). */
@@ -1712,6 +1789,10 @@ export interface TalkDef {
   readonly happened?: { readonly saw: string; readonly heard: string };
   /** The hero's own first journal page in a new game (`{inn}`: the inn as it is called): where to ask. */
   readonly arrival: { readonly title: string; readonly text: string; readonly from: string };
+  /** Who the people are (D68): temperaments with their voices, pursuits, ages. */
+  readonly persona: PersonaDef;
+  /** What the people know of the land round the town (D68, N2): the topic that asks for it, and where those who know it have it from. */
+  readonly lore: { readonly topic: string; readonly source: string };
 }
 
 /**
@@ -2091,6 +2172,36 @@ export function guildOf(m: Pick<SettingModule, 'guilds'>, keeper: string | undef
   return keeper === undefined ? undefined : m.guilds?.find((g) => g.keeper === keeper);
 }
 
+/** The checks for who people are (D68, N1). */
+function validatePersona(p: PersonaDef, where: string): string[] {
+  const out: string[] = [];
+  for (const t of TEMPERAMENTS) {
+    const v = p.temperaments[t];
+    if (!v) { out.push(`${where}: persona has no temperament "${t}"`); continue; }
+    for (const k of ['intro', 'greeting', 'farewell', 'wellbeing', 'nothing'] as const) if (!v[k]?.length) out.push(`${where}: persona.${t}.${k} is empty`);
+    if (!v.intro?.every((l) => l.includes('{name}'))) out.push(`${where}: persona.${t}.intro lines must name {name}`);
+    if (!v.more) out.push(`${where}: persona.${t}.more is empty`);
+    for (const k of ['sure', 'heard', 'source', 'testimony'] as const) if (!v[k]?.includes('{claim}')) out.push(`${where}: persona.${t}.${k} must say {claim}`);
+    for (const k of ['source', 'testimony'] as const) if (!v[k]?.includes('{source}')) out.push(`${where}: persona.${t}.${k} must say {source}`);
+    if (!v.thanks || !v.repair) out.push(`${where}: persona.${t} needs thanks and repair`);
+    if (!Object.values(v.lean).every(Number.isFinite)) out.push(`${where}: persona.${t}.lean must be numbers`);
+  }
+  const ids = new Set<string>();
+  for (const d of p.pursuits) {
+    if (ids.has(d.id)) out.push(`${where}: pursuit "${d.id}" defined twice`);
+    ids.add(d.id);
+    if (!/^[a-z][a-z_]*$/.test(d.id)) out.push(`${where}: pursuit "${d.id}" id must be lowercase words joined with _`);
+    if (!d.name || !d.self.length || !d.reasons.length || !(d.weight > 0)) out.push(`${where}: pursuit "${d.id}" needs a name, self lines, reasons and a weight > 0`);
+  }
+  for (const g of AGE_GROUPS) {
+    if (!p.ages[g]?.length) out.push(`${where}: persona.ages.${g} is empty`);
+    // Each group has someone to take pursuits up: a child, a grown person.
+    if (!p.pursuits.some((d) => (!d.ages || d.ages.includes(g)))) out.push(`${where}: no pursuit fits the ${g}`);
+  }
+  if (!(p.young > 0 && p.elder > p.young)) out.push(`${where}: persona.young must be above 0 and below persona.elder`);
+  return out;
+}
+
 export function validateSetting(m: SettingModule): string[] {
   const out: string[] = [];
   const where = `setting "${m.id}"`;
@@ -2202,7 +2313,7 @@ export function validateSetting(m: SettingModule): string[] {
   const t = m.talk;
   for (const k of ['greet', 'self', 'news', 'more', 'source', 'bye']) if (!t.topics[k]) out.push(`${where}: talk topic "${k}" has no wording`);
   for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child', 'traveller']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);
-  if (!t.nothing.length) out.push(`${where}: talk.nothing is empty`);
+  out.push(...validatePersona(t.persona, where));
   if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
   out.push(...validateFight(m, where));
   out.push(...validatePeoples(m, where));
