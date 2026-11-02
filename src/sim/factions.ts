@@ -3,7 +3,7 @@
  * (ally, neutral, wary, hostile; the same both ways round, a faction its own ally). Nothing here changes during play: the hero's
  * standing (game/standing.ts) is the only thing that moves. Pure.
  */
-import type { FactionsDef, Hostility, SettingModule } from '../setting/contract';
+import type { CreatureDef, FactionsDef, Hostility, SettingModule } from '../setting/contract';
 import type { Person } from './people';
 
 const tables = new WeakMap<FactionsDef, Map<string, Hostility>>();
@@ -26,3 +26,6 @@ export const factionOfPerson = (p: Pick<Person, 'race'>): string => p.race;
 
 /** Every faction of the setting, the peoples first. */
 export const factionIds = (setting: Pick<SettingModule, 'peoples' | 'factions'>): string[] => [...setting.peoples.map((p) => p.id), ...setting.factions.others.map((f) => f.id)];
+
+/** The leader of a group (its first member's kind, as the setting's creatures name it). */
+export const leadOf = (setting: Pick<SettingModule, 'creatures'>, members: readonly string[]): CreatureDef | undefined => setting.creatures.find((c) => c.id === members[0]);

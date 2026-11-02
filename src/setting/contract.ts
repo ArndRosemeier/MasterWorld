@@ -915,20 +915,21 @@ export const WARNING_STANCES: readonly StanceKind[] = ['guard', 'rob', 'jeer'];
 
 /**
  * What a warning band says (D64): `warn` its first word (a guard's challenge, a robber's halt), `last` the final one, `demand` a robber's
- * price, `jeer` a goblin's jibe, `settle` giving way once the hero has gone back, `greet` its word to a friend.
+ * price, `jeer` a goblin's jibe, `settle` giving way once the hero has gone back, `greet` its word to a friend, `yield` backing off from
+ * a hero far above it (D58).
  */
-export const WARN_TURNS = ['warn', 'last', 'demand', 'jeer', 'settle', 'greet'] as const;
+export const WARN_TURNS = ['warn', 'last', 'demand', 'jeer', 'settle', 'greet', 'yield'] as const;
 export type WarnTurn = (typeof WARN_TURNS)[number];
 
-/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero. */
-export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated'] as const;
+/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero, or the VGM knows a reason (the hero was hired against them, or killed their kin: `vgm/stance.ts`). */
+export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated', 'hired', 'kin'] as const;
 export type BreakCause = (typeof BREAK_CAUSES)[number];
 
 /** What each warning stance says, and the ways its warning ends (the lines the setting must give). */
 export const STANCE_SPEECH: Readonly<Record<'guard' | 'rob' | 'jeer', { readonly turns: readonly WarnTurn[]; readonly breaks: readonly BreakCause[] }>> = {
-  guard: { turns: ['warn', 'last', 'settle', 'greet'], breaks: ['line', 'struck', 'hated'] },
-  rob: { turns: ['warn', 'demand', 'settle', 'greet'], breaks: ['line', 'struck', 'hated', 'patience'] },
-  jeer: { turns: ['jeer', 'settle', 'greet'], breaks: ['line', 'struck', 'hated', 'many', 'frail'] },
+  guard: { turns: ['warn', 'last', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin'] },
+  rob: { turns: ['warn', 'demand', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'patience'] },
+  jeer: { turns: ['jeer', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'many', 'frail'] },
 };
 
 /** The lines of one stance: a pool for each turn it speaks (one picked, seeded) and for each way its warning ends. */

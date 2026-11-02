@@ -41,8 +41,8 @@ export interface Creature {
   signalLeft: number;
   /** Weapon drawn while the band talks (its last warning, a robber's demand), though the fight has not begun. */
   armed: boolean;
-  /** It has greeted the hero already (a friend's faction: D65). */
-  greeted: boolean;
+  /** It has spoke the hero already (a friend's faction: D65). */
+  spoke: boolean;
   /** The band it warns the hero with (D64): the id of the one who noticed first; -1 while it is in none. */
   band: number;
   /** The one who breaks expectations. */
@@ -238,6 +238,11 @@ export class Den {
   private quarry: Quarry | null = null;
   /** Those held up this step by another body (not stuck: it is not counted towards a hop). */
   private readonly waiting = new Set<Creature>();
+  /**
+   * What the VGM knows that makes this den attack the hero on sight (D64, `vgm/stance.ts`): they were hired against it, or killed its kin.
+   * Set by the game when the den is woken or placed.
+   */
+  knows: 'hired' | 'kin' | null = null;
   /** The bands that warn the hero now (D64), by the id of the one who noticed first. */
   private readonly bands = new Map<number, Band>();
 
@@ -251,7 +256,7 @@ export class Den {
       const p = this.ground.spot(s.room, rng);
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
-        aware: 0, leader: id === 0 && def.pack, band: -1, signal: null, signalLeft: 0, armed: false, greeted: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
+        aware: 0, leader: id === 0 && def.pack, band: -1, signal: null, signalLeft: 0, armed: false, spoke: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
         repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
@@ -350,8 +355,13 @@ export class Den {
     if (this.peace) { if (c.state === 'alert' || c.state === 'warn') { c.state = 'idle'; c.band = -1; } return; }
     // Left a hero it could not reach: it keeps to itself a while.
     if (c.spurn > 0 && c.state === 'idle') return;
-    if ((c.state === 'idle' || c.state === 'alert') && c.aware >= 1 && !this.keepsOff(c, q) && !cowed(c, q)) this.notice(c, q, out);
-    else if (c.state === 'idle' && c.aware > 0.35) { c.state = 'alert'; c.path = []; }
+    const noticed = (c.state === 'idle' || c.state === 'alert') && c.aware >= 1 && !this.keepsOff(c, q);
+    if (noticed && !cowed(c, q)) this.notice(c, q, out);
+    else {
+      // Too weak against this hero (D58): one that would warn says so once, and keeps back.
+      if (noticed && warns(c)) this.yielding(c, q, out);
+      if (c.state === 'idle' && c.aware > 0.35) { c.state = 'alert'; c.path = []; }
+    }
   }
 
   private notice(c: Creature, q: Quarry, out: DenEvent[]): void {
@@ -365,20 +375,30 @@ export class Den {
     if (c.def.pack) this.call(c, out);
   }
 
+  /** A band that would warn but dares not (the hero far above it, D58): one of it says so once within its warning distance. */
+  private yielding(c: Creature, q: Quarry, out: DenEvent[]): void {
+    if (Math.hypot(q.x - c.x, q.z - c.z) > c.def.stance!.warn!) { c.spoke = false; return; }
+    const tier = q.regard?.(c.def.faction);
+    if (c.spoke || tier === 'friend' || tier === 'honoured') return;
+    for (const o of this.creatures) if (o === c || (o.def.faction === c.def.faction && this.hears(c, o))) o.spoke = true;
+    this.signalling(c, 'yield', []);
+    out.push({ kind: 'warn', who: c, turn: 'yield' });
+  }
+
   /**
    * Its faction's view of the hero picks what it does (D65): a hated hero is attacked at once, with the reason spoken; a friend is let pass
-   * and greeted once; anyone else gets the kind's own stance (stranger) or a warning (unwelcome: every stance that warns).
+   * and spoke once; anyone else gets the kind's own stance (stranger) or a warning (unwelcome: every stance that warns).
    */
   private meet(c: Creature, q: Quarry, out: DenEvent[]): void {
     const tier = q.regard?.(c.def.faction) ?? 'stranger', st = c.def.stance!;
-    if (Math.hypot(q.x - c.x, q.z - c.z) > st.warn!) { c.greeted = false; if (c.state === 'idle') { c.state = 'alert'; c.path = []; } return; }
-    if (tier === 'hated') {
-      out.push({ kind: 'break', who: c, cause: 'hated' }, { kind: 'notice', who: c });
+    if (Math.hypot(q.x - c.x, q.z - c.z) > st.warn!) { c.spoke = false; if (c.state === 'idle') { c.state = 'alert'; c.path = []; } return; }
+    if (tier === 'hated' || this.knows) {
+      out.push({ kind: 'break', who: c, cause: this.knows ?? 'hated' }, { kind: 'notice', who: c });
       c.state = 'fight';
       c.path = [];
       this.call(c, out);
     } else if (tier === 'friend' || tier === 'honoured') {
-      if (!c.greeted) { for (const o of this.creatures) if (o === c || (o.def.faction === c.def.faction && this.hears(c, o))) o.greeted = true; this.signalling(c, 'greet', []); out.push({ kind: 'warn', who: c, turn: 'greet' }); }
+      if (!c.spoke) { for (const o of this.creatures) if (o === c || (o.def.faction === c.def.faction && this.hears(c, o))) o.spoke = true; this.signalling(c, 'greet', []); out.push({ kind: 'warn', who: c, turn: 'greet' }); }
       c.state = 'idle';
       c.aware = 0.3;
     } else this.warnUp(c, q, out);

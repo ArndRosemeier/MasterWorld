@@ -88,7 +88,7 @@ export interface FoeDoing {
  * warning, a demand and a last word, cheering arms for a jibe, a shaken head for giving way, a nod for a friend. (A pointing arm and a
  * raised hand are new clips for Actors; until they are made these stand in.)
  */
-export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string>> = { warn: 'talk', last: 'talk', demand: 'talk', jeer: 'cheer', settle: 'shake head', greet: 'nod' };
+export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string>> = { warn: 'talk', last: 'talk', demand: 'talk', jeer: 'cheer', settle: 'shake head', greet: 'nod', yield: 'shake head' };
 
 /** The clip for it; the dead and the gaunt (ghouls) shamble and claw. */
 export function foeClip(def: CreatureDef, d: FoeDoing): string {

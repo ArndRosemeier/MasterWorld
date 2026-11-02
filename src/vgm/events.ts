@@ -13,6 +13,7 @@
  * Left alone past its `fades` hours an event runs its course without the hero (`fadedFor`, C11): the band goes,
  * a raid's beasts with it for good.
  */
+import { leadOf } from '../sim/factions';
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import { farmlandReach } from '@futuremagic/settlement';
 import type { LivestockKind, SettingModule, StoryEventDef } from '../setting/contract';
@@ -298,7 +299,7 @@ export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | '
   const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
   const where = eventWhere(setting, log, towns, e);
   if (!def || !town || !where) return null;
-  const lead = setting.creatures.find((x) => x.id === e.members[0]);
+  const lead = leadOf(setting, e.members);
   const words: Record<string, string> = {
     ...where,
     creatures: lead?.plural ?? 'creatures',
