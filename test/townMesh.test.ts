@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { townMeshes } from '../src/world/townMesh';
+import { readyMesh, townMeshBuffers, townMeshes } from '../src/world/townMesh';
 import { marketStart } from '../src/world/town';
 import { startWorld } from './frontierLand';
 
@@ -34,4 +34,14 @@ test('town: its fixtures out of doors are drawn (stalls, the well, benches ...) 
   assert.ok(town.fixtureAt(well.x, well.z, 0.3) && !town.solid(well.x, well.z, 0.3), 'the well stops the hero only');
   const s = marketStart(town.plan);
   assert.ok(!town.fixtureAt(s.x, s.z, 0.3), 'the market start is free');
+});
+
+test('town: a cell made ready in the worker has its floats and sphere, and hands them over with its buffers', () => {
+  const [c] = townMeshes(terrain.towns[0]);
+  const r = readyMesh(c.near);
+  assert.equal(r.tintF.length, c.near.tint.length);
+  assert.ok(Math.abs(r.tintF[0] - c.near.tint[0] / 255) < 1e-6 && r.matF[0] === c.near.mat[0]);
+  const [x, y, z, rad] = r.sphere, p = c.near.position;
+  for (let i = 0; i < p.length; i += 3) assert.ok(Math.hypot(p[i] - x, p[i + 1] - y, p[i + 2] - z) <= rad + 1e-4, 'every point in its sphere');
+  assert.equal(townMeshBuffers([{ ...c, near: r, far: readyMesh(c.far) }]).length, 16);
 });

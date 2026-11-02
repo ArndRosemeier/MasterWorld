@@ -244,3 +244,10 @@ export class WorldJobs {
 export async function until(test: () => boolean): Promise<void> {
   while (!test()) await new Promise((r) => setTimeout(r, 20));
 }
+
+export type CavePool = WorkerPool<import('./cave.worker').CaveJob, import('./cave.worker').CaveResult>;
+
+/** Formed caves (phase K) are formed, carved and meshed off the main thread. */
+export function createCavePool(size?: number): CavePool {
+  return new WorkerPool(() => new Worker(new URL('./cave.worker.ts', import.meta.url), { type: 'module' }), 'cave', size);
+}

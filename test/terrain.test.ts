@@ -76,8 +76,9 @@ test('shore: the ground runs smoothly through the waterline, beaches are low, so
 });
 
 test('chunk mesh: the level runs 0..1 and is smoother than the normals on a cliff', () => {
-  // A stretch of sea cliff north of the start.
-  const segs = 32, m = buildChunk(terrain, { x0: -31830, z0: 30870, size: 64, segs });
+  // A stretch of sea cliff north of the start, a rough one (where a face runs on smooth, its normals change little
+  // more than its level).
+  const segs = 32, m = buildChunk(terrain, { x0: -31766, z0: 30870, size: 64, segs });
   const n = segs + 1;
   let steepest = 1, level = 0, normal = 0;
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {

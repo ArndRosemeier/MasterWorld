@@ -2,7 +2,7 @@
  * The ability book (K): every ability the hero knows, with what it costs and does, to drag onto the action bar
  * (actionBarUi.ts). While it is open the bar wakes for arranging: sockets swap when dragged onto each other and
  * clear when dragged off. In warded brass (D45, windows.css; its own look in actionBar.css): the cards rise one
- * after another, and the ones already on the bar glow.
+ * after another, and the ones already on the bar glow. The foot shows the ability points free (D61).
  */
 import type { SettingModule } from '../setting/contract';
 import { BAR_EXTRAS, POTION } from '../game/actionBar';
@@ -34,7 +34,10 @@ export class AbilityBook extends BodyWindow {
       });
       return card;
     });
-    this.fill([el('div', { className: 'list' }, ...cards)], [el('span', { className: 'hint' }, 'Drag an ability onto the bar. On the bar, drag a socket onto another to swap them, or off the bar to clear it.')]);
+    // Ability points free (D61): what a trainer or a writing can still teach.
+    const pts = this.hero.points;
+    const points = el('span', { className: `points${pts ? '' : ' none'}`, title: 'One comes with every level; a potion of learning gives one more. A trainer or a writing takes one for each ability.' }, `Ability points: ${pts}`);
+    this.fill([el('div', { className: 'list' }, ...cards)], [points, el('span', { className: 'hint' }, 'Drag an ability onto the bar. On the bar, drag a socket onto another to swap them, or off the bar to clear it.')]);
   }
 
   protected closed(): void { this.bar.editing = false; }

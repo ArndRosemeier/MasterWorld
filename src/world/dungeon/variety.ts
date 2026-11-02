@@ -6,7 +6,7 @@ import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonForm } from '../../setting/contract';
 import type { DungeonDecision, DungeonTemplate } from '../decisions';
-import { isEmpty, outlineCellar, type Cellar, type DungeonPlace } from './cellar';
+import { drownedRooms, isEmpty, outlineCellar, type Cellar, type DungeonPlace } from './cellar';
 import { setPiecesFor } from './setPieces';
 
 export interface VarietyReport {
@@ -30,8 +30,8 @@ export function testHouse(i: number): TownBuilding {
   } as unknown as TownBuilding;
 }
 
-export function testDecision(i: number, base = 1, template: DungeonTemplate = 'cellar', also?: readonly string[]): DungeonDecision {
-  const pieces = setPiecesFor(template, also);
+export function testDecision(i: number, base = 1, template: DungeonTemplate = 'cellar', also?: readonly string[], flooded = false): DungeonDecision {
+  const pieces = setPiecesFor(template, also, flooded);
   return { kind: 'dungeon', id: `${template}-${i}`, template, town: 'town-1', building: i, seed: deriveSeed(base, 'variety', template === 'cellar' ? i : `${template}-${i}`), setPiece: pieces[i % pieces.length].id };
 }
 
@@ -54,7 +54,7 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
   const aspects: Record<string, string[]> = { layout: [], mainPattern: [], pattern: [], story: [], goalRoom: [], dressing: [], setPiece: [] };
   for (let i = 0; i < count; i++) {
     let c: Cellar;
-    try { c = outlineCellar(testDecision(i, base, template, lore.form.pieces), testPlace(i, template, lore.form), lore); } catch (e) { problems.push(`${template} ${i}: ${(e as Error).message}`); continue; }
+    try { c = outlineCellar(testDecision(i, base, template, lore.form.pieces, lore.form.space.flood !== undefined), testPlace(i, template, lore.form), lore); } catch (e) { problems.push(`${template} ${i}: ${(e as Error).message}`); continue; }
     const where = `${template} ${i} (${c.signature.split('|')[0]})`;
     if (c.pace.safe < 0) problems.push(`${where}: no safe spot`);
     if (!c.pace.shortcut) problems.push(`${where}: no shortcut out`);
@@ -65,6 +65,12 @@ export function checkVariety(lore: CellarLore, count: number, base = 1, template
     if (!c.clues.length) problems.push(`${where}: nothing to read`);
     if (!c.spawns.length && !isEmpty(c)) problems.push(`${where}: nobody lives there`);
     if (!c.hatch || c.hatch.kind !== lore.form.space.way) problems.push(`${where}: no way back out`);
+    if (lore.form.space.flood !== undefined) {
+      // A drowned storey (a sea cave): some of it under water, never the lair nor anyone living there.
+      const wet = drownedRooms(c.layout);
+      if (!wet.size) problems.push(`${where}: nothing under water`);
+      if (wet.has(c.graph.goal) || c.spawns.some((s) => wet.has(s.room))) problems.push(`${where}: the lair or its dwellers under water`);
+    }
     aspects.layout.push(c.signature);
     aspects.mainPattern.push(c.graph.patterns[0]);
     aspects.pattern.push(...c.graph.patterns.filter((p) => p !== 'shortcut' && p !== 'refuge'));

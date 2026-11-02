@@ -43,8 +43,12 @@ export interface SoundHost {
   flash(): { light: number; bearing: number };
   /** Where the hero is: out on the land, in a room (the building's kind), down in the cellar. */
   where(): { place: Place; room: string | null };
+  /** Down in a formed cave (K5): where it drips and runs, in world metres (null: not in one). */
+  cave(): { readonly drips: readonly (readonly [number, number, number])[]; readonly streams: readonly (readonly [number, number, number])[] } | null;
   /** Flying the free camera: no footsteps. */
   inFlight(): boolean;
+  /** The hero stands on a ship's deck (S10). */
+  aboard(): boolean;
   /** The horses about, and the one the hero rides (null: on foot). */
   horses(): readonly Steed[];
   riding(): Steed | null;
@@ -232,6 +236,11 @@ export class SoundDirector {
     this.notes([['title/bell', 0.55, 1.6, 0], ['title/bell', 0.35, 2.4, 0.12], ['title/ward', 0.5, 1.2, 0.25]]);
   }
 
+  /** A potion of learning drunk (D61): the ward's hum as its light rises, and a soft high bell as it sinks in. */
+  learnt(): void {
+    this.notes([['title/ward', 0.45, 0.8, 0.6], ['title/bell', 0.3, 2, 2.2]]);
+  }
+
   /** Coins changed hands (a trade). */
   coins(): void { this.host.engine.play('fight/coins', { bus: 'ui', gain: 0.8 }); }
 
@@ -294,8 +303,17 @@ export class SoundDirector {
     return {
       hour: this.host.hour(), place: where.place, room: where.room, under: this.host.camera.position.y < (this.host.water(camera.position.x, camera.position.z)?.level ?? -1e9) - 0.05 && where.place === 'land',
       rain: wx.rain, snow: wx.snow, wind: wx.wind, storm: wx.storm, height: Math.max(0, ground), sea, water, river: where.place === 'land' ? river : null,
-      fall: where.place === 'land' ? fall : null, town, woods: this.c.cover, conifer: this.c.conifer,
+      fall: where.place === 'land' ? fall : null, town, woods: this.c.cover, conifer: this.c.conifer, aboard: this.host.aboard(),
+      stream: where.place === 'cellar' ? this.streamNear() : undefined,
     };
+  }
+
+  /** Down in a formed cave: how far the nearest point of a stream in it is from the listener (Infinity: none). */
+  private streamNear(): number {
+    const cave = this.host.cave(), cam = this.host.camera.position;
+    let best = Infinity;
+    if (cave) for (const p of cave.streams) best = Math.min(best, Math.hypot(p[0] - cam.x, p[2] - cam.z, (p[1] - cam.y) * 0.5));
+    return best;
   }
 
   /** The hero's body: steps, jumps, landings, swimming. */
@@ -409,6 +427,13 @@ export class SoundDirector {
       if (this.clock < this.nextCall) return;
       const n = this.calls++, draw = (k: number): number => hashToFloat(hash3i(seed, n, k, 0xd217));
       this.nextCall = this.clock + 3 + draw(0) * 9;
+      // A formed cave drips where its roof does (K5): one of the drips within earshot, none where it is dry (a mine, a lava tube).
+      const cave = this.host.cave();
+      if (cave) {
+        const near = cave.drips.filter((p) => Math.hypot(p[0] - cam.x, p[2] - cam.z) < 16 && Math.abs(p[1] - cam.y) < 8);
+        if (near.length) { const p = near[Math.floor(draw(3) * near.length)]; e.play('call/drip', { at: [p[0], p[1] + 0.1, p[2]], ref: 3, gain: 0.6 }); }
+        return;
+      }
       const a = draw(1) * Math.PI * 2, d = 3 + draw(2) * 9;
       e.play('call/drip', { at: [cam.x + Math.cos(a) * d, cam.y + 1, cam.z + Math.sin(a) * d], ref: 3, gain: 0.6 });
       return;

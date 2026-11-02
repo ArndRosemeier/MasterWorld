@@ -47,6 +47,7 @@ test('places: the debug go-to has every kind of place the setting has, and finds
   const promised: string[] = [], entered: string[] = [];
   const host: GoHost = {
     setting: classic,
+    terrain,
     log: () => log,
     hours: () => 10,
     heroPos: () => stood ?? { x: town.decision.x, z: town.decision.z },

@@ -8,6 +8,7 @@
  * north (−z) and yaw π/2 faces west (−x).
  */
 import { clamp, damp } from '@futuremagic/core';
+import { caveHolds } from '../world/rockHolds';
 
 /** What the walker needs to know of the world around it. */
 export interface WalkWorld {
@@ -17,8 +18,12 @@ export interface WalkWorld {
   rockSurface(x: number, y: number, z: number): number | null;
   /** Calm water surface level here, or null where there is no water. */
   waterLevel(x: number, z: number): number | null;
-  /** Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. */
-  floor?(x: number, z: number): number | null;
+  /**
+   * Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. With
+   * `y` (the feet's height) a floor that has another over it (a ship's cabin under its castle's deck) is the one a step
+   * over the feet or below; a floor high over the feet may be left out (a deck over a swimmer is not under them).
+   */
+  floor?(x: number, z: number, y?: number): number | null;
   /** What the camera keeps clear of, if not `rockSurface` (a building one is in: its doorway shut too, so the camera stays in the room). */
   sightSurface?(x: number, y: number, z: number): number | null;
   /** Walls (buildings, furniture): does a body of radius `r` at (x, z), its feet at `y` (the storey it is on), touch one? */
@@ -48,11 +53,16 @@ export interface WalkIntent {
   up: boolean;
   /** Dive while swimming. */
   down: boolean;
+  /** Where the camera looks, up or down (rad, up positive): swimming forward, a look well down dives and well up rises. */
+  look?: number;
   /** How much of its speed the ground lets it make (0..1; a horse off the road). Default 1. */
   pace?: number;
 }
 
 /** `climb`: on a rock face; `pull`: pulling up over its top. */
+/** How far down (and up) the camera must look for a swimmer going forward to dive (rise), rad: past a third-person look down at the hero. */
+const DIVE_LOOK = 0.55, RISE_LOOK = 0.3;
+
 export type WalkMode = 'ground' | 'air' | 'swim' | 'climb' | 'pull';
 
 /** Speeds (m/s) and the body of something that walks (the hero's, a horse's in game/horse.ts). */
@@ -73,6 +83,13 @@ const PULL_RISE = 0.5;
 const OFF_FACE = 0.35;
 /** Pushing into a climbable face this long starts a climb (s): no climb by brushing past. */
 const GRIP_ON = 0.25;
+/** The highest ledge in a cave the body hops up on (m): a jump rises about a metre, and the feet go over an edge within a step of its top. */
+const HOP = 1.3;
+/**
+ * How far a swimming body ducks to get under a lower roof ahead (m), at most, tried a hand apart from the least: a
+ * lintel, or a drowned way's mouth under the water of a chamber with air (swum at the surface, its roof well under it).
+ */
+const DUCK_MOST = 3.5, DUCK_STEP = 0.15;
 
 /** The hero's. */
 export const WALK: WalkSpec = {
@@ -137,7 +154,7 @@ export class Walker {
    * `y` (so the walker can stand on an arch and walk under it).
    */
   support(x: number, z: number, y: number): number {
-    const h = Math.max(this.world.height(x, z), this.world.floor?.(x, z) ?? -Infinity);
+    const h = Math.max(this.world.height(x, z), this.world.floor?.(x, z, y) ?? -Infinity);
     let s = y + this.spec.step;
     if (s <= h) return h;
     for (let i = 0; i < 48; i++) {
@@ -154,6 +171,15 @@ export class Walker {
   private onFloor(x: number, z: number): boolean {
     const f = this.world.floor?.(x, z) ?? null;
     return f !== null && f >= this.world.height(x, z);
+  }
+
+  /** How deep the body is in a wall at (x, z), feet at y (m; 0: clear): its radius less the widest that is clear there. */
+  private wallDepth(x: number, y: number, z: number): number {
+    const w = this.world.wall, r = this.spec.radius;
+    if (!w || !w(x, z, r, y)) return 0;
+    let lo = 0, hi = r;
+    for (let i = 0; i < 7; i++) { const m = (lo + hi) / 2; if (w(x, z, m, y)) hi = m; else lo = m; }
+    return r - lo;
   }
 
   /** Whether the body would be in rock at (x, z) with its feet at y. */
@@ -188,7 +214,13 @@ export class Walker {
     const w = this.swimLevel(this.pos.x, this.pos.z, this.pos.y);
     if (w !== null) {
       this.mode = 'swim';
-      this.pos.y = Math.max(this.pos.y, this.floatAt(w));
+      // Up to the surface, or as far as the rock over the head lets it (a drowned way's roof).
+      const p = this.pos, top = this.floatAt(w);
+      while (p.y < top) {
+        const y = Math.min(top, p.y + 0.1), over = this.world.rockSurface(p.x, y + this.height, p.z);
+        if (over !== null && over < 0.1) break;
+        p.y = y;
+      }
     }
   }
 
@@ -211,10 +243,23 @@ export class Walker {
     // Across: blocked by rock (try each axis alone, to slide along a wall) and by too steep a slope. A body
     // already in something (placed against a tree) may move, so it can walk out.
     const stuck = this.bodyInRock(p.x, p.y, p.z), held = stuck ? this.clearance(p.x, p.y, p.z) : Infinity;
+    const walled = stuck ? this.wallDepth(p.x, p.y, p.z) : 0;
     const tryMove = (nx: number, nz: number): boolean => {
+      // Swimming under a roof that comes lower ahead (a drowned way's lintel, a tunnel narrowing up to its roof):
+      // the body ducks under it, also when it already brushes the rock (floated up into the top of a way).
+      if (this.mode === 'swim' && this.bodyInRock(nx, p.y, nz)) {
+        for (let d = 0.1; d <= DUCK_MOST; d += DUCK_STEP) {
+          if (this.bodyInRock(nx, p.y - d, nz) || p.y - d < this.support(nx, nz, p.y - d)) continue;
+          p.y -= d; p.x = nx; p.z = nz;
+          return true;
+        }
+        if (!stuck) return false;
+      }
       // Out, not further in (else it walks into the rock and up its face, or into the wall itself), unless going down
       // a step (the body sinks as it moves on: a tall head under a low edge on the way down a stair).
       if (stuck && this.clearance(nx, p.y, nz) < held - 1e-4 && !(this.mode === 'ground' && this.floorAhead(nx, nz) < p.y - 0.01)) return false;
+      // In a wall (a ship's rail or hull that moved onto it): out of it, never on through it.
+      if (stuck && walled > 0 && this.wallDepth(nx, p.y, nz) > walled + 1e-3) return false;
       // Going down a step the body sinks as it moves on, so the head is tested at the lower floor too
       // (else a tall body under a low edge climbs a stair it can never come down again).
       if (!stuck && this.bodyInRock(nx, p.y, nz)) {
@@ -251,7 +296,7 @@ export class Walker {
     // Pushing on into a face with holds: onto it.
     if (asked && intent.forward > 0.5 && this.stuckFor > 0 && this.spec.climb && (this.world.climbable || this.inRock())) {
       this.pushing += dt;
-      if (this.pushing >= GRIP_ON && this.gripFace(-sh, -ch)) return;
+      if (this.pushing >= GRIP_ON && (this.gripFace(-sh, -ch) || this.hopLedge(-sh, -ch))) return;
     } else this.pushing = 0;
 
     // Up and down.
@@ -282,8 +327,14 @@ export class Walker {
     } else {
       const top = level === null ? -Infinity : this.floatAt(level);
       // Up and down by choice; otherwise the body floats up to the surface.
-      const want = intent.up ? 1.4 : intent.down ? -1.4 : p.y < top - 0.05 ? 0.8 : 0;
+      // (Swimming forward, the camera's look steers too: well down dives, well up rises, level holds the depth.)
+      const looked = intent.look !== undefined && intent.forward > 0 ? (intent.look < -DIVE_LOOK ? -1 : intent.look > RISE_LOOK ? 1 : 0) : null;
+      const want = intent.up || this.surfacing ? 1.4 : intent.down || looked === -1 ? -1.4 : looked === 1 ? 1.4 : p.y < top - 0.05 && looked !== 0 ? 0.8 : 0;
       v.y += (want - v.y) * damp(4, dt);
+      // Under a roof (a drowned cave's): the head stops at the rock, in the air caught under it if there is any.
+      // (The whole body, not only the head's top: a way narrows up to its roof, and a body floated up into that is held.)
+      const roof = v.y > 0 ? this.world.rockSurface(p.x, p.y + v.y * dt + this.height, p.z) : null;
+      if ((roof !== null && roof < 0.1) || (v.y > 0 && !this.bodyInRock(p.x, p.y, p.z) && this.bodyInRock(p.x, p.y + v.y * dt, p.z))) v.y = 0;
       p.y = Math.min(top, p.y + v.y * dt);
       if (p.y <= ground) { p.y = ground; v.y = Math.max(0, v.y); }
       // Out of the water once the ground is high enough to wade.
@@ -330,12 +381,7 @@ export class Walker {
    */
   private holds(x: number, z: number, y: number): { nx: number; nz: number } | null {
     if (!this.inRock()) return this.world.climbable?.(x, z) ?? null;
-    const f = (px: number, py: number, pz: number) => this.world.rockSurface(px, py, pz) ?? -1, e = 0.15, h = y + 1;
-    if (f(x, h, z) > 0.6) return null;
-    const gx = f(x + e, h, z) - f(x - e, h, z), gy = f(x, h + e, z) - f(x, h - e, z), gz = f(x, h, z + e) - f(x, h, z - e);
-    const across = Math.hypot(gx, gz);
-    if (across < 1e-6 || across < 0.7 * Math.hypot(gx, gy, gz)) return null;
-    return { nx: -gx / across, nz: -gz / across };
+    return caveHolds((px, py, pz) => this.world.rockSurface(px, py, pz) ?? -1, x, z, y);
   }
 
   /** Onto the climbable face ahead (dx, dz: the way the body pushes), if it is one; whether it got on. */
@@ -353,6 +399,22 @@ export class Walker {
     p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.yaw = Math.atan2(-c.nx, -c.nz);
+    this.pushing = 0;
+    return true;
+  }
+
+  /**
+   * In a cave, pushing on into rock that is too high to step and too low to climb (a ledge, a rough steep ramp of the
+   * floor): the body hops up on it, seen as a jump. Whether it did.
+   */
+  private hopLedge(dx: number, dz: number): boolean {
+    if (!this.inRock() || this.mode !== 'ground') return false;
+    const p = this.pos, r = this.spec.radius + 0.25, fx = p.x + dx * r, fz = p.z + dz * r;
+    const top = this.support(fx, fz, p.y + HOP - this.spec.step);
+    if (top <= p.y + this.spec.step || top > p.y + HOP || this.bodyInRock(fx, top, fz)) return false;
+    this.mode = 'air';
+    this.vel.y = this.spec.jump;
+    this.airTop = p.y;
     this.pushing = 0;
     return true;
   }
@@ -430,6 +492,15 @@ export class Walker {
   /** The gait for the animator. */
   /** Speed over the ground, m/s. */
   get groundSpeed(): number { return Math.hypot(this.vel.x, this.vel.z); }
+
+  /** Out of breath (game/breath.ts): swimming, the body comes up whatever is pressed. */
+  surfacing = false;
+
+  /** The head is under the water (diving): the hero holds their breath (game/breath.ts). */
+  get headUnder(): boolean {
+    const w = this.mode === 'swim' ? this.world.waterLevel(this.pos.x, this.pos.z) : null;
+    return w !== null && this.pos.y + this.height * 0.9 < w;
+  }
 
   get gait(): 'idle' | 'walk' | 'run' | 'swim' | 'jump' | 'fall' {
     if (this.mode === 'swim') return 'swim';

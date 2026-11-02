@@ -119,6 +119,14 @@ export function cleanStoneSave(raw: unknown): PortalStoneSave {
   return { home, far, homeRealm: realmOf(r.homeRealm), farRealm: realmOf(r.farRealm), size };
 }
 
+/**
+ * A stone that marked no home yet is imprinted with `spawn` (the land, where a new hero starts): a hero stuck
+ * before ever marking a home still has a portal out. A stone with a home is left as it is.
+ */
+export function imprintSpawn(saved: PortalStoneSave, spawn: PortalFrame): PortalStoneSave {
+  return saved.home ? saved : { ...saved, home: spawn, far: null, homeRealm: 'land' };
+}
+
 export class PortalStone {
   home: PortalSide | null;
   far: PortalSide | null;

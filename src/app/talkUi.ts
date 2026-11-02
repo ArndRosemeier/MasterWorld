@@ -38,10 +38,14 @@ export interface TalkHost {
   heard(lead: { id: string; title: string; note: string }): void;
   /** The hero asked about story event `id` and was told of it (by `from`): the journal and map take it up. */
   heardOf(event: string, from: string): void;
+  /** A thief was named and dealt with (D62): promise `id`, caught or let go; or a lied-about thing given to its rightful household (Q3). */
+  named(id: string, ending: 'caught' | 'let-go' | 'given'): void;
   /** A service was asked for (trade, a repair, a room): the talk has ended, open its window. */
   serve(service: string, agent: Agent): void;
   /** The hero tells `agent` the place of promise `id` is safe again: the game pays and keeps it; their answer. */
   report(id: string, agent: Agent): Reply;
+  /** The hero is about to talk with `agent`: the VGM may have them ask a favour of the hero (D68, N3), which must be in the log before they greet. */
+  favour(agent: Agent): void;
   /** In a room: who is in it and where they stand there (their own x, z are out in the town); null outside. */
   readonly roomPeople: readonly { agent: Agent; x: number; z: number }[] | null;
 }
@@ -113,17 +117,22 @@ export class TalkUi {
     return this.host.roomPeople ?? this.folk.agents.filter((a) => !a.hidden).map((a) => ({ agent: a, x: a.x, z: a.z }));
   }
 
-  /** The grown-up nearest in front of the hero, within reach. */
+  /**
+   * The grown-up in front of the hero within reach whom the hero faces most: near and straight ahead (two at one
+   * table half a metre apart: the one the hero turns to, not always the nearer).
+   */
   private inFront(): Agent | null {
     const w = this.player.walker;
-    let best: Agent | null = null, bd = REACH;
+    let best: Agent | null = null, bs = Infinity;
     for (const { agent: a, x, z } of this.about()) {
       if (a.person.role === 'child') continue;
       const dx = x - w.pos.x, dz = z - w.pos.z, d = Math.hypot(dx, dz);
-      if (d >= bd) continue;
+      if (d >= REACH) continue;
       // The walker's yaw faces −z at 0 (walker.ts); the direction to them as the same kind of angle.
-      if (Math.abs(angleDiff(Math.atan2(-dx, -dz), w.yaw)) > FRONT) continue;
-      best = a; bd = d;
+      const off = Math.abs(angleDiff(Math.atan2(-dx, -dz), w.yaw));
+      if (off > FRONT) continue;
+      const score = d * (1 + 2 * off);
+      if (score < bs) { best = a; bs = score; }
     }
     return best;
   }
@@ -157,7 +166,10 @@ export class TalkUi {
     this.box.classList.add('open');
     this.host.paused(true);
     this.frame(a);
-    this.speak(this.talk.greet(a.person.id).text);
+    this.host.favour(a);
+    const hello = this.talk.greet(a.person.id);
+    this.speak(hello.text);
+    this.tellLeads(hello, this.talk.nameOf(a.person.id));
     this.offer();
   }
 
@@ -184,6 +196,15 @@ export class TalkUi {
     this.speak(r.text);
     const from = this.talk.nameOf(a.person.id);
     if (t.id.startsWith('event:')) this.host.heardOf(t.id.slice(6), from);
+    if (r.named) this.host.named(r.named.id, r.named.ending);
+    this.tellLeads(r, from);
+    if (r.opens) { const id = r.opens; this.topicList.replaceChildren(); setTimeout(() => { this.close(); this.host.serve(id, a); }, 600); return; }
+    if (r.done) { setTimeout(() => this.close(), 900); this.topicList.replaceChildren(); return; }
+    this.offer();
+  }
+
+  /** The leads a reply told of go into the journal, and the map is handed over for the place. */
+  private tellLeads(r: Reply, from: string): void {
     for (const id of r.heard) {
       const b = this.plan.buildings[this.talk.houseOf(id)];
       const title = fill(this.words.lead, { cellar: this.talk.cellarCalled(id) });
@@ -193,9 +214,6 @@ export class TalkUi {
       // The map is handed over in the world (app/handOverScene.ts), not told in the talk.
       this.host.heard({ id, title, note: fill(this.words.marked, { name: from, house: this.talk.houseCalled(id) }) });
     }
-    if (r.opens) { const id = r.opens; this.topicList.replaceChildren(); setTimeout(() => { this.close(); this.host.serve(id, a); }, 600); return; }
-    if (r.done) { setTimeout(() => this.close(), 900); this.topicList.replaceChildren(); return; }
-    this.offer();
   }
 
   private speak(text: string): void {

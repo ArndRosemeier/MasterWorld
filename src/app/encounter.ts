@@ -26,10 +26,13 @@ import { joltOf } from '../render/jolt';
 import { warning, type Director } from '../vgm/director';
 import { cap } from '../talk/townTalk';
 import { fill } from '../talk/folk';
+import { foeLine } from '../game/foeSpeech';
 import type { FightHud } from './fightHud';
+import { OVER_HEAD } from './speech';
 import type { Notes } from './notes';
 import type { Player } from './player';
 import { SearchKneel } from './searchKneel';
+import type { Fallen } from './fallen';
 
 export interface FightHost {
   readonly bindings: Bindings;
@@ -54,6 +57,14 @@ export interface FightHost {
    * (a cellar's household down its ladder, app/ownerComes.ts). True if someone comes (then no line says it is quiet).
    */
   stilled(id: string): boolean;
+  /** The place of a promise ended without what it asked (D62: a parley the hero broke): nobody pays. True once taken in. */
+  failed(id: string): boolean;
+  /** The hero killed one of this faction (D65): standing with it and with its foes moves. */
+  slain(faction: string): void;
+  /** The hero struck a band of this faction first, while it was talking or after its word (R7): a deed, once per band (`key`), kept in the log. */
+  struckFirst(faction: string, key: string): void;
+  /** Someone down there speaks (a parley's leader): a bubble over them while `at` gives where (null: gone). */
+  say(text: string, at: () => { x: number; y: number; z: number } | null): void;
 }
 
 /** Where an encounter is: a cellar, a band's ground. */
@@ -66,6 +77,8 @@ export interface Arena {
   readonly enclosed: boolean;
   /** As the Director's warning names it ('this cellar'). */
   readonly place: string;
+  /** Who it is, for what the hero does to it once (the wild group's territory id, the dungeon's id); none: its place stands for it. */
+  readonly id?: string;
   /** Its danger (D29: from who lives there). */
   readonly danger: number;
   /** The promise whose household waits to hear once it is quiet and the hero has left (null: none). */
@@ -88,24 +101,30 @@ export type FightCue =
   | { readonly kind: 'woke' }
   | { readonly kind: 'paid'; readonly coins: number };
 
+/** Walling up a breach (D62): seconds the stones take, and where the hero kneels before it (m out from it). */
+const SEAL_BUSY = 7, SEAL_FRONT = 0.75;
+/** What G does to what is near, as the HUD offers it. */
+const PROMPT: Record<Lootable['kind'], string> = { body: 'Search', hoard: 'Search', breach: 'Wall up', chief: 'Speak with' };
+
 export class Encounter {
   /** Hears every cue (the game's sound sets it); nothing listens by default. */
   onCue: (cue: FightCue) => void = () => {};
   /** A chest's lid lifted by k (0 shut, 1 open): its view sets it (a cellar's); nothing by default. */
   onLid: (hoard: number, k: number) => void = () => {};
+  /** A seal's breach walled up so far (D62; 0..1), as the hero sets the stones. */
+  onSeal: (k: number) => void = () => {};
   /** The hero kneeling to search (null: not searching). */
   private kneel: SearchKneel | null = null;
   private wasInside = false;
   private warned = false;
   private quietSaid = false;
+  private metSaid = false;
   /** The promise was kept and paid (its household was told). */
   paid: boolean;
   /** The game took in that it is quiet. */
   private reported = false;
   /** Its dwellers were replaced by new ones (a move-in): it no longer plays. */
   retired = false;
-  private down = 0;
-  private fallenFor = -1;
   private wasFighting = 0;
   private near: Lootable | null = null;
   private readonly ray = new Vector3();
@@ -195,12 +214,41 @@ export class Encounter {
     const l = this.near, p = this.player;
     if (!l || this.kneel || p.puppet) return null;
     const O = this.creatures.group.position, w = p.walker;
+    // A seal's breach (D62): kneeling before it, the stones go in course by course until it is walled up.
+    if (l.kind === 'breach') {
+      const b = this.delve.breach!, f = [-Math.sin(b.yaw), -Math.cos(b.yaw)];
+      this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, null, () => { this.delve.seal(); this.onSeal(1); }, { x: O.x + l.x + f[0] * SEAL_FRONT, z: O.z + l.z + f[1] * SEAL_FRONT }, { busy: SEAL_BUSY, work: (k) => this.onSeal(k) });
+      p.puppet = this.kneel;
+      return null;
+    }
+    // A parley's leader (D62): spoken with where the hero stands, the words over the leader's head.
+    if (l.kind === 'chief') {
+      const said = this.delve.speak();
+      if (said) {
+        this.bubble(l.who, said.text);
+      }
+      return null;
+    }
     const lid = l.kind === 'hoard' && l.hoard.prop ? (k: number) => this.onLid(l.hoard.id, k) : null;
     // A chest is opened from its front.
     const f = l.kind === 'hoard' ? l.hoard.front : undefined;
     this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, lid, () => this.found(l), f && { x: O.x + f[0], z: O.z + f[1] });
     p.puppet = this.kneel;
     return null;
+  }
+
+  /** `text` in a bubble over `who`'s head while they live (the bubble floats OVER_HEAD over the point it is given, so give the feet less that much below the head). */
+  private bubble(who: Creature, text: string): void {
+    const O = this.creatures.group.position, head = (who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1) - OVER_HEAD;
+    this.host.say(text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
+  }
+
+  /** What a band says and why it fights (D64), by whoever speaks for it: a bubble over their head, a line picked by who they are and how often they have spoken. */
+  private said = 0;
+  private foeSays(who: Creature, e: FightEvent & { readonly kind: 'warn' | 'break' }): void {
+    const n = this.said++;
+    const text = foeLine(this.setting, who.def, e.kind === 'warn' ? e.turn : e.cause, who.id, n);
+    if (text) this.bubble(who, text);
   }
 
   /** The hands are in what was searched: what it held, if anything. */
@@ -243,7 +291,8 @@ export class Encounter {
     if (this.retired) return;
     this.cueInside();
     this.creatures.group.visible = this.arena.shown;
-    if (!this.arena.inside && !this.paid && !this.reported && this.arena.promise && this.delve.beaten) this.reported = this.host.quiet(this.arena.promise);
+    if (!this.arena.inside && !this.paid && !this.reported && this.arena.promise && this.delve.met) this.reported = this.host.quiet(this.arena.promise);
+    if (!this.paid && !this.reported && this.arena.promise && this.delve.failed) this.reported = this.paid = this.host.failed(this.arena.promise);
   }
 
   private cueInside(): void {
@@ -261,18 +310,17 @@ export class Encounter {
     this.creatures.group.visible = true;
     const pose = this.heroPose();
     if (lead) {
-      this.hud.shown = this.arena.enclosed || this.delve.den.fighting.length > 0 || !!this.fight.target || this.hero.health < this.hero.maxHealth || !this.hero.alive;
+      this.hud.shown = this.arena.enclosed || this.delve.den.fighting.length > 0 || !!this.fight.target || !!this.near || this.hero.health < this.hero.maxHealth || !this.hero.alive;
       if (!this.warned) {
         this.warned = true;
         const w = warning(this.arena.danger, this.hero.power, this.arena.place, this.director.fairness);
         if (w) this.director.queue(w, 3);
       }
     }
-    // Fallen: the wards go dark, then the hero wakes at the inn.
+    // Fallen: the wards go dark, then the hero wakes at the inn (app/fallen.ts sees to that, whoever struck the blow).
     if (!this.hero.alive) {
       this.getUp();
-      this.down += dt;
-      if (lead && this.down > 3.2 && this.fallenFor >= 0) this.wakeUp();
+      this.fight.pick(null);
       this.creatures.pose(dt);
       return;
     }
@@ -292,11 +340,17 @@ export class Encounter {
     if (this.wasFighting > 0 && fighting === 0) this.director.met('challenge');
     if ((this.wasFighting > 0) !== (fighting > 0)) this.onCue({ kind: 'battle', on: fighting > 0 });
     this.wasFighting = fighting;
+    // Aura round every creature near in a fight, strong round the hero's target (sim/aura.ts).
+    this.creatures.auras(dt, pose, lead ? this.fight.target : null, fighting > 0 || !!this.fight.target);
     if (!this.quietSaid && this.delve.beaten) {
       this.quietSaid = true;
       this.onCue({ kind: 'quiet' });
+    }
+    // What was asked is done (D62: a fetch once the keepsake is in hand, someone lost once found): the household may come to the hero.
+    if (!this.metSaid && this.delve.met) {
+      this.metSaid = true;
       const comes = !this.paid && !!this.arena.promise && this.arena.inside && this.host.stilled(this.arena.promise);
-      if (this.arena.quietLine && !comes) this.director.queue(this.arena.quietLine, 2);
+      if (this.arena.quietLine && !comes && (this.delve.ask?.verb ?? 'clear') === 'clear') this.director.queue(this.arena.quietLine, 2);
     }
     if (!lead) return;
     if (this.kneel?.done) this.getUp();
@@ -304,7 +358,7 @@ export class Encounter {
     const stance = this.player.stance;
     const swinging = stance.action && this.player.hero ? this.player.hero.clock - stance.action.t0 < stance.action.dur : false;
     this.player.stance = { combat: fighting > 0 || this.fight.attacking, action: swinging ? stance.action : undefined };
-    this.hud.follow(this.fight, this.hero, this.near ? `Search ${this.near.name}` : null);
+    this.hud.follow(this.fight, this.hero, this.near ? `${PROMPT[this.near.kind]} ${this.near.name}` : null, pose);
   }
 
   /** What the Director watches (plan 4.3): who fights the hero, and how much danger knows of them. */
@@ -348,32 +402,20 @@ export class Encounter {
         break;
       case 'heal': this.hud.healed(); this.act('drink', 1.1); break;
       // Noticed, fleeing, slinking off spared: all seen on the creature, so nothing is said.
+      case 'warn': case 'break':
+        this.foeSays(e.who, e);
+        if (e.kind === 'break' && e.cause === 'struck') this.host.struckFirst(e.who.def.faction, this.arena.id ?? this.arena.place);
+        break;
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
       case 'spared': this.director.met('people', 0.5); break;
-      case 'killed': if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
+      case 'killed':
+        if (e.byHero) this.host.slain(e.who.def.faction);
+        if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
       case 'refused': this.notes.say(e.text, 2.5); break;
       case 'recipe': if (this.active) this.spellCues.push(e.event); break;
       case 'worn': if (e.state !== 'new') this.director.queue(fill(this.setting.upkeep.words[e.state], { item: e.item.name.toLowerCase() }), 1); break;
-      case 'fallen':
-        this.fallenFor = 0;
-        this.down = 0;
-        this.hud.fallen(true, 'You fall.');
-        this.host.still(true);
-        break;
       default: break;
     }
-  }
-
-  /** The wards gone dark: the hero wakes somewhere safe (classic), or stays down for good (roguelike). */
-  private wakeUp(): void {
-    this.fallenFor = -1;
-    this.fight.pick(null);
-    const woke = this.host.wake();
-    if (woke === null) return;
-    this.hud.fallen(false);
-    this.host.still(false);
-    this.onCue({ kind: 'woke' });
-    this.notes.say(woke, 8);
   }
 }
 
@@ -381,7 +423,9 @@ export class Encounter {
  * One frame of every encounter: those the hero is in play (the most stirred leads), the others rest;
  * with none, the hero catches breath and the HUD shows only while they are hurt.
  */
-export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[] }): void {
+export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly townDens?: readonly Den[]; readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[]; readonly fallen?: Fallen }): void {
+  // A fall is seen through whichever fight (if any) dealt it.
+  calm.fallen?.seeTo(dt, calm.hero);
   let best: Encounter | null = null;
   // A bird in the hero's place (bird form) is nothing the dwellers fight: every encounter rests meanwhile.
   const flown = !!calm.player.shape?.aloft;
@@ -389,7 +433,8 @@ export function stepEncounters(dt: number, all: readonly Encounter[], calm: { re
   // Out on the land, the bodies of different groups block each other too (cellars have frames of their own).
   const open: Den[] = [];
   for (const e of all) if (!flown && e.stir >= 0 && !e.arena.enclosed) open.push(e.delve.den);
-  for (const d of open) d.neighbours = open.filter((o) => o !== d);
+  // (A town's fighters, R6, stand beside them too: the raiders see and fight them.)
+  for (const d of open) d.neighbours = [...open.filter((o) => o !== d), ...(calm.townDens ?? [])];
   for (const e of all) {
     if (flown || e.stir < 0) { e.rest(); e.delve.den.neighbours = []; }
     else e.play(dt, e === best);

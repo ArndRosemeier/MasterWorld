@@ -3,18 +3,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { decodePack } from '@futuremagic/props';
 import { MEDIEVAL_NAMES, generateFacadeLayer, generateMedievalLayer } from '@futuremagic/texgen';
-import { classic } from '../src/setting/classic/index';
-import { CELL, STOREY, outlineCellar, type Cellar } from '../src/world/dungeon/cellar';
+import { CELL, STOREY, type Cellar } from '../src/world/dungeon/cellar';
 import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
 import { BuildingMat as M } from '../src/world/dungeon/meshKit';
 import { LAYER_MEAN, slotLayer } from '../src/world/dungeon/propModels';
 import { torchSpots } from '../src/world/dungeon/torches';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { TOWN_LAYERS } from '../src/render/terrain/groundTextures';
+import { testCellars } from './testCellars';
 
 const models = decodePack(readFileSync(new URL('../public/props/cellar.fmpk', import.meta.url)));
 const spec = JSON.parse(readFileSync(new URL('../tools/props/models.json', import.meta.url), 'utf8')) as { specs: string[] };
-const cellars: Cellar[] = Array.from({ length: 10 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar));
+const cellars: Cellar[] = testCellars(10);
 /** Each cellar's meshes with the models and with the kit alone, built once for all the tests. */
 const built = cellars.map((c) => ({ c, m: cellarMeshes(c, models), bare: cellarMeshes(c) }));
 

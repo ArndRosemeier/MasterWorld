@@ -3,9 +3,10 @@
  * is closer than `SPLIT` chunk sizes. Pure, so it is tested headless.
  */
 
-/** Side of the finest chunk, metres; with 64 segments a vertex every 2 m. */
-export const CHUNK0 = 128;
-export const SEGS = 64;
+import { CHUNK0 } from '../../world/chunkMesh';
+
+/** Side of the finest chunk, metres, and its segments (a vertex every 2 m): the world's, which the hero stands on. */
+export { CHUNK0, SEGS } from '../../world/chunkMesh';
 /** Level of the root chunks (128 m × 2^8 ≈ 33 km). */
 export const ROOT_LEVEL = 8;
 /** Split a chunk while the camera is closer than this many chunk sizes. */

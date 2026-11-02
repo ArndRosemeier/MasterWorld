@@ -16,9 +16,11 @@ import { cellarMeshes, type DoorPiece } from '../../world/dungeon/cellarMesh';
 import { buildingMeshAt, caveRockMeshAt } from '../materials/building';
 import { loadCellarProps } from './props';
 import { flameMesh } from '../materials/flame';
-import { caveShaftMesh, caveWaterMesh } from '../materials/caveWater';
+import { caveShaftMesh, caveWaterMesh, floodMesh } from '../materials/caveWater';
 import type { CaveFeatures } from '../../world/dungeon/caveFeatures';
 import { torchSpots } from '../../world/dungeon/torches';
+import { formedMeshes } from '../cave/formedMeshes';
+import type { CaveResult } from '../../world/cave/job';
 
 export class CellarView {
   readonly group = new Group();
@@ -31,8 +33,15 @@ export class CellarView {
   /** The keys lying where they are picked up, by room; and the rooms whose key is taken. */
   private readonly keys = new Map<number, Mesh>();
   private readonly taken = new Set<number>();
+  /** A seal's breach walled up (D62), course by course; and how far it is set (0..1). */
+  private seal: Mesh[] = [];
+  private sealed = 0;
   /** A cave's carved rock (world/dungeon/caveRock.ts), drawn with the rest; set before `add`. */
   rock: BuildingMesh | null = null;
+  /** A formed cave's walls, formations, stones and water (D63, K5), instead of `rock`; set before `add`. */
+  formed: Pick<CaveResult, 'mesh' | 'parts'> | null = null;
+  /** A formed cave's shut ways and the keys that lie in it (K6, world/cave/lockMesh.ts), instead of the story layout's doors and keys; set before `add`. */
+  locks: { readonly doors: DoorPiece[]; readonly keys: { readonly room: number; readonly mesh: BuildingMesh }[] } = { doors: [], keys: [] };
   /** A cave's water and shafts of daylight (world/dungeon/caveFeatures.ts); set before `add`. */
   cave: CaveFeatures | null = null;
   /** Walked into through a throat from its mouth (a portal): no ladder up stands at its way out; set before `add`. */
@@ -47,22 +56,26 @@ export class CellarView {
   async add(stage: Stage): Promise<void> {
     const m = cellarMeshes(this.cellar, await loadCellarProps(), this.throat);
     this.group.add(this.piece(m.shell, 'shell'), this.piece(m.props, 'props'));
-    if (this.rock) this.group.add(caveRockMeshAt(this.rock, this.origin.x, this.origin.y, this.origin.z));
+    if (this.formed) this.group.add(formedMeshes(this.formed, this.origin).group);
+    else if (this.rock) this.group.add(caveRockMeshAt(this.rock, this.origin.x, this.origin.y, this.origin.z));
     const O = this.origin;
-    for (const m of this.cave ? [caveWaterMesh(this.cave, O.x, O.y, O.z), caveShaftMesh(this.cave, O.x, O.y, O.z)] : []) if (m) this.group.add(m);
+    for (const m of this.cave ? [caveWaterMesh(this.cave, O.x, O.y, O.z), caveShaftMesh(this.cave, O.x, O.y, O.z)] : [floodMesh(this.cellar.layout, O.x, O.y, O.z)]) if (m) this.group.add(m);
     const torches = torchSpots(this.cellar);
     if (torches.length) this.group.add(flameMesh(torches, this.origin.x, this.origin.y, this.origin.z));
     m.lids.forEach((l, i) => {
       this.lids.push({ pivot: this.onPivot(l.mesh, `chest lid ${i}`, l.hinge), axis: new Vector3(l.axis[0], 0, l.axis[1]) });
       this.lidUp(i, this.lift.get(i) ?? 0);
     });
-    for (const k of m.keys) {
+    this.seal = m.seal.map((c, i) => this.piece(c, `seal course ${i}`));
+    for (const c of this.seal) this.group.add(c);
+    this.sealUp(this.sealed);
+    for (const k of this.formed ? this.locks.keys : m.keys) {
       const mesh = this.piece(k.mesh, `key ${k.room}`);
       mesh.visible = !this.taken.has(k.room);
       this.keys.set(k.room, mesh);
       this.group.add(mesh);
     }
-    for (const d of m.doors) {
+    for (const d of this.formed ? this.locks.doors : m.doors) {
       const at = d.opens === 'push' ? farFoot(d) : d.hinge ?? d.at;
       const door: Door = { piece: d, pivot: this.onPivot(d.mesh, `door ${d.kind}`, at), bar: d.bar ? this.onPivot(d.bar, `bar ${d.link}`, d.at) : null, t: -1, away: [d.through[0], d.through[1]] };
       this.doors.set(d.link, door);
@@ -153,6 +166,13 @@ export class CellarView {
     this.lift.set(i, k);
     const l = this.lids[i];
     if (l) l.pivot.quaternion.setFromAxisAngle(l.axis, LID_OPEN * k);
+  }
+
+  /** The breach walled up as far as `k` (0 open .. 1 closed): a course more shows for each part set. */
+  sealUp(k: number): void {
+    this.sealed = k;
+    const n = Math.ceil(k * this.seal.length - 1e-6);
+    this.seal.forEach((c, i) => (c.visible = i < n));
   }
 
   private piece(m: BuildingMesh, name: string): Mesh {

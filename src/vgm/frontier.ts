@@ -8,7 +8,7 @@
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { RegionFillDef, RegionsDef } from '../setting/contract';
 import { harbourSpots, riverMouths } from '../world/coast';
-import { HOUSE_SCALE } from '@futuremagic/settlement';
+import { HOUSE_SCALE, sizeRules, type SettlementSize } from '@futuremagic/settlement';
 import { settlementOf, sitesIn, type DecisionLog, type RegionDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
 import { bankSpots, freshWaterEdge, WATER_REACH } from '../world/freshWater';
@@ -111,28 +111,52 @@ function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; 
   let roll = hash2f(s, Math.floor(p.x / 250), Math.floor(p.z / 250)) * total, pick = country;
   for (const f of pool) { if ((roll -= f.weight) < 0) { pick = f; break; } }
   const base = { kind: 'region' as const, id: `region-${n}`, seed: s, at: c.hours };
-  if (pick.place !== 'none') {
-    // The place needs a square of its own: its size if that is free, else the largest free one round the
-    // point. Open ground first: the point's square, then the free squares beside it; woodland only when
-    // none of them has open ground.
-    for (let level = pick.level; level >= 0; level--) {
-      // A smaller square only while the place (and the fields round it) still fits in it: the capital never squeezes.
-      if (sizeOf(level) < radiusOf(pick) * 5) break;
-      const k = keyAt(level, p.x, p.z);
-      if (!wholeFree(map, k)) continue;
-      let wooded: { k: RegionKey; site: Spot } | null = null;
-      for (const [dx, dz] of AROUND) {
-        const q = { level, x: k.x + dx, z: k.z + dz };
-        if (!wholeFree(map, q)) continue;
-        const site = findSite(c, pick, q, s);
-        if (site?.open) return { ...base, ...q, fill: pick.id, site: site.at };
-        if (site && !wooded) wooded = { k: q, site };
-      }
-      if (wooded) return { ...base, ...wooded.k, fill: pick.id, site: wooded.site.at };
-      break;
+  return (pick.place !== 'none' ? placeFill(c, map, p, pick, base) : null) ?? { ...base, ...keyAt(country.level, p.x, p.z), fill: country.id };
+}
+
+/**
+ * A harbour town opened round `p` (S4, the far harbour of a voyage): the setting's harbour fill, its square and its
+ * place by a river's mouth found as the frontier finds them. Null: the setting has no harbour, or none fits there.
+ */
+export function harbourRegion(c: FrontierContext, p: { x: number; z: number }): RegionDecision | null {
+  const done = regionDecisions(c.log), map = c.map ?? regionMapOf(c.log, c.regions.country);
+  const f = c.regions.fills.find((x) => x.harbour && !x.island), n = done.length + 1;
+  if (!f || map.at(p.x, p.z)) return null;
+  return placeFill(c, map, p, f, { kind: 'region', id: `region-${n}`, seed: deriveSeed(c.seed, 'vgm', 'region', n), at: c.hours });
+}
+
+/**
+ * A region of fill `f` with its place at `site`, found by the caller (S7: an island's fishing village on its shore):
+ * the square of the fill's size round it, if that is free. Null: taken, or the setting has no such fill.
+ */
+export function siteRegion(c: FrontierContext, f: RegionFillDef, site: NonNullable<RegionDecision['site']>): RegionDecision | null {
+  const map = c.map ?? regionMapOf(c.log, c.regions.country), n = regionDecisions(c.log).length + 1, k = keyAt(f.level, site.x, site.z);
+  if (!wholeFree(map, k)) return null;
+  return { kind: 'region', id: `region-${n}`, seed: deriveSeed(c.seed, 'vgm', 'region', n), at: c.hours, ...k, fill: f.id, site };
+}
+
+/** The place of `pick` in a free square round `p` (its own size, or smaller while it fits), or null. */
+function placeFill(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; z: number }, pick: RegionFillDef, base: Pick<RegionDecision, 'kind' | 'id' | 'seed' | 'at'>): RegionDecision | null {
+  // The place needs a square of its own: its size if that is free, else the largest free one round the
+  // point. Open ground first: the point's square, then the free squares beside it; woodland only when
+  // none of them has open ground.
+  for (let level = pick.level; level >= 0; level--) {
+    // A smaller square only while the place (and the fields round it) still fits in it: the capital never squeezes.
+    if (sizeOf(level) < radiusOf(pick) * 5) break;
+    const k = keyAt(level, p.x, p.z);
+    if (!wholeFree(map, k)) continue;
+    let wooded: { k: RegionKey; site: Spot } | null = null;
+    for (const [dx, dz] of AROUND) {
+      const q = { level, x: k.x + dx, z: k.z + dz };
+      if (!wholeFree(map, q)) continue;
+      const site = findSite(c, pick, q, base.seed);
+      if (site?.open) return { ...base, ...q, fill: pick.id, site: site.at };
+      if (site && !wooded) wooded = { k: q, site };
     }
+    if (wooded) return { ...base, ...wooded.k, fill: pick.id, site: wooded.site.at };
+    break;
   }
-  return { ...base, ...keyAt(country.level, p.x, p.z), fill: country.id };
+  return null;
 }
 
 /** The point's own square first, then the eight beside it. */
@@ -162,11 +186,14 @@ function fitsAt(c: FrontierContext, f: RegionFillDef, p: { x: number; z: number 
   return !SETTLES[f.place] || freshWaterEdge(t, p.x, p.z, Math.min(sizeOf(f.level) * 1.5, 1500)) < Infinity;
 }
 
+/** A walled place's middle keeps this share of its radius from fresh water. */
+const WALL_DRY = 0.6;
+
 /** The places people live in, which stand by fresh water (D50): their squares' banks are tried too. */
 const SETTLES: Record<RegionFillDef['place'], boolean> = { none: false, waystation: true, hamlet: true, village: true, capital: true, camp: false, ruin: false, barrows: false };
 
 /** A fill's footprint radius (m): a settlement's grows with its houses (AssetGenerator HOUSE_SCALE), a camp's or a ruin's does not. */
-function radiusOf(f: RegionFillDef): number {
+export function radiusOf(f: RegionFillDef): number {
   return (f.radius ?? 20) * (SETTLES[f.place] ? HOUSE_SCALE : 1);
 }
 
@@ -206,7 +233,7 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
   // The best spot so far (lowest score).
   let bx = NaN, bz = NaN, low = Infinity, open = false;
   // A grid of spots through the square; a settlement also tries the banks in it, and needs water.
-  const N = 7, settles = SETTLES[f.place];
+  const N = 7, settles = SETTLES[f.place], walled = settles && !!sizeRules(f.place as SettlementSize).wall;
   const spots: [number, number][] = [];
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) spots.push([
     x0 + margin + (size - 2 * margin) * ((i + hash2f(s, i, j + 40)) / N),
@@ -231,6 +258,9 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
       steep = Math.max(steep, Math.abs(ph - h) / rr);
     }
     if (!ok || steep > STEEP[f.place]) continue;
+    // A walled place needs dry ground round its middle: its wall and gates keep off the water, and a river close by
+    // would draw them back to the market (a capital hemmed in by brooks kept a few dozen houses, its wall still wet).
+    if (walled && freshWaterEdge(t, x, z, r * WALL_DRY) <= r * WALL_DRY) continue;
     // Open ground first (the place is seen from afar); woodland only when the square has none.
     // How wooded the place's footprint is, on the whole (its clearing opens the rest round it).
     let woods = wood(x, z);
@@ -254,10 +284,10 @@ function findSite(c: FrontierContext, f: RegionFillDef, k: RegionKey, s: number)
 }
 
 /** The settlements in the log (the towns, and the hamlets and villages of regions): for roads and for whatever links places. */
-export function settlementsOf(log: DecisionLog, regions?: RegionsDef): { id: string; x: number; z: number; r: number }[] {
+export function settlementsOf(log: DecisionLog, regions?: RegionsDef): { id: string; x: number; z: number; r: number; isle?: true }[] {
   return log.flatMap((d) => {
     const t = d.kind === 'town' ? d : d.kind === 'region' && regions ? settlementOf(d, regions.fills) : null;
-    return t ? [{ id: t.id, x: t.x, z: t.z, r: t.radius }] : [];
+    return t ? [{ id: t.id, x: t.x, z: t.z, r: t.radius, ...(t.isle ? { isle: t.isle } : {}) }] : [];
   });
 }
 

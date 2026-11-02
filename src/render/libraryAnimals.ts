@@ -4,7 +4,10 @@
  * so tests check it against Actors' catalogue (@actors/animal/library) and tools/packs/library.mjs reads the ids.
  */
 
+import { deriveSeed } from '@futuremagic/core';
+import { deform, type DeformPlan } from '@actors/core';
 import type { BirdDoing } from '../sim/birdFlight';
+import type { OtterDoing } from '../sim/otterSwim';
 
 /** What a wild animal does this frame (from its den state). */
 export type AnimalDoing = 'idle' | 'alert' | 'feed' | 'walk' | 'run' | 'blow' | 'hurt' | 'dead' | 'flick' | 'rest' | 'call';
@@ -41,6 +44,17 @@ export const LIBRARY_KINDS = {
     ids: ['red-deer-male', 'female-deer', 'female-deer'],
     clips: { idle: ['Idle'], alert: ['Idle_2', 'Idle_Idle_02', 'Idle_Breathing_01'], feed: ['Idle_Eating', 'Idle_Eating_01'], walk: ['Walk'], run: ['Sprint', 'Run'], hurt: ['Hit_Stand_L01'], dead: ['Death_Stand_R01'] },
   },
+  elk: {
+    // The giant elk's body (M2, Deform "giant"): WildMesh3D's elk, on the red deer's rig B (so the deer's clips, here under their elk names).
+    ids: ['elk'],
+    clips: { idle: ['Idle'], alert: ['Idle_Breathing_01', 'Idle'], feed: ['Food_Eating_01_Wolf'], walk: ['Walk'], run: ['Run', 'Sprint'], hurt: ['Hit_Idle_L01'], dead: ['Death_Idle_R01'] },
+  },
+  turtle: {
+    // The giant turtle's body (M2, Deform "giant"): a stylized tortoise (0.85 m at scale 1) that draws its head in when struck and dies on its back.
+    ids: ['tortoise-stylized'],
+    clips: { idle: ['Idle', 'Idle_2'], alert: ['Idle'], feed: ['Idle_2'], walk: ['Walk'], run: ['Run'], blow: ['Attack'], hurt: ['Hide'], dead: ['Onback'] },
+    scale: 1.3,
+  },
   hen: {
     // The yards' hens (sim/poultry.ts): both idles peck at the ground; at night they sit (IdleLay).
     ids: ['chicken'],
@@ -56,12 +70,35 @@ export const LIBRARY_KINDS = {
     ids: ['pheasant'],
     clips: { idle: ['Idle', 'Idle_Breathing'], feed: ['StandGrazingA'], walk: ['WalkMedium_NoRootMotion'], run: ['RunFast_NoRootMotion'] },
   },
+  crab: {
+    // A big red stylized crab (1.1 m across its legs at scale 1): its own sidle, pinches, flinch and fall.
+    ids: ['crab-stylized'],
+    clips: { idle: ['Idle'], alert: ['Idle'], feed: ['Idle'], walk: ['Walk'], run: ['Walk'], blow: ['Attack1', 'Attack2'], hurt: ['HitBack'], dead: ['Die'] },
+  },
+  shark: {
+    // The deep water's sharks (S9): a stylized shark (6.6 m at scale 1, some 3.6 m here) with its own bites and death roll.
+    ids: ['jaws-stylized'],
+    clips: { idle: ['Swim'], alert: ['Swim'], feed: ['Swim'], walk: ['Swim'], run: ['SwimAt', 'Swim'], blow: ['BiteLeft', 'BiteRight'], hurt: ['SwimLeft', 'SwimRight'], dead: ['Dead'] },
+    scale: 0.55,
+  },
+  otter: {
+    // The hero's otter form (S6, game/birdForm.ts): WildMesh3D's American mink, which swims at the surface and under
+    // it (OTTER_CLIPS), grown to an otter's size (its model is some 2 m long).
+    ids: ['american-mink'],
+    clips: { idle: ['swim_surface_idle_01'], walk: ['swim_fwd_surface_fast_01'], run: ['swim_fwd_underwater_01'] },
+    scale: 0.6,
+  },
 } satisfies Record<string, LibraryKind>;
 
 /** The pheasant's clip for each thing the hero's bird does (game/birdForm.ts BirdDoing). */
 export const BIRD_CLIPS: Readonly<Record<BirdDoing, string>> = {
   idle: 'Idle', walk: 'WalkMedium_NoRootMotion', run: 'RunFast_NoRootMotion',
   takeoff: 'TakeOf_BounceOff', flap: 'FlyFlapping_NoRootMotion', glide: 'FlyGliding_NoRootMotion', dive: 'FlyGliding_NoRootMotion', land: 'Landing_Touch',
+};
+
+/** The mink's clip for each thing the hero's otter does (sim/otterSwim.ts OtterDoing). */
+export const OTTER_CLIPS: Readonly<Record<OtterDoing, string>> = {
+  float: 'swim_surface_idle_01', paddle: 'swim_fwd_surface_fast_01', dive: 'swim_surface_dive_fwd', swim: 'swim_fwd_underwater_01',
 };
 
 /** What a doing asks of `clipFor` when the kind names no clip for it. */
@@ -78,4 +115,9 @@ export function libraryClip(lib: { readonly clipNames: readonly string[]; clipFo
   if (want) return want.find((n) => lib.clipNames.includes(n));
   const motion = MOTION[doing];
   return motion ? lib.clipFor(motion) : undefined;
+}
+
+/** The Deform plan of a giant animal: strength 0..1 of Actors' "giant" recipe, seeded by the animal's own seed (null: not a giant). */
+export function giantPlan(giant: number | undefined, seed: number): DeformPlan | null {
+  return giant && giant > 0 ? deform({ recipe: 'giant', seed: deriveSeed(seed, 'giant'), strength: giant }) : null;
 }

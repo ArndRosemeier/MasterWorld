@@ -25,6 +25,13 @@ test('soundscape: meadow by day, woods at night, a storm, the sea, a river and a
   assert.ok(soundscape({ ...land, sea: 10, height: 30 }).beds['bed/surf-rocks'] > 0.9);
   assert.ok(soundscape({ ...land, river: { bank: 2, half: 3 } }).beds['bed/river-riffle'] > 0.8);
   assert.ok(soundscape({ ...land, fall: { dist: 50, drop: 25 } }).beds['bed/falls'] > 0.5);
+  // S10: aboard, the timbers creak, more in the wind; a gale at sea roars, aboard and on the shore; calm, it does not.
+  const deck = soundscape({ ...land, sea: 0, height: 0, aboard: true }).beds, gale = soundscape({ ...land, sea: 0, height: 0, aboard: true, wind: 0.95, storm: 1 }).beds;
+  assert.ok(deck['bed/ship-creak'] > 0.4 && gale['bed/ship-creak'] > deck['bed/ship-creak']);
+  assert.equal(deck['bed/sea-storm'], undefined);
+  assert.ok(gale['bed/sea-storm'] > 0.8);
+  assert.ok(soundscape({ ...land, sea: 10, height: 2, wind: 0.95, storm: 1 }).beds['bed/sea-storm'] > 0.8);
+  assert.equal(soundscape({ ...land, sea: 10, height: 2 }).beds['bed/ship-creak'], undefined);
 });
 
 test('soundscape: rooms, the cellar and under water', () => {
@@ -33,6 +40,10 @@ test('soundscape: rooms, the cellar and under water', () => {
   assert.equal(inn.beds['bed/birds-meadow'], undefined);
   assert.ok(soundscape({ ...land, place: 'room', room: 'temple' }).echo.t60 > 2);
   assert.ok(soundscape({ ...land, place: 'cellar' }).beds['bed/cellar'] > 0.5);
+  // K5: a stream in a formed cave is heard from near, not from far, and a dry cave has none.
+  assert.ok(soundscape({ ...land, place: 'cellar', stream: 2 }).beds['bed/river-riffle'] > 0.6);
+  assert.equal(soundscape({ ...land, place: 'cellar', stream: 40 }).beds['bed/river-riffle'], undefined);
+  assert.equal(soundscape({ ...land, place: 'cellar' }).beds['bed/river-riffle'], undefined);
   const under = soundscape({ ...land, under: true });
   assert.deepEqual(Object.keys(under.beds), ['bed/underwater']);
   assert.ok(under.muffle !== null && under.muffle < 1000);

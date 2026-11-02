@@ -9,9 +9,13 @@
 import type { SettingModule, SituationKind } from '../setting/contract';
 import type { DecisionLog, DungeonDecision, EventDecision, RegionDecision } from '../world/decisions';
 import { onLand } from '../world/dungeon/site';
+import type { Terrain } from '../world/terrain';
+import { nearestCoast } from '../world/coast';
+import { woodsOf } from '../world/flora';
 import { COURT } from '../world/hold';
 import type { Bridge } from '../world/bridges';
 import type { Town } from '../world/town';
+import type { Volcano } from '../world/volcano';
 import { polyCentroid, type TownBuilding } from '@futuremagic/settlement';
 import type { Need } from '../vgm/director';
 import type { Made } from '../vgm/toolbox';
@@ -26,6 +30,8 @@ import { atDoor, before, beside, clearStand, decisionsOf, nearestTo, outsideGate
 /** What the go-to list reaches in the running game. */
 export interface GoHost {
   readonly setting: SettingModule;
+  /** The land itself: the kinds of country, the biomes, the volcanoes and the coast are looked for in it. */
+  readonly terrain: Terrain;
   log(): DecisionLog;
   hours(): number;
   heroPos(): { readonly x: number; readonly z: number };
@@ -210,6 +216,40 @@ export function goSpots(h: GoHost): GoSpot[] {
     });
   }
 
+  // The kinds of country, the biomes, the coast and the volcanoes (Arnd 2026-11-02): the nearest of each in this seed's land,
+  // found in the height field itself (the land opens round the hero as they arrive).
+  const R = 'Go to: terrain';
+  const sk = h.terrain.skeleton;
+  for (const k of sk.kinds) {
+    add(R, `Country: ${cap(k.id)}`, async () => { const f = sk.nearestKind(k.id, h.heroPos().x, h.heroPos().z); return at(f && { ...f, yaw: 0 }, `${k.id} country`); });
+  }
+  // A woodland biome (its flora cover over 0) is shown in a thick wood: the woods are patchy (a few hundred metres), a taiga's clearing has no tree in sight.
+  const woods = woodsOf(h.terrain);
+  const thick = (x: number, z: number): boolean => [[0, 0], [60, 0], [-60, 0], [0, 60], [0, -60]].every(([dx, dz]) => woods(x + dx, z + dz) > 0.9);
+  for (const b of h.setting.world.biomes) {
+    const wooded = (b.flora?.cover ?? -1) > 0;
+    add(R, `Biome: ${b.name}`, async () => { const f = sk.nearestBiome(b.id, h.heroPos().x, h.heroPos().z, wooded ? thick : undefined); return at(f && { ...f, yaw: 0 }, `${b.id} (${b.name.toLowerCase()})`); });
+  }
+  for (const [kind, name] of [['beach', 'Beach'], ['cliff', 'Sea cliff (on its top)'], ['under', 'Under the sea']] as const) {
+    add(R, name, async () => {
+      const c = nearestCoast(h.terrain, kind, h.heroPos().x, h.heroPos().z);
+      return at(c && { x: c.x, z: c.z, yaw: Math.atan2(-c.seaX, -c.seaZ) }, name.toLowerCase());
+    });
+  }
+  /** Before a volcano on the side its lava spills, `d` m out, looking at its crater (a little up from afar). */
+  const volcano = (label: string, want: string, d: (v: Volcano) => number): void => {
+    add(R, label, async () => {
+      const p = h.heroPos(), v = h.terrain.volcanoes.nearestVolcano(p.x, p.z, want);
+      if (!v) return `no ${want === 'any' ? '' : `${want} `}volcano within 90 km`;
+      const out = d(v), x = v.x + Math.cos(v.phi0) * out, z = v.z + Math.sin(v.phi0) * out;
+      return at({ x, z, yaw: Math.atan2(x - v.x, z - v.z), at: v, arc: Math.PI / 3, pitch: out > 300 ? 0.1 : undefined }, `${v.state} volcano ${v.id}`);
+    });
+  };
+  volcano('Volcano', 'any', (v) => v.R * 0.65);
+  for (const state of ['erupting', 'lake', 'steaming'] as const) volcano(`Volcano: ${state}`, state, (v) => v.R * 0.65);
+  volcano('Volcano: crater rim', 'any', (v) => v.rimR * 1.35);
+  volcano('Volcano: from afar', 'any', () => 1100);
+
   // Dungeons of every kind (D51: the setting's dungeon kinds): before the way in, and down in it.
   const D = 'Go to: dungeons';
   const dungeonNear = (kind: string, make: boolean): DungeonDecision | null => {
@@ -272,7 +312,7 @@ export function goSpots(h: GoHost): GoSpot[] {
       let s = find(), why = '';
       if (!s) {
         // A town's situations happen in the town the hero is in: the start's, if they are out on the land.
-        if (kind !== 'hurt-traveller' && !h.towns().some((x) => Math.hypot(h.heroPos().x - x.town.decision.x, h.heroPos().z - x.town.decision.z) < x.town.decision.radius + 40)) {
+        if (kind !== 'hurt-traveller' && kind !== 'castaway' && !h.towns().some((x) => Math.hypot(h.heroPos().x - x.town.decision.x, h.heroPos().z - x.town.decision.z) < x.town.decision.radius + 40)) {
           const home = nearestTo(h.towns().map((x) => ({ t: x.town, x: x.town.decision.x, z: x.town.decision.z })), h.heroPos())?.t;
           if (home) await h.stand(beside({ x: home.plan.centre[0], z: home.plan.centre[1] }, h.heroPos(), 10));
         }
@@ -289,6 +329,8 @@ export function goSpots(h: GoHost): GoSpot[] {
   situation('hurt-traveller', 'Hurt traveller', () => decisionsOf(h.log(), 'traveller').filter((x) => x.situation && now(x)).at(-1), 10);
   situation('paddock-wolves', 'Wolves at a paddock', () => decisionsOf(h.log(), 'wild').filter((x) => x.situation).at(-1), 30);
   situation('stray-beast', 'A beast got out', () => decisionsOf(h.log(), 'stray').filter(now).at(-1), 12);
+  // By the sea (S9): from the strand, the fisher out on the water in sight.
+  situation('castaway', 'A cry from the water', () => decisionsOf(h.log(), 'castaway').filter(now).at(-1), 40);
   add(W, 'Traveller resting by the way', async () => {
     let d = decisionsOf(h.log(), 'traveller').filter((x) => !x.situation && now(x)).at(-1);
     if (!d) { const m = h.answerFor('people'); d = m?.decision.kind === 'traveller' ? m.decision : undefined; }

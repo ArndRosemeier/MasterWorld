@@ -10,7 +10,6 @@
 import { hatchLadderHalfWidth, HATCH_RAILS_UP, HATCH_RUNG, HATCH_RUNG_IN, HATCH_SHAFT, hatchSides, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { hatchOf, openHouse, type OpenHouse } from '../world/townMesh';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
-import { guildSigns } from '../game/guilds';
 import type { HouseView } from '../render/town/HouseView';
 import type { SkyView } from '../render/sky';
 import type { PointLight } from 'three/webgpu';
@@ -98,7 +97,7 @@ export class InteriorVisit {
     else {
       // A house where fighting is taught is a hall: a weapon rack and a practice post (D49); the witch keeps a home.
       const g = door.town.guildAt(door.b.id);
-      h = this.lay(door.b, this.cellars.has(key), !!g?.guild.hall && !g.out, guildSigns(door.town.guilds).get(door.b.id));
+      h = this.lay(door.b, this.cellars.has(key), !!g?.guild.hall && !g.out, door.town.signs.get(door.b.id));
       h.catch(() => this.houses.delete(key));
     }
     this.houses.set(key, h);
@@ -135,6 +134,8 @@ export class InteriorVisit {
    */
   async enter(door: TownDoor, _now = true, byHatch = false): Promise<void> {
     const o = await this.openUp(door), b = door.b;
+    // (A walk the hero was playing, a barrow's way out, would drag them back to where it was going.)
+    this.player.puppet = null;
     const hatch = byHatch ? hatchOf(o.plan) : undefined;
     if (hatch) {
       const l = this.wayDown(o, hatch).ladder;
@@ -303,12 +304,20 @@ export class InteriorVisit {
   }
   private placed: Placed[] | null = null;
 
+  /**
+   * Those in the open building one can talk to: not those asleep, but for the ones the hero comes to find (a
+   * teacher, one a map mark sends the hero to): they get up for the hero at any hour.
+   */
+  talkers(): Placed[] | null {
+    const o = this.open, all = this.people();
+    return o && all ? all.filter((p) => p.act !== 'sleep' || o.door.town.life.isKept(p.agent.person.id)) : all;
+  }
+
   /** Who is in the open building this frame, and where (walking in, sitting down, walking out). */
   private stepPeople(dt: number): void {
     const o = this.open;
     if (!o) { this.placed = null; return; }
     const life = o.door.town.life;
-    // Only those drawn (Actors makes adults): a child would hold a seat and show nobody.
     const cast = roomCast(life.agents, life.spots, o.b.id, o.plan, o.flow.kept);
     const places = o.flow.frame(cast, dt);
     // Those walking out wait on the doorstep until they reach it (else they would be in the street already).

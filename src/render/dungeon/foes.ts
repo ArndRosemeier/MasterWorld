@@ -7,7 +7,7 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
-import type { CreatureDef } from '../../setting/contract';
+import type { CreatureDef, WarnTurn } from '../../setting/contract';
 import { HAIR_COLORS, MEN_HAIR, WOMEN_HAIR, garmentColors } from '../folk/looks';
 
 /** Clips only the cellar's people play: the dead shamble and claw, the hurt reel, the meek kneel. */
@@ -79,7 +79,16 @@ export interface FoeDoing {
   readonly action: 'stab' | 'swing_1h' | 'slam' | 'flinch' | null;
   /** Which of two blows (alternates). */
   readonly variant: number;
+  /** What the speaker of a band shows now (D64), standing still: the gesture of the turn. */
+  readonly signal?: WarnTurn | null;
 }
+
+/**
+ * The gesture of each turn of a band's words (D64), from the people's own clips (the pack has them all): talking with the hands for a
+ * warning, a demand and a last word, cheering arms for a jibe, a shaken head for giving way, a nod for a friend. (A pointing arm and a
+ * raised hand are new clips for Actors; until they are made these stand in.)
+ */
+export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string>> = { warn: 'talk', last: 'talk', demand: 'talk', jeer: 'cheer', settle: 'shake head', greet: 'nod', yield: 'shake head' };
 
 /** The clip for it; the dead and the gaunt (ghouls) shamble and claw. */
 export function foeClip(def: CreatureDef, d: FoeDoing): string {
@@ -90,6 +99,7 @@ export function foeClip(def: CreatureDef, d: FoeDoing): string {
   if (d.action === 'stab') return 'sword slash C';
   if (d.action === 'swing_1h') return d.variant % 2 ? 'sword slash B' : 'sword slash A';
   if (d.action === 'slam') return dead ? 'zombie scratch' : 'hook';
+  if (d.signal && d.speed < 0.2 && !dead && !d.low) return SIGNAL_CLIPS[d.signal];
   if (d.speed > 2.6) return 'jog';
   if (d.speed > 0.2) return dead ? 'zombie walk' : 'walk';
   if (d.low === 'beg') return 'repair (kneeling)';

@@ -9,26 +9,37 @@ import { byFreshWater } from '../src/world/freshWater';
 import { orbitPose, steadyHeight, type Orbit } from '../src/app/title/route';
 import { SMALL } from './small';
 
+/** A world's terrain, made once for the tests of this file (its hydrology is the slow part). */
+const worlds = new Map<string, Terrain>();
+const worldOf = (name: string): Terrain => { if (!worlds.has(name)) worlds.set(name, new Terrain(parseSeed(name), classic, SMALL)); return worlds.get(name)!; };
+
 // L5 (D56): the classic setting asks for its start in a mesa valley; every seed's start town stands there.
 for (const name of ['masterworld', 'alpha']) {
-  test(`start valley (${name}): the start town stands on a valley floor of mesa country by fresh water, plateaus in view`, () => {
-    const terrain = new Terrain(parseSeed(name), classic, SMALL);
+  test(`start valley (${name}): the start town stands in mesa country by fresh water, plateaus in view, on a valley floor or at the sea`, () => {
+    const terrain = worldOf(name);
     const town = firstDecisions(terrain, startPlace(terrain)).find((d) => d.kind === 'town')!;
     const sk = terrain.skeleton;
     assert.ok(town, 'a start town');
     assert.ok(sk.kindShare('mesa', town.x, town.z) >= 0.9, `mesa country ${sk.kindShare('mesa', town.x, town.z).toFixed(2)}`);
-    // On the floor all over the town, not up a wall's apron.
+    // A sea town where a river's mouth has cut the valley down to the sea (Arnd 2026-10-30): gentle on its landward
+    // side. Else on the floor all over the town, not up a wall's apron.
+    const h = town.harbour, c = terrain.height(town.x, town.z);
     for (let a = 0; a < 8; a++) {
-      const x = town.x + Math.cos((a * Math.PI) / 4) * town.radius, z = town.z + Math.sin((a * Math.PI) / 4) * town.radius;
-      assert.ok(sk.mesaRise(x, z) < 5, `rise ${sk.mesaRise(x, z).toFixed(1)} m at the town's edge`);
+      const ox = Math.cos((a * Math.PI) / 4), oz = Math.sin((a * Math.PI) / 4), x = town.x + ox * town.radius, z = town.z + oz * town.radius;
+      if (!h) assert.ok(sk.mesaRise(x, z) < 5, `rise ${sk.mesaRise(x, z).toFixed(1)} m at the town's edge`);
+      else if (ox * h.dx + oz * h.dz < 0.2) {
+        const g = Math.abs(terrain.height(town.x + ox * town.radius * 0.8, town.z + oz * town.radius * 0.8) - c) / (town.radius * 0.8);
+        assert.ok(g < 0.2, `a slope of ${g.toFixed(2)} inland`);
+      }
     }
+    if (name === 'masterworld') assert.ok(h, 'the start is a sea town');
     assert.ok(byFreshWater(terrain, town.x, town.z, town.radius, false), 'fresh water');
     assert.ok(plateauInView(sk, town.x, town.z), 'a plateau in view');
   });
 }
 
 test('start valley: the title orbit over the start town keeps above the land and climbs no wall in a jump', () => {
-  const terrain = new Terrain(parseSeed('masterworld'), classic, SMALL);
+  const terrain = worldOf('masterworld');
   const town = firstDecisions(terrain, startPlace(terrain)).find((d) => d.kind === 'town')!;
   const ground = (x: number, z: number) => terrain.height(x, z);
   for (const near of [0]) {
@@ -45,4 +56,13 @@ test('start valley: the title orbit over the start town keeps above the land and
       last = y;
     }
   }
+});
+
+test('start by the sea: with no river reaching the sea near (seed poev7x, a cliffed coast), the start town still has its harbour on a low shore', () => {
+  const t = new Terrain(parseSeed('poev7x'), classic, SMALL), home = startPlace(t);
+  assert.ok(home.harbour, 'a harbour');
+  const q = home.harbour!;
+  assert.ok(t.waterDepth(q.x + q.dx * 30, q.z + q.dz * 30) > 0, 'the sea before its quay');
+  assert.ok(t.height(q.x - q.dx * 20, q.z - q.dz * 20) <= 8, 'a low shore, not a cliff');
+  assert.ok(t.height(home.x, home.z) > 0, 'the town on dry land');
 });

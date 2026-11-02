@@ -73,20 +73,38 @@ export const params = {
   /** The wild around the town (`wild=0` leaves it out; `wild=wolves` starts beside the first group of that kind). */
   wild: q.get('wild') !== '0',
   wildAt: ['0', '1', '', null].includes(q.get('wild')) ? null : q.get('wild'),
-  /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about). */
+  /** Birds and squirrels about the land (`small=0` leaves them out; `small=squirrel`, `small=birds` or `small=flock` stands beside the first about; `small=fish` with `fly` swims beside a shoal). */
   small: q.get('small') !== '0',
-  smallAt: (['squirrel', 'birds', 'flock'] as const).find((k) => k === q.get('small')) ?? null,
+  smallAt: (['squirrel', 'birds', 'flock', 'fish'] as const).find((k) => k === q.get('small')) ?? null,
   /** Regions open as the hero walks (`regions=0`: only the start's land). */
   regions: q.get('regions') !== '0',
   /** Start beside a place the VGM opens out on the land: `site=waystation`, `hamlet`, `village`, `camp`, `ruin` or `barrows` (the first a walk finds). */
   site: q.get('site'),
   /** With `site`: stand this far (m) outside its edge (default 14; a capital's 60, outside its wall). */
   siteAt: q.has('siteAt') ? Number(q.get('siteAt')) : null,
+  /** With `site=harbour`: start aboard the first ship moored there, on its main deck by the gangway (S3). */
+  aboard: q.has('aboard'),
   /** Start before a barrow (`barrow`; one is promised at once if there is none yet). */
   barrow: q.has('barrow'),
   /** Start before a cave's mouth (`cave`) or a ruined tower (`tower`), as `barrow`. */
   cave: q.has('cave'),
   tower: q.has('tower'),
+  /**
+   * Start before an active volcano, on the side its lava spills, facing the crater (K7d): `volcano` the nearest, `volcano=erupting|lake|steaming`
+   * the nearest in that state, `volcano=<id>` a given one; `volcano.at=rim|foot|far` how near (default: the foot, 420 m out).
+   */
+  volcano: q.has('volcano') ? (q.get('volcano') || 'any') : null,
+  volcanoAt: q.get('volcano.at') ?? 'foot',
+  /** Start before a sea cave's mouth (`seacave`; S8), as `barrow`. */
+  seacave: q.has('seacave'),
+  /** Start before a sunken ruin on the shore (`sunken`; S8), as `barrow`. */
+  sunken: q.has('sunken'),
+  /** On the strand where the giant crabs live, a fisher whose boat went over out on the water before the hero (S9). */
+  castaway: q.has('castaway'),
+  /** On the strand where the giant crabs live, facing a boat the sea threw up there (S9). */
+  washedUp: q.has('washedup'),
+  /** Start in the sea over a wreck off the start town (`wreck`; S8), one put there now if there is none. */
+  wreck: q.has('wreck'),
   /** A test portal (app/portals.ts): an opening 6 m ahead of the start, joined to one 30 m to the right and turned. */
   portal: q.has('portal'),
   /** Start out in the nearest stretch of a kind of country (`kind=downs`, moor, karst, badlands, mesa, open; L7). */
@@ -103,6 +121,8 @@ export const params = {
   holdTier: (['hated', 'unwelcome', 'stranger', 'friend', 'honoured'] as const).find((k) => k === q.get('hold')) ?? null,
   /** How many terrain workers (`workers=6`; for timing the load): by default one less than the cores, at most 4. */
   workers: q.get('workers') ? Math.max(1, Math.min(16, Number(q.get('workers')) || 4)) : undefined,
+  /** The start town holds a feast at its market from the start (`feast`), its people dancing, drinking and playing there. */
+  feast: q.has('feast'),
   /** Start in the saddle of the first horse (`ride`). */
   ride: q.has('ride'),
   /** Open character creation at once, without the title (`create`; with the title it follows New game). */
@@ -114,6 +134,8 @@ export const params = {
   cellarRoom: q.get('cellar') ? Number(q.get('cellar')) : undefined,
   /** Slow motion for watching a blow land (tools/shot/hits.mjs): `slow=8` runs everything eight times slower. */
   slow: Math.max(1, Number(q.get('slow') ?? 1) || 1),
+  /** What every first place's household asks (D62, for looking at it): one of the setting's asks, `ask=breach`. */
+  ask: q.get('ask'),
   /** Who lives in the town's cellar (for looking at them): a cellar dweller's id, `dweller=goblins`. */
   dweller: q.get('dweller'),
   /** The first cellar was cleared long ago and others have moved in (`moved`, with `cellar` to look at them). */

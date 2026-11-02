@@ -9,7 +9,7 @@
  * cellar's origin.
  */
 import { Box3, Group, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
-import { Rng, deriveSeed, hexToRgb } from '@futuremagic/core';
+import { Rng, damp, deriveSeed, hexToRgb } from '@futuremagic/core';
 import { Character } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
@@ -28,6 +28,8 @@ import { Jolt, joltRoot, joltSpine } from '../jolt';
 import { limp, limpOf } from '../limp';
 import { PACE } from '../hero/clips';
 import { Held, Steady } from '../steady';
+import { AURAS } from '../aura/marks';
+import { FAINT, STRONG, auraReach, auraSize, healthLook } from '../../sim/aura';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -64,22 +66,29 @@ interface Shown {
   /** Blows taken so far (the den's count), and the last one's jolt. */
   blows: number;
   readonly jolt: Jolt;
+  /** How lit its aura is: the faint one (near the hero, in a fight) and the strong one (the hero's target), each eased 0..1. */
+  faint: number;
+  strong: number;
 }
 
 const yawOf = (dir: number) => Math.atan2(-Math.cos(dir), -Math.sin(dir));
 
 /** How each beast of the land is grown: a hunter's lean build, a grazer's long legs and neck, a rooting brute. */
-const BEAST: Record<'wolf' | 'deer' | 'boar', { role: CritterRole; integument: Integument }> = {
+const BEAST: Record<'wolf' | 'deer' | 'boar' | 'crab' | 'shark' | 'elk' | 'turtle', { role: CritterRole; integument: Integument; plan?: BodyPlan }> = {
   wolf: { role: 'hunter', integument: 'fur' },
   deer: { role: 'grazer', integument: 'fur' },
   boar: { role: 'brute', integument: 'hide' },
+  crab: { role: 'brute', integument: 'chitin', plan: 'crab' },
+  shark: { role: 'hunter', integument: 'hide', plan: 'serpent' },
+  elk: { role: 'grazer', integument: 'fur' },
+  turtle: { role: 'brute', integument: 'chitin' },
 };
 
 /** The animal a rat, spider or beast is (one species per creature kind, from the seed). */
 function speciesFor(def: CreatureDef, seed: number) {
   const b = def.body;
   const spider = b.kind === 'spider', beast = b.kind === 'beast' ? BEAST[b.species] : null;
-  const force: { plan: BodyPlan; integument: Integument } = spider ? { plan: 'octopod', integument: 'chitin' } : { plan: 'quadruped', integument: beast?.integument ?? 'fur' };
+  const force: { plan: BodyPlan; integument: Integument } = spider ? { plan: 'octopod', integument: 'chitin' } : { plan: beast?.plan ?? 'quadruped', integument: beast?.integument ?? 'fur' };
   const sp = grow(new Rng(deriveSeed(seed, 'creature', def.id)), spider ? 'hunter' : beast?.role ?? 'scuttler', 0, def.id, force);
   const tone = hexToRgb(parseInt((b.kind === 'humanoid' ? '#000000' : b.color).slice(1), 16));
   // The setting's colour over the grown coat, its pattern kept.
@@ -118,7 +127,7 @@ export class CreatureView {
       const b = c.def.body;
       let body: Body;
       // The wild's beasts are Actors' animals (render/dungeon/animals.ts).
-      const animal = b.kind === 'beast' ? await animalBody(b.species, deriveSeed(seed, 'animal', c.id), renderer) : null;
+      const animal = b.kind === 'beast' ? await animalBody(b.species, deriveSeed(seed, 'animal', c.id), renderer, undefined, b.giant) : null;
       if (b.kind === 'humanoid') {
         const ch = await person();
         await ch.set(foeLook(c.def, seed, c.id));
@@ -157,7 +166,7 @@ export class CreatureView {
         v.group.add(fig.root);
         body = { kind: 'critter', fig, scale };
       }
-      v.shown.push({ c, body, st: new Steady().ease(0, c.x, c.y, c.z, yawOf(c.dir)), look: new Held(''), blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0, blows: c.blows, jolt: new Jolt() });
+      v.shown.push({ c, body, st: new Steady().ease(0, c.x, c.y, c.z, yawOf(c.dir)), look: new Held(''), blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0, blows: c.blows, jolt: new Jolt(), faint: 0, strong: 0 });
     }
     v.pose(0);
     return v;
@@ -213,14 +222,16 @@ export class CreatureView {
           : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
         const doing = s.look.pick(dt, want, dead || blowT < 1 || hurtT < 1) as AnimalDoing;
         poseAnimal(s.body, X, Y, Z, yaw, doing, speed, dt, fresh);
-        if (!dead) joltRoot(s.body.place, s.jolt, 0.14, 0.14);
-        if (!dead) limp(s.body.place, lame, s.walked, 1.3, 1, moving);
+        // A giant's blow-back and limp are a giant's: its stride and size, not a wolf's (the tilt stays small, a heavy body tips less).
+        const big = c.def.body.kind === 'beast' && c.def.body.giant ? Math.max(1, c.def.body.length / 1.5) : 1;
+        if (!dead) joltRoot(s.body.place, s.jolt, 0.14 * big, 0.14 / Math.sqrt(big));
+        if (!dead) limp(s.body.place, lame, s.walked, 1.3 * big, big, moving);
       } else if (s.body.kind === 'critter') {
         const i = this.input;
         // Its body pushed back from the blow, the feet planted where they stand.
         const push = s.jolt.amount * (c.def.body.kind === 'spider' ? c.def.body.length * 0.3 : 0.05);
         i.x = X + s.jolt.dx * push; i.y = Y; i.z = Z + s.jolt.dz * push; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
-        i.running = c.act === 'run' || c.state === 'fight' || c.state === 'flee';
+        i.running = c.act === 'run' || c.state === 'fight' || c.state === 'brawl' || c.state === 'flee';
         i.pose = c.act === 'gnaw' || c.act === 'sniff' || c.act === 'rummage' || c.act === 'spin' ? 'feed' : '';
         const O = this.group.position;
         if (watching) { this.eyeWorld[0] = watching[0] + O.x; this.eyeWorld[1] = watching[1] + O.y; this.eyeWorld[2] = watching[2] + O.z; }
@@ -232,12 +243,12 @@ export class CreatureView {
         s.body.fig.animate(i, dt, hurtT < 1 ? 1 - hurtT : 0);
       } else {
         const p = s.body;
-        const fighting = c.state === 'fight' || c.state === 'alert';
+        const fighting = c.state === 'fight' || c.state === 'brawl' || c.state === 'alert' || c.armed;
         const doing: FoeDoing = {
           dead, speed: Math.hypot(vx, vz), fighting,
           low: c.act === 'beg' ? 'beg' : c.act === 'rummage' || c.act === 'gnaw' ? 'rummage' : null,
           action: dead ? null : blowT < 1 ? (c.def.body.kind === 'humanoid' && c.def.body.held === 'knife' ? 'stab' : c.def.body.kind === 'humanoid' && c.def.body.held ? 'swing_1h' : 'slam') : hurtT < 1 ? 'flinch' : null,
-          variant: s.variant,
+          variant: s.variant, signal: c.signal,
         };
         const clip = s.look.pick(dt, foeClip(c.def, doing), dead || !!doing.action);
         // A blow or flinch starts again when a new one comes, even of the same clip.
@@ -267,6 +278,23 @@ export class CreatureView {
     }
   }
 
+  /**
+   * The auras of this frame (sim/aura.ts): while a fight is on (`on`) every living creature within reach of the
+   * hero (`hero`, in the den's frame) is faintly lit in its health's colour, `target` strongly. They ease in and out.
+   */
+  auras(dt: number, hero: { readonly x: number; readonly z: number }, target: Creature | null, on: boolean): void {
+    const O = this.group.position;
+    for (const s of this.shown) {
+      const c = s.c, live = c.state !== 'dead';
+      s.faint += ((on && live ? auraReach(Math.hypot(c.x - hero.x, c.z - hero.z)) : 0) - s.faint) * damp(5, dt);
+      s.strong += ((live && c === target ? 1 : 0) - s.strong) * damp(8, dt);
+      const k = Math.max(s.faint * FAINT, s.strong * STRONG);
+      if (k <= 0.003) continue;
+      const size = auraSize(c.def), look = healthLook(c.health / Math.max(1, c.def.health));
+      AURAS.mark(s.st.x + O.x, s.st.y + O.y + size.lift, s.st.z + O.z, k, size.halfW, size.halfH, (c.id * 0.6180339) % 1, look.r, look.g, look.b, look.dim);
+    }
+  }
+
   /** Compile every shader it draws with (preparePeople). */
   warm(stage: Stage): Promise<void> {
     return preparePeople(stage, this.group);
@@ -278,7 +306,7 @@ export class CreatureView {
     const O = this.group.position;
     for (const s of this.shown) {
       const c = s.c;
-      const h = c.def.body.kind === 'humanoid' ? c.def.body.height * 0.6 : s.body.kind === 'animal' ? 0.55 : 0.2;
+      const h = c.def.body.kind === 'humanoid' ? c.def.body.height * 0.6 : s.body.kind === 'animal' ? Math.max(0.55, (c.def.body.kind === 'beast' ? c.def.body.length : 0) * 0.28) : 0.2;
       const px = c.x + O.x - from.x, py = c.y + h + O.y - from.y, pz = c.z + O.z - from.z;
       const along = px * dir.x + py * dir.y + pz * dir.z;
       if (along < 0) continue;

@@ -4,7 +4,7 @@
  * uv runs 0..1 across and up; `color.r` is the flame's own seed, so each flickers out of step.
  */
 import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, MeshBasicNodeMaterial, type Mesh } from 'three/webgpu';
-import { abs, attribute, float, mix, pow, sin, smoothstep, uv, vec3 } from 'three/tsl';
+import { abs, attribute, dot, float, max, normalFlat, positionViewDirection, mix, pow, sin, smoothstep, toneMappingExposure, uv, vec3 } from 'three/tsl';
 import { defineKind, kindMesh } from '../materials';
 import { WEATHER } from './weather';
 
@@ -15,16 +15,27 @@ export const FLAME = defineKind('flame', ['position', 'uv', 'color'], () => {
   const t = WEATHER.time;
   const q = uv();
   const up = q.y;
-  // The tip sways and licks; the body narrows upward like a drop.
-  const sway = sin(t.mul(9.0).add(seed)).mul(0.12).add(sin(t.mul(23.0).add(seed.mul(1.7))).mul(0.05)).mul(up.mul(up));
-  const x = abs(q.x.sub(0.5).sub(sway)).mul(2.0);
-  const width = pow(float(1.0).sub(up), 0.55).mul(smoothstep(0.0, 0.18, up)).mul(0.9);
-  const body = smoothstep(width, width.mul(0.35), x);
-  const core = smoothstep(width.mul(0.5), 0.0, x).mul(smoothstep(0.75, 0.15, up));
-  const lick = float(0.85).add(sin(t.mul(17.0).add(seed.mul(2.3))).mul(0.15));
-  const col = mix(vec3(1.0, 0.32, 0.05), vec3(1.0, 0.82, 0.45), core);
-  m.colorNode = col.mul(body).mul(lick).mul(2.2);
-  m.opacityNode = body;
+  // Tongues: waves running up the flame bend it more the higher they go, and the top tears into licks that
+  // rise and fall out of step (two flames never burn alike).
+  const rise = up.mul(9.0).sub(t.mul(13.0)).add(seed);
+  const bend = sin(rise).mul(0.07).add(sin(rise.mul(1.9).add(1.3)).mul(0.04)).add(sin(t.mul(5.0).add(seed)).mul(0.05)).mul(up.mul(up).mul(1.6).add(up.mul(0.2)));
+  const x = abs(q.x.sub(0.5).sub(bend)).mul(2.0);
+  const lick = float(0.78).add(sin(t.mul(11.0).add(seed).add(q.x.mul(14.0))).mul(0.12)).add(sin(t.mul(23.0).add(seed.mul(1.7))).mul(0.06));
+  const h = up.div(lick);
+  const width = pow(max(float(1.0).sub(h), 0.0), 0.6).mul(smoothstep(0.0, 0.16, up)).mul(0.95);
+  // (Above a lick's tip the width is nought, where smoothstep's edges meet: cut there, not filled.)
+  const body = smoothstep(width, width.mul(0.25), x).mul(smoothstep(0.0, 0.03, width));
+  // Blue at the root, the yellow-white heart low and inside, orange to deep red out at the edges and tips.
+  const heart = smoothstep(width.mul(0.55), 0.0, x).mul(smoothstep(0.7, 0.1, h));
+  const edge = smoothstep(0.35, 1.0, h).add(smoothstep(width.mul(0.4), width, x)).min(1.0);
+  const fire = mix(vec3(1.0, 0.32, 0.03), vec3(0.65, 0.08, 0.01), edge);
+  const root = smoothstep(0.1, 0.0, up).mul(0.35);
+  const col = mix(mix(fire, vec3(1.0, 0.66, 0.2), heart.mul(0.85)), vec3(0.3, 0.3, 0.9), root);
+  // Held at the same brightness whatever the eye's exposure (night opens it about 3x and burned the flame white).
+  // Each of the crossed quads fades as it turns edge-on (else it shows as a bright seam down the middle).
+  const facing = smoothstep(0.12, 0.55, abs(dot(normalFlat, positionViewDirection)));
+  m.colorNode = col.mul(body).mul(facing).mul(2.0).div(toneMappingExposure);
+  m.opacityNode = body.mul(facing);
   return m;
 }, { cast: false, receive: false });
 

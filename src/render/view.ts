@@ -10,6 +10,11 @@ import { WarmLights } from './warmLights';
 import './materials/flame';
 import { ORIGIN } from './origin';
 import { waterVeil } from './underwater';
+import { outlineVeil } from './materials/outline';
+import { projectAuras } from './aura/marks';
+
+/** The hero's lantern's own colour (a lit torch tints it its flame's orange: main.ts). */
+export const LANTERN_COLOR = 0xffc27a;
 
 export interface View {
   readonly renderer: WebGPURenderer;
@@ -63,7 +68,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const sun = new DirectionalLight(0xfff0d8, 4.2);
   const hemi = new HemisphereLight(0xbcd6f0, 0x5a5040, 1.4);
   // The lantern is always in the scene (lights are part of every shader's key), dark until needed.
-  const lantern = new PointLight(0xffc27a, 0, 14, 1.6);
+  const lantern = new PointLight(LANTERN_COLOR, 0, 14, 1.6);
   lantern.castShadow = false;
   scene.add(sun, sun.target, hemi, lantern);
   const warm = new WarmLights(scene);
@@ -72,9 +77,10 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const sky = new SkyView(renderer, scene, sun, hemi, { ...opts, exposure: (opts.tone ?? 'graded') === 'aces' ? 1 : (opts.tone ?? 'graded') === 'agx' ? 1.5 : 1.6 });
   // Bloom: a soft glow round the sun, lit windows and fire. Its threshold follows the exposure (frame()).
   // Ambient occlusion: contact shade in corners, under eaves, round feet and stones.
-  const post = opts.post === false ? null : createPost(renderer, scene, drawn, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth, veil: waterVeil });
+  const post = opts.post === false ? null : createPost(renderer, scene, drawn, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth, veil: (color, depth) => outlineVeil(waterVeil(color, depth), depth) });
   const draw = (hooks?: PostHooks): void => {
     ORIGIN.view(camera, drawn);
+    projectAuras(camera);
     if (!post) { renderer.render(scene, drawn); return; }
     const day = sky.indoors ? 0 : sky.light.day;
     post.bloom!.threshold.value = (opts.bloom?.[0] ?? BLOOM_AT_NIGHT + (BLOOM_AT - BLOOM_AT_NIGHT) * day) / Math.max(1e-3, renderer.toneMappingExposure);

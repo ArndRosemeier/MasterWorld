@@ -157,11 +157,12 @@ export function archMesh(t: Terrain, site: ArchSite): VolumeMesh | null {
  * The arch near the start (milestone 1): on dry, fairly level ground 150 to 300 m from `home`, its span
  * across the line of sight from there, so it is seen broadside. Deterministic per seed; null if none fits.
  */
-export function archNear(t: Terrain, home: { x: number; z: number }): ArchSite | null {
+export function archNear(t: Terrain, home: { x: number; z: number }, keep = 0): ArchSite | null {
   const seed = deriveSeed(t.seed, 'volumes', 'arch');
   const w = { river: 0, lake: 0 };
   const turn = hash2f(seed, 1, 2) * Math.PI * 2;
-  for (const r of [180, 230, 280, 150]) for (let k = 0; k < 24; k++) {
+  // (Never within `keep` of home: a town standing there.)
+  for (const r of [180, 230, 280, 150, ...(keep ? [330] : [])].filter((d) => d >= keep)) for (let k = 0; k < 24; k++) {
     const a = turn + (k / 24) * Math.PI * 2;
     const cx = home.x + Math.cos(a) * r, cz = home.z + Math.sin(a) * r;
     const span = 30 + 10 * hash2f(seed, k, r);

@@ -26,7 +26,7 @@ export interface NeedContext {
   readonly terrain: Terrain;
   readonly towns: readonly Town[];
   readonly hours: number;
-  readonly setting: Pick<SettingModule, 'sights' | 'encounters' | 'creatures' | 'situations' | 'dungeons'>;
+  readonly setting: Pick<SettingModule, 'sights' | 'encounters' | 'creatures' | 'situations' | 'dungeons' | 'noticing'>;
   /** Where the game began (danger grows with distance from it, D29); none: the first town. */
   readonly home?: { readonly x: number; readonly z: number };
   readonly hero: { readonly x: number; readonly z: number };
@@ -63,7 +63,7 @@ export function sightsOf(log: DecisionLog): SightDecision[] {
  * for that need, or no ground fits).
  */
 export function sightFor(c: NeedContext, need: 'discovery' | 'reward' = 'discovery'): SightDecision | null {
-  const defs = (c.setting.sights ?? []).filter((d) => (d.need ?? 'discovery') === need);
+  const defs = (c.setting.sights ?? []).filter((d) => (d.need ?? 'discovery') === need && !d.sea && !d.strand);
   if (!defs.length) return null;
   const past = sightsOf(c.log), n = past.length + 1, s = deriveSeed(c.seed, 'sight', n), r = new Rng(s);
   // Not the one met last, if there is another.

@@ -1,12 +1,13 @@
 /**
- * The hero's standing with each people (plan 11.6, D34): one number per people, −100 .. 100, starting at
+ * The hero's standing with each faction (plan 11.6, D34, D65): one number per people and per other faction (smugglers, bandits, goblins, the watch ...), −100 .. 100, starting at
  * what they think of a stranger (or of their own kin, for the hero's own people). The game reads it for
  * greetings, prices, who will talk and whether a hold's guards let the hero in; deeds move it (every good
  * deed once, D54: a promise kept, a band beaten, a hurt traveller tended; a gift; trespass, striking or
  * killing a guard). Pure: saved as plain data.
  */
 import { hash2f } from '@futuremagic/core';
-import { TIERS, type PeopleDef, type SettingModule, type StandingDef, type Tier } from '../setting/contract';
+import { TIERS, type FactionDef, type PeopleDef, type SettingModule, type StandingDef, type Tier } from '../setting/contract';
+import { opposed } from '../sim/factions';
 import type { Person } from '../sim/people';
 import { dungeonOf, type DecisionLog } from '../world/decisions';
 
@@ -40,9 +41,12 @@ export interface StandingSave {
   readonly renown?: number;
 }
 
+/** Whom a standing is with: a people or one of the setting's other factions. */
+export type Side = Pick<PeopleDef, 'id' | 'name' | 'plural'>;
+
 /** A change of standing, as the game tells it. */
 export interface StandingChange {
-  readonly people: PeopleDef;
+  readonly people: Side;
   readonly from: number;
   readonly to: number;
   /** The tier it moved into, if it moved into another. */
@@ -55,13 +59,19 @@ export class Standing {
   private readonly deeds = new Set<string>();
   private readonly rules: StandingDef;
   private readonly peoples: readonly PeopleDef[];
+  private readonly others: readonly FactionDef[];
+  private readonly setting: Pick<SettingModule, 'peoples' | 'standing' | 'factions'>;
   race: string;
 
-  constructor(setting: Pick<SettingModule, 'peoples' | 'standing'>, race: string, saved?: StandingSave) {
+  constructor(setting: Pick<SettingModule, 'peoples' | 'standing' | 'factions'>, race: string, saved?: StandingSave) {
+    this.setting = setting;
     this.peoples = setting.peoples;
+    this.others = setting.factions.others;
     this.rules = setting.standing;
     this.race = saved?.race ?? race;
+    // A faction a save does not know yet (older saves) starts as for a new hero.
     for (const p of this.peoples) this.of.set(p.id, saved?.of[p.id] ?? this.first(p));
+    for (const f of this.others) this.of.set(f.id, saved?.of[f.id] ?? f.regard);
     for (const [k, v] of Object.entries(saved?.gifts ?? {})) this.gifts.set(k, v);
     for (const k of saved?.deeds ?? []) this.deeds.add(k);
   }
@@ -69,23 +79,32 @@ export class Standing {
   private first(p: PeopleDef): number { return p.id === this.race ? p.kin : p.regard; }
 
   /** A new hero (of `race`) in this world: every people thinks of them as of any stranger (or kin) again. */
-  begin(race: string): void {
+  restart(race: string): void {
     this.race = race;
     this.gifts.clear();
     this.deeds.clear();
+    this.reset();
+  }
+
+  /** Everyone thinks of the hero as of any stranger (or kin) again. */
+  private reset(): void {
     for (const p of this.peoples) this.of.set(p.id, this.first(p));
+    for (const f of this.others) this.of.set(f.id, f.regard);
   }
 
   people(id: string): PeopleDef | null { return this.peoples.find((p) => p.id === id) ?? null; }
+
+  /** A people or one of the other factions. */
+  side(id: string): Side | null { return this.people(id) ?? this.others.find((f) => f.id === id) ?? null; }
 
   /** Standing with a people (a people the setting does not know: 0). */
   value(id: string): number { return this.of.get(id) ?? 0; }
 
   tier(id: string): Tier { return tierOf(this.value(id)); }
 
-  /** Move standing with a people by `by` (clamped to −100 .. 100); null when nothing changed. */
+  /** Move standing with a faction by `by` (clamped to −100 .. 100); null when nothing changed. */
   change(id: string, by: number): StandingChange | null {
-    const people = this.people(id);
+    const people = this.side(id);
     if (!people || !by) return null;
     const from = this.value(id), to = Math.max(-100, Math.min(100, Math.round(from + by)));
     if (to === from) return null;
@@ -107,6 +126,34 @@ export class Standing {
       if (c) out.push(c);
     }
     return out;
+  }
+
+  /**
+   * The hero killed one of faction `id` (D65): its faction thinks worse of them, and the factions hostile to it a little better (never past
+   * the setting's `upTo` that way). Only the factions that hear of deeds count (not beasts) and not the peoples, whose losses
+   * belong to the deed (a hold's guard, game/hold.ts).
+   */
+  slain(id: string): StandingChange[] {
+    const k = this.setting.factions.kill, f = this.others.find((o) => o.id === id);
+    if (!f?.aware) return [];
+    const out: StandingChange[] = [];
+    const note = (c: StandingChange | null) => { if (c) out.push(c); };
+    note(this.change(id, k.own));
+    for (const o of [...this.peoples, ...this.others]) {
+      if (o.id === id || !opposed(this.setting, id, o.id)) continue;
+      const room = k.upTo - this.value(o.id);
+      if (room > 0) note(this.change(o.id, Math.min(k.foes, room)));
+    }
+    return out;
+  }
+
+  /** The hero struck a band of faction `id` first, in the middle of its warning or after its word (R7): counted once for each band (`key`), kept with the deeds. */
+  struckFirst(key: string, id: string): StandingChange[] {
+    const k = `first:${key}`;
+    if (this.deeds.has(k) || !this.others.find((o) => o.id === id)?.aware) return [];
+    this.deeds.add(k);
+    const c = this.change(id, this.setting.factions.kill.first);
+    return c ? [c] : [];
   }
 
   /** Whether a deed was counted already. */
@@ -194,5 +241,10 @@ export function peopleOf(residents: readonly Person[]): string | null {
 export function householdOf(log: DecisionLog, promise: string, people: readonly Person[]): Person | null {
   const dungeon = dungeonOf(log, log.find((x) => x.id === promise));
   if (!dungeon) return null;
-  return people.find((p) => p.home === dungeon.building && p.role !== 'child' && p.role !== 'traveller') ?? null;
+  return grownUpOf(people, dungeon.building);
+}
+
+/** A grown-up who lives in house `building` (not a child, not a traveller staying there), or null. */
+export function grownUpOf<P extends Pick<Person, 'home' | 'role'>>(people: readonly P[], building: number | undefined): P | null {
+  return people.find((p) => p.home === building && p.role !== 'child' && p.role !== 'traveller') ?? null;
 }

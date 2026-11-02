@@ -25,6 +25,12 @@ export const abilities: readonly AbilityDef[] = [
     ops: [{ op: 'shape', into: 'bird', change: 15, back: 6 }],
     text: 'Kneel and become a pheasant: fifteen slow breaths, and never while you fight. Space takes off, W flaps on, X dives. Use it again to land and be yourself.',
   },
+  // Otter form (S6, D60): the water's change, taken in the water. Swift at the surface, deep under it, and a breath lasts six times as long.
+  {
+    id: 'otter', icon: '🦦', name: 'Otter form', aim: 'self', cooldown: 30, taught: true,
+    ops: [{ op: 'shape', into: 'otter', change: 8, back: 4, hold: 6 }],
+    text: 'In the water, let the bubbles take you and become an otter: eight breaths, never while you fight. W swims, X dives, Space rises; a breath lasts six times as long. Use it again at the surface to be yourself.',
+  },
   ...arts(),
   ...spells(),
   // Abilities only items give (D31, C5): each legendary piece of the canon carries one, the hero has it while wearing it.
@@ -187,6 +193,12 @@ function spells(): AbilityDef[] {
       ops: [{ op: 'effect', to: 'self', effect: { id: 'mending', magnitude: 2, duration: 10 } }, { op: 'look', look: 'leaves', at: 'self' }],
       text: 'Your body mends itself for ten breaths, even while you fight.',
     }),
+    // Life in the water too (S5, D60): breath under it for minutes, every other ability as on land.
+    spell('vitae', 10, {
+      id: 'deep-breath', icon: '🫧', name: 'Breath of the deep', aim: 'self', cost: { mana: 14 }, cooldown: 30, cast: 1.2,
+      ops: [{ op: 'effect', to: 'self', effect: { id: 'gills', magnitude: 1, duration: 240 } }, { op: 'look', look: 'leaves', at: 'self' }],
+      text: 'Breathe water as fish do, for four minutes and longer as you grow.',
+    }),
     spell('vitae', 20, {
       id: 'roots', icon: '🌱', name: 'Grasping roots', cost: { mana: 18 }, cooldown: 16, cast: 1, range: 20,
       ops: [{ op: 'zone', radius: 2.5, duration: 5, tick: 1, at: 'target', look: 'roots', ops: [{ op: 'area', radius: 2.5, damage: 1, kind: 'pierce', effect: { id: 'rooted', magnitude: 1, duration: 1.2 } }] }],
@@ -245,6 +257,7 @@ export const effects: readonly EffectDef[] = [
   { id: 'decay', name: 'Withering', icon: '☾', kind: 'bane', dot: 'shadow' },
   { id: 'veiled', name: 'Veiled', icon: '🌑', kind: 'boon', veil: true },
   { id: 'feared', name: 'Afraid', icon: '😱', kind: 'bane', fear: true },
+  { id: 'gills', name: 'Water breathing', icon: '🫧', kind: 'boon', gills: true },
 ];
 
 export const director: DirectorDef = {

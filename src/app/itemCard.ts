@@ -6,7 +6,7 @@
  * with it, the pack window what is worn and carried (styles in brass.css).
  */
 import { abilityOf, type Quality, type Rarity, type SettingModule } from '../setting/contract';
-import type { Item } from '../game/items';
+import { draughtEffect, findDef, type Item } from '../game/items';
 import { condition, wearState } from '../game/upkeep';
 import { el } from './dom';
 import { twinkles, wardRim } from './ward';
@@ -16,12 +16,14 @@ import { twinkles, wardRim } from './ward';
 /** What a quality is called on a card. */
 const QUALITY_NAMES: Record<Quality, string> = { aim: 'aim', guard: 'guard', armour: 'armour', block: 'block', spell: 'spell power', stealth: 'stealth', speech: 'speech', health: 'health' };
 export function itemLines(i: Item, setting: SettingModule): string[] {
-  const d = setting.items.items.find((x) => x.id === i.def);
+  const d = findDef(setting.items, i.def);
   const lines = Object.entries(i.bonuses).map(([k, v]) => `+${v} ${QUALITY_NAMES[k as Quality] ?? k}`);
   if (d?.weapon) lines.unshift(`${d.weapon.damage[0]}–${d.weapon.damage[1]} damage`);
   if (d?.armour) lines.unshift(`armour ${d.armour}`);
   if (d?.block) lines.unshift(`blocks ${Math.round(d.block * 100)}%`);
   if (d?.heal) lines.unshift(`restores ${d.heal} health`);
+  const fx = d && draughtEffect(setting.effects, d);
+  if (fx && d?.effect) lines.unshift(`${fx.name.toLowerCase()} for ${Math.round(d.effect.duration / 60)} minutes`);
   // An ability only items give (D31, C5): the hero has it while wearing this.
   const a = abilityOf(setting, i.grants);
   if (a) lines.push(`${GRANTS}${a.name}: ${a.text}`);

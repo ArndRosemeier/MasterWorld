@@ -13,7 +13,7 @@ import type { BuildingMesh } from '@futuremagic/settlement';
 import { WildMat, scaleTint, type Tint } from './meshKit';
 import { cragMat, meshField, walkRaster, type Field, type WalkRaster } from './rockMesh';
 import { groundIn, type Site } from './site';
-import { THROAT_BEYOND, THROAT_DARK, throatAir, throatNoise } from './caveThroat';
+import { THROAT_BEYOND, THROAT_DARK, THROAT_GROW, throatAir, throatNoise } from './caveThroat';
 
 /** Where in the mouth the hero goes down (its frame): a hillside's, a cliff's (its way in is bigger). */
 export const MOUTH_WAY_DOWN = { x: 0, z: -3.2 } as const;
@@ -189,7 +189,7 @@ export function caveMouth(seed: number, ground: (x: number, z: number) => number
   const ramp = new Float32Array(nz);
   for (let k = 0; k < nz; k++) ramp[k] = throatRamp(groundUnder, portal, EXTENT.back + k * STEP);
   const rampAt = (z: number) => ramp[Math.max(0, Math.min(nz - 1, Math.round((z - EXTENT.back) / STEP)))];
-  const throat = (x: number, y: number, z: number) => Math.min(throatAir(gullet, x, y - rampAt(z), z - pz), z - pz + THROAT_BEYOND);
+  const throat = (x: number, y: number, z: number) => Math.min(throatAir(gullet, x, y - rampAt(z), z - pz, THROAT_GROW), z - pz + THROAT_BEYOND);
   const oy = low - 2, ny = Math.ceil((EXTENT.top - oy) / STEP) + 1;
   const air = (i: number, y: number, k: number) => {
     const x = -EXTENT.half + i * STEP, z = EXTENT.back + k * STEP, h = g[k * nx + i];

@@ -59,6 +59,11 @@ export const routines: RoutinesDef = {
         { at: 12.5, do: 'meal' }, { at: 13.5, do: 'work' }, { at: 17.5, do: 'meal' }, { at: 18.25, do: 'work' }, { at: 19.5, do: 'home' }, { at: 21.5, do: 'sleep' },
       ],
     },
+    // The watch (D65, R6): half walk the night's rounds (the diligent ones), all walk the day's, and drink at the inn after.
+    watch: { workday: [
+      { at: 0, do: 'sleep', or: { do: 'work', chance: 0.5, trait: 'diligent' } }, { at: 4.5, do: 'sleep' }, { at: 6, do: 'rise' }, { at: 6.5, do: 'meal' }, { at: 7, do: 'work' },
+      { at: 12, do: 'meal' }, { at: 13, do: 'work' }, { at: 17, do: 'chores' }, ...evening(18, 0.4, 22.25),
+    ] },
     // Keeping house: water in the morning, the garden and the washing, the market, the cooking.
     homemaker: { workday: [
       { at: 0, do: 'sleep' }, { at: 5.5, do: 'rise' }, { at: 6.5, do: 'meal' }, { at: 7, do: 'chores' },

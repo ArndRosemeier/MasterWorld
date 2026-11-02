@@ -1,30 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { firstDecisions, startPlace } from '../src/vgm/builder';
-import { regionDecisions, walkFrontier } from '../src/vgm/frontier';
+import { regionDecisions } from '../src/vgm/frontier';
 import { nextPromise, openPromises } from '../src/vgm/leads';
 import { TownLife } from '../src/sim/townLife';
 import { townTalk, type TownTalkSave } from '../src/talk/townTalk';
 import { Township } from '../src/game/township';
 import { townSaves, type SaveData } from '../src/app/saveGame';
 import { houseKey } from '../src/world/town';
-import { Terrain } from '../src/world/terrain';
 import { settlementOf, type Decision, type DecisionLog } from '../src/world/decisions';
-import { SMALL } from './small';
 import { planInterior } from '@futuremagic/settlement';
 import { roomCast } from '../src/sim/roomCast';
+import { SOUTH, frontierLand } from './frontierLand';
 
-const seed = parseSeed('masterworld');
-// The start's land with small drainage tiles (as the frontier test): the same town, faster.
-const terrain = new Terrain(seed, classic, SMALL);
-const first = firstDecisions(terrain, startPlace(terrain));
-terrain.settle(first);
-const home = terrain.towns[0].decision;
-const regions = classic.regions!;
-const walked: DecisionLog = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, 0, 5)];
+// The start's land (test/frontierLand.ts; ours, as a hamlet is settled on it).
+const { seed, terrain, home, regions, walk } = frontierLand({ own: true });
+const walked: DecisionLog = walk(3, SOUTH);
 const hamlet = regionDecisions(walked).find((d) => settlementOf(d, regions.fills)?.size === 'hamlet')!;
 terrain.settleMore([hamlet]);
 const town = terrain.town(hamlet.id)!;
@@ -60,7 +52,9 @@ test('settlements: in a hamlet the VGM promises a place from it, and its people 
   assert.equal(d.town, town.decision.id);
   // A cellar under one of its houses, or a place out on the land near it.
   const at = d.site ?? { x: town.plan.buildings[d.building].cx, z: town.plan.buildings[d.building].cz };
-  assert.ok(Math.hypot(at.x - town.decision.x, at.z - town.decision.z) < 1500, 'near the hamlet');
+  // Within its kind's ring of the hamlet (a cliff or shore moves the spot a little further).
+  const far = Math.hypot(at.x - town.decision.x, at.z - town.decision.z), ring = classic.dungeons[d.template]?.form.ring?.[1] ?? 1300;
+  assert.ok(far < ring + 200, `near the hamlet: ${d.template} ${far.toFixed(0)} m`);
   log = [...log, d];
   assert.equal(nextPromise({ ...ctx(log, town), hours: 30 }), null, 'one at a time');
   const life = new TownLife(town.plan, town.decision.seed!, 9, classic.routines);
@@ -133,6 +127,20 @@ test('settlements: every guild house keeps its teacher at home while awake (the 
     for (const { a, b } of housed) if (a!.act === 'walk' || a!.spot < 0 || life.spots[a!.spot].building !== b.id) out.set(a!.person.id, (out.get(a!.person.id) ?? 0) + 1);
   }
   assert.deepEqual([...out], [], 'teachers out of their houses');
+});
+
+test('settlements: a market day, a feast or a gathering does not take a teacher from their house (the witch is found at home)', () => {
+  for (const mood of ['market', 'feast', undefined] as const) {
+    const start = new Township(terrain.towns[0], { seed, setting: classic, log: () => walked, hours: () => 10 });
+    const life = start.life;
+    start.keepMarked(life, []);
+    const [x, z] = terrain.towns[0].plan.centre;
+    life.order({ kind: 'gather', x, z, radius: 16, from: 10, to: 13, ...(mood ? { mood } : {}) });
+    const housed = start.guilds.map((g) => ({ b: g.b, a: life.agents.find((y) => y.person.work === g.b.id && y.person.trade === g.guild.keeper) })).filter((t) => t.a && !t.a.post);
+    assert.ok(housed.some((t) => t.a!.person.trade === 'hedge-witch'));
+    for (let s = 0; s < 300; s++) life.step(1, 10.1 + s / 600);
+    for (const { a, b } of housed) assert.ok(a!.act !== 'walk' && a!.spot >= 0 && life.spots[a!.spot].building === b.id, `${a!.person.trade} at home on a ${mood ?? 'gathering'}`);
+  }
 });
 
 test('settlements: at night every guild teacher lies asleep in a bed of their own house (the hedge witch is found in hers)', () => {

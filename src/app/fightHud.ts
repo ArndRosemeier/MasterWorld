@@ -15,6 +15,8 @@ import { coinText } from '../game/items';
 import { keyLabel, type Bindings } from '../input/controls';
 import { cap } from '../talk/townTalk';
 import { levelOfDanger } from '../game/growth';
+import { foeGroup } from '../game/foeGroup';
+import { healthCss } from '../sim/aura';
 import { el } from './dom';
 import { itemCard, plainCard } from './itemCard';
 import { replay } from './ward';
@@ -32,7 +34,6 @@ export class FightHud {
   private readonly target = el('div', { className: 'target plate' });
   private readonly tName = el('div', { className: 'name' });
   private readonly tState = el('div', { className: 'state' });
-  private readonly tBar = el('div');
   /** The foe's level (D58): the level whose even fight it is. */
   private readonly tLevel = el('div', { className: 'lvl' });
   /** The hero's level engraved on a brass seal by the vials (D58; the way to the next is the action bar's experience rule). */
@@ -43,6 +44,12 @@ export class FightHud {
   private readonly hurtEdge = el('div', { className: 'hurt' });
   private readonly dark = el('div', { className: 'dark' });
   private shownFor: Creature | null = null;
+  /** The group panel: a row for each foe of the fight, with its health and its distance; a click on a row targets it. */
+  private readonly group = el('div', { className: 'foes plate' });
+  private readonly rows = new Map<number, { row: HTMLElement; bar: HTMLElement; dist: HTMLElement; who: Creature }>();
+  private readonly more = el('div', { className: 'more' });
+  /** The fight the panel's clicks go to (the one followed last). */
+  private fight: Fight | null = null;
   private searchShown: string | null = null;
 
   constructor(private readonly setting: SettingModule, private readonly bindings: () => Bindings) {
@@ -52,9 +59,14 @@ export class FightHud {
       return { box, liquid, text, was: -1 };
     };
     this.vials = { health: vial('health'), stamina: vial('stamina'), mana: vial('mana') };
-    this.target.append(el('div', { className: 'ward' }), this.tLevel, this.tName, this.tState, el('div', { className: 'bar' }, this.tBar));
+    this.target.append(el('div', { className: 'ward' }), this.tLevel, this.tName, this.tState);
     const level = el('div', { className: 'level' }, this.seal);
-    this.root.append(this.hurtEdge, el('div', { className: 'gauges plate' }, level, this.vials.health.box, this.vials.stamina.box, this.vials.mana.box), this.target, this.prompt, this.finds, this.dark);
+    this.root.append(this.hurtEdge, el('div', { className: 'gauges plate' }, level, this.vials.health.box, this.vials.stamina.box, this.vials.mana.box), this.target, this.group, this.prompt, this.finds, this.dark);
+    this.group.append(this.more);
+    this.group.addEventListener('click', (e) => {
+      const row = (e.target as HTMLElement).closest('.foe');
+      for (const r of this.rows.values()) if (r.row === row) { this.fight?.pick(r.who); return; }
+    });
     document.body.append(this.root);
   }
 
@@ -70,11 +82,13 @@ export class FightHud {
     this.vial('stamina', hero.stamina, hero.maxStamina);
     this.vial('mana', hero.mana, hero.maxMana);
     if (this.shownFor) { this.shownFor = null; this.target.classList.remove('shown'); }
+    this.group.classList.remove('shown');
     this.prompt.classList.remove('shown');
   }
 
   /** Every frame: the gauges, the target. */
-  follow(fight: Fight, hero: Character, search: string | null): void {
+  follow(fight: Fight, hero: Character, search: string | null, at: { readonly x: number; readonly y: number; readonly z: number }): void {
+    this.fight = fight;
     this.levelOf(hero);
     this.vial('health', hero.health, hero.maxHealth);
     this.vial('stamina', hero.stamina, hero.maxStamina);
@@ -94,13 +108,40 @@ export class FightHud {
       if (this.target.style.getPropertyValue('--threat') !== THREAT[threat]) this.target.style.setProperty('--threat', THREAT[threat]);
       // Several at once: the ward and the words are for all of them ("the pack" when it hunts as one).
       const who = together ? (t.def.pack ? 'the pack: ' : 'together: ') : '';
-      const state = [STATE[t.state], who + THREAT_WORD[threat]].filter(Boolean).join(' · '), bar = `${Math.max(0, (t.health / t.def.health) * 100).toFixed(1)}%`;
+      const state = [STATE[t.state], who + THREAT_WORD[threat]].filter(Boolean).join(' · ');
       if (this.tState.textContent !== state) this.tState.textContent = state;
-      if (this.tBar.style.width !== bar) this.tBar.style.width = bar;
     }
+    this.foes(fight, at);
     this.prompt.classList.toggle('shown', !!search);
     if (search && search !== this.searchShown) this.prompt.replaceChildren(el('b', {}, keyLabel(this.bindings().search[0])), ` ${search}`);
     this.searchShown = search;
+  }
+
+  /** The group panel: shown while two or more foes are in the fight (one is the target plate's), a row for each. */
+  private foes(fight: Fight, at: { readonly x: number; readonly y: number; readonly z: number }): void {
+    const g = foeGroup(fight.den.fighting, fight.target, at);
+    this.group.classList.toggle('shown', g.rows.length > 1);
+    const live = new Set<number>();
+    for (const r of g.rows) {
+      const id = r.creature.id;
+      live.add(id);
+      let row = this.rows.get(id);
+      if (!row) {
+        const bar = el('div', { className: 'fill' }), dist = el('div', { className: 'dist' });
+        const box = el('div', { className: 'foe' }, el('div', { className: 'name' }, cap(r.creature.def.name)), dist, el('div', { className: 'bar' }, bar));
+        row = { row: box, bar, dist, who: r.creature };
+        this.rows.set(id, row);
+        this.group.insertBefore(box, this.more);
+      }
+      row.row.classList.toggle('aimed', r.target);
+      const w = `${(r.frac * 100).toFixed(0)}%`;
+      if (row.bar.style.width !== w) { row.bar.style.width = w; row.bar.style.background = healthCss(r.frac); }
+      const d = `${Math.round(r.dist)} m`;
+      if (row.dist.textContent !== d) row.dist.textContent = d;
+    }
+    for (const [id, row] of this.rows) if (!live.has(id)) { row.row.remove(); this.rows.delete(id); }
+    const more = g.more ? `+${g.more} more` : '';
+    if (this.more.textContent !== more) this.more.textContent = more;
   }
 
   /** A blow of the hero's landed on the target (or missed). */

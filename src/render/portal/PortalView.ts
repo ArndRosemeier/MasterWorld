@@ -34,6 +34,8 @@ export interface PortalPass {
    * is below, the sun's map must be drawn of the land, not of the cave.
    */
   readonly shadows?: boolean;
+  /** The near plane of the view beyond lies this far back from the far opening, towards the camera (m), so a passage built past the opening shows its walls. */
+  readonly clipBack?: number;
 }
 
 const UP = new Vector3(0, 1, 0);
@@ -126,6 +128,7 @@ export class PortalView {
     // Seen from the opening's back (its -z side), the view goes on out of the far opening's back: the near plane faces the other way.
     const plane = openingPlane(this.to);
     if (this.inv.copy(this.from).invert() && main.getWorldPosition(this.eye).applyMatrix4(this.inv).z < 0) plane.negate();
+    plane.constant += p.clipBack ?? 0;
     if (!clipNear(this.drawnCam, plane)) return;
     const back = p.beyond();
     // No shadow map is drawn for the view beyond, unless it is the one place that needs it this frame.

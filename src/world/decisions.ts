@@ -22,6 +22,8 @@ export interface TownDecision {
   readonly seed?: number;
   /** A harbour town's shore (S2): a point on it near the town and the way out to sea (AssetGenerator HarbourSite). */
   readonly harbour?: HarbourAt;
+  /** It stands on an island out at sea (S7: an island's fishing village). */
+  readonly isle?: true;
 }
 
 /** A point on the shore and the way out to sea from it (a unit vector). */
@@ -68,6 +70,50 @@ export interface DungeonDecision {
   readonly event?: string;
   /** The guild whose master asked for it, as their one deed (C14: a keeper's id); its household is the master's. */
   readonly quest?: string;
+  /** The guild whose task it is (D49: a keeper's id): the one place that does the task. */
+  readonly task?: string;
+  /** What its household asks (D62): a kind of the setting's asks and its verb; none (an older save, a guild's place): clear it. */
+  readonly ask?: PromiseAsk;
+}
+
+/**
+ * What someone wanted that a task came from (Q5): `elder`, the eldest of a household, old now, wants back what is left
+ * of the ones before them; `rival`, a trader suspects the rival of their trade (`rival`, a person id); `parent`, a grown-up with a child in
+ * the house fears for them; `pious`, a devout one wants the restless laid to rest; `peaceable`, a sociable one would rather it were talked out;
+ * `craft`, someone asked the hero themselves (the VGM's favour, N3) for something of their own calling or pursuit.
+ */
+export interface PromiseWant {
+  readonly person: number;
+  readonly kind: 'rival' | 'elder' | 'parent' | 'pious' | 'peaceable' | 'craft';
+  readonly rival?: number;
+  /** `craft` (D68, N3): what the person does that the task is made from, a pursuit's id or `trade:<their trade>`. */
+  readonly craft?: string;
+}
+
+/** What a household asks about its place (D62, vgm/asks.ts): only the thing it names counts as done. */
+export interface PromiseAsk {
+  /** The setting's ask (its kind). */
+  readonly id: string;
+  readonly verb: string;
+  /** `fetch`: which of the ask's things (index). */
+  readonly thing?: number;
+  /** Which of the ask's told lines the household says (index). */
+  readonly line: number;
+  /** `lost`: who of the town is lost (a seeded pick, `vgm/asks.ts` `askedOne`), and whether they are found alive. */
+  readonly who?: number;
+  readonly alive?: boolean;
+  /** `parley`: the leader's terms, a price (copper) or a pact. */
+  readonly terms?: 'price' | 'pact';
+  readonly price?: number;
+  /** Whose want it came from (Q5): who in the household wants it, and why. */
+  readonly want?: PromiseWant;
+  /** `thief` (Q4): the earlier promise whose thief, let go, is at it again. */
+  readonly again?: string;
+  /** What turns out other than told (Q3: the setting's twist id); none: as told. */
+  readonly twist?: string;
+  /** `watch`: whether a band comes out of the dark, and who they are (the dwellers' encounter). */
+  readonly comes?: boolean;
+  readonly band?: string;
 }
 
 /**
@@ -80,6 +126,10 @@ export interface KeptDecision {
   readonly promise: string;
   /** Game hours since the world began. */
   readonly at: number;
+  /** It ended without what was asked (D62: a parley the hero broke by striking first); nobody pays for it. */
+  readonly failed?: boolean;
+  /** How it ended, where there was a choice (D62, Q4: a thief `caught` or `let-go`); what comes next may follow from it. */
+  readonly ending?: string;
   /** It ended without the hero (C11: a story event left alone ran its course; the VGM's 'fade' tool). */
   readonly faded?: true;
 }
@@ -198,7 +248,7 @@ export const settles = (place: RegionFillDef['place']): place is 'waystation' | 
 export function settlementOf(d: RegionDecision, fills: readonly RegionFillDef[]): TownDecision | null {
   const f = d.site ? fills.find((x) => x.id === d.fill) : undefined;
   if (!f || !d.site || !settles(f.place)) return null;
-  return { kind: 'town', id: d.id, x: d.site.x, z: d.site.z, radius: d.site.r, size: f.place, seed: d.seed, ...(d.site.harbour ? { harbour: d.site.harbour } : {}) };
+  return { kind: 'town', id: d.id, x: d.site.x, z: d.site.z, radius: d.site.r, size: f.place, seed: d.seed, ...(d.site.harbour ? { harbour: d.site.harbour } : {}), ...(f.island ? { isle: true as const } : {}) };
 }
 
 /**
@@ -267,6 +317,8 @@ export interface WildDecision {
   readonly at: number;
   /** A situation it is (C10: the setting's, wolves at a paddock at dusk); none: a group of the wild. */
   readonly situation?: string;
+  /** The promise whose night watch it came on (D62): beaten, the watch is done. */
+  readonly watch?: string;
 }
 
 /**
@@ -282,6 +334,21 @@ export interface JourneyDecision {
   readonly fare: number;
   readonly at: number;
   readonly arrive: number;
+  /** By sea (S4): passage aboard a ship between harbour towns, along its way over the water (x, z, ...). */
+  readonly by?: 'sea';
+  readonly route?: readonly number[];
+}
+
+/**
+ * A ship held in harbour (S10): the VGM's word that the voyage `journey` waits out a storm at its harbour and
+ * sails at `until` instead (it comes in as much later). Logged as passage is bought.
+ */
+export interface DelayDecision {
+  readonly kind: 'delay';
+  readonly id: string;
+  readonly journey: string;
+  readonly until: number;
+  readonly at: number;
 }
 
 /**
@@ -295,6 +362,10 @@ export interface SightDecision {
   readonly sight: string;
   /** The need it answers, if not Discovery (a find by the way answers Reward). */
   readonly need?: 'reward';
+  /** It lies on the sea bed (a wreck, S8: `vgm/wrecks.ts`), its yaw the way her bow points. */
+  readonly sea?: true;
+  /** It lies on a strand (a wreck washed up, S9: `vgm/wrecks.ts`), its yaw the way her bow points. */
+  readonly strand?: true;
   readonly x: number;
   readonly z: number;
   readonly yaw: number;
@@ -320,6 +391,25 @@ export interface TravellerDecision {
   readonly until: number;
   /** A situation it is (C10: the setting's, a hurt traveller); none: one resting. */
   readonly situation?: string;
+}
+
+/**
+ * A situation by the sea (S9, D52): a fisher of harbour town `town` whose boat went over, clinging to it upturned at
+ * (x, z) off the strand (its keel along `yaw`), crying for help, from game hour `at` until `until` (then another boat
+ * picks them up). The hero swims out to them and brings them in.
+ */
+export interface CastawayDecision {
+  readonly kind: 'castaway';
+  readonly id: string;
+  readonly town: string;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  readonly seed: number;
+  readonly at: number;
+  readonly until: number;
+  /** The setting's situation. */
+  readonly situation: string;
 }
 
 /**
@@ -356,7 +446,7 @@ export interface FestivityDecision {
   readonly for?: string;
 }
 
-export type Decision = FestivityDecision | StrayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+export type Decision = DelayDecision | FestivityDecision | StrayDecision | CastawayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 

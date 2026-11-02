@@ -44,6 +44,10 @@ export interface ChunkMesh {
   maxY: number;
 }
 
+/** Side of the finest chunk, metres; with SEGS segments a vertex every 2 m (render/terrain/lod.ts draws them). */
+export const CHUNK0 = 128;
+export const SEGS = 64;
+
 /** Brooks are drawn finer: a chunk this size or smaller with a brook's channel in it is built at twice the segments asked. */
 export const BROOK_FINE_SIZE = 128;
 /** Sampling step when looking for a brook's channel in a chunk, m (the narrowest channel is 2 m wide). */
@@ -97,14 +101,29 @@ export function followEdges(h: (i: number, j: number) => number, segs: number, s
   const n = segs + 1;
   let out: Uint16Array | Uint32Array | null = null;
   for (let j = 0; j < segs; j++) for (let i = 0; i < segs; i++) {
-    // The shared list cuts b-c; a-d instead where its corners differ clearly less (by a third of a cell's width).
-    const bc = Math.abs(h(i + 1, j) - h(i, j + 1)), ad = Math.abs(h(i, j) - h(i + 1, j + 1));
-    if (bc - ad < step / 3) continue;
+    if (!cutsAD(h(i, j), h(i + 1, j), h(i, j + 1), h(i + 1, j + 1), step)) continue;
     out ??= vertexCount(segs) < 65536 ? new Uint16Array(chunkIndex(segs)) : chunkIndex(segs);
     const a = j * n + i, b = a + 1, c = a + n, d = c + 1, q = (j * segs + i) * 6;
     out[q] = a; out[q + 1] = c; out[q + 2] = d; out[q + 3] = a; out[q + 4] = d; out[q + 5] = b;
   }
   return out;
+}
+
+/**
+ * Whether a quad (corners a at its least x and z, b along x, c along z, d across) is cut a-d: the shared list cuts
+ * b-c; a-d instead where its corners differ clearly less (by a third of a cell's width).
+ */
+export function cutsAD(a: number, b: number, c: number, d: number, step: number): boolean {
+  return Math.abs(b - c) - Math.abs(a - d) >= step / 3;
+}
+
+/**
+ * The height drawn at (u, w) in a quad (0..1 along x and z; corners as `cutsAD`), on the triangle it falls in: what
+ * the mesh shows there, which the hero stands on (world/drawnGround.ts).
+ */
+export function drawnIn(a: number, b: number, c: number, d: number, u: number, w: number, step: number): number {
+  if (cutsAD(a, b, c, d, step)) return w >= u ? a + (d - c) * u + (c - a) * w : a + (b - a) * u + (d - b) * w;
+  return u + w <= 1 ? a + (b - a) * u + (c - a) * w : d + (c - d) * (1 - u) + (b - d) * (1 - w);
 }
 
 function borderRing(segs: number): number[] {

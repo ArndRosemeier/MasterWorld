@@ -45,8 +45,8 @@ export class SearchKneel implements Puppet {
     private readonly onFound: () => void,
     /** Where to kneel (a chest's front); else on the line from the hero to it, KNEEL_AT short of it (where the hero is, if nearer). */
     kneelAt?: { readonly x: number; readonly z: number },
-    /** How long the hands are busy (s; none: a search's quick look), and the ground out on the land (none: a level floor). */
-    private readonly o: { readonly busy?: number; readonly ground?: (x: number, z: number) => number; readonly up?: () => void } = {},
+    /** How long the hands are busy (s; none: a search's quick look), the ground out on the land (none: a level floor), and the work done so far while busy (0..1: stones set). */
+    private readonly o: { readonly busy?: number; readonly ground?: (x: number, z: number) => number; readonly up?: () => void; readonly work?: (k: number) => void } = {},
   ) {
     this.pos = { x: from.x, y: from.y, z: from.z };
     this.yaw = yaw;
@@ -72,6 +72,7 @@ export class SearchKneel implements Puppet {
     this.t += dt;
     this.lid?.(smoothstep(LID_FROM, LID_TO, this.t));
     const busy = this.o.busy ?? KNEEL_FOR;
+    this.o.work?.(Math.min(1, this.t / (busy - (KNEEL_FOR - FOUND_AT))));
     if (!this.found && this.t >= busy - (KNEEL_FOR - FOUND_AT)) { this.found = true; this.onFound(); }
     if (this.t >= busy) { this.clip = undefined; this.done = true; this.o.up?.(); }
   }

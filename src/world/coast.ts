@@ -36,6 +36,15 @@ function seaward(t: Terrain, x: number, z: number): [number, number] {
   return [gx / l, gz / l];
 }
 
+/** The way to the sea from (x, z) if open water `deep` m deep or more lies within `within` m (a unit vector), looked for in eight ways; else null. */
+export function seaWithin(t: Pick<Terrain, 'waterDepth'>, x: number, z: number, within: number, deep = 0.5): [number, number] | null {
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2, ux = Math.cos(a), uz = Math.sin(a);
+    if (t.waterDepth(x + ux * within, z + uz * within) > deep) return [ux, uz];
+  }
+  return null;
+}
+
 /**
  * The nearest coast spot of a kind from (x, z), along a spiral out to some 30 km; null if none is met. A beach and
  * a cliff stand on land just in from the waterline, facing the sea; `under` is off the nearest beach, on the bed.
@@ -117,12 +126,12 @@ export interface HarbourSpot {
  * harbour), on either bank: the quay on the coast beside the mouth, the town's middle inland of it, on dry ground at
  * least 1.5 m up. Those with more dry ground round the middle first.
  */
-export function harbourSpots(t: Terrain, m: RiverMouth, r: number): HarbourSpot[] {
+export function harbourSpots(t: Terrain, m: RiverMouth, r: number, along: readonly number[] = HARBOUR_ALONG): HarbourSpot[] {
   const [sx, sz] = seaward(t, m.x, m.z), out: (HarbourSpot & { dry: number })[] = [];
-  for (const side of [1, -1]) for (const along of HARBOUR_ALONG) {
+  for (const side of [1, -1]) for (const k of along) {
     // Along the coast, one way or the other from the mouth (the river's end lies a little out at sea), past its bank
     // (nearer or farther: a place must fit in its square); then inland to the shore.
-    const tx = -sz * side, tz = sx * side, off = m.half + 15 + r * along;
+    const tx = -sz * side, tz = sx * side, off = m.half + 15 + r * k;
     let hx = NaN, hz = NaN;
     for (let s = -60; s < 400; s += 4) {
       const x = m.x + tx * off - sx * s, z = m.z + tz * off - sz * s;

@@ -214,6 +214,9 @@
 .lessons .rule .cap { position: absolute; left: calc(var(--cap) * 100%); top: -4px; width: 3px; height: 14px; margin-left: -1px; border-radius: 1px; background: linear-gradient(var(--brass-hi), var(--brass-mid)); box-shadow: 0 0 4px #000; }
 .lessons .lesson .price { text-align: right; font: 13px 'Marcellus SC', Georgia, serif; color: var(--brass); }
 .lessons .lesson.opens .price { color: var(--ward); }
+/* Ability points free (D61): a brass seal with its number; dim when none is free. */
+.foot .points { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--brass); color: var(--brass-hi); font: 13px 'Marcellus SC', Georgia, serif; letter-spacing: .04em; box-shadow: 0 0 8px #8fe3ff44; white-space: nowrap; }
+.foot .points.none { color: var(--ink-dim); border-color: var(--brass-lo); box-shadow: none; }
 .lessons .foot .standing { margin-left: auto; font: 13px 'Marcellus SC', Georgia, serif; color: var(--ink-dim); }
 .lessons .lesson.done .price { font-style: italic; font-family: 'EB Garamond', Georgia, serif; color: #6a6458; }
 @media (max-width: 560px) { .lessons .lesson { grid-template-columns: 1fr 36px 90px; } .lessons .rule { grid-column: 1 / -1; grid-row: 2; } }

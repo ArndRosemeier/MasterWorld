@@ -13,7 +13,10 @@ import type { Stage } from '@futuremagic/stage';
 import type { TownBuilding } from '@futuremagic/settlement';
 import { deriveSeed } from '@futuremagic/core';
 import type { Character } from '../game/character';
+import type { Standing } from '../game/standing';
+import type { GroupFacts, Known } from '../vgm/stance';
 import { Delve, type DelveSave } from '../game/delve';
+import type { Item } from '../game/items';
 import { CellarView } from '../render/dungeon/CellarView';
 import type { WarmLights } from '../render/warmLights';
 import { CreatureView } from '../render/dungeon/CreatureView';
@@ -27,7 +30,7 @@ import { occupationOf } from '../vgm/leads';
 import type { DecisionLog, DungeonDecision, MoveInDecision, RetakeDecision } from '../world/decisions';
 import { barrowMesh, inBarrowShape, WAY_DOWN } from '../world/dungeon/barrowMesh';
 import { CaveSpace, caveField, caveShell, type CaveThroat } from '../world/dungeon/caveRock';
-import { THROAT_OPENING, caveThroat, type ThroatFrame } from '../world/dungeon/caveThroat';
+import { THROAT_BEYOND, THROAT_OPENING, caveThroat, type ThroatFrame } from '../world/dungeon/caveThroat';
 import type { Portal } from '../game/portal';
 import { caveFeatures, keepSpots } from '../world/dungeon/caveFeatures';
 import { caveSeed } from '../world/dungeon/torches';
@@ -36,6 +39,13 @@ import { inWalkRaster } from '../world/dungeon/rockMesh';
 import { groundIn, onLand, inFrame, type Site as LandSite } from '../world/dungeon/site';
 import { inTowerShape, TOWER_WAY_IN, towerMesh, towerSize } from '../world/dungeon/towerMesh';
 import type { ScaledLayout } from '../world/dungeon/cellar';
+import { runCaveJob, type CaveJob, type CaveResult } from '../world/cave/job';
+import { caveSpecFor, type CaveSpec } from '../vgm/caves';
+import { inhabit } from '../vgm/inhabit';
+import { FormedSpace } from '../sim/formedSpace';
+import { lockSites, type CaveLock } from '../world/cave/locks';
+import { lockPiece } from '../world/cave/lockMesh';
+import { keyMesh } from '../world/dungeon/cellarMesh';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { moveIn, occupantId, outlineCellar, type Cellar, type DungeonPlace } from '../world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
@@ -64,6 +74,10 @@ export interface CellarsHost {
   readonly notes: Notes;
   readonly setting: SettingModule;
   readonly character: Character;
+  /** What the factions make of the hero (D65): the foes read it before they fight. */
+  readonly standing: Standing;
+  /** Why a group woken or placed attacks the hero at once, if the VGM knows (vgm/stance.ts); null: it does not. */
+  known(group: GroupFacts): Known | null;
   readonly seed: number;
   readonly director: Director;
   readonly journal: Journal;
@@ -77,15 +91,21 @@ export interface CellarsHost {
   readonly dweller: string | null;
   /** The land's height (a barrow, a cave's crag, a tower stand on it). */
   ground(x: number, z: number): number;
+  /** The kind of country at a point (the rock a cave there is in: setting `caves.geology`); none: unknown. */
+  land?(x: number, z: number): string;
   /** The terrain workers, for a cave's rock and mouth (none: built here, a moment's stall). */
   /** A portal opened (a cave's mouth joined to its throat below: app/portals.ts). */
   readonly portal?: (p: Portal) => void;
   readonly jobs?: {
     caveRock(layout: ScaledLayout, cave: number, keep: readonly (readonly [number, number])[], throat?: CaveThroat | null): Promise<{ readonly field: import('../world/dungeon/caveRock').CaveField; readonly shell: BuildingMesh }>;
     caveMouth(site: LandSite, cave: number): Promise<CaveMouth>;
+    /** A formed cave (phase K, world/cave/job.ts) made in a worker; none: made here, a moment's stall. */
+    formed?(job: CaveJob): Promise<CaveResult>;
   };
   /** A place out on the land opens: the trees round it go (the land's views are built again there). */
   cleared?(d: DungeonDecision): void;
+  /** The keepsake a place's household asked to be brought (D62: a fetch, a lost one dead), named for them; null: none.  */
+  keepsake?(d: DungeonDecision): Item | null;
   /** Down (true) or up again: the land above leaves the frame meanwhile, all but `keep` (the cellar and its dwellers). */
   depth(below: boolean, keep: readonly Object3D[]): void;
 }
@@ -96,6 +116,8 @@ interface Mound extends LandSite {
   mesh: Mesh | null;
   /** Is a body of radius `r` at (x, z) of its own frame in its way? */
   inShape: (x: number, z: number, r: number) => boolean;
+  /** The height (world y) of its highest point, once its mesh is made: over it a body or the camera is not in its way. */
+  top: number;
   /** Where in its doorway the way goes in (its frame; a cave's once its mouth is made). */
   way: { readonly x: number; readonly z: number };
   /** Where the hero comes back out (its frame), facing away from it. */
@@ -107,6 +129,8 @@ interface Mound extends LandSite {
    * portal stands, once the mouth is made; and the floor of the way in there (frame heights), else null.
    */
   throat?: { readonly z: number; readonly floor: number; readonly y: number; walk(x: number, z: number): number | null };
+  /** A cave's mouth being made by a worker: settled once it stands. */
+  made?: Promise<void>;
 }
 
 /** A place on the land is built (rooms, dwellers) once the hero is this near, metres. */
@@ -127,9 +151,11 @@ interface Site {
   /** A place's piece on the land (none: a cellar, reached through its house). */
   readonly mound: Mound | null;
   /** As outlined for its first dwellers (the rooms never change). */
-  readonly first: Cellar;
+  first: Cellar;
   /** A cave's throat in its own frame, where the portal from its mouth comes out (null: walked in with a fade). */
-  readonly throat: ThroatFrame | null;
+  throat: ThroatFrame | null;
+  /** What the VGM asked of the formed cave below (vgm/caves.ts `caveSpecFor`); none: the old natural cave, or not a cave. */
+  readonly spec: CaveSpec | null;
   /** Who lives there now. */
   cellar: Cellar;
   built: Promise<Built> | null;
@@ -202,6 +228,17 @@ export class Cellars {
   }
 
   /**
+   * Before the hero is set down at (x, z) by a jump (a teleport, a start before a place): the places near there are
+   * built now and awaited, mouth and rooms, so a cave's portal is open on arrival, not a moment after. (Walking up,
+   * `approach` has built them long before.)
+   */
+  async buildNear(x: number, z: number): Promise<void> {
+    const near = [...this.sites.values()].filter((s) => s.mound && Math.hypot(x - s.mound.x, z - s.mound.z) <= BARROW_NEAR);
+    // (A place that fails to build is left to `approach`, as before: the jump goes on.)
+    await Promise.all(near.map((s) => Promise.all([s.mound?.made, this.ensure(s)]).catch(() => undefined)));
+  }
+
+  /**
    * Out on the land, every frame (`dt`): barrows near the hero get built, and walking into one's passage
    * goes down.
    */
@@ -233,7 +270,7 @@ export class Cellars {
     if (!s || !m || !t || !f || !visit) return;
     const [ax, az] = onLand(m, 0, t.z), O = visit.origin;
     this.host.portal?.({
-      id: `cave:${id}`, shape: THROAT_OPENING,
+      id: `cave:${id}`, shape: THROAT_OPENING, clipBack: THROAT_BEYOND,
       a: { realm: 'land', frame: { x: ax, y: t.y + t.floor, z: az, yaw: m.yaw } },
       b: { realm: id, frame: { x: O.x + f.x, y: O.y + f.y, z: O.z + f.z, yaw: f.yaw } },
     });
@@ -298,10 +335,19 @@ export class Cellars {
   }
 
   /** Is a body of radius `r` at (x, z) on the land inside a place's piece (a barrow's mound, a crag, a tower's walls)? */
-  solid(x: number, z: number, r: number): boolean {
+  solid(x: number, z: number, r: number): boolean { return this.inPieces(x, -Infinity, z, r); }
+
+  /**
+   * Is (x, y, z) in a place's piece on the land, with `r` to spare? The camera keeps out of it: `solid` knows no height,
+   * and the camera swings round over the land with the mouse.
+   */
+  inPiece(x: number, y: number, z: number, r: number): boolean { return this.inPieces(x, y, z, r); }
+
+  /** The pieces' footprints, for what is not over their top (`y`). */
+  private inPieces(x: number, y: number, z: number, r: number): boolean {
     for (const s of this.sites.values()) {
       const m = s.mound;
-      if (!m || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
+      if (!m || y > m.top || Math.abs(x - m.x) > MOUND_REACH || Math.abs(z - m.z) > MOUND_REACH) continue;
       const [fx, fz] = inFrame(m, x, z);
       if (m.inShape(fx, fz, r)) return true;
     }
@@ -373,8 +419,11 @@ export class Cellars {
     const m = occupationOf(this.log, d.id);
     const mound = d.site ? this.heap(d, d.site, first.layout) : null;
     if (d.site) this.host.cleared?.(d);
-    const throat = mound && first.form.space.carved && loreOf(this.host.setting, d.template).form.shell === 'mouth' ? caveThroat(first) : null;
-    const s: Site = { decision: d, house, place, mound, first, throat, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
+    // A cave's throat: from its layout's entrance room, or (a formed cave) once the cave is made, its mouth's plane (a placeholder till then).
+    const mouthed = mound && first.form.space.carved && loreOf(this.host.setting, d.template).form.shell === 'mouth';
+    const caves = this.host.setting.caves, at = d.site, spec = first.form.space.formed && caves && at ? caveSpecFor(caves, this.host.land?.(at.x, at.z) ?? '*', d, first.graph.rooms.length) : null;
+    const throat = mouthed ? (spec ? { x: 0, y: 0, z: 0, yaw: 0 } : caveThroat(first)) : null;
+    const s: Site = { decision: d, house, place, mound, first, throat, spec, cellar: m ? moveIn(first, m, place, lore) : first, built: null, ready: null };
     this.sites.set(d.id, s);
     if (mound) return;
     this.down.set(houseKey(d.town, house.id), async () => (await this.ensure(s)).visit);
@@ -393,13 +442,15 @@ export class Cellars {
       void h.stage.add(m);
       return m;
     };
+    const topOf = (mesh: Mesh): number => { mesh.geometry.computeBoundingBox(); return y + mesh.geometry.boundingBox!.max.y; };
     // What stands over it is its kind's shell (C6c: the form says which builder, not the kind's name).
     const shell = loreOf(h.setting, d.template).form.shell;
     if (shell === 'mouth') {
       const seed = deriveSeed(d.seed, 'cave');
-      const mound: Mound = { ...site, mesh: null, inShape: () => false, way: MOUTH_WAY_DOWN, out: 3, cool: 0 };
-      void (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
+      const mound: Mound = { ...site, mesh: null, inShape: () => false, top: -Infinity, way: MOUTH_WAY_DOWN, out: 3, cool: 0 };
+      mound.made = (h.jobs ? h.jobs.caveMouth(site, seed) : Promise.resolve(mouthOnLand((x, z) => h.ground(x, z), site, seed))).then((mouth) => {
         mound.mesh = put(mouth.mesh, 0);
+        mound.top = topOf(mound.mesh);
         mound.inShape = (x, z) => inWalkRaster(mouth.walk, x, z);
         // A cliff's way in is bigger: it goes down further in, and the hero comes out further before it.
         mound.way = mouth.way;
@@ -411,9 +462,11 @@ export class Cellars {
     }
     if (shell === 'keep') {
       const size = towerOf(layout);
-      return { ...site, mesh: put(towerMesh(size, deriveSeed(d.seed, 'tower'), land), 0.02), inShape: (x, z, r) => inTowerShape(size, x, z, r), way: TOWER_WAY_IN, out: 2.4, cool: 0 };
+      const mesh = put(towerMesh(size, deriveSeed(d.seed, 'tower'), land), 0.02);
+      return { ...site, mesh, top: topOf(mesh), inShape: (x, z, r) => inTowerShape(size, x, z, r), way: TOWER_WAY_IN, out: 2.4, cool: 0 };
     }
-    return { ...site, mesh: put(barrowMesh(deriveSeed(d.seed, 'barrow'), land), 0.05), inShape: inBarrowShape, way: WAY_DOWN, out: 2.2, cool: 0 };
+    const mesh = put(barrowMesh(deriveSeed(d.seed, 'barrow'), land), 0.05);
+    return { ...site, mesh, top: topOf(mesh), inShape: inBarrowShape, way: WAY_DOWN, out: 2.2, cool: 0 };
   }
 
   /** New dwellers (a move-in after a clear, or a retake while it stands): only the latest of them lives there. */
@@ -434,12 +487,21 @@ export class Cellars {
 
   private async assemble(s: Site): Promise<Built> {
     const h = this.host;
+    // A formed cave (phase K) is made first: the rooms of its story are told as places of it, and its throat is the way in.
+    const formed = s.spec ? await this.formedCave(s) : null;
     // Its own space, deep under the house.
     const m = s.mound, at = m ?? { x: s.house.cx, z: s.house.cz };
     const view = new CellarView(s.first, { x: at.x, y: -400, z: at.z });
     // A cave: its rock carved round its rooms (a worker's few hundred milliseconds), walked as it is seen.
     let carved: CaveSpace | undefined;
-    if (s.first.form.space.carved) {
+    if (formed) {
+      view.formed = formed.res;
+      view.locks = {
+        doors: formed.locks.map((l) => lockPiece(l, s.decision.seed)),
+        keys: formed.locks.flatMap((l) => (l.kind === 'locked' && l.key !== undefined ? [{ room: l.key, mesh: keyMesh(formed.space.keyAt(l.key), deriveSeed(s.decision.seed, 'key', l.key)) }] : [])),
+      };
+      view.throat = !!s.throat;
+    } else if (s.first.form.space.carved) {
       const layout = s.first.layout, seed = caveSeed(s.first);
       // Its natural features (caveFeatures.ts): the floor kept level where its things lie, its water and shafts drawn.
       const keep = keepSpots(s.first), feat = caveFeatures(layout, seed, keep);
@@ -455,7 +517,7 @@ export class Cellars {
     // A place on the land: back out in front of its doorway, facing away from it.
     // (Read when the hero comes out: a cave's mouth may be made after this, a cliff's further out.)
     const out = m ? { get door() { return [...onLand(m, 0, m.out), m.yaw + Math.PI] as const; } } : s.house;
-    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, carved);
+    const visit = new CellarVisit(s.first, out, view, h.player, h.lantern, h.warm, h.sky, h.notes, formed?.space ?? carved);
     if (!m) visit.above = { town: s.decision.town, house: s.house };
     visit.throat = s.throat;
     // Down there nothing of the land above can be seen: it leaves the frame (it was drawn behind the walls).
@@ -472,6 +534,29 @@ export class Cellars {
     return b;
   }
 
+  /**
+   * A formed cave for a cave place (phase K5): made in a worker from the place's seed, the cellar's rooms told as places of it
+   * (vgm/inhabit.ts), its mouth's plane as the throat the portal comes out of. Null: the setting has no rock for it.
+   */
+  private async formedCave(s: Site): Promise<{ readonly res: CaveResult; readonly space: FormedSpace; readonly locks: readonly CaveLock[] } | null> {
+    const caves = this.host.setting.caves, h = this.host;
+    // The VGM's cave tool (vgm/caves.ts) asked for the rock, size and shares when the place was opened.
+    const spec = s.spec;
+    if (!caves || !spec) return null;
+    const job: CaveJob = { kind: 'form', setting: h.setting.id, seed: s.decision.seed, rock: spec.rock, size: spec.size, dress: true, read: true, field: true };
+    const res = await (h.jobs?.formed ? h.jobs.formed(job) : Promise.resolve(runCaveJob(job).result));
+    if (!res.field || !res.read || !res.mesh) throw new Error(`formed cave of ${s.decision.id}: ${!res.field ? 'no field' : !res.read ? 'no reading' : 'no mesh'}`);
+    const was = s.first, throat = res.skeleton.throat, first = inhabit(was, res.field, res.read.reading, throat);
+    // The newest dwellers' rooms are told in the same places.
+    s.first = first.cellar;
+    s.cellar = s.cellar === was ? first.cellar : inhabit(s.cellar, res.field, res.read.reading, throat).cellar;
+    s.throat = throat ?? null;
+    const d = res.dressing, sounds = { drips: d?.drips.map((p): [number, number, number] => [p.x, p.floor, p.z]) ?? [], streams: d?.streams.flatMap((st) => st.pts.filter((_, i) => i % 2 === 0).map((q): [number, number, number] => [q[0], q[1], q[2]])) ?? [] };
+    // Its story's shut ways, set where the cave narrows (K6): solid for the walker and the creatures, drawn as pieces that open on screen.
+    const locks = lockSites(first.cellar, res.field, res.read.reading, first.cells, caves.way);
+    return { res, locks, space: new FormedSpace(first.cellar.layout, res.field, first.ground, first.cellar.formed!.homes, sounds, locks) };
+  }
+
   /** Its dwellers now: the den, their bodies and the fight (again after a move-in). */
   private async populate(s: Site, b: Built): Promise<void> {
     const h = this.host, cellar = s.cellar, own = occupantId(cellar);
@@ -481,7 +566,12 @@ export class Cellars {
     // Chests opened before new dwellers came stay open; the lair's hoard is theirs.
     const before = own === s.decision.id ? undefined : priorChests(cellar, was ? was.delve.tally() : this.saved[s.decision.id]?.delve, h.setting);
     const saved: DelveSave | undefined = mine?.delve ?? (before ? { dead: [], spared: [], searched: [], opened: before } : undefined);
-    b.delve = new Delve(cellar, b.visit.space, h.setting, h.character, h.seed, saved);
+    const space = b.visit.space;
+    b.delve = new Delve(cellar, space instanceof FormedSpace ? space.ground : space, h.setting, h.character, h.seed, saved);
+    b.delve.fight.standing = h.standing;
+    b.delve.den.knows = h.known({ id: own, members: b.delve.den.creatures.map((c) => c.def.id), town: s.decision.town });
+    // What its household asks (D62; the place's own promise: new dwellers are only to be cleared): a keepsake lies in the lair's hoard.
+    if (own === s.decision.id) { b.delve.ask = s.decision.ask ?? null; b.delve.keepsake = h.keepsake?.(s.decision) ?? null; }
     b.creatures = await CreatureView.build(b.delve.den, h.seed, b.view.origin, h.renderer);
     // Its people's shaders build in the Stage's frame slots; they show once warm.
     const drawn = b.creatures;
@@ -492,7 +582,7 @@ export class Cellars {
     const arena: Arena = {
       get inside() { return visit.inside; },
       get shown() { return visit.inside; },
-      enclosed: true, place: `this ${s.first.form.word}`, danger, promise: own,
+      enclosed: true, id: s.decision.id, place: `this ${s.first.form.word}`, danger, promise: own,
       quietLine: fill(words.quiet, { place }),
     };
     b.fight = new Encounter(arena, b.delve, b.creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight, !!mine?.paid || this.kept.has(own));
@@ -501,6 +591,9 @@ export class Cellars {
     // The chests stand open that were opened (before these dwellers too), shut the rest; searched, a lid lifts.
     for (const x of hoardsOf(cellar, h.setting.creatures)) if (x.prop) b.view.lidUp(x.id, b.delve.hasOpened(x) ? 1 : 0);
     b.fight.onLid = (id, k) => b.view.lidUp(id, k);
+    // A seal's breach (D62): walled up before, or seen walled up as the hero sets the stones.
+    b.view.sealUp(b.delve.sealed ? 1 : 0);
+    b.fight.onSeal = (k) => b.view.sealUp(k);
   }
 
   /** The newest dwellers' warm-up (loading waits for the first cellar's; later ones warm while the hero walks to the hatch). */

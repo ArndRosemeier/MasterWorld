@@ -16,15 +16,20 @@ const clock = (h: number) => `day ${Math.floor(h / 24)} ${String(Math.floor(h % 
 const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   // The level a run ends at is printed, not held to a band (Arnd 2026-10-30: these runs are artificial; he judges
   // progression in play). `levels` stays for a run by hand.
+  // The start towns stand by the sea (Arnd 2026-10-30): these runs are the harbour town's (S2), its tavern on the quay.
   ...seeds.map((seed) => ({ seed, opts: { evenings }, what: `${evenings} evenings` })),
   { seed: seeds[0], opts: { evenings: 1, reckless: true }, what: 'a reckless evening (a fall)' },
   // A second town (plan B3a): the same game in a village out on the land, through the same code.
   { seed: seeds[0], opts: { evenings: 3, settlement: 'village' }, what: '3 evenings in a village' },
-  // A harbour town (S2): the same game by the sea, its tavern on the quay.
-  { seed: seeds[0], opts: { evenings: 3, settlement: 'village', harbour: true }, what: '3 evenings in a harbour town' },
   { seed: seeds[1] ?? seeds[0], opts: { evenings: 2, settlement: 'hamlet' }, what: '2 evenings in a hamlet' },
   // The capital (C15): an evening in the first city, its 700 houses and 2700 people.
   { seed: seeds[0], opts: { evenings: 1, settlement: 'capital' }, what: 'an evening in the capital' },
+  // Coverage (gate Q): the kinds of task that come by chance in the runs above, each played end to end at least once.
+  ...(['parley', 'thief', 'watch'] as const).map((kind) => ({ seed: seeds[0], opts: { evenings: 3, only: [kind] }, what: `3 evenings asking ${kind} where it fits` })),
+  // A household that lied about whose heirloom it is (Q3): the seed is one where the first fetches turn out so.
+  { seed: 'x4', opts: { evenings: 3, only: ['heirloom'] }, what: '3 evenings asking heirloom (a lie)' },
+  // A person's favour (D68, N3): evening one begins with someone of the town asking the hero for something of their own calling.
+  { seed: seeds[0], opts: { evenings: 2, favour: true }, what: '2 evenings with a favour asked' },
   // A mage (plan C3): asks the bard, opens a school at its teacher and casts in the first place.
   { seed: seeds[2] ?? seeds[0], opts: { evenings: 3, mage: true }, what: '3 evenings as a mage' },
 ];
@@ -35,7 +40,13 @@ function play(i: number): boolean {
   console.log(`\n== ${seed}: ${what}`);
   const t0 = performance.now();
   const r = playEvening(parseSeed(seed), classic, { ...opts, log: (s) => console.log(`${clock(s.hour)}  ${s.what}`) });
-  console.log(`${r.ok ? 'passed' : 'FAILED'}: ${r.cleared.length} places cleared, ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, learned ${r.lessons.join(', ') || 'nothing'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}, level ${r.level} (${r.xp} xp)${r.spells ? `, ${r.spells} spells cast` : ''}; plays like a ${r.style ?? 'newcomer'} (challenge x${r.challengeLean.toFixed(2)}); longest overdue ${Object.entries(r.overdue).map(([n, s]) => `${n} ${(s / 60).toFixed(1)}`).join(', ')} min; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+  console.log(`${r.ok ? "passed" : "FAILED"}: ${r.cleared.length} places cleared (asked: ${r.verbs.join(", ")}${r.twists.length ? `; twists: ${r.twists.join(", ")}` : ""}${r.consequences.length ? `; consequences: ${r.consequences.join(", ")}` : ""}${r.wants.length ? `; wants: ${r.wants.join(", ")}` : ""}), ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, learned ${r.lessons.join(', ') || 'nothing'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}, level ${r.level} (${r.xp} xp)${r.spells ? `, ${r.spells} spells cast` : ''}; plays like a ${r.style ?? 'newcomer'} (challenge x${r.challengeLean.toFixed(2)}); longest overdue ${Object.entries(r.overdue).map(([n, s]) => `${n} ${(s / 60).toFixed(1)}`).join(', ')} min; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+  const met = (): boolean => {
+    const kinds = r.verbs.filter((v) => !/\((dwellers|task|deed|favour|other)\)$/.test(v)).map((v) => v.split(' ')[0]);
+    return r.ok && new Set(kinds).size >= 3 && kinds.every((v, k) => k === 0 || v !== kinds[k - 1]) && r.twists.length > 0 && r.consequences.length > 0 && r.wants.length > 0;
+  };
+  console.log(`GATEQ ${JSON.stringify({ met: met(), ok: r.ok, verbs: r.verbs.map((v) => v.split(' ')[0]), wants: r.wants, twists: r.twists, consequences: r.consequences })}`);
+  if (met()) console.log('gate Q: met (3+ kinds of task, none twice in a row, a twist, a consequence, a want, replayed from the log)');
   return r.ok;
 }
 
@@ -72,6 +83,21 @@ if (one !== undefined) {
     process.stdout.write(r.out);
     if (!r.ok) failed++;
   }
+  // Gate Q is held by the check (the plan thread's review, 2026-11-01): the variety must not rot unseen.
+  const seen = results.length ? await Promise.all(results) : [];
+  const gate = seen.flatMap((r) => r.out.split('\n').filter((l) => l.startsWith('GATEQ ')).map((l) => JSON.parse(l.slice(6)) as { met: boolean; verbs: string[]; wants: string[]; twists: string[] }));
+  const have = (f: (g: (typeof gate)[number]) => string[]) => new Set(gate.flatMap(f));
+  const missing: string[] = [];
+  for (const v of ['clear', 'fetch', 'lost', 'seal', 'parley', 'watch', 'thief']) if (!have((g) => g.verbs).has(v)) missing.push(`no run asked ${v}`);
+  // A household's wants (Q5) are three kinds at least; a person's favour is their own (N3) and must be asked in some run.
+  const households = [...have((g) => g.wants)].filter((w) => w !== 'craft');
+  if (households.length < 3) missing.push(`only ${households.length} kinds of want across the runs (at least 3)`);
+  if (!have((g) => g.wants).has('craft')) missing.push('no run had a person ask a favour');
+  if (have((g) => g.twists).size < 3) missing.push(`only ${[...have((g) => g.twists)].join(', ') || 'no'} twists (first, changed and lied)`);
+  if (!gate.some((g) => g.met)) missing.push('no run met gate Q (3+ kinds of task, no repeat, a twist, a consequence, a want)');
+  for (const m of missing) console.log(`GATE Q FAILED: ${m}`);
+  if (missing.length) failed++;
+  else console.log(`gate Q holds across the runs: verbs ${[...have((g) => g.verbs)].join(', ')}; wants ${[...have((g) => g.wants)].join(', ')}; twists ${[...have((g) => g.twists)].join(', ')}`);
   console.log(`\n${failed ? `${failed} of ${runs.length} FAILED` : `all ${runs.length} passed`} in ${((performance.now() - all) / 1000).toFixed(1)} s`);
   if (failed) process.exit(1);
 }

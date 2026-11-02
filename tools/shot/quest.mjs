@@ -71,7 +71,7 @@ else {
     await shoot('04-first-change');
     await page.waitForTimeout(12000);
     await shoot('05-bird');
-    if (!(await page.evaluate(() => window.game.birdForm?.flying))) { console.log('the change did not end in a bird'); failed = true; }
+    if (!(await page.evaluate(() => window.game.birdForm?.animal))) { console.log('the change did not end in a bird'); failed = true; }
   }
 }
 const sh = await page.evaluate(() => { const m = window.shaders; return m ? m.summary() : null; });

@@ -10,16 +10,16 @@ import { criesDue, paddockWolvesFor, smokesAt, strayBeastFor, type PaddockContex
 import { pointInPoly } from '@futuremagic/settlement';
 import { answerNeed } from '../src/vgm/toolbox';
 import type { Decision } from '../src/world/decisions';
-import { EAST, frontierLand } from './frontierLand';
+import { SOUTH, frontierLand } from './frontierLand';
 
 const { home, seed, terrain, walk } = frontierLand();
 
-const log = walk(2, EAST);
+const log = walk(2, SOUTH);
 const town = terrain.towns[0];
-// Out past the mesa wall east of the town, on open land.
-const out = { x: home.x + home.radius + 350, z: home.z };
+// Out inland south of the sea town, on open land.
+const out = { x: home.x, z: home.z + home.radius + 700 };
 const sure = { ...classic, situations: classic.situations!.map((t) => (t.kind === 'hurt-traveller' ? { ...t, chance: 1 } : t)) };
-const need = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: sure, hero: out, toward: { x: out.x + 600, z: out.z }, ...over });
+const need = (over: Partial<NeedContext> = {}): NeedContext => ({ seed, log, terrain, towns: terrain.towns, hours: 30, setting: sure, hero: out, toward: { x: out.x, z: out.z + 600 }, ...over });
 const dusk = (over: Partial<PaddockContext> = {}): PaddockContext => ({ seed, log, hours: 24 * 2 + 19, near: town, setting: classic, ...over });
 
 test('situations: the setting\'s situations are sound; each cries only a short line, and only from where it is seen', () => {
@@ -122,8 +122,9 @@ test('situations: by day a beast gets out of its paddock, someone of its farm go
 test('situations: speech bubbles carry only the cries, a story event shouted in town and a household come to thank the hero (D52: rare lines)', () => {
   const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
   const says = [...main.matchAll(/speech\.say\(([^,]+),/g)].map((m) => m[1].trim());
-  // (`text`: a cellar's household come down once it is quiet, app/ownerComes.ts: their thanks show the task is done.)
-  assert.deepEqual(says.sort(), ['c.text', 'text', 'told.cry'], 'the game says nothing else in a bubble');
+  // (`text`: a cellar's household come down once it is quiet, app/ownerComes.ts: their thanks show the task is done; a parley's leader naming terms, D62;
+  // and the watchman's cry as raiders come into the town, app/townDefence.ts, R6.)
+  assert.deepEqual(says.sort(), ['c.text', 'text', 'text', 'told.cry'], 'the game says nothing else in a bubble');
 });
 
 test('situations: no narrator tells a story event, a lead or a feast (D52, rule 11)', () => {

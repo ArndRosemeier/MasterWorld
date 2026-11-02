@@ -41,6 +41,8 @@ interface Walk {
 }
 
 const OUT = -1, UP = -2;
+/** One up out of bed stands this far from the bed's middle, beside it (half a bed's width and a step, m). */
+const BESIDE_BED = 0.9;
 
 export class RoomFlow {
   /** Where each one was drawn last (and the spot they had). */
@@ -126,6 +128,13 @@ export class RoomFlow {
       if (this.walks.has(c.agent)) continue;
       const s = this.plan.spots[c.spot], bench = c.act === 'sit' ? benchUnder(this.plan, s) : undefined;
       const bed = c.act === 'sleep' ? benchUnder(this.plan, s, 'bed') : undefined;
+      if (s.kind === 'sleep' && c.act !== 'sleep') {
+        // Up out of bed for a talk: standing beside it on the room's side, facing into the room.
+        const side = s.a > 0 ? -1 : 1, a = s.a + side * BESIDE_BED;
+        out.push({ agent: c.agent, a, b: s.b, storey: s.storey, yaw: side > 0 ? 0 : Math.PI, act: c.act });
+        this.drawn.set(c.agent, { spot: c.spot, a, b: s.b, yaw: side > 0 ? 0 : Math.PI });
+        continue;
+      }
       out.push({ agent: c.agent, a: s.a, b: s.b, storey: s.storey, yaw: s.yaw, act: c.act, ...(bench ? { seat: bench.h } : {}), ...(bed ? { bed: bed.h } : {}) });
       this.drawn.set(c.agent, { spot: c.spot, a: s.a, b: s.b, yaw: s.yaw });
     }

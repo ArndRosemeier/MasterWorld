@@ -39,6 +39,8 @@ export interface Portal {
   readonly shape: PortalShape;
   /** Drawn as a rift (a rippling ellipse rimmed with light: the portal stone's) instead of a plain opening. */
   readonly rift?: boolean;
+  /** How far the view beyond reaches back in front of each opening (m): a passage built a little way past its opening, whose walls the view must show. */
+  readonly clipBack?: number;
 }
 
 /** A point (or a direction with `w` 0). */

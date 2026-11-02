@@ -6,9 +6,12 @@ import { CONTRACT_VERSION, type SettingModule } from '../contract';
 import { backgrounds } from './backgrounds';
 import { barrow } from './barrow';
 import { cave } from './cave';
+import { seaCave, sunkenRuin } from './seaCave';
+
 import { hideout } from './hideout';
 import { cellar } from './cellar';
 import { names, talk } from './people';
+import { factions } from './factions';
 import { peoples, standing } from './peoples';
 import { growth } from './growth';
 import { creatures } from './creatures';
@@ -18,13 +21,15 @@ import { wild } from './wild';
 import { encounters } from './encounters';
 import { events } from './events';
 import { festivities } from './festivities';
+import { asks, twists } from './asks';
 import { regions } from './regions';
 import { smallLife } from './smallLife';
 import { tower } from './tower';
-import { items, travel, upkeep } from './items';
+import { items, travel, upkeep, voyage } from './items';
 import { sights } from './sights';
 import { situations } from './situations';
 import { landformMix, landforms, landscapeKinds } from './landforms';
+import { caves } from './formedCaves';
 import { shops } from './shops';
 import { bard, guilds } from './guilds';
 import { abilities, director, effects, schools } from './abilities';
@@ -38,6 +43,8 @@ export const classic: SettingModule = {
     continentSpacing: 900_000,
     landFraction: 0.45,
     seaDepth: 3500,
+    // Islands out at sea (S7): one in every few 5 km squares of open sea, 0.3-1 km of land each.
+    islands: { cell: 5000, chance: 0.4, radius: [600, 1400], off: 2500 },
     mountainHeight: 3600,
     rangeSpacing: 70_000,
     drama: 0.75,
@@ -71,10 +78,11 @@ export const classic: SettingModule = {
     vista: 220,
     kind: 'mesa',
   },
-  dungeons: { cellar, barrow, cave, tower, hideout },
+  dungeons: { cellar, barrow, cave, tower, hideout, 'sea-cave': seaCave, 'sunken-ruin': sunkenRuin },
   names,
   peoples,
   standing,
+  factions,
   growth,
   talk,
   schools,
@@ -82,6 +90,7 @@ export const classic: SettingModule = {
   items,
   upkeep,
   travel,
+  voyage,
   sights,
   situations,
   shops,
@@ -93,6 +102,9 @@ export const classic: SettingModule = {
   hero,
   backgrounds,
   routines,
+  caves,
+  // The hero notices a place in line of sight within 150 m by day (a fifth of that in the dark); the VGM sites a place 70 to 260 m ahead, within 70 degrees of their way (a hero running along a cliff has it to the side).
+  noticing: { range: 150, night: 0.2, eye: 1.7, face: 2.5, ahead: [70, 260], spread: 1.2, caves: { chance: 0.5, cell: 15, near: 250, most: 8 } },
   // Golden late light, a cooler blue dusk, a blue night; neutral by day (the sun's own colour does the rest).
   look: {
     grade: [
@@ -107,6 +119,8 @@ export const classic: SettingModule = {
   encounters,
   events,
   festivities,
+  asks,
+  twists,
   smallLife,
   regions,
 };

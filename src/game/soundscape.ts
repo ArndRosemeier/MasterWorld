@@ -36,6 +36,10 @@ export interface Hearing {
   /** Woods over the listener: cover 0..1 and the share of conifers. */
   woods: number;
   conifer: number;
+  /** On a ship's deck (S10). */
+  aboard?: boolean;
+  /** Down in a formed cave (K5): the distance to the nearest point of a stream in it, metres (none: no stream near). */
+  stream?: number;
 }
 
 /** What to play for a hearing. */
@@ -78,6 +82,8 @@ export function soundscape(h: Hearing): Scape {
   }
   if (h.place === 'cellar') {
     add('bed/cellar', 0.8);
+    // A stream running through a cave is heard before it is seen.
+    add('bed/river-riffle', close(h.stream ?? Infinity, 1.5, 24) * 0.75);
     return { beds, muffle: null, echo: { t60: 1.1, wet: 0.3 }, day };
   }
   const wet = h.rain * (1 - h.snow);
@@ -112,8 +118,12 @@ export function soundscape(h: Hearing): Scape {
   add('bed/bees', smoothstep(9, 11, h.hour) * (1 - smoothstep(15, 17, h.hour)) * open * dry * noSnow * (1 - high) * 0.25);
   // Water: the sea on a beach or against cliffs below, lakes, rivers, falls.
   const sea = close(h.sea, 25, 300), cliff = smoothstep(8, 20, h.height);
-  add('bed/sea', sea * (1 - cliff));
+  add('bed/sea', sea * (1 - cliff) * (h.aboard ? 0.4 : 1));
   add('bed/surf-rocks', sea * cliff);
+  // Aboard a ship (S10): her timbers creak and work, the more as the sea gets up; in a gale the sea roars, out there and on the shore.
+  const rough = smoothstep(0.5, 1, Math.max(h.wind, h.storm));
+  add('bed/ship-creak', h.aboard ? 0.45 + 0.55 * h.wind : 0);
+  add('bed/sea-storm', (h.aboard ? 1 : sea) * rough);
   add('bed/lake', close(h.water, 3, 40) * (h.river ? 0 : 0.7));
   if (h.river) {
     const near = close(h.river.bank, 4, h.river.half > 6 ? 140 : 60);

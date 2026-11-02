@@ -18,4 +18,6 @@ export const growth: GrowthDef = {
   // An ability learned at level 1 hits about 1.6 times as hard at level 10; its effects last a fifth longer.
   // A spell gains a hundredth for each point of spell power on the gear.
   scale: { damage: 0.07, heal: 0.07, duration: 0.02, range: 0.01, spell: 0.01 },
+  // One ability point a level (D61, Arnd 2026-10-31): a fresh hero can learn one ability; the rest come with growing.
+  points: { perLevel: 1, none: 'You have no room for more just now. Grow a little, come back, and I will teach you.' },
 };

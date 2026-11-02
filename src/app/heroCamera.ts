@@ -127,7 +127,7 @@ export class HeroCamera {
       this.yaw -= turnKeys * TURN * dt;
     }
     return {
-      intent: { forward, strafe, heading: facing, walk: c.held('walk'), up: c.held('jump'), down: c.held('dive') },
+      intent: { forward, strafe, heading: facing, walk: c.held('walk'), up: c.held('jump'), down: c.held('dive'), look: this.pitch },
       facing,
     };
   }

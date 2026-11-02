@@ -14,12 +14,14 @@ import { talkCellar, talkEvent, townTalk, type TownTalk, type TownTalkSave } fro
 import { keptOf } from '../vgm/leads';
 import { ordersOf } from '../vgm/orders';
 import { heldBy, refugeOf, takenFrom } from '../vgm/events';
+import { askedOne } from '../vgm/asks';
 import type { Decision, DecisionLog, RetreatDecision, TravellerDecision } from '../world/decisions';
 import { restingAt } from '../vgm/answers';
 import { strayAt } from '../vgm/situations';
 import { onCircle } from '../world/sites';
 import type { Town } from '../world/town';
-import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
+import { bardOf, guildHouses, guildSigns, staffGuilds, type GuildHouse } from './guilds';
+import { postsOf, postTrades } from './posts';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
 import { keptAt } from '../sim/marked';
@@ -97,6 +99,11 @@ export class Township {
     return (this.housesOf ??= guildHouses(this.town.plan, this.town.decision.size ?? 'town', this.c.setting, this.retreats));
   }
 
+  /** The shields over its doors by building id: the guild houses', and the harbour master's hall (the same set the town is drawn with, near and in the open house). */
+  get signs(): Map<number, [number, number, number]> {
+    return guildSigns(this.guilds, this.town.plan, this.c.setting);
+  }
+
   /** The teachers' places out on the land that belong to this town (C3: the warden's tower). */
   get retreats(): readonly RetreatDecision[] {
     return this.c.log().filter((d): d is RetreatDecision => d.kind === 'retreat' && d.town === this.id);
@@ -165,7 +172,7 @@ export class Township {
   get life(): TownLife {
     if (this.lifeOf) {
       const log = this.c.log();
-      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); this.shelter(this.lifeOf); }
+      if (log.length !== this.heldLog) { this.heldLog = log.length; this.lifeOf.gone = !!heldBy(log, this.id); this.shelter(this.lifeOf); this.lose(this.lifeOf); }
       this.rest(this.lifeOf);
       this.chase(this.lifeOf);
       return this.lifeOf;
@@ -202,6 +209,7 @@ export class Township {
     life.gone = !!heldBy(this.c.log(), this.id);
     this.heldLog = this.c.log().length;
     this.shelter(life);
+    this.lose(life);
     // A master with a place out on the land keeps watch at its door, facing the town.
     for (const { guild, out } of this.guilds) {
       const a = out && life.agents.find((x) => x.person.trade === guild.keeper);
@@ -306,7 +314,7 @@ export class Township {
   /**
    * The map's marks (the open leads): whoever one is sent here to find (the innkeeper at the start, a cellar's
    * household) keeps to that building while awake (sim/marked.ts), instead of wandering the town; so does every
-   * guild house's keeper (the teachers).
+   * guild house's keeper (the teachers), the harbour master and every shop and service master (game/posts.ts).
    */
   keepMarked(life: TownLife, marks: readonly { readonly id: string; readonly x: number; readonly z: number }[]): void {
     const t = this.talkOf;
@@ -315,19 +323,47 @@ export class Township {
     this.keptKey = key;
     this.keptLife = life;
     const kept = keptAt(this.town.plan, this.residents, marks.map((m) => ({ x: m.x, z: m.z, who: t && t.houseOf(m.id) >= 0 ? t.reportTo(m.id) : undefined })));
-    // The teachers keep to their houses too (one comes to the hedge witch's cottage to find her there).
-    for (const [id, b] of this.teachersAt) if (!kept.has(id)) kept.set(id, b);
+    // Whoever the game's services rest on holds their post, day and night, whatever a mark says (game/posts.ts).
+    for (const [id, b] of this.postHolders) kept.set(id, b);
     life.keep(kept);
   }
 
-  /** Each guild house's keeper (by person id) and their house: where the hero comes to learn, always found there while awake. */
-  private get teachersAt(): Map<number, number> {
-    const out = new Map<number, number>();
-    for (const { guild, b } of this.guilds) {
-      const p = this.residents.find((x) => x.work === b.id && x.trade === guild.keeper);
-      if (p) out.set(p.id, b.id);
+  /** Who holds a post (game/posts.ts: every service's master, the teachers, the harbour master, the bard) and the building of it. */
+  private get postHolders(): Map<number, number> {
+    return this.postHoldersOf ??= postsOf(this.town.plan, this.residents, postTrades(this.c.setting));
+  }
+  private postHoldersOf: Map<number, number> | null = null;
+
+  /** Promises whose lost one was found alive this session (D62): they are on their way home. */
+  private readonly homeAgain = new Set<string>();
+
+  /**
+   * Who of its people is lost in a place (D62, vgm/asks.ts): away from their days while lost; found alive, they come
+   * home (found now, told of, or kept); the dead never do.
+   */
+  private lose(life: TownLife): void {
+    life.missing.clear();
+    const log = this.c.log(), kept = keptOf(log);
+    for (const d of log) {
+      if (d.kind !== 'dungeon' || d.town !== this.id || d.ask?.verb !== 'lost') continue;
+      const p = askedOne(this.residents, log, d);
+      if (!p) continue;
+      const home = d.ask.alive && (kept.has(d.id) || this.homeAgain.has(d.id) || (this.talkOf?.isQuiet(d.id) ?? false));
+      if (!home) life.missing.add(p.id);
     }
-    return out;
+  }
+
+  /** The one lost in promise `id`'s place was found alive and walks home (D62). */
+  foundLost(id: string): void {
+    this.homeAgain.add(id);
+    if (this.lifeOf) this.lose(this.lifeOf);
+  }
+
+  /** Who is lost in promise `id`'s place and still to be found alive there (null: nobody, or found). */
+  lostIn(id: string): Person | null {
+    const d = this.c.log().find((x) => x.id === id);
+    if (d?.kind !== 'dungeon' || !d.ask?.alive || this.homeAgain.has(id) || keptOf(this.c.log()).has(id) || this.talkOf?.isQuiet(id)) return null;
+    return askedOne(this.residents, this.c.log(), d);
   }
 
   /** Whether its people live yet (a town far off never needed them). */
@@ -340,6 +376,8 @@ export class Township {
     const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk, this.world, this.c.hours()).talk;
     // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
     for (const id of keptOf(log)) t.hush(id);
+    // Word gets round the town as its hours pass (talk/rumour.ts).
+    t.gameHours = () => this.c.hours();
     this.talkOf = t;
     this.onTalk?.(t);
     return t;

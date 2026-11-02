@@ -3,7 +3,19 @@
  * of armour, potions, food, tools and valuables; a few legendary pieces with their history; what places
  * and creatures of some danger hold. Rarity and the bonuses to its qualities are rolled when an item is found.
  */
-import type { ItemCatalog, TravelDef, UpkeepDef } from '../contract';
+import type { ItemCatalog, TravelDef, TreasureFind, UpkeepDef, VoyageDef } from '../contract';
+
+/**
+ * Where a potion of learning may lie (D61): in treasure, never on a body or at a trader's. Likeliest in the
+ * hoard of the lair at the bottom of a place, rarer in its chests (rolled at seven tenths of its danger) and
+ * in what was hidden or sunk out on the land (a stash, a wreck). At the danger of a fresh hero's places
+ * (5..12) a lair holds one about one time in ten, a deep and deadly one (25) one in five.
+ */
+const LEARNING: Record<'lair' | 'sight' | 'chest', readonly TreasureFind[]> = {
+  lair: [{ item: 'learning-potion', chance: 0.03, perDanger: 0.006 }],
+  sight: [{ item: 'learning-potion', chance: 0.015, perDanger: 0.004 }],
+  chest: [{ item: 'learning-potion', chance: 0.005, perDanger: 0.002 }],
+};
 
 export const items: ItemCatalog = {
   items: [
@@ -30,15 +42,50 @@ export const items: ItemCatalog = {
     { id: 'amulet', name: 'Pendant on a thong', kind: 'armour', slot: 'amulet', armour: 0, value: 20, weight: 0.05 },
     { id: 'minor-potion', name: 'Small healing draught', kind: 'potion', heal: 25, value: 25, weight: 0.2, lore: 'Bitter and green; the hedge witch swears by it.' },
     { id: 'potion', name: 'Healing draught', kind: 'potion', heal: 55, value: 70, weight: 0.3 },
+    // The potion of learning (D61): found only in treasure, likelier deep and dangerous; never sold.
+    { id: 'learning-potion', name: 'Potion of learning', kind: 'potion', learning: 1, value: 120, weight: 0.2, lore: 'Clear as spring water until it is shaken: then it glows like a lamp. Drunk, it leaves room in the mind for one more thing learned.' },
+    { id: 'deep-draught', name: 'Draught of the deep', kind: 'potion', effect: { id: 'gills', magnitude: 1, duration: 180 }, value: 60, weight: 0.3, lore: 'Kelp, salt and something the herbalist will not name: three minutes of breathing water.' },
     { id: 'bread', name: 'Loaf of bread', kind: 'food', heal: 6, value: 2, weight: 0.4 },
     { id: 'cheese', name: 'Wedge of cheese', kind: 'food', heal: 8, value: 4, weight: 0.3 },
-    { id: 'torch', name: 'Torch', kind: 'tool', value: 2, weight: 0.5 },
+    { id: 'torch', name: 'Torch', kind: 'tool', slot: 'off', value: 2, weight: 0.5, lore: 'Pitch-soaked rag on an oak stick. Held in the off hand, it burns whenever the dark comes.' },
     { id: 'rope', name: 'Coil of rope', kind: 'tool', value: 6, weight: 2 },
     { id: 'portal-stone', name: 'Portal stone', kind: 'tool', portal: true, value: 0, weight: 0.3, lore: 'Smooth and cold, it hums when held. One glyph remembers a place; the other opens the way back to it.' },
     { id: 'lockpicks', name: 'Lockpicks', kind: 'tool', value: 40, weight: 0.1 },
     { id: 'old-coin', name: 'Coin of the old realm', kind: 'valuable', value: 30, weight: 0.01, lore: 'A crowned hammer on one side, a tower on the other. Nobody mints these any more.' },
     { id: 'candlestick', name: 'Silver candlestick', kind: 'valuable', value: 90, weight: 0.8 },
     { id: 'garnet', name: 'Rough garnet', kind: 'valuable', value: 60, weight: 0.02 },
+    // Keepsakes a household asks back (D62, vgm/asks.ts): named for the family when one is asked for; no table rolls them.
+    { id: 'locket', name: 'Silver locket', kind: 'valuable', value: 40, weight: 0.05 },
+    { id: 'signet', name: 'Signet ring', kind: 'valuable', value: 55, weight: 0.03 },
+    { id: 'old-blade', name: 'Old family sword', kind: 'valuable', value: 30, weight: 1.6 },
+    { id: 'deed-box', name: 'Iron deed box', kind: 'valuable', value: 10, weight: 2.2 },
+    // What a person asks the hero to fetch that is of their own calling or pursuit (D68, N3; classic/crafts.ts): named for the family when asked for; no table rolls them.
+    { id: 'bee-skep', name: 'Straw bee skep', kind: 'valuable', value: 6, weight: 1 },
+    { id: 'tackle-roll', name: 'Roll of fishing tackle', kind: 'valuable', value: 8, weight: 0.4 },
+    { id: 'long-net', name: 'Long mended net', kind: 'valuable', value: 8, weight: 2 },
+    { id: 'carving-set', name: 'Set of carving knives', kind: 'valuable', value: 14, weight: 0.3 },
+    { id: 'herb-book', name: 'Book of herb cures', kind: 'valuable', value: 12, weight: 0.5 },
+    { id: 'songbook', name: 'Handwritten songbook', kind: 'valuable', value: 10, weight: 0.4 },
+    { id: 'old-book', name: 'Old book of tales', kind: 'valuable', value: 16, weight: 0.8 },
+    { id: 'brewing-crock', name: 'Brewing crock', kind: 'valuable', value: 5, weight: 3 },
+    { id: 'hunting-horn', name: 'Hunting horn', kind: 'valuable', value: 18, weight: 0.5 },
+    { id: 'knucklebones', name: 'Set of knucklebones', kind: 'valuable', value: 3, weight: 0.05 },
+    { id: 'star-chart', name: 'Hide star chart', kind: 'valuable', value: 20, weight: 0.3 },
+    { id: 'walking-staff', name: 'Ash walking staff', kind: 'valuable', value: 6, weight: 1.2 },
+    { id: 'tool-roll', name: 'Roll of small tools', kind: 'valuable', value: 20, weight: 0.5 },
+    { id: 'needle-case', name: 'Bone needle case', kind: 'valuable', value: 9, weight: 0.05 },
+    { id: 'cake-mould', name: 'Carved cake mould', kind: 'valuable', value: 7, weight: 0.8 },
+    { id: 'seed-pouch', name: 'Pouch of prize seed', kind: 'valuable', value: 5, weight: 0.1 },
+    { id: 'good-iron', name: 'Bar of good iron', kind: 'valuable', value: 25, weight: 3 },
+    { id: 'sourdough-crock', name: 'Crock of old leaven', kind: 'valuable', value: 4, weight: 2 },
+    { id: 'loom-shuttle', name: 'Boxwood loom shuttle', kind: 'valuable', value: 10, weight: 0.2 },
+    { id: 'cobblers-last', name: "Cobbler's last", kind: 'valuable', value: 8, weight: 0.8 },
+    { id: 'carpenters-plane', name: "Carpenter's plane", kind: 'valuable', value: 16, weight: 1 },
+    { id: 'coopers-adze', name: "Cooper's adze", kind: 'valuable', value: 14, weight: 1.2 },
+    // What is left of someone lost (D62, a lost person found dead): named for them; no table rolls them.
+    { id: 'satchel', name: 'Torn satchel', kind: 'valuable', value: 1, weight: 0.4 },
+    { id: 'woollen-cap', name: 'Woollen cap', kind: 'valuable', value: 1, weight: 0.1 },
+    { id: 'whittled-knife', name: 'Whittled knife', kind: 'valuable', value: 2, weight: 0.2 },
     { id: 'trinket', name: 'Shiny trinket', kind: 'valuable', value: 3, weight: 0.05, lore: 'A button, a bent spoon and a bead on a string. Treasured by someone.' },
     { id: 'silk', name: 'Bundle of spider silk', kind: 'valuable', value: 45, weight: 0.3, lore: 'Weavers in the city pay well for it, and ask no questions.' },
     { id: 'wolf-pelt', name: 'Wolf pelt', kind: 'valuable', value: 35, weight: 2.5, lore: 'Thick grey fur. The furrier in town pays well for it before winter.' },
@@ -46,7 +93,17 @@ export const items: ItemCatalog = {
     { id: 'rat-hide', name: 'Giant rat hide', kind: 'valuable', value: 6, weight: 0.6, lore: 'Coarse and greasy. The tanner takes it, for gloves nobody admits to wearing.' },
     { id: 'venom-sac', name: 'Spider venom sac', kind: 'valuable', value: 30, weight: 0.1, lore: 'Handle it gently. The hedge witch makes a numbing salve of it.' },
     { id: 'boar-tusk', name: 'Boar tusk', kind: 'valuable', value: 14, weight: 0.2 },
+    { id: 'elk-hide', name: 'Giant elk hide', kind: 'valuable', value: 80, weight: 5, lore: 'Grey-brown and thick as a door. Tanners would trade a season for one.' },
+    { id: 'elk-antler', name: 'Giant elk antler', kind: 'valuable', value: 120, weight: 6, lore: 'Heavier than a man can swing, and pale as bone. Carvers pay in silver for the tines.' },
+    { id: 'turtle-shell', name: 'Giant turtle shell plate', kind: 'valuable', value: 95, weight: 6, lore: 'A plate of shell, green-black and ridged. Armourers say it turns an axe.' },
+    { id: 'turtle-meat', name: 'Turtle meat', kind: 'food', heal: 16, value: 12, weight: 3 },
+    { id: 'giant-tusk', name: 'Giant boar tusk', kind: 'valuable', value: 110, weight: 3, lore: 'As long as an arm and yellow as old piano keys. The smith at the capital buys them for hilts.' },
+    { id: 'giant-pelt', name: 'Giant wolf pelt', kind: 'valuable', value: 150, weight: 6, lore: 'Grey as thunder. A furrier will not believe you until the pelt is on the counter.' },
     { id: 'venison', name: 'Haunch of venison', kind: 'food', heal: 14, value: 9, weight: 2 },
+    { id: 'crab-meat', name: 'Crab meat', kind: 'food', heal: 10, value: 6, weight: 1 },
+    { id: 'shark-tooth', name: 'Shark tooth', kind: 'valuable', value: 9, weight: 0.1, lore: 'A white wedge, serrated like a saw. Sailors wear them against drowning.' },
+    { id: 'shark-meat', name: 'Shark meat', kind: 'food', heal: 12, value: 5, weight: 2 },
+    { id: 'crab-shell', name: 'Giant crab shell', kind: 'valuable', value: 12, weight: 3, lore: 'Red and hard as a buckler. Armourers and cooks both ask after them.' },
     // Writings (C3): rare extra ways to a spell. Read, the spell is yours and the school opens; the page crumbles.
     { id: 'tome-embers', name: 'Charred primer of embers', kind: 'writing', teaches: 'fireball', value: 140, weight: 1.2, lore: 'Half its pages are ash. The rest still smell of smoke, and teach how to throw a fireball.' },
     { id: 'scroll-sunlance', name: 'Scroll of the sunlance', kind: 'writing', teaches: 'sunlance', value: 90, weight: 0.1, lore: 'Gold ink that glows faintly in the dark. Reading it once is enough.' },
@@ -68,13 +125,23 @@ export const items: ItemCatalog = {
     { id: 'wolf', items: [['wolf-pelt', 1]], count: [1, 1], coins: [0, 0] },
     { id: 'boar', items: [['boar-tusk', 2], ['venison', 1]], count: [1, 2], coins: [0, 0] },
     { id: 'deer', items: [['deer-hide', 1], ['venison', 2]], count: [1, 1], coins: [0, 0] },
+    { id: 'giant-elk', items: [['elk-hide', 2], ['elk-antler', 1], ['venison', 4]], count: [1, 2], coins: [0, 0] },
+    { id: 'giant-turtle', items: [['turtle-shell', 2], ['turtle-meat', 3]], count: [1, 2], coins: [0, 0] },
+    { id: 'giant-boar', items: [['giant-tusk', 2], ['venison', 3]], count: [1, 2], coins: [0, 0] },
+    { id: 'giant-wolf', items: [['giant-pelt', 1]], count: [1, 1], coins: [0, 0] },
+    { id: 'shark', items: [['shark-meat', 2], ['shark-tooth', 2]], count: [1, 2], coins: [0, 0] },
+    { id: 'crab', items: [['crab-meat', 2], ['crab-shell', 1]], count: [1, 1], coins: [0, 0] },
     { id: 'web', items: [['silk', 3], ['venom-sac', 2]], count: [1, 2], coins: [0, 0] },
     { id: 'hold', items: [['bearded-axe', 2], ['iron-cap', 2], ['mail-shirt', 1], ['garnet', 2], ['old-coin', 1], ['tome-stone', 0.3]], count: [0, 1], coins: [10, 40] },
     { id: 'grave', items: [['old-coin', 3], ['amulet', 2], ['ring', 2], ['iron-cap', 1], ['arming-sword', 1], ['tome-shadows', 0.25]], count: [0, 1], coins: [0, 0] },
-    { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30] },
-    { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25] },
+    { id: 'stash', items: [['minor-potion', 3], ['rope', 1], ['old-coin', 2], ['ring', 1], ['dagger', 1], ['cloak', 1], ['scroll-mend', 0.2]], count: [1, 2], coins: [8, 30], finds: LEARNING.sight },
+    { id: 'cellar-chest', items: [['candlestick', 1], ['minor-potion', 3], ['rope', 2], ['lockpicks', 1], ['cheese', 2], ['cloak', 1], ['old-coin', 2], ['scroll-mend', 0.15]], count: [1, 2], coins: [3, 25], finds: LEARNING.chest },
+    // What the sea leaves (S5, for the wrecks and sea caves of S8): a drowned sailor's chest, a diver's draughts in it.
+    { id: 'washed-up', items: [['rope', 1], ['old-coin', 2], ['deep-draught', 1], ['ring', 0.4]], count: [1, 2], coins: [2, 18] },
+    { id: 'wreck', items: [['deep-draught', 2], ['old-coin', 3], ['rope', 1], ['ring', 1], ['amulet', 0.5], ['garnet', 0.5]], count: [1, 2], coins: [5, 40], finds: LEARNING.sight },
     {
       id: 'lair', count: [2, 3], coins: [20, 80],
+      finds: LEARNING.lair,
       items: [['minor-potion', 3], ['potion', 1], ['short-sword', 1], ['hatchet', 1], ['spear', 1], ['mace', 1], ['buckler', 1], ['round-shield', 1], ['leather-jerkin', 1], ['mail-shirt', 0.3], ['iron-cap', 0.6], ['boots', 1], ['ring', 1], ['amulet', 1], ['garnet', 1], ['tome-embers', 0.2], ['scroll-sunlance', 0.25]],
     },
   ],
@@ -107,6 +174,28 @@ export const travel: TravelDef = {
     tooDear: 'The cart is {price}, friend, and your purse says otherwise. Your legs are free.',
     going: 'The road goes by…',
     arrived: 'The cart sets you down at the inn of {place}, {hours} on the road.',
+  },
+};
+
+/**
+ * Passage by sea (S4): a ship makes 7 m/s with the wind (quicker than the cart, the way over the water is short); a
+ * berth costs about twice a seat on the cart a kilometre, a day's wage for a short crossing, food aboard included.
+ */
+export const voyage: VoyageDef = {
+  speed: 7,
+  perKm: 12,
+  least: 24,
+  offers: 3,
+  reach: [2500, 14000],
+  sign: '#2f5f8f',
+  hall: 'Harbour master (passage by ship)',
+  words: {
+    topic: 'Passage by ship to {place} ({price})',
+    given: '{price}. She lies at the pier: go aboard by the gangplank, she casts off directly.',
+    tooDear: 'Passage is {price}, and the master takes no promises. Come back with the coin.',
+    held: "{price}. But nothing leaves this harbour in weather like this: she waits at the pier till it blows over, {hours} or so. Go aboard when you like.",
+    arrived: 'The ship comes in to {place}, {hours} at sea.',
+    island: 'Sailors talk of an island out at sea, {place}: passage there ({price})',
   },
 };
 

@@ -44,8 +44,6 @@
 /* The foe's level on a small seal at the plate's left (D58). */
 #fight .target .lvl { position: absolute; left: 10px; top: 8px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 13px 'Marcellus SC', Georgia, serif; color: #2a1c0c; background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 60%, var(--brass-dark)); box-shadow: 0 0 6px var(--threat, var(--ward)); }
 #fight .target .state { font-size: 12px; text-align: center; color: var(--ink-dim); font-style: italic; height: 15px; }
-#fight .target .bar { height: 9px; margin-top: 4px; border-radius: 5px; background: #0b0807; border: 1px solid var(--brass-lo); overflow: hidden; }
-#fight .target .bar div { height: 100%; background: linear-gradient(#ff8a7a, #9d1f17); transition: width .3s; }
 #fight .target .ward { position: absolute; inset: 3px; border-radius: 6px; border: 1px solid var(--threat, var(--ward)); box-shadow: 0 0 8px var(--threat, var(--ward)); animation: hud-pulse 2.4s ease-in-out infinite; pointer-events: none; }
 #fight .target .hit { position: absolute; right: 10px; top: -6px; font: 18px 'Marcellus SC', serif; color: #ffd27a; text-shadow: 0 1px 3px #000; animation: hud-rise .9s ease-out forwards; }
 #fight .target .hit.miss { color: var(--ink-dim); font-size: 14px; }
@@ -68,8 +66,22 @@
 @keyframes hud-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 @keyframes hud-rise { from { transform: translateY(6px); opacity: 1; } to { transform: translateY(-22px); opacity: 0; } }
 
+/* The group panel: a row for each foe (name, distance, a bar in the health colour); a click targets it. */
+#fight .foes { position: absolute; right: 22px; top: 128px; width: 226px; padding: 8px 8px 6px; display: flex; flex-direction: column; gap: 5px;
+  opacity: 0; transform: translateX(30px); pointer-events: none; transition: transform .35s cubic-bezier(.3, 1.4, .5, 1), opacity .2s; }
+#fight .foes.shown { opacity: 1; transform: none; pointer-events: auto; }
+#fight .foe { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: baseline; padding: 3px 6px 5px; border-radius: 5px; border: 1px solid transparent; cursor: pointer; }
+#fight .foe:hover { background: #ffffff12; }
+#fight .foe.aimed { border-color: var(--brass-hi); background: #ffffff1a; box-shadow: 0 0 8px var(--ward); }
+#fight .foe .name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#fight .foe .dist { font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+#fight .foe .bar { grid-column: 1 / 3; height: 7px; margin-top: 3px; border-radius: 4px; background: #0b0807; box-shadow: inset 0 1px 3px #000, 0 0 0 1px var(--brass-dark); overflow: hidden; }
+#fight .foe .fill { height: 100%; border-radius: 4px; transition: width .3s ease-out; }
+#fight .foes .more { font-size: 12px; color: var(--ink-dim); text-align: center; font-style: italic; }
+#fight .foes .more:empty { display: none; }
+
 /* Fallen: the wards go dark one by one; waking, they relight from the centre. */
-#fight.fallen .vial, #fight.fallen .target { filter: grayscale(1) brightness(.4); transition: filter 1.2s; }
+#fight.fallen .vial, #fight.fallen .target, #fight.fallen .foes { filter: grayscale(1) brightness(.4); transition: filter 1.2s; }
 #fight .dark { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 1.6s; display: grid; place-items: center; font: 26px 'Marcellus SC', serif; color: var(--ink-dim); }
 #fight.fallen .dark { opacity: .85; }
 
@@ -103,6 +115,11 @@
 #compass .stud.vgm::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--ward); animation: vgm-stud 2.4s ease-out infinite; opacity: 0; }
 #compass .stud.vgm.picked { z-index: 1; left: -6px; top: -6px; width: 12px; height: 12px; background: radial-gradient(circle at 40% 35%, #fff, var(--brass-hi) 40%, var(--brass)); box-shadow: 0 0 10px var(--ward-hot), 0 0 0 2px var(--ward); }
 #compass .stud.vgm.picked::after { inset: -6px; border-width: 2px; animation-duration: 1.4s; }
+/* The places the hero has noticed (D66): ward-light studs that pulse slowly, brass-cored, flaring as they light up. */
+#compass .stud.noticed { left: -4px; top: -4px; width: 8px; height: 8px; background: radial-gradient(circle at 40% 35%, #fff, var(--ward) 45%, #1d6f8a); box-shadow: 0 0 7px var(--ward); }
+#compass .stud.noticed::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--ward); animation: vgm-stud 3.2s ease-out infinite; opacity: 0; }
+#compass .stud.noticed.new { animation: noticed-in 1.8s ease-out backwards; }
+@keyframes noticed-in { from { scale: 4; opacity: 0; filter: brightness(2.5); } 40% { opacity: 1; } }
 @keyframes vgm-stud { from { scale: .6; opacity: .9; } to { scale: 2.2; opacity: 0; } }
 @keyframes stud-in { from { scale: 3.5; opacity: 0; } }
 #compass .lubber { position: absolute; left: 50%; top: -4px; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-top: 9px solid var(--brass); filter: drop-shadow(0 1px 1px #000); }

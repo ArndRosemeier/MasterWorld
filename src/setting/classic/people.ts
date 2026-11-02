@@ -3,6 +3,7 @@
  * with an old-country ring; dwarves short and hard, halflings homely, elves long.
  */
 import type { NamesDef, TalkDef } from '../contract';
+import { persona } from './personas';
 
 export const names: Record<string, NamesDef> = {
   human: {
@@ -28,16 +29,19 @@ export const names: Record<string, NamesDef> = {
 };
 
 export const talk: TalkDef = {
+  // `{intro}` is how the person gives their name, in their temperament's words (personas.ts); the lines with none are a calling of their own.
   identity: {
-    trade: "I'm {name}, the {trade}. Our home is {house}.",
+    trade: '{intro} I am the {trade} here, and our home is {house}.',
     'trade:ruler': "I am {name}. This realm is mine to keep, and the great hall is my seat. Speak plainly; I listen.",
     'hand:ruler': "I'm {name}. I serve in the great hall, at the seat of the realm.",
-    trader: "I'm {name}. I sell at the market, and we live in {house}.",
-    keeper: "I'm {name}, keeper of the temple. I live in {house}.",
-    hand: "I'm {name}. I help the {trade}; home is {house}.",
-    homemaker: "I'm {name}. I keep house in {house}.",
-    child: "I'm {name}! I live in {house}.",
-    traveller: "I am {name}, only passing through. I lodge at {house} until the road calls again.",
+    trader: '{intro} I sell at the market, and we live in {house}.',
+    keeper: '{intro} I keep the temple, and I live in {house}.',
+    hand: '{intro} I help the {trade}; home is {house}.',
+    homemaker: '{intro} I keep house in {house}.',
+    child: '{intro} I live in {house}.',
+    traveller: "{intro} I'm only passing through, lodging at {house} until the road calls again.",
+    // (Asked in town or aboard: S3's passengers are these.)
+    'traveller:sea': "I am {name}, a traveller by sea. Between ships I lodge at {house}; then I'm off to the next harbour.",
   },
   topics: {
     greet: 'Greet',
@@ -47,7 +51,6 @@ export const talk: TalkDef = {
     source: 'How do you know?',
     bye: 'Farewell.',
   },
-  nothing: ['Nothing out of the ordinary, that I know of.', 'Not that I have heard.', 'All quiet, as far as I know.', "Can't say I've noticed anything."],
   house: '{house} of the {family} family',
   cellar: 'the cellar under {house}',
   troubled: 'something is wrong in {subject}',
@@ -72,6 +75,8 @@ export const talk: TalkDef = {
     note: 'It is quiet there now. {name} of {house} will want to hear it, and pay what the trouble was worth.',
     rumour: 'And since you are so good at this:',
   },
+  persona,
+  lore: { topic: 'What lives out beyond the town?', source: 'my own rounds out there' },
   arrival: {
     title: 'Find work in town',
     text: 'A light purse and a long road behind me. Innkeepers hear every rumour: ask at {inn} whether anything strange has happened lately, or ask the townsfolk.',

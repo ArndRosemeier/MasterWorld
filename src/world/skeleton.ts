@@ -7,7 +7,7 @@
  */
 import { Noise, deriveSeed, clamp, smoothstep, lerp, smax, hash2i, hashToFloat } from '@futuremagic/core';
 import { spiralFind } from './spiral';
-import type { BiomeDef, LandscapeKindDef, MesaDef, WorldShape } from '../setting/contract';
+import type { BiomeDef, IslandsDef, LandscapeKindDef, MesaDef, WorldShape } from '../setting/contract';
 
 /** Everything the skeleton knows about one point. */
 export interface SkeletonSample {
@@ -42,6 +42,17 @@ export const SHORE = {
   band: 0.12,
 };
 
+/**
+ * An island's rise in the continent field: its top (a little inland of the coast, so it has a beach and some land),
+ * and how far below the coast it falls at its rim, so its shore lies at some 0.6 of its radius whatever the depth.
+ */
+const ISLE_TOP = 0.04, ISLE_FOOT = 0.07;
+/** An island's rim wanders in and out this share of its radius. */
+const ISLE_RAGGED = 0.22;
+
+/** An island out at sea (S7): the middle of its rise and its radius (m). */
+export interface Isle { readonly x: number; readonly z: number; readonly r: number }
+
 /** Kinds of country (D55): stretches round seed points this far apart (metres), so 5-20 km across. */
 const KIND_CELL = 11_000;
 /** Width of the border between two kinds (metres): one blends into the other over it. */
@@ -67,6 +78,8 @@ export class Skeleton {
   private readonly coast: number;
   private readonly kindNoise: Noise;
   private readonly mesaNoise: Noise;
+  /** Scratch for the sea cliffs' gully noise with its slope. */
+  private readonly cleftNoise = new Float64Array(3);
   private readonly kindSeed: number;
   /** The kinds of country, and the mesa country's shape (if any kind is one). */
   readonly kinds: readonly LandscapeKindDef[];
@@ -85,6 +98,9 @@ export class Skeleton {
   private bi = NaN;
   private bj = NaN;
   private oneKind = -1;
+  /** Each sea cell's island, or null (worked out once). */
+  private readonly isles = new Map<number, Isle | null>();
+  private readonly isleSeed: number;
   private readonly seedX9 = new Float64Array(9);
   private readonly seedZ9 = new Float64Array(9);
   private readonly kinds9 = new Int32Array(9);
@@ -102,6 +118,7 @@ export class Skeleton {
     this.kindNoise = new Noise(deriveSeed(seed, 'skeleton', 'kind'));
     this.mesaNoise = new Noise(deriveSeed(seed, 'skeleton', 'mesa'));
     this.kindSeed = deriveSeed(seed, 'skeleton', 'kinds');
+    this.isleSeed = deriveSeed(seed, 'skeleton', 'isles');
     this.kinds = shape.kinds?.length ? shape.kinds : OPEN;
     this.mesa = this.kinds.find((k) => k.mesa)?.mesa ?? null;
     this.swells = this.kinds.some((k) => k.swell);
@@ -215,6 +232,28 @@ export class Skeleton {
     return spiralFind(x, z, (px, pz) => (this.elevation(px, pz) >= 5 && this.kindWeights(px, pz)[k] > share ? { x: px, z: pz } : null), 1000, 2000, 250, 12000);
   }
 
+  /**
+   * The nearest land well inside the biome `id` from (x, z) (the biome holding all round it, 120 m out), along a spiral walked out from
+   * there: first close (turns 2 km apart, a step every 500 m, out to some 160 km), then wide (8 km apart, a step every 4 km, out to
+   * some 1000 km: the warm biomes lie hundreds of kilometres to the south of the start, `northCooling`). Null if none is met.
+   * It looks for the biome as it is meant to be seen, in plain country (a kind with no swell, bareness or mesa: a meadow on a moor's
+   * bare hills or a badland's ridges is not a meadow to look at), and takes any country only where there is no such place.
+   * `also(x, z)`: a further wish for the spot (a wood: thick trees there), kept in the first two tries. For the debug menu and checks.
+   */
+  nearestBiome(id: string, x: number, z: number, also?: (x: number, z: number) => boolean): { x: number; z: number } | null {
+    const k = this.shape.biomes.findIndex((b) => b.id === id);
+    if (k < 0) return null;
+    const plain = this.kinds.find((d) => !d.swell && !d.bare && !d.mesa)?.id;
+    const out = emptySample(), is = (px: number, pz: number): boolean => this.sample(px, pz, out).biome === k;
+    const find = (inPlain: boolean, extra: boolean): { x: number; z: number } | null => {
+      const inside = (px: number, pz: number) => (is(px, pz) && is(px + 120, pz) && is(px - 120, pz) && is(px, pz + 120) && is(px, pz - 120)
+        && (!inPlain || (plain !== undefined && this.kindShare(plain, px, pz) > 0.99)) && (!extra || also!(px, pz)) ? { x: px, z: pz } : null);
+      return spiralFind(x, z, inside, 1000, 2000, 500, 80000) ?? spiralFind(x, z, inside, 160000, 8000, 4000, 100000);
+    };
+    // The best look first (plain country, and what `also` asks), then less.
+    return (plain !== undefined && also ? find(true, true) : null) ?? (also ? find(false, true) : null) ?? (plain !== undefined ? find(true, false) : null) ?? find(false, false);
+  }
+
   /** How much of mesa country is at (x, z), 0..1. */
   mesaWeight(x: number, z: number): number {
     if (!this.mesa) return 0;
@@ -250,7 +289,7 @@ export class Skeleton {
     const wx = n.fbm2(x / 1100 + 3.3, z / 1100 - 1.4, 1) * 160, wz = n.fbm2(x / 1100 - 7.6, z / 1100 + 5.2, 1) * 160;
     // (The plateaus' field: n.fbm2(px * s, pz * s, 3, 2, 0.5), written out, as no closure is made on every call.)
     const D = 40, f = n.fbm2((x + wx) * s, (z + wz) * s, 3, 2, 0.5), t = (0.5 - m.cover) * 0.5;
-    // Quick out: far down in a valley (some hundreds of metres from any wall or pass).
+    // Quick out: far down in a valley (some hundreds of metres from any wall or pass; a pass's ramp ends before it).
     if (f < t - 0.25) return 0;
     const gx = (n.fbm2((x + wx + D) * s, (z + wz) * s, 3, 2, 0.5) - f) / D, gz = (n.fbm2((x + wx) * s, (z + wz + D) * s, 3, 2, 0.5) - f) / D;
     const g = Math.max(1e-7, Math.hypot(gx, gz));
@@ -281,12 +320,57 @@ export class Skeleton {
       wall = cliffProfile(u1, tall * split, steep, MESA_APRON, MESA_CREST) + cliffProfile(u2, tall * (1 - split), steep, MESA_APRON, MESA_CREST);
     } else wall = cliffProfile(u1, tall, steep, MESA_APRON, MESA_CREST);
     if (p <= 0) return wall;
-    const ramp = clamp((u1 - PASS_TOP + tall / PASS_SLOPE) * PASS_SLOPE, 0, tall);
+    // It comes down to nothing by the line of the valley's quick out above (else it ended there in a step tens of
+    // metres high: the hero met a wall the mesh drew as a slope, or stood in the drawn one).
+    const toQuick = (f - t + 0.25) / g;
+    const ramp = clamp(Math.min(u1 - PASS_TOP + tall / PASS_SLOPE, toQuick) * PASS_SLOPE, 0, tall);
     return lerp(wall, ramp, p);
   }
 
-  /** Continent field: -1 deep ocean … 0 coast … 1 deep inland. */
+  /** Continent field: -1 deep ocean … 0 coast … 1 deep inland; the islands out at sea (S7) rise in it. */
   continent(x: number, z: number): number {
+    const c = this.mainland(x, z), d = this.shape.islands;
+    return d ? this.withIsle(x, z, c, d) : c;
+  }
+
+  /**
+   * The island in the sea cell (i, j) of `d` (S7), or null: by the seed a share of the cells has one, its middle and
+   * radius inside the cell, where the mainland's shore is at least `d.off` beyond its rim.
+   */
+  isleOf(i: number, j: number, d: IslandsDef): Isle | null {
+    const key = (i + 0x80000) * 0x100000 + (j + 0x80000);
+    const had = this.isles.get(key);
+    if (had !== undefined) return had;
+    let isle: Isle | null = null;
+    const h = hash2i(this.isleSeed, i, j);
+    if (hashToFloat(h) < d.chance) {
+      const m = d.radius[1] * (1 + ISLE_RAGGED), span = d.cell - 2 * m;
+      const x = i * d.cell + m + hashToFloat(hash2i(h, 1, 7)) * span, z = j * d.cell + m + hashToFloat(hash2i(h, 2, 11)) * span;
+      const r = lerp(d.radius[0], d.radius[1], hashToFloat(hash2i(h, 3, 13)));
+      const c0 = this.mainland(x, z), D = 50;
+      // How far the mainland's shore is: its field over its slope (none in the open ocean, where the field is flat).
+      const g = Math.hypot(this.mainland(x + D, z) - c0, this.mainland(x, z + D) - c0) / D;
+      if (c0 < -0.005 && -c0 > g * (d.off + r)) isle = { x, z, r };
+    }
+    this.isles.set(key, isle);
+    return isle;
+  }
+
+  /** The continent field `c` at (x, z), lifted by its cell's island. */
+  private withIsle(x: number, z: number, c: number, d: IslandsDef): number {
+    const isle = this.isleOf(Math.floor(x / d.cell), Math.floor(z / d.cell), d);
+    if (!isle) return c;
+    const dx = x - isle.x, dz = z - isle.z, d2 = dx * dx + dz * dz, most = isle.r * (1 + ISLE_RAGGED);
+    if (d2 >= most * most) return c;
+    // A ragged rim: bays and points, so it is no round blob.
+    const t = Math.sqrt(d2) / (isle.r * (1 + ISLE_RAGGED * this.shoreNoise.fbm2(x / 300 + 11.7, z / 300 - 4.2, 2)));
+    if (t >= 1) return c;
+    // Its field falls from the top at its middle to under the coast at its rim, and blends into the sea's beyond.
+    return smax(c, ISLE_TOP - (ISLE_TOP + ISLE_FOOT) * t * t, 0.04);
+  }
+
+  /** The mainland's continent field, before the islands. */
+  private mainland(x: number, z: number): number {
     const s = 1 / this.shape.continentSpacing;
     // Domain warp: coasts with bays and peninsulas instead of round blobs.
     const wx = this.warpNoise.fbm2(x * s * 2, z * s * 2, 3) * 0.35;
@@ -418,9 +502,25 @@ export class Skeleton {
     // The foot wanders (buttresses and coves), and some stretches lean back more than others.
     const foot = Math.max(3, 11 + n.fbm2(x / 70 + 0.7, z / 70 - 5.5, 2) * 5 + n.fbm2(x / 240 - 3.3, z / 240 + 2.9, 2) * 8 + n.fbm2(x / 24 - 9.1, z / 24 + 7.7, 2) * 1.8);
     const steep = lerp(1.7, 3, smoothstep(-0.4, 0.4, n.fbm2(x / 600 + 8.8, z / 600, 2)));
-    // Gullies: narrow clefts every few dozen metres, cut deeper into the top of the face than at its foot.
-    const cleft = clamp(1 - Math.abs(n.fbm2(x / 38 + 1.9, z / 38 - 4.2, 2)) * 3.2, 0, 1) ** 2;
-    const depth = cleft * (4 + 0.25 * top);
+    // Gullies: clefts every few dozen metres, cut deeper into the top of the face than at its foot. Their floor is
+    // rounded, and none is deeper than its width allows: where the noise turned fast a cleft was a V-shaped slot a
+    // metre or two wide and metres deep, which the ground's mesh (a vertex every 2 m) stepped over, so the hero sank
+    // into the drawn ground.
+    // (The noise is fbm2(x / CLEFT_SPACING, z / CLEFT_SPACING, 2), written out with its slope.)
+    const px = x / CLEFT_SPACING + 1.9, pz = z / CLEFT_SPACING - 4.2, o = this.cleftNoise;
+    n.n2d(px, pz, o);
+    const v0 = o[0], dx0 = o[1], dz0 = o[2];
+    n.n2d(px * 2 + 17.31, pz * 2 - 9.17, o);
+    const cn = (v0 + 0.5 * o[0]) / 1.5;
+    const cleft = 1 - smoothstep(0, CLEFT_BAND, Math.abs(cn));
+    let depth = 0;
+    if (cleft > 0) {
+      // Its full depth where its half width (the band over the noise's slope) is at least CLEFT_MIN and its depth
+      // over CLEFT_STEEP, none where it is CLEFT_MIN or less; eased between by the slope (by the width, it turned at
+      // once where the noise flattens out).
+      const most = 4 + 0.25 * top, slope = Math.hypot(dx0 + o[1], dz0 + o[2]) / (1.5 * CLEFT_SPACING);
+      depth = cleft * most * (1 - smoothstep(CLEFT_BAND / (CLEFT_MIN + most / CLEFT_STEEP), CLEFT_BAND / CLEFT_MIN, slope));
+    }
     const u = s - foot;
     return cliffProfile(u - depth * (0.25 + 0.75 * smoothstep(0, 0.9 * top + 12, u)), top, steep);
   }
@@ -451,6 +551,9 @@ export class Skeleton {
     return out;
   }
 }
+
+/** Sea cliffs' gullies: about how far apart (m), the noise's band that makes one, the least half width (m) one is cut in, and how much deeper it may be cut (as the face is set back) than it is wide beyond that. */
+const CLEFT_SPACING = 76, CLEFT_BAND = 0.3, CLEFT_MIN = 2, CLEFT_STEEP = 0.7;
 
 /**
  * A cliff's height `u` metres in from its foot: a concave apron of scree easing into the face, the face at

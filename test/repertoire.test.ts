@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLIP_SECS, REPERTOIRE, Repertoire } from '../src/render/folk/repertoire';
 import { clipOf, PACK_CLIPS } from '../src/render/folk/looks';
+import { MOVE_CLIPS } from '../src/render/folk/moves';
 import type { ActivityKind } from '../src/sim/spots';
 
 /** The clips `seed` shows doing `act` for `secs`, frame by frame at 60 fps: each clip with its seconds on screen. */
@@ -19,7 +20,7 @@ test('repertoire: every clip is shipped, timed, and each rests on the activity\'
   for (const [act, turns] of Object.entries(REPERTOIRE)) {
     assert.equal(turns![0].clip, clipOf(act as ActivityKind, 0), `${act} rests on its own clip`);
     for (const t of turns!) {
-      assert.ok(PACK_CLIPS.includes(t.clip), `${t.clip} in the pack`);
+      assert.ok(PACK_CLIPS.includes(t.clip) || MOVE_CLIPS.includes(t.clip), `${t.clip} in the pack`);
       assert.ok(CLIP_SECS[t.clip] > 0, `${t.clip} timed`);
     }
   }

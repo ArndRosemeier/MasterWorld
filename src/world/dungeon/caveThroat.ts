@@ -20,6 +20,8 @@ export interface ThroatFrame { readonly x: number; readonly y: number; readonly 
 const HALF = 1.45, HIGH = 2.55, MID = 0.75;
 /** The opening of the portal in it: a little bigger than the arch, so its edge lies in the rock all round. */
 export const THROAT_OPENING = { halfWidth: HALF + 0.3, height: HIGH + 0.3 };
+/** How much bigger the mouth's side of the throat is than the cave's (m): more than the portal's opening and the cave's scallops, never less. */
+export const THROAT_GROW = 0.55;
 /** How far the throat goes on past the portal on each side before the side's own rock takes over (m). */
 export const THROAT_BEYOND = 1.2;
 /** How dark the throat's rock is at the portal (its tint times this): the day reaches no further in. */
@@ -28,9 +30,11 @@ export const THROAT_DARK = 0.3;
 const LIGHT_BACK = 5;
 
 /** The throat's air at (u, v, w) of the portal's frame: positive inside the arch and over its floor. Endless along w. */
-export function throatAir(noise: Noise, u: number, v: number, w: number): number {
-  // The arch as a squashed circle (distance roughly in metres near its wall), cut by the flat floor.
-  const arch = HALF * (1 - Math.hypot(u / HALF, (v - MID) / (HIGH - MID)));
+export function throatAir(noise: Noise, u: number, v: number, w: number, grow = 0): number {
+  // The arch as a squashed circle (distance roughly in metres near its wall), cut by the flat floor; `grow` makes it wider and
+  // higher (the mouth's side of the throat is a little bigger than the cave's, so no gap shows between the two).
+  const half = HALF + grow, high = HIGH + grow;
+  const arch = half * (1 - Math.hypot(u / half, (v - MID) / (high - MID)));
   const lumps = noise.fbm3(u / 1.3 + 3.7, v / 1.3, w / 1.3, 2) * 0.16 * smoothstep(0.2, 0.9, v);
   return Math.min(arch + lumps, v);
 }

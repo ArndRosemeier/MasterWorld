@@ -12,20 +12,30 @@ import { Footprints, distSqPointSeg, polyCentroid, wayRound, type TownPlan } fro
 import { NavGraph, aroundHouse } from './nav';
 import type { DayTask, RoutinesDef } from '../setting/contract';
 import { routines as classicRoutines } from '../setting/classic/routines';
-import { away, buildingOf, townsfolk, type Person } from './people';
+import { away, buildingOf, OLD_AGE, townsfolk, type Person } from './people';
 import { dayPlan, taskAt, type DayPlan } from './routines';
 import { seatAt, seatDir, townSpots, type ActivityKind, type Spot } from './spots';
 import { inRoom } from './roomCast';
+import { onCircle } from '../world/sites';
 
 /** What someone is about: their plan's task, a VGM order, or out of town. */
 export type Task = DayTask | 'order' | 'away';
 
 /** A VGM order for the town (plain data, logged with the decisions): times in game hours since the start (day × 24 + hour). */
 export type TownOrder =
-  /** Everyone awake comes together around a place (a festival, a speech, a hanging). */
-  | { kind: 'gather'; x: number; z: number; radius: number; from: number; to: number }
+  /**
+   * Everyone awake comes together around a place (a festival, a speech, a hanging). `mood` says what they do there:
+   * at a feast they dance in a ring round it, drink and cheer round the ring, and the children run about; on a
+   * market day they go round the stalls; otherwise they stand and talk it over.
+   */
+  | { kind: 'gather'; x: number; z: number; radius: number; from: number; to: number; mood?: 'feast' | 'market' }
   /** Everyone stays indoors (a curfew, a storm). */
   | { kind: 'stayIn'; from: number; to: number };
+
+/** Someone standing at (x, z) facing `dir`, doing `act`, with no day planned yet (a town's life plans it; a crew's post sets it). */
+export function standingAgent(person: Person, x: number, z: number, dir: number, act: ActivityKind, seed: number): Agent {
+  return { person, x, z, dir, act, next: act, spot: -1, seat: 0, hidden: false, until: 0, path: [], pi: 0, task: 'sleep', plan: { day: NaN, rest: false, at: [0], task: ['sleep'] }, rng: new Rng(seed) };
+}
 
 export interface Agent {
   person: Person;
@@ -68,7 +78,13 @@ export interface Agent {
    */
   stay?: number;
   /** Held in a building's room (they were in it when the talk began): drawn there, not where they stand outside (read only while `held`). */
+  /** Held for a talk out of bed (asleep when the hero came): they stand by their bed, which stays theirs. */
+  woke?: boolean;
   heldIn?: boolean;
+  /** Running, not walking (children at play at a feast): RUN times their pace. */
+  run?: boolean;
+  /** Turns to face this point on arrival (a feast's ring faces its middle). */
+  faceTo?: { x: number; z: number };
   /** Sent over by the VGM (plan D27): walks up to (x, z), then waits there facing `face` until let go or `until`. */
   seek?: { x: number; z: number; face: { x: number; z: number } };
   /** Keeps watch at a place of their own out on the land (C3: the warden at the tower's door), day and night. */
@@ -153,7 +169,7 @@ const CROWD = { hero: 0.35, space: 0.2, turns: [-0.3, -0.6, -1.2, -1.65, 0.3, 0.
 const CROWD_CELLS = Math.ceil((2 * CROWD.near) / CROWD.cell) + 4;
 
 /** Trades one goes into on an errand (to buy bread, have shoes mended ...). */
-const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'potter', 'weaver', 'cooper', 'smith', 'miller', 'fletcher', 'bowyer', 'armourer', 'jeweller', 'bookbinder', 'glazier']);
+const SHOPS = new Set(['baker', 'butcher', 'chandler', 'cobbler', 'tailor', 'potter', 'weaver', 'cooper', 'smith', 'miller', 'fletcher', 'bowyer', 'armourer', 'jeweller', 'bookbinder', 'glazier', 'herbalist']);
 
 /** Market spots weigh as if this many metres away per step of 1 (25 for the rest): the market draws from all over the town. */
 const MARKET_REACH = 110;
@@ -165,6 +181,17 @@ const SKIP_HOURS = 0.5;
 const DETAIL = 260;
 /** A child at play keeps this far off a wall (m). */
 const PLAY_CLEAR = 0.6;
+/** Running is this many times one's walking pace. */
+export const RUN = 2.3;
+/**
+ * A feast (TownOrder mood 'feast'): the ring dances this far from the middle (m: clear of a well or a cross there),
+ * the share of the grown who dance in it, each dancer's room along the ring (m), revellers stand round it from
+ * `revel` out.
+ */
+const FEAST = { ring: 7, dancers: 0.6, room: 1.1, revel: 9.5 } as const;
+
+/** How fast `a` goes when on the move (m/s). */
+export const paceOf = (a: Agent): number => a.person.speed * (a.run ? RUN : 1);
 
 export class TownLife {
   readonly nav: NavGraph;
@@ -194,6 +221,10 @@ export class TownLife {
   private readonly orders: TownOrder[] = [];
   /** Everyone has fled (a band holds the place, vgm/events.ts take): all are away until it is false again. */
   gone = false;
+  /** People running for their doors from raiders (D65, R6: sim/townFight.ts keeps it): everyone awake in it goes indoors and stays. */
+  readonly alarmed = new Set<number>();
+  /** People lost in a place (D62: a lost person, vgm/asks.ts): away from their days until they come home (the dead never do). */
+  readonly missing = new Set<number>();
   private readonly market: [number, number];
   /** Every building's footprint (walks go round them). */
   private readonly footprints: Footprints;
@@ -256,7 +287,7 @@ export class TownLife {
     const t0 = performance.now();
     while (this.agents.length < this.waiting.length) {
       const p = this.waiting[this.agents.length], d = this.plan.buildings[p.home].door;
-      const a: Agent = { person: p, x: d[0], z: d[1], dir: d[2], act: 'wait', next: 'wait', spot: -1, seat: 0, hidden: false, until: 0, path: [], pi: 0, task: 'sleep', plan: { day: NaN, rest: false, at: [0], task: ['sleep'] }, rng: new Rng(deriveSeed(this.seed, 'life', p.id)) };
+      const a = standingAgent(p, d[0], d[1], d[2], 'wait', deriveSeed(this.seed, 'life', p.id));
       this.choose(a, true);
       a.until = this.time + a.rng.range(0, 1) * (a.until - this.time);
       this.agents.push(a);
@@ -276,13 +307,27 @@ export class TownLife {
     const was = this.kept;
     if (was.size === kept.size && [...kept].every(([id, b]) => was.get(id) === b)) return;
     this.kept = new Map(kept);
+    // Before the first step nobody has seen the town: those kept are at their posts from the start, not walking there.
+    this.skipping = this.time === 0;
     for (const a of this.agents) {
       const id = a.person.id;
       if (was.get(id) === kept.get(id) || a.held || a.post) continue;
       if (a.seek) a.seek = undefined;
       this.choose(a, false);
     }
+    this.skipping = false;
   }
+
+  /** The stall (a seller's spot) of market seller `id`, one each in turn (-1: the town has no stall). */
+  private stallOf(id: number): number {
+    if (!this.stalls) {
+      const stalls = this.spots.filter((s) => s.use === 'trade').map((s) => s.id);
+      this.stalls = new Map();
+      this.waiting.filter((p) => p.role === 'trader').sort((a, b) => a.id - b.id).forEach((p, k) => { if (stalls.length) this.stalls!.set(p.id, stalls[k % stalls.length]); });
+    }
+    return this.stalls.get(id) ?? -1;
+  }
+  private stalls: Map<number, number> | null = null;
 
   /** Whether a map mark keeps this person where they are. */
   isKept(id: number): boolean { return this.kept.has(id); }
@@ -311,10 +356,22 @@ export class TownLife {
         if (this.time < a.stay) continue;
         a.stay = undefined;
       }
+      if (this.runs(a) && a.task !== 'order') { this.runForDoor(a); continue; }
       if (a.act === 'walk') this.walk(a, dt);
+      else if (a.hidden && this.alarmed.has(a.person.id)) continue;
       else if (a.seek && this.time < a.until) continue;
       else if (this.time >= a.until || this.taskOf(a) !== a.task) this.choose(a, false);
     }
+  }
+
+  /** Raiders about (R6): they drop what they are doing, mid-walk too, and run for their own door. */
+  private runForDoor(a: Agent): void {
+    const was = a.spot >= 0 && a.act !== 'walk' ? this.spots[a.spot] : null;
+    this.freeSpot(a);
+    const door = this.doorOf(a.person.home), s = this.spots[door];
+    Object.assign(a, { task: 'order', spot: door, seat: 0, next: 'indoors', run: true, faceTo: undefined, seek: undefined, until: this.time + 240, pi: 0, act: 'walk', hidden: false });
+    s.users++;
+    a.path = this.wayTo(a, was, s.x, s.z, s);
   }
 
   /** After skipped time: everyone not held goes straight to what they do now, without walking there. */
@@ -331,7 +388,9 @@ export class TownLife {
    */
   hold(a: Agent, x: number, z: number): void {
     const s = a.spot >= 0 ? this.spots[a.spot] : null;
-    a.heldIn = !!s && inRoom(a, s);
+    // Woken in bed (a teacher the hero comes to at night): in the room, up beside the bed to talk.
+    a.woke = a.act === 'sleep' && !!s?.door && s.building >= 0;
+    a.heldIn = !!s && (inRoom(a, s) || a.woke);
     a.held = true;
     a.hidden = false;
     if (a.act === 'sit') return;
@@ -373,8 +432,24 @@ export class TownLife {
   /** The talk is over: they pick up their day from here. */
   letGo(a: Agent): void {
     a.held = false;
+    a.woke = false;
     if (a.post) this.station(a, a.post.x, a.post.z, a.post.dir, a.post.act);
     else this.choose(a, false);
+  }
+
+  /**
+   * They go to a fight (D65, R6; sim/townFight.ts): out of their day and out of doors, standing where they were; the fight
+   * places them and shows what they do. `disband` sends them back to their day from wherever the fight left them.
+   */
+  muster(a: Agent): void {
+    if (a.post) return;
+    this.station(a, a.x, a.z, a.dir, 'wait');
+    a.held = false;
+  }
+
+  disband(a: Agent): void {
+    a.post = undefined;
+    this.choose(a, false);
   }
 
   /** Someone keeps watch at (x, z) from now on, facing `dir` (as `Agent.dir`), doing `act`: they stay there and never walk the town. */
@@ -428,12 +503,15 @@ export class TownLife {
 
   /** What they should be about now (today's plan is made on the day's first ask). */
   taskOf(a: Agent): Task {
-    if (this.gone || away(a.person, this.hours)) return 'away';
+    if (this.gone || this.missing.has(a.person.id) || away(a.person, this.hours)) return 'away';
     const day = Math.floor(this.hours / 24);
     if (a.plan.day !== day) a.plan = dayPlan(this.routines, a.person, day);
     const t = taskAt(a.plan, this.hour);
-    return t !== 'sleep' && this.activeOrder() ? 'order' : t;
+    return t !== 'sleep' && (this.activeOrder() || this.runs(a)) ? 'order' : t;
   }
+
+  /** Is this one running for their door from raiders (R6)? Those already indoors stay where they are. */
+  private runs(a: Agent): boolean { return this.alarmed.has(a.person.id) && !a.hidden; }
 
   /** Whether it is dark out (the routines' night hours). */
   get dark(): boolean {
@@ -462,15 +540,55 @@ export class TownLife {
     }
     const [tx, tz] = s ? seatAt(s, a.seat) : [pick.x, pick.z];
     a.next = pick.act;
+    a.run = pick.run;
+    a.faceTo = pick.face;
     a.until = this.time + a.rng.range(pick.secs[0], pick.secs[1]) * (s?.outside && (this.weather.rain > 0.5 || this.dark) ? 0.5 : 1);
     if (here || this.skipping || (s && s === was) || (Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > DETAIL && Math.hypot(tx - this.focus.x, tz - this.focus.z) > DETAIL)) {
-      this.arrive(a, tx, tz, s ? seatDir(s, a.seat) : a.dir);
+      this.arrive(a, tx, tz, s ? seatDir(s, a.seat) : pick.face ? Math.atan2(pick.face.z - tz, pick.face.x - tx) : a.dir);
       return;
     }
     a.path = this.wayTo(a, was, tx, tz, s);
     a.pi = 0;
     a.act = 'walk';
     a.hidden = false;
+  }
+
+  /**
+   * At a feast round (order.x, order.z): children run from one place to the next and play there a moment; some of
+   * the grown (not the old) dance in a ring facing its middle; the rest stand round the ring, facing it, drinking,
+   * laughing and cheering. Each finds open ground (never inside a stall or a house).
+   */
+  private feast(a: Agent, order: { x: number; z: number; radius: number }): ReturnType<TownLife['pick']> {
+    const r = a.rng, p = a.person, face = { x: order.x, z: order.z };
+    const openSpot = (from: number, to: number): [number, number] => {
+      for (let k = 0; k < 8; k++) {
+        const [x, z] = onCircle(order, r.range(0, Math.PI * 2), r.range(from, to));
+        if (this.freeGround(x, z)) return [x, z];
+      }
+      return [order.x + r.range(-1, 1), order.z + r.range(-1, 1)];
+    };
+    if (p.role === 'child') {
+      // Out round the revellers, never through the ring.
+      const [x, z] = openSpot(FEAST.revel, Math.max(FEAST.revel + 2, order.radius));
+      return { spot: -1, x, z, act: 'play', secs: [3, 9], run: true };
+    }
+    if (p.age < OLD_AGE && r.chance(FEAST.dancers)) {
+      // A free place in the ring, evenly spaced (where the others dance, or are on their way to).
+      const n = Math.floor((2 * Math.PI * FEAST.ring) / FEAST.room), taken = new Set<number>();
+      for (const o of this.agents) {
+        if (o === a || (o.act !== 'dance' && o.next !== 'dance')) continue;
+        const [ox, oz] = o.act === 'dance' ? [o.x, o.z] : [o.path[o.path.length - 2], o.path[o.path.length - 1]];
+        taken.add(((Math.round((Math.atan2(oz - order.z, ox - order.x) / (2 * Math.PI)) * n) % n) + n) % n);
+      }
+      const free: number[] = [];
+      for (let k = 0; k < n; k++) if (!taken.has(k)) free.push(k);
+      for (let tries = 0; tries < 6 && free.length; tries++) {
+        const k = free.splice(r.int(0, free.length - 1), 1)[0], [x, z] = onCircle(order, (k / n) * 2 * Math.PI, FEAST.ring);
+        if (this.freeGround(x, z)) return { spot: -1, x, z, act: 'dance', secs: [60, 180], face };
+      }
+    }
+    const [x, z] = openSpot(FEAST.revel, Math.max(FEAST.revel + 2, order.radius));
+    return { spot: -1, x, z, act: 'revel', secs: [60, 200], face };
   }
 
   /** Open ground: no house there, nor a wall within a child's reach. */
@@ -527,7 +645,7 @@ export class TownLife {
         const o = this.agents[k];
         if (o === a || o.hidden) continue;
         // One walking on is judged where it will be (else who follows whom in a file hangs on the order of the steps).
-        const go = o.act === 'walk' && !o.stalled && o.stepped !== this.time ? o.person.speed * this.dt : 0;
+        const go = o.act === 'walk' && !o.stalled && o.stepped !== this.time ? paceOf(o) * this.dt : 0;
         if (pressesInto(a, x, z, o.x + Math.cos(o.dir) * go, o.z + Math.sin(o.dir) * go, BODY * 2, min, share)) return true;
       }
     }
@@ -588,7 +706,7 @@ export class TownLife {
 
   private walk(a: Agent, dt: number): void {
     a.stepped = this.time;
-    let left = a.person.speed * dt;
+    let left = paceOf(a) * dt;
     const minded = Math.abs(a.x - this.focus.x) < CROWD.near && Math.abs(a.z - this.focus.z) < CROWD.near;
     while (left > 0 && a.pi * 2 < a.path.length) {
       const px = a.path[a.pi * 2], pz = a.path[a.pi * 2 + 1];
@@ -611,7 +729,7 @@ export class TownLife {
       const s = a.spot >= 0 ? this.spots[a.spot] : null;
       // The turn starts on arrival: its length counts from now.
       const length = a.until - this.time;
-      const f = a.seek?.face;
+      const f = a.seek?.face ?? a.faceTo;
       this.arrive(a, a.x, a.z, f ? facing(a, f.x, f.z) : s ? seatDir(s, a.seat) : a.dir);
       a.until = this.time + Math.max(length, 5);
     }
@@ -636,7 +754,7 @@ export class TownLife {
   }
 
   /** What to do next for the task at hand: a spot (or a free point), the activity and how long. */
-  private pick(a: Agent): { spot: number; x: number; z: number; act: ActivityKind; secs: [number, number] } {
+  private pick(a: Agent): { spot: number; x: number; z: number; act: ActivityKind; secs: [number, number]; run?: boolean; face?: { x: number; z: number } } {
     const p = a.person, r = a.rng, rain = this.weather.rain, dark = this.dark;
     const home = this.doorOf(p.home);
     const at = (spot: number, act?: ActivityKind, secs?: [number, number]) => ({ spot, x: 0, z: 0, act: act ?? this.spots[spot].activity, secs: secs ?? this.spots[spot].secs });
@@ -644,7 +762,20 @@ export class TownLife {
     const inside = (spot: number) => at(spot, 'indoors', [120, 400]);
     const stroll = () => { const n = r.int(0, this.nav.xs.length - 1); return free(this.nav.xs[n], this.nav.zs[n], 'stroll', [20, 60]); };
     let task = a.task;
-    if (task === 'sleep') return at(home, 'sleep', [600, 1200]);
+    // The temple's keeper lies in the temple's cot, not in the house they were counted to (a fallen hero is brought to them).
+    if (task === 'sleep') return at(p.role === 'keeper' && this.temple >= 0 ? this.temple : home, 'sleep', [600, 1200]);
+    // Marked on the hero's map (a teacher, one a mark sends the hero to): in that building while awake, where the
+    // hero was sent to find them; a gathering, a feast or a market day does not take them from it.
+    const kept = this.kept.get(p.id);
+    if (kept !== undefined && this.doorOf(kept) >= 0) return inside(this.doorOf(kept));
+    // Raiders about (R6): the awake run for their doors and stay in till it is over; the watch walks its rounds.
+    if (this.runs(a)) return { ...inside(home), run: true };
+    if (p.watch && task === 'work') return stroll();
+    // A market seller keeps their own stall through the working day, at meals and on a market day (the hero buys there).
+    if (p.role === 'trader' && (task === 'work' || task === 'meal' || task === 'order')) {
+      const stall = this.stallOf(p.id);
+      if (stall >= 0) return at(stall, 'sell');
+    }
     if (task === 'away') {
       // On the road: gone where it leaves the town (or still there).
       const [x, z] = this.roadEnds.length ? r.pick(this.roadEnds) : [this.spots[home].x, this.spots[home].z];
@@ -653,15 +784,18 @@ export class TownLife {
     if (task === 'order') {
       const order = this.activeOrder();
       if (order?.kind === 'stayIn') return inside(home);
+      if (order?.mood === 'feast') return this.feast(a, order);
+      if (order?.mood === 'market') {
+        // Round the stalls (where one is free), else about the market looking on.
+        const stalls = (this.spotsBy.get('browse') ?? []).filter((s) => s.market && s.users < s.cap);
+        if (stalls.length && r.chance(0.7)) return at(r.pick(stalls).id);
+      }
       if (order) {
         const ang = r.range(0, Math.PI * 2), rr = order.radius * Math.sqrt(r.float());
-        return free(order.x + Math.cos(ang) * rr, order.z + Math.sin(ang) * rr, 'gather', [60, 200]);
+        return free(order.x + Math.cos(ang) * rr, order.z + Math.sin(ang) * rr, order.mood === 'market' ? 'browse' : 'gather', [60, 200]);
       }
       task = 'home';
     }
-    // Marked on the hero's map: in that building while awake, where the hero was sent to find them.
-    const kept = this.kept.get(p.id);
-    if (kept !== undefined && this.doorOf(kept) >= 0) return inside(this.doorOf(kept));
     // In the dark only the lit inn and the way home are out of doors.
     if (dark && (task === 'play' || task === 'leisure' || task === 'errands')) task = 'home';
     if (task === 'home') return inside(home);

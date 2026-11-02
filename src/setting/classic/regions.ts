@@ -17,6 +17,8 @@ export const regions: RegionsDef = {
     { id: 'capital', name: 'the capital', level: 3, weight: 40, place: 'capital', radius: 260, biomes: FARMLAND, ring: [2800, 7000], apart: 1e7 },
     // A harbour town where a river meets the sea (S2, D60): a village with its quay, piers and ships; all but sure to take the first land by a river's mouth.
     { id: 'harbour', name: 'a harbour town', level: 2, weight: 30, place: 'village', harbour: true, radius: 72, ring: [1200], apart: 8000 },
+    // An island's fishing village (S7): a handful of houses round a quay, opened only when the VGM promises the island.
+    { id: 'isle-village', name: 'an island fishing village', level: 1, weight: 0, place: 'village', harbour: true, island: true, radius: 60 },
     { id: 'village', name: 'a village', level: 2, weight: 1, place: 'village', radius: 72, biomes: FARMLAND, ring: [2500], apart: 4000 },
     { id: 'camp', name: 'a camp', level: 0, weight: 2, place: 'camp', radius: 14, clearing: 8, biomes: ['meadow', 'forest', 'taiga', 'heath', 'steppe'], ring: [900], apart: 1500 },
     { id: 'ruin', name: 'ruins of the old realm', level: 0, weight: 2, place: 'ruin', radius: 22, ring: [1100], apart: 1400 },

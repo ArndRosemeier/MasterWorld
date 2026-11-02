@@ -22,6 +22,8 @@ const FOOT = 2.2;
 /** How far below the lowest ground under it a pier's foot goes where the land falls away more than FOOT, metres. */
 const FOOT_UNDER = 0.6;
 
+/** How far a string course stands out from the wall, metres. */
+const COURSE_OUT = 0.16;
 /** Height of a storey on the outside, metres. */
 const STOREY_OUT = 3.4;
 
@@ -59,12 +61,14 @@ export function towerMesh(size: TowerSize, seed = 1, ground: Ground = LEVEL): Pl
   };
   // Four walls of one-metre piers, each to its own height (faces with their texture upright, so the
   // coursed stone reads); the front one round the doorway, a window on each wall's upper storeys.
-  const walls: [number, number, number, number][] = [[-half, 0, half, 0], [half, 0, half, -depth], [half, -depth, -half, -depth], [-half, -depth, -half, 0]];
+  // The front and back walls hold the corners; the sides run between them (two walls through one corner put
+  // their faces in one plane, and those fight on screen: world/zFight.ts).
+  const walls: [number, number, number, number][] = [[-half, 0, half, 0], [half, -WALL, half, -depth + WALL], [half, -depth, -half, -depth], [-half, -depth + WALL, -half, -WALL]];
   for (const [ax, az, bx, bz] of walls) {
     const len = Math.hypot(bx - ax, bz - az), n = Math.round(len), w = len / n, ux = (bx - ax) / len, uz = (bz - az) / len;
     // Inward: the walls run round the keep so that its inside is to their right.
     const ix = uz, iz = -ux, yaw = Math.atan2(-uz, ux);
-    const front = az === 0 && bz === 0, mid = Math.floor(n / 2);
+    const front = az === 0 && bz === 0, mid = Math.floor(n / 2), corners = az === bz;
     for (let s = 0; s < n; s++) {
       const t0 = s * w, t1 = (s + 1) * w, cx = ax + ux * (t0 + w / 2) + ix * (WALL / 2), cz = az + uz * (t0 + w / 2) + iz * (WALL / 2);
       // Merlons stand a little higher on every other pier, where the top has not fallen (and not all of those are left).
@@ -92,7 +96,11 @@ export function towerMesh(size: TowerSize, seed = 1, ground: Ground = LEVEL): Pl
       else k.footed(() => run(foot, h));
       // A string course at every storey, and an arrow slit (dark) on some of the piers.
       for (let st = 1; st < size.storeys && st * STOREY_OUT < h - 0.4; st++) {
-        k.box(cx - ix * 0.08, st * STOREY_OUT - 0.12, cz - iz * 0.08, w + 0.03, 0.22, WALL + 0.16, yaw, BuildingMat.Ashlar, mixTint(COURSE, LICHEN, rng.range(0.3, 0.8)));
+        // On the wall's face, pier to pier, none over the next and none in the wall's own faces (faces in one
+        // plane fight); round the corner: the sides' run on past the corners' piers, the front's and back's to meet them.
+        const end = corners ? COURSE_OUT : WALL, out0 = s === 0 ? end : 0, out1 = s === n - 1 ? end : 0, along = (out1 - out0) / 2;
+        const outw = WALL / 2 + COURSE_OUT / 2;
+        k.box(cx - ix * outw + ux * along, st * STOREY_OUT - 0.12, cz - iz * outw + uz * along, w + out0 + out1, 0.22, COURSE_OUT, yaw, BuildingMat.Ashlar, mixTint(COURSE, LICHEN, rng.range(0.3, 0.8)));
         if (s % 4 === 2 && !win && st * STOREY_OUT + 2 < h) k.box(cx - ix * (WALL / 2 + 0.01), st * STOREY_OUT + 0.6, cz - iz * (WALL / 2 + 0.01), 0.18, 1.1, 0.02, yaw, BuildingMat.Plaster, DARK);
       }
     }

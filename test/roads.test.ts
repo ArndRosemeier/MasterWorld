@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { firstDecisions, startPlace } from '../src/vgm/builder';
-import { Terrain } from '../src/world/terrain';
 import { linkRoad } from '../src/vgm/roads';
 import { settlementsOf, walkFrontier } from '../src/vgm/frontier';
 import { FLORA_KINDS, FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../src/world/flora';
@@ -12,13 +9,10 @@ import { ROAD_REACH, WAY_WIDTH, emptyRoad, roadMask } from '../src/world/roads';
 import { archY, bridgeMesh, bridgeSideAt, bridgesOn, deckAt, deckY } from '../src/world/bridges';
 import { emptyWater, inChannel } from '../src/world/hydro';
 import { Walker } from '../src/game/walker';
-import { SMALL } from './small';
+import { frontierLand } from './frontierLand';
 
-const seed = parseSeed('masterworld');
-// The start's land with small drainage tiles (as the flora and water tests): the same town, a quarter of the time.
-const terrain = new Terrain(seed, classic, SMALL);
-const log = firstDecisions(terrain, startPlace(terrain));
-terrain.settle(log);
+// The start's land (test/frontierLand.ts; ours, as roads are laid on it).
+const { seed, terrain, first: log, plans } = frontierLand({ own: true });
 const town = terrain.towns[0];
 // The first hamlet the VGM founds on a walk south-east from the start (plan B1). (East, it stands across the river
 // where it has no ford: no track reaches it.)
@@ -35,9 +29,9 @@ const n = road.pts.length / 3;
 const inner = Array.from({ length: n }, (_, k) => k).filter((k) => k > 6 && k < n - 6 && k % 5 === 0 && terrain.waterDepth(pt(k).x, pt(k).z) <= 0
   && !inChannel(terrain.hydro.brookAt(pt(k).x, pt(k).z), 4) && !inChannel(terrain.hydro.riverAt(pt(k).x, pt(k).z, emptyWater()), 4));
 const bare = inner.map((k) => terrain.height(pt(k).x, pt(k).z));
-// A track out to a spot 1.8 km south of the town, past a brook, for the bridges (the hamlet's track may cross none).
+// A track out to a spot 2.8 km south of the town, past brooks, for the bridges (the hamlet's track may cross none).
 // Its own id: laid with the hamlet track's (both are the log's first road), the net kept only the first.
-const brookRoad = { ...linkRoad(terrain, log.filter((d) => d.kind === 'road'), { id: 'ford', x: town.decision.x, z: town.decision.z + 1800, r: 20 }, 'track')!, id: 'road-ford' };
+const brookRoad = { ...linkRoad(terrain, log.filter((d) => d.kind === 'road'), { id: 'ford', x: town.decision.x, z: town.decision.z + 2800, r: 20 }, 'track')!, id: 'road-ford' };
 const bp = (k: number) => ({ x: brookRoad.pts[k * 3], y: brookRoad.pts[k * 3 + 1], z: brookRoad.pts[k * 3 + 2] });
 const bn = brookRoad.pts.length / 3;
 terrain.addRoad(road);
@@ -110,7 +104,7 @@ test('roads: the mask holds the distances the shader draws from; roads replay fr
   assert.equal(terrain.roads.roads.length, laid);
   const q = pt(inner[8]), h = terrain.height(q.x, q.z);
   // (The brook's track, laid with addRoad above, is settled again too: the bridge tests below stand on it.)
-  terrain.settle([...log, road, brookRoad]);
+  terrain.settle([...log, road, brookRoad], plans);
   assert.equal(terrain.height(q.x, q.z), h);
 });
 

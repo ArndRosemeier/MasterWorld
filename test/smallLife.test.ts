@@ -114,3 +114,38 @@ test('small life: a flock settles to feed, rises together when someone comes nea
   run(life, 1, at(400, 0), 1, 0.9);
   assert.equal([...life.birds()].length, 0, 'none in hard rain');
 });
+
+test('small life: gulls wheel over the coast and the water off it (S9) and settle on the strand; none inland', () => {
+  // The sea east of x = 0 (its bed 10 m down), open land west of it, rising inland.
+  const coast: LifeLand = { height: (x) => (x > 0 ? -10 : 3 - x * 0.01), waterDepth: (x) => (x > 0 ? 10 : 0), woods: () => 0, trees: () => new Float32Array() };
+  const pale = (b: { r: number; g: number; b: number }) => b.r > 0.5 && b.g > 0.5;
+  const shore = new SmallLife(4, coast, def);
+  run(shore, 10, at(0, 0));
+  const gulls = [...shore.birds()].filter(pale);
+  assert.ok(gulls.length >= 5, `${gulls.length} gulls over the coast`);
+  assert.ok(gulls.filter((g) => g.doing === 'fly').every((g) => g.y > 8), 'in the air over the strand and the water');
+  assert.ok(gulls.filter((g) => g.doing !== 'fly').every((g) => g.x < 0), 'down on the strand, never on the water');
+  const inland = new SmallLife(4, coast, def);
+  run(inland, 10, at(-1500, 0));
+  assert.equal([...inland.birds()].filter(pale).length, 0, 'none inland');
+});
+
+test('small life: shoals swim under the sea, never in the shallows, and dart away from a swimmer (S9)', () => {
+  // The sea east of x = 0, its bed 10 m down; dry land west of it.
+  const sea: LifeLand = { height: (x) => (x > 0 ? -10 : 3), waterDepth: (x) => (x > 0 ? 10 : 0), woods: () => 0, trees: () => new Float32Array() };
+  const life = new SmallLife(7, sea, def);
+  run(life, 20, at(60, 0));
+  const fish = [...life.fish()];
+  assert.ok(fish.length >= 8, `${fish.length} fish off the coast`);
+  assert.ok(fish.every((f) => f.x > 0 && f.y < -0.2 && f.y > -10), 'under the water, over its bed, never on land');
+  // A swimmer comes right up to the nearest shoal: it darts off.
+  const near = fish.reduce((a, b) => (Math.hypot(a.x - 60, a.z) < Math.hypot(b.x - 60, b.z) ? a : b));
+  const swimmer: LifeHero = { x: near.x, y: near.y, z: near.z + 1, speed: 1 };
+  life.step(0.1, swimmer, 1, 0, swimmer);
+  assert.ok(near.sweep > 0.15, 'the tail beats hard');
+  for (let k = 0; k < 20; k++) life.step(0.1, swimmer, 1, 0, swimmer);
+  assert.ok(Math.hypot(near.x - swimmer.x, near.y - swimmer.y, near.z - swimmer.z) > 4, 'it has swum away');
+  const dry = new SmallLife(7, sea, def);
+  run(dry, 5, at(-500, 0));
+  assert.equal([...dry.fish()].length, 0, 'none on land');
+});

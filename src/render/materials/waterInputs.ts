@@ -3,8 +3,8 @@
  * What the water shader and the terrain's underwater shading read: uniforms the WaterView and SkyView
  * write each frame, and the water masks. No material here (materials live in the registry).
  */
-import { Color, Vector2, Vector3, type Node } from 'three/webgpu';
-import { mix, smoothstep, uniform, vec4 } from 'three/tsl';
+import { Color, Vector2, Vector3, Vector4, type Node } from 'three/webgpu';
+import { mix, smoothstep, uniform, uniformArray, vec4 } from 'three/tsl';
 import { DRY } from '../../world/water';
 import { FloatMask, inside, sampleMask } from './masks';
 
@@ -21,7 +21,17 @@ export function waterAt(p: Node<'vec2'>): Node<'vec4'> {
   return mix(mid, sampleMask(WATER.near, p), smoothstep(0.0, 0.05, inside(WATER.near, p)));
 }
 
+/** The ships' hulls near the camera with no water drawn inside them (S3), and the stations along each where its width is known. */
+export const HULL_STATIONS = 17;
+/** Each hull's middle and heading (world x, z, and its unit ux, uz): written by the ships' view. */
+export const HULL_POSES: readonly Vector4[] = [new Vector4(), new Vector4(), new Vector4(), new Vector4()];
+export const HULLS = HULL_POSES.length;
+
 export const WATER = {
+  /** Each hull's half length (0: none), and its half width at the waterline at each station from stern to bow (m). */
+  hullPose: uniformArray(HULL_POSES as Vector4[], 'vec4'),
+  hullLength: uniformArray(new Array<number>(HULLS).fill(0), 'float'),
+  hullWidth: uniformArray(new Array<number>(HULLS * HULL_STATIONS).fill(0), 'float'),
   time: uniform(0),
   /** The water mesh's centre (it follows the camera). */
   center: uniform(new Vector3()),

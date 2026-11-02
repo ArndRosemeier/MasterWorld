@@ -1,5 +1,5 @@
 /**
- * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves|kinds|capital]` after `npm run build`,
+ * The standard shot set (implementation plan F1, F2): `node tools/shot/set.mjs [out root] [--part=town|land|caves|kinds|sea|ships|capital]` after `npm run build`,
  * with SHOT_GPU=1 on the reference machine (RTX 5070, webgl2, 1080p). Takes the same pictures every time (the
  * title, the creator, the town at noon, dusk, night, in rain and wet toward the afternoon sun, a cellar, a barrow, the wild, a fight, a fight with magic, a hurt traveller, a raided farm, the pack,
  * the map, the trade window, talk, a people's hold) as JPEGs into one folder per commit, `<out root>/<date>-<commit>/` (default root `shots/set`), and
@@ -11,9 +11,9 @@
  * the town at noon (F2). Four slow checks (docs/CHECKS.md), each under 5 min: `--part=town` (the title, the town,
  * the inn) and `--part=land` (a cellar, the land, the wild, fights, a hamlet, a village, a hold, a hurt traveller and a raided farm);
  * `--part=caves` is mesa country (a valley, a plateau top, a tor, a climb; gate L) and a cave's mouth in a cliff and its cavern (L6); `--part=kinds` the downs, a moor, karst and badlands (L7);
- * `--part=sea` is the nearest beach, sea cliff and the bed off the beach, the camera in the waterline and the hero swimming (S1);
+ * `--part=sea` is the nearest beach, sea cliff and the bed off the beach, the camera in the waterline and the hero swimming (S1), sea caves, sunken ruins, a wreck and the sea's situations (S8, S9); `--part=ships` a harbour town (S2), a storm from the deck (S10) and aboard a ship at its berth (S3);
  * `--part=capital` runs tools/shot/capital.mjs (its gate by day and night, its market; gate P) into `<out root>/capital`;
- * without `--part` all six run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
+ * without `--part` all seven run, one after the other, each its own run. Each writes `index-<part>.md` and `.json`.
  * SET_ONLY=town,land takes only those sessions; SET_GL=0 draws with WebGPU instead of WebGL 2.
  * Exits 1 when a page failed or a shot breaks F2 or F3 (what was still waiting to be drawn is noted).
  */
@@ -51,6 +51,33 @@ const close = async (page) => { await page.keyboard.press('Escape'); await page.
  * The sessions: one page load each (loads are most of the run's time), then its shots in order. A shot's
  * `act` runs before it settles; `first` runs once the page is loaded, before waiting for it to be ready.
  */
+/** In the page: the hero stood just inside a ship's castle cabin door (`end`: 'aft' or 'fore'), looking in, the hero's camera behind. */
+function cabinShot(end) {
+  const g = window.game, id = g.decks.ship, plan = g.decks.planOf(id), c = plan[end], aft = end === 'aft';
+  const face = aft ? c.a1 : c.a0, dir = aft ? 1 : -1, w = g.decks.worldOf(id, face - dir * (aft ? 1.6 : 1.2), plan.deckY + 0.05, 0);
+  g.player.flying = false;
+  g.player.puppet = null; // off the ladder the shot before climbed (its end would put the hero back on the castle)
+  g.player.walker.place(w.x, w.z, w.y);
+  const f = g.decks.worldOf(id, face - dir * 3, plan.deckY + 0.05, 0);
+  g.player.walker.yaw = Math.atan2(-(f.x - w.x), -(f.z - w.z));
+  g.player.heroCam.yaw = g.player.walker.yaw;
+  g.player.heroCam.pitch = -0.2;
+  g.player.heroCam.zoom = 3;
+}
+
+/** In the page: the hero stood on a ship's lower deck by the companionway's foot, looking forward along its passage. */
+function holdShot() {
+  const g = window.game, id = g.decks.ship, plan = g.decks.planOf(id), h = plan.hold;
+  const w = g.decks.worldOf(id, h.a0 + 1.0, h.y + 0.05, 0), f = g.decks.worldOf(id, h.a0 + 6, h.y + 0.05, 0);
+  g.player.flying = false;
+  g.player.puppet = null; // off the ladder the shot before climbed (its end would put the hero back on the castle)
+  g.player.walker.place(w.x, w.z, w.y);
+  g.player.walker.yaw = Math.atan2(-(f.x - w.x), -(f.z - w.z));
+  g.player.heroCam.yaw = g.player.walker.yaw;
+  g.player.heroCam.pitch = -0.15;
+  g.player.heroCam.zoom = 3;
+}
+
 const SESSIONS = [
   // The title, then New game: the dive lands by the hero and the creator opens (one load for both).
   { id: 'title', query: `title&day=0${gl ? '&gl' : ''}`, first: async (page) => {
@@ -193,6 +220,10 @@ const SESSIONS = [
   { id: 'land', query: `${still}&hour=10&weather=fair&barrow`, shots: [
     { name: 'barrow' },
     { name: 'wild', act: meet('deer', 25) },
+    // S9: the giant crabs on a strand by the sea.
+    { name: 'sea-crabs', act: meet('crabs', 10) },
+    // S9: a shark out in deep water, the hero swimming near it.
+    { name: 'sea-shark', act: meet('sharks', 8) },
     { name: 'fight', act: async (p) => { await meet('wolves', 12)(p); await p.waitForTimeout(1500); await p.keyboard.press('Tab'); await p.keyboard.press('Digit1'); } },
     // Gate C: a fight with magic. The hero learns a spell a fresh hero may cast (the debug menu's way),
     // picks a wolf and casts; the picture is taken once the spell shows.
@@ -271,12 +302,101 @@ const SESSIONS = [
     { name: 'sea-waterline', act: seaLook({ out: -6, level: 0, back: true, pitch: 0 }) },
     { name: 'sea-swim', act: seaLook({ swim: true, pitch: 0.1 }) },
   ] },
+  // S8: a sea cave's mouth by the shore, then inside: under the water of its drowned storey, and at the surface of
+  // the lake chamber over it, the hero swimming there.
+  { id: 'sea-cave', query: `${still}&hour=11&weather=fair&seacave`, shots: [
+    { name: 'sea-cave-mouth', act: (p) => p.evaluate(() => {
+      const g = window.game, s = g.log.find((x) => x.kind === 'dungeon' && x.template === 'sea-cave')?.site;
+      if (!s) return;
+      const a = s.yaw + 0.35, x = s.x + Math.sin(a) * 16, z = s.z + Math.cos(a) * 16;
+      g.player.teleport(x, undefined, z, a); g.player.heroCam.yaw = a + 0.3; g.player.heroCam.pitch = 0.08;
+    }) },
+    { name: 'sea-cave-under', act: seaCaveLook('under') },
+    { name: 'sea-cave-lake', act: seaCaveLook('lake') },
+  ] },
+  // S8: a sunken ruin on the shore, the dunes over it; then inside, under the water of its drowned halls and at the
+  // surface of one, the hero swimming there.
+  { id: 'sunken-ruin', query: `${still}&hour=11&weather=fair&sunken`, shots: [
+    { name: 'sunken-ruin-mouth', act: (p) => p.evaluate(() => {
+      const g = window.game, s = g.log.find((x) => x.kind === 'dungeon' && x.template === 'sunken-ruin')?.site;
+      if (!s) return;
+      const a = s.yaw + 0.35, x = s.x + Math.sin(a) * 12, z = s.z + Math.cos(a) * 12;
+      g.player.teleport(x, undefined, z, a); g.player.heroCam.yaw = a + 0.3; g.player.heroCam.pitch = 0.08;
+    }) },
+    { name: 'sunken-ruin-under', act: seaCaveLook('under', 'sunken-ruin') },
+    { name: 'sunken-ruin-hall', act: seaCaveLook('lake', 'sunken-ruin') },
+  ] },
+  // S8: a wreck on the sea bed off the start town: the free camera under the water beside her, then from above at
+  // the surface, the hero swimming over her.
+  { id: 'sea-wreck', query: `${still}&hour=11&weather=fair&wreck`, shots: [
+    { name: 'sea-wreck-under', act: wreckLook('under') },
+    { name: 'sea-wreck-over', act: wreckLook('over') },
+  ] },
+  // S9: a situation by the sea: from the water's edge, a fisher clinging to their upturned boat out on the water,
+  // calling for help (the cry's bubble shows once the hero is near enough to see them).
+  { id: 'sea-castaway', query: `${still}&hour=11&weather=fair&castaway&wild=0`, shots: [
+    { name: 'sea-castaway', act: async (p) => { await p.waitForTimeout(2500); } },
+  ] },
+  // S9: a boat the sea threw up on a strand, broken on her side, her casks and sea chest in the wrack.
+  { id: 'sea-washed-up', query: `${still}&hour=11&weather=fair&washedup&wild=0`, shots: [
+    { name: 'sea-washed-up', act: async (p) => { await p.waitForTimeout(1500); } },
+  ] },
   // S2: a harbour town the VGM founded by a river's mouth. On its quay at late morning looking out over the piers,
   // then from out over the water back at the town, then the quay in the evening, its tavern lit.
   { id: 'sea-harbour', query: `${still}&hour=11&weather=fair&site=harbour`, shots: [
     { name: 'sea-harbour', act: seaLook({ pitch: 0.15 }) },
     { name: 'sea-harbour-aloft', act: seaLook({ out: 70, up: 16, side: 20, back: true, pitch: -8 }) },
     { name: 'sea-harbour-evening', act: async (p) => { await turn(17.8, 'fair')(p); await seaLook({ out: 40, up: 6, back: true, pitch: -3 })(p); } },
+  ] },
+  // S10: a storm at sea from the deck of a ship held at her berth (the sea's swell high, the sky dark, rain).
+  { id: 'sea-storm', query: `${still}&hour=15&weather=storm&site=harbour&aboard`, shots: [
+    { name: 'sea-storm-deck', act: async (p) => {
+      await p.waitForFunction(() => window.game?.decks?.ship, null, { timeout: TIMEOUT });
+      await p.evaluate(() => { const pl = window.game.player; pl.flying = false; pl.heroCam.yaw = pl.walker.yaw + Math.PI / 2; pl.heroCam.pitch = -0.15; pl.heroCam.zoom = 4; });
+      await p.waitForTimeout(4000);
+    } },
+  ] },
+  // S3: aboard a ship at its berth (the hero on its main deck, looking to the bow), then from beside it at the pier:
+  // the gangplank up to its gangway, the hull on the swell.
+  { id: 'sea-deck', query: `${still}&hour=11&weather=fair&site=harbour&aboard`, shots: [
+    { name: 'sea-deck', act: async (p) => {
+      await p.waitForFunction(() => window.game?.decks?.ship, null, { timeout: TIMEOUT });
+      // The hero's own camera, from behind and above (the free camera lost the hero aboard).
+      await p.evaluate(() => { const pl = window.game.player; pl.flying = false; pl.heroCam.yaw = pl.walker.yaw; pl.heroCam.pitch = -0.4; pl.heroCam.zoom = 4; });
+      await p.waitForTimeout(2000);
+    } },
+    { name: 'sea-deck-plank', act: async (p) => {
+      await p.evaluate(() => {
+        const g = window.game, e = g.decks.plankOf(g.decks.ship);
+        if (!e) throw new Error('sea-deck-plank: no gangplank out');
+        const dx = e.foot.x - e.head.x, dz = e.foot.z - e.head.z, l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l;
+        // Along the pier from the plank's foot, a little out from the ship, looking across at its middle.
+        const x = e.foot.x + ux * 1.5 - uz * 5, z = e.foot.z + uz * 1.5 + ux * 5, mx = (e.foot.x + e.head.x) / 2, mz = (e.foot.z + e.head.z) / 2;
+        g.player.flying = true;
+        g.player.goTo([x, e.foot.y + 1.3, z], [(Math.atan2(mx - x, z - mz) * 180) / Math.PI, -8]);
+      });
+      await p.waitForTimeout(2000);
+    } },
+    // Up the forecastle's ladder, caught halfway (the hero's own camera, from behind on the main deck): stood at its
+    // foot to settle, then the climb started just before the picture.
+    { name: 'sea-climb', act: async (p) => {
+      await p.evaluate(() => {
+        const g = window.game, id = g.decks.ship, plan = g.decks.planOf(id), w = g.decks.worldOf(id, plan.fore.a0 - 1.6, plan.deckY + 0.05, 1.0);
+        g.player.flying = false;
+        g.player.walker.place(w.x, w.z, w.y);
+      });
+      await p.waitForFunction(() => window.game.shipClimbs.climbOffered === 'up', null, { timeout: 10000 });
+    },
+    last: async (p) => {
+      await p.evaluate(() => { const g = window.game, c = g.player.heroCam; g.shipClimbs.use(); c.yaw = g.player.walker.yaw + 0.5; c.pitch = -0.1; c.zoom = 4; });
+      await p.waitForTimeout(2600);
+    } },
+    // Down the companionway onto the lower deck, along the passage between the passengers' cabins.
+    { name: 'sea-hold', act: async (p) => { await p.evaluate(holdShot); await p.waitForTimeout(2500); } },
+    // In the captain's cabin under the sterncastle, from by its door: his table, his bunk, the stern windows.
+    { name: 'sea-cabin', act: async (p) => { await p.evaluate(cabinShot, 'aft'); await p.waitForTimeout(2500); } },
+    // In the forecastle: the galley stove, a berth, the crew's table.
+    { name: 'sea-galley', act: async (p) => { await p.evaluate(cabinShot, 'fore'); await p.waitForTimeout(2500); } },
   ] },
   // Gate C: what phase C gave the world, seen. A hurt traveller by the way (they cry out once seen), then a
   // farm the bandits raided: its barn burnt, smoke over it, its paddock empty.
@@ -306,7 +426,65 @@ const SESSIONS = [
 ];
 /** The sessions of each part (each part one run, under 5 min). */
 const TOWN_PART = new Set(['title', 'town', 'wet', 'inn', 'talk']), CAVE_PART = new Set(['cave', 'mesa']);
-const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : s.id.startsWith('sea-') ? 'sea' : 'land');
+// (The harbour and its ships are their own part: with the sea's they ran over 5 min.)
+const SHIP_PART = new Set(['sea-harbour', 'sea-storm', 'sea-deck']);
+const partOf = (s) => (TOWN_PART.has(s.id) ? 'town' : CAVE_PART.has(s.id) ? 'caves' : s.id.startsWith('kind-') ? 'kinds' : SHIP_PART.has(s.id) ? 'ships' : s.id.startsWith('sea-') ? 'sea' : 'land');
+
+/**
+ * Inside the first sea cave (S8; or another kind with a drowned storey, a sunken ruin), in its first drowned room: `under`, the free camera under the water 1.5 m over the
+ * floor, looking across the room to its far corner; `lake`, the hero swimming in the middle of the room, seen from the
+ * hero's camera at the surface of the water over it.
+ */
+function seaCaveLook(what, kind = 'sea-cave') {
+  return async (p) => {
+    const said = await p.evaluate(async ([what, kind]) => {
+      const g = window.game, d = g.log.find((x) => x.kind === 'dungeon' && x.template === kind);
+      const v = d && await g.cellars.build(d.id);
+      if (!v) throw new Error(`no ${kind}`);
+      const L = v.cellar.layout, { cell, storey } = L.scale, O = v.view.origin;
+      const r = L.rooms.find((q) => q.level * storey < L.flood);
+      if (!r) return `${kind}: nothing under water`;
+      if (!v.inside) await v.enter(true, r.id);
+      const x0 = O.x + r.x * cell, z0 = O.z + r.z * cell, W = r.w * cell, D = r.d * cell, floor = O.y + r.level * storey, top = O.y + L.flood;
+      const pl = g.player;
+      if (what === 'under') {
+        const cx = x0 + W * 0.2, cz = z0 + D * 0.25, cy = floor + 1.5, tx = x0 + W * 0.85, tz = z0 + D * 0.8, dx = tx - cx, dz = tz - cz;
+        pl.flying = true;
+        pl.goTo([cx, cy, cz], [(Math.atan2(dx, -dz) * 180) / Math.PI, (Math.atan2(floor + 1 - cy, Math.hypot(dx, dz)) * 180) / Math.PI]);
+      } else {
+        pl.flying = false;
+        pl.teleport(x0 + W / 2, top - 1, z0 + D / 2, Math.atan2(-1, -1));
+        pl.heroCam.pitch = 0.1;
+      }
+      return `${kind} ${d.id}: room ${r.id} ${W} x ${D} m, floor ${floor.toFixed(1)}, water ${top.toFixed(1)}, ${r.height * storey} m high`;
+    }, [what, kind]);
+    console.log(said);
+    await p.waitForTimeout(2500);
+  };
+}
+
+/** By the wreck the `wreck` start put off the start town (vgm/wrecks.ts): under the water beside her, or at the surface. */
+function wreckLook(what) {
+  return async (p) => {
+    const said = await p.evaluate((what) => {
+      const g = window.game, d = g.log.find((x) => x.kind === 'sight' && x.sea);
+      if (!d) return 'no wreck';
+      const pl = g.player, bed = g.terrain.height(d.x, d.z);
+      if (what === 'under') {
+        const cx = d.x + 13, cz = d.z + 7, cy = bed + 3;
+        pl.flying = true;
+        pl.goTo([cx, cy, cz], [(Math.atan2(d.x - cx, -(d.z - cz)) * 180) / Math.PI, -8]);
+      } else {
+        pl.flying = false;
+        pl.teleport(d.x + 14, undefined, d.z, Math.PI / 2);
+        pl.heroCam.pitch = -0.5;
+      }
+      return `wreck ${d.id} at ${d.x.toFixed(0)}, ${d.z.toFixed(0)}: bed ${bed.toFixed(1)}`;
+    }, what);
+    console.log(said);
+    await p.waitForTimeout(2500);
+  };
+}
 
 /**
  * The free camera in the start cave's highest cavern (cave-cavern went in): from its floor at eye height across it,
@@ -404,7 +582,7 @@ if (part === 'capital') {
 }
 if (!part) {
   let bad = false;
-  for (const p of ['town', 'land', 'caves', 'kinds', 'sea', 'capital']) {
+  for (const p of ['town', 'land', 'caves', 'kinds', 'sea', 'ships', 'capital']) {
     try { execFileSync(process.execPath, [fileURLToPath(import.meta.url), root, `--part=${p}`], { stdio: 'inherit' }); } catch { bad = true; }
   }
   process.exit(bad ? 1 : 0);

@@ -71,7 +71,7 @@ const EMPTY: Cell = { forms: [], relief: 0 };
 const CACHE = 4096;
 
 /** A smooth hump: 1 at t = 0 down to 0 at t = 1 (flat at both ends). */
-const bump = (t: number): number => (t >= 1 ? 0 : (1 - t * t) * (1 - t * t));
+export const bump = (t: number): number => (t >= 1 ? 0 : (1 - t * t) * (1 - t * t));
 
 export class Landforms {
   private readonly cells = new Map<number, Cell>();
@@ -86,9 +86,15 @@ export class Landforms {
   private free: readonly FormFree[] = [];
 
   /**
-   * `wet(x, z)`: whether a river runs near (no pond is kept there: the river's banks would spill it).
+   * `wet(x, z)`: whether a river runs near (no pond is kept there: the river's banks would spill it). `base(x, z)`: the
+   * land the landforms are laid on, as the water carved it (a brook's valley cuts tens of metres into the skeleton:
+   * a pond set from the skeleton there stood far above the valley floor); the skeleton where not given.
    */
-  constructor(seed: number, readonly world: WorldShape, readonly skeleton: Skeleton, private readonly wet: (x: number, z: number) => boolean = () => false) {
+  constructor(
+    seed: number, readonly world: WorldShape, readonly skeleton: Skeleton,
+    private readonly wet: (x: number, z: number) => boolean = () => false,
+    private readonly base: (x: number, z: number) => number = (x, z) => skeleton.elevation(x, z),
+  ) {
     this.seed = deriveSeed(seed, 'landforms');
     this.band = new Noise(deriveSeed(seed, 'landforms', 'band'));
     this.defs = world.landforms ?? [];
@@ -116,13 +122,18 @@ export class Landforms {
 
   /** A pond's water level at (x, z) (NaN where there is none). */
   pondAt(x: number, z: number): number {
+    return this.pondOf(x, z)?.pond ?? NaN;
+  }
+
+  /** The dell whose pond's water may lie at (x, z), null where none. */
+  pondOf(x: number, z: number): Landform | null {
     this.gatherNear(x, z);
     for (const f of this.near) {
       if (Number.isNaN(f.pond)) continue;
       const dx = x - f.x, dz = z - f.z;
-      if (dx * dx + dz * dz < f.L * f.L) return f.pond;
+      if (dx * dx + dz * dz < f.L * f.L) return f;
     }
-    return NaN;
+    return null;
   }
 
   /** The landforms whose centre lies within `r` metres of (x, z). */
@@ -192,7 +203,7 @@ export class Landforms {
     const all: Landform[] = [];
     for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) all.push(...this.placedCell(i + di, j + dj).forms);
     const landAt = (x: number, z: number) => {
-      let h = this.skeleton.elevation(x, z) + c.relief * this.bandAt(x, z);
+      let h = this.base(x, z) + c.relief * this.bandAt(x, z);
       for (const g of all) {
         const dx = x - g.x, dz = z - g.z;
         if (dx * dx + dz * dz < g.reach * g.reach) h += shapeAt(g, dx * g.ax + dz * g.az, dz * g.ax - dx * g.az);
@@ -301,7 +312,7 @@ export class Landforms {
    * most half way up from its floor. NaN if that leaves too little water.
    */
   private pondLevel(x: number, z: number, L: number, H: number, relief: number): number {
-    const landAt = (px: number, pz: number) => this.skeleton.elevation(px, pz) + relief * this.bandAt(px, pz);
+    const landAt = (px: number, pz: number) => this.base(px, pz) + relief * this.bandAt(px, pz);
     let rim = Infinity;
     for (let a = 0; a < 12; a++) rim = Math.min(rim, landAt(x + Math.cos((a * Math.PI) / 6) * L * 1.1, z + Math.sin((a * Math.PI) / 6) * L * 1.1));
     const floor = landAt(x, z) - H, level = Math.min(rim - 1.4, floor + H * 0.55);
@@ -317,7 +328,7 @@ export class Landforms {
 /** How far from its centre a landform shapes the land. */
 function reachOf(shape: LandformShape, L: number, W: number): number {
   switch (shape) {
-    case 'knoll': case 'tor': case 'dell': case 'sinkhole': return Math.hypot(L, W) * 1.15;
+    case 'knoll': case 'tor': case 'dell': case 'sinkhole': case 'cone': return Math.hypot(L, W) * 1.15;
     case 'scarp': return Math.hypot(L, W * 3 + L * 0.1);
     case 'bank': case 'sunkenLane': return Math.hypot(L, W * 2.2 + L * 0.08);
     case 'boulders': case 'erratic': return 0;
@@ -330,7 +341,7 @@ export function shapeAt(f: Landform, u: number, v: number): number {
   const { L, W, H } = f;
   const ph = (f.seed % 1000) / 159.2; // a phase from the seed, 0..2π
   switch (f.shape) {
-    case 'knoll': case 'tor': case 'dell': case 'sinkhole': {
+    case 'knoll': case 'tor': case 'dell': case 'sinkhole': case 'cone': {
       // Round, with a lobed outline so no two look turned out of one mould.
       // (Three lobes and two, from the direction's sine and cosine; each form lies turned its own way.)
       const d = Math.sqrt(u * u + v * v) || 1, c = u / d, sn = v / d;
@@ -339,6 +350,8 @@ export function shapeAt(f: Landform, u: number, v: number): number {
       // A tor's crown stands up steeply where the rock breaks through.
       if (f.shape === 'tor') return H * (0.55 * bump(r) + 0.45 * smoothstep(0.5, 0.22, r));
       // A dell is a dish; a sinkhole drops steeply to a narrow floor.
+      // A cinder cone: steep sides straight up to a rim, a crater bowl inside it (a quarter of the height deep).
+      if (f.shape === 'cone') return H * (clamp(1 - r, 0, 1) ** 0.8 - 0.5 * smoothstep(0.36, 0.02, r));
       if (f.shape === 'dell') return -H * bump(r);
       return -H * smoothstep(1, 0.35, r);
     }

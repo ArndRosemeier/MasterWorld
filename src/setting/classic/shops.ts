@@ -36,6 +36,13 @@ export const shops: readonly ShopDef[] = [
     buys: ['valuable'], purse: 1500, pays: 0.55, asks: 1.3, restock: 3,
     fine: { uncommon: 3, rare: 2, danger: 10 },
   },
+  // By the sea (S5): the herbalist on the quay brews for those who work the water, and for those who go under it.
+  {
+    keeper: 'herbalist', name: "The herbalist's", topic: 'What have you brewed?',
+    line: 'Salves for rope-burn, draughts for the fever, and for the divers a thing that lets you breathe the sea. Mind the dose.',
+    goods: [['minor-potion', 3], ['potion', 2], ['deep-draught', 3]],
+    buys: ['potion', 'food'], purse: 350, pays: 0.4, asks: 1.3, restock: 2,
+  },
   {
     keeper: 'innkeeper', name: 'The inn', topic: 'What is there to eat?',
     line: 'Bread from this morning, cheese, and a draught or two for the road. Game for the pot I always buy.',

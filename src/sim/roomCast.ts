@@ -49,7 +49,7 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
     const s = at(a);
     // Someone held for a talk in the room stays in it (holding shows them, as out of doors); someone stopped
     // out of doors on the way in stays out there with the hero.
-    return !!s && s.building === building && (a.held ? !!a.heldIn : inRoom(a, s));
+    return !!s && s.building === building && !a.woke && (a.held ? !!a.heldIn : inRoom(a, s));
   });
   const free = plan.spots.map((s, i) => ({ kind: s.kind, i })).filter((s) => s.kind !== 'sleep');
   const beds = plan.spots.map((s, i) => ({ kind: s.kind, i })).filter((s) => s.kind === 'sleep');
@@ -78,7 +78,8 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
     const ok = (k: InteriorSpotKind) => WORK.has(k) || (a.person.role === 'keeper' && k === 'pray');
     const i = take(ok, a);
     if (i >= 0) out.push({ agent: a, spot: i, act: actAt(i) });
-    else rest.push(a);
+    // No work spot here (the hedge witch's cottage): the first of the seats, before the household takes them all.
+    else rest.unshift(a);
   }
   for (const a of rest) {
     // The place they had, whatever kind of rest it is; else the likeliest free one.
@@ -87,10 +88,15 @@ export function roomCast(agents: readonly Agent[], spots: readonly { building: n
     if (i >= 0) out.push({ agent: a, spot: i, act: actAt(i) });
   }
   // Asleep at home: in bed, the one working there first (the hedge witch in her own bed), each in the bed they had.
-  const sleepers = agents.filter((a) => !a.held && a.act === 'sleep' && !!at(a)?.door && at(a)!.building === building)
-    .sort((x, y) => Number(y.person.work === building) - Number(x.person.work === building) || x.person.id - y.person.id);
-  const abed = (a: Agent, k: number) => { out.push({ agent: a, spot: beds[k].i, act: 'sleep' }); beds.splice(k, 1); };
-  const newcomers = sleepers.filter((a) => { const k = beds.findIndex((s) => s.i === kept?.get(a)); if (k >= 0) abed(a, k); return k < 0; });
+  // One woken for a talk stands by the bed (act 'chat' on its spot: roomFlow puts them beside it), and it stays theirs.
+  const sleepers = agents.filter((a) => (a.held ? !!a.woke : a.act === 'sleep') && !!at(a)?.door && at(a)!.building === building)
+    .sort((x, y) => Number(!!y.woke) - Number(!!x.woke) || Number(y.person.work === building) - Number(x.person.work === building) || x.person.id - y.person.id);
+  const abed = (a: Agent, k: number) => { out.push({ agent: a, spot: beds[k].i, act: a.woke ? 'chat' : 'sleep' }); beds.splice(k, 1); };
+  // The worker of the house first to the bed they had, then the rest to theirs, then any left.
+  const mine = (a: Agent) => beds.findIndex((s) => s.i === kept?.get(a));
+  const first = sleepers.filter((a) => a.woke || a.person.work === building), others = sleepers.filter((a) => !first.includes(a));
+  for (const a of first) if (beds.length) abed(a, Math.max(0, mine(a)));
+  const newcomers = others.filter((a) => { const k = mine(a); if (k >= 0) abed(a, k); return k < 0; });
   for (const a of newcomers) if (beds.length) abed(a, 0);
   return out.sort((x, y) => x.agent.person.id - y.agent.person.id);
 }

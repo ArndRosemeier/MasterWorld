@@ -13,6 +13,7 @@ import { CAVE_ROCK, defineKind, kindMesh } from '../materials';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 import { townTextures } from './townGround';
 import { WEATHER } from './weather';
+import { floatsOf, sphereOf, type ReadyMesh } from '../../world/townMesh';
 
 /**
  * Lit windows after dusk (sky.ts sets them): `glow` 0 by day .. 1 at night, `share` of the rooms with a
@@ -64,48 +65,21 @@ export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat
 });
 
 /** A building-format mesh's geometry: position, normal and tint, and its uv and material if `full`. */
-function buildingGeometry(m: BuildingMesh, full: boolean): BufferGeometry {
-  const g = new BufferGeometry();
+/** (Made ready in a worker, world/townMesh.ts `readyMesh`: its floats and sphere are taken as they are.) */
+function buildingGeometry(m: BuildingMesh | ReadyMesh, full: boolean): BufferGeometry {
+  const g = new BufferGeometry(), ready = (m as Partial<ReadyMesh>).tintF ? (m as ReadyMesh) : null;
   g.setAttribute('position', new BufferAttribute(m.position, 3));
   g.setAttribute('normal', new BufferAttribute(m.normal, 3));
   if (full) {
     g.setAttribute('uv', new BufferAttribute(m.uv, 2));
     // Floats: WebGPU has no 1- or 3-byte vertex formats.
-    g.setAttribute('mat', new BufferAttribute(floats(m.mat, 1), 1));
+    g.setAttribute('mat', new BufferAttribute(ready?.matF ?? floatsOf(m.mat, 1), 1));
   }
-  g.setAttribute('tint', new BufferAttribute(floats(m.tint, 1 / 255), 3));
+  g.setAttribute('tint', new BufferAttribute(ready?.tintF ?? floatsOf(m.tint, 1 / 255), 3));
   g.setIndex(new BufferAttribute(m.index, 1));
-  g.boundingSphere = sphereOf(m.position);
+  const [x, y, z, r] = ready?.sphere ?? sphereOf(m.position);
+  g.boundingSphere = new Sphere(new Vector3(x, y, z), r);
   return g;
-}
-
-/**
- * The sphere round flat x, y, z positions, as three's `computeBoundingSphere` makes it (the box's middle, out to the
- * farthest point), in plain loops: three's goes through a vector per vertex, garbage by the megabyte per town.
- */
-function sphereOf(p: ArrayLike<number>): Sphere {
-  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
-  for (let i = 0; i + 2 < p.length; i += 3) {
-    const x = p[i], y = p[i + 1], z = p[i + 2];
-    if (x < x0) x0 = x; if (x > x1) x1 = x;
-    if (y < y0) y0 = y; if (y > y1) y1 = y;
-    if (z < z0) z0 = z; if (z > z1) z1 = z;
-  }
-  if (x0 > x1) return new Sphere(new Vector3(), -1);
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
-  let r2 = 0;
-  for (let i = 0; i + 2 < p.length; i += 3) {
-    const dx = p[i] - cx, dy = p[i + 1] - cy, dz = p[i + 2] - cz, d = dx * dx + dy * dy + dz * dz;
-    if (d > r2) r2 = d;
-  }
-  return new Sphere(new Vector3(cx, cy, cz), Math.sqrt(r2));
-}
-
-/** Bytes as floats times `k`, in a plain loop (`Float32Array.from` with a map boxed every value: garbage by the megabyte per town). */
-function floats(src: ArrayLike<number>, k: number): Float32Array {
-  const out = new Float32Array(src.length);
-  for (let i = 0; i < src.length; i++) out[i] = src[i] * k;
-  return out;
 }
 
 /** A natural cave's rock (world/dungeon/caveRock.ts, building format) with the cave rock shader, at (x, y, z). */
@@ -116,7 +90,7 @@ export function caveRockMeshAt(m: BuildingMesh, x: number, y: number, z: number)
 }
 
 /** A mesh in the building format (@futuremagic/settlement) as a three mesh with the building shader, at (x, y, z). */
-export function buildingMeshAt(m: BuildingMesh, x: number, y: number, z: number, name: string, yaw = 0): Mesh {
+export function buildingMeshAt(m: BuildingMesh | ReadyMesh, x: number, y: number, z: number, name: string, yaw = 0): Mesh {
   const mesh = kindMesh(buildingGeometry(m, true), BUILDING, x, y, z);
   // Turned about +y (a barrow, a hold's gate); its matrix is fixed, so it is set here, once.
   mesh.rotation.y = yaw;

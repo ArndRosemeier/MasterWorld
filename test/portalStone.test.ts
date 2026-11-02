@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { beyondFrame, cleanStoneSave, hasRoom, homeFrame, NEAR_HOME, PortalStone, STONE_PORTAL, STONE_SHAPE, stoneShape, stoneSpot, type RoomProbe } from '../src/game/portalStone';
+import { beyondFrame, cleanStoneSave, hasRoom, homeFrame, imprintSpawn, NEAR_HOME, PortalStone, STONE_PORTAL, STONE_SHAPE, stoneShape, stoneSpot, type RoomProbe } from '../src/game/portalStone';
 import { passesThrough, stepPoint, toFrame } from '../src/game/portal';
 import { classic as setting } from '../src/setting/classic/index';
 import { Character } from '../src/game/character';
@@ -98,6 +98,21 @@ test('the stone is kept in the save, and a broken save marks nothing', () => {
   assert.deepEqual(back.portal, st.portal);
   assert.deepEqual(cleanStoneSave({ home: { x: 'a' }, far: { x: 1, y: 1, z: 1, yaw: 0 } }), { home: null, far: null, homeRealm: 'land', farRealm: 'land', size: 1 });
   assert.deepEqual(cleanStoneSave(undefined), { home: null, far: null, homeRealm: 'land', farRealm: 'land', size: 1 });
+});
+
+test('a stone with no home is imprinted with the spawn; a marked one is left alone', () => {
+  const spawn = { x: 5, y: 2, z: 7, yaw: 0.3 };
+  const fresh = new PortalStone(imprintSpawn(cleanStoneSave(undefined), spawn));
+  assert.deepEqual(fresh.home, { realm: 'land', frame: spawn });
+  assert.equal(fresh.portal, null, 'imprinted, but nothing open yet');
+  // From the spawn, a portal opened elsewhere leads back to it.
+  const far = beyondFrame({ x: 300, y: 12, z: 0 }, 0, floor);
+  assert.ok(fresh.canOpen(far, flat));
+  assert.deepEqual(fresh.open(far)?.portal.a.frame, spawn);
+  // A marked home stays (here, below ground), and the imprint survives a save.
+  const marked = { home: { x: 1, y: 2, z: 3, yaw: 0 }, far: null, homeRealm: 'cave-3', farRealm: 'land', size: 1 };
+  assert.deepEqual(imprintSpawn(marked, spawn), marked);
+  assert.deepEqual(new PortalStone(JSON.parse(JSON.stringify(fresh.kept()))).home, fresh.home);
 });
 
 test('every new hero carries a portal stone', () => {

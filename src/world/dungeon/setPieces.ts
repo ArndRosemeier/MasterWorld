@@ -36,6 +36,11 @@ export interface SetPieceDef {
   readonly troubles?: readonly string[];
   /** Needs a storey below (an older layer). */
   readonly older?: boolean;
+  /**
+   * Its drop or grate holds the rooms of a built place where they are (the goal on the lowest storey, often): not in
+   * a kind with a drowned storey (S8). A cave's drops lie between its upper storeys and leave the water be.
+   */
+  readonly holds?: boolean;
   /** Main cycle patterns that make room for it. */
   readonly main?: readonly string[];
   /** Patterns to favour for the inserted cycles. */
@@ -61,6 +66,7 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     troubles: ['collapse'],
     older: true,
     main: ['drop-in'],
+    holds: true,
     find: (g) => g.links.find((l) => l.kind === 'drop') ?? null,
     use: { id: 'collapse', room: (_g, l) => l.a },
     dress({ link, put, clue }) {
@@ -105,6 +111,7 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     about: 'Through the bars of an old grating the lair is seen long before it is reached: what lives there, and what it has gathered.',
     main: ['seen-goal', 'gallery'],
     prefer: ['seen-key'],
+    holds: true,
     find: (g) => g.links.find((l) => l.kind === 'grate' && (l.a === g.goal || l.b === g.goal)) ?? null,
     dress({ link, graph, dweller, put, clue }) {
       const near = other(link, graph.goal);
@@ -314,6 +321,7 @@ export const SET_PIECES: readonly SetPieceDef[] = [
     about: 'The floor of an upper room burned through into the hall beneath; from its charred edge the hall is in sight, and the way back up goes round.',
     main: ['drop-in'],
     prefer: ['gallery', 'split-descent'],
+    holds: true,
     find: (g) => g.links.find((l) => l.kind === 'drop') ?? null,
     use: { id: 'collapse', era: 'trouble', room: (_g, l) => l.a },
     dress({ link, trouble, put, clue }) {
@@ -365,8 +373,8 @@ export const SET_PIECES: readonly SetPieceDef[] = [
 ];
 
 /** The set pieces of a kind of dungeon (and of the kinds it borrows from, `DungeonForm.pieces`). */
-export function setPiecesFor(kind: DungeonTemplate, also: readonly string[] = []): readonly SetPieceDef[] {
-  return SET_PIECES.filter((p) => !p.kinds || p.kinds.includes(kind) || also.some((k) => p.kinds!.includes(k)));
+export function setPiecesFor(kind: DungeonTemplate, also: readonly string[] = [], flooded = false): readonly SetPieceDef[] {
+  return SET_PIECES.filter((p) => (!p.kinds || p.kinds.includes(kind) || also.some((k) => p.kinds!.includes(k))) && !(flooded && p.holds));
 }
 
 export function setPieceById(id: string): SetPieceDef {

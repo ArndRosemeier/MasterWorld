@@ -7,15 +7,15 @@ import { hitChance, strike, threatOf } from '../src/sim/combat';
 import { Character } from '../src/game/character';
 import { coinText, rarityOdds, rollItem, rollLoot } from '../src/game/items';
 import { fightBot } from '../src/game/bot';
-import { outlineCellar, CELL, type Cellar } from '../src/world/dungeon/cellar';
+import { CELL, type Cellar } from '../src/world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../src/world/dungeon/treasure';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { DungeonSpace } from '../src/world/dungeon/space';
 import { DungeonNav, navKey } from '../src/sim/dungeonNav';
 import { Den, type Quarry } from '../src/sim/creatures';
 import { Delve } from '../src/game/delve';
+import { testCellars } from './testCellars';
 
-const cellars: Cellar[] = Array.from({ length: 24 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar));
+const cellars: Cellar[] = testCellars(24);
 const openSpace = (c: Cellar) => { const s = new DungeonSpace(c.layout); for (const pl of c.layout.links) s.open.add(pl.link.id); return s; };
 const away: Quarry = { x: 1e4, y: 0, z: 1e4, noise: 0, light: 0, alive: true, guard: { defence: 10, armour: 0 } };
 
@@ -271,4 +271,27 @@ test('fight: struck with no target, the hero targets whoever struck; a target al
   assert.equal(fresh.target, fresh.by);
   const kept = run(true);
   if (kept?.other && kept.by !== kept.other) assert.equal(kept.target, kept.other);
+});
+
+test('fight: when the target falls, the nearest still fighting the hero is the target (the swinging goes on); with none, no target', () => {
+  const c = cellars.find((x) => x.dweller.id === 'rats') ?? cellars[0];
+  const hero = new Character(classic);
+  hero.health = hero.maxHealth * 50;
+  const d = new Delve(c, openSpace(c), classic, hero, 4);
+  const [first, second, third] = d.den.creatures;
+  assert.ok(second && third, 'a pack');
+  const pose = { x: first.x, y: first.y, z: first.z, yaw: 0, speed: 0 };
+  for (const o of d.den.creatures) o.state = 'fight';
+  d.fight.pick(first);
+  d.fight.attacking = true;
+  first.state = 'dead'; first.health = 0;
+  d.step(0.02, pose);
+  const next = d.fight.target;
+  assert.ok(next && next !== first && d.den.fighting.includes(next), 'the next fighter is the target');
+  assert.equal(d.fight.attacking, true);
+  // All fighters gone: no target, no swinging.
+  for (const o of d.den.creatures) { o.state = 'dead'; o.health = 0; }
+  d.step(0.02, pose);
+  assert.equal(d.fight.target, null);
+  assert.equal(d.fight.attacking, false);
 });

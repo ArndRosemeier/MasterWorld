@@ -12,20 +12,22 @@ import { atDoor, placesFor } from './app/places';
 import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
 import { Portals } from './app/portals';
-import { CAVE_LANTERN } from './app/cellarVisit';
+import { CAVE_LANTERN, TORCH_DUSK, TORCH_LIGHT_OUT, TORCH_LIGHT_UP, TORCH_NIGHT } from './app/cellarVisit';
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
 import { PortalStoneUse } from './app/portalStoneUse';
-import { cleanStoneSave } from './game/portalStone';
+import { cleanStoneSave, imprintSpawn } from './game/portalStone';
 import { SettingsStore } from './app/settings';
 import type { WalkWorld } from './game/walker';
 import { Trunks } from './world/trunks';
 import { nearestCoast } from './world/coast';
+import { nearestFirst } from './world/spiral';
 import { UNDER_LENS, updateVeil } from './render/underwater';
 import { Rocks } from './world/rocks';
 import { RockView } from './render/rocks/RockView';
 import { woodsOf } from './world/flora';
 import { daylight } from './game/soundscape';
+import { Noticed, noticeable, type NoticeSpot } from './game/noticed';
 import { HeroView } from './render/hero/HeroView';
 import { preparePeople } from './render/hero/play';
 import { GiantView } from './render/giant/GiantView';
@@ -38,12 +40,12 @@ import { PoultryView } from './render/livestock/PoultryView';
 import { Steed, groundPace, horseSpots } from './game/horse';
 import { buildingOf } from './sim/people';
 import type { Agent, TownOrder } from './sim/townLife';
-import { createView } from './render/view';
+import { LANTERN_COLOR, createView } from './render/view';
 import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
 import { ROOT_LEVEL, chunkSize } from './render/terrain/lod';
 import { VolumeView } from './render/terrain/VolumeView';
-import { TerrainJobs, WorldJobs, createTerrainPool, createTexturePool, createWorldPool } from './workers/pool';
+import { TerrainJobs, WorldJobs, createCavePool, createTerrainPool, createTexturePool, createWorldPool, type CavePool } from './workers/pool';
 import { WaterView } from './render/water/WaterView';
 import { FloraView } from './render/flora/FloraView';
 import { GrassView } from './render/grass/GrassView';
@@ -51,10 +53,11 @@ import { useWaterEnvironment } from './render/materials/water';
 import { loadGroundTextures, loadTownTextures } from './render/terrain/groundTextures';
 import { useTownMasks, useTownTextures } from './render/materials/townGround';
 import { WINDOWS } from './render/materials/building';
+import { TORCHLIGHT, flameFlicker } from './render/warmLights';
 import { GROUND_DIP, useGroundTextures } from './render/materials';
 import { settingById } from './setting/index';
-import { distSqPointSeg } from '@futuremagic/settlement';
-import { abilityOf, validateSetting, type BackgroundDef, type GrowthSource, type SituationKind } from './setting/contract';
+import { distSqPointSeg, harbourMoorings } from '@futuremagic/settlement';
+import { abilityOf, validateSetting, type BackgroundDef, type GuildDef, type GrowthSource, type SightDef, type SituationKind } from './setting/contract';
 import { openWorld } from './vgm/builder';
 import { RoadWork } from './app/roads';
 import { townOrder } from './vgm/orders';
@@ -62,18 +65,22 @@ import { WEATHER_KINDS, Weather, type WeatherKind } from './world/weather';
 import { WeatherView } from './render/weather/WeatherView';
 import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
-import { firstDungeon, houseOf, placeOf, promisePlace, type LandKind } from './vgm/dungeons';
-import { questFor, questGuild } from './vgm/quests';
+import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
+import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
+import { favourFor, favourWhy } from './vgm/favours';
+import { askDefOf, askNamed, askOf, asEnded, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
 import { answerNeed, madeBy, vgmTurn, type Made } from './vgm/toolbox';
 import { cleanWhys, PACING, vgmLines, whyOf, WHY_KEPT, type VgmWhy } from './vgm/vgmLog';
 import { findIn, travellerFor } from './vgm/answers';
+import { offTheCoast, washedUpFor, wreckFor } from './vgm/wrecks';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
+import { NightWatch } from './vgm/watch';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
 import { Speech } from './app/speech';
-import { OwnerComes } from './app/ownerComes';
+import { OwnerComes, type OwnerHost } from './app/ownerComes';
 import { FAR } from './render/folk/FarFolk';
 /**
  * One of a place's household goes out to wait before its way in once the hero is this near (m: within the 400 m round
@@ -81,24 +88,36 @@ import { FAR } from './render/folk/FarFolk';
  * FAR); they go home once the hero is this far off.
  */
 const WAIT_FROM = 395, WAIT_UNSEEN = FAR + 10, WAIT_GONE = 600;
-import { burntBarns, criesDue, situationOf, smokesAt } from './vgm/situations';
+import { burntBarns, castawayFor, castawaysAt, criesDue, situationOf, smokesAt } from './vgm/situations';
 import { festivitiesOf, festivityOrder } from './vgm/festivities';
 import { SmokeView } from './render/smoke/SmokeView';
+import { VolcanoView } from './render/volcano/VolcanoView';
 import { Cellars } from './app/cellars';
 import { HatchClimb } from './app/hatchClimb';
+import { BunkSleep } from './app/bunkSleep';
+import { BreathHud } from './app/breathHud';
+import { Breath } from './game/breath';
+import { ShipClimb } from './app/shipClimb';
 import { UsePrompt } from './app/usePrompt';
+import { voyageArrived, voyagesIn } from './vgm/voyages';
 import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
+import { Fallen } from './app/fallen';
 import { WildLand } from './app/wildLand';
+import { TownDefence } from './app/townDefence';
+import type { Land } from './sim/wild';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
 import { ShipsView } from './render/ships';
+import { Castaways, ShipCrews } from './game/shipCrews';
+import { Decks } from './world/deck';
+import { seaPace, underWay } from './world/fleet';
 import type { Township } from './game/township';
 import { cap, type TownTalk } from './talk/townTalk';
 import { settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
-import { dungeonOf, type Decision, type DungeonDecision, type EventDecision, type RegionDecision, type RoadDecision, type RoadWay } from './world/decisions';
+import { dungeonOf, type CastawayDecision, type Decision, type DungeonDecision, type EventDecision, type RegionDecision, type RoadDecision, type RoadWay, type SightDecision } from './world/decisions';
 import { InteriorVisit } from './app/interiorVisit';
 import { HouseView } from './render/town/HouseView';
 import { lookFromDegrees } from './app/look';
@@ -123,19 +142,23 @@ import { HandOverScene } from './app/handOverScene';
 import { MapSheet } from './render/hero/MapSheet';
 import { HOME_SIGHT, KnownLand } from './game/knownLand';
 import { Minimap, type SkyGlyph } from './app/minimap';
-import { belowRange, paintBelow } from './app/dungeonSheet';
+import { belowRange, paintBelow, paintFormed } from './app/dungeonSheet';
+import type { DungeonSeen } from './game/dungeonMap';
+import { STOREY } from './game/formedMap';
 import { fill } from './talk/folk';
 import { Journal } from './talk/journal';
 import { AUTOSAVE, SavesUi, latestSave, loadAtRestart, pendingLoad, saveNow, type SavesHost } from './app/savesUi';
 import { ROGUE_SLOT, SAVE_VERSION, heirSave, remainsEntry, saveLabel, startMoved, townSaves, type SaveData } from './app/saveGame';
 import { release } from './app/release';
 import { CLIMB_COST, Character, fallHurt } from './game/character';
+import { inLava, lavaBurn } from './game/heat';
 import { itemWorth } from './game/trade';
-import { bardTells, GuildBook, questGift, teacherOf, whereOf } from './game/guilds';
-import { CHEER, LevelWatch } from './app/levelUp';
+import { bardTells, GuildBook, harbourHall, questGift, teacherOf, whereOf } from './game/guilds';
+import { CHEER, DRINK, LevelWatch } from './app/levelUp';
 import { carryRenown } from './game/growth';
-import { coinText, uniqueItem } from './game/items';
-import { epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
+import { coinText, findDef, uniqueItem } from './game/items';
+import { washedUpChest } from './world/sites';
+import { GATHER_REACH, epitaph, fallClassic, fallRoguelike, gather, remainsId, remainsNear, type FallPlace, type GameMode, type Remains } from './game/death';
 import { TalesEnd } from './app/talesEnd';
 import { RemainsView } from './render/remainsView';
 import { SearchKneel } from './app/searchKneel';
@@ -147,17 +170,19 @@ import { ActionBarUi } from './app/actionBarUi';
 import { AbilityBook } from './app/abilityBook';
 import { POTION, REST } from './game/actionBar';
 import { Rest, type RestWatch } from './game/rest';
-import { BirdForm } from './app/birdForm';
+import { BirdKit, OtterKit, ShapeForm, shapesFrame } from './app/shapeForm';
 import { Alone, blowOf, Recipes, shapeOf, type RecipeEvent } from './game/recipe';
+import { shapeBars } from './game/birdForm';
 import { SpellView } from './app/spellView';
 import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { Retreats } from './app/retreats';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
+import { stanceFor } from './vgm/stance';
 import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
-import { GroundCache } from './world/groundCache';
+import { DrawnGround, drawnSource } from './world/drawnGround';
 import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
 
@@ -247,6 +272,8 @@ export async function start(b: Boot): Promise<void> {
     // Roads decided while the last game was played level the land from the start.
     terrain.settleMore(later);
     const weather = new Weather(seed, setting.world.weather, (x, z) => terrain.skeleton.sample(x, z));
+    /** The harbour master's look at the sky (S10), kept for reuse. */
+    const seaSky = weather.state(0, 0, 0);
     const hour = title && !params.hourSet ? title.draw.hour : params.hour;
     if (params.weather) {
       if (!WEATHER_KINDS.includes(params.weather as WeatherKind)) throw new Error(`?weather=${params.weather}: one of ${WEATHER_KINDS.join(', ')}`);
@@ -293,20 +320,34 @@ export async function start(b: Boot): Promise<void> {
     };
     // Bridges where roads cross brooks, round the hero: their decks are floors.
     const bridgeView = new BridgeView(view.stage, terrain);
+    // The decks of the ships near the hero (S3): floors and walls that move with the waves, carrying the hero on them.
+    const decks = new Decks(() => player.walker.pos);
+    // Their crews at work (S3): drawn with the townsfolk, carried with their vessels, solid as everyone is.
+    const crews = new ShipCrews(seed);
+    // A fisher whose boat went over (S9, a castaway): drawn with the townsfolk, solid as everyone is.
+    const castaways = new Castaways(seed);
+    // A pier's deck or a bridge's high over the feet (a swimmer under it) is not under them: never lifted onto it.
+    const overhead = (f: number | null, y: number | undefined): number | null => (f !== null && y !== undefined && f > y + 1.6 ? null : f);
+    // The ground as drawn near the camera: the hero and everything with feet stand on it, never in relief the mesh steps over.
+    const drawn = new DrawnGround(drawnSource(terrain));
     // The land as walked (also from below, through a cave's portal: the camera trailing out into the day).
     const landWorld: WalkWorld = {
       // In a cave mouth's throat its own floor (it runs under the land's ground, which the crag carves).
-      height: (x, z) => cellars?.floor(x, z) ?? terrain.height(x, z),
+      height: (x, z) => cellars?.floor(x, z) ?? drawn.footing(x, z),
       // Also the steps and porches before the doors (as floors: climbed a step at a time), and a cave's throat.
-      floor: (x, z) => towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null,
+      floor: (x, z, y) => decks.underfoot(x, z, y) ?? overhead(towns?.stand(x, z) ?? bridgeView.deck(x, z) ?? cellars?.floor(x, z) ?? null, y),
       // A cave mouth's throat is open where the land's own rock is not carved (the crag carves it).
       rockSurface: (x, y, z) => (cellars?.throatAir(x, y, z) ? null : surfaceAt(x, y, z, false)),
       // In a building the camera stays in the room (its doorway shut to it).
       // Out of doors also a stall's awning, a well's roof (the talk view stood on an awning).
       sightSurface: (x, y, z) => {
         if (cellars?.throatAir(x, y, z)) return null;
+        // A cave's crag, a barrow's mound, a tower's walls: the camera swung round with the mouse stays out of them.
+        if (cellars?.inPiece(x, y, z, 0.2)) return -1;
         const s = surfaceAt(x, y, z, !!rooms?.inside), f = rooms?.inside ? null : towns?.fixtureSight(x, y, z) ?? null;
-        return s === null ? f : f === null ? s : Math.min(s, f);
+        // A ship's cabins and lower deck keep the camera in them; out on deck, out of its hull and castles.
+        const d = decks.sight(x, y, z);
+        return [s, f, d].reduce<number | null>((m, v) => (v === null ? m : m === null ? v : Math.min(m, v)), null);
       },
       // The surface as drawn, waves and all: a swimmer rides the swell.
       waterLevel: (x, z) => water?.surfaceAt(x, z) ?? null,
@@ -317,16 +358,16 @@ export async function start(b: Boot): Promise<void> {
         // Within the open building its walls and the furniture of the storey one is on; elsewhere the town.
         const h = openHouse(), inHouse = h?.wallAt(x, z, r, y) ?? null;
         if (inHouse !== null) return inHouse;
-        return !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
+        return decks.hull(x, z, r, y ?? player.walker.pos.y) || crews.inCrew(x, z, r, y ?? player.walker.pos.y) || castaways.inBody(x, z, r) || !!towns?.solid(x, z, r, h ? rooms?.opened : null) || !!towns?.fixtureAt(x, z, r, y ?? player.walker.pos.y) || bridgeView.side(x, z, r, y) || trunks.blocks(x, z, r) || rocks.blocks(x, z, r, y) || !!cellars?.solid(x, z, r) || !!regionSites?.standsIn(x, z, r) || !!hold?.solid(x, z, r) || !!retreats?.inKeep(x, z, r) || !!towns?.touches(x, z, r, player.walker.pos.x, player.walker.pos.z);
       },
     };
     // Down in a cellar the walker walks its space, else the land.
     const world: WalkWorld = {
       height: (x, z) => below()?.height(x, z) ?? landWorld.height(x, z),
-      floor: (x, z) => (below() ? null : landWorld.floor!(x, z)),
+      floor: (x, z, y) => (below() ? null : landWorld.floor!(x, z, y)),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : landWorld.rockSurface(x, y, z); },
       sightSurface: (x, y, z) => { const b = below(); return b ? (b.sightSurface ?? b.rockSurface)(x, y, z) : landWorld.sightSurface!(x, y, z); },
-      waterLevel: (x, z) => (below() ? null : landWorld.waterLevel(x, z)),
+      waterLevel: (x, z) => { const b = below(); return b ? b.waterLevel(x, z) : landWorld.waterLevel(x, z); },
       climbable: (x, z) => (below() ? null : landWorld.climbable!(x, z)),
       // Down in a cave its rock walls (D56, P1): a drop is climbed back up, not jumped.
       rockHolds: () => !!below()?.rockHolds?.(),
@@ -337,6 +378,8 @@ export async function start(b: Boot): Promise<void> {
     let bodiesBlock: NonNullable<WalkWorld['bodies']> = () => false;
     const player = new Player(view.camera, canvas, world, params.fly);
     player.goTo(params.pos ?? (resume ? [resume.x, resume.z] : [home.x, home.z]), params.look);
+    // Which way the hero faced at the start (the portal stone's first home faces so).
+    const spawn = { x: home.x, y: player.walker.support(home.x, home.z, 1e5), z: home.z, yaw: player.walker.yaw };
     // The floating origin starts where the camera does (everything drawn is relative to it: render/origin.ts).
     if (params.origin) ORIGIN.moveTo(view.camera.position.x, view.camera.position.z);
     // Off (`origin=0`, or from the debug console: game.followOrigin) the origin stays where it is.
@@ -402,6 +445,7 @@ export async function start(b: Boot): Promise<void> {
 
     const wx = new WeatherView(weather, (x, z) => terrain.height(x, z));
     const hours = () => view.sky.day * 24 + view.sky.hour;
+    const setClock = (h: number) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; };
     wx.apply(0, view.camera.position, hours(), view.sky);
     view.sky.update(0, view.camera);
     // The shaders build from the moment their parts exist (plan A7): the GPU compiles them while the seas, the
@@ -431,6 +475,8 @@ export async function start(b: Boot): Promise<void> {
     };
     // Smoke over a raided farm (C10): one shader, built once the game is playable (warmLater).
     const smoke = new SmokeView(deriveSeed(seed, 'smoke'));
+    // The active volcanoes (K7d): lava, sulphur and steam, built when one comes in sight, its late shaders once the game is playable.
+    const volcanoes = new VolcanoView(terrain, view.stage, deriveSeed(seed, 'volcanoes'));
     compileEarly([wx.precip]);
     loading.set('Filling the seas');
     useWaterEnvironment(view.sky.envTexture);
@@ -473,7 +519,19 @@ export async function start(b: Boot): Promise<void> {
     const sea = new WaterView(seed, (x0, z0, side, res) => terrainJobs.water(x0, z0, side, res));
     water = sea;
     // The harbours' ships and boats, riding the swell and out fishing by day (S2).
-    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z) });
+    const handL = new Vector3(), handR = new Vector3();
+    // (The voyages in the log, read again only when the log has changed.)
+    let voyages: { log: readonly Decision[] | null; list: ReturnType<typeof voyagesIn> } = { log: null, list: [] };
+    let shipClock = -1;
+    // The wrecks on the sea bed (S8) and the boats washed up on the strands (S9): the log's sea and strand sights,
+    // looked up again only when the log has changed.
+    const sightsWhere = (which: 'sea' | 'strand') => {
+      let kept: { log: readonly Decision[]; list: SightDecision[] } = { log: [], list: [] };
+      return () => (kept.log === log ? kept.list : (kept = { log, list: log.filter((d): d is SightDecision => d.kind === 'sight' && !!d[which]) }).list);
+    };
+    const wrecksNow = sightsWhere('sea'), beachedNow = sightsWhere('strand');
+    const voyagesNow = () => (voyages.log === log ? voyages.list : (voyages = { log, list: voyagesIn(log) }).list);
+    const ships = new ShipsView({ stage: view.stage, harbours: () => terrain.towns, surface: (x, z) => sea.surfaceAt(x, z), water: (x, z) => terrain.waterDepth(x, z), decks, voyages: voyagesNow, wrecks: () => wrecksNow(), capsized: () => { const h = hours(); return log.filter((d): d is CastawayDecision => d.kind === 'castaway' && h >= d.at && h < d.until); }, beached: () => beachedNow(), ground: (x, z) => terrain.height(x, z) });
     // Its shader first of all: its pipeline is the slowest to build (over 5 s on the reference PC), and built in the
     // kinds' warm-up it started late and held 'Preparing shaders' for seconds after everything else was done.
     compileEarly([sea.mesh]);
@@ -542,6 +600,11 @@ export async function start(b: Boot): Promise<void> {
     let playing = !title && !((params.create && !save) || save?.heir);
     // The VGM's decisions so far (the towns' orders among them: each town's people follow theirs, game/township.ts).
     let log: readonly Decision[] = [...opened.log, ...later];
+    // `ask=`: what the households of the first places ask (D62), for looking at it.
+    const looked = params.ask && !save ? askNamed(setting, params.ask) : null;
+    // A parley needs dwellers who talk: the first of its kinds moves in (their encounter is named as they are).
+    const talkers = askDefOf(setting, looked ?? undefined)?.dwellers?.[0];
+    if (looked) log = log.map((d) => (d.kind === 'dungeon' && !d.quest && !d.task ? { ...d, ask: looked, ...(talkers ? { dwellers: talkers } : {}) } : d));
     // `moved`: the first cellar was cleared long ago, and new dwellers have moved in since.
     const cleared = params.moved && start ? firstDungeon(log) : null;
     if (cleared && start && !keptOf(log).has(cleared.id)) {
@@ -568,6 +631,8 @@ export async function start(b: Boot): Promise<void> {
       if (!place) return;
       roading = roading.then(async () => {
         await towns?.found(d, view.camera.position);
+        // (An island's village has no road to the mainland: the ships are its way.)
+        if (place.isle) return;
         const road = await jobs.linkRoad(log.filter((x): x is RoadDecision => x.kind === 'road'), place, 'track', d.at);
         if (road && !log.some((x) => x.id === road.id)) { log = [...log, road]; await roadWork.lay(road); }
       }).catch((e: unknown) => console.warn('founding a settlement:', e));
@@ -577,16 +642,27 @@ export async function start(b: Boot): Promise<void> {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights, jobs: { frontier: (a) => jobs.frontier(a), site: (j) => terrainJobs.site(j) } }, log);
       for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
       // `site=<place or fill>`: walk out from the start until one opens, then stand before it (a harbour town: on
-      // its quay, facing the sea).
+      // its quay, facing the sea). `site=harbour` with a start town by the sea: its own quay.
       const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind || f.id === kind).map((f) => f.id));
-      for (let dir = 0; kind && dir < 8; dir++) {
-        const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: start?.decision ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
+      const onQuay = (id: string, quay: { x: number; z: number; dx: number; dz: number }): void => {
+        const back = params.siteAt ?? 4;
+        player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
+        // Aboard its first ship once the town stands: on the main deck abaft the mainmast (forward of it the cargo
+        // hatch stands open), looking along it to the bow.
+        if (params.aboard) void roading.then(() => {
+          const t = terrain.town(id), h = t?.plan.harbour, m = h && harbourMoorings(h, t.decision.seed ?? 0).find((x) => x.plan.kind === 'ship');
+          if (m) player.teleport(m.x - m.ux * 2, m.plan.deckY + 0.6, m.z - m.uz * 2, Math.atan2(-m.ux, -m.uz));
+        });
+      };
+      const home = start?.decision;
+      if (kind === 'harbour' && home?.harbour) onQuay(home.id, home.harbour);
+      else for (let dir = 0; kind && dir < 8; dir++) {
+        const walked = walkFrontier({ seed, log, terrain, regions: setting.regions, home: home ?? opened.home }, (dir * Math.PI) / 4, 8, (d) => ids.has(d.fill) && !!d.site);
         const found = walked.at(-1);
         if (!found?.site || !ids.has(found.fill)) continue;
         for (const d of walked) regionOpened(d);
         const s = found.site, d = s.r + (params.siteAt ?? (kind === 'capital' ? 60 : 14)); // a capital's wall stands out past its houses
-        const quay = s.harbour, back = params.siteAt ?? 4;
-        if (quay) player.teleport(quay.x - quay.dx * back, undefined, quay.z - quay.dz * back, Math.atan2(-quay.dx, -quay.dz));
+        if (s.harbour) onQuay(found.id, s.harbour);
         else player.teleport(s.x + Math.sin(s.yaw) * d, undefined, s.z + Math.cos(s.yaw) * d, s.yaw);
         break;
       }
@@ -596,6 +672,11 @@ export async function start(b: Boot): Promise<void> {
       log = [...log, townOrder(log, t.id, o)];
       t.obey(o);
     };
+    // `feast`: the start town holds a feast at its market now (for looking at it; the debug menu has it too).
+    if (params.feast && startTown) {
+      const [x, z] = startTown.town.plan.centre;
+      orderTown(startTown, { kind: 'gather', x, z, radius: 16, from: hours(), to: hours() + 3, mood: 'feast' });
+    }
     // Saddled horses waiting by the start (Actors' horse): the mount key gets on.
     let horses: HorseView | null = null;
     if (params.horses > 0) {
@@ -620,14 +701,12 @@ export async function start(b: Boot): Promise<void> {
     let stock: StockView | null = null;
     if (params.stock > 0) {
       loading.set('Turning out the herds');
-      stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => terrain.height(x, z));
+      stock = await StockView.pool(view.renderer, setting.world.livestock, params.stock, (x, z) => drawn.footing(x, z));
     }
-    // The ground under birds' and creatures' feet: off a fine grid of exact heights (the land's own is costly, asked every frame).
-    const feet = new GroundCache((x, z) => terrain.height(x, z), () => terrain.version);
     // Birds and squirrels about the land (plan 9.3): their squares are the trunks' cells.
     const woods = woodsOf(terrain);
     const small = setting.smallLife && params.small ? new SmallLife(seed, {
-      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
+      height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
       waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
       // The town's farmland and fields are open land whatever the woods round them.
       woods: (x, z) => (terrain.townGround(x, z) >= TownGround.Street ? 0 : woods(x, z)),
@@ -636,7 +715,7 @@ export async function start(b: Boot): Promise<void> {
     }, setting.smallLife) : null;
     const smallView = small ? new SmallLifeView(small, view.stage, view.renderer) : null;
     // The yards' hens (the private library's chicken and rooster): bodies for the nearest; none without the library.
-    const hens = params.hens > 0 && setting.world.poultry ? await PoultryView.pool(params.hens, Math.max(1, Math.round(params.hens / 5)), (x, z) => feet.footing(x, z)) : null;
+    const hens = params.hens > 0 && setting.world.poultry ? await PoultryView.pool(params.hens, Math.max(1, Math.round(params.hens / 5)), (x, z) => drawn.footing(x, z)) : null;
     if (hens) compileEarly(hens.toWarm());
     if (stock) compileEarly(stock.toWarm());
     if (smallView) compileEarly(smallView.toWarm());
@@ -703,6 +782,7 @@ export async function start(b: Boot): Promise<void> {
     const warmLater = async (): Promise<void> => {
       await view.stage.add(smoke.mesh);
       smokeIn = true;
+      await volcanoes.switchOn();
       await spellView.enter(view.stage);
     };
 
@@ -714,8 +794,16 @@ export async function start(b: Boot): Promise<void> {
     director.strict = save?.mode === 'roguelike';
     const fightHud = new FightHud(setting, () => settings.current.bindings);
     const journal = new Journal(save?.journal);
+    // A guild's task names its place now (D49): an unnamed task's page from a save of before closes.
+    for (const l of journal.open) if (l.id.startsWith('task:')) journal.fulfil(l.id);
     // The land the hero knows (plan 11.7): a new hero knows the town where the game begins; the rest is seen on the way or told of.
     const known = new KnownLand(save?.map);
+    // A formed cave's drips and streams in world metres, for its sounds (made once for each visit).
+    let caveHeard: { of: object; drips: [number, number, number][]; streams: [number, number, number][] } | null = null;
+    // The places the hero noticed on the land (D66, K9): the log's fixed places, kept while the log has not grown.
+    const noticed = new Noticed(save?.noticed);
+    let noticeFor = -1, noticeSpots: NoticeSpot[] = [], noticeClock = 0;
+    const noticeList = (): NoticeSpot[] => { if (log.length !== noticeFor) { noticeFor = log.length; noticeSpots = noticeable(log); } return noticeSpots; };
     if (!save?.map) known.see(home.x, home.z, HOME_SIGHT);
     let seenAt: [number, number] | null = null;
     // Every cellar the VGM promised under the town's houses: the first is built now, the others when the hero steps into the house above.
@@ -725,6 +813,7 @@ export async function start(b: Boot): Promise<void> {
     let quietPlace: ((id: string) => boolean) | null = null;
     /** A cellar gone quiet with the hero down in it: its household comes down to them (set once the town talks). */
     let comeDown: ((id: string) => boolean) | null = null;
+    let failedPlace: ((id: string) => boolean) | null = null;
     /** Who of a cellar's household came down to the hero (app/ownerComes.ts), while they are there. */
     let owner: OwnerComes | null = null;
     // What the fights (down in a cellar, out on the land) ask of the game.
@@ -756,13 +845,22 @@ export async function start(b: Boot): Promise<void> {
       armed: armHero,
       quiet: (id) => quietPlace?.(id) ?? false,
       stilled: (id) => comeDown?.(id) ?? false,
+      failed: (id) => failedPlace?.(id) ?? true,
+      slain: (faction) => { for (const c of standing.slain(faction)) if (c.tier) notes.say(changeLine(c), 5); },
+      struckFirst: (faction, key) => { for (const c of standing.struckFirst(key, faction)) if (c.tier) notes.say(changeLine(c), 5); },
+      say: (text, at) => overHead(text, at),
     };
+    // The hero's fall, seen through to its end whichever fight dealt it.
+    const fallen = new Fallen(fightHost, fightHud, notes, (c) => sounds?.cue(c));
     // What of the land left the frame while the hero is below.
     const hidden: Object3D[] = [];
     // The portals (app/portals.ts: a cave's mouth joined to its throat below), and those opened before they were set up.
     let portals: Portals | null = null;
     /** The lantern lit in a cave mouth's throat on the land (app/cellars.ts throatDepth). */
     let throatLamp = false;
+    /** The lantern lit by the hero's torch out of doors at night (else dark, or lit by whoever lights it below). */
+    let torchLamp = false;
+    const flamePoint = new Vector3();
     /** The place below whose lights are lit from out on the land, near its portal. */
     let caveLit: string | null = null;
     /** A cave's own lights are lit once the hero on the land is this near its portal (m). */
@@ -775,16 +873,21 @@ export async function start(b: Boot): Promise<void> {
     const portalsDue: Portal[] = [];
     /** The portal stone as held up (set once the portals are): it goes below ground with the hero. */
     let stoneMesh: Object3D | null = null;
+    // Formed caves (phase K) are made in a worker of their own, started with the first one.
+    let cavePool: CavePool | null = null;
     cellars = new Cellars({
-      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
+      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, standing, seed, director, journal, hud: fightHud,
       fight: fightHost,
+      known: (group) => stanceFor({ setting, log, towns: terrain.towns, hours: hours(), group }),
       swapped: () => autosave(),
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
       ground: (x, z) => terrain.height(x, z),
-      jobs: terrainJobs,
+      land: (x, z) => terrain.skeleton.kinds[terrain.skeleton.kindAt(x, z)].id,
+      jobs: { caveRock: (l, c, k, t) => terrainJobs.caveRock(l, c, k, t), caveMouth: (s, c) => terrainJobs.caveMouth(s, c), formed: (j) => (cavePool ??= createCavePool(1)).run(j) },
       portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
       cleared: (d) => void roadWork.clear(d),
+      keepsake: (d) => { const t = towns?.get(d.town); return t ? keepsakeOf(setting, d, t.talk.namesFor(d)) : null; },
       // Down in a cellar nothing of the land above can be seen: it leaves the frame (it was drawn behind the
       // cellar's walls, half the cellar's frame time). The lights stay, so no shader changes; the land's updates pause below.
       // The hero, what they leave lying and their spells go down with them.
@@ -810,18 +913,30 @@ export async function start(b: Boot): Promise<void> {
         noteMade(madeBy('wild', d, `${d.encounter} round ${d.town} (${d.members.length})`, hours()));
       }
     }
+    // The land the wild's bands and the town's fighters stand on.
+    const openLand: Land = {
+      height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
+      waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
+      // The sea's waves: a shark keeps under them (S9).
+      surface: (x, z) => sea.surfaceAt(x, z),
+      // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
+      blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
+    };
     const wild = start && params.wild ? new WildLand({
-      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, seed, director, journal, hud: fightHud, fight: fightHost,
+      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, standing, seed, director, journal, hud: fightHud, fight: fightHost,
+      known: (group) => stanceFor({ setting, log, towns: terrain.towns, hours: hours(), group }),
       cue: (c) => sounds?.cue(c),
       out: () => !visit() && !rooms?.inside && !player.offFoot,
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
-    }, start, {
-      height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
-      waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
-      // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
-      blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
-    }, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
+    }, start, openLand, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
+    // A town's watch and able folk meet raiders that come in; the rest go indoors (D65, R6).
+    const townDefence = wild ? new TownDefence({
+      setting, seed, land: openLand,
+      dens: () => wild.encounters.map((e) => e.delve.den),
+      say: (text, over) => speech.say(text, over),
+      hero: () => ({ x: player.walker.pos.x, y: player.walker.pos.y, z: player.walker.pos.z, noise: 0, light: 0, alive: true, guard: { defence: 0, armour: 0, open: false } }),
+    }) : null;
     // The first people's hold (plan 11.6): its gate and court, its wardens built as the hero comes near.
     const holdSite = log.find((d): d is HoldDecision => d.kind === 'hold') ?? null;
     const holdPeople = holdSite ? setting.peoples.find((p) => p.id === holdSite.people && p.hold) : undefined;
@@ -833,7 +948,7 @@ export async function start(b: Boot): Promise<void> {
         changed: (c) => notes.say(changeLine(c), 6),
         jobs: terrainJobs,
       }, holdSite, holdPeople, {
-        height: (x, z) => bridgeView.ground(x, z, feet.footing(x, z)),
+        height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
         waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
         blocked: (x, z, r) => !!hold?.solid(x, z, r) || bridgeView.side(x, z, r),
       }, save?.hold);
@@ -893,7 +1008,10 @@ export async function start(b: Boot): Promise<void> {
           for (const o of mine) set(o, true);
         }
         const back = view.sky.shade(realm === 'land' ? 'open' : cellars?.visitOf(realm)?.cellar.form.space.carved ? 'cave' : 'below');
-        return () => { for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; unhold(); back(); };
+        // Undone in the reverse order: the sky's light first (it holds the dome as hidden, since it was hidden above),
+        // then what was shown or hidden. The other way round the dome stayed hidden, and the land's sky behind a cave
+        // mouth in view was black.
+        return () => { back(); for (let i = changed.length - 1; i >= 0; i--) changed[i][0].visible = changed[i][1]; unhold(); };
       },
       world: (realm) => (realm === 'land' ? landWorld : cellars?.visitOf(realm)?.world ?? null),
     });
@@ -928,7 +1046,8 @@ export async function start(b: Boot): Promise<void> {
       },
       gesture: (what) => castHands(what === 'raise' ? 'charge' : 'release', what === 'raise' ? 0.9 : 0.8),
       changed: () => autosave(),
-    }, cleanStoneSave(save?.portalStone));
+    // A stone that marked no home yet (every new hero's) is imprinted with where the hero started: a way out when stuck.
+    }, imprintSpawn(cleanStoneSave(save?.portalStone), spawn));
     await stoneUse.addToStage();
     stoneMesh = stoneUse.mesh;
     spellView.also = (b, dt) => stoneUse.stoneLight(b, dt);
@@ -938,8 +1057,8 @@ export async function start(b: Boot): Promise<void> {
       const ax = w.x + fx * 6, az = w.z + fz * 6, bx = w.x - fz * 30, bz = w.z + fx * 30;
       portals.add({ id: 'test', shape: { halfWidth: 1.3, height: 2.8 }, a: { realm: 'land', frame: { x: ax, y: terrain.height(ax, az), z: az, yaw } }, b: { realm: 'land', frame: { x: bx, y: terrain.height(bx, bz), z: bz, yaw: yaw + Math.PI / 2 } } });
     }
-    // `barrow`, `cave`, `tower`: before one, looking at it (one is promised now if there is none).
-    const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : null;
+    // `barrow`, `cave`, `tower`, `seacave`, `sunken`: before one, looking at it (one is promised now if there is none).
+    const lookAt: LandKind | null = params.barrow ? 'barrow' : params.cave ? 'cave' : params.tower ? 'tower' : params.seacave ? 'sea-cave' : params.sunken ? 'sunken-ruin' : null;
     const lookForm = lookAt ? setting.dungeons[lookAt]?.form : undefined;
     if (lookAt && lookForm && start) {
       let b = log.find((d): d is DungeonDecision => d.kind === 'dungeon' && d.template === lookAt) ?? null;
@@ -949,7 +1068,55 @@ export async function start(b: Boot): Promise<void> {
       }
       // Far enough off to see it whole.
       const off = { hatch: 9, mound: 9, mouth: 16, keep: 32 }[lookForm.shell];
-      if (b?.site) player.teleport(b.site.x + Math.sin(b.site.yaw) * off, undefined, b.site.z + Math.cos(b.site.yaw) * off, b.site.yaw);
+      if (b?.site) {
+        const tx = b.site.x + Math.sin(b.site.yaw) * off, tz = b.site.z + Math.cos(b.site.yaw) * off;
+        // (Its mouth and rooms made first: a cave's portal is open when one arrives, not a moment after.)
+        await cellars.buildNear(tx, tz);
+        player.teleport(tx, undefined, tz, b.site.yaw);
+      }
+    }
+    // `volcano`: before an active volcano (the nearest, or of a state or id), on the side its lava spills, facing the crater (K7d).
+    if (params.volcano) {
+      const p0 = player.walker.pos, v = terrain.volcanoes.nearestVolcano(p0.x, p0.z, params.volcano);
+      if (v) {
+        const out = ({ rim: v.rimR * 1.35, foot: 420, far: 1100 } as Record<string, number>)[params.volcanoAt] ?? 420;
+        const tx = v.x + Math.cos(v.phi0) * out, tz = v.z + Math.sin(v.phi0) * out;
+        console.info(`[volcano] ${v.id} (${v.state}) at ${Math.round(v.x)}, ${Math.round(v.z)}, lake ${terrain.lakeLevel(v)?.toFixed(1) ?? 'none'}, floor ${terrain.height(v.x, v.z).toFixed(1)}, rim ${v.rimR.toFixed(0)} m, saddle ${v.phi0.toFixed(2)} rad, foot ${v.R.toFixed(0)} m, height ${v.H.toFixed(0)} m, vents ${v.vents.slice(0, 3).map((e) => `${Math.round(e.x)},${Math.round(e.z)} r${e.r.toFixed(0)}`).join(' | ')}`);
+        player.teleport(tx, undefined, tz, Math.atan2(v.x - tx, v.z - tz) + Math.PI);
+      }
+    }
+    // `wreck`: in the sea 14 m off a wreck near the start town, facing her (one is put there now if there is none).
+    if (params.wreck && start) {
+      const off = offTheCoast(terrain, start.decision);
+      let w = off && log.find((d): d is SightDecision => d.kind === 'sight' && !!d.sea && Math.hypot(d.x - off.x, d.z - off.z) < 1500) || null;
+      if (off && !w) {
+        w = wreckFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, home: start.decision, hero: off, toward: null });
+        if (w) log = [...log, w];
+      }
+      if (w) player.teleport(w.x + 14, undefined, w.z, Math.PI / 2);
+    }
+    // `castaway`: on a strand by the start (the giant crabs' ground) with a fisher's boat gone over out on the water, facing it.
+    if (params.castaway && start) {
+      const shore = wildFor({ seed, log: [], towns: terrain.towns, terrain, hours: 0, setting }, start).find((t) => t.group === 'crabs');
+      const d = shore && castawayFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: shore, toward: null }, true);
+      if (shore && d) {
+        log = [...log, d];
+        // At the water's edge on the way in from them, looking out at them (yaw 0 faces −z, π/2 faces −x).
+        const k = Math.hypot(shore.x - d.x, shore.z - d.z) || 1, ux = (shore.x - d.x) / k, uz = (shore.z - d.z) / k;
+        let s = 0;
+        while (s < k && terrain.height(d.x + ux * s, d.z + uz * s) < 0.3) s += 1;
+        player.teleport(d.x + ux * (s + 2), undefined, d.z + uz * (s + 2), Math.atan2(ux, uz));
+      }
+    }
+    // `washedup`: on a strand by the start (the giant crabs' ground), a dozen metres from a boat the sea threw up there.
+    if (params.washedUp && start) {
+      const shore = wildFor({ seed, log: [], towns: terrain.towns, terrain, hours: 0, setting }, start).find((t) => t.group === 'crabs');
+      const d = shore && washedUpFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: shore, toward: null });
+      if (shore && d) {
+        log = [...log, d];
+        const k = Math.hypot(shore.x - d.x, shore.z - d.z) || 1, ux = (shore.x - d.x) / k, uz = (shore.z - d.z) / k;
+        player.teleport(d.x + ux * 12, undefined, d.z + uz * 12, Math.atan2(ux, uz));
+      }
     }
     // `wild=<kind>`: beside its first group (for looking at them).
     const by = params.wildAt ? wild?.territories.find((t) => t.kind === params.wildAt) : undefined;
@@ -960,7 +1127,7 @@ export async function start(b: Boot): Promise<void> {
     let lookSmall = params.smallAt;
     let lookHens = params.henShot;
     /** With `fly`: the one the free camera follows, and how far off. */
-    let watchSmall: { it: { x: number; y: number; z: number }; d: number } | null = null;
+    let watchSmall: { it: { x: number; y: number; z: number }; d: number; wet?: boolean } | null = null;
     /** The hero `d` metres from `seen`, on the side they are on, facing it. */
     const standBeside = (seen: { x: number; z: number }, d: number) => {
       const p = player.walker.pos, k = Math.max(1, Math.hypot(p.x - seen.x, p.z - seen.z));
@@ -1050,8 +1217,10 @@ export async function start(b: Boot): Promise<void> {
       weather: () => wx.shown,
       hour: () => view.sky.hour,
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
+      cave: () => { const v = visit(), f = v?.formed; if (!v || !f) return null; if (caveHeard?.of !== f) { const o = v.origin, pastOrigin = (q: readonly [number, number, number]): [number, number, number] => [q[0] + o.x, q[1] + o.y, q[2] + o.z]; caveHeard = { of: f, drips: f.sounds.drips.map(pastOrigin), streams: f.sounds.streams.map(pastOrigin) }; } return caveHeard; },
       where: () => (visit() ? { place: 'cellar', room: null } : rooms?.door ? { place: 'room', room: rooms.door.b.kind } : { place: 'land', room: null }),
       inFlight: () => player.offFoot,
+      aboard: () => !!decks.ship,
       horses: () => player.steeds,
       riding: () => player.riding,
       threat: () => (director.mood === 'fight' ? 'fight' : director.mood === 'tension' ? 'tension' : null),
@@ -1098,6 +1267,8 @@ export async function start(b: Boot): Promise<void> {
         const k = keepPromise(log, id, hours());
         if (k) log = [...log, k];
         deedFor(`wolves:${id}`, towns?.get(ev.town), setting.standing.help, 'help');
+        // A night watch's band beaten (D62): the watch is kept; its household will want to hear.
+        if (ev.watch) return quietPlace?.(ev.watch) ?? true;
         return true;
       }
       // A place cleared is experience (D58), once; telling its household is more.
@@ -1107,7 +1278,16 @@ export async function start(b: Boot): Promise<void> {
       const words = t.talk, to = words.reportTo(id)[0], p = t.residents.find((x) => x.id === to);
       if (p === undefined) return true;
       const name = words.nameOf(p.id), house = words.homeCalled(p.id), door = t.town.plan.buildings[p.home].door;
-      journal.quiet(id, { text: fill(setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
+      journal.quiet(id, { text: fill(words.askOf(id)?.note ?? setting.talk.cleared.note, { name, house }), from: 'you' }, { x: door[0], z: door[1], label: name });
+      return true;
+    };
+    // A parley broken (D62): the hero struck first and beat them; the household asked for none of it and pays nothing.
+    failedPlace = (id) => {
+      const k = keepPromise(log, id, hours(), true, 'broken');
+      if (k) log = [...log, k];
+      const t = townOfPromise(id), broken = askDefOf(setting, askOf(log, id) ?? undefined)?.parley?.broken;
+      if (broken) journal.lapse(id, { text: fill(broken, { place: t?.talk.cellarCalled(id) ?? 'that place' }), from: 'you' });
+      else journal.fulfil(id);
       return true;
     };
     /**
@@ -1115,7 +1295,8 @@ export async function start(b: Boot): Promise<void> {
      * household's people (and the hero's name), a master's gift if it was their deed (C14), and the VGM's next lead.
      */
     const keptNow = (id: string, t: Township): void => {
-      const k = keepPromise(log, id, hours());
+      // How it ended goes into the log (a thief caught or let go, D62): what comes next may follow from it.
+      const k = keepPromise(log, id, hours(), false, t.talk.endingOf(id) ?? asEnded(askOf(log, id)));
       if (k) log = [...log, k];
       journal.fulfil(id);
       director.met('purpose');
@@ -1138,11 +1319,17 @@ export async function start(b: Boot): Promise<void> {
       character.coins += coins;
       if (coins) sounds?.cue({ kind: 'paid', coins });
       character.earn(`cleared:${id}`, 'cleared');
+      // A fetch (D62): the keepsake goes back to its household.
+      const asked = t.talk.askOf(id), i = character.pack.findIndex((it) => it.keepsake === id);
+      if (i >= 0) character.pack.splice(i, 1);
       keptNow(id, t);
+      if (asked && due) return cap(fill(asked.thanks, { coins: coinText(coins), place: t.talk.cellarCalled(id) }));
       return deed?.quest ? deed.quest.done : due ? due.thanks(coinText(coins)) : '';
     };
     // A cellar gone quiet with the hero down in it (show, don't tell): the one of its household the hero would report to
     // climbs down the ladder, comes to the hero and thanks and pays them there.
+    /** What one of a household says down in a place, over their head (their thanks; someone lost, found). */
+    const overHead: OwnerHost['say'] = (text, at) => speech.say(text, at);
     comeDown = (id) => {
       const v = visit(), t = townOfPromise(id);
       if (!v || owner || !t?.living || t.talk.isSettled(id)) return false;
@@ -1151,13 +1338,28 @@ export async function start(b: Boot): Promise<void> {
       if (!a) return false;
       owner = new OwnerComes(v, a, {
         body: () => folk?.bodyOf(a) ?? null,
-        say: (text, at) => speech.say(text, at),
+        say: overHead,
         told: () => {
           t.talk.thanked(a.person.id, id);
           return paidFor(id, t, true);
         },
       });
       return true;
+    };
+    /**
+     * Someone lost in the place the hero is down in (D62), still to be found alive: they sit hurt by the lair's hoard
+     * at its end; come up to, they get up, say so, and walk out and home (app/ownerComes.ts `LostHere`).
+     */
+    const lostBelow = (): void => {
+      const v = visit(), f = cellars.fightBelow;
+      if (!v || owner || !f) return;
+      const id = v.cellar.decision.id, t = towns?.get(v.cellar.decision.town), p = t?.living ? t.lostIn(id) : null;
+      const a = p && t?.life.agentOf(p.id), lair = f.delve.hoards.find((h) => !h.prop);
+      if (!t || !a || !lair) return;
+      owner = new OwnerComes(v, a, { body: () => folk?.bodyOf(a) ?? null, say: overHead, told: () => '' }, {
+        at: lair,
+        cameUp: () => { f.delve.found = true; t.foundLost(id); return t.talk.askOf(id)?.found ?? ''; },
+      });
     };
     /**
      * Out on the land, one of a place's household waits outside its way in while it is to be cleared (they come in to the
@@ -1218,6 +1420,15 @@ export async function start(b: Boot): Promise<void> {
       }, { x: a.x + dx * k, z: a.z + dz * k }, { busy: TEND_FOR, ground: (x, z) => terrain.height(x, z), up: () => { if (player.puppet === kneel) player.puppet = null; } });
       player.puppet = kneel;
     });
+    // A castaway brought in (S9, D54): a good deed, as a hurt traveller tended.
+    castaways.saved = (d, a) => {
+      const kept = keepPromise(log, d.id, hours());
+      if (kept) log = [...log, kept];
+      director.met('people');
+      character.earn(`castaway:${d.id}`, 'help');
+      const own = standing.deed(`castaway:${d.id}`, a.person.race, setting.standing.help).find((c) => c.people.id === a.person.race);
+      if (own) notes.say(changeLine(own), 5);
+    };
     services.set('trade', (a) => { const t = talkTown(), m = t?.market.of(a.person.id); if (t && m) { director.model.note('crafter', 0.5); trade.show(t.market, m, t.talk.nameOf(a.person.id)); } });
     // Talk: in the town the hero is in (it follows them from town to town, below).
     const talk: TalkUi | null = startTown ? new TalkUi(startTown, setting.talk, journal, player, {
@@ -1232,13 +1443,39 @@ export async function start(b: Boot): Promise<void> {
         journal.fulfil(ARRIVAL);
       },
       heardOf: (id, from) => learnEvent(id, from),
+      // The VGM may have this person ask a favour of the hero (D68, N3: made from who they are, when the hero talks with them).
+      favour: (a) => {
+        const t = talkTown();
+        if (!t || !start) return;
+        const d = favourFor({ town: t.town, people: t.residents, person: a.person.id }, { seed, log, hours: hours(), setting, home: start.decision });
+        if (d) applied(madeBy('favour', d, favourWhy(d, { person: (id) => t.talk.nameOf(id) }), hours()));
+      },
+      // A thief named and dealt with (D62): the ask is done; the household will want to hear.
+      named: (id, ending) => {
+        if (ending !== 'given') { quietPlace?.(id); return; }
+        // A lie found out (Q3): the thing went to its rightful household; the one who lied gets nothing, and pays nothing.
+        const i = character.pack.findIndex((it) => it.keepsake === id);
+        if (i >= 0) character.pack.splice(i, 1);
+        const k = keepPromise(log, id, hours(), true, 'given');
+        if (k) log = [...log, k];
+        journal.fulfil(id);
+      },
       serve: (id, a) => services.get(id)?.(a),
       report: (id, a) => {
         const t = talk!.place;
+        // A fetch (D62), or news of someone lost dead, is done only with the thing itself: told without it in hand, they ask where it is.
+        if (bringsBack(askOf(log, id)) && !holdsKeepsake(character.pack, id)) return { text: t.talk.askOf(id)?.missing ?? '', heard: [], done: false };
         return t.talk.toldSafe(a.person.id, id, paidFor(id, t));
       },
-      // Sleepers lie in their beds, not to be talked to.
-      get roomPeople() { return rooms?.inside ? rooms.people()?.filter((p) => p.act !== 'sleep') ?? null : null; },
+      // Sleepers lie in their beds, not to be talked to (but those the hero comes to find get up for the hero).
+      // Aboard a ship near the hero: its passengers too, where they stand on it (S3).
+      get roomPeople() {
+        if (rooms?.inside) return rooms.talkers();
+        const aboard = crews.passengers;
+        if (!aboard.length) return null;
+        const on = new Set(aboard.map((p) => p.agent)), out = talk?.place.life.agents.filter((a) => !a.hidden && !on.has(a)).map((a) => ({ agent: a, x: a.x, z: a.z })) ?? [];
+        return [...out, ...aboard];
+      },
     }) : null;
     // A room at the inn and the smith's mending (plan 11.5): two more services, in whichever town.
     const upkeep = new UpkeepUi(character, setting, {
@@ -1260,8 +1497,13 @@ export async function start(b: Boot): Promise<void> {
       get towns() { return towns?.every ?? []; },
       log: () => log,
       journey: (d) => { log = [...log, d]; },
+      hold: (d) => { log = [...log, d]; },
+      weather: (x, z, h) => weather.state(x, z, h, seaSky),
+      frontier: () => ({ seed, log, terrain, regions: setting.regions!, home: start?.decision ?? home, hero: player.walker.pos, hours: hours() }),
+      openRegion: (d) => regionOpened(d),
+      water: (x, z) => terrain.waterDepth(x, z),
       hours,
-      setClock: (h) => { view.sky.day = Math.floor(h / 24); view.sky.hour = h - view.sky.day * 24; },
+      setClock,
       enter: (door) => rooms?.enter(door, true) ?? Promise.resolve(),
       say: (text, secs) => notes.say(text, secs),
       worth: (it) => itemWorth(setting.items, it),
@@ -1270,7 +1512,7 @@ export async function start(b: Boot): Promise<void> {
     for (const id of UPKEEP_SERVICES) services.set(id, (a) => { const t = talkTown(); if (t) upkeep.answer(id, a.person, t.talk.nameOf(a.person.id)); });
     /** An ability was learned (a teacher, a writing): the hero redressed, and bird form's body made ready once it is known. */
     // What the hero can do changed (a spell learned, an item that gives an ability put on or off): the bar and book show it.
-    const learnedAbility = () => { armHero(); actionBar.draw(); book.redraw(); if (birdAbility && character.knows(birdAbility.id)) void birdForm?.warm(); };
+    const learnedAbility = () => { armHero(); actionBar.draw(); book.redraw(); warmForms(); };
     /** One of the canon's legendary items (C5) into the pack and on, to try the ability it gives (debug menu, shots). */
     const wearLegend = (id: string): string => {
       const u = setting.items.uniques.find((x) => x.id === id);
@@ -1282,6 +1524,25 @@ export async function start(b: Boot): Promise<void> {
       return `${u.name} worn${it.grants ? `: ${abilityOf(setting, it.grants)?.name ?? it.grants} on the action bar` : ''}`;
     };
     // Lessons (plan 11.4, D49, D59): the guild houses' trainers teach abilities for coin at a level; one more service.
+    /**
+     * A place a guild's master names (their deed, or the guild's task), made by the VGM for the town the hero
+     * talks in: into the log, the journal and on the map. What it is called, or null if none fits.
+     */
+    const guildPlace = (g: GuildDef, tool: 'quest' | 'task', make: (a: QuestAsk, c: DungeonContext) => DungeonDecision | null, said: (place: string) => string, why: string, who?: string): string | null => {
+      const t = talkTown(), house = t?.guilds.find((h) => h.guild.keeper === g.keeper);
+      if (!t || !house || !start) return null;
+      const d = make({ guild: g, town: t.town, building: house.b.id, hours: hours() }, { seed, terrain, log, home: start.decision, dungeons: setting.dungeons, avoid: wild?.territories ?? [] });
+      if (!d) { console.warn(`[vgm] no place for ${g.keeper}'s ${tool} near ${t.town.decision.id}`); return null; }
+      applied(madeBy(tool, d, why, hours()));
+      // Out on the land its name says where; a cellar is called by its house, as the town knows it.
+      const door = t.town.plan.buildings.find((b) => b.id === d.building)?.door;
+      const place = d.site ? placeOf(d, terrain.towns, setting.dungeons)?.name : t.talk.cellarCalled(d.id);
+      const at = d.site ?? (door && { x: door[0], z: door[1] });
+      if (!place || !at) return null;
+      const from = who || t.talk.nameOf(t.residents.find((p) => p.trade === g.keeper)?.id ?? -1) || g.name;
+      journal.hear(d.id, fill(setting.talk.lead, { cellar: place }), { text: said(place), from }, { x: at.x, z: at.z, label: place });
+      return place;
+    };
     const lessons = new LessonsUi(character, setting, {
       paused,
       get bindings() { return settings.current.bindings; },
@@ -1292,17 +1553,9 @@ export async function start(b: Boot): Promise<void> {
       hours,
       standing,
       // A master's one deed (C14): the VGM makes its place, the master's household will be told; it goes in the journal and on the map.
-      quest: (g) => {
-        const t = talkTown(), house = t?.guilds.find((h) => h.guild.keeper === g.keeper);
-        if (!t || !house || !start || !g.quest) return null;
-        const d = questFor({ guild: g, town: t.town, building: house.b.id, hours: hours() }, { seed, terrain, log, home: start.decision, dungeons: setting.dungeons, avoid: wild?.territories ?? [] });
-        const place = d && placeOf(d, terrain.towns, setting.dungeons)?.name;
-        if (!d?.site || !place) return null;
-        applied(madeBy('quest', d, `${g.keeper}'s deed, for ${g.quest.reward}: the hero is a student and known well enough`, hours()));
-        const from = t.talk.nameOf(t.residents.find((p) => p.trade === g.keeper)?.id ?? -1) || g.name;
-        journal.hear(d.id, fill(setting.talk.lead, { cellar: place }), { text: fill(g.quest.ask, { place }), from }, { x: d.site.x, z: d.site.z, label: place });
-        return place;
-      },
+      quest: (g) => g.quest ? guildPlace(g, 'quest', (a, c) => questFor(a, c), (place) => fill(g.quest!.ask, { place }), `${g.keeper}'s deed, for ${g.quest.reward}: the hero is a student and known well enough`) : null,
+      // A guild's task (D49): the VGM names the one place that does it; the journal and map take it up.
+      task: (g, who) => guildPlace(g, 'task', (a, c) => taskFor(a, c), (place) => fill(g.task.ask, { place }), `${g.keeper}'s task: the hero asked for work`, who),
     });
     services.set('lessons', (a) => { const t = teacherOf(setting, a.person), town = talkTown(); if (t && town) lessons.teach(t, town.talk.nameOf(a.person.id), a.person.race); });
     // The bard at the inn (D49): "where can I learn something?" names every guild house of the town and puts
@@ -1328,6 +1581,8 @@ export async function start(b: Boot): Promise<void> {
     const tend = situationOf(setting, 'hurt-traveller')?.tend;
     tieTalk = (t, words) => {
       words.manner = (p) => standing.manner(p.race, p.seed);
+      // A thief can be faced once the hero holds what they stole (D62).
+      words.holding = (id) => holdsKeepsake(character.pack, id);
       words.services = (id) => {
         const p = t.residents.find((x) => x.id === id);
         if (!p) return [];
@@ -1354,6 +1609,14 @@ export async function start(b: Boot): Promise<void> {
       changed: learnedAbility,
       drank: (n) => { if (n > 0) fightHud.healed(); },
       raised: () => stoneUse.holdUp(),
+      // A potion of learning (D61, rule 11): the hero is seen drinking it, and its light winds up to the brow.
+      learnt: () => {
+        const h = player.hero;
+        if (h && !player.stance.action) player.stance = { ...player.stance, action: { ...DRINK, t0: h.clock } };
+        spellView.learnt(DRINK.dur * 0.6);
+        sounds?.learnt();
+        book.redraw();
+      },
       readOut: (why, id) => {
         const a = abilityOf(setting, id);
         notes.say(why ?? `You read it through, and ${a?.name ?? id} is yours. The page crumbles to dust.`, 7);
@@ -1364,7 +1627,7 @@ export async function start(b: Boot): Promise<void> {
     const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
     bodiesBlock = (x, z, r, y, ax, az) => encounters().some((e) => e.pressedBy(x, z, r, y, ax, az));
     const leading = () => encounters().find((e) => e.leading) ?? null;
-    const potions = () => character.pack.filter((i) => setting.items.items.find((d) => d.id === i.def)?.kind === 'potion').length;
+    const potions = () => character.remedies.length;
     // Out of a fight the hero's own spells still work (healing, wards): the recipe runner with nobody else about.
     const alone = new Recipes(character, new Alone(character, () => player.walker.pos), setting.effects ?? [], deriveSeed(seed, 'alone'));
     const aloneCues: RecipeEvent[] = [];
@@ -1375,28 +1638,40 @@ export async function start(b: Boot): Promise<void> {
       hands: castHands,
       sound: (what, motif, at) => sounds?.spell(what, motif, at),
     };
-    // Bird form (plan 10): the hero becomes a pheasant and flies; the change takes its time and never in a fight.
-    const birdAbility = setting.abilities.find((a) => shapeOf(a)?.into === 'bird') ?? null;
-    const birdForm = birdAbility ? new BirdForm(birdAbility, player, world, {
+    // Animal forms (plan 10, S6): the hero becomes a pheasant and flies, or an otter in the water and swims; the change
+    // takes its time and never in a fight, and in any form no other ability works.
+    const formHost = {
       stage: view.stage, notes,
       around: () => ({ fighting: encounters().some((e) => e.pressure.fighting > 0), riding: !!player.riding, swimming: player.walker.mode === 'swim', roofed: !!visit() || !!rooms?.inside }),
       changed: () => autosave(),
-    }) : null;
-    if (birdForm && birdAbility && character.knows(birdAbility.id)) void birdForm.warm();
+    };
+    const shapeAbility = (into: 'bird' | 'otter') => setting.abilities.find((a) => shapeOf(a)?.into === into);
+    const birdAbility = shapeAbility('bird'), otterAbility = shapeAbility('otter');
+    const birdForm = birdAbility ? new ShapeForm(birdAbility, new BirdKit(world), player, formHost) : null;
+    const otterForm = otterAbility ? new ShapeForm(otterAbility, new OtterKit(world), player, formHost) : null;
+    const forms: ShapeForm[] = [];
+    for (const f of [birdForm, otterForm]) if (f) forms.push(f);
+    player.shape = shapesFrame(forms);
+    const formOf = (id: string) => forms.find((f) => f.shift.ability.id === id);
+    /** The forms the hero knows, loaded and compiled ahead (the change then shows the animal at once). */
+    const warmForms = () => { for (const f of forms) if (character.knows(f.shift.ability.id)) void f.warm(); };
+    warmForms();
+    const shifts = forms.map((f) => f.shift);
     // Sitting down to rest (the rest key or the bar): faster healing, ended by moving, a fight or a wound.
     const rest = new Rest(character);
     const restWatch = (): RestWatch => ({
       moving: player.walker.gait !== 'idle',
       fighting: encounters().some((e) => e.pressure.fighting > 0),
-      afoot: !player.riding && !player.offFoot && !player.hideHero && !birdForm?.flying && player.walker.mode === 'ground',
+      afoot: !player.riding && !player.offFoot && !player.hideHero && player.walker.mode === 'ground',
     });
     /** An ability from the action bar (or a shot): resting, bird form, the fight's, the hero's own out of a fight, the potion. A line why not, or null. */
     const useAbility = (id: string): string | null => {
+      const barred = shapeBars(shifts, id), form = formOf(id);
+      if (barred) return barred;
+      if (form) return form.invoke();
       if (id === REST) return rest.toggle(restWatch());
       if (id !== POTION) rest.stand();
       const e = leading();
-      if (birdForm && id === birdAbility?.id) return birdForm.invoke();
-      if (birdForm?.flying) return 'A pheasant cannot do that.';
       const a = abilityOf(setting, id), spell = !!a && !blowOf(a);
       // A spell cast is a mage's evidence (C12: the player model).
       if (e) { const no = e.use(id); if (!no && spell) director.model.count('casts'); return no; }
@@ -1411,10 +1686,11 @@ export async function start(b: Boot): Promise<void> {
       get blocked() { return open > 0; },
       trigger: (id) => { const said = useAbility(id); if (said) notes.say(said, 2.5); },
       state: (id) => {
-        const f = leading()?.fighting ?? null;
+        const f = leading()?.fighting ?? null, form = formOf(id);
+        if (form) { const b = form.state; return { left: b.left, total: form.shift.ability.cooldown, dim: false, on: b.on }; }
+        if (shapeBars(shifts, id)) return { left: 0, total: 0, dim: true, on: false };
         if (id === POTION) { const n = potions(); return { left: 0, total: 0, dim: n === 0, on: false, count: n }; }
         if (id === REST) return { left: 0, total: 0, dim: false, on: rest.sitting };
-        if (birdForm && id === birdAbility?.id) { const b = birdForm.state; return { left: b.left, total: birdAbility.cooldown, dim: false, on: b.on }; }
         const a = abilityOf(setting, id);
         if (!a) return { left: 0, total: 0, dim: true, on: false };
         if (!f) return { left: alone.cooling(id), total: a.cooldown, dim: !!blowOf(a) || character.mana < (a.cost?.mana ?? 0), on: alone.casting?.def === a };
@@ -1440,8 +1716,12 @@ export async function start(b: Boot): Promise<void> {
       woods,
       heroAt: () => heroAt(player.walker.yaw),
       known,
+      noticed: () => noticed.of(noticeList()),
       roadLines: () => terrain.roads.roads,
-      signs: () => (towns?.every ?? []).flatMap((t) => t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) }))),
+      signs: () => (towns?.every ?? []).flatMap((t) => {
+        const hall = setting.voyage?.hall ? harbourHall(t.town.plan) : undefined;
+        return [...t.guilds.filter((h) => guildBook.onMap(t.id, h.guild)).map((h) => ({ ...whereOf(h), label: cap(h.guild.name) })), ...(hall ? [{ x: hall.door[0], z: hall.door[1], label: setting.voyage!.hall! }] : [])];
+      }),
     }) : null;
     // The minimap at the top (plan 17.1, G4): the known land round the hero on the map's own parchment, turning
     // with the camera and always true; the townsfolk near as dots. Below ground: the dungeon's own plan, as far
@@ -1450,7 +1730,8 @@ export async function start(b: Boot): Promise<void> {
       const v = visit();
       if (v) {
         const O = v.origin;
-        return paintBelow(canvas, { space: v.space, seen: v.seen, carved: !!v.cellar.form.space.carved, exit: v.cellar.hatch }, x - O.x, z - O.z, v.space.levelAt(player.walker.pos.y - O.y), across);
+        if (v.formed) return paintFormed(canvas, v.seen, v.cellar.hatch, x - O.x, z - O.z, Math.round((player.walker.pos.y - O.y) / STOREY), across);
+        return paintBelow(canvas, { space: v.space, seen: v.seen as DungeonSeen, carved: !!v.cellar.form.space.carved, exit: v.cellar.hatch }, x - O.x, z - O.z, v.space.levelAt(player.walker.pos.y - O.y), across);
       }
       const t = here(), r = across / 2;
       const dots = (t?.life.agents ?? []).filter((a) => !a.hidden && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);
@@ -1535,6 +1816,7 @@ export async function start(b: Boot): Promise<void> {
           towns: towns?.toSave() ?? {},
           journal: journal.entries(),
           map: known.landSave(),
+          noticed: noticed.keep(),
           character: character.save(),
           standing: standing.save(),
           guilds: guildBook.bookSave(),
@@ -1592,6 +1874,35 @@ export async function start(b: Boot): Promise<void> {
       });
       player.puppet = gathering;
     };
+    // A find by the way (Reward's answer): into the pack and purse, shown as finds below are.
+    const takeFind = (sight: SightDef, d: SightDecision) => {
+      const loot = findIn(setting, sight, d, start?.decision ?? home);
+      if (loot) {
+        character.pack.push(...loot.items);
+        character.coins += loot.coins;
+        fightHud.showFinds(loot);
+        sounds?.coins();
+        director.met('reward');
+      } else director.met('discovery');
+    };
+    // Sea chests come upon and not yet searched (a boat washed up, S9): the hero walks up, kneels, and the find comes.
+    const chests: { x: number; z: number; sight: SightDef; decision: SightDecision }[] = [];
+    let searching: SearchKneel | null = null;
+    const searchChests = () => {
+      if (searching) {
+        if (searching.done || player.puppet !== searching) { if (player.puppet === searching) player.puppet = null; searching = null; }
+        return;
+      }
+      if (!chests.length || !character.alive || player.puppet || visit()) return;
+      const w = player.walker.pos, c = chests.find((c) => Math.hypot(c.x - w.x, c.z - w.z) <= GATHER_REACH);
+      if (!c) return;
+      searching = new SearchKneel(w, player.walker.yaw, c, null, () => {
+        if (!chests.includes(c)) return;
+        chests.splice(chests.indexOf(c), 1);
+        takeFind(c.sight, c.decision);
+      }, undefined, { ground: (x, z) => terrain.height(x, z) });
+      player.puppet = searching;
+    };
     // `?open=tale`: the end of a roguelike tale as it shows (for the standard shots), without ending anything.
     const showTale = () => { paused(true); new TalesEnd().show(heroName || 'Wenna Stonehelm', epitaph(heroName || 'Wenna Stonehelm', view.sky.day, { x: 0, y: 0, z: 0, below: null, mark: { x: 0, z: 0 }, label: 'out on the land' }), () => location.reload()); };
     // Roguelike (plan 11.1): the hero's tale ends where they fell. The world goes on; the next start makes a new hero in it.
@@ -1645,6 +1956,7 @@ export async function start(b: Boot): Promise<void> {
     const brookHere = emptyWater();
     const spots = goSpots({
       setting,
+      terrain,
       log: () => log,
       hours,
       heroPos: () => player.walker.pos,
@@ -1744,8 +2056,9 @@ export async function start(b: Boot): Promise<void> {
         const t = here() ?? startTown;
         if (!t) return 'no town';
         const [x, z] = t.town.plan.centre;
-        orderTown(t, kind === 'gather' ? { kind, x, z, radius: 14, from: hours(), to: hours() + 2 } : { kind, from: hours(), to: hours() + 2 });
-        return kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
+        const from = hours(), to = from + 2;
+        orderTown(t, kind === 'feast' ? { kind: 'gather', x, z, radius: 16, from, to, mood: 'feast' } : kind === 'gather' ? { kind, x, z, radius: 14, from, to } : { kind, from, to });
+        return kind === 'feast' ? 'a feast at the market for 2 game hours' : kind === 'gather' ? 'everyone to the market for 2 game hours' : 'everyone indoors for 2 game hours';
       },
       get viewParams() { return player.viewParams; },
       // Abilities a teacher opens (D49), learned or forgotten here so they can be tried.
@@ -1763,13 +2076,13 @@ export async function start(b: Boot): Promise<void> {
         const did = on ? character.learnToUse(id) : character.forget(id);
         actionBar.draw();
         book.redraw();
-        if (on && id === birdAbility?.id) void birdForm?.warm();
+        if (on) void formOf(id)?.warm();
         return did ? (on ? 'learned: on the action bar' : 'forgotten') : (on ? 'known already' : 'not known');
       },
       places: placesFor(seedText, home),
       spots,
       seed: seedText,
-      game: { player, view, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, decks, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get shipClimbs() { return shipClimbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, otterForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */
@@ -1796,7 +2109,7 @@ export async function start(b: Boot): Promise<void> {
       nameFor: (r, female, n) => heroNameFor(setting.names[r] ?? setting.names.human, female, n),
       backgrounds: setting.backgrounds,
       abilityName: (id) => abilityOf(setting, id)?.name ?? id,
-      itemName: (id) => setting.items.items.find((i) => i.id === id)?.name ?? id,
+      itemName: (id) => findDef(setting.items, id)?.name ?? id,
       knownBy: (bg) => (startTown ? friendsOf(bg).map((a) => `${startTown.talk.nameOf(a.person.id)}, the ${a.person.trade}`) : []),
       click: () => sound.play('click'),
       mode: save?.heir ? 'roguelike' : null,
@@ -1819,7 +2132,7 @@ export async function start(b: Boot): Promise<void> {
       const bg = setting.backgrounds.find((b) => b.id === made.background);
       if (bg) { character.beginAs(bg); armHero(); }
       // A new hero: every people thinks of them as of any stranger, their own kin a little better.
-      standing.begin(made.look.race ?? 'human');
+      standing.restart(made.look.race ?? 'human');
       // A roguelike tale has its one save from the first step.
       mode = made.mode;
       director.strict = mode === 'roguelike';
@@ -1857,6 +2170,12 @@ export async function start(b: Boot): Promise<void> {
       // The ground's vertices lie a couple of metres apart: sunk well round the hatch, all of them under it go.
       sink: (at) => { if (at) GROUND_DIP.value.set(at.x, at.z, SINK_REACH, SINK_DEPTH); else GROUND_DIP.value.w = 0; },
     });
+    // A ship's castle ladders, climbed in sight as the ship rides the swell (E; app/shipClimb.ts).
+    const shipClimbs = new ShipClimb({ player, decks });
+    const breath = new Breath(), breathHud = new BreathHud();
+    let drownClock = 0;
+    let burnClock = 0;
+    const bunk = new BunkSleep({ player, decks, voyages: voyagesNow, hours, setClock });
     // The free camera is a debug tool: its key (F) works only with `?fly` or once the debug menu has flown, and
     // always lands again while flying (a stray F in a cellar flew the camera through its walls).
     let flyKey = params.fly;
@@ -1865,7 +2184,7 @@ export async function start(b: Boot): Promise<void> {
     onKeyDown((e) => {
       if (e.repeat || open > 0) return;
       const b = settings.current.bindings;
-      if (b.use.includes(e.code) && playing && climbs.use()) return;
+      if (b.use.includes(e.code) && playing && (climbs.use() || shipClimbs.use() || bunk.use())) return;
       if (b.fly.includes(e.code) && (flyKey || player.flying)) player.flying = !player.flying;
       else if (b.mount.includes(e.code)) player.toggleMount();
       else if (b.dive.includes(e.code) && playing && player.walker.mode === 'ground' && !player.flying) {
@@ -1886,6 +2205,7 @@ export async function start(b: Boot): Promise<void> {
       say: (text) => notes.say(text, 6),
     });
     /** Each VGM tool's time into the hitch log (a slow frame names the tool). */
+    const nightWatch = new NightWatch();
     const vgmTimed = { timeNow: () => performance.now(), spent: (tool: string, ms: number) => { if (ms >= 2) HITCHES.note(`vgm ${tool}`, ms); } };
     const direct = (dt: number): void => {
       const below = !!visit();
@@ -1896,13 +2216,15 @@ export async function start(b: Boot): Promise<void> {
       const m = director.next();
       if (m) notes.say(m, 6);
       HITCHES.part('vgm gather+hails');
-      if (!title?.holding && !creator?.showing) gatherNear();
+      if (!title?.holding && !creator?.showing) { gatherNear(); searchChests(); }
       hails?.sendFor(dt, fighting > 0 || below);
       builderClock += dt;
       if (builderClock < 3 || title?.holding || creator?.showing) return;
       builderClock = 0;
       HITCHES.part('vgm turn');
       vgmStep();
+      // A night watched through at a household's door, nothing having come (D62).
+      for (const id of nightWatch.step({ seed, log, towns: terrain.towns, hours: hours(), hero: { x: player.walker.pos.x, z: player.walker.pos.z }, setting })) quietPlace?.(id);
       HITCHES.part('vgm answer');
       answerOverdue(below);
     };
@@ -1940,7 +2262,9 @@ export async function start(b: Boot): Promise<void> {
       if (!start) return [];
       const made = vgmTurn({
         seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id),
-        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), hero: { x: player.walker.pos.x, z: player.walker.pos.z }, lean: (n) => director.model.lean(n),
+        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), beaten: (id) => wild?.bandBeaten(id) ?? false, hero: { x: player.walker.pos.x, z: player.walker.pos.z }, lean: (n) => director.model.lean(n),
+        // Out on the land on foot, where the world may press the hero: the way they are going (the caves along a cliff open ahead of it).
+        toward: visit() || here() || player.offFoot || !director.fair ? null : regionSites?.ahead(400) ?? null,
         // A story event's band needs the wild to roam in.
         tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which, ...vgmTimed,
       });
@@ -1968,7 +2292,7 @@ export async function start(b: Boot): Promise<void> {
       } else if (d.kind === 'festivity') {
         // A good day (C11): the town gathers at its market; a feast for the hero's deed is told to them.
         console.info(`[vgm] ${d.id} (${d.festivity}) in ${d.town}, ${d.from.toFixed(1)} to ${d.to.toFixed(1)} h`);
-        const t = towns?.get(d.town), order = festivityOrder(terrain.towns, d);
+        const t = towns?.get(d.town), order = festivityOrder(terrain.towns, d, setting);
         if (t && order) orderTown(t, order);
         t?.promised(d);
         // Seen, not told (rule 11): the town gathers at its market; asked, its folk tell of the feast.
@@ -2013,8 +2337,7 @@ export async function start(b: Boot): Promise<void> {
         if (journal.knows(e.id)) continue;
         if (Math.hypot(p.x - e.x, p.z - e.z) < SEEN_BAND) { learnEvent(e.id, 'what you saw'); continue; }
         if (!t || t.id !== e.town || shouted.has(e.id) || !t.living) continue;
-        const who = t.life.agents.filter((a) => !a.hidden && !a.held && Math.hypot(a.x - p.x, a.z - p.z) < SHOUT_R)
-          .sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
+        const who = nearestFirst(t.life.agents.filter((a) => !a.hidden && !a.held && Math.hypot(a.x - p.x, a.z - p.z) < SHOUT_R), p.x, p.z)[0];
         const told = who && eventTold(setting, log, terrain.towns, e);
         if (!who || !told) continue;
         shouted.add(e.id);
@@ -2026,6 +2349,12 @@ export async function start(b: Boot): Promise<void> {
     const situationNow = (kind: SituationKind): Made | null => {
       if (kind === 'paddock-wolves' || kind === 'stray-beast') return vgmStep({ tools: [kind], early: true })[0] ?? null;
       const at = player.walker.pos, def = situationOf(setting, kind);
+      if (kind === 'castaway') {
+        const d = castawayFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: { x: at.x, z: at.z }, toward: null }, true);
+        const m = d && madeBy('castaway', d, 'asked for now', hours());
+        if (m) applied(m);
+        return m;
+      }
       const d = def && travellerFor({ seed, log, terrain, towns: terrain.towns, hours: hours(), setting, hero: { x: at.x, z: at.z }, toward: regionSites?.ahead(400) ?? null });
       if (!d || !def) return null;
       const m = madeBy('hurt-traveller', { ...d, situation: def.id }, 'asked for now', hours());
@@ -2052,9 +2381,25 @@ export async function start(b: Boot): Promise<void> {
         if (title.holding) giant.view.frame(dt, giantPose(orbit, title.draw.seed, (giant.t += dt)));
         else { giant.view.dispose(); giant = null; }
       }
+      // The ships on the waves first: a hero on a deck goes with it before taking a step.
+      part('ships');
+      ships.float(view.camera.position, hours(), dt);
+      // (A harbour town's passengers aboard too, from its life while it lives.)
+      const crewNow = crews.atWork(decks, hours(), (id) => { const t = towns?.get(id); return t?.living ? t.life : null; }, player.walker.pos);
+      // A castaway (S9): treading water by their boat, brought in behind the swimming hero, wading ashore.
+      const w0 = player.walker, castNow = castaways.drift(dt, castawaysAt(log, hours()), { x: w0.pos.x, y: w0.pos.y, z: w0.pos.z, yaw: w0.yaw, swimming: w0.mode === 'swim' && !player.offFoot }, { surface: (x, z) => sea.surfaceAt(x, z) ?? 0, ground: (x, z) => terrain.height(x, z) });
+      const outdoorsFolk = castNow.length ? [...crewNow, ...castNow] : crewNow;
       part('player');
       if (title?.holding || creator?.showing) player.standBy(dt);
       else player.update(dt);
+      decks.boarded();
+      // Coming in at the far quay aboard her ship (S4): said once, as she comes alongside.
+      { const now = hours(), aboard = decks.ship;
+        if (aboard && setting.voyage && shipClock >= 0) for (const o of voyagesNow()) if (o.v.arrive > shipClock && o.v.arrive <= now && aboard.startsWith(`${o.from}/`)) notes.say(voyageArrived(setting.voyage, { name: towns?.get(o.to)?.town.decision.size ? `the ${towns.get(o.to)!.town.decision.size}` : 'the harbour', hours: o.v.arrive - o.v.at }), 7);
+        shipClock = now;
+        // Out at sea aboard her, the day goes by faster (S4).
+        const o = aboard ? underWay(voyagesNow(), aboard, now) : null, pose = o && decks.poseOf(aboard!);
+        view.sky.pace = o && pose ? seaPace(o.v, now, pose.x, pose.z) : 1; }
       // Through an opening: on out of the other; the camera stands on whichever side it trails on.
       if (!title?.holding && !creator?.showing) {
         const was = through.passed;
@@ -2111,18 +2456,16 @@ export async function start(b: Boot): Promise<void> {
           const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
           if (opened) regionOpened(opened);
           // A place come upon for the first time meets Discovery (C9): a sight in full, with its words; a region's place half.
-          const came = player.offFoot ? null : regionSites.cameUpon(player.walker.pos.x, player.walker.pos.z);
+          // (As an otter, where it swims: a wreck is come upon in that shape too.)
+          const swims = otterForm?.animal ? otterForm.kit.sim.pos : player.offFoot ? null : player.walker.pos;
+          const came = swims ? regionSites.cameUpon(swims.x, swims.z, swims.y) : null;
           if (came?.sight && came.decision) {
             notes.say(came.sight.seen, 8);
-            // A find by the way (Reward's answer): into the pack and purse, shown as finds below are.
-            const loot = findIn(setting, came.sight, came.decision, start?.decision ?? home);
-            if (loot) {
-              character.pack.push(...loot.items);
-              character.coins += loot.coins;
-              fightHud.showFinds(loot);
-              sounds?.coins();
-              director.met('reward');
-            } else director.met('discovery');
+            // A boat washed up (S9): her sea chest is searched where it lies, the hero kneeling at it (searchChests).
+            if (came.decision.strand) {
+              const [cx, cz] = washedUpChest(came.decision);
+              chests.push({ x: cx, z: cz, sight: came.sight, decision: came.decision });
+            } else takeFind(came.sight, came.decision);
             character.earn(`sight:${came.id}`, 'sight');
           } else if (came) {
             director.met('discovery', 0.5);
@@ -2140,9 +2483,12 @@ export async function start(b: Boot): Promise<void> {
             cried.add(c.id);
             const t = towns?.get(c.town), folk = t?.living ? t.life.agents.filter((a) => !a.hidden && !a.held) : [];
             // The traveller themselves; at a paddock or a burning barn whoever of the town stands nearest it (nobody near: no cry).
+            // A castaway calls out themselves, from the water.
             const who = c.kind === 'hurt-traveller' ? folk.find((a) => a.person.role === 'traveller')
+              : c.kind === 'castaway' ? null
               : folk.filter((a) => Math.hypot(a.x - c.x, a.z - c.z) < 90).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
-            if (who) speech.say(c.text, () => (who.hidden ? null : { x: who.x, y: terrain.height(who.x, who.z), z: who.z }));
+            const adrift = c.kind === 'castaway' && castaways.fisherOf(c.id);
+            if (who || adrift) speech.say(c.text, () => (adrift ? castaways.fisherOf(c.id) : who!.hidden ? null : { x: who!.x, y: terrain.height(who!.x, who!.z), z: who!.z }));
             // The smoke over a raided farm and the refugees on the road are a story event seen: the hero knows of it now.
             if (c.kind === 'raid-smoke' || c.kind === 'refugees') learnEvent(c.id.replace(/\/fled$/, ''), 'what you saw');
           }
@@ -2157,7 +2503,27 @@ export async function start(b: Boot): Promise<void> {
           player.walker.fell = 0;
           if (hurt > 0 && character.alive) { character.health = Math.max(1, character.health - hurt); fightHud.hurt(); }
         }
-        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues });
+        // Breath under water (S5): held while the head is under, unless the hero breathes water; out of it they drown.
+        // An otter holds it far longer (its shape's `hold`).
+        const otter = otterForm?.animal ? otterForm : null;
+        const under = otter ? otter.kit.sim.under : player.walker.headUnder && !player.offFoot;
+        const lost = breath.breathe(dt, under, character.gills, character.maxHealth, otter?.shift.shape.hold ?? 1);
+        player.walker.surfacing = breath.gasping;
+        if (otter) otter.kit.sim.surfacing = breath.gasping;
+        if (lost > 0 && character.alive) {
+          character.health = Math.max(1, character.health - lost);
+          if ((drownClock -= dt) <= 0) { drownClock = 1; fightHud.hurt(); }
+        }
+        // Lava (K7d): standing in a volcano's lake or in a flow's channel burns, to the last point of health and no lower.
+        if (!visit() && !player.offFoot && character.alive) {
+          const p = player.walker.pos, burns = inLava(p.y, terrain.lavaAt(p.x, p.z));
+          if (burns) {
+            character.health = Math.max(1, character.health - lavaBurn(dt, true, character.maxHealth));
+            if ((burnClock -= dt) <= 0) { burnClock = 0.5; fightHud.hurt(); }
+          }
+        }
+        breathHud.showBreath(breath.share, under, character.gills);
+        stepEncounters(dt, encounters(), { townDens: townDefence?.dens, hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
         const lead = leading();
         // A level gained (G3): the ring of light, the chime and the seal engraved; the hands raised only out of a fight.
         const h = player.hero, act = player.stance.action, acting = !!act && !!h && h.clock - act.t0 < act.dur;
@@ -2168,8 +2534,12 @@ export async function start(b: Boot): Promise<void> {
           if (cheer.gesture && h) player.stance = { ...player.stance, action: { ...CHEER, t0: h.clock } };
         }
         stoneUse.stoneFrame(dt);
+        spellView.bodyHeight = player.walker.height;
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
+      } else {
+        // Indoors no fight is in play, but the hero still falls and wakes, mends (sitting too) and casts.
+        stepEncounters(dt, [], { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
       }
       part('rooms+talk');
       if (!visit()) rooms?.update(dt);
@@ -2178,23 +2548,27 @@ export async function start(b: Boot): Promise<void> {
       { const t = here(); if (t) { if (!t.been) director.met('discovery'); character.earn(`town:${t.town.decision.id}`, 'town'); t.been = true; if (talk) talk.place = t; } }
       talk?.watch();
       // The key for what the hero stands by (a hatch, the ladder up): only the key and the deed, the climb is seen.
-      { const o = playing && open === 0 && !ended ? climbs.climbOffered : null; usePrompt.keyFor(settings.current.bindings.use[0], o === 'down' ? 'Climb down' : o === 'up' ? 'Climb up' : null); }
+      { const o = playing && open === 0 && !ended ? climbs.climbOffered ?? shipClimbs.climbOffered : null; usePrompt.keyFor(settings.current.bindings.use[0], o === 'down' ? 'Climb down' : o === 'up' ? 'Climb up' : playing && open === 0 && !ended && bunk.offered ? 'Sleep till landfall' : null); }
       part('map+minimap');
       const at = player.walker.pos;
       // The map fills in: the land round the hero as they go (not below ground), and a sketch of the way to each new mark.
       if (!visit() && (!seenAt || Math.hypot(at.x - seenAt[0], at.z - seenAt[1]) > 16)) { seenAt = [at.x, at.z]; known.see(at.x, at.z); }
+      // Noticing (D66): twice a second the hero's eyes take in the places in view, and the minimap and map mark them.
+      if (!visit() && setting.noticing && (noticeClock -= dt) <= 0) { noticeClock = 0.5; noticed.glance(at, noticeList(), (x, z) => terrain.height(x, z), daylight(view.sky.hour), setting.noticing); }
       for (const l of journal.open) if (!known.told(l.id)) known.tell(l.id, rooms?.outside ? [rooms.outside.x, rooms.outside.z] : [at.x, at.z], [l.mark.x, l.mark.z]);
       if (minimap.showWhile(!title?.holding && !creator?.showing && !!window.__mwReady)) {
         const look = player.flying ? player.fly.yaw : player.heroCam.yaw, me = heroAt(player.walker.yaw), v = visit(), w = player.walker;
         const marks = journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })), sky = skyGlyph();
         if (v) {
           // Below ground the round is the dungeon round the hero; the land's marks ride the rim from its door.
-          const lv = v.space.levelAt(w.pos.y - v.origin.y), range = belowRange(v.space, !!v.cellar.form.space.carved);
+          const lv = v.formed ? Math.round((w.pos.y - v.origin.y) / STOREY) : v.space.levelAt(w.pos.y - v.origin.y), range = belowRange(v.space, !!v.cellar.form.space.carved);
           minimap.read({ x: w.pos.x, z: w.pos.z, look, yaw: w.yaw, hour: view.sky.hour, sky, marks, below: { sheet: `${v.origin.x},${v.origin.z}:${lv}:${v.seen.version}`, range, from: me } });
           minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark, 0);
+          minimap.noticedMarks(noticed.of(noticeList()), me.x, me.z, 0);
         } else {
           minimap.read({ x: me.x, z: me.z, look, yaw: me.yaw, hour: view.sky.hour, sky, marks });
           minimap.vgmMarks(vgmPanel.marks, me.x, me.z, vgmPanel.pickedMark);
+          minimap.noticedMarks(noticed.of(noticeList()), me.x, me.z);
         }
       }
       part('vgm direct');
@@ -2211,7 +2585,8 @@ export async function start(b: Boot): Promise<void> {
       part('origin+weather');
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
       // Under the sea, or in the waterline (render/underwater.ts): the camera's height over the surface at it, waves and all.
-      const camAt = view.camera.position, surf = sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
+      // Down in a place, its own water (a sea cave's drowned storey), not the sea's.
+      const camAt = view.camera.position, surf = below() ? world.waterLevel(camAt.x, camAt.z) : sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
       view.sky.underwater = overSea < -UNDER_LENS;
       updateVeil(view.camera, overSea, view.sky.underwater, view.sky.murk, dt);
       wx.apply(dt, view.camera.position, hours(), view.sky);
@@ -2233,6 +2608,7 @@ export async function start(b: Boot): Promise<void> {
         scorched = burnt;
       }
       if (smokeIn) smoke.billow(dt);
+      volcanoes.keepUp(dt, view.camera.position);
       part('sky');
       view.sky.update(dt, view.camera);
       // Down in the cellar the land above is out of the frame (visit.onDepth): its updates wait.
@@ -2240,7 +2616,6 @@ export async function start(b: Boot): Promise<void> {
       if (above) {
         part('sea');
         sea.update(dt, view.camera.position, view.sky.light, view.sky.gain);
-        ships.float(view.camera.position, hours(), dt);
         part('ground');
         ground.update(view.camera);
         part('roads+horizon');
@@ -2248,6 +2623,26 @@ export async function start(b: Boot): Promise<void> {
         view.sky.horizon.track(view.camera.position, view.sky.lightDirection, params.horizon ? terrainJobs : null);
         part('towns.tick');
         towns.tick(dt, view.camera.position);
+      }
+      // The hero's torch (worn in the off hand): lit in the dark (below ground, in a cave's throat, out of doors at
+      // night), out indoors, in the water and in an animal's form. Its flame carries the lantern's light.
+      part('torch');
+      {
+        const h = player.hero, under = !!visit() || throatLamp, L = view.lantern;
+        const dark = under || (WINDOWS.glow.value > TORCH_DUSK && !rooms?.inside);
+        if (h) h.torchLit = h.holdsTorch && dark && !player.hideHero && player.walker.mode !== 'swim';
+        const at = h?.flameAt(flamePoint) ?? null;
+        // Out of doors at night the lantern is the torch's alone: a little beyond the flame, away from the body (right
+        // beside it, it burned the hero's own clothes white), in firelight's orange. Below and in a throat their own
+        // walks light it as before, head-high just ahead (about where the flame burns), as the places were tuned.
+        const night = !!at && !under;
+        if (night) {
+          const w = player.walker.pos, dx = at.x - w.x, dz = at.z - w.z, d = Math.hypot(dx, dz) || 1;
+          L.position.set(at.x + (dx / d) * TORCH_LIGHT_OUT, at.y + TORCH_LIGHT_UP, at.z + (dz / d) * TORCH_LIGHT_OUT);
+          L.intensity = TORCH_NIGHT * flameFlicker(h!.clock);
+        } else if (torchLamp && !under && !rooms?.inside) L.intensity = 0;
+        L.color.setHex(night ? TORCHLIGHT.color : LANTERN_COLOR);
+        torchLamp = night;
       }
       // Doorways at night above, torches below, a soft fill on the hero in a room.
       part('warm lights');
@@ -2258,6 +2653,8 @@ export async function start(b: Boot): Promise<void> {
       const cam = view.camera.position;
       part('towns.live');
       const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain }, journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })), below() ? null : player.walker.pos);
+      // Raiders in a town: its watch and able folk meet them, the rest go indoors (R6).
+      townDefence?.guard(dt, towns.every.filter((t) => t.living));
       if (folk) folk.lives = lives;
       part('herds');
       stock?.herd(dt, cam, towns.graze(dt, cam.x, cam.z));
@@ -2286,15 +2683,15 @@ export async function start(b: Boot): Promise<void> {
         const near = lookSmall ? small.firstSeen(lookSmall) : null;
         if (near && lookSmall) {
           // With `fly`: the free camera follows it close by (a free camera alarms no one).
-          if (player.flying) watchSmall = { it: near, d: lookSmall === 'flock' ? 25 : 2.5 };
+          if (player.flying) watchSmall = { it: near, d: lookSmall === 'flock' ? 25 : lookSmall === 'fish' ? 5 : 2.5, wet: lookSmall === 'fish' };
           else standBeside(near, lookSmall === 'squirrel' ? 13 : lookSmall === 'flock' ? 45 : 15);
           lookSmall = null;
         }
         if (watchSmall && player.flying) {
-          const { it, d } = watchSmall, c = view.camera.position, k = Math.max(0.01, Math.hypot(c.x - it.x, c.z - it.z));
+          const { it, d, wet } = watchSmall, c = view.camera.position, k = Math.max(0.01, Math.hypot(c.x - it.x, c.z - it.z));
           if (k > d * 1.5 || k < d * 0.5) {
             const cx = it.x + (c.x - it.x) / k * d, cz = it.z + (c.z - it.z) / k * d;
-            player.fly.place(cx, cz, d > 5 ? it.y - 4 : terrain.height(cx, cz) + 0.9, true);
+            player.fly.place(cx, cz, wet ? it.y : d > 5 ? it.y - 4 : terrain.height(cx, cz) + 0.9, true);
           }
           const dx = it.x - c.x, dy = it.y + 0.1 - c.y, dz = it.z - c.z;
           player.fly.setLook(Math.atan2(dx, -dz) * 180 / Math.PI, Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI);
@@ -2302,23 +2699,27 @@ export async function start(b: Boot): Promise<void> {
         // A free camera disturbs no one; they live round it.
         const hero = player.flying ? null : { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed };
         if (out) for (const e of small.step(dt, hero, daylight(view.sky.hour), wx.shown.rain, hero ?? view.camera.position)) sounds?.wings(e);
-        smallView.show(dt, view.camera.position, out);
+        smallView.show(dt, view.camera.position, out, view.sky.underwater);
       }
       // The people in the building drawn open (seen through its door and windows too).
       part('folk');
       // Below, only whoever of the household came down to the hero (nobody else is in the frame).
       if (owner && (owner.done || visit() !== owner.visit)) owner = null;
+      lostBelow();
       if (owner) owner.step(dt, player.walker.pos);
       const ownerAt = owner?.placed() ?? null;
       if (folk) {
         folk.only = !!visit();
-        folk.indoors = visit() ? (ownerAt ? [ownerAt] : null) : rooms ? rooms.people() : null;
+        // (And out of doors the ships' crews, where their vessels carry them.)
+        folk.indoors = visit() ? (ownerAt ? [ownerAt] : null) : rooms?.inside ? rooms.people() : outdoorsFolk.length ? [...(rooms?.people() ?? []), ...outdoorsFolk] : rooms ? rooms.people() : null;
         if (!above && ownerAt) folk.follow(dt, view.camera);
       }
       if (above) {
         // Until the game begins, the people round the hero's place are dressed (the title's fly-over is far up).
         if (folk) folk.focus = title?.holding || !window.__mwReady ? player.walker.pos : null;
         folk?.follow(dt, view.camera);
+        // The crew's ropes, from between their hands as their clips move them (where they are drawn as characters).
+        ships.ropes(crews.lines.map((l) => (l.held && folk?.agentHand(l.agent, 'l', handL) && folk.agentHand(l.agent, 'r', handR) ? { from: { x: (handL.x + handR.x) / 2, y: (handL.y + handR.y) / 2, z: (handL.z + handR.z) / 2 }, to: l.to } : l)));
         part('flora');
         if (boot.trees) flora.update(dt, view.camera);
         part('trunks+grass');

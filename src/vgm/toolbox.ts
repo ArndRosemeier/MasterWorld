@@ -9,18 +9,23 @@ import type { SettingModule } from '../setting/contract';
 import type { Decision } from '../world/decisions';
 import type { Need } from './director';
 import { ambushFor, travellerFor, sightFor, type NeedContext } from './answers';
-import { caveFor } from './caves';
+import { caveFor, cliffCaveFor } from './caves';
+import { washedUpFor, wreckFor } from './wrecks';
 import { fadedFor, lairFor, nextEvent, type EventsContext } from './events';
 import { festivityFor } from './festivities';
-import { hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
+import { castawayFor, hurtTravellerFor, paddockWolvesFor, strayBeastFor } from './situations';
+import { nightWatchFor } from './watch';
 import { nextPromise, openPromises, type LeadsContext } from './leads';
+import { islandPlace } from './islands';
 
 /** Who asks a tool: the start of a game, the hero walking, the Builder's turn, an overdue need (C9), or another tool or the game. */
 export type Asked = 'start' | 'walk' | 'turn' | 'need' | 'call';
 
 /** What the Builder's turn knows: the log, the land and towns, the hours, the hero and the setting. */
 export type TurnContext = Omit<LeadsContext, 'dungeons' | 'terrain'> & Omit<EventsContext, 'setting'> & {
-  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world'>;
+  readonly setting: EventsContext['setting'] & Pick<SettingModule, 'situations' | 'festivities' | 'world' | 'asks' | 'twists' | 'sights' | 'noticing'>;
+  /** Where the hero is going, if the game knows and they are out on the land on foot (the cliff caves ahead of them; none: no way known). */
+  readonly toward?: { readonly x: number; readonly z: number } | null;
   /** Ask only these turn tools (by id); none: all of them. */
   readonly tools?: readonly string[];
   /** How much this player enjoys a need (C12: the player model); none: no lean. */
@@ -62,7 +67,9 @@ export const TOOLS: readonly Tool[] = [
   { id: 'region', name: 'Open a region', writes: ['region'], need: 'discovery', asked: 'walk' },
   { id: 'road', name: 'Lay a road', writes: ['road'], need: 'discovery', asked: 'call' },
   { id: 'wild', name: 'Place the wild', writes: ['wild'], need: 'challenge', asked: 'call' },
-  { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons }),
+  { id: 'island-place', name: 'A place on an island', writes: ['dungeon'], need: 'discovery', asked: 'turn', next: (c) => islandPlace({ ...c, dungeons: c.setting.dungeons }),
+    why: (d) => (d.kind === 'dungeon' ? `a ${d.template} out on the island of ${d.town}, for its people to know of` : d.kind) },
+  { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons, asks: c.setting.asks, twists: c.setting.twists }),
     why: (d, c) => {
       const open = openPromises(c.log).length;
       const what = d.kind === 'move-in' ? `new dwellers into ${d.dungeon}` : d.kind === 'dungeon' ? `a ${d.template} for ${d.town}` : d.kind;
@@ -80,19 +87,33 @@ export const TOOLS: readonly Tool[] = [
     why: (d) => (d.kind === 'festivity' ? `${d.festivity} in ${d.town}${d.for ? `: the hero kept ${d.for}` : ''}` : d.kind) },
   { id: 'retake', name: 'Others take a place', writes: ['retake'], need: 'challenge', asked: 'call' },
   { id: 'cave', name: 'A cave in the cliffs', writes: ['dungeon'], need: 'discovery', asked: 'need', answer: caveFor },
+  { id: 'cliff-cave', name: 'Caves along a cliff', writes: ['dungeon'], need: 'discovery', asked: 'turn', next: (c) => cliffCaveFor({ ...c, hero: c.hero ?? { x: Infinity, z: Infinity }, toward: c.toward ?? null }),
+    why: (d) => (d.kind === 'dungeon' ? `a ${d.template} in a cliff ahead of the hero, as they run along it` : d.kind) },
   { id: 'sight', name: 'A sight by the way', writes: ['sight'], need: 'discovery', asked: 'need', answer: (c) => sightFor(c) },
+  { id: 'washed-up', name: 'A wreck washed up', writes: ['sight'], need: 'reward', asked: 'need', answer: washedUpFor },
+  { id: 'wreck', name: 'A wreck off the coast', writes: ['sight'], need: 'reward', asked: 'need', answer: wreckFor },
   { id: 'cache', name: 'A find by the way', writes: ['sight'], need: 'reward', asked: 'need', answer: (c) => sightFor(c, 'reward') },
   { id: 'ambush', name: 'An ambush', writes: ['wild'], need: 'challenge', asked: 'need', answer: ambushFor },
   { id: 'paddock-wolves', name: 'Wolves at the paddock', writes: ['wild'], need: 'challenge', asked: 'turn', next: paddockWolvesFor,
     why: (d) => (d.kind === 'wild' ? `dusk in ${d.town}: ${d.encounter} (${d.members.length}) at a paddock` : d.kind) },
+  { id: 'night-watch', name: 'The threat comes in the night', writes: ['wild'], need: 'challenge', asked: 'turn', next: nightWatchFor,
+    why: (d) => (d.kind === 'wild' ? `the hero keeps watch for ${d.watch}: ${d.encounter} (${d.members.length}) come out of the dark` : d.kind) },
   { id: 'stray-beast', name: 'A beast got out', writes: ['stray'], need: 'people', asked: 'turn', next: strayBeastFor,
     why: (d) => (d.kind === 'stray' ? `a day in ${d.town}: a beast out of its paddock, its farm after it` : d.kind) },
+  { id: 'castaway', name: 'A cry from the water', writes: ['castaway'], need: 'people', asked: 'need', answer: castawayFor },
   { id: 'hurt-traveller', name: 'A hurt traveller', writes: ['traveller'], need: 'people', asked: 'need', answer: hurtTravellerFor },
   { id: 'traveller', name: 'A traveller by the way', writes: ['traveller'], need: 'people', asked: 'need', answer: travellerFor },
   { id: 'journey', name: 'A journey', writes: ['journey'], need: null, asked: 'call' },
+  { id: 'voyage', name: 'A voyage', writes: ['journey'], need: null, asked: 'call' },
+  { id: 'hold-ship', name: 'Hold a ship in harbour', writes: ['delay'], need: null, asked: 'call' },
+  { id: 'far-harbour', name: 'A harbour across the water', writes: ['region'], need: null, asked: 'call' },
+  { id: 'island', name: 'An island out at sea', writes: ['region'], need: 'discovery', asked: 'call' },
   { id: 'quest', name: "A master's deed", writes: ['dungeon'], need: 'purpose', asked: 'call' },
+  { id: 'task', name: "A guild's task", writes: ['dungeon'], need: 'purpose', asked: 'call' },
+  { id: 'favour', name: 'A favour asked', writes: ['dungeon'], need: 'purpose', asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },
+  { id: 'stance', name: 'What foes know of the hero', writes: [], need: null, asked: 'call' },
 ];
 
 /** The tool of this id. */
@@ -131,7 +152,7 @@ export function answerNeed(need: Need, c: NeedContext): Made | null {
     if (t.asked !== 'need' || t.need !== need || !t.answer) continue;
     const t0 = c.timeNow?.() ?? 0, d = t.answer(c);
     if (c.spent && c.timeNow) c.spent(t.id, c.timeNow() - t0);
-    if (d) return madeBy(t.id, d, `${need} is overdue: ${d.kind === 'sight' ? d.sight : d.kind === 'dungeon' ? `a ${d.template} in a cliff` : d.kind === 'wild' ? `${d.encounter} (${d.members.length}) lying in wait` : d.kind} by the hero's way${c.toward ? ` to ${Math.round(c.toward.x)}, ${Math.round(c.toward.z)}` : ''}`, c.hours);
+    if (d) return madeBy(t.id, d, `${need} is overdue: ${d.kind === 'sight' ? (d.sea ? `${d.sight} off the coast` : d.sight) : d.kind === 'dungeon' ? `a ${d.template} in a cliff` : d.kind === 'wild' ? `${d.encounter} (${d.members.length}) lying in wait` : d.kind} by the hero's way${c.toward ? ` to ${Math.round(c.toward.x)}, ${Math.round(c.toward.z)}` : ''}`, c.hours);
   }
   return null;
 }

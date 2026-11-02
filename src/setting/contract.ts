@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 14;
+export const CONTRACT_VERSION = 17;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -67,11 +67,12 @@ export interface BiomeDef {
 
 /**
  * The shapes a landform can take (D55, plan 5.9): each is a rule in world/landforms.ts that bends the height
- * field over 30-500 m. Round ones: knoll, tor (a knoll with rock breaking through its crown), dell, sinkhole.
+ * field over 30-500 m. Round ones: knoll, tor (a knoll with rock breaking through its crown), dell, sinkhole, cone (a
+ * cinder cone: steep sides to a rim round a crater).
  * Long ones run along an axis: gully and ravine (cut downhill), ridge, scarp (a step in the land), dry valley,
  * bank and sunken lane (old work of hands). Boulders and erratics leave the ground as it is; their rock is all.
  */
-export const LANDFORM_SHAPES = ['knoll', 'tor', 'dell', 'sinkhole', 'gully', 'ravine', 'ridge', 'scarp', 'dryValley', 'bank', 'sunkenLane', 'boulders', 'erratic'] as const;
+export const LANDFORM_SHAPES = ['knoll', 'tor', 'dell', 'sinkhole', 'gully', 'ravine', 'ridge', 'scarp', 'dryValley', 'bank', 'sunkenLane', 'boulders', 'erratic', 'cone'] as const;
 export type LandformShape = (typeof LANDFORM_SHAPES)[number];
 
 /** One kind of landform: its shape and how big it comes. */
@@ -153,6 +154,271 @@ export interface WorldShape {
   readonly landforms?: readonly LandformDef[];
   /** The kinds of country (D55, plan 5.9), each stretch of 5-20 km one of them; all open country if absent. */
   readonly kinds?: readonly LandscapeKindDef[];
+  /** Islands out at sea (S7); none if absent. */
+  readonly islands?: IslandsDef;
+}
+
+/**
+ * Caves that form (D63, phase K, docs/design/caves.md): every size, share and rock setting of a formed cave is a
+ * number here, so it is changed in one place. A cave is a block of rock (geology from the land's kind), a former
+ * that lets the water, the lava or the miners open it, and a carver that turns what formed into the rock field.
+ */
+export interface CavesDef {
+  /** Which rocks the land's kinds hold (by landscape kind id); a kind not listed holds no formed cave. */
+  readonly geology: readonly CaveGeologyDef[];
+  /** The rock settings: how the rock is bedded and jointed, where the water comes in and how it opens the rock. */
+  readonly rocks: readonly CaveRockDef[];
+  /** How big a cave is; the big one is about 300 m across and 60 m deep. */
+  readonly sizes: readonly CaveSizeDef[];
+  /** How the built, water and lava shares of a cave mix (Arnd: pure caves are the norm, a mixed one has two shares). */
+  readonly shares: CaveSharesDef;
+  /** What a way must allow: no squeezing, every way is at least the hero's standing size. */
+  readonly way: CaveWayDef;
+  /** The carved walls. */
+  readonly walls: CaveWallsDef;
+  /** What lies in the cave: silt, fallen rock, water, drips and formations (K3). */
+  readonly dress: CaveDressDef;
+  /** The ore in the rock (it only shows in the walls: no mining, D63). */
+  readonly ore: CaveOreDef;
+}
+
+/** The rocks a kind of country holds (`kind` '*': any other kind), by weight. */
+export interface CaveGeologyDef {
+  readonly kind: string;
+  /** Rock setting id to weight. */
+  readonly rocks: Readonly<Record<string, number>>;
+}
+
+/** A lava tube's making (K7, docs/design/caves.md 3.2): a flow runs from a vent down the old land, a few metres under its crust, and drains. Metres, as the block's frame. */
+export interface CaveLavaDef {
+  /** A tube's half-width and half-height, metres, least and most (a tube 5 to 15 m wide). */
+  readonly halfWidth: readonly [number, number];
+  readonly halfHeight: readonly [number, number];
+  /** How much the floor falls per metre along a tube, least and most (a tube is gently sloped). */
+  readonly gradient: readonly [number, number];
+  /** How far the main tube runs under the crust before it may come out, as a share of the block's width (least and most). */
+  readonly length: readonly [number, number];
+  /** Rock over a tube's roof, metres; a tube reaches the land (a mouth) where the land comes down to it. */
+  readonly roof: number;
+  /** Side tubes (distributaries) off the main one, least and most, and how long they run, metres. */
+  readonly branches: readonly [number, number];
+  readonly branchLength: readonly [number, number];
+  /** How much the course wanders (radians of turn per step, 0..1). */
+  readonly wander: number;
+  /** Skylights (the roof fell in) most, how far apart, and the roof thickness under which one may stand, metres. */
+  readonly skylights: { readonly most: number; readonly apart: number; readonly thin: number };
+}
+
+/** Mines (K8): people followed the ore. A square-cut adit from the hillside to a vein, drifts along it on levels, crosscuts, stopes where the ore was taken and inclines between the levels. */
+export interface CaveMineDef {
+  /** A drift's half-width and half-height, metres (people cut a way as wide as a cart needs: 1.4 to 1.9 m either side). */
+  readonly halfWidth: readonly [number, number];
+  readonly halfHeight: readonly [number, number];
+  /** How far a drift's walls are cut square: 0 an ellipse, 1 a box with rounded corners. */
+  readonly square: number;
+  /** Levels (floors of drifts), least and most, and the height between two of them (m). */
+  readonly levels: readonly [number, number];
+  readonly gap: number;
+  /** How far the adit runs under the hill at least (m) and the rock left over its roof (m). */
+  readonly adit: number;
+  readonly roof: number;
+  /** Crosscuts (side drifts off a drift to the other side of the vein), least and most per level, and their length (m). */
+  readonly crosscuts: readonly [number, number];
+  readonly crosscutLength: readonly [number, number];
+  /** Stopes (the ore taken out as a tall chamber over a drift): most per level and their size (strike half-length, m). */
+  readonly stopes: number;
+  readonly stopeLength: readonly [number, number];
+  /** How steeply an incline between two levels climbs (rise per metre). */
+  readonly incline: number;
+  /** What people fitted in (world/cave/fittings.ts): timber sets every `posts` m (a post's half thickness, the beam's, the share of sets that stand), rails (gauge, rail thickness, sleeper spacing) and carts (most). */
+  readonly fittings: { readonly posts: number; readonly post: number; readonly beam: number; readonly timbered: number; readonly gauge: number; readonly rail: number; readonly sleeper: number; readonly carts: number };
+}
+
+/** One rock setting of a solution cave: the three patterns the water leaves (branchwork, network maze, braids) come from these numbers. */
+export interface CaveRockDef {
+  readonly id: string;
+  readonly name: string;
+  /** Beds (layers): thickness and dip, how readily they dissolve, how much the water prefers the planes between them. */
+  readonly bedding: {
+    /** Thickness of one bed, metres, least and most. */
+    readonly thickness: readonly [number, number];
+    /** Dip of the beds, degrees, least and most. */
+    readonly dip: readonly [number, number];
+    /** Share of the beds that dissolve readily (the rest are hard and tight). */
+    readonly soluble: number;
+    /** How much easier the water goes along the plane between two beds, 0 (no preference) and up. */
+    readonly parting: number;
+    /** Wall colours of the beds (0xRRGGBB); each bed takes one, varied in lightness. */
+    readonly colors: readonly number[];
+  };
+  /**
+   * How much the rock resists the water, patch by patch (D63, Arnd: the rock differs in what it is made of, so the water
+   * does not open it evenly): hard and soft patches, `size` metres across, whose ease differs by about `contrast` (the
+   * natural log of the spread: 1 is a factor of about 3 either way). The water winds round the hard and opens the soft
+   * wide.
+   */
+  readonly resistance: { readonly size: number; readonly contrast: number };
+  /** Joints: near-vertical cracks in sets at an angle to each other. */
+  readonly joints: {
+    readonly sets: number;
+    /** Spacing between cracks of a set, metres. */
+    readonly spacing: readonly [number, number];
+    /** The angle between the first set and each next, degrees. */
+    readonly between: readonly [number, number];
+    /** How much easier the water goes along a crack, 0 and up. */
+    readonly strength: number;
+  };
+  /** Faults: rare, long breaks. */
+  readonly faults: { readonly count: readonly [number, number]; readonly strength: number };
+  /** Where the water comes in and goes out, and how the water table dropped over time. */
+  readonly water: {
+    /** Sinks (water gets in high up), least and most. */
+    readonly sinks: readonly [number, number];
+    /** Springs (water comes out low, on the valley side), least and most. */
+    readonly springs: readonly [number, number];
+    /** Levels: stages the water table stood at, least and most (the older ones dry above the new). */
+    readonly stages: readonly [number, number];
+    /** How far the table dropped between two stages, metres. */
+    readonly drop: readonly [number, number];
+    /** How far below the table the water may loop in a tube, metres. */
+    readonly loop: number;
+  };
+  /** How the water opens the rock (the feedback of flow and width). */
+  readonly former: {
+    /** Rounds of flow and widening per stage. */
+    readonly rounds: number;
+    /** Paths found per round, each over rock whose ease is jittered: 1 gives a tree, more give braids. */
+    readonly samples: number;
+    /** How strongly width draws flow (the conductance goes with width to this power): high gives one winner, low a net. */
+    readonly feedback: number;
+    /** How much a round of full flow widens a path (a factor per round). */
+    readonly growth: number;
+    /** How much of its ease an old, now dry passage keeps when the water table has dropped (0..1): low lets the new water find its own way down. */
+    readonly reuse: number;
+    /** How uneven the rock's ease is, 0..1 (cracks, pockets); braids need it. */
+    readonly noise: number;
+    /** Least share of the water a path carries to stay a passage. */
+    readonly keep: number;
+  };
+  /** Lava tubes (K7): a rock with this is opened by a lava flow draining from under its crust (world/cave/lava.ts), not by water. */
+  readonly lava?: CaveLavaDef;
+  /** Mines (K8): a rock with this is dug by people following its ore (world/cave/mine.ts); it has no water and no dripstone. */
+  readonly mine?: CaveMineDef;
+  /** Collapse: where passages cross or span too wide, the ceiling falls (a big uneven void and a rubble heap under it). */
+  readonly collapse: {
+    /** Chance at a junction of big passages. */
+    readonly junction: number;
+    /** Half-width of a passage, metres, past which its ceiling may fall. */
+    readonly span: number;
+    /** Most voids in one cave. */
+    readonly most: number;
+  };
+}
+
+/** A size of cave: the block of rock around it. */
+export interface CaveSizeDef {
+  readonly id: string;
+  /** Side of the block, metres. */
+  readonly across: number;
+  /** Depth of the block, metres. */
+  readonly deep: number;
+  /** Relative chance. */
+  readonly weight: number;
+  /** How much its passages are scaled (a big cave has broad trunks). */
+  readonly scale: number;
+  /** Distance between nodes of the lattice the water flows on, metres (a coarser lattice for a bigger block keeps the forming quick). */
+  readonly step: number;
+  /** Distance between samples of the carved field, metres (coarser for a bigger cave: the carving and the mesh cost goes with the cube of it). */
+  readonly field: number;
+}
+
+/** Shares of a cave: built (people dug), water (a solution cave), lava (a lava tube). They add up to 1; one is usually 0. */
+export interface CaveSharesDef {
+  /** Chance of a cave with one share only (the norm), with two, with all three. They add up to 1. */
+  readonly pure: number;
+  readonly two: number;
+  readonly three: number;
+  /** How likely each share is to be among the ones present. */
+  readonly weight: { readonly built: number; readonly water: number; readonly lava: number };
+  /** The kinds of country lava caves need (none today: there is no volcanic country yet). */
+  readonly lavaOn: readonly string[];
+}
+
+/** The least size of a way (D63: no squeezing): the standing hero fits everywhere. */
+export interface CaveWayDef {
+  /** Least width of a passage at the floor, metres. */
+  readonly minWidth: number;
+  /** Least height of a passage, metres. */
+  readonly minHeight: number;
+  /** Greatest half-width of a tube, metres, at a scale of 1. */
+  readonly maxRadius: number;
+  /** Deepest a canyon is cut into its floor, metres, at a scale of 1. */
+  readonly maxCut: number;
+  /** The reader's hero (K4): standing height and body radius, metres; a step up or down that is just walked; the highest face climbed (cave rock is climbable, D56); the furthest jumped or let down (one way). */
+  readonly stand: number;
+  readonly radius: number;
+  readonly step: number;
+  readonly climb: number;
+  readonly drop: number;
+  /**
+   * Rubble ramps (K5): a face higher than `above` metres that the only way on climbs gets a slope of fallen rock at its foot, `slope` rise per metre
+   * of run (up to `steep` where there is no room for that) and `half` metres either side of its line, so the hero walks it (the real climb up a tall face fails more often than not).
+   */
+  readonly ramp: { readonly above: number; readonly slope: number; readonly steep: number; readonly half: number };
+  /**
+   * Natural locks (K6): a story's shut way (a wedged boulder, a locked grate, stacked stones) is set where the cave narrows, a place of
+   * the way between the two rooms that no other way goes round: at most `widest` metres across, at least `tall` metres of air over it,
+   * `apart` metres from another lock and `fromEntry` metres of way from a way in.
+   */
+  readonly lock: { readonly widest: number; readonly tall: number; readonly apart: number; readonly fromEntry: number };
+}
+
+/** The look of the carved walls. */
+export interface CaveWallsDef {
+  /** How the rock's walls are roughened, metres of the biggest scallop. */
+  readonly rough: number;
+}
+
+/** What the dresser puts in a solution cave (D63, K3; docs/design/caves.md 3.4). Metres, at a scale of 1. */
+export interface CaveDressDef {
+  /** Silt on the floor: depth least and most, and the floor's own unevenness (the highest bump). The floor is never level. */
+  readonly floor: { readonly silt: readonly [number, number]; readonly relief: number };
+  /** Fallen rock: stones along the walls' feet (per 100 m of way), under a collapse (per hall) and their size (half-size, least and most). */
+  readonly rocks: { readonly along: number; readonly perHall: readonly [number, number]; readonly size: readonly [number, number] };
+  /** The stream of the live level: its width (least, most) and how deep the bed is cut, and the most it is cut into a floor that stands higher over the water (where the floor stands higher there is no stream); pools along it (per 100 m) and their depth. */
+  readonly water: { readonly width: readonly [number, number]; readonly bed: number; readonly pools: number; readonly poolDepth: number; readonly cutMost: number };
+  /** Drips fall along the cracks that cross a way's roof: chance at each spacing metres along the crack, the drips still running (the rest are dead), the crack's spacing; and drips from the roof away from any crack, per 100 m of way. */
+  readonly drips: { readonly chance: number; readonly live: number; readonly spacing: number; readonly scatter: number };
+  /** Loose stones, per 100 m of way: their half-size (least, most; most are small: a power law), how many gather in heaps, and the most in a cave. */
+  readonly stones: { readonly per100: number; readonly size: readonly [number, number]; readonly heaps: number; readonly most: number };
+  /** Crystals on the walls: clusters per 100 m of way, how many prisms (least, most), how long (least, most), and tries to find ore in the walls (lumps and gems show where a body reaches the wall). */
+  readonly crystals: { readonly per100: number; readonly count: readonly [number, number]; readonly len: readonly [number, number]; readonly oreTries: number };
+  /** Formations: stalactite length (least, most), how much longer old levels grow, a column forms where roof and floor are closer than `column`, the share of drips with a straw, at most this many in a cave. */
+  readonly formations: { readonly length: readonly [number, number]; readonly age: number; readonly column: number; readonly straws: number; readonly most: number };
+}
+
+/** The ore in the rock (K8's mines follow it; in K1 to K7 it only shows). */
+export interface CaveOreDef {
+  /** Ore bodies in a block, least and most. */
+  readonly bodies: readonly [number, number];
+  /** Relative chance of a vein (steep, along a fault or joint), a seam (along a bed) and a pocket. */
+  readonly kinds: { readonly vein: number; readonly seam: number; readonly pocket: number };
+  readonly ores: readonly { readonly id: string; readonly name: string; readonly color: number; readonly weight: number }[];
+}
+
+/**
+ * Islands out at sea (S7, plan 13): the sea is cut into square cells, and a share of them holds an island well off
+ * any coast, a rise of the sea floor whose top stands above the water, with its own beaches and cliffs.
+ */
+export interface IslandsDef {
+  /** The cells' side (m); an island stays inside its cell. */
+  readonly cell: number;
+  /** Share of the cells with an island (where the sea is open enough). */
+  readonly chance: number;
+  /** Its rise's radius (m), least and most; the land above water is some 0.4-0.7 of it. */
+  readonly radius: readonly [number, number];
+  /** How far from the mainland's shore its middle lies at least (m): open water between. */
+  readonly off: number;
 }
 
 /**
@@ -253,6 +519,8 @@ export interface StartSpec {
 export const DUNGEON_PROPS = [
   'barrel', 'cask', 'rack', 'crate', 'sack', 'shelf', 'table', 'stool', 'cot', 'straw', 'rubble', 'bones',
   'candle', 'lantern', 'ledger', 'chest', 'web', 'nest', 'vat', 'bricks', 'beam', 'puddle', 'bin', 'jar', 'ladder', 'door',
+  // A hole broken through a wall where something comes through (D62: a seal's breach, walled up by the hero).
+  'breach',
 ] as const;
 export type DungeonProp = (typeof DUNGEON_PROPS)[number];
 
@@ -358,12 +626,20 @@ export interface DungeonSpace {
   readonly entrance: 'footprint' | readonly [number, number];
   /** Its rock is carved (a signed distance field meshed with surface nets), not built of walls and floors. */
   readonly carved: boolean;
+  /** Its rock is a formed cave (D63, phase K: the setting's `caves`), the cellar's rooms told as places of it, not carved round a room layout. */
+  readonly formed?: boolean;
   /** Wall torches by its doors (a natural cave has none: the lantern is all the light there is). */
   readonly torches: boolean;
   /** The hero comes in standing in the middle of the entrance room (a tower's door, a cave's rock step), else by the way out. */
   readonly arriveMid: boolean;
   /** Its built walls: rubble and brick (a cellar), or dressed stone with boarded upper floors (a tower). */
   readonly walls: 'rubble' | 'dressed';
+  /**
+   * Its lowest storey stands under water this deep (m over its floor; S8, a sea cave): its ways there are dived,
+   * with breath, a spell, a potion or the otter. The lair, the safe spot and the way in always stay dry, and so do
+   * the dwellers; at least one room on the way to the goal lies under it.
+   */
+  readonly flood?: number;
 }
 
 /**
@@ -373,9 +649,10 @@ export interface DungeonSpace {
 export interface DungeonForm {
   /**
    * Under a house of a town; out on the land on a rise, at the foot of a slope going into its hill, at the
-   * foot of a cliff going into it (a slope where there is none), or on level raised ground.
+   * foot of a cliff going into it (a slope where there is none), on level raised ground, or in a slope by the
+   * sea going into it, the water just below (a sea cave).
    */
-  readonly stands: 'house' | 'rise' | 'slope' | 'cliff' | 'level';
+  readonly stands: 'house' | 'rise' | 'slope' | 'cliff' | 'level' | 'shore';
   /** Metres from the town's market it lies, at least and at most (out on the land). */
   readonly ring?: readonly [number, number];
   /** What people call one out on the land, `{dir}` the way from the town ("the barrow {dir} of the town"). */
@@ -466,11 +743,15 @@ export type CreatureBody =
     readonly bones?: boolean;
   }
   | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string }
-  /** An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures. `length` nose to rump. */
-  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar'; readonly length: number; readonly color: string };
+  /**
+   * An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures, a giant crab of the strand (S9), the elk and
+   * the turtle (M2). `length` nose to rump, as drawn. `giant`: the strength 0..1 of Actors' Deform "giant" recipe (D67, phase M): the
+   * body is grown by it (thicker legs and neck, an old coat, a slow gait), not just scaled; `length` is the size it ends up.
+   */
+  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab' | 'shark' | 'elk' | 'turtle'; readonly length: number; readonly color: string; readonly giant?: number };
 
-/** Where an encounter is met: in a place below, under thick trees, on open land, by a road. */
-export type EncounterWhere = 'below' | 'wood' | 'open' | 'road';
+/** Where an encounter is met: in a place below, under thick trees, on open land, by a road, on the strand (S9). */
+export type EncounterWhere = 'below' | 'wood' | 'open' | 'road' | 'shore' | 'water' | 'sea';
 
 /**
  * An encounter (C6b, docs/design/vgm.md 3): who the hero meets together, how many, and where. The one
@@ -487,6 +768,8 @@ export interface EncounterDef {
   readonly where: readonly EncounterWhere[];
   /** What meeting them gives the hero (the Director's need it meets): a fight, or a sight. */
   readonly need: 'challenge' | 'discovery';
+  /** The leader is one only: the others are drawn from the creatures after it (a giant wolf leading plain wolves), never the leader's kind. */
+  readonly lone?: boolean;
 }
 
 /**
@@ -498,14 +781,28 @@ export interface WildDef {
   readonly id: string;
   /** Who they are and how many (an encounter's id; it is met in this habitat). */
   readonly encounter: string;
-  /** wood: under thick trees; open: meadows and heath; road: by a road out of town. */
-  readonly habitat: 'wood' | 'open' | 'road';
+  /** wood: under thick trees; open: meadows and heath; road: by a road out of town; shore: on a strand by the sea; sea: out in deep water, under the surface (S9). */
+  readonly habitat: 'wood' | 'open' | 'road' | 'shore' | 'water' | 'sea';
   /** Metres from the town's market where their territories lie. */
   readonly ring: readonly [number, number];
   /** Territory radius, metres. */
   readonly range: number;
   /** Territories of this kind around a town. */
   readonly groups: number;
+  /** How many in a group, within the encounter's own count (none: the encounter's count). */
+  readonly count?: readonly [number, number];
+  /** What the people who know the land say of them (D68, N2): none: nobody speaks of them. */
+  readonly lore?: WildLore;
+}
+
+/**
+ * What is told of a group of the wild (D68, N2): `told` the clause as they tell it (`{dir}` where it lies from the town: "north-east"),
+ * `by` who knows it first-hand from their own rounds, and everyone else hears it from them: a person who takes up one of the pursuits, works one of the
+ * trades (the building's trade), or is of the town's watch.
+ */
+export interface WildLore {
+  readonly told: string;
+  readonly by: { readonly pursuits?: readonly string[]; readonly trades?: readonly string[]; readonly watch?: boolean };
 }
 
 /**
@@ -535,9 +832,12 @@ export interface StoryEventDef {
    * `spill`: a place promised and never cleared spills its dwellers onto the land near it. `raid`: a wild
    * group (`by`) still living near a town comes down on a farm and drives off animals from its paddock.
    * `take`: a wild group (`by`) takes a settlement of the size `takes` near it; its folk flee, the band
-   * holds it, and the rest of the group lies up in a place asked for (`lair`) near it.
+   * holds it, and the rest of the group lies up in a place asked for (`lair`) near it. `foray` (D65, R6): a wild group (`by`)
+   * comes into the town itself at the game hours `hours`; the town's watch and able folk meet it (sim/townFight.ts).
    */
-  readonly kind: 'spill' | 'raid' | 'take';
+  readonly kind: 'spill' | 'raid' | 'take' | 'foray';
+  /** A foray's: the hours of the day it comes in (from, to; `[21, 4]` is the night). */
+  readonly hours?: readonly [number, number];
   /** A raid's or take's raiders: the setting's wild group (WildDef id) that comes down while any of it lives. */
   readonly by?: string;
   /** A take's: the size of settlement taken (classic: a waystation), within `reach` metres of the raiders' ground. */
@@ -595,6 +895,11 @@ export interface RegionFillDef {
   readonly apart?: number;
   /** A harbour town (phase D, S2): the settlement stands where a river meets the sea, with a quay and piers. */
   readonly harbour?: boolean;
+  /**
+   * An island's fishing village (S7): opened only when the VGM promises the island (vgm/islands.ts), on its shore
+   * with a quay (a spring its fresh water, no river); never by the frontier (give it weight 0).
+   */
+  readonly island?: boolean;
 }
 
 /** The regions the VGM opens as the hero walks (plan 5.5): the fills, which is plain country, and the start's. */
@@ -615,6 +920,23 @@ export interface SmallLifeDef {
   readonly squirrels: readonly string[];
   /** Chance of a squirrel in a 32 m square of closed wood (less where the wood is thinner). */
   readonly squirrelChance: number;
+  /** Shoals under the water (S9); none: no fish. */
+  readonly fish?: readonly FishKindDef[];
+}
+
+/** A kind of small fish, swimming in shoals (S9). */
+export interface FishKindDef {
+  readonly id: string;
+  /** Length, metres (a sprat 0.12, a herring 0.3). */
+  readonly size: number;
+  /** Colours of the back (sRGB 0xRRGGBB), one picked per shoal; the flanks and belly are silvered. */
+  readonly colours: readonly number[];
+  /** sea: off the coast; fresh: in lakes. */
+  readonly water: 'sea' | 'fresh';
+  /** How many in a shoal, at least and at most. */
+  readonly count: readonly [number, number];
+  /** Chance of a shoal in a 32 m square of water deep enough. */
+  readonly chance: number;
 }
 
 /** A kind of bird (plan 9.3). */
@@ -627,15 +949,85 @@ export interface BirdKindDef {
   /**
    * wood: a few forage on the woodland floor and flee up into the crowns; open: the same on meadows and
    * at wood edges, fleeing to the nearest trees or farther over the grass; flock: many wheel over open
-   * land and fields, settle to feed, and rise together.
+   * land and fields, settle to feed, and rise together; shore: a flock over the coast (S9: gulls), wheeling
+   * over the strand and the water off it, settling on the strand.
    */
-  readonly habitat: 'wood' | 'open' | 'flock';
+  readonly habitat: 'wood' | 'open' | 'flock' | 'shore';
   /** How many together, at least and at most. */
   readonly count: readonly [number, number];
   /** Chance of a group in a square where they live (32 m; flocks 128 m). */
   readonly chance: number;
   /** Wing beats per second. */
   readonly beat: number;
+}
+
+/**
+ * What a humanoid foe wants of the hero (D64). `guard`: warns and holds a line; `rob`: walks up and demands a share of the purse;
+ * `jeer`: taunts, and attacks once many or the hero looks weak; `bar`: a hold's warden (the hold's own watch, game/hold.ts, speaks for it);
+ * `mindless`: the walking dead attack at once; `murderous`: attacks at once with a war cry that says why (cutthroats).
+ */
+export const STANCE_KINDS = ['guard', 'rob', 'jeer', 'bar', 'mindless', 'murderous'] as const;
+export type StanceKind = (typeof STANCE_KINDS)[number];
+
+/** The kinds that warn before they fight (a bar's warning belongs to the hold). */
+export const WARNING_STANCES: readonly StanceKind[] = ['guard', 'rob', 'jeer'];
+/** The kinds whose speaker has lines: the warning ones, and the murderous with their war cry (R8). */
+export const SPEAKING_STANCES: readonly StanceKind[] = [...WARNING_STANCES, 'murderous'];
+
+/**
+ * What a warning band says (D64): `warn` its first word (a guard's challenge, a robber's halt), `last` the final one, `demand` a robber's
+ * price, `jeer` a goblin's jibe, `settle` giving way once the hero has gone back, `greet` its word to a friend, `yield` backing off from
+ * a hero far above it (D58).
+ */
+export const WARN_TURNS = ['warn', 'last', 'demand', 'jeer', 'settle', 'greet', 'yield'] as const;
+export type WarnTurn = (typeof WARN_TURNS)[number];
+
+/**
+ * What the speaker of a band says when the hero talks to it during its warning (R7): `terms` what it wants, `deal` its word once the
+ * hero agrees, `short` when the hero cannot pay. A robber's terms are a price (`{coins}` copper), a guard's a pact (the hero keeps away).
+ */
+export const TALK_TURNS = ['terms', 'deal', 'short'] as const;
+export type TalkTurn = (typeof TALK_TURNS)[number];
+
+/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero, a cutthroat wants them dead (`murder`: R8, no warning at all), or the VGM knows a reason (the hero was hired against them, or killed their kin: `vgm/stance.ts`). */
+export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated', 'hired', 'kin', 'murder'] as const;
+export type BreakCause = (typeof BREAK_CAUSES)[number];
+
+/** What each warning stance says, and the ways its warning ends (the lines the setting must give). */
+export const STANCE_SPEECH: Readonly<Record<'guard' | 'rob' | 'jeer' | 'murderous', { readonly turns: readonly WarnTurn[]; readonly breaks: readonly BreakCause[] }>> = {
+  guard: { turns: ['warn', 'last', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin'] },
+  rob: { turns: ['warn', 'demand', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'patience'] },
+  jeer: { turns: ['jeer', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'many', 'frail'] },
+  murderous: { turns: [], breaks: ['murder', 'struck'] },
+};
+
+/** The lines of one stance: a pool for each turn it speaks (one picked, seeded) and for each way its warning ends. */
+export interface StanceWords {
+  readonly turns: Readonly<Partial<Record<WarnTurn, readonly string[]>>>;
+  readonly breaks: Readonly<Partial<Record<BreakCause, readonly string[]>>>;
+  /** What it says when the hero talks to it (only the stances that can be talked to: `StanceDef.talk`). */
+  readonly talk?: Readonly<Partial<Record<TalkTurn, readonly string[]>>>;
+}
+
+export interface StanceDef {
+  readonly kind: StanceKind;
+  /** Warning kinds: it speaks to a hero this near (m) once it has noticed them. */
+  readonly warn?: number;
+  /** Warning kinds: a hero nearer than this (m) starts the fight. */
+  readonly line?: number;
+  /** `rob`: it walks up to the hero until it stands this far off (m), and demands. */
+  readonly close?: number;
+  /** `rob`, `jeer`: seconds after its demand or first jibe before it loses patience and fights. */
+  readonly patience?: number;
+  /** `jeer`: with at least this many of its band, it fights when its patience is spent (a lone one only jeers). */
+  readonly many?: number;
+  /**
+   * Talking to the band during its warning (R7): `price` it names a share of the hero's purse and lets them pass once it is paid; `pact`
+   * it lets them pass on their word to keep away; none: it does not talk. The band then keeps its word until the hero strikes.
+   */
+  readonly talk?: 'price' | 'pact';
+  /** `talk: price`: the share of the hero's purse it asks, between these two (seeded by who asks and the purse). */
+  readonly toll?: readonly [number, number];
 }
 
 /**
@@ -655,11 +1047,17 @@ export interface CreatureDef {
   readonly defence: number;
   /** Running speed, m/s. */
   readonly speed: number;
+  /** Walks the bottom of water this deep (m), not swimming: a crab sidles into the sea along the bed. Unset: it wades only a knee deep. */
+  readonly bed?: number;
   readonly attacks: readonly AttackDef[];
   /** Sees this far in the dark (m) and much farther by the hero's light; hears a running hero this far. */
   readonly senses: { readonly sight: number; readonly hearing: number };
-  /** skittish: keeps away unless cornered or many; hostile: attacks on sight. */
+  /** skittish: keeps away unless cornered or many; hostile: attacks on sight (D64: a humanoid's `stance` says what it wants first). */
   readonly temper: 'skittish' | 'hostile';
+  /** Who it belongs to (D65): a people's id or one of `factions.others`. It never changes. */
+  readonly faction: string;
+  /** What a humanoid wants of the hero before any blow (D64, phase R); every humanoid has one, beasts none (they only fight or flee). */
+  readonly stance?: StanceDef;
   /**
    * A shy beast's flight distance, metres (deer): farther off it only lifts its head and watches the hero,
    * nearer it bolts, and it runs until twice this far before it grazes again, never back towards the hero.
@@ -703,6 +1101,10 @@ export interface ItemDef {
   readonly block?: number;
   /** Potions and food: health restored. */
   readonly heal?: number;
+  /** Potions: an effect the drinker wears (a draught of the deep: water breathing for minutes, S5). */
+  readonly effect?: EffectApply;
+  /** Potions: ability points it gives when drunk (D61: the potion of learning). */
+  readonly learning?: number;
   /** Copper pieces. */
   readonly value: number;
   readonly weight: number;
@@ -736,6 +1138,137 @@ export interface TreasureDef {
   readonly count: readonly [number, number];
   /** Coins, copper, lo..hi. */
   readonly coins: readonly [number, number];
+  /**
+   * Rare finds rolled on their own, besides the items (D61: the potion of learning): each is there with
+   * `chance` plus `perDanger` for each point of the danger it is found at (at most `TOP_FIND`).
+   */
+  readonly finds?: readonly TreasureFind[];
+}
+
+/** A rare find in a treasure table, likelier the more dangerous the place (D61). */
+export interface TreasureFind {
+  readonly item: string;
+  readonly chance: number;
+  readonly perDanger: number;
+}
+
+/** The most a rare find's chance grows to, however dangerous the place. */
+export const TOP_FIND = 0.3;
+
+/**
+ * A twist (D62, Q3): what turns out other than the household told, seen in the world and heard in talk, never a
+ * note. `first`: someone got there first (its dwellers lie dead and searched, all but the strongest, hurt; the
+ * household says so: `told`). `changed`: the place changed since it was told (other dwellers there than the town
+ * speaks of; the thanks own to it). `lied`: the household lied (the thing they want back is another family's: its
+ * `lore` names them, `{other}`; the hero can give it to them instead, `give`, who thank them, `rightful`).
+ */
+export type TwistKind = 'first' | 'changed' | 'lied';
+export const TWIST_KINDS: readonly TwistKind[] = ['first', 'changed', 'lied'];
+export interface TwistDef {
+  readonly id: string;
+  readonly kind: TwistKind;
+  /** The asks' verbs it can come with. */
+  readonly verbs: readonly AskVerb[];
+  readonly weight: number;
+  readonly words: {
+    /** Added to what the household says of the trouble. */
+    readonly told?: string;
+    /** The household's thanks instead of the ask's (`{coins}`). */
+    readonly thanks?: string;
+    readonly lore?: string;
+    readonly give?: string;
+    readonly rightful?: string;
+  };
+}
+
+/**
+ * What a household asks of the hero about its place (D62, phase Q): one verb on one place, and only the
+ * thing it names counts as done. `clear`: the dwellers gone (as every lead was before). `fetch`: one named
+ * thing out of the place (an heirloom). `seal`: the breach in the wall of its last room walled up (the hero kneels
+ * and sets the stones, course by course). The words: `told` the lines the household says themselves (in talk,
+ * as what they know; `{thing}` the thing's name, `{place}`), `topic` the hero's line when it is done (the
+ * topic to tell them), `note` the journal's line once it is done (`{name}` who to tell, `{house}`), `thanks`
+ * what they say (`{coins}`, `{thing}`).
+ */
+export type AskVerb = 'clear' | 'fetch' | 'lost' | 'seal' | 'parley' | 'watch' | 'thief';
+export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost', 'seal', 'parley', 'watch', 'thief'];
+
+/**
+ * A thing an ask names: a catalogue item and what it is called (`{family}`: the household's name). A personal ask's things say
+ * whose they are (`for`: the pursuits or trades whose it is) and how those people tell of losing it (`told`, `{thing}`).
+ */
+export interface AskThing {
+  readonly item: string;
+  readonly name: string;
+  readonly lore: string;
+  readonly for?: { readonly pursuits?: readonly string[]; readonly trades?: readonly string[] };
+  readonly told?: readonly string[];
+  readonly thanks?: string;
+}
+
+export interface AskDef {
+  /** The kind (the VGM remembers kinds given, D62): a slug. */
+  readonly id: string;
+  readonly verb: AskVerb;
+  /** How often against the others (before the VGM's memory weighs it). */
+  readonly weight: number;
+  /** The dungeon kinds it fits (none: any). */
+  readonly kinds?: readonly string[];
+  /** Only places with dwellers (`true`), only empty ones (`false`), or either (none). */
+  readonly lived?: boolean;
+  /** `fetch`: the things it may name, each a catalogue item and what it is called (`{family}`: the household's name). */
+  readonly things?: readonly AskThing[];
+  /**
+   * D68, N3: asked only by someone for something of their own calling or pursuit (the VGM's favour, vgm/favours.ts), never of a
+   * household in general: each of its `things` says whose it is (`for`), so the person who asks is the one the thing fits.
+   */
+  readonly personal?: boolean;
+  /**
+   * `lost`: someone of the town went in and did not come back (`{who}` their name in every line). `alive` the share
+   * found alive (they sit hurt at the end of the place; come up to, they get up, say `found` and walk home). The
+   * rest are dead: what is left of them (one of `things`, `{who}`'s) lies in the lair's hoard, and `dead` gives the
+   * topic, note and thanks for bringing it home.
+   */
+  /** Only places whose dwellers are one of these (the lore's dweller ids; none: any). */
+  readonly dwellers?: readonly string[];
+  /**
+   * `parley`: the dwellers are not hostile (they watch the hero, and fight only once struck); their leader names
+   * terms when spoken to: a `price` (copper, `cost`; paid, they pack up and go meekly) or a `pact` (they stay and
+   * leave the household be). The leader's words: `terms` (`{coins}`), `struck` once agreed, `short` when the hero
+   * cannot pay; `broken` the journal's line when the hero struck first and the parley can never be (`{place}`).
+   */
+  /**
+   * `watch`: the dwellers come out by night; the hero stands watch by the household's door (within `near` m) through
+   * the night's `hours` (from, to; past midnight as 24 and more). With the share `comes` a band of them comes out of the
+   * dark and must be beaten; otherwise nothing comes and the night watched through does it.
+   */
+  /**
+   * `thief`: someone of the town steals from the household and hides it in their place. The stolen thing (`things`)
+   * lies in the stash at its end, and its lore gives the thief away (`{who}`). With it in hand the hero can face the
+   * thief in town: `accuse` (the topic), `confess` (their answer), then `catch` or `spare` (topics) and their words
+   * `caught` or `spared`. Named, caught or let go, is done; the thing goes back to the household.
+   */
+  readonly thief?: {
+    readonly accuse: string; readonly confess: string; readonly catch: string; readonly spare: string; readonly caught: string; readonly spared: string;
+    /** Q4: added to the household's words when a thief let go before is at it again (`{who}`). */
+    readonly again?: string;
+  };
+  readonly watch?: { readonly comes: number; readonly hours: readonly [number, number]; readonly near: number };
+  readonly parley?: {
+    readonly pact: number;
+    readonly cost: readonly [number, number];
+    readonly terms: { readonly price: string; readonly pact: string };
+    readonly struck: { readonly price: string; readonly pact: string };
+    readonly short: string;
+    readonly broken: string;
+  };
+  readonly lost?: { readonly alive: number; readonly found: string; readonly dead: { readonly topic: string; readonly note: string; readonly thanks: string } };
+  /** `missing`: what they say when told it is done but the thing is not in the hero's hands (a fetch). */
+  readonly words: {
+    readonly told: readonly string[]; readonly topic: string; readonly note: string; readonly thanks: string; readonly missing?: string;
+    /** Q5: added to what the household says when the ask came from their want (`rival`, `elder`, `parent`, `pious`, `peaceable`; `{who}` the rival). */
+    readonly wants?: { readonly [kind: string]: string | undefined };
+  };
 }
 
 /** Items: the catalogue, the legendary ones, treasure tables, and the words for rarer finds. */
@@ -784,8 +1317,8 @@ export interface UpkeepDef {
   };
 }
 
-/** How a sight stands on the land (world/sites.ts `layOutSight`). */
-export const SIGHT_SHAPES = ['stones', 'waystone', 'cairn', 'stash'] as const;
+/** How a sight stands on the land (world/sites.ts `layOutSight`); `wreck`, a ship lying on the sea bed (S8). */
+export const SIGHT_SHAPES = ['stones', 'waystone', 'cairn', 'stash', 'wreck', 'washed-up'] as const;
 export type SightShape = (typeof SIGHT_SHAPES)[number];
 
 /**
@@ -804,10 +1337,20 @@ export interface SightDef {
    */
   readonly need?: 'discovery' | 'reward';
   readonly loot?: string;
+  /**
+   * It lies on the sea bed (S8, a wreck): the VGM puts it off a coast near the hero (`vgm/wrecks.ts` wreckFor), never
+   * by a way on the land, and it is come upon by diving down to it.
+   */
+  readonly sea?: true;
+  /**
+   * It lies on a strand (S9, a wreck washed up): the VGM puts it on the strand near a hero walking by the sea
+   * (`vgm/wrecks.ts` washedUpFor), never by a way inland.
+   */
+  readonly strand?: true;
 }
 
 /** The situations the engine knows how to stage (C10). */
-export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves', 'raid-smoke', 'stray-beast', 'refugees'] as const;
+export const SITUATION_KINDS = ['hurt-traveller', 'paddock-wolves', 'raid-smoke', 'stray-beast', 'refugees', 'castaway'] as const;
 export type SituationKind = (typeof SITUATION_KINDS)[number];
 
 /**
@@ -818,7 +1361,9 @@ export type SituationKind = (typeof SITUATION_KINDS)[number];
  * `lasts` game hours, seen over the trees from afar. `stray-beast`: in the day `hours`, one of the beasts of
  * a paddock of the town the hero is in gets out and wanders off, and someone of its farm goes after it (once
  * a town every `every` days, for `lasts` hours at most). `refugees` (C11): the folk of a settlement a band
- * holds (a take) camp by the road outside the nearest town until it is freed, one of them hurt. `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
+ * holds (a take) camp by the road outside the nearest town until it is freed, one of them hurt. `castaway` (S9): a
+ * fisher whose boat went over clings to it off the strand near the hero (People's answer by the sea, the share
+ * `chance`), for `lasts` hours; the hero swims out and brings them in. `cry` is the one urgent line someone there calls out in a speech bubble (D52: rare,
  * only a cry for help), and only once the hero is within `seen` metres of what it is about, so the hero sees
  * it before they are told.
  */
@@ -829,7 +1374,7 @@ export interface SituationDef {
   readonly cry?: string;
   /** How near the hero must be (m) to the situation before the cry (they see it first). */
   readonly seen: number;
-  /** hurt-traveller: the share of People's travellers that are hurt (0..1). */
+  /** hurt-traveller: the share of People's travellers that are hurt (0..1); castaway: the share of People's answers by the sea. */
   readonly chance?: number;
   /**
    * hurt-traveller: the talk topic to see to the hurt one, and what they say to it. Chosen, the hero kneels by
@@ -840,7 +1385,7 @@ export interface SituationDef {
   readonly encounter?: string;
   readonly hours?: readonly [number, number];
   readonly every?: number;
-  /** raid-smoke: how long the barn smoulders (game hours). */
+  /** raid-smoke: how long the barn smoulders (game hours); castaway: how long they hold on before another boat picks them up. */
   readonly lasts?: number;
 }
 
@@ -868,6 +1413,36 @@ export interface TravelDef {
     readonly going: string;
     /** The note on arriving (`{place}`, `{hours}`). */
     readonly arrived: string;
+  };
+}
+
+/**
+ * Passage by sea (S4, plan 5.4, D60): a harbour master sells a berth aboard a ship to another harbour town along the
+ * coast. The ship sails `speed` (m/s, the hero's own time) along its way over deep water, the clock running on as
+ * for anyone aboard (D37); the fare is `perKm` copper a kilometre of the way, at least `least`. When no harbour lies
+ * within `reach` (m, straight; [nearest, farthest]) the VGM opens one at a river's mouth along the coast, before the
+ * ship gets there. `offers`: how many ways the harbour master names.
+ */
+export interface VoyageDef {
+  readonly speed: number;
+  readonly perKm: number;
+  readonly least: number;
+  readonly offers: number;
+  readonly reach: readonly [number, number];
+  /** The shield over the harbour master's door ('#rrggbb'), and the map's name for their hall: where passage is bought. */
+  readonly sign?: string;
+  readonly hall?: string;
+  readonly words: {
+    /** The harbour master's topic (`{place}`: "the village 4.6 km west", `{price}`), the answer as passage is bought or the purse is too light. */
+    readonly topic: string;
+    readonly given: string;
+    readonly tooDear: string;
+    /** The answer as passage is bought while a storm keeps the ship in (S10: `{price}`, `{hours}` till she sails). */
+    readonly held: string;
+    /** The note on coming in to the far harbour (`{place}`, `{hours}`). */
+    readonly arrived: string;
+    /** The topic for passage to an island (S7: what sailors say of it, `{place}`: "the island 8.4 km west", `{price}`). */
+    readonly island: string;
   };
 }
 
@@ -911,11 +1486,15 @@ export interface ShopDef {
  * abilities (of level `from` and up) are taught only once it is done.
  */
 export interface GuildTaskDef {
-  /** What the trainer asks, and says when it is done. */
+  /** What the trainer asks ({place}: the one place that does it, named when the task is given), and says when it is done. */
   readonly ask: string;
   readonly done: string;
+  /** Said for {place} when no place fits (any place of the task's kind does it then). */
+  readonly anywhere: string;
   /** Only a place out on the land counts (a barrow, a cave, a tower), not a cellar. */
   readonly out?: boolean;
+  /** Only a place below a house counts (a cellar), not one out on the land. */
+  readonly house?: boolean;
   /** Abilities of this level and higher wait for it. */
   readonly from: number;
 }
@@ -1084,7 +1663,7 @@ export type AbilityOp =
   /** The land reshaped (a wall, a pillar…), where the world allows it (volumes, D9). */
   | { readonly op: 'terrain'; readonly shape: TerrainShape; readonly at?: OpAnchor; readonly radius: number; readonly height?: number; readonly length?: number }
   /** A change of the hero's shape (bird form). */
-  | { readonly op: 'shape'; readonly into: 'bird'; readonly change: number; readonly back: number }
+  | { readonly op: 'shape'; readonly into: 'bird' | 'otter'; readonly change: number; readonly back: number; /** Breath under water lasts this many times longer in the shape (an otter's). */ readonly hold?: number }
   /** Its steps, `t` seconds later. */
   | { readonly op: 'delay'; readonly t: number; readonly ops: readonly AbilityOp[] }
   /** Only for the eye and the ear. */
@@ -1114,6 +1693,8 @@ export interface EffectDef {
   readonly fear?: boolean;
   /** Harder to see and hear, by magnitude (0..1, a share). */
   readonly veil?: boolean;
+  /** Breathes under water for as long as it lasts (S5, D60). */
+  readonly gills?: boolean;
 }
 
 /** How the VGM's Director paces play (plan 4.1): how fast each need grows (per real minute). */
@@ -1133,6 +1714,87 @@ export interface NamesDef {
   readonly family: readonly string[];
 }
 
+/** The temperaments a person can have (Conversations' profile: how they speak). */
+export const TEMPERAMENTS = ['warm', 'reserved', 'curious', 'dry', 'lively'] as const;
+export type Temperament = (typeof TEMPERAMENTS)[number];
+/** Roughly where a person is in life (Conversations' profile `ageGroup`). */
+export const AGE_GROUPS = ['young', 'adult', 'elder'] as const;
+export type AgeGroup = (typeof AGE_GROUPS)[number];
+
+/**
+ * Something a person does with their free hours (D68, N1): keeping bees, whittling, singing. A person has one or
+ * two; they are what they tell of themselves, what they talk of with each other (N6) and what a task of theirs is
+ * made from (N3). `id` is Conversations' pursuit id.
+ */
+export interface PursuitDef {
+  readonly id: string;
+  /** What it is called after "I keep coming back to" ("keeping bees"). */
+  readonly name: string;
+  /** Why they like it, one is picked (a reason in the first person). */
+  readonly reasons: readonly string[];
+  /** What they say of it when asked who they are: whole sentences, one is picked per person. */
+  readonly self: readonly string[];
+  /** How common it is among those it fits. */
+  readonly weight: number;
+  /** Who takes it up; none of these: anyone. Trades are the building's trade ('smith'); '' is a household without one. */
+  readonly trades?: readonly string[];
+  readonly roles?: readonly string[];
+  readonly ages?: readonly AgeGroup[];
+  readonly races?: readonly string[];
+}
+
+/**
+ * How someone asks a favour of the hero (D68, N3), by temperament: `greeting` they blurt it out as the talk opens, `news` they tell it
+ * when asked for news, `again` they only hint and tell it when asked a second time. `lead` comes before the task as they tell it,
+ * `close` after; `hint` is all they say the first time when it is `again`.
+ */
+export interface AskingManner {
+  readonly when: 'greeting' | 'news' | 'again';
+  readonly lead: readonly string[];
+  readonly close: readonly string[];
+  readonly hint?: readonly string[];
+}
+
+/** How a temperament speaks and how likely it is to be someone's (D68, N1). Lines are first person; `{claim}` is what they know. */
+export interface TemperamentDef {
+  /** The odds of the temperament for someone: `base` plus each of their traits (0..1) times its weight; `young` and `old` are 1 for those age groups. */
+  readonly lean: { readonly base: number; readonly social: number; readonly diligent: number; readonly pious: number; readonly early: number; readonly young: number; readonly old: number };
+  /** How they give their name, the start of "Who are you?" (`{name}`); one is picked per person. */
+  readonly intro: readonly string[];
+  /** The greeting as a talk opens, and the parting words; one each is picked per person. */
+  readonly greeting: readonly string[];
+  readonly farewell: readonly string[];
+  /** What they say of themselves when asked how they are, and when asked back. */
+  readonly wellbeing: readonly string[];
+  /** What they say when they know nothing of what was asked. */
+  readonly nothing: readonly string[];
+  /** What they know first-hand, and what they only heard (hearsay): each with `{claim}`. */
+  readonly sure: string;
+  readonly heard: string;
+  /** When asked how they know: first-hand (`{source}`, `{claim}`), and from another. */
+  readonly source: string;
+  readonly testimony: string;
+  /** How they bring up a task of their own (N3): when, in what words before and after, and what they hint at if they hold it back. */
+  readonly asking: AskingManner;
+  /** What they add when there is more to tell. */
+  readonly more: string;
+  /** Their thanks, and what they say when they cannot follow. */
+  readonly thanks: string;
+  readonly repair: string;
+}
+
+/** Who people are, beyond their trade (D68, N1; docs/design/masterworld-plan.md 9.1). */
+export interface PersonaDef {
+  readonly temperaments: Readonly<Record<Temperament, TemperamentDef>>;
+  readonly pursuits: readonly PursuitDef[];
+  /** A sentence about their years, per age group; `{age}` their age. */
+  readonly ages: Readonly<Record<AgeGroup, readonly string[]>>;
+  /** From what age (human years) a person is young no more and old; `long` multiplies these for the long-lived peoples. */
+  readonly young: number;
+  readonly elder: number;
+  readonly long: Readonly<Record<string, number>>;
+}
+
 /**
  * How townsfolk talk (plan 9.1: topic-based dialogue through Conversations), in English for now. `{name}`,
  * `{family}`, `{house}`, `{trade}` and `{sign}` are filled in by the engine.
@@ -1142,8 +1804,6 @@ export interface TalkDef {
   readonly identity: Readonly<Record<string, string>>;
   /** The topics the player can pick, by id (greet, self, news, more, source, bye, and `lead` for a lead's topic). */
   readonly topics: Readonly<Record<string, string>>;
-  /** What is said when someone knows nothing of a topic. */
-  readonly nothing: readonly string[];
   /** How a house is called: `{house}` the building ("the cottage"), `{family}` the household's name. */
   readonly house: string;
   /** How a promised cellar is called (`{house}` from above). */
@@ -1175,6 +1835,10 @@ export interface TalkDef {
   readonly happened?: { readonly saw: string; readonly heard: string };
   /** The hero's own first journal page in a new game (`{inn}`: the inn as it is called): where to ask. */
   readonly arrival: { readonly title: string; readonly text: string; readonly from: string };
+  /** Who the people are (D68): temperaments with their voices, pursuits, ages. */
+  readonly persona: PersonaDef;
+  /** What the people know of the land round the town (D68, N2): the topic that asks for it, and where those who know it have it from. */
+  readonly lore: { readonly topic: string; readonly source: string };
 }
 
 /**
@@ -1370,6 +2034,11 @@ export interface GrowthDef {
    * quality gear adds to a spell's damage and healing.
    */
   readonly scale: AbilityScale & { readonly spell: number };
+  /**
+   * Ability points (D61): how many each level gives (the first level too), and the trainer's words when the
+   * hero has none free. Learning an ability from a trainer or a writing costs one; gifts and worn items none.
+   */
+  readonly points: { readonly perLevel: number; readonly none: string };
 }
 
 /** The share an ability's damage, healing, effect duration and range gain per level above its own (G2). */
@@ -1400,6 +2069,38 @@ export interface StandingDef {
   readonly prices: readonly [number, number];
 }
 
+/** How one faction stands towards another (D65): constant, never moved by anything the hero does. */
+export const HOSTILITIES = ['ally', 'neutral', 'wary', 'hostile'] as const;
+export type Hostility = (typeof HOSTILITIES)[number];
+
+/**
+ * A faction besides the peoples (D65): smugglers, bandits, goblins, the undead, the town watch, beasts of prey and the beasts
+ * they hunt. Like a people it has one number for what it thinks of the hero (`regard`, −100 .. 100).
+ */
+export interface FactionDef {
+  readonly id: string;
+  readonly name: string;
+  readonly plural: string;
+  /** What it thinks of the hero at first. */
+  readonly regard: number;
+  /** It hears of deeds: killing its kind moves the hero's standing with it and with its foes, and a change of tier is told. Beasts do not. */
+  readonly aware: boolean;
+}
+
+/**
+ * Factions and who is against whom (D65). The peoples (`peoples`) are factions too. Every creature kind has one (`CreatureDef.faction`),
+ * every townsperson their people's. The matrix is constant: creatures do not gain or lose factions or friends; only the hero's standing moves.
+ */
+export interface FactionsDef {
+  readonly others: readonly FactionDef[];
+  /** Each pair that is not neutral, both ways round (a faction is its own ally). */
+  readonly matrix: readonly (readonly [string, string, Hostility])[];
+  /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. Striking a band first (R7, once per band) moves it by `first`. */
+  readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number; readonly first: number };
+  /** What the one who speaks for a band says to the hero (D64), by stance: a short speech bubble, never anywhere else (rule 11). */
+  readonly words: Readonly<Partial<Record<'guard' | 'rob' | 'jeer' | 'murderous', StanceWords>>>;
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -1416,6 +2117,8 @@ export interface SettingModule {
   /** The peoples as factions (plan 11.6, D34), and what changes the hero's standing with them. */
   readonly peoples: readonly PeopleDef[];
   readonly standing: StandingDef;
+  /** The factions besides the peoples, and the hostility between all (D65). */
+  readonly factions: FactionsDef;
   /** Levels and experience (D58). */
   readonly growth: GrowthDef;
   readonly talk: TalkDef;
@@ -1431,6 +2134,8 @@ export interface SettingModule {
   readonly situations?: readonly SituationDef[];
   /** Carts between towns (plan 5.4, C7); without it no cart goes. */
   readonly travel?: TravelDef;
+  /** Passage by sea between harbour towns (S4); without it no ship takes passengers. */
+  readonly voyage?: VoyageDef;
   /** The town's shops (plan 11.5), by who keeps them. */
   readonly shops: readonly ShopDef[];
   /** The guild houses (D49, D59) that teach abilities, and the bard who knows them; without them nothing is taught. */
@@ -1453,12 +2158,43 @@ export interface SettingModule {
   readonly events?: readonly StoryEventDef[];
   /** Good days in the towns (C11): feasts for the hero's deeds, market days. None: no such days. */
   readonly festivities?: readonly FestivityDef[];
+  /** What a household may ask of the hero besides clearing a place (D62, phase Q): each a verb on a place. None: every lead is "clear it". */
+  readonly asks?: readonly AskDef[];
+  /** What may turn out other than told about an ask (D62, Q3); none: every ask is as told. */
+  readonly twists?: readonly TwistDef[];
   /** Birds and squirrels about the land; without it the land has none. */
   readonly smallLife?: SmallLifeDef;
   /** What fills the regions the VGM opens as the hero walks; without it no regions open beyond the start. */
   readonly regions?: RegionsDef;
   /** The setting's colour key over the day; without it the engine's neutral grade. */
   readonly look?: LookDef;
+  /** Caves that form (D63, phase K): rock, sizes, shares. None: only the old grid caves. */
+  readonly caves?: CavesDef;
+  /** How the hero notices the places the VGM put on the land (D66, K9). None: they are never marked. */
+  readonly noticing?: NoticingDef;
+}
+
+/**
+ * How the hero notices a fixed place on the land (D66, K9; Arnd 2026-11-02: "the character subconsciously notices it and that is what the
+ * minimap displays"): a place in line of sight within `range` metres by day is marked on the minimap and the map, with nothing said or shown.
+ */
+export interface NoticingDef {
+  /** Metres at which a place in line of sight is noticed by day. */
+  readonly range: number;
+  /** The share of `range` left in the dark (the sun below the horizon); a place's own light is not read yet. */
+  readonly night: number;
+  /** The height of the hero's eyes over the ground, and of a place's face (its mouth, door or stones) over its ground, metres. */
+  readonly eye: number;
+  readonly face: number;
+  /** A place ahead of the hero is sited between these metres from them (the roadside sights' own 70 to 260), within this many radians either side of their way. */
+  readonly ahead: readonly [number, number];
+  readonly spread: number;
+  /**
+   * Caves along a cliff the hero runs by (Arnd 2026-11-02: "a user running along a cliff has a very good chance to see one"): for every
+   * `cell` metres they cover with a cliff ahead of them, `chance` of a cave opening in it, never within `near` metres of another open
+   * one and never more than `most` open within 2.5 km of them.
+   */
+  readonly caves?: { readonly chance: number; readonly cell: number; readonly near: number; readonly most: number };
 }
 
 /** The picture's colour key: grade keys at sun heights, sorted by `at` (warm dusk, blue night, ...). */
@@ -1480,6 +2216,37 @@ export function schoolOf(m: Pick<SettingModule, 'schools'>, id: string | undefin
 /** A guild by its keeper's id (none: the setting has no such guild). */
 export function guildOf(m: Pick<SettingModule, 'guilds'>, keeper: string | undefined): GuildDef | undefined {
   return keeper === undefined ? undefined : m.guilds?.find((g) => g.keeper === keeper);
+}
+
+/** The checks for who people are (D68, N1). */
+function validatePersona(p: PersonaDef, where: string): string[] {
+  const out: string[] = [];
+  for (const t of TEMPERAMENTS) {
+    const v = p.temperaments[t];
+    if (!v) { out.push(`${where}: persona has no temperament "${t}"`); continue; }
+    for (const k of ['intro', 'greeting', 'farewell', 'wellbeing', 'nothing'] as const) if (!v[k]?.length) out.push(`${where}: persona.${t}.${k} is empty`);
+    if (!v.intro?.every((l) => l.includes('{name}'))) out.push(`${where}: persona.${t}.intro lines must name {name}`);
+    if (!v.more) out.push(`${where}: persona.${t}.more is empty`);
+    if (!v.asking?.lead.length || !v.asking.close.length || (v.asking.when === 'again' && !v.asking.hint?.length)) out.push(`${where}: persona.${t}.asking needs lead and close lines (and a hint if it is asked again)`);
+    for (const k of ['sure', 'heard', 'source', 'testimony'] as const) if (!v[k]?.includes('{claim}')) out.push(`${where}: persona.${t}.${k} must say {claim}`);
+    for (const k of ['source', 'testimony'] as const) if (!v[k]?.includes('{source}')) out.push(`${where}: persona.${t}.${k} must say {source}`);
+    if (!v.thanks || !v.repair) out.push(`${where}: persona.${t} needs thanks and repair`);
+    if (!Object.values(v.lean).every(Number.isFinite)) out.push(`${where}: persona.${t}.lean must be numbers`);
+  }
+  const ids = new Set<string>();
+  for (const d of p.pursuits) {
+    if (ids.has(d.id)) out.push(`${where}: pursuit "${d.id}" defined twice`);
+    ids.add(d.id);
+    if (!/^[a-z][a-z_]*$/.test(d.id)) out.push(`${where}: pursuit "${d.id}" id must be lowercase words joined with _`);
+    if (!d.name || !d.self.length || !d.reasons.length || !(d.weight > 0)) out.push(`${where}: pursuit "${d.id}" needs a name, self lines, reasons and a weight > 0`);
+  }
+  for (const g of AGE_GROUPS) {
+    if (!p.ages[g]?.length) out.push(`${where}: persona.ages.${g} is empty`);
+    // Each group has someone to take pursuits up: a child, a grown person.
+    if (!p.pursuits.some((d) => (!d.ages || d.ages.includes(g)))) out.push(`${where}: no pursuit fits the ${g}`);
+  }
+  if (!(p.young > 0 && p.elder > p.young)) out.push(`${where}: persona.young must be above 0 and below persona.elder`);
+  return out;
 }
 
 export function validateSetting(m: SettingModule): string[] {
@@ -1593,15 +2360,145 @@ export function validateSetting(m: SettingModule): string[] {
   const t = m.talk;
   for (const k of ['greet', 'self', 'news', 'more', 'source', 'bye']) if (!t.topics[k]) out.push(`${where}: talk topic "${k}" has no wording`);
   for (const k of ['trade', 'trader', 'keeper', 'hand', 'homemaker', 'child', 'traveller']) if (!t.identity[k]) out.push(`${where}: talk identity "${k}" has no wording`);
-  if (!t.nothing.length) out.push(`${where}: talk.nothing is empty`);
+  out.push(...validatePersona(t.persona, where));
   if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
   out.push(...validateFight(m, where));
   out.push(...validatePeoples(m, where));
+  out.push(...validateFactions(m, where));
   out.push(...validateRoutines(m.routines, where));
+  out.push(...validateAsks(m, where));
+  if (m.caves) out.push(...validateCaves(m.caves, m.world.kinds?.map((k) => k.id) ?? [], where));
+  if (m.noticing) {
+    const n = m.noticing;
+    if (!(n.range >= 30 && n.night > 0 && n.night <= 1 && n.eye > 0 && n.face >= 0 && n.ahead[0] > 0 && n.ahead[1] > n.ahead[0] && n.ahead[1] <= n.range * 2 && n.spread > 0 && n.spread < Math.PI / 2)) out.push(`${where}: noticing needs a range of 30 m or more, a night share above 0 and up to 1, positive heights, an ahead range that rises and a spread under a quarter turn`);
+    if (n.caves && !(n.caves.chance > 0 && n.caves.chance <= 1 && n.caves.cell > 0 && n.caves.near > 0 && n.caves.most >= 1)) out.push(`${where}: noticing.caves needs a chance above 0 and up to 1, a cell and a spacing above 0 and at least one cave`);
+  }
+  return out;
+}
+
+/** Formed caves (D63): the rocks their kinds name exist, the ranges run the right way, the chances add up, no way squeezes. */
+/** A humanoid has a stance (D64), a beast none; a warning stance has its distances, the line inside the warning. */
+export function validateStance(c: CreatureDef, where: string): string[] {
+  const out: string[] = [], st = c.stance, at = `${where}: creature "${c.id}"`;
+  if (c.body.kind !== 'humanoid') { if (st) out.push(`${at} is no humanoid and has a stance`); return out; }
+  if (!st) return [`${at} is a humanoid and needs a stance (D64)`];
+  if (!STANCE_KINDS.includes(st.kind)) return [`${at} has an unknown stance "${st.kind}"`];
+  if (!WARNING_STANCES.includes(st.kind)) return out;
+  if (!(st.warn! > 0) || !(st.line! > 0) || st.line! >= st.warn!) out.push(`${at} stance ${st.kind} needs warn > line > 0`);
+  if (st.kind === 'rob' && (!(st.close! > st.line!) || st.close! >= st.warn! || !(st.patience! > 0))) out.push(`${at} stance rob needs warn > close > line and a patience`);
+  if (st.kind === 'jeer' && (!(st.many! >= 2) || !(st.patience! > 0))) out.push(`${at} stance jeer needs many (2 or more) and a patience`);
+  if (st.talk === 'price' && (!st.toll || !(st.toll[0] > 0 && st.toll[0] <= st.toll[1] && st.toll[1] <= 1))) out.push(`${at} stance talk price needs a toll of two shares, 0 < low <= high <= 1`);
+  if (st.talk !== 'price' && st.toll) out.push(`${at} has a toll without asking a price`);
+  return out;
+}
+
+export function validateCaves(c: CavesDef, kinds: readonly string[], where: string): string[] {
+  const out: string[] = [];
+  const ids = new Set<string>();
+  const range = (r: readonly [number, number], what: string, lo = 0) => { if (!(r[0] >= lo && r[0] <= r[1])) out.push(`${where}: caves ${what} must run from least to most, from ${lo} up`); };
+  for (const r of c.rocks) {
+    if (ids.has(r.id)) out.push(`${where}: cave rock "${r.id}" defined twice`);
+    ids.add(r.id);
+    const w = `cave rock "${r.id}"`;
+    range(r.bedding.thickness, `${w} bed thickness`, 0.2); range(r.bedding.dip, `${w} dip`); range(r.joints.spacing, `${w} joint spacing`, 2);
+    range(r.joints.between, `${w} joint angle`); range(r.faults.count, `${w} faults`); range(r.water.sinks, `${w} sinks`, 1); range(r.water.springs, `${w} springs`, 1);
+    range(r.water.stages, `${w} stages`, 1); range(r.water.drop, `${w} drop`, 1);
+    if (!(r.bedding.soluble > 0 && r.bedding.soluble <= 1) || !r.bedding.colors.length) out.push(`${where}: ${w} needs a soluble share in 0..1 and bed colours`);
+      if (!(r.resistance.size >= 4 && r.resistance.contrast >= 0 && r.resistance.contrast <= 6)) out.push(`${where}: ${w} resistance needs a patch size of 4 m or more and a contrast of 0 to 6`);
+    if (!(r.former.rounds >= 1 && r.former.samples >= 1 && r.former.feedback > 0 && r.former.growth > 0 && r.former.reuse >= 0 && r.former.reuse <= 1 && r.former.keep > 0 && r.former.keep < 1)) out.push(`${where}: ${w} former needs rounds, samples, feedback, growth > 0 and keep in 0..1`);
+    if (r.lava) {
+      const l = r.lava;
+      range(l.halfWidth, `${w} lava tube half width`, 1.2); range(l.halfHeight, `${w} lava tube half height`, 1.5); range(l.gradient, `${w} lava gradient`); range(l.length, `${w} lava length`, 0.1); range(l.branches, `${w} lava branches`); range(l.branchLength, `${w} lava branch length`, 8);
+      if (!(l.roof >= 2 && l.wander >= 0 && l.wander <= 1 && l.skylights.most >= 0 && l.skylights.apart > 0 && l.skylights.thin > 0)) out.push(`${where}: ${w} lava needs a roof of 2 m or more, a wander in 0..1 and skylights`);
+    }
+    if (r.mine) {
+      const m = r.mine;
+      range(m.halfWidth, `${w} mine drift half width`, 1.1); range(m.halfHeight, `${w} mine drift half height`, 1.45); range(m.levels, `${w} mine levels`, 1); range(m.crosscuts, `${w} mine crosscuts`); range(m.crosscutLength, `${w} mine crosscut length`, 6); range(m.stopeLength, `${w} mine stope length`, 3);
+      if (!(m.square >= 0 && m.square <= 1 && m.gap >= 6 && m.adit >= 10 && m.roof >= 2 && m.stopes >= 0 && m.incline > 0 && m.incline <= 0.5)) out.push(`${where}: ${w} mine needs a square in 0..1, a level gap of 6 m or more, an adit of 10 m or more, a roof of 2 m or more and an incline in 0..0.5`);
+    }
+    if (r.mine) {
+      const fi = r.mine.fittings;
+      if (!(fi.posts >= 2 && fi.post > 0.05 && fi.post < 0.5 && fi.beam > 0.05 && fi.beam < 0.5 && fi.timbered >= 0 && fi.timbered <= 1 && fi.gauge >= 0.5 && fi.gauge < 1.6 && fi.rail > 0.02 && fi.sleeper >= 0.6 && fi.carts >= 0)) out.push(`${where}: ${w} mine fittings are malformed (posts every 2 m or more, a gauge of 0.5 to 1.6 m)`);
+    }
+    if (!(r.collapse.junction >= 0 && r.collapse.junction <= 1 && r.collapse.span > 0 && r.collapse.most >= 0)) out.push(`${where}: ${w} collapse is malformed`);
+  }
+  for (const g of c.geology) {
+    if (g.kind !== '*' && !kinds.includes(g.kind)) out.push(`${where}: cave geology names land kind "${g.kind}" the world has not`);
+    for (const id of Object.keys(g.rocks)) if (!ids.has(id)) out.push(`${where}: cave geology of "${g.kind}" names rock "${id}" the setting has not`);
+  }
+  if (!c.sizes.length || c.sizes.some((s) => !(s.across >= 40 && s.deep >= 20 && s.weight > 0 && s.scale > 0 && s.step >= 1.5 && s.step <= s.across / 8 && s.field >= 0.25 && s.field <= 1.5))) out.push(`${where}: cave sizes need across >= 40, deep >= 20, weight and scale > 0 and a lattice step of 1.5 m up to an eighth of the block and a field step of 0.25 to 1.5 m`);
+  const sh = c.shares;
+  if (Math.abs(sh.pure + sh.two + sh.three - 1) > 1e-6) out.push(`${where}: cave shares pure, two and three must add up to 1`);
+  const wy = c.way;
+  if (!(wy.minWidth >= 1.6 && wy.minHeight >= 2.4 && wy.maxRadius > wy.minWidth && wy.maxCut > 0)) out.push(`${where}: cave ways must fit the standing hero (width >= 1.6 m, height >= 2.4 m)`);
+  if (!(wy.stand >= 1.6 && wy.stand < wy.minHeight && wy.radius > 0.2 && wy.radius * 2 < wy.minWidth && wy.step > 0.2 && wy.climb > wy.step && wy.drop >= wy.climb && wy.ramp.above >= wy.step && wy.ramp.slope > 0.2 && wy.ramp.slope <= wy.ramp.steep && wy.ramp.steep <= 1.2 && wy.ramp.half >= wy.radius && wy.lock.widest >= wy.minWidth && wy.lock.tall >= wy.stand && wy.lock.apart > 0 && wy.lock.fromEntry >= 0)) out.push(`${where}: the reader's hero must fit the ways (stand < minHeight, 2 x radius < minWidth, step < climb <= drop)`);
+  if (!(c.walls.rough >= 0 && c.walls.rough <= 1.2)) out.push(`${where}: cave wall roughness must be 0 to 1.2 m (more could close a way)`);
+  const d = c.dress, span = (r: readonly [number, number], what: string) => { if (!(r[0] >= 0 && r[1] >= r[0])) out.push(`${where}: cave ${what} must be a range, least first`); };
+  span(d.floor.silt, 'silt depth'); span(d.rocks.perHall, 'rocks per hall'); span(d.rocks.size, 'rock size'); span(d.water.width, 'stream width'); span(d.formations.length, 'stalactite length'); span(d.stones.size, 'stone size'); span(d.crystals.count, 'crystal count'); span(d.crystals.len, 'crystal length');
+  if (!(d.stones.per100 >= 0 && d.stones.most >= 0 && d.stones.heaps >= 0 && d.stones.heaps <= 1 && d.crystals.per100 >= 0 && d.crystals.oreTries >= 0)) out.push(`${where}: cave stones and crystals need counts, and heaps a share`);
+  if (!(d.floor.relief >= 0 && d.floor.relief <= 1)) out.push(`${where}: cave floor relief must be 0 to 1 m`);
+  if (!(d.drips.chance >= 0 && d.drips.chance <= 1 && d.drips.live >= 0 && d.drips.live <= 1 && d.drips.spacing > 0.3 && d.drips.scatter >= 0)) out.push(`${where}: cave drips need chances 0 to 1 and a crack spacing over 0.3 m`);
+  if (!(d.formations.most > 0 && d.formations.column > 0 && d.water.bed >= 0 && d.water.poolDepth >= 0 && d.water.cutMost > 0)) out.push(`${where}: cave formations and water need positive sizes`);
+  range(c.ore.bodies, 'ore bodies');
+  return out;
+}
+
+/** What households ask (D62): known verbs, the things a fetch names exist, every ask says its words. */
+function validateAsks(m: SettingModule, where: string): string[] {
+  const out: string[] = [];
+  for (const t of m.twists ?? []) {
+    if (!TWIST_KINDS.includes(t.kind)) out.push(`${where}: twist "${t.id}" kind "${t.kind}" is unknown`);
+    if (!t.verbs.length || t.verbs.some((v) => !ASK_VERBS.includes(v))) out.push(`${where}: twist "${t.id}" names no verbs, or one unknown`);
+    if (t.kind === 'lied' && (!t.words.lore || !t.words.give || !t.words.rightful)) out.push(`${where}: twist "${t.id}" is a lie: it needs lore, give and rightful`);
+  }
+  const ids = new Set<string>();
+  for (const a of m.asks ?? []) {
+    if (ids.has(a.id)) out.push(`${where}: ask "${a.id}" defined twice`);
+    ids.add(a.id);
+    if (!ASK_VERBS.includes(a.verb)) out.push(`${where}: ask "${a.id}" verb "${a.verb}" is unknown`);
+    if (!(a.weight > 0)) out.push(`${where}: ask "${a.id}" needs a weight above 0`);
+    for (const k of a.kinds ?? []) if (!m.dungeons[k]) out.push(`${where}: ask "${a.id}" names dungeon kind "${k}" the setting has not`);
+    if (!a.words.told.length || !a.words.topic || !a.words.note || !a.words.thanks) out.push(`${where}: ask "${a.id}" lacks its words`);
+    if (a.verb === 'lost' && (!a.lost || !a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" is lost: it needs lost (alive, found, dead), things left of the dead and missing`);
+    if (a.verb === 'thief' && (!a.thief || !a.things?.length)) out.push(`${where}: ask "${a.id}" is a thief: it needs thief (accuse, confess, catch, spare, caught, spared) and the things stolen`);
+    if (a.verb === 'watch' && (!a.watch || !a.dwellers?.length || a.watch.hours[1] <= a.watch.hours[0])) out.push(`${where}: ask "${a.id}" is a watch: it needs watch (comes, hours from before to) and the dwellers who come by night`);
+    if (a.verb === 'parley' && (!a.parley || !a.dwellers?.length)) out.push(`${where}: ask "${a.id}" is a parley: it needs parley (terms, struck, short, broken) and the dwellers who talk`);
+    if (a.verb === 'fetch' && (!a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" fetches nothing (things), or has no words for the thing not brought (missing)`);
+    for (const t of a.things ?? []) if (!m.items.items.some((d) => d.id === t.item)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is no catalogue item (${t.item})`);
+    if (a.personal && (a.verb !== 'fetch' || !a.things?.every((t) => t.for && (t.for.pursuits?.length || t.for.trades?.length) && t.told?.length && t.thanks))) out.push(`${where}: ask "${a.id}" is personal: it must fetch things that each say whose they are (for), how they are told of (told) and the thanks`);
+    for (const t of a.things ?? []) for (const pu of t.for?.pursuits ?? []) if (!m.talk.persona.pursuits.some((x) => x.id === pu)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is for pursuit "${pu}" the setting has not`);
+  }
   return out;
 }
 
 /** The peoples: one for every people with names, sensible regard, and a hold's guard that exists. */
+/** Factions (D65): every creature has a known one, the matrix names known factions and says each pair once. */
+export function validateFactions(m: SettingModule, where: string): string[] {
+  const out: string[] = [], f = m.factions;
+  const ids = new Set([...m.peoples.map((p) => p.id), ...f.others.map((o) => o.id)]);
+  if (ids.size !== m.peoples.length + f.others.length) out.push(`${where}: a faction is defined twice`);
+  for (const o of f.others) if (!(Math.abs(o.regard) <= 100)) out.push(`${where}: faction "${o.id}" regard must be in −100..100`);
+  for (const c of m.creatures) if (!ids.has(c.faction)) out.push(`${where}: creature "${c.id}" belongs to unknown faction "${c.faction}"`);
+  const seen = new Set<string>();
+  for (const [a, b, is] of f.matrix) {
+    if (!ids.has(a) || !ids.has(b)) out.push(`${where}: hostility ${a}–${b} names an unknown faction`);
+    else if (a === b) out.push(`${where}: hostility ${a}–${a}: a faction is its own ally`);
+    if (!HOSTILITIES.includes(is) || is === 'neutral') out.push(`${where}: hostility ${a}–${b} is "${is}": say only ally, wary or hostile`);
+    const key = [a, b].sort().join('|');
+    if (seen.has(key)) out.push(`${where}: hostility ${a}–${b} is given twice`);
+    seen.add(key);
+  }
+  if (!(f.kill.own < 0 && f.kill.foes > 0 && f.kill.upTo > 0)) out.push(`${where}: factions.kill needs own below 0, foes and upTo above 0`);
+  for (const kind of ['guard', 'rob', 'jeer', 'murderous'] as const) {
+    const need = STANCE_SPEECH[kind], w = f.words[kind];
+    if (!w) { out.push(`${where}: stance ${kind} has no words`); continue; }
+    for (const t of need.turns) if (!w.turns[t]?.length) out.push(`${where}: stance ${kind} has no line for ${t}`);
+    for (const b of need.breaks) if (!w.breaks[b]?.length) out.push(`${where}: stance ${kind} has no line for breaking on ${b}`);
+    for (const l of [...Object.values(w.turns), ...Object.values(w.breaks), ...Object.values(w.talk ?? {})].flat()) if (l.length > 60) out.push(`${where}: stance ${kind} line "${l.slice(0, 20)}…" is over 60 characters (a bubble is short)`);
+  }
+  return out;
+}
+
 function validatePeoples(m: SettingModule, where: string): string[] {
   const out: string[] = [];
   const ids = new Set(m.peoples.map((p) => p.id));
@@ -1662,6 +2559,7 @@ function validateFight(m: SettingModule, where: string): string[] {
     }
   }
   if (new Set(m.shops.map((s) => s.keeper)).size !== m.shops.length) out.push(`${where}: a shop keeper is defined twice`);
+  for (const it of m.items.items) { const fx = it.effect?.id; if (fx !== undefined && (it.kind !== 'potion' || !(m.effects ?? []).some((e) => e.id === fx))) out.push(`${where}: item "${it.id}" puts on unknown effect "${fx}" or is no potion`); }
   for (const it of m.items.items) if (it.teaches && !taught(it.teaches)) out.push(`${where}: item "${it.id}" teaches unknown or untaught ability "${it.teaches}"`);
   for (const u of m.items.uniques) {
     if (!items.has(u.base)) out.push(`${where}: unique "${u.id}" base "${u.base}" is unknown`);
@@ -1676,6 +2574,7 @@ function validateFight(m: SettingModule, where: string): string[] {
     for (const k of b.known) if (!k.line.includes('{hero}')) out.push(`${where}: background "${b.id}": the ${k.trade}'s greeting must name {hero}`);
   }
   for (const t of m.items.treasure) for (const [id] of t.items) if (!items.has(id)) out.push(`${where}: treasure "${t.id}" holds unknown item "${id}"`);
+  for (const t of m.items.treasure) for (const f of t.finds ?? []) if (!items.has(f.item)) out.push(`${where}: treasure "${t.id}" finds unknown item "${f.item}"`);
   for (const k of QUALITIES) if (!m.items.affixes[k]) out.push(`${where}: no affix for quality "${k}"`);
   const ids = new Set<string>();
   for (const c of m.creatures) {
@@ -1685,6 +2584,9 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (!(c.morale >= 0 && c.morale <= 1)) out.push(`${where}: creature "${c.id}" morale must be 0..1`);
     for (const a of c.attacks) if (!DAMAGE_KINDS.includes(a.kind) || !(a.time > 0)) out.push(`${where}: creature "${c.id}" attack "${a.name}" needs a known kind and time > 0`);
     if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
+    out.push(...validateStance(c, where));
+    const talk = c.stance?.talk ? m.factions.words[c.stance.kind as 'guard']?.talk : undefined;
+    if (c.stance?.talk) for (const t of TALK_TURNS) if (!talk?.[t]?.length) out.push(`${where}: creature "${c.id}" can be talked to and its stance ${c.stance.kind} has no line for ${t}`);
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
   const encounter = (id: string) => m.encounters.find((e) => e.id === id);
@@ -1702,7 +2604,8 @@ function validateFight(m: SettingModule, where: string): string[] {
   }
   for (const e of m.events ?? []) {
     if (!(e.after >= 0) || !(e.cooldown >= 0) || e.count[0] < 1 || e.count[1] < e.count[0]) out.push(`${where}: event "${e.id}" needs after, cooldown and a count`);
-    if ((e.kind === 'raid' || e.kind === 'take') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
+    if ((e.kind === 'raid' || e.kind === 'take' || e.kind === 'foray') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
+    if (e.kind === 'foray' && (!e.hours || e.hours.some((h) => !(h >= 0 && h < 24)) || !e.fades)) out.push(`${where}: foray "${e.id}" needs its hours of the day and the hours it fades in`);
     if (e.kind === 'take' && (!e.takes || !(e.reach! > 0))) out.push(`${where}: take "${e.id}" needs the settlement it takes and a reach`);
     if (e.lair && !Object.values(m.dungeons).some((l) => l?.form.purposes.includes(e.lair!))) out.push(`${where}: event "${e.id}" asks for a ${e.lair}, which no dungeon kind is for`);
     if (e.fades !== undefined && (!(e.fades > 0) || !e.words.faded)) out.push(`${where}: event "${e.id}" fades: it needs the hours and how it is told (words.faded)`);

@@ -372,6 +372,16 @@
    "prompt": "The sound of heavy sea waves crashing against rocky cliffs below, deep booming surges and spray, no voices, no talking, no music, continuous for twenty seconds"
   },
   {
+   "id": "bed/ship-creak",
+   "kind": "bed",
+   "prompt": "The sound of the wooden hull and rigging of an old sailing ship at sea, timbers creaking and groaning slowly as she rolls, ropes and blocks straining, water washing along the hull, no voices, no talking, no music, continuous for twenty seconds"
+  },
+  {
+   "id": "bed/sea-storm",
+   "kind": "bed",
+   "prompt": "The sound of a stormy open sea, huge waves breaking and crashing, a roaring gale over the water, spray and spume, deep and wild, no voices, no talking, no music, no thunder, continuous for twenty seconds"
+  },
+  {
    "id": "call/gull",
    "kind": "call",
    "most": 3,

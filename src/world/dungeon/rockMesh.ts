@@ -50,9 +50,12 @@ export function brickField(ox: number, oy: number, oz: number, step: number, nx:
   return { ox, oy, oz, step, nx, ny, nz, bx, by, bz, bricks: new Array<Float32Array | null>(bx * by * bz).fill(null) };
 }
 
+/** The index in `bricks` of the brick holding sample (i, j, k). */
+export const brickIndex = (f: BrickField, i: number, j: number, k: number): number => ((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0));
+
 /** Set a sample of a field in bricks (its brick is made when first needed). */
 export function setSample(f: BrickField, i: number, j: number, k: number, v: number): void {
-  const b = ((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0));
+  const b = brickIndex(f, i, j, k);
   let brick = f.bricks[b];
   if (!brick) {
     if (v === -1) return;
@@ -64,7 +67,7 @@ export function setSample(f: BrickField, i: number, j: number, k: number, v: num
 /** A sample of a field (inside its grid). */
 export function sampleOf(f: AnyField, i: number, j: number, k: number): number {
   if ('d' in f) return f.d[i + f.nx * (j + f.ny * k)];
-  const brick = f.bricks[((i / BRICK) | 0) + f.bx * (((j / BRICK) | 0) + f.by * ((k / BRICK) | 0))];
+  const brick = f.bricks[brickIndex(f, i, j, k)];
   return brick ? brick[(i % BRICK) + BRICK * ((j % BRICK) + BRICK * (k % BRICK))] : -1;
 }
 
@@ -110,9 +113,9 @@ export function meshField(f: AnyField, look: RockLook): BuildingMesh {
 
   /** One cube's triangles. */
   function add(P: Float32Array, N: Float32Array, I: Uint32Array): void {
-    const made = new Map<string, number>();
+    const made = new Map<number, number>();
     const vertex = (v: number, axis: number, m: number): number => {
-      const key = `${v},${axis},${m}`;
+      const key = (v * 3 + axis) * 256 + m;
       let out = made.get(key);
       if (out !== undefined) return out;
       out = pos.length / 3;
@@ -138,6 +141,13 @@ export function meshField(f: AnyField, look: RockLook): BuildingMesh {
       idx.push(vertex(a, axis, m), vertex(b, axis, m), vertex(c, axis, m));
     }
   }
+}
+
+/** Which columns of a field hold any brick (the others are solid throughout): a test for a sample column. */
+export function brickColumns(f: BrickField): (i: number, k: number) => boolean {
+  const has = new Uint8Array(f.bx * f.bz);
+  for (let b = 0; b < f.bricks.length; b++) if (f.bricks[b]) has[(b % f.bx) + f.bx * Math.floor(b / (f.bx * f.by))] = 1;
+  return (i, k) => has[((i / BRICK) | 0) + f.bx * ((k / BRICK) | 0)] === 1;
 }
 
 /** The field at a point (trilinear); `outside` beyond it. */

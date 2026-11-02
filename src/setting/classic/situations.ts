@@ -11,4 +11,6 @@ export const situations: readonly SituationDef[] = [
   // No cry: a farmer after a beast is no emergency; the hero sees them run.
   { id: 'refugees', kind: 'refugees', seen: 30, cry: 'They took our home! We got out with nothing!' },
   { id: 'stray-beast', kind: 'stray-beast', hours: [8, 17], every: 3, lasts: 1.5, seen: 40 },
+  // By the sea (S9): a fisher whose boat went over, clinging to it off the strand.
+  { id: 'castaway', kind: 'castaway', chance: 0.6, lasts: 1.5, seen: 55, cry: 'Help! Out here! The boat went over!' },
 ];

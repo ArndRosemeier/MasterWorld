@@ -86,6 +86,23 @@ export class Lake {
     return this.shore(x, z) < LAKE_GRID;
   }
 
+  /**
+   * Where the way from (ax, az) on the land to (bx, bz) in the water first reaches the water's edge (half a cell out
+   * from the water's cells, where the ground meets the level); (bx, bz) if it never does before.
+   */
+  waterline(ax: number, az: number, bx: number, bz: number): [number, number] {
+    const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / 10), alongAt = (t: number): [number, number] => [ax + (bx - ax) * t, az + (bz - az) * t];
+    const reached = (t: number) => this.shore(...alongAt(t)) <= LAKE_GRID / 2;
+    for (let s = 0; s <= steps; s++) {
+      if (!reached(s / (steps || 1))) continue;
+      // To within a few centimetres between the last dry step and this one.
+      let lo = Math.max(0, s - 1) / (steps || 1), hi = s / (steps || 1);
+      for (let i = 0; i < 8 && s > 0; i++) { const m = (lo + hi) / 2; if (reached(m)) hi = m; else lo = m; }
+      return alongAt(hi);
+    }
+    return [bx, bz];
+  }
+
   /** The centre of the lake's cell nearest to (x, z). */
   nearestWater(x: number, z: number): [number, number] {
     let best = Infinity, bx = x, bz = z;

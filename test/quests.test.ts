@@ -4,7 +4,7 @@ import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic';
 import { Character } from '../src/game/character';
 import { GuildBook, questDue, questGift, teach, teachingsOf, teachRefusal } from '../src/game/guilds';
-import { questFor, questOf, questReward } from '../src/vgm/quests';
+import { questFor, questOf, questReward, taskFor, taskOf } from '../src/vgm/quests';
 import { keepPromise } from '../src/vgm/leads';
 import type { DecisionLog } from '../src/world/decisions';
 import { startWorld } from './frontierLand';
@@ -48,4 +48,28 @@ test('quests: bird form is gained only through the Undercroft keeper\'s deed', (
   assert.equal(questGift(classic, log, d.id, hero), null, 'given once');
   // A place of a guild without a deed gives nothing.
   assert.equal(questReward(classic, [...log, { ...d, id: 'cave-9', quest: undefined }, { kind: 'kept', id: 'k9', promise: 'cave-9', at: 41 }], 'cave-9'), null);
+});
+
+test('quests: a guild\'s task names one place, of the kind it asks, and only that place does it', () => {
+  const seed = parseSeed('masterworld');
+  const { terrain, log: first, home } = startWorld();
+  const town = terrain.towns[0], c = { seed, terrain, home, dungeons: classic.dungeons };
+  const guild = (k: string) => classic.guilds!.find((g) => g.keeper === k)!;
+  // Below a house: a cellar, its household its own.
+  const cellar = taskFor({ guild: under, town, building: 7, hours: 30 }, { ...c, log: first })!;
+  assert.ok(cellar && !cellar.site && cellar.task === under.keeper && cellar.building !== 7, 'a cellar under a house of the town');
+  // Out on the land: a place with a site, its household the trainer's.
+  const witch = guild('hedge-witch'), out = taskFor({ guild: witch, town, building: 7, hours: 30 }, { ...c, log: first })!;
+  assert.ok(out?.site && out.building === 7 && out.task === witch.keeper);
+  let log: DecisionLog = [...first, cellar];
+  assert.equal(taskOf(log, under.keeper), cellar);
+  assert.equal(taskFor({ guild: under, town, building: 7, hours: 31 }, { ...c, log }), null, 'named once');
+  const book = new GuildBook();
+  book.assign(under.keeper, 30);
+  // Another place kept does not do it, even a cellar.
+  const other = { ...cellar, id: 'cellar-77', task: undefined };
+  log = [...log, other, { kind: 'kept', id: 'k-77', promise: 'cellar-77', at: 40 }];
+  assert.equal(book.taskDone(under, log), false, 'not the place named');
+  log = [...log, keepPromise(log, cellar.id, 41)!];
+  assert.equal(book.taskDone(under, log), true);
 });

@@ -1,5 +1,6 @@
 /**
- * Bird form (plan 10, D49): a taught ability by which the hero takes the shape of a bird and flies. Not a man
+ * Changes of shape (plan 10, D49, D60): bird form, by which the hero takes the shape of a bird and flies, and otter
+ * form (S6), taken in the water, which swims fast and dives deep. In either no other ability works. Bird form is not a man
  * flying: the hero kneels, the change takes its time (the setting's `shape.change`, 15 s in the classic one) and
  * cannot be made or finished in a fight; turning back is shorter and needs the bird on the ground (using the
  * ability again in the air glides it down first). Pure: `Shapeshift` the steps of the change, `BirdFlight` how
@@ -8,8 +9,8 @@
 import type { AbilityDef, ShapeDef } from '../setting/contract';
 import { shapeOf } from './recipe';
 
-/** Where the change stands: the hero as themself, changing, a bird, changing back. */
-export type FormPhase = 'self' | 'changing' | 'bird' | 'returning';
+/** Where the change stands: the hero as themself, changing, the animal (a bird, an otter), changing back. */
+export type FormPhase = 'self' | 'changing' | 'animal' | 'returning';
 
 /** What around the hero bears on the change this frame. */
 export interface ShiftAround {
@@ -19,8 +20,21 @@ export interface ShiftAround {
   readonly swimming?: boolean;
   /** Under a roof or below ground: no sky to fly in. */
   readonly roofed?: boolean;
-  /** The bird stands on the ground (it can turn back). */
+  /** The bird stands on the ground, the otter in the shallows or at the surface (it can turn back). */
   readonly grounded?: boolean;
+}
+
+/** What the hero is in each animal form, for the lines. */
+const ANIMAL: Readonly<Record<ShapeDef['into'], string>> = { bird: 'A pheasant', otter: 'An otter' };
+
+/**
+ * While a change of shape is on (changing, the animal, changing back), no other ability works (D60), nor the potion
+ * or rest: the line why `id` cannot be used, or null when it may (the change's own ability, to stop or turn back).
+ */
+export function shapeBars(shifts: readonly Shapeshift[], id: string): string | null {
+  const on = shifts.find((s) => s.busy);
+  if (!on || on.ability.id === id) return null;
+  return on.phase === 'animal' ? `${ANIMAL[on.shape.into]} cannot do that.` : 'Not while your shape changes.';
 }
 
 /** A step of the change the game shows or says. */
@@ -46,7 +60,7 @@ export class Shapeshift {
   get progress(): number {
     switch (this.phase) {
       case 'self': return 0;
-      case 'bird': return 1;
+      case 'animal': return 1;
       case 'changing': return Math.min(1, this.t / this.shape.change);
       case 'returning': return Math.max(0, 1 - this.t / this.shape.back);
     }
@@ -65,8 +79,13 @@ export class Shapeshift {
         if (this.cooling > 0) return `${this.ability.name} is not ready yet.`;
         if (around.fighting) return 'Not while you fight.';
         if (around.riding) return 'Get off your horse first.';
-        if (around.swimming) return 'Not in the water.';
-        if (around.roofed) return 'There is no sky here to fly in.';
+        if (this.shape.into === 'otter') {
+          // The otter is taken in the water (S6): never on land, never in a fight.
+          if (!around.swimming) return 'Only in the water.';
+        } else {
+          if (around.swimming) return 'Not in the water.';
+          if (around.roofed) return 'There is no sky here to fly in.';
+        }
         this.phase = 'changing';
         this.t = 0;
         events.push('began');
@@ -78,7 +97,7 @@ export class Shapeshift {
         this.t = 0;
         events.push('stopped');
         return null;
-      case 'bird':
+      case 'animal':
         if (around.grounded) this.turnBack(events);
         else if (!this.landing) { this.landing = true; events.push('landing'); }
         return null;
@@ -94,8 +113,8 @@ export class Shapeshift {
     if (this.phase === 'changing') {
       if (around.fighting) { this.phase = 'self'; this.t = 0; out.push('broken'); return out; }
       this.t += dt;
-      if (this.t >= this.shape.change) { this.phase = 'bird'; this.t = 0; this.landing = false; out.push('became'); }
-    } else if (this.phase === 'bird') {
+      if (this.t >= this.shape.change) { this.phase = 'animal'; this.t = 0; this.landing = false; out.push('became'); }
+    } else if (this.phase === 'animal') {
       if (this.landing && around.grounded) this.turnBack(out);
     } else if (this.phase === 'returning') {
       this.t += dt;

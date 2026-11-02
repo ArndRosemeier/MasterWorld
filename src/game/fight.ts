@@ -8,12 +8,14 @@
 import { Rng, angleDiff, deriveSeed } from '@futuremagic/core';
 import { abilityOf, type AbilityDef, type DamageKind, type SettingModule } from '../setting/contract';
 import { strike, threatOf, type Blow, type Strike, type Threat } from '../sim/combat';
-import { radiusOf, type Creature, type Den, type DenEvent, type Quarry } from '../sim/creatures';
+import { radiusOf, type BreakCause, type Creature, type Den, type DenEvent, type Quarry, type WarnTurn } from '../sim/creatures';
 import type { Character } from './character';
 import { defOf, rollLoot, type Item, type Loot } from './items';
 import { blowOf, mendCaster, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
 import { WEAR, type WearState } from './upkeep';
 import { dauntsFrom, fightXp } from './growth';
+import type { Standing } from './standing';
+import { opposed } from '../sim/factions';
 
 export interface HeroPose {
   readonly x: number;
@@ -31,7 +33,12 @@ export type FightEvent =
   | { readonly kind: 'hurt'; readonly by: Creature; readonly strike: Strike }
   | { readonly kind: 'swing'; readonly who: Creature }
   | { readonly kind: 'notice'; readonly who: Creature }
-  | { readonly kind: 'killed'; readonly who: Creature; readonly loot: Loot; readonly xp: number }
+  /** A band of foes speaks to the hero before any blow (D64): `who` speaks for it, `turn` is what it says. */
+  | { readonly kind: 'warn'; readonly who: Creature; readonly turn: WarnTurn }
+  /** The warning ended in a fight: `who` speaks for the band, `cause` is why. */
+  | { readonly kind: 'break'; readonly who: Creature; readonly cause: BreakCause }
+  /** `byHero`: the hero hurt it (D65: only then it gives experience and counts against its faction); else others brought it down. */
+  | { readonly kind: 'killed'; readonly who: Creature; readonly loot: Loot; readonly xp: number; readonly byHero: boolean }
   | { readonly kind: 'flee'; readonly who: Creature }
   | { readonly kind: 'plea'; readonly who: Creature; readonly text: string }
   | { readonly kind: 'spared'; readonly who: Creature }
@@ -45,6 +52,8 @@ export type FightEvent =
   /** A foe lifted a door's bar (link) standing at `from` (the den's frame): the door is seen swinging away from it. */
   | { readonly kind: 'unbarred'; readonly link: number; readonly from: readonly [number, number] };
 
+/** The hero looks weak to a jeering band below this share of their health (D64). */
+const FRAIL = 0.5;
 /** Hero body radius, metres. */
 const HERO_R = 0.35;
 /** The hero must face the target within this to strike (radians). */
@@ -56,6 +65,8 @@ const TAB_RANGE = 22;
 export const yawToDir = (yaw: number): number => Math.atan2(-Math.cos(yaw), -Math.sin(yaw));
 
 export class Fight implements RecipeWorld {
+  /** What the factions make of the hero (D65); none: every foe takes them for a stranger. */
+  standing: Standing | null = null;
   target: Creature | null = null;
   /** Swinging again and again at the target (Strike toggles it). */
   attacking = false;
@@ -78,6 +89,7 @@ export class Fight implements RecipeWorld {
   constructor(readonly hero: Character, readonly den: Den, private readonly setting: SettingModule, seed: number, public light = 9) {
     this.rng = new Rng(deriveSeed(seed, 'fight'));
     this.recipes = new Recipes(hero, this, setting.effects ?? [], deriveSeed(seed, 'recipes'));
+    den.feud = (a, b) => opposed(setting, a, b);
   }
 
   /** The den's view of the hero now. */
@@ -89,7 +101,7 @@ export class Fight implements RecipeWorld {
     const noise = Math.max(this.quiet < 3 ? 1 : 0, moving * (1 - stealth / 160)) * veil;
     const g = this.hero.guard(this.hero.stamina <= 0 || this.recipes.isHeld(SELF));
     // Foes the hero has outgrown so far they give no experience dare not start a fight (D58).
-    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) }, daunts: dauntsFrom(this.setting.growth, this.hero.level) };
+    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) }, daunts: dauntsFrom(this.setting.growth, this.hero.level), frail: this.hero.health < this.hero.maxHealth * FRAIL, ...(this.standing ? { regard: (faction: string) => this.standing!.tier(faction) } : {}) };
   }
 
   /**
@@ -193,7 +205,11 @@ export class Fight implements RecipeWorld {
     for (const e of this.den.step(dt, this.quarry(p))) this.denEvent(e, out);
     for (const e of this.recipes.elapse(dt, p, p.speed, breathe)) this.recipeEvent(e, out);
     const t = this.target;
-    if (t && t.state === 'dead') { this.target = null; this.attacking = false; }
+    // The target fell: the nearest of those still fighting the hero is the target now (the swinging goes on), else none.
+    if (t && t.state === 'dead') {
+      this.target = this.den.fighting.reduce<Creature | null>((best, c) => (!best || Math.hypot(c.x - p.x, c.z - p.z) < Math.hypot(best.x - p.x, best.z - p.z) ? c : best), null);
+      if (!this.target) this.attacking = false;
+    }
     if (hero.alive && this.attacking && this.target && this.swing === 0 && !this.recipes.isHeld(SELF) && !this.recipes.casting) this.blow(this.target, p, out);
     this.still = p.speed < 0.3 ? this.still + dt : 0;
     if (breathe) hero.recover(dt, this.den.fighting.length > 0 || this.quiet < 6, this.still);
@@ -296,12 +312,14 @@ export class Fight implements RecipeWorld {
       }
       case 'swing': out.push({ kind: 'swing', who: e.who }); break;
       case 'notice': out.push({ kind: 'notice', who: e.who }); break;
+      case 'warn': out.push({ kind: 'warn', who: e.who, turn: e.turn }); break;
+      case 'break': out.push({ kind: 'break', who: e.who, cause: e.cause }); break;
       case 'flee': out.push({ kind: 'flee', who: e.who }); break;
       case 'plea': out.push({ kind: 'plea', who: e.who, text: e.text }); break;
       case 'spared': out.push({ kind: 'spared', who: e.who }); break;
       case 'unbarred': out.push({ kind: 'unbarred', link: e.link, from: [e.who.x, e.who.z] }); break;
       // Experience for the foe (D58), weighed by its danger against the hero's level.
-      case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who), xp: this.earnFrom(e.who) }); break;
+      case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who), xp: e.who.struck ? this.earnFrom(e.who) : 0, byHero: e.who.struck }); break;
       default: break;
     }
   }

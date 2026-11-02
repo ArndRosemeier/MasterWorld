@@ -11,7 +11,7 @@
  */
 import { MinHeap, Noise, clamp, deriveSeed, hash2f, lerp, smoothstep } from '@futuremagic/core';
 import type { Skeleton } from './skeleton';
-import { chamfer, floodLake, unpackLake, type Lake } from './lakes';
+import { LAKE_GRID, chamfer, floodLake, unpackLake, type Lake } from './lakes';
 
 export interface HydroOptions {
   /** Coarse cell side, metres. */
@@ -720,10 +720,44 @@ export class HydroTile {
       // Levels never rise downstream: through a rim the river cuts a gorge down to the level it came at.
       for (let k = 1; k < pl.length; k++) pl[k] = Math.min(pl[k], pl[k - 1]);
       if (into && lines) this.ontoLine(lines, px, pz, pl);
-      this.rivers.push(this.shape(px, pz, pl, ph));
+      const river = this.lakes.length ? this.atLakeShores(this.shape(px, pz, pl, ph)) : this.shape(px, pz, pl, ph);
+      if (!river) continue;
+      this.rivers.push(river);
       if (lines) this.addLine(lines, this.rivers.length - 1);
     }
     this.rivers.forEach((r, ri) => this.index(r, ri));
+  }
+
+  /**
+   * A river begins and ends at a lake's shore, never runs on over its water. Its coarse ends lie in the lake's cells
+   * and meander and smooth from there, so a river into a lake went on far out over the water, its current drawn
+   * across the lake, and one out of a lake swung back over it before it left (the meanders are full a few points
+   * from its start). Cut off: before the last point in the water of the lake it comes from, and from the first point
+   * in any lake's water after that, each end moved to the water's edge. Null where nothing is left.
+   */
+  private atLakeShores(r: River): River | null {
+    const n = r.level.length, x = (k: number) => r.xz[k * 2], z = (k: number) => r.xz[k * 2 + 1];
+    const inWater = (l: Lake | null, k: number) => l !== null && l.shore(x(k), z(k)) <= LAKE_GRID / 2;
+    const from = this.lakeNear(x(0), z(0));
+    const out = inWater(from, 0);
+    let a = 0;
+    if (out) for (let k = 1; k < n; k++) if (inWater(from, k)) a = k;
+    let b = n - 1, into: Lake | null = null;
+    for (let k = a + 1; k < n; k++) {
+      const l = this.lakeNear(x(k), z(k));
+      if (inWater(l, k)) { b = k; into = l; break; }
+    }
+    if (!out && !into) return r;
+    if (b - a < 2) return null;
+    const xz = Array.from(r.xz.subarray(a * 2, b * 2 + 2)), level = Array.from(r.level.subarray(a, b + 1));
+    const e = xz.length / 2 - 1;
+    if (out) [xz[0], xz[1]] = from!.waterline(xz[2], xz[3], xz[0], xz[1]);
+    if (into) {
+      [xz[e * 2], xz[e * 2 + 1]] = into.waterline(xz[e * 2 - 2], xz[e * 2 - 1], xz[e * 2], xz[e * 2 + 1]);
+      // At the lake's level where it reaches it (never higher than it came).
+      level[e] = Math.min(level[e - 1], Math.max(level[e], into.level));
+    }
+    return { xz: Float64Array.from(xz), level: Float32Array.from(level), half: r.half.slice(a, b + 1), fall: r.fall.slice(a, b), ...(r.reach ? { reach: r.reach.slice(a, b + 1) } : {}) };
   }
 
   /** Where the step from cell `a` to cell `b` first meets a river or lake (`BrookFeed.join`), checked every ~20 m. */

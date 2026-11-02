@@ -7,7 +7,7 @@ import type { EncounterDef } from '../contract';
 
 export const encounters: readonly EncounterDef[] = [
   { id: 'rats', creatures: ['giant rat', 'rat'], count: [3, 6], where: ['below'], need: 'challenge' },
-  { id: 'smugglers', creatures: ['bandit'], count: [2, 4], where: ['below', 'open'], need: 'challenge' },
+  { id: 'smugglers', creatures: ['bandit'], count: [2, 4], where: ['below', 'open', 'shore'], need: 'challenge' },
   { id: 'spiders', creatures: ['giant spider'], count: [1, 2], where: ['below', 'wood'], need: 'challenge' },
   { id: 'goblins', creatures: ['goblin'], count: [2, 5], where: ['below', 'wood', 'open'], need: 'challenge' },
   { id: 'ghoul-and-bones', creatures: ['ghoul', 'skeleton'], count: [1, 3], where: ['below'], need: 'challenge' },
@@ -15,8 +15,16 @@ export const encounters: readonly EncounterDef[] = [
   { id: 'the-dead', creatures: ['skeleton'], count: [2, 4], where: ['below', 'open'], need: 'challenge' },
   { id: 'wolves', creatures: ['wolf'], count: [3, 4], where: ['below', 'wood'], need: 'challenge' },
   { id: 'highwaymen', creatures: ['highwayman'], count: [2, 3], where: ['below', 'road', 'open'], need: 'challenge' },
+  { id: 'cutthroats', creatures: ['cutthroat'], count: [2, 3], where: ['open', 'road'], need: 'challenge' },
   { id: 'boar', creatures: ['boar'], count: [1, 2], where: ['wood'], need: 'challenge' },
   { id: 'deer', creatures: ['deer'], count: [3, 6], where: ['open'], need: 'discovery' },
+  { id: 'crabs', creatures: ['giant crab'], count: [2, 3], where: ['shore'], need: 'challenge' },
+  // The giants (D67, phase M): two peaceful, as a promise, and two that hunt, which the land holds only far out (their danger, D29).
+  { id: 'giant-elk', creatures: ['giant elk'], count: [1, 1], where: ['open'], need: 'discovery' },
+  { id: 'giant-turtle', creatures: ['giant turtle'], count: [1, 1], where: ['water'], need: 'discovery' },
+  { id: 'giant-boar', creatures: ['giant boar'], count: [1, 1], where: ['wood'], need: 'challenge' },
+  { id: 'giant-wolves', creatures: ['giant wolf', 'wolf'], count: [3, 4], where: ['wood'], need: 'challenge', lone: true },
+  { id: 'shark', creatures: ['shark'], count: [1, 1], where: ['sea'], need: 'challenge' },
 ];
 
 /** A dweller's who: the encounter's id and its creatures (spread into a DwellerDef). */

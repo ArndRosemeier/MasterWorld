@@ -4,6 +4,7 @@ import { deriveSeed, parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { OpenGround, Wilds, groupDanger, type Land } from '../src/sim/wild';
 import { territoryOf, wildFor } from '../src/vgm/wild';
+import { dangerAt } from '../src/vgm/dungeons';
 import { Den, type Quarry } from '../src/sim/creatures';
 import { Delve, type DelveSave } from '../src/game/delve';
 import { Character } from '../src/game/character';
@@ -26,8 +27,9 @@ test('wild: deer, boar, a wolf pack and bandits live around the town, apart, on 
   for (const t of places) {
     const d = Math.hypot(t.x - town.decision.x, t.z - town.decision.z);
     assert.ok(d >= ringOf(t.kind)[0] - 1 && d <= ringOf(t.kind)[1] + 1, `${t.id} at ${d.toFixed(0)} m`);
-    assert.equal(terrain.waterDepth(t.x, t.z), 0, `${t.id} on dry land`);
-    assert.ok(groupDanger(t.members, classic.creatures) <= 18, `${t.id} fits a fresh hero`);
+    if (t.kind !== 'sharks') assert.equal(terrain.waterDepth(t.x, t.z), 0, `${t.id} on dry land`);
+    // None too strong for the hero near the town, and farther out only as strong as the land there is (D29: dangerAt).
+    assert.ok(groupDanger(t.members, classic.creatures) <= Math.max(18, dangerAt({ decision: t }, town.decision)), `${t.id} fits a fresh hero`);
     for (const o of places) if (o !== t) assert.ok(Math.hypot(o.x - t.x, o.z - t.z) > o.r + t.r, `${t.id} and ${o.id} apart`);
   }
   assert.deepEqual(placeWild(), places, 'the same every time');
@@ -130,4 +132,60 @@ test('wild: deer keep their distance (Arnd 2026-10-28): they bolt once, then wat
   }
   assert.ok(closest > wary * 0.9, `closest ${closest.toFixed(1)} m`);
   assert.ok(bolts <= d2.den.creatures.length, `${bolts} bolts`);
+});
+
+test('wild (S9): by the sea town, giant crabs and smugglers live on strands just above the sea, the sea beside them', () => {
+  for (const k of ['crabs', 'smugglers']) {
+    const groups = places.filter((t) => t.kind === k);
+    assert.ok(groups.length > 0, `${k} on the coast`);
+    for (const t of groups) {
+      const h = terrain.height(t.x, t.z);
+      assert.ok(h >= 0.3 && h <= 4, `${t.id} on a strand (${h.toFixed(1)} m)`);
+      const sea = [0, 1, 2, 3, 4, 5, 6, 7].some((i) => terrain.waterDepth(t.x + Math.cos(i * Math.PI / 4) * 35, t.z + Math.sin(i * Math.PI / 4) * 35) > 1);
+      assert.ok(sea, `${t.id} by the sea`);
+    }
+  }
+  assert.ok(places.filter((t) => t.kind === 'crabs').every((t) => t.members.every((m) => m === 'giant crab')));
+});
+
+test('wild (S9): a shark keeps to deep water under the surface, comes for a hero who swims, and never follows into the shallows', () => {
+  const sharks = places.filter((t) => t.kind === 'sharks');
+  assert.ok(sharks.length > 0, 'sharks off the sea town');
+  for (const t of sharks) assert.ok(terrain.waterDepth(t.x, t.z) >= 6, `${t.id} in deep water`);
+  const t = sharks[0], surface = 0.3;
+  let swimmer: Quarry = { x: t.x + 12, y: surface - 1, z: t.z, noise: 0.6, light: 0, alive: true, guard };
+  const den = new Den(new OpenGround(land, [t], () => swimmer.y), t.members.map((creature) => ({ creature, room: 0 })), classic.creatures, deriveSeed(t.seed, 'den'));
+  const shark = den.creatures[0];
+  let bit = 0;
+  for (let i = 0; i < 400 && !bit; i++) {
+    for (const e of den.step(0.1, swimmer)) if (e.kind === 'blow') bit++;
+    assert.ok(terrain.waterDepth(shark.x, shark.z) >= 1.8, 'in the water');
+    assert.ok(shark.y <= surface - 0.59 && shark.y >= terrain.height(shark.x, shark.z) + 0.59, `under the surface, over the bed (${shark.y.toFixed(2)})`);
+  }
+  assert.ok(bit > 0, 'it bit the swimmer');
+  // In a heavy swell (PC round 33: it broke out of the troughs) it keeps under the waves, and fights to the end.
+  let time = 0;
+  const swell: Land = { ...land, surface: (x) => surface + 1.5 * Math.sin(time * 1.3 + x * 0.05) };
+  const rough = new Den(new OpenGround(swell, [t], () => swimmer.y), t.members.map((creature) => ({ creature, room: 0 })), classic.creatures, deriveSeed(t.seed, 'den'));
+  const s2 = rough.creatures[0];
+  for (let i = 0; i < 300; i++) {
+    time += 0.1;
+    swimmer = { ...swimmer, x: s2.x + 2, z: s2.z, y: swell.surface!(s2.x + 2, s2.z)! - 1 };
+    rough.step(0.1, swimmer);
+    assert.ok(s2.y <= swell.surface!(s2.x, s2.z)! - 0.59, `under the swell (${s2.y.toFixed(2)})`);
+  }
+  s2.health = 2;
+  for (const e of rough.step(0.1, swimmer)) assert.notEqual(e.kind, 'flee', 'a shark never breaks off');
+  // Dead, it floats up under the waves and rides them.
+  s2.state = 'dead';
+  for (let i = 0; i < 400; i++) { time += 0.1; rough.step(0.1, swimmer); }
+  const top = swell.surface!(s2.x, s2.z)! - 0.25;
+  assert.ok(s2.y <= top + 1e-6 && s2.y > top - 0.5, `floating under the waves (${s2.y.toFixed(2)}, top ${top.toFixed(2)})`);
+  // The hero ashore: it keeps to the water.
+  const strand = places.find((p) => p.kind === 'crabs')!;
+  swimmer = hero(strand.x, strand.z);
+  for (let i = 0; i < 300; i++) {
+    den.step(0.1, swimmer);
+    assert.ok(terrain.waterDepth(shark.x, shark.z) >= 1.8, 'never out of the water');
+  }
 });

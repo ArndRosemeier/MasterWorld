@@ -4,6 +4,7 @@ import { floatOf, parseSeed } from '@futuremagic/core';
 import { rockModel } from '@futuremagic/rocks';
 import { classic } from '../src/setting/classic/index';
 import { Terrain } from '../src/world/terrain';
+import { drawnOf } from '../src/world/drawnGround';
 import { FORM_CELL } from '../src/world/landforms';
 import { ROCK_STRIDE, Rocks, STEP_OVER, obstaclesOf, rockKinds, rockPlacement, talusOf } from '../src/world/rocks';
 import { Walker } from '../src/game/walker';
@@ -29,8 +30,8 @@ test('rocks: a tor wears a crown of rock, a boulder field its boulders; placed a
   }
 });
 
-test('rocks: every rock sits on the ground, no edge floating', () => {
-  const ks = rockKinds(), ground = (x: number, z: number) => terrain.height(x, z);
+test('rocks: every rock sits on the ground as drawn, no edge floating', () => {
+  const ks = rockKinds(), drawn = drawnOf(terrain), ground = (x: number, z: number) => drawn.footing(x, z);
   for (const f of [tor, field]) {
     const d = cellOf(f.x, f.z);
     for (let k = 0; k < d.length; k += ROCK_STRIDE) {

@@ -15,8 +15,9 @@ import { RoadNet } from './roads';
 import { brookCuts } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
-import { Landforms } from './landforms';
+import { Landforms, type Landform } from './landforms';
 import type { Lake } from './lakes';
+import { Volcanoes, lavaIn, lowestCrest, nearVent, scorched, type Volcano } from './volcano';
 
 /**
  * How far out from a town's middle the landforms are eased away (its farms and outlying houses stand on calm
@@ -24,6 +25,10 @@ import type { Lake } from './lakes';
  */
 /** How far (m) from a brook a dell keeps above its water (`Hydrology.brookFloor`). */
 const DELL_REACH = 120;
+/** Rings (times its half length) on which a dell's rim is looked at; how far (m) its pond keeps below it; least depth (m) it keeps. */
+const POND_RIM = [1, 1.15, 1.4] as const;
+const POND_FREEBOARD = 0.3;
+const POND_MIN_DEPTH = 0.8;
 /** From how far past a brook's edge (m) to how far the land's small shapes ease in beside it. */
 const BROOK_CLEAR = [4, 40] as const;
 const formsOut = (radius: number): number => radius * 2.5 + 130;
@@ -39,6 +44,8 @@ export class Terrain {
   private readonly wetProbe: WaterHere = emptyWater();
   /** The small shapes of the land (D55): knolls, dells, gullies … and the middle band of relief. */
   readonly landforms: Landforms;
+  /** The active volcanoes of volcanic country (K7d). */
+  readonly volcanoes: Volcanoes;
 
   /** `hydro`, `brooks`: tile sizes for drainage (tests use small tiles; null: no brooks). */
   constructor(readonly seed: number, readonly setting: SettingModule, hydro: HydroOptions = HYDRO, brooks: HydroOptions | null = BROOKS) {
@@ -46,23 +53,78 @@ export class Terrain {
     this.detail = new Noise(deriveSeed(seed, 'terrain', 'detail'));
     this.hydro = new Hydrology(this.skeleton, hydro, brooks);
     this.biomes = setting.world.biomes;
-    this.landforms = new Landforms(seed, setting.world, this.skeleton, (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookFloor(x, z, DELL_REACH) < Infinity);
+    this.landforms = new Landforms(
+      seed, setting.world, this.skeleton,
+      (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookFloor(x, z, DELL_REACH) < Infinity,
+      (x, z) => this.erodedLand(x, z),
+    );
+    this.volcanoes = new Volcanoes(seed, this.skeleton, (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookFloor(x, z, DELL_REACH) < Infinity);
+  }
+
+  /** The level a volcano's lava lake stands at (m; null: it holds none): under its rim's lowest crest, which a spilling lake brims. */
+  private readonly lakeLevels = new WeakMap<Volcano, number | null>();
+  lakeLevel(v: Volcano): number | null {
+    if (v.state === 'steaming') return null;
+    let y = this.lakeLevels.get(v);
+    if (y === undefined) {
+      const low = lowestCrest(v, (x, z) => this.height(x, z));
+      y = low - (v.state === 'erupting' ? 0.35 : v.drop);
+      if (y - this.height(v.x, v.z) < 3) y = null;
+      this.lakeLevels.set(v, y);
+    }
+    return y;
+  }
+
+  /**
+   * The height of the lava's surface at (x, z) when lava lies there (a volcano's lake, or a flow in its channel), else null
+   * (the hero burns in it).
+   */
+  lavaAt(x: number, z: number): number | null {
+    const v = this.volcanoes.holding(x, z);
+    if (!v || v.state === 'steaming') return null;
+    const ground = this.height(x, z), lake = this.lakeLevel(v), kind = lavaIn(v, x, z, ground, lake);
+    return kind === 'lake' ? lake : kind === 'flow' ? ground + 0.3 : null;
+  }
+
+  /** Each pond's level as the land drawn round it holds it (NaN: it holds none), by dell. */
+  private readonly pondLevels = new WeakMap<Landform, number>();
+
+  /**
+   * A dell pond's water level at (x, z), NaN where there is none. The pond was set on the land before towns, roads and
+   * the water's banks shaped it; checked here against the land as drawn: where that rim lies lower, the pond sinks
+   * below it, or holds no water at all (else it floats over the land with its edge hanging down to the ground).
+   */
+  pondAt(x: number, z: number): number {
+    const f = this.landforms.pondOf(x, z);
+    if (!f) return NaN;
+    let level = this.pondLevels.get(f);
+    if (level === undefined) {
+      let rim = Infinity;
+      for (const r of POND_RIM) for (let a = 0; a < 24; a++) rim = Math.min(rim, this.height(f.x + Math.cos((a * Math.PI) / 12) * f.L * r, f.z + Math.sin((a * Math.PI) / 12) * f.L * r));
+      level = Math.min(f.pond, rim - POND_FREEBOARD);
+      if (level - this.height(f.x, f.z) < POND_MIN_DEPTH) level = NaN;
+      this.pondLevels.set(f, level);
+    }
+    return level;
   }
 
   /** The towns' grounds hold no landforms (a town levels its ground). */
   private freeTowns(): void {
     this.landforms.setFree(this.townSpots.map((s) => ({ x: s.d.x, z: s.d.z, r: formsOut(s.d.radius) * 0.7, calm: formsOut(s.d.radius) })));
+    this.volcanoes.keepFree(this.townSpots.map((s) => ({ x: s.d.x, z: s.d.z, r: formsOut(s.d.radius) })));
   }
 
   private fields: ArchField[] = [];
   private townSpots: { d: TownDecision; level: number }[] = [];
   private townList: Town[] | null = null;
+  /** Town plans made elsewhere for the towns of the last `settle` (by town id): taken instead of planning them again. */
+  private givenPlans: ReadonlyMap<string, TownPlan> | null = null;
   private holdList: HoldDecision[] = [];
   private readonly probe = emptySample();
   private readonly wet = { river: 0, lake: 0 };
   private roadNet = new RoadNet();
   private readonly clearingMap = new Map<string, Clearing>();
-  /** Counts up whenever the land's heights may change (a road laid, a town founded): caches of them start over (world/groundCache.ts). */
+  /** Counts up whenever the land's heights may change (a road laid, a town founded): caches of them start over (world/drawnGround.ts). */
   version = 0;
 
   /**
@@ -71,7 +133,8 @@ export class Terrain {
    * under a town calms down (less small relief, a level market), so call this before anything is built
    * from the heights.
    */
-  settle(log: DecisionLog): void {
+  settle(log: DecisionLog, plans?: ReadonlyMap<string, TownPlan>): void {
+    this.givenPlans = plans ?? null;
     this.version++;
     this.fields = [];
     this.townSpots = [];
@@ -188,7 +251,7 @@ export class Terrain {
 
   /** The towns standing on this land (planned when first asked for). */
   get towns(): readonly Town[] {
-    if (!this.townList) this.townList = this.townSpots.map(({ d }) => new Town(d, this));
+    if (!this.townList) this.townList = this.townSpots.map(({ d }) => new Town(d, this, this.givenPlans?.get(d.id)));
     return this.townList;
   }
 
@@ -252,6 +315,9 @@ export class Terrain {
   rockAt(x: number, z: number, h: number): boolean {
     for (const f of this.volumes) if (f.inBounds(x, h + 0.3, z) && f.at(x, h + 0.3, z) < 0.8) return true;
     for (const d of this.holdList) if (holdBare(d, x, z)) return true;
+    // Lava, the sulphur crusts round a volcano's vents, its crater and the ground beside its flows: nothing grows there.
+    const v = this.volcanoes.holding(x, z);
+    if (v && (this.lavaAt(x, z) !== null || nearVent(v, x, z) || scorched(v, x, z))) return true;
     return false;
   }
 
@@ -263,7 +329,7 @@ export class Terrain {
     const w = this.hydro.query(x, z, this.here);
     out.river = w.river ? w.dist - w.half : Infinity;
     out.lake = Number.isNaN(w.lake) ? Infinity : h - w.lake;
-    const pond = this.landforms.pondAt(x, z);
+    const pond = this.pondAt(x, z);
     if (!Number.isNaN(pond)) out.lake = Math.min(out.lake, h - pond);
     return out;
   }
@@ -323,7 +389,7 @@ export class Terrain {
     const clear = bk?.river ? smoothstep(bk.half + BROOK_CLEAR[0], bk.half + BROOK_CLEAR[1], bk.dist) : 1;
     if (lake) { const keep = 1 - lake.calm(x, z); forms *= keep; calm *= keep; }
     if (forms > 0) {
-      const off = this.landforms.offset(x, z);
+      const off = this.landforms.offset(x, z) * (1 - this.volcanoes.shield(x, z)) + this.volcanoes.lift(x, z);
       let shaped = Math.max(Math.min(level, 1), level + off * forms * (off > 0 ? clear : 1));
       // By a brook they dig no lower than its water (a gully runs down into it, a dell beside it stays dry).
       if (bk?.river && bk.dist < bk.valley && shaped < level) shaped = Math.max(shaped, Math.min(level, bk.level + 0.6 + (bk.dist - bk.half) * 0.04));

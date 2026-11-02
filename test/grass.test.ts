@@ -5,6 +5,7 @@ import { Terrain } from '../src/world/terrain';
 import { startPlace } from '../src/vgm/builder';
 import { classic } from '../src/setting/classic/index';
 import { grassMask } from '../src/world/grass';
+import { drawnOf } from '../src/world/drawnGround';
 import { SMALL } from './small';
 
 const seed = parseSeed('masterworld');
@@ -18,7 +19,7 @@ test('grass: the start has grass on the ground, patchy, within the biome\'s heig
   let grown = 0, bare = 0;
   for (let p = 0; p < 64 * 64; p++) {
     const i = p % 64, j = Math.floor(p / 64);
-    assert.ok(Math.abs(m[p * 4] - terrain.height(x0 + i + 0.5, z0 + j + 0.5)) < 1e-3, 'ground height');
+    assert.ok(Math.abs(m[p * 4] - drawnOf(terrain).footing(x0 + i + 0.5, z0 + j + 0.5)) < 1e-3, 'ground height: the drawn ground');
     const dens = m[p * 4 + 1];
     assert.ok(dens >= 0 && dens <= 1);
     if (dens > 0.05) { grown++; assert.ok(m[p * 4 + 2] > 0.05 && m[p * 4 + 2] < 1.5, `blade height ${m[p * 4 + 2]}`); } else bare++;
@@ -35,4 +36,16 @@ test('grass: none in the sea, masks agree where they overlap', () => {
     const pa = ((j + 16) * 32 + i + 16) * 4, pb = (j * 16 + i) * 4;
     for (let c = 0; c < 4; c++) assert.ok(Math.abs(a[pa + c] - b[pb + c]) < 1e-4);
   }
+});
+
+test('grass: blades are rooted on the ground as drawn, where the land has relief the mesh steps over (a sea cliff)', () => {
+  const x0 = -31872 + 20, z0 = 30848 + 20, res = 64, m = grassMask(terrain, job(x0, z0, 64, res)), g = drawnOf(terrain);
+  let off = 0, steps = 0;
+  for (let p = 0; p < res * res; p++) {
+    const x = x0 + (p % res) + 0.5, z = z0 + Math.floor(p / res) + 0.5;
+    off = Math.max(off, Math.abs(m[p * 4] - g.footing(x, z)));
+    steps = Math.max(steps, Math.abs(terrain.height(x, z) - g.footing(x, z)));
+  }
+  assert.ok(off < 1e-3, `${off.toFixed(4)} m off the drawn ground`);
+  assert.ok(steps > 0.05, `the land itself differs from the drawn ground by ${steps.toFixed(3)} m here, or this test shows nothing`);
 });

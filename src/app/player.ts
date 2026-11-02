@@ -33,7 +33,7 @@ export class Player {
   /** The horse the hero rides, or null on foot. */
   riding: Steed | null = null;
   /**
-   * Another body is played (bird form, app/birdForm.ts): it takes the frame when it says so (true), moving the
+   * Another body is played (an animal form, app/shapeForm.ts): it takes the frame when it says so (true), moving the
    * walker with it and drawing what it draws.
    */
   shape: { take(dt: number): boolean; readonly aloft: boolean } | null = null;

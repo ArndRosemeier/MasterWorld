@@ -10,8 +10,11 @@ import type { SettingModule } from '../setting/contract';
 import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type KeptDecision, type MoveInDecision, type RetakeDecision } from '../world/decisions';
 import { sketchCellar } from '../world/dungeon/cellar';
 import type { Terrain } from '../world/terrain';
-import type { Town } from '../world/town';
+import { townById, type Town } from '../world/town';
 import { landKinds, loreOf, placeOf, promiseCellar, promisePlace } from './dungeons';
+import { townsfolk } from '../sim/people';
+import { wantsOf } from './wants';
+import { askFor, asksGiven, CLEAR } from './asks';
 
 export const LEADS = {
   /** Open promises the world always has. */
@@ -41,10 +44,10 @@ export function openPromises(log: DecisionLog): (DungeonDecision | MoveInDecisio
 }
 
 /** The promise kept, for the log; null if it already was. */
-export function keepPromise(log: DecisionLog, promise: string, at: number): KeptDecision | null {
+export function keepPromise(log: DecisionLog, promise: string, at: number, failed = false, ending?: string): KeptDecision | null {
   if (keptOf(log).has(promise)) return null;
   const n = log.filter((d) => d.kind === 'kept').length + 1;
-  return { kind: 'kept', id: `kept-${n}`, promise, at };
+  return { kind: 'kept', id: `kept-${n}`, promise, at, ...(failed ? { failed } : {}), ...(ending ? { ending } : {}) };
 }
 
 /** Who lives in a place now as its story goes: the latest move-in or retake into it (a move-in promise's: itself or a later retake). */
@@ -90,13 +93,71 @@ export interface LeadsContext {
    * people do), even when the world has its few open leads already (one more than `max` at most).
    */
   readonly near?: Town | null;
+  /** What households may ask about a new place (D62); none: every place is to be cleared. */
+  readonly asks?: SettingModule['asks'];
+  /** What may turn out other than told (Q3). */
+  readonly twists?: SettingModule['twists'];
+}
+
+/** How long (game hours) a thief let go keeps their word before they are at it again (Q4). */
+const THIEF_BACK = 24;
+
+/**
+ * How a promise ended, where it could end more than one way (Q4: the log replays it): a thief `caught`, `let-go`
+ * or the thing `given` to its rightful owners, a parley's `pact`, `paid` or `broken`, a breach `sealed`; null:
+ * not kept, or no such ending.
+ */
+export function endingOf(log: DecisionLog, promise: string): string | null {
+  return log.find((x): x is KeptDecision => x.kind === 'kept' && x.promise === promise)?.ending ?? null;
+}
+
+/**
+ * A thief let go in `d`'s town long enough ago, not yet back (Q4): the promise they were let go on. Null: none,
+ * or `d` is no place under a house.
+ */
+export function thiefBack(log: DecisionLog, d: DungeonDecision, hours: number): DungeonDecision | null {
+  if (d.site) return null;
+  const letGo = new Map<string, number>();
+  for (const x of log) if (x.kind === 'kept' && x.ending === 'let-go') letGo.set(x.promise, x.at);
+  for (const x of log) {
+    if (x.kind !== 'dungeon' || x.town !== d.town || x.ask?.verb !== 'thief') continue;
+    if (x.ask.again) letGo.delete(x.ask.again);
+  }
+  for (const [id, at] of letGo) {
+    const p = log.find((x): x is DungeonDecision => x.kind === 'dungeon' && x.id === id);
+    if (p && p.town === d.town && hours - at >= THIEF_BACK) return p;
+  }
+  return null;
 }
 
 /** Share of new places that lie out on the land (a barrow, a cave, a tower), when the setting has a kind none of which is open. */
 const LAND_SHARE = 0.55;
 
-/** The Builder's next promise, if one is due now. */
+/** The Builder's next promise, if one is due now: a new place carries what its household asks (D62). */
 export function nextPromise(c: LeadsContext): Decision | null {
+  const d = promiseDue(c);
+  return d?.kind === 'dungeon' ? asked(c, d) : d;
+}
+
+/** A new place with what its household asks of it (D62): of the kinds that fit it, not the last kind given. */
+function asked(c: LeadsContext, d: DungeonDecision): DungeonDecision {
+  if (!c.asks?.length) return d;
+  const place = placeOf(d, c.towns, c.dungeons);
+  if (!place) return d;
+  // A thief let go comes back (Q4): their town's next place under a house is robbed again, by them.
+  const back = thiefBack(c.log, d, c.hours), thief = back && c.asks.find((a) => a.verb === 'thief' && (!a.kinds || a.kinds.includes(d.template)));
+  if (back && thief) return { ...d, ask: { id: thief.id, verb: 'thief', line: 0, thing: (back.ask?.thing ?? 0) % Math.max(1, thief.things?.length ?? 1), who: back.ask?.who ?? 0, again: back.id } };
+  const dweller = sketchCellar(d, place, loreOf({ dungeons: c.dungeons }, d.template)).dweller;
+  // What the household wants, as the world simulation has them (Q5).
+  const town = townById(c.towns, d.town);
+  const spent = new Set(c.log.flatMap((x) => (x.kind === 'dungeon' && x.town === d.town && x.ask?.want ? [x.ask.want.person] : [])));
+  // A want drives one task: someone who has asked from it once does not ask from it again.
+  const wants = town ? wantsOf(townsfolk(town.plan, town.decision.seed ?? c.seed), d).filter((w) => !spent.has(w.person)) : [];
+  const ask = askFor({ asks: c.asks, twists: c.twists }, c.seed, c.log, { decision: d, lived: dweller.creatures.length > 0, dweller: dweller.id, encounter: dweller.encounter, wants });
+  return ask ? { ...d, ask } : d;
+}
+
+function promiseDue(c: LeadsContext): Decision | null {
   const promised = openPromises(c.log), open = promised.length;
   const local = c.near && c.near !== c.towns[0] && c.terrain && !promised.some((p) => dungeonOf(c.log, p)?.town === c.near!.decision.id) ? c.near : null;
   if (open >= LEADS.max + (local ? 1 : 0) || (open >= LEADS.min && !c.purposeOverdue && !local)) return null;
@@ -114,7 +175,9 @@ export function nextPromise(c: LeadsContext): Decision | null {
   // then the new place lies out on the land: a barrow, a cave or a tower (one of each kind open at a time).
   const town = c.towns[0];
   const fresh = (town && landPlace(c, s, town)) ?? (town ? promiseCellar(c.seed, town, c.log, c.home) : null);
-  if (moved && (!fresh || hash2f(s, 5, 1) < 0.4)) return moved;
+  // New dwellers are only to be cleared: not right after a place that was (D62), while a new place can be had.
+  const cleared = asksGiven(c.log).at(-1) === CLEAR && !!c.asks?.length;
+  if (moved && (!fresh || (!cleared && hash2f(s, 5, 1) < 0.4))) return moved;
   return fresh ? { ...fresh, at: c.hours } : null;
 }
 
@@ -142,6 +205,8 @@ export function moveInto(c: LeadsContext, s: number): MoveInDecision | null {
     const now = occupationOf(c.log, d.id);
     const k = kept.find((x) => x.promise === (now?.id ?? d.id));
     if (!k || c.hours - k.at < LEADS.settle) continue;
+    // How it ended holds (Q4): a pact's dwellers still live there in peace; a breach walled up stays shut.
+    if (k.ending === 'pact' || k.ending === 'sealed') continue;
     const house = placeOf(d, c.towns, c.dungeons);
     if (!house) continue;
     const sketch = sketchCellar(d, house, loreOf(c, d.template), now ?? undefined);

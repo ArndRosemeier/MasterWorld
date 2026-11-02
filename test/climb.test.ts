@@ -86,13 +86,22 @@ test('climb: spent, the climber lets go and falls; the fall is measured', () => 
   assert.ok(w.fell > 4, `fell ${w.fell.toFixed(1)} m`);
 });
 
+/** How far in from a pass's foot the bot goes: its ramp reaches the top 50 m in from the wall's foot (world/skeleton.ts PASS_TOP), then 40 m on. */
+const PASS_INWARD = 90;
+
 /** A pass's foot: where a ramp of fallen rock starts up a wall (the noise is read at the foot, so it runs straight up). */
 function passFoot(): { x: number; z: number; nx: number; nz: number; tall: number } {
   for (let z = 36000; z < 40000; z += 61) for (let x = -25000; x < -19000; x += 3) {
     sk.mesaRise(x, z);
     const m = sk.lastMesa;
     if (m.u < 0 || m.u > 3 || m.pass < 0.9 || m.tall < 45 || sk.mesaWeight(x, z) < 1) continue;
-    return { x, z, nx: m.nx, nz: m.nz, tall: m.tall };
+    // Up all the way from where the bot sets off to its goal on the top, well over the start (no brook's gorge across
+    // the ramp, no narrow plateau with another valley behind it).
+    const { nx, nz, tall } = m, inward = PASS_INWARD;
+    let low = Infinity, dips = false;
+    for (let d = inward; d >= -25 && !dips; d -= 10) { const h = terrain.height(x + nx * d, z + nz * d); dips = h > low + 10; low = Math.min(low, h); }
+    if (dips || terrain.height(x + nx * inward, z + nz * inward) - terrain.height(x - nx * 25, z - nz * 25) < 40) continue;
+    return { x, z, nx, nz, tall };
   }
   throw new Error('no pass found');
 }
@@ -107,7 +116,7 @@ function botUp(f: { x: number; z: number; nx: number; nz: number; tall: number }
 }
 
 test('climb: the loop bot reaches a plateau top once by a pass and once by climbing', () => {
-  const pass = passFoot(), byPass = botUp(pass, false, pass.tall / 0.6 + 40);
+  const pass = passFoot(), byPass = botUp(pass, false, PASS_INWARD);
   assert.ok(byPass.arrived, `up the pass: ${byPass.left.toFixed(0)} m short`);
   assert.equal(byPass.climbed, 0, 'walked up the pass');
   assert.ok(byPass.top > 30 && byPass.rose > byPass.top - 3, `rose ${byPass.rose.toFixed(0)} m to a top ${byPass.top.toFixed(0)} m up`);

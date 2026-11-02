@@ -4,10 +4,23 @@
  * the lit doorways; in a cellar they are its torches, and the nearest torch also casts shadows. Each light
  * fades as the next spot in line comes as near, so none pops on or off.
  */
-import { PointLight, type Scene, type Vector3 } from 'three/webgpu';
+import { PointLight, PointShadowNode, type LightShadow, type RenderTarget, type Renderer, type Scene, type Vector3 } from 'three/webgpu';
 import { hash32, hashToFloat } from '@futuremagic/core';
 import type { TownBuilding, TownWall } from '@futuremagic/settlement';
 import { ORIGIN } from './origin';
+
+/**
+ * The torch's shadow, its cube map made ready on the GPU as soon as three makes it. three otherwise sizes it at
+ * its first draw (down in a cave) and makes its depth texture again then, while the shaders built at load still
+ * hold the old one: WebGPU stops every frame that uses it ("Destroyed texture used in a submit").
+ */
+class ReadyPointShadowNode extends PointShadowNode {
+  setupRenderTarget(shadow: LightShadow, builder: { renderer: Renderer }): { shadowMap: RenderTarget } {
+    const made = (PointShadowNode.prototype as unknown as { setupRenderTarget(s: LightShadow, b: unknown): { shadowMap: RenderTarget } }).setupRenderTarget.call(this, shadow, builder);
+    builder.renderer.initRenderTarget(made.shadowMap);
+    return made;
+  }
+}
 
 /** Plain point lights in the pool (the shadow torch is one more). */
 export const WARM_LIGHTS = 3;
@@ -61,6 +74,7 @@ export class WarmLights {
     s.shadow.camera.far = REACH;
     s.shadow.bias = -0.002;
     s.shadow.autoUpdate = false;
+    (s.shadow as LightShadow & { shadowNode?: PointShadowNode }).shadowNode = new ReadyPointShadowNode(s, s.shadow);
     s.position.set(0, -1e5, 0);
     this.shadowed = s;
     scene.add(s);
@@ -150,11 +164,15 @@ export class WarmLights {
     }
   }
 
-  /** A flame's own unsteady brightness (two slow waves and a quick one, out of step per torch). */
+  /** A torch's own unsteady brightness, out of step per torch. */
   private flicker(s: Spot): number {
-    const t = this.time + s.roll * 50;
-    return 0.86 + 0.07 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 13.1 + 1.7) + 0.03 * Math.sin(t * 29.7);
+    return flameFlicker(this.time + s.roll * 50);
   }
+}
+
+/** A flame's unsteady brightness at time `t` (s): two slow waves and a quick one, about 0.86. */
+export function flameFlicker(t: number): number {
+  return 0.86 + 0.07 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 13.1 + 1.7) + 0.03 * Math.sin(t * 29.7);
 }
 
 function closest(spots: readonly Spot[], cam: Vector3, n: number): { s: Spot; dist: number }[] {
