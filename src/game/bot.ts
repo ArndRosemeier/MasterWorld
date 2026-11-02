@@ -6,7 +6,7 @@
  * it then searches every body and chest, goes to any other spots it was given (a pack left by a fall) and
  * climbs back to the ladder, as a player ends a visit (the evening's loop check, game/evening.ts). Pure.
  */
-import type { SettingModule } from '../setting/contract';
+import { WARNING_STANCES, type SettingModule } from '../setting/contract';
 import type { Cellar } from '../world/dungeon/cellar';
 import { DungeonSpace } from '../world/dungeon/space';
 import { Character } from './character';
@@ -59,6 +59,8 @@ export interface DelveRun extends BotResult {
   readonly at: { readonly x: number; readonly y: number; readonly z: number };
   /** The spells that went off (ability ids, each time). */
   readonly spells: readonly string[];
+  /** Kinds of foe that fought the hero with no warning, no spoken reason and no blow from the hero first (gate R: none). */
+  readonly unexplained: readonly string[];
 }
 
 /**
@@ -105,7 +107,10 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
   const spells: string[] = [];
   /** Short of a parley's price: it comes to blows. */
   let short = false;
-  const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z }, spells });
+  /** A humanoid that warns fights only after its reason is said (a `break`), or after the hero's blow (gate R). */
+  let broke = false;
+  const unexplained = new Set<string>();
+  const run = (won: boolean, t: number, out = false): DelveRun => ({ won, seconds: t, health: hero.health / hero.maxHealth, kills, potions, spared, delve, looted, out, at: { x, y, z }, spells, unexplained: [...unexplained] });
   /** Nothing in the way of walking straight to `to` (no wall's corner between, which sliding would never get round). */
   const clear = (to: { x: number; z: number }): boolean => {
     const n = Math.ceil(Math.hypot(to.x - x, to.z - z) / 0.25);
@@ -153,7 +158,9 @@ export function fightBot(cellar: Cellar, setting: SettingModule, seed: number, h
       if (e.kind === 'spared') spared++;
       if (e.kind === 'fallen') return run(false, t);
       if (e.kind === 'recipe' && e.event.kind === 'went' && e.event.ability.cost?.mana) spells.push(e.event.ability.id);
+      if (e.kind === 'break') broke = true;
     }
+    if (!broke && !den.creatures.some((o) => o.struck)) for (const c of den.creatures) if (c.state === 'fight' && c.def.stance && WARNING_STANCES.includes(c.def.stance.kind)) unexplained.add(c.def.id);
     // A parley (D62): up to the leader, hear their terms and agree (short of their price, it comes to blows).
     if (delve.talking && !short) {
       const l = delve.within(pose);

@@ -27,6 +27,16 @@ export interface MapHost extends WindowHost {
   readonly known: KnownLand;
   /** The roads on the land (points as x, y, z triples). */
   roadLines?(): readonly MapRoad[];
+  /** The places the hero has noticed (D66, K9): drawn on the parchment with their short names. */
+  noticed?(): readonly MapNoticed[];
+}
+
+/** A place the hero noticed, as the map draws it. */
+export interface MapNoticed {
+  readonly id: string;
+  readonly x: number;
+  readonly z: number;
+  readonly what: string;
 }
 
 /** A road drawn on the map. */
@@ -287,6 +297,13 @@ export class MapUi extends KeyWindow {
         g.font = `italic ${Math.round(15 * Math.max(1, u))}px Georgia, serif`; g.fillStyle = '#7a1e16'; g.textAlign = 'left';
         g.fillText(l.mark.label, x + r + 4, z + 5);
       }
+    }
+    // The places the hero noticed on the way (D66): a small ward-teal diamond, as if jotted down without a thought, and what it is. (The minimap's own studs show them there.)
+    if (!small) for (const n of this.map.noticed?.() ?? []) {
+      const x = X(n.x), z = Z(n.z), k = 7 * Math.max(1, u);
+      g.strokeStyle = '#1d6f8a'; g.fillStyle = 'rgba(143, 227, 255, 0.55)'; g.lineWidth = 2 * Math.max(1, u);
+      g.beginPath(); g.moveTo(x, z - k); g.lineTo(x + k, z); g.lineTo(x, z + k); g.lineTo(x - k, z); g.closePath(); g.fill(); g.stroke();
+      if (zoom >= 0.5) { g.font = `italic ${Math.round(14 * Math.max(1, u))}px Georgia, serif`; g.fillStyle = '#1d5a70'; g.textAlign = 'left'; g.fillText(n.what, x + k + 4, z + 5); }
     }
     if (small) {
       // The townsfolk near: small dots of brown ink.

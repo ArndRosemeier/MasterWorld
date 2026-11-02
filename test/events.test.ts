@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { keepPromise, nextPromise, openPromises } from '../src/vgm/leads';
-import { eventTold, gatherFor, nextEvent, openBands, openEvents, takenFrom } from '../src/vgm/events';
+import { eventTold, fadedFor, gatherFor, nextEvent, openBands, openEvents, takenFrom } from '../src/vgm/events';
 import { Wilds } from '../src/sim/wild';
 import { territoryOf, wildFor } from '../src/vgm/wild';
 import { Herds } from '../src/sim/livestock';
@@ -87,4 +87,27 @@ test('events: bandits left alone raid a farm: animals leave its paddock, a band 
   const kept = keepPromise(now, e.id, raid.after + 3)!;
   herds.driven(takenFrom([...now, kept], town.decision.id));
   assert.equal(herds.animals.length, all);
+});
+
+test('events: wolves left alone come into a town by night (a foray): at its edge on their side, no promise to pay, ended once beaten', () => {
+  const foray = classic.events!.find((e) => e.kind === 'foray')!, town = towns[0];
+  const groups = wildFor({ seed, log: [], towns, terrain, hours: 0, setting: classic }, town).map(territoryOf).map((territory) => ({ town: town.decision.id, territory, left: territory.members.length }));
+  const night = Math.ceil(foray.after / 24) * 24 + 23, day = Math.ceil(foray.after / 24) * 24 + 12;
+  const at = (log: Decision[], hours: number) => ({ ...ctx(log, hours), wild: groups, which: foray.id });
+  assert.equal(nextEvent(at([], foray.after - 1)), null, 'not before its time');
+  assert.equal(nextEvent(at([], day)), null, 'not by day');
+  const e = nextEvent(at([], night));
+  assert.ok(e, 'by night it comes');
+  assert.equal(e!.event, foray.id);
+  const d = town.decision;
+  assert.ok(Math.hypot(e!.x - d.x, e!.z - d.z) < d.radius, 'into the town');
+  assert.ok(e!.members.every((m) => m === 'wolf') && e!.members.length >= 2);
+  // One at a time, and its words are the setting's with nothing left over.
+  assert.equal(nextEvent(at([e!], night + 1)), null);
+  const told = eventTold(classic, [e!], towns, e!)!;
+  assert.ok(told && /Wolves in the/i.test(told.title) && !/\{/.test(told.cry + told.note + told.done + told.faded), told?.cry);
+  // The town's watch beats them: it ends at once, without the hero, and the band is gone.
+  const over = fadedFor({ ...at([e!], night + 0.5), beaten: (id) => id === e!.id });
+  assert.ok(over && over.promise === e!.id && over.faded, 'ended');
+  assert.equal(fadedFor({ ...at([e!], night + 0.5), beaten: () => false }), null, 'not while the band is about');
 });

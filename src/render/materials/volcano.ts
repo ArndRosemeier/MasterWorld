@@ -27,7 +27,7 @@ export const LAVA = { time: uniform(0) };
  * meshes lie on the near ground as it is drawn (2 m between its vertices), but the ground chunks further out are coarser and
  * their vertices stand higher over a channel cut a metre and a half deep, so unlifted the lava sank into them and vanished by 300 m.
  */
-const liftByDistance = () => {
+const farLift = () => {
   const far = length(modelWorldMatrix.mul(vec4(positionLocal, 1)).xyz.sub(cameraPosition));
   return smoothstep(45, 300, far).mul(1.3).add(smoothstep(300, 1500, far).mul(3.0));
 };
@@ -44,7 +44,7 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
   const uv = attribute('uv', 'vec2'), fx = attribute('fx', 'vec4');
   const flow = fx.x, heat = fx.y, half = fx.z, ph = fx.w, t = LAVA.time;
   // (A flow is lifted by its distance; the lake's disc lies flat at its level.)
-  m.positionNode = positionLocal.add(vec3(0, liftByDistance().mul(flow), 0));
+  m.positionNode = positionLocal.add(vec3(0, farLift().mul(flow), 0));
   const across = abs(uv.y).mul(flow);
   // The plates' space: on a flow, metres along and across, carried downstream; on the lake, the world point, stirred slowly.
   const qFlow = vec2(uv.x.sub(t.mul(0.6)), uv.y.mul(half));
@@ -94,7 +94,7 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
 export const VOLCANO_CRUST = defineKind('volcano crust', ['position', 'normal', 'uv', 'fx'], () => {
   const m = new MeshStandardNodeMaterial({ roughness: 0.62, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const uv = attribute('uv', 'vec2'), fx = attribute('fx', 'vec4');
-  m.positionNode = positionLocal.add(vec3(0, liftByDistance(), 0));
+  m.positionNode = positionLocal.add(vec3(0, farLift(), 0));
   const p = WORLD, r = length(uv);
   const grain = mx_noise_float(p.mul(vec3(2.6, 2.6, 2.6)).add(fx.x)), clot = mx_noise_float(p.mul(0.55).add(fx.x.mul(3.0)));
   const rimFray = r.add(clot.mul(0.28)).add(grain.mul(0.1));

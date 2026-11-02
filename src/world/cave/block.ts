@@ -114,7 +114,7 @@ export function rockBlock(seed: number, rock: CaveRockDef, size: Pick<CaveSizeDe
   const joints = makeJoints(rng.fork('joints'), rock, across);
   const faults = makeFaults(rng.fork('faults'), rock, across, deep);
   const water = makeWater(rng.fork('water'), rock, land, across, deep, lattice);
-  return { seed, rock, across, deep, beds, joints, faults, ore: makeOre(rng.fork('ore'), ore, joints, faults, across, deep), oreDef: ore, water, land };
+  return { seed, rock, across, deep, beds, joints, faults, ore: makeOre(rng.fork('ore'), ore, joints, faults, across, deep, !!rock.mine), oreDef: ore, water, land };
 }
 
 // --- beds ---
@@ -203,13 +203,14 @@ export const faultDistance = (f: Fault, x: number, y: number, z: number): number
 
 // --- ore ---
 
-function makeOre(rng: Rng, def: CaveOreDef, joints: readonly JointSet[], faults: readonly Fault[], across: number, deep: number): OreBody[] {
+function makeOre(rng: Rng, def: CaveOreDef, joints: readonly JointSet[], faults: readonly Fault[], across: number, deep: number, mine = false): OreBody[] {
   const out: OreBody[] = [], n = rng.int(def.bodies[0], def.bodies[1]);
   const total = def.ores.reduce((a, o) => a + o.weight, 0), kinds = def.kinds, kt = kinds.vein + kinds.seam + kinds.pocket;
   for (let i = 0; i < n; i++) {
     let w = rng.range(0, total), ore = 0;
     for (; ore < def.ores.length - 1; ore++) { w -= def.ores[ore].weight; if (w < 0) break; }
-    const k = rng.range(0, kt), cx = rng.range(0.15, 0.85) * across, cz = rng.range(0.15, 0.85) * across;
+    // (A mine's first body is a long, tall vein: the people came for it.)
+    const k = mine && i === 0 ? 0 : rng.range(0, kt), cx = rng.range(0.15, 0.85) * across, cz = rng.range(0.15, 0.85) * across;
     if (k < kinds.vein) {
       let plane: Fault;
       if (faults.length && rng.chance(0.5)) plane = faults[rng.int(0, faults.length - 1)];
@@ -220,8 +221,8 @@ function makeOre(rng: Rng, def: CaveOreDef, joints: readonly JointSet[], faults:
         for (const p of set.planes) if (Math.abs(p - u) < Math.abs(best - u)) best = p;
         plane = { px: set.nx * best, py: 0, pz: set.nz * best, nx: set.nx, ny: 0, nz: set.nz };
       }
-      const y0 = rng.range(0.05, 0.5) * deep;
-      out.push({ kind: 'vein', ore, plane, cx, cz, along: rng.range(25, 70), y0, y1: y0 + rng.range(10, 0.5 * deep), thick: rng.range(0.3, 1.2) });
+      const big = mine && i === 0, y0 = big ? rng.range(0.08, 0.2) * deep : rng.range(0.05, 0.5) * deep;
+      out.push({ kind: 'vein', ore, plane, cx, cz, along: big ? rng.range(55, 95) : rng.range(25, 70), y0, y1: big ? y0 + rng.range(0.45, 0.6) * deep : y0 + rng.range(10, 0.5 * deep), thick: big ? rng.range(0.7, 1.5) : rng.range(0.3, 1.2) });
     } else if (k < kinds.vein + kinds.seam) {
       out.push({ kind: 'seam', ore, s: rng.range(0.15, 0.85) * deep, cx, cz, reach: rng.range(40, 120), thick: rng.range(0.3, 0.8) });
     } else {

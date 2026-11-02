@@ -11,6 +11,7 @@ import { seaCave, sunkenRuin } from './seaCave';
 import { hideout } from './hideout';
 import { cellar } from './cellar';
 import { names, talk } from './people';
+import { factions } from './factions';
 import { peoples, standing } from './peoples';
 import { growth } from './growth';
 import { creatures } from './creatures';
@@ -81,6 +82,7 @@ export const classic: SettingModule = {
   names,
   peoples,
   standing,
+  factions,
   growth,
   talk,
   schools,
@@ -101,6 +103,8 @@ export const classic: SettingModule = {
   backgrounds,
   routines,
   caves,
+  // The hero notices a place in line of sight within 150 m by day (a fifth of that in the dark); the VGM sites a place 70 to 260 m ahead, within 40 degrees of their way.
+  noticing: { range: 150, night: 0.2, eye: 1.7, face: 2.5, ahead: [70, 260], spread: 0.7 },
   // Golden late light, a cooler blue dusk, a blue night; neutral by day (the sun's own colour does the rest).
   look: {
     grade: [

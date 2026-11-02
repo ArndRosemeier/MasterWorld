@@ -13,6 +13,7 @@
 import { Noise, Rng, deriveSeed, lerp } from '@futuremagic/core';
 import type { CavesDef } from '../../setting/contract';
 import { jointDistance, oreAt, type RockBlock } from './block';
+import { fitMine, type Box } from './fittings';
 import type { Crystal, Stone } from './loose';
 import { BRICK, brickColumns, brickIndex, fieldAt, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
 import type { CondPoint, Conduit, Skeleton } from './skeleton';
@@ -53,6 +54,8 @@ export interface Dressing {
   readonly stones: readonly Stone[];
   /** Clusters of crystals on the walls. */
   readonly crystals: readonly Crystal[];
+  /** What people fitted into a mine: timber sets, rails, carts (none elsewhere). */
+  readonly fittings: readonly Box[];
   readonly stats: {
     /** Columns with head room to stand, and the share of them whose floor is level (under about 2.5 degrees). */
     readonly standable: number;
@@ -259,8 +262,8 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   }
 
   // --- drips and formations along the cracks over the ways ---
-  // (A lava tube has no dripstone: its own drips and ledges are K7's dresser; no limestone crystals either.)
-  const lava = !!block.rock.lava, most = lava ? 0 : d.formations.most;
+  // (A mine has none either, nor a stream. A lava tube has no dripstone: its own drips and ledges are K7's dresser; no limestone crystals either.)
+  const lava = !!block.rock.lava || !!block.rock.mine, most = lava ? 0 : d.formations.most;
   const speleos: Speleo[] = [], drips: Drip[] = [], lastLevel = Math.max(0, sk.tables.length - 1);
   for (const c of passages) {
     const age = 1 + d.formations.age * (1 - (lastLevel ? c.level / lastLevel : 0));
@@ -399,5 +402,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     if (h === h && hx === hx && hz === hz && Math.max(Math.abs(hx - h), Math.abs(hz - h)) < 0.045 * step) level++;
   }
   const { stones, crystals } = scatter();
-  return { speleos, drips, streams, pools, rocks, stones, crystals, stats: { standable, level: standable ? level / standable : 0, ms: timer() - t0 } };
+  // --- a mine's timber, rails and carts ---
+  const fittings = block.rock.mine ? fitMine(sk.conduits, block.rock.mine, spanAt, rng.fork('fittings')) : [];
+  return { speleos, drips, streams, pools, rocks, stones, crystals, fittings, stats: { standable, level: standable ? level / standable : 0, ms: timer() - t0 } };
 }

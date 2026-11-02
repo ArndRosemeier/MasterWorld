@@ -13,6 +13,7 @@
  * Left alone past its `fades` hours an event runs its course without the hero (`fadedFor`, C11): the band goes,
  * a raid's beasts with it for good.
  */
+import { leadOf } from '../sim/factions';
 import { deriveSeed, hash2f } from '@futuremagic/core';
 import { farmlandReach } from '@futuremagic/settlement';
 import type { LivestockKind, SettingModule, StoryEventDef } from '../setting/contract';
@@ -41,6 +42,8 @@ export interface EventsContext {
   readonly inside: (dungeon: string) => boolean;
   /** Ground a band keeps off (the wild's territories). */
   readonly avoid?: readonly { readonly x: number; readonly z: number; readonly r: number }[];
+  /** Is the band of this event beaten or driven off (the game knows; a foray the town fought off itself ends then)? */
+  readonly beaten?: (event: string) => boolean;
   /** Now, whatever the waits say (the debug menu's "a story event now"). */
   readonly early?: boolean;
   /** Only this event of the setting's (by id). */
@@ -77,7 +80,7 @@ export function nextEvent(c: EventsContext): EventDecision | null {
   const past = eventsOf(c.log);
   for (const def of c.setting.events ?? []) {
     if (c.which && def.id !== c.which) continue;
-    const e = def.kind === 'raid' ? raid(c, def, past) : def.kind === 'take' ? takeOver(c, def, past) : spill(c, def, past);
+    const e = def.kind === 'raid' ? raid(c, def, past) : def.kind === 'take' ? takeOver(c, def, past) : def.kind === 'foray' ? foray(c, def, past) : spill(c, def, past);
     if (e) return e;
   }
   return null;
@@ -143,8 +146,11 @@ const UNSEEN = 450;
 export function fadedFor(c: EventsContext): KeptDecision | null {
   for (const e of openEvents(c.log)) {
     const def = (c.setting.events ?? []).find((x) => x.id === e.event);
-    if (!def?.fades || (!c.early && c.hours - e.at < def.fades)) continue;
-    if (c.hero && Math.hypot(c.hero.x - e.x, c.hero.z - e.z) < UNSEEN + e.r) continue;
+    if (!def?.fades) continue;
+    // A foray the town fought off itself ends when its band is beaten; anything else when its hours are up and the hero is far.
+    const over = def.kind === 'foray' && !!c.beaten?.(e.id);
+    if (!over && !c.early && c.hours - e.at < def.fades) continue;
+    if (!over && c.hero && Math.hypot(c.hero.x - e.x, c.hero.z - e.z) < UNSEEN + e.r) continue;
     const k = keepPromise(c.log, e.id, c.hours);
     if (k) return { ...k, faded: true };
   }
@@ -227,6 +233,31 @@ function raid(c: EventsContext, def: StoryEventDef, past: readonly EventDecision
   return null;
 }
 
+/** How far a foray's band strays from where it came in, metres. */
+const FORAY_R = 8;
+
+/**
+ * Raiders of the wild come into a town by night (D65, R6): a group of the event's kind still living near it, left alone, comes in
+ * at the town's edge on the side of their ground, and the town's watch meets it (sim/townFight.ts). One at a time, one per town
+ * per `cooldown`.
+ */
+function foray(c: EventsContext, def: StoryEventDef, past: readonly EventDecision[]): EventDecision | null {
+  if (!c.early && c.hours < def.after) return null;
+  const h = ((c.hours % 24) + 24) % 24, [from, to] = def.hours ?? [0, 24];
+  if (!c.early && !(from > to ? h >= from || h < to : h >= from && h < to)) return null;
+  const open = new Set(openEvents(c.log).map((e) => e.from));
+  for (const g of c.wild ?? []) {
+    const t = g.territory, town = townById(c.towns, g.town);
+    if (t.kind !== def.by || g.left < 1 || open.has(t.id) || !town || !rested(c, def, past, g.town)) continue;
+    const s = deriveSeed(c.seed, 'vgm', 'event', past.length), d = town.decision;
+    const dx = t.x - d.x, dz = t.z - d.z, len = Math.hypot(dx, dz) || 1, edge = d.radius * 0.8;
+    const met = bandFrom(c, def, t.encounter, s);
+    if (!met) continue;
+    return { kind: 'event', id: `event-${past.length + 1}`, event: def.id, town: g.town, from: t.id, x: d.x + (dx / len) * edge, z: d.z + (dz / len) * edge, r: FORAY_R, ...met, seed: s, at: c.hours };
+  }
+  return null;
+}
+
 /** The oldest place left open long enough comes out onto the land, if its town has had no event lately. */
 function spill(c: EventsContext, def: StoryEventDef, past: readonly EventDecision[]): EventDecision | null {
   const spilled = new Set(past.map((e) => e.from));
@@ -298,7 +329,7 @@ export function eventTold(setting: Pick<SettingModule, 'events' | 'dungeons' | '
   const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
   const where = eventWhere(setting, log, towns, e);
   if (!def || !town || !where) return null;
-  const lead = setting.creatures.find((x) => x.id === e.members[0]);
+  const lead = leadOf(setting, e.members);
   const words: Record<string, string> = {
     ...where,
     creatures: lead?.plural ?? 'creatures',
@@ -326,7 +357,7 @@ export function promiseCalled(setting: Pick<SettingModule, 'dungeons'>, log: Dec
 /** Where an event befell, named as its words have it (`{place}`, a raid's `{animals}`); null if it cannot be told. */
 export function eventWhere(setting: Pick<SettingModule, 'events' | 'dungeons' | 'world'>, log: DecisionLog, towns: readonly Town[], e: EventDecision): Record<string, string> | null {
   const def = (setting.events ?? []).find((x) => x.id === e.event), town = townById(towns, e.town);
-  return def && town ? (def.kind === 'raid' ? farmOf(setting, town, e) : def.kind === 'take' ? heldOf(towns, e) : spillOf(setting, log, towns, e)) : null;
+  return def && town ? (def.kind === 'raid' ? farmOf(setting, town, e) : def.kind === 'take' ? heldOf(towns, e) : def.kind === 'foray' ? { place: `the ${town.decision.size ?? 'town'}` } : spillOf(setting, log, towns, e)) : null;
 }
 
 /** The settlement a take holds, named ("the waystation"). */

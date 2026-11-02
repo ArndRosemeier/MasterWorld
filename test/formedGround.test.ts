@@ -50,7 +50,7 @@ test('formed ground: a goblin wakes in its place and walks the cave to the hero,
     try { pair = twoPlaces(8, k); } catch { break; }
     const [home, there, ground] = pair, hero = { x: g.x[there], y: g.y[there], z: g.z[there] };
     const den = new Den(ground, [{ creature: 'goblin', room: 0 }], classic.creatures, 11);
-    const q: Quarry = { ...hero, noise: 1, light: 40, alive: true, guard };
+    const q: Quarry = { ...hero, noise: 1, light: 40, alive: true, guard, regard: () => 'hated' };
     const gob = den.creatures[0], start = Math.hypot(gob.x - hero.x, gob.z - hero.z);
     let closest = start;
     for (let i = 0; i < 1200; i++) {

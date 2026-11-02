@@ -7,17 +7,17 @@
  * mercy in broken Common). Coordinates are the dungeon's own frame. Deterministic for a seed and a
  * sequence of steps. Pure.
  */
-import { Rng, deriveSeed } from '@futuremagic/core';
-import type { CreatureDef } from '../setting/contract';
+import { Rng, deriveSeed, hash2f } from '@futuremagic/core';
+import { WARNING_STANCES, type BreakCause, type CreatureDef, type TalkTurn, type Tier, type WarnTurn } from '../setting/contract';
 import type { Spawn } from '../world/dungeon/cellar';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { strike, type Guard, type Strike } from './combat';
-import { DungeonGround, type DenGround, type DungeonNav } from './dungeonNav';
+import { DungeonGround, type DenGround, type DungeonNav, type P3 } from './dungeonNav';
 
-export type CreatureState = 'idle' | 'alert' | 'fight' | 'flee' | 'beg' | 'meek' | 'dead';
+export type CreatureState = 'idle' | 'alert' | 'warn' | 'fight' | 'brawl' | 'flee' | 'beg' | 'meek' | 'down' | 'dead';
 
 /** What the body shows (the renderer picks a clip or a pose for it). */
-export type CreatureAct = 'stand' | 'walk' | 'run' | 'sniff' | 'gnaw' | 'graze' | 'watch' | 'rummage' | 'spin' | 'swing' | 'hurt' | 'beg' | 'die' | 'dead' | 'leap';
+export type CreatureAct = 'stand' | 'walk' | 'run' | 'sniff' | 'gnaw' | 'graze' | 'watch' | 'rummage' | 'spin' | 'swing' | 'hurt' | 'beg' | 'die' | 'dead' | 'leap' | 'warn';
 
 export interface Creature {
   /** Index in the den (stable: saves name the dead by it). */
@@ -36,6 +36,25 @@ export interface Creature {
   aware: number;
   /** Leads the den's fight (the lair's first). */
   leader: boolean;
+  /** What it is saying with its body now (a raised hand, a jibe, a nod), seconds left of it; the speaker of a band shows each turn. */
+  signal: WarnTurn | null;
+  signalLeft: number;
+  /** Weapon drawn while the band talks (its last warning, a robber's demand), though the fight has not begun. */
+  armed: boolean;
+  /** It has spoke the hero already (a friend's faction: D65). */
+  spoke: boolean;
+  /** The band it warns the hero with (D64): the id of the one who noticed first; -1 while it is in none. */
+  band: number;
+  /** Who it fights while it brawls (D65): another body, maybe of another den on the same ground. */
+  prey: Prey | null;
+  /** Seconds it is still loud with fighting (others in earshot come to it, D65). */
+  din: number;
+  /** Seconds until it looks about for a quarrel again. */
+  eye: number;
+  /** Seconds it lies knocked down still (D65: those a den spares from death, `Den.mercy`). */
+  downFor: number;
+  /** The hero has hurt it (D65: only such a foe gives experience, and only such a kill counts against its faction). */
+  struck: boolean;
   /** The one who breaks expectations. */
   surprise?: string;
   /** Seconds left of a staggered moment. */
@@ -88,6 +107,52 @@ export interface Hop {
   t: number;
 }
 
+/** The body a brawler fights, and the den that body is in. */
+export interface Prey {
+  readonly c: Creature;
+  readonly den: Den;
+}
+
+/** A band that warns the hero (D64): where it is in its words, and since when. */
+interface Band {
+  turn: WarnTurn | null;
+  /** Sim time of its last words, and of the one that began its patience (the demand, the first jibe). */
+  at: number;
+  began: number;
+  /** The hero has talked to it and heard its terms (R7), and the price named (copper; 0 for a pact). */
+  heard?: boolean;
+  toll?: number;
+}
+
+/** What the speaker of a warning band says when the hero talks to it (R7): `coins` the price the hero was named or pays. */
+export interface Parley {
+  readonly turn: TalkTurn;
+  readonly who: Creature;
+  readonly coins: number;
+}
+
+/** The hero can talk to a warning band from this far (m), nearer if its warning distance is. */
+const TALK_FROM = 14;
+
+/** A band gives up its warning when the hero is this much farther than its warning distance. */
+const SETTLE_AT = 1.25;
+/** A warning band repeats itself this often (s) while the hero stays within it. */
+const REPEAT = 10;
+/** How long (s) the speaker shows what it says. */
+const SIGNAL = 2.2;
+/** A robbers' band walks up at this share of its pace. */
+const CLOSE_IN = 0.55;
+/** A creature looks about for a quarrel this often (s), and a brawl is loud this long after each blow (s). */
+const LOOK = 0.6, DIN = 4;
+/** A brawler's blow at a prey that runs reaches this much further (m): it springs after it. */
+const LUNGE = 2.5;
+/** A body knocked down lies this long (s) before it gets up, and gets up with this share of its health. */
+export const DOWN_FOR = 45;
+const UP_WITH = 0.3;
+
+/** Does it warn before it fights (D64)? */
+const warns = (c: Creature): boolean => !!c.def.stance && WARNING_STANCES.includes(c.def.stance.kind);
+
 /** Too frightened of the hero to start a fight (Quarry.daunts). */
 const cowed = (c: Creature, q: Quarry): boolean => c.def.danger < (q.daunts ?? 0);
 
@@ -102,6 +167,10 @@ export interface Quarry {
   readonly light: number;
   readonly alive: boolean;
   readonly guard: Guard;
+  /** The hero looks weak (hurt past half their health): a jeering band does not wait (D64). */
+  readonly frail?: boolean;
+  /** What the foe's faction makes of the hero (D65, game/standing.ts); none: a stranger. */
+  readonly regard?: (faction: string) => Tier;
   /**
    * Foes of less danger than this are too frightened of the hero to start a fight (D58: those the hero has
    * outgrown so far they give no experience): they watch from where they are and fight back only when struck,
@@ -116,12 +185,22 @@ export type DenEvent =
   | { readonly kind: 'swing'; readonly who: Creature }
   | { readonly kind: 'blow'; readonly who: Creature; readonly strike: Strike }
   | { readonly kind: 'flee'; readonly who: Creature }
-  | { readonly kind: 'died'; readonly who: Creature }
+  /** `by`: the creature that dealt the blow, none when the hero did (or a spell, or bleeding). */
+  | { readonly kind: 'died'; readonly who: Creature; readonly by?: Creature }
+  /** A body mercy spared knocked down by `by`, and got up again some time after. */
+  | { readonly kind: 'down'; readonly who: Creature; readonly by: Creature }
+  | { readonly kind: 'up'; readonly who: Creature }
   | { readonly kind: 'plea'; readonly who: Creature; readonly text: string }
   | { readonly kind: 'spared'; readonly who: Creature }
   | { readonly kind: 'home'; readonly who: Creature }
+  /** A band of foes speaks to the hero (D64): `who` is the one who speaks for it, `turn` what it says. */
+  | { readonly kind: 'warn'; readonly who: Creature; readonly turn: WarnTurn }
+  /** The band's warning is over and it fights; `who` is the one who speaks for it, `cause` why. */
+  | { readonly kind: 'break'; readonly who: Creature; readonly cause: BreakCause }
   /** It lifted the bar of a barred door from its bar's side (link): the door is seen opening away from it. */
   | { readonly kind: 'unbarred'; readonly who: Creature; readonly link: number };
+
+export type { BreakCause, WarnTurn };
 
 /** Body radius by kind and size, metres. */
 export function radiusOf(def: CreatureDef): number {
@@ -199,6 +278,30 @@ export class Den {
   private quarry: Quarry | null = null;
   /** Those held up this step by another body (not stuck: it is not counted towards a hop). */
   private readonly waiting = new Set<Creature>();
+  /**
+   * What the VGM knows that makes this den attack the hero on sight (D64, `vgm/stance.ts`): they were hired against it, or killed its kin.
+   * Set by the game when the den is woken or placed.
+   */
+  knows: 'hired' | 'kin' | null = null;
+  /**
+   * What the hero settled with this den's warning band (R7): `paid` its toll, or gave their `pact` to keep away. The den keeps its word
+   * (a greeting, never a fight) until the hero strikes one of it; saved with the place.
+   */
+  word: 'paid' | 'pact' | null = null;
+  /** The bands that warn the hero now (D64), by the id of the one who noticed first. */
+  private readonly bands = new Map<number, Band>();
+  /**
+   * Are two factions at feud (D65: `opposed` of the setting's matrix)? Set by whoever plays the den (game/fight.ts); none: its
+   * creatures know no quarrel but the hero's.
+   */
+  feud: ((a: string, b: string) => boolean) | null = null;
+  /**
+   * Whose fall is a knock-down, not a death (D65: a town's folk who fight raiders never die of it): a creature at 0 health from a
+   * creature's blow (not the hero's) lies `DOWN_FOR` seconds and gets up again with a share of its health.
+   */
+  mercy: ((c: Creature) => boolean) | null = null;
+  /** What the creatures of other dens did to this den's (a blow, a fall), out with the next step's events. */
+  private readonly outbox: DenEvent[] = [];
 
   /** A dungeon's space (its rooms are the homes), or any other ground (open land: sim/wild.ts). */
   constructor(ground: DungeonSpace | DenGround, spawns: readonly Spawn[], defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []) {
@@ -210,7 +313,7 @@ export class Den {
       const p = this.ground.spot(s.room, rng);
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
-        aware: 0, leader: id === 0 && def.pack, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
+        aware: 0, leader: id === 0 && def.pack, band: -1, prey: null, din: 0, eye: id * 0.13 % LOOK, downFor: 0, struck: false, signal: null, signalLeft: 0, armed: false, spoke: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
         repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
@@ -240,9 +343,14 @@ export class Den {
     this.quarry = q;
     this.waiting.clear();
     const out: DenEvent[] = [];
+    this.warnings(q, out);
     for (const c of this.creatures) {
       if (c.state === 'dead') { c.y = this.ground.floatAt?.(c.x, c.z, c.y) ?? c.y; continue; }
       c.stagger = Math.max(0, c.stagger - dt);
+      if ((c.signalLeft -= dt) <= 0) { c.signalLeft = 0; c.signal = null; }
+      c.din = Math.max(0, c.din - dt);
+      c.eye = Math.max(0, c.eye - dt);
+      if (c.state !== 'brawl') c.prey = null;
       c.ready = Math.max(0, c.ready - dt);
       c.repath = Math.max(0, c.repath - dt);
       c.hopIn = Math.max(0, c.hopIn - dt);
@@ -250,6 +358,7 @@ export class Den {
       c.wants = false;
       this.heal(c, dt);
       this.sense(c, q, dt, out);
+      this.quarrel(c);
       if (c.hop) { this.hopping(c, dt); continue; }
       // A swimmer rides the water standing still too (the waves rise and fall under it).
       if (this.ground.afloat) c.y = this.ground.floorAt(c.x, c.z, c.y + 0.6) ?? c.y;
@@ -262,7 +371,10 @@ export class Den {
       switch (c.state) {
         case 'idle': if (this.peace && c.aware > 0.35) this.watch(c, q, dt); else this.idle(c, q, dt); break;
         case 'alert': this.alert(c, q, dt); break;
+        case 'warn': this.warning(c, q, dt); break;
         case 'fight': this.fight(c, q, dt, out); break;
+        case 'brawl': this.brawl(c, dt, out); break;
+        case 'down': this.lying(c, dt, out); break;
         case 'flee': this.flee(c, q, dt, out); break;
         case 'beg': this.beg(c, q, dt, out); break;
         case 'meek': this.meek(c, q, dt); break;
@@ -270,8 +382,9 @@ export class Den {
       this.progress(c, dt);
     }
     this.spread();
-    out.push(...this.walked);
+    out.push(...this.walked, ...this.outbox);
     this.walked.length = 0;
+    this.outbox.length = 0;
     return out;
   }
 
@@ -303,20 +416,206 @@ export class Den {
       c.aware = Math.max(0, c.aware - dt * 0.08);
       c.lost += dt;
     }
-    if (this.peace) { if (c.state === 'alert') c.state = 'idle'; return; }
+    if (this.peace) { if (c.state === 'alert' || c.state === 'warn') { c.state = 'idle'; c.band = -1; } return; }
     // Left a hero it could not reach: it keeps to itself a while.
     if (c.spurn > 0 && c.state === 'idle') return;
-    if ((c.state === 'idle' || c.state === 'alert') && c.aware >= 1 && !this.keepsOff(c, q) && !cowed(c, q)) this.notice(c, q, out);
-    else if (c.state === 'idle' && c.aware > 0.35) { c.state = 'alert'; c.path = []; }
+    const noticed = (c.state === 'idle' || c.state === 'alert' || c.state === 'brawl') && c.aware >= 1 && !this.keepsOff(c, q);
+    if (noticed && !cowed(c, q)) this.notice(c, q, out);
+    else {
+      // Too weak against this hero (D58): one that would warn says so once, and keeps back.
+      if (noticed && warns(c)) this.yielding(c, q, out);
+      if (c.state === 'idle' && c.aware > 0.35) { c.state = 'alert'; c.path = []; }
+    }
   }
 
   private notice(c: Creature, q: Quarry, out: DenEvent[]): void {
+    // One that warns first (D64) speaks before it fights; the hero beyond its warning distance is only watched.
+    if (warns(c) && !c.surprise) { this.meet(c, q, out); return; }
+    // A murderous one (R8) falls on the hero at once, and its war cry says why.
+    if (c.def.stance?.kind === 'murderous') out.push({ kind: 'break', who: c, cause: 'murder' });
     out.push({ kind: 'notice', who: c });
     if (c.surprise && c.pleas === 0) { c.state = 'beg'; c.act = 'beg'; c.until = 0; return; }
     if (c.def.temper === 'skittish' && !this.brave(c, q)) { this.toFlee(c, out); return; }
     c.state = 'fight';
     c.path = [];
     if (c.def.pack) this.call(c, out);
+  }
+
+  /** A band that would warn but dares not (the hero far above it, D58): one of it says so once within its warning distance. */
+  private yielding(c: Creature, q: Quarry, out: DenEvent[]): void {
+    if (Math.hypot(q.x - c.x, q.z - c.z) > c.def.stance!.warn!) { c.spoke = false; return; }
+    const tier = q.regard?.(c.def.faction);
+    if (c.spoke || tier === 'friend' || tier === 'honoured') return;
+    for (const o of this.creatures) if (o === c || (o.def.faction === c.def.faction && this.hears(c, o))) o.spoke = true;
+    this.signalling(c, 'yield', []);
+    out.push({ kind: 'warn', who: c, turn: 'yield' });
+  }
+
+  /**
+   * Its faction's view of the hero picks what it does (D65): a hated hero is attacked at once, with the reason spoken; a friend is let pass
+   * and spoke once; anyone else gets the kind's own stance (stranger) or a warning (unwelcome: every stance that warns).
+   */
+  private meet(c: Creature, q: Quarry, out: DenEvent[]): void {
+    const tier = q.regard?.(c.def.faction) ?? 'stranger', st = c.def.stance!;
+    if (Math.hypot(q.x - c.x, q.z - c.z) > st.warn!) { c.spoke = false; if (c.state === 'idle') { c.state = 'alert'; c.path = []; } return; }
+    if (tier === 'hated' || this.knows) {
+      out.push({ kind: 'break', who: c, cause: this.knows ?? 'hated' }, { kind: 'notice', who: c });
+      c.state = 'fight';
+      c.path = [];
+      this.call(c, out);
+    } else if (tier === 'friend' || tier === 'honoured' || this.word) {
+      if (!c.spoke) { for (const o of this.creatures) if (o === c || (o.def.faction === c.def.faction && this.hears(c, o))) o.spoke = true; this.signalling(c, 'greet', []); out.push({ kind: 'warn', who: c, turn: 'greet' }); }
+      c.state = 'idle';
+      c.aware = 0.3;
+    } else this.warnUp(c, q, out);
+  }
+
+  /** Is the creature close enough to the hero to be heard by those of its band (the shout carries as far as one can see)? */
+  private hears(c: Creature, o: Creature): boolean {
+    const d = Math.hypot(o.x - c.x, o.z - c.z, o.y - c.y);
+    return d <= (this.ground.sees(c.x, c.y, c.z, o.x, o.y, o.z, 0.6) ? o.def.senses.hearing : 2.5);
+  }
+
+  /**
+   * It has noticed the hero (D64) and warns instead of attacking: it and those of its kind in earshot stop and face them (one band, which
+   * speaks through its leader). The hero beyond its warning distance is only watched, and nothing is said.
+   */
+  private warnUp(c: Creature, q: Quarry, out: DenEvent[]): void {
+    out.push({ kind: 'notice', who: c });
+    this.bands.set(c.id, { turn: null, at: this.time, began: this.time });
+    for (const o of this.creatures) {
+      const joins = o === c || (o.def.pack && warns(o) && (o.state === 'idle' || o.state === 'alert') && !cowed(o, q) && this.hears(c, o));
+      if (!joins) continue;
+      o.state = 'warn';
+      o.band = c.id;
+      o.aware = Math.max(o.aware, 0.7);
+      o.seen = c.seen ?? { x: q.x, y: q.y, z: q.z };
+      o.lost = 0;
+      o.path = [];
+    }
+  }
+
+  /** Those of a band now (still warning). */
+  private members(id: number): Creature[] { return this.creatures.filter((c) => c.state === 'warn' && c.band === id); }
+
+  /** The one who speaks for a band: its leader, else the one nearest the hero. */
+  private speaker(m: readonly Creature[], q: { readonly x: number; readonly z: number }): Creature {
+    const byGap = (c: Creature) => Math.hypot(q.x - c.x, q.z - c.z);
+    return m.find((c) => c.leader) ?? m.reduce((a, b) => (byGap(b) < byGap(a) ? b : a));
+  }
+
+  /**
+   * Each band's words, once a step (D64). A guard warns, warns again nearer, and repeats while the hero stays; a robber's band says
+   * halt, walks up and demands; a goblin band jibes. The hero crossing the line, a blow, a spent patience or a hero who looks weak
+   * ends it in a fight; the hero going back lets them settle at their posts.
+   */
+  private warnings(q: Quarry, out: DenEvent[]): void {
+    for (const [id, b] of this.bands) {
+      const m = this.members(id);
+      if (!m.length) { this.bands.delete(id); continue; }
+      const who = this.speaker(m, q), st = who.def.stance!;
+      const d = Math.min(...m.map((c) => Math.hypot(q.x - c.x, q.z - c.z)));
+      if (!q.alive || d > st.warn! * SETTLE_AT || m.every((c) => c.aware < 0.25)) { this.standDown(id, m, who, q.alive, out); continue; }
+      if (d <= st.line!) { this.breakBand(id, m, who, 'line', out); continue; }
+      const utter = (turn: WarnTurn) => { b.turn = turn; b.at = this.time; this.signalling(who, turn, m); out.push({ kind: 'warn', who, turn }); };
+      switch (st.kind) {
+        case 'guard':
+          if (b.turn === null) utter('warn');
+          else if (b.turn === 'warn' && d <= (st.warn! + st.line!) / 2) utter('last');
+          else if (this.time - b.at > REPEAT) utter(b.turn);
+          break;
+        case 'rob':
+          if (b.turn === null) utter('warn');
+          else if (b.turn === 'warn' && d <= st.close! + 0.6) { utter('demand'); b.began = this.time; }
+          else if (b.turn === 'demand' && this.time - b.began > st.patience!) this.breakBand(id, m, who, 'patience', out);
+          else if (b.turn === 'demand' && this.time - b.at > REPEAT) utter('demand');
+          break;
+        case 'jeer':
+          if (b.turn === null) { utter('jeer'); b.began = this.time; }
+          else if (q.frail) this.breakBand(id, m, who, 'frail', out);
+          else if (this.time - b.began > st.patience! && m.length >= st.many!) this.breakBand(id, m, who, 'many', out);
+          else if (this.time - b.at > REPEAT / 2) utter('jeer');
+          break;
+      }
+    }
+  }
+
+  /** The speaker shows what it says (a gesture for a moment); a last warning or a demand has the whole band draw. */
+  private signalling(who: Creature, turn: WarnTurn, band: readonly Creature[]): void {
+    who.signal = turn;
+    who.signalLeft = SIGNAL;
+    if (turn === 'last' || turn === 'demand') for (const c of band) c.armed = true;
+  }
+
+  /** The band's warning is over and it fights, one of its words saying why; the rest of its pack in earshot joins. */
+  private breakBand(id: number, m: readonly Creature[], who: Creature, cause: BreakCause, out: DenEvent[]): void {
+    this.bands.delete(id);
+    out.push({ kind: 'break', who, cause });
+    for (const c of m) { c.state = 'fight'; c.band = -1; c.path = []; c.close = false; c.armed = false; }
+    this.call(who, out);
+  }
+
+  /** The warning band the hero can talk to now (R7): one whose stance talks, near enough, nearest first. */
+  private talker(): { id: number; band: Band; who: Creature; stance: NonNullable<CreatureDef['stance']>; members: Creature[] } | null {
+    const q = this.quarry;
+    if (!q?.alive || this.peace) return null;
+    let best: ReturnType<Den['talker']> = null, bd = Infinity;
+    for (const [id, band] of this.bands) {
+      const members = this.members(id);
+      if (!members.length) continue;
+      const who = this.speaker(members, q), stance = who.def.stance!, d = Math.hypot(q.x - who.x, q.z - who.z);
+      if (stance.talk && band.turn !== null && d <= Math.min(stance.warn!, TALK_FROM) && d < bd) { bd = d; best = { id, band, who, stance, members }; }
+    }
+    return best;
+  }
+
+  /** Who speaks for the band the hero can talk to now, if any (R7). */
+  hail(): Creature | null { return this.talker()?.who ?? null; }
+
+  /**
+   * The hero talks to the band that warns them (R7): the first word hears its terms (a share of the purse, seeded by the speaker and the
+   * purse; or a pact), the next agrees to them. A price the purse cannot meet gets the short answer. A deal ends the warning: the band
+   * stands down and greets the hero from then on (`word`). Null: there is none to talk to. The caller takes `coins` from the purse.
+   */
+  parley(purse: number): Parley | null {
+    const t = this.talker();
+    if (!t) return null;
+    const { band: b, who, stance: st } = t;
+    if (!b.heard) {
+      const share = st.toll ? st.toll[0] + (st.toll[1] - st.toll[0]) * hash2f(who.id, Math.floor(purse), 91) : 0;
+      b.heard = true;
+      b.toll = st.talk === 'price' ? Math.max(1, Math.round(purse * share)) : 0;
+      b.began = this.time;
+      this.signalling(who, 'warn', []);
+      return { turn: 'terms', who, coins: b.toll };
+    }
+    if (purse < b.toll!) return { turn: 'short', who, coins: b.toll! };
+    this.word = b.toll ? 'paid' : 'pact';
+    this.bands.delete(t.id);
+    this.signalling(who, 'greet', []);
+    for (const c of t.members) { c.state = 'idle'; c.band = -1; c.armed = false; c.aware = 0.3; c.spoke = true; c.path = []; }
+    return { turn: 'deal', who, coins: b.toll! };
+  }
+
+  /** The hero has gone back (or is gone): the band lets it be and goes back to its post. */
+  private standDown(id: number, m: readonly Creature[], who: Creature, said: boolean, out: DenEvent[]): void {
+    const b = this.bands.get(id);
+    this.bands.delete(id);
+    if (said && b?.turn) { this.signalling(who, 'settle', m); out.push({ kind: 'warn', who, turn: 'settle' }); }
+    for (const c of m) { c.band = -1; c.armed = false; this.goHome(c, out); }
+  }
+
+  /** It stands with its band, facing the hero; a robber walks up to the distance it demands from. */
+  private warning(c: Creature, q: Quarry, dt: number): void {
+    const st = c.def.stance!, b = this.bands.get(c.band);
+    const dx = q.x - c.x, dz = q.z - c.z;
+    if (st.kind === 'rob' && b && b.turn !== 'demand' && Math.hypot(dx, dz) > st.close!) {
+      if (c.repath === 0 || c.pi >= c.path.length) { c.path = [this.slot(c, q, st.close!)]; c.pi = 0; c.repath = 0.5; }
+      if (this.move(c, dt, CLOSE_IN)) return;
+    }
+    c.path = [];
+    c.dir = Math.atan2(dz, dx);
+    c.act = 'warn';
   }
 
   /** A shy one (def.wary) farther off than its flight distance only watches (a loud hero is fled sooner). */
@@ -349,6 +648,138 @@ export class Den {
       called = true;
     }
     if (called) out.push({ kind: 'alarm', who: c });
+  }
+
+  /** Every living body on this ground that it can tell is there: those of this den and of the dens beside it. */
+  private bodies(): { readonly c: Creature; readonly den: Den }[] {
+    return [this, ...this.neighbours].flatMap((den) => den.creatures.filter((o) => o.state !== 'dead' && !o.hop).map((o) => ({ c: o, den })));
+  }
+
+  /** The nearest body at feud with it that it sees, or hears fighting (D65); none if it knows no quarrel. */
+  private foeFor(c: Creature): Prey | null {
+    let best: Prey | null = null, near = Infinity;
+    for (const p of this.bodies()) {
+      const o = p.c;
+      if (o === c || o.state === 'down' || !this.feud!(c.def.faction, o.def.faction) || Math.abs(o.y - c.y) > 3) continue;
+      const d = Math.hypot(o.x - c.x, o.z - c.z);
+      const known = d <= c.def.senses.sight && this.ground.sees(c.x, c.y, c.z, o.x, o.y, o.z, 0.8);
+      const heard = o.din > 0 && d <= c.def.senses.hearing;
+      if ((known || heard) && d < near) { near = d; best = p; }
+    }
+    return best;
+  }
+
+  /**
+   * It looks about for a quarrel (D65): another body of a faction at feud with its own that it sees, or hears fighting, is
+   * attacked; its pack comes too. A shy one runs from whoever hunts. The hero has the first claim: one that has noticed them
+   * (fight) does not look.
+   */
+  private quarrel(c: Creature): void {
+    if (!this.feud || c.eye > 0 || c.spurn > 0 || (c.state !== 'idle' && c.state !== 'alert')) return;
+    c.eye = LOOK;
+    if (c.def.temper === 'skittish') {
+      if (this.dread(c, null)) this.toFlee(c, this.walked);
+      return;
+    }
+    const foe = this.foeFor(c);
+    if (!foe) return;
+    for (const o of this.creatures) {
+      if (o !== c && !(c.def.pack && o.def.pack && (o.state === 'idle' || o.state === 'alert') && o.def.temper !== 'skittish' && this.hears(c, o))) continue;
+      o.state = 'brawl';
+      o.prey = foe;
+      o.path = [];
+    }
+  }
+
+  /** Whom it fights: it closes in on its prey and strikes, until one of them falls or runs, or it loses sight of it. */
+  private brawl(c: Creature, dt: number, out: DenEvent[]): void {
+    const p = c.prey;
+    if (!p || p.c.state === 'dead' || p.c.state === 'down' || (p.c.state === 'flee' && Math.hypot(p.c.x - c.x, p.c.z - c.z) > c.def.senses.sight)) { this.settleDown(c); return; }
+    const t = p.c, dx = t.x - c.x, dz = t.z - c.z, d = Math.hypot(dx, dz), dy = Math.abs(t.y - c.y);
+    const atk = c.def.attacks[0], reach = atk.reach + radiusOf(c.def) + radiusOf(t.def);
+    const sees = d < c.def.senses.sight && this.ground.sees(c.x, c.y, c.z, t.x, t.y, t.z, 0.9);
+    if (sees) { c.lost = 0; c.seen = { x: t.x, y: t.y, z: t.z }; }
+    else if (c.lost > GIVE_UP) { this.settleDown(c); return; }
+    if (c.stagger > 0) { c.act = 'hurt'; c.windup = 0; return; }
+    if (c.windup > 0) {
+      c.windup -= dt;
+      c.dir = Math.atan2(dz, dx);
+      if (c.windup <= 0) {
+        c.ready = atk.time;
+        // Stepped back out of reach: the blow goes wide; a lunge at one that runs reaches the further for it.
+        if (d < reach + 0.3 + (t.state === 'flee' ? LUNGE : 0) && dy < 1.2 && sees) p.den.bitten(t, strike({ damage: atk.damage, kind: atk.kind, prowess: atk.prowess }, p.den.guardOf(t), c.rng), c, this);
+      }
+      return;
+    }
+    if (d < (c.close ? reach + HOLD : reach) && dy < 1.2 && sees) {
+      c.close = true;
+      c.path = [];
+      c.dir = Math.atan2(dz, dx);
+      if (c.ready === 0) { c.windup = WINDUP; c.act = 'swing'; c.din = DIN; out.push({ kind: 'swing', who: c }); }
+      else c.act = 'stand';
+      return;
+    }
+    c.close = false;
+    const goal = sees ? t : c.seen;
+    if (!goal) { this.settleDown(c); return; }
+    if (c.repath === 0 || c.pi >= c.path.length) { this.headTo(c, goal); c.repath = 0.6; }
+    if (!this.move(c, dt, 1)) c.act = 'stand';
+  }
+
+  /** Knocked down: it lies, then gets up with a share of its health. */
+  private lying(c: Creature, dt: number, out: DenEvent[]): void {
+    c.act = 'hurt';
+    if ((c.downFor -= dt) > 0) return;
+    this.getUp(c, out);
+  }
+
+  private getUp(c: Creature, out: DenEvent[]): void {
+    c.state = 'idle';
+    c.act = 'stand';
+    c.downFor = 0;
+    c.health = Math.max(c.health, c.def.health * UP_WITH);
+    c.calm = 0;
+    c.aware = 0.2;
+    c.until = 0;
+    out.push({ kind: 'up', who: c });
+  }
+
+  /** Someone tends the fallen: it lies shorter (the rest of its time cut to `left` seconds). */
+  tend(c: Creature, left: number): void {
+    if (c.state === 'down') c.downFor = Math.min(c.downFor, left);
+  }
+
+  /** A body at ease walks to (x, y, z) and stands there (an errand: a tender to the fallen). */
+  sendTo(c: Creature, p: P3): void {
+    if (c.state !== 'idle') return;
+    c.path = [p];
+    c.pi = 0;
+    c.until = 0;
+  }
+
+  /** It goes for `prey` at once, seen or not (a call to arms: the town's watch for the raiders). */
+  engage(c: Creature, prey: Prey): void {
+    if (c.state !== 'dead' && c.state !== 'down' && c.state !== 'flee') Object.assign(c, { state: 'brawl', prey, path: [], seen: { x: prey.c.x, y: prey.c.y, z: prey.c.z }, lost: 0 });
+  }
+
+  /** The quarrel is over (its prey is down, away or lost): back to its ways. */
+  private settleDown(c: Creature): void {
+    c.state = 'idle';
+    c.prey = null;
+    c.path = [];
+    c.until = 0;
+    c.eye = 0;
+  }
+
+  /** What it runs from: the nearest body at feud with it that fights now (within sight); else the hero, `q` (none: nothing). */
+  private dread(c: Creature, q: Quarry | null): P3 | null {
+    let best: P3 | null = null, near = c.def.senses.sight;
+    for (const { c: o } of this.bodies()) {
+      if ((o.state !== 'brawl' && o.state !== 'fight') || !this.feud?.(o.def.faction, c.def.faction)) continue;
+      const d = Math.hypot(o.x - c.x, o.z - c.z);
+      if (d < near) { near = d; best = o; }
+    }
+    return best ?? (q && q.alive ? q : null);
   }
 
   /** Always doing something: roam the home room, stop and sniff or gnaw or keep watch, roam again. */
@@ -394,7 +825,7 @@ export class Den {
   private alert(c: Creature, q: Quarry, dt: number): void {
     if (c.aware < 0.2) { c.state = 'idle'; c.until = 0; return; }
     // A shy beast never creeps closer: head up, it keeps the hero in sight; nor does one too frightened of them.
-    if (c.def.wary || cowed(c, q)) { if (!this.move(c, dt, 0.32)) { c.act = 'watch'; c.dir = Math.atan2(q.z - c.z, q.x - c.x); } return; }
+    if (c.def.wary || cowed(c, q) || warns(c)) { if (!this.move(c, dt, 0.32)) { c.act = 'watch'; c.dir = Math.atan2(q.z - c.z, q.x - c.x); } return; }
     if (c.seen && c.repath === 0) { this.headTo(c, c.seen); c.repath = 1.5; }
     if (!this.move(c, dt, 0.35)) { c.act = 'watch'; c.dir = Math.atan2(q.z - c.z, q.x - c.x); }
   }
@@ -420,7 +851,7 @@ export class Den {
       c.close = true;
       c.path = [];
       c.dir = Math.atan2(dz, dx);
-      if (c.ready === 0) { c.windup = WINDUP; c.act = 'swing'; out.push({ kind: 'swing', who: c }); }
+      if (c.ready === 0) { c.windup = WINDUP; c.act = 'swing'; c.din = DIN; out.push({ kind: 'swing', who: c }); }
       else c.act = 'stand';
       return;
     }
@@ -464,10 +895,12 @@ export class Den {
   /** Off to the room farthest from the hero; cornered there, it fights. */
   private flee(c: Creature, q: Quarry, dt: number, out: DenEvent[]): void {
     if (this.move(c, dt, 1)) return;
-    const d = Math.hypot(q.x - c.x, q.z - c.z);
-    if (d > (c.def.wary ? c.def.wary * 2 : 10) || !q.alive) { c.state = c.surprise ? 'meek' : 'idle'; c.aware = 0.3; c.until = 0; out.push({ kind: 'home', who: c }); return; }
+    // From whoever hunts it: a body at feud with it, else the hero.
+    const from = this.dread(c, q);
+    const d = from ? Math.hypot(from.x - c.x, from.z - c.z) : Infinity;
+    if (!from || d > (c.def.wary ? c.def.wary * 2 : 10)) { c.state = c.surprise ? 'meek' : 'idle'; c.aware = 0.3; c.until = 0; out.push({ kind: 'home', who: c }); return; }
     if (c.repath === 0) {
-      this.runFrom(c, q);
+      this.runFrom(c, from);
       c.repath = 2;
       // Nowhere left to run and the hero upon it: cornered, it fights.
       if (c.pi >= c.path.length && d < 2) { c.state = 'fight'; return; }
@@ -510,23 +943,19 @@ export class Den {
     const out: DenEvent[] = [];
     if (c.state === 'dead') return out;
     c.health -= s.damage;
-    if (s.damage > 0) c.calm = 0;
+    if (s.damage > 0) { c.calm = 0; c.struck = true; }
+    // The hero breaks the word given (R7): the den fights, and says who started it.
+    if (this.word && s.damage > 0) { this.word = null; out.push({ kind: 'break', who: c, cause: 'struck' }); }
+    // Struck while the band was still talking: it fights now (D64), and says who started it.
+    if (c.state === 'warn') {
+      const m = this.members(c.band), live = m.filter((o) => o.health > 0);
+      this.breakBand(c.band, m, this.speaker(live.length ? live : m, from), 'struck', out);
+    }
     c.aware = 1;
     c.seen = { ...from };
     c.lost = 0;
-    if (s.damage > 0 && flinch) { c.stagger = Math.max(c.stagger, stagger, s.outcome === 'crit' ? 0.5 : 0.18); c.windup = 0; c.blows++; }
-    if (c.health <= 0) {
-      c.health = 0;
-      c.state = 'dead';
-      c.act = 'die';
-      c.path = [];
-      out.push({ kind: 'died', who: c });
-      // The leader falls: the rest may lose heart.
-      if (c.leader) for (const o of this.creatures) if (o.state === 'fight' && o.def.morale < 1 && o.rng.chance(0.5)) this.toFlee(o, out);
-      return out;
-    }
-    if (c.state === 'beg' || c.state === 'meek') { this.toFlee(c, out); return out; }
-    if (c.health < c.def.health * (1 - c.def.morale) && c.state !== 'flee') { this.toFlee(c, out); return out; }
+    c.din = DIN;
+    if (this.afterBlow(c, s, stagger, flinch, out)) return out;
     if (c.state !== 'fight') {
       c.state = 'fight';
       c.path = [];
@@ -534,6 +963,53 @@ export class Den {
       if (c.def.pack) this.call(c, out);
     }
     return out;
+  }
+
+  /**
+   * What a blow did to it past its health: a stagger, a fall (the leader's lets the rest lose heart), a flight. True when that settled
+   * what it does now (down, or running).
+   */
+  private afterBlow(c: Creature, s: Strike, stagger: number, flinch: boolean, out: DenEvent[], by?: Creature): boolean {
+    if (s.damage > 0 && flinch) { c.stagger = Math.max(c.stagger, stagger, s.outcome === 'crit' ? 0.5 : 0.18); c.windup = 0; c.blows++; }
+    if (c.health <= 0 && by && this.mercy?.(c)) {
+      c.health = 0;
+      c.state = 'down';
+      c.act = 'hurt';
+      c.path = [];
+      c.windup = 0;
+      c.downFor = DOWN_FOR;
+      c.prey = null;
+      out.push({ kind: 'down', who: c, by });
+      return true;
+    }
+    if (c.health <= 0) {
+      c.health = 0;
+      c.state = 'dead';
+      c.act = 'die';
+      c.path = [];
+      out.push({ kind: 'died', who: c, ...(by ? { by } : {}) });
+      // The leader falls: the rest may lose heart.
+      if (c.leader) for (const o of this.creatures) if ((o.state === 'fight' || o.state === 'brawl') && o.def.morale < 1 && o.rng.chance(0.5)) this.toFlee(o, out);
+      return true;
+    }
+    if (c.state === 'beg' || c.state === 'meek') { this.toFlee(c, out); return true; }
+    if (c.health < c.def.health * (1 - c.def.morale) && c.state !== 'flee') { this.toFlee(c, out); return true; }
+    return false;
+  }
+
+  /**
+   * A blow from a creature of `from` (D65): the same wound as the hero's, without the hero's part in it. One at ease turns on whoever
+   * struck it, a shy one runs; the fall is told with the den's next events.
+   */
+  bitten(c: Creature, s: Strike, by: Creature, from: Den): void {
+    if (c.state === 'dead' || c.state === 'down') return;
+    c.health -= s.damage;
+    if (s.damage > 0) c.calm = 0;
+    c.din = DIN;
+    if (this.afterBlow(c, s, 0, true, this.outbox, by)) return;
+    if (c.state !== 'idle' && c.state !== 'alert') return;
+    if (c.def.temper === 'skittish') this.toFlee(c, this.outbox);
+    else { c.state = 'brawl'; c.prey = { c: by, den: from }; c.path = []; }
   }
 
   /** How it stands against the hero's blow: caught unaware or staggered, it neither dodges nor parries. */
@@ -554,7 +1030,7 @@ export class Den {
   /** Terror (a spell): it runs from the hero, unless it already runs or is dead. */
   frighten(c: Creature): DenEvent[] {
     const out: DenEvent[] = [];
-    if (c.state === 'fight' || c.state === 'alert' || c.state === 'idle') this.toFlee(c, out);
+    if (c.state === 'fight' || c.state === 'alert' || c.state === 'warn' || c.state === 'idle') { c.band = -1; this.toFlee(c, out); }
     return out;
   }
 
@@ -579,7 +1055,7 @@ export class Den {
   }
 
   /** Off as far from the hero as it can get. */
-  private runFrom(c: Creature, q: Quarry): void {
+  private runFrom(c: Creature, q: P3): void {
     const way = this.ground.away(c, q, hands(c));
     if (way.length) { c.path = way; c.pi = 0; }
   }

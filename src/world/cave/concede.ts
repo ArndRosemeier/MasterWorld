@@ -8,9 +8,10 @@
  */
 import type { CavesDef } from '../../setting/contract';
 import type { BrickField } from '../dungeon/rockMesh';
-import { stampSlab } from './carve';
+import { stampRamp, stampSlab } from './carve';
+import { fieldAt } from '../dungeon/rockMesh';
 import type { Dressing } from './dress';
-import { PART_MIN, readField, type Reading } from './reader';
+import { PART_MIN, readField, reachFree, type Reading } from './reader';
 import type { Skeleton } from './skeleton';
 
 /** A way cut by the concession: from one floor point to another. */
@@ -38,6 +39,94 @@ function lumps(r: Reading): number[][] {
     }
     const unreached = r.depth[c0] === Infinity;
     if (lump.length >= (unreached ? PART_MIN : PIT_MIN)) out.push(lump);
+  }
+  return out;
+}
+
+/** How far down a line from `top` along `dir` a ramp can run (head room all the way, out over air, ending where the old floor meets the line or at `run`), or null. */
+function rampFoot(f: BrickField, top: readonly [number, number, number], dir: readonly [number, number], run: number, slope: number, way: CavesDef['way']): number | null {
+  let over = false;
+  for (let t = 0; t <= run + 1e-6; t += 0.5) {
+    const x = top[0] + dir[0] * t, z = top[2] + dir[1] * t, y = top[1] - slope * t;
+    if (!bodyAt(f, x, y, z, way)) return null;
+    if (fieldAt(f, x, y - 0.5, z) > 0.3) over = true;
+    else if (over && fieldAt(f, x, y - 0.3, z) < 0) return t;
+  }
+  return over ? run : null;
+}
+
+/** Does the hero's body fit standing at floor height y (the reader's test: its radius clear of rock at the knee, the waist and the head)? */
+const bodyAt = (f: BrickField, x: number, y: number, z: number, way: CavesDef['way']): boolean => [0.75, 1.3, way.stand - way.radius].every((h) => fieldAt(f, x, y + h, z) >= way.radius);
+
+/** How far along `dir` from a ledge's floor point `top` the ledge goes on (standing room all the way) until air opens under it, or null (a wall first, or none within 10 m). */
+function ledgeEdge(f: BrickField, top: readonly [number, number, number], dir: readonly [number, number], way: CavesDef['way']): number | null {
+  for (let t = 0; t <= 10; t += 0.5) {
+    const x = top[0] + dir[0] * t, z = top[2] + dir[1] * t;
+    if (!bodyAt(f, x, top[1], z, way)) return null;
+    if (fieldAt(f, x, top[1] - 0.5, z) > 0.3) return t;
+  }
+  return null;
+}
+
+/** Rounds of ramp-building at the most. */
+const RAMP_ROUNDS = 16;
+
+/**
+ * The tall faces the only way on climbs (K5): the ground that a hero can walk in and out of using no face higher than `way.ramp.above`
+ * is found; where a tall face is the way from it to ground it cannot walk (not reached, or not left), the cheapest such face of each lump
+ * gets a rubble ramp at its foot, if the ramp has room (headroom all along and a foot on the ground). Returns the ramps built.
+ */
+function ramps(f: BrickField, r: Reading, caves: CavesDef): Opened[] {
+  const way = caves.way, { above, slope, steep, half } = way.ramp, out: Opened[] = [];
+  const tall = (a: number, e: number): boolean => r.edgeKind[e] === 1 && Math.abs(r.y[r.edgeTo[e]] - r.y[a]) > above;
+  // Reached from a way in, and able to walk back to one, over no tall face.
+  const fwd = reachFree(r, above, r.entries).reached, bck = new Uint8Array(r.count), rev: number[][] = Array.from({ length: r.count }, () => []);
+  for (let a = 0; a < r.count; a++) for (let e = r.edgeStart[a]; e < r.edgeStart[a + 1]; e++) if (!tall(a, e)) rev[r.edgeTo[e]].push(a);
+  const queue: number[] = [];
+  for (const c of r.entries) { bck[c] = 1; queue.push(c); }
+  for (let n = 0; n < queue.length; n++) { const b = queue[n]; for (const a of rev[b]) if (!bck[a]) { bck[a] = 1; queue.push(a); } }
+  const good = (c: number): boolean => fwd[c] === 1 && bck[c] === 1;
+  // The lumps of the rest (cells joined by any link), each with its cheapest tall face to good ground.
+  const lump = new Int32Array(r.count).fill(-1), faces: { rise: number; lo: number; up: number }[] = [];
+  let lumps = 0;
+  for (let c0 = 0; c0 < r.count; c0++) {
+    if (good(c0) || lump[c0] >= 0) continue;
+    const id = lumps++, members = [c0]; lump[c0] = id;
+    let best: { rise: number; lo: number; up: number } | undefined;
+    for (let n = 0; n < members.length; n++) {
+      const a = members[n];
+      for (let e = r.edgeStart[a]; e < r.edgeStart[a + 1]; e++) {
+        const b = r.edgeTo[e];
+        if (!good(b) && lump[b] < 0) { lump[b] = id; members.push(b); }
+        if (good(b) && tall(a, e)) { const rise = Math.abs(r.y[b] - r.y[a]), lo = r.y[a] < r.y[b] ? a : b; if (!best || rise < best.rise) best = { rise, lo, up: lo === a ? b : a }; }
+      }
+      // (Faces from good ground into the lump are the lump's too: the edge b -> a is stored with b.)
+      for (const b of rev[a]) if (good(b)) for (let e = r.edgeStart[b]; e < r.edgeStart[b + 1]; e++) if (r.edgeTo[e] === a && tall(b, e)) { const rise = Math.abs(r.y[b] - r.y[a]), lo = r.y[a] < r.y[b] ? a : b; if (!best || rise < best.rise) best = { rise, lo, up: lo === a ? b : a }; }
+    }
+    if (best && members.length >= PIT_MIN) faces.push(best);
+  }
+  for (const { rise, lo, up } of faces) {
+    // The ramp starts at the ledge's floor and runs away from the face over the lower ground: along the way from the ledge to the lower cell if
+    // that has room, else the nearest heading that has (the ledge and the canyon seldom run the same way).
+    const base = Math.atan2(r.z[lo] - r.z[up], r.x[lo] - r.x[up]), top: [number, number, number] = [r.x[up], r.y[up], r.z[up]];
+    // (A steeper slope, up to the walker's own limit, where the room for the gentle one is not there.)
+    let done = false;
+    for (const sl of [slope, (slope + steep) / 2, steep]) {
+      const run = rise / sl;
+      for (let turn = 0; turn <= 12 && !done; turn++) {
+        for (const sg of turn === 0 ? [1] : [1, -1]) {
+          const dir: [number, number] = [Math.cos(base + sg * turn * Math.PI / 12), Math.sin(base + sg * turn * Math.PI / 12)], edge = ledgeEdge(f, top, dir, way);
+          if (edge === null) continue;
+          const from: [number, number, number] = [top[0] + dir[0] * edge, top[1], top[2] + dir[1] * edge], foot = rampFoot(f, from, dir, run, sl, way);
+          if (foot === null) continue;
+          stampRamp(f, from, dir, foot, sl, half);
+          out.push({ a: from, b: [from[0] + dir[0] * foot, from[1] - sl * foot, from[2] + dir[1] * foot] });
+          done = true;
+          break;
+        }
+      }
+      if (done) break;
+    }
   }
   return out;
 }
@@ -96,6 +185,20 @@ export function concede(f: BrickField, sk: Skeleton, caves: CavesDef, dressing?:
     prev = left;
     reading = readField(f, sk, caves, dressing, stopwatch);
   }
+  // Tall faces the only way on climbs get a rubble ramp (read again after each round: a ramp joins what lay behind it). A ramp must never cost
+  // ground: if the cave reads smaller than before the ramps (one filled a way), the field and the reading are put back as they were.
+  const before = { reading, count: opened.length, bricks: f.bricks.map((b) => (b ? b.slice() : null)) };
+  for (let round = 0; round < RAMP_ROUNDS && reading.entries.length; round++) {
+    const built = ramps(f, reading, caves);
+    if (!built.length) break;
+    opened.push(...built);
+    reading = readField(f, sk, caves, dressing, stopwatch);
+  }
+  if (reading.stats.reached < before.reading.stats.reached) {
+    f.bricks.splice(0, f.bricks.length, ...before.bricks);
+    opened.length = before.count;
+    reading = before.reading;
+  }
   return { reading, opened, ms: stopwatch() - t0 };
 }
 
@@ -114,5 +217,6 @@ export function clearOpened(d: Dressing, opened: readonly Opened[]): Dressing {
     crystals: d.crystals.filter((c) => !cutsThrough(c.x, c.y, c.z)),
     rocks: d.rocks.filter((k) => !cutsThrough(k.x, k.y, k.z)),
     drips: d.drips.filter((p) => !cutsThrough(p.x, p.y, p.z)),
+    fittings: d.fittings.filter((k) => !cutsThrough(k.x, k.y, k.z)),
   };
 }

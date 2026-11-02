@@ -24,7 +24,7 @@ export type FormedField = BrickField;
 
 /** The field of a skeleton. */
 export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, step: number): FormedField {
-  const rough = caves.walls.rough, noise = new Noise(deriveSeed(block.seed, 'cave', 'walls'));
+  const rough = caves.walls.rough * (sk.rough ?? 1), noise = new Noise(deriveSeed(block.seed, 'cave', 'walls'));
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
   const grow = (x: number, y: number, z: number, rh: number, down: number, up: number) => {
     x0 = Math.min(x0, x - rh); x1 = Math.max(x1, x + rh); z0 = Math.min(z0, z - rh); z1 = Math.max(z1, z + rh); y0 = Math.min(y0, y - down); y1 = Math.max(y1, y + up);
@@ -95,8 +95,10 @@ export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, 
     const qx = a.x + abx * t, qy = a.y + aby * t, qz = a.z + abz * t, dx = x - qx, dy = y - qy, dz = z - qz;
     const A = a.A + (b.A - a.A) * t, B = a.B + (b.B - a.B) * t, hh = Math.sqrt(dx * dx + dz * dz);
     // The tube: an ellipse, its distance estimated to first order.
-    const e = Math.sqrt((hh / A) ** 2 + (dy / B) ** 2);
-    let v = e < 1e-4 ? Math.min(A, B) : (1 - e) * e / Math.sqrt((hh / (A * A)) ** 2 + (dy / (B * B)) ** 2);
+    // (A mine's drift is cut square: the section's norm has a higher power, 2 for an ellipse and up to 6 for a box with rounded corners.)
+    const sq = a.sq === undefined && b.sq === undefined ? 0 : (a.sq ?? 0) + ((b.sq ?? 0) - (a.sq ?? 0)) * t, n = 2 + 4 * sq;
+    const ua = hh / A, ub = Math.abs(dy) / B, e = n === 2 ? Math.sqrt(ua * ua + ub * ub) : (ua ** n + ub ** n) ** (1 / n);
+    let v = e < 1e-4 ? Math.min(A, B) : n === 2 ? (1 - e) * e / Math.sqrt((hh / (A * A)) ** 2 + (dy / (B * B)) ** 2) : (1 - e) * e ** (n - 1) / Math.sqrt((ua ** (2 * n - 2)) / (A * A) + (ub ** (2 * n - 2)) / (B * B));
     v = Math.min(v, Math.min(A, B));
     const C = a.C + (b.C - a.C) * t;
     if (C > 0) {
@@ -107,6 +109,28 @@ export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, 
     // (A lava tube's floor is level: its flat bottom takes hardly any scallops, or the hero would stand in dents.)
     if (v < rough + 0.3 && v > -rough - 0.3) v += wall(x, y, z) * (a.D === 0 && C > 0 && dy < -0.4 * B ? 0.15 : 1);
     putSample(f, i, j, k, v);
+  }
+}
+
+/**
+ * A slope of fallen rock (the rubble ramp, K5): from `top` it runs `run` metres along the unit heading `dir` (x, z), falling `slope` per metre, `half`
+ * wide either side; the air under the line is filled with rock (to the sides' edge columns, so no sliver of rock stands at its rim), the air over it is left as it is.
+ */
+export function stampRamp(f: BrickField, top: readonly [number, number, number], dir: readonly [number, number], run: number, slope: number, half: number): void {
+  const { step } = f, ex = top[0] + dir[0] * run, ez = top[2] + dir[1] * run;
+  const [i0, i1] = sampleRange(f, Math.min(top[0], ex) - half - 1, Math.max(top[0], ex) + half + 1, 'x'), [k0, k1] = sampleRange(f, Math.min(top[2], ez) - half - 1, Math.max(top[2], ez) + half + 1, 'z'), [j0, j1] = sampleRange(f, top[1] - slope * run - 8, top[1] + 0.5, 'y');
+  for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+    const x = f.ox + i * step, z = f.oz + k * step, t = (x - top[0]) * dir[0] + (z - top[2]) * dir[1], hh = Math.abs(-(x - top[0]) * dir[1] + (z - top[2]) * dir[0]);
+    if (t < -0.4 || t > run + 0.4 || hh > half) continue;
+    const yf = top[1] - slope * Math.max(0, Math.min(run, t));
+    // Fill the air straight under the line down to the old floor (and no other air under it: a passage on a lower level stays).
+    let air = true;
+    for (let j = j1; j >= j0; j--) {
+      const y = f.oy + j * step;
+      if (y >= yf) continue;
+      if (air && sampleOf(f, i, j, k) <= 0) air = false;
+      if (air) putSample(f, i, j, k, -Math.min(half + 0.35 - hh, yf - y, 1), true);
+    }
   }
 }
 

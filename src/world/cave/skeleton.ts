@@ -22,6 +22,8 @@ export interface CondPoint {
   readonly D: number;
   /** Share of the cave's water this point carries (1 at the springs). */
   readonly flow: number;
+  /** How square the tube's section is cut (0 or none: an ellipse; 1: a box with rounded corners): a mine's drift. */
+  readonly sq?: number;
 }
 
 /** What a conduit is. */
@@ -58,6 +60,8 @@ export interface Void {
 export interface Skeleton {
   /** Where the first mouth's portal plane stands, once the carver has cut its throat (form.ts): the cave's way in from the land. */
   readonly throat?: ThroatFrame;
+  /** How much of the usual wall scalloping the carver keeps (default 1): a mine's walls are tooled, not water-worn. */
+  readonly rough?: number;
   readonly conduits: readonly Conduit[];
   readonly voids: readonly Void[];
   /** Where the water came in (the lattice nodes' positions) and went out. */
@@ -78,4 +82,9 @@ export interface SkeletonStats {
   readonly loops: number;
   /** Milliseconds: lattice set-up, flow rounds, chains and sections. */
   readonly ms: { readonly prep: number; readonly flow: number; readonly chains: number };
+}
+
+/** The mouth of a passage that ends at the land: its last point run on out along `yaw`, level (`out`: metres from the point). */
+export function mouthOf(p: CondPoint, yaw: number, out: readonly number[], level = 0): Conduit {
+  return { kind: 'mouth', points: out.map((d) => ({ ...p, x: p.x + Math.cos(yaw) * d, z: p.z + Math.sin(yaw) * d })), level, active: false };
 }

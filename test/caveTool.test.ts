@@ -15,17 +15,16 @@ test('cave tool: Discovery overdue near a cliff opens a cave in it, one at a tim
   const seed = parseSeed('masterworld');
   const { terrain, log, home } = startWorld();
   const town = terrain.towns[0], height = (x: number, z: number) => terrain.height(x, z);
-  // A cliff near the town (the way the Builder finds one), and the hero out on the land before it.
-  const cliff = dungeonFor({ purpose: 'lead', town, kinds: ['cave'] }, { seed, terrain, log: [], home, dungeons: classic.dungeons });
-  assert.ok(cliff?.site && siteInCliff(height, cliff.site), 'the masterworld seed has a cliff by its town');
-  const s = cliff.site, hero = { x: s.x + Math.sin(s.yaw) * 250, z: s.z + Math.cos(s.yaw) * 250 };
+  // The hero out on the land, walking a way that a cliff lies ahead of (found by scanning the headings out of the town; D66: the tool opens the cave ahead, in view).
+  const t = town.decision, a = (3 * Math.PI) / 8, hero = { x: t.x + Math.cos(a) * 450, z: t.z + Math.sin(a) * 450 }, toward = { x: hero.x + Math.cos(a) * 400, z: hero.z + Math.sin(a) * 400 };
   const open = log.filter((d) => !(d.kind === 'dungeon' && d.template === 'cave'));
-  const c = { seed, log: open, terrain, towns: terrain.towns, hours: 30, setting: classic, home, hero, toward: null };
+  const c = { seed, log: open, terrain, towns: terrain.towns, hours: 30, setting: classic, home, hero, toward };
   const d = caveFor(c);
   assert.ok(d?.site, 'a cave is opened');
   assert.equal(d.template, 'cave');
   assert.ok(siteInCliff(height, d.site), 'its mouth is in a cliff');
   assert.ok(Math.hypot(d.site.x - hero.x, d.site.z - hero.z) < 500, 'near the hero');
+  assert.equal(caveFor({ ...c, toward: null }), null, 'no way known, no cave ahead');
   assert.equal(d.at, 30);
   assert.equal(caveFor({ ...c, log: [...open, d] }), null, 'not another while it is open near');
   const m = answerNeed('discovery', c);
@@ -60,9 +59,12 @@ test('caves: a share stand empty, sights with nobody in them; asked-for dwellers
 
 test('cave tool (K6): the formed cave is asked for by the country at its mouth: its rock, a size the story needs, shares the land allows', () => {
   const caves = classic.caves!;
-  // Country without a solution cave holds none (the old cave stands there); karst holds one of its three rocks.
-  assert.equal(caveSpecFor(caves, 'moor', { seed: 5 }, 6), null);
-  assert.equal(caveSpecFor(caves, 'badlands', { seed: 5 }, 6), null);
+  // Moor and badlands hold mines (all built); karst holds one of its three rocks.
+  for (const kind of ['moor', 'badlands']) {
+    const m = caveSpecFor(caves, kind, { seed: 5 }, 6)!;
+    assert.equal(m.rock, 'hard-rock');
+    assert.deepEqual(m.shares, { built: 1, water: 0, lava: 0 });
+  }
   const rocks = new Set<string>(), sizes = new Set<string>();
   for (let seed = 1; seed < 80; seed++) {
     const a = caveSpecFor(caves, 'karst', { seed, danger: 3 }, 6)!, again = caveSpecFor(caves, 'karst', { seed, danger: 3 }, 6)!;

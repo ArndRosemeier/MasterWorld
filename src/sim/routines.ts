@@ -23,7 +23,7 @@ export function isRestDay(r: RoutinesDef, day: number): boolean {
 
 /** The routine parts for a person on a working day or the rest day. */
 export function partsOf(r: RoutinesDef, p: Person, rest: boolean): readonly DayPart[] {
-  const own = r.trades[p.trade] && (p.role === 'trade' || p.role === 'hand') ? r.trades[p.trade] : r.roles[p.role] ?? r.roles.homemaker;
+  const own = p.watch && r.roles.watch ? r.roles.watch : r.trades[p.trade] && (p.role === 'trade' || p.role === 'hand') ? r.trades[p.trade] : r.roles[p.role] ?? r.roles.homemaker;
   return rest ? own.restday ?? r.restday : own.workday;
 }
 
