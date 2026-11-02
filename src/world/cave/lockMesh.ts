@@ -5,9 +5,12 @@
  * grate swings, the stones topple. Seeded by the cave and the link.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { CAVE_ROCK, DOOR_H, IRON, type DoorPiece } from '../dungeon/cellarMesh';
-import { BuildingMat as M, MeshKit, WildMat, scaleTint, varyTint } from '../dungeon/meshKit';
+import { CAVE_ROCK, DOOR_H, type DoorPiece } from '../dungeon/cellarMesh';
+import { BuildingMat as M, MeshKit, WildMat, scaleTint, varyTint, type Tint } from '../dungeon/meshKit';
 import type { CaveLock } from './locks';
+
+/** The grate's iron: a cool dark grey, which the slate layer shows as metal (the old cellars' brown-black IRON read as charred wood on the GPU). */
+const GRATE_IRON: Tint = [78, 82, 94];
 
 /** The piece for a lock of the cave whose seed is `seed`: its mesh in the cave's frame, where it stands and how it opens. */
 export function lockPiece(l: CaveLock, seed: number): DoorPiece {
@@ -37,10 +40,11 @@ export function lockPiece(l: CaveLock, seed: number): DoorPiece {
     opens = 'swing';
     const bars = Math.round(w * 3.5), post = w / 2 + 0.15;
     hinge = [x - ux * post, y, z - uz * post];
-    for (let s = 0; s <= bars; s++) { const u = (s / bars - 0.5) * w; kit.box(x + ux * u, y - 0.1, z + uz * u, 0.05, high + 0.4, 0.05, yaw, M.Slate, IRON); }
-    for (const h of [0.35, high * 0.55, high + 0.1]) kit.box(x, y + h, z, w + 0.3, 0.06, 0.06, yaw, M.Slate, IRON);
-    kit.box(x + ux * (w / 2 - 0.2) - tx * 0.06, y + 1.05, z + uz * (w / 2 - 0.2) - tz * 0.06, 0.16, 0.14, 0.06, yaw, M.Slate, IRON);
-    kit.box(x - ux * (w / 2 + 0.05), y - 0.1, z - uz * (w / 2 + 0.05), 0.14, high + 0.5, 0.2, yaw, M.Slate, IRON);
+    for (let s = 0; s <= bars; s++) { const u = (s / bars - 0.5) * w; kit.box(x + ux * u, y - 0.1, z + uz * u, 0.05, high + 0.4, 0.05, yaw, M.Slate, GRATE_IRON); }
+    for (const h of [0.35, high * 0.55, high + 0.1]) kit.box(x, y + h, z, w + 0.3, 0.06, 0.06, yaw, M.Slate, GRATE_IRON);
+    kit.box(x + ux * (w / 2 - 0.2) - tx * 0.06, y + 1.05, z + uz * (w / 2 - 0.2) - tz * 0.06, 0.16, 0.14, 0.06, yaw, M.Slate, GRATE_IRON);
+    kit.box(x - ux * (w / 2 + 0.05), y - 0.1, z - uz * (w / 2 + 0.05), 0.14, high + 0.5, 0.2, yaw, M.Slate, GRATE_IRON);
   }
-  return { link: l.link, kind: l.kind, mesh: kit.mesh(), at: [x, y, z], through: [tx, tz], opens, ...(hinge ? { hinge } : {}) };
+  // A boulder is too big to lie down in the way: it tumbles and sinks out of sight; the stones and the rubble in its lee stay.
+  return { link: l.link, kind: l.kind, mesh: kit.mesh(), at: [x, y, z], through: [tx, tz], opens, ...(hinge ? { hinge } : {}), ...(l.kind === 'oneway' ? { sink: high + 0.6 } : {}) };
 }

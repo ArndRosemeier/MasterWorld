@@ -372,7 +372,12 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
         if (!o) continue;
         found++;
         const col = ores[o - 1].color;
-        for (let m = srng.int(1, 4); m > 0; m--) addStone(h[0] + srng.range(-0.5, 0.5) - h[3] * 0.06, h[1] + srng.range(-0.4, 0.4) - h[4] * 0.06, h[2] + srng.range(-0.5, 0.5) - h[5] * 0.06, srng.range(0.07, 0.3), col);
+        for (let m = srng.int(1, 4); m > 0; m--) {
+          // Spread over the wall, then pressed back onto it along its normal (a spread point beside a bend or a ledge hung in the air, up to a metre off).
+          let sx = h[0] + srng.range(-0.5, 0.5), sy = h[1] + srng.range(-0.4, 0.4), sz = h[2] + srng.range(-0.5, 0.5);
+          for (let pass = 0; pass < 3; pass++) { const back = Math.max(-1, Math.min(1, gx(sx, sy, sz) + 0.06)); sx -= h[3] * back; sy -= h[4] * back; sz -= h[5] * back; }
+          addStone(sx, sy, sz, srng.range(0.07, 0.3), col);
+        }
         if (!lava && (o - 1 === GEM || srng.chance(0.25))) crystals.push({ x: h[0], y: h[1], z: h[2], nx: h[3], ny: h[4], nz: h[5], count: srng.int(d.crystals.count[0], d.crystals.count[1]), len: srng.range(d.crystals.len[0], d.crystals.len[1] * 1.2), color: o - 1 === GEM ? 0x9a6ad8 : col, seed: srng.int(0, 99999) });
       }
     }

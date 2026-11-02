@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { formedCave, caves, small } from './support/formedCave';
 import { formCave } from '../src/world/cave/form';
 import { oreAt } from '../src/world/cave/block';
+import { fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
 import { boxesMesh } from '../src/world/cave/fittings';
 import { rockFor, sharesFor } from '../src/world/cave/choose';
 
@@ -46,4 +47,12 @@ test('mines (K8): timber sets, rails and a cart are fitted (inside the air, on t
     assert.equal(mesh.position.length / 3, dressing.fittings.length * 24, 'four corners on each of six faces');
   }
   assert.equal(formedCave(1, 'basalt').dressing.fittings.length, 0);
+});
+
+test('mines (K8): the lumps of ore lie on the wall they show in, none hung in the air beside it (seen on the GPU)', () => {
+  for (const seed of [1, 2]) {
+    const { c, dressing } = formedCave(seed, 'hard-rock'), ores = dressing.stones.filter((s) => s.ore >= 0);
+    const hung = ores.filter((s) => fieldAt(c.field as BrickField, s.x, s.y, s.z, -1) > s.r);
+    assert.ok(ores.length >= 50 && hung.length <= ores.length * 0.04, `seed ${seed}: ${hung.length} of ${ores.length} ore lumps hang off the wall`);
+  }
 });

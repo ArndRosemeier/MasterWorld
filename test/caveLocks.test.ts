@@ -65,6 +65,11 @@ test('cave locks (K6): a shut lock is solid and keeps the creatures back; a boul
     assert.ok(space.sdf(l.x, l.y + 1, l.z) < 0);
     const ev = space.touch(near.x, l.y, near.z, 0.1);
     assert.deepEqual(ev, [{ kind: 'unbarred', link: l.link }]);
+    // It is seen opening first (its piece takes a moment on screen); only then is the way clear.
+    assert.ok(space.sdf(l.x, l.y + 1, l.z) < 0, 'still in the way while it tumbles');
+    assert.deepEqual(space.touch(near.x, l.y, near.z, 0.5), []);
+    assert.ok(space.sdf(l.x, l.y + 1, l.z) < 0, 'half way');
+    assert.deepEqual(space.touch(near.x, l.y, near.z, 0.5), []);
     assert.ok(space.sdf(l.x, l.y + 1, l.z) > 0, 'open: the way is clear');
     assert.equal(h.ground.way(a, b).length > 0, free > 0, 'and the creatures go through');
     // A saved visit opens it again.
@@ -106,6 +111,7 @@ test('cave locks (K6): each kind is drawn as a piece of its own at its lock, and
       }
       assert.equal(p.opens, kind === 'locked' ? 'swing' : 'push');
       assert.equal(!!p.hinge, kind === 'locked');
+      assert.equal(p.sink !== undefined, kind === 'oneway', `${kind}: only a boulder sinks as it tumbles`);
       assert.ok(!new Set(p.mesh.mat).has(BuildingMat.Oak), `${kind}: no wood in the rock`);
     }
   }

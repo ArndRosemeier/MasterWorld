@@ -39,6 +39,8 @@ export interface DoorPiece {
   readonly hinge?: readonly [number, number, number];
   /** A barred door's bar, apart: lifted out of its brackets and set down against the wall before it swings. */
   readonly bar?: BuildingMesh;
+  /** A `push` piece too tall to lie down in the way sinks this far (m) into the floor as it tumbles, so nothing is left standing in the open way. */
+  readonly sink?: number;
 }
 
 /** A chest's lid, apart from its body, to lift as it is searched: about its hinge along the back's top edge. */
