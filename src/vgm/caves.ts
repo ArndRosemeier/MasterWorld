@@ -6,7 +6,7 @@
  * of it, as of any promised place. Pure.
  */
 import type { CavesDef } from '../setting/contract';
-import { deriveSeed } from '@futuremagic/core';
+import { deriveSeed, hash2f } from '@futuremagic/core';
 import { rockFor, sharesFor, sizeFor, type CaveShares } from '../world/cave/choose';
 import type { DungeonDecision } from '../world/decisions';
 import { siteInCliff } from '../world/dungeon/caveMouth';
@@ -19,8 +19,10 @@ import { seesOver } from '../world/sight';
 const RING: readonly [number, number] = [120, 450];
 /** No new cave while an open one lies this near the hero (m): one at a time. */
 const NEAR = 700;
+/** How far round the hero (m) the open caves are counted against `noticing.caves.most`. */
+const OPEN_ROUND = 2500;
 /** Seeded looks for a cave ahead of the hero in view, at the most. */
-const LOOKS = 8;
+const LOOKS = 3;
 /** A cave keeps this far from a town's edge (m). */
 const OFF_TOWN = 120;
 
@@ -29,25 +31,42 @@ const OFF_TOWN = 120;
  * (D66, K9) it stands ahead of the hero on their way (70 to 260 m, within the spread of it), in view of them, its mouth turned towards
  * them: the hero comes on it, and the map marks it when they have seen it; with no way known (`toward` none) no cave is opened.
  */
-export function caveFor(c: NeedContext): DungeonDecision | null {
-  const dungeons = c.setting.dungeons, kinds = Object.keys(dungeons).filter((k) => dungeons[k]?.form.stands === 'cliff');
+export function caveFor(c: NeedContext, apart = NEAR): DungeonDecision | null {
+  const dungeons = c.setting.dungeons, kinds = cliffKinds(c);
   if (!kinds.length) return null;
-  if (openPromises(c.log).some((p) => p.kind === 'dungeon' && kinds.includes(p.template) && p.site && Math.hypot(p.site.x - c.hero.x, p.site.z - c.hero.z) < NEAR)) return null;
+  if (openPromises(c.log).some((p) => p.kind === 'dungeon' && kinds.includes(p.template) && p.site && Math.hypot(p.site.x - c.hero.x, p.site.z - c.hero.z) < apart)) return null;
   const town = [...c.towns].sort((a, b) => farFrom(a, c.hero) - farFrom(b, c.hero))[0];
   if (!town) return null;
   const n = c.setting.noticing, way = c.toward ? Math.atan2(c.toward.z - c.hero.z, c.toward.x - c.hero.x) : null;
   if (n && way === null) return null;
-  // (Ahead of the hero a cliff that is also in view and faces them is rarer than any cliff: a few seeded looks are made, the first that fits is taken.)
+  const low = (x: number, z: number) => c.terrain.height(x, z), ahead = n && way !== null ? { yaw: way, spread: n.spread } : undefined;
+  // (Ahead of the hero a cliff that is also in view and faces them is rarer than any cliff: the ring is searched for the best spot that fits, so a few seeded looks are enough.)
   for (let look = 0; look < (n ? LOOKS : 1); look++) {
     const seed = look === 0 ? c.seed : deriveSeed(c.seed, 'cave-look', look);
-    const d = dungeonFor({ purpose: 'lead', town, kinds, near: { x: c.hero.x, z: c.hero.z, ring: n ? n.ahead : RING, ahead: n && way !== null ? { yaw: way, spread: n.spread } : undefined } }, { seed, terrain: c.terrain, log: c.log, home: c.home ?? town.decision, dungeons });
-    // Only a mouth in a cliff: a hillside cave is the Builder's promise to make, not this tool's.
-    if (!d?.site || !siteInCliff((x, z) => c.terrain.height(x, z), d.site)) continue;
-    if (c.towns.some((w) => farFrom(w, d.site!) < w.decision.radius + OFF_TOWN)) continue;
-    if (n && !facesAndShows(c, d.site, n)) continue;
-    return { ...d, at: c.hours };
+    // Only a mouth in a cliff (a hillside cave is the Builder's promise to make, not this tool's), off the towns, and in view and facing the hero.
+    const mouthFits = (x: number, z: number, yaw: number | undefined): boolean => yaw !== undefined && siteInCliff(low, { x, z, yaw }) && !c.towns.some((w) => farFrom(w, { x, z }) < w.decision.radius + OFF_TOWN) && (!n || facesAndShows(c, { x, z, yaw }, n));
+    const d = dungeonFor({ purpose: 'lead', town, kinds, near: { x: c.hero.x, z: c.hero.z, ring: n ? n.ahead : RING, ahead, accept: mouthFits } }, { seed, terrain: c.terrain, log: c.log, home: c.home ?? town.decision, dungeons });
+    if (d?.site) return { ...d, at: c.hours };
   }
   return null;
+}
+
+/** The setting's kinds of place that stand in a cliff (classic: `cave`). */
+const cliffKinds = (c: NeedContext): string[] => Object.keys(c.setting.dungeons).filter((k) => c.setting.dungeons[k]?.form.stands === 'cliff');
+
+/**
+ * Caves along a cliff the hero runs by (Arnd 2026-11-02: "a user running along a cliff has a very good chance to see one"; the Builder's
+ * turn, whatever Discovery says): for every `cell` metres of their way a roll of `chance` from the seed, and on a hit the cave of `caveFor`
+ * (ahead of them in a cliff, in view), at least `near` metres from any open one, and not while `most` stand open within 2.5 km. Null
+ * without the setting's `noticing.caves` and a way known.
+ */
+export function cliffCaveFor(c: NeedContext): DungeonDecision | null {
+  const n = c.setting.noticing?.caves;
+  if (!n || !c.toward) return null;
+  if (hash2f(deriveSeed(c.seed, 'cliff-cave'), Math.floor(c.hero.x / n.cell), Math.floor(c.hero.z / n.cell)) >= n.chance) return null;
+  const kinds = cliffKinds(c);
+  if (openPromises(c.log).filter((p) => p.kind === 'dungeon' && kinds.includes(p.template) && p.site && Math.hypot(p.site.x - c.hero.x, p.site.z - c.hero.z) < OPEN_ROUND).length >= n.most) return null;
+  return caveFor(c, n.near);
 }
 
 /** Does the hero, where they stand, see the mouth at `site` over the ground, and from its open side (not from behind the cliff)? */

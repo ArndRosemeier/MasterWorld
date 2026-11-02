@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
-import { caveFor, caveSpecFor } from '../src/vgm/caves';
+import { caveFor, caveSpecFor, cliffCaveFor } from '../src/vgm/caves';
 import { dungeonFor, loreOf, placeOf } from '../src/vgm/dungeons';
 import { answerNeed } from '../src/vgm/toolbox';
 import { siteInCliff } from '../src/world/dungeon/caveMouth';
@@ -16,7 +16,7 @@ test('cave tool: Discovery overdue near a cliff opens a cave in it, one at a tim
   const { terrain, log, home } = startWorld();
   const town = terrain.towns[0], height = (x: number, z: number) => terrain.height(x, z);
   // The hero out on the land, walking a way that a cliff lies ahead of (found by scanning the headings out of the town; D66: the tool opens the cave ahead, in view).
-  const t = town.decision, a = (3 * Math.PI) / 8, hero = { x: t.x + Math.cos(a) * 450, z: t.z + Math.sin(a) * 450 }, toward = { x: hero.x + Math.cos(a) * 400, z: hero.z + Math.sin(a) * 400 };
+  const t = town.decision, a = (3 * Math.PI) / 8, hero = { x: t.x + Math.cos(a) * 430, z: t.z + Math.sin(a) * 430 }, toward = { x: hero.x + Math.cos(a) * 400, z: hero.z + Math.sin(a) * 400 };
   const open = log.filter((d) => !(d.kind === 'dungeon' && d.template === 'cave'));
   const c = { seed, log: open, terrain, towns: terrain.towns, hours: 30, setting: classic, home, hero, toward };
   const d = caveFor(c);
@@ -82,4 +82,52 @@ test('cave tool (K6): the formed cave is asked for by the country at its mouth: 
   assert.ok(sizes.has('small') && sizes.has('medium'));
   // Downs hold only the thin-bedded and the massive.
   for (let seed = 1; seed < 30; seed++) assert.ok(['thin-bedded', 'massive'].includes(caveSpecFor(caves, 'downs', { seed }, 4)!.rock));
+});
+
+test('cave tool: running along a cliff opens a cave in it now and then, away from the open ones, never many, and not without a way known (Arnd 2026-11-02)', () => {
+  const seed = parseSeed('masterworld');
+  const { terrain, log, home } = startWorld();
+  const n = classic.noticing!.caves!, t = terrain.towns[0].decision, a = (3 * Math.PI) / 8, way = { x: Math.cos(a), z: Math.sin(a) };
+  const open = log.filter((d) => !(d.kind === 'dungeon' && d.template === 'cave'));
+  const at = (k: number) => {
+    const hero = { x: t.x + way.x * (450 + k * n.cell), z: t.z + way.z * (450 + k * n.cell) };
+    return { seed, log: open, terrain, towns: terrain.towns, hours: 30, setting: classic, home, hero, toward: { x: hero.x + way.x * 400, z: hero.z + way.z * 400 } };
+  };
+  // Along the way a cave opens for some of the cells, and (the roll aside) in a cliff, ahead of them.
+  const hits = Array.from({ length: 40 }, (_, k) => k).filter((k) => cliffCaveFor(at(k)) !== null);
+  assert.ok(hits.length >= 1, 'a cave opens somewhere along the cliff');
+  const k = hits[0], c = at(k), d = cliffCaveFor(c)!;
+  assert.ok(siteInCliff((x, z) => terrain.height(x, z), d.site!), 'its mouth is in a cliff');
+  assert.equal(cliffCaveFor({ ...c, toward: null }), null, 'no way known, none');
+  assert.equal(cliffCaveFor({ ...c, setting: { ...classic, noticing: { ...classic.noticing!, caves: undefined } } }), null, 'a setting without them, none');
+  // Open, it keeps the next away: none for the cells within its spacing of the hero.
+  assert.equal(cliffCaveFor({ ...c, log: [...open, { ...d, site: { ...d.site!, x: c.hero.x + 10, z: c.hero.z } }] }), null, 'not while one is open near');
+  // Nor more than `most` open round the hero, however far apart.
+  const many = Array.from({ length: n.most }, (_, i) => ({ ...d, id: `c${i}`, site: { ...d.site!, x: c.hero.x + 900 + i * 5, z: c.hero.z } }));
+  assert.equal(cliffCaveFor({ ...c, log: [...open, ...many] }), null, 'not while the most are open');
+});
+
+test('cave tool: a hero running along a cliff meets a cave within a few hundred metres, to the side of their way as well as ahead (Arnd 2026-11-02)', () => {
+  const seed = parseSeed('masterworld');
+  const { terrain, log, home } = startWorld();
+  const t = terrain.towns[0].decision, height = (x: number, z: number) => terrain.height(x, z);
+  const open = log.filter((d) => !(d.kind === 'dungeon' && d.template === 'cave'));
+  let walks = 0, met = 0, sideways = 0;
+  for (let h = 0; h < 8; h++) {
+    const a = (h / 8) * Math.PI * 2, way = { x: Math.cos(a), z: Math.sin(a) };
+    walks++;
+    // A run out of the town, a roll every 40 m of it, as the Builder's turn asks.
+    for (let k = 0; k < 15; k++) {
+      const hero = { x: t.x + way.x * (500 + k * 40), z: t.z + way.z * (500 + k * 40) };
+      const d = caveFor({ seed: seed + k, log: open, terrain, towns: terrain.towns, hours: 30, setting: classic, home, hero, toward: { x: hero.x + way.x * 400, z: hero.z + way.z * 400 } });
+      if (!d?.site) continue;
+      assert.ok(siteInCliff(height, d.site), 'its mouth is in a cliff');
+      const off = Math.abs(Math.atan2(d.site.z - hero.z, d.site.x - hero.x) - a);
+      if (Math.min(off, 2 * Math.PI - off) > 0.7) sideways++;
+      met++;
+      break;
+    }
+  }
+  assert.ok(met >= 3, `a cave within 600 m on ${met} of ${walks} runs`);
+  assert.ok(sideways >= 1, 'one lies well off the way, along the cliff');
 });
