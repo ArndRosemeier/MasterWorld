@@ -35,7 +35,7 @@ export const OUTLINE = {
 };
 
 /** The line's two widths (px): the others' and the target's. */
-const LINE_PX = [1.4, 2.8];
+const LINE_PX = [4.2, 8.4];
 
 /** Four steps round a pixel (each with its opposite): the depth seen on either side of it. */
 const AROUND = [[1, 0], [0, 1], [0.7, 0.7], [0.7, -0.7]];

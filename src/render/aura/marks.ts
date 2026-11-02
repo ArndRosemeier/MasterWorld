@@ -28,7 +28,7 @@ export class AuraMarks {
 export const AURAS = new AuraMarks();
 
 /** Thickness of the line (px): the faint ones thin, the target's thick. */
-const THIN = 1.4, THICK = 2.8; // (the shader reads both widths itself: materials/outline.ts LINE_PX)
+const THIN = 4.2, THICK = 8.4; // (the shader reads both widths itself: materials/outline.ts LINE_PX)
 /** Depth tolerance (m) of a creature's pixels about its middle: its body's half depth, at least this much. */
 const DEPTH_TOL = 0.3;
 
