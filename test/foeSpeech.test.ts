@@ -4,6 +4,8 @@ import { classic } from '../src/setting/classic/index';
 import { BREAK_CAUSES, STANCE_SPEECH, WARN_TURNS, validateFactions } from '../src/setting/contract';
 import { foeLine } from '../src/game/foeSpeech';
 import { SIGNAL_CLIPS, foeClip } from '../src/render/dungeon/foes';
+import { PACK_CLIPS } from '../src/render/folk/looks';
+import { MOVE_CLIPS } from '../src/render/folk/moves';
 import { OpenGround, type Land } from '../src/sim/wild';
 import { Den, type DenEvent, type Quarry } from '../src/sim/creatures';
 
@@ -68,6 +70,10 @@ test('foe speech: every turn has a gesture clip of the people\'s own, only for a
     assert.equal(foeClip(def('bandit'), { ...doing, speed: 3, signal: t }), 'jog', 'on the move it walks');
     assert.notEqual(foeClip(def('skeleton'), { ...doing, signal: t }), SIGNAL_CLIPS[t], 'the dead have nothing to gesture');
   }
+});
+
+test('foe speech: every gesture is a clip the pack ships (the people\'s own or a take cut for it)', () => {
+  for (const t of WARN_TURNS) assert.ok(PACK_CLIPS.includes(SIGNAL_CLIPS[t]) || MOVE_CLIPS.includes(SIGNAL_CLIPS[t]), `${t}: ${SIGNAL_CLIPS[t]}`);
 });
 
 test('foe speech: no line calls the hero he or him (the hero may be a woman)', () => {
