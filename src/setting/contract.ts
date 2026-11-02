@@ -230,6 +230,8 @@ export interface CaveMineDef {
   readonly stopeLength: readonly [number, number];
   /** How steeply an incline between two levels climbs (rise per metre). */
   readonly incline: number;
+  /** What people fitted in (world/cave/fittings.ts): timber sets every `posts` m (a post's half thickness, the beam's, the share of sets that stand), rails (gauge, rail thickness, sleeper spacing) and carts (most). */
+  readonly fittings: { readonly posts: number; readonly post: number; readonly beam: number; readonly timbered: number; readonly gauge: number; readonly rail: number; readonly sleeper: number; readonly carts: number };
 }
 
 /** One rock setting of a solution cave: the three patterns the water leaves (branchwork, network maze, braids) come from these numbers. */
@@ -2220,6 +2222,10 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
       const m = r.mine;
       range(m.halfWidth, `${w} mine drift half width`, 1.1); range(m.halfHeight, `${w} mine drift half height`, 1.45); range(m.levels, `${w} mine levels`, 1); range(m.crosscuts, `${w} mine crosscuts`); range(m.crosscutLength, `${w} mine crosscut length`, 6); range(m.stopeLength, `${w} mine stope length`, 3);
       if (!(m.square >= 0 && m.square <= 1 && m.gap >= 6 && m.adit >= 10 && m.roof >= 2 && m.stopes >= 0 && m.incline > 0 && m.incline <= 0.5)) out.push(`${where}: ${w} mine needs a square in 0..1, a level gap of 6 m or more, an adit of 10 m or more, a roof of 2 m or more and an incline in 0..0.5`);
+    }
+    if (r.mine) {
+      const fi = r.mine.fittings;
+      if (!(fi.posts >= 2 && fi.post > 0.05 && fi.post < 0.5 && fi.beam > 0.05 && fi.beam < 0.5 && fi.timbered >= 0 && fi.timbered <= 1 && fi.gauge >= 0.5 && fi.gauge < 1.6 && fi.rail > 0.02 && fi.sleeper >= 0.6 && fi.carts >= 0)) out.push(`${where}: ${w} mine fittings are malformed (posts every 2 m or more, a gauge of 0.5 to 1.6 m)`);
     }
     if (!(r.collapse.junction >= 0 && r.collapse.junction <= 1 && r.collapse.span > 0 && r.collapse.most >= 0)) out.push(`${where}: ${w} collapse is malformed`);
   }
