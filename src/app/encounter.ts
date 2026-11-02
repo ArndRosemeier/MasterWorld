@@ -58,6 +58,8 @@ export interface FightHost {
   stilled(id: string): boolean;
   /** The place of a promise ended without what it asked (D62: a parley the hero broke): nobody pays. True once taken in. */
   failed(id: string): boolean;
+  /** The hero killed one of this faction (D65): standing with it and with its foes moves. */
+  slain(faction: string): void;
   /** Someone down there speaks (a parley's leader): a bubble over them while `at` gives where (null: gone). */
   say(text: string, at: () => { x: number; y: number; z: number } | null): void;
 }
@@ -385,7 +387,9 @@ export class Encounter {
       // Noticed, fleeing, slinking off spared: all seen on the creature, so nothing is said.
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
       case 'spared': this.director.met('people', 0.5); break;
-      case 'killed': if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
+      case 'killed':
+        this.host.slain(e.who.def.faction);
+        if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
       case 'refused': this.notes.say(e.text, 2.5); break;
       case 'recipe': if (this.active) this.spellCues.push(e.event); break;
       case 'worn': if (e.state !== 'new') this.director.queue(fill(this.setting.upkeep.words[e.state], { item: e.item.name.toLowerCase() }), 1); break;

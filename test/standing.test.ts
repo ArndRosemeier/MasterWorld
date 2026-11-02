@@ -26,7 +26,7 @@ test('standing: each people starts at its regard for a stranger, its own kin hig
   // Clamped, and a new hero starts afresh.
   s.change('dwarf', -500);
   assert.equal(s.value('dwarf'), -100);
-  s.begin('dwarf');
+  s.restart('dwarf');
   assert.equal(s.value('dwarf'), 30);
   assert.deepEqual(new Standing(classic, 'elf', s.save()).save(), s.save(), 'saved and loaded');
 });

@@ -835,6 +835,7 @@ export async function start(b: Boot): Promise<void> {
       quiet: (id) => quietPlace?.(id) ?? false,
       stilled: (id) => comeDown?.(id) ?? false,
       failed: (id) => failedPlace?.(id) ?? true,
+      slain: (faction) => { for (const c of standing.slain(faction)) if (c.tier) notes.say(changeLine(c), 5); },
       say: (text, at) => overHead(text, at),
     };
     // The hero's fall, seen through to its end whichever fight dealt it.
@@ -2098,7 +2099,7 @@ export async function start(b: Boot): Promise<void> {
       const bg = setting.backgrounds.find((b) => b.id === made.background);
       if (bg) { character.beginAs(bg); armHero(); }
       // A new hero: every people thinks of them as of any stranger, their own kin a little better.
-      standing.begin(made.look.race ?? 'human');
+      standing.restart(made.look.race ?? 'human');
       // A roguelike tale has its one save from the first step.
       mode = made.mode;
       director.strict = mode === 'roguelike';
