@@ -5,13 +5,13 @@
  * rival); the eldest, old now, wants back what is left of the ones before them (`elder`: a fetch); a grown-up
  * with a child in the house fears for them (`parent`: someone lost, the child); a devout one wants the
  * restless laid to rest (`pious`: a seal); a sociable one would rather it were talked out than fought (`peaceable`:
- * a parley). The want goes onto the ask in the log, so the task can be traced back to the person and why. Pure.
+ * a parley). A person's own want (`craft`, the VGM's favour, favours.ts) is no household's: it is made when the hero talks to them. The want goes onto the ask in the log, so the task can be traced back to the person and why. Pure.
  */
 import { OLD_AGE, type Person } from '../sim/people';
 import type { DungeonDecision, PromiseWant } from '../world/decisions';
 
 /** The verb each want asks for. */
-export const WANT_VERB: Readonly<Record<PromiseWant['kind'], string>> = { rival: 'thief', elder: 'fetch', parent: 'lost', pious: 'seal', peaceable: 'parley' };
+export const WANT_VERB: Readonly<Record<PromiseWant['kind'], string>> = { rival: 'thief', elder: 'fetch', parent: 'lost', pious: 'seal', peaceable: 'parley', craft: 'fetch' };
 
 /** How devout and how sociable a grown-up must be to want a seal or a parley (0..1). */
 const DEVOUT = 0.8, SOCIABLE = 0.8;
