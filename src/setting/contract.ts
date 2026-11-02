@@ -779,6 +779,18 @@ export interface WildDef {
   readonly groups: number;
   /** How many in a group, within the encounter's own count (none: the encounter's count). */
   readonly count?: readonly [number, number];
+  /** What the people who know the land say of them (D68, N2): none: nobody speaks of them. */
+  readonly lore?: WildLore;
+}
+
+/**
+ * What is told of a group of the wild (D68, N2): `told` the clause as they tell it (`{dir}` where it lies from the town: "north-east"),
+ * `by` who knows it first-hand from their own rounds, and everyone else hears it from them: a person who takes up one of the pursuits, works one of the
+ * trades (the building's trade), or is of the town's watch.
+ */
+export interface WildLore {
+  readonly told: string;
+  readonly by: { readonly pursuits?: readonly string[]; readonly trades?: readonly string[]; readonly watch?: boolean };
 }
 
 /**
@@ -1718,6 +1730,8 @@ export interface TemperamentDef {
   /** When asked how they know: first-hand (`{source}`, `{claim}`), and from another. */
   readonly source: string;
   readonly testimony: string;
+  /** What they add when there is more to tell. */
+  readonly more: string;
   /** Their thanks, and what they say when they cannot follow. */
   readonly thanks: string;
   readonly repair: string;
@@ -1777,6 +1791,8 @@ export interface TalkDef {
   readonly arrival: { readonly title: string; readonly text: string; readonly from: string };
   /** Who the people are (D68): temperaments with their voices, pursuits, ages. */
   readonly persona: PersonaDef;
+  /** What the people know of the land round the town (D68, N2): the topic that asks for it, and where those who know it have it from. */
+  readonly lore: { readonly topic: string; readonly source: string };
 }
 
 /**
@@ -2164,6 +2180,7 @@ function validatePersona(p: PersonaDef, where: string): string[] {
     if (!v) { out.push(`${where}: persona has no temperament "${t}"`); continue; }
     for (const k of ['intro', 'greeting', 'farewell', 'wellbeing', 'nothing'] as const) if (!v[k]?.length) out.push(`${where}: persona.${t}.${k} is empty`);
     if (!v.intro?.every((l) => l.includes('{name}'))) out.push(`${where}: persona.${t}.intro lines must name {name}`);
+    if (!v.more) out.push(`${where}: persona.${t}.more is empty`);
     for (const k of ['sure', 'heard', 'source', 'testimony'] as const) if (!v[k]?.includes('{claim}')) out.push(`${where}: persona.${t}.${k} must say {claim}`);
     for (const k of ['source', 'testimony'] as const) if (!v[k]?.includes('{source}')) out.push(`${where}: persona.${t}.${k} must say {source}`);
     if (!v.thanks || !v.repair) out.push(`${where}: persona.${t} needs thanks and repair`);
