@@ -259,8 +259,8 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   }
 
   // --- drips and formations along the cracks over the ways ---
-  // (A lava tube has no dripstone: its own drips and ledges are K7's dresser; no limestone crystals either.)
-  const lava = !!block.rock.lava, most = lava ? 0 : d.formations.most;
+  // (A mine has none either, nor a stream. A lava tube has no dripstone: its own drips and ledges are K7's dresser; no limestone crystals either.)
+  const lava = !!block.rock.lava || !!block.rock.mine, most = lava ? 0 : d.formations.most;
   const speleos: Speleo[] = [], drips: Drip[] = [], lastLevel = Math.max(0, sk.tables.length - 1);
   for (const c of passages) {
     const age = 1 + d.formations.age * (1 - (lastLevel ? c.level / lastLevel : 0));

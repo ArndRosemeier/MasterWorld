@@ -33,6 +33,12 @@ export function asksGiven(log: DecisionLog): string[] {
  * left out altogether while another fits (`askFor`).
  */
 const waited = (since: number): number => 1 + Math.min(since, 6) * 0.5;
+/**
+ * Several promises wait at once and the hero plays them in any order, so a kind is left out while another fits if it was one of the
+ * last few given, not only the last (else the hero could play two of a kind one after the other).
+ */
+const RECENT = 3;
+
 /** How much more the ask someone wants weighs (Q5): what people lack drives what they ask. */
 const WANT_PULL = 4;
 
@@ -54,14 +60,15 @@ export function asksFitting(setting: Pick<SettingModule, 'asks'>, p: AskPlace): 
 }
 
 /**
- * What the household asks about a newly promised place: a kind that fits it, not the kind given last (while
+ * What the household asks about a newly promised place: a kind that fits it, not one of the last few kinds given (while
  * another fits), weighed by how long each has waited. Null: the setting has no asks that fit (clear it).
  */
 export function askFor(setting: Pick<SettingModule, 'asks' | 'twists'>, seed: number, log: DecisionLog, p: AskPlace): PromiseAsk | null {
   const fit = asksFitting(setting, p);
   if (!fit.length) return null;
   const given = asksGiven(log), last = given.at(-1);
-  const pool = fit.length > 1 ? fit.filter((a) => a.id !== last) : fit;
+  const apart = fit.filter((a) => !given.slice(-RECENT).includes(a.id));
+  const pool = apart.length ? apart : fit.length > 1 ? fit.filter((a) => a.id !== last) : fit;
   const since = (id: string) => {
     const i = given.lastIndexOf(id);
     return i < 0 ? given.length + 1 : given.length - 1 - i;

@@ -24,6 +24,8 @@ export interface Person {
   trade: string;
   /** Dressed for their calling rather than by role: a guild's master at arms, an old caravan hand. */
   dress?: 'fighter' | 'traveller';
+  /** One of the town's watch (D65, R6): armed, on patrol by day or night, and first against raiders. */
+  watch?: boolean;
   /** A traveller who comes and goes by sea (a harbour town's): the end of each visit is spent aboard, waiting to sail. */
   bySea?: boolean;
   /** Such a traveller sailing now with their town's ship (set by its crew, game/shipCrews.ts): out of town till she comes in. */
@@ -41,6 +43,9 @@ export interface Person {
   age: number;
   seed: number;
 }
+
+/** One watchman to every this many townsfolk, at most this many. */
+const WATCH_PER = 14, WATCH_MAX = 8;
 
 /** Buildings whose whole household works there. */
 const FAMILY_TRADES = new Set<string>(['inn', 'farmhouse']);
@@ -89,6 +94,14 @@ export function townsfolk(plan: TownPlan, seed: number): Person[] {
     const near = people.filter((p) => p.role === 'homemaker')
       .sort((a, b) => dist(plan, a.home, temple.cx, temple.cz) - dist(plan, b.home, temple.cx, temple.cz))[0];
     if (near) { near.role = 'keeper'; near.work = temple.id; near.trade = 'keeper'; }
+  }
+  // The watch: a few able grown-ups of the town who keep house no more but patrol (a hamlet has one, a capital eight).
+  const able = people.filter((p) => p.role === 'homemaker' && p.age >= 20 && p.age <= 45);
+  const wr = new Rng(deriveSeed(seed, 'watch'));
+  for (let k = Math.min(WATCH_MAX, Math.max(1, Math.floor(people.length / WATCH_PER)), able.length); k > 0; k--) {
+    const p = able.splice(wr.int(0, able.length - 1), 1)[0];
+    p.watch = true;
+    p.dress = 'fighter';
   }
   // Peoples (plan 12.1): the start town is mostly human; dwarves keep the smithy and one more house (a
   // miner family, the one farthest out), a halfling family runs the inn.

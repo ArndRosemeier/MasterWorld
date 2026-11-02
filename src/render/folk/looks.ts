@@ -23,6 +23,8 @@ export const PACK_CLIPS = [
   'idle', 'talk', 'arms folded', 'nod', 'shake head', 'dance', 'walk', 'walk carrying', 'sit', 'sit and talk', 'pick up', 'interact', 'eat or drink',
   'repair (kneeling)', 'harvest', 'plant seeds', 'water plants', 'chop wood', 'crouch', 'get up from lying', 'jog',
   'tread water', 'swim',
+  // The watch and the able folk fighting raiders (R6).
+  'sword slash A',
 ];
 
 /** Asleep in bed: the first frame of getting up from lying, held still (FolkView lays it along the bed). */
@@ -132,7 +134,7 @@ const CLIP: Record<ActivityKind, string> = {
   dance: 'dance folk', revel: 'idle',
   browse: 'arms folded', sit: 'sit', chat: 'talk', drink: 'eat or drink', pray: 'crouch', mourn: 'arms folded', play: 'idle',
   plough: 'harvest', sow: 'plant seeds', hoe: 'harvest', reap: 'harvest', tendStock: 'interact', muckOut: 'pick up',
-  hurt: 'crouch', mark: 'interact',
+  hurt: 'crouch', fight: 'sword slash A', mark: 'interact',
   haul: 'haul line', carry: 'pick up', mendNets: 'repair (kneeling)',
   tread: 'tread water', swim: 'swim',
 };

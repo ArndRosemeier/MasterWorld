@@ -16,6 +16,19 @@ export const events: readonly StoryEventDef[] = [
     },
     fades: 72,
   },
+  // Out of the woods and into the streets at night (D65, R6): the town's watch and able folk meet them, the rest bar their doors.
+  {
+    id: 'wolves-in-town', kind: 'foray', by: 'wolves', hours: [21, 4], after: 40, cooldown: 72, count: [2, 3], gather: 0,
+    words: {
+      title: 'Wolves in {place}',
+      cry: '{creatures} are in the streets of {place}! Bar your doors!',
+      note: '{creatures} came into the streets of {place} by night, and the watch had them to deal with.',
+      done: 'The {creatures} that came into {place} are dead or driven out.',
+      told: '{creatures} came down out of the woods into the streets of {place} one night; the watch and the stout of the town saw to them',
+      faded: 'The watch and the stout folk of {place} drove the {creatures} out of the streets before the morning.',
+    },
+    fades: 4,
+  },
   {
     id: 'farm-raid', kind: 'raid', by: 'bandits', after: 36, cooldown: 48, count: [2, 3], gather: 1.5,
     words: {

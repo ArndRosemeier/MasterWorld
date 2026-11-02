@@ -11,6 +11,7 @@ import { seaCave, sunkenRuin } from './seaCave';
 import { hideout } from './hideout';
 import { cellar } from './cellar';
 import { names, talk } from './people';
+import { factions } from './factions';
 import { peoples, standing } from './peoples';
 import { growth } from './growth';
 import { creatures } from './creatures';
@@ -81,6 +82,7 @@ export const classic: SettingModule = {
   names,
   peoples,
   standing,
+  factions,
   growth,
   talk,
   schools,

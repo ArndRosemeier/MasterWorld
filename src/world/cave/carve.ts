@@ -24,7 +24,7 @@ export type FormedField = BrickField;
 
 /** The field of a skeleton. */
 export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, step: number): FormedField {
-  const rough = caves.walls.rough, noise = new Noise(deriveSeed(block.seed, 'cave', 'walls'));
+  const rough = caves.walls.rough * (sk.rough ?? 1), noise = new Noise(deriveSeed(block.seed, 'cave', 'walls'));
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
   const grow = (x: number, y: number, z: number, rh: number, down: number, up: number) => {
     x0 = Math.min(x0, x - rh); x1 = Math.max(x1, x + rh); z0 = Math.min(z0, z - rh); z1 = Math.max(z1, z + rh); y0 = Math.min(y0, y - down); y1 = Math.max(y1, y + up);
@@ -95,8 +95,10 @@ export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, 
     const qx = a.x + abx * t, qy = a.y + aby * t, qz = a.z + abz * t, dx = x - qx, dy = y - qy, dz = z - qz;
     const A = a.A + (b.A - a.A) * t, B = a.B + (b.B - a.B) * t, hh = Math.sqrt(dx * dx + dz * dz);
     // The tube: an ellipse, its distance estimated to first order.
-    const e = Math.sqrt((hh / A) ** 2 + (dy / B) ** 2);
-    let v = e < 1e-4 ? Math.min(A, B) : (1 - e) * e / Math.sqrt((hh / (A * A)) ** 2 + (dy / (B * B)) ** 2);
+    // (A mine's drift is cut square: the section's norm has a higher power, 2 for an ellipse and up to 6 for a box with rounded corners.)
+    const sq = a.sq === undefined && b.sq === undefined ? 0 : (a.sq ?? 0) + ((b.sq ?? 0) - (a.sq ?? 0)) * t, n = 2 + 4 * sq;
+    const ua = hh / A, ub = Math.abs(dy) / B, e = n === 2 ? Math.sqrt(ua * ua + ub * ub) : (ua ** n + ub ** n) ** (1 / n);
+    let v = e < 1e-4 ? Math.min(A, B) : n === 2 ? (1 - e) * e / Math.sqrt((hh / (A * A)) ** 2 + (dy / (B * B)) ** 2) : (1 - e) * e ** (n - 1) / Math.sqrt((ua ** (2 * n - 2)) / (A * A) + (ub ** (2 * n - 2)) / (B * B));
     v = Math.min(v, Math.min(A, B));
     const C = a.C + (b.C - a.C) * t;
     if (C > 0) {

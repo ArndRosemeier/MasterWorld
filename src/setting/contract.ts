@@ -209,6 +209,29 @@ export interface CaveLavaDef {
   readonly skylights: { readonly most: number; readonly apart: number; readonly thin: number };
 }
 
+/** Mines (K8): people followed the ore. A square-cut adit from the hillside to a vein, drifts along it on levels, crosscuts, stopes where the ore was taken and inclines between the levels. */
+export interface CaveMineDef {
+  /** A drift's half-width and half-height, metres (people cut a way as wide as a cart needs: 1.4 to 1.9 m either side). */
+  readonly halfWidth: readonly [number, number];
+  readonly halfHeight: readonly [number, number];
+  /** How far a drift's walls are cut square: 0 an ellipse, 1 a box with rounded corners. */
+  readonly square: number;
+  /** Levels (floors of drifts), least and most, and the height between two of them (m). */
+  readonly levels: readonly [number, number];
+  readonly gap: number;
+  /** How far the adit runs under the hill at least (m) and the rock left over its roof (m). */
+  readonly adit: number;
+  readonly roof: number;
+  /** Crosscuts (side drifts off a drift to the other side of the vein), least and most per level, and their length (m). */
+  readonly crosscuts: readonly [number, number];
+  readonly crosscutLength: readonly [number, number];
+  /** Stopes (the ore taken out as a tall chamber over a drift): most per level and their size (strike half-length, m). */
+  readonly stopes: number;
+  readonly stopeLength: readonly [number, number];
+  /** How steeply an incline between two levels climbs (rise per metre). */
+  readonly incline: number;
+}
+
 /** One rock setting of a solution cave: the three patterns the water leaves (branchwork, network maze, braids) come from these numbers. */
 export interface CaveRockDef {
   readonly id: string;
@@ -277,6 +300,8 @@ export interface CaveRockDef {
   };
   /** Lava tubes (K7): a rock with this is opened by a lava flow draining from under its crust (world/cave/lava.ts), not by water. */
   readonly lava?: CaveLavaDef;
+  /** Mines (K8): a rock with this is dug by people following its ore (world/cave/mine.ts); it has no water and no dripstone. */
+  readonly mine?: CaveMineDef;
   /** Collapse: where passages cross or span too wide, the ceiling falls (a big uneven void and a rubble heap under it). */
   readonly collapse: {
     /** Chance at a junction of big passages. */
@@ -776,9 +801,12 @@ export interface StoryEventDef {
    * `spill`: a place promised and never cleared spills its dwellers onto the land near it. `raid`: a wild
    * group (`by`) still living near a town comes down on a farm and drives off animals from its paddock.
    * `take`: a wild group (`by`) takes a settlement of the size `takes` near it; its folk flee, the band
-   * holds it, and the rest of the group lies up in a place asked for (`lair`) near it.
+   * holds it, and the rest of the group lies up in a place asked for (`lair`) near it. `foray` (D65, R6): a wild group (`by`)
+   * comes into the town itself at the game hours `hours`; the town's watch and able folk meet it (sim/townFight.ts).
    */
-  readonly kind: 'spill' | 'raid' | 'take';
+  readonly kind: 'spill' | 'raid' | 'take' | 'foray';
+  /** A foray's: the hours of the day it comes in (from, to; `[21, 4]` is the night). */
+  readonly hours?: readonly [number, number];
   /** A raid's or take's raiders: the setting's wild group (WildDef id) that comes down while any of it lives. */
   readonly by?: string;
   /** A take's: the size of settlement taken (classic: a waystation), within `reach` metres of the raiders' ground. */
@@ -903,6 +931,72 @@ export interface BirdKindDef {
 }
 
 /**
+ * What a humanoid foe wants of the hero (D64). `guard`: warns and holds a line; `rob`: walks up and demands a share of the purse;
+ * `jeer`: taunts, and attacks once many or the hero looks weak; `bar`: a hold's warden (the hold's own watch, game/hold.ts, speaks for it);
+ * `mindless`: the walking dead attack at once; `murderous`: attacks at once with a war cry that says why (cutthroats).
+ */
+export const STANCE_KINDS = ['guard', 'rob', 'jeer', 'bar', 'mindless', 'murderous'] as const;
+export type StanceKind = (typeof STANCE_KINDS)[number];
+
+/** The kinds that warn before they fight (a bar's warning belongs to the hold). */
+export const WARNING_STANCES: readonly StanceKind[] = ['guard', 'rob', 'jeer'];
+
+/**
+ * What a warning band says (D64): `warn` its first word (a guard's challenge, a robber's halt), `last` the final one, `demand` a robber's
+ * price, `jeer` a goblin's jibe, `settle` giving way once the hero has gone back, `greet` its word to a friend, `yield` backing off from
+ * a hero far above it (D58).
+ */
+export const WARN_TURNS = ['warn', 'last', 'demand', 'jeer', 'settle', 'greet', 'yield'] as const;
+export type WarnTurn = (typeof WARN_TURNS)[number];
+
+/**
+ * What the speaker of a band says when the hero talks to it during its warning (R7): `terms` what it wants, `deal` its word once the
+ * hero agrees, `short` when the hero cannot pay. A robber's terms are a price (`{coins}` copper), a guard's a pact (the hero keeps away).
+ */
+export const TALK_TURNS = ['terms', 'deal', 'short'] as const;
+export type TalkTurn = (typeof TALK_TURNS)[number];
+
+/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero, or the VGM knows a reason (the hero was hired against them, or killed their kin: `vgm/stance.ts`). */
+export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated', 'hired', 'kin'] as const;
+export type BreakCause = (typeof BREAK_CAUSES)[number];
+
+/** What each warning stance says, and the ways its warning ends (the lines the setting must give). */
+export const STANCE_SPEECH: Readonly<Record<'guard' | 'rob' | 'jeer', { readonly turns: readonly WarnTurn[]; readonly breaks: readonly BreakCause[] }>> = {
+  guard: { turns: ['warn', 'last', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin'] },
+  rob: { turns: ['warn', 'demand', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'patience'] },
+  jeer: { turns: ['jeer', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'many', 'frail'] },
+};
+
+/** The lines of one stance: a pool for each turn it speaks (one picked, seeded) and for each way its warning ends. */
+export interface StanceWords {
+  readonly turns: Readonly<Partial<Record<WarnTurn, readonly string[]>>>;
+  readonly breaks: Readonly<Partial<Record<BreakCause, readonly string[]>>>;
+  /** What it says when the hero talks to it (only the stances that can be talked to: `StanceDef.talk`). */
+  readonly talk?: Readonly<Partial<Record<TalkTurn, readonly string[]>>>;
+}
+
+export interface StanceDef {
+  readonly kind: StanceKind;
+  /** Warning kinds: it speaks to a hero this near (m) once it has noticed them. */
+  readonly warn?: number;
+  /** Warning kinds: a hero nearer than this (m) starts the fight. */
+  readonly line?: number;
+  /** `rob`: it walks up to the hero until it stands this far off (m), and demands. */
+  readonly close?: number;
+  /** `rob`, `jeer`: seconds after its demand or first jibe before it loses patience and fights. */
+  readonly patience?: number;
+  /** `jeer`: with at least this many of its band, it fights when its patience is spent (a lone one only jeers). */
+  readonly many?: number;
+  /**
+   * Talking to the band during its warning (R7): `price` it names a share of the hero's purse and lets them pass once it is paid; `pact`
+   * it lets them pass on their word to keep away; none: it does not talk. The band then keeps its word until the hero strikes.
+   */
+  readonly talk?: 'price' | 'pact';
+  /** `talk: price`: the share of the hero's purse it asks, between these two (seeded by who asks and the purse). */
+  readonly toll?: readonly [number, number];
+}
+
+/**
  * A creature (plan 9.3, 12, D29): its body, senses, temper and power. Its danger is fixed by what it is,
  * never scaled to the player; weak ones fight anyway, as they do not know the player is a champion.
  */
@@ -922,8 +1016,12 @@ export interface CreatureDef {
   readonly attacks: readonly AttackDef[];
   /** Sees this far in the dark (m) and much farther by the hero's light; hears a running hero this far. */
   readonly senses: { readonly sight: number; readonly hearing: number };
-  /** skittish: keeps away unless cornered or many; hostile: attacks on sight. */
+  /** skittish: keeps away unless cornered or many; hostile: attacks on sight (D64: a humanoid's `stance` says what it wants first). */
   readonly temper: 'skittish' | 'hostile';
+  /** Who it belongs to (D65): a people's id or one of `factions.others`. It never changes. */
+  readonly faction: string;
+  /** What a humanoid wants of the hero before any blow (D64, phase R); every humanoid has one, beasts none (they only fight or flee). */
+  readonly stance?: StanceDef;
   /**
    * A shy beast's flight distance, metres (deer): farther off it only lifts its head and watches the hero,
    * nearer it bolts, and it runs until twice this far before it grazes again, never back towards the hero.
@@ -1834,6 +1932,38 @@ export interface StandingDef {
   readonly prices: readonly [number, number];
 }
 
+/** How one faction stands towards another (D65): constant, never moved by anything the hero does. */
+export const HOSTILITIES = ['ally', 'neutral', 'wary', 'hostile'] as const;
+export type Hostility = (typeof HOSTILITIES)[number];
+
+/**
+ * A faction besides the peoples (D65): smugglers, bandits, goblins, the undead, the town watch, beasts of prey and the beasts
+ * they hunt. Like a people it has one number for what it thinks of the hero (`regard`, −100 .. 100).
+ */
+export interface FactionDef {
+  readonly id: string;
+  readonly name: string;
+  readonly plural: string;
+  /** What it thinks of the hero at first. */
+  readonly regard: number;
+  /** It hears of deeds: killing its kind moves the hero's standing with it and with its foes, and a change of tier is told. Beasts do not. */
+  readonly aware: boolean;
+}
+
+/**
+ * Factions and who is against whom (D65). The peoples (`peoples`) are factions too. Every creature kind has one (`CreatureDef.faction`),
+ * every townsperson their people's. The matrix is constant: creatures do not gain or lose factions or friends; only the hero's standing moves.
+ */
+export interface FactionsDef {
+  readonly others: readonly FactionDef[];
+  /** Each pair that is not neutral, both ways round (a faction is its own ally). */
+  readonly matrix: readonly (readonly [string, string, Hostility])[];
+  /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. Striking a band first (R7, once per band) moves it by `first`. */
+  readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number; readonly first: number };
+  /** What the one who speaks for a band says to the hero (D64), by stance: a short speech bubble, never anywhere else (rule 11). */
+  readonly words: Readonly<Partial<Record<'guard' | 'rob' | 'jeer', StanceWords>>>;
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -1850,6 +1980,8 @@ export interface SettingModule {
   /** The peoples as factions (plan 11.6, D34), and what changes the hero's standing with them. */
   readonly peoples: readonly PeopleDef[];
   readonly standing: StandingDef;
+  /** The factions besides the peoples, and the hostility between all (D65). */
+  readonly factions: FactionsDef;
   /** Levels and experience (D58). */
   readonly growth: GrowthDef;
   readonly talk: TalkDef;
@@ -2039,6 +2171,7 @@ export function validateSetting(m: SettingModule): string[] {
   if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
   out.push(...validateFight(m, where));
   out.push(...validatePeoples(m, where));
+  out.push(...validateFactions(m, where));
   out.push(...validateRoutines(m.routines, where));
   out.push(...validateAsks(m, where));
   if (m.caves) out.push(...validateCaves(m.caves, m.world.kinds?.map((k) => k.id) ?? [], where));
@@ -2046,6 +2179,21 @@ export function validateSetting(m: SettingModule): string[] {
 }
 
 /** Formed caves (D63): the rocks their kinds name exist, the ranges run the right way, the chances add up, no way squeezes. */
+/** A humanoid has a stance (D64), a beast none; a warning stance has its distances, the line inside the warning. */
+export function validateStance(c: CreatureDef, where: string): string[] {
+  const out: string[] = [], st = c.stance, at = `${where}: creature "${c.id}"`;
+  if (c.body.kind !== 'humanoid') { if (st) out.push(`${at} is no humanoid and has a stance`); return out; }
+  if (!st) return [`${at} is a humanoid and needs a stance (D64)`];
+  if (!STANCE_KINDS.includes(st.kind)) return [`${at} has an unknown stance "${st.kind}"`];
+  if (!WARNING_STANCES.includes(st.kind)) return out;
+  if (!(st.warn! > 0) || !(st.line! > 0) || st.line! >= st.warn!) out.push(`${at} stance ${st.kind} needs warn > line > 0`);
+  if (st.kind === 'rob' && (!(st.close! > st.line!) || st.close! >= st.warn! || !(st.patience! > 0))) out.push(`${at} stance rob needs warn > close > line and a patience`);
+  if (st.kind === 'jeer' && (!(st.many! >= 2) || !(st.patience! > 0))) out.push(`${at} stance jeer needs many (2 or more) and a patience`);
+  if (st.talk === 'price' && (!st.toll || !(st.toll[0] > 0 && st.toll[0] <= st.toll[1] && st.toll[1] <= 1))) out.push(`${at} stance talk price needs a toll of two shares, 0 < low <= high <= 1`);
+  if (st.talk !== 'price' && st.toll) out.push(`${at} has a toll without asking a price`);
+  return out;
+}
+
 export function validateCaves(c: CavesDef, kinds: readonly string[], where: string): string[] {
   const out: string[] = [];
   const ids = new Set<string>();
@@ -2064,6 +2212,11 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
       const l = r.lava;
       range(l.halfWidth, `${w} lava tube half width`, 1.2); range(l.halfHeight, `${w} lava tube half height`, 1.5); range(l.gradient, `${w} lava gradient`); range(l.length, `${w} lava length`, 0.1); range(l.branches, `${w} lava branches`); range(l.branchLength, `${w} lava branch length`, 8);
       if (!(l.roof >= 2 && l.wander >= 0 && l.wander <= 1 && l.skylights.most >= 0 && l.skylights.apart > 0 && l.skylights.thin > 0)) out.push(`${where}: ${w} lava needs a roof of 2 m or more, a wander in 0..1 and skylights`);
+    }
+    if (r.mine) {
+      const m = r.mine;
+      range(m.halfWidth, `${w} mine drift half width`, 1.1); range(m.halfHeight, `${w} mine drift half height`, 1.45); range(m.levels, `${w} mine levels`, 1); range(m.crosscuts, `${w} mine crosscuts`); range(m.crosscutLength, `${w} mine crosscut length`, 6); range(m.stopeLength, `${w} mine stope length`, 3);
+      if (!(m.square >= 0 && m.square <= 1 && m.gap >= 6 && m.adit >= 10 && m.roof >= 2 && m.stopes >= 0 && m.incline > 0 && m.incline <= 0.5)) out.push(`${where}: ${w} mine needs a square in 0..1, a level gap of 6 m or more, an adit of 10 m or more, a roof of 2 m or more and an incline in 0..0.5`);
     }
     if (!(r.collapse.junction >= 0 && r.collapse.junction <= 1 && r.collapse.span > 0 && r.collapse.most >= 0)) out.push(`${where}: ${w} collapse is malformed`);
   }
@@ -2115,6 +2268,33 @@ function validateAsks(m: SettingModule, where: string): string[] {
 }
 
 /** The peoples: one for every people with names, sensible regard, and a hold's guard that exists. */
+/** Factions (D65): every creature has a known one, the matrix names known factions and says each pair once. */
+export function validateFactions(m: SettingModule, where: string): string[] {
+  const out: string[] = [], f = m.factions;
+  const ids = new Set([...m.peoples.map((p) => p.id), ...f.others.map((o) => o.id)]);
+  if (ids.size !== m.peoples.length + f.others.length) out.push(`${where}: a faction is defined twice`);
+  for (const o of f.others) if (!(Math.abs(o.regard) <= 100)) out.push(`${where}: faction "${o.id}" regard must be in −100..100`);
+  for (const c of m.creatures) if (!ids.has(c.faction)) out.push(`${where}: creature "${c.id}" belongs to unknown faction "${c.faction}"`);
+  const seen = new Set<string>();
+  for (const [a, b, is] of f.matrix) {
+    if (!ids.has(a) || !ids.has(b)) out.push(`${where}: hostility ${a}–${b} names an unknown faction`);
+    else if (a === b) out.push(`${where}: hostility ${a}–${a}: a faction is its own ally`);
+    if (!HOSTILITIES.includes(is) || is === 'neutral') out.push(`${where}: hostility ${a}–${b} is "${is}": say only ally, wary or hostile`);
+    const key = [a, b].sort().join('|');
+    if (seen.has(key)) out.push(`${where}: hostility ${a}–${b} is given twice`);
+    seen.add(key);
+  }
+  if (!(f.kill.own < 0 && f.kill.foes > 0 && f.kill.upTo > 0)) out.push(`${where}: factions.kill needs own below 0, foes and upTo above 0`);
+  for (const kind of ['guard', 'rob', 'jeer'] as const) {
+    const need = STANCE_SPEECH[kind], w = f.words[kind];
+    if (!w) { out.push(`${where}: stance ${kind} has no words`); continue; }
+    for (const t of need.turns) if (!w.turns[t]?.length) out.push(`${where}: stance ${kind} has no line for ${t}`);
+    for (const b of need.breaks) if (!w.breaks[b]?.length) out.push(`${where}: stance ${kind} has no line for breaking on ${b}`);
+    for (const l of [...Object.values(w.turns), ...Object.values(w.breaks), ...Object.values(w.talk ?? {})].flat()) if (l.length > 60) out.push(`${where}: stance ${kind} line "${l.slice(0, 20)}…" is over 60 characters (a bubble is short)`);
+  }
+  return out;
+}
+
 function validatePeoples(m: SettingModule, where: string): string[] {
   const out: string[] = [];
   const ids = new Set(m.peoples.map((p) => p.id));
@@ -2200,6 +2380,9 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (!(c.morale >= 0 && c.morale <= 1)) out.push(`${where}: creature "${c.id}" morale must be 0..1`);
     for (const a of c.attacks) if (!DAMAGE_KINDS.includes(a.kind) || !(a.time > 0)) out.push(`${where}: creature "${c.id}" attack "${a.name}" needs a known kind and time > 0`);
     if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
+    out.push(...validateStance(c, where));
+    const talk = c.stance?.talk ? m.factions.words[c.stance.kind as 'guard']?.talk : undefined;
+    if (c.stance?.talk) for (const t of TALK_TURNS) if (!talk?.[t]?.length) out.push(`${where}: creature "${c.id}" can be talked to and its stance ${c.stance.kind} has no line for ${t}`);
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
   const encounter = (id: string) => m.encounters.find((e) => e.id === id);
@@ -2217,7 +2400,8 @@ function validateFight(m: SettingModule, where: string): string[] {
   }
   for (const e of m.events ?? []) {
     if (!(e.after >= 0) || !(e.cooldown >= 0) || e.count[0] < 1 || e.count[1] < e.count[0]) out.push(`${where}: event "${e.id}" needs after, cooldown and a count`);
-    if ((e.kind === 'raid' || e.kind === 'take') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
+    if ((e.kind === 'raid' || e.kind === 'take' || e.kind === 'foray') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
+    if (e.kind === 'foray' && (!e.hours || e.hours.some((h) => !(h >= 0 && h < 24)) || !e.fades)) out.push(`${where}: foray "${e.id}" needs its hours of the day and the hours it fades in`);
     if (e.kind === 'take' && (!e.takes || !(e.reach! > 0))) out.push(`${where}: take "${e.id}" needs the settlement it takes and a reach`);
     if (e.lair && !Object.values(m.dungeons).some((l) => l?.form.purposes.includes(e.lair!))) out.push(`${where}: event "${e.id}" asks for a ${e.lair}, which no dungeon kind is for`);
     if (e.fades !== undefined && (!(e.fades > 0) || !e.words.faded)) out.push(`${where}: event "${e.id}" fades: it needs the hours and how it is told (words.faded)`);

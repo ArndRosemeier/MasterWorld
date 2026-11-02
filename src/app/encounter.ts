@@ -26,6 +26,7 @@ import { joltOf } from '../render/jolt';
 import { warning, type Director } from '../vgm/director';
 import { cap } from '../talk/townTalk';
 import { fill } from '../talk/folk';
+import { foeLine } from '../game/foeSpeech';
 import type { FightHud } from './fightHud';
 import { OVER_HEAD } from './speech';
 import type { Notes } from './notes';
@@ -58,6 +59,10 @@ export interface FightHost {
   stilled(id: string): boolean;
   /** The place of a promise ended without what it asked (D62: a parley the hero broke): nobody pays. True once taken in. */
   failed(id: string): boolean;
+  /** The hero killed one of this faction (D65): standing with it and with its foes moves. */
+  slain(faction: string): void;
+  /** The hero struck a band of this faction first, while it was talking or after its word (R7): a deed, once per band (`key`), kept in the log. */
+  struckFirst(faction: string, key: string): void;
   /** Someone down there speaks (a parley's leader): a bubble over them while `at` gives where (null: gone). */
   say(text: string, at: () => { x: number; y: number; z: number } | null): void;
 }
@@ -72,6 +77,8 @@ export interface Arena {
   readonly enclosed: boolean;
   /** As the Director's warning names it ('this cellar'). */
   readonly place: string;
+  /** Who it is, for what the hero does to it once (the wild group's territory id, the dungeon's id); none: its place stands for it. */
+  readonly id?: string;
   /** Its danger (D29: from who lives there). */
   readonly danger: number;
   /** The promise whose household waits to hear once it is quiet and the hero has left (null: none). */
@@ -218,9 +225,7 @@ export class Encounter {
     if (l.kind === 'chief') {
       const said = this.delve.speak();
       if (said) {
-        // The bubble floats OVER_HEAD over the point it is given (their feet), so give the feet less that much below the head.
-        const who = l.who, head = (who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1) - OVER_HEAD;
-        this.host.say(said.text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
+        this.bubble(l.who, said.text);
       }
       return null;
     }
@@ -230,6 +235,20 @@ export class Encounter {
     this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, lid, () => this.found(l), f && { x: O.x + f[0], z: O.z + f[1] });
     p.puppet = this.kneel;
     return null;
+  }
+
+  /** `text` in a bubble over `who`'s head while they live (the bubble floats OVER_HEAD over the point it is given, so give the feet less that much below the head). */
+  private bubble(who: Creature, text: string): void {
+    const O = this.creatures.group.position, head = (who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1) - OVER_HEAD;
+    this.host.say(text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
+  }
+
+  /** What a band says and why it fights (D64), by whoever speaks for it: a bubble over their head, a line picked by who they are and how often they have spoken. */
+  private said = 0;
+  private foeSays(who: Creature, e: FightEvent & { readonly kind: 'warn' | 'break' }): void {
+    const n = this.said++;
+    const text = foeLine(this.setting, who.def, e.kind === 'warn' ? e.turn : e.cause, who.id, n);
+    if (text) this.bubble(who, text);
   }
 
   /** The hands are in what was searched: what it held, if anything. */
@@ -383,9 +402,15 @@ export class Encounter {
         break;
       case 'heal': this.hud.healed(); this.act('drink', 1.1); break;
       // Noticed, fleeing, slinking off spared: all seen on the creature, so nothing is said.
+      case 'warn': case 'break':
+        this.foeSays(e.who, e);
+        if (e.kind === 'break' && e.cause === 'struck') this.host.struckFirst(e.who.def.faction, this.arena.id ?? this.arena.place);
+        break;
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
       case 'spared': this.director.met('people', 0.5); break;
-      case 'killed': if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
+      case 'killed':
+        if (e.byHero) this.host.slain(e.who.def.faction);
+        if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
       case 'refused': this.notes.say(e.text, 2.5); break;
       case 'recipe': if (this.active) this.spellCues.push(e.event); break;
       case 'worn': if (e.state !== 'new') this.director.queue(fill(this.setting.upkeep.words[e.state], { item: e.item.name.toLowerCase() }), 1); break;
@@ -398,7 +423,7 @@ export class Encounter {
  * One frame of every encounter: those the hero is in play (the most stirred leads), the others rest;
  * with none, the hero catches breath and the HUD shows only while they are hurt.
  */
-export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[]; readonly fallen?: Fallen }): void {
+export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly townDens?: readonly Den[]; readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[]; readonly fallen?: Fallen }): void {
   // A fall is seen through whichever fight (if any) dealt it.
   calm.fallen?.seeTo(dt, calm.hero);
   let best: Encounter | null = null;
@@ -408,7 +433,8 @@ export function stepEncounters(dt: number, all: readonly Encounter[], calm: { re
   // Out on the land, the bodies of different groups block each other too (cellars have frames of their own).
   const open: Den[] = [];
   for (const e of all) if (!flown && e.stir >= 0 && !e.arena.enclosed) open.push(e.delve.den);
-  for (const d of open) d.neighbours = open.filter((o) => o !== d);
+  // (A town's fighters, R6, stand beside them too: the raiders see and fight them.)
+  for (const d of open) d.neighbours = [...open.filter((o) => o !== d), ...(calm.townDens ?? [])];
   for (const e of all) {
     if (flown || e.stir < 0) { e.rest(); e.delve.den.neighbours = []; }
     else e.play(dt, e === best);
