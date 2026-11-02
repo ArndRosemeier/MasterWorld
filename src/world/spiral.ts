@@ -19,8 +19,8 @@ export function nearestFirst<T extends { readonly x: number; readonly z: number 
   return [...items].sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
 }
 
-/** The `k`th seeded spot (seed `s`) on a ring round `at`, `ring` metres out (least, most): where and how far out. */
-export function ringSpot(at: { readonly x: number; readonly z: number }, ring: readonly [number, number], s: number, k: number): { x: number; z: number; d: number } {
-  const d = ring[0] + (ring[1] - ring[0]) * hash2f(s, k, 1), a = hash2f(s, k, 2) * Math.PI * 2;
+/** The `k`th seeded spot (seed `s`) on a ring round `at`, `ring` metres out (least, most): where and how far out. `ahead`: only within `spread` radians of the heading `yaw` (atan2 of z over x). */
+export function ringSpot(at: { readonly x: number; readonly z: number }, ring: readonly [number, number], s: number, k: number, ahead?: { readonly yaw: number; readonly spread: number }): { x: number; z: number; d: number } {
+  const d = ring[0] + (ring[1] - ring[0]) * hash2f(s, k, 1), a = ahead ? ahead.yaw + (hash2f(s, k, 2) * 2 - 1) * ahead.spread : hash2f(s, k, 2) * Math.PI * 2;
   return { x: at.x + Math.cos(a) * d, z: at.z + Math.sin(a) * d, d };
 }

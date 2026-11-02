@@ -87,6 +87,9 @@ export class Minimap {
   /** The VGM's studs (show mode), by decision id, with their last transform. */
   private readonly vgmStuds = el('div', { className: 'studs' });
   private readonly vgmAt = new Map<string, { el: HTMLElement; at: string }>();
+  /** The places the hero has noticed (D66, K9), by decision id, with their last transform. */
+  private readonly noticedStuds = el('div', { className: 'studs' });
+  private readonly noticedAt = new Map<string, { el: HTMLElement; at: string }>();
   private dialDeg = NaN;
   private armDeg = NaN;
   private sky: SkyGlyph | null = null;
@@ -101,7 +104,7 @@ export class Minimap {
   /** `paint`: the map's painter (none: an empty round, before the game has a map). */
   constructor(private readonly paint: SheetPainter | null = null) {
     this.studs = el('div', { className: 'studs' });
-    this.dial = el('div', { className: 'dial' }, el('div', { className: 'land' }, this.sheet), svg(DIAL), this.vgmStuds, this.studs);
+    this.dial = el('div', { className: 'dial' }, el('div', { className: 'land' }, this.sheet), svg(DIAL), this.vgmStuds, this.noticedStuds, this.studs);
     this.arm = el('div', { className: 'arm' }, el('i', { className: 'sun' }), el('i', { className: 'moon' }));
     this.glyph = el('div', { className: 'glyph' });
     this.root = el('div', { id: 'compass', ariaHidden: 'true' },
@@ -176,16 +179,29 @@ export class Minimap {
    */
   vgmMarks(placed: readonly { readonly id: string; readonly x: number; readonly z: number }[], x: number, z: number, picked: { readonly id: string; readonly x: number; readonly z: number } | null = null, inside = RANGE): void {
     const marks = picked && !placed.some((m) => m.id === picked.id) ? [...placed, picked] : placed;
+    this.studsAt(this.vgmAt, this.vgmStuds, 'stud vgm new', marks, x, z, inside, picked?.id);
+  }
+
+  /**
+   * Each frame while shown: the places the hero has noticed (D66, K9), as ward-light studs with a slow pulse at their spot inside the
+   * round when near, on the band when farther; one lights up with a flare as it is noticed. `inside` as for `vgmMarks`.
+   */
+  noticedMarks(noticed: readonly { readonly id: string; readonly x: number; readonly z: number }[], x: number, z: number, inside = RANGE): void {
+    this.studsAt(this.noticedAt, this.noticedStuds, 'stud noticed new', noticed, x, z, inside);
+  }
+
+  /** One kind of studs laid out: made when new, moved when the hero or the mark did, removed when gone; `picked` lit. */
+  private studsAt(at: Map<string, { el: HTMLElement; at: string }>, layer: HTMLElement, make: string, marks: readonly { readonly id: string; readonly x: number; readonly z: number }[], x: number, z: number, inside: number, picked?: string): void {
     const now = new Set(marks.map((m) => m.id));
-    for (const [id, s] of this.vgmAt) if (!now.has(id)) { s.el.remove(); this.vgmAt.delete(id); }
+    for (const [id, s] of at) if (!now.has(id)) { s.el.remove(); at.delete(id); }
     for (const m of marks) {
-      let s = this.vgmAt.get(m.id);
-      if (!s) { s = { el: el('i', { className: 'stud vgm new' }), at: '' }; this.vgmAt.set(m.id, s); this.vgmStuds.append(s.el); }
+      let s = at.get(m.id);
+      if (!s) { s = { el: el('i', { className: make }), at: '' }; at.set(m.id, s); layer.append(s.el); }
       const d = Math.hypot(m.x - x, m.z - z), deg = Math.atan2(m.x - x, -(m.z - z)) * DEG;
       const out = d > inside ? BAND_PX : (d / inside) * LAND_PX;
-      const at = `rotate(${deg.toFixed(1)}deg) translateY(-${out.toFixed(1)}px)`;
-      if (at !== s.at) { s.at = at; s.el.style.transform = at; }
-      s.el.classList.toggle('picked', m.id === picked?.id);
+      const to = `rotate(${deg.toFixed(1)}deg) translateY(-${out.toFixed(1)}px)`;
+      if (to !== s.at) { s.at = to; s.el.style.transform = to; }
+      s.el.classList.toggle('picked', m.id === picked);
     }
   }
 }

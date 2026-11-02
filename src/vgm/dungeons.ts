@@ -65,7 +65,7 @@ export interface DungeonAsk {
   /** The town whose people may know of it (the household nearest it), and whose danger it has (D29). */
   readonly town: Town;
   /** Near this point (world metres), on `ring` round it; none: on the kind's own ring round the town. */
-  readonly near?: { readonly x: number; readonly z: number; readonly ring: readonly [number, number] };
+  readonly near?: { readonly x: number; readonly z: number; readonly ring: readonly [number, number]; readonly ahead?: { readonly yaw: number; readonly spread: number } };
   /** Who lives there (an encounter's id): only kinds whose lore has such dwellers. */
   readonly dwellers?: string;
   /** Only these kinds, tried in this order (none: those that fit, from a seeded start). */
@@ -237,13 +237,13 @@ const TRIES = 128;
  * from other places on the land, its doorway facing the town (a cave: going into its hill). The household
  * who knows of it lives on the town's side towards it. Null if no ground fits.
  */
-export function promisePlace(kind: LandKind, form: DungeonForm, seed: number, terrain: Terrain, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[] = [], near?: { readonly x: number; readonly z: number; readonly ring: readonly [number, number] }): DungeonDecision | null {
+export function promisePlace(kind: LandKind, form: DungeonForm, seed: number, terrain: Terrain, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[] = [], near?: DungeonAsk['near']): DungeonDecision | null {
   if (form.stands === 'house' || !form.ring) return null;
   const dungeons = log.filter((d): d is DungeonDecision => d.kind === 'dungeon');
   const n = dungeons.filter((d) => d.template === kind).length + 1;
   const s = deriveSeed(seed, 'vgm', kind, n);
   const { x: tx, z: tz } = town.decision;
-  const best = spotOnRing(form.stands, near?.ring ?? form.ring, s, terrain, near ?? town.decision, [...avoid, ...sitesIn(log, 150)]);
+  const best = spotOnRing(form.stands, near?.ring ?? form.ring, s, terrain, near ?? town.decision, [...avoid, ...sitesIn(log, 150)], near?.ahead);
   if (!best) return null;
   const dx = best.x - tx, dz = best.z - tz;
   // Facing into it is facing away from the town (yaw as the walker's: it faces (−sin, −cos)), unless its ground says otherwise.
@@ -263,7 +263,7 @@ const MESA_LEVEL = 15;
  * ground that fits the kind, away from `avoid`; null if none of the tries fits.
  */
 
-function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[]): { x: number; z: number; score: number; yaw?: number } | null {
+function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number], s: number, terrain: Terrain, at: { readonly x: number; readonly z: number }, avoid: readonly { readonly x: number; readonly z: number; readonly r: number }[], ahead?: { readonly yaw: number; readonly spread: number }): { x: number; z: number; score: number; yaw?: number } | null {
   const r0 = ring[0], fit = GROUND[stands](terrain, s);
   // On the level of where it is asked from (D56): not up on a mesa's plateau or bench over a valley, whose way up
   // may be kilometres round to a pass.
@@ -272,7 +272,7 @@ function spotOnRing(stands: keyof typeof GROUND, ring: readonly [number, number]
   const low = stands === 'shore' ? SHORE_DRY : 3;
   const dry = (x: number, z: number) => terrain.waterDepth(x, z) <= 0 && terrain.height(x, z) >= low && Math.abs(sk.mesaRise(x, z) - level) <= MESA_LEVEL && !avoid.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 40);
   for (let k = 0; k < TRIES; k++) {
-    const { x, z } = ringSpot(at, ring, s, k);
+    const { x, z } = ringSpot(at, ring, s, k, ahead);
     if (!dry(x, z)) continue;
     const f = fit(x, z, k);
     // Ground that moved the spot: the spot it moved to must suit too (dry, on the level asked, clear of others).
