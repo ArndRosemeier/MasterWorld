@@ -44,6 +44,8 @@ export interface TalkHost {
   serve(service: string, agent: Agent): void;
   /** The hero tells `agent` the place of promise `id` is safe again: the game pays and keeps it; their answer. */
   report(id: string, agent: Agent): Reply;
+  /** The hero is about to talk with `agent`: the VGM may have them ask a favour of the hero (D68, N3), which must be in the log before they greet. */
+  favour(agent: Agent): void;
   /** In a room: who is in it and where they stand there (their own x, z are out in the town); null outside. */
   readonly roomPeople: readonly { agent: Agent; x: number; z: number }[] | null;
 }
@@ -164,7 +166,10 @@ export class TalkUi {
     this.box.classList.add('open');
     this.host.paused(true);
     this.frame(a);
-    this.speak(this.talk.greet(a.person.id).text);
+    this.host.favour(a);
+    const hello = this.talk.greet(a.person.id);
+    this.speak(hello.text);
+    this.tellLeads(hello, this.talk.nameOf(a.person.id));
     this.offer();
   }
 
@@ -192,6 +197,14 @@ export class TalkUi {
     const from = this.talk.nameOf(a.person.id);
     if (t.id.startsWith('event:')) this.host.heardOf(t.id.slice(6), from);
     if (r.named) this.host.named(r.named.id, r.named.ending);
+    this.tellLeads(r, from);
+    if (r.opens) { const id = r.opens; this.topicList.replaceChildren(); setTimeout(() => { this.close(); this.host.serve(id, a); }, 600); return; }
+    if (r.done) { setTimeout(() => this.close(), 900); this.topicList.replaceChildren(); return; }
+    this.offer();
+  }
+
+  /** The leads a reply told of go into the journal, and the map is handed over for the place. */
+  private tellLeads(r: Reply, from: string): void {
     for (const id of r.heard) {
       const b = this.plan.buildings[this.talk.houseOf(id)];
       const title = fill(this.words.lead, { cellar: this.talk.cellarCalled(id) });
@@ -201,9 +214,6 @@ export class TalkUi {
       // The map is handed over in the world (app/handOverScene.ts), not told in the talk.
       this.host.heard({ id, title, note: fill(this.words.marked, { name: from, house: this.talk.houseCalled(id) }) });
     }
-    if (r.opens) { const id = r.opens; this.topicList.replaceChildren(); setTimeout(() => { this.close(); this.host.serve(id, a); }, 600); return; }
-    if (r.done) { setTimeout(() => this.close(), 900); this.topicList.replaceChildren(); return; }
-    this.offer();
   }
 
   private speak(text: string): void {

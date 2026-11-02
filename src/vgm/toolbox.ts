@@ -110,6 +110,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'island', name: 'An island out at sea', writes: ['region'], need: 'discovery', asked: 'call' },
   { id: 'quest', name: "A master's deed", writes: ['dungeon'], need: 'purpose', asked: 'call' },
   { id: 'task', name: "A guild's task", writes: ['dungeon'], need: 'purpose', asked: 'call' },
+  { id: 'favour', name: 'A favour asked', writes: ['dungeon'], need: 'purpose', asked: 'call' },
   { id: 'order', name: 'Steer a town', writes: ['order'], need: 'people', asked: 'call' },
   { id: 'guide', name: 'Guide', writes: [], need: 'purpose', asked: 'call' },
   { id: 'stance', name: 'What foes know of the hero', writes: [], need: null, asked: 'call' },

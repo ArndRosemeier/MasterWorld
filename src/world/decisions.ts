@@ -79,12 +79,15 @@ export interface DungeonDecision {
 /**
  * What someone wanted that a task came from (Q5): `elder`, the eldest of a household, old now, wants back what is left
  * of the ones before them; `rival`, a trader suspects the rival of their trade (`rival`, a person id); `parent`, a grown-up with a child in
- * the house fears for them; `pious`, a devout one wants the restless laid to rest; `peaceable`, a sociable one would rather it were talked out.
+ * the house fears for them; `pious`, a devout one wants the restless laid to rest; `peaceable`, a sociable one would rather it were talked out;
+ * `craft`, someone asked the hero themselves (the VGM's favour, N3) for something of their own calling or pursuit.
  */
 export interface PromiseWant {
   readonly person: number;
-  readonly kind: 'rival' | 'elder' | 'parent' | 'pious' | 'peaceable';
+  readonly kind: 'rival' | 'elder' | 'parent' | 'pious' | 'peaceable' | 'craft';
   readonly rival?: number;
+  /** `craft` (D68, N3): what the person does that the task is made from, a pursuit's id or `trade:<their trade>`. */
+  readonly craft?: string;
 }
 
 /** What a household asks about its place (D62, vgm/asks.ts): only the thing it names counts as done. */
