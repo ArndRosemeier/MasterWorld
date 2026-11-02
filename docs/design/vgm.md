@@ -166,4 +166,5 @@ A new kind of thing the VGM makes (an encounter kind, an event, a place, a steer
 * **Wild groups are decisions, but nothing moves them yet.** The VGM can't add a wolf pack where Challenge is overdue or remove the highwaymen after the hero drove them off (C9).
 * **The Director orders only one thing.** Only Purpose makes the Builder act. Challenge, Reward, Discovery and People are counted but nothing answers them. The toolbox's `need` field is how it will ask: when a need is overdue, the Director asks the tools that meet it for their cheapest fitting move (plan 4.1).
 * **Few traces yet.** A raided barn smokes and a taken place's folk camp outside the nearest town, but events leave no ruins or ash (plan 4.5). Good days are only feasts and market days; nothing changes at the market itself (stalls, prices).
-* **No LLM hook** (plan 15). The player model has no sneaking yet (no stealth to show it).
+* **No task comes from a person yet.** Every task is about a place (a household's ask, a guild's task, a master's deed). Phase N step N3 adds a tool that makes a task from who a person is and asks it in their temperament (D68).
+* **No LLM, ever** (D62; plan 15 dropped). The player model has no sneaking yet (no stealth to show it).
