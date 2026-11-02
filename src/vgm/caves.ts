@@ -6,32 +6,57 @@
  * of it, as of any promised place. Pure.
  */
 import type { CavesDef } from '../setting/contract';
+import { deriveSeed } from '@futuremagic/core';
 import { rockFor, sharesFor, sizeFor, type CaveShares } from '../world/cave/choose';
 import type { DungeonDecision } from '../world/decisions';
 import { siteInCliff } from '../world/dungeon/caveMouth';
 import type { NeedContext } from './answers';
 import { dungeonFor, farFrom } from './dungeons';
 import { openPromises } from './leads';
+import { seesOver } from '../world/sight';
 
 /** How far from the hero (m) the VGM looks for a cliff to open a cave in. */
 const RING: readonly [number, number] = [120, 450];
 /** No new cave while an open one lies this near the hero (m): one at a time. */
 const NEAR = 700;
+/** Seeded looks for a cave ahead of the hero in view, at the most. */
+const LOOKS = 8;
 /** A cave keeps this far from a town's edge (m). */
 const OFF_TOWN = 120;
 
-/** The cave the VGM opens in a cliff near the hero, or null (no cliff kind, no cliff near, one open nearby). */
+/**
+ * The cave the VGM opens in a cliff near the hero, or null (no cliff kind, no cliff near, one open nearby). With the setting's `noticing`
+ * (D66, K9) it stands ahead of the hero on their way (70 to 260 m, within the spread of it), in view of them, its mouth turned towards
+ * them: the hero comes on it, and the map marks it when they have seen it; with no way known (`toward` none) no cave is opened.
+ */
 export function caveFor(c: NeedContext): DungeonDecision | null {
   const dungeons = c.setting.dungeons, kinds = Object.keys(dungeons).filter((k) => dungeons[k]?.form.stands === 'cliff');
   if (!kinds.length) return null;
   if (openPromises(c.log).some((p) => p.kind === 'dungeon' && kinds.includes(p.template) && p.site && Math.hypot(p.site.x - c.hero.x, p.site.z - c.hero.z) < NEAR)) return null;
   const town = [...c.towns].sort((a, b) => farFrom(a, c.hero) - farFrom(b, c.hero))[0];
   if (!town) return null;
-  const d = dungeonFor({ purpose: 'lead', town, kinds, near: { x: c.hero.x, z: c.hero.z, ring: RING } }, { seed: c.seed, terrain: c.terrain, log: c.log, home: c.home ?? town.decision, dungeons });
-  // Only a mouth in a cliff: a hillside cave is the Builder's promise to make, not this tool's.
-  if (!d?.site || !siteInCliff((x, z) => c.terrain.height(x, z), d.site)) return null;
-  if (c.towns.some((w) => farFrom(w, d.site!) < w.decision.radius + OFF_TOWN)) return null;
-  return { ...d, at: c.hours };
+  const n = c.setting.noticing, way = c.toward ? Math.atan2(c.toward.z - c.hero.z, c.toward.x - c.hero.x) : null;
+  if (n && way === null) return null;
+  // (Ahead of the hero a cliff that is also in view and faces them is rarer than any cliff: a few seeded looks are made, the first that fits is taken.)
+  for (let look = 0; look < (n ? LOOKS : 1); look++) {
+    const seed = look === 0 ? c.seed : deriveSeed(c.seed, 'cave-look', look);
+    const d = dungeonFor({ purpose: 'lead', town, kinds, near: { x: c.hero.x, z: c.hero.z, ring: n ? n.ahead : RING, ahead: n && way !== null ? { yaw: way, spread: n.spread } : undefined } }, { seed, terrain: c.terrain, log: c.log, home: c.home ?? town.decision, dungeons });
+    // Only a mouth in a cliff: a hillside cave is the Builder's promise to make, not this tool's.
+    if (!d?.site || !siteInCliff((x, z) => c.terrain.height(x, z), d.site)) continue;
+    if (c.towns.some((w) => farFrom(w, d.site!) < w.decision.radius + OFF_TOWN)) continue;
+    if (n && !facesAndShows(c, d.site, n)) continue;
+    return { ...d, at: c.hours };
+  }
+  return null;
+}
+
+/** Does the hero, where they stand, see the mouth at `site` over the ground, and from its open side (not from behind the cliff)? */
+function facesAndShows(c: NeedContext, site: { readonly x: number; readonly z: number; readonly yaw: number }, n: NonNullable<NeedContext['setting']['noticing']>): boolean {
+  const dx = c.hero.x - site.x, dz = c.hero.z - site.z, d = Math.hypot(dx, dz) || 1;
+  // The way in goes (−sin yaw, −cos yaw); the hero stands out on the other side of the mouth.
+  if ((dx * -Math.sin(site.yaw) + dz * -Math.cos(site.yaw)) / d > -0.2) return false;
+  const low = (x: number, z: number) => c.terrain.height(x, z);
+  return seesOver(low, c.hero.x, low(c.hero.x, c.hero.z) + n.eye, c.hero.z, site.x, low(site.x, site.z) + n.face, site.z);
 }
 
 /** A story of this many rooms or more wants at least the size of the same index (small, medium, big): a tale of many rooms needs the halls. */

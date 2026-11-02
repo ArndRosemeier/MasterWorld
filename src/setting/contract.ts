@@ -2043,6 +2043,25 @@ export interface SettingModule {
   readonly look?: LookDef;
   /** Caves that form (D63, phase K): rock, sizes, shares. None: only the old grid caves. */
   readonly caves?: CavesDef;
+  /** How the hero notices the places the VGM put on the land (D66, K9). None: they are never marked. */
+  readonly noticing?: NoticingDef;
+}
+
+/**
+ * How the hero notices a fixed place on the land (D66, K9; Arnd 2026-11-02: "the character subconsciously notices it and that is what the
+ * minimap displays"): a place in line of sight within `range` metres by day is marked on the minimap and the map, with nothing said or shown.
+ */
+export interface NoticingDef {
+  /** Metres at which a place in line of sight is noticed by day. */
+  readonly range: number;
+  /** The share of `range` left in the dark (the sun below the horizon); a place's own light is not read yet. */
+  readonly night: number;
+  /** The height of the hero's eyes over the ground, and of a place's face (its mouth, door or stones) over its ground, metres. */
+  readonly eye: number;
+  readonly face: number;
+  /** A place ahead of the hero is sited between these metres from them (the roadside sights' own 70 to 260), within this many radians either side of their way. */
+  readonly ahead: readonly [number, number];
+  readonly spread: number;
 }
 
 /** The picture's colour key: grade keys at sun heights, sorted by `at` (warm dusk, blue night, ...). */
@@ -2185,6 +2204,10 @@ export function validateSetting(m: SettingModule): string[] {
   out.push(...validateRoutines(m.routines, where));
   out.push(...validateAsks(m, where));
   if (m.caves) out.push(...validateCaves(m.caves, m.world.kinds?.map((k) => k.id) ?? [], where));
+  if (m.noticing) {
+    const n = m.noticing;
+    if (!(n.range >= 30 && n.night > 0 && n.night <= 1 && n.eye > 0 && n.face >= 0 && n.ahead[0] > 0 && n.ahead[1] > n.ahead[0] && n.ahead[1] <= n.range * 2 && n.spread > 0 && n.spread < Math.PI / 2)) out.push(`${where}: noticing needs a range of 30 m or more, a night share above 0 and up to 1, positive heights, an ahead range that rises and a spread under a quarter turn`);
+  }
   return out;
 }
 

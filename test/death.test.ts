@@ -77,7 +77,7 @@ test('death (roguelike): the tale ends, all the hero had becomes a grave, and th
     version: SAVE_VERSION, game: '0.1', setting: { id: 'classic', version: 1 }, seed: 'masterworld', log: [{ kind: 'x' } as never],
     clock: { day: 4, hour: 9 }, hero: { x: 1, y: 2, z: 3, yaw: 1, below: true, cellar: 'cellar-1' }, cellars: { 'cellar-1': { open: [1], keys: [], read: [] } },
     talk: null, journal: [{ id: 'cellar-1', title: 'The cellar', notes: [], mark: { x: 0, z: 0, label: 'here' }, done: false }],
-    character: c.save(), director: null, looks: { name: 'Wenna Stonehelm', look: {} }, mode: 'roguelike', remains: [],
+    character: c.save(), director: null, looks: { name: 'Wenna Stonehelm', look: {} }, mode: 'roguelike', remains: [], noticed: ['cave-1'],
   };
   const heir = heirSave(was, grave, { x: 5, y: 0, z: 6, yaw: 0, below: false });
   // The hero is gone: a new one is made in the same world.
@@ -86,6 +86,7 @@ test('death (roguelike): the tale ends, all the hero had becomes a grave, and th
   assert.equal(heir.character, null);
   assert.equal(heir.looks, null);
   assert.equal(heir.hero.below, false);
+  assert.equal(heir.noticed, undefined, 'a new hero has noticed nothing yet (D66)');
   // The world stays: its ledger, the places and the clock.
   assert.deepEqual(heir.log, was.log);
   assert.deepEqual(heir.cellars, was.cellars);
