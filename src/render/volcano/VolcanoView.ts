@@ -9,10 +9,11 @@
  * again beyond `FAR`; the steam is one instanced draw for every volcano in sight.
  */
 import { BufferGeometry, Float32BufferAttribute, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Vector3, type Object3D } from 'three/webgpu';
+import { puffMesh } from '../smoke/SmokeView';
 import type { Stage } from '@futuremagic/stage';
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { kindMesh } from '../materials';
-import { LAVA, STEAM, STEAM_COLUMNS, STEAM_FEET, STEAM_PUFFS, STEAM_SHAPE, VOLCANO_CRUST, VOLCANO_LAVA, VOLCANO_SULPHUR, createSteamMaterial } from '../materials/volcano';
+import { GLOW, GLOW_FEET, GLOW_MAX, LAVA, STEAM, STEAM_COLUMNS, STEAM_FEET, STEAM_PUFFS, STEAM_SHAPE, VOLCANO_CRUST, VOLCANO_LAVA, VOLCANO_SULPHUR, createGlowMaterial, createSteamMaterial } from '../materials/volcano';
 import { ORIGIN } from '../origin';
 import type { Terrain } from '../../world/terrain';
 import { acrossFlow, flowHalf, type Flow, type Volcano } from '../../world/volcano';
@@ -22,9 +23,9 @@ const NEAR = 3200, FAR = 4400;
 /** The clock wraps (s): the plates' drift then jumps, once in nine hours. */
 const WRAP = 32768;
 /** How the lake's disc is cut: rays, rings, and the least it reaches beyond where the ground meets its level (m). */
-const RAYS = 72, RINGS = 20, LAP = 0.7;
+const RAYS = 160, RINGS = 18, LAP = 0.7;
 /** The lava lies this far over the ground it is laid on (m; `Terrain.lavaAt` says 0.3, the mesh's far levels of detail lie lower). */
-const ON = 0.42;
+const ON = 0.62;
 /** A flow's ribbon: metres between its cross-sections, and points across it. */
 const STEP = 4, ACROSS = 9;
 
@@ -37,6 +38,9 @@ interface Piece {
 
 export class VolcanoView {
   readonly steam: Mesh<InstancedBufferGeometry>;
+  /** The halos over lakes. */
+  readonly halo: Mesh<InstancedBufferGeometry>;
+  private halos: { x: number; y: number; z: number; r: number }[] = [];
   private readonly pieces = new Map<string, Piece>();
   private seconds = 0;
   private clock = 0;
@@ -45,23 +49,23 @@ export class VolcanoView {
   on = false;
 
   constructor(private readonly terrain: Terrain, private readonly stage: Stage, seed: number) {
-    const g = new InstancedBufferGeometry();
-    g.setAttribute('position', new Float32BufferAttribute([-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3));
-    g.setIndex([0, 1, 2, 2, 1, 3]);
-    const rng = new Rng(deriveSeed(seed, 'volcano steam')), n = STEAM_COLUMNS * STEAM_PUFFS, puffs = new Float32Array(n * 4);
-    for (let i = 0; i < n; i++) puffs.set([rng.float(), rng.float(), rng.float(), Math.floor(i / STEAM_PUFFS)], i * 4);
-    g.setAttribute('pPuff', new InstancedBufferAttribute(puffs, 4));
-    g.instanceCount = n;
-    this.steam = new Mesh(g, createSteamMaterial());
-    this.steam.name = 'volcano steam';
-    this.steam.frustumCulled = false;
-    this.steam.renderOrder = 4;
-    ORIGIN.pin(this.steam);
+    this.steam = puffMesh(deriveSeed(seed, 'volcano steam'), STEAM_COLUMNS, STEAM_PUFFS, createSteamMaterial(), 'volcano steam');
+    const h = new InstancedBufferGeometry();
+    h.setAttribute('position', new Float32BufferAttribute([-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3));
+    h.setIndex([0, 1, 2, 2, 1, 3]);
+    h.setAttribute('pGlow', new InstancedBufferAttribute(Float32Array.from({ length: GLOW_MAX }, (_, i) => i), 1));
+    h.instanceCount = GLOW_MAX;
+    this.halo = new Mesh(h, createGlowMaterial());
+    this.halo.name = 'volcano halo';
+    this.halo.frustumCulled = false;
+    this.halo.renderOrder = 5;
+    ORIGIN.pin(this.halo);
   }
 
   /** The steam's shader built (under the shader cap) and drawn; from now on volcanoes in sight are built. */
   async enter(): Promise<void> {
     await this.stage.add(this.steam);
+    await this.stage.add(this.halo);
     this.on = true;
   }
 
@@ -76,7 +80,9 @@ export class VolcanoView {
       const near = this.terrain.volcanoes.nearTo(cam.x, cam.z, NEAR);
       for (const v of near) if (!this.pieces.has(v.id)) this.pieces.set(v.id, this.begin(v));
       for (const [id, p] of this.pieces) if (Math.hypot(p.v.x - cam.x, p.v.z - cam.z) > FAR) { this.drop(p); this.pieces.delete(id); }
-      this.columns = this.columnsOf([...this.pieces.values()].map((p) => p.v), cam);
+      const vs = [...this.pieces.values()].map((p) => p.v);
+      this.columns = this.columnsOf(vs, cam);
+      this.halos = this.haloesOf(vs);
     }
     // One piece of one volcano a frame: the heights it needs are the land's, a few thousand of them.
     for (const p of this.pieces.values()) {
@@ -87,6 +93,16 @@ export class VolcanoView {
       break;
     }
     this.placeSteam();
+  }
+
+  /** The halos over the lakes of the volcanoes in sight: wide over a spilling lake, narrower over a quiet one. */
+  private haloesOf(vs: readonly Volcano[]): typeof this.halos {
+    const out: typeof this.halos = [];
+    for (const v of vs) {
+      const lake = this.terrain.lakeLevel(v);
+      if (lake !== null && v.state !== 'steaming') out.push({ x: v.x, y: lake + 26, z: v.z, r: v.rimR * (v.state === 'erupting' ? 2.4 : 1.6) });
+    }
+    return out.slice(0, GLOW_MAX);
   }
 
   /** Everything is built and shown for volcano `v` (for checks). */
@@ -201,7 +217,7 @@ export class VolcanoView {
         const u = i / RR, a = (k / RA) * Math.PI * 2, x = vent.x + Math.cos(a) * R * u, z = vent.z + Math.sin(a) * R * u;
         // Dome up to a ring a third of the way out, hollow in the middle.
         const dome = 0.34 * Math.sin(Math.min(1, u * 2.2) * Math.PI * 0.5) * (1 - u) - 0.16 * Math.max(0, 1 - u * 5);
-        pos.push(x - v.x, Math.max(this.terrain.height(x, z), h0 - 1.5) + 0.05 + dome, z - v.z);
+        pos.push(x - v.x, Math.max(this.terrain.height(x, z), h0 - 1.5) + 0.3 + dome, z - v.z);
         nor.push(0, 1, 0);
         uv.push(Math.cos(a) * u, Math.sin(a) * u);
         fx.push(ph, 0, 0, 0);
@@ -273,7 +289,7 @@ export class VolcanoView {
     for (const v of [...vs].sort((a, b) => Math.hypot(a.x - cam.x, a.z - cam.z) - Math.hypot(b.x - cam.x, b.z - cam.z))) {
       const lake = this.terrain.lakeLevel(v);
       // The crater: an ash plume over a spilling lake, a thinner one over a lake, a broad steam over a steaming crater.
-      if (v.state === 'erupting' && lake !== null) out.push({ x: v.x, y: lake, z: v.z, ash: 1, high: 230, thick: 1, size: 15, glow: 1 });
+      if (v.state === 'erupting' && lake !== null) for (let k = 0; k < 4; k++) out.push({ x: v.x + (k - 1.5) * 7, y: lake, z: v.z + ((k * 5) % 3 - 1) * 8, ash: 1, high: 300 - k * 25, thick: 1, size: 22 - k * 2, glow: 1 });
       else if (v.state === 'lake' && lake !== null) out.push({ x: v.x, y: lake, z: v.z, ash: 0.6, high: 120, thick: 0.75, size: 11, glow: 0.7 });
       else out.push({ x: v.x, y: this.terrain.height(v.x, v.z) + 1, z: v.z, ash: 0, high: 85, thick: 0.8, size: 9, glow: 0 });
       for (const vent of v.vents) out.push({ x: vent.x, y: this.terrain.height(vent.x, vent.z) + 0.4, z: vent.z, ash: 0, high: 28 + vent.r * 2.6, thick: 0.62, size: 1.7 + vent.r * 0.26, glow: 0 });
@@ -290,5 +306,12 @@ export class VolcanoView {
       STEAM_SHAPE[i].set(c ? c.high : 1, c ? c.thick : 0, c ? c.size : 1, c ? c.glow : 0);
     }
     this.steam.visible = this.columns.length > 0;
+    for (let i = 0; i < GLOW_MAX; i++) {
+      const g = this.halos[i];
+      GLOW_FEET[i].set(g ? g.x - at.x : 0, g ? g.y : 0, g ? g.z - at.z : 0, g ? g.r : 0);
+    }
+    // The halos come out in the dark: faint by day, full when the eye has opened (the exposure up).
+    GLOW.power.value = 0.05 + 0.4 * Math.min(1, Math.max(0, (this.stage.renderer.toneMappingExposure - 1.2) / 2.2));
+    this.halo.visible = this.halos.length > 0;
   }
 }

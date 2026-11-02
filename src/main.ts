@@ -1060,7 +1060,7 @@ export async function start(b: Boot): Promise<void> {
         if (!v) continue;
         const out = ({ rim: v.rimR * 1.35, foot: 420, far: 1100 } as Record<string, number>)[params.volcanoAt] ?? 420;
         const tx = v.x + Math.cos(v.phi0) * out, tz = v.z + Math.sin(v.phi0) * out;
-        console.info(`[volcano] ${v.id} (${v.state}) at ${Math.round(v.x)}, ${Math.round(v.z)}, lake ${terrain.lakeLevel(v)?.toFixed(1) ?? 'none'}, rim ${v.rimR.toFixed(0)} m, saddle ${v.phi0.toFixed(2)} rad, foot ${v.R.toFixed(0)} m, height ${v.H.toFixed(0)} m`);
+        console.info(`[volcano] ${v.id} (${v.state}) at ${Math.round(v.x)}, ${Math.round(v.z)}, lake ${terrain.lakeLevel(v)?.toFixed(1) ?? 'none'}, floor ${terrain.height(v.x, v.z).toFixed(1)}, rim ${v.rimR.toFixed(0)} m, saddle ${v.phi0.toFixed(2)} rad, foot ${v.R.toFixed(0)} m, height ${v.H.toFixed(0)} m, vents ${v.vents.slice(0, 3).map((e) => `${Math.round(e.x)},${Math.round(e.z)} r${e.r.toFixed(0)}`).join(' | ')}`);
         player.teleport(tx, undefined, tz, Math.atan2(v.x - tx, v.z - tz) + Math.PI);
         break;
       }

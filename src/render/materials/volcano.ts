@@ -12,10 +12,11 @@
  * All of it late: nothing here is needed in the first seconds (built under the shader cap when first added, docs/SHADERS.md).
  * Patterns read WORLD (the floating origin).
  */
-import { DoubleSide, MeshBasicNodeMaterial, MeshStandardNodeMaterial, Vector4 } from 'three/webgpu';
-import { abs, attribute, cameraPosition, cross, float, fract, int, length, max, mix, mx_noise_float, mx_worley_noise_vec2, normalize, positionGeometry, pow, sin, smoothstep, uniform, uniformArray, vec2, vec3, vec4 } from 'three/tsl';
+import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, MeshStandardNodeMaterial, Vector4 } from 'three/webgpu';
+import { abs, attribute, cameraPosition, cross, float, fract, int, length, max, mix, mx_noise_float, mx_worley_noise_vec2, normalize, positionGeometry, pow, sin, smoothstep, toneMappingExposure, uniform, uniformArray, vec2, vec3, vec4 } from 'three/tsl';
 import { defineKind } from '../materials';
 import { WORLD } from '../origin';
+import { puffMaterial } from './smoke';
 import { WEATHER } from './weather';
 
 /** The volcano's clock (seconds; it moves the lava's plates and the steam's puffs). */
@@ -36,13 +37,16 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
   // The plates' space: on a flow, metres along and across, carried downstream; on the lake, the world point, stirred slowly.
   const qFlow = vec2(uv.x.sub(t.mul(0.6)), uv.y.mul(half));
   const qLake = WORLD.xz.add(vec2(sin(t.mul(0.043).add(ph)), sin(t.mul(0.037).add(ph.mul(2.3)))).mul(8)).add(vec2(t.mul(0.16), t.mul(-0.09)));
-  const q = mix(qLake, qFlow, flow);
+  const q0 = mix(qLake, qFlow, flow);
+  // Warped, so the plates are slabs of every shape and not a honeycomb; some cracks open wider than others.
+  const q = q0.add(vec2(mx_noise_float(vec3(q0.mul(0.045), ph)), mx_noise_float(vec3(q0.mul(0.045).add(7.3), ph))).mul(5.5));
   // Two layers of plates, the finer one drifting its own way: where their edges run, the crust is cracked.
-  const a = mx_worley_noise_vec2(q.mul(0.15)), b = mx_worley_noise_vec2(q.mul(0.41).add(vec2(5.3, t.mul(0.07))));
+  const a = mx_worley_noise_vec2(q.mul(0.095)), b = mx_worley_noise_vec2(q.mul(0.27).add(vec2(5.3, t.mul(0.07))));
   const d1 = a.y.sub(a.x), d2 = b.y.sub(b.x);
   const crack1 = float(1).sub(smoothstep(0.0, 0.085, d1)), crack2 = float(1).sub(smoothstep(0.0, 0.1, d2));
   const soft = float(1).sub(smoothstep(0.0, 0.42, d1));
-  const crack = max(crack1, crack2.mul(0.65));
+  const wide = mx_noise_float(vec3(q.mul(0.06), 2.0)).mul(0.5).add(0.5);
+  const crack = max(crack1.mul(wide.mul(0.7).add(0.5)), crack2.mul(0.65).mul(wide));
   // Thin spots in the crust where it glows through, coming and going.
   const thin = smoothstep(0.52, 0.86, mx_noise_float(vec3(q.mul(0.085), t.mul(0.05).add(ph))));
   // Pulses of heat running down a flow; the lake breathes.
@@ -56,7 +60,8 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
   // The chilled edge: a flow's levees are dark crust.
   const edge = smoothstep(0.62, 0.95, across);
   col = col.mul(float(1).sub(edge.mul(0.88)));
-  m.colorNode = col;
+  // Lit by itself: the eye's exposure (the night's, a cave's) is taken out, so lava reads orange and not white in the dark.
+  m.colorNode = col.div(toneMappingExposure);
   // A ragged edge: the lava's rim frays into the ground.
   const fray = mx_noise_float(vec3(WORLD.xz.mul(0.9), 3.0)).mul(0.12);
   m.opacityNode = float(1).sub(smoothstep(0.86, 1.0, across.add(fray.mul(flow))));
@@ -96,6 +101,28 @@ export const VOLCANO_SULPHUR = defineKind('volcano sulphur', ['position', 'norma
   return m;
 }, { cast: true, receive: true }, true);
 
+/** Halos of lava light over a lake (it lights the haze and the ash above it): drawn at once, and their feet (origin-relative x, y, z; w the radius, 0: none). */
+export const GLOW_MAX = 8;
+export const GLOW_FEET: readonly Vector4[] = Array.from({ length: GLOW_MAX }, () => new Vector4());
+/** `power`: how strong they are now (the dark brings them out). */
+export const GLOW = { feet: uniformArray(GLOW_FEET as Vector4[], 'vec4'), power: uniform(0.2) };
+
+/** A soft orange halo, a camera-facing quad per instance (`pGlow`: its index in GLOW_FEET), added to the picture. */
+export function createGlowMaterial(): MeshBasicNodeMaterial {
+  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
+  const foot = GLOW.feet.element(int(attribute('pGlow', 'float'))), r = foot.w;
+  const toCam = normalize(cameraPosition.sub(foot.xyz));
+  const side = normalize(cross(vec3(0, 1, 0), toCam)), up = cross(toCam, side);
+  m.positionNode = foot.xyz.add(side.mul(positionGeometry.x.mul(r))).add(up.mul(positionGeometry.y.mul(r)));
+  const r2 = positionGeometry.x.mul(positionGeometry.x).add(positionGeometry.y.mul(positionGeometry.y));
+  // Fading as the eye comes into it (its light is then the lava's own, not a haze).
+  const near = smoothstep(r.mul(0.5), r.mul(1.7), length(cameraPosition.sub(foot.xyz)));
+  const fall = pow(smoothstep(1.0, 0.0, r2), 3.2).mul(near);
+  m.colorNode = vec4(vec3(1.0, 0.27, 0.04).mul(fall).mul(GLOW.power).div(toneMappingExposure).mul(r.sign()), 1);
+  m.opacityNode = float(1);
+  return m;
+}
+
 /** Columns of steam and ash drawn at once, and puffs in each. */
 export const STEAM_COLUMNS = 32;
 export const STEAM_PUFFS = 36;
@@ -105,32 +132,17 @@ const LIFE = 18;
 /** Each column: its foot (x, y, z origin-relative; w: 0 steam, 1 ash) and its shape (x: height, y: thickness 0..1, z: size m, w: how much the lava lights its foot, 0..1). */
 export const STEAM_FEET: readonly Vector4[] = Array.from({ length: STEAM_COLUMNS }, () => new Vector4());
 export const STEAM_SHAPE: readonly Vector4[] = Array.from({ length: STEAM_COLUMNS }, () => new Vector4());
-export const STEAM = { feet: uniformArray(STEAM_FEET as Vector4[], 'vec4'), shape: uniformArray(STEAM_SHAPE as Vector4[], 'vec4'), time: uniform(0) };
+export const STEAM = { columns: uniformArray(STEAM_FEET as Vector4[], 'vec4'), shape: uniformArray(STEAM_SHAPE as Vector4[], 'vec4'), time: uniform(0) };
 
-/** The steam's puffs: instanced, `pPuff` three random numbers and the column (as the smoke's, materials/smoke.ts). */
+/** The steam's puffs (materials/smoke.ts puffMaterial): white steam; ash a dirty grey, darker low and paler as it thins; where the lava lights its foot, an orange glow. */
 export function createSteamMaterial(): MeshBasicNodeMaterial {
-  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: true, side: DoubleSide });
-  const puff = attribute('pPuff', 'vec4'), idx = int(puff.w);
-  const foot = STEAM.feet.element(idx), shape = STEAM.shape.element(idx);
-  const t = fract(STEAM.time.div(LIFE).add(puff.x)), ash = foot.w;
-  const high = shape.x, thick = shape.y.min(1), size0 = shape.z;
-  // Rising, spreading, leaning with the wind more the higher it gets, and billowing a little.
-  const spread = t.mul(size0.mul(1.3)).add(size0.mul(0.4));
-  const wind = vec3(WEATHER.windDir.x, 0, WEATHER.windDir.y).mul(WEATHER.wind.mul(40).add(10).mul(t.mul(t)).mul(high.div(60).max(0.5)));
-  const swirl = vec3(sin(t.mul(9.0).add(puff.y.mul(40.0))), 0, sin(t.mul(8.0).add(puff.z.mul(40.0)))).mul(t.mul(size0).mul(0.5));
-  const centre = foot.xyz.add(vec3(puff.y.sub(0.5).mul(spread), t.mul(high), puff.z.sub(0.5).mul(spread))).add(wind).add(swirl);
-  const size = t.mul(size0.mul(1.6)).add(size0.mul(0.45)).mul(thick.sign());
-  const toCam = normalize(cameraPosition.sub(centre));
-  const side = normalize(cross(vec3(0, 1, 0), toCam)), up = cross(toCam, side);
-  m.positionNode = centre.add(side.mul(positionGeometry.x.mul(size))).add(up.mul(positionGeometry.y.mul(size)));
-  const r2 = positionGeometry.x.mul(positionGeometry.x).add(positionGeometry.y.mul(positionGeometry.y));
-  const soft = smoothstep(1.0, 0.1, r2);
-  const a = soft.mul(smoothstep(0, 0.05, t)).mul(pow(float(1).sub(t), 1.25)).mul(thick).mul(mix(float(0.5), float(0.78), ash));
-  // White steam; ash a dirty grey, darker low and paler as it thins. Where the lava lights its foot, an orange glow.
-  const steamCol = WEATHER.light.mul(vec3(0.95, 0.96, 1.0)).mul(mix(float(0.55), float(0.9), t.sqrt()));
-  const ashCol = WEATHER.light.mul(vec3(1.0, 0.92, 0.84)).mul(mix(float(0.1), float(0.34), t.sqrt()));
-  const glow = vec3(2.6, 0.9, 0.22).mul(shape.w).mul(float(1).sub(smoothstep(0.0, 0.4, t))).mul(soft);
-  m.colorNode = vec4(mix(steamCol, ashCol, ash).add(glow), 1);
-  m.opacityNode = a;
-  return m;
+  return puffMaterial(STEAM, { life: LIFE, spread: [0.4, 1.3], size: [0.45, 1.6], wind: [40, 10], sway: 0.5 }, ({ t, soft, thick, ash, shape }) => {
+    const steamCol = WEATHER.light.mul(vec3(0.95, 0.96, 1.0)).mul(mix(float(0.55), float(0.9), t.sqrt()));
+    const ashCol = WEATHER.light.mul(vec3(1.0, 0.92, 0.84)).mul(mix(float(0.1), float(0.34), t.sqrt()));
+    const glow = vec3(2.6, 0.9, 0.22).div(toneMappingExposure).mul(GLOW.power.mul(2.2)).mul(shape.w).mul(float(1).sub(smoothstep(0.0, 0.4, t))).mul(soft);
+    return {
+      color: mix(steamCol, ashCol, ash).add(glow),
+      alpha: soft.mul(smoothstep(0, 0.05, t)).mul(pow(float(1).sub(t), 1.25)).mul(thick).mul(mix(float(0.5), float(0.78), ash)),
+    };
+  });
 }
