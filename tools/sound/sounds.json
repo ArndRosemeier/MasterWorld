@@ -745,6 +745,12 @@
    "most": 16
   },
   {
+   "id": "portal/cross",
+   "kind": "call",
+   "most": 2.2,
+   "prompt": "The sound of passing through a thin place between worlds, a bright airy rising shimmer of glassy chimes and a soft breathy whoosh that swells and fades away, ethereal and eerie, about two seconds, close-up, no voices, no talking, no music, no other sounds"
+  },
+  {
    "id": "spell/gather",
    "kind": "call",
    "most": 1.6,

@@ -556,7 +556,7 @@
     "reason": "Three's BufferGeometry finishing calls after building vertices by hand; each mesh builds its own shape."
   },
   {
-    "key": "idiom: [.emit] in masterworld/app/spellFx/levelRing.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
+    "key": "idiom: [.emit] in masterworld/app/spellFx/crossingFx.ts + masterworld/app/spellFx/levelRing.ts + masterworld/app/spellFx/looks.ts + masterworld/app/spellFx/portalStoneFx.ts",
     "reason": "Calls into the spells' particle bits (spellFx/particles.ts SpellBits): each effect throws its own sprites; the shared part is SpellBits itself."
   },
   {

@@ -943,6 +943,15 @@
     150.3
    ]
   },
+  "portal/cross": {
+   "kind": "call",
+   "files": [
+    "portal/cross.mp3"
+   ],
+   "seconds": [
+    1.475
+   ]
+  },
   "spell/bloom-hit": {
    "kind": "call",
    "files": [
