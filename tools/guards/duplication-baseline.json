@@ -376,10 +376,6 @@
     "reason": "A per-frame step: the owner walking down to the hero vs a den stepping its creatures."
   },
   {
-    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/creatures.ts#step",
-    "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
-  },
-  {
     "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/livestock.ts#step",
     "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
   },
@@ -489,10 +485,6 @@
   },
   {
     "key": "same name: masterworld/game/visitor.ts#step + masterworld/lab/spellLab.ts#step",
-    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/creatures.ts#step",
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
   {
