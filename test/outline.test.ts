@@ -15,14 +15,16 @@ test('outline: a creature straight ahead is an ellipse in the middle of the scre
   const m = new AuraMarks();
   m.mark(1000, 2, -510, 1, 0.5, 1, 0, 0.2, 1, 0.3, 1);
   projectAuras(camera(), m);
-  const a = OUTLINE.slots.area[0]!, r = OUTLINE.slots.range[0]!, t = OUTLINE.slots.tint[0]!;
+  const a = OUTLINE.slots.area[0]!, r = OUTLINE.slots.range[0]!;
   assert.ok(Math.abs(a.x - 0.5) < 1e-6 && Math.abs(a.y - 0.5) < 1e-6, 'in the middle');
   assert.ok(Math.abs(r.x - 10) < 1e-6, 'ten metres off');
   assert.ok(a.w > a.z * 1.3, 'taller than wide on a wide screen for a body twice as high as wide');
   assert.equal(r.z, 1);
-  assert.ok(t.w > 2, 'the strong one has a thick line');
+  assert.equal(OUTLINE.live.value, 1, 'the outline is live');
   assert.equal(m.count, 0, 'the marks are taken');
   assert.equal(OUTLINE.slots.range[1]!.z, 0, 'the rest of the table is empty');
+  projectAuras(camera(), m);
+  assert.equal(OUTLINE.live.value, 0, 'nothing marked: not live');
 });
 
 test('outline: behind the eye nothing is outlined; the strongest come first and only so many fit', () => {

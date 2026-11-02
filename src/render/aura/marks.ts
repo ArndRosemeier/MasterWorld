@@ -27,8 +27,6 @@ export class AuraMarks {
 /** Every fight puts its marks here; the view takes them once a frame. */
 export const AURAS = new AuraMarks();
 
-/** Thickness of the line (px): the faint ones thin, the target's thick. */
-const THIN = 4.2, THICK = 8.4; // (the shader reads both widths itself: materials/outline.ts LINE_PX)
 /** Depth tolerance (m) of a creature's pixels about its middle: its body's half depth, at least this much. */
 const DEPTH_TOL = 0.3;
 
@@ -46,6 +44,7 @@ export function projectAuras(camera: PerspectiveCamera, marks: AuraMarks = AURAS
   inverse.copy(camera.matrixWorld).invert();
   const p = camera.projectionMatrix.elements;
   OUTLINE.near.value = camera.near;
+  OUTLINE.live.value = n > 0 ? 1 : 0;
   let k = 0;
   for (const i of order) {
     if (k >= OUTLINE.cap) break;
@@ -58,7 +57,7 @@ export function projectAuras(camera: PerspectiveCamera, marks: AuraMarks = AURAS
     // The ellipse on the screen (uv, y down): where it stands and how far it reaches.
     OUTLINE.slots.area[k]!.set(0.5 + 0.5 * p[0]! * at.x / z, 0.5 - 0.5 * p[5]! * at.y / z, Math.max(1e-4, 0.5 * p[0]! * halfW / z), Math.max(1e-4, 0.5 * p[5]! * halfH / z));
     OUTLINE.slots.range[k]!.set(z, Math.max(DEPTH_TOL, halfH * 0.45), s, strong);
-    OUTLINE.slots.tint[k]!.set(d[o + 7]! * dim, d[o + 8]! * dim, d[o + 9]! * dim, THIN + (THICK - THIN) * strong);
+    OUTLINE.slots.tint[k]!.set(d[o + 7]! * dim, d[o + 8]! * dim, d[o + 9]! * dim, 0);
     k++;
   }
   // The rest of the table is empty (no strength).
