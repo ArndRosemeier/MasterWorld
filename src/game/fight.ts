@@ -15,6 +15,7 @@ import { blowOf, mendCaster, Recipes, SELF, type Mark, type RecipeEvent, type Re
 import { WEAR, type WearState } from './upkeep';
 import { dauntsFrom, fightXp } from './growth';
 import type { Standing } from './standing';
+import { opposed } from '../sim/factions';
 
 export interface HeroPose {
   readonly x: number;
@@ -36,7 +37,8 @@ export type FightEvent =
   | { readonly kind: 'warn'; readonly who: Creature; readonly turn: WarnTurn }
   /** The warning ended in a fight: `who` speaks for the band, `cause` is why. */
   | { readonly kind: 'break'; readonly who: Creature; readonly cause: BreakCause }
-  | { readonly kind: 'killed'; readonly who: Creature; readonly loot: Loot; readonly xp: number }
+  /** `byHero`: the hero hurt it (D65: only then it gives experience and counts against its faction); else others brought it down. */
+  | { readonly kind: 'killed'; readonly who: Creature; readonly loot: Loot; readonly xp: number; readonly byHero: boolean }
   | { readonly kind: 'flee'; readonly who: Creature }
   | { readonly kind: 'plea'; readonly who: Creature; readonly text: string }
   | { readonly kind: 'spared'; readonly who: Creature }
@@ -87,6 +89,7 @@ export class Fight implements RecipeWorld {
   constructor(readonly hero: Character, readonly den: Den, private readonly setting: SettingModule, seed: number, public light = 9) {
     this.rng = new Rng(deriveSeed(seed, 'fight'));
     this.recipes = new Recipes(hero, this, setting.effects ?? [], deriveSeed(seed, 'recipes'));
+    den.feud = (a, b) => opposed(setting, a, b);
   }
 
   /** The den's view of the hero now. */
@@ -316,7 +319,7 @@ export class Fight implements RecipeWorld {
       case 'spared': out.push({ kind: 'spared', who: e.who }); break;
       case 'unbarred': out.push({ kind: 'unbarred', link: e.link, from: [e.who.x, e.who.z] }); break;
       // Experience for the foe (D58), weighed by its danger against the hero's level.
-      case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who), xp: this.earnFrom(e.who) }); break;
+      case 'died': out.push({ kind: 'killed', who: e.who, loot: this.restoreBody(e.who), xp: e.who.struck ? this.earnFrom(e.who) : 0, byHero: e.who.struck }); break;
       default: break;
     }
   }

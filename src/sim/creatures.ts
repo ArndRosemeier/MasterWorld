@@ -12,9 +12,9 @@ import { WARNING_STANCES, type BreakCause, type CreatureDef, type Tier, type War
 import type { Spawn } from '../world/dungeon/cellar';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { strike, type Guard, type Strike } from './combat';
-import { DungeonGround, type DenGround, type DungeonNav } from './dungeonNav';
+import { DungeonGround, type DenGround, type DungeonNav, type P3 } from './dungeonNav';
 
-export type CreatureState = 'idle' | 'alert' | 'warn' | 'fight' | 'flee' | 'beg' | 'meek' | 'dead';
+export type CreatureState = 'idle' | 'alert' | 'warn' | 'fight' | 'brawl' | 'flee' | 'beg' | 'meek' | 'dead';
 
 /** What the body shows (the renderer picks a clip or a pose for it). */
 export type CreatureAct = 'stand' | 'walk' | 'run' | 'sniff' | 'gnaw' | 'graze' | 'watch' | 'rummage' | 'spin' | 'swing' | 'hurt' | 'beg' | 'die' | 'dead' | 'leap' | 'warn';
@@ -45,6 +45,14 @@ export interface Creature {
   spoke: boolean;
   /** The band it warns the hero with (D64): the id of the one who noticed first; -1 while it is in none. */
   band: number;
+  /** Who it fights while it brawls (D65): another body, maybe of another den on the same ground. */
+  prey: Prey | null;
+  /** Seconds it is still loud with fighting (others in earshot come to it, D65). */
+  din: number;
+  /** Seconds until it looks about for a quarrel again. */
+  eye: number;
+  /** The hero has hurt it (D65: only such a foe gives experience, and only such a kill counts against its faction). */
+  struck: boolean;
   /** The one who breaks expectations. */
   surprise?: string;
   /** Seconds left of a staggered moment. */
@@ -97,6 +105,12 @@ export interface Hop {
   t: number;
 }
 
+/** The body a brawler fights, and the den that body is in. */
+export interface Prey {
+  readonly c: Creature;
+  readonly den: Den;
+}
+
 /** A band that warns the hero (D64): where it is in its words, and since when. */
 interface Band {
   turn: WarnTurn | null;
@@ -113,6 +127,10 @@ const REPEAT = 10;
 const SIGNAL = 2.2;
 /** A robbers' band walks up at this share of its pace. */
 const CLOSE_IN = 0.55;
+/** A creature looks about for a quarrel this often (s), and a brawl is loud this long after each blow (s). */
+const LOOK = 0.6, DIN = 4;
+/** A brawler's blow at a prey that runs reaches this much further (m): it springs after it. */
+const LUNGE = 2.5;
 
 /** Does it warn before it fights (D64)? */
 const warns = (c: Creature): boolean => !!c.def.stance && WARNING_STANCES.includes(c.def.stance.kind);
@@ -149,7 +167,8 @@ export type DenEvent =
   | { readonly kind: 'swing'; readonly who: Creature }
   | { readonly kind: 'blow'; readonly who: Creature; readonly strike: Strike }
   | { readonly kind: 'flee'; readonly who: Creature }
-  | { readonly kind: 'died'; readonly who: Creature }
+  /** `by`: the creature that dealt the blow, none when the hero did (or a spell, or bleeding). */
+  | { readonly kind: 'died'; readonly who: Creature; readonly by?: Creature }
   | { readonly kind: 'plea'; readonly who: Creature; readonly text: string }
   | { readonly kind: 'spared'; readonly who: Creature }
   | { readonly kind: 'home'; readonly who: Creature }
@@ -245,6 +264,13 @@ export class Den {
   knows: 'hired' | 'kin' | null = null;
   /** The bands that warn the hero now (D64), by the id of the one who noticed first. */
   private readonly bands = new Map<number, Band>();
+  /**
+   * Are two factions at feud (D65: `opposed` of the setting's matrix)? Set by whoever plays the den (game/fight.ts); none: its
+   * creatures know no quarrel but the hero's.
+   */
+  feud: ((a: string, b: string) => boolean) | null = null;
+  /** What the creatures of other dens did to this den's (a blow, a fall), out with the next step's events. */
+  private readonly outbox: DenEvent[] = [];
 
   /** A dungeon's space (its rooms are the homes), or any other ground (open land: sim/wild.ts). */
   constructor(ground: DungeonSpace | DenGround, spawns: readonly Spawn[], defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []) {
@@ -256,7 +282,7 @@ export class Den {
       const p = this.ground.spot(s.room, rng);
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
-        aware: 0, leader: id === 0 && def.pack, band: -1, signal: null, signalLeft: 0, armed: false, spoke: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
+        aware: 0, leader: id === 0 && def.pack, band: -1, prey: null, din: 0, eye: id * 0.13 % LOOK, struck: false, signal: null, signalLeft: 0, armed: false, spoke: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
         repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
@@ -291,6 +317,9 @@ export class Den {
       if (c.state === 'dead') { c.y = this.ground.floatAt?.(c.x, c.z, c.y) ?? c.y; continue; }
       c.stagger = Math.max(0, c.stagger - dt);
       if ((c.signalLeft -= dt) <= 0) { c.signalLeft = 0; c.signal = null; }
+      c.din = Math.max(0, c.din - dt);
+      c.eye = Math.max(0, c.eye - dt);
+      if (c.state !== 'brawl') c.prey = null;
       c.ready = Math.max(0, c.ready - dt);
       c.repath = Math.max(0, c.repath - dt);
       c.hopIn = Math.max(0, c.hopIn - dt);
@@ -298,6 +327,7 @@ export class Den {
       c.wants = false;
       this.heal(c, dt);
       this.sense(c, q, dt, out);
+      this.quarrel(c);
       if (c.hop) { this.hopping(c, dt); continue; }
       // A swimmer rides the water standing still too (the waves rise and fall under it).
       if (this.ground.afloat) c.y = this.ground.floorAt(c.x, c.z, c.y + 0.6) ?? c.y;
@@ -312,6 +342,7 @@ export class Den {
         case 'alert': this.alert(c, q, dt); break;
         case 'warn': this.warning(c, q, dt); break;
         case 'fight': this.fight(c, q, dt, out); break;
+        case 'brawl': this.brawl(c, dt, out); break;
         case 'flee': this.flee(c, q, dt, out); break;
         case 'beg': this.beg(c, q, dt, out); break;
         case 'meek': this.meek(c, q, dt); break;
@@ -319,8 +350,9 @@ export class Den {
       this.progress(c, dt);
     }
     this.spread();
-    out.push(...this.walked);
+    out.push(...this.walked, ...this.outbox);
     this.walked.length = 0;
+    this.outbox.length = 0;
     return out;
   }
 
@@ -355,7 +387,7 @@ export class Den {
     if (this.peace) { if (c.state === 'alert' || c.state === 'warn') { c.state = 'idle'; c.band = -1; } return; }
     // Left a hero it could not reach: it keeps to itself a while.
     if (c.spurn > 0 && c.state === 'idle') return;
-    const noticed = (c.state === 'idle' || c.state === 'alert') && c.aware >= 1 && !this.keepsOff(c, q);
+    const noticed = (c.state === 'idle' || c.state === 'alert' || c.state === 'brawl') && c.aware >= 1 && !this.keepsOff(c, q);
     if (noticed && !cowed(c, q)) this.notice(c, q, out);
     else {
       // Too weak against this hero (D58): one that would warn says so once, and keeps back.
@@ -542,6 +574,102 @@ export class Den {
     if (called) out.push({ kind: 'alarm', who: c });
   }
 
+  /** Every living body on this ground that it can tell is there: those of this den and of the dens beside it. */
+  private bodies(): { readonly c: Creature; readonly den: Den }[] {
+    return [this, ...this.neighbours].flatMap((den) => den.creatures.filter((o) => o.state !== 'dead' && !o.hop).map((o) => ({ c: o, den })));
+  }
+
+  /** The nearest body at feud with it that it sees, or hears fighting (D65); none if it knows no quarrel. */
+  private foeFor(c: Creature): Prey | null {
+    let best: Prey | null = null, near = Infinity;
+    for (const p of this.bodies()) {
+      const o = p.c;
+      if (o === c || !this.feud!(c.def.faction, o.def.faction) || Math.abs(o.y - c.y) > 3) continue;
+      const d = Math.hypot(o.x - c.x, o.z - c.z);
+      const known = d <= c.def.senses.sight && this.ground.sees(c.x, c.y, c.z, o.x, o.y, o.z, 0.8);
+      const heard = o.din > 0 && d <= c.def.senses.hearing;
+      if ((known || heard) && d < near) { near = d; best = p; }
+    }
+    return best;
+  }
+
+  /**
+   * It looks about for a quarrel (D65): another body of a faction at feud with its own that it sees, or hears fighting, is
+   * attacked; its pack comes too. A shy one runs from whoever hunts. The hero has the first claim: one that has noticed them
+   * (fight) does not look.
+   */
+  private quarrel(c: Creature): void {
+    if (!this.feud || this.peace || c.eye > 0 || c.spurn > 0 || (c.state !== 'idle' && c.state !== 'alert')) return;
+    c.eye = LOOK;
+    if (c.def.temper === 'skittish') {
+      if (this.dread(c, null)) this.toFlee(c, this.walked);
+      return;
+    }
+    const foe = this.foeFor(c);
+    if (!foe) return;
+    for (const o of this.creatures) {
+      if (o !== c && !(c.def.pack && o.def.pack && (o.state === 'idle' || o.state === 'alert') && o.def.temper !== 'skittish' && this.hears(c, o))) continue;
+      o.state = 'brawl';
+      o.prey = foe;
+      o.path = [];
+    }
+  }
+
+  /** Whom it fights: it closes in on its prey and strikes, until one of them falls or runs, or it loses sight of it. */
+  private brawl(c: Creature, dt: number, out: DenEvent[]): void {
+    const p = c.prey;
+    if (!p || p.c.state === 'dead' || (p.c.state === 'flee' && Math.hypot(p.c.x - c.x, p.c.z - c.z) > c.def.senses.sight)) { this.settleDown(c); return; }
+    const t = p.c, dx = t.x - c.x, dz = t.z - c.z, d = Math.hypot(dx, dz), dy = Math.abs(t.y - c.y);
+    const atk = c.def.attacks[0], reach = atk.reach + radiusOf(c.def) + radiusOf(t.def);
+    const sees = d < c.def.senses.sight && this.ground.sees(c.x, c.y, c.z, t.x, t.y, t.z, 0.9);
+    if (sees) { c.lost = 0; c.seen = { x: t.x, y: t.y, z: t.z }; }
+    else if (c.lost > GIVE_UP) { this.settleDown(c); return; }
+    if (c.stagger > 0) { c.act = 'hurt'; c.windup = 0; return; }
+    if (c.windup > 0) {
+      c.windup -= dt;
+      c.dir = Math.atan2(dz, dx);
+      if (c.windup <= 0) {
+        c.ready = atk.time;
+        // Stepped back out of reach: the blow goes wide; a lunge at one that runs reaches the further for it.
+        if (d < reach + 0.3 + (t.state === 'flee' ? LUNGE : 0) && dy < 1.2 && sees) p.den.bitten(t, strike({ damage: atk.damage, kind: atk.kind, prowess: atk.prowess }, p.den.guardOf(t), c.rng), c, this);
+      }
+      return;
+    }
+    if (d < (c.close ? reach + HOLD : reach) && dy < 1.2 && sees) {
+      c.close = true;
+      c.path = [];
+      c.dir = Math.atan2(dz, dx);
+      if (c.ready === 0) { c.windup = WINDUP; c.act = 'swing'; c.din = DIN; out.push({ kind: 'swing', who: c }); }
+      else c.act = 'stand';
+      return;
+    }
+    c.close = false;
+    const goal = sees ? t : c.seen;
+    if (!goal) { this.settleDown(c); return; }
+    if (c.repath === 0 || c.pi >= c.path.length) { this.headTo(c, goal); c.repath = 0.6; }
+    if (!this.move(c, dt, 1)) c.act = 'stand';
+  }
+
+  /** The quarrel is over (its prey is down, away or lost): back to its ways. */
+  private settleDown(c: Creature): void {
+    c.state = 'idle';
+    c.prey = null;
+    c.path = [];
+    c.until = 0;
+    c.eye = 0;
+  }
+
+  /** What it runs from: the nearest body at feud with it that fights now (within sight); else the hero, `q` (none: nothing). */
+  private dread(c: Creature, q: Quarry | null): P3 | null {
+    let best: P3 | null = null, near = c.def.senses.sight;
+    for (const { c: o } of this.bodies()) {
+      if ((o.state !== 'brawl' && o.state !== 'fight') || !this.feud?.(o.def.faction, c.def.faction)) continue;
+      const d = Math.hypot(o.x - c.x, o.z - c.z);
+      if (d < near) { near = d; best = o; }
+    }
+    return best ?? (q && q.alive ? q : null);
+  }
+
   /** Always doing something: roam the home room, stop and sniff or gnaw or keep watch, roam again. */
   private idle(c: Creature, q: Quarry, dt: number): void {
     if (this.move(c, dt, 0.32)) return;
@@ -611,7 +739,7 @@ export class Den {
       c.close = true;
       c.path = [];
       c.dir = Math.atan2(dz, dx);
-      if (c.ready === 0) { c.windup = WINDUP; c.act = 'swing'; out.push({ kind: 'swing', who: c }); }
+      if (c.ready === 0) { c.windup = WINDUP; c.act = 'swing'; c.din = DIN; out.push({ kind: 'swing', who: c }); }
       else c.act = 'stand';
       return;
     }
@@ -655,10 +783,12 @@ export class Den {
   /** Off to the room farthest from the hero; cornered there, it fights. */
   private flee(c: Creature, q: Quarry, dt: number, out: DenEvent[]): void {
     if (this.move(c, dt, 1)) return;
-    const d = Math.hypot(q.x - c.x, q.z - c.z);
-    if (d > (c.def.wary ? c.def.wary * 2 : 10) || !q.alive) { c.state = c.surprise ? 'meek' : 'idle'; c.aware = 0.3; c.until = 0; out.push({ kind: 'home', who: c }); return; }
+    // From whoever hunts it: a body at feud with it, else the hero.
+    const from = this.dread(c, q);
+    const d = from ? Math.hypot(from.x - c.x, from.z - c.z) : Infinity;
+    if (!from || d > (c.def.wary ? c.def.wary * 2 : 10)) { c.state = c.surprise ? 'meek' : 'idle'; c.aware = 0.3; c.until = 0; out.push({ kind: 'home', who: c }); return; }
     if (c.repath === 0) {
-      this.runFrom(c, q);
+      this.runFrom(c, from);
       c.repath = 2;
       // Nowhere left to run and the hero upon it: cornered, it fights.
       if (c.pi >= c.path.length && d < 2) { c.state = 'fight'; return; }
@@ -701,7 +831,7 @@ export class Den {
     const out: DenEvent[] = [];
     if (c.state === 'dead') return out;
     c.health -= s.damage;
-    if (s.damage > 0) c.calm = 0;
+    if (s.damage > 0) { c.calm = 0; c.struck = true; }
     // Struck while the band was still talking: it fights now (D64), and says who started it.
     if (c.state === 'warn') {
       const m = this.members(c.band), live = m.filter((o) => o.health > 0);
@@ -710,19 +840,8 @@ export class Den {
     c.aware = 1;
     c.seen = { ...from };
     c.lost = 0;
-    if (s.damage > 0 && flinch) { c.stagger = Math.max(c.stagger, stagger, s.outcome === 'crit' ? 0.5 : 0.18); c.windup = 0; c.blows++; }
-    if (c.health <= 0) {
-      c.health = 0;
-      c.state = 'dead';
-      c.act = 'die';
-      c.path = [];
-      out.push({ kind: 'died', who: c });
-      // The leader falls: the rest may lose heart.
-      if (c.leader) for (const o of this.creatures) if (o.state === 'fight' && o.def.morale < 1 && o.rng.chance(0.5)) this.toFlee(o, out);
-      return out;
-    }
-    if (c.state === 'beg' || c.state === 'meek') { this.toFlee(c, out); return out; }
-    if (c.health < c.def.health * (1 - c.def.morale) && c.state !== 'flee') { this.toFlee(c, out); return out; }
+    c.din = DIN;
+    if (this.afterBlow(c, s, stagger, flinch, out)) return out;
     if (c.state !== 'fight') {
       c.state = 'fight';
       c.path = [];
@@ -730,6 +849,42 @@ export class Den {
       if (c.def.pack) this.call(c, out);
     }
     return out;
+  }
+
+  /**
+   * What a blow did to it past its health: a stagger, a fall (the leader's lets the rest lose heart), a flight. True when that settled
+   * what it does now (down, or running).
+   */
+  private afterBlow(c: Creature, s: Strike, stagger: number, flinch: boolean, out: DenEvent[], by?: Creature): boolean {
+    if (s.damage > 0 && flinch) { c.stagger = Math.max(c.stagger, stagger, s.outcome === 'crit' ? 0.5 : 0.18); c.windup = 0; c.blows++; }
+    if (c.health <= 0) {
+      c.health = 0;
+      c.state = 'dead';
+      c.act = 'die';
+      c.path = [];
+      out.push({ kind: 'died', who: c, ...(by ? { by } : {}) });
+      // The leader falls: the rest may lose heart.
+      if (c.leader) for (const o of this.creatures) if ((o.state === 'fight' || o.state === 'brawl') && o.def.morale < 1 && o.rng.chance(0.5)) this.toFlee(o, out);
+      return true;
+    }
+    if (c.state === 'beg' || c.state === 'meek') { this.toFlee(c, out); return true; }
+    if (c.health < c.def.health * (1 - c.def.morale) && c.state !== 'flee') { this.toFlee(c, out); return true; }
+    return false;
+  }
+
+  /**
+   * A blow from a creature of `from` (D65): the same wound as the hero's, without the hero's part in it. One at ease turns on whoever
+   * struck it, a shy one runs; the fall is told with the den's next events.
+   */
+  bitten(c: Creature, s: Strike, by: Creature, from: Den): void {
+    if (c.state === 'dead') return;
+    c.health -= s.damage;
+    if (s.damage > 0) c.calm = 0;
+    c.din = DIN;
+    if (this.afterBlow(c, s, 0, true, this.outbox, by)) return;
+    if (c.state !== 'idle' && c.state !== 'alert') return;
+    if (c.def.temper === 'skittish') this.toFlee(c, this.outbox);
+    else { c.state = 'brawl'; c.prey = { c: by, den: from }; c.path = []; }
   }
 
   /** How it stands against the hero's blow: caught unaware or staggered, it neither dodges nor parries. */
@@ -775,7 +930,7 @@ export class Den {
   }
 
   /** Off as far from the hero as it can get. */
-  private runFrom(c: Creature, q: Quarry): void {
+  private runFrom(c: Creature, q: P3): void {
     const way = this.ground.away(c, q, hands(c));
     if (way.length) { c.path = way; c.pi = 0; }
   }
