@@ -31,7 +31,7 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     id: 'bandit', name: 'smuggler', plural: 'smugglers', body: { kind: 'humanoid', race: 'human', height: 1.78, outfit: 'bandit', held: 'short-sword' },
-    health: 34, armour: 2, defence: 22, speed: 4.8, senses: { sight: 11, hearing: 14 }, faction: 'smugglers', temper: 'hostile', stance: { kind: 'guard', warn: 12, line: 5 }, morale: 0.6, pack: true, role: 'melee', danger: 11,
+    health: 34, armour: 2, defence: 22, speed: 4.8, senses: { sight: 11, hearing: 14 }, faction: 'smugglers', temper: 'hostile', stance: { kind: 'guard', warn: 12, line: 5, talk: 'pact' }, morale: 0.6, pack: true, role: 'melee', danger: 11,
     attacks: [{ name: 'short sword', damage: [3, 8], kind: 'cut', reach: 1.0, time: 2.0, prowess: 28 }],
     loot: 'bandit', tell: 'Low voices, a laugh, the clink of a bottle.',
   },
@@ -78,7 +78,7 @@ export const creatures: readonly CreatureDef[] = [
   // The land around the town (plan 9.3: the world simulation's wild).
   {
     id: 'highwayman', name: 'bandit', plural: 'bandits', body: { kind: 'humanoid', race: 'human', height: 1.8, outfit: 'bandit', held: 'short-sword' },
-    health: 34, armour: 2, defence: 22, speed: 5, senses: { sight: 24, hearing: 18 }, faction: 'bandits', temper: 'hostile', stance: { kind: 'rob', warn: 24, close: 5, line: 2.5, patience: 10 }, morale: 0.55, pack: true, role: 'melee', danger: 11,
+    health: 34, armour: 2, defence: 22, speed: 5, senses: { sight: 24, hearing: 18 }, faction: 'bandits', temper: 'hostile', stance: { kind: 'rob', warn: 24, close: 5, line: 2.5, patience: 10, talk: 'price', toll: [0.18, 0.4] }, morale: 0.55, pack: true, role: 'melee', danger: 11,
     attacks: [{ name: 'short sword', damage: [3, 8], kind: 'cut', reach: 1.0, time: 2.0, prowess: 28 }],
     loot: 'bandit', tell: 'Woodsmoke where no farm is, and a whistle that is not a bird.',
   },

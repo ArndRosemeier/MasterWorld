@@ -572,7 +572,7 @@ export class Cellars {
     const arena: Arena = {
       get inside() { return visit.inside; },
       get shown() { return visit.inside; },
-      enclosed: true, place: `this ${s.first.form.word}`, danger, promise: own,
+      enclosed: true, id: s.decision.id, place: `this ${s.first.form.word}`, danger, promise: own,
       quietLine: fill(words.quiet, { place }),
     };
     b.fight = new Encounter(arena, b.delve, b.creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight, !!mine?.paid || this.kept.has(own));

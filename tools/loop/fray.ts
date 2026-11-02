@@ -2,7 +2,8 @@
  * The loop check's fights without the hero (phase R, D65): wolves come into the start town by night (the VGM's foray event) and
  * its watch and able folk meet them while the rest go indoors, with nobody of the town dying; and a wolf pack and a herd of deer
  * on open ground fight though no hero is near. Headless: the town, its people, the wild's creatures and the VGM's event are
- * the game's own (sim/townFight.ts, sim/creatures.ts). `node --import tsx tools/loop/fray.ts [seed...]`; run by `npm run loop`.
+ * the game's own (sim/townFight.ts, sim/creatures.ts). Also (R7): a hero met by highwaymen on the road pays a holdup once (the band
+ * keeps its word) and refuses once (it fights, and says why). `node --import tsx tools/loop/fray.ts [seed...]`; run by `npm run loop`.
  * Exits 1 if a fight broke.
  */
 import { parseSeed } from '@futuremagic/core';
@@ -12,6 +13,8 @@ import { bandOf, nextEvent } from '../../src/vgm/events';
 import { territoryOf, wildFor } from '../../src/vgm/wild';
 import { Township } from '../../src/game/township';
 import { TownFight, type TownFightEvent } from '../../src/sim/townFight';
+import { Delve } from '../../src/game/delve';
+import { Character } from '../../src/game/character';
 import { Den, type DenEvent, type Quarry } from '../../src/sim/creatures';
 import { opposed } from '../../src/sim/factions';
 import { OpenGround, type Land } from '../../src/sim/wild';
@@ -74,13 +77,45 @@ function brawl(name: string): string | null {
   return null;
 }
 
+/** The road: highwaymen halt a hero, who pays them once and is let by, and refuses another band and is fought. */
+function holdup(name: string): string | null {
+  const seed = parseSeed(name);
+  const flat: Land = { height: () => 0, waterDepth: () => 0, blocked: () => false };
+  const hero = new Character(classic);
+  hero.coins = 150;
+  const meet = (x: number) => {
+    const d = new Den(new OpenGround(flat, [{ x, z: 0, r: 0.01 }]), Array.from({ length: 3 }, () => ({ creature: 'highwayman', room: 0 })), classic.creatures, seed);
+    d.creatures.forEach((c, i) => { c.x = x - i * 0.8; c.z = 0; });
+    return new Delve(null, d, classic, hero, seed);
+  };
+  const pose = (x: number) => ({ x, y: 0, z: 0, yaw: 0, speed: 0 });
+  const say = (d: Delve, secs: number, at: number): string[] => {
+    const turns: string[] = [];
+    for (let t = 0; t < secs; t += DT) for (const e of d.step(DT, pose(at), false)) if (e.kind === 'warn') turns.push(e.turn); else if (e.kind === 'break') turns.push(`break:${e.cause}`);
+    return turns;
+  };
+  const a = meet(0);
+  say(a, 6, 20);
+  const terms = a.speak(), deal = a.speak();
+  if (terms?.kind !== 'terms' || deal?.kind !== 'struck') return 'the holdup was not paid';
+  if (hero.coins >= 150 || hero.coins < 150 * 0.5) return `the toll was not a share of the purse (${150 - hero.coins})`;
+  const toll = 150 - hero.coins, after = say(a, 90, 4);
+  if (a.den.fighting.length || after.some((t) => t.startsWith('break'))) return 'a band that was paid fought on';
+  const b = meet(500);
+  say(b, 6, 520);
+  const refused = say(b, 20, 505);
+  if (!refused.includes('break:patience') || b.den.fighting.length !== 3) return 'a refused holdup did not end in a fight';
+  console.log(`  ${name}: paid ${toll} copper of 150 and was let by, not a word more in 90 s; refused the next band and it fought on ${refused.at(-1)}`);
+  return null;
+}
+
 let failed = 0;
 for (const name of seeds) {
-  for (const [what, run] of [['a town fights off wolves', fray], ['creatures fight creatures', brawl]] as const) {
+  for (const [what, run] of [['a town fights off wolves', fray], ['creatures fight creatures', brawl], ['a holdup on the road', holdup]] as const) {
     console.log(`== ${name}: ${what}`);
     const why = run(name);
     if (why) { console.log(`FAILED: ${why}`); failed++; }
   }
 }
-console.log(failed ? `${failed} fray checks FAILED` : `all ${seeds.length * 2} fray checks passed`);
+console.log(failed ? `${failed} fray checks FAILED` : `all ${seeds.length * 3} fray checks passed`);
 if (failed) process.exit(1);

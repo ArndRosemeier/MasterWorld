@@ -35,7 +35,7 @@ export const factions: FactionsDef = {
     // The dead go for anything living.
     ...['smugglers', 'bandits', 'goblins', 'cutthroats', 'predators', 'prey', 'vermin', 'beasts'].map((f) => ['undead', f, 'hostile'] as const),
   ],
-  kill: { own: -8, foes: 3, upTo: 14 },
+  kill: { own: -8, foes: 3, upTo: 14, first: -3 },
   words: {
     guard: {
       turns: {
@@ -44,6 +44,11 @@ export const factions: FactionsDef = {
         settle: ['That is right. Keep walking.', 'Wise. Go on your way.', 'Good. Forget you saw us.'],
         greet: ['Ah, it is you. Pass, friend.', 'Go on through. We never saw you.'],
         yield: ['Leave it, lads. He is too much for us.', 'Not that one. Let him pass.'],
+      },
+      talk: {
+        terms: ['Keep clear of us and our hole. Your word on it?', 'We want no trouble. Stay away, and give your word.'],
+        deal: ['Good. We never saw you. Go on.', 'Your word is enough. Pass, and keep it.'],
+        short: ['Your word? You do not mean it. Back off.'],
       },
       breaks: {
         line: ['That is far enough!', 'You were told!', 'Get him!'],
@@ -60,6 +65,11 @@ export const factions: FactionsDef = {
         settle: ['Off with you, then.', 'Run along. Not worth the trouble.', 'Go on, we have no quarrel.'],
         greet: ['Well met, friend. The road is yours.', 'Ha! You. Go on, no toll for you.'],
         yield: ['Leave it, lads. Not worth it.', 'Back, lads. That one bites.'],
+      },
+      talk: {
+        terms: ['{coins} and you walk on. Or we take it all.', 'Toll is {coins}. Pay it, and the road is yours.', 'Give us {coins} and no one bleeds today.'],
+        deal: ['A wise traveller. We will remember this.', 'Pleasure. Off you go. You are known to us now.'],
+        short: ['That is not {coins}! Pay, or bleed.', 'Not enough! {coins}, I said!'],
       },
       breaks: {
         line: ['Too close! Take him!', 'He means trouble! Cut him!'],

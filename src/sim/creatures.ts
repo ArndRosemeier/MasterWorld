@@ -7,8 +7,8 @@
  * mercy in broken Common). Coordinates are the dungeon's own frame. Deterministic for a seed and a
  * sequence of steps. Pure.
  */
-import { Rng, deriveSeed } from '@futuremagic/core';
-import { WARNING_STANCES, type BreakCause, type CreatureDef, type Tier, type WarnTurn } from '../setting/contract';
+import { Rng, deriveSeed, hash2f } from '@futuremagic/core';
+import { WARNING_STANCES, type BreakCause, type CreatureDef, type TalkTurn, type Tier, type WarnTurn } from '../setting/contract';
 import type { Spawn } from '../world/dungeon/cellar';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { strike, type Guard, type Strike } from './combat';
@@ -119,7 +119,20 @@ interface Band {
   /** Sim time of its last words, and of the one that began its patience (the demand, the first jibe). */
   at: number;
   began: number;
+  /** The hero has talked to it and heard its terms (R7), and the price named (copper; 0 for a pact). */
+  heard?: boolean;
+  toll?: number;
 }
+
+/** What the speaker of a warning band says when the hero talks to it (R7): `coins` the price the hero was named or pays. */
+export interface Parley {
+  readonly turn: TalkTurn;
+  readonly who: Creature;
+  readonly coins: number;
+}
+
+/** The hero can talk to a warning band from this far (m), nearer if its warning distance is. */
+const TALK_FROM = 14;
 
 /** A band gives up its warning when the hero is this much farther than its warning distance. */
 const SETTLE_AT = 1.25;
@@ -270,6 +283,11 @@ export class Den {
    * Set by the game when the den is woken or placed.
    */
   knows: 'hired' | 'kin' | null = null;
+  /**
+   * What the hero settled with this den's warning band (R7): `paid` its toll, or gave their `pact` to keep away. The den keeps its word
+   * (a greeting, never a fight) until the hero strikes one of it; saved with the place.
+   */
+  word: 'paid' | 'pact' | null = null;
   /** The bands that warn the hero now (D64), by the id of the one who noticed first. */
   private readonly bands = new Map<number, Band>();
   /**
@@ -443,7 +461,7 @@ export class Den {
       c.state = 'fight';
       c.path = [];
       this.call(c, out);
-    } else if (tier === 'friend' || tier === 'honoured') {
+    } else if (tier === 'friend' || tier === 'honoured' || this.word) {
       if (!c.spoke) { for (const o of this.creatures) if (o === c || (o.def.faction === c.def.faction && this.hears(c, o))) o.spoke = true; this.signalling(c, 'greet', []); out.push({ kind: 'warn', who: c, turn: 'greet' }); }
       c.state = 'idle';
       c.aware = 0.3;
@@ -533,6 +551,48 @@ export class Den {
     out.push({ kind: 'break', who, cause });
     for (const c of m) { c.state = 'fight'; c.band = -1; c.path = []; c.close = false; c.armed = false; }
     this.call(who, out);
+  }
+
+  /** The warning band the hero can talk to now (R7): one whose stance talks, near enough, nearest first. */
+  private talker(): { id: number; band: Band; who: Creature; stance: NonNullable<CreatureDef['stance']>; members: Creature[] } | null {
+    const q = this.quarry;
+    if (!q?.alive || this.peace) return null;
+    let best: ReturnType<Den['talker']> = null, bd = Infinity;
+    for (const [id, band] of this.bands) {
+      const members = this.members(id);
+      if (!members.length) continue;
+      const who = this.speaker(members, q), stance = who.def.stance!, d = Math.hypot(q.x - who.x, q.z - who.z);
+      if (stance.talk && band.turn !== null && d <= Math.min(stance.warn!, TALK_FROM) && d < bd) { bd = d; best = { id, band, who, stance, members }; }
+    }
+    return best;
+  }
+
+  /** Who speaks for the band the hero can talk to now, if any (R7). */
+  hail(): Creature | null { return this.talker()?.who ?? null; }
+
+  /**
+   * The hero talks to the band that warns them (R7): the first word hears its terms (a share of the purse, seeded by the speaker and the
+   * purse; or a pact), the next agrees to them. A price the purse cannot meet gets the short answer. A deal ends the warning: the band
+   * stands down and greets the hero from then on (`word`). Null: there is none to talk to. The caller takes `coins` from the purse.
+   */
+  parley(purse: number): Parley | null {
+    const t = this.talker();
+    if (!t) return null;
+    const { band: b, who, stance: st } = t;
+    if (!b.heard) {
+      const share = st.toll ? st.toll[0] + (st.toll[1] - st.toll[0]) * hash2f(who.id, Math.floor(purse), 91) : 0;
+      b.heard = true;
+      b.toll = st.talk === 'price' ? Math.max(1, Math.round(purse * share)) : 0;
+      b.began = this.time;
+      this.signalling(who, 'warn', []);
+      return { turn: 'terms', who, coins: b.toll };
+    }
+    if (purse < b.toll!) return { turn: 'short', who, coins: b.toll! };
+    this.word = b.toll ? 'paid' : 'pact';
+    this.bands.delete(t.id);
+    this.signalling(who, 'greet', []);
+    for (const c of t.members) { c.state = 'idle'; c.band = -1; c.armed = false; c.aware = 0.3; c.spoke = true; c.path = []; }
+    return { turn: 'deal', who, coins: b.toll! };
   }
 
   /** The hero has gone back (or is gone): the band lets it be and goes back to its post. */
@@ -882,6 +942,8 @@ export class Den {
     if (c.state === 'dead') return out;
     c.health -= s.damage;
     if (s.damage > 0) { c.calm = 0; c.struck = true; }
+    // The hero breaks the word given (R7): the den fights, and says who started it.
+    if (this.word && s.damage > 0) { this.word = null; out.push({ kind: 'break', who: c, cause: 'struck' }); }
     // Struck while the band was still talking: it fights now (D64), and says who started it.
     if (c.state === 'warn') {
       const m = this.members(c.band), live = m.filter((o) => o.health > 0);
