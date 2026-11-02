@@ -53,6 +53,9 @@ interface Source { readonly x: number; readonly z: number; readonly y: number; r
  * pool's. `floor` reads the carved floor under the surface. Without it the beds' own shape stands for the floor (a ribbon
  * and fans of pools, as the dresser cut them; for tests of the dressing alone).
  */
+/** A cell of water whose corners differ by more than this in height (m) is a drop, not a surface. */
+const DROP = 0.4;
+
 export function waterMesh(d: Dressing, bed: number, poolDepth: number, floor?: FloorOf): WaterMesh {
   const sources: Source[] = [];
   for (const s of d.streams) {
@@ -138,6 +141,10 @@ export function waterMesh(d: Dressing, bed: number, poolDepth: number, floor?: F
         poly.push(addVertex(ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`, x, z, 0, src));
       }
     }
+    // Where two sources of different heights meet (a stream's drop), the cell would stand on its edge as a sheet across the way: leave it out (seen on the GPU, a 3 m sheet).
+    let lo = Infinity, hi = -Infinity;
+    for (const v of poly) { const y = pos[v * 3 + 1]; lo = Math.min(lo, y); hi = Math.max(hi, y); }
+    if (hi - lo > DROP) continue;
     for (let n = 1; n + 1 < poly.length; n++) idx.push(poly[0], poly[n], poly[n + 1]);
   }
   const normal = new Float32Array(pos.length);
