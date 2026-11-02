@@ -4,6 +4,8 @@
  * brook) and read at points all over it, mesh against world/drawnGround.ts (what the hero, creatures and birds stand
  * on). Fails if any point is off by more than 1 cm: then the hero sinks into or floats over what is drawn.
  *
+ * Cave mouths (the crag of a cave in a cliff) are built on it too: it fails if the rock hangs over it or sinks into it (over 1 m²).
+ *
  * Trees, rocks and grass stand on the drawn ground too: it fails if a tree's foot is off the mesh by more than 1 cm, or a
  * rock's middle floats over it, or a grass mask's ground is off it. It also reports where the land's own height is off the drawn ground by more than
  * 0.5 m: relief finer than the mesh shows (a gorge's sheer wall, a sea cliff's gully, a pass's side), the worst as
@@ -19,11 +21,17 @@ import { FLORA_STRIDE, NEAR_SPACING, floraPlacement } from '../../src/world/flor
 import { grassMask } from '../../src/world/grass';
 import { ROCK_STRIDE, rockPlacement } from '../../src/world/rocks';
 import { Terrain } from '../../src/world/terrain';
+import { caveMouth, mouthOffGround, siteInCliff } from '../../src/world/dungeon/caveMouth';
+import { groundIn } from '../../src/world/dungeon/site';
 
 /** Off the mesh by more than this (m), the hero is not on what is drawn: the check fails. */
 const LIMIT = 0.01;
 /** Chunks scanned each way from a square's middle (3 x 3 chunks, 384 m across). */
 const REACH = 1;
+/** Cave mouths tried round a square's middle: a site every `MOUTH_GRID` m out to `MOUTH_REACH` m, four ways round, the first `MOUTHS` that stand in a cliff. */
+const MOUTH_GRID = 24, MOUTH_REACH = 192, MOUTHS = 8;
+/** A mouth's rock hangs over the drawn ground or sinks into it by more than this area (m²): the check fails. */
+const MOUTH_LIMIT = 1;
 
 /** The mesh's height at (x, z): the triangle of the chunk built at (x0, z0) the point falls in. */
 function meshAt(m: ReturnType<typeof buildChunk>, x0: number, z0: number, x: number, z: number): number {
@@ -92,6 +100,19 @@ for (const name of seeds) {
     console.log(`  grass: ${blades} mask pixels, worst root ${bladeOff.toFixed(4)} m off the mesh${bladeOff > LIMIT ? ' FAIL' : ''}`);
     console.log(`  the land under the mesh: ${fine} of ${cells} cells off by > 0.5 m${worst[0] ? `, worst ${worst[0].d.toFixed(2)} m` : ''}`);
     for (const w of worst.slice(0, 3)) console.log(`    ${w.d > 0 ? '+' : ''}${w.d.toFixed(2)} m  ?seed=${name}&pos=${w.x},${w.z}`);
+    // Cave mouths: a crag in a cliff, built as the game builds it (on the drawn ground) and, for comparison, on the land's own height.
+    const land = (x: number, z: number) => terrain.height(x, z), drawnH = (x: number, z: number) => g.footing(x, z), tried: { hover: number; buried: number; wild: number }[] = [];
+    for (let k = 0; tried.length < MOUTHS && k < ((2 * MOUTH_REACH) / MOUTH_GRID) ** 2 * 4; k++) {
+      const i = Math.floor(k / 4) % ((2 * MOUTH_REACH) / MOUTH_GRID), j = Math.floor(k / 4 / ((2 * MOUTH_REACH) / MOUTH_GRID));
+      const site = { x: cx - MOUTH_REACH + i * MOUTH_GRID, z: cz - MOUTH_REACH + j * MOUTH_GRID, yaw: (k % 4) * (Math.PI / 2) };
+      if (!siteInCliff(drawnH, site)) continue;
+      const mouthOff = (h: (x: number, z: number) => number) => { const base = h(site.x, site.z); return mouthOffGround(caveMouth(1, groundIn(site, h, base), true), site, base, h, drawnH); };
+      const on = mouthOff(drawnH), off = mouthOff(land);
+      tried.push({ hover: on.hover, buried: on.buried, wild: off.hover + off.buried });
+      if (on.hover > MOUTH_LIMIT || on.buried > MOUTH_LIMIT) { failed = true; console.log(`    cave mouth FAIL ?seed=${name}&pos=${site.x},${site.z}: hangs ${on.hover.toFixed(1)}, sunk ${on.buried.toFixed(1)} m²`); }
+    }
+    const sum = (f: (m: (typeof tried)[number]) => number) => tried.reduce((a, m) => a + f(m), 0);
+    console.log(`  cave mouths: ${tried.length} in cliffs, rock off the drawn ground: ${sum((m) => m.hover + m.buried).toFixed(1)} m² (on the land's own height it would be ${sum((m) => m.wild).toFixed(1)} m²)`);
   }
   console.log(`  (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
 }

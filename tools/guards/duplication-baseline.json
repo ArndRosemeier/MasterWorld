@@ -192,20 +192,12 @@
     "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
   },
   {
-    "key": "same name: masterworld/game/standing.ts#save + masterworld/talk/townTalk.ts#save",
-    "reason": "save() is the codebase's convention for 'this state as plain data'; unrelated states."
-  },
-  {
     "key": "idiom: [.fbm3 .sin Math] in masterworld/world/dungeon/caveMouth.ts + masterworld/world/dungeon/caveRock.ts + masterworld/world/volumes.ts",
     "reason": "Rock beds as a sine warped by fbm noise: one line of shaping in each rock field, with its own scales and amplitudes."
   },
   {
     "key": "same name: masterworld/world/dungeon/caveRock.ts#sdf + masterworld/world/dungeon/space.ts#sdf",
     "reason": "CaveSpace.sdf overrides DungeonSpace.sdf: the layout's distance with the carved rock over it (it calls super.sdf)."
-  },
-  {
-    "key": "same name: masterworld/game/trade.ts#save + masterworld/talk/townTalk.ts#save",
-    "reason": "Each class writes its own state for the save (talk evidence and leads vs the hero's skills and kit vs the merchants' stock); only the name matches."
   },
   {
     "key": "same name: masterworld/game/evening.ts#log + masterworld/main.ts#log",
@@ -384,10 +376,6 @@
     "reason": "A per-frame step: the owner walking down to the hero vs a den stepping its creatures."
   },
   {
-    "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/creatures.ts#step",
-    "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
-  },
-  {
     "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/livestock.ts#step",
     "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
   },
@@ -497,10 +485,6 @@
   },
   {
     "key": "same name: masterworld/game/visitor.ts#step + masterworld/lab/spellLab.ts#step",
-    "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
-  },
-  {
-    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/creatures.ts#step",
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
   {
@@ -716,10 +700,6 @@
     "reason": "Shared idiom, not a copy."
   },
   {
-    "key": "idiom: [.filter .kind .log] in masterworld/vgm/answers.ts + masterworld/vgm/leads.ts + masterworld/vgm/watch.ts",
-    "reason": "Shared idiom, not a copy."
-  },
-  {
     "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/vgm/watch.ts#step",
     "reason": "Shared idiom, not a copy."
   },
@@ -912,7 +892,23 @@
     "reason": "A point offset to the side of a heading (x - sin(yaw) d, z + cos(yaw) d) in each file's own geometry (a visit's door, a mine's timber, a throat's arch); two lines of trigonometry."
   },
   {
-    "key": "idiom: [.map .person] in masterworld/app/hails.ts + masterworld/main.ts + masterworld/sim/townFight.ts",
-    "reason": "Reading a list of people into their ids or spots (.map over .person) in three unrelated places; it comes and goes with edits to main.ts and is not a copied helper."
+    "key": "idiom: [.Rock .range] in masterworld/world/cave/lockMesh.ts + masterworld/world/dungeon/barrowMesh.ts + masterworld/world/dungeon/cellarMesh.ts",
+    "reason": "Setting stones into a piece (kit.stone with a seeded range of size and turn) in each mesh file's own shape: a cave lock's boulder and stacked courses, a barrow's kerbstones, a cellar's rubble; one call each, not a copied helper."
+  },
+  {
+    "key": "idiom: [.edgeStart .edgeTo] in masterworld/sim/formedGround.ts + masterworld/world/cave/concede.ts + masterworld/world/cave/locks.ts + masterworld/world/cave/reader.ts",
+    "reason": "Walking the reading's edge arrays (edgeStart..edgeTo) in each search over the cave network: the creatures' A*, the concession's flood, the lock finder's breadth-first search; the loop is how the arrays are read."
+  },
+  {
+    "key": "idiom: [.key .kind] in masterworld/app/cellars.ts + masterworld/sim/formedSpace.ts + masterworld/world/dungeon/setPieces.ts + masterworld/world/dungeon/space.ts",
+    "reason": "Reading a link's kind and key (a locked link's key room) where a lock is made, opened or set up; the same two fields of the graph's link, in code that does different things with them."
+  },
+  {
+    "key": "idiom: [.push .reverse] in masterworld/sim/nav.ts + masterworld/world/cave/locks.ts + masterworld/world/cave/reader.ts",
+    "reason": "Building a path by walking parents back from the goal and reversing it, in each search's own parent array (the land's nav, the reader's way in, the lock finder's way between two rooms)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedSpace.ts#touch + masterworld/world/dungeon/space.ts#touch",
+    "reason": "FormedSpace overrides DungeonSpace.touch: a formed cave's keys and locks instead of the built layout's doors; the name is the override's."
   }
 ]

@@ -95,8 +95,18 @@ export interface Creature {
   hop: Hop | null;
   /** Seconds left that it leaves a hero it could not reach alone (it went home). */
   spurn: number;
+  /** Its hunt of a shy beast (creep, then burst), while it brawls with one. */
+  stalk: Stalk | null;
+  /** Seconds it rests after a hunt that failed, before it looks for another quarrel. */
+  winded: number;
   rng: Rng;
 }
+
+/**
+ * A hunt of a shy beast (`CreatureDef.stalks`): unseen it creeps (`hidden`), the prey's notice rolled once (`rolled`) as it comes
+ * within the prey's flight distance; seen or close enough it bursts, `left` seconds of burst (-1 before it begins).
+ */
+export interface Stalk { hidden: boolean; rolled: boolean; left: number }
 
 /** A hop free of where it was stuck: from, to, how long it takes and how far it has got (seconds). */
 export interface Hop {
@@ -146,6 +156,10 @@ const CLOSE_IN = 0.55;
 const LOOK = 0.6, DIN = 4;
 /** A brawler's blow at a prey that runs reaches this much further (m): it springs after it. */
 const LUNGE = 2.5;
+/** A hunter creeping up on shy prey goes at this share of its pace, and a failed hunt leaves it winded, and a kill leaves it fed, this long (s). */
+const STALK_CREEP = 0.4, WINDED = 30, FED = 90;
+/** A hunter in its burst springs this much further (m) at prey that runs. */
+const BOUND = 2.5;
 /** A body knocked down lies this long (s) before it gets up, and gets up with this share of its health. */
 export const DOWN_FOR = 45;
 const UP_WITH = 0.3;
@@ -314,7 +328,7 @@ export class Den {
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
         aware: 0, leader: id === 0 && def.pack, band: -1, prey: null, din: 0, eye: id * 0.13 % LOOK, downFor: 0, struck: false, signal: null, signalLeft: 0, armed: false, spoke: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
-        repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
+        repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, stalk: null, winded: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
       this.creatures.push(c);
@@ -350,7 +364,8 @@ export class Den {
       if ((c.signalLeft -= dt) <= 0) { c.signalLeft = 0; c.signal = null; }
       c.din = Math.max(0, c.din - dt);
       c.eye = Math.max(0, c.eye - dt);
-      if (c.state !== 'brawl') c.prey = null;
+      if (c.state !== 'brawl') { c.prey = null; c.stalk = null; }
+      c.winded = Math.max(0, c.winded - dt);
       c.ready = Math.max(0, c.ready - dt);
       c.repath = Math.max(0, c.repath - dt);
       c.hopIn = Math.max(0, c.hopIn - dt);
@@ -540,6 +555,20 @@ export class Den {
     }
   }
 
+  /**
+   * A living one of this den shows what its people say (a gesture), facing the hero at (x, z): the nearest to them speaks. A last warning
+   * has the whole den draw; a settle puts the weapons away again. For a hold's wardens, who are not a warning band (game/hold.ts).
+   */
+  gesture(turn: WarnTurn, at: { readonly x: number; readonly z: number }): void {
+    const alive = this.creatures.filter((c) => c.state !== 'dead' && c.state !== 'down');
+    if (!alive.length) return;
+    let who = alive[0];
+    for (const c of alive) if (Math.hypot(at.x - c.x, at.z - c.z) < Math.hypot(at.x - who.x, at.z - who.z)) who = c;
+    who.dir = Math.atan2(at.z - who.z, at.x - who.x);
+    this.signalling(who, turn, alive);
+    if (turn === 'settle') for (const c of alive) c.armed = false;
+  }
+
   /** The speaker shows what it says (a gesture for a moment); a last warning or a demand has the whole band draw. */
   private signalling(who: Creature, turn: WarnTurn, band: readonly Creature[]): void {
     who.signal = turn;
@@ -675,7 +704,7 @@ export class Den {
    * (fight) does not look.
    */
   private quarrel(c: Creature): void {
-    if (!this.feud || c.eye > 0 || c.spurn > 0 || (c.state !== 'idle' && c.state !== 'alert')) return;
+    if (!this.feud || c.eye > 0 || c.spurn > 0 || c.winded > 0 || (c.state !== 'idle' && c.state !== 'alert')) return;
     c.eye = LOOK;
     if (c.def.temper === 'skittish') {
       if (this.dread(c, null)) this.toFlee(c, this.walked);
@@ -688,13 +717,19 @@ export class Den {
       o.state = 'brawl';
       o.prey = foe;
       o.path = [];
+      o.stalk = o.def.stalks && foe.c.def.temper === 'skittish' ? { hidden: true, rolled: false, left: -1 } : null;
     }
   }
 
   /** Whom it fights: it closes in on its prey and strikes, until one of them falls or runs, or it loses sight of it. */
   private brawl(c: Creature, dt: number, out: DenEvent[]): void {
     const p = c.prey;
-    if (!p || p.c.state === 'dead' || p.c.state === 'down' || (p.c.state === 'flee' && Math.hypot(p.c.x - c.x, p.c.z - c.z) > c.def.senses.sight)) { this.settleDown(c); return; }
+    if (!p || p.c.state === 'dead' || p.c.state === 'down' || (p.c.state === 'flee' && Math.hypot(p.c.x - c.x, p.c.z - c.z) > c.def.senses.sight)) {
+      // A hunter that brought its prey down is fed, and hunts no more for a long while (the herd is not wiped out).
+      if (p && c.def.stalks && (p.c.state === 'dead' || p.c.state === 'down')) c.winded = FED;
+      this.settleDown(c);
+      return;
+    }
     const t = p.c, dx = t.x - c.x, dz = t.z - c.z, d = Math.hypot(dx, dz), dy = Math.abs(t.y - c.y);
     const atk = c.def.attacks[0], reach = atk.reach + radiusOf(c.def) + radiusOf(t.def);
     const sees = d < c.def.senses.sight && this.ground.sees(c.x, c.y, c.z, t.x, t.y, t.z, 0.9);
@@ -707,7 +742,7 @@ export class Den {
       if (c.windup <= 0) {
         c.ready = atk.time;
         // Stepped back out of reach: the blow goes wide; a lunge at one that runs reaches the further for it.
-        if (d < reach + 0.3 + (t.state === 'flee' ? LUNGE : 0) && dy < 1.2 && sees) p.den.bitten(t, strike({ damage: atk.damage, kind: atk.kind, prowess: atk.prowess }, p.den.guardOf(t), c.rng), c, this);
+        if (d < reach + 0.3 + (t.state === 'flee' ? LUNGE + (this.bursting(c) ? BOUND : 0) : 0) && dy < 1.2 && sees) p.den.bitten(t, strike({ damage: atk.damage, kind: atk.kind, prowess: atk.prowess }, this.onTheRun(c, p.den.guardOf(t)), c.rng), c, this);
       }
       return;
     }
@@ -723,7 +758,38 @@ export class Den {
     const goal = sees ? t : c.seen;
     if (!goal) { this.settleDown(c); return; }
     if (c.repath === 0 || c.pi >= c.path.length) { this.headTo(c, goal); c.repath = 0.6; }
-    if (!this.move(c, dt, 1)) c.act = 'stand';
+    const pace = c.stalk ? this.stalking(c, c.stalk, p, d, dt) : 1;
+    if (pace > 0 && !this.move(c, dt, pace)) c.act = 'stand';
+  }
+
+  /** Prey running from a hunter's burst has no guard to put up: the bite lands on it open. */
+  private onTheRun(c: Creature, g: Guard): Guard {
+    return this.bursting(c) ? { ...g, open: true } : g;
+  }
+
+  /** In the burst of a hunt (it springs the further for it, BOUND). */
+  private bursting(c: Creature): boolean {
+    return !!c.stalk && c.stalk.left > 0;
+  }
+
+  /**
+   * A hunt of a shy beast (Arnd 2026-11-02): the pace this step. It creeps up unseen; the prey may notice it as it comes within
+   * its flight distance (a seeded roll, once), or it bursts from `from` metres; the burst is fast and short, and a hunt it does not end
+   * is given up (pace 0), the hunter winded a while. One of a pack seen, all burst.
+   */
+  private stalking(c: Creature, s: Stalk, p: Prey, d: number, dt: number): number {
+    const st = c.def.stalks!;
+    if (s.left < 0) {
+      if (!s.rolled && d < (p.c.def.wary ?? 20)) { s.rolled = true; if (c.rng.chance(st.seen)) s.hidden = false; }
+      if (s.hidden && this.creatures.some((o) => o.stalk && !o.stalk.hidden && o.prey?.c === p.c)) s.hidden = false;
+      if (s.hidden && d > st.from) return STALK_CREEP;
+      s.hidden = false;
+      s.left = st.secs;
+    }
+    if ((s.left -= dt) > 0) return st.burst;
+    c.winded = WINDED;
+    this.settleDown(c);
+    return 0;
   }
 
   /** Knocked down: it lies, then gets up with a share of its health. */
@@ -766,6 +832,7 @@ export class Den {
   private settleDown(c: Creature): void {
     c.state = 'idle';
     c.prey = null;
+    c.stalk = null;
     c.path = [];
     c.until = 0;
     c.eye = 0;
@@ -775,7 +842,7 @@ export class Den {
   private dread(c: Creature, q: Quarry | null): P3 | null {
     let best: P3 | null = null, near = c.def.senses.sight;
     for (const { c: o } of this.bodies()) {
-      if ((o.state !== 'brawl' && o.state !== 'fight') || !this.feud?.(o.def.faction, c.def.faction)) continue;
+      if ((o.state !== 'brawl' && o.state !== 'fight') || o.stalk?.hidden || !this.feud?.(o.def.faction, c.def.faction)) continue;
       const d = Math.hypot(o.x - c.x, o.z - c.z);
       if (d < near) { near = d; best = o; }
     }

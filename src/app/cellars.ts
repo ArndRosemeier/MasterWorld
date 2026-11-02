@@ -43,6 +43,9 @@ import { runCaveJob, type CaveJob, type CaveResult } from '../world/cave/job';
 import { caveSpecFor, type CaveSpec } from '../vgm/caves';
 import { inhabit } from '../vgm/inhabit';
 import { FormedSpace } from '../sim/formedSpace';
+import { lockSites, type CaveLock } from '../world/cave/locks';
+import { lockPiece } from '../world/cave/lockMesh';
+import { keyMesh } from '../world/dungeon/cellarMesh';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import { moveIn, occupantId, outlineCellar, type Cellar, type DungeonPlace } from '../world/dungeon/cellar';
 import { cellarDanger, hoardsOf } from '../world/dungeon/treasure';
@@ -493,6 +496,10 @@ export class Cellars {
     let carved: CaveSpace | undefined;
     if (formed) {
       view.formed = formed.res;
+      view.locks = {
+        doors: formed.locks.map((l) => lockPiece(l, s.decision.seed)),
+        keys: formed.locks.flatMap((l) => (l.kind === 'locked' && l.key !== undefined ? [{ room: l.key, mesh: keyMesh(formed.space.keyAt(l.key), deriveSeed(s.decision.seed, 'key', l.key)) }] : [])),
+      };
       view.throat = !!s.throat;
     } else if (s.first.form.space.carved) {
       const layout = s.first.layout, seed = caveSeed(s.first);
@@ -531,7 +538,7 @@ export class Cellars {
    * A formed cave for a cave place (phase K5): made in a worker from the place's seed, the cellar's rooms told as places of it
    * (vgm/inhabit.ts), its mouth's plane as the throat the portal comes out of. Null: the setting has no rock for it.
    */
-  private async formedCave(s: Site): Promise<{ readonly res: CaveResult; readonly space: FormedSpace } | null> {
+  private async formedCave(s: Site): Promise<{ readonly res: CaveResult; readonly space: FormedSpace; readonly locks: readonly CaveLock[] } | null> {
     const caves = this.host.setting.caves, h = this.host;
     // The VGM's cave tool (vgm/caves.ts) asked for the rock, size and shares when the place was opened.
     const spec = s.spec;
@@ -545,7 +552,9 @@ export class Cellars {
     s.cellar = s.cellar === was ? first.cellar : inhabit(s.cellar, res.field, res.read.reading, throat).cellar;
     s.throat = throat ?? null;
     const d = res.dressing, sounds = { drips: d?.drips.map((p): [number, number, number] => [p.x, p.floor, p.z]) ?? [], streams: d?.streams.flatMap((st) => st.pts.filter((_, i) => i % 2 === 0).map((q): [number, number, number] => [q[0], q[1], q[2]])) ?? [] };
-    return { res, space: new FormedSpace(first.cellar.layout, res.field, first.ground, first.cellar.formed!.homes, sounds) };
+    // Its story's shut ways, set where the cave narrows (K6): solid for the walker and the creatures, drawn as pieces that open on screen.
+    const locks = lockSites(first.cellar, res.field, res.read.reading, first.cells, caves.way);
+    return { res, locks, space: new FormedSpace(first.cellar.layout, res.field, first.ground, first.cellar.formed!.homes, sounds, locks) };
   }
 
   /** Its dwellers now: the den, their bodies and the fight (again after a move-in). */

@@ -17,7 +17,7 @@ import { Delve, type DelveSave } from '../game/delve';
 import { CreatureView } from '../render/dungeon/CreatureView';
 import type { SettingModule } from '../setting/contract';
 import { Den } from '../sim/creatures';
-import { OpenGround, awake, groupDanger, type Land, type Territory } from '../sim/wild';
+import { OpenGround, awake, bedOf, groupDanger, type Land, type Territory } from '../sim/wild';
 import type { Journal } from '../talk/journal';
 import type { Director } from '../vgm/director';
 import type { WildGroup } from '../vgm/events';
@@ -156,7 +156,7 @@ export class WildLand {
     const h = this.host, t = g.territory, saved = this.saved[t.id];
     // Out at sea (S9) its swimmers come to the depth of a hero who swims.
     const w = h.player.walker, prey = () => (w.mode === 'swim' && !h.player.offFoot ? w.pos.y : null);
-    const den = new Den(new OpenGround(this.land, [t], prey), t.members.map((creature) => ({ creature, room: 0 })), h.setting.creatures, deriveSeed(t.seed, 'den'), saved?.dead ?? []);
+    const den = new Den(new OpenGround(this.land, [t], prey, bedOf(t.members, h.setting.creatures)), t.members.map((creature) => ({ creature, room: 0 })), h.setting.creatures, deriveSeed(t.seed, 'den'), saved?.dead ?? []);
     const delve = new Delve(null, den, h.setting, h.character, h.seed, saved);
     delve.fight.standing = h.standing;
     den.knows = h.known?.({ id: t.id, members: t.members, town: this.town }) ?? null;

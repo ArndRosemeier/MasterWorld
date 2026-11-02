@@ -111,18 +111,27 @@ function stage(root, roots) {
   return path.join(tmp, 'scan');
 }
 
+/** The two halves of the finder: copied bodies and idioms (`copies`), and same-name candidates (`names`). */
+export const DUPLICATION_KINDS = ['copies', 'names'];
+
 /** The current duplication findings as stable keys (names and files, never line numbers). */
-export function duplicationFindings(root = REPO, roots = RULES.duplication.roots) {
+export function duplicationFindings(root = REPO, roots = RULES.duplication.roots, kinds = DUPLICATION_KINDS) {
   const dir = stage(root, roots);
   try {
-    const rep = scanRepeated(dir, { displayBase: dir });
-    const clones = rep.clones.clusters.map((c) => `clone: ${[...new Set(c.fns.map((f) => `${f.file}#${f.name}`))].sort().join(' + ')}`);
-    const idioms = rep.idioms.idioms.map((d) => `idiom: [${d.names.join(' ')}] in ${[...new Set(d.at.map((a) => a.file))].sort().join(' + ')}`);
-    const tree = scanTree(dir, { displayBase: dir });
-    const g = groupCandidates(tree.functions);
-    const names = [...g.tier1, ...g.tier2]
-      .filter((p) => (p.status === 'compared' || p.status === 'confirmed') && p.sim >= DEFAULT_CONFIRM_FLOOR)
-      .map((p) => `same name: ${[`${p.a.file}#${p.a.name}`, `${p.b.file}#${p.b.name}`].sort().join(' + ')}`);
+    // (Each half takes a few seconds: the repository's ratchet runs them as two tests, so each stays inside a test's 5 s.)
+    let clones = [], idioms = [], names = [];
+    if (kinds.includes('copies')) {
+      const rep = scanRepeated(dir, { displayBase: dir });
+      clones = rep.clones.clusters.map((c) => `clone: ${[...new Set(c.fns.map((f) => `${f.file}#${f.name}`))].sort().join(' + ')}`);
+      idioms = rep.idioms.idioms.map((d) => `idiom: [${d.names.join(' ')}] in ${[...new Set(d.at.map((a) => a.file))].sort().join(' + ')}`);
+    }
+    if (kinds.includes('names')) {
+      const tree = scanTree(dir, { displayBase: dir });
+      const g = groupCandidates(tree.functions);
+      names = [...g.tier1, ...g.tier2]
+        .filter((p) => (p.status === 'compared' || p.status === 'confirmed') && p.sim >= DEFAULT_CONFIRM_FLOOR)
+        .map((p) => `same name: ${[`${p.a.file}#${p.a.name}`, `${p.b.file}#${p.b.name}`].sort().join(' + ')}`);
+    }
     return [...new Set([...clones, ...idioms, ...names])].sort();
   } finally {
     fs.rmSync(path.dirname(dir), { recursive: true, force: true });

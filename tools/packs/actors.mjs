@@ -14,7 +14,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import * as core from '@actors/core';
-import { cutLoop, findLoop, findStill, framesOf } from './cutLoop.mjs';
+import { cutLoop, findLoop, findStill, framesOf, mirrorFrames } from './cutLoop.mjs';
 
 /** A cut whose ends differ more than this (cutLoop's measure) is refused: it would hitch at the seam. */
 const MAX_SEAM = 0.06;
@@ -35,8 +35,8 @@ const cuts = [...gaitText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', pace: (
 if (!cuts.length) throw new Error('no GAIT_CUTS in src/render/folk/gaits.ts');
 // Moves on the spot cut out of the CMU takes (src/render/folk/moves.ts), one `{ clip, take, secs, seam, travel, upright }` a line.
 const moveText = readFileSync(join(root, 'src/render/folk/moves.ts'), 'utf8');
-for (const m of moveText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', secs: \[([\d.]+), ([\d.]+)\], seam: ([\d.]+), travel: ([\d.]+), upright: \{ hips: ([\d.]+), tilt: ([\d.]+) \} \}/g)) {
-  cuts.push({ clip: m[1], take: m[2], still: { secs: [Number(m[3]), Number(m[4])], seam: Number(m[5]), travel: Number(m[6]), upright: { hips: Number(m[7]), tilt: Number(m[8]) } } });
+for (const m of moveText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', (mirror: true, )?secs: \[([\d.]+), ([\d.]+)\], seam: ([\d.]+), travel: ([\d.]+), upright: \{ hips: ([\d.]+), tilt: ([\d.]+) \} \}/g)) {
+  cuts.push({ clip: m[1], take: m[2], mirror: !!m[3], still: { secs: [Number(m[4]), Number(m[5])], seam: Number(m[6]), travel: Number(m[7]), upright: { hips: Number(m[8]), tilt: Number(m[9]) } } });
 }
 if (!cuts.some((c) => c.still)) throw new Error('no MOVE_CUTS in src/render/folk/moves.ts');
 // The pack's walk at its own speed (m/s): the cuts' paces are measured against it.
@@ -151,7 +151,8 @@ function cutTakes(src, manifest) {
     const entry = lib.clips.find((x) => x.name === c.take);
     if (!entry) throw new Error(`no ${c.take} in the CMU library`);
     const def = { ...lib.rigs[entry.rig], ...entry };
-    const frames = framesOf(def, decodeClip(def, buf(join(src, 'clips/cmu', entry.file))));
+    const taken = framesOf(def, decodeClip(def, buf(join(src, 'clips/cmu', entry.file))));
+    const frames = c.mirror ? mirrorFrames(def, taken) : taken;
     const loop = c.still ? findStill(def, frames, c.still) : findLoop(def, frames);
     if (!loop || (!c.still && loop.score > MAX_SEAM)) throw new Error(`${c.take}: no clean loop (${loop ? `seam ${loop.score.toFixed(3)}` : 'no fitting stretch'})`);
     const out = { ...def, loop: true, frameCount: loop.len + 1 };

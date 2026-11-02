@@ -84,11 +84,12 @@ export interface FoeDoing {
 }
 
 /**
- * The gesture of each turn of a band's words (D64), from the people's own clips (the pack has them all): talking with the hands for a
- * warning, a demand and a last word, cheering arms for a jibe, a shaken head for giving way, a nod for a friend. (A pointing arm and a
- * raised hand are new clips for Actors; until they are made these stand in.)
+ * The gesture of each turn of a band's words (D64), motion-capture takes cut into clips (src/render/folk/moves.ts MOVE_CUTS): a raised
+ * hand (the free one) for a warning, a laugh for a jibe, a shrug for giving way, a wave for a friend; a shaken head settles a quarrel.
+ * A last warning and a demand have no clip of their own: the band's weapons are drawn (`armed`, the grip changes) and it stands in its
+ * fighting stance (null here). Pointing and handing over coin have no take cut yet.
  */
-export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string>> = { warn: 'talk', last: 'talk', demand: 'talk', jeer: 'cheer', settle: 'shake head', greet: 'nod', yield: 'shake head' };
+export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string | null>> = { warn: 'raised hand', last: null, demand: null, jeer: 'laugh', settle: 'shake head', greet: 'wave hello', yield: 'shrug' };
 
 /** The clip for it; the dead and the gaunt (ghouls) shamble and claw. */
 export function foeClip(def: CreatureDef, d: FoeDoing): string {
@@ -99,7 +100,8 @@ export function foeClip(def: CreatureDef, d: FoeDoing): string {
   if (d.action === 'stab') return 'sword slash C';
   if (d.action === 'swing_1h') return d.variant % 2 ? 'sword slash B' : 'sword slash A';
   if (d.action === 'slam') return dead ? 'zombie scratch' : 'hook';
-  if (d.signal && d.speed < 0.2 && !dead && !d.low) return SIGNAL_CLIPS[d.signal];
+  const gesture = d.signal && d.speed < 0.2 && !dead && !d.low ? SIGNAL_CLIPS[d.signal] : null;
+  if (gesture) return gesture;
   if (d.speed > 2.6) return 'jog';
   if (d.speed > 0.2) return dead ? 'zombie walk' : 'walk';
   if (d.low === 'beg') return 'repair (kneeling)';

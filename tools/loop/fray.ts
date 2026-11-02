@@ -109,13 +109,48 @@ function holdup(name: string): string | null {
   return null;
 }
 
+/** The giants (phase M, D67): a giant elk and a giant turtle walk off from a hero and nobody hunts them; a giant boar far out comes at the hero. */
+function giants(name: string): string | null {
+  const seed = parseSeed(name);
+  const flat: Land = { height: () => 0, waterDepth: () => 0, blocked: () => false };
+  const den = (kind: string, n: number, x: number) => {
+    const d = new Den(new OpenGround(flat, [{ x, z: 0, r: 0.01 }]), Array.from({ length: n }, () => ({ creature: kind, room: 0 })), classic.creatures, seed);
+    d.creatures.forEach((c, i) => { c.x = x + (i % 2) * 1.2; c.z = Math.floor(i / 2) * 1.2; });
+    d.feud = (a, b) => opposed(classic, a, b);
+    return d;
+  };
+  const hero = (x: number): Quarry => ({ x, y: 0, z: 0, noise: 0.6, light: 0, alive: true, guard: { defence: 20, armour: 1, open: false } });
+  // The peaceful: a hero walks up to them, wolves lie beside the elk; no blow is struck by or at a great beast, and the elk walks away.
+  const elk = den('giant elk', 1, 0), turtle = den('giant turtle', 1, 60), wolves = den('wolf', 3, 9);
+  elk.neighbours = [wolves]; wolves.neighbours = [elk];
+  let blows = 0, fled = 0;
+  const a0 = elk.creatures[0].x;
+  for (let t = 0; t < 120; t += DT) {
+    const at = Math.max(5, 40 - t * 0.6);
+    for (const e of [...elk.step(DT, hero(at)), ...turtle.step(DT, hero(60 + Math.max(5, 40 - t * 0.6))), ...wolves.step(DT, far)]) {
+      if (e.kind === 'swing' && (e.who.def.faction === 'great' || e.who.def.faction === 'predators')) blows++;
+      if (e.kind === 'flee' && e.who.def.faction === 'great') fled++;
+    }
+  }
+  if (blows) return `a great beast was struck at or struck: ${blows} blows`;
+  if (!fled) return 'the giant elk and turtle never walked off from the hero';
+  if (Math.abs(elk.creatures[0].x - a0) < 1) return 'the giant elk stayed put';
+  // The hunters: a giant boar notices a hero close by and fights.
+  const boar = den('giant boar', 1, 500);
+  let fought = false;
+  for (let t = 0; t < 30 && !fought; t += DT) { boar.step(DT, hero(510)); fought = boar.fighting.length > 0; }
+  if (!fought) return 'the giant boar never went for the hero';
+  console.log(`  ${name}: the giant elk and turtle walked off from a hero (${fled} flights), the wolves beside them struck no blow at the elk; the giant boar went for the hero`);
+  return null;
+}
+
 let failed = 0;
 for (const name of seeds) {
-  for (const [what, run] of [['a town fights off wolves', fray], ['creatures fight creatures', brawl], ['a holdup on the road', holdup]] as const) {
+  for (const [what, run] of [['a town fights off wolves', fray], ['creatures fight creatures', brawl], ['a holdup on the road', holdup], ['giants: the peaceful walk off, the boar fights', giants]] as const) {
     console.log(`== ${name}: ${what}`);
     const why = run(name);
     if (why) { console.log(`FAILED: ${why}`); failed++; }
   }
 }
-console.log(failed ? `${failed} fray checks FAILED` : `all ${seeds.length * 3} fray checks passed`);
+console.log(failed ? `${failed} fray checks FAILED` : `all ${seeds.length * 4} fray checks passed`);
 if (failed) process.exit(1);

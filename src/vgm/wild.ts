@@ -46,14 +46,36 @@ const STRAND_TOP = 4, SEA_NEAR = 35;
 const SEA_DEEP = 6, SEA_OFF_HARBOUR = 300;
 
 
+/**
+ * A spot on the way out from (x, z) in direction `a` within `ring` that `fits` (the `pick` share of those found, looked for every `step` m), or -1.
+ * A strand or a bank is a narrow band, so it is looked for along the way out, not at one distance.
+ */
+function spotOn(x: number, z: number, a: number, ring: readonly [number, number], pick: number, step: number, fits: (px: number, pz: number) => boolean): number {
+  const found: number[] = [];
+  for (let d = ring[0]; d <= ring[1]; d += step) if (fits(x + Math.cos(a) * d, z + Math.sin(a) * d)) found.push(d);
+  return found.length ? found[Math.floor(pick * found.length) % found.length] : -1;
+}
+
 /** A strand on the way out from (x, z) in direction `a` within `ring` (its distance; the `pick` share of those found), or -1. */
 function strandOn(terrain: Terrain, x: number, z: number, a: number, ring: readonly [number, number], pick: number): number {
-  const found: number[] = [];
-  for (let d = ring[0]; d <= ring[1]; d += 8) {
-    const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, h = terrain.height(px, pz);
-    if (h >= 0.3 && h <= STRAND_TOP && terrain.waterDepth(px, pz) === 0 && seaWithin(terrain, px, pz, SEA_NEAR, 1)) found.push(d);
-  }
-  return found.length ? found[Math.floor(pick * found.length) % found.length] : -1;
+  return spotOn(x, z, a, ring, pick, 8, (px, pz) => {
+    const h = terrain.height(px, pz);
+    return h >= 0.3 && h <= STRAND_TOP && terrain.waterDepth(px, pz) === 0 && !!seaWithin(terrain, px, pz, SEA_NEAR, 1);
+  });
+}
+
+/** How far off (m) water is looked for round a water's-edge group's ground, and how deep it must be (m). */
+const EDGE_NEAR = 26, EDGE_DEEP = 0.5;
+
+/** Does water (any: a pond, a river, a lake, the sea) lie within EDGE_NEAR of (x, z)? */
+function waterNear(terrain: Terrain, x: number, z: number): boolean {
+  for (let k = 0; k < 8; k++) if (terrain.waterDepth(x + Math.cos((k * Math.PI) / 4) * EDGE_NEAR, z + Math.sin((k * Math.PI) / 4) * EDGE_NEAR) >= EDGE_DEEP) return true;
+  return false;
+}
+
+/** A dry bank with water beside it on the way out from (x, z) in direction `a` within `ring` (its distance; the `pick` share of those found), or -1. */
+function edgeOn(terrain: Terrain, x: number, z: number, a: number, ring: readonly [number, number], pick: number): number {
+  return spotOn(x, z, a, ring, pick, 12, (px, pz) => terrain.waterDepth(px, pz) === 0 && terrain.height(px, pz) >= 0.6 && waterNear(terrain, px, pz));
 }
 
 /**
@@ -72,14 +94,16 @@ function placeWild(c: WildContext, town: Town): WildDecision[] {
     for (let g = 0; g < def.groups; g++) {
       const s = deriveSeed(seed, 'wild', def.id, g);
       let best: { x: number; z: number; score: number } | null = null;
-      for (let k = 0; k < 48; k++) {
+      // A strand or a bank is a narrow band: more ways out are tried for it.
+      const tries = def.habitat === 'water' ? 144 : 48;
+      for (let k = 0; k < tries; k++) {
         const d = def.ring[0] + (def.ring[1] - def.ring[0]) * hash2f(s, k, 1);
         let a = hash2f(s, k, 2) * Math.PI * 2;
         // By a road: along one of the roads out, a little off it.
         if (def.habitat === 'road' && roads.length) a = roads[Math.floor(hash2f(s, k, 3) * roads.length)] + (hash2f(s, k, 4) - 0.5) * 0.35;
-        const shore = def.habitat === 'shore';
-        // A strand is a narrow band: looked for along the way out, not at one distance.
-        const along = shore ? strandOn(terrain, tx, tz, a, def.ring, hash2f(s, k, 6)) : d;
+        const shore = def.habitat === 'shore', edge = def.habitat === 'water';
+        // A strand or a bank is a narrow band: looked for along the way out, not at one distance.
+        const along = shore ? strandOn(terrain, tx, tz, a, def.ring, hash2f(s, k, 6)) : edge ? edgeOn(terrain, tx, tz, a, def.ring, hash2f(s, k, 6)) : d;
         if (along < 0) continue;
         const x = tx + Math.cos(a) * along, z = tz + Math.sin(a) * along;
         if (def.habitat === 'sea') {
@@ -91,12 +115,13 @@ function placeWild(c: WildContext, town: Town): WildDecision[] {
           continue;
         }
         // Dry and above the floods; on the strand only just above the sea, with the sea beside it.
-        if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < (shore ? 0.3 : 2) || (shore && (terrain.height(x, z) > STRAND_TOP || !seaWithin(terrain, x, z, SEA_NEAR, 1)))) continue;
+        if (terrain.waterDepth(x, z) > 0 || terrain.height(x, z) < (shore ? 0.3 : edge ? 0.6 : 2) || (shore && (terrain.height(x, z) > STRAND_TOP || !seaWithin(terrain, x, z, SEA_NEAR, 1)))) continue;
         // Gentle enough to live on.
         const h = terrain.height(x, z), slope = terrain.steepness(x, z, 8, h);
         if (slope > 0.45) continue;
         const w = woods(x, z);
-        const fit = def.habitat === 'wood' ? w : def.habitat === 'open' || shore ? 1 - w : 0.6 + (1 - w) * 0.2;
+        // A water's edge is wherever the water is (woods or not); a bank in the open is only a little better.
+        const fit = def.habitat === 'wood' ? w : edge ? 0.5 + (1 - w) * 0.4 : def.habitat === 'open' || shore ? 1 - w : 0.6 + (1 - w) * 0.2;
         // Apart from the other groups, and clear of a people's hold.
         const crowd = out.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + def.range + 60) || terrain.holds.some((h) => Math.hypot(h.x - x, h.z - z) < def.range + 110) ? 1 : 0;
         const score = fit - crowd - slope + hash2f(s, k, 5) * 0.1;

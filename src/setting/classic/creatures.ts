@@ -90,7 +90,7 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     id: 'wolf', name: 'wolf', plural: 'wolves', body: { kind: 'beast', species: 'wolf', length: 1.15, color: '#6e665a' },
-    health: 26, armour: 0, defence: 26, speed: 7.5, senses: { sight: 26, hearing: 34 }, faction: 'predators', temper: 'hostile', morale: 0.5, pack: true, role: 'melee', danger: 6,
+    health: 26, armour: 0, defence: 26, speed: 7.5, senses: { sight: 26, hearing: 34 }, faction: 'predators', temper: 'hostile', stalks: { from: 10, secs: 3.5, burst: 1.7, seen: 0.2 }, morale: 0.5, pack: true, role: 'melee', danger: 6,
     attacks: [{ name: 'bite', damage: [3, 7], kind: 'bite', reach: 0.7, time: 1.3, prowess: 30 }],
     loot: 'wolf', tell: 'A howl, far off, and then another, nearer.',
   },
@@ -100,10 +100,10 @@ export const creatures: readonly CreatureDef[] = [
     attacks: [{ name: 'tusks', damage: [4, 9], kind: 'pierce', reach: 0.8, time: 1.8, prowess: 28 }],
     loot: 'boar', tell: 'The earth turned over under the oaks, and a grunting in the undergrowth.',
   },
-  // The strand (S9): crabs as big as a dog, sidling out of the wrack at low water.
+  // The strand (S9): crabs as big as a dog, sidling out of the wrack at low water. They do not swim: they walk the sea bed, as deep as a swimmer's feet still reach them (`bed`).
   {
     id: 'giant crab', name: 'giant crab', plural: 'giant crabs', body: { kind: 'beast', species: 'crab', length: 1.1, color: '#9a4a2c' },
-    health: 26, armour: 3, defence: 12, speed: 3.2, senses: { sight: 8, hearing: 10 }, faction: 'vermin', temper: 'hostile', morale: 0.6, pack: true, role: 'melee', danger: 5,
+    health: 26, armour: 3, defence: 12, speed: 3.2, bed: 2.2, senses: { sight: 8, hearing: 10 }, faction: 'vermin', temper: 'hostile', morale: 0.6, pack: true, role: 'melee', danger: 5,
     attacks: [{ name: 'claws', damage: [2, 6], kind: 'pierce', reach: 0.8, time: 1.9, prowess: 22 }],
     loot: 'crab', tell: 'Scratching among the wrack on the strand, and shells that are far too big.',
   },
@@ -114,6 +114,34 @@ export const creatures: readonly CreatureDef[] = [
     health: 40, armour: 1, defence: 18, speed: 5.5, senses: { sight: 18, hearing: 30 }, faction: 'predators', temper: 'hostile', morale: 1, pack: false, role: 'melee', danger: 8,
     attacks: [{ name: 'bite', damage: [4, 9], kind: 'bite', reach: 1.1, time: 1.8, prowess: 28 }],
     loot: 'shark', tell: 'A fin cutting the swell farther out, and then nothing.',
+  },
+  // The first world's leak makes giants (D67, phase M; Actors' Deform "giant" recipe, never a scaled copy: thicker legs and neck, an old coat, a slow
+  // gait). Two are a promise, peaceful and near: a giant elk of the open land and a giant turtle on the strand. They are the great beasts' own
+  // faction, at feud with nobody, and a shy one runs when struck; cornered it fights. The two that hunt live only far out (D29), at the
+  // danger the land there holds, and never below.
+  {
+    id: 'giant elk', name: 'giant elk', plural: 'giant elk', body: { kind: 'beast', species: 'elk', length: 4.2, color: '#6e5238', giant: 0.55 },
+    health: 110, armour: 2, defence: 16, speed: 8, senses: { sight: 34, hearing: 40 }, faction: 'great', temper: 'skittish', wary: 16, morale: 0.5, pack: false, role: 'melee', danger: 14,
+    attacks: [{ name: 'antlers', damage: [6, 12], kind: 'pierce', reach: 1.6, time: 2.2, prowess: 30 }],
+    loot: 'giant-elk', tell: 'Antlers like a dead tree above the grass, and the grass does not move for the wind.',
+  },
+  {
+    id: 'giant turtle', name: 'giant turtle', plural: 'giant turtles', body: { kind: 'beast', species: 'turtle', length: 2.9, color: '#5a6a40', giant: 1 },
+    health: 140, armour: 7, defence: 6, speed: 1.6, senses: { sight: 14, hearing: 18 }, faction: 'great', temper: 'skittish', wary: 8, morale: 0.7, pack: false, role: 'melee', danger: 12,
+    attacks: [{ name: 'beak', damage: [5, 10], kind: 'bite', reach: 1.1, time: 2.8, prowess: 24 }],
+    loot: 'giant-turtle', tell: 'A boulder by the water that is, on a closer look, breathing.',
+  },
+  {
+    id: 'giant boar', name: 'giant boar', plural: 'giant boars', body: { kind: 'beast', species: 'boar', length: 3.1, color: '#3a2e24', giant: 0.6 },
+    health: 150, armour: 4, defence: 12, speed: 6.6, senses: { sight: 12, hearing: 24 }, faction: 'beasts', temper: 'hostile', morale: 1, pack: false, role: 'melee', danger: 26,
+    attacks: [{ name: 'tusks', damage: [9, 18], kind: 'pierce', reach: 1.5, time: 2.0, prowess: 40 }],
+    loot: 'giant-boar', tell: 'Whole oaks rooted up, and a smell like a midden at noon.',
+  },
+  {
+    id: 'giant wolf', name: 'giant wolf', plural: 'giant wolves', body: { kind: 'beast', species: 'wolf', length: 3.2, color: '#5c564c', giant: 0.7 },
+    health: 120, armour: 2, defence: 28, speed: 8.4, senses: { sight: 30, hearing: 38 }, faction: 'predators', temper: 'hostile', morale: 0.9, pack: true, role: 'leader', danger: 26,
+    attacks: [{ name: 'bite', damage: [8, 16], kind: 'bite', reach: 1.4, time: 1.6, prowess: 42 }],
+    loot: 'giant-wolf', tell: 'A howl that comes up through the soles of your feet.',
   },
   {
     id: 'deer', name: 'deer', plural: 'deer', body: { kind: 'beast', species: 'deer', length: 1.5, color: '#8a6a48' },

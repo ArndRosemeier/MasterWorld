@@ -10,7 +10,6 @@
 import { hatchLadderHalfWidth, HATCH_RAILS_UP, HATCH_RUNG, HATCH_RUNG_IN, HATCH_SHAFT, hatchSides, type InteriorFixture, type InteriorPlan, type TownBuilding } from '@futuremagic/settlement';
 import { hatchOf, openHouse, type OpenHouse } from '../world/townMesh';
 import { houseWalk, type HouseWalk } from '../game/interiorWorld';
-import { guildSigns } from '../game/guilds';
 import type { HouseView } from '../render/town/HouseView';
 import type { SkyView } from '../render/sky';
 import type { PointLight } from 'three/webgpu';
@@ -98,7 +97,7 @@ export class InteriorVisit {
     else {
       // A house where fighting is taught is a hall: a weapon rack and a practice post (D49); the witch keeps a home.
       const g = door.town.guildAt(door.b.id);
-      h = this.lay(door.b, this.cellars.has(key), !!g?.guild.hall && !g.out, guildSigns(door.town.guilds).get(door.b.id));
+      h = this.lay(door.b, this.cellars.has(key), !!g?.guild.hall && !g.out, door.town.signs.get(door.b.id));
       h.catch(() => this.houses.delete(key));
     }
     this.houses.set(key, h);

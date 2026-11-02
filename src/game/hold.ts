@@ -107,6 +107,7 @@ export class HoldWatch {
       if (off > CALM_AGAIN && !this.den.fighting.length) {
         this.mood = 'calm';
         this.den.peace = true;
+        for (const c of this.den.creatures) c.armed = false;
         this.struck = false;
         this.hailed = false;
         this.calm = this.den.creatures.map((c) => c.health);
@@ -117,20 +118,20 @@ export class HoldWatch {
     if (off > HOLD_WARN + 40) this.hailed = false;
     if (this.welcome) {
       this.mood = 'calm';
-      if (!this.hailed && off < HOLD_WARN) { this.hailed = true; out.push({ kind: 'hail', text: this.line(this.def.hail) }); }
+      if (!this.hailed && off < HOLD_WARN) { this.hailed = true; this.den.gesture('greet', hero); out.push({ kind: 'hail', text: this.line(this.def.hail) }); }
       return out;
     }
     if (this.standing.tier(people) === 'hated' && off < HOLD_WARN) { this.war(out, true); return out; }
     switch (this.mood) {
       case 'calm':
-        if (off < HOLD_WARN) { this.mood = 'warned'; this.away = 0; out.push({ kind: 'warn', text: this.line(this.def.warn) }); }
+        if (off < HOLD_WARN) { this.mood = 'warned'; this.away = 0; this.den.gesture('warn', hero); out.push({ kind: 'warn', text: this.line(this.def.warn) }); }
         break;
       case 'warned':
-        if (off === 0) { this.mood = 'last'; this.grace = 0; out.push({ kind: 'last', text: this.line(this.def.last) }); }
+        if (off === 0) { this.mood = 'last'; this.grace = 0; this.den.gesture('last', hero); out.push({ kind: 'last', text: this.line(this.def.last) }); }
         else if (off > HOLD_WARN + 10 && (this.away += dt) > 20) this.mood = 'calm';
         break;
       case 'last':
-        if (off > 0) { this.mood = 'warned'; this.away = 0; break; }
+        if (off > 0) { this.mood = 'warned'; this.away = 0; this.den.gesture('settle', hero); break; }
         if ((this.grace += dt) > HOLD_GRACE) this.war(out, true, true);
         break;
     }

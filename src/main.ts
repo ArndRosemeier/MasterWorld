@@ -68,6 +68,7 @@ import { onKeyDown } from './input/keys';
 import { TOWN_RASTER, TownGround, marketStart } from './world/town';
 import { firstDungeon, houseOf, placeOf, promisePlace, type DungeonContext, type LandKind } from './vgm/dungeons';
 import { questFor, questGuild, taskFor, type QuestAsk } from './vgm/quests';
+import { favourFor, favourWhy } from './vgm/favours';
 import { askDefOf, askNamed, askOf, asEnded, bringsBack, holdsKeepsake, keepsakeOf } from './vgm/asks';
 import { LEADS, keepPromise, keptOf, moveInto, openPromises } from './vgm/leads';
 import { bandOf, eventTold, gatherFor, openBands, openEvents } from './vgm/events';
@@ -882,7 +883,8 @@ export async function start(b: Boot): Promise<void> {
       swapped: () => autosave(),
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
-      ground: (x, z) => terrain.height(x, z),
+      // What the pieces on the land (a cave's crag, a tower, a barrow) are set on: the ground as drawn, as the hero stands on it.
+      ground: (x, z) => drawn.footing(x, z),
       land: (x, z) => terrain.skeleton.kinds[terrain.skeleton.kindAt(x, z)].id,
       jobs: { caveRock: (l, c, k, t) => terrainJobs.caveRock(l, c, k, t), caveMouth: (s, c) => terrainJobs.caveMouth(s, c), formed: (j) => (cavePool ??= createCavePool(1)).run(j) },
       portal: (p) => (portals ? portals.add(p) : void portalsDue.push(p)),
@@ -1451,6 +1453,13 @@ export async function start(b: Boot): Promise<void> {
         journal.fulfil(ARRIVAL);
       },
       heardOf: (id, from) => learnEvent(id, from),
+      // The VGM may have this person ask a favour of the hero (D68, N3: made from who they are, when the hero talks with them).
+      favour: (a) => {
+        const t = talkTown();
+        if (!t || !start) return;
+        const d = favourFor({ town: t.town, people: t.residents, person: a.person.id }, { seed, log, hours: hours(), setting, home: start.decision });
+        if (d) applied(madeBy('favour', d, favourWhy(d, { person: (id) => t.talk.nameOf(id) }), hours()));
+      },
       // A thief named and dealt with (D62): the ask is done; the household will want to hear.
       named: (id, ending) => {
         if (ending !== 'given') { quietPlace?.(id); return; }

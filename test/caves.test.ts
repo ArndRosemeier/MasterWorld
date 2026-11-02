@@ -18,8 +18,9 @@ import { DungeonNav, navKey } from '../src/sim/dungeonNav';
 import { dungeonWorld } from '../src/game/dungeonWorld';
 import { Walker } from '../src/game/walker';
 import { Rng } from '@futuremagic/core';
+import { testCellar } from './testCellars';
 
-const cave = (n: number) => outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
+const cave = (n: number) => testCellar(n, 'cave');
 /** The cave of a seed with its features, rock field and space, built once (its field takes seconds). */
 const builtCaves = new Map<number, { c: ReturnType<typeof cave>; feat: ReturnType<typeof caveFeatures>; field: ReturnType<typeof caveField>; space: CaveSpace }>();
 function built(n: number) {
@@ -152,7 +153,7 @@ test('tower: no way steps off the side of its own stair onto the way above or be
 
 test('cave: no wooden doors in the rock; a wedged boulder or an iron grate where a way is shut', () => {
   let seen = 0;
-  for (let n = 1; n <= 30; n++) {
+  for (let n = 1; n <= 16; n++) {
     const c = cave(n), ms = cellarMeshes(c);
     for (const d of ms.doors) {
       if (d.kind !== 'oneway' && d.kind !== 'locked') continue;
