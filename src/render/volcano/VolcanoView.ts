@@ -63,14 +63,14 @@ export class VolcanoView {
   }
 
   /** The steam's shader built (under the shader cap) and drawn; from now on volcanoes in sight are built. */
-  async enter(): Promise<void> {
+  async switchOn(): Promise<void> {
     await this.stage.add(this.steam);
     await this.stage.add(this.halo);
     this.on = true;
   }
 
   /** Each frame (`dt` s): the clock, the volcanoes in sight built and let go, and the steam's columns placed. */
-  tend(dt: number, cam: Vector3): void {
+  keepUp(dt: number, cam: Vector3): void {
     if (!this.on) return;
     this.seconds = (this.seconds + dt) % WRAP;
     LAVA.time.value = this.seconds;
@@ -78,8 +78,8 @@ export class VolcanoView {
     if ((this.clock -= dt) <= 0) {
       this.clock = 0.5;
       const near = this.terrain.volcanoes.nearTo(cam.x, cam.z, NEAR);
-      for (const v of near) if (!this.pieces.has(v.id)) this.pieces.set(v.id, this.begin(v));
-      for (const [id, p] of this.pieces) if (Math.hypot(p.v.x - cam.x, p.v.z - cam.z) > FAR) { this.drop(p); this.pieces.delete(id); }
+      for (const v of near) if (!this.pieces.has(v.id)) this.pieces.set(v.id, this.piecesFor(v));
+      for (const [id, p] of this.pieces) if (Math.hypot(p.v.x - cam.x, p.v.z - cam.z) > FAR) { this.letGo(p); this.pieces.delete(id); }
       const vs = [...this.pieces.values()].map((p) => p.v);
       this.columns = this.columnsOf(vs, cam);
       this.halos = this.haloesOf(vs);
@@ -108,7 +108,7 @@ export class VolcanoView {
   /** Everything is built and shown for volcano `v` (for checks). */
   built(v: Volcano): boolean { const p = this.pieces.get(v.id); return !!p && p.todo.length === 0; }
 
-  private begin(v: Volcano): Piece {
+  private piecesFor(v: Volcano): Piece {
     const lake = this.terrain.lakeLevel(v), todo: (() => Object3D | null)[] = [];
     if (lake !== null) todo.push(() => this.lake(v, lake));
     v.flows.forEach((f, i) => todo.push(() => this.flow(v, f, i)));
@@ -116,7 +116,7 @@ export class VolcanoView {
     return { v, objects: [], todo };
   }
 
-  private drop(p: Piece): void {
+  private letGo(p: Piece): void {
     for (const o of p.objects) { o.removeFromParent(); (o as Mesh).geometry?.dispose(); }
     p.objects.length = 0;
     p.todo = [];
@@ -126,13 +126,13 @@ export class VolcanoView {
 
   /** The lake: a disc at its level over the crater, each ray cut back to where the ground rises to that level. */
   private lake(v: Volcano, level: number): Object3D {
-    const h = (x: number, z: number) => this.terrain.height(x, z), reach = v.rimR * 1.25;
+    const ground = (x: number, z: number) => this.terrain.height(x, z), reach = v.rimR * 1.25;
     const rad = new Float32Array(RAYS);
     for (let k = 0; k < RAYS; k++) {
       const a = (k / RAYS) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
       let r = 2;
       // Out along the ray to the first ground at the lake's level (walls rise to it); the saddle's sill is a little over it.
-      while (r < reach && h(v.x + c * r, v.z + s * r) < level + 0.05) r += 1.5;
+      while (r < reach && ground(v.x + c * r, v.z + s * r) < level + 0.05) r += 1.5;
       rad[k] = Math.min(r + LAP, reach);
     }
     const pos: number[] = [0, 0, 0], uv: number[] = [0, 0], fx: number[] = [0, 1, 0, 0.3], idx: number[] = [];
@@ -146,9 +146,9 @@ export class VolcanoView {
         fx.push(0, 1 - 0.25 * u * u, 0, 0.3);
       }
     }
-    const ring = (i: number, k: number) => 1 + (i - 1) * RAYS + (k % RAYS);
-    for (let k = 0; k < RAYS; k++) idx.push(0, ring(1, k + 1), ring(1, k));
-    for (let i = 1; i < RINGS; i++) for (let k = 0; k < RAYS; k++) idx.push(ring(i, k), ring(i, k + 1), ring(i + 1, k + 1), ring(i, k), ring(i + 1, k + 1), ring(i + 1, k));
+    const around = (i: number, k: number) => 1 + (i - 1) * RAYS + (k % RAYS);
+    for (let k = 0; k < RAYS; k++) idx.push(0, around(1, k + 1), around(1, k));
+    for (let i = 1; i < RINGS; i++) for (let k = 0; k < RAYS; k++) idx.push(around(i, k), around(i, k + 1), around(i + 1, k + 1), around(i, k), around(i + 1, k + 1), around(i + 1, k));
     const g = new BufferGeometry();
     g.setAttribute('position', new Float32BufferAttribute(pos, 3));
     g.setAttribute('uv', new Float32BufferAttribute(uv, 2));

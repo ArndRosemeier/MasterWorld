@@ -17,7 +17,7 @@ import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
 import { Landforms, type Landform } from './landforms';
 import type { Lake } from './lakes';
-import { Volcanoes, lavaIn, lowestCrest, type Volcano } from './volcano';
+import { Volcanoes, lavaIn, lowestCrest, nearVent, type Volcano } from './volcano';
 
 /**
  * How far out from a town's middle the landforms are eased away (its farms and outlying houses stand on calm
@@ -314,7 +314,7 @@ export class Terrain {
     for (const d of this.holdList) if (holdBare(d, x, z)) return true;
     // Lava, and the sulphur crusts round a volcano's vents: nothing grows there.
     const v = this.volcanoes.holding(x, z);
-    if (v && (this.lavaAt(x, z) !== null || v.vents.some((e) => Math.hypot(x - e.x, z - e.z) < e.r * 1.8))) return true;
+    if (v && (this.lavaAt(x, z) !== null || nearVent(v, x, z))) return true;
     return false;
   }
 

@@ -777,7 +777,7 @@ export async function start(b: Boot): Promise<void> {
     const warmLater = async (): Promise<void> => {
       await view.stage.add(smoke.mesh);
       smokeIn = true;
-      await volcanoes.enter();
+      await volcanoes.switchOn();
       await spellView.enter(view.stage);
     };
 
@@ -2568,7 +2568,7 @@ export async function start(b: Boot): Promise<void> {
         scorched = burnt;
       }
       if (smokeIn) smoke.billow(dt);
-      volcanoes.tend(dt, view.camera.position);
+      volcanoes.keepUp(dt, view.camera.position);
       part('sky');
       view.sky.update(dt, view.camera);
       // Down in the cellar the land above is out of the frame (visit.onDepth): its updates wait.

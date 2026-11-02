@@ -268,3 +268,9 @@ export function lowestCrest(v: Volcano, height: (x: number, z: number) => number
   }
   return low;
 }
+
+/** Is (x, z) on the crust round one of the volcano's vents (where nothing grows)? */
+export function nearVent(v: Volcano, x: number, z: number): boolean {
+  for (const e of v.vents) if (Math.hypot(x - e.x, z - e.z) < e.r * 1.8) return true;
+  return false;
+}
