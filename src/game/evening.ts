@@ -441,6 +441,8 @@ export function playEvening(seed: number, setting0: SettingModule, opts: Evening
           } else if (k < parts - 1) director.met('reward', 0.4);
         }
         if (!r.kills) casts(cast);
+        // Gate R: no humanoid that warns fought the hero without saying why (or being struck first).
+        if (r.unexplained.length) throw new Broke(`${r.unexplained.join(', ')} fought ${name} with no warning, no reason said and no blow from the hero`);
         saved = r.delve.tally();
         found ||= r.delve.found;
         spells += cast;
