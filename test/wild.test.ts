@@ -4,6 +4,7 @@ import { deriveSeed, parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { OpenGround, Wilds, groupDanger, type Land } from '../src/sim/wild';
 import { territoryOf, wildFor } from '../src/vgm/wild';
+import { dangerAt } from '../src/vgm/dungeons';
 import { Den, type Quarry } from '../src/sim/creatures';
 import { Delve, type DelveSave } from '../src/game/delve';
 import { Character } from '../src/game/character';
@@ -27,7 +28,8 @@ test('wild: deer, boar, a wolf pack and bandits live around the town, apart, on 
     const d = Math.hypot(t.x - town.decision.x, t.z - town.decision.z);
     assert.ok(d >= ringOf(t.kind)[0] - 1 && d <= ringOf(t.kind)[1] + 1, `${t.id} at ${d.toFixed(0)} m`);
     if (t.kind !== 'sharks') assert.equal(terrain.waterDepth(t.x, t.z), 0, `${t.id} on dry land`);
-    assert.ok(groupDanger(t.members, classic.creatures) <= 18, `${t.id} fits a fresh hero`);
+    // None too strong for the hero near the town, and farther out only as strong as the land there is (D29: dangerAt).
+    assert.ok(groupDanger(t.members, classic.creatures) <= Math.max(18, dangerAt({ decision: t }, town.decision)), `${t.id} fits a fresh hero`);
     for (const o of places) if (o !== t) assert.ok(Math.hypot(o.x - t.x, o.z - t.z) > o.r + t.r, `${t.id} and ${o.id} apart`);
   }
   assert.deepEqual(placeWild(), places, 'the same every time');

@@ -1,11 +1,11 @@
 /**
  * What a band of foes says to the hero (D64): the one who speaks for it (the leader, else the nearest) says each turn of its stance in a
  * short line the setting gives, picked by a seed so the same band does not always say the same thing. Beasts never speak; the
- * mindless have nothing to say. Pure.
+ * mindless have nothing to say; a cutthroat has only its war cry. Pure.
  */
 import { hash2f } from '@futuremagic/core';
 import type { BreakCause, CreatureDef, SettingModule, TalkTurn, WarnTurn } from '../setting/contract';
-import { WARNING_STANCES } from '../setting/contract';
+import { SPEAKING_STANCES } from '../setting/contract';
 
 /**
  * What one of kind `def` says for a turn of its stance, or as its warning ends in a fight and why (none share a name):
@@ -13,7 +13,7 @@ import { WARNING_STANCES } from '../setting/contract';
  */
 export function foeLine(setting: Pick<SettingModule, 'factions'>, def: CreatureDef, what: WarnTurn | BreakCause | TalkTurn, seed: number, n: number): string | null {
   const kind = def.stance?.kind;
-  if (!kind || !WARNING_STANCES.includes(kind)) return null;
+  if (!kind || !SPEAKING_STANCES.includes(kind)) return null;
   const words = setting.factions.words[kind as 'guard'];
   const by = (m: unknown): readonly string[] | undefined => (m as Partial<Record<string, readonly string[]>> | undefined)?.[what];
   const pool = by(words?.turns) ?? by(words?.breaks) ?? by(words?.talk);
