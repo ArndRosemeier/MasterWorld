@@ -1908,6 +1908,7 @@ export async function start(b: Boot): Promise<void> {
     const brookHere = emptyWater();
     const spots = goSpots({
       setting,
+      terrain,
       log: () => log,
       hours,
       heroPos: () => player.walker.pos,

@@ -172,6 +172,22 @@ export class Volcanoes {
     return out;
   }
 
+  /**
+   * The volcano nearest (x, z) that is `want` (`any`, one of the states, or an id), looked for in widening rings out to 90 km (null: none).
+   * For starts and the debug menu.
+   */
+  nearestVolcano(x: number, z: number, want = 'any'): Volcano | null {
+    for (const reach of [3000, 8000, 20000, 45000, 90000]) {
+      let best: Volcano | null = null, low = Infinity;
+      for (const v of this.nearTo(x, z, reach)) {
+        const d = Math.hypot(v.x - x, v.z - z);
+        if (d < low && (want === 'any' || v.state === want || v.id === want)) { low = d; best = v; }
+      }
+      if (best) return best;
+    }
+    return null;
+  }
+
   /** The volcano square (i, j) holds, from the seed: only where the land is wholly volcanic country, inland, level, dry and clear of towns. */
   private found(i: number, j: number): Volcano | null {
     const rng = new Rng(hash2i(this.seed, i, j)), sk = this.skeleton;

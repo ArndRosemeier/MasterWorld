@@ -232,6 +232,17 @@ export class Skeleton {
     return spiralFind(x, z, (px, pz) => (this.elevation(px, pz) >= 5 && this.kindWeights(px, pz)[k] > share ? { x: px, z: pz } : null), 1000, 2000, 250, 12000);
   }
 
+  /**
+   * The nearest land well inside the biome `id` from (x, z) (the biome holds all round it, 120 m out), along a spiral walked out from
+   * there (turns 2 km apart, a step every 500 m, out to some 160 km); null if none is met. For the debug menu and checks.
+   */
+  nearestBiome(id: string, x: number, z: number): { x: number; z: number } | null {
+    const k = this.shape.biomes.findIndex((b) => b.id === id);
+    if (k < 0) return null;
+    const out = emptySample(), is = (px: number, pz: number): boolean => this.sample(px, pz, out).biome === k;
+    return spiralFind(x, z, (px, pz) => (is(px, pz) && is(px + 120, pz) && is(px - 120, pz) && is(px, pz + 120) && is(px, pz - 120) ? { x: px, z: pz } : null), 1000, 2000, 500, 80000);
+  }
+
   /** How much of mesa country is at (x, z), 0..1. */
   mesaWeight(x: number, z: number): number {
     if (!this.mesa) return 0;
