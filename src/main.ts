@@ -12,6 +12,7 @@ import { atDoor, placesFor } from './app/places';
 import { goSpots } from './app/goPlaces';
 import { Player } from './app/player';
 import { Portals } from './app/portals';
+import { CrossingFx } from './app/spellFx/crossingFx';
 import { CAVE_LANTERN, TORCH_DUSK, TORCH_LIGHT_OUT, TORCH_LIGHT_UP, TORCH_NIGHT } from './app/cellarVisit';
 import type { Portal } from './game/portal';
 import { PortalView } from './render/portal/PortalView';
@@ -970,6 +971,8 @@ export async function start(b: Boot): Promise<void> {
     // Portals (app/portals.ts): openings joining two places, walked through and looked through.
     const portalView = new PortalView(view);
     await view.stage.add(portalView.group);
+    // The light on the hero passing through any opening (drawn with the spells' bits, below).
+    const crossingFx = new CrossingFx(seed);
     portals = new Portals({
       player, view: portalView, hero: hero.object, lamp: view.lantern,
       realm: () => cellars?.realm ?? 'land',
@@ -984,6 +987,8 @@ export async function start(b: Boot): Promise<void> {
         caveLit = null;
         (into ?? out)?.onSwap?.();
       },
+      // Through any opening (a cave's mouth, the portal stone's pair): a sound and a brief glow on the hero.
+      passed: (n, at) => { crossingFx.flare(n); sounds?.crossing(n, [at.x, at.y + 1, at.z]); },
       // One realm shown for a view: the land (what left the frame below comes back, the places below go) or a place
       // below (the land leaves the frame; the hero, what lies about and the spells stay), and its light.
       showRealm: (realm) => {
@@ -1051,7 +1056,11 @@ export async function start(b: Boot): Promise<void> {
     }, imprintSpawn(cleanStoneSave(save?.portalStone), spawn));
     await stoneUse.addToStage();
     stoneMesh = stoneUse.mesh;
-    spellView.also = (b, dt) => stoneUse.stoneLight(b, dt);
+    spellView.also = (b, dt) => {
+      stoneUse.stoneLight(b, dt);
+      const f = player.walker.pos;
+      crossingFx.glow(b, dt, [f.x, f.y, f.z]);
+    };
     if (params.portal) {
       // `portal`: an opening 6 m ahead, joined to one 30 m to the right, turned a quarter.
       const w = player.walker.pos, yaw = player.walker.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
@@ -2083,7 +2092,7 @@ export async function start(b: Boot): Promise<void> {
       places: placesFor(seedText, home),
       spots,
       seed: seedText,
-      game: { player, view, decks, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get shipClimbs() { return shipClimbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, otterForm, alone, spellView, stone: stoneUse, portals, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
+      game: { player, view, decks, hitches: HITCHES, /** A debug go-to by its label (`game.go('Capital gate')`). */ go: (label: string) => spots.find((x) => x.label === label)?.go() ?? `no go-to called ${label}`, goes: spots.map((x) => x.label), origin: ORIGIN, notes, journal, known, roads: roadWork, layRoad, bridges: bridgeView, get followOrigin() { return followOrigin; }, set followOrigin(on) { followOrigin = on; }, terrain, sea, flora, grass, ground, settings, params, home, weather, wx, get cellar() { return visit(); }, cellars, get climbs() { return climbs; }, get shipClimbs() { return shipClimbs; }, get wild() { return wild; }, get regionSites() { return regionSites; }, towns, title, sound, get sounds() { return sounds; }, get life() { return startTown?.life ?? null; }, get folk() { return folk; }, get talk() { return talk; }, get rooms() { return rooms; }, get herds() { return startTown?.herds ?? null; }, character, get remains() { return remains; }, get market() { return startTown?.market ?? null; }, trade, tradeAt, fightHud, actionBar, birdForm, otterForm, alone, spellView, stone: stoneUse, portals, crossingFx, useAbility, wearLegend, storyEvent: (id?: string) => storyEventNow(id), answerNow: (need: Need) => answerNow(need), situationNow: (kind: SituationKind) => situationNow(kind), goodDay: () => goodDayNow(), trunks, rocks, rockView, smoke, get speech() { return speech; }, get owner() { return owner; }, director, get log() { return log; }, vgmLog, setting, minimap, standing, get hold() { return hold; }, lessons, services,
         /** A master's deed (C14) as if done and told (shots): the gift is the hero's. */
         questDone: () => { const d = log.filter((x) => x.kind === 'dungeon' && !!x.quest).at(-1), t = d?.kind === 'dungeon' ? towns?.get(d.town) : null; if (!d || !t) return 'no deed asked'; keptNow(d.id, t); return d.id; },
         /** What near the hero is not drawn as itself yet (empty: everything is), for screenshots (tools/shot/set.mjs). */

@@ -65,6 +65,7 @@
     "shot:holdfight": "node tools/shot/holdfight.mjs",
     "shot:vgm": "node tools/shot/vgm.mjs",
     "shot:stone": "node tools/shot/stone.mjs",
+    "shot:crossing": "node tools/shot/crossing.mjs",
     "shot:giants": "node tools/shot/giants.mjs"
   },
   "dependencies": {

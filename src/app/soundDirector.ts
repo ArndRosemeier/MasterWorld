@@ -75,7 +75,7 @@ const CRIES: Record<string, { cry: string; pitch: number; small?: boolean; bones
 /** Heard often: decoded once sound is open. */
 const PRELOAD = [
   'step/grass', 'step/litter', 'step/gravel', 'step/stone', 'step/cobbles', 'step/dirt', 'step/boards', 'step/rock', 'step/sand', 'step/water', 'step/snow',
-  'body/jump', 'body/land', 'body/land-hard', 'swim/stroke', 'swim/splash', 'swim/out', 'ui/open', 'ui/close', 'title/click', 'door/open', 'door/close',
+  'body/jump', 'body/land', 'body/land-hard', 'swim/stroke', 'swim/splash', 'swim/out', 'ui/open', 'ui/close', 'title/click', 'door/open', 'door/close', 'portal/cross',
 ];
 
 /** How often the world round the listener is sampled (s). */
@@ -152,6 +152,12 @@ export class SoundDirector {
   spell(what: SpellSound, motif: SpellMotif, at: readonly [number, number, number]): void {
     const id = what === 'gather' ? 'spell/gather' : `spell/${motif}-${what}`;
     this.host.engine.play(id, { at: [at[0], at[1], at[2]], gain: what === 'gather' ? 0.7 : 1, pitch: what === 'gather' ? GATHER_PITCH[motif] : 1 });
+  }
+
+  /** The hero went through a portal (app/portals.ts), the `n`th time: a soft otherworldly shimmer at the body, a little different each time. */
+  crossing(n: number, at: readonly [number, number, number]): void {
+    const pitch = 0.92 + hashToFloat(hash3i(this.host.seed, n, 1, 0x9c06)) * 0.2;
+    this.host.engine.play('portal/cross', { at: [at[0], at[1], at[2]], ref: 6, gain: 1, pitch });
   }
 
   /** Small birds taking wing (sim/smallLife.ts): a flurry from where they rose, fuller the more they are. */

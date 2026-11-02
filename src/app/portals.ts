@@ -32,6 +32,8 @@ export interface PortalsHost {
   showRealm(realm: string): () => void;
   /** The walker's world in a realm (the camera keeps out of its rock through an opening). */
   world(realm: string): WalkWorld | null;
+  /** The hero went through any opening (the `n`th time): `at` is where it came out, its feet. Sound and light. */
+  passed?(n: number, at: P3, to: string, from: string): void;
 }
 
 /** How far apart two points are (`lift`: the second one raised by that much). */
@@ -110,6 +112,7 @@ export class Portals {
     this.host.crossed(t.there.realm, realm);
     this.last = { p: { x: p.x, y: p.y + MIDDLE, z: p.z }, realm: t.there.realm };
     this.passed++;
+    this.host.passed?.(this.passed, { x: p.x, y: p.y, z: p.z }, t.there.realm, realm);
   }
 
   /** A point behind the head that is beyond an opening, where it joins (for the camera's trail). */

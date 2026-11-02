@@ -11,15 +11,15 @@ import { riftEllipse } from '../../render/materials/portal';
 import type { SpellBits, Vec3 } from './particles';
 
 /** The light not of this world: violet and sea green (linear, over 1: it glows). */
-const VIOLET: Vec3 = [1.1, 0.35, 2.6];
-const TEAL: Vec3 = [0.25, 2.0, 1.9];
-const WHITE: Vec3 = [2.6, 2.4, 3.2];
+export const VIOLET: Vec3 = [1.1, 0.35, 2.6];
+export const TEAL: Vec3 = [0.25, 2.0, 1.9];
+export const WHITE: Vec3 = [2.6, 2.4, 3.2];
 const UP: Vec3 = [0, 1, 0];
 /** How long the beam stands (s), and how long the floor glows after it (s). */
 export const BEAM_TIME = 0.75;
 export const FLOOR_TIME = 4.5;
 
-const lit3 = (c: Vec3, s: number): Vec3 => [c[0] * s, c[1] * s, c[2] * s];
+export const lit3 = (c: Vec3, s: number): Vec3 => [c[0] * s, c[1] * s, c[2] * s];
 /** The colour at a phase: drifting between violet and sea green. */
 const hueAt = (p: number): Vec3 => v3lerp([...VIOLET], [...TEAL], 0.5 + 0.5 * Math.sin(p));
 
