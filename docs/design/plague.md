@@ -14,7 +14,7 @@ Both are unlike anything of this world: very colourful plants and animals with a
 
 The changed ones **wander**. That carries the plague, and the seeds caught in their coats, far from where it began. So the plague is not confined to one area: twisted creatures turn up anywhere, but most of them are round the **origin area** of a Bright spot.
 
-**Anybody can catch it**: animals, monsters, people, the hero. Twisted giant humanoids are part of it.
+**Any creature or person can catch it**, animals, monsters and people alike; twisted giant humanoids are part of it. **The hero never does** (Arnd: the plague spreads by eating, and the hero does not eat in the game).
 
 Arnd: "We can later expand into actually visiting the first world, that could be a high level thing... not now though."
 
@@ -25,7 +25,7 @@ Arnd: "We can later expand into actually visiting the first world, that could be
 - Affected beings mutate into twisted, giant versions of the original. They spread, not just in one area, with an origin area holding more of them.
 - **Actors gets a Deform function** that mutates the bones and textures of an actor (humanoid or animal) and twists standard animations. The animations must still work, but become awkward.
 - **Giant versions of our established creatures** are a cheap win on top. The same function delivers them without twists, but not as a mere upscale: modified textures and bones.
-- Anybody can catch it. "Twisted giant humanoids will be great to have."
+- Anybody can catch it. "Twisted giant humanoids will be great to have." But not the hero: "since we do not have eating in game yet and this is spread by eating... lets not have the hero get it at all."
 - The cracks are called **Bright spots**: viewports into a way more colourful world.
 - **No Bright spots at the start.** Twisted creatures can appear without them. The Bright spots exist, but the player can't find them at first; the VGM decides later when and where to place one. That is content for level 6 and up; weaker twisted creatures can come earlier.
 - **Peaceful giant animals from the start**, such as a giant turtle, as a promise.
@@ -93,11 +93,11 @@ This uses the existing creature simulation: herds graze, packs hunt (R5), and te
 
 Blighted creatures leave their territory and wander. That is how the plague turns up far from any Bright spot, and how new bright patches start. A world simulation drives it, not the VGM. The VGM may use it, for example by sending blighted wolves into a town (R6's raid) or by asking a household for help when its herd turns.
 
-### 4.6 People and the hero
+### 4.6 People
 
 **Anybody can catch it.** People turn into **twisted giant humanoids**: a farmer, a bandit, a hermit who ate the wrong fruit. They join the blighted faction like the animals. A town may lose someone to it, which the VGM can use (a household asking for help, a missing son seen in the woods).
 
-**The hero can catch it too** (open question 1 below: how, and what it does).
+**The hero does not catch it** (Arnd, 2026-11-02): it spreads by eating, and the hero does not eat in the game.
 
 ### 4.7 Giants without the plague
 
@@ -134,5 +134,4 @@ Arnd: "I do not mean LLM dialog though, just better than we have now. Right now,
 
 ## 8. Open questions for Arnd
 
-1. **The hero catching it.** Proposal: bright fruit and first-world meat give **mana** (the first world is the source of magic), which tempts a mage, but each bite adds taint. Taint shows on the hero's skin (first-world blotches growing from the hands) and, past a threshold, people fear the hero (worse greetings and prices, guards wary). A cure comes later with the plug. Does it ever change the hero's body or abilities?
-2. Names for the growth, the strays and the twisted (working names: bright growth, strays, the blighted).
+1. Names for the growth, the strays and the twisted (working names: bright growth, strays, the blighted).
