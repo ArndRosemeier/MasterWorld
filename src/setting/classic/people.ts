@@ -76,6 +76,7 @@ export const talk: TalkDef = {
     rumour: 'And since you are so good at this:',
   },
   persona,
+  lore: { topic: 'What lives out beyond the town?', source: 'my own rounds out there' },
   arrival: {
     title: 'Find work in town',
     text: 'A light purse and a long road behind me. Innkeepers hear every rumour: ask at {inn} whether anything strange has happened lately, or ask the townsfolk.',
