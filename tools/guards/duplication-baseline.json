@@ -898,5 +898,25 @@
   {
     "key": "idiom: [.cos .sin .yaw Math] in masterworld/app/cellarVisit.ts + masterworld/world/cave/fittings.ts + masterworld/world/cave/throat.ts",
     "reason": "A point offset to the side of a heading (x - sin(yaw) d, z + cos(yaw) d) in each file's own geometry (a visit's door, a mine's timber, a throat's arch); two lines of trigonometry."
+  },
+  {
+    "key": "idiom: [.Rock .range] in masterworld/world/cave/lockMesh.ts + masterworld/world/dungeon/barrowMesh.ts + masterworld/world/dungeon/cellarMesh.ts",
+    "reason": "Setting stones into a piece (kit.stone with a seeded range of size and turn) in each mesh file's own shape: a cave lock's boulder and stacked courses, a barrow's kerbstones, a cellar's rubble; one call each, not a copied helper."
+  },
+  {
+    "key": "idiom: [.edgeStart .edgeTo] in masterworld/sim/formedGround.ts + masterworld/world/cave/concede.ts + masterworld/world/cave/locks.ts + masterworld/world/cave/reader.ts",
+    "reason": "Walking the reading's edge arrays (edgeStart..edgeTo) in each search over the cave network: the creatures' A*, the concession's flood, the lock finder's breadth-first search; the loop is how the arrays are read."
+  },
+  {
+    "key": "idiom: [.key .kind] in masterworld/app/cellars.ts + masterworld/sim/formedSpace.ts + masterworld/world/dungeon/setPieces.ts + masterworld/world/dungeon/space.ts",
+    "reason": "Reading a link's kind and key (a locked link's key room) where a lock is made, opened or set up; the same two fields of the graph's link, in code that does different things with them."
+  },
+  {
+    "key": "idiom: [.push .reverse] in masterworld/sim/nav.ts + masterworld/world/cave/locks.ts + masterworld/world/cave/reader.ts",
+    "reason": "Building a path by walking parents back from the goal and reversing it, in each search's own parent array (the land's nav, the reader's way in, the lock finder's way between two rooms)."
+  },
+  {
+    "key": "same name: masterworld/sim/formedSpace.ts#touch + masterworld/world/dungeon/space.ts#touch",
+    "reason": "FormedSpace overrides DungeonSpace.touch: a formed cave's keys and locks instead of the built layout's doors; the name is the override's."
   }
 ]
