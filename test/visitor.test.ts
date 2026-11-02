@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classic } from '../src/setting/classic/index';
-import { STOREY, outlineCellar } from '../src/world/dungeon/cellar';
+import { STOREY } from '../src/world/dungeon/cellar';
 import { DungeonSpace } from '../src/world/dungeon/space';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { DungeonGround } from '../src/sim/dungeonNav';
 import { VISIT, Visitor } from '../src/game/visitor';
+import { testCellars } from './testCellars';
 
-const cellars = Array.from({ length: 6 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar));
+const cellars = testCellars(6);
 
 test('visitor: the household comes from the ladder to the hero in the farthest room, thanks them and goes back', () => {
   for (const c of cellars) {

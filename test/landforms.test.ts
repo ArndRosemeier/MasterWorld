@@ -6,8 +6,8 @@ import type { SettingModule } from '../src/setting/contract';
 import { Terrain } from '../src/world/terrain';
 import { Skeleton } from '../src/world/skeleton';
 import { Landforms } from '../src/world/landforms';
-import { firstDecisions, startPlace } from '../src/vgm/builder';
 import { SMALL } from './small';
+import { frontierLand } from './frontierLand';
 
 const seed = parseSeed('masterworld');
 const world = classic.world;
@@ -52,8 +52,7 @@ test('landforms: placed from the seed alone (two threads agree), and they shape 
 });
 
 test('landforms: none in a town; the town and its market keep their ground', () => {
-  const t = new Terrain(seed, classic, SMALL);
-  t.settle(firstDecisions(t, startPlace(t)));
+  const t = frontierLand().terrain;
   const town = t.towns[0].decision;
   assert.deepEqual(t.landforms.within(town.x, town.z, town.radius), []);
 });

@@ -26,8 +26,19 @@ const town = terrain.towns[0];
 const people = townsfolk(town.plan, seed);
 const ctx = (log: DecisionLog, hours: number) => ({ seed, log, towns: terrain.towns, home, hours, purposeOverdue: false, inside: () => false, dungeons: classic.dungeons, terrain, asks: classic.asks, twists: classic.twists });
 
-/** The Builder for `hours`, keeping the oldest open promise every two game hours. */
-function play(hours: number, s = seed): Decision[] {
+/**
+ * The Builder for `hours`, keeping the oldest open promise every two game hours. The same play is asked for by several
+ * tests and is the same each time, so it is made once (and frozen: no test may change another's log).
+ */
+const played = new Map<string, readonly Decision[]>();
+function play(hours: number, s = seed): readonly Decision[] {
+  const key = `${hours}:${s}`;
+  let made = played.get(key);
+  if (!made) played.set(key, (made = Object.freeze(playOut(hours, s))));
+  return made;
+}
+
+function playOut(hours: number, s: number): Decision[] {
   let log: Decision[] = [...first];
   for (let h = 0; h < hours; h += 0.25) {
     const d = nextPromise({ ...ctx(log, h), seed: s });

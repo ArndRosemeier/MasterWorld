@@ -1,15 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DIRS } from '@futuremagic/dungeon';
-import { classic } from '../src/setting/classic/index';
-import { CELL, STOREY, outlineCellar, type Cellar } from '../src/world/dungeon/cellar';
+import { CELL, STOREY, type Cellar } from '../src/world/dungeon/cellar';
 import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
 import { DungeonSpace, KEY_REACH, keySpot } from '../src/world/dungeon/space';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { Walker } from '../src/game/walker';
 import { dungeonWorld } from '../src/game/dungeonWorld';
+import { testCellars } from './testCellars';
 
-const cellars: Cellar[] = Array.from({ length: 10 }, (_, i) => i).map((i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar));
+const cellars: Cellar[] = testCellars(10);
 const O = { x: 0, y: 0, z: 0 };
 
 test('cellar space: air in every room, solid outside, floors where the rooms are', () => {

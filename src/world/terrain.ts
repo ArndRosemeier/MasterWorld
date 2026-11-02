@@ -117,6 +117,8 @@ export class Terrain {
   private fields: ArchField[] = [];
   private townSpots: { d: TownDecision; level: number }[] = [];
   private townList: Town[] | null = null;
+  /** Town plans made elsewhere for the towns of the last `settle` (by town id): taken instead of planning them again. */
+  private givenPlans: ReadonlyMap<string, TownPlan> | null = null;
   private holdList: HoldDecision[] = [];
   private readonly probe = emptySample();
   private readonly wet = { river: 0, lake: 0 };
@@ -131,7 +133,8 @@ export class Terrain {
    * under a town calms down (less small relief, a level market), so call this before anything is built
    * from the heights.
    */
-  settle(log: DecisionLog): void {
+  settle(log: DecisionLog, plans?: ReadonlyMap<string, TownPlan>): void {
+    this.givenPlans = plans ?? null;
     this.version++;
     this.fields = [];
     this.townSpots = [];
@@ -248,7 +251,7 @@ export class Terrain {
 
   /** The towns standing on this land (planned when first asked for). */
   get towns(): readonly Town[] {
-    if (!this.townList) this.townList = this.townSpots.map(({ d }) => new Town(d, this));
+    if (!this.townList) this.townList = this.townSpots.map(({ d }) => new Town(d, this, this.givenPlans?.get(d.id)));
     return this.townList;
   }
 

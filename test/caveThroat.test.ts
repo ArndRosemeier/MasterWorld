@@ -1,7 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classic } from '../src/setting/classic/index';
-import { outlineCellar } from '../src/world/dungeon/cellar';
 import { CaveSpace, caveField } from '../src/world/dungeon/caveRock';
 import { caveFeatures, keepSpots } from '../src/world/dungeon/caveFeatures';
 import { caveMouth, throatWalk } from '../src/world/dungeon/caveMouth';
@@ -9,9 +7,9 @@ import { THROAT_OPENING, caveThroat } from '../src/world/dungeon/caveThroat';
 import { inWalkRaster } from '../src/world/dungeon/rockMesh';
 import { onLand } from '../src/world/dungeon/site';
 import { inOpening } from '../src/game/portal';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
+import { testCellar } from './testCellars';
 
-const cave = (n: number) => outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
+const cave = (n: number) => testCellar(n, 'cave');
 
 test('cave throat: most caves lead out of their entrance room into free rock, behind the way out', () => {
   let found = 0;

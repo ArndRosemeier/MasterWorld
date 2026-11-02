@@ -6,9 +6,9 @@ import { aimsAtFoe, costText, Recipes, SELF, shapeOf, type Caster, type Mark, ty
 import type { Blow } from '../src/sim/combat';
 import { Character } from '../src/game/character';
 import { Delve } from '../src/game/delve';
-import { outlineCellar, type Cellar } from '../src/world/dungeon/cellar';
-import { testDecision, testHouse } from '../src/world/dungeon/variety';
+import { type Cellar } from '../src/world/dungeon/cellar';
 import { DungeonSpace } from '../src/world/dungeon/space';
+import { testCellars } from './testCellars';
 
 /** A small world: the caster at the origin and foes where a test puts them. */
 class TestWorld implements RecipeWorld {
@@ -182,7 +182,7 @@ test('recipes: the setting checks every recipe step', () => {
 });
 
 test('recipes: in a cellar fight, a spell flies at the target and hurts it; second wind needs no target', () => {
-  const c: Cellar = Array.from({ length: 24 }, (_, i) => outlineCellar(testDecision(i), testHouse(i), classic.dungeons.cellar)).find((x) => x.dweller.id === 'rats')!;
+  const c: Cellar = testCellars(24).find((x) => x.dweller.id === 'rats')!;
   const space = new DungeonSpace(c.layout);
   for (const pl of c.layout.links) space.open.add(pl.link.id);
   const setting: SettingModule = { ...classic, abilities: [...classic.abilities, { ...bolt, cost: { stamina: 5 }, cast: 0, range: 40, ops: [{ op: 'projectile', speed: 30, damage: 30, kind: 'cold' }] }] };
