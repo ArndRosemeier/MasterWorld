@@ -1216,7 +1216,7 @@ export async function start(b: Boot): Promise<void> {
       weather: () => wx.shown,
       hour: () => view.sky.hour,
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
-      cave: () => { const v = visit(), f = v?.formed; if (!v || !f) return null; if (caveHeard?.of !== f) { const o = v.origin, at = (q: readonly [number, number, number]): [number, number, number] => [q[0] + o.x, q[1] + o.y, q[2] + o.z]; caveHeard = { of: f, drips: f.sounds.drips.map(at), streams: f.sounds.streams.map(at) }; } return caveHeard; },
+      cave: () => { const v = visit(), f = v?.formed; if (!v || !f) return null; if (caveHeard?.of !== f) { const o = v.origin, pastOrigin = (q: readonly [number, number, number]): [number, number, number] => [q[0] + o.x, q[1] + o.y, q[2] + o.z]; caveHeard = { of: f, drips: f.sounds.drips.map(pastOrigin), streams: f.sounds.streams.map(pastOrigin) }; } return caveHeard; },
       where: () => (visit() ? { place: 'cellar', room: null } : rooms?.door ? { place: 'room', room: rooms.door.b.kind } : { place: 'land', room: null }),
       inFlight: () => player.offFoot,
       aboard: () => !!decks.ship,
