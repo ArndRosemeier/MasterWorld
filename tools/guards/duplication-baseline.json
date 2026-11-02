@@ -380,6 +380,10 @@
     "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
   },
   {
+    "key": "same name: masterworld/app/ownerComes.ts#step + masterworld/sim/creatures.ts#step",
+    "reason": "A per-frame step: the owner walking down to the hero vs a den stepping its creatures."
+  },
+  {
     "key": "same name: masterworld/app/searchKneel.ts#step + masterworld/sim/creatures.ts#step",
     "reason": "The Puppet interface's per-frame step (app/player.ts): a search's kneel vs another thing's own frame."
   },

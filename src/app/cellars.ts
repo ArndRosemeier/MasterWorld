@@ -13,6 +13,7 @@ import type { Stage } from '@futuremagic/stage';
 import type { TownBuilding } from '@futuremagic/settlement';
 import { deriveSeed } from '@futuremagic/core';
 import type { Character } from '../game/character';
+import type { Standing } from '../game/standing';
 import { Delve, type DelveSave } from '../game/delve';
 import type { Item } from '../game/items';
 import { CellarView } from '../render/dungeon/CellarView';
@@ -69,6 +70,8 @@ export interface CellarsHost {
   readonly notes: Notes;
   readonly setting: SettingModule;
   readonly character: Character;
+  /** What the factions make of the hero (D65): the foes read it before they fight. */
+  readonly standing: Standing;
   readonly seed: number;
   readonly director: Director;
   readonly journal: Journal;
@@ -552,6 +555,7 @@ export class Cellars {
     const saved: DelveSave | undefined = mine?.delve ?? (before ? { dead: [], spared: [], searched: [], opened: before } : undefined);
     const space = b.visit.space;
     b.delve = new Delve(cellar, space instanceof FormedSpace ? space.ground : space, h.setting, h.character, h.seed, saved);
+    b.delve.fight.standing = h.standing;
     // What its household asks (D62; the place's own promise: new dwellers are only to be cleared): a keepsake lies in the lair's hoard.
     if (own === s.decision.id) { b.delve.ask = s.decision.ask ?? null; b.delve.keepsake = h.keepsake?.(s.decision) ?? null; }
     b.creatures = await CreatureView.build(b.delve.den, h.seed, b.view.origin, h.renderer);

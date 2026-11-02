@@ -864,7 +864,7 @@ export async function start(b: Boot): Promise<void> {
     // Formed caves (phase K) are made in a worker of their own, started with the first one.
     let cavePool: CavePool | null = null;
     cellars = new Cellars({
-      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, seed, director, journal, hud: fightHud,
+      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, standing, seed, director, journal, hud: fightHud,
       fight: fightHost,
       swapped: () => autosave(),
       cue: (c) => sounds?.cue(c),
@@ -901,7 +901,7 @@ export async function start(b: Boot): Promise<void> {
       }
     }
     const wild = start && params.wild ? new WildLand({
-      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, seed, director, journal, hud: fightHud, fight: fightHost,
+      stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, standing, seed, director, journal, hud: fightHud, fight: fightHost,
       cue: (c) => sounds?.cue(c),
       out: () => !visit() && !rooms?.inside && !player.offFoot,
       // Seen far off by day, near by night.
