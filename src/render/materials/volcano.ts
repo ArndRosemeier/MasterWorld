@@ -13,7 +13,7 @@
  * Patterns read WORLD (the floating origin).
  */
 import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, MeshStandardNodeMaterial, Vector4 } from 'three/webgpu';
-import { abs, attribute, cameraPosition, cross, float, fract, int, length, max, mix, mx_noise_float, mx_worley_noise_vec2, normalize, positionGeometry, pow, sin, smoothstep, toneMappingExposure, uniform, uniformArray, vec2, vec3, vec4 } from 'three/tsl';
+import { abs, attribute, cameraPosition, cross, float, fract, int, length, max, mix, modelWorldMatrix, mx_noise_float, mx_worley_noise_vec2, normalize, positionGeometry, positionLocal, pow, sin, smoothstep, toneMappingExposure, uniform, uniformArray, vec2, vec3, vec4 } from 'three/tsl';
 import { defineKind } from '../materials';
 import { WORLD } from '../origin';
 import { puffMaterial } from './smoke';
@@ -21,6 +21,16 @@ import { WEATHER } from './weather';
 
 /** The volcano's clock (seconds; it moves the lava's plates and the steam's puffs). */
 export const LAVA = { time: uniform(0) };
+
+/**
+ * How far (m) a vertex of the lava or the sulphur crust is lifted over the ground it was laid on, by its distance from the eye: the
+ * meshes lie on the near ground as it is drawn (2 m between its vertices), but the ground chunks further out are coarser and
+ * their vertices stand higher over a channel cut a metre and a half deep, so unlifted the lava sank into them and vanished by 300 m.
+ */
+const lift = () => {
+  const far = length(modelWorldMatrix.mul(vec4(positionLocal, 1)).xyz.sub(cameraPosition));
+  return smoothstep(45, 300, far).mul(1.3).add(smoothstep(300, 1500, far).mul(3.0));
+};
 
 const CRUST = vec3(0.02, 0.016, 0.015);
 const DEEP = vec3(0.7, 0.07, 0.006), ORANGE = vec3(3.4, 0.82, 0.07), YELLOW = vec3(7.0, 3.6, 0.9);
@@ -33,6 +43,8 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
   const m = new MeshBasicNodeMaterial({ fog: true, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const uv = attribute('uv', 'vec2'), fx = attribute('fx', 'vec4');
   const flow = fx.x, heat = fx.y, half = fx.z, ph = fx.w, t = LAVA.time;
+  // (A flow is lifted by its distance; the lake's disc lies flat at its level.)
+  m.positionNode = positionLocal.add(vec3(0, lift().mul(flow), 0));
   const across = abs(uv.y).mul(flow);
   // The plates' space: on a flow, metres along and across, carried downstream; on the lake, the world point, stirred slowly.
   const qFlow = vec2(uv.x.sub(t.mul(0.6)), uv.y.mul(half));
@@ -75,6 +87,7 @@ export const VOLCANO_LAVA = defineKind('volcano lava', ['position', 'uv', 'fx'],
 export const VOLCANO_CRUST = defineKind('volcano crust', ['position', 'normal', 'uv', 'fx'], () => {
   const m = new MeshStandardNodeMaterial({ roughness: 0.62, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const uv = attribute('uv', 'vec2'), fx = attribute('fx', 'vec4');
+  m.positionNode = positionLocal.add(vec3(0, lift(), 0));
   const p = WORLD, r = length(uv);
   const grain = mx_noise_float(p.mul(vec3(2.6, 2.6, 2.6)).add(fx.x)), clot = mx_noise_float(p.mul(0.55).add(fx.x.mul(3.0)));
   const rimFray = r.add(clot.mul(0.28)).add(grain.mul(0.1));
