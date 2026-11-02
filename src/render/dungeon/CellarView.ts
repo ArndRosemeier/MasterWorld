@@ -40,6 +40,8 @@ export class CellarView {
   rock: BuildingMesh | null = null;
   /** A formed cave's walls, formations, stones and water (D63, K5), instead of `rock`; set before `add`. */
   formed: Pick<CaveResult, 'mesh' | 'parts'> | null = null;
+  /** A formed cave's shut ways and the keys that lie in it (K6, world/cave/lockMesh.ts), instead of the story layout's doors and keys; set before `add`. */
+  locks: { readonly doors: DoorPiece[]; readonly keys: { readonly room: number; readonly mesh: BuildingMesh }[] } = { doors: [], keys: [] };
   /** A cave's water and shafts of daylight (world/dungeon/caveFeatures.ts); set before `add`. */
   cave: CaveFeatures | null = null;
   /** Walked into through a throat from its mouth (a portal): no ladder up stands at its way out; set before `add`. */
@@ -67,13 +69,13 @@ export class CellarView {
     this.seal = m.seal.map((c, i) => this.piece(c, `seal course ${i}`));
     for (const c of this.seal) this.group.add(c);
     this.sealUp(this.sealed);
-    for (const k of m.keys) {
+    for (const k of this.formed ? this.locks.keys : m.keys) {
       const mesh = this.piece(k.mesh, `key ${k.room}`);
       mesh.visible = !this.taken.has(k.room);
       this.keys.set(k.room, mesh);
       this.group.add(mesh);
     }
-    for (const d of m.doors) {
+    for (const d of this.formed ? this.locks.doors : m.doors) {
       const at = d.opens === 'push' ? farFoot(d) : d.hinge ?? d.at;
       const door: Door = { piece: d, pivot: this.onPivot(d.mesh, `door ${d.kind}`, at), bar: d.bar ? this.onPivot(d.bar, `bar ${d.link}`, d.at) : null, t: -1, away: [d.through[0], d.through[1]] };
       this.doors.set(d.link, door);

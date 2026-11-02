@@ -28,6 +28,8 @@ const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   ...(['parley', 'thief', 'watch'] as const).map((kind) => ({ seed: seeds[0], opts: { evenings: 3, only: [kind] }, what: `3 evenings asking ${kind} where it fits` })),
   // A household that lied about whose heirloom it is (Q3): the seed is one where the first fetches turn out so.
   { seed: 'x4', opts: { evenings: 3, only: ['heirloom'] }, what: '3 evenings asking heirloom (a lie)' },
+  // A person's favour (D68, N3): evening one begins with someone of the town asking the hero for something of their own calling.
+  { seed: seeds[0], opts: { evenings: 2, favour: true }, what: '2 evenings with a favour asked' },
   // A mage (plan C3): asks the bard, opens a school at its teacher and casts in the first place.
   { seed: seeds[2] ?? seeds[0], opts: { evenings: 3, mage: true }, what: '3 evenings as a mage' },
 ];
@@ -40,7 +42,7 @@ function play(i: number): boolean {
   const r = playEvening(parseSeed(seed), classic, { ...opts, log: (s) => console.log(`${clock(s.hour)}  ${s.what}`) });
   console.log(`${r.ok ? "passed" : "FAILED"}: ${r.cleared.length} places cleared (asked: ${r.verbs.join(", ")}${r.twists.length ? `; twists: ${r.twists.join(", ")}` : ""}${r.consequences.length ? `; consequences: ${r.consequences.join(", ")}` : ""}${r.wants.length ? `; wants: ${r.wants.join(", ")}` : ""}), ${r.falls} falls, ${r.earned} copper earned, bought ${r.bought.join(', ') || 'nothing'}, learned ${r.lessons.join(', ') || 'nothing'}, spent ${r.spent.join('/')} a night, purse ${r.purse}, power ${r.power[0]} -> ${r.power[1]}, level ${r.level} (${r.xp} xp)${r.spells ? `, ${r.spells} spells cast` : ''}; plays like a ${r.style ?? 'newcomer'} (challenge x${r.challengeLean.toFixed(2)}); longest overdue ${Object.entries(r.overdue).map(([n, s]) => `${n} ${(s / 60).toFixed(1)}`).join(', ')} min; ${(r.seconds / 60).toFixed(0)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   const met = (): boolean => {
-    const kinds = r.verbs.filter((v) => !/\((dwellers|task|deed|other)\)$/.test(v)).map((v) => v.split(' ')[0]);
+    const kinds = r.verbs.filter((v) => !/\((dwellers|task|deed|favour|other)\)$/.test(v)).map((v) => v.split(' ')[0]);
     return r.ok && new Set(kinds).size >= 3 && kinds.every((v, k) => k === 0 || v !== kinds[k - 1]) && r.twists.length > 0 && r.consequences.length > 0 && r.wants.length > 0;
   };
   console.log(`GATEQ ${JSON.stringify({ met: met(), ok: r.ok, verbs: r.verbs.map((v) => v.split(' ')[0]), wants: r.wants, twists: r.twists, consequences: r.consequences })}`);
@@ -87,7 +89,10 @@ if (one !== undefined) {
   const have = (f: (g: (typeof gate)[number]) => string[]) => new Set(gate.flatMap(f));
   const missing: string[] = [];
   for (const v of ['clear', 'fetch', 'lost', 'seal', 'parley', 'watch', 'thief']) if (!have((g) => g.verbs).has(v)) missing.push(`no run asked ${v}`);
-  if (have((g) => g.wants).size < 3) missing.push(`only ${have((g) => g.wants).size} kinds of want across the runs (at least 3)`);
+  // A household's wants (Q5) are three kinds at least; a person's favour is their own (N3) and must be asked in some run.
+  const households = [...have((g) => g.wants)].filter((w) => w !== 'craft');
+  if (households.length < 3) missing.push(`only ${households.length} kinds of want across the runs (at least 3)`);
+  if (!have((g) => g.wants).has('craft')) missing.push('no run had a person ask a favour');
   if (have((g) => g.twists).size < 3) missing.push(`only ${[...have((g) => g.twists)].join(', ') || 'no'} twists (first, changed and lied)`);
   if (!gate.some((g) => g.met)) missing.push('no run met gate Q (3+ kinds of task, no repeat, a twist, a consequence, a want)');
   for (const m of missing) console.log(`GATE Q FAILED: ${m}`);

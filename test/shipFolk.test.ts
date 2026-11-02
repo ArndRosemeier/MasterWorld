@@ -121,6 +121,11 @@ test('harbour master: the hall on the quay has a shield over its door and a name
   assert.ok(hall, 'a harbour master\'s hall in the harbour town');
   assert.ok(guildSigns([], plan, classic).has(hall.id), 'a shield over its door');
   assert.ok(classic.voyage?.hall, 'a name for it on the map');
+  // The open house (drawn when the hero comes close) takes its shield from the town, as the town's own mesh does: it was lost there.
+  const { Township } = await import('../src/game/township');
+  const { seed } = frontierLand();
+  const township = new Township(terrain.town(home.id)!, { seed, setting: classic, log: () => [], hours: () => 12, towns: () => terrain.towns });
+  assert.ok(township.signs.has(hall.id), 'the open hall keeps its shield');
   const master = townsfolk(plan, home.seed ?? 0).find((p) => p.trade === 'harbourmaster');
   assert.equal(master?.work, hall.id, 'the harbour master works in the hall');
 });

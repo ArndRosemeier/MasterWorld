@@ -34,13 +34,13 @@ export function dangerAt(at: { readonly decision: { readonly x: number; readonly
   return Math.round(18 + Math.max(0, km - 1) * 6);
 }
 
-/** A cellar promised under one of the town's houses (`home`: where the game starts); null if the town has none that fits. */
-export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, kind: DungeonTemplate = 'cellar', form?: DungeonForm): DungeonDecision | null {
+/** A cellar promised under one of the town's houses (`home`: where the game starts; `only`: under this house alone); null if the town has none that fits. */
+export function promiseCellar(seed: number, town: Town, log: DecisionLog, home: { readonly x: number; readonly z: number } = town.decision, kind: DungeonTemplate = 'cellar', form?: DungeonForm, only?: number): DungeonDecision | null {
   const dungeons = log.filter((d): d is DungeonDecision => d.kind === 'dungeon');
   const n = dungeons.length + 1;
   const s = deriveSeed(seed, 'vgm', 'cellar', n);
   const taken = new Set(dungeons.filter((d) => d.town === town.decision.id).map((d) => d.building));
-  const houses = town.plan.buildings.filter((b) => CELLARED.includes(b.kind) && b.household > 0 && !taken.has(b.id) && b.hu >= 2 && b.hv >= 2);
+  const houses = town.plan.buildings.filter((b) => CELLARED.includes(b.kind) && b.household > 0 && !taken.has(b.id) && b.hu >= 2 && b.hv >= 2 && (only === undefined || b.id === only));
   if (!houses.length) return null;
   // Rather a house off the market (a cellar under a back lane feels found), then by the seed.
   const [cx, cz] = town.plan.centre;

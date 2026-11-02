@@ -365,6 +365,12 @@ export interface CaveWayDef {
    * of run (up to `steep` where there is no room for that) and `half` metres either side of its line, so the hero walks it (the real climb up a tall face fails more often than not).
    */
   readonly ramp: { readonly above: number; readonly slope: number; readonly steep: number; readonly half: number };
+  /**
+   * Natural locks (K6): a story's shut way (a wedged boulder, a locked grate, stacked stones) is set where the cave narrows, a place of
+   * the way between the two rooms that no other way goes round: at most `widest` metres across, at least `tall` metres of air over it,
+   * `apart` metres from another lock and `fromEntry` metres of way from a way in.
+   */
+  readonly lock: { readonly widest: number; readonly tall: number; readonly apart: number; readonly fromEntry: number };
 }
 
 /** The look of the carved walls. */
@@ -737,11 +743,15 @@ export type CreatureBody =
     readonly bones?: boolean;
   }
   | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string }
-  /** An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures, a giant crab of the strand (S9). `length` nose to rump. */
-  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab' | 'shark'; readonly length: number; readonly color: string };
+  /**
+   * An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures, a giant crab of the strand (S9), the elk and
+   * the turtle (M2). `length` nose to rump, as drawn. `giant`: the strength 0..1 of Actors' Deform "giant" recipe (D67, phase M): the
+   * body is grown by it (thicker legs and neck, an old coat, a slow gait), not just scaled; `length` is the size it ends up.
+   */
+  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab' | 'shark' | 'elk' | 'turtle'; readonly length: number; readonly color: string; readonly giant?: number };
 
 /** Where an encounter is met: in a place below, under thick trees, on open land, by a road, on the strand (S9). */
-export type EncounterWhere = 'below' | 'wood' | 'open' | 'road' | 'shore' | 'sea';
+export type EncounterWhere = 'below' | 'wood' | 'open' | 'road' | 'shore' | 'water' | 'sea';
 
 /**
  * An encounter (C6b, docs/design/vgm.md 3): who the hero meets together, how many, and where. The one
@@ -758,6 +768,8 @@ export interface EncounterDef {
   readonly where: readonly EncounterWhere[];
   /** What meeting them gives the hero (the Director's need it meets): a fight, or a sight. */
   readonly need: 'challenge' | 'discovery';
+  /** The leader is one only: the others are drawn from the creatures after it (a giant wolf leading plain wolves), never the leader's kind. */
+  readonly lone?: boolean;
 }
 
 /**
@@ -770,7 +782,7 @@ export interface WildDef {
   /** Who they are and how many (an encounter's id; it is met in this habitat). */
   readonly encounter: string;
   /** wood: under thick trees; open: meadows and heath; road: by a road out of town; shore: on a strand by the sea; sea: out in deep water, under the surface (S9). */
-  readonly habitat: 'wood' | 'open' | 'road' | 'shore' | 'sea';
+  readonly habitat: 'wood' | 'open' | 'road' | 'shore' | 'water' | 'sea';
   /** Metres from the town's market where their territories lie. */
   readonly ring: readonly [number, number];
   /** Territory radius, metres. */
@@ -1035,6 +1047,8 @@ export interface CreatureDef {
   readonly defence: number;
   /** Running speed, m/s. */
   readonly speed: number;
+  /** Walks the bottom of water this deep (m), not swimming: a crab sidles into the sea along the bed. Unset: it wades only a knee deep. */
+  readonly bed?: number;
   readonly attacks: readonly AttackDef[];
   /** Sees this far in the dark (m) and much farther by the hero's light; hears a running hero this far. */
   readonly senses: { readonly sight: number; readonly hearing: number };
@@ -1179,6 +1193,19 @@ export interface TwistDef {
 export type AskVerb = 'clear' | 'fetch' | 'lost' | 'seal' | 'parley' | 'watch' | 'thief';
 export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost', 'seal', 'parley', 'watch', 'thief'];
 
+/**
+ * A thing an ask names: a catalogue item and what it is called (`{family}`: the household's name). A personal ask's things say
+ * whose they are (`for`: the pursuits or trades whose it is) and how those people tell of losing it (`told`, `{thing}`).
+ */
+export interface AskThing {
+  readonly item: string;
+  readonly name: string;
+  readonly lore: string;
+  readonly for?: { readonly pursuits?: readonly string[]; readonly trades?: readonly string[] };
+  readonly told?: readonly string[];
+  readonly thanks?: string;
+}
+
 export interface AskDef {
   /** The kind (the VGM remembers kinds given, D62): a slug. */
   readonly id: string;
@@ -1190,7 +1217,12 @@ export interface AskDef {
   /** Only places with dwellers (`true`), only empty ones (`false`), or either (none). */
   readonly lived?: boolean;
   /** `fetch`: the things it may name, each a catalogue item and what it is called (`{family}`: the household's name). */
-  readonly things?: readonly { readonly item: string; readonly name: string; readonly lore: string }[];
+  readonly things?: readonly AskThing[];
+  /**
+   * D68, N3: asked only by someone for something of their own calling or pursuit (the VGM's favour, vgm/favours.ts), never of a
+   * household in general: each of its `things` says whose it is (`for`), so the person who asks is the one the thing fits.
+   */
+  readonly personal?: boolean;
   /**
    * `lost`: someone of the town went in and did not come back (`{who}` their name in every line). `alive` the share
    * found alive (they sit hurt at the end of the place; come up to, they get up, say `found` and walk home). The
@@ -1711,6 +1743,18 @@ export interface PursuitDef {
   readonly races?: readonly string[];
 }
 
+/**
+ * How someone asks a favour of the hero (D68, N3), by temperament: `greeting` they blurt it out as the talk opens, `news` they tell it
+ * when asked for news, `again` they only hint and tell it when asked a second time. `lead` comes before the task as they tell it,
+ * `close` after; `hint` is all they say the first time when it is `again`.
+ */
+export interface AskingManner {
+  readonly when: 'greeting' | 'news' | 'again';
+  readonly lead: readonly string[];
+  readonly close: readonly string[];
+  readonly hint?: readonly string[];
+}
+
 /** How a temperament speaks and how likely it is to be someone's (D68, N1). Lines are first person; `{claim}` is what they know. */
 export interface TemperamentDef {
   /** The odds of the temperament for someone: `base` plus each of their traits (0..1) times its weight; `young` and `old` are 1 for those age groups. */
@@ -1730,6 +1774,8 @@ export interface TemperamentDef {
   /** When asked how they know: first-hand (`{source}`, `{claim}`), and from another. */
   readonly source: string;
   readonly testimony: string;
+  /** How they bring up a task of their own (N3): when, in what words before and after, and what they hint at if they hold it back. */
+  readonly asking: AskingManner;
   /** What they add when there is more to tell. */
   readonly more: string;
   /** Their thanks, and what they say when they cannot follow. */
@@ -2181,6 +2227,7 @@ function validatePersona(p: PersonaDef, where: string): string[] {
     for (const k of ['intro', 'greeting', 'farewell', 'wellbeing', 'nothing'] as const) if (!v[k]?.length) out.push(`${where}: persona.${t}.${k} is empty`);
     if (!v.intro?.every((l) => l.includes('{name}'))) out.push(`${where}: persona.${t}.intro lines must name {name}`);
     if (!v.more) out.push(`${where}: persona.${t}.more is empty`);
+    if (!v.asking?.lead.length || !v.asking.close.length || (v.asking.when === 'again' && !v.asking.hint?.length)) out.push(`${where}: persona.${t}.asking needs lead and close lines (and a hint if it is asked again)`);
     for (const k of ['sure', 'heard', 'source', 'testimony'] as const) if (!v[k]?.includes('{claim}')) out.push(`${where}: persona.${t}.${k} must say {claim}`);
     for (const k of ['source', 'testimony'] as const) if (!v[k]?.includes('{source}')) out.push(`${where}: persona.${t}.${k} must say {source}`);
     if (!v.thanks || !v.repair) out.push(`${where}: persona.${t} needs thanks and repair`);
@@ -2384,7 +2431,7 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
   if (Math.abs(sh.pure + sh.two + sh.three - 1) > 1e-6) out.push(`${where}: cave shares pure, two and three must add up to 1`);
   const wy = c.way;
   if (!(wy.minWidth >= 1.6 && wy.minHeight >= 2.4 && wy.maxRadius > wy.minWidth && wy.maxCut > 0)) out.push(`${where}: cave ways must fit the standing hero (width >= 1.6 m, height >= 2.4 m)`);
-  if (!(wy.stand >= 1.6 && wy.stand < wy.minHeight && wy.radius > 0.2 && wy.radius * 2 < wy.minWidth && wy.step > 0.2 && wy.climb > wy.step && wy.drop >= wy.climb && wy.ramp.above >= wy.step && wy.ramp.slope > 0.2 && wy.ramp.slope <= wy.ramp.steep && wy.ramp.steep <= 1.2 && wy.ramp.half >= wy.radius)) out.push(`${where}: the reader's hero must fit the ways (stand < minHeight, 2 x radius < minWidth, step < climb <= drop)`);
+  if (!(wy.stand >= 1.6 && wy.stand < wy.minHeight && wy.radius > 0.2 && wy.radius * 2 < wy.minWidth && wy.step > 0.2 && wy.climb > wy.step && wy.drop >= wy.climb && wy.ramp.above >= wy.step && wy.ramp.slope > 0.2 && wy.ramp.slope <= wy.ramp.steep && wy.ramp.steep <= 1.2 && wy.ramp.half >= wy.radius && wy.lock.widest >= wy.minWidth && wy.lock.tall >= wy.stand && wy.lock.apart > 0 && wy.lock.fromEntry >= 0)) out.push(`${where}: the reader's hero must fit the ways (stand < minHeight, 2 x radius < minWidth, step < climb <= drop)`);
   if (!(c.walls.rough >= 0 && c.walls.rough <= 1.2)) out.push(`${where}: cave wall roughness must be 0 to 1.2 m (more could close a way)`);
   const d = c.dress, span = (r: readonly [number, number], what: string) => { if (!(r[0] >= 0 && r[1] >= r[0])) out.push(`${where}: cave ${what} must be a range, least first`); };
   span(d.floor.silt, 'silt depth'); span(d.rocks.perHall, 'rocks per hall'); span(d.rocks.size, 'rock size'); span(d.water.width, 'stream width'); span(d.formations.length, 'stalactite length'); span(d.stones.size, 'stone size'); span(d.crystals.count, 'crystal count'); span(d.crystals.len, 'crystal length');
@@ -2418,6 +2465,8 @@ function validateAsks(m: SettingModule, where: string): string[] {
     if (a.verb === 'parley' && (!a.parley || !a.dwellers?.length)) out.push(`${where}: ask "${a.id}" is a parley: it needs parley (terms, struck, short, broken) and the dwellers who talk`);
     if (a.verb === 'fetch' && (!a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" fetches nothing (things), or has no words for the thing not brought (missing)`);
     for (const t of a.things ?? []) if (!m.items.items.some((d) => d.id === t.item)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is no catalogue item (${t.item})`);
+    if (a.personal && (a.verb !== 'fetch' || !a.things?.every((t) => t.for && (t.for.pursuits?.length || t.for.trades?.length) && t.told?.length && t.thanks))) out.push(`${where}: ask "${a.id}" is personal: it must fetch things that each say whose they are (for), how they are told of (told) and the thanks`);
+    for (const t of a.things ?? []) for (const pu of t.for?.pursuits ?? []) if (!m.talk.persona.pursuits.some((x) => x.id === pu)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is for pursuit "${pu}" the setting has not`);
   }
   return out;
 }
