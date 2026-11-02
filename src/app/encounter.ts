@@ -416,7 +416,7 @@ export class Encounter {
  * One frame of every encounter: those the hero is in play (the most stirred leads), the others rest;
  * with none, the hero catches breath and the HUD shows only while they are hurt.
  */
-export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[]; readonly fallen?: Fallen }): void {
+export function stepEncounters(dt: number, all: readonly Encounter[], calm: { readonly townDens?: readonly Den[]; readonly hero: Character; readonly player: Player; readonly hud: FightHud; readonly alone?: Recipes; readonly notes?: Notes; readonly cues?: RecipeEvent[]; readonly fallen?: Fallen }): void {
   // A fall is seen through whichever fight (if any) dealt it.
   calm.fallen?.seeTo(dt, calm.hero);
   let best: Encounter | null = null;
@@ -426,7 +426,8 @@ export function stepEncounters(dt: number, all: readonly Encounter[], calm: { re
   // Out on the land, the bodies of different groups block each other too (cellars have frames of their own).
   const open: Den[] = [];
   for (const e of all) if (!flown && e.stir >= 0 && !e.arena.enclosed) open.push(e.delve.den);
-  for (const d of open) d.neighbours = open.filter((o) => o !== d);
+  // (A town's fighters, R6, stand beside them too: the raiders see and fight them.)
+  for (const d of open) d.neighbours = [...open.filter((o) => o !== d), ...(calm.townDens ?? [])];
   for (const e of all) {
     if (flown || e.stir < 0) { e.rest(); e.delve.den.neighbours = []; }
     else e.play(dt, e === best);
