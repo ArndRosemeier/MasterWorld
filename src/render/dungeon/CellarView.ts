@@ -150,6 +150,7 @@ export class CellarView {
     } else {
       // Toppling over its far foot: slow, then falling (about up × away, the top goes away).
       d.pivot.quaternion.setFromAxisAngle(this.axis.set(az, 0, -ax), TOPPLE * k * k);
+      if (p.sink) d.pivot.position.y = this.origin.y + p.at[1] - p.sink * k * k;
     }
   }
   private readonly axis = new Vector3();

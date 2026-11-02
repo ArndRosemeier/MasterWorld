@@ -12,7 +12,9 @@ import type { FormedGround } from './formedGround';
 /** A room's home counts as the hero's place within this far of it (m). */
 const NEAR_HOME = 14;
 /** A shut lock is touched from this far off its box (m). */
-const TOUCH = 1.1;
+const TOUCH = 1.6;
+/** A lock that is opening stays solid this long (s), the time its piece takes on screen (CellarView: stones and boulders 0.9, a grate 1.2), so the hero waits for it and is never inside it. */
+const OPENING = { oneway: 0.9, secret: 0.9, locked: 1.2 } as const;
 
 /** Where a formed cave drips and runs (cave metres), for its sounds (K5): the drips that fall, and points along its streams. */
 export interface CaveSounds {
@@ -56,12 +58,16 @@ export class FormedSpace extends DungeonSpace {
    */
   override touch(x: number, y: number, z: number, dt: number): SpaceEvent[] {
     const out: SpaceEvent[] = [];
+    for (const [link, left] of this.unlatching) {
+      if (left > dt) this.unlatching.set(link, left - dt);
+      else { this.unlatching.delete(link); this.openLink(link); }
+    }
     for (const l of this.locks) {
       if (l.kind === 'locked' && l.key !== undefined && !this.keys.has(l.key)) {
         const [kx, ky, kz] = this.keyAt(l.key);
         if (Math.hypot(kx - x, kz - z) < KEY_REACH && Math.abs(ky - y) < 1.5) { this.keys.add(l.key); out.push({ kind: 'key', link: l.link }); }
       }
-      if (this.open.has(l.link) || lockBox(l, x, y + 0.9, z) > TOUCH) continue;
+      if (this.open.has(l.link) || this.unlatching.has(l.link) || lockBox(l, x, y + 0.9, z) > TOUCH) continue;
       const near = (x - l.x) * l.tx + (z - l.z) * l.tz < 0;
       if (l.kind === 'oneway' && near) this.unlatch(l, 'unbarred', out);
       else if (l.kind === 'locked' && l.key !== undefined && this.keys.has(l.key)) this.unlatch(l, 'unlocked', out);
@@ -74,9 +80,12 @@ export class FormedSpace extends DungeonSpace {
     return out;
   }
 
-  /** A lock opened: it is no longer solid, and the creatures may go through. */
+  /** The locks being opened, and the seconds still to go before each stops being solid. */
+  private readonly unlatching = new Map<number, number>();
+
+  /** A lock opened: it is seen opening, and once its piece is done it is no longer solid and the creatures may go through. */
   private unlatch(l: CaveLock, kind: SpaceEvent['kind'], out: SpaceEvent[]): void {
-    this.openLink(l.link);
+    this.unlatching.set(l.link, OPENING[l.kind as keyof typeof OPENING] ?? 0.9);
     out.push({ kind, link: l.link });
   }
 
