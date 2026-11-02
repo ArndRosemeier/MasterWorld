@@ -20,7 +20,7 @@ import { TORCH_OUT, torchSpots } from './torches';
 import { Rng, deriveSeed } from '@futuremagic/core';
 
 /** Height of a door's opening. */
-export const DOOR_H = 2.1;
+export const DOOR_H = 2.3;
 
 export interface DoorPiece {
   /** The link id. */
