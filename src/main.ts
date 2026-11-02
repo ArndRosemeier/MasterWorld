@@ -2505,6 +2505,9 @@ export async function start(b: Boot): Promise<void> {
         spellView.bodyHeight = player.walker.height;
         spellView.show(dt, lead ? lead.spellFrame() : { recipes: alone, offset: { x: 0, y: 0, z: 0 }, me: player.walker.pos, yaw: player.walker.yaw, cues: aloneCues.splice(0) });
         if (!visit()) hold?.tend(dt, player.walker.pos.x, player.walker.pos.z);
+      } else {
+        // Indoors no fight is in play, but the hero still falls and wakes, mends (sitting too) and casts.
+        stepEncounters(dt, [], { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
       }
       part('rooms+talk');
       if (!visit()) rooms?.update(dt);
