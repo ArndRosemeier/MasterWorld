@@ -154,6 +154,8 @@ export function rockPlacement(t: Terrain, x0: number, z0: number, size: number):
       const x = rs[k], z = rs[k + 1], scale = rs[k + 2], yaw = rs[k + 3], kind = rs[k + 4], m = ks[kind];
       const r = m.foot * scale;
       if (t.waterDepth(x, z) > 0 || t.roads.fromEdge(x, z) < r + 0.5 || t.townGround(x, z) !== 0) continue;
+      // None on an active volcano's cone: its landforms give way to it (Terrain.landShape), and no rock stands in its lava.
+      if (t.volcanoes.shield(x, z) > 0.2 || t.lavaAt(x, z) !== null) continue;
       // Set on the lowest drawn ground under its foot, sunk in by a share of its height (it grew out of the ground).
       const y = seatHeight((gx, gz) => ground.footing(gx, gz), x, z, r * 0.8, r * 0.8, yaw, 0.12 * m.height * scale);
       out.push(x, y, z, scale, yaw, kind);

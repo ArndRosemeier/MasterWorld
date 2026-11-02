@@ -35,6 +35,13 @@ export function healthLook(frac: number): { readonly r: number; readonly g: numb
   return { r: a[1] + (b[1] - a[1]) * t, g: a[2] + (b[2] - a[2]) * t, b: a[3] + (b[3] - a[3]) * t, dim: 0.55 + 0.45 * f };
 }
 
+/** The health colour as a CSS colour (the same ramp, linear light turned to sRGB), for the group panel's bars. */
+export function healthCss(frac: number): string {
+  const l = healthLook(frac);
+  const c = (x: number) => Math.round(255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055));
+  return `rgb(${c(l.r)}, ${c(l.g)}, ${c(l.b)})`;
+}
+
 /** The ellipse of light behind a creature: half width, half height, and how high its middle stands (m). */
 export function auraSize(def: CreatureDef): { readonly halfW: number; readonly halfH: number; readonly lift: number } {
   const b = def.body;

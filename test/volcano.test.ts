@@ -6,18 +6,18 @@ import { VOLCANO, acrossFlow, flowHalf } from '../src/world/volcano';
 import { settingById } from '../src/setting/index';
 import { SMALL } from './small';
 
-// Seed ajn1uw has an erupting volcano with three flows at (3287, 11828) in volcanic country (found by scanning).
+// Seed ajn1uw has an erupting volcano at (-17880, 15359) in volcanic country (found by scanning).
 const make = () => new Terrain(parseSeed('ajn1uw'), settingById('classic'), SMALL);
 const terrain = make();
-const v = terrain.volcanoes.nearTo(3287, 11828, 100)[0];
+const v = terrain.volcanoes.nearTo(-17880, 15359, 100)[0];
 
 test('volcano: placed from the seed, the same twice, inside volcanic country, clear of the square edges', () => {
   assert.ok(v, 'the volcano is there');
-  const again = make().volcanoes.nearTo(3287, 11828, 100)[0];
+  const again = make().volcanoes.nearTo(-17880, 15359, 100)[0];
   assert.deepEqual(again, v);
   assert.ok(terrain.skeleton.kindShare('volcanic', v.x, v.z) >= 0.9);
-  assert.ok(v.reach <= 700);
-  assert.ok(Math.min(v.x % 2200, v.z % 2200) >= 800 - 1e-6 || v.x < 0 || v.z < 0);
+  assert.ok(v.reach <= 920);
+  assert.ok(Math.min(v.x % 2800, v.z % 2800) >= 1000 - 1e-6 || v.x < 0 || v.z < 0);
   assert.ok(v.R >= VOLCANO.base[0] && v.R <= VOLCANO.base[1]);
 });
 
@@ -59,7 +59,7 @@ test('volcano: the lake stands under the rim\'s lowest crest and over the crater
 
 test('volcano: a steaming one holds no lava, only vents', () => {
   const other = new Terrain(parseSeed('brazok'), settingById('classic'), SMALL);
-  const s = other.volcanoes.nearTo(18775, 5247, 100)[0];
+  const s = other.volcanoes.nearTo(15272, 6613, 100)[0];
   assert.equal(s.state, 'steaming');
   assert.equal(other.lakeLevel(s), null);
   assert.equal(other.lavaAt(s.x, s.z), null);

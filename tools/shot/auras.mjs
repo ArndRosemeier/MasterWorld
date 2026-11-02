@@ -48,6 +48,18 @@ for (const id of SCENES) {
   if (next === null && (await page.evaluate(`${FIGHT}.delve.den.fighting.length`)) > 0) failed = true;
   await page.waitForTimeout(800);
   await page.screenshot({ path: join(dir, `${id}-5-next.jpg`), type: 'jpeg', quality: 88, timeout: 180000 });
+  // The group panel: a click on a foe's row targets that foe.
+  const rows = await page.locator('#fight .foe').count();
+  if (rows < 2) { console.log(`${id}: the group panel lists ${rows} foes`); failed = true; }
+  else {
+    const before = await page.evaluate(`${FIGHT}.delve.fight.target?.id ?? null`);
+    await page.locator('#fight .foe').nth(rows - 1).click({ timeout: 60000 });
+    const after = await page.evaluate(`${FIGHT}.delve.fight.target?.id ?? null`);
+    console.log(`${id}: group panel of ${rows}, a click on the last row moved the target ${before} -> ${after}`);
+    if (after === null || after === before) failed = true;
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: join(dir, `${id}-6-clicked.jpg`), type: 'jpeg', quality: 88, timeout: 180000 });
+  }
   await page.close();
 }
 await browser.close();

@@ -383,7 +383,7 @@ export class Terrain {
     const clear = bk?.river ? smoothstep(bk.half + BROOK_CLEAR[0], bk.half + BROOK_CLEAR[1], bk.dist) : 1;
     if (lake) { const keep = 1 - lake.calm(x, z); forms *= keep; calm *= keep; }
     if (forms > 0) {
-      const off = this.landforms.offset(x, z) + this.volcanoes.lift(x, z);
+      const off = this.landforms.offset(x, z) * (1 - this.volcanoes.shield(x, z)) + this.volcanoes.lift(x, z);
       let shaped = Math.max(Math.min(level, 1), level + off * forms * (off > 0 ? clear : 1));
       // By a brook they dig no lower than its water (a gully runs down into it, a dell beside it stays dry).
       if (bk?.river && bk.dist < bk.valley && shaped < level) shaped = Math.max(shaped, Math.min(level, bk.level + 0.6 + (bk.dist - bk.half) * 0.04));
