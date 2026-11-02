@@ -213,12 +213,12 @@ export class VolcanoView {
     const rng = new Rng(deriveSeed(v.seed, 'crusts'));
     for (const vent of v.vents) {
       const base = pos.length / 3, ph = rng.float() * 10, R = vent.r * 1.7;
-      const h0 = this.terrain.height(vent.x, vent.z);
       for (let i = 0; i <= RR; i++) for (let k = 0; k < RA; k++) {
         const u = i / RR, a = (k / RA) * Math.PI * 2, x = vent.x + Math.cos(a) * R * u, z = vent.z + Math.sin(a) * R * u;
         // Dome up to a ring a third of the way out, hollow in the middle.
         const dome = 0.34 * Math.sin(Math.min(1, u * 2.2) * Math.PI * 0.5) * (1 - u) - 0.16 * Math.max(0, 1 - u * 5);
-        pos.push(x - v.x, Math.max(drawnOf(this.terrain).footing(x, z), h0 - 1.5) + 0.1 + dome, z - v.z);
+        // Always on the drawn ground: a floor under the ground's height held the disc out in the air where the flank falls away.
+        pos.push(x - v.x, drawnOf(this.terrain).footing(x, z) + 0.1 + dome, z - v.z);
         nor.push(0, 1, 0);
         uv.push(Math.cos(a) * u, Math.sin(a) * u);
         fx.push(ph, 0, 0, 0);
