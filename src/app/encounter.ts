@@ -402,7 +402,7 @@ export class Encounter {
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
       case 'spared': this.director.met('people', 0.5); break;
       case 'killed':
-        this.host.slain(e.who.def.faction);
+        if (e.byHero) this.host.slain(e.who.def.faction);
         if (e.loot.items.length || e.loot.coins) this.director.queue(cap(`${name(e.who)} carried something. (${this.host.bindings.search[0].replace(/^Key/, '')} to search)`), 0.4); break;
       case 'refused': this.notes.say(e.text, 2.5); break;
       case 'recipe': if (this.active) this.spellCues.push(e.event); break;

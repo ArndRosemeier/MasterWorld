@@ -227,7 +227,7 @@ export class CreatureView {
         // Its body pushed back from the blow, the feet planted where they stand.
         const push = s.jolt.amount * (c.def.body.kind === 'spider' ? c.def.body.length * 0.3 : 0.05);
         i.x = X + s.jolt.dx * push; i.y = Y; i.z = Z + s.jolt.dz * push; i.yaw = yaw; i.vx = vx; i.vz = vz; i.dead = dead; i.time = t; i.scale = s.body.scale;
-        i.running = c.act === 'run' || c.state === 'fight' || c.state === 'flee';
+        i.running = c.act === 'run' || c.state === 'fight' || c.state === 'brawl' || c.state === 'flee';
         i.pose = c.act === 'gnaw' || c.act === 'sniff' || c.act === 'rummage' || c.act === 'spin' ? 'feed' : '';
         const O = this.group.position;
         if (watching) { this.eyeWorld[0] = watching[0] + O.x; this.eyeWorld[1] = watching[1] + O.y; this.eyeWorld[2] = watching[2] + O.z; }
@@ -239,7 +239,7 @@ export class CreatureView {
         s.body.fig.animate(i, dt, hurtT < 1 ? 1 - hurtT : 0);
       } else {
         const p = s.body;
-        const fighting = c.state === 'fight' || c.state === 'alert' || c.armed;
+        const fighting = c.state === 'fight' || c.state === 'brawl' || c.state === 'alert' || c.armed;
         const doing: FoeDoing = {
           dead, speed: Math.hypot(vx, vz), fighting,
           low: c.act === 'beg' ? 'beg' : c.act === 'rummage' || c.act === 'gnaw' ? 'rummage' : null,
