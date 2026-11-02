@@ -20,9 +20,19 @@ import { Walker } from '../src/game/walker';
 import { Rng } from '@futuremagic/core';
 
 const cave = (n: number) => outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
+/** The cave of a seed with its features, rock field and space, built once (its field takes seconds). */
+const builtCaves = new Map<number, { c: ReturnType<typeof cave>; feat: ReturnType<typeof caveFeatures>; field: ReturnType<typeof caveField>; space: CaveSpace }>();
+function built(n: number) {
+  if (!builtCaves.has(n)) {
+    const c = cave(n), feat = caveFeatures(c.layout, n, keepSpots(c));
+    const field = caveField(c.layout, n, feat);
+    builtCaves.set(n, { c, feat, field, space: new CaveSpace(c.layout, field, feat) });
+  }
+  return builtCaves.get(n)!;
+}
 
 test('cave: its rock leaves every room and way walkable, and the walker reads the rock it sees', () => {
-  const c = cave(3), feat = caveFeatures(c.layout, 3, keepSpots(c)), field = caveField(c.layout, 3, feat), space = new CaveSpace(c.layout, field, feat), { cell: CELL, storey: STOREY } = c.layout.scale;
+  const { c, feat, field, space } = built(3), { cell: CELL, storey: STOREY } = c.layout.scale;
   // In the middle of every room and every passage cell, a body stands clear of the rock at chest height.
   for (const r of c.layout.rooms) {
     const x = (r.x + r.w / 2) * CELL, z = (r.z + r.d / 2) * CELL, y = r.level * STOREY + 1.1;
@@ -194,7 +204,7 @@ test('cave (P1): natural floors, water and a shaft; level where things lie; the 
     for (const hall of f.halls.values()) for (const [x, z] of hall.doors) assert.ok(Math.abs(floorLift(f, hall, x, z)) < 0.02, `cave ${n}: doorway of room ${hall.id} raised`);
   }
   // The walker stands on the floor the field carves (heaped, banked, in a pool's hollow), not the layout's level.
-  const c = cave(4), f = caveFeatures(c.layout, 4, keepSpots(c)), space = new CaveSpace(c.layout, caveField(c.layout, 4, f), f);
+  const { feat: f, space } = built(3);
   const h = [...f.halls.values()].find((x) => x.cavern)!;
   let checked = 0;
   for (let u = 0.1; u < 0.95; u += 0.08) for (let v = 0.1; v < 0.95; v += 0.08) {
@@ -209,7 +219,7 @@ test('cave (P1): natural floors, water and a shaft; level where things lie; the 
 });
 
 test('cave: a body running and jumping about its rooms never ends in the rock, nor is lifted up a face', () => {
-  const c = cave(5), feat = caveFeatures(c.layout, 5, keepSpots(c)), space = new CaveSpace(c.layout, caveField(c.layout, 5, feat), feat);
+  const { c, space } = built(3);
   const { cell: C, storey: S } = c.layout.scale, w = new Walker(dungeonWorld(space, { x: 0, y: 0, z: 0 })), rng = new Rng(5);
   w.tire = () => true;
   for (const r of c.layout.rooms.slice(0, 6)) {
